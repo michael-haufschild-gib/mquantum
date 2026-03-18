@@ -3,7 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useTransformStore, MIN_SCALE, MAX_SCALE, DEFAULT_SCALE } from '@/stores/transformStore'
+
+import { DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, useTransformStore } from '@/stores/transformStore'
 
 describe('transformStore', () => {
   beforeEach(() => {

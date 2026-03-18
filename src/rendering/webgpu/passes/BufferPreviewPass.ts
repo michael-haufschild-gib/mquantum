@@ -13,8 +13,8 @@
  * @module rendering/webgpu/passes/BufferPreviewPass
  */
 
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
  * Buffer types that can be previewed.

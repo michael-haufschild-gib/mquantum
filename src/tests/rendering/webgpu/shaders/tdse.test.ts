@@ -1,22 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { tdseUniformsBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseUniforms.wgsl'
-import { tdseInitBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseInit.wgsl'
-import { tdseApplyPotentialHalfBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
+
 import { tdseApplyKineticBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
-import { tdsePotentialBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdsePotential.wgsl'
-import { tdseWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseWriteGrid.wgsl'
+import { tdseApplyPotentialHalfBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import {
   tdseComplexPackBlock,
   tdseComplexUnpackBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
+  tdseDiagNormFinalizeBlock,
+  tdseDiagNormReduceBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import { tdseInitBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseInit.wgsl'
+import { tdsePotentialBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdsePotential.wgsl'
+import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
-import {
-  tdseDiagNormReduceBlock,
-  tdseDiagNormFinalizeBlock,
-} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import { tdseUniformsBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseUniforms.wgsl'
+import { tdseWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 
 describe('TDSE uniform struct', () => {
   it('declares TDSEUniforms struct', () => {

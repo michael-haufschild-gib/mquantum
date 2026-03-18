@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 
-/**
- *
- */
+/** GPU timing metrics collected per frame. */
 export interface GPUStats {
   calls: number
   triangles: number
@@ -11,9 +9,7 @@ export interface GPUStats {
   uniqueVertices?: number // Actual vertex buffer count (for indexed geometry)
 }
 
-/**
- *
- */
+/** JavaScript heap memory usage snapshot. */
 export interface MemoryStats {
   geometries: number
   textures: number
@@ -21,44 +17,34 @@ export interface MemoryStats {
   heap: number
 }
 
-/**
- *
- */
+/** GPU buffer and texture memory usage. */
 export interface VRAMStats {
   geometries: number
   textures: number
   total: number
 }
 
-/**
- *
- */
+/** Time-series data points for performance sparklines. */
 export interface GraphData {
   fps: number[]
   cpu: number[]
   mem: number[]
 }
 
-/**
- *
- */
+/** Width and height of a GPU buffer in pixels. */
 export interface BufferDimensions {
   width: number
   height: number
 }
 
-/**
- *
- */
+/** Metadata for a named GPU buffer resource. */
 export interface BufferStats {
   depth: BufferDimensions
   temporal: BufferDimensions
   screen: BufferDimensions
 }
 
-/**
- *
- */
+/** Aggregated performance metrics store state. */
 export interface PerformanceMetricsState {
   fps: number
   minFps: number

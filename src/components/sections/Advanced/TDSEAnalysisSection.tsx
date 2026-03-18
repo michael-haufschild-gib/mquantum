@@ -13,14 +13,15 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Slider } from '@/components/ui/Slider'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 import {
-  samplePotentialProfile,
   computePacketKineticEnergy,
   getPotentialPlotScale,
+  samplePotentialProfile,
 } from '@/lib/physics/tdse/potentialProfile'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

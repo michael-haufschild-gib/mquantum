@@ -17,10 +17,11 @@
  * ```
  */
 
-import type { AnimationSystemDef } from '@/lib/geometry/registry'
-import { ToggleButton } from '@/components/ui/ToggleButton'
-import { Slider } from '@/components/ui/Slider'
 import React from 'react'
+
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import type { AnimationSystemDef } from '@/lib/geometry/registry'
 
 /**
  * Formats a camelCase parameter key to a human-readable label
@@ -47,9 +48,7 @@ function formatParamLabel(paramKey: string): string {
     .trim()
 }
 
-/**
- *
- */
+/** Props for the animation system control panel. */
 export interface AnimationSystemPanelProps {
   /** Key identifying this animation system */
   systemKey: string

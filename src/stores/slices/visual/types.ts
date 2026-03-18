@@ -1,11 +1,11 @@
 import type {
   ColorAlgorithm,
   CosineCoefficients,
+  DistributionSettings,
   DivergingPsiSettings,
   DomainColoringSettings,
-  PhaseDivergingSettings,
-  DistributionSettings,
   MultiSourceWeights,
+  PhaseDivergingSettings,
 } from '@/rendering/shaders/palette'
 import type {
   AllShaderSettings,
@@ -18,9 +18,7 @@ import type {
 // Color Slice
 // ============================================================================
 
-/**
- *
- */
+/** Read-only state for color algorithm and palette settings. */
 export interface ColorSliceState {
   // Basic
   edgeColor: string
@@ -40,9 +38,7 @@ export interface ColorSliceState {
   divergingPsi: DivergingPsiSettings
 }
 
-/**
- *
- */
+/** Mutation actions for color algorithm settings. */
 export interface ColorSliceActions {
   setEdgeColor: (color: string) => void
   setFaceColor: (color: string) => void
@@ -61,9 +57,7 @@ export interface ColorSliceActions {
   setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) => void
 }
 
-/**
- *
- */
+/** Combined color state and actions. */
 export type ColorSlice = ColorSliceState & ColorSliceActions
 
 // ============================================================================
@@ -82,54 +76,42 @@ export interface MaterialSliceState {
   faceEmissionColorShift: number
 }
 
-/**
- *
- */
+/** Mutation actions for material/shader settings. */
 export interface MaterialSliceActions {
   setFaceEmission: (emission: number) => void
   setFaceEmissionThreshold: (threshold: number) => void
   setFaceEmissionColorShift: (shift: number) => void
 }
 
-/**
- *
- */
+/** Combined material state and actions. */
 export type MaterialSlice = MaterialSliceState & MaterialSliceActions
 
 // ============================================================================
 // Render Slice
 // ============================================================================
 
-/**
- *
- */
+/** Read-only state for render quality settings. */
 export interface RenderSliceState {
   // Shader System
   shaderType: ShaderType
   shaderSettings: AllShaderSettings
 }
 
-/**
- *
- */
+/** Mutation actions for render quality settings. */
 export interface RenderSliceActions {
   setShaderType: (shaderType: ShaderType) => void
   setWireframeSettings: (settings: Partial<WireframeSettings>) => void
   setSurfaceSettings: (settings: Partial<SurfaceSettings>) => void
 }
 
-/**
- *
- */
+/** Combined render state and actions. */
 export type RenderSlice = RenderSliceState & RenderSliceActions
 
 // ============================================================================
 // Advanced Rendering Slice
 // ============================================================================
 
-/**
- *
- */
+/** Read-only state for advanced rendering features (SSS, emission). */
 export interface AdvancedRenderingState {
   // Subsurface Scattering
   sssEnabled: boolean
@@ -139,9 +121,7 @@ export interface AdvancedRenderingState {
   sssJitter: number
 }
 
-/**
- *
- */
+/** Mutation actions for advanced rendering features. */
 export interface AdvancedRenderingActions {
   setSssEnabled: (enabled: boolean) => void
   setSssIntensity: (intensity: number) => void
@@ -150,25 +130,19 @@ export interface AdvancedRenderingActions {
   setSssJitter: (jitter: number) => void
 }
 
-/**
- *
- */
+/** Combined advanced rendering state and actions. */
 export type AdvancedRenderingSlice = AdvancedRenderingState & AdvancedRenderingActions
 
 // ============================================================================
 // Combined Appearance Slice
 // ============================================================================
 
-/**
- *
- */
+/** Action to reset all appearance state to defaults. */
 export interface AppearanceResetAction {
   reset: () => void
 }
 
-/**
- *
- */
+/** Complete appearance slice combining all visual sub-slices. */
 export type AppearanceSlice = ColorSlice &
   MaterialSlice &
   RenderSlice &

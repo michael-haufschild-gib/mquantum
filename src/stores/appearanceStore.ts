@@ -1,11 +1,10 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import { createAppearanceSlice, AppearanceSlice } from './slices/appearanceSlice'
+
+import { AppearanceSlice, createAppearanceSlice } from './slices/appearanceSlice'
 
 // Extended type with version tracking for dirty-flag optimization
-/**
- *
- */
+/** Combined appearance store state with all visual slices. */
 export interface AppearanceStoreState extends AppearanceSlice {
   /** Version counter for dirty-flag tracking (incremented on any appearance change) */
   appearanceVersion: number

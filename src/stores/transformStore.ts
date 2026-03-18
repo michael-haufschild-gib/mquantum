@@ -3,10 +3,11 @@
  * Manages scale transformations
  */
 
+import { create } from 'zustand'
+
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { createScaleMatrix } from '@/lib/math'
 import type { MatrixND } from '@/lib/math/types'
-import { create } from 'zustand'
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 /** Minimum scale value */
 export const MIN_SCALE = 0.1

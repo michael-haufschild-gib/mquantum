@@ -1,6 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'
+import {
+  clampMin,
+  clampToRange,
+  getCompressionFactor as getCompressionFactorImpl,
+  getRecommendedBitrate as getRecommendedBitrateImpl,
+  isBitrateMode,
+  isExportFormat,
+  isExportResolution,
+  isFiniteNumber,
+  isHardwareAcceleration,
+  isRotation,
+  isVideoCodec,
+  sanitizeCropPatch,
+  sanitizeTextOverlayPatch,
+} from './utils/exportValidation'
+
+// Re-export for backward compatibility with tests and consumers
+export const getCompressionFactor = getCompressionFactorImpl
+export const getRecommendedBitrate = getRecommendedBitrateImpl
 
 /** Supported container formats for exported videos. */
 export type ExportFormat = 'mp4' | 'webm'
@@ -162,32 +182,6 @@ const DEFAULT_SETTINGS: ExportSettings = {
   },
 }
 
-const isFiniteNumber = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value)
-
-const clampToRange = (value: number, min: number, max: number): number =>
-  Math.max(min, Math.min(max, value))
-
-const clampMin = (value: number, min: number): number => Math.max(min, value)
-
-const isExportFormat = (value: unknown): value is ExportFormat =>
-  value === 'mp4' || value === 'webm'
-
-const isVideoCodec = (value: unknown): value is VideoCodec =>
-  value === 'avc' || value === 'hevc' || value === 'vp9' || value === 'av1'
-
-const isExportResolution = (value: unknown): value is ExportResolution =>
-  value === '720p' || value === '1080p' || value === '4k' || value === 'custom'
-
-const isBitrateMode = (value: unknown): value is ExportSettings['bitrateMode'] =>
-  value === 'constant' || value === 'variable'
-
-const isHardwareAcceleration = (value: unknown): value is ExportSettings['hardwareAcceleration'] =>
-  value === 'no-preference' || value === 'prefer-hardware' || value === 'prefer-software'
-
-const isRotation = (value: unknown): value is ExportSettings['rotation'] =>
-  value === 0 || value === 90 || value === 180 || value === 270
-
 const sanitizeHydratedTextOverlay = (rawTextOverlay: unknown): TextOverlaySettings => {
   const textOverlay = {
     ...DEFAULT_SETTINGS.textOverlay,
@@ -314,113 +308,6 @@ const detectBrowser = (): BrowserType => {
     return 'chromium-capable'
   }
   return 'standard'
-}
-
-/**
- * Calculate recommended bitrate based on resolution and FPS.
- * Higher resolution and FPS require more bitrate to maintain quality.
- *
- * Base bitrates (at 30 FPS):
- * - 720p:  8 Mbps
- * - 1080p: 12 Mbps
- * - 4K:    35 Mbps
- *
- * FPS multiplier: scale proportionally (60fps = 2x base, 24fps = 0.8x base)
- *
- * @param resolution - The video resolution preset
- * @param fps - The target frames per second
- * @param customWidth - Optional custom width in pixels
- * @param customHeight - Optional custom height in pixels
- * @returns Recommended bitrate in Mbps
- */
-/**
- * Get compression factor for realistic file size estimation.
- *
- * Video codecs rarely use 100% of the target bitrate due to:
- * - Temporal compression (similar frames share data)
- * - Spatial compression (gradients/solid areas compress well)
- * - VBR mode dynamically reduces bitrate for simple scenes
- *
- * For 3D renders with smooth movements and gradients (typical for this app),
- * compression is particularly efficient due to high temporal redundancy.
- *
- * Factors are based on real-world encoding benchmarks:
- * - AVC (H.264): Mature codec, moderate efficiency
- * - HEVC (H.265): ~30-40% more efficient than AVC
- * - VP9: Similar efficiency to HEVC
- * - AV1: ~20-30% more efficient than HEVC (most modern)
- *
- * @param codec - The video codec being used
- * @param bitrateMode - CBR (constant) or VBR (variable)
- * @returns Factor to multiply theoretical size by (0.0 - 1.0)
- */
-export const getCompressionFactor = (
-  codec: VideoCodec,
-  bitrateMode: 'constant' | 'variable'
-): number => {
-  // Base compression factors by codec (for CBR mode)
-  // These represent typical output/theoretical ratios for animated 3D content
-  const codecFactors: Record<VideoCodec, number> = {
-    avc: 0.55, // H.264 - oldest, least efficient
-    hevc: 0.42, // H.265 - ~25% better than AVC
-    vp9: 0.42, // Similar to HEVC
-    av1: 0.32, // ~25% better than HEVC, most efficient
-  }
-
-  let factor = codecFactors[codec] ?? 0.5
-
-  // VBR mode is typically 15-25% more efficient for animated content
-  // as it can allocate fewer bits to static/simple frames
-  if (bitrateMode === 'variable') {
-    factor *= 0.8
-  }
-
-  return factor
-}
-
-export const getRecommendedBitrate = (
-  resolution: ExportResolution,
-  fps: number,
-  customWidth?: number,
-  customHeight?: number
-): number => {
-  // Base bitrates at 30 FPS
-  const baseBitrates: Record<ExportResolution, number> = {
-    '720p': 8,
-    '1080p': 12,
-    '4k': 35,
-    custom: 12, // Will be calculated below
-  }
-
-  const safeFps = Number.isFinite(fps) && fps > 0 ? fps : 30
-  const safeResolution: ExportResolution = resolution in baseBitrates ? resolution : '1080p'
-  let baseBitrate = baseBitrates[safeResolution]
-
-  // For custom resolution, scale based on pixel count relative to 1080p
-  if (
-    safeResolution === 'custom' &&
-    typeof customWidth === 'number' &&
-    Number.isFinite(customWidth) &&
-    customWidth > 0 &&
-    typeof customHeight === 'number' &&
-    Number.isFinite(customHeight) &&
-    customHeight > 0
-  ) {
-    const pixels1080p = 1920 * 1080
-    const customPixels = customWidth * customHeight
-    const pixelRatio = customPixels / pixels1080p
-    baseBitrate = Math.round(12 * pixelRatio) // Scale from 1080p base
-  }
-
-  // FPS multiplier: proportional to frame rate (30fps = 1.0x)
-  const fpsMultiplier = safeFps / 30
-
-  // Calculate final bitrate, with reasonable min/max bounds
-  const recommendedBitrate = Math.round(baseBitrate * fpsMultiplier)
-  if (!Number.isFinite(recommendedBitrate)) {
-    return 12
-  }
-  return Math.max(4, Math.min(100, recommendedBitrate)) // Clamp between 4-100 Mbps
 }
 
 export const useExportStore = create<ExportStore>()(
@@ -593,145 +480,15 @@ export const useExportStore = create<ExportStore>()(
         }
 
         if (newSettings.textOverlay) {
-          const textPatch = { ...(newSettings.textOverlay as Partial<TextOverlaySettings>) }
-          const clampToRange = (value: number, min: number, max: number): number =>
-            Math.max(min, Math.min(max, value))
-          const clampMin = (value: number, min: number): number => Math.max(min, value)
-
-          const sanitizeFiniteNumber = (
-            key: 'fontSize' | 'fontWeight' | 'letterSpacing' | 'opacity' | 'shadowBlur' | 'padding'
-          ): number | undefined => {
-            const value = textPatch[key]
-            if (value === undefined) {
-              return undefined
-            }
-            if (!Number.isFinite(value)) {
-              if (import.meta.env.DEV) {
-                console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, value)
-              }
-              delete textPatch[key]
-              return undefined
-            }
-            return value
-          }
-
-          const fontSize = sanitizeFiniteNumber('fontSize')
-          if (fontSize !== undefined) {
-            textPatch.fontSize = clampMin(fontSize, 1)
-          }
-
-          const fontWeight = sanitizeFiniteNumber('fontWeight')
-          if (fontWeight !== undefined) {
-            textPatch.fontWeight = clampToRange(Math.round(fontWeight), 100, 900)
-          }
-
-          const letterSpacing = sanitizeFiniteNumber('letterSpacing')
-          if (letterSpacing !== undefined) {
-            textPatch.letterSpacing = letterSpacing
-          }
-
-          const opacity = sanitizeFiniteNumber('opacity')
-          if (opacity !== undefined) {
-            textPatch.opacity = clampToRange(opacity, 0, 1)
-          }
-
-          const shadowBlur = sanitizeFiniteNumber('shadowBlur')
-          if (shadowBlur !== undefined) {
-            textPatch.shadowBlur = clampMin(shadowBlur, 0)
-          }
-
-          const padding = sanitizeFiniteNumber('padding')
-          if (padding !== undefined) {
-            textPatch.padding = clampMin(padding, 0)
-          }
-
-          if ('enabled' in textPatch && typeof textPatch.enabled !== 'boolean') {
-            if (import.meta.env.DEV) {
-              console.warn(
-                '[exportStore] Ignoring invalid textOverlay.enabled update:',
-                textPatch.enabled
-              )
-            }
-            delete textPatch.enabled
-          }
-
-          for (const key of ['text', 'fontFamily', 'color', 'shadowColor'] as const) {
-            if (key in textPatch && typeof textPatch[key] !== 'string') {
-              if (import.meta.env.DEV) {
-                console.warn(
-                  `[exportStore] Ignoring invalid textOverlay.${key} update:`,
-                  textPatch[key]
-                )
-              }
-              delete textPatch[key]
-            }
-          }
-
-          if (
-            'verticalPlacement' in textPatch &&
-            textPatch.verticalPlacement !== 'top' &&
-            textPatch.verticalPlacement !== 'center' &&
-            textPatch.verticalPlacement !== 'bottom'
-          ) {
-            if (import.meta.env.DEV) {
-              console.warn(
-                '[exportStore] Ignoring invalid textOverlay.verticalPlacement update:',
-                textPatch.verticalPlacement
-              )
-            }
-            delete textPatch.verticalPlacement
-          }
-
-          if (
-            'horizontalPlacement' in textPatch &&
-            textPatch.horizontalPlacement !== 'left' &&
-            textPatch.horizontalPlacement !== 'center' &&
-            textPatch.horizontalPlacement !== 'right'
-          ) {
-            if (import.meta.env.DEV) {
-              console.warn(
-                '[exportStore] Ignoring invalid textOverlay.horizontalPlacement update:',
-                textPatch.horizontalPlacement
-              )
-            }
-            delete textPatch.horizontalPlacement
-          }
-
-          newSettings.textOverlay = textPatch as ExportSettings['textOverlay']
+          newSettings.textOverlay = sanitizeTextOverlayPatch(
+            newSettings.textOverlay as Partial<TextOverlaySettings>
+          ) as ExportSettings['textOverlay']
         }
 
         if (newSettings.crop) {
-          const cropPatch = { ...(newSettings.crop as Partial<CropSettings>) }
-          const clampUnitRange = (value: number): number => Math.max(0, Math.min(1, value))
-
-          const sanitizeCropNumeric = (key: 'x' | 'y' | 'width' | 'height'): void => {
-            const value = cropPatch[key]
-            if (value === undefined) {
-              return
-            }
-            if (!Number.isFinite(value)) {
-              if (import.meta.env.DEV) {
-                console.warn(`[exportStore] Ignoring invalid crop.${key} update:`, value)
-              }
-              delete cropPatch[key]
-              return
-            }
-            cropPatch[key] = clampUnitRange(value)
-          }
-
-          sanitizeCropNumeric('x')
-          sanitizeCropNumeric('y')
-          sanitizeCropNumeric('width')
-          sanitizeCropNumeric('height')
-
-          if ('enabled' in cropPatch && typeof cropPatch.enabled !== 'boolean') {
-            if (import.meta.env.DEV) {
-              console.warn('[exportStore] Ignoring invalid crop.enabled update:', cropPatch.enabled)
-            }
-            delete cropPatch.enabled
-          }
-
-          newSettings.crop = cropPatch as ExportSettings['crop']
+          newSettings.crop = sanitizeCropPatch(
+            newSettings.crop as Partial<CropSettings>
+          ) as ExportSettings['crop']
         }
 
         const updatedSettings = { ...currentSettings, ...newSettings }

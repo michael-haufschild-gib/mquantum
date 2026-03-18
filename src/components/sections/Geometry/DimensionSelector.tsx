@@ -3,21 +3,20 @@
  * Allows users to select the number of dimensions (3D, 4D, 5D, 6D)
  */
 
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import {
+  type GeometryState,
   MAX_DIMENSION,
   MIN_DIMENSION,
   useGeometryStore,
-  type GeometryState,
 } from '@/stores/geometryStore'
-import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+/** Props for the dimension (2-11D) selector control. */
 export interface DimensionSelectorProps {
   className?: string
   disabled?: boolean
@@ -145,10 +144,10 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
       [setDimension]
     )
 
-    const handlePreventDefault = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    const handlePreventDefault = (e: React.PointerEvent | React.MouseEvent) => {
       e.stopPropagation()
       e.preventDefault()
-    }, [])
+    }
 
     return (
       <div className={`${className}`}>

@@ -2,6 +2,8 @@
  * Tests for animationStore
  */
 
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import {
   BASE_ROTATION_RATE,
   DEFAULT_SPEED,
@@ -9,7 +11,6 @@ import {
   MIN_SPEED,
   useAnimationStore,
 } from '@/stores/animationStore'
-import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('animationStore', () => {
   beforeEach(() => {

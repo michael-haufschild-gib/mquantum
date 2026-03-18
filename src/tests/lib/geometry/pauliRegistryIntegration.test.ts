@@ -2,7 +2,8 @@
  * Integration tests for pauliSpinor registry, geometry store, and component loader.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { hasControlsComponent } from '@/lib/geometry/registry/components'
 import { isExtendedObjectType } from '@/lib/geometry/types'
 import { useGeometryStore } from '@/stores/geometryStore'

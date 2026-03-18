@@ -8,10 +8,10 @@
  */
 
 import type { StateCreator } from 'zustand'
+
+import { logger } from '@/lib/logger'
 import type { LightSource, LightType, TransformMode } from '@/rendering/lights/types'
 import {
-  MAX_LIGHTS,
-  MIN_LIGHTS,
   clampConeAngle,
   clampDecay,
   clampIntensity,
@@ -19,9 +19,12 @@ import {
   clampRange,
   cloneLight,
   createNewLight,
+  MAX_LIGHTS,
+  MIN_LIGHTS,
   normalizeRotationTupleSigned,
 } from '@/rendering/lights/types'
 import type { ToneMappingAlgorithm } from '@/rendering/shaders/types'
+
 import {
   DEFAULT_AMBIENT_COLOR,
   DEFAULT_AMBIENT_ENABLED,
@@ -299,28 +302,25 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
         if (import.meta.env.DEV) {
           if (hasInvalidIntensity) {
-            console.warn(
+            logger.warn(
               '[lightingSlice] Ignoring non-finite light intensity update:',
               updates.intensity
             )
           }
           if (hasInvalidConeAngle) {
-            console.warn(
-              '[lightingSlice] Ignoring non-finite cone angle update:',
-              updates.coneAngle
-            )
+            logger.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
           }
           if (hasInvalidPenumbra) {
-            console.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
+            logger.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
           }
           if (hasInvalidRange) {
-            console.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
+            logger.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
           }
           if (hasInvalidDecay) {
-            console.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
+            logger.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
           }
           if (hasInvalidRotation) {
-            console.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
+            logger.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
           }
         }
 

@@ -9,9 +9,9 @@
 
 import type { HydrogenBasisState } from './hydrogenBasis'
 import type { TransitionRate } from './hydrogenRates'
+import { isAllowedE1 } from './selectionRules'
 import type { LindbladChannel } from './types'
 import type { DensityMatrix } from './types'
-import { isAllowedE1 } from './selectionRules'
 
 // ---------------------------------------------------------------------------
 // Types

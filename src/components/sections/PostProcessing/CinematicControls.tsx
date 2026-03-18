@@ -4,17 +4,16 @@
  * Controls for the Cinematic post-processing effect (Chromatic Aberration, Vignette, Grain).
  */
 
-import { Select } from '@/components/ui/Select'
-import { Slider } from '@/components/ui/Slider'
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
-import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/rendering/shaders/types'
+import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+
+/** Props for cinematic effects (vignette, grain, aberration). */
 export interface CinematicControlsProps {
   className?: string
 }

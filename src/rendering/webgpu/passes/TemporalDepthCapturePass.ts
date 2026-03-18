@@ -13,16 +13,19 @@
  */
 
 import { usePerformanceStore } from '@/stores/performanceStore'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
+import {
+  registerTemporalDepthPass,
+  unregisterTemporalDepthPass,
+} from '../utils/temporalDepthRegistry'
 
 // =============================================================================
 // Temporal Depth Uniforms Interface
 // =============================================================================
 
-/**
- *
- */
+/** Uniform data for temporal depth reprojection between consecutive frames. */
 export interface TemporalDepthUniforms {
   /** Previous frame's position texture (xyz=world pos, w=model-space ray distance) */
   prevPositionTexture: GPUTextureView | null
@@ -40,9 +43,7 @@ export interface TemporalDepthUniforms {
 // Pass Configuration
 // =============================================================================
 
-/**
- *
- */
+/** Configuration for the pass that captures world-space positions for temporal reprojection. */
 export interface TemporalDepthCapturePassConfig {
   /** Position input resource ID (MRT with gPosition) */
   positionInput: string
@@ -76,22 +77,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 }
 `
 
-// =============================================================================
-// Global Registry for Invalidation
-// =============================================================================
-
-/** Registry of all active TemporalDepthCapturePass instances for global invalidation */
-const instanceRegistry = new Set<TemporalDepthCapturePass>()
-
-/**
- * Invalidate all registered WebGPU TemporalDepthCapturePass instances.
- * Called when global state changes require resetting temporal data.
- */
-export function invalidateAllTemporalDepthWebGPU(): void {
-  instanceRegistry.forEach((instance) => {
-    instance.invalidate()
-  })
-}
+// Re-export for backward compatibility with existing barrel consumers
+export { invalidateAllTemporalDepthWebGPU } from '../utils/temporalDepthRegistry'
 
 // =============================================================================
 // Pass Implementation
@@ -157,7 +144,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     this.setIdentityMatrix(this.prevInverseViewProjectionMatrix)
 
     // Register for global invalidation
-    instanceRegistry.add(this)
+    registerTemporalDepthPass(this)
   }
 
   /**
@@ -571,7 +558,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     this.copyBindGroupPositionView = null
 
     // Unregister from global invalidation
-    instanceRegistry.delete(this)
+    unregisterTemporalDepthPass(this)
 
     super.dispose()
   }

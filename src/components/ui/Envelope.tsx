@@ -1,13 +1,9 @@
 import React, { useId, useMemo } from 'react'
 
-/**
- *
- */
+/** Supported envelope shapes: AD, AR, ADSR, or AHDSR. */
 export type EnvelopeMode = 'AD' | 'AR' | 'ADSR' | 'AHDSR'
 
-/**
- *
- */
+/** Props for the SVG {@link Envelope} visualization component. */
 export interface EnvelopeProps {
   mode?: EnvelopeMode
   delay?: number // Time

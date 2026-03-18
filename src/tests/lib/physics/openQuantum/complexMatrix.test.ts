@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import {
   complexMatAdd,
   complexMatIdentity,
@@ -10,7 +11,6 @@ import {
   matrixExponentialPade,
   solveLinearSystem,
 } from '@/lib/physics/openQuantum/complexMatrix'
-import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 
 /**
  * Helper: create a ComplexMatrix from row-major (re, im) pair arrays.

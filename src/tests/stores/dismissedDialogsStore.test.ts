@@ -8,8 +8,9 @@
  * - Trustworthy: Deterministic results, no flaky tests
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useDismissedDialogsStore, DIALOG_IDS } from '@/stores/dismissedDialogsStore'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { DIALOG_IDS, useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 
 // Mock localStorage
 const localStorageMock = (() => {

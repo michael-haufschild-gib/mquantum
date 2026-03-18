@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
+
 import type { OpenQuantumMetrics } from '@/lib/physics/openQuantum/types'
+import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
 
 const store = useOpenQuantumDiagnosticsStore
 

@@ -12,18 +12,17 @@
  */
 
 import type { StateCreator } from 'zustand'
-import { AppearanceSlice as AppearanceSliceType } from './visual/types'
-import { createColorSlice, COLOR_INITIAL_STATE } from './visual/colorSlice'
+
+import {
+  ADVANCED_RENDERING_INITIAL_STATE,
+  createAdvancedRenderingSlice,
+} from './visual/advancedRenderingSlice'
+import { COLOR_INITIAL_STATE, createColorSlice } from './visual/colorSlice'
 import { createMaterialSlice, MATERIAL_INITIAL_STATE } from './visual/materialSlice'
 import { createRenderSlice, RENDER_INITIAL_STATE } from './visual/renderSlice'
-import {
-  createAdvancedRenderingSlice,
-  ADVANCED_RENDERING_INITIAL_STATE,
-} from './visual/advancedRenderingSlice'
+import { AppearanceSlice as AppearanceSliceType } from './visual/types'
 
-/**
- *
- */
+/** Re-export of the composed appearance slice type. */
 export type AppearanceSlice = AppearanceSliceType
 export * from './visual/types'
 

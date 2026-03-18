@@ -1,5 +1,6 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { TimelineControls } from '@/components/layout/TimelineControls'
 
 const mockGeometryState = {

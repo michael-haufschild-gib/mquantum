@@ -1,8 +1,9 @@
+import { MotionValue, useSpring } from 'motion/react'
 import { useEffect } from 'react'
-import { useSpring, MotionValue } from 'motion/react'
-import { useLayoutStore } from '@/stores/layoutStore'
-import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { useShallow } from 'zustand/react/shallow'
+
+import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { useLayoutStore } from '@/stores/layoutStore'
 
 const SIDEBAR_WIDTH = 320
 const TOP_BAR_HEIGHT = 48

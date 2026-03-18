@@ -1,6 +1,8 @@
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import React, { useEffect, useMemo, useRef } from 'react'
-import { FPS_COLORS, getFpsColorLevel, type FpsColorLevel } from './utils'
+
+import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+
+import { FPS_COLORS, type FpsColorLevel, getFpsColorLevel } from './utils'
 
 // ============================================================================
 // COLLAPSED VIEW - Zero re-renders, updates via refs
@@ -125,7 +127,7 @@ export const CollapsedView = React.memo(function CollapsedView() {
       })
       .join(' ')
     return `M ${points}`
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialState.history.fps])
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 h-12">

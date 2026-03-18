@@ -6,9 +6,9 @@
  */
 
 import type { StateCreator } from 'zustand'
+
 import {
   type AntiAliasingMethod,
-  type PaperQuality,
   DEFAULT_ANTI_ALIASING_METHOD,
   DEFAULT_BLOOM_ENABLED,
   DEFAULT_BLOOM_GAIN,
@@ -33,6 +33,7 @@ import {
   DEFAULT_PAPER_QUALITY,
   DEFAULT_PAPER_ROUGHNESS,
   DEFAULT_PAPER_SEED,
+  type PaperQuality,
 } from '../defaults/visualDefaults'
 
 function clamp(value: number, min: number, max: number): number {

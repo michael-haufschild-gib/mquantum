@@ -8,6 +8,8 @@
  * @module rendering/webgpu/core/WebGPUDevice
  */
 
+import { logger } from '@/lib/logger'
+
 import type { WebGPUCapabilities, WebGPUInitResult, WebGPUInitSuccess } from './types'
 
 /** Internal type for raw init data (before wrapping with success flag) */
@@ -129,7 +131,7 @@ export class WebGPUDevice {
 
     // Handle device loss
     device.lost.then((info) => {
-      console.error('WebGPU device lost:', info.message, 'reason:', info.reason)
+      logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
       this.handleDeviceLost(info.reason)
     })
 
@@ -192,15 +194,15 @@ export class WebGPUDevice {
       try {
         callback(reason)
       } catch (e) {
-        console.error('Error in device lost callback:', e)
+        logger.error('Error in device lost callback:', e)
       }
     })
 
     // Attempt automatic recovery
     if (this.canvas && reason !== 'destroyed') {
-      if (import.meta.env.DEV) console.log('[WebGPU] Attempting device recovery...')
+      if (import.meta.env.DEV) logger.log('[WebGPU] Attempting device recovery...')
       this.initialize(this.canvas).catch((err) => {
-        console.error('[WebGPU] Recovery failed:', err)
+        logger.error('[WebGPU] Recovery failed:', err)
       })
     }
   }

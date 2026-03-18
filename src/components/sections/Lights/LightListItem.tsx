@@ -8,6 +8,8 @@
  * - Delete button (can be disabled for ambient light)
  */
 
+import React, { memo, useCallback } from 'react'
+
 import AmbientIcon from '@/assets/icons/light-ambient.svg?react'
 import DirectionalIcon from '@/assets/icons/light-directional.svg?react'
 import PointIcon from '@/assets/icons/light-point.svg?react'
@@ -17,14 +19,11 @@ import LightToggleOnIcon from '@/assets/icons/light-toggle-on.svg?react'
 import TrashIcon from '@/assets/icons/trash.svg?react'
 import { Button } from '@/components/ui/Button'
 import type { LightSource, LightType } from '@/rendering/lights/types'
-import React, { memo, useCallback } from 'react'
 
 /** Special ID for the virtual ambient light entry */
 export const AMBIENT_LIGHT_ID = '__ambient__'
 
-/**
- *
- */
+/** Props for a single light source list entry. */
 export interface LightListItemProps {
   light: LightSource
   isSelected: boolean

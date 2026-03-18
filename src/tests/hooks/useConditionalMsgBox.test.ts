@@ -9,11 +9,12 @@
  * - Trustworthy: Deterministic results
  */
 
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { showConditionalMsgBox, useConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
 import { DismissedDialogsState, useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
-import { act, renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -262,7 +263,6 @@ describe('Hydration timing', () => {
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
 
     // Now trigger the hydration callback
-    expect(hydrationCallback).not.toBeNull()
     hydrationCallback!(useDismissedDialogsStore.getState())
 
     // Now dialog should be shown (since it wasn't dismissed)

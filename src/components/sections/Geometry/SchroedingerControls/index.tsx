@@ -6,20 +6,22 @@
  * free scalar field, TDSE dynamics, BEC dynamics, and Dirac equation.
  */
 
+import React from 'react'
+
+import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { Section } from '@/components/sections/Section'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React from 'react'
+
+import { BECControls } from './BECControls'
+import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { TDSEControls } from './TDSEControls'
-import { BECControls } from './BECControls'
-import { DiracControls } from './DiracControls'
-import { WignerControls } from './WignerControls'
 import { useSchroedingerActions } from './useSchroedingerActions'
+import { WignerControls } from './WignerControls'
 
 /**
  * Props for the SchroedingerControls component.
@@ -211,5 +213,5 @@ export { FreeScalarFieldControls } from './FreeScalarFieldControls'
 export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 export { HydrogenNDControls } from './HydrogenNDControls'
 export { TDSEControls } from './TDSEControls'
-export { WignerControls } from './WignerControls'
 export type * from './types'
+export { WignerControls } from './WignerControls'

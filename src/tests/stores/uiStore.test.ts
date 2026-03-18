@@ -6,8 +6,9 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { useUIStore } from '@/stores/uiStore'
+
 import { UI_INITIAL_STATE } from '@/stores/slices/uiSlice'
+import { useUIStore } from '@/stores/uiStore'
 
 describe('uiStore.bufferVisualization', () => {
   beforeEach(() => {

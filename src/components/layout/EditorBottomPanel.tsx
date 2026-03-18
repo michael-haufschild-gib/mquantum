@@ -1,4 +1,5 @@
 import React from 'react'
+
 import { TimelineControls } from './TimelineControls'
 
 export const EditorBottomPanel: React.FC = React.memo(() => {

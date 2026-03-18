@@ -8,10 +8,12 @@
  * @module rendering/renderers/base/useRotationUpdates
  */
 
+import { useEffect, useRef } from 'react'
+
 import { composeRotations } from '@/lib/math/rotation'
 import type { MatrixND } from '@/lib/math/types'
 import { useRotationStore } from '@/stores/rotationStore'
-import { useEffect, useRef } from 'react'
+
 import {
   applyRotationInPlace,
   createWorkingArrays,

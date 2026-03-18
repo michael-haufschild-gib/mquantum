@@ -7,19 +7,21 @@
  * @module rendering/webgpu/renderers/WebGPUSkyboxRenderer
  */
 
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
+import { logger } from '@/lib/logger'
+import type {
+  SkyboxMode,
+  SkyboxProceduralSettings,
+  SkyboxTexture,
+} from '@/stores/defaults/visualDefaults'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
   SKYBOX_BIND_GROUPS,
   type SkyboxMode as ShaderSkyboxMode,
 } from '../shaders/skybox'
-import type {
-  SkyboxProceduralSettings,
-  SkyboxMode,
-  SkyboxTexture,
-} from '@/stores/defaults/visualDefaults'
 
 /**
  * Resolved URLs for skybox face PNG images (eagerly loaded by Vite).
@@ -89,6 +91,39 @@ function modeToNumeric(mode: ShaderSkyboxMode): number {
     default:
       return 0
   }
+}
+
+/** Pack cosine palette coefficients into skybox uniform data (indices 16-39). */
+function packSkyboxPalette(
+  data: Float32Array,
+  coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined
+): void {
+  const a = coeffs?.a
+  const b = coeffs?.b
+  const c = coeffs?.c
+  const d = coeffs?.d
+
+  // color1 (= palA), color2 (= palB)
+  data[16] = a?.[0] ?? 0.5
+  data[17] = a?.[1] ?? 0.5
+  data[18] = a?.[2] ?? 0.5
+  data[20] = b?.[0] ?? 0.5
+  data[21] = b?.[1] ?? 0.5
+  data[22] = b?.[2] ?? 0.5
+
+  // palA-D (explicit palette coefficients)
+  data[24] = a?.[0] ?? 0.5
+  data[25] = a?.[1] ?? 0.5
+  data[26] = a?.[2] ?? 0.5
+  data[28] = b?.[0] ?? 0.5
+  data[29] = b?.[1] ?? 0.5
+  data[30] = b?.[2] ?? 0.5
+  data[32] = c?.[0] ?? 1.0
+  data[33] = c?.[1] ?? 1.0
+  data[34] = c?.[2] ?? 1.0
+  data[36] = d?.[0] ?? 0.0
+  data[37] = d?.[1] ?? 0.33
+  data[38] = d?.[2] ?? 0.67
 }
 
 /**
@@ -352,7 +387,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       const key = `/src/assets/skyboxes/${textureName}/${face}.png`
       const url = skyboxFaceAssets[key]
       if (!url) {
-        console.warn(`[WebGPU Skybox] Missing face asset: ${key}`)
+        logger.warn(`[WebGPU Skybox] Missing face asset: ${key}`)
         return
       }
       faceURLs.push(url)
@@ -662,7 +697,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
         this.loadedHighQuality = highQuality
         this.loadCubeTexture(this.device, textureName, highQuality)
           .catch((err) => {
-            console.error('[WebGPU Skybox] Failed to load cube texture:', err)
+            logger.error('[WebGPU Skybox] Failed to load cube texture:', err)
             this.loadedTextureName = null // Allow retry
           })
           .finally(() => {
@@ -731,99 +766,78 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       }
     }
 
-    // --- Pack SkyboxUniforms (must match WGSL struct layout) ---
+    // Pack and write skybox uniform data
+    this.packSkyboxData(
+      shaderMode,
+      env?.skyboxIntensity ?? 1.0,
+      settings,
+      t,
+      animHue,
+      animIntensityMul,
+      animDistortion
+    )
+
+    // Update vertex uniforms (offset 256)
+    this.updateVertexUniforms(ctx)
+  }
+
+  /** Pack all skybox fragment uniform values into the typed array and write to GPU. */
+  private packSkyboxData(
+    shaderMode: ShaderSkyboxMode,
+    baseIntensity: number,
+    settings: SkyboxProceduralSettings | undefined,
+    t: number,
+    animHue: number,
+    animIntensityMul: number,
+    animDistortion: number
+  ): void {
     const data = this.skyboxUniformData
     data.fill(0)
 
-    const baseIntensity = env?.skyboxIntensity ?? 1.0
     const baseHue = settings?.hue ?? 0.0
     const baseDistortion = settings?.turbulence ?? 0.3
 
     // Core uniforms (first 64 bytes / 16 floats)
-    data[0] = modeToNumeric(shaderMode) // mode
-    data[1] = t // time (raw — shader multiplies by timeScale, matching WebGL)
-    data[2] = baseIntensity * animIntensityMul // intensity (with animation)
-    data[3] = baseHue + animHue // hue (with animation)
+    data[0] = modeToNumeric(shaderMode)
+    data[1] = t
+    data[2] = baseIntensity * animIntensityMul
+    data[3] = baseHue + animHue
 
-    data[4] = settings?.saturation ?? 1.0 // saturation
-    data[5] = settings?.scale ?? 1.0 // scale
-    data[6] = settings?.complexity ?? 0.5 // complexity
-    data[7] = settings?.timeScale ?? 0.2 // timeScale
+    data[4] = settings?.saturation ?? 1.0
+    data[5] = settings?.scale ?? 1.0
+    data[6] = settings?.complexity ?? 0.5
+    data[7] = settings?.timeScale ?? 0.2
 
-    data[8] = settings?.evolution ?? 0.0 // evolution
-    data[9] = 0.0 // _padSync (was usePalette, removed)
-    data[10] = animDistortion // distortion (animation-driven for heatwave)
-    data[11] = 0.0 // vignette
+    data[8] = settings?.evolution ?? 0.0
+    data[9] = 0.0
+    data[10] = animDistortion
+    data[11] = 0.0
 
-    data[12] = baseDistortion // turbulence
-    data[13] = settings?.dualToneContrast ?? 0.5 // dualTone
-    data[14] = settings?.sunIntensity ?? 0.0 // sunIntensity
-    data[15] = 0.0 // padding
+    data[12] = baseDistortion
+    data[13] = settings?.dualToneContrast ?? 0.5
+    data[14] = settings?.sunIntensity ?? 0.0
+    data[15] = 0.0
 
-    // color1 (vec3 + padding)
-    const coeffs = settings?.cosineCoefficients
-    data[16] = coeffs?.a?.[0] ?? 0.5
-    data[17] = coeffs?.a?.[1] ?? 0.5
-    data[18] = coeffs?.a?.[2] ?? 0.5
-    data[19] = 0.0 // padding
-
-    // color2 (vec3 + padding)
-    data[20] = coeffs?.b?.[0] ?? 0.5
-    data[21] = coeffs?.b?.[1] ?? 0.5
-    data[22] = coeffs?.b?.[2] ?? 0.5
-    data[23] = 0.0 // padding
-
-    // Cosine palette coefficients (palA, palB, palC, palD)
-    // palA
-    data[24] = coeffs?.a?.[0] ?? 0.5
-    data[25] = coeffs?.a?.[1] ?? 0.5
-    data[26] = coeffs?.a?.[2] ?? 0.5
-    data[27] = 0.0
-
-    // palB
-    data[28] = coeffs?.b?.[0] ?? 0.5
-    data[29] = coeffs?.b?.[1] ?? 0.5
-    data[30] = coeffs?.b?.[2] ?? 0.5
-    data[31] = 0.0
-
-    // palC
-    data[32] = coeffs?.c?.[0] ?? 1.0
-    data[33] = coeffs?.c?.[1] ?? 1.0
-    data[34] = coeffs?.c?.[2] ?? 1.0
-    data[35] = 0.0
-
-    // palD
-    data[36] = coeffs?.d?.[0] ?? 0.0
-    data[37] = coeffs?.d?.[1] ?? 0.33
-    data[38] = coeffs?.d?.[2] ?? 0.67
-    data[39] = 0.0
+    // Cosine palette: color1/color2 at indices 16-23, palA/B/C/D at 24-39
+    packSkyboxPalette(data, settings?.cosineCoefficients)
 
     // sunPosition (vec3 + padding)
     const sunPos = settings?.sunPosition ?? [10, 10, 10]
     data[40] = sunPos[0]
     data[41] = sunPos[1]
     data[42] = sunPos[2]
-    data[43] = 0.0
 
     // Mode-specific settings
-    // Aurora
-    data[44] = settings?.aurora?.curtainHeight ?? 0.5 // auroraCurtainHeight
-    data[45] = settings?.aurora?.waveFrequency ?? 1.0 // auroraWaveFrequency
+    data[44] = settings?.aurora?.curtainHeight ?? 0.5
+    data[45] = settings?.aurora?.waveFrequency ?? 1.0
+    data[46] = settings?.horizonGradient?.gradientContrast ?? 0.5
+    data[47] = settings?.horizonGradient?.spotlightFocus ?? 0.5
+    data[48] = settings?.ocean?.causticIntensity ?? 0.5
+    data[49] = settings?.ocean?.depthGradient ?? 0.5
+    data[50] = settings?.ocean?.bubbleDensity ?? 0.3
+    data[51] = settings?.ocean?.surfaceShimmer ?? 0.4
 
-    // Horizon
-    data[46] = settings?.horizonGradient?.gradientContrast ?? 0.5 // horizonGradientContrast
-    data[47] = settings?.horizonGradient?.spotlightFocus ?? 0.5 // horizonSpotlightFocus
-
-    // Ocean
-    data[48] = settings?.ocean?.causticIntensity ?? 0.5 // oceanCausticIntensity
-    data[49] = settings?.ocean?.depthGradient ?? 0.5 // oceanDepthGradient
-    data[50] = settings?.ocean?.bubbleDensity ?? 0.3 // oceanBubbleDensity
-    data[51] = settings?.ocean?.surfaceShimmer ?? 0.4 // oceanSurfaceShimmer
-
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data, 0)
-
-    // Update vertex uniforms (offset 256)
-    this.updateVertexUniforms(ctx)
+    this.writeUniformBuffer(this.device!, this.uniformBuffer!, data, 0)
   }
 
   /**
@@ -969,7 +983,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       this.pipelineNeedsRecreation = false
       // Trigger async recreation - pipeline will update for next frame
       this.createPipelineForMode(this.device, this.currentShaderMode).catch((err) => {
-        console.error('[WebGPU Skybox] Failed to recreate pipeline for mode change:', err)
+        logger.error('[WebGPU Skybox] Failed to recreate pipeline for mode change:', err)
       })
     }
 

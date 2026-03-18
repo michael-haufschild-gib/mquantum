@@ -7,16 +7,18 @@
  */
 
 import React, { useMemo } from 'react'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import type { TdseActions } from './types'
 import type {
   TdseConfig,
-  TdsePotentialType,
   TdseDriveWaveform,
+  TdsePotentialType,
 } from '@/lib/geometry/extended/types'
+
 import { ALL_POTENTIAL_TYPE_OPTIONS, DRIVE_WAVEFORM_OPTIONS } from './tdseControlsConstants'
+import type { TdseActions } from './types'
 
 /** Props for TDSEPotentialControls. */
 interface TDSEPotentialControlsProps {

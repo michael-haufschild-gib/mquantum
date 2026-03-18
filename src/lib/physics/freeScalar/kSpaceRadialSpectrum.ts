@@ -7,9 +7,9 @@
  */
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
+import type { KSpaceDisplayGrid } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
-import type { KSpaceDisplayGrid } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 
 // ============================================================================
 // Radial Shell Data

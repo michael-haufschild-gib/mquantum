@@ -1,19 +1,20 @@
+import { AnimatePresence, m } from 'motion/react'
 import React, {
-  useState,
-  useRef,
-  useEffect,
-  useLayoutEffect,
-  useCallback,
-  useId,
-  useContext,
   createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { m, AnimatePresence } from 'motion/react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { useIsMobile } from '@/hooks/useMediaQuery'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { useDropdownStore } from '@/stores/dropdownStore'
-import { useIsMobile } from '@/hooks/useMediaQuery'
 
 /**
  * Context to provide portal container for submenus.
@@ -22,9 +23,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
  */
 const SubmenuPortalContext = createContext<React.RefObject<HTMLDivElement | null> | null>(null)
 
-/**
- *
- */
+/** Single item in a {@link DropdownMenu}, optionally with nested submenu items. */
 export interface DropdownMenuItem {
   label: string
   onClick?: () => void
@@ -35,9 +34,7 @@ export interface DropdownMenuItem {
   items?: DropdownMenuItem[] // Submenu support
 }
 
-/**
- *
- */
+/** Props for the portal-rendered dropdown menu with submenu support. */
 export interface DropdownMenuProps {
   trigger: React.ReactNode
   items: DropdownMenuItem[]
@@ -168,6 +165,7 @@ const MenuItemButton = React.memo(
   }) => {
     return (
       <button
+        type="button"
         ref={itemRef}
         role="menuitem"
         tabIndex={-1}
@@ -414,34 +412,34 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       return () => popover.removeEventListener('toggle', handleToggle)
     }, [dropdownId, closeDropdown, openDropdown])
 
-    const updatePosition = useCallback(() => {
-      if (triggerRef.current && isOpen && popoverRef.current) {
-        const triggerRect = triggerRef.current.getBoundingClientRect()
-        const contentRect = popoverRef.current.getBoundingClientRect()
-        const viewportHeight = window.innerHeight
-        const viewportWidth = window.innerWidth
-
-        let top = triggerRect.bottom + offset
-        const overflowsBottom = triggerRect.bottom + offset + contentRect.height > viewportHeight
-
-        if (overflowsBottom) {
-          const topSpace = triggerRect.top
-          const bottomSpace = viewportHeight - triggerRect.bottom
-          if (topSpace > bottomSpace) {
-            top = triggerRect.top - contentRect.height - offset
-            if (top < 8) top = 8
-          }
-        }
-
-        let left = align === 'right' ? triggerRect.right - contentRect.width : triggerRect.left
-
-        left = Math.max(8, Math.min(left, viewportWidth - contentRect.width - 8))
-        setCoords({ top, left })
-      }
-    }, [isOpen, align])
-
     useLayoutEffect(() => {
       if (!isOpen) return
+
+      const updatePosition = () => {
+        if (triggerRef.current && popoverRef.current) {
+          const triggerRect = triggerRef.current.getBoundingClientRect()
+          const contentRect = popoverRef.current.getBoundingClientRect()
+          const viewportHeight = window.innerHeight
+          const viewportWidth = window.innerWidth
+
+          let top = triggerRect.bottom + offset
+          const overflowsBottom = triggerRect.bottom + offset + contentRect.height > viewportHeight
+
+          if (overflowsBottom) {
+            const topSpace = triggerRect.top
+            const bottomSpace = viewportHeight - triggerRect.bottom
+            if (topSpace > bottomSpace) {
+              top = triggerRect.top - contentRect.height - offset
+              if (top < 8) top = 8
+            }
+          }
+
+          let left = align === 'right' ? triggerRect.right - contentRect.width : triggerRect.left
+
+          left = Math.max(8, Math.min(left, viewportWidth - contentRect.width - 8))
+          setCoords({ top, left })
+        }
+      }
 
       // Throttle scroll/resize handlers with RAF to avoid layout thrashing
       let rafId: number | null = null
@@ -463,7 +461,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
         window.removeEventListener('resize', throttledUpdate)
         window.removeEventListener('scroll', throttledUpdate, true)
       }
-    }, [isOpen, updatePosition])
+    }, [isOpen, align, offset])
 
     const handleToggle = useCallback(
       (e: React.MouseEvent) => {
@@ -482,9 +480,9 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       closeDropdown(dropdownId)
     }, [closeDropdown, dropdownId])
 
-    const handleContentClick = useCallback((e: React.MouseEvent) => {
+    const handleContentClick = (e: React.MouseEvent) => {
       e.stopPropagation()
-    }, [])
+    }
 
     const menuRef = useRef<HTMLDivElement>(null)
 

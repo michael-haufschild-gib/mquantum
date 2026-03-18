@@ -3,12 +3,13 @@
  * sorting, labeling, and truncation.
  */
 import { describe, expect, it } from 'vitest'
+
 import {
-  buildHydrogenBasis,
-  basisLabels,
   basisEnergies,
-  hydrogenEnergy,
+  basisLabels,
+  buildHydrogenBasis,
   extraDimEnergy,
+  hydrogenEnergy,
 } from '@/lib/physics/openQuantum/hydrogenBasis'
 
 // ---------------------------------------------------------------------------

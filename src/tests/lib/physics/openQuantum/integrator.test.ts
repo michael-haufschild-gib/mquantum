@@ -3,37 +3,17 @@
  * evolution, and physicality guards.
  */
 import { describe, expect, it } from 'vitest'
+
+import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
 import {
   createDensityMatrix,
   densityMatrixFromCoefficients,
-  evolveStep,
   evolveMultiStep,
+  evolveStep,
 } from '@/lib/physics/openQuantum/integrator'
-import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
+import { linearEntropy, purity, vonNeumannEntropy } from '@/lib/physics/openQuantum/metrics'
 import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
-
-/** Helper: compute Tr(rho) */
-function trace(rho: { K: number; elements: Float64Array }): number {
-  let tr = 0
-  for (let k = 0; k < rho.K; k++) {
-    tr += rho.elements[2 * (k * rho.K + k)]!
-  }
-  return tr
-}
-
-/** Helper: check Hermiticity rho_{kl} = conj(rho_{lk}) */
-function isHermitian(rho: { K: number; elements: Float64Array }, tol = 1e-10): boolean {
-  for (let k = 0; k < rho.K; k++) {
-    for (let l = k + 1; l < rho.K; l++) {
-      const idx_kl = 2 * (k * rho.K + l)
-      const idx_lk = 2 * (l * rho.K + k)
-      if (Math.abs(rho.elements[idx_kl]! - rho.elements[idx_lk]!) > tol) return false
-      if (Math.abs(rho.elements[idx_kl + 1]! + rho.elements[idx_lk + 1]!) > tol) return false
-    }
-  }
-  return true
-}
 
 describe('createDensityMatrix', () => {
   it('creates a zero-initialized K×K matrix', () => {
@@ -49,12 +29,12 @@ describe('densityMatrixFromCoefficients', () => {
     // |psi> = (1/sqrt(2)) |0> + (1/sqrt(2)) |1>
     const c = 1 / Math.sqrt(2)
     const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
-    expect(trace(rho)).toBeCloseTo(1.0, 10)
+    expect(rho).toHaveUnitTrace(1e-10)
   })
 
   it('produces a Hermitian matrix', () => {
     const rho = densityMatrixFromCoefficients([0.6, 0.0], [0.0, 0.8], 2)
-    expect(isHermitian(rho)).toBe(true)
+    expect(rho).toBeHermitian()
   })
 
   it('produces rho = |psi><psi| (rank-1)', () => {
@@ -81,7 +61,7 @@ describe('evolveStep', () => {
       evolveStep(rho, energies, channels, 0.01)
     }
 
-    expect(trace(rho)).toBeCloseTo(1.0, 6)
+    expect(rho).toHaveUnitTrace(1e-6)
   })
 
   it('maintains Hermiticity after evolution', () => {
@@ -101,7 +81,7 @@ describe('evolveStep', () => {
       evolveStep(rho, energies, channels, 0.01)
     }
 
-    expect(isHermitian(rho)).toBe(true)
+    expect(rho).toBeHermitian()
   })
 })
 
@@ -128,7 +108,7 @@ describe('evolveMultiStep', () => {
     expect(offDiagMag).toBeLessThan(0.01)
 
     // Diagonal should still sum to 1
-    expect(trace(rho)).toBeCloseTo(1.0, 6)
+    expect(rho).toHaveUnitTrace(1e-6)
   })
 
   it('drives ground population up under relaxation', () => {
@@ -149,5 +129,246 @@ describe('evolveMultiStep', () => {
     // Ground population should have increased
     const finalGround = rho.elements[0]
     expect(finalGround!).toBeGreaterThan(initialGround + 0.1)
+  })
+})
+
+// ============================================================================
+// Physical conservation laws and invariants
+// ============================================================================
+
+describe('physical invariants under Lindblad evolution', () => {
+  it('purity monotonically decreases under dephasing (dissipation theorem)', () => {
+    const c = 1 / Math.sqrt(2)
+    const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
+    const energies = new Float64Array([0.5, 1.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 1.0,
+    }
+    const channels = buildLindbladChannels(config, 2)
+
+    const purityHistory: number[] = [purity(rho)]
+    for (let step = 0; step < 50; step++) {
+      evolveStep(rho, energies, channels, 0.01)
+      purityHistory.push(purity(rho))
+    }
+
+    // Purity should monotonically decrease (or stay equal — never increase)
+    for (let i = 1; i < purityHistory.length; i++) {
+      expect(purityHistory[i]!).toBeLessThanOrEqual(purityHistory[i - 1]! + 1e-10)
+    }
+
+    // Pure state starts at purity = 1; after dephasing, should be < 1
+    expect(purityHistory[purityHistory.length - 1]!).toBeLessThan(0.95)
+  })
+
+  it('von Neumann entropy monotonically increases under dephasing', () => {
+    const c = 1 / Math.sqrt(2)
+    const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
+    const energies = new Float64Array([0.5, 1.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 2.0,
+    }
+    const channels = buildLindbladChannels(config, 2)
+
+    const entropyHistory: number[] = [vonNeumannEntropy(rho)]
+    for (let step = 0; step < 50; step++) {
+      evolveStep(rho, energies, channels, 0.01)
+      entropyHistory.push(vonNeumannEntropy(rho))
+    }
+
+    // Entropy should monotonically increase (or stay equal)
+    for (let i = 1; i < entropyHistory.length; i++) {
+      expect(entropyHistory[i]!).toBeGreaterThanOrEqual(entropyHistory[i - 1]! - 1e-10)
+    }
+  })
+
+  it('linear entropy equals 1 - purity (definition consistency)', () => {
+    const rho = densityMatrixFromCoefficients([0.6, 0.0], [0.0, 0.8], 2)
+    const p = purity(rho)
+    const le = linearEntropy(rho)
+    expect(le).toBeCloseTo(1 - p, 10)
+  })
+
+  it('pure state has purity = 1 and von Neumann entropy = 0', () => {
+    const rho = densityMatrixFromCoefficients([1, 0], [0, 0], 2)
+    expect(purity(rho)).toBeCloseTo(1.0, 10)
+    expect(vonNeumannEntropy(rho)).toBeCloseTo(0.0, 10)
+  })
+
+  it('maximally mixed state has purity = 1/K and maximum entropy', () => {
+    const K = 3
+    const rho = createDensityMatrix(K)
+    // Maximally mixed: rho_{kk} = 1/K, all off-diagonal = 0
+    for (let k = 0; k < K; k++) {
+      rho.elements[2 * (k * K + k)] = 1 / K
+    }
+
+    expect(purity(rho)).toBeCloseTo(1 / K, 10)
+    expect(vonNeumannEntropy(rho)).toBeCloseTo(Math.log(K), 6)
+  })
+
+  it('all diagonal elements remain non-negative under evolution (positivity)', () => {
+    const rho = densityMatrixFromCoefficients(
+      [1 / Math.sqrt(3), 1 / Math.sqrt(3), 1 / Math.sqrt(3)],
+      [0, 0, 0],
+      3
+    )
+    const energies = new Float64Array([0.5, 1.5, 2.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 1.0,
+      relaxationEnabled: true,
+      relaxationRate: 0.5,
+    }
+    const channels = buildLindbladChannels(config, 3)
+
+    for (let step = 0; step < 200; step++) {
+      evolveStep(rho, energies, channels, 0.01)
+
+      // Check all diagonal elements (populations) are non-negative
+      for (let k = 0; k < 3; k++) {
+        expect(rho.elements[2 * (k * 3 + k)]!).toBeGreaterThanOrEqual(-1e-10)
+      }
+    }
+  })
+
+  it('relaxation drives system toward ground state at T=0', () => {
+    // Start in equal superposition of 3 states
+    const c = 1 / Math.sqrt(3)
+    const rho = densityMatrixFromCoefficients([c, c, c], [0, 0, 0], 3)
+    const energies = new Float64Array([0.5, 1.5, 2.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      relaxationEnabled: true,
+      relaxationRate: 2.0,
+      dephasingEnabled: true,
+      dephasingRate: 1.0,
+    }
+    const channels = buildLindbladChannels(config, 3)
+
+    evolveMultiStep(rho, energies, channels, 0.01, 500)
+
+    // Ground state population should dominate
+    const groundPop = rho.elements[0]! // rho_{00} re
+    const firstExcited = rho.elements[2 * (1 * 3 + 1)]! // rho_{11} re
+    const secondExcited = rho.elements[2 * (2 * 3 + 2)]! // rho_{22} re
+
+    expect(groundPop).toBeGreaterThan(0.5)
+    expect(groundPop).toBeGreaterThan(firstExcited)
+    expect(groundPop).toBeGreaterThan(secondExcited)
+  })
+
+  it('unitary evolution (no channels) preserves purity exactly', () => {
+    const c = 1 / Math.sqrt(2)
+    const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
+    const energies = new Float64Array([0.5, 1.5])
+    const initialPurity = purity(rho)
+
+    // No channels = purely unitary
+    for (let step = 0; step < 100; step++) {
+      evolveStep(rho, energies, [], 0.01)
+    }
+
+    expect(purity(rho)).toBeCloseTo(initialPurity, 8)
+    expect(rho).toHaveUnitTrace(1e-10)
+  })
+
+  it('4-level system with all channels preserves trace and positivity', () => {
+    const K = 4
+    const c = 1 / Math.sqrt(K)
+    const re = Array.from({ length: K }, () => c)
+    const im = Array.from({ length: K }, () => 0)
+    const rho = densityMatrixFromCoefficients(re, im, K)
+    const energies = new Float64Array([0.5, 1.5, 2.5, 3.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 1.5,
+      relaxationEnabled: true,
+      relaxationRate: 1.0,
+    }
+    const channels = buildLindbladChannels(config, K)
+
+    for (let step = 0; step < 300; step++) {
+      evolveStep(rho, energies, channels, 0.01)
+    }
+
+    expect(rho).toHaveUnitTrace(1e-4)
+    expect(rho).toBeHermitian()
+    for (let k = 0; k < K; k++) {
+      expect(rho.elements[2 * (k * K + k)]!).toBeGreaterThanOrEqual(-1e-8)
+    }
+  })
+
+  it('large timestep does not produce negative populations', () => {
+    const c = 1 / Math.sqrt(2)
+    const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
+    const energies = new Float64Array([0.5, 1.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 0.5,
+    }
+    const channels = buildLindbladChannels(config, 2)
+
+    // Use larger-than-recommended timestep
+    for (let step = 0; step < 20; step++) {
+      evolveStep(rho, energies, channels, 0.1)
+      for (let k = 0; k < 2; k++) {
+        expect(rho.elements[2 * (k * 2 + k)]!).toBeGreaterThanOrEqual(-0.05)
+      }
+    }
+
+    expect(rho).toHaveUnitTrace(0.1)
+  })
+
+  it('starting from fully mixed state with no channels yields unchanged state', () => {
+    const K = 3
+    const rho = createDensityMatrix(K)
+    for (let k = 0; k < K; k++) {
+      rho.elements[2 * (k * K + k)] = 1 / K
+    }
+    const energies = new Float64Array([1, 2, 3])
+
+    // Pure unitary evolution of a fully mixed state — should remain mixed
+    for (let step = 0; step < 50; step++) {
+      evolveStep(rho, energies, [], 0.01)
+    }
+
+    // Diagonal should remain 1/K (unitary doesn't change populations of a mixed state)
+    for (let k = 0; k < K; k++) {
+      expect(rho.elements[2 * (k * K + k)]!).toBeCloseTo(1 / K, 6)
+    }
+  })
+
+  it('unitary evolution preserves off-diagonal magnitude (coherence)', () => {
+    const c = 1 / Math.sqrt(2)
+    const rho = densityMatrixFromCoefficients([c, c], [0, 0], 2)
+    const energies = new Float64Array([0.5, 1.5])
+
+    const offDiagBefore = Math.sqrt(
+      rho.elements[2]! * rho.elements[2]! + rho.elements[3]! * rho.elements[3]!
+    )
+
+    for (let step = 0; step < 100; step++) {
+      evolveStep(rho, energies, [], 0.01)
+    }
+
+    const offDiagAfter = Math.sqrt(
+      rho.elements[2]! * rho.elements[2]! + rho.elements[3]! * rho.elements[3]!
+    )
+
+    expect(offDiagAfter).toBeCloseTo(offDiagBefore, 6)
   })
 })

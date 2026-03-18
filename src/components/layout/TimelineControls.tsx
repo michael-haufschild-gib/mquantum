@@ -1,3 +1,7 @@
+import { AnimatePresence, m } from 'motion/react'
+import { type FC, useCallback, useMemo, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
@@ -5,18 +9,16 @@ import { ToggleButton } from '@/components/ui/ToggleButton'
 import { getConfigStoreKey, hasTimelineControls } from '@/lib/geometry/registry'
 import { getRotationPlanes } from '@/lib/math'
 import {
+  type AnimationState,
   MAX_SPEED,
   MIN_SPEED,
   useAnimationStore,
-  type AnimationState,
 } from '@/stores/animationStore'
 import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
+import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
-import { AnimatePresence, m } from 'motion/react'
-import { useCallback, useMemo, useState, type FC } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+
 import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'

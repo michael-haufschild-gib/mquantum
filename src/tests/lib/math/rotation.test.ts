@@ -2,6 +2,8 @@
  * Tests for n-dimensional rotation operations
  */
 
+import { describe, expect, it } from 'vitest'
+
 import {
   composeRotations,
   createIdentityMatrix,
@@ -16,7 +18,6 @@ import {
   parsePlaneName,
   transposeMatrix,
 } from '@/lib/math'
-import { describe, expect, it } from 'vitest'
 
 /**
  * Helper to access element at [row][col] in a flat row-major matrix
@@ -340,6 +341,113 @@ describe('Rotation Operations', () => {
     })
   })
 
+  describe('N-dimensional rotation properties', () => {
+    it('full 2π rotation returns to identity', () => {
+      const R = createRotationMatrix(4, 0, 1, 2 * Math.PI)
+      const I = createIdentityMatrix(4)
+      for (let i = 0; i < 16; i++) {
+        expect(R[i]).toBeCloseTo(I[i]!, 0)
+      }
+    })
+
+    it('composing rotation with its inverse yields identity', () => {
+      const angle = Math.PI / 5
+      const R = createRotationMatrix(4, 1, 3, angle)
+      const Rinv = createRotationMatrix(4, 1, 3, -angle)
+      const product = multiplyMatrices(R, Rinv)
+      const I = createIdentityMatrix(4)
+      for (let i = 0; i < 16; i++) {
+        expect(product[i]).toBeCloseTo(I[i]!, 0)
+      }
+    })
+
+    it('preserves vector magnitude under rotation', () => {
+      const R = createRotationMatrix(5, 2, 4, Math.PI / 3)
+      const v = [1, 2, 3, 4, 5]
+      const rotated = multiplyMatrixVector(R, v)
+
+      const origMag = Math.sqrt(v.reduce((s, x) => s + x * x, 0))
+      const rotMag = Math.sqrt(rotated.reduce((s, x) => s + x * x, 0))
+      expect(rotMag).toBeCloseTo(origMag, 0)
+    })
+
+    it('rotation only affects the two axes in the rotation plane', () => {
+      const R = createRotationMatrix(5, 1, 3, Math.PI / 4)
+      // Axes 0, 2, 4 should be untouched (unit column in identity)
+      for (const axis of [0, 2, 4]) {
+        const col: number[] = []
+        for (let row = 0; row < 5; row++) {
+          col.push(matrixAt(R, 5, row, axis))
+        }
+        // Should be a standard basis vector
+        expect(col[axis]).toBeCloseTo(1, 0)
+        for (let row = 0; row < 5; row++) {
+          if (row !== axis) expect(col[row]).toBeCloseTo(0, 0)
+        }
+      }
+    })
+
+    it('rotation in orthogonal planes commutes', () => {
+      // XY and ZW planes share no axes → should commute
+      const R1 = createRotationMatrix(4, 0, 1, Math.PI / 3)
+      const R2 = createRotationMatrix(4, 2, 3, Math.PI / 5)
+
+      const AB = multiplyMatrices(R1, R2)
+      const BA = multiplyMatrices(R2, R1)
+
+      for (let i = 0; i < 16; i++) {
+        expect(AB[i]).toBeCloseTo(BA[i]!, 0)
+      }
+    })
+
+    it('rotation in overlapping planes does NOT commute', () => {
+      // XY and XZ share the X axis → should not commute
+      const R1 = createRotationMatrix(3, 0, 1, Math.PI / 3)
+      const R2 = createRotationMatrix(3, 0, 2, Math.PI / 5)
+
+      const AB = multiplyMatrices(R1, R2)
+      const BA = multiplyMatrices(R2, R1)
+
+      let differs = false
+      for (let i = 0; i < 9; i++) {
+        if (Math.abs(AB[i]! - BA[i]!) > 0.01) {
+          differs = true
+          break
+        }
+      }
+      expect(differs).toBe(true)
+    })
+
+    it('composeRotations with out parameter reuses buffer', () => {
+      const out = createIdentityMatrix(3)
+      const angles = new Map([['XY', Math.PI / 4]])
+      const result = composeRotations(3, angles, out)
+      expect(result).toBe(out)
+      // Should not be identity anymore
+      expect(out[0]).not.toBeCloseTo(1, 3)
+    })
+
+    it('produces correct planes for 11D (maximum dimension)', () => {
+      const planes = getRotationPlanes(11)
+      expect(planes).toHaveLength((11 * 10) / 2) // 55
+      // Check high-dimension plane names
+      const names = planes.map((p) => p.name)
+      expect(names).toContain('XA6')
+      expect(names).toContain('A6A7')
+      expect(names).toContain('A9A10')
+    })
+
+    it('parsePlaneName handles high-dimension plane names', () => {
+      expect(parsePlaneName('XA6')).toEqual([0, 6])
+      expect(parsePlaneName('A6A7')).toEqual([6, 7])
+      expect(parsePlaneName('UA6')).toEqual([5, 6])
+    })
+
+    it('parsePlaneName rejects axes with same index', () => {
+      expect(() => parsePlaneName('XX')).toThrow()
+    })
+  })
+
   describe('Quality Gate Requirements', () => {
     it('4D rotation produces exactly 6 unique rotation planes', () => {
       const planes = getRotationPlanes(4)
@@ -394,6 +502,68 @@ describe('Rotation Operations', () => {
         const det = determinant(R)
         expect(Math.abs(det - 1)).toBeLessThan(FAST_TRIG_TOLERANCE)
       }
+    })
+  })
+
+  describe('SO(n) group properties across all supported dimensions', () => {
+    // Test every dimension the app supports (3 through 11)
+    const ALL_DIMS = [3, 4, 5, 6, 7, 8, 9, 10, 11]
+    const FAST_TRIG_TOLERANCE = 0.15
+
+    for (const dim of ALL_DIMS) {
+      it(`${dim}D: rotation matrix is orthogonal and has det = +1`, () => {
+        // Use the last valid plane for this dimension to stress high-index paths
+        const i1 = dim - 2
+        const i2 = dim - 1
+        const R = createRotationMatrix(dim, i1, i2, Math.PI / 5)
+        const RT = transposeMatrix(R)
+        const product = multiplyMatrices(R, RT)
+        const I = createIdentityMatrix(dim)
+
+        for (let r = 0; r < dim; r++) {
+          for (let c = 0; c < dim; c++) {
+            expect(Math.abs(matrixAt(product, dim, r, c) - matrixAt(I, dim, r, c))).toBeLessThan(
+              FAST_TRIG_TOLERANCE
+            )
+          }
+        }
+      })
+    }
+
+    it('composition is associative: (A * B) * C === A * (B * C)', () => {
+      const A = createRotationMatrix(4, 0, 1, Math.PI / 7)
+      const B = createRotationMatrix(4, 1, 2, Math.PI / 5)
+      const C = createRotationMatrix(4, 2, 3, Math.PI / 3)
+
+      const AB = multiplyMatrices(A, B)
+      const BC = multiplyMatrices(B, C)
+      const lhs = multiplyMatrices(AB, C) // (A*B)*C
+      const rhs = multiplyMatrices(A, BC) // A*(B*C)
+
+      for (let i = 0; i < 16; i++) {
+        expect(lhs[i]).toBeCloseTo(rhs[i]!, 0)
+      }
+    })
+
+    it('double rotation by π in same plane returns to identity', () => {
+      const R = createRotationMatrix(5, 1, 3, Math.PI)
+      const R2 = multiplyMatrices(R, R) // Rπ * Rπ = R2π = I
+      const I = createIdentityMatrix(5)
+
+      for (let i = 0; i < 25; i++) {
+        expect(R2[i]).toBeCloseTo(I[i]!, 0)
+      }
+    })
+
+    it('rotation in XY plane leaves Z,W,... components unchanged (5D)', () => {
+      const R = createRotationMatrix(5, 0, 1, Math.PI / 3)
+      const v = [0, 0, 3.7, -2.1, 8.4] // all weight on non-rotated axes
+      const rotated = multiplyMatrixVector(R, v)
+
+      // XY plane rotation should not touch Z, W, V components
+      expect(rotated[2]).toBeCloseTo(3.7, 0)
+      expect(rotated[3]).toBeCloseTo(-2.1, 0)
+      expect(rotated[4]).toBeCloseTo(8.4, 0)
     })
   })
 })

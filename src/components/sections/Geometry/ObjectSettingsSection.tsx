@@ -10,6 +10,8 @@
  * - Unified control rendering across all object types
  */
 
+import React, { Suspense, useMemo } from 'react'
+
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import {
   getControlsComponent,
@@ -17,11 +19,8 @@ import {
   hasControlsComponent,
 } from '@/lib/geometry/registry'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React, { Suspense, useMemo } from 'react'
 
-/**
- *
- */
+/** Props for the quantum mode-specific settings panel. */
 export interface ObjectSettingsSectionProps {
   className?: string
 }

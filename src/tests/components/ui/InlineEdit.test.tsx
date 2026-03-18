@@ -1,6 +1,7 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { InlineEdit } from '@/components/ui/InlineEdit'
 
 // Mock the sound manager

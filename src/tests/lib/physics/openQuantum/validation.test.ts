@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest'
+
+import { buildHydrogenBasis } from '@/lib/physics/openQuantum/hydrogenBasis'
+import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
+import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
+import {
+  createDensityMatrix,
+  densityMatrixFromCoefficients,
+} from '@/lib/physics/openQuantum/integrator'
+import type { LindbladChannel } from '@/lib/physics/openQuantum/types'
 import {
   validateDensityMatrix,
   validateDetailedBalance,
   validateSelectionRules,
 } from '@/lib/physics/openQuantum/validation'
-import {
-  createDensityMatrix,
-  densityMatrixFromCoefficients,
-} from '@/lib/physics/openQuantum/integrator'
-import { buildHydrogenBasis } from '@/lib/physics/openQuantum/hydrogenBasis'
-import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
-import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
-import type { LindbladChannel } from '@/lib/physics/openQuantum/types'
 
 // ---------------------------------------------------------------------------
 // Helpers

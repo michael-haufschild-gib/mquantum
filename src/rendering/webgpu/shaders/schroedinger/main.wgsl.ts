@@ -202,9 +202,7 @@ export interface IsosurfaceMainBlockConfig {
   useDensityGrid?: boolean
 }
 
-/**
- *
- */
+/** Generates the isosurface ray-marching main block with optional density grid sampling. */
 export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = {}): string {
   const { useDensityGrid = false } = config
 

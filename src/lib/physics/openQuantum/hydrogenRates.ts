@@ -12,8 +12,8 @@
  * @module lib/physics/openQuantum/hydrogenRates
  */
 
-import type { HydrogenBasisState } from './hydrogenBasis'
 import { dipoleMatrixElementSquared } from './dipoleElements'
+import type { HydrogenBasisState } from './hydrogenBasis'
 import { isAllowedE1 } from './selectionRules'
 
 // ---------------------------------------------------------------------------

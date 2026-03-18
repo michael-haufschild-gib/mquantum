@@ -11,9 +11,9 @@ import { assembleShaderBlocks } from '../../shared/compose-helpers'
 import { constantsBlock } from '../../shared/core/constants.wgsl'
 import { hermiteBlock } from '../quantum/hermite.wgsl'
 import {
-  eigenCacheComputeParamsBlock,
   eigenCacheComputeBindingsBlock,
   eigenCacheComputeMainBlock,
+  eigenCacheComputeParamsBlock,
 } from './eigenfunctionCache.wgsl'
 
 /**

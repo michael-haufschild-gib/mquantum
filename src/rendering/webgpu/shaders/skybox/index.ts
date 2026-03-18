@@ -9,33 +9,33 @@
  */
 
 // Types
-export type { SkyboxMode, SkyboxEffects, SkyboxShaderConfig } from './types'
+export type { SkyboxEffects, SkyboxMode, SkyboxShaderConfig } from './types'
 export { SKYBOX_BIND_GROUPS, SKYBOX_BINDINGS } from './types'
 
 // Core modules
 export { constantsBlock } from './core/constants.wgsl'
-export { uniformStructBlock, uniformBindingsBlock, uniformAliasesBlock } from './core/uniforms.wgsl'
+export { uniformAliasesBlock, uniformBindingsBlock, uniformStructBlock } from './core/uniforms.wgsl'
 export {
-  generateVertexOutputStruct,
   fragmentOutputStruct,
   fragmentOutputStructSingle,
+  generateVertexOutputStruct,
 } from './core/varyings.wgsl'
 
 // Utility modules
 export { colorBlock } from './utils/color.wgsl'
-export { rotationBlock } from './utils/rotation.wgsl'
 export { noiseBlock } from './utils/noise.wgsl'
+export { rotationBlock } from './utils/rotation.wgsl'
 
 // Effect modules
 export { sunBlock } from './effects/sun.wgsl'
 export { vignetteBlock } from './effects/vignette.wgsl'
 
 // Mode modules
-export { classicBlock } from './modes/classic.wgsl'
 export { auroraBlock } from './modes/aurora.wgsl'
-export { nebulaBlock } from './modes/nebula.wgsl'
+export { classicBlock } from './modes/classic.wgsl'
 export { crystallineBlock } from './modes/crystalline.wgsl'
 export { horizonBlock } from './modes/horizon.wgsl'
+export { nebulaBlock } from './modes/nebula.wgsl'
 export { oceanBlock } from './modes/ocean.wgsl'
 export { twilightBlock } from './modes/twilight.wgsl'
 

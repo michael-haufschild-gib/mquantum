@@ -6,17 +6,16 @@
  */
 
 import React, { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
-import { useShallow } from 'zustand/react/shallow'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
+import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
 
-/**
- *
- */
+/** Props for the paper texture overlay controls. */
 export interface PaperControlsProps {
   className?: string
 }

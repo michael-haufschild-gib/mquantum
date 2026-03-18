@@ -1,234 +1,74 @@
 /**
- * MobileTimelineControls Tests
+ * Mobile Bottom Panel Visibility Tests
  *
- * Tests for the mobile bottom app bar timeline controls feature.
- * Verifies that timeline controls are shown/hidden correctly based on:
- * - Viewport size (mobile vs desktop)
- * - Panel visibility (left/right panels open/closed)
- * - Cinematic mode state
+ * Tests the useMobileBottomPanel hook logic that controls when
+ * the mobile bottom app bar (timeline controls) is shown/hidden.
+ *
+ * Visibility rule: shown when mobile viewport, both side panels closed, not cinematic mode.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
-import { EditorLayout } from '@/components/layout/EditorLayout'
+import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Mock all the dependent stores and hooks
-const mockLayoutState = {
-  isCollapsed: true,
-  showLeftPanel: false,
-  isCinematicMode: false,
-  toggleCollapsed: vi.fn(),
-  toggleCinematicMode: vi.fn(),
-  setCinematicMode: vi.fn(),
-  setCollapsed: vi.fn(),
-  setLeftPanel: vi.fn(),
-}
+import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
+import { useLayoutStore } from '@/stores/layoutStore'
 
 let mockIsDesktop = false
-
-// Cache for useShallow results to prevent infinite re-renders
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- Required for caching selector functions
-const layoutStateCache = new WeakMap<Function, unknown>()
-
-vi.mock('@/stores/layoutStore', () => ({
-  useLayoutStore: vi.fn((selector) => {
-    if (!selector) return mockLayoutState
-    // Cache useShallow selector results to prevent infinite loops
-    if (layoutStateCache.has(selector)) {
-      // Compare with current state to bust cache when state changes
-      const cached = layoutStateCache.get(selector)
-      const current = selector(mockLayoutState)
-      if (JSON.stringify(cached) === JSON.stringify(current)) {
-        return cached
-      }
-    }
-    const result = selector(mockLayoutState)
-    layoutStateCache.set(selector, result)
-    return result
-  }),
-}))
-
-vi.mock('@/stores/themeStore', () => ({
-  useThemeStore: vi.fn((selector) => {
-    const state = {
-      accent: 'cyan',
-      mode: 'dark',
-      setAccent: vi.fn(),
-      setMode: vi.fn(),
-    }
-    return selector(state)
-  }),
-}))
 
 vi.mock('@/hooks/useMediaQuery', () => ({
   useIsDesktop: () => mockIsDesktop,
 }))
 
-vi.mock('zustand/react/shallow', () => ({
-  useShallow: <T,>(selector: T) => selector,
-}))
-
-// Mock child components to simplify tests
-vi.mock('@/components/layout/EditorTopBar', () => ({
-  EditorTopBar: () => <div data-testid="editor-top-bar">TopBar</div>,
-}))
-
-vi.mock('@/components/layout/EditorLeftPanel', () => ({
-  EditorLeftPanel: () => <div data-testid="editor-left-panel">LeftPanel</div>,
-}))
-
-vi.mock('@/components/layout/EditorRightPanel', () => ({
-  EditorRightPanel: () => <div data-testid="editor-right-panel">RightPanel</div>,
-}))
-
-vi.mock('@/components/layout/EditorBottomPanel', () => ({
-  EditorBottomPanel: () => <div data-testid="editor-bottom-panel">BottomPanel</div>,
-}))
-
-vi.mock('@/components/layout/CommandPalette', () => ({
-  CommandPalette: () => null,
-}))
-
-vi.mock('@/components/layout/CanvasContextMenu', () => ({
-  CanvasContextMenu: () => null,
-}))
-
-vi.mock('@/components/layout/ShortcutsOverlay', () => ({
-  ShortcutsOverlay: () => null,
-}))
-
-vi.mock('@/components/overlays/ExportModal', () => ({
-  ExportModal: () => null,
-}))
-
-vi.mock('@/components/ui/GlobalProgress', () => ({
-  GlobalProgress: () => null,
-}))
-
-vi.mock('@/lib/audio/SoundManager', () => ({
-  soundManager: {
-    playClick: vi.fn(),
-    playHover: vi.fn(),
-    playSuccess: vi.fn(),
-    playSwish: vi.fn(),
-  },
-}))
-
-// SKIP REASON: EditorLayout uses Zustand useShallow selectors across
-// 10+ child components. The WeakMap-based mock cache strategy cannot
-// maintain referential stability for useShallow results, causing
-// infinite re-renders during test. Fix requires either:
-// (a) extracting mobile timeline visibility logic to a testable hook, or
-// (b) switching to component-level testing with a real Zustand store.
-describe.skip('MobileTimelineControls', () => {
+describe('useMobileBottomPanel', () => {
   beforeEach(() => {
-    cleanup()
-    // Clear selector cache between tests
-    // WeakMap doesn't have clear(), but we can reassign in module scope
-    // For now, changing state will naturally bust the cache via JSON comparison
-    // Reset to mobile viewport by default
+    useLayoutStore.getState().setCollapsed(true)
+    useLayoutStore.getState().setLeftPanel(false)
+    useLayoutStore.getState().setCinematicMode(false)
     mockIsDesktop = false
-    // Reset layout state
-    mockLayoutState.isCollapsed = true
-    mockLayoutState.showLeftPanel = false
-    mockLayoutState.isCinematicMode = false
   })
 
-  describe('Mobile viewport visibility', () => {
-    it('shows mobile timeline when on mobile and both panels are closed', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = true
-      mockLayoutState.showLeftPanel = false
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      expect(screen.getByTestId('mobile-timeline-controls')).toBeInTheDocument()
-    })
-
-    it('hides mobile timeline when right panel is open', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = false // Right panel is open
-      mockLayoutState.showLeftPanel = false
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      expect(screen.queryByTestId('mobile-timeline-controls')).not.toBeInTheDocument()
-    })
-
-    it('hides mobile timeline when left panel is open', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = true
-      mockLayoutState.showLeftPanel = true // Left panel is open
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      expect(screen.queryByTestId('mobile-timeline-controls')).not.toBeInTheDocument()
-    })
-
-    it('hides mobile timeline when both panels are open', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = false
-      mockLayoutState.showLeftPanel = true
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      expect(screen.queryByTestId('mobile-timeline-controls')).not.toBeInTheDocument()
-    })
-
-    it('hides mobile timeline in cinematic mode', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = true
-      mockLayoutState.showLeftPanel = false
-      mockLayoutState.isCinematicMode = true
-
-      render(<EditorLayout />)
-
-      expect(screen.queryByTestId('mobile-timeline-controls')).not.toBeInTheDocument()
-    })
+  it('returns true on mobile with both panels closed and not cinematic', () => {
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(true)
   })
 
-  describe('Desktop viewport visibility', () => {
-    it('does not show mobile timeline on desktop viewport', () => {
-      mockIsDesktop = true
-      mockLayoutState.isCollapsed = true
-      mockLayoutState.showLeftPanel = false
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      expect(screen.queryByTestId('mobile-timeline-controls')).not.toBeInTheDocument()
-    })
-
-    it('shows desktop bottom panel on desktop viewport', () => {
-      mockIsDesktop = true
-      mockLayoutState.isCollapsed = false
-      mockLayoutState.showLeftPanel = true
-      mockLayoutState.isCinematicMode = false
-
-      render(<EditorLayout />)
-
-      // Desktop bottom panel is rendered inline (not the mobile fixed version)
-      // Check that the component is rendered somewhere in the DOM
-      expect(screen.getAllByTestId('editor-bottom-panel').length).toBeGreaterThanOrEqual(1)
-    })
+  it('returns false when right panel is open', () => {
+    useLayoutStore.getState().setCollapsed(false)
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
   })
 
-  describe('Content verification', () => {
-    it('mobile timeline contains the EditorBottomPanel component', () => {
-      mockIsDesktop = false
-      mockLayoutState.isCollapsed = true
-      mockLayoutState.showLeftPanel = false
-      mockLayoutState.isCinematicMode = false
+  it('returns false when left panel is open', () => {
+    useLayoutStore.getState().setLeftPanel(true)
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
+  })
 
-      render(<EditorLayout />)
+  it('returns false when both panels are open', () => {
+    useLayoutStore.getState().setCollapsed(false)
+    useLayoutStore.getState().setLeftPanel(true)
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
+  })
 
-      const mobileTimeline = screen.getByTestId('mobile-timeline-controls')
-      // The EditorBottomPanel mock renders "BottomPanel" text
-      expect(mobileTimeline).toHaveTextContent('BottomPanel')
-    })
+  it('returns false in cinematic mode even with panels closed', () => {
+    useLayoutStore.getState().setCinematicMode(true)
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
+  })
+
+  it('returns false on desktop viewport regardless of panel state', () => {
+    mockIsDesktop = true
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
+  })
+
+  it('returns false on desktop even with panels closed and not cinematic', () => {
+    mockIsDesktop = true
+    useLayoutStore.getState().setCollapsed(true)
+    useLayoutStore.getState().setLeftPanel(false)
+    useLayoutStore.getState().setCinematicMode(false)
+    const { result } = renderHook(() => useMobileBottomPanel())
+    expect(result.current).toBe(false)
   })
 })

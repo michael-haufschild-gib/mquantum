@@ -7,6 +7,7 @@
 
 import scenesData from '@/assets/defaults/scenes.json'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { logger } from '@/lib/logger'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
 /**
@@ -83,7 +84,7 @@ export function getSceneExamples(): SceneExample[] {
 export function applySceneExample(id: string): boolean {
   const scene = scenesData.find((s) => s.id === id)
   if (!scene) {
-    console.warn(`Scene example with id "${id}" not found`)
+    logger.warn(`Scene example with id "${id}" not found`)
     return false
   }
 

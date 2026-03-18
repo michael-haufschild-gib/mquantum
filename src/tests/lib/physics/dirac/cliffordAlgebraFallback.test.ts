@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  spinorSize,
   generateDiracMatricesFallback,
+  spinorSize,
 } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 
 describe('spinorSize', () => {

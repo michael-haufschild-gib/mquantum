@@ -11,36 +11,29 @@
  */
 
 import { assembleShaderBlocks } from '../../shared/compose-helpers'
-
 // Core blocks
 import { constantsBlock } from '../../shared/core/constants.wgsl'
-
-// Schroedinger-specific blocks
-import { schroedingerUniformsBlock } from '../uniforms.wgsl'
-
 // Quantum math blocks
 import { complexMathBlock } from '../quantum/complex.wgsl'
 import { hermiteBlock } from '../quantum/hermite.wgsl'
 import { ho1dBlock } from '../quantum/ho1d.wgsl'
-
+import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
 // Wigner-specific blocks
 import { laguerreBlock } from '../quantum/laguerre.wgsl'
-import { wignerHOBlock } from '../quantum/wignerHO.wgsl'
-import { wignerHydrogenBlock } from '../quantum/wignerHydrogen.wgsl'
-
 // Hydrogen radial for numerical quadrature
 import { legendreBlock } from '../quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from '../quantum/sphericalHarmonics.wgsl'
-import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
-
+import { wignerHOBlock } from '../quantum/wignerHO.wgsl'
+import { wignerHydrogenBlock } from '../quantum/wignerHydrogen.wgsl'
+// Schroedinger-specific blocks
+import { schroedingerUniformsBlock } from '../uniforms.wgsl'
+import type { ComputeQuantumMode } from './compose'
 // Compute-specific blocks
 import {
-  wignerGridParamsBlock,
   generateWignerCacheBindingsBlock,
   wignerCacheComputeBlock,
+  wignerGridParamsBlock,
 } from './wignerCache.wgsl'
-
-import type { ComputeQuantumMode } from './compose'
 
 /**
  * Configuration for the Wigner cache compute shader

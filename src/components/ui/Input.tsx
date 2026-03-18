@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { m, AnimatePresence } from 'motion/react'
-import { LoadingSpinner } from './LoadingSpinner'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+import { LoadingSpinner } from './LoadingSpinner'
+
+/** Props for the {@link Input} component. */
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
@@ -34,6 +34,7 @@ export const Input = ({
   ref,
   ...props
 }: InputProps & { ref?: React.Ref<HTMLInputElement> }) => {
+  const inputId = useId()
   const [isFocused, setIsFocused] = useState(false)
   const [internalValue, setInternalValue] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -93,7 +94,11 @@ export const Input = ({
 
   return (
     <div className={`flex flex-col gap-1.5 ${containerClassName}`}>
-      {label && <label className="text-xs font-medium text-text-secondary ms-1">{label}</label>}
+      {label && (
+        <label htmlFor={inputId} className="text-xs font-medium text-text-secondary ms-1">
+          {label}
+        </label>
+      )}
 
       <m.div
         className={`relative flex items-center group
@@ -112,6 +117,7 @@ export const Input = ({
         )}
 
         <input
+          id={inputId}
           ref={setRefs}
           type={type}
           value={value}

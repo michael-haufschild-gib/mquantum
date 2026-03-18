@@ -8,8 +8,8 @@
  * @module rendering/webgpu/passes/EnvironmentCompositePass
  */
 
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
  * Environment composite pass configuration.

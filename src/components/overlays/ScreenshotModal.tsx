@@ -1,10 +1,13 @@
+import { useEffect, useRef, useState } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { logger } from '@/lib/logger'
 import { useScreenshotStore } from '@/stores/screenshotStore'
-import { useEffect, useRef, useState } from 'react'
+
 import { CropBox, CropValues } from './CropBox'
 
 export const ScreenshotModal = () => {
@@ -70,7 +73,7 @@ export const ScreenshotModal = () => {
       soundManager.playSuccess()
       closeModal()
     } catch (err) {
-      console.error(err)
+      logger.error(err)
       addToast('Failed to copy. ' + (err instanceof Error ? err.message : ''), 'error')
     }
   }
@@ -99,7 +102,7 @@ export const ScreenshotModal = () => {
       soundManager.playSuccess()
       closeModal()
     } catch (err) {
-      console.error(err)
+      logger.error(err)
       addToast('Failed to save image.', 'error')
     } finally {
       setIsSaving(false)

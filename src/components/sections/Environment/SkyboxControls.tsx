@@ -7,11 +7,13 @@
  * - Shared procedural controls (all procedural modes)
  * - Mode-specific controls (Starfield, Aurora, Horizon)
  */
-import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
-import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore'
-import { Button } from '@/components/ui/Button'
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
+import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
+import { type EnvironmentStore, useEnvironmentStore } from '@/stores/environmentStore'
+
 import { AuroraControls } from './skybox/AuroraControls'
 import { HorizonControls } from './skybox/HorizonControls'
 import { OceanControls } from './skybox/OceanControls'

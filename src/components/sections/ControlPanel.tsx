@@ -7,16 +7,15 @@
  * - side-by-side: Inline flex item next to canvas (desktop)
  */
 
+import React, { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+import { ResizeHandle } from '@/components/layout/ResizeHandle'
 import { Button } from '@/components/ui/Button'
 import type { LayoutMode } from '@/stores/layoutStore'
 import { useLayoutStore } from '@/stores/layoutStore'
-import React, { useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { ResizeHandle } from '@/components/layout/ResizeHandle'
 
-/**
- *
- */
+/** Props for the main control panel that aggregates sidebar sections. */
 export interface ControlPanelProps {
   children: React.ReactNode
   title?: string

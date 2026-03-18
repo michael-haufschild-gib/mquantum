@@ -9,12 +9,14 @@
  */
 
 import React, { useCallback, useMemo } from 'react'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import type { BecControlsProps } from './types'
-import type { BecInitialCondition, BecFieldView } from '@/lib/geometry/extended/types'
+import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
+
+import type { BecControlsProps } from './types'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 

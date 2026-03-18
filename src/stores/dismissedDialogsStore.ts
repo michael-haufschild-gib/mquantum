@@ -9,9 +9,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-/**
- *
- */
+/** Persistent state tracking permanently dismissed dialog boxes. */
 export interface DismissedDialogsState {
   /** Set of dialog IDs that have been dismissed */
   dismissedIds: Set<string>

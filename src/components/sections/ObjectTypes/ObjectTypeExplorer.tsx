@@ -1,12 +1,13 @@
-import { soundManager } from '@/lib/audio/SoundManager'
-import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import { m } from 'motion/react'
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
 import { useToast } from '@/hooks/useToast'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
-import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
-import { m } from 'motion/react'
-import React, { useCallback, useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { soundManager } from '@/lib/audio/SoundManager'
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
 
 /** Per-mode metadata */
 const MODE_FEATURES: Record<
@@ -20,6 +21,43 @@ const MODE_FEATURES: Record<
   becDynamics: { minDim: 3, category: 'compute' },
   diracEquation: { minDim: 3, category: 'compute' },
 }
+
+const MODE_OPTIONS: {
+  value: SchroedingerQuantumMode
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'harmonicOscillator',
+    label: 'Harmonic Oscillator',
+    description: 'N-dimensional quantum superposition states.',
+  },
+  {
+    value: 'hydrogenND',
+    label: 'Hydrogen Orbitals',
+    description: 'N-dimensional hydrogen atom in 3D space.',
+  },
+  {
+    value: 'freeScalarField',
+    label: 'Free Scalar Field',
+    description: 'Klein-Gordon field on a lattice with real-time evolution.',
+  },
+  {
+    value: 'tdseDynamics',
+    label: 'TDSE Dynamics',
+    description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
+  },
+  {
+    value: 'becDynamics',
+    label: 'Bose-Einstein Condensate',
+    description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
+  },
+  {
+    value: 'diracEquation',
+    label: 'Dirac',
+    description: 'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
+  },
+]
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(
@@ -40,43 +78,6 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
   // Handle object type initialization (fractals, polytopes, raymarching visibility)
   useObjectTypeInitialization(objectType, dimension)
 
-  const modeOptions = useMemo(
-    () => [
-      {
-        value: 'harmonicOscillator' as SchroedingerQuantumMode,
-        label: 'Harmonic Oscillator',
-        description: 'N-dimensional quantum superposition states.',
-      },
-      {
-        value: 'hydrogenND' as SchroedingerQuantumMode,
-        label: 'Hydrogen Orbitals',
-        description: 'N-dimensional hydrogen atom in 3D space.',
-      },
-      {
-        value: 'freeScalarField' as SchroedingerQuantumMode,
-        label: 'Free Scalar Field',
-        description: 'Klein-Gordon field on a lattice with real-time evolution.',
-      },
-      {
-        value: 'tdseDynamics' as SchroedingerQuantumMode,
-        label: 'TDSE Dynamics',
-        description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
-      },
-      {
-        value: 'becDynamics' as SchroedingerQuantumMode,
-        label: 'Bose-Einstein Condensate',
-        description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
-      },
-      {
-        value: 'diracEquation' as SchroedingerQuantumMode,
-        label: 'Dirac',
-        description:
-          'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
-      },
-    ],
-    []
-  )
-
   const { addToast } = useToast()
 
   const handleSelectMode = useCallback(
@@ -94,12 +95,12 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       const changes: string[] = []
       if (newDim !== prevDim) changes.push(`Dimension → ${newDim}D`)
       if (features.category === 'compute') changes.push('Representation → Position')
-      const modeLabel = modeOptions.find((m) => m.value === value)?.label ?? value
+      const modeLabel = MODE_OPTIONS.find((m) => m.value === value)?.label ?? value
       if (changes.length > 0) {
         addToast(`${modeLabel}: ${changes.join(', ')}`, 'info')
       }
     },
-    [setObjectType, setQuantumMode, addToast, modeOptions]
+    [setObjectType, setQuantumMode, addToast]
   )
 
   const handleSelectPauli = useCallback(() => {
@@ -125,10 +126,10 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
 
   const isPauliSelected = objectType === 'pauliSpinor'
 
-  const analyticModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'analytic')
-  const computeModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'compute')
+  const analyticModes = MODE_OPTIONS.filter((m) => MODE_FEATURES[m.value].category === 'analytic')
+  const computeModes = MODE_OPTIONS.filter((m) => MODE_FEATURES[m.value].category === 'compute')
 
-  const renderCard = (mode: (typeof modeOptions)[number]) => {
+  const renderCard = (mode: (typeof MODE_OPTIONS)[number]) => {
     const isSelected = !isPauliSelected && quantumMode === mode.value
     const features = MODE_FEATURES[mode.value]
 

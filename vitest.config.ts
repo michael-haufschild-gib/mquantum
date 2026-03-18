@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import react from '@vitejs/plugin-react'
+import path from 'path'
+import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
@@ -21,12 +21,13 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
       reportsDirectory: 'coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: [
-        'src/tests/**',
-        'src/**/*.d.ts',
-        'src/vite-env.d.ts',
-        'src/wasm/**/pkg/**',
-      ],
+      exclude: ['src/tests/**', 'src/**/*.d.ts', 'src/vite-env.d.ts', 'src/wasm/**/pkg/**'],
+      thresholds: {
+        statements: 45,
+        branches: 40,
+        functions: 44,
+        lines: 45,
+      },
     },
   },
   resolve: {
@@ -39,7 +40,10 @@ export default defineConfig({
       '@/types': path.resolve(import.meta.dirname, './src/types'),
       '@/utils': path.resolve(import.meta.dirname, './src/utils'),
       // Mock WASM module for tests (Vite import analysis runs before vitest mocks)
-      'mdimension-core': path.resolve(import.meta.dirname, './src/tests/__mocks__/mdimension-core.ts'),
+      'mdimension-core': path.resolve(
+        import.meta.dirname,
+        './src/tests/__mocks__/mdimension-core.ts'
+      ),
     },
   },
 })

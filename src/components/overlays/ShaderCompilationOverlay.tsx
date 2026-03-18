@@ -14,11 +14,13 @@
  * @module components/overlays/ShaderCompilationOverlay
  */
 
-import { Z_INDEX } from '@/constants/zIndex'
-import { usePerformanceStore } from '@/stores/performanceStore'
 import { AnimatePresence, m } from 'motion/react'
 import React, { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Z_INDEX } from '@/constants/zIndex'
+import { usePerformanceStore } from '@/stores/performanceStore'
+
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
 /** Animation duration for overlay fade in (seconds) */

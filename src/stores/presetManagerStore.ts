@@ -1,13 +1,11 @@
-import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+
+import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
+import { logger } from '@/lib/logger'
+
 import { DEFAULT_SPEED, useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
-import { APPEARANCE_INITIAL_STATE } from './slices/appearanceSlice'
-import { LIGHTING_INITIAL_STATE } from './slices/lightingSlice'
-import { POST_PROCESSING_INITIAL_STATE } from './slices/postProcessingSlice'
-import { SKYBOX_INITIAL_STATE } from './slices/skyboxSlice'
-import { PBR_INITIAL_STATE } from './slices/visual/pbrSlice'
 import { useCameraStore } from './cameraStore'
 import { DIALOG_IDS } from './dismissedDialogsStore'
 import { useEnvironmentStore } from './environmentStore'
@@ -19,31 +17,36 @@ import { usePBRStore } from './pbrStore'
 import { usePerformanceStore } from './performanceStore'
 import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
+import { APPEARANCE_INITIAL_STATE } from './slices/appearanceSlice'
+import { LIGHTING_INITIAL_STATE } from './slices/lightingSlice'
+import { POST_PROCESSING_INITIAL_STATE } from './slices/postProcessingSlice'
+import { SKYBOX_INITIAL_STATE } from './slices/skyboxSlice'
+import { PBR_INITIAL_STATE } from './slices/visual/pbrSlice'
 import { useTransformStore } from './transformStore'
 import { useUIStore } from './uiStore'
 import { mergeExtendedObjectStateForType } from './utils/mergeWithDefaults'
-import type { SavedScene, SavedStyle } from './utils/presetTypes'
-import {
-  serializeState,
-  serializeAnimationState,
-  serializeRotationState,
-  serializeExtendedState,
-  sanitizeLoadedState,
-  sanitizeExtendedLoadedState,
-  sanitizeStyleData,
-  sanitizeSceneData,
-} from './utils/presetSerialization'
 import {
   isNonEmptyTrimmedString,
   makeUniqueImportedName,
-  normalizeAppearanceLoadData,
   normalizeAnimationLoadData,
+  normalizeAppearanceLoadData,
   normalizeEnvironmentLoadData,
   normalizeLightingLoadData,
   normalizePbrLoadData,
   normalizePostProcessingLoadData,
   normalizeUiLoadData,
 } from './utils/presetNormalization'
+import {
+  sanitizeExtendedLoadedState,
+  sanitizeLoadedState,
+  sanitizeSceneData,
+  sanitizeStyleData,
+  serializeAnimationState,
+  serializeExtendedState,
+  serializeRotationState,
+  serializeState,
+} from './utils/presetSerialization'
+import type { SavedScene, SavedStyle } from './utils/presetTypes'
 
 /**
  * Pending rAF ID for scene load completion.
@@ -107,7 +110,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Validate and sanitize name
         const trimmedName = name.trim()
         if (!trimmedName) {
-          console.warn('Cannot save style with empty name')
+          logger.warn('Cannot save style with empty name')
           return
         }
 
@@ -212,7 +215,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       renameStyle: (id, newName) => {
         const trimmedName = newName.trim()
         if (!trimmedName) {
-          console.warn('Cannot rename style to empty name')
+          logger.warn('Cannot rename style to empty name')
           return
         }
         set((state) => ({
@@ -275,7 +278,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           set((state) => ({ savedStyles: [...state.savedStyles, ...processedStyles] }))
           return true
         } catch (e) {
-          console.error('Failed to import styles', e)
+          logger.error('Failed to import styles', e)
           useMsgBoxStore
             .getState()
             .showMsgBox(
@@ -297,7 +300,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Validate and sanitize name
         const trimmedName = name.trim()
         if (!trimmedName) {
-          console.warn('Cannot save scene with empty name')
+          logger.warn('Cannot save scene with empty name')
           return
         }
 
@@ -598,7 +601,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       renameScene: (id, newName) => {
         const trimmedName = newName.trim()
         if (!trimmedName) {
-          console.warn('Cannot rename scene to empty name')
+          logger.warn('Cannot rename scene to empty name')
           return
         }
         set((state) => ({
@@ -670,7 +673,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           set((state) => ({ savedScenes: [...state.savedScenes, ...processedScenes] }))
           return true
         } catch (e) {
-          console.error('Failed to import scenes', e)
+          logger.error('Failed to import scenes', e)
           useMsgBoxStore
             .getState()
             .showMsgBox(

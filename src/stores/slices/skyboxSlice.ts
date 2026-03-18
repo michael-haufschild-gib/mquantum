@@ -1,10 +1,6 @@
 import type { StateCreator } from 'zustand'
+
 import {
-  type SkyboxAnimationMode,
-  type SkyboxMode,
-  type SkyboxProceduralSettings,
-  type SkyboxSelection,
-  type SkyboxTexture,
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_SKYBOX_ANIMATION_MODE,
   DEFAULT_SKYBOX_ANIMATION_SPEED,
@@ -16,6 +12,11 @@ import {
   DEFAULT_SKYBOX_ROTATION,
   DEFAULT_SKYBOX_SELECTION,
   DEFAULT_SKYBOX_TEXTURE,
+  type SkyboxAnimationMode,
+  type SkyboxMode,
+  type SkyboxProceduralSettings,
+  type SkyboxSelection,
+  type SkyboxTexture,
 } from '../defaults/visualDefaults'
 
 /**

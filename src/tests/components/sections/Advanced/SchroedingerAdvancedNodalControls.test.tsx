@@ -1,8 +1,9 @@
+import { within } from '@testing-library/dom'
+import { act, fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { act, fireEvent, render, screen } from '@testing-library/react'
-import { within } from '@testing-library/dom'
-import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
   beforeEach(() => {

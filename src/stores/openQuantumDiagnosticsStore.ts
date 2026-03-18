@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand'
+
 import type { OpenQuantumMetrics } from '@/lib/physics/openQuantum/types'
 
 /** Ring buffer length — ~2s at 60fps */

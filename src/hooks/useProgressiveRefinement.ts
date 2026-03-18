@@ -3,28 +3,25 @@
  * Manages quality stages after interaction stops
  */
 
-import { useEnvironmentStore } from '@/stores/environmentStore'
-import {
-  REFINEMENT_STAGE_TIMING,
-  REFINEMENT_STAGES,
-  usePerformanceStore,
-  type RefinementStage,
-} from '@/stores/performanceStore'
-import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useExportStore } from '@/stores/exportStore'
+import {
+  REFINEMENT_STAGE_TIMING,
+  REFINEMENT_STAGES,
+  type RefinementStage,
+  usePerformanceStore,
+} from '@/stores/performanceStore'
+
+/** Options for the {@link useProgressiveRefinement} hook. */
 export interface UseProgressiveRefinementOptions {
   /** Enable progressive refinement (default: true) */
   enabled?: boolean
 }
 
-/**
- *
- */
+/** Current state of the progressive refinement pipeline. */
 export interface ProgressiveRefinementState {
   /** Current refinement stage */
   stage: RefinementStage
@@ -102,14 +99,13 @@ export function useProgressiveRefinement(
     }
   }, [])
 
-  // Start refinement sequence
+  // eslint-disable-next-line @eslint-react/no-unnecessary-use-callback -- inlining into useEffect triggers no-leaked-timeout; timers are cleaned via clearTimers ref
   const startRefinement = useCallback(() => {
     if (!enabled) return
 
     clearTimers()
     startTimeRef.current = performance.now()
 
-    // Set initial stage
     setRefinementStage('low')
     setRefinementProgress(0)
 
@@ -123,7 +119,7 @@ export function useProgressiveRefinement(
       stageTimersRef.current.push(timer)
     })
 
-    // Start progress animation using RAF for proper frame sync
+    // Progress animation using RAF for proper frame sync
     const totalDuration = REFINEMENT_STAGE_TIMING.final
     const updateProgress = () => {
       const elapsed = performance.now() - startTimeRef.current
@@ -139,7 +135,7 @@ export function useProgressiveRefinement(
     progressRafRef.current = requestAnimationFrame(updateProgress)
   }, [enabled, clearTimers, setRefinementStage, setRefinementProgress])
 
-  // Stop refinement (reset to low)
+  // eslint-disable-next-line @eslint-react/no-unnecessary-use-callback -- same: inlining triggers no-leaked-timeout
   const stopRefinement = useCallback(() => {
     clearTimers()
     setRefinementStage('low')
@@ -155,18 +151,14 @@ export function useProgressiveRefinement(
     }
 
     if (!enabled) {
-      // If disabled, ensure we're at final quality
       setRefinementStage('final')
       setRefinementProgress(100)
       return
     }
 
-    // Keep low quality while skybox is loading, during interaction, scene transition, or shader compilation
     if (isInteracting || skyboxLoading || sceneTransitioning || isShaderCompiling) {
-      // Interaction/loading/transition - reset to low quality
       stopRefinement()
     } else {
-      // All clear - start refinement sequence
       startRefinement()
     }
 

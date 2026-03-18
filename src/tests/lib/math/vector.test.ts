@@ -2,19 +2,20 @@
  * Tests for n-dimensional vector operations
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  createVector,
   addVectors,
-  subtractVectors,
-  scaleVector,
+  copyVector,
+  createVector,
+  crossProduct3D,
   dotProduct,
+  EPSILON,
   magnitude,
   normalize,
+  scaleVector,
+  subtractVectors,
   vectorsEqual,
-  copyVector,
-  crossProduct3D,
-  EPSILON,
 } from '@/lib/math'
 
 describe('Vector Operations', () => {

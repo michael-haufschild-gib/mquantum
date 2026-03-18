@@ -4,17 +4,16 @@
  * Dropdown for selecting the color algorithm used for face/surface coloring.
  */
 
-import { Select } from '@/components/ui/Select'
-import { getAvailableColorAlgorithms, type ColorAlgorithm } from '@/rendering/shaders/palette'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import React, { useMemo, useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Select } from '@/components/ui/Select'
+import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/rendering/shaders/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
+/** Props for the color algorithm selection dropdown. */
 export interface ColorAlgorithmSelectorProps {
   className?: string
 }

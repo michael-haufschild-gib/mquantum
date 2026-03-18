@@ -13,8 +13,10 @@
  * @module rendering/webgpu/passes/ToScreenPass
  */
 
+import { logger } from '@/lib/logger'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
  * Configuration for ToScreenPass.
@@ -262,7 +264,7 @@ export class ToScreenPass extends WebGPUBasePass {
 
     const sourceView = ctx.getTextureView(this.passConfig.inputResource)
     if (!sourceView) {
-      console.warn('ToScreenPass: Input texture not found:', this.passConfig.inputResource)
+      logger.warn('ToScreenPass: Input texture not found:', this.passConfig.inputResource)
       return
     }
 

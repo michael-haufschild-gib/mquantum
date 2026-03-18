@@ -1,30 +1,32 @@
+import { StateCreator } from 'zustand'
+
+import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
+import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
+import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
-  DEFAULT_SCHROEDINGER_CONFIG,
   type BecConfig,
+  DEFAULT_SCHROEDINGER_CONFIG,
   type DiracConfig,
   type FreeScalarConfig,
-  type SchroedingerConfig,
-  type TdseConfig,
+  HydrogenNDPresetName,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
+  type SchroedingerConfig,
   SchroedingerPresetName,
-  HydrogenNDPresetName,
+  type TdseConfig,
 } from '@/lib/geometry/extended/types'
-import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
-import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
-import { StateCreator } from 'zustand'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { ExtendedObjectSlice, SchroedingerSlice } from './types'
+
+import { createBecSetters, resizeBecArrays } from './setters/becSetters'
+import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
+import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
+import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import type { SetterContext } from './setters/sliceSetterUtils'
 import { clampDtWithCfl } from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
-import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
-import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
-import { createBecSetters, resizeBecArrays } from './setters/becSetters'
-import { createOpenQuantumSetters } from './setters/openQuantumSetters'
+import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 export const createSchroedingerSlice: StateCreator<
   ExtendedObjectSlice,

@@ -1,5 +1,12 @@
-import { ControlGroup } from '@/components/ui/ControlGroup'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+import { HOEnergyDiagram } from '@/components/sections/Advanced/HOEnergyDiagram'
+import { HydrogenEnergyDiagram } from '@/components/sections/Advanced/HydrogenEnergyDiagram'
+import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
+import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
 import { ColorPicker } from '@/components/ui/ColorPicker'
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
@@ -10,14 +17,8 @@ import type {
   SchroedingerCrossSectionScalar,
 } from '@/lib/geometry/extended/types'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
-import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
-import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { HOEnergyDiagram } from '@/components/sections/Advanced/HOEnergyDiagram'
-import { HydrogenEnergyDiagram } from '@/components/sections/Advanced/HydrogenEnergyDiagram'
-import React from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 const CROSS_SECTION_COMPOSITE_OPTIONS: {
   value: SchroedingerCrossSectionCompositeMode

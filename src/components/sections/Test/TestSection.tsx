@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
-import { Section } from '@/components/sections/Section'
-import { Knob } from '@/components/ui/Knob'
-import { Envelope } from '@/components/ui/Envelope'
 
-/**
- *
- */
+import { Section } from '@/components/sections/Section'
+import { Envelope } from '@/components/ui/Envelope'
+import { Knob } from '@/components/ui/Knob'
+
+/** Props for the development test section. */
 export interface TestSectionProps {
   defaultOpen?: boolean
 }

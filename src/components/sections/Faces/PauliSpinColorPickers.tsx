@@ -9,6 +9,7 @@
 
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { rgbToHex } from '@/lib/colors/colorUtils'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'

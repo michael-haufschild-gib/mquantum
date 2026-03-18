@@ -10,12 +10,14 @@
  */
 
 import React, { useCallback } from 'react'
-import { Slider } from '@/components/ui/Slider'
-import { Select } from '@/components/ui/Select'
-import { ToggleButton } from '@/components/ui/ToggleButton'
-import { Button } from '@/components/ui/Button'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 
 /**

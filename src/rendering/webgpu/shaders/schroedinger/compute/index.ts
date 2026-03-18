@@ -7,48 +7,39 @@
  * @module rendering/webgpu/shaders/schroedinger/compute
  */
 
-export { gridParamsBlock, densityGridComputeBlock } from './densityGrid.wgsl'
-
 export {
   composeDensityGridComputeShader,
-  type DensityGridComputeConfig,
   type ComputeQuantumMode,
+  type DensityGridComputeConfig,
 } from './compose'
-
-export {
-  eigenCacheComputeParamsBlock,
-  eigenCacheComputeBindingsBlock,
-  eigenCacheComputeMainBlock,
-} from './eigenfunctionCache.wgsl'
-
 export { composeEigenfunctionCacheComputeShader } from './composeEigenCache'
-
-export {
-  wignerGridParamsBlock,
-  wignerCacheComputeBlock,
-  WIGNER_GRID_PARAMS_SIZE,
-} from './wignerCache.wgsl'
-
 export {
   composeWignerCacheComputeShader,
   type WignerCacheComputeConfig,
 } from './composeWignerCache'
-
-export {
-  wignerSpatialParamsBlock,
-  wignerSpatialComputeBlock,
-  WIGNER_SPATIAL_PARAMS_SIZE,
-} from './wignerSpatial.wgsl'
-
+export { composeWignerReconstructComputeShader } from './composeWignerReconstruct'
 export {
   composeWignerSpatialComputeShader,
   type WignerSpatialComputeConfig,
 } from './composeWignerSpatial'
-
+export { densityGridComputeBlock, gridParamsBlock } from './densityGrid.wgsl'
 export {
-  wignerReconstructParamsBlock,
-  wignerReconstructComputeBlock,
+  eigenCacheComputeBindingsBlock,
+  eigenCacheComputeMainBlock,
+  eigenCacheComputeParamsBlock,
+} from './eigenfunctionCache.wgsl'
+export {
+  WIGNER_GRID_PARAMS_SIZE,
+  wignerCacheComputeBlock,
+  wignerGridParamsBlock,
+} from './wignerCache.wgsl'
+export {
   WIGNER_RECONSTRUCT_PARAMS_SIZE,
+  wignerReconstructComputeBlock,
+  wignerReconstructParamsBlock,
 } from './wignerReconstruct.wgsl'
-
-export { composeWignerReconstructComputeShader } from './composeWignerReconstruct'
+export {
+  WIGNER_SPATIAL_PARAMS_SIZE,
+  wignerSpatialComputeBlock,
+  wignerSpatialParamsBlock,
+} from './wignerSpatial.wgsl'

@@ -3,13 +3,13 @@
  * Section wrapper for lighting controls
  */
 
-import { Section } from '@/components/sections/Section'
 import React from 'react'
+
+import { Section } from '@/components/sections/Section'
+
 import { LightingControls } from './LightingControls'
 
-/**
- *
- */
+/** Props for the lighting section of the sidebar. */
 export interface LightsSectionProps {
   defaultOpen?: boolean
 }

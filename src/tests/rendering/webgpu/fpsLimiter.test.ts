@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { evaluateFpsLimit } from '@/rendering/webgpu/utils/fpsLimiter'
 
 interface SimulationArgs {

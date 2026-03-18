@@ -7,12 +7,13 @@
  * @module rendering/webgpu/utils/gizmoHitTesting
  */
 
-import { multiplyMat4, invertMat4, transformPoint } from './sceneMath'
 import { rotationToDirection } from '@/rendering/lights/types'
+
 import {
   calculateGroundIntersection,
   calculateSphereGroundIntersection,
 } from '../passes/gizmoGeometry'
+import { invertMat4, multiplyMat4, transformPoint } from './sceneMath'
 
 /** Gizmo scale formula (matches LightGizmoPass) */
 const GIZMO_BASE_SIZE = 0.3

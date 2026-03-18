@@ -7,8 +7,8 @@
  * @module rendering/webgpu/passes/CompositePass
  */
 
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
  * Blend modes for compositing.

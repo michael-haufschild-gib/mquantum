@@ -6,7 +6,8 @@
  * produce physically valid parameters.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 describe('Pauli physics config constraints', () => {

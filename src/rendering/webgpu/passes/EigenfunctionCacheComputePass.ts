@@ -13,8 +13,8 @@
  * @module rendering/webgpu/passes/EigenfunctionCacheComputePass
  */
 
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeEigenfunctionCacheComputeShader } from '../shaders/schroedinger/compute/composeEigenCache'
 import {
   EIGEN_CACHE_SAMPLES,
@@ -73,9 +73,7 @@ interface DeduplicationResult {
   funcMeta: Float32Array
 }
 
-/**
- *
- */
+/** Compute pass that pre-evaluates and caches eigenfunction values on a 3D grid. */
 export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
   /** Single cached pipeline — the eigenfunction compute shader has no config variants. */
   private static cachedPipeline: GPUComputePipeline | null = null

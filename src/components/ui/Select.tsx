@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Single option in a Select dropdown */
@@ -55,7 +56,8 @@ export const Select = React.memo(
     className = '',
     disabled = false,
     'data-testid': testId,
-  }: SelectProps<T>) => {
+    ref,
+  }: SelectProps<T> & { ref?: React.Ref<HTMLSelectElement> }) => {
     // Generate a unique ID for the select element to associate with the label
     const selectId = React.useId()
 
@@ -81,6 +83,7 @@ export const Select = React.memo(
         )}
         <div className="relative group">
           <select
+            ref={ref}
             id={selectId}
             value={value}
             onChange={handleChange}

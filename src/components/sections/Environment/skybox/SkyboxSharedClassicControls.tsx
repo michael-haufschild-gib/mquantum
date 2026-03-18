@@ -2,11 +2,12 @@
  * Shared controls for all classic (texture-based) skybox modes
  * Includes: Quality, Animation, Color
  */
+import React from 'react'
+
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { SkyboxAnimationMode, SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
-import React from 'react'
 
 const ANIMATION_MODES: { value: SkyboxAnimationMode; label: string }[] = [
   { value: 'none', label: 'None' },

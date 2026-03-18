@@ -1,10 +1,12 @@
-import { Button } from '@/components/ui/Button'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceMetricsStore, type BufferStats } from '@/stores/performanceMetricsStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { type BufferStats, usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import { useUIStore } from '@/stores/uiStore'
+
 import { Icons } from '../icons'
 import { BufferRow, DebugToggle, SectionHeader } from '../subcomponents'
 

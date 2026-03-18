@@ -1,11 +1,12 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { clearDipoleCache } from '@/lib/physics/openQuantum/dipoleElements'
+import { buildHydrogenBasis } from '@/lib/physics/openQuantum/hydrogenBasis'
 import {
+  buildTransitionRates,
   einsteinA,
   thermalOccupation,
-  buildTransitionRates,
 } from '@/lib/physics/openQuantum/hydrogenRates'
-import { buildHydrogenBasis } from '@/lib/physics/openQuantum/hydrogenBasis'
-import { clearDipoleCache } from '@/lib/physics/openQuantum/dipoleElements'
 
 /**
  * Boltzmann constant in atomic units (E_h / K).

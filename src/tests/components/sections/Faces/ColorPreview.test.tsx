@@ -1,7 +1,8 @@
-import { ColorPreview } from '@/components/sections/Faces/ColorPreview'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { ColorPreview } from '@/components/sections/Faces/ColorPreview'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 
 function hexToRgb(hex: string): [number, number, number] {
   const parsed = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)

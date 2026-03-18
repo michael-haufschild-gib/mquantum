@@ -2,9 +2,10 @@
  * Unit tests for Pauli scenario presets.
  */
 
-import { describe, it, expect } from 'vitest'
-import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
+import { describe, expect, it } from 'vitest'
+
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
+import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 
 describe('PAULI_SCENARIO_PRESETS', () => {
   it('contains exactly 6 presets', () => {

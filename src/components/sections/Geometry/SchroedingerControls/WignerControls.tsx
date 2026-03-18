@@ -9,9 +9,11 @@
  */
 
 import React, { useMemo } from 'react'
+
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+
 import type { WignerControlsProps } from './types'
 
 /**

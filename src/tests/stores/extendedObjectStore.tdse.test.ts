@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/types'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('TDSE store slice', () => {
   beforeEach(() => {
@@ -262,9 +263,8 @@ describe('TDSE store slice', () => {
     store.setTdseSlicePosition(0, 1.5)
     const sp = useExtendedObjectStore.getState().schroedinger.tdse.slicePositions
     expect(sp).toHaveLength(1)
-    // Value is clamped to half-extent of the 4th grid dimension
-    expect(typeof sp[0]).toBe('number')
-    expect(sp[0]).not.toBe(0)
+    // Value is clamped to half-extent of the 4th grid dimension (default: 16 * 0.1 * 0.5 = 0.8)
+    expect(sp[0]).toBe(0.8)
   })
 
   it('setTdseBarrierHeight clamps to [0, 100]', () => {

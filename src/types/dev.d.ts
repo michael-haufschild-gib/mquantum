@@ -3,13 +3,13 @@
  * These properties are only set in development mode (import.meta.env.DEV).
  */
 
-import type { useGeometryStore } from '@/stores/geometryStore'
-import type { useUIStore } from '@/stores/uiStore'
-import type { useEnvironmentStore } from '@/stores/environmentStore'
 import type { useAppearanceStore } from '@/stores/appearanceStore'
+import type { useEnvironmentStore } from '@/stores/environmentStore'
+import type { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import type { useGeometryStore } from '@/stores/geometryStore'
 import type { useLayoutStore } from '@/stores/layoutStore'
 import type { usePostProcessingStore } from '@/stores/postProcessingStore'
-import type { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import type { useUIStore } from '@/stores/uiStore'
 
 declare global {
   interface Window {

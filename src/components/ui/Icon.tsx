@@ -1,5 +1,7 @@
 import React from 'react'
 
+import ArrowLeftIcon from '@/assets/icons/arrow-left-filled.svg?react'
+import ArrowRightIcon from '@/assets/icons/arrow-right-filled.svg?react'
 // SVGR imports
 import CheckIcon from '@/assets/icons/checkmark.svg?react'
 import ChevronDownIcon from '@/assets/icons/chevron-down.svg?react'
@@ -10,6 +12,7 @@ import CogIcon from '@/assets/icons/cog.svg?react'
 import CopyIcon from '@/assets/icons/copy.svg?react'
 import CropIcon from '@/assets/icons/crop.svg?react'
 import CrossIcon from '@/assets/icons/cross.svg?react'
+import DiceIcon from '@/assets/icons/dice.svg?react'
 import DownloadIcon from '@/assets/icons/download.svg?react'
 import EyeIcon from '@/assets/icons/eye.svg?react'
 import HomeIcon from '@/assets/icons/home.svg?react'
@@ -29,9 +32,6 @@ import SphereIcon from '@/assets/icons/sphere.svg?react'
 import StopIcon from '@/assets/icons/stop2.svg?react'
 import UndoIcon from '@/assets/icons/undo.svg?react'
 import WarningIcon from '@/assets/icons/warning.svg?react'
-import ArrowLeftIcon from '@/assets/icons/arrow-left-filled.svg?react'
-import ArrowRightIcon from '@/assets/icons/arrow-right-filled.svg?react'
-import DiceIcon from '@/assets/icons/dice.svg?react'
 
 const icons = {
   eye: EyeIcon,
@@ -68,9 +68,7 @@ const icons = {
   dice: DiceIcon,
 } as const
 
-/**
- *
- */
+/** Union of all available icon names from the built-in icon set. */
 export type IconName = keyof typeof icons
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

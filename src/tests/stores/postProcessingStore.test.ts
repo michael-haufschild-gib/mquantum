@@ -3,7 +3,8 @@
  * Verifies post-processing effects state management
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { POST_PROCESSING_INITIAL_STATE } from '@/stores/slices/postProcessingSlice'
 

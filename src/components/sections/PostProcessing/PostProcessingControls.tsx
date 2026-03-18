@@ -1,12 +1,14 @@
-import React, { useState, useCallback, useMemo } from 'react'
-import { BloomControls } from './BloomControls'
-import { CinematicControls } from './CinematicControls'
-import { PaperControls } from './PaperControls'
+import React, { useCallback, useMemo, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Switch } from '@/components/ui/Switch'
 import { Tabs } from '@/components/ui/Tabs'
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
-import { useShallow } from 'zustand/react/shallow'
+import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+
+import { BloomControls } from './BloomControls'
+import { CinematicControls } from './CinematicControls'
 import { MiscControls } from './MiscControls'
+import { PaperControls } from './PaperControls'
 
 export const PostProcessingControls: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('bloom')

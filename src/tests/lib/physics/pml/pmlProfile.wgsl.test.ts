@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { pmlProfileBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pmlProfile.wgsl'
+import { describe, expect, it } from 'vitest'
+
 import { freeScalarNDIndexBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import { pmlProfileBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/pmlProfile.wgsl'
 
 describe('pmlProfile WGSL block', () => {
   it('defines computePMLSigma function with correct signature', () => {

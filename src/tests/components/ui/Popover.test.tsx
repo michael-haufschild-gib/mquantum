@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { Popover } from '@/components/ui/Popover'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { Button } from '@/components/ui/Button'
+import { Popover } from '@/components/ui/Popover'
 
 // Mock the sound manager
 vi.mock('@/lib/audio/SoundManager', () => ({

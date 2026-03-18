@@ -6,8 +6,9 @@
  * @module tests/hooks/useWebGPUSupport.test
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { useRendererStore } from '@/stores/rendererStore'
 
@@ -97,7 +98,6 @@ describe('useWebGPUSupport', () => {
         expect(result.current.isComplete).toBe(true)
       })
 
-      expect(result.current.capabilities).not.toBeNull()
       expect(result.current.capabilities?.supported).toBe(true)
     })
 
@@ -193,8 +193,8 @@ describe('useWebGPUSupport', () => {
       })
 
       const state = useRendererStore.getState()
-      expect(state.webgpuCapabilities).not.toBeNull()
       expect(state.webgpuStatus).toBe('supported')
+      expect(state.webgpuCapabilities?.supported).toBe(true)
     })
   })
 })

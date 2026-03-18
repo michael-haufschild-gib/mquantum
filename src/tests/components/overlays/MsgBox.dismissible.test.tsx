@@ -9,12 +9,13 @@
  * - Trustworthy: Deterministic results
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { MsgBox } from '@/components/overlays/MsgBox'
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
 // Mock localStorage
 const localStorageMock = (() => {

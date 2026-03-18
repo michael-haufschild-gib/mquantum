@@ -8,18 +8,18 @@
 
 // Bloom (progressive downsample/upsample)
 export {
-  bloomPrefilterShader,
-  bloomDownsampleShader,
-  bloomUpsampleShader,
   bloomCompositeShader,
   bloomCopyShader,
+  bloomDownsampleShader,
+  bloomPrefilterShader,
+  bloomUpsampleShader,
 } from './bloom.wgsl'
 
 // Anti-aliasing
 export { fxaaShader } from './fxaa.wgsl'
 export {
-  smaaEdgeDetectionShader,
   smaaBlendingWeightShader,
+  smaaEdgeDetectionShader,
   smaaNeighborhoodBlendingShader,
   smaaShaders,
 } from './smaa.wgsl'

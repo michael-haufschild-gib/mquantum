@@ -1,3 +1,6 @@
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
@@ -10,10 +13,8 @@ import type {
   SchroedingerNodalRenderMode,
 } from '@/lib/geometry/extended/types'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
   { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
@@ -33,9 +34,7 @@ const NODAL_RENDER_MODE_OPTIONS: { value: SchroedingerNodalRenderMode; label: st
   { value: 'surface', label: 'Ray-Hit Surface' },
 ]
 
-/**
- *
- */
+/** Props for the quantum effects analysis section (uncertainty, nodal surfaces). */
 export interface SchroedingerQuantumEffectsSectionProps {
   defaultOpen?: boolean
 }

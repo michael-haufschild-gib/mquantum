@@ -1,10 +1,11 @@
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { DivergingPsiSettings } from '@/rendering/shaders/palette'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 
 const COMPONENT_OPTIONS: { value: DivergingPsiSettings['component']; label: string }[] = [
   { value: 'real', label: 'Re(ψ)' },

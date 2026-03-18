@@ -8,29 +8,31 @@
  *
  */
 
+import React, { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
-import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
-import React, { useCallback, useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+import { type PBRSlice, usePBRStore } from '@/stores/pbrStore'
+
 import { ColorAlgorithmSelector } from './ColorAlgorithmSelector'
 import { ColorPreview } from './ColorPreview'
 import { CosineGradientEditor } from './CosineGradientEditor'
 import { DistributionControls } from './DistributionControls'
 import { DomainColoringControls } from './DomainColoringControls'
+import { KSpaceVizControls } from './KSpaceVizControls'
 import { LchPresetSelector } from './LchPresetSelector'
+import { PauliSpinColorPickers } from './PauliSpinColorPickers'
 import { PresetSelector } from './PresetSelector'
 import { RealImagDivergingControls } from './RealImagDivergingControls'
-import { KSpaceVizControls } from './KSpaceVizControls'
-import { PauliSpinColorPickers } from './PauliSpinColorPickers'
 import { SignedPhaseDivergingControls } from './SignedPhaseDivergingControls'
 
 /** Algorithms that use the cosine palette (preset selector + advanced editor) */
@@ -42,9 +44,7 @@ const USES_DISTRIBUTION = new Set(['lch', 'multiSource', 'radial'])
 /** Algorithms that use the base/face color (HSL-based) */
 const USES_BASE_COLOR = new Set(['phase', 'mixed'])
 
-/**
- *
- */
+/** Props for the faces/color section of the sidebar. */
 export interface FacesSectionProps {
   defaultOpen?: boolean
 }

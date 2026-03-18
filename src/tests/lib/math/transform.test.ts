@@ -2,7 +2,8 @@
  * Tests for n-dimensional transformation operations
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import { createScaleMatrix, multiplyMatrixVector } from '@/lib/math'
 
 describe('Transform Operations', () => {

@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { m, AnimatePresence } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+
 import { Button } from '@/components/ui/Button'
 
-/**
- *
- */
+/** Props for the collapsible sidebar section container. */
 export interface SectionProps {
   title: string
   defaultOpen?: boolean
@@ -62,7 +61,7 @@ export const Section: React.FC<SectionProps> = React.memo(
     // `isOpen` is intentionally omitted: toggling fires in handleToggle, not here.
     useEffect(() => {
       onOpenChange?.(isOpen)
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      // eslint-disable-next-line @eslint-react/exhaustive-deps
     }, [onOpenChange])
 
     const handleToggle = useCallback(() => {

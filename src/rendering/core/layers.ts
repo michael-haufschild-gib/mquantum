@@ -38,9 +38,7 @@ export const RENDER_LAYERS = {
   DEBUG: 4,
 } as const
 
-/**
- *
- */
+/** Numeric render layer identifier derived from the RENDER_LAYERS constant. */
 export type RenderLayer = (typeof RENDER_LAYERS)[keyof typeof RENDER_LAYERS]
 
 /**

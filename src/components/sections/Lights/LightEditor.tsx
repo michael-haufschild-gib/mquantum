@@ -14,15 +14,17 @@
  * - Range/Decay sliders (point/spot only)
  */
 
+import React, { memo, useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import type { LightSource, LightType } from '@/rendering/lights/types'
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
-import React, { memo, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+
 import { AMBIENT_LIGHT_ID } from './LightListItem'
 import { Vector3Input } from './Vector3Input'
 

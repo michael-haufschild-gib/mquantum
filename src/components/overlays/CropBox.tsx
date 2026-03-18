@@ -2,9 +2,7 @@ import { m, useMotionValue } from 'motion/react'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-/**
- *
- */
+/** Crop region coordinates as top/right/bottom/left fractions (0-1). */
 export interface CropValues {
   x: number // 0-1
   y: number // 0-1

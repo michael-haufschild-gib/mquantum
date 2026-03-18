@@ -20,111 +20,28 @@ import {
 import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/compose'
 import { composeEigenfunctionCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeEigenCache'
 import { composeWignerCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerCache'
+import { generateEmissionPreBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl'
 import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
 } from '@/rendering/webgpu/shaders/skybox/compose'
-import { generateEmissionPreBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl'
 
-/**
- * Removes comments from WGSL code for syntax checking.
- * This prevents false positives from GLSL terms mentioned in comments.
- * @param code
- */
-function removeComments(code: string): string {
-  // Remove single-line comments
-  let result = code.replace(/\/\/.*$/gm, '')
-  // Remove multi-line comments
-  result = result.replace(/\/\*[\s\S]*?\*\//g, '')
-  return result
-}
-
-/**
- * Verifies that a shader string is valid WGSL syntax.
- * @param wgsl - The WGSL shader code to verify
- * @param isFragment - Whether this is a fragment shader (vs vertex)
- */
+/** Verify fragment or vertex WGSL shader and check for GLSL leakage. */
 function verifyWgsl(wgsl: string, isFragment: boolean = true): void {
-  expect(typeof wgsl).toBe('string')
-  expect(wgsl.length).toBeGreaterThan(100)
-
-  // Remove comments for syntax checking (GLSL terms may appear in comments)
-  const codeWithoutComments = removeComments(wgsl)
-
-  // WGSL syntax checks
-  // Must use WGSL function syntax
-  expect(wgsl).toMatch(/fn\s+\w+\s*\(/)
-
-  // Must not contain GLSL-specific syntax (check code without comments)
-  expect(codeWithoutComments).not.toContain('void main()')
-  expect(codeWithoutComments).not.toContain('gl_FragColor')
-  expect(codeWithoutComments).not.toMatch(/\bprecision\s+(highp|mediump|lowp)/)
-  expect(codeWithoutComments).not.toMatch(/\bvarying\s+(highp|mediump|lowp|vec|mat|float|int)/)
-  expect(codeWithoutComments).not.toMatch(/\battribute\s+(highp|mediump|lowp|vec|mat|float|int)/)
-  expect(codeWithoutComments).not.toMatch(/\btexture2D\s*\(/)
-
-  // Should have @group/@binding decorators for resources
-  if (codeWithoutComments.includes('var<uniform>')) {
-    expect(wgsl).toMatch(/@group\s*\(\s*\d+\s*\)\s*@binding\s*\(\s*\d+\s*\)/)
-  }
-
-  // Fragment shaders should have @fragment entry point
-  if (isFragment) {
-    expect(wgsl).toMatch(/@fragment/)
-  } else {
-    expect(wgsl).toMatch(/@vertex/)
-  }
+  expect(wgsl).toBeValidWGSL(isFragment ? 'fragment' : 'vertex')
+  expect(wgsl).toHaveNoGLSLLeakage()
 }
 
-/**
- * Verifies WGSL does not have common GLSL->WGSL porting mistakes.
- * Note: Many math functions (mod, clamp, etc.) are the same in both languages.
- * @param wgsl
- */
-function verifyNoGlslLeakage(wgsl: string): void {
-  // GLSL atan(y, x) vs WGSL atan2(y, x)
-  const atanTwoArgPattern = /\batan\s*\([^,)]+,[^)]+\)/g
-  const matches = wgsl.match(atanTwoArgPattern)
-  if (matches) {
-    // Filter out atan2 calls which are correct
-    const wrongAtanCalls = matches.filter((m) => !m.includes('atan2'))
-    expect(wrongAtanCalls.length).toBe(0)
-  }
-}
-
-/**
- * Verifies that a compute shader string is valid WGSL syntax.
- * @param wgsl - The WGSL compute shader code to verify
- */
+/** Verify compute WGSL shader with additional compute-specific checks. */
 function verifyWgslCompute(wgsl: string): void {
-  expect(typeof wgsl).toBe('string')
-  expect(wgsl.length).toBeGreaterThan(100)
-
-  // Remove comments for syntax checking
-  const codeWithoutComments = removeComments(wgsl)
-
-  // WGSL syntax checks
-  expect(wgsl).toMatch(/fn\s+\w+\s*\(/)
-
-  // Must not contain GLSL-specific syntax
-  expect(codeWithoutComments).not.toContain('void main()')
-  expect(codeWithoutComments).not.toContain('gl_FragColor')
-  expect(codeWithoutComments).not.toMatch(/\bprecision\s+(highp|mediump|lowp)/)
-  expect(codeWithoutComments).not.toMatch(/\btexture2D\s*\(/)
-
-  // Should have @group/@binding decorators for resources
-  if (codeWithoutComments.includes('var<uniform>')) {
-    expect(wgsl).toMatch(/@group\s*\(\s*\d+\s*\)\s*@binding\s*\(\s*\d+\s*\)/)
-  }
-
-  // Compute shaders should have @compute entry point
-  expect(wgsl).toMatch(/@compute/)
-
-  // Should have @workgroup_size decorator
+  expect(wgsl).toBeValidWGSL('compute')
+  expect(wgsl).toHaveNoGLSLLeakage()
   expect(wgsl).toMatch(/@workgroup_size\s*\(\s*\d+/)
-
-  // Should have texture_storage_3d for output
   expect(wgsl).toMatch(/texture_storage_3d/)
+}
+
+function verifyNoGlslLeakage(wgsl: string): void {
+  expect(wgsl).toHaveNoGLSLLeakage()
 }
 
 describe('WGSL Shader Compilation - Schroedinger', () => {
@@ -143,7 +60,8 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       verifyWgsl(wgsl, true)
       verifyNoGlslLeakage(wgsl)
-      expect(features).toBeDefined()
+      expect(features).toContain(`${dimension}D Quantum`)
+      expect(features).toContain('Hydrogen ND')
     })
   }
 
@@ -863,7 +781,6 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
 
       verifyWgslCompute(wgsl)
       verifyNoGlslLeakage(wgsl)
-      expect(features).toBeDefined()
       expect(features).toContain('Density Grid Compute')
     })
   }
@@ -932,7 +849,6 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
   it('composes eigenfunction cache compute shader', () => {
     const { wgsl, features } = composeEigenfunctionCacheComputeShader()
 
-    expect(typeof wgsl).toBe('string')
     expect(wgsl.length).toBeGreaterThan(100)
     expect(wgsl).toMatch(/@compute/)
     expect(wgsl).toMatch(/@workgroup_size\s*\(\s*256/)
@@ -1184,7 +1100,6 @@ describe('WGSL Shader Compilation - Wigner Cache', () => {
       quantumMode: 'harmonicOscillator',
     })
 
-    expect(typeof wgsl).toBe('string')
     expect(wgsl.length).toBeGreaterThan(100)
     expect(wgsl).toMatch(/@compute/)
     expect(wgsl).toMatch(/@workgroup_size\s*\(\s*16\s*,\s*16/)

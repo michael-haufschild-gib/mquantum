@@ -1,9 +1,8 @@
 import React, { useCallback } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+/** Props for the {@link ToggleButton} component. */
 export interface ToggleButtonProps extends Omit<
   React.ComponentPropsWithoutRef<'button'>,
   'onToggle'
@@ -39,9 +38,9 @@ export const ToggleButton = React.memo(
       onToggle(!pressed)
     }, [sound, pressed, onToggle])
 
-    const handleMouseEnter = useCallback(() => {
+    const handleMouseEnter = () => {
       soundManager.playHover()
-    }, [])
+    }
 
     return (
       <button

@@ -13,8 +13,10 @@
  * @module rendering/webgpu/passes/DensityGridComputePass
  */
 
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { logger } from '@/lib/logger'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
 
 // Grid parameters struct size (must match WGSL GridParams)
@@ -28,7 +30,7 @@ const DEFAULT_GRID_SIZE = 64
 const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
-const WORKGROUP_SIZE = 8
+const WORKGROUP_SIZE = 4
 // PERF: Precomputed 2^(exponent-15) lookup table for Float16 decoding.
 // Exponents 0..30 (31 is Inf/NaN handled separately). Avoids Math.pow per voxel.
 const F16_EXP_TABLE = new Float32Array(31)
@@ -696,7 +698,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   execute(ctx: WebGPURenderContext): void {
     if (!this.computePipeline || !this.computeBindGroup) {
-      console.warn('DensityGridComputePass: Pipeline not initialized')
+      logger.warn('DensityGridComputePass: Pipeline not initialized')
       return
     }
 

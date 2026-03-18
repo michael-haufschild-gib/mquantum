@@ -12,8 +12,10 @@
  * @module rendering/webgpu/passes/FullscreenPass
  */
 
+import { logger } from '@/lib/logger'
+
+import type { WebGPURenderContext, WebGPUResourceAccess, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPURenderContext, WebGPUSetupContext, WebGPUResourceAccess } from '../core/types'
 
 /**
  * Uniform type for WebGPU fullscreen pass.
@@ -383,7 +385,7 @@ export class FullscreenPass extends WebGPUBasePass {
     for (const input of this.normalizedInputs) {
       const textureView = ctx.getTextureView(input.resourceId)
       if (!textureView) {
-        console.warn(`FullscreenPass ${this.id}: Missing input texture '${input.resourceId}'`)
+        logger.warn(`FullscreenPass ${this.id}: Missing input texture '${input.resourceId}'`)
         return
       }
       inputViews.push(textureView)
@@ -417,7 +419,7 @@ export class FullscreenPass extends WebGPUBasePass {
       : ctx.getCanvasTextureView()
 
     if (!outputView) {
-      console.warn(`FullscreenPass ${this.id}: Missing output target`)
+      logger.warn(`FullscreenPass ${this.id}: Missing output target`)
       return
     }
 

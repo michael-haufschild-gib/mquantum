@@ -9,18 +9,17 @@
  * @see {@link usePostProcessingStore} for state management
  */
 
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select, type SelectOption } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 import { type AntiAliasingMethod } from '@/stores/defaults/visualDefaults'
-import React from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
 
-/**
- *
- */
+/** Props for miscellaneous post-processing controls (AA, frame blending). */
 export interface MiscControlsProps {
   className?: string
 }

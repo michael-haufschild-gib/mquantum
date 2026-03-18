@@ -4,12 +4,13 @@
  * These are pure TypeScript functions that can be tested without WASM.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
+  flattenVertices,
+  float64ToVector,
   matrixToFloat64,
   vectorToFloat64,
-  float64ToVector,
-  flattenVertices,
 } from '@/lib/wasm/animation-wasm'
 
 describe('animation-wasm helpers', () => {
@@ -74,7 +75,6 @@ describe('animation-wasm helpers', () => {
       const input = new Float64Array([1.5, 2.5, 3.5])
       const result = float64ToVector(input)
 
-      expect(Array.isArray(result)).toBe(true)
       expect(result).toEqual([1.5, 2.5, 3.5])
     })
 

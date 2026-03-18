@@ -8,8 +8,9 @@
  */
 
 import React, { useMemo } from 'react'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 

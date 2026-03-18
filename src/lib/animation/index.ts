@@ -3,9 +3,9 @@
  */
 
 export {
-  GOLDEN_RATIO,
-  MIN_MULTIPLIER,
-  MAX_MULTIPLIER,
-  MAX_DEVIATION,
   getPlaneMultiplier,
+  GOLDEN_RATIO,
+  MAX_DEVIATION,
+  MAX_MULTIPLIER,
+  MIN_MULTIPLIER,
 } from './biasCalculation'

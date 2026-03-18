@@ -2,7 +2,8 @@
  * Unit tests for PauliConfig types, defaults, and presets.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
   DEFAULT_PAULI_CONFIG,
   type PauliFieldType,

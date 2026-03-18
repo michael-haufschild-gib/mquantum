@@ -1,11 +1,10 @@
-import { soundManager } from '@/lib/audio/SoundManager'
-import { Tooltip } from '@/components/ui/Tooltip'
 import { AnimatePresence, m } from 'motion/react'
-import React, { useState, useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 
-/**
- *
- */
+import { Tooltip } from '@/components/ui/Tooltip'
+import { soundManager } from '@/lib/audio/SoundManager'
+
+/** Props for the collapsible control group container. */
 export interface ControlGroupProps {
   title: string
   children: React.ReactNode
@@ -55,9 +54,9 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
       }
     }, [collapsible])
 
-    const handleRightElementClick = useCallback((e: React.MouseEvent) => {
+    const handleRightElementClick = (e: React.MouseEvent) => {
       e.stopPropagation()
-    }, [])
+    }
 
     const isCard = variant === 'card'
     const showTitleSection = collapsible || title.trim() !== ''

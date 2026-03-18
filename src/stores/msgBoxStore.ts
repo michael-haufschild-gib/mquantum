@@ -1,13 +1,9 @@
 import { create } from 'zustand'
 
-/**
- *
- */
+/** Message box severity level. */
 export type MsgBoxType = 'info' | 'success' | 'warning' | 'error'
 
-/**
- *
- */
+/** Button action configuration for a message box. */
 export interface MsgBoxAction {
   label: string
   onClick: () => void

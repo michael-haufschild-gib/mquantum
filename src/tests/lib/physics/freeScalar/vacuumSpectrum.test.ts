@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { type FreeScalarConfig, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import { DEFAULT_KSPACE_VIZ, type FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,

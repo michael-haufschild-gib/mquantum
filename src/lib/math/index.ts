@@ -10,8 +10,8 @@
  */
 
 // Type definitions
-export { EPSILON } from './types'
 export type { MatrixND, RotationPlane, Vector3D, VectorND } from './types'
+export { EPSILON } from './types'
 
 // Vector operations
 export {

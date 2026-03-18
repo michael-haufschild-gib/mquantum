@@ -9,9 +9,9 @@
  *   Worker → Main: KSpaceWorkerResponse (with Transferable density/analysis buffers)
  */
 
-import { computeRawKSpaceDataFromComplex } from '@/lib/physics/freeScalar/kSpaceOccupation'
-import { buildKSpaceDisplayTextures } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
+import { buildKSpaceDisplayTextures } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
+import { computeRawKSpaceDataFromComplex } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
 /** Inbound message to the k-space web worker requesting a texture computation. */
 export interface KSpaceWorkerRequest {

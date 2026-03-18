@@ -2,6 +2,8 @@
  * Tests for n-dimensional matrix operations
  */
 
+import { describe, expect, it } from 'vitest'
+
 import {
   copyMatrix,
   createIdentityMatrix,
@@ -15,7 +17,6 @@ import {
   multiplyMatrixVector,
   transposeMatrix,
 } from '@/lib/math'
-import { describe, expect, it } from 'vitest'
 import { MatrixND } from '@/lib/math/types'
 
 // Helper to create MatrixND from array of arrays

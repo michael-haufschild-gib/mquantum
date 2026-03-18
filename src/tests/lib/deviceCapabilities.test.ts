@@ -4,8 +4,9 @@
  * Tests for the unified device capability detection module.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { isWebGL2Supported, detectDeviceCapabilities } from '@/lib/deviceCapabilities'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { detectDeviceCapabilities, isWebGL2Supported } from '@/lib/deviceCapabilities'
 
 // Mock detect-gpu module
 vi.mock('detect-gpu', () => ({

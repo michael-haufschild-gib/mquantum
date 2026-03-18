@@ -17,8 +17,9 @@ import {
   DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_THRESHOLD,
 } from '@/stores/defaults/visualDefaults'
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
   bloomCompositeShader,
   bloomCopyShader,
@@ -43,9 +44,7 @@ interface BloomStoreState {
   bloomRadius?: number
 }
 
-/**
- *
- */
+/** Configuration for the multi-pass bloom post-processing effect. */
 export interface BloomPassOptions {
   /**
    * Base scene color input used for final composite.
@@ -63,9 +62,7 @@ export interface BloomPassOptions {
   filterRadius?: number
 }
 
-/**
- *
- */
+/** Multi-pass bloom effect: prefilter, downsample chain, upsample chain, and composite. */
 export class BloomPass extends WebGPUBasePass {
   // Pipelines
   private prefilterPipeline: GPURenderPipeline | null = null

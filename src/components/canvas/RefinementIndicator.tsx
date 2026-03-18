@@ -3,15 +3,14 @@
  * Displays progressive refinement progress
  */
 
-import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
-import { usePerformanceStore } from '@/stores/performanceStore'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
+import { usePerformanceStore } from '@/stores/performanceStore'
+
+/** Props for the progressive rendering quality indicator overlay. */
 export interface RefinementIndicatorProps {
   /** Position in the viewport */
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

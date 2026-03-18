@@ -1,10 +1,9 @@
-import React, { useCallback } from 'react'
 import { m } from 'motion/react'
+import React, { useCallback } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+/** Props for the {@link Switch} toggle component. */
 export interface SwitchProps {
   checked: boolean
   onCheckedChange: (checked: boolean) => void
@@ -26,7 +25,8 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     iconOn,
     iconOff,
     'data-testid': dataTestId,
-  }) => {
+    ref,
+  }: SwitchProps & { ref?: React.Ref<HTMLInputElement> }) => {
     const handleMouseEnter = useCallback(() => {
       if (!disabled) {
         soundManager.playHover()
@@ -55,6 +55,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
       >
         <div className="relative isolate w-11 h-6">
           <input
+            ref={ref}
             type="checkbox"
             className="peer sr-only"
             checked={checked}
@@ -62,6 +63,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
             disabled={disabled}
             role="switch"
             aria-checked={checked}
+            aria-label={label}
           />
 
           {/* Track */}

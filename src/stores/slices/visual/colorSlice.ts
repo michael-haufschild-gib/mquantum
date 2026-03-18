@@ -1,28 +1,31 @@
+import type { StateCreator } from 'zustand'
+
+import { logger } from '@/lib/logger'
 import type {
   ColorAlgorithm,
   CosineCoefficients,
+  DistributionSettings,
   DivergingPsiSettings,
   DomainColoringSettings,
-  PhaseDivergingSettings,
-  DistributionSettings,
   MultiSourceWeights,
+  PhaseDivergingSettings,
 } from '@/rendering/shaders/palette'
 import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
+  DEFAULT_DISTRIBUTION,
   DEFAULT_DIVERGING_PSI_SETTINGS,
   DEFAULT_DOMAIN_COLORING_SETTINGS,
-  DEFAULT_PHASE_DIVERGING_SETTINGS,
-  DEFAULT_DISTRIBUTION,
   DEFAULT_EDGE_COLOR,
   DEFAULT_FACE_COLOR,
   DEFAULT_LCH_CHROMA,
   DEFAULT_LCH_LIGHTNESS,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
   DEFAULT_PER_DIMENSION_COLOR_ENABLED,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
 } from '@/stores/defaults/visualDefaults'
-import type { StateCreator } from 'zustand'
+
 import type { AppearanceSlice, ColorSlice, ColorSliceState } from './types'
 
 function isFiniteColorInput(value: number): boolean {
@@ -80,19 +83,19 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
 
           if (import.meta.env.DEV) {
             if (!isFiniteColorInput(values[0])) {
-              console.warn(
+              logger.warn(
                 `[colorSlice] Ignoring non-finite cosine coefficient ${key}[0]:`,
                 values[0]
               )
             }
             if (!isFiniteColorInput(values[1])) {
-              console.warn(
+              logger.warn(
                 `[colorSlice] Ignoring non-finite cosine coefficient ${key}[1]:`,
                 values[1]
               )
             }
             if (!isFiniteColorInput(values[2])) {
-              console.warn(
+              logger.warn(
                 `[colorSlice] Ignoring non-finite cosine coefficient ${key}[2]:`,
                 values[2]
               )

@@ -9,9 +9,9 @@
 
 export { absorptionBlock } from './absorption.wgsl'
 export {
-  generateEmissionPreBlock,
+  COLOR_ALG_NAMES,
   emissionPostBlock,
   generateComputeBaseColor,
-  COLOR_ALG_NAMES,
+  generateEmissionPreBlock,
 } from './emission.wgsl'
 export { volumeGradientBlock, volumeIntegrationBlock } from './integration.wgsl'

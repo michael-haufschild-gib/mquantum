@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { useCameraStore } from '@/stores/cameraStore'
 
 /** Creates a mock CameraInstance matching the WebGPUCamera interface */

@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+
 import { Input, InputProps } from './Input'
 
-/**
- *
- */
+/** Props for the {@link NumberInput} component. Extends {@link InputProps} with numeric constraints. */
 export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'> {
   value: number
   onChange: (value: number) => void
@@ -195,8 +194,9 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
     step = 1,
     precision = 3,
     onBlur,
+    ref: externalRef,
     ...props
-  }) => {
+  }: NumberInputProps & { ref?: React.Ref<HTMLInputElement> }) => {
     const [localValue, setLocalValue] = useState(value.toString())
     const [error, setError] = useState<string | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)
@@ -302,10 +302,20 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
       onChange(Math.max(value - step, min))
     }, [onChange, value, step, min])
 
+    const mergedRef = useCallback(
+      (element: HTMLInputElement | null) => {
+        inputRef.current = element
+        if (typeof externalRef === 'function') externalRef(element)
+        else if (externalRef)
+          (externalRef as React.MutableRefObject<HTMLInputElement | null>).current = element
+      },
+      [externalRef]
+    )
+
     return (
       <Input
         {...props}
-        ref={inputRef}
+        ref={mergedRef}
         value={localValue}
         onChange={handleChange}
         onFocus={handleFocus}
@@ -315,18 +325,22 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
         rightIcon={
           <div className="flex flex-col gap-[1px]">
             <button
+              type="button"
               className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
               onClick={handleIncrement}
               tabIndex={-1}
+              aria-label="Increment"
             >
               <svg width="6" height="4" viewBox="0 0 8 4" fill="currentColor">
                 <path d="M4 0L8 4H0L4 0Z" />
               </svg>
             </button>
             <button
+              type="button"
               className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
               onClick={handleDecrement}
               tabIndex={-1}
+              aria-label="Decrement"
             >
               <svg width="6" height="4" viewBox="0 0 8 4" fill="currentColor">
                 <path d="M4 4L0 0H8L4 4Z" />

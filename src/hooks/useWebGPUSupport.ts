@@ -8,16 +8,16 @@
  */
 
 import { useEffect, useRef } from 'react'
+
+import { logger } from '@/lib/logger'
+import type { WebGPUAdapterMode, WebGPUCapabilityInfo } from '@/stores/rendererStore'
 import { useRendererStore } from '@/stores/rendererStore'
-import type { WebGPUCapabilityInfo, WebGPUAdapterMode } from '@/stores/rendererStore'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- *
- */
+/** Return type for the {@link useWebGPUSupport} detection hook. */
 export interface UseWebGPUSupportResult {
   /** Whether detection is still in progress */
   isChecking: boolean
@@ -143,7 +143,7 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
         adapterModeEstimated: adapterModeResult.adapterModeEstimated,
       }
     } catch (deviceError) {
-      console.warn('[useWebGPUSupport] Failed to create device:', deviceError)
+      logger.warn('[useWebGPUSupport] Failed to create device:', deviceError)
       return {
         supported: false,
         vendor: adapterInfo?.vendor || undefined,
@@ -156,7 +156,7 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
       }
     }
   } catch (error) {
-    console.warn('[useWebGPUSupport] Detection error:', error)
+    logger.warn('[useWebGPUSupport] Detection error:', error)
     return {
       supported: false,
       unavailableReason: 'initialization_error',
@@ -215,9 +215,9 @@ export function useWebGPUSupport(): UseWebGPUSupportResult {
 
       if (import.meta.env.DEV) {
         if (caps.supported) {
-          console.log('[useWebGPUSupport] WebGPU supported:', caps)
+          logger.log('[useWebGPUSupport] WebGPU supported:', caps)
         } else {
-          console.log('[useWebGPUSupport] WebGPU not available:', caps.unavailableReason)
+          logger.log('[useWebGPUSupport] WebGPU not available:', caps.unavailableReason)
         }
       }
 

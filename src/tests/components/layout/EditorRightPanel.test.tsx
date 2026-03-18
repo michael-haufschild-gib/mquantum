@@ -1,7 +1,8 @@
-import { EditorRightPanel } from '@/components/layout/EditorRightPanel'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
+
+import { EditorRightPanel } from '@/components/layout/EditorRightPanel'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('EditorRightPanel object tab layout', () => {
   beforeEach(() => {
@@ -20,8 +21,8 @@ describe('EditorRightPanel object tab layout', () => {
     const analysisToQuantum = analysis.compareDocumentPosition(quantumEffects)
     const quantumToAdvanced = quantumEffects.compareDocumentPosition(advanced)
 
-    expect(analysisToQuantum & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(quantumToAdvanced & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(analysisToQuantum & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0)
+    expect(quantumToAdvanced & Node.DOCUMENT_POSITION_FOLLOWING).toBeGreaterThan(0)
   })
 
   it('does not render isosurface mode toggle in the right panel surface section', () => {

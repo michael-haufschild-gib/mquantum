@@ -7,21 +7,22 @@
  * @module rendering/webgpu/WebGPUCanvas
  */
 
-import React, { useEffect, useRef, useCallback, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+
+import { logger } from '@/lib/logger'
+import { useRendererStore } from '@/stores/rendererStore'
+
 import { WebGPUBasePass } from './core/WebGPUBasePass'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
-import { useRendererStore } from '@/stores/rendererStore'
-import { WebGPUContext, type WebGPUCanvasContext } from './WebGPUContext'
+import { type WebGPUCanvasContext, WebGPUContext } from './WebGPUContext'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- *
- */
+/** Props for the WebGPU canvas component that manages device initialization and the render loop. */
 export interface WebGPUCanvasProps {
   /** CSS class name for the canvas container */
   className?: string
@@ -75,13 +76,19 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const dprRef = useRef<number | undefined>(dpr)
   dprRef.current = dpr
 
+  // Stable refs for callbacks — prevents re-initializing the entire WebGPU
+  // device + render graph when a parent re-renders with new function references.
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
+  const handleDeviceLostRef = useRef(useRendererStore.getState().handleDeviceLost)
+
   const [context, setContext] = useState<WebGPUCanvasContext | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState<Error | null>(null)
 
-  const handleDeviceLost = useRendererStore((state) => state.handleDeviceLost)
-
-  // Initialize WebGPU
+  // Initialize WebGPU — runs once on mount, not on prop/callback changes.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -132,11 +139,11 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
         // Register device lost handler (store unsubscribe for cleanup)
         unsubDeviceLost = deviceManager.onDeviceLost((reason) => {
-          console.error('[WebGPUCanvas] Device lost:', reason)
+          logger.error('[WebGPUCanvas] Device lost:', reason)
           // Clear static GPU resources that hold references to the destroyed device
           WebGPUBasePass.clearStaticResources()
           WebGPUSchrodingerRenderer.clearPipelineCache()
-          handleDeviceLost(reason)
+          handleDeviceLostRef.current(reason)
         })
 
         // Create context
@@ -149,13 +156,13 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
         setContext(ctx)
         setIsInitialized(true)
-        onReady?.(graph)
+        onReadyRef.current?.(graph)
       } catch (error) {
         if (cancelled) return
-        console.error('[WebGPUCanvas] Initialization failed:', error)
+        logger.error('[WebGPUCanvas] Initialization failed:', error)
         const err = error instanceof Error ? error : new Error(String(error))
         setInitError(err)
-        onError?.(err)
+        onErrorRef.current?.(err)
       }
     }
 
@@ -169,34 +176,32 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         graphRef.current = null
       }
     }
-  }, [onReady, onError, handleDeviceLost])
-
-  // Handle resize
-  const handleResize = useCallback(() => {
-    const container = containerRef.current
-    const canvas = canvasRef.current
-    const graph = graphRef.current
-
-    if (!container || !canvas || !graph) return
-
-    const devicePixelRatio = dpr ?? window.devicePixelRatio
-    const width = Math.floor(container.clientWidth * devicePixelRatio)
-    const height = Math.floor(container.clientHeight * devicePixelRatio)
-
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width
-      canvas.height = height
-      graph.setSize(width, height)
-
-      // Update context size
-      setContext((prev) => (prev ? { ...prev, size: { width, height } } : null))
-    }
-  }, [dpr])
+  }, [])
 
   // Set up resize observer
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+
+    const handleResize = () => {
+      const canvas = canvasRef.current
+      const graph = graphRef.current
+
+      if (!canvas || !graph) return
+
+      const devicePixelRatio = dpr ?? window.devicePixelRatio
+      const width = Math.floor(container.clientWidth * devicePixelRatio)
+      const height = Math.floor(container.clientHeight * devicePixelRatio)
+
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width
+        canvas.height = height
+        graph.setSize(width, height)
+
+        // Update context size
+        setContext((prev) => (prev ? { ...prev, size: { width, height } } : null))
+      }
+    }
 
     // Apply current size immediately (including DPR changes) without
     // tearing down and reinitializing WebGPU resources.
@@ -211,7 +216,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [handleResize])
+  }, [dpr])
 
   // Render error state
   if (initError) {
@@ -248,6 +253,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     >
       <canvas
         ref={canvasRef}
+        data-testid="webgpu-canvas"
         style={{
           position: 'absolute',
           top: 0,

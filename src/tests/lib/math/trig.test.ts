@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { fcos, fsin } from '@/lib/math/trig'
 
 describe('fsin', () => {

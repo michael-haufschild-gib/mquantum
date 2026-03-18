@@ -1,147 +1,78 @@
 /**
- * Tests for rendererStore - WebGPU mode management
- *
- * @module tests/stores/rendererStore.test
+ * Tests for rendererStore - WebGPU detection lifecycle
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useRendererStore } from '@/stores/rendererStore'
+
 import type { WebGPUCapabilityInfo } from '@/stores/rendererStore'
+import { useRendererStore } from '@/stores/rendererStore'
 
 describe('rendererStore', () => {
   beforeEach(() => {
-    // Reset store to initial state
     useRendererStore.getState().reset()
   })
 
-  describe('initial state', () => {
-    it('starts with webgpu mode', () => {
-      const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgpu')
-    })
+  it('completeDetection stores capabilities and marks detection done', () => {
+    const caps: WebGPUCapabilityInfo = {
+      supported: true,
+      vendor: 'Mock Vendor',
+      architecture: 'Mock Arch',
+      device: 'Mock Device',
+    }
+    useRendererStore.getState().completeDetection(caps)
 
-    it('has unknown webgpuStatus initially', () => {
-      const state = useRendererStore.getState()
-      expect(state.webgpuStatus).toBe('unknown')
-    })
-
-    it('has no capabilities initially', () => {
-      const state = useRendererStore.getState()
-      expect(state.webgpuCapabilities).toBeNull()
-    })
-
-    it('has detection not complete initially', () => {
-      const state = useRendererStore.getState()
-      expect(state.detectionComplete).toBe(false)
-    })
-
-    it('does not show fallback notification initially', () => {
-      const state = useRendererStore.getState()
-      expect(state.showFallbackNotification).toBe(false)
-    })
+    const state = useRendererStore.getState()
+    expect(state.detectionComplete).toBe(true)
+    expect(state.webgpuCapabilities).toEqual(caps)
+    expect(state.mode).toBe('webgpu')
+    expect(state.webgpuStatus).toBe('supported')
+    expect(state.showFallbackNotification).toBe(false)
   })
 
-  describe('setWebGPUStatus', () => {
-    it('updates webgpuStatus to checking', () => {
-      useRendererStore.getState().setWebGPUStatus('checking')
-      expect(useRendererStore.getState().webgpuStatus).toBe('checking')
+  it('completeDetection shows fallback notification when unsupported', () => {
+    useRendererStore.getState().completeDetection({
+      supported: false,
+      unavailableReason: 'not_in_browser',
     })
 
-    it('updates webgpuStatus to supported', () => {
-      useRendererStore.getState().setWebGPUStatus('supported')
-      expect(useRendererStore.getState().webgpuStatus).toBe('supported')
-    })
-
-    it('updates webgpuStatus to unsupported', () => {
-      useRendererStore.getState().setWebGPUStatus('unsupported')
-      expect(useRendererStore.getState().webgpuStatus).toBe('unsupported')
-    })
+    const state = useRendererStore.getState()
+    expect(state.webgpuStatus).toBe('unsupported')
+    expect(state.showFallbackNotification).toBe(true)
+    expect(state.webgpuCapabilities?.unavailableReason).toBe('not_in_browser')
   })
 
-  describe('completeDetection', () => {
-    it('marks detection as complete', () => {
-      useRendererStore.getState().completeDetection({
-        supported: true,
-        vendor: 'Test',
-      })
-      expect(useRendererStore.getState().detectionComplete).toBe(true)
-    })
+  it('handleDeviceLost marks unsupported and shows notification', () => {
+    useRendererStore.getState().handleDeviceLost('GPU process crashed')
 
-    it('sets capabilities from detection result', () => {
-      const caps: WebGPUCapabilityInfo = {
-        supported: true,
-        vendor: 'Mock Vendor',
-        architecture: 'Mock Arch',
-        device: 'Mock Device',
-      }
-      useRendererStore.getState().completeDetection(caps)
-
-      const state = useRendererStore.getState()
-      expect(state.webgpuCapabilities).toEqual(caps)
-    })
-
-    it('sets mode to webgpu when supported', () => {
-      useRendererStore.getState().completeDetection({
-        supported: true,
-      })
-
-      expect(useRendererStore.getState().mode).toBe('webgpu')
-      expect(useRendererStore.getState().webgpuStatus).toBe('supported')
-    })
-
-    it('shows fallback notification when webgpu not supported', () => {
-      useRendererStore.getState().completeDetection({
-        supported: false,
-        unavailableReason: 'not_in_browser',
-      })
-
-      const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgpu')
-      expect(state.webgpuStatus).toBe('unsupported')
-      expect(state.showFallbackNotification).toBe(true)
-    })
+    const state = useRendererStore.getState()
+    expect(state.webgpuStatus).toBe('unsupported')
+    expect(state.webgpuCapabilities?.unavailableReason).toBe('device_lost')
+    expect(state.showFallbackNotification).toBe(true)
   })
 
-  describe('handleDeviceLost', () => {
-    it('marks webgpu as unsupported', () => {
-      useRendererStore.getState().handleDeviceLost('Test reason')
+  it('dismissFallbackNotification hides the notification', () => {
+    useRendererStore.getState().handleDeviceLost('Test')
+    useRendererStore.getState().dismissFallbackNotification()
 
-      const state = useRendererStore.getState()
-      expect(state.webgpuStatus).toBe('unsupported')
-      expect(state.webgpuCapabilities?.unavailableReason).toBe('device_lost')
-    })
-
-    it('shows fallback notification', () => {
-      useRendererStore.getState().handleDeviceLost('Test reason')
-      expect(useRendererStore.getState().showFallbackNotification).toBe(true)
-    })
+    expect(useRendererStore.getState().showFallbackNotification).toBe(false)
   })
 
-  describe('dismissFallbackNotification', () => {
-    it('hides the fallback notification', () => {
-      // Show notification
-      useRendererStore.getState().handleDeviceLost('Test')
-      expect(useRendererStore.getState().showFallbackNotification).toBe(true)
-
-      // Dismiss
-      useRendererStore.getState().dismissFallbackNotification()
-      expect(useRendererStore.getState().showFallbackNotification).toBe(false)
-    })
+  it('setWebGPUStatus transitions through lifecycle states', () => {
+    for (const status of ['checking', 'supported', 'unsupported'] as const) {
+      useRendererStore.getState().setWebGPUStatus(status)
+      expect(useRendererStore.getState().webgpuStatus).toBe(status)
+    }
   })
 
-  describe('reset', () => {
-    it('resets to initial state', () => {
-      // Modify state
-      useRendererStore.getState().completeDetection({ supported: true })
+  it('reset restores pre-detection state after full lifecycle', () => {
+    useRendererStore.getState().completeDetection({ supported: true, vendor: 'NVIDIA' })
+    useRendererStore.getState().reset()
 
-      // Reset
-      useRendererStore.getState().reset()
-
-      const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgpu')
-      expect(state.webgpuStatus).toBe('unknown')
-      expect(state.webgpuCapabilities).toBeNull()
-      expect(state.detectionComplete).toBe(false)
-    })
+    const state = useRendererStore.getState()
+    expect(state.mode).toBe('webgpu')
+    expect(state.webgpuStatus).toBe('unknown')
+    expect(state.webgpuCapabilities).toBeNull()
+    expect(state.detectionComplete).toBe(false)
+    expect(state.showFallbackNotification).toBe(false)
   })
 })

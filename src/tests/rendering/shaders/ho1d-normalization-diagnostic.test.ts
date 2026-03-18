@@ -9,7 +9,8 @@
  * instead of a volumetric Gaussian blob.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 
 // ============================================================================
@@ -234,15 +235,8 @@ describe('HO1D Normalization Diagnostic', () => {
       totalAlphaVisual < 0.01 ? 'YES - INVISIBLE!' : 'no - visible'
     )
 
-    // The canonical normalization should still produce visible output
-    // If this fails, the normalization change is the root cause
-    if (totalAlphaCanonical < 0.01) {
-      console.error('!!! CANONICAL NORMALIZATION PRODUCES INVISIBLE OUTPUT !!!')
-      console.error('This is likely the root cause of the "3 thin black lines" bug.')
-    }
-
-    // We just want to know - don't assert yet
-    expect(true).toBe(true)
+    // Canonical normalization must produce visible output (alpha > discard threshold)
+    expect(totalAlphaCanonical).toBeGreaterThan(0.01)
   })
 
   it('should compare ho1D peak values per quantum number', () => {

@@ -1,4 +1,5 @@
 import type { StateCreator } from 'zustand'
+
 import type { AdvancedRenderingSlice } from './types'
 
 function isFiniteAdvancedRenderingInput(value: number): boolean {

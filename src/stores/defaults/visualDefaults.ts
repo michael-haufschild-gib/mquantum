@@ -7,14 +7,14 @@
 import type { TransformMode } from '@/rendering/lights/types'
 import { createDefaultLight } from '@/rendering/lights/types'
 import {
+  type CosineCoefficients,
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
-  DEFAULT_DOMAIN_COLORING_SETTINGS,
-  DEFAULT_DIVERGING_PSI_SETTINGS,
-  DEFAULT_PHASE_DIVERGING_SETTINGS,
   DEFAULT_DISTRIBUTION,
+  DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_DOMAIN_COLORING_SETTINGS,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
-  type CosineCoefficients,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
   type DistributionSettings,
 } from '@/rendering/shaders/palette'
 import type { ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
@@ -194,14 +194,10 @@ export const DEFAULT_FACE_PBR: PBRConfig = {
 // Skybox Defaults
 // ============================================================================
 
-/**
- *
- */
+/** Available pre-baked skybox texture identifiers. */
 export type SkyboxTexture = 'space_blue' | 'space_lightblue' | 'space_red' | 'none'
 
-/**
- *
- */
+/** Skybox rendering mode (procedural vs texture-based). */
 export type SkyboxMode =
   | 'classic'
   | 'procedural_aurora'
@@ -231,9 +227,7 @@ export const DEFAULT_SKYBOX_INTENSITY = 1
 export const DEFAULT_SKYBOX_ROTATION = 0
 export const DEFAULT_SKYBOX_HIGH_QUALITY = false
 
-/**
- *
- */
+/** Animation style for procedural skybox effects. */
 export type SkyboxAnimationMode =
   | 'none'
   | 'cinematic' // Smooth Y orbit + subtle vertical bob (The "Standard")
@@ -284,9 +278,7 @@ export const DEFAULT_OCEAN_SETTINGS: OceanSettings = {
   surfaceShimmer: 0.4,
 }
 
-/**
- *
- */
+/** Configuration for procedural skybox generation. */
 export interface SkyboxProceduralSettings {
   // Core
   scale: number
@@ -375,9 +367,9 @@ export const MAX_MAX_FPS = 120
 export {
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
-  DEFAULT_DOMAIN_COLORING_SETTINGS,
-  DEFAULT_DIVERGING_PSI_SETTINGS,
-  DEFAULT_PHASE_DIVERGING_SETTINGS,
   DEFAULT_DISTRIBUTION,
+  DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_DOMAIN_COLORING_SETTINGS,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
 }

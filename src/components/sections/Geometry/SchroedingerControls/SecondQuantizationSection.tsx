@@ -12,6 +12,7 @@
  */
 
 import { useMemo } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
@@ -19,6 +20,7 @@ import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { SecondQuantizationMode } from '@/lib/geometry/extended/types'
 import { computeSecondQuantMetrics, type SecondQuantParams } from '@/lib/math/secondQuantization'
+
 import type { SecondQuantizationSectionProps } from './types'
 
 /**

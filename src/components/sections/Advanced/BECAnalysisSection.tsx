@@ -13,9 +13,10 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Slider } from '@/components/ui/Slider'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

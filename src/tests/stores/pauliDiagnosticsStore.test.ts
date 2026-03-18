@@ -2,7 +2,8 @@
  * Unit tests for the Pauli diagnostics store.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 
 describe('pauliDiagnosticsStore', () => {

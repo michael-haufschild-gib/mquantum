@@ -5,14 +5,13 @@
  * before palette lookup. Controls power curve, cycles, and offset.
  */
 
-import { Slider } from '@/components/ui/Slider'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Slider } from '@/components/ui/Slider'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+
+/** Props for the color distribution parameter controls. */
 export interface DistributionControlsProps {
   className?: string
 }

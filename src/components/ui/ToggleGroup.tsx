@@ -1,19 +1,16 @@
+import { LayoutGroup, m } from 'motion/react'
 import React, { useCallback } from 'react'
-import { m, LayoutGroup } from 'motion/react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+/** Single option within a {@link ToggleGroup}. */
 export interface ToggleOption<T extends string = string> {
   value: T
   label: string
   disabled?: boolean
 }
 
-/**
- *
- */
+/** Props for the {@link ToggleGroup} mutually-exclusive option selector. */
 export interface ToggleGroupProps<T extends string = string> {
   options: ToggleOption<T>[]
   value: T
@@ -56,6 +53,7 @@ const ToggleGroupButton = React.memo(
 
     return (
       <button
+        type="button"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         disabled={isDisabled}

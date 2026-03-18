@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+
 import {
-  normDriftFromHistory,
   computeReflectionTransmission,
+  normDriftFromHistory,
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'

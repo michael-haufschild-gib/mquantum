@@ -4,7 +4,10 @@
  */
 
 import { useShallow } from 'zustand/react/shallow'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
 import type {
   BecActions,
   DiracActions,
@@ -14,7 +17,6 @@ import type {
   TdseActions,
   WignerActions,
 } from './types'
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 
 /** Return type of the useSchroedingerActions hook. */
 export interface SchroedingerActionsResult {

@@ -25,19 +25,22 @@
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import {
-  DENSITY_GRID_SIZE,
-  DIAG_DECIMATION,
-  FFT_UNIFORM_SIZE,
-  GRID_WG,
-  LINEAR_WG,
-  MAX_DIM,
-  PACK_UNIFORM_SIZE,
-  nearestPow2,
-} from './computePassUtils'
-import type { WebGPURenderContext } from '../core/types'
 
+import type { WebGPURenderContext } from '../core/types'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import { pauliAbsorberBlock } from '../shaders/schroedinger/compute/pauliAbsorber.wgsl'
+import {
+  pauliDiagFinalizeBlock,
+  pauliDiagReduceBlock,
+} from '../shaders/schroedinger/compute/pauliDiagnostics.wgsl'
+import { pauliInitBlock } from '../shaders/schroedinger/compute/pauliInit.wgsl'
+import { pauliKineticBlock } from '../shaders/schroedinger/compute/pauliKinetic.wgsl'
+import { pauliPotentialHalfBlock } from '../shaders/schroedinger/compute/pauliPotentialHalf.wgsl'
+// Pauli-specific shaders
+import { pauliUniformsBlock } from '../shaders/schroedinger/compute/pauliUniforms.wgsl'
+import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteGrid.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 // Reuse FFT and pack/unpack infrastructure from Dirac/TDSE
 import {
   tdseComplexPackBlock,
@@ -47,20 +50,17 @@ import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-
-// Pauli-specific shaders
-import { pauliUniformsBlock } from '../shaders/schroedinger/compute/pauliUniforms.wgsl'
-import { pauliInitBlock } from '../shaders/schroedinger/compute/pauliInit.wgsl'
-import { pauliPotentialHalfBlock } from '../shaders/schroedinger/compute/pauliPotentialHalf.wgsl'
-import { pauliKineticBlock } from '../shaders/schroedinger/compute/pauliKinetic.wgsl'
-import { pauliAbsorberBlock } from '../shaders/schroedinger/compute/pauliAbsorber.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
-import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteGrid.wgsl'
 import {
-  pauliDiagReduceBlock,
-  pauliDiagFinalizeBlock,
-} from '../shaders/schroedinger/compute/pauliDiagnostics.wgsl'
+  DENSITY_GRID_SIZE,
+  DIAG_DECIMATION,
+  FFT_UNIFORM_SIZE,
+  GRID_WG,
+  LINEAR_WG,
+  MAX_DIM,
+  nearestPow2,
+  PACK_UNIFORM_SIZE,
+  reduceGridToFit,
+} from './computePassUtils'
 
 /** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
 const UNIFORM_SIZE = 592
@@ -194,9 +194,12 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     return `${config.latticeDim}|${config.gridSize.join(',')}|${config.spacing.join(',')}`
   }
 
-  /** Sanitize grid sizes to nearest power of 2 for FFT */
+  /** Sanitize grid sizes to nearest power of 2 and reduce to fit GPU dispatch limits */
   private sanitizeGridSizes(config: PauliConfig): PauliConfig {
-    const gridSize = config.gridSize.map(nearestPow2)
+    const pow2Grid = config.gridSize.map(nearestPow2)
+    const activeGrid = pow2Grid.slice(0, config.latticeDim)
+    const fittedActive = reduceGridToFit(activeGrid)
+    const gridSize = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
     if (gridSize.every((g, i) => g === config.gridSize[i])) return config
     return { ...config, gridSize }
   }

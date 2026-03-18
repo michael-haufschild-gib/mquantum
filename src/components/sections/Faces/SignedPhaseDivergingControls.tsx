@@ -1,7 +1,8 @@
-import { ColorPicker } from '@/components/ui/ColorPicker'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 
 export const SignedPhaseDivergingControls: React.FC = React.memo(() => {
   const selector = useShallow((state: AppearanceSlice) => ({

@@ -8,8 +8,6 @@ describe('PerformanceMonitor utils', () => {
         unknown
       >
 
-    expect(typeof utilsModule['formatFpsBound']).toBe('function')
-
     const formatFpsBound = utilsModule['formatFpsBound'] as (value: number) => string
 
     expect(formatFpsBound(Infinity)).toBe('--')

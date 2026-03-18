@@ -1,12 +1,13 @@
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React, { useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
   const { dimension, objectType } = useGeometryStore(

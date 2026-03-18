@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
+
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
-import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 import { ScenePass } from '@/rendering/webgpu/passes/ScenePass'
+import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 
 interface ScenePassConfig {
   objectType: 'schroedinger'
@@ -53,17 +54,6 @@ interface ScenePassConfig {
   backgroundColor: string
 }
 
-function ensureGpuTextureUsageConstants(): void {
-  if (!('GPUTextureUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUTextureUsage: Record<string, number> }).GPUTextureUsage = {
-      TEXTURE_BINDING: 1 << 0,
-      RENDER_ATTACHMENT: 1 << 1,
-      COPY_SRC: 1 << 2,
-      COPY_DST: 1 << 3,
-    }
-  }
-}
-
 function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassConfig {
   return {
     objectType: 'schroedinger',
@@ -111,7 +101,6 @@ function createGraphHarness() {
 
 describe('WebGPUScene mode-switch rebuild strategy', () => {
   it('forces full rebuild when switching into or out of free scalar mode', async () => {
-    ensureGpuTextureUsageConstants()
     const { shouldForceFullRebuildForQuantumModeTransition } =
       await import('@/rendering/webgpu/WebGPUScene')
 
@@ -131,7 +120,6 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
   })
 
   it('forces full rebuild when switching objectType between schroedinger and pauliSpinor', async () => {
-    ensureGpuTextureUsageConstants()
     const { shouldForceFullRebuildForQuantumModeTransition } =
       await import('@/rendering/webgpu/WebGPUScene')
 
@@ -153,7 +141,6 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
   })
 
   it('keeps warm-swap eligibility for non-free-scalar transitions', async () => {
-    ensureGpuTextureUsageConstants()
     const { shouldForceFullRebuildForQuantumModeTransition } =
       await import('@/rendering/webgpu/WebGPUScene')
 
@@ -182,7 +169,6 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
 describe('WebGPUScene temporal reprojection wiring', () => {
   it('maps domainColoringPsi to compile-time colorAlgorithm=8', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -199,7 +185,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('maps diverging to compile-time colorAlgorithm=9', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -216,7 +201,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('maps relativePhase to compile-time colorAlgorithm=10', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -233,7 +217,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('falls back kSpaceOccupation to radialDistance for non-free-scalar modes', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -251,7 +234,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('falls back relativePhase to phaseDensity in free scalar mode', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -271,7 +253,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('keeps kSpaceOccupation in free scalar mode', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -289,7 +270,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('creates Schrödinger renderer in quarter-res temporal mode when enabled', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer('schroedinger', createPassConfig())
 
@@ -302,7 +282,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('uses quarter-res temporal outputs for isosurface + temporal mode', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -321,7 +300,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('uses full-resolution color + depth outputs for isosurface without temporal', async () => {
-    ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -340,7 +318,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('adds quarter-res resources and temporal cloud pass when temporal reprojection is enabled', async () => {
-    ensureGpuTextureUsageConstants()
     const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
     const { graph, resources, passes } = createGraphHarness()
 
@@ -362,11 +339,10 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     })
 
     const objectColorUsage = resources.get('object-color')?.usage as number
-    expect((objectColorUsage & GPUTextureUsage.COPY_SRC) !== 0).toBe(true)
+    expect(objectColorUsage & GPUTextureUsage.COPY_SRC).toBe(GPUTextureUsage.COPY_SRC)
   })
 
   it('does not add temporal resources when the feature is disabled', async () => {
-    ensureGpuTextureUsageConstants()
     const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
     const { graph, resources, passes } = createGraphHarness()
 
@@ -381,11 +357,10 @@ describe('WebGPUScene temporal reprojection wiring', () => {
 
     // object-color always includes COPY_SRC to avoid resource recreation on temporal toggle
     const objectColorUsage = resources.get('object-color')?.usage as number
-    expect((objectColorUsage & GPUTextureUsage.COPY_SRC) !== 0).toBe(true)
+    expect(objectColorUsage & GPUTextureUsage.COPY_SRC).toBe(GPUTextureUsage.COPY_SRC)
   })
 
   it('uses configured background color for no-skybox scene clear pass', async () => {
-    ensureGpuTextureUsageConstants()
     const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
     const { graph, passes } = createGraphHarness()
     const backgroundColor = '#4080ff'
@@ -403,9 +378,6 @@ describe('WebGPUScene temporal reprojection wiring', () => {
           getClearColor?: () => { r: number; g: number; b: number; a: number }
         } & WebGPURenderPass)
       | undefined
-    expect(scenePass).toBeDefined()
-    expect(typeof scenePass?.getClearColor).toBe('function')
-
     const clearColor = scenePass?.getClearColor?.()
     const expected = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
 
@@ -424,8 +396,6 @@ describe('WebGPUScene background color runtime updates', () => {
       string,
       unknown
     >
-
-    expect(typeof sceneModule['updateScenePassBackgroundColor']).toBe('function')
 
     const updateScenePassBackgroundColor = sceneModule['updateScenePassBackgroundColor'] as (args: {
       graph: Pick<WebGPURenderGraph, 'getPass'>
@@ -465,8 +435,6 @@ describe('WebGPUScene background color runtime updates', () => {
       string,
       unknown
     >
-
-    expect(typeof sceneModule['updateScenePassBackgroundColor']).toBe('function')
 
     const updateScenePassBackgroundColor = sceneModule['updateScenePassBackgroundColor'] as (args: {
       graph: Pick<WebGPURenderGraph, 'getPass'>

@@ -7,17 +7,18 @@
  * @module rendering/webgpu/renderers/schrodingerRendererTypes
  */
 
-import type { WebGPURenderContext } from '../core/types'
-import type { QuantumModeForShader } from '../shaders/schroedinger/compose'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import type { packLightingUniforms } from '../utils/lighting'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum'
-import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { AnimationState } from '@/stores/animationStore'
+import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { GeometryState } from '@/stores/geometryStore'
 import type { RotationState } from '@/stores/rotationStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
+
+import type { WebGPURenderContext } from '../core/types'
+import type { QuantumModeForShader } from '../shaders/schroedinger/compose'
+import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
+import type { packLightingUniforms } from '../utils/lighting'
 
 // ---------------------------------------------------------------------------
 // Uniform buffer size
@@ -203,7 +204,7 @@ export interface PerformanceSnapshot {
 export type LightingSnapshot = Parameters<typeof packLightingUniforms>[1]
 
 // Re-export store types used by the renderer for convenience
-export type { AppearanceStoreState, AnimationState, GeometryState, RotationState, PBRSliceState }
+export type { AnimationState, AppearanceStoreState, GeometryState, PBRSliceState, RotationState }
 
 // ---------------------------------------------------------------------------
 // Renderer configuration

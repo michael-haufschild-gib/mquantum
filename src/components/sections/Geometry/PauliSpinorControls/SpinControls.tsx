@@ -8,9 +8,10 @@
  */
 
 import React from 'react'
+
+import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { Select } from '@/components/ui/Select'
 import type { PauliInitialCondition } from '@/lib/geometry/extended/types'
 
 const SPIN_PRESETS = [

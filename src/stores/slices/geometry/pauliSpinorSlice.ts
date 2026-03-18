@@ -1,5 +1,7 @@
-import { DEFAULT_PAULI_CONFIG, type PauliConfig } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
+
+import { DEFAULT_PAULI_CONFIG, type PauliConfig } from '@/lib/geometry/extended/types'
+
 import { ExtendedObjectSlice, PauliSpinorSlice } from './types'
 
 export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], PauliSpinorSlice> = (
@@ -177,7 +179,9 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     initializePauliForDimension: (dimension) => {
       setWithVersion((state) => {
         const dim = Math.max(2, Math.min(11, dimension))
-        const gridSize = Array.from({ length: dim }, () => (dim <= 3 ? 64 : dim <= 5 ? 32 : 16))
+        const gridSize = Array.from({ length: dim }, () =>
+          dim <= 3 ? 64 : dim <= 4 ? 32 : dim <= 7 ? 8 : 4
+        )
         const spacing = Array.from({ length: dim }, () => 0.15)
         const packetCenter = Array.from({ length: 11 }, () => 0)
         const packetMomentum = Array.from({ length: 11 }, () => 0)

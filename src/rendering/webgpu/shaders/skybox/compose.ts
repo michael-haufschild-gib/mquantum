@@ -3,19 +3,16 @@
  * Port of: src/rendering/shaders/skybox/compose.ts
  */
 import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
-
 import { constantsBlock } from './core/constants.wgsl'
-import { uniformStructBlock, uniformBindingsBlock } from './core/uniforms.wgsl'
+import { uniformBindingsBlock, uniformStructBlock } from './core/uniforms.wgsl'
 import {
-  generateVertexOutputStruct,
   fragmentOutputStruct,
   fragmentOutputStructSingle,
+  generateVertexOutputStruct,
 } from './core/varyings.wgsl'
-
-import { colorBlock } from './utils/color.wgsl'
-import { noiseBlock } from './utils/noise.wgsl'
-import { rotationBlock } from './utils/rotation.wgsl'
-
+import { sunBlock } from './effects/sun.wgsl'
+import { vignetteBlock } from './effects/vignette.wgsl'
+import { generateMain } from './main.wgsl'
 import { auroraBlock } from './modes/aurora.wgsl'
 import { classicBlock } from './modes/classic.wgsl'
 import { crystallineBlock } from './modes/crystalline.wgsl'
@@ -23,13 +20,11 @@ import { horizonBlock } from './modes/horizon.wgsl'
 import { nebulaBlock } from './modes/nebula.wgsl'
 import { oceanBlock } from './modes/ocean.wgsl'
 import { twilightBlock } from './modes/twilight.wgsl'
-
-import { sunBlock } from './effects/sun.wgsl'
-import { vignetteBlock } from './effects/vignette.wgsl'
-
-import { generateMain } from './main.wgsl'
-import { composeSkyboxVertexShader } from './vertex.wgsl'
 import { SkyboxShaderConfig } from './types'
+import { colorBlock } from './utils/color.wgsl'
+import { noiseBlock } from './utils/noise.wgsl'
+import { rotationBlock } from './utils/rotation.wgsl'
+import { composeSkyboxVertexShader } from './vertex.wgsl'
 
 /**
  * Compose Skybox fragment shader with specified mode and effects.

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+
 import { useThemeStore } from '@/stores/themeStore'
 
 export const useDynamicFavicon = () => {

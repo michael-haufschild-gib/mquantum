@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { FrameBlendingPass } from '@/rendering/webgpu/passes/FrameBlendingPass'
-import { TemporalCloudPass } from '@/rendering/webgpu/passes/TemporalCloudPass'
 import { TemporalCloudDepthPass } from '@/rendering/webgpu/passes/TemporalCloudDepthPass'
+import { TemporalCloudPass } from '@/rendering/webgpu/passes/TemporalCloudPass'
 import { TemporalDepthCapturePass } from '@/rendering/webgpu/passes/TemporalDepthCapturePass'
 import { WebGPUTemporalCloudPass } from '@/rendering/webgpu/passes/WebGPUTemporalCloudPass'
 

@@ -1,9 +1,10 @@
-import { EditorLeftPanel } from '@/components/layout/EditorLeftPanel'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { EditorLeftPanel } from '@/components/layout/EditorLeftPanel'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({

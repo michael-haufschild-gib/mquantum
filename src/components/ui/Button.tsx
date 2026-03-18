@@ -1,11 +1,11 @@
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
-import { m, HTMLMotionProps } from 'motion/react'
-import { LoadingSpinner } from './LoadingSpinner'
+import { HTMLMotionProps, m } from 'motion/react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+import { LoadingSpinner } from './LoadingSpinner'
+
+/** Props for the {@link Button} component. */
 export interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'md' | 'lg' | 'icon'
@@ -51,9 +51,20 @@ export const Button: React.FC<ButtonProps> = React.memo(
     ariaLabel,
     'data-testid': testId,
     glow = false,
+    ref: externalRef,
     ...props
-  }) => {
-    const ref = useRef<HTMLButtonElement>(null)
+  }: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
+    const internalRef = useRef<HTMLButtonElement>(null)
+
+    const setRef = useCallback(
+      (element: HTMLButtonElement | null) => {
+        internalRef.current = element
+        if (typeof externalRef === 'function') externalRef(element)
+        else if (externalRef)
+          (externalRef as React.MutableRefObject<HTMLButtonElement | null>).current = element
+      },
+      [externalRef]
+    )
 
     // Ripple State
     const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([])
@@ -118,7 +129,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
 
     return (
       <m.button
-        ref={ref}
+        ref={setRef}
         type={type}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}

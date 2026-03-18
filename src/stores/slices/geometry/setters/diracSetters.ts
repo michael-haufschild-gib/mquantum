@@ -9,6 +9,7 @@
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
+
 import type { SchroedingerSliceActions } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 

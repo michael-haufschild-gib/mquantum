@@ -1,10 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { m, AnimatePresence } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-/**
- *
- */
+/** Props for the portal-rendered {@link Tooltip} component. */
 export interface TooltipProps {
   content: string | React.ReactNode
   children: React.ReactNode

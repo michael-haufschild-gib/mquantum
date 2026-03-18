@@ -31,8 +31,10 @@
  * @module rendering/webgpu/passes/MainObjectMRTPass
  */
 
+import { logger } from '@/lib/logger'
+
+import type { WebGPURenderContext, WebGPUResourceAccess, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext, WebGPUResourceAccess } from '../core/types'
 
 /**
  * Configuration for a single MRT attachment.
@@ -182,7 +184,7 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     for (const attachment of this.passConfig.attachments) {
       const view = ctx.getWriteTarget(attachment.resourceId)
       if (!view) {
-        console.warn(`MainObjectMRTPass: Missing output target ${attachment.resourceId}`)
+        logger.warn(`MainObjectMRTPass: Missing output target ${attachment.resourceId}`)
         continue
       }
 
@@ -199,7 +201,7 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     }
 
     if (colorAttachments.length === 0) {
-      console.warn('MainObjectMRTPass: No valid color attachments')
+      logger.warn('MainObjectMRTPass: No valid color attachments')
       return
     }
 

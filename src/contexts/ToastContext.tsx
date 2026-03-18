@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { ToastContext, type Toast, type ToastType } from './ToastContextInstance'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+
+import { type Toast, ToastContext, type ToastType } from './ToastContextInstance'
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -27,8 +28,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     timerMapRef.current.set(id, timer)
   }, [])
 
+  const contextValue = useMemo(() => ({ addToast }), [addToast])
+
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       <div className="fixed bottom-6 end-6 z-[100] flex flex-col gap-2 pointer-events-none items-end">
         <AnimatePresence mode="popLayout">

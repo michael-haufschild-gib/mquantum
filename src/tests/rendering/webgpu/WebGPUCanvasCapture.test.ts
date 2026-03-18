@@ -2,20 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { WebGPUCanvasCapture } from '@/rendering/webgpu/utils/WebGPUCanvasCapture'
 
-function ensureGPUConstants(): void {
-  if (!('GPUBufferUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUBufferUsage: Record<string, number> }).GPUBufferUsage = {
-      COPY_DST: 1 << 0,
-      MAP_READ: 1 << 1,
-    }
-  }
-  if (!('GPUMapMode' in globalThis)) {
-    ;(globalThis as unknown as { GPUMapMode: Record<string, number> }).GPUMapMode = {
-      READ: 1 << 0,
-    }
-  }
-}
-
 function makeDeferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void
   const promise = new Promise<T>((res) => {
@@ -26,8 +12,6 @@ function makeDeferred<T>() {
 
 describe('WebGPUCanvasCapture', () => {
   it('reports cancellation when disposed before in-flight readback completes', async () => {
-    ensureGPUConstants()
-
     const gate = makeDeferred<void>()
     const readbackBuffer = {
       mapAsync: vi.fn(async () => {}),

@@ -13,17 +13,15 @@
  * @module rendering/webgpu/passes/SMAAPass
  */
 
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
-  smaaEdgeDetectionShader,
   smaaBlendingWeightShader,
+  smaaEdgeDetectionShader,
   smaaNeighborhoodBlendingShader,
 } from '../shaders/postprocessing/smaa.wgsl'
 
-/**
- *
- */
+/** Configuration for the SMAA anti-aliasing post-processing pass. */
 export interface SMAAPassOptions {
   /** Input color resource (default: 'ldr-color') */
   colorInput?: string

@@ -11,6 +11,8 @@
  *   Worker → Main: DiracAlgebraResponse (with Transferable gamma buffer)
  */
 
+import { logger } from '@/lib/logger'
+
 import { generateDiracMatricesFallback } from './cliffordAlgebraFallback'
 
 /** Inbound message requesting gamma matrix generation. */
@@ -46,7 +48,7 @@ async function initWasm(): Promise<DiracWasmModule | null> {
     await wasm.default()
     return wasm as unknown as DiracWasmModule
   } catch (err) {
-    console.warn(
+    logger.warn(
       '[DiracWorker] WASM init failed, using JS fallback:',
       err instanceof Error ? err.message : String(err)
     )

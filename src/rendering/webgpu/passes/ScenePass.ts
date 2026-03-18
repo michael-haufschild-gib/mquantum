@@ -17,8 +17,8 @@
  * @module rendering/webgpu/passes/ScenePass
  */
 
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
  * Render stats captured after scene render (for compatibility with WebGL interface).

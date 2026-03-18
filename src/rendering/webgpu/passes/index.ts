@@ -7,92 +7,72 @@
  */
 
 // Post-processing passes
-export { ToneMappingCinematicPass, ToneMappingMode } from './ToneMappingCinematicPass'
-export type { ToneMappingCinematicPassConfig } from './ToneMappingCinematicPass'
-
-export { BloomPass } from './BloomPass'
 export type { BloomPassOptions } from './BloomPass'
-
-export { FXAAPass } from './FXAAPass'
-export type { FXAAPassOptions } from './FXAAPass'
-
-export { SMAAPass } from './SMAAPass'
-export type { SMAAPassOptions } from './SMAAPass'
-
-export { EnvironmentCompositePass } from './EnvironmentCompositePass'
-export type { EnvironmentCompositePassConfig } from './EnvironmentCompositePass'
-
-export { NormalPass } from './NormalPass'
-export type { NormalPassConfig } from './NormalPass'
-
-export { DepthPass } from './DepthPass'
-export type { DepthPassConfig, DepthFormat } from './DepthPass'
-
-export { CopyPass } from './CopyPass'
-export type { CopyPassConfig } from './CopyPass'
-
-export { FrameBlendingPass } from './FrameBlendingPass'
-export type { FrameBlendingPassConfig } from './FrameBlendingPass'
-
-export { PaperTexturePass } from './PaperTexturePass'
-export type { PaperTexturePassConfig } from './PaperTexturePass'
-
-export { CompositePass } from './CompositePass'
-export type { CompositePassConfig, CompositeInput, BlendMode } from './CompositePass'
-
-export { ToScreenPass } from './ToScreenPass'
-export type { ToScreenPassConfig } from './ToScreenPass'
-
-export { BufferPreviewPass } from './BufferPreviewPass'
+export { BloomPass } from './BloomPass'
 export type {
   BufferPreviewPassConfig,
   BufferPreviewStoreConfig,
   BufferType,
   DepthMode,
 } from './BufferPreviewPass'
-
-export { DebugOverlayPass } from './DebugOverlayPass'
-export type { DebugOverlayPassConfig } from './DebugOverlayPass'
-
-export { LightGizmoPass } from './LightGizmoPass'
-export type { LightGizmoPassConfig } from './LightGizmoPass'
-
-export { CubemapCapturePass } from './CubemapCapturePass'
+export { BufferPreviewPass } from './BufferPreviewPass'
+export type { BlendMode, CompositeInput, CompositePassConfig } from './CompositePass'
+export { CompositePass } from './CompositePass'
+export type { CopyPassConfig } from './CopyPass'
+export { CopyPass } from './CopyPass'
 export type { CubemapCapturePassConfig } from './CubemapCapturePass'
-
-export { TemporalCloudDepthPass } from './TemporalCloudDepthPass'
-export type { TemporalCloudDepthPassConfig } from './TemporalCloudDepthPass'
-
-export { FullscreenPass } from './FullscreenPass'
+export { CubemapCapturePass } from './CubemapCapturePass'
+export type { DebugOverlayPassConfig } from './DebugOverlayPass'
+export { DebugOverlayPass } from './DebugOverlayPass'
+export type { DepthFormat, DepthPassConfig } from './DepthPass'
+export { DepthPass } from './DepthPass'
+export type { EnvironmentCompositePassConfig } from './EnvironmentCompositePass'
+export { EnvironmentCompositePass } from './EnvironmentCompositePass'
+export type { FrameBlendingPassConfig } from './FrameBlendingPass'
+export { FrameBlendingPass } from './FrameBlendingPass'
 export type {
   FullscreenPassConfig,
   FullscreenUniform,
   FullscreenUniformType,
 } from './FullscreenPass'
-
-export {
-  TemporalDepthCapturePass,
-  invalidateAllTemporalDepthWebGPU,
-} from './TemporalDepthCapturePass'
-export type {
-  TemporalDepthCapturePassConfig,
-  TemporalDepthUniforms,
-} from './TemporalDepthCapturePass'
-
-export { TemporalCloudPass } from './TemporalCloudPass'
-export type { TemporalCloudPassConfig } from './TemporalCloudPass'
-
-export { MainObjectMRTPass, createMRTPipelineConfig } from './MainObjectMRTPass'
+export { FullscreenPass } from './FullscreenPass'
+export type { FXAAPassOptions } from './FXAAPass'
+export { FXAAPass } from './FXAAPass'
+export type { LightGizmoPassConfig } from './LightGizmoPass'
+export { LightGizmoPass } from './LightGizmoPass'
 export type {
   MainObjectMRTPassConfig,
   MRTAttachmentConfig,
   MRTPipelineConfig,
 } from './MainObjectMRTPass'
+export { createMRTPipelineConfig, MainObjectMRTPass } from './MainObjectMRTPass'
+export type { NormalPassConfig } from './NormalPass'
+export { NormalPass } from './NormalPass'
+export type { PaperTexturePassConfig } from './PaperTexturePass'
+export { PaperTexturePass } from './PaperTexturePass'
+export type { SMAAPassOptions } from './SMAAPass'
+export { SMAAPass } from './SMAAPass'
+export type { TemporalCloudDepthPassConfig } from './TemporalCloudDepthPass'
+export { TemporalCloudDepthPass } from './TemporalCloudDepthPass'
+export type { TemporalCloudPassConfig } from './TemporalCloudPass'
+export { TemporalCloudPass } from './TemporalCloudPass'
+export type {
+  TemporalDepthCapturePassConfig,
+  TemporalDepthUniforms,
+} from './TemporalDepthCapturePass'
+export {
+  invalidateAllTemporalDepthWebGPU,
+  TemporalDepthCapturePass,
+} from './TemporalDepthCapturePass'
+export type { ToneMappingCinematicPassConfig } from './ToneMappingCinematicPass'
+export { ToneMappingCinematicPass, ToneMappingMode } from './ToneMappingCinematicPass'
+export type { ToScreenPassConfig } from './ToScreenPass'
+export { ToScreenPass } from './ToScreenPass'
 
 // Compute passes
-export { DensityGridComputePass } from './DensityGridComputePass'
 export type { DensityGridComputeConfig } from './DensityGridComputePass'
+export { DensityGridComputePass } from './DensityGridComputePass'
 
 // Scene passes
-export { ScenePass } from './ScenePass'
 export type { ScenePassConfig, SceneRenderStats } from './ScenePass'
+export { ScenePass } from './ScenePass'

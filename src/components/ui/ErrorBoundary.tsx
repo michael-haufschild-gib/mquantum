@@ -10,9 +10,7 @@ interface State {
   error?: Error
 }
 
-/**
- *
- */
+/** React error boundary that catches render errors and displays a fallback UI. */
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -45,6 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </pre>
             )}
             <button
+              type="button"
               className="rounded bg-danger-solid px-4 py-2 text-sm font-semibold text-text-inverse hover:brightness-110 transition-colors"
               onClick={() => window.location.reload()}
             >

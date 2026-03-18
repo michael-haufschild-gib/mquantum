@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { describe, expect, it } from 'vitest'
+
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('Schroedinger Store Presets', () => {
   it('should update configuration parameters when preset is selected', () => {
@@ -9,7 +10,7 @@ describe('Schroedinger Store Presets', () => {
     const presetConfig = SCHROEDINGER_NAMED_PRESETS[presetName]
 
     // Verify we have a valid preset to test against
-    expect(presetConfig).toBeDefined()
+    expect(presetConfig).toHaveProperty('seed')
     if (!presetConfig) throw new Error('presetConfig not found')
 
     // Apply the preset

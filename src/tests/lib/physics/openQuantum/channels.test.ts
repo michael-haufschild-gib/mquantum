@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
 import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'

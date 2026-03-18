@@ -83,6 +83,6 @@ describe('SoundManager', () => {
 
     expect(() => manager.init()).not.toThrow()
     expect(manager.initialized).toBe(true)
-    expect(manager.ctx).not.toBeNull()
+    expect(manager.ctx).toBeInstanceOf(FlakyAudioContext)
   })
 })

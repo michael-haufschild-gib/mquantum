@@ -1,6 +1,9 @@
 import { StateCreator } from 'zustand'
-import { AppearanceSlice, RenderSlice, RenderSliceState } from './types'
+
+import { logger } from '@/lib/logger'
 import { DEFAULT_SHADER_SETTINGS, DEFAULT_SHADER_TYPE } from '@/stores/defaults/visualDefaults'
+
+import { AppearanceSlice, RenderSlice, RenderSliceState } from './types'
 
 function isFiniteRenderSettingValue(value: number): boolean {
   return Number.isFinite(value)
@@ -23,7 +26,7 @@ export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlic
         !isFiniteRenderSettingValue(settings.lineThickness) &&
         import.meta.env.DEV
       ) {
-        console.warn(
+        logger.warn(
           '[renderSlice] Ignoring non-finite wireframe line thickness:',
           settings.lineThickness
         )
@@ -53,7 +56,7 @@ export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlic
         !isFiniteRenderSettingValue(settings.specularIntensity) &&
         import.meta.env.DEV
       ) {
-        console.warn(
+        logger.warn(
           '[renderSlice] Ignoring non-finite surface specular intensity:',
           settings.specularIntensity
         )

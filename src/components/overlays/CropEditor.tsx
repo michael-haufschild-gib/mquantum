@@ -1,12 +1,15 @@
-import { useExportStore } from '@/stores/exportStore'
-import { useLayoutStore } from '@/stores/layoutStore'
+import { m } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useToast } from '@/hooks/useToast'
+import { logger } from '@/lib/logger'
+import { useExportStore } from '@/stores/exportStore'
+import { useLayoutStore } from '@/stores/layoutStore'
+
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
-import { useEffect, useRef, useState } from 'react'
-import { m } from 'motion/react'
-import { useShallow } from 'zustand/react/shallow'
 import { CropBox, CropValues } from './CropBox'
 
 /**
@@ -61,7 +64,7 @@ export const CropEditor = () => {
       setPreviewImage(dataUrl)
       return true
     } catch (e) {
-      console.error('Failed to recapture preview:', e)
+      logger.error('Failed to recapture preview:', e)
       addToast('Failed to refresh preview image. Try again.', 'error')
       return false
     }

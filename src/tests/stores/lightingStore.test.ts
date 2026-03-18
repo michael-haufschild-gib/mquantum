@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useLightingStore } from '@/stores/lightingStore'
+
 import { MAX_LIGHTS, MIN_LIGHTS } from '@/rendering/lights/types'
+import { useLightingStore } from '@/stores/lightingStore'
 
 describe('lightingStore (invariants)', () => {
   beforeEach(() => {
@@ -14,8 +15,8 @@ describe('lightingStore (invariants)', () => {
 
     const id = useLightingStore.getState().addLight('point')
     const afterAdd = useLightingStore.getState()
-    expect(id).not.toBeNull()
-    expect(afterAdd.lights.length).toBe(initialCount + 1)
+    expect(afterAdd.lights).toHaveLength(initialCount + 1)
+    expect(afterAdd.lights.find((l) => l.id === id)?.type).toBe('point')
     expect(afterAdd.selectedLightId).toBe(id)
     expect(afterAdd.version).toBeGreaterThan(initialVersion)
 
@@ -42,18 +43,18 @@ describe('lightingStore (invariants)', () => {
     expect(useLightingStore.getState().lights.length).toBe(MIN_LIGHTS)
 
     // Add one, select it, then remove it => selection clears.
-    const added = useLightingStore.getState().addLight('spot')
-    expect(added).not.toBeNull()
+    const added = useLightingStore.getState().addLight('spot')!
+    expect(useLightingStore.getState().lights.find((l) => l.id === added)?.type).toBe('spot')
     useLightingStore.getState().selectLight(added)
-    useLightingStore.getState().removeLight(added!)
+    useLightingStore.getState().removeLight(added)
     expect(useLightingStore.getState().selectedLightId).toBeNull()
   })
 
   it('updateLight clamps intensity/coneAngle/penumbra and normalizes rotation into [-π, π)', () => {
-    const id = useLightingStore.getState().addLight('spot')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('spot')!
+    expect(useLightingStore.getState().lights.find((l) => l.id === id)?.type).toBe('spot')
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       intensity: 999,
       coneAngle: 999,
       penumbra: -5,
@@ -73,10 +74,9 @@ describe('lightingStore (invariants)', () => {
   })
 
   it('updateLight clamps range and decay to valid bounds', () => {
-    const id = useLightingStore.getState().addLight('point')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('point')!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       range: -10,
       decay: 9,
     })
@@ -85,7 +85,7 @@ describe('lightingStore (invariants)', () => {
     expect(light.range).toBe(1)
     expect(light.decay).toBe(3)
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       range: 150,
       decay: -2,
     })
@@ -96,10 +96,9 @@ describe('lightingStore (invariants)', () => {
   })
 
   it('updateLight preserves explicit range=0 sentinel (infinite range)', () => {
-    const id = useLightingStore.getState().addLight('point')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('point')!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       range: 0,
     })
 
@@ -108,10 +107,9 @@ describe('lightingStore (invariants)', () => {
   })
 
   it('updateLight preserves explicit decay=0 sentinel (no distance falloff power)', () => {
-    const id = useLightingStore.getState().addLight('point')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('point')!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       decay: 0,
     })
 
@@ -120,10 +118,9 @@ describe('lightingStore (invariants)', () => {
   })
 
   it('updateLight ignores non-finite numeric and rotation updates while applying valid fields', () => {
-    const id = useLightingStore.getState().addLight('spot')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('spot')!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       intensity: 1.6,
       coneAngle: 40,
       penumbra: 0.35,
@@ -133,7 +130,7 @@ describe('lightingStore (invariants)', () => {
 
     const before = useLightingStore.getState().lights.find((l) => l.id === id)!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       intensity: Number.NaN,
       coneAngle: Number.POSITIVE_INFINITY,
       penumbra: Number.NEGATIVE_INFINITY,
@@ -150,10 +147,9 @@ describe('lightingStore (invariants)', () => {
   })
 
   it('updateLight ignores non-finite range/decay updates while applying valid fields', () => {
-    const id = useLightingStore.getState().addLight('point')
-    expect(id).not.toBeNull()
+    const id = useLightingStore.getState().addLight('point')!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       range: 42,
       decay: 1.7,
       color: '#ABCDEF',
@@ -161,7 +157,7 @@ describe('lightingStore (invariants)', () => {
 
     const before = useLightingStore.getState().lights.find((l) => l.id === id)!
 
-    useLightingStore.getState().updateLight(id!, {
+    useLightingStore.getState().updateLight(id, {
       range: Number.NaN,
       decay: Number.POSITIVE_INFINITY,
       color: '#00FF00',

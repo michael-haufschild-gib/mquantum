@@ -1,4 +1,6 @@
 import type { ObjectType } from '@/lib/geometry/types'
+import { logger } from '@/lib/logger'
+
 import type { SavedScene, SavedStyle } from './presetTypes'
 
 /**
@@ -252,7 +254,7 @@ export const serializeExtendedState = <T extends object>(
   const configKey = OBJECT_TYPE_TO_CONFIG_KEY[objectType]
   if (!configKey) {
     // Unknown object type - return empty (shouldn't happen)
-    console.warn(`Unknown object type for extended config: ${objectType}`)
+    logger.warn(`Unknown object type for extended config: ${objectType}`)
     return {}
   }
 

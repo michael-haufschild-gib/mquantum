@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 const ThrowError = () => {

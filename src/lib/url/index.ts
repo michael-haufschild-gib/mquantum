@@ -2,10 +2,10 @@
  * URL Utilities
  */
 
+export type { ShareableState } from './state-serializer'
 export {
-  serializeState,
   deserializeState,
   generateShareUrl,
   parseCurrentUrl,
+  serializeState,
 } from './state-serializer'
-export type { ShareableState } from './state-serializer'

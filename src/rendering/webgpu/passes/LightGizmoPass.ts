@@ -14,25 +14,26 @@
  * @module rendering/webgpu/passes/LightGizmoPass
  */
 
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
-import { rotationToDirection } from '@/rendering/lights/types'
 import type { LightSource, TransformMode } from '@/rendering/lights/types'
+import { rotationToDirection } from '@/rendering/lights/types'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
-  generateIcosahedronWireframe,
-  generateOctahedronWireframe,
-  generateArrow,
-  generateConeWireframe,
-  generateSphereWireframe,
-  generateSelectionRing,
-  generateDashedLine,
-  generateGroundEllipse,
-  generateGroundCircle,
-  generateGroundTarget,
-  generateTranslateGizmo,
-  generateRotateGizmo,
   calculateGroundIntersection,
   calculateSphereGroundIntersection,
+  generateArrow,
+  generateConeWireframe,
+  generateDashedLine,
+  generateGroundCircle,
+  generateGroundEllipse,
+  generateGroundTarget,
+  generateIcosahedronWireframe,
+  generateOctahedronWireframe,
+  generateRotateGizmo,
+  generateSelectionRing,
+  generateSphereWireframe,
+  generateTranslateGizmo,
   transformAndAppend,
   transformBillboardAndAppend,
 } from './gizmoGeometry'

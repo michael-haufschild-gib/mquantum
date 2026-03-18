@@ -12,6 +12,9 @@
  * @module hooks/useDeviceCapabilities
  */
 
+import { useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import {
   detectDeviceCapabilities,
   MOBILE_DEFAULT_MAX_FPS,
@@ -23,8 +26,6 @@ import {
   hasPersistedResolutionScale,
   usePerformanceStore,
 } from '@/stores/performanceStore'
-import { useEffect, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Hook to detect device capabilities and apply mobile defaults.

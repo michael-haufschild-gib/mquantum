@@ -10,8 +10,10 @@
  * for the missing parameters.
  */
 
+import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import type { ObjectType } from '@/lib/geometry/types'
-import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
+
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -158,13 +160,13 @@ export function mergeExtendedObjectStateForType(
 ): Record<string, unknown> {
   const configKey = OBJECT_TYPE_TO_CONFIG_KEY[objectType]
   if (!configKey) {
-    console.warn(`Unknown object type for extended config merge: ${objectType}`)
+    logger.warn(`Unknown object type for extended config merge: ${objectType}`)
     return {}
   }
 
   const defaultConfig = CONFIG_KEY_TO_DEFAULT[configKey]
   if (!defaultConfig) {
-    console.warn(`No default config found for key: ${configKey}`)
+    logger.warn(`No default config found for key: ${configKey}`)
     return {}
   }
 

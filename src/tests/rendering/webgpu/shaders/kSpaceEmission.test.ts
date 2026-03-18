@@ -7,7 +7,6 @@ import {
 
 describe('k-Space Occupation emission shader (algorithm 15)', () => {
   it('ALGO_BRANCH[15] contains sampleAnalysisFromGrid call', () => {
-    expect(ALGO_BRANCH[15]).toBeDefined()
     expect(ALGO_BRANCH[15]).toContain('sampleAnalysisFromGrid')
   })
 
@@ -24,9 +23,11 @@ describe('k-Space Occupation emission shader (algorithm 15)', () => {
   })
 
   it('has entries for all 16 algorithms (0-15)', () => {
+    expect(Object.keys(ALGO_BRANCH).length).toBeGreaterThanOrEqual(16)
+    expect(Object.keys(COLOR_ALG_NAMES).length).toBeGreaterThanOrEqual(16)
     for (let i = 0; i <= 15; i++) {
-      expect(ALGO_BRANCH[i]).toBeDefined()
-      expect(COLOR_ALG_NAMES[i]).toBeDefined()
+      expect(ALGO_BRANCH[i]!.length).toBeGreaterThan(0)
+      expect(COLOR_ALG_NAMES[i]!.length).toBeGreaterThan(0)
     }
   })
 })

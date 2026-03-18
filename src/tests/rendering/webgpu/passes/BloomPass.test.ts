@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { BloomPass } from '@/rendering/webgpu/passes/BloomPass'
+
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
+import { BloomPass } from '@/rendering/webgpu/passes/BloomPass'
 import {
-  bloomPrefilterShader,
-  bloomDownsampleShader,
-  bloomUpsampleShader,
   bloomCompositeShader,
   bloomCopyShader,
+  bloomDownsampleShader,
+  bloomPrefilterShader,
+  bloomUpsampleShader,
 } from '@/rendering/webgpu/shaders/postprocessing/bloom.wgsl'
 
 function primeInternals(pass: BloomPass): Record<string, unknown> {

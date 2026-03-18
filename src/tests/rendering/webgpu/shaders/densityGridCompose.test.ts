@@ -2,6 +2,7 @@
  * Tests for density grid compute shader composition with open quantum support.
  */
 import { describe, expect, it } from 'vitest'
+
 import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/compose'
 
 describe('composeDensityGridComputeShader — density matrix mode', () => {

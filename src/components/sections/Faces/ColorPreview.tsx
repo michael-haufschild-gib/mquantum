@@ -9,17 +9,16 @@
  * surface normals, so exact visual match is not possible for all algorithms.
  */
 
-import { getCosinePaletteColorTS, applyDistributionTS } from '@/rendering/shaders/palette'
-import { rgbToHex } from '@/lib/colors/colorUtils'
-import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import React, { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { rgbToHex } from '@/lib/colors/colorUtils'
+import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
+import { applyDistributionTS, getCosinePaletteColorTS } from '@/rendering/shaders/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
+/** Props for the color gradient preview strip. */
 export interface ColorPreviewProps {
   className?: string
   width?: number

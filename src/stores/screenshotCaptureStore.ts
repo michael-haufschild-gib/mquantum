@@ -22,14 +22,12 @@
 
 import { create } from 'zustand'
 
-/**
- *
- */
+import { logger } from '@/lib/logger'
+
+/** Screenshot capture lifecycle status. */
 export type CaptureStatus = 'idle' | 'capturing' | 'ready' | 'error'
 
-/**
- *
- */
+/** State for the screenshot capture pipeline. */
 export interface ScreenshotCaptureState {
   /** Current capture status */
   status: CaptureStatus
@@ -60,7 +58,7 @@ export const useScreenshotCaptureStore = create<ScreenshotCaptureState>((set, ge
   requestCapture: () => {
     // Prevent concurrent capture requests - race condition guard
     if (get().status === 'capturing') {
-      console.warn('[ScreenshotCaptureStore] Capture already in progress, ignoring request')
+      logger.warn('[ScreenshotCaptureStore] Capture already in progress, ignoring request')
       return get().requestId
     }
     const nextRequestId = get().requestId + 1

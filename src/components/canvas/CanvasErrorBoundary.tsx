@@ -8,8 +8,9 @@
  * context is lost or a shader compilation fails.
  */
 
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+
+import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
 interface CanvasErrorBoundaryProps {
   children: ReactNode

@@ -23,7 +23,36 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import {
+  computeReflectionTransmission,
+  TdseDiagnosticsHistory,
+  type TdseDiagnosticsSnapshot,
+} from '@/lib/physics/tdse/diagnostics'
+import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.wgsl'
+import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
+import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
+import {
+  tdseComplexPackBlock,
+  tdseComplexUnpackBlock,
+} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import {
+  tdseDiagNormFinalizeBlock,
+  tdseDiagNormReduceBlock,
+} from '../shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import { tdseInitBlock } from '../shaders/schroedinger/compute/tdseInit.wgsl'
+import { tdsePotentialBlock } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
+import {
+  tdseFFTStageUniformsBlock,
+  tdseStockhamFFTBlock,
+} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
+import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 import {
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
@@ -31,37 +60,10 @@ import {
   GRID_WG,
   LINEAR_WG,
   MAX_DIM,
-  PACK_UNIFORM_SIZE,
   nearestPow2,
+  PACK_UNIFORM_SIZE,
+  reduceGridToFit,
 } from './computePassUtils'
-import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
-import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { tdseInitBlock } from '../shaders/schroedinger/compute/tdseInit.wgsl'
-import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
-import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
-import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
-import { tdsePotentialBlock } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
-import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
-import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
-} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import {
-  tdseFFTStageUniformsBlock,
-  tdseStockhamFFTBlock,
-} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
-import {
-  tdseDiagNormReduceBlock,
-  tdseDiagNormFinalizeBlock,
-} from '../shaders/schroedinger/compute/tdseDiagnostics.wgsl'
-import {
-  TdseDiagnosticsHistory,
-  computeReflectionTransmission,
-  type TdseDiagnosticsSnapshot,
-} from '@/lib/physics/tdse/diagnostics'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** TDSEUniforms struct size in bytes (704 = 636 + 48 trapAnisotropy + 16 radialWell + 4 pad) */
 const UNIFORM_SIZE = 704
@@ -222,20 +224,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     return this.diagHistory.getHistory()
   }
 
-  /** Ensure all grid sizes are power-of-2 for FFT correctness. */
+  /** Ensure all grid sizes are power-of-2 and total sites fit GPU dispatch limits. */
   private sanitizeGridSizes(config: TdseConfig): TdseConfig {
-    let needsFix = false
-    for (let d = 0; d < config.latticeDim; d++) {
-      const g = config.gridSize[d]!
-      if ((g & (g - 1)) !== 0 || g < 2) {
-        needsFix = true
-        break
-      }
-    }
-    if (!needsFix) return config
-    const fixed = config.gridSize.map((g) => nearestPow2(g))
+    const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
+    const activeGrid = pow2Grid.slice(0, config.latticeDim)
+    const fittedActive = reduceGridToFit(activeGrid)
+    const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
+    if (fixed.every((g, i) => g === config.gridSize[i])) return config
     if (import.meta.env.DEV) {
-      console.warn(`[TDSE] Non-power-of-2 grid sizes clamped: ${config.gridSize} → ${fixed}`)
+      console.warn(`[TDSE] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
     }
     return { ...config, gridSize: fixed }
   }

@@ -19,17 +19,19 @@
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { ToggleButton } from '@/components/ui/ToggleButton'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
-import { AnimationDrawerContainer } from './AnimationDrawerContainer'
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
 import type {
   SchroedingerProbabilityCurrentColorMode,
   SchroedingerProbabilityCurrentPlacement,
   SchroedingerProbabilityCurrentStyle,
 } from '@/lib/geometry/extended/types'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
+import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 
 const PROBABILITY_CURRENT_STYLE_OPTIONS: {
   value: SchroedingerProbabilityCurrentStyle
@@ -58,9 +60,7 @@ const PROBABILITY_CURRENT_COLOR_MODE_OPTIONS: {
   { value: 'circulationSign', label: 'Circulation Sign' },
 ]
 
-/**
- *
- */
+/** Props for the Schroedinger animation configuration drawer. */
 export interface SchroedingerAnimationDrawerProps {
   /** Callback to close the drawer */
   onClose?: () => void

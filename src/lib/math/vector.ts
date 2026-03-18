@@ -5,16 +5,17 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
-import type { VectorND } from './types'
-import { EPSILON } from './types'
 import {
-  isAnimationWasmReady,
   dotProductWasm,
+  float64ToVector,
+  isAnimationWasmReady,
   magnitudeWasm,
   normalizeVectorWasm,
   subtractVectorsWasm,
-  float64ToVector,
 } from '@/lib/wasm'
+
+import type { VectorND } from './types'
+import { EPSILON } from './types'
 
 // ============================================================================
 // Scratch Buffer Pools for WASM Operations

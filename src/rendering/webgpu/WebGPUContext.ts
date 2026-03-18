@@ -1,10 +1,9 @@
 import React from 'react'
+
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 
-/**
- *
- */
+/** React context value providing the WebGPU device, render graph, and canvas references. */
 export interface WebGPUCanvasContext {
   /** The WebGPU device manager */
   device: WebGPUDevice

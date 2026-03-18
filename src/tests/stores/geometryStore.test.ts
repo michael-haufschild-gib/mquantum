@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+
+import { useAnimationStore } from '@/stores/animationStore'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 import {
   DEFAULT_DIMENSION,
   MAX_DIMENSION,
   MIN_DIMENSION,
   useGeometryStore,
 } from '@/stores/geometryStore'
-import { useAnimationStore } from '@/stores/animationStore'
 import { useRotationStore } from '@/stores/rotationStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 
 describe('geometryStore (invariants)', () => {
   beforeEach(() => {
@@ -59,6 +60,6 @@ describe('geometryStore (invariants)', () => {
   })
 
   it('appearance store no longer exposes faces visibility toggle', () => {
-    expect('facesVisible' in useAppearanceStore.getState()).toBe(false)
+    expect(Object.keys(useAppearanceStore.getState())).not.toContain('facesVisible')
   })
 })

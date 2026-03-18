@@ -1,3 +1,6 @@
+import { AnimatePresence, m } from 'motion/react'
+import { useEffect, useState } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { NumberInput } from '@/components/ui/NumberInput'
@@ -6,8 +9,6 @@ import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { ExportResolution, useExportStore, VideoCodec } from '@/stores/exportStore'
 import { useLayoutStore } from '@/stores/layoutStore'
-import { AnimatePresence, m } from 'motion/react'
-import { useEffect, useState } from 'react'
 
 export const ExportGeneralTab = () => {
   const { settings, updateSettings, setCropEditorOpen, setModalOpen } = useExportStore()

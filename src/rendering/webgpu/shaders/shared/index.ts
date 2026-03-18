@@ -28,14 +28,14 @@ export { temporalBlock } from './features/temporal.wgsl'
 // Composition helpers
 export {
   assembleShaderBlocks,
+  type FeatureFlags,
   fullscreenVertexInputsBlock,
   generateObjectBindGroup,
   generateStandardBindGroups,
   generateTextureBindings,
   processFeatureFlags,
   raymarchVertexInputsBlock,
-  singleOutputBlock,
-  type FeatureFlags,
   type ShaderBlock,
+  singleOutputBlock,
   type WGSLShaderConfig,
 } from './compose-helpers'

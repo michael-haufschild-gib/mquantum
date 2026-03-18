@@ -9,18 +9,19 @@
  */
 
 import { assembleShaderBlocks } from '../../shared/compose-helpers'
-
 // Core blocks
 import { constantsBlock } from '../../shared/core/constants.wgsl'
-
-// Schroedinger-specific blocks
-import { schroedingerUniformsBlock } from '../uniforms.wgsl'
-
 // Quantum math blocks
 import { complexMathBlock } from '../quantum/complex.wgsl'
+import {
+  densityPostMapBlock,
+  densityPreMapBlock,
+  generateMapPosToND,
+} from '../quantum/density.wgsl'
 import { hermiteBlock } from '../quantum/hermite.wgsl'
 import { ho1dBlock } from '../quantum/ho1d.wgsl'
 import {
+  generateHoNDDispatchBlock,
   hoND3dBlock,
   hoND4dBlock,
   hoND5dBlock,
@@ -30,26 +31,14 @@ import {
   hoND9dBlock,
   hoND10dBlock,
   hoND11dBlock,
-  generateHoNDDispatchBlock,
 } from '../quantum/hoNDVariants.wgsl'
 import {
-  getHOUnrolledBlocks,
   generateHODispatchBlock,
+  getHOUnrolledBlocks,
 } from '../quantum/hoSuperpositionVariants.wgsl'
-import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from '../quantum/psi.wgsl'
-import {
-  densityPreMapBlock,
-  generateMapPosToND,
-  densityPostMapBlock,
-} from '../quantum/density.wgsl'
-
-// Hydrogen blocks (shared by hydrogen ND mode)
-import { laguerreBlock } from '../quantum/laguerre.wgsl'
-import { legendreBlock } from '../quantum/legendre.wgsl'
-import { sphericalHarmonicsBlock } from '../quantum/sphericalHarmonics.wgsl'
-import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
 import { hydrogenNDCommonBlock } from '../quantum/hydrogenNDCommon.wgsl'
 import {
+  generateHydrogenNDDispatchBlock,
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
   hydrogenNDGen5dBlock,
@@ -59,24 +48,28 @@ import {
   hydrogenNDGen9dBlock,
   hydrogenNDGen10dBlock,
   hydrogenNDGen11dBlock,
-  generateHydrogenNDDispatchBlock,
 } from '../quantum/hydrogenNDVariants.wgsl'
-
+import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
+// Hydrogen blocks (shared by hydrogen ND mode)
+import { laguerreBlock } from '../quantum/laguerre.wgsl'
+import { legendreBlock } from '../quantum/legendre.wgsl'
+import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from '../quantum/psi.wgsl'
 // Single basis evaluation for density matrix mode
 import { generateSingleBasisBlock } from '../quantum/singleBasis.wgsl'
-
+import { sphericalHarmonicsBlock } from '../quantum/sphericalHarmonics.wgsl'
+// Schroedinger-specific blocks
+import { schroedingerUniformsBlock } from '../uniforms.wgsl'
 // Open quantum uniforms and hydrogen basis uniforms
-import { openQuantumUniformsBlock, hydrogenBasisUniformsBlock } from '../uniforms.wgsl'
-
+import { hydrogenBasisUniformsBlock, openQuantumUniformsBlock } from '../uniforms.wgsl'
 // Compute-specific blocks
 import {
-  gridParamsBlock,
-  generateDensityGridBindingsBlock,
-  generateDensityGridBindingsWithOpenQuantumBlock,
-  generateDensityGridBindingsWithHydrogenBasisBlock,
   densityGridComputeBlock,
   densityGridWithPhaseComputeBlock,
   densityMatrixComputeBlock,
+  generateDensityGridBindingsBlock,
+  generateDensityGridBindingsWithHydrogenBasisBlock,
+  generateDensityGridBindingsWithOpenQuantumBlock,
+  gridParamsBlock,
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */

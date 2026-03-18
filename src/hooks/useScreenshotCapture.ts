@@ -12,15 +12,13 @@
  * - Prevents concurrent capture requests via store-level guard
  */
 
-import { useScreenshotCaptureStore, type CaptureStatus } from '@/stores/screenshotCaptureStore'
 import { useShallow } from 'zustand/react/shallow'
-import { useCallback } from 'react'
+
+import { type CaptureStatus, useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 
 const CAPTURE_TIMEOUT_MS = 5000
 
-/**
- *
- */
+/** Return type for the {@link useScreenshotCapture} hook. */
 export interface UseScreenshotCaptureResult {
   /** Request a screenshot and wait for the result */
   captureScreenshot: () => Promise<string>
@@ -112,7 +110,7 @@ async function captureWithSubscription(): Promise<string> {
  *     const dataUrl = await captureScreenshot()
  *     // Use dataUrl...
  *   } catch (error) {
- *     console.error('Capture failed:', error)
+ *     logger.error('Capture failed:', error)
  *   }
  * }
  * ```
@@ -122,9 +120,9 @@ export function useScreenshotCapture(): UseScreenshotCaptureResult {
     useShallow((s) => ({ status: s.status, capturedImage: s.capturedImage, error: s.error }))
   )
 
-  const captureScreenshot = useCallback(async (): Promise<string> => {
+  const captureScreenshot = async (): Promise<string> => {
     return captureWithSubscription()
-  }, [])
+  }
 
   return { captureScreenshot, status, capturedImage, error }
 }
@@ -140,9 +138,9 @@ export function useScreenshotCapture(): UseScreenshotCaptureResult {
  * ```ts
  * try {
  *   const dataUrl = await captureScreenshotAsync()
- *   console.log('Captured:', dataUrl.substring(0, 50))
+ *   logger.log('Captured:', dataUrl.substring(0, 50))
  * } catch (error) {
- *   console.error('Capture failed:', error)
+ *   logger.error('Capture failed:', error)
  * }
  * ```
  */

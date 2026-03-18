@@ -15,21 +15,23 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
+import { logger } from '@/lib/logger'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { freeScalarAbsorberBlock } from '../shaders/schroedinger/compute/freeScalarAbsorber.wgsl'
 import {
-  freeScalarUniformsBlock,
   freeScalarInitBlock,
+  freeScalarUniformsBlock,
 } from '../shaders/schroedinger/compute/freeScalarInit.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
+import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
-import { freeScalarAbsorberBlock } from '../shaders/schroedinger/compute/freeScalarAbsorber.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
   DENSITY_GRID_SIZE,
@@ -770,20 +772,25 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 
-    // Flush pending k-space texture data (computed async in previous frame)
+    // Flush pending k-space texture data (computed async in previous frame).
+    // Worker produces data at OUTPUT_GRID_SIZE (64³), which may differ from
+    // DENSITY_GRID_SIZE (96³). Copy dimensions must match the data source.
     if (this.pendingKSpaceData && this.densityTexture && this.analysisTexture) {
       const { density, analysis } = this.pendingKSpaceData
       const bytesPerTexel = 8 // rgba16float = 4 × 2
-      const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
-      const rowsPerImage = DENSITY_GRID_SIZE
+      // Infer the worker's output grid size from the actual buffer length
+      const outputVoxels = density.length / 4 // 4 channels (rgba)
+      const outputGridSize = Math.round(Math.cbrt(outputVoxels))
+      const bytesPerRow = outputGridSize * bytesPerTexel
+      const rowsPerImage = outputGridSize
       device.queue.writeTexture(
         { texture: this.densityTexture },
         density.buffer,
         { offset: density.byteOffset, bytesPerRow, rowsPerImage },
         {
-          width: DENSITY_GRID_SIZE,
-          height: DENSITY_GRID_SIZE,
-          depthOrArrayLayers: DENSITY_GRID_SIZE,
+          width: outputGridSize,
+          height: outputGridSize,
+          depthOrArrayLayers: outputGridSize,
         }
       )
       device.queue.writeTexture(
@@ -791,9 +798,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         analysis.buffer,
         { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
         {
-          width: DENSITY_GRID_SIZE,
-          height: DENSITY_GRID_SIZE,
-          depthOrArrayLayers: DENSITY_GRID_SIZE,
+          width: outputGridSize,
+          height: outputGridSize,
+          depthOrArrayLayers: outputGridSize,
         }
       )
       this.pendingKSpaceData = null
@@ -983,7 +990,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       gridPass.end()
     } else {
-      console.warn(
+      logger.warn(
         `[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`
       )
     }

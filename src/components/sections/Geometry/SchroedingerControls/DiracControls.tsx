@@ -9,17 +9,19 @@
  */
 
 import React, { useMemo } from 'react'
-import type { DiracConfig } from '@/lib/geometry/extended/types'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import type { DiracControlsProps } from './types'
+import type { DiracConfig } from '@/lib/geometry/extended/types'
 import type {
-  DiracInitialCondition,
   DiracFieldView,
+  DiracInitialCondition,
   DiracPotentialType,
 } from '@/lib/geometry/extended/types'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+
+import type { DiracControlsProps } from './types'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 

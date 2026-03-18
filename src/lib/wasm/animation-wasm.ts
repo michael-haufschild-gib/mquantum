@@ -15,6 +15,7 @@
  * - subtractVectorsWasm: Vector subtraction
  */
 
+import { logger } from '@/lib/logger'
 import type { MatrixND, VectorND } from '@/lib/math/types'
 
 // WASM module types
@@ -86,7 +87,7 @@ export async function initAnimationWasm(): Promise<void> {
       }
     } catch (err) {
       const wasmError = err instanceof Error ? err : new Error(String(err))
-      console.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
+      logger.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
     }
   })()
 

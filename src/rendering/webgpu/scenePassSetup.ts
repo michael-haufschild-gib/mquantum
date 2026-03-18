@@ -7,37 +7,37 @@
  * @module rendering/webgpu/scenePassSetup
  */
 
-import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
-import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
-import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 import type { ObjectType } from '@/lib/geometry/types'
-import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
+import { logger } from '@/lib/logger'
 import {
   COLOR_ALGORITHM_TO_INT,
-  getAvailableColorAlgorithms,
   type ColorAlgorithm as PaletteColorAlgorithm,
+  getAvailableColorAlgorithms,
 } from '@/rendering/shaders/palette/types'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
+import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 
+import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
+import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
+import { BloomPass } from './passes/BloomPass'
+import { BufferPreviewPass } from './passes/BufferPreviewPass'
+import { DebugOverlayPass } from './passes/DebugOverlayPass'
+import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
+import { FrameBlendingPass } from './passes/FrameBlendingPass'
+import { FXAAPass } from './passes/FXAAPass'
+import { LightGizmoPass } from './passes/LightGizmoPass'
+import { PaperTexturePass } from './passes/PaperTexturePass'
+// Passes
+import { ScenePass } from './passes/ScenePass'
+import { SMAAPass } from './passes/SMAAPass'
+import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
+import { ToScreenPass } from './passes/ToScreenPass'
+import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 // Object Renderers
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
 import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
-
-// Passes
-import { ScenePass } from './passes/ScenePass'
-import { BloomPass } from './passes/BloomPass'
-import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
-import { FXAAPass } from './passes/FXAAPass'
-import { SMAAPass } from './passes/SMAAPass'
-import { ToScreenPass } from './passes/ToScreenPass'
-import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
-import { PaperTexturePass } from './passes/PaperTexturePass'
-import { FrameBlendingPass } from './passes/FrameBlendingPass'
-import { BufferPreviewPass } from './passes/BufferPreviewPass'
-import { LightGizmoPass } from './passes/LightGizmoPass'
-import { DebugOverlayPass } from './passes/DebugOverlayPass'
-import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
+import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 import { parseHexColorToLinearRgb } from './utils/color'
+import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
 // ============================================================================
 // Types
@@ -215,6 +215,9 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
   const isDirac = config.quantumMode === 'diracEquation'
   const isPauli = config.objectType === 'pauliSpinor'
   const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
+  // 2D pipelines (dim=2 or Wigner) disable temporal, eigenfunction cache, etc.
+  // Must match applyModeOverrides in rendererConfigUtils.ts
+  const is2D = !isComputeMode && (config.dimension === 2 || config.representation === 'wigner')
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
@@ -237,10 +240,11 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
       isComputeMode || config.openQuantumEnabled ? false : config.interferenceEnabled,
     uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
     representation: isComputeMode ? 'position' : config.representation,
-    eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
-    analyticalGradientEnabled: isComputeMode ? false : config.analyticalGradientEnabled,
-    fastEigenInterpolationEnabled: isComputeMode ? false : config.fastEigenInterpolationEnabled,
-    temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
+    eigenfunctionCacheEnabled: isComputeMode || is2D ? false : config.eigenfunctionCacheEnabled,
+    analyticalGradientEnabled: isComputeMode || is2D ? false : config.analyticalGradientEnabled,
+    fastEigenInterpolationEnabled:
+      isComputeMode || is2D ? false : config.fastEigenInterpolationEnabled,
+    temporalReprojectionEnabled: isComputeMode || is2D ? false : config.temporalReprojectionEnabled,
     openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
   }
 }
@@ -378,7 +382,7 @@ async function safeAddPass(
 
     return getPass ? getPass(pass.id) === pass : true
   } catch (err) {
-    console.error(`[WebGPU setupRenderPasses] Failed to add pass '${label}':`, err)
+    logger.error(`[WebGPU setupRenderPasses] Failed to add pass '${label}':`, err)
     return false
   }
 }
@@ -520,7 +524,7 @@ export async function warmSwapSchrodingerPasses(
       }
     }
   } catch (err) {
-    console.error('[WebGPU warmSwap] Pass pre-initialization failed:', err)
+    logger.error('[WebGPU warmSwap] Pass pre-initialization failed:', err)
     newRenderer?.dispose()
     newTemporalPass?.dispose()
     throw err
@@ -897,7 +901,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
       })
 
     default:
-      console.warn(`WebGPU: No renderer for object type '${objectType}'`)
+      logger.warn(`WebGPU: No renderer for object type '${objectType}'`)
       return null
   }
 }

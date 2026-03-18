@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { SchroedingerOpenQuantumDrawer } from '@/components/layout/TimelineControls/SchroedingerOpenQuantumDrawer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'

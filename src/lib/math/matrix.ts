@@ -6,14 +6,15 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
+import {
+  float64ToVector,
+  isAnimationWasmReady,
+  multiplyMatricesWasm,
+  multiplyMatrixVectorWasm,
+} from '@/lib/wasm'
+
 import type { MatrixND, VectorND } from './types'
 import { EPSILON } from './types'
-import {
-  isAnimationWasmReady,
-  multiplyMatrixVectorWasm,
-  multiplyMatricesWasm,
-  float64ToVector,
-} from '@/lib/wasm'
 
 // ============================================================================
 // Scratch Buffer Pools for WASM Operations

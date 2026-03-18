@@ -71,9 +71,7 @@ export function formatShaderName(key: string, objectType: string): string {
 }
 
 // --- Color helper for collapsed view ---
-/**
- *
- */
+/** FPS threshold color classification: high (green), medium (yellow), low (red). */
 export type FpsColorLevel = 'high' | 'medium' | 'low'
 export const FPS_COLORS = {
   high: { text: 'health-high', bg: 'bg-health-high', stroke: 'var(--health-high-stroke)' },

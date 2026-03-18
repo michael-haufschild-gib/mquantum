@@ -1,11 +1,12 @@
+import React, { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React, { useCallback, useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const { dimension, objectType } = useGeometryStore(

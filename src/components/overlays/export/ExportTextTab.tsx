@@ -1,11 +1,11 @@
-import { useExportStore } from '@/stores/exportStore'
-import { Switch } from '@/components/ui/Switch'
+import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Input } from '@/components/ui/Input'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { ColorPicker } from '@/components/ui/ColorPicker'
+import { useExportStore } from '@/stores/exportStore'
 
 export const ExportTextTab = () => {
   const { settings, updateSettings } = useExportStore()

@@ -2,10 +2,11 @@
  * Tests for Cosine Gradient Palette TypeScript Functions
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  calculateCosineColor,
   applyDistributionTS,
+  calculateCosineColor,
   getCosinePaletteColorTS,
 } from '@/rendering/shaders/palette/cosine.glsl'
 

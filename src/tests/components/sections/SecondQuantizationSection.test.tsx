@@ -1,8 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
-import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 
 function createMockActions(): SecondQuantizationActions {
   return {
@@ -166,13 +167,11 @@ describe('SecondQuantizationSection', () => {
     expandSection()
 
     const hundredPercentLabel = screen.getByText('100.0%')
-    const row = hundredPercentLabel.parentElement
-    expect(row).not.toBeNull()
+    const row = hundredPercentLabel.parentElement!
 
-    const fill = row?.querySelector<HTMLDivElement>('div.flex-1 > div')
-    expect(fill).toBeTruthy()
-    expect(fill?.classList.contains('bg-accent')).toBe(true)
-    expect(fill?.classList.contains('bg-accent-cyan')).toBe(false)
+    const fill = row.querySelector<HTMLDivElement>('div.flex-1 > div')!
+    expect(fill.classList.contains('bg-accent')).toBe(true)
+    expect(fill.classList.contains('bg-accent-cyan')).toBe(false)
     expect(fill).toHaveStyle({ width: '100%' })
   })
 

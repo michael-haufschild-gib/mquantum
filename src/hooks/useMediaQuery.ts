@@ -5,9 +5,7 @@
 
 import { useEffect, useState } from 'react'
 
-/**
- *
- */
+/** Named responsive breakpoint sizes. */
 export type Breakpoint = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
 export const BREAKPOINTS: Record<Breakpoint, string> = {

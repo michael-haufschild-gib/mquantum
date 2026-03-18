@@ -7,9 +7,10 @@
  * - Bubble Density: Amount of rising particle/bubble effects
  * - Surface Shimmer: Intensity of surface light shimmer effect
  */
+import React from 'react'
+
 import { Slider } from '@/components/ui/Slider'
 import { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
-import React from 'react'
 
 interface OceanControlsProps {
   proceduralSettings: SkyboxProceduralSettings

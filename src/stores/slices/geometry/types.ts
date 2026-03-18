@@ -6,17 +6,13 @@ import {
   type DiracPotentialType,
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
+  HydrogenNDPresetName,
   type OpenQuantumVisualizationMode,
   type PauliConfig,
   type PauliFieldType,
   type PauliFieldView,
   type PauliInitialCondition,
   type PauliPotentialType,
-  type TdseDriveWaveform,
-  type TdseFieldView,
-  type TdseInitialCondition,
-  type TdsePotentialType,
-  HydrogenNDPresetName,
   RaymarchQuality,
   SchroedingerColorMode,
   SchroedingerConfig,
@@ -26,21 +22,21 @@ import {
   SchroedingerQuantumMode,
   SchroedingerRenderStyle,
   SecondQuantizationMode,
+  type TdseDriveWaveform,
+  type TdseFieldView,
+  type TdseInitialCondition,
+  type TdsePotentialType,
 } from '@/lib/geometry/extended/types'
 
 // ============================================================================
 // Schroedinger Slice
 // ============================================================================
-/**
- *
- */
+/** Read-only state for the Schroedinger quantum configuration. */
 export interface SchroedingerSliceState {
   schroedinger: SchroedingerConfig
 }
 
-/**
- *
- */
+/** Mutation actions for the Schroedinger quantum configuration. */
 export interface SchroedingerSliceActions {
   // Geometry Settings
   setSchroedingerScale: (scale: number) => void
@@ -423,9 +419,7 @@ export interface SchroedingerSliceActions {
   getSchroedingerConfig: () => SchroedingerConfig
 }
 
-/**
- *
- */
+/** Combined Schroedinger state and actions. */
 export type SchroedingerSlice = SchroedingerSliceState & SchroedingerSliceActions
 
 // ============================================================================

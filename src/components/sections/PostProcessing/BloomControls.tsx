@@ -7,12 +7,11 @@
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Slider } from '@/components/ui/Slider'
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 
-/**
- *
- */
+import { Slider } from '@/components/ui/Slider'
+import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
+
+/** Props for the bloom post-processing effect controls. */
 export interface BloomControlsProps {
   className?: string
 }

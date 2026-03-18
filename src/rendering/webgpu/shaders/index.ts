@@ -13,4 +13,4 @@ export * from './shared'
 export * from './postprocessing'
 
 // Re-export composition types
-export type { WGSLShaderConfig, ShaderBlock, FeatureFlags } from './shared/compose-helpers'
+export type { FeatureFlags, ShaderBlock, WGSLShaderConfig } from './shared/compose-helpers'

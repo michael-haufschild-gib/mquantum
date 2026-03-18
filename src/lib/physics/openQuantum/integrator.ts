@@ -10,8 +10,8 @@
  *   3. Physicality guards: Hermitianize, trace-normalize, eigenvalue floor
  */
 
-import type { DensityMatrix, LindbladChannel } from './types'
 import { computeDissipator } from './lindblad'
+import type { DensityMatrix, LindbladChannel } from './types'
 
 // ---------------------------------------------------------------------------
 // Preallocated scratch buffers (module-scoped, shared across calls)

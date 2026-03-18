@@ -2,11 +2,12 @@
  * Tests for URL state serializer
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  serializeState,
   deserializeState,
   generateShareUrl,
+  serializeState,
   type ShareableState,
 } from '@/lib/url/state-serializer'
 
@@ -127,6 +128,34 @@ describe('state-serializer', () => {
       expect(deserialized.dimension).toBe(7)
       expect(deserialized.objectType).toBe('schroedinger')
       expect(deserialized.quantumMode).toBe('hydrogenND')
+    })
+
+    it('should roundtrip all quantum modes', () => {
+      const modes = [
+        'hydrogenND',
+        'freeScalarField',
+        'tdseDynamics',
+        'becDynamics',
+        'diracEquation',
+      ] as const
+
+      for (const mode of modes) {
+        const serialized = serializeState({
+          dimension: 3,
+          objectType: 'schroedinger',
+          quantumMode: mode,
+        })
+        const deserialized = deserializeState(serialized)
+        expect(deserialized.quantumMode, `roundtrip failed for ${mode}`).toBe(mode)
+      }
+    })
+
+    it('should roundtrip all valid dimensions (3-11)', () => {
+      for (let d = 3; d <= 11; d++) {
+        const serialized = serializeState({ dimension: d, objectType: 'schroedinger' })
+        const deserialized = deserializeState(serialized)
+        expect(deserialized.dimension, `roundtrip failed for d=${d}`).toBe(d)
+      }
     })
   })
 

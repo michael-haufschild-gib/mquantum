@@ -15,12 +15,14 @@
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { ToggleButton } from '@/components/ui/ToggleButton'
-import { Slider } from '@/components/ui/Slider'
+
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 
 /**

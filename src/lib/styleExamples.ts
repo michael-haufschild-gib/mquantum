@@ -7,11 +7,10 @@
 
 import stylesData from '@/assets/defaults/styles.json'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { logger } from '@/lib/logger'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
-/**
- *
- */
+/** Built-in style preset examples for the preset manager. */
 export interface StyleExample {
   id: string
   name: string
@@ -81,7 +80,7 @@ export function getStyleExamples(): StyleExample[] {
 export function applyStyleExample(id: string): boolean {
   const style = stylesData.find((s) => s.id === id)
   if (!style) {
-    console.warn(`Style example with id "${id}" not found`)
+    logger.warn(`Style example with id "${id}" not found`)
     return false
   }
 

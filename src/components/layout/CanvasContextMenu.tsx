@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { m, AnimatePresence } from 'motion/react'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
-import { useCameraStore } from '@/stores/cameraStore'
-import { useDropdownStore } from '@/stores/dropdownStore'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { getModifierSymbols } from '@/lib/platform'
-import { Button } from '@/components/ui/Button'
+import { useCameraStore } from '@/stores/cameraStore'
+import { useDropdownStore } from '@/stores/dropdownStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
 
 const DROPDOWN_ID = 'canvas-context-menu'
 
@@ -122,9 +123,9 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
     [closeDropdown]
   )
 
-  const handleItemHover = useCallback(() => {
+  const handleItemHover = () => {
     soundManager.playHover()
-  }, [])
+  }
 
   return (
     <div

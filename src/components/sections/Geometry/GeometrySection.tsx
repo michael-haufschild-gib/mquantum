@@ -3,16 +3,16 @@
  * Section wrapper for object geometry controls
  */
 
+import React from 'react'
+
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
-import React from 'react'
+
 import { DimensionSelector } from './DimensionSelector'
 import { ObjectSettingsSection } from './ObjectSettingsSection'
 import { ObjectTypeSelector } from './ObjectTypeSelector'
 
-/**
- *
- */
+/** Props for the geometry/quantum configuration section. */
 export interface GeometrySectionProps {
   defaultOpen?: boolean
 }

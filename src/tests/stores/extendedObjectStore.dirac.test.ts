@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
 import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/types'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('Dirac store slice', () => {
   beforeEach(() => {

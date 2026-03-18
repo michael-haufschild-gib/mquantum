@@ -3,9 +3,10 @@
  * Exports WebGPU canvas content to PNG images using on-demand screenshot capture
  */
 
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
+import { logger } from '@/lib/logger'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
 import { useScreenshotStore } from '@/stores/screenshotStore'
-import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 
 /**
  * Options for PNG export capture requests.
@@ -39,9 +40,9 @@ export async function exportSceneToPNG(_options: ExportOptions = {}): Promise<bo
     if (error instanceof DOMException && error.name === 'SecurityError') {
       errorMsg =
         'Canvas is tainted by cross-origin content (CORS). External textures or images were used without proper permissions.'
-      console.error('Export failed: ' + errorMsg)
+      logger.error('Export failed: ' + errorMsg)
     } else {
-      console.error('Export failed:', error)
+      logger.error('Export failed:', error)
     }
 
     useMsgBoxStore.getState().showMsgBox('Export Failed', errorMsg, 'error')

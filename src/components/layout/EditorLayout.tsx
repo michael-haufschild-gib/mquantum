@@ -1,3 +1,7 @@
+import { AnimatePresence, m } from 'motion/react'
+import React, { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
 import { CommandPalette } from '@/components/layout/CommandPalette'
 import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay'
@@ -6,12 +10,11 @@ import { ExportModal } from '@/components/overlays/ExportModal'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { useMobileBottomPanel } from '@/hooks/useMobileBottomPanel'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
 import { useThemeStore } from '@/stores/themeStore'
-import { AnimatePresence, m } from 'motion/react'
-import React, { useEffect } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+
 import { EditorBottomPanel } from './EditorBottomPanel'
 import { EditorLeftPanel } from './EditorLeftPanel'
 import { EditorRightPanel } from './EditorRightPanel'
@@ -147,7 +150,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
   }
 
   // Mobile bottom panel visibility: shown when both side panels are closed
-  const showMobileBottomPanel = !isCinematicMode && !isDesktop && isCollapsed && !showLeftPanel
+  const showMobileBottomPanel = useMobileBottomPanel()
 
   return (
     <div className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-full bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app">
@@ -236,6 +239,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 animate="visible"
                 exit="hiddenLeft"
                 variants={panelVariants}
+                data-testid="left-panel"
                 className={`
                             glass-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col
@@ -290,6 +294,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 animate="visible"
                 exit="hiddenRight"
                 variants={panelVariants}
+                data-testid="right-panel"
                 className={`
                             glass-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col

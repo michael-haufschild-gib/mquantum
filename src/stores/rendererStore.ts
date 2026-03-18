@@ -10,6 +10,8 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
 
+import { logger } from '@/lib/logger'
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -149,7 +151,7 @@ export const useRendererStore = create<RendererState>()(
     },
 
     handleDeviceLost: (reason: string) => {
-      console.warn(`[RendererStore] WebGPU device lost: ${reason}`)
+      logger.warn(`[RendererStore] WebGPU device lost: ${reason}`)
 
       set({
         webgpuStatus: 'unsupported',

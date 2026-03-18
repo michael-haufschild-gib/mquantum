@@ -5,8 +5,8 @@
  * Eigendecomposition reuses the shared scratch buffers from integrator.ts.
  */
 
-import type { DensityMatrix, OpenQuantumMetrics } from './types'
 import { hermitianEigendecompose, MAX_K } from './integrator'
+import type { DensityMatrix, OpenQuantumMetrics } from './types'
 
 // Scratch buffers for eigendecomposition (shared with integrator module)
 const eigenvaluesScratch = new Float64Array(MAX_K)

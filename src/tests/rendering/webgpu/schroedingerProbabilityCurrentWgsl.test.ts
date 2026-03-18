@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 
 describe('Schroedinger probability current WGSL composition', () => {

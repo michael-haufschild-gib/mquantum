@@ -7,15 +7,19 @@
  * @module stores/slices/geometry/setters/becSetters
  */
 
-import {
-  DEFAULT_BEC_CONFIG,
-  type BecConfig,
-} from '@/lib/geometry/extended/types'
+import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
 import type { SchroedingerSliceActions } from '../types'
-import { type SetterContext, computeCflLimit, clampDtWithCfl, defaultTdseGridPerDim, TDSE_MAX_TOTAL_SITES } from './sliceSetterUtils'
+import {
+  clampDtWithCfl,
+  computeCflLimit,
+  defaultTdseGridPerDim,
+  type SetterContext,
+  TDSE_MAX_TOTAL_SITES,
+} from './sliceSetterUtils'
 
 type BecActions = Pick<
   SchroedingerSliceActions,

@@ -10,12 +10,14 @@
  * etc.) requires scene presets. See state-serializer.ts for rationale.
  */
 
+import { useEffect, useRef } from 'react'
+
+import { logger } from '@/lib/logger'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useEffect, useRef } from 'react'
 
 /**
  * Apply individual URL state parameters to stores.
@@ -76,7 +78,7 @@ function loadSceneByName(sceneName: string): void {
       }
     }
   } else {
-    console.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
+    logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)
   }
 }
 

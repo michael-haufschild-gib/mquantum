@@ -1,12 +1,14 @@
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
 import './index.css'
 
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 // Initialize WASM module for high-performance animation operations
 // This is async and non-blocking - functions fallback to JS until ready
 import { initAnimationWasm } from '@/lib/wasm'
+
+import App from './App.tsx'
 initAnimationWasm()
 
 // Expose stores for e2e testing

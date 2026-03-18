@@ -1,14 +1,15 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  nearestPow2,
   computeStrides,
   DENSITY_GRID_SIZE,
-  LINEAR_WG,
-  GRID_WG,
-  MAX_DIM,
-  FFT_UNIFORM_SIZE,
-  PACK_UNIFORM_SIZE,
   DIAG_DECIMATION,
+  FFT_UNIFORM_SIZE,
+  GRID_WG,
+  LINEAR_WG,
+  MAX_DIM,
+  nearestPow2,
+  PACK_UNIFORM_SIZE,
 } from '@/rendering/webgpu/passes/computePassUtils'
 
 describe('nearestPow2', () => {

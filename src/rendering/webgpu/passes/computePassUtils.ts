@@ -6,6 +6,18 @@
 /** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
 export const LINEAR_WG = 64
 
+/**
+ * Maximum workgroups per dimension (WebGPU spec minimum guaranteed limit).
+ * All dispatches must stay within this bound.
+ */
+export const MAX_DISPATCH_PER_DIM = 65535
+
+/**
+ * Maximum total lattice sites that can be dispatched with a single linear dispatch.
+ * Exceeding this causes a GPU validation error.
+ */
+export const MAX_LINEAR_DISPATCH_SITES = MAX_DISPATCH_PER_DIM * LINEAR_WG
+
 /** 3D dispatch workgroup size for write-grid passes */
 export const GRID_WG = 4
 
@@ -32,6 +44,27 @@ export const DIAG_DECIMATION = 5
 export function nearestPow2(v: number): number {
   const p = Math.max(2, 2 ** Math.round(Math.log2(Math.max(1, v))))
   return Math.min(128, p)
+}
+
+/**
+ * Reduce grid dimensions until total sites fit within the GPU dispatch limit.
+ * Halves the largest axis repeatedly until the product is within bounds.
+ *
+ * @param grid - Per-axis grid sizes (power-of-2 values)
+ * @param maxSites - Maximum allowed total sites (defaults to MAX_LINEAR_DISPATCH_SITES)
+ * @returns Grid sizes reduced to fit within the dispatch limit
+ */
+export function reduceGridToFit(grid: number[], maxSites = MAX_LINEAR_DISPATCH_SITES): number[] {
+  const result = [...grid]
+  while (result.reduce((a, b) => a * b, 1) > maxSites) {
+    let maxIdx = 0
+    for (let i = 1; i < result.length; i++) {
+      if (result[i]! > result[maxIdx]!) maxIdx = i
+    }
+    if (result[maxIdx]! <= 2) break
+    result[maxIdx] = result[maxIdx]! / 2
+  }
+  return result
 }
 
 /**

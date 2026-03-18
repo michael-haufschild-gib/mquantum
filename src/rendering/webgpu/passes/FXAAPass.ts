@@ -6,13 +6,11 @@
  * @module rendering/webgpu/passes/FXAAPass
  */
 
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { fxaaShader } from '../shaders/postprocessing/fxaa.wgsl'
 
-/**
- *
- */
+/** Configuration for the FXAA anti-aliasing post-processing pass. */
 export interface FXAAPassOptions {
   /** Input color resource (default: 'ldr-color') */
   colorInput?: string

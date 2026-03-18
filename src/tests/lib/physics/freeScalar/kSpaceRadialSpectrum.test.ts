@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { PASSTHROUGH_KSPACE_VIZ, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
 import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
-  computeRadialShells,
   buildRadialDisplayGrid,
+  computeRadialShells,
 } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 
 // ============================================================================

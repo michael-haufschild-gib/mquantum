@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { rotationToDirection } from '@/rendering/lights/types'
 import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 import { packLightingUniforms } from '@/rendering/webgpu/utils/lighting'

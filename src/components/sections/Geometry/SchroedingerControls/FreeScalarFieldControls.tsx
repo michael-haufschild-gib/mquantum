@@ -7,6 +7,8 @@
  * for extra dimensions (d>3), and field view controls.
  */
 
+import React, { useCallback, useMemo } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
@@ -14,7 +16,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { FreeScalarFieldView, FreeScalarInitialCondition } from '@/lib/geometry/extended/types'
-import React, { useCallback, useMemo } from 'react'
+
 import type { FreeScalarFieldControlsProps } from './types'
 
 /** Power-of-2 grid size options for exact vacuum mode */

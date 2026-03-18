@@ -3,7 +3,8 @@
  * Verifies environment (skybox/background) state management
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { SKYBOX_INITIAL_STATE } from '@/stores/slices/skyboxSlice'
 

@@ -1,9 +1,10 @@
-import { FacesSection } from '@/components/sections/Faces/FacesSection'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
+
+import { FacesSection } from '@/components/sections/Faces/FacesSection'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('FacesSection material tab availability', () => {
   beforeEach(() => {

@@ -28,23 +28,23 @@ export { OBJECT_TYPE_REGISTRY } from './registry'
 
 // Helper functions
 export {
-  // Core lookups
-  getObjectTypeEntry,
-  // Rendering capability helpers
-  isRaymarchingType,
-  // Dimension constraint helpers
-  getDimensionConstraints,
-  getRecommendedDimension,
-  isAvailableForDimension,
-  getUnavailabilityReason,
   getAvailableTypesForDimension,
-  // UI helpers
-  getControlsComponentKey,
-  hasTimelineControls,
-  // Validation helpers
-  isValidObjectType,
   // Store config helpers
   getConfigStoreKey,
+  // UI helpers
+  getControlsComponentKey,
+  // Dimension constraint helpers
+  getDimensionConstraints,
+  // Core lookups
+  getObjectTypeEntry,
+  getRecommendedDimension,
+  getUnavailabilityReason,
+  hasTimelineControls,
+  isAvailableForDimension,
+  // Rendering capability helpers
+  isRaymarchingType,
+  // Validation helpers
+  isValidObjectType,
 } from './helpers'
 
 // Component loader

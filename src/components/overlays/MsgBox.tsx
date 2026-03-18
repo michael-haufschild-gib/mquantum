@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { useMsgBoxStore } from '@/stores/msgBoxStore'
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { Modal } from '@/components/ui/Modal'
+import React, { useEffect, useState } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { Icon, type IconName } from '@/components/ui/Icon'
+import { Modal } from '@/components/ui/Modal'
 import { Switch } from '@/components/ui/Switch'
+import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
 export const MsgBox: React.FC = () => {
   const { isOpen, title, message, type, actions, dismissible, dismissId, closeMsgBox } =

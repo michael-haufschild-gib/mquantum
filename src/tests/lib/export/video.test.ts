@@ -2,7 +2,8 @@
  * Tests for video export utilities (VideoRecorder)
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { VideoRecorder } from '@/lib/export/video'
 
 // Mock mediabunny - it uses WebCodecs which aren't available in test environment
@@ -249,7 +250,6 @@ describe('VideoRecorder', () => {
       const blob = await recorder.finalize()
 
       expect(blob).toBeInstanceOf(Blob)
-      expect(blob).not.toBeNull()
       if (blob) {
         // Should use getMimeType() for codec-qualified MIME
         // Note: Blob API normalizes MIME types to lowercase

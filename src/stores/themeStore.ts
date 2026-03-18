@@ -1,18 +1,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-/**
- *
- */
+import { logger } from '@/lib/logger'
+
+/** Application color scheme mode. */
 export type ThemeMode = 'light' | 'dark' | 'system'
-/**
- *
- */
+/** Available accent color options. */
 export type ThemeAccent = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue' | 'violet' | 'red'
 
-/**
- *
- */
+/** Named theme configuration combining mode and accent. */
 export interface ThemePreset {
   id: string
   label: string
@@ -50,9 +46,7 @@ function isValidMode(value: unknown): value is ThemeMode {
   return typeof value === 'string' && ['light', 'dark', 'system'].includes(value)
 }
 
-/**
- *
- */
+/** Global theme store state and actions. */
 export interface ThemeState {
   mode: ThemeMode
   accent: ThemeAccent
@@ -72,7 +66,7 @@ export const useThemeStore = create<ThemeState>()(
       },
       setAccent: (accent) => {
         if (!isValidAccent(accent)) {
-          console.warn(`Invalid accent: "${accent}". Using default "cyan".`)
+          logger.warn(`Invalid accent: "${accent}". Using default "cyan".`)
           set({ accent: 'cyan' })
           return
         }

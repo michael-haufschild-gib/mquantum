@@ -128,7 +128,7 @@ export const densityGridComputeBlock = /* wgsl */ `
 // Density Grid Compute Shader Entry Point
 // ============================================
 
-@compute @workgroup_size(8, 8, 8)
+@compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check - skip threads outside grid
   if (any(gid >= gridParams.gridSize)) {
@@ -184,7 +184,7 @@ export const densityGridWithPhaseComputeBlock = /* wgsl */ `
 // Density Grid with Phase - Compute Shader
 // ============================================
 
-@compute @workgroup_size(8, 8, 8)
+@compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check
   if (any(gid >= gridParams.gridSize)) {
@@ -253,7 +253,7 @@ fn complexConjOQ(a: vec2f) -> vec2f {
   return vec2f(a.x, -a.y);
 }
 
-@compute @workgroup_size(8, 8, 8)
+@compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check
   if (any(gid >= gridParams.gridSize)) {

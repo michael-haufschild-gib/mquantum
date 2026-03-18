@@ -5,25 +5,26 @@
  * Only 'schroedinger' exists as the sole object type.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  // Registry data
-  OBJECT_TYPE_REGISTRY,
-  // Core lookups
-  getObjectTypeEntry,
-  // Rendering capabilities
-  isRaymarchingType,
-  // Dimension constraints
-  getDimensionConstraints,
-  isAvailableForDimension,
   getAvailableTypesForDimension,
-  getRecommendedDimension,
+  getConfigStoreKey,
   // UI
   getControlsComponentKey,
+  // Dimension constraints
+  getDimensionConstraints,
+  // Core lookups
+  getObjectTypeEntry,
+  getRecommendedDimension,
   hasTimelineControls,
+  isAvailableForDimension,
+  // Rendering capabilities
+  isRaymarchingType,
   // Validation
   isValidObjectType,
-  getConfigStoreKey,
+  // Registry data
+  OBJECT_TYPE_REGISTRY,
 } from '@/lib/geometry/registry'
 
 describe('Object Type Registry', () => {
@@ -37,10 +38,9 @@ describe('Object Type Registry', () => {
 
     it('returns valid entry for schroedinger', () => {
       const entry = getObjectTypeEntry('schroedinger')
-      expect(entry).toBeDefined()
-      expect(entry?.type).toBe('schroedinger')
-      expect(entry?.name).toBeTruthy()
-      expect(entry?.description).toBeTruthy()
+      expect(entry).toMatchObject({ type: 'schroedinger' })
+      expect(entry?.name).toBe('Schrödinger Slices')
+      expect(entry?.description.length).toBeGreaterThan(10)
     })
 
     it('returns undefined for invalid object type', () => {
@@ -52,8 +52,7 @@ describe('Object Type Registry', () => {
   describe('pauliSpinor entry', () => {
     it('returns valid entry for pauliSpinor', () => {
       const entry = getObjectTypeEntry('pauliSpinor')
-      expect(entry).toBeDefined()
-      expect(entry?.type).toBe('pauliSpinor')
+      expect(entry).toMatchObject({ type: 'pauliSpinor' })
       expect(entry?.configStoreKey).toBe('pauliSpinor')
     })
 

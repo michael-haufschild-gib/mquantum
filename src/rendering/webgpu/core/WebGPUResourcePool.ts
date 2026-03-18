@@ -8,6 +8,8 @@
  * @module rendering/webgpu/core/WebGPUResourcePool
  */
 
+import { logger } from '@/lib/logger'
+
 import type { ResourceSize, WebGPURenderResourceConfig, WebGPUResource } from './types'
 
 // =============================================================================
@@ -176,7 +178,7 @@ export class WebGPUResourcePool {
 
     const config = this.configs.get(id)
     if (!config) {
-      console.warn(`WebGPUResourcePool: Cannot enable ping-pong for unknown resource '${id}'`)
+      logger.warn(`WebGPUResourcePool: Cannot enable ping-pong for unknown resource '${id}'`)
       return
     }
 

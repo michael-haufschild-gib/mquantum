@@ -3,13 +3,13 @@
  * Section wrapper for environment/scene controls
  */
 
-import { Section } from '@/components/sections/Section'
 import React from 'react'
+
+import { Section } from '@/components/sections/Section'
+
 import { EnvironmentControls } from './EnvironmentControls'
 
-/**
- *
- */
+/** Props for the environment/skybox section. */
 export interface EnvironmentSectionProps {
   defaultOpen?: boolean
 }

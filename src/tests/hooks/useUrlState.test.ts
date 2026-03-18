@@ -3,6 +3,8 @@
  */
 
 import { renderHook, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { useUrlState } from '@/hooks/useUrlState'
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import type { ShareableState } from '@/lib/url/state-serializer'
@@ -10,7 +12,6 @@ import { parseCurrentUrl } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/url/state-serializer', async () => {
   const actual = await vi.importActual<typeof import('@/lib/url/state-serializer')>(

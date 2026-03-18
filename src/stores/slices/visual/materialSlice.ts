@@ -9,6 +9,7 @@
  */
 
 import { StateCreator } from 'zustand'
+
 import { AppearanceSlice, MaterialSlice, MaterialSliceState } from './types'
 
 function isFiniteMaterialInput(value: number): boolean {

@@ -17,14 +17,14 @@
  * @module rendering/webgpu/passes/WignerCacheComputePass
  */
 
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeWignerCacheComputeShader } from '../shaders/schroedinger/compute/composeWignerCache'
-import { composeWignerSpatialComputeShader } from '../shaders/schroedinger/compute/composeWignerSpatial'
 import { composeWignerReconstructComputeShader } from '../shaders/schroedinger/compute/composeWignerReconstruct'
+import { composeWignerSpatialComputeShader } from '../shaders/schroedinger/compute/composeWignerSpatial'
 import { WIGNER_GRID_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerCache.wgsl'
-import { WIGNER_SPATIAL_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerSpatial.wgsl'
 import { WIGNER_RECONSTRUCT_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerReconstruct.wgsl'
+import { WIGNER_SPATIAL_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerSpatial.wgsl'
 
 /** Workgroup size — must match @workgroup_size(16, 16) in shaders */
 const WORKGROUP_SIZE = 16

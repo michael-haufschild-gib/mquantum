@@ -10,9 +10,9 @@ import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   OUTPUT_GRID_SIZE,
-  packRGBA16F,
-  packRG16F,
   packR16F,
+  packRG16F,
+  packRGBA16F,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { buildRadialDisplayGrid } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 

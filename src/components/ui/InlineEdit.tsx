@@ -1,12 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react'
-import { m, AnimatePresence } from 'motion/react'
-import { Icon } from './Icon'
-import { Button } from './Button'
+import { AnimatePresence, m } from 'motion/react'
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+import { Button } from './Button'
+import { Icon } from './Icon'
+
+/** Props for the inline text editing component with confirm/cancel controls. */
 export interface InlineEditProps {
   /** Current value to display */
   value: string

@@ -10,6 +10,7 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /* ── SVG layout constants ── */
@@ -24,9 +25,6 @@ const PH = HEIGHT - PY - PB
 
 /** Blue secondary color for radial curve — uses theme token */
 const WAVE_COLOR = 'var(--dirac-particle)'
-
-/** Spectroscopic notation for l values */
-const L_LABELS = ['s', 'p', 'd', 'f', 'g', 'h']
 
 /**
  * Associated Laguerre polynomial L_p^k(x) via recurrence.
@@ -76,12 +74,9 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
   const chart = useMemo(() => {
     // ── Energy diagram data ──
     const maxN = Math.max(n + 1, 4)
-    const energyLevels: { n: number; energy: number; sublevels: number[] }[] = []
+    const energyLevels: { n: number; energy: number }[] = []
     for (let ni = 1; ni <= maxN; ni++) {
-      const energy = -13.6 / (ni * ni)
-      const subs: number[] = []
-      for (let li = 0; li < ni; li++) subs.push(li)
-      energyLevels.push({ n: ni, energy, sublevels: subs })
+      energyLevels.push({ n: ni, energy: -13.6 / (ni * ni) })
     }
 
     const eMin = energyLevels[0]!.energy * 1.15
@@ -154,47 +149,22 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
             strokeDasharray="2,2"
           />
 
-          {/* Energy levels with sublevel lines */}
+          {/* Energy levels — full-width lines */}
           {chart.energyLevels.map((lvl) => {
             const y = chart.toEnergyY(lvl.energy)
-            const subCount = lvl.sublevels.length
-            const subWidth = Math.min((PW * 0.5) / subCount, 24)
-            const totalWidth = subCount * subWidth
-            const startX = PX_L + (PW - totalWidth) / 2
+            const isActive = lvl.n === n
 
             return (
               <g key={lvl.n}>
-                {/* Sublevel lines */}
-                {lvl.sublevels.map((li) => {
-                  const isActive = lvl.n === n && li === l
-                  const sx = startX + li * subWidth + 2
-                  const ex = sx + subWidth - 4
-
-                  return (
-                    <g key={li}>
-                      <line
-                        x1={sx}
-                        y1={y}
-                        x2={ex}
-                        y2={y}
-                        stroke={isActive ? 'var(--theme-accent)' : 'var(--theme-accent)'}
-                        strokeWidth={isActive ? 2 : 0.5}
-                        opacity={isActive ? 0.9 : 0.15}
-                      />
-                      <text
-                        x={(sx + ex) / 2}
-                        y={y + 8}
-                        textAnchor="middle"
-                        fill={isActive ? 'var(--theme-accent)' : 'var(--text-tertiary)'}
-                        fontSize={5}
-                        fontFamily="monospace"
-                        opacity={isActive ? 1 : 0.4}
-                      >
-                        {L_LABELS[li] ?? li}
-                      </text>
-                    </g>
-                  )
-                })}
+                <line
+                  x1={PX_L}
+                  y1={y}
+                  x2={PX_L + PW}
+                  y2={y}
+                  stroke="var(--theme-accent)"
+                  strokeWidth={isActive ? 1.5 : 0.5}
+                  opacity={isActive ? 0.8 : 0.12}
+                />
 
                 {/* Energy value on right */}
                 <text
@@ -255,13 +225,13 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
             strokeWidth={0.5}
           />
           <text
-            x={4}
+            x={PX_L / 2}
             y={PY + PH / 2}
             textAnchor="middle"
             fill={WAVE_COLOR}
             fontSize={8}
             fontFamily="monospace"
-            transform={`rotate(-90, 4, ${PY + PH / 2})`}
+            transform={`rotate(-90, ${PX_L / 2}, ${PY + PH / 2})`}
           >
             r²|R|²
           </text>
@@ -277,13 +247,13 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
             opacity={0.4}
           />
           <text
-            x={WIDTH - 2}
+            x={WIDTH - PX_R / 2}
             y={PY + PH / 2}
             textAnchor="middle"
             fill="var(--theme-accent)"
             fontSize={8}
             fontFamily="monospace"
-            transform={`rotate(90, ${WIDTH - 2}, ${PY + PH / 2})`}
+            transform={`rotate(90, ${WIDTH - PX_R / 2}, ${PY + PH / 2})`}
           >
             E (eV)
           </text>

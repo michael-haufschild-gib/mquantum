@@ -6,8 +6,8 @@
  * @module components/sections/Geometry/SchroedingerControls/tdseControlsConstants
  */
 
-import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 
 /** Axis labels for N-dimensional controls. */
 export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']

@@ -1,6 +1,4 @@
-import { Icon } from '@/components/ui/Icon'
-import { Tab, Tabs } from '@/components/ui/Tabs'
-import React, { useMemo, useState } from 'react'
+import React, { useState } from 'react'
 
 // Import existing sidebar sections
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
@@ -13,6 +11,8 @@ import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
 import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
+import { Icon } from '@/components/ui/Icon'
+import { Tab, Tabs } from '@/components/ui/Tabs'
 
 /** Object tab content — extracted so it can subscribe to quantum mode */
 const ObjectTabContent: React.FC = React.memo(() => {
@@ -32,54 +32,51 @@ export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
   const [activeTab, setActiveTab] = useState('object')
 
-  const tabs: Tab[] = useMemo(
-    () => [
-      {
-        id: 'object',
-        label: (
-          <div className="flex items-center gap-2">
-            <Icon name="sphere" size={14} />
-            <span>Object</span>
-          </div>
-        ),
-        content: <ObjectTabContent />,
-      },
-      {
-        id: 'scene',
-        label: (
-          <div className="flex items-center gap-2">
-            <Icon name="home" size={14} />
-            <span>Scene</span>
-          </div>
-        ),
-        content: (
-          <div>
-            {/* The "Stage" - Background, Lighting, Lens, FX */}
-            <EnvironmentSection defaultOpen={true} />
-            <LightsSection defaultOpen={false} />
-            <PostProcessingSection defaultOpen={false} />
-          </div>
-        ),
-      },
-      {
-        id: 'system',
-        label: (
-          <div className="flex items-center gap-2">
-            <Icon name="cog" size={14} />
-            <span>System</span>
-          </div>
-        ),
-        content: (
-          <div>
-            {/* The "App" - Settings, Meta, Output */}
-            <SettingsSection defaultOpen={true} />
-            <PerformanceSection defaultOpen={false} />
-          </div>
-        ),
-      },
-    ],
-    []
-  )
+  const tabs: Tab[] = [
+    {
+      id: 'object',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="sphere" size={14} />
+          <span>Object</span>
+        </div>
+      ),
+      content: <ObjectTabContent />,
+    },
+    {
+      id: 'scene',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="home" size={14} />
+          <span>Scene</span>
+        </div>
+      ),
+      content: (
+        <div>
+          {/* The "Stage" - Background, Lighting, Lens, FX */}
+          <EnvironmentSection defaultOpen={true} />
+          <LightsSection defaultOpen={false} />
+          <PostProcessingSection defaultOpen={false} />
+        </div>
+      ),
+    },
+    {
+      id: 'system',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="cog" size={14} />
+          <span>System</span>
+        </div>
+      ),
+      content: (
+        <div>
+          {/* The "App" - Settings, Meta, Output */}
+          <SettingsSection defaultOpen={true} />
+          <PerformanceSection defaultOpen={false} />
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">

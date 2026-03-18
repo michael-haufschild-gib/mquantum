@@ -4,6 +4,8 @@
  * These tests verify actual behavior and logic, not default values.
  */
 
+import { describe, expect, it } from 'vitest'
+
 import {
   clampConeAngle,
   clampDecay,
@@ -14,14 +16,13 @@ import {
   createNewLight,
   DEFAULT_NEW_LIGHT_POSITIONS,
   directionToRotation,
+  type LightSource,
   normalizeRotation,
   normalizeRotationSigned,
   normalizeRotationTuple,
   normalizeRotationTupleSigned,
   rotationToDirection,
-  type LightSource,
 } from '@/rendering/lights/types'
-import { describe, expect, it } from 'vitest'
 
 describe('Light Types', () => {
   describe('createNewLight', () => {

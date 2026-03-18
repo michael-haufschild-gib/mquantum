@@ -1,17 +1,14 @@
 import React, { useCallback } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
-/**
- *
- */
+/** Single option within a {@link MultiToggleGroup}. */
 export interface MultiToggleOption<T extends string = string> {
   value: T
   label: string
 }
 
-/**
- *
- */
+/** Props for the multi-select toggle group (allows multiple active options). */
 export interface MultiToggleGroupProps<T extends string = string> {
   options: MultiToggleOption<T>[]
   value: T[]
@@ -53,6 +50,7 @@ const MultiToggleButton = React.memo(
 
     return (
       <button
+        type="button"
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         disabled={disabled}

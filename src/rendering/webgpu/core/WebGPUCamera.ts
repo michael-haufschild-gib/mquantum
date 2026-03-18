@@ -11,9 +11,7 @@
 // Types
 // ============================================================================
 
-/**
- *
- */
+/** Orbital camera parameters: position, target, clipping planes, and field of view. */
 export interface WebGPUCameraState {
   /** Camera position in world space */
   position: [number, number, number]
@@ -31,9 +29,7 @@ export interface WebGPUCameraState {
   aspect: number
 }
 
-/**
- *
- */
+/** Pre-computed camera matrices in column-major layout for GPU uniform upload. */
 export interface WebGPUCameraMatrices {
   /** View matrix (world to camera) - column-major Float32Array */
   viewMatrix: Float32Array

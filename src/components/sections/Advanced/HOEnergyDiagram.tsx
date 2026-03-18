@@ -10,10 +10,11 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+
 import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

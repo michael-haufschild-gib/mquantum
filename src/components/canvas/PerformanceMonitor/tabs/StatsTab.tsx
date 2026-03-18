@@ -1,6 +1,8 @@
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+
 import { Icons } from '../icons'
 import { InfoCard, SectionHeader } from '../subcomponents'
 import { formatMetric } from '../utils'

@@ -3,6 +3,9 @@
  * Section wrapper for app settings controls
  */
 
+import React, { useCallback, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
@@ -10,12 +13,8 @@ import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/hooks/useToast'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useUIStore } from '@/stores/uiStore'
-import React, { useState, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+/** Props for the application settings section. */
 export interface SettingsSectionProps {
   defaultOpen?: boolean
 }

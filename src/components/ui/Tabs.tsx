@@ -7,23 +7,22 @@
  * Optimized to avoid forced reflows and support "keep-alive" with "mount-on-demand" for tab content.
  */
 
-import ChevronLeftIcon from '@/assets/icons/chevron-left2.svg?react'
-import ChevronRightIcon from '@/assets/icons/chevron-right2.svg?react'
-import { soundManager } from '@/lib/audio/SoundManager'
 import { m } from 'motion/react'
 import React, {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   useTransition,
-  useMemo,
 } from 'react'
 
-/**
- *
- */
+import ChevronLeftIcon from '@/assets/icons/chevron-left2.svg?react'
+import ChevronRightIcon from '@/assets/icons/chevron-right2.svg?react'
+import { soundManager } from '@/lib/audio/SoundManager'
+
+/** Definition for a single tab within a {@link Tabs} component. */
 export interface Tab {
   /** Unique identifier for the tab */
   id: string
@@ -35,9 +34,7 @@ export interface Tab {
   disabled?: boolean
 }
 
-/**
- *
- */
+/** Props for the {@link Tabs} component. Supports keep-alive and mount-on-demand strategies. */
 export interface TabsProps {
   /** Array of tab definitions */
   tabs: Tab[]

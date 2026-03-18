@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
 import { ToScreenPass } from '@/rendering/webgpu/passes/ToScreenPass'
@@ -46,30 +47,6 @@ interface ScenePassConfig {
     | 'procedural_twilight'
   backgroundColor: string
   renderResolutionScale: number
-}
-
-function ensureGpuTextureUsageConstants(): void {
-  if (!('GPUTextureUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUTextureUsage: Record<string, number> }).GPUTextureUsage = {
-      TEXTURE_BINDING: 1 << 0,
-      RENDER_ATTACHMENT: 1 << 1,
-      COPY_SRC: 1 << 2,
-      COPY_DST: 1 << 3,
-    }
-  }
-
-  if (!('GPUBufferUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUBufferUsage: Record<string, number> }).GPUBufferUsage = {
-      UNIFORM: 1 << 0,
-      COPY_DST: 1 << 1,
-      VERTEX: 1 << 2,
-      INDEX: 1 << 3,
-      STORAGE: 1 << 4,
-      COPY_SRC: 1 << 5,
-      QUERY_RESOLVE: 1 << 6,
-      MAP_READ: 1 << 7,
-    }
-  }
 }
 
 function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassConfig {
@@ -120,13 +97,10 @@ function createGraphHarness() {
 
 describe('WebGPUScene CAS sharpening', () => {
   it('maps render scale to CAS sharpness with threshold and clamp', async () => {
-    ensureGpuTextureUsageConstants()
     const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
       string,
       unknown
     >
-
-    expect(typeof sceneModule['computeCasSharpnessFromRenderScale']).toBe('function')
 
     const computeCasSharpnessFromRenderScale = sceneModule[
       'computeCasSharpnessFromRenderScale'
@@ -140,13 +114,11 @@ describe('WebGPUScene CAS sharpening', () => {
   })
 
   it('initializes ToScreenPass sharpness from render resolution scale', async () => {
-    ensureGpuTextureUsageConstants()
     const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
       string,
       unknown
     >
 
-    expect(typeof sceneModule['setupRenderPasses']).toBe('function')
     const setupRenderPasses = sceneModule['setupRenderPasses'] as (
       graph: WebGPURenderGraph,
       config: ScenePassConfig

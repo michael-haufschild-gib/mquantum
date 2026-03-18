@@ -1,31 +1,54 @@
 /**
- * Tests for themeStore
- *
- * Keep these tests focused on behavior that can break in production:
- * - accepting valid themes
- * - rejecting/normalizing invalid runtime values (e.g. persisted garbage)
+ * Tests for themeStore — mode/accent validation and preset application.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { useThemeStore, ThemeAccent } from '@/stores/themeStore'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { ThemeAccent, ThemeMode, useThemeStore, VALID_ACCENTS } from '@/stores/themeStore'
 
 describe('themeStore', () => {
   beforeEach(() => {
     useThemeStore.setState({ accent: 'cyan', mode: 'dark' })
   })
 
-  it('accepts a valid accent', () => {
-    useThemeStore.getState().setAccent('green')
-    expect(useThemeStore.getState().accent).toBe('green')
+  it('accepts all valid accents', () => {
+    for (const accent of VALID_ACCENTS) {
+      useThemeStore.getState().setAccent(accent)
+      expect(useThemeStore.getState().accent).toBe(accent)
+    }
   })
 
-  it('rejects an invalid accent', () => {
+  it('falls back to cyan for invalid accent', () => {
+    useThemeStore.getState().setAccent('green')
     useThemeStore.getState().setAccent('invalid' as unknown as ThemeAccent)
     expect(useThemeStore.getState().accent).toBe('cyan')
   })
 
-  it('accepts a valid mode', () => {
+  it('accepts all valid modes', () => {
+    for (const mode of ['light', 'dark', 'system'] as const) {
+      useThemeStore.getState().setMode(mode)
+      expect(useThemeStore.getState().mode).toBe(mode)
+    }
+  })
+
+  it('ignores invalid mode values', () => {
     useThemeStore.getState().setMode('light')
+    useThemeStore.getState().setMode('auto' as unknown as ThemeMode)
     expect(useThemeStore.getState().mode).toBe('light')
+  })
+
+  it('setPreset applies both mode and accent', () => {
+    useThemeStore.getState().setPreset('paper')
+    const state = useThemeStore.getState()
+    expect(state.mode).toBe('light')
+    expect(state.accent).toBe('blue')
+  })
+
+  it('setPreset ignores unknown preset IDs', () => {
+    useThemeStore.getState().setMode('light')
+    useThemeStore.getState().setAccent('red')
+    useThemeStore.getState().setPreset('nonexistent')
+    expect(useThemeStore.getState().mode).toBe('light')
+    expect(useThemeStore.getState().accent).toBe('red')
   })
 })

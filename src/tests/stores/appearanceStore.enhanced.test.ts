@@ -6,6 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'

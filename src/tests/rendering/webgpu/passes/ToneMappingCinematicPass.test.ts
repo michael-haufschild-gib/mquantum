@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import {
   ToneMappingCinematicPass,

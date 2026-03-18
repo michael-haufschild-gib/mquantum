@@ -3,8 +3,9 @@
  * and dipole component computation.
  */
 import { describe, expect, it } from 'vitest'
-import { isAllowedE1, dipoleComponent } from '@/lib/physics/openQuantum/selectionRules'
+
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
+import { dipoleComponent, isAllowedE1 } from '@/lib/physics/openQuantum/selectionRules'
 
 // ---------------------------------------------------------------------------
 // Helper: construct a minimal basis state for selection rule tests

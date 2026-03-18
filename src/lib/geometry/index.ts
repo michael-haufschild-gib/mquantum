@@ -6,29 +6,10 @@
  */
 
 // Type exports from types.ts
-export { isExtendedObjectType } from './types'
 export type { ObjectType } from './types'
+export { isExtendedObjectType } from './types'
 
 // Registry exports (single source of truth for object type capabilities)
-export {
-  // Registry data
-  OBJECT_TYPE_REGISTRY,
-  // Core lookups
-  getObjectTypeEntry,
-  // Rendering capabilities
-  isRaymarchingType,
-  // Dimension constraints
-  getDimensionConstraints,
-  isAvailableForDimension,
-  getAvailableTypesForDimension,
-  // UI
-  getControlsComponentKey,
-  hasTimelineControls,
-  getControlsComponent,
-  // Validation
-  isValidObjectType,
-  getConfigStoreKey,
-} from './registry'
 export type {
   AnimationCapabilities,
   AnimationSystemDef,
@@ -36,6 +17,25 @@ export type {
   DimensionConstraints,
   ObjectTypeEntry,
   RenderingCapabilities,
+} from './registry'
+export {
+  getAvailableTypesForDimension,
+  getConfigStoreKey,
+  getControlsComponent,
+  // UI
+  getControlsComponentKey,
+  // Dimension constraints
+  getDimensionConstraints,
+  // Core lookups
+  getObjectTypeEntry,
+  hasTimelineControls,
+  isAvailableForDimension,
+  // Rendering capabilities
+  isRaymarchingType,
+  // Validation
+  isValidObjectType,
+  // Registry data
+  OBJECT_TYPE_REGISTRY,
 } from './registry'
 
 // Extended object type exports (Schroedinger only)

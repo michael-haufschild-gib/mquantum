@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { usePresetManagerStore } from '@/stores/presetManagerStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+
 import { useAnimationStore } from '@/stores/animationStore'
-import { useRotationStore } from '@/stores/rotationStore'
-import { useLightingStore } from '@/stores/lightingStore'
+import { useAppearanceStore } from '@/stores/appearanceStore'
+import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore } from '@/stores/environmentStore'
-import { usePostProcessingStore } from '@/stores/postProcessingStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useTransformStore } from '@/stores/transformStore'
+import { useLightingStore } from '@/stores/lightingStore'
 import { usePBRStore } from '@/stores/pbrStore'
+import { usePostProcessingStore } from '@/stores/postProcessingStore'
+import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import { useRotationStore } from '@/stores/rotationStore'
 import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
-import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
+import { useTransformStore } from '@/stores/transformStore'
+import { useUIStore } from '@/stores/uiStore'
 
 // Mock msgBoxStore to prevent actual dialog displays
 vi.mock('@/stores/msgBoxStore', () => ({
@@ -41,7 +42,7 @@ describe('presetManagerStore', () => {
 
       // Check it's saved
       const [firstStyle] = usePresetManagerStore.getState().savedStyles
-      expect(firstStyle).toBeDefined()
+      expect(firstStyle).toHaveProperty('name', 'Red Edge')
       expect(firstStyle!.name).toBe('Red Edge')
       expect(firstStyle!.data.appearance.edgeColor).toBe('#ff0000')
 
@@ -78,7 +79,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -112,7 +113,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -154,13 +155,13 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
       const lighting = useLightingStore.getState()
       const importedLight = lighting.lights.find((light) => light.id === 'light-1')
-      expect(importedLight).toBeDefined()
+      expect(importedLight).toHaveProperty('id', 'light-1')
       expect(importedLight!.intensity).toBe(0.1)
       expect(importedLight!.coneAngle).toBe(120)
       expect(importedLight!.penumbra).toBe(0)
@@ -204,13 +205,13 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
       const lighting = useLightingStore.getState()
       const importedLight = lighting.lights.find((light) => light.id === 'light-1')
-      expect(importedLight).toBeDefined()
+      expect(importedLight).toHaveProperty('id', 'light-1')
       expect(importedLight!.range).toBe(0)
     })
 
@@ -249,13 +250,13 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
       const lighting = useLightingStore.getState()
       const importedLight = lighting.lights.find((light) => light.id === 'light-1')
-      expect(importedLight).toBeDefined()
+      expect(importedLight).toHaveProperty('id', 'light-1')
       expect(importedLight!.decay).toBe(0)
     })
 
@@ -279,7 +280,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -330,7 +331,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -384,7 +385,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -418,7 +419,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -458,7 +459,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -492,7 +493,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -585,7 +586,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -667,7 +668,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -696,7 +697,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
@@ -708,7 +709,7 @@ describe('presetManagerStore', () => {
     it('should delete a style', () => {
       usePresetManagerStore.getState().saveStyle('Test Style')
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().deleteStyle(saved!.id)
       expect(usePresetManagerStore.getState().savedStyles).toHaveLength(0)
@@ -717,7 +718,7 @@ describe('presetManagerStore', () => {
     it('should rename a style', () => {
       usePresetManagerStore.getState().saveStyle('Original Name')
       const [saved] = usePresetManagerStore.getState().savedStyles
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
       expect(saved!.name).toBe('Original Name')
 
       usePresetManagerStore.getState().renameStyle(saved!.id, 'New Name')
@@ -803,11 +804,11 @@ describe('presetManagerStore', () => {
 
       // Check saved
       const [firstScene] = usePresetManagerStore.getState().savedScenes
-      expect(firstScene).toBeDefined()
+      expect(firstScene).toHaveProperty('data')
       expect(firstScene!.data.animation.speed).toBe(2.0)
 
       // Check Set -> Array conversion (serialization shape)
-      expect(Array.isArray(firstScene!.data.animation.animatingPlanes)).toBe(true)
+      expect(firstScene!.data.animation.animatingPlanes).toEqual(['XY', 'YZ', 'XZ'])
 
       // Change state
       animStore.setSpeed(0.5)
@@ -849,7 +850,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
@@ -867,11 +868,10 @@ describe('presetManagerStore', () => {
 
       // Check saved - Map should be serialized as Object
       const [firstScene] = usePresetManagerStore.getState().savedScenes
-      expect(firstScene).toBeDefined()
-      expect(firstScene!.data.rotation.rotations).toBeDefined()
-      // Verify it's an object (not Map or Array)
-      expect(typeof firstScene!.data.rotation.rotations).toBe('object')
-      expect(Array.isArray(firstScene!.data.rotation.rotations)).toBe(false)
+      expect(firstScene).toHaveProperty('data')
+      expect(firstScene!.data.rotation).toHaveProperty('rotations')
+      // Verify Map was serialized as a plain object with expected entries
+      expect(firstScene!.data.rotation.rotations).toEqual({ XY: 1.5, YZ: 2.0 })
 
       // Reset rotation
       rotStore.reset()
@@ -911,7 +911,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       useUIStore.setState({ animationBias: 0 })
       usePresetManagerStore.getState().loadScene(saved!.id)
@@ -950,7 +950,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       useUIStore.setState({
         showAxisHelper: true,
@@ -999,7 +999,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       useEnvironmentStore.getState().setSkyboxIntensity(1.25)
       useAnimationStore.getState().setSpeed(0.75)
@@ -1044,7 +1044,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       useGeometryStore.getState().setDimension(3)
       useTransformStore.getState().setDimension(3)
@@ -1084,7 +1084,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
@@ -1122,7 +1122,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       useAnimationStore.getState().setSpeed(0.8)
       usePresetManagerStore.getState().loadScene(saved!.id)
@@ -1163,7 +1163,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
@@ -1200,7 +1200,7 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(true)
 
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
@@ -1221,7 +1221,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().saveScene('Momentum Scene')
       const [savedScene] = usePresetManagerStore.getState().savedScenes
-      expect(savedScene).toBeDefined()
+      expect(savedScene).toHaveProperty('data')
 
       const savedConfig = savedScene!.data.extended.schroedinger as {
         representation?: string
@@ -1251,7 +1251,7 @@ describe('presetManagerStore', () => {
     it('should delete a scene', () => {
       usePresetManagerStore.getState().saveScene('Test Scene')
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
 
       usePresetManagerStore.getState().deleteScene(saved!.id)
       expect(usePresetManagerStore.getState().savedScenes).toHaveLength(0)
@@ -1260,7 +1260,7 @@ describe('presetManagerStore', () => {
     it('should rename a scene', () => {
       usePresetManagerStore.getState().saveScene('Original Scene')
       const [saved] = usePresetManagerStore.getState().savedScenes
-      expect(saved).toBeDefined()
+      expect(saved).toHaveProperty('id')
       expect(saved!.name).toBe('Original Scene')
 
       usePresetManagerStore.getState().renameScene(saved!.id, 'Renamed Scene')
@@ -1675,7 +1675,6 @@ describe('presetManagerStore', () => {
       const exported = usePresetManagerStore.getState().exportStyles()
       const parsed = JSON.parse(exported)
 
-      expect(Array.isArray(parsed)).toBe(true)
       expect(parsed).toHaveLength(2)
       expect(parsed[0].name).toBe('Style 1')
       expect(parsed[1].name).toBe('Style 2')
@@ -1688,7 +1687,6 @@ describe('presetManagerStore', () => {
       const exported = usePresetManagerStore.getState().exportScenes()
       const parsed = JSON.parse(exported)
 
-      expect(Array.isArray(parsed)).toBe(true)
       expect(parsed).toHaveLength(2)
       expect(parsed[0].name).toBe('Scene 1')
       expect(parsed[1].name).toBe('Scene 2')
@@ -1849,7 +1847,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().importScenes(JSON.stringify([legacyScene]))
       const [imported] = usePresetManagerStore.getState().savedScenes
-      expect(imported).toBeDefined()
+      expect(imported).toHaveProperty('id')
 
       // Load the scene — sqLayer transient fields should be stripped during load
       usePresetManagerStore.getState().loadScene(imported!.id)
@@ -1952,7 +1950,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().importStyles(JSON.stringify([styleWithLegacyPostProcessing]))
       const [imported] = usePresetManagerStore.getState().savedStyles
-      expect(imported).toBeDefined()
+      expect(imported).toHaveProperty('id')
 
       // Removed fields should not be kept in persisted imported data
       expect(imported!.data.postProcessing.objectOnlyDepth).toBeUndefined()
@@ -2003,7 +2001,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().importScenes(JSON.stringify([sceneWithLegacyPostProcessing]))
       const [imported] = usePresetManagerStore.getState().savedScenes
-      expect(imported).toBeDefined()
+      expect(imported).toHaveProperty('id')
 
       // Removed fields should not be kept in persisted imported data
       expect(imported!.data.postProcessing.objectOnlyDepth).toBeUndefined()

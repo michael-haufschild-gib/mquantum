@@ -8,17 +8,17 @@
  * - Maximum 4 lights enforced
  */
 
+import React, { memo, useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Select, type SelectOption } from '@/components/ui/Select'
 import type { LightSource, LightType } from '@/rendering/lights/types'
 import { MAX_LIGHTS } from '@/rendering/lights/types'
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
-import React, { memo, useMemo, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+
 import { AMBIENT_LIGHT_ID, LightListItem } from './LightListItem'
 
-/**
- *
- */
+/** Props for the light source list with add/remove support. */
 export interface LightListProps {
   className?: string
 }
@@ -85,9 +85,9 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({ cla
     selectLight(AMBIENT_LIGHT_ID)
   }, [selectLight])
 
-  const handleAmbientRemove = useCallback(() => {
+  const handleAmbientRemove = () => {
     // No-op, ambient can't be removed
-  }, [])
+  }
 
   const canAddLight = lights.length < MAX_LIGHTS
 

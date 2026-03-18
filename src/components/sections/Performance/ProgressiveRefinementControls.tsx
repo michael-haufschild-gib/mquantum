@@ -3,10 +3,11 @@
  * Controls for progressive quality improvement after interaction stops
  */
 
-import { Switch } from '@/components/ui/Switch'
-import { usePerformanceStore } from '@/stores/performanceStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Switch } from '@/components/ui/Switch'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 /**
  * Get stage label for display.

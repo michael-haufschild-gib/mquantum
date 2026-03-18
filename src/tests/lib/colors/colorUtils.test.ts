@@ -41,5 +41,55 @@ describe('colorUtils', () => {
     it('falls back to black for malformed 6-digit hex with mixed invalid chars', () => {
       expect(hexToHsv('#12gg34')).toEqual({ h: 0, s: 0, v: 0, a: 1 })
     })
+
+    it('converts pure red correctly', () => {
+      const hsv = hexToHsv('#FF0000')
+      expect(hsv.h).toBeCloseTo(0, 2)
+      expect(hsv.s).toBeCloseTo(1, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+    })
+
+    it('converts pure green correctly (hue = 1/3)', () => {
+      const hsv = hexToHsv('#00FF00')
+      expect(hsv.h).toBeCloseTo(1 / 3, 4)
+      expect(hsv.s).toBeCloseTo(1, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+    })
+
+    it('converts pure blue correctly (hue = 2/3)', () => {
+      const hsv = hexToHsv('#0000FF')
+      expect(hsv.h).toBeCloseTo(2 / 3, 4)
+      expect(hsv.s).toBeCloseTo(1, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+    })
+
+    it('converts white correctly (zero saturation)', () => {
+      const hsv = hexToHsv('#FFFFFF')
+      expect(hsv.s).toBeCloseTo(0, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+    })
+
+    it('converts black correctly (zero value)', () => {
+      const hsv = hexToHsv('#000000')
+      expect(hsv.s).toBeCloseTo(0, 2)
+      expect(hsv.v).toBeCloseTo(0, 2)
+    })
+  })
+
+  describe('parseColorToHsv', () => {
+    it('handles valid 6-digit hex', () => {
+      const hsv = parseColorToHsv('#FF0000')
+      expect(hsv.h).toBeCloseTo(0, 2)
+      expect(hsv.s).toBeCloseTo(1, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+      expect(hsv.a).toBe(1)
+    })
+
+    it('handles valid rgb string', () => {
+      const hsv = parseColorToHsv('rgb(0, 255, 0)')
+      expect(hsv.h).toBeCloseTo(1 / 3, 4)
+      expect(hsv.s).toBeCloseTo(1, 2)
+      expect(hsv.v).toBeCloseTo(1, 2)
+    })
   })
 })

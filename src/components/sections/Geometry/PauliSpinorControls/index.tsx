@@ -10,15 +10,16 @@
 
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import type { PauliFieldView } from '@/lib/geometry/extended/types'
+import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
+import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
-import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
-import type { PauliFieldView } from '@/lib/geometry/extended/types'
-import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
 
 /** Map Pauli field view → matching color algorithm for synchronized rendering. */
 const FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorithm> = {
@@ -27,11 +28,11 @@ const FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorithm> = {
   spinExpectation: 'pauliSpinExpectation',
   coherence: 'pauliCoherence',
 }
-import { SpinControls } from './SpinControls'
 import { MagneticFieldControls } from './MagneticFieldControls'
-import { PauliPotentialControls } from './PauliPotentialControls'
 import { PauliGridControls } from './PauliGridControls'
+import { PauliPotentialControls } from './PauliPotentialControls'
 import { PauliVisualizationControls } from './PauliVisualizationControls'
+import { SpinControls } from './SpinControls'
 
 const PRESET_OPTIONS = [
   { value: '', label: '\u2014 Select Preset \u2014' },

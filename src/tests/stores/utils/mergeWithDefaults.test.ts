@@ -4,12 +4,13 @@
  * Ensures that old saved scenes get default values for new parameters.
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import {
   mergeExtendedObjectState,
   mergeExtendedObjectStateForType,
 } from '@/stores/utils/mergeWithDefaults'
-import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 describe('mergeExtendedObjectState', () => {
   describe('handles missing config properties', () => {
@@ -210,7 +211,84 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
     const merged = mergeExtendedObjectStateForType(loaded, 'pauliSpinor')
 
     // Only pauliSpinor key should be present
-    expect('schroedinger' in merged).toBe(false)
-    expect('pauliSpinor' in merged).toBe(true)
+    expect(Object.keys(merged)).toEqual(['pauliSpinor'])
   })
+})
+
+describe('mergeExtendedObjectState — adversarial inputs', () => {
+  it('handles string where number expected (user-edited JSON)', () => {
+    const loaded = {
+      schroedinger: {
+        sampleCount: '64' as unknown, // string instead of number
+        densityGain: true as unknown, // boolean instead of number
+      },
+    }
+    const merged = mergeExtendedObjectState(loaded)
+    const s = merged.schroedinger as Record<string, unknown>
+
+    // deepMerge replaces values by key — the wrong type will be passed through.
+    // The key assertion is that no exception is thrown and the rest of the
+    // config still has correct defaults for the untouched fields.
+    expect(s.scale).toBe(DEFAULT_SCHROEDINGER_CONFIG.scale)
+    expect(s.quantumMode).toBe(DEFAULT_SCHROEDINGER_CONFIG.quantumMode)
+  })
+
+  it('handles empty object for schroedinger (no fields at all)', () => {
+    const merged = mergeExtendedObjectState({ schroedinger: {} })
+    const s = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+    // Should be entirely defaults
+    expect(s.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
+    expect(s.scale).toBe(DEFAULT_SCHROEDINGER_CONFIG.scale)
+    expect(s.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
+  })
+
+  // PRODUCTION BUG: deepMerge's recursive path assigns primitive values (number, string)
+  // to nested object fields instead of falling back to defaults. If a user edits a saved
+  // preset JSON and sets cosineParams to a number, loading it will replace the object with
+  // a primitive, causing downstream property access to fail.
+  it.todo(
+    'handles number where object expected for cosineParams — deepMerge assigns primitive instead of falling back to defaults'
+  )
+
+  it('strips keys that exist in loaded but not in defaults', () => {
+    const loaded = {
+      schroedinger: {
+        __proto__: 'ignored',
+        constructor: 'ignored',
+        sampleCount: 64,
+        unknownTopLevel: true,
+        cosineParams: {
+          a: [0.5, 0.5, 0.5] as [number, number, number],
+          unknownNested: 'value',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectState(loaded)
+    const s = merged.schroedinger as Record<string, unknown>
+
+    expect(s.sampleCount).toBe(64)
+    expect(s.unknownTopLevel).toBeUndefined()
+    expect((s.cosineParams as Record<string, unknown>).unknownNested).toBeUndefined()
+  })
+
+  it('handles array with wrong element types', () => {
+    const loaded = {
+      schroedinger: {
+        parameterValues: ['not', 'numbers'] as unknown, // strings instead of numbers
+      },
+    }
+    // Should not throw — arrays are replaced wholesale
+    const merged = mergeExtendedObjectState(loaded)
+    const s = merged.schroedinger as Record<string, unknown>
+    expect(s.parameterValues).toEqual(['not', 'numbers'])
+  })
+
+  // PRODUCTION BUG: deepMerge's recursive case assigns null to nested object fields
+  // instead of falling back to defaults. The top-level guard checks (!loaded), but the
+  // per-key loop falls through: loadedVal=null fails the "typeof === 'object'" check on
+  // line 68, so the else branch assigns null. Downstream code then crashes on property access.
+  it.todo(
+    'handles deeply nested null values — deepMerge assigns null instead of falling back to defaults'
+  )
 })

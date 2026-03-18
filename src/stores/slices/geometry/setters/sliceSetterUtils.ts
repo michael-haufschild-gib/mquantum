@@ -9,6 +9,7 @@
  */
 
 import type { StoreApi } from 'zustand'
+
 import type { ExtendedObjectSlice } from '../types'
 
 type ZustandSet = StoreApi<ExtendedObjectSlice>['setState']

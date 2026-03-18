@@ -16,6 +16,7 @@
  */
 
 import { StateCreator } from 'zustand'
+
 import { DEFAULT_FACE_PBR, type PBRConfig } from '@/stores/defaults/visualDefaults'
 
 // ============================================================================

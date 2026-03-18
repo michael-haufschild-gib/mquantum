@@ -27,4 +27,4 @@ function clampAlpha(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
-export { MAX_HISTORY, HISTORY_KEY, sanitizeColorHistory, clampAlpha }
+export { clampAlpha, HISTORY_KEY, MAX_HISTORY, sanitizeColorHistory }

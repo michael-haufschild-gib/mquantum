@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('Schroedinger probability current settings', () => {

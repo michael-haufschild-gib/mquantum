@@ -13,15 +13,16 @@
 
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { BECAnalysisContent } from '@/components/sections/Advanced/BECAnalysisSection'
+import { DiracAnalysisContent } from '@/components/sections/Advanced/DiracAnalysisSection'
+import { FSFAnalysisContent } from '@/components/sections/Advanced/FSFAnalysisSection'
+import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalysisSection'
+import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
+import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
-import { FSFAnalysisContent } from '@/components/sections/Advanced/FSFAnalysisSection'
-import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
-import { BECAnalysisContent } from '@/components/sections/Advanced/BECAnalysisSection'
-import { DiracAnalysisContent } from '@/components/sections/Advanced/DiracAnalysisSection'
-import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalysisSection'
 
 /**
  * Props for AnalysisSection.

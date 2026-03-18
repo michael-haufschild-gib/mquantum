@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { m, AnimatePresence } from 'motion/react'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
-import { useThemeStore } from '@/stores/themeStore'
-import { useCameraStore } from '@/stores/cameraStore'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useCameraStore } from '@/stores/cameraStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
+import { useThemeStore } from '@/stores/themeStore'
 
 interface Command {
   id: string
@@ -282,11 +283,14 @@ export const CommandPalette: React.FC = React.memo(() => {
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 10)
+      const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 10)
       const resetSelectionTimer = window.setTimeout(() => {
         setSelectedIndex(0)
       }, 0)
-      return () => clearTimeout(resetSelectionTimer)
+      return () => {
+        clearTimeout(focusTimer)
+        clearTimeout(resetSelectionTimer)
+      }
     }
     return undefined
   }, [isOpen])

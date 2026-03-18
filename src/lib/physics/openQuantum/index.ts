@@ -5,6 +5,32 @@
  * for modeling decoherence, relaxation, and thermal effects.
  */
 
+export { buildLindbladChannels } from './channels'
+export {
+  createDensityMatrix,
+  densityMatrixFromCoefficients,
+  evolveMultiStep,
+  evolveStep,
+  hermitianEigendecompose,
+  MAX_K,
+} from './integrator'
+export { applyDissipator, computeDissipator } from './lindblad'
+export {
+  coherenceMagnitude,
+  computeMetrics,
+  groundPopulation,
+  linearEntropy,
+  purity,
+  trace,
+  vonNeumannEntropy,
+} from './metrics'
+export {
+  createPackedBuffer,
+  OPEN_QUANTUM_BUFFER_BYTES,
+  OPEN_QUANTUM_BUFFER_FLOATS,
+  packForGPU,
+  unpackFromGPU,
+} from './statePacking'
 export type {
   DensityMatrix,
   LindbladChannel,
@@ -12,83 +38,43 @@ export type {
   OpenQuantumMetrics,
   OpenQuantumVisualizationMode,
 } from './types'
-
 export { DEFAULT_OPEN_QUANTUM_CONFIG } from './types'
-
-export { buildLindbladChannels } from './channels'
-
-export { applyDissipator, computeDissipator } from './lindblad'
-
-export {
-  createDensityMatrix,
-  densityMatrixFromCoefficients,
-  evolveStep,
-  evolveMultiStep,
-  hermitianEigendecompose,
-  MAX_K,
-} from './integrator'
-
-export {
-  trace,
-  purity,
-  linearEntropy,
-  vonNeumannEntropy,
-  coherenceMagnitude,
-  groundPopulation,
-  computeMetrics,
-} from './metrics'
-
-export {
-  OPEN_QUANTUM_BUFFER_FLOATS,
-  OPEN_QUANTUM_BUFFER_BYTES,
-  createPackedBuffer,
-  packForGPU,
-  unpackFromGPU,
-} from './statePacking'
 
 // --- Hydrogen-specific modules ---
 
-export type { HydrogenBasisState } from './hydrogenBasis'
-export {
-  buildHydrogenBasis,
-  basisLabels,
-  basisEnergies,
-  hydrogenEnergy,
-  extraDimEnergy,
-} from './hydrogenBasis'
-
-export { isAllowedE1, dipoleComponent } from './selectionRules'
-
-export {
-  radialDipoleIntegral,
-  angularFactor,
-  wigner3j,
-  dipoleMatrixElementSquared,
-  clearDipoleCache,
-} from './dipoleElements'
-
-export type { TransitionRate } from './hydrogenRates'
-export { einsteinA, thermalOccupation, buildTransitionRates } from './hydrogenRates'
-
-export { buildHydrogenChannels } from './hydrogenChannels'
-
 export type { ComplexMatrix } from './complexMatrix'
 export {
-  complexMatZero,
+  complexMatAdd,
+  complexMatCopy,
   complexMatIdentity,
   complexMatMul,
-  complexMatAdd,
-  complexMatScale,
-  complexMatCopy,
   complexMatNorm1,
+  complexMatScale,
+  complexMatZero,
   matrixExponentialPade,
   solveLinearSystem,
 } from './complexMatrix'
-
+export {
+  angularFactor,
+  clearDipoleCache,
+  dipoleMatrixElementSquared,
+  radialDipoleIntegral,
+  wigner3j,
+} from './dipoleElements'
+export type { HydrogenBasisState } from './hydrogenBasis'
+export {
+  basisEnergies,
+  basisLabels,
+  buildHydrogenBasis,
+  extraDimEnergy,
+  hydrogenEnergy,
+} from './hydrogenBasis'
+export { buildHydrogenChannels } from './hydrogenChannels'
+export type { TransitionRate } from './hydrogenRates'
+export { buildTransitionRates, einsteinA, thermalOccupation } from './hydrogenRates'
 export { buildLiouvillian } from './liouvillian'
-
-export { computePropagator, applyPropagator, evolvePropagatorStep } from './propagator'
-
+export { applyPropagator, computePropagator, evolvePropagatorStep } from './propagator'
+export { dipoleComponent, isAllowedE1 } from './selectionRules'
 export type { ValidationResult } from './validation'
 export {
   validateDensityMatrix,

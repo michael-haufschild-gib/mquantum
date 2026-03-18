@@ -13,9 +13,10 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Slider } from '@/components/ui/Slider'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /**
  * Analysis content for diracEquation mode.

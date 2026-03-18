@@ -7,14 +7,17 @@
  * @module stores/slices/geometry/setters/tdseSetters
  */
 
-import {
-  DEFAULT_TDSE_CONFIG,
-  type TdseConfig,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
 import { getTdsePreset } from '@/lib/physics/tdse/presets'
 import { useGeometryStore } from '@/stores/geometryStore'
+
 import type { SchroedingerSliceActions } from '../types'
-import { type SetterContext, clampDtWithCfl, defaultTdseGridPerDim, TDSE_MAX_TOTAL_SITES } from './sliceSetterUtils'
+import {
+  clampDtWithCfl,
+  defaultTdseGridPerDim,
+  type SetterContext,
+  TDSE_MAX_TOTAL_SITES,
+} from './sliceSetterUtils'
 
 type TdseActions = Pick<
   SchroedingerSliceActions,

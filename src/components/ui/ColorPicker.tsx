@@ -1,17 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Popover } from './Popover'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+
 import {
-  parseColorToHsv,
+  generatePalette,
+  type HSVA,
   hsvToHex,
   hsvToHex8,
   hsvToRgb,
   isValidHex,
+  parseColorToHsv,
   rgbToHex,
-  generatePalette,
-  type HSVA,
 } from '@/lib/colors/colorUtils'
-import { HISTORY_KEY, MAX_HISTORY, clampAlpha, sanitizeColorHistory } from './colorPickerUtils'
+import { logger } from '@/lib/logger'
+
 import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
+import { clampAlpha, HISTORY_KEY, MAX_HISTORY, sanitizeColorHistory } from './colorPickerUtils'
+import { Popover } from './Popover'
 
 interface ColorPickerProps {
   value: string // Hex, Hex8, or RGB string
@@ -48,9 +51,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
         return sanitizeColorHistory(parsed)
       } catch (error) {
         if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          console.warn('ColorPicker: localStorage quota exceeded')
+          logger.warn('ColorPicker: localStorage quota exceeded')
         } else {
-          console.error('ColorPicker: failed to load color history', error)
+          logger.error('ColorPicker: failed to load color history', error)
         }
         return []
       }
@@ -230,7 +233,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       } catch (error) {
         // AbortError is expected when user cancels the eyedropper
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          console.error('ColorPicker: EyeDropper error', error)
+          logger.error('ColorPicker: EyeDropper error', error)
         }
       }
     }
@@ -240,7 +243,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       try {
         await navigator.clipboard.writeText(value)
       } catch (error) {
-        console.error('ColorPicker: Clipboard write failed', error)
+        logger.error('ColorPicker: Clipboard write failed', error)
       }
     }
 
@@ -311,6 +314,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   {/* EyeDropper */}
                   {typeof window !== 'undefined' && 'EyeDropper' in window && (
                     <button
+                      type="button"
                       onClick={handleEyedropper}
                       className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
                       title="Pick color"
@@ -320,6 +324,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   )}
                   {/* Copy */}
                   <button
+                    type="button"
                     onClick={handleCopy}
                     className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
                     title="Copy to clipboard"
@@ -427,6 +432,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                     {(['HEX', 'RGB'] as const).map((m) => (
                       <button
                         key={m}
+                        type="button"
                         onClick={() => setMode(m)}
                         className={`px-2 py-0.5 text-[9px] font-bold rounded-sm transition-colors ${mode === m ? 'bg-[var(--bg-active)] text-text-primary shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
                       >
@@ -513,6 +519,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   {palette.map((c, i) => (
                     <button
                       key={i}
+                      type="button"
                       onClick={() => handleHsvChange(parseColorToHsv(c))}
                       className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-transform shadow-sm"
                       style={{ backgroundColor: c }}
@@ -527,6 +534,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                     {history.map((c, i) => (
                       <button
                         key={i}
+                        type="button"
                         onClick={() => handleHsvChange(parseColorToHsv(c))}
                         className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-transform shadow-sm relative overflow-hidden"
                         title="History"

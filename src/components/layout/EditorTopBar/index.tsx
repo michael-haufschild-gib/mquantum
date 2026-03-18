@@ -6,6 +6,9 @@
  * and panel toggle buttons. Responsive design with mobile-friendly unified menu.
  */
 
+import React, { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { TopBarControls } from '@/components/layout/TopBarControls'
 import { SceneManager } from '@/components/presets/SceneManager'
 import { StyleManager } from '@/components/presets/StyleManager'
@@ -14,19 +17,19 @@ import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { InputModal } from '@/components/ui/InputModal'
 import { Modal } from '@/components/ui/Modal'
 import { useIsDesktop, useIsMobile } from '@/hooks/useMediaQuery'
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
-import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { OBJECT_TYPE_REGISTRY } from '@/lib/geometry/registry/registry'
+import { logger } from '@/lib/logger'
 import { useExportStore } from '@/stores/exportStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
-import { usePresetManagerStore, type PresetManagerState } from '@/stores/presetManagerStore'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
+import { type PresetManagerState, usePresetManagerStore } from '@/stores/presetManagerStore'
 import { useThemeStore } from '@/stores/themeStore'
-import React, { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+
 import {
   useFileMenuItems,
   useMobileMenuItems,
@@ -139,12 +142,12 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
 
     // --- Handlers ---
 
-    const handleExport = useCallback(async () => {
+    const handleExport = async () => {
       soundManager.playSuccess()
       await new Promise((resolve) => setTimeout(resolve, 50))
       const filename = generateTimestampFilename('ndimensional')
       exportSceneToPNG({ filename })
-    }, [])
+    }
 
     const { setExportModalOpen, setPreviewImage, updateExportSettings } = useExportStore(
       useShallow((state) => ({
@@ -160,7 +163,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
         const dataUrl = await captureScreenshotAsync()
         setPreviewImage(dataUrl)
       } catch (e) {
-        console.error('Failed to capture preview for video export:', e)
+        logger.error('Failed to capture preview for video export:', e)
       }
 
       let defaultText = ''
@@ -305,6 +308,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
               size="icon"
               onClick={toggleLeftPanel}
               ariaLabel="Toggle Explorer"
+              aria-expanded={showLeftPanel}
               data-testid="toggle-left-panel"
               className={`p-1.5 ${
                 showLeftPanel
@@ -427,6 +431,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
               size="icon"
               onClick={toggleRightPanel}
               ariaLabel="Toggle Inspector"
+              aria-expanded={showRightPanel}
               data-testid="toggle-right-panel"
               className={`p-1.5 ${
                 showRightPanel

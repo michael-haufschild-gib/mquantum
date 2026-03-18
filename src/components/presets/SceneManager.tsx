@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from 'react'
-import {
-  usePresetManagerStore,
-  type SavedScene,
-  type PresetManagerState,
-} from '@/stores/presetManagerStore'
-import { useToast } from '@/hooks/useToast'
 import { useShallow } from 'zustand/react/shallow'
-import { ConfirmModal } from '@/components/ui/ConfirmModal'
+
 import { Button } from '@/components/ui/Button'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InlineEdit } from '@/components/ui/InlineEdit'
+import { useToast } from '@/hooks/useToast'
+import {
+  type PresetManagerState,
+  type SavedScene,
+  usePresetManagerStore,
+} from '@/stores/presetManagerStore'
 
 /**
  * Format a timestamp to a readable date string

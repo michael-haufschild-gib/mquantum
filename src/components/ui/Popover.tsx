@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react'
-import { m, AnimatePresence } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Props for the Popover component */
@@ -111,64 +112,61 @@ export const Popover: React.FC<PopoverProps> = React.memo(
       return () => popover.removeEventListener('toggle', handleToggle)
     }, [handleOpenChange])
 
-    // Update position - memoized to avoid stale closure in event listeners
-    const updatePosition = useCallback(() => {
-      if (triggerRef.current && isOpen) {
-        const triggerRect = triggerRef.current.getBoundingClientRect()
-        const popoverRect = popoverRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+    useLayoutEffect(() => {
+      const updatePosition = () => {
+        if (triggerRef.current && isOpen) {
+          const triggerRect = triggerRef.current.getBoundingClientRect()
+          const popoverRect = popoverRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
 
-        let top = 0
-        let left = 0
+          let top = 0
+          let left = 0
 
-        // Vertical Positioning
-        if (side === 'bottom') {
-          top = triggerRect.bottom + offset
-        } else {
-          top = triggerRect.top - popoverRect.height - offset
-        }
-
-        // Horizontal Positioning
-        if (align === 'start') {
-          left = triggerRect.left
-        } else if (align === 'end') {
-          left = triggerRect.right - popoverRect.width
-        } else {
-          left = triggerRect.left + triggerRect.width / 2 - popoverRect.width / 2
-        }
-
-        // Viewport Collision Detection
-        const viewportWidth = window.innerWidth
-        const viewportHeight = window.innerHeight
-        const margin = 8
-
-        // Calculate available space in each direction
-        const spaceBelow = viewportHeight - triggerRect.bottom - offset
-        const spaceAbove = triggerRect.top - offset
-
-        // Smart vertical positioning: flip if needed and beneficial
-        if (side === 'bottom') {
-          if (popoverRect.height > spaceBelow && spaceAbove > spaceBelow) {
-            // Flip to top if more space available above
+          // Vertical Positioning
+          if (side === 'bottom') {
+            top = triggerRect.bottom + offset
+          } else {
             top = triggerRect.top - popoverRect.height - offset
           }
-        } else {
-          if (popoverRect.height > spaceAbove && spaceBelow > spaceAbove) {
-            // Flip to bottom if more space available below
-            top = triggerRect.bottom + offset
+
+          // Horizontal Positioning
+          if (align === 'start') {
+            left = triggerRect.left
+          } else if (align === 'end') {
+            left = triggerRect.right - popoverRect.width
+          } else {
+            left = triggerRect.left + triggerRect.width / 2 - popoverRect.width / 2
           }
+
+          // Viewport Collision Detection
+          const viewportWidth = window.innerWidth
+          const viewportHeight = window.innerHeight
+          const margin = 8
+
+          // Calculate available space in each direction
+          const spaceBelow = viewportHeight - triggerRect.bottom - offset
+          const spaceAbove = triggerRect.top - offset
+
+          // Smart vertical positioning: flip if needed and beneficial
+          if (side === 'bottom') {
+            if (popoverRect.height > spaceBelow && spaceAbove > spaceBelow) {
+              top = triggerRect.top - popoverRect.height - offset
+            }
+          } else {
+            if (popoverRect.height > spaceAbove && spaceBelow > spaceAbove) {
+              top = triggerRect.bottom + offset
+            }
+          }
+
+          // Clamp vertical position to keep within viewport bounds
+          top = Math.max(margin, Math.min(top, viewportHeight - popoverRect.height - margin))
+
+          // Clamp horizontal position to keep within viewport bounds
+          left = Math.max(margin, Math.min(left, viewportWidth - popoverRect.width - margin))
+
+          setCoords({ top, left })
         }
-
-        // Clamp vertical position to keep within viewport bounds
-        top = Math.max(margin, Math.min(top, viewportHeight - popoverRect.height - margin))
-
-        // Clamp horizontal position to keep within viewport bounds
-        left = Math.max(margin, Math.min(left, viewportWidth - popoverRect.width - margin))
-
-        setCoords({ top, left })
       }
-    }, [isOpen, side, align, offset])
 
-    useLayoutEffect(() => {
       if (isOpen) {
         // Initial position (may have zero dimensions)
         const initialPositionTimer = window.setTimeout(() => {
@@ -207,11 +205,8 @@ export const Popover: React.FC<PopoverProps> = React.memo(
           window.removeEventListener('scroll', updatePosition, true)
         }
       }
-      return () => {
-        window.removeEventListener('resize', updatePosition)
-        window.removeEventListener('scroll', updatePosition, true)
-      }
-    }, [isOpen, updatePosition])
+      return undefined
+    }, [isOpen, side, align, offset])
 
     return (
       <>

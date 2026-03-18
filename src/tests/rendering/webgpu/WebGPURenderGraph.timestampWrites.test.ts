@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+
 import type {
   WebGPURenderPass,
   WebGPURenderPassConfig,
@@ -37,25 +38,7 @@ function createNoopComputePassEncoder(): GPUComputePassEncoder {
   } as unknown as GPUComputePassEncoder
 }
 
-function ensureGPUConstants(): void {
-  if (!('GPUTextureUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUTextureUsage: Record<string, number> }).GPUTextureUsage = {
-      TEXTURE_BINDING: 1 << 0,
-      RENDER_ATTACHMENT: 1 << 1,
-      COPY_SRC: 1 << 2,
-      COPY_DST: 1 << 3,
-    }
-  }
-  if (!('GPUMapMode' in globalThis)) {
-    ;(globalThis as unknown as { GPUMapMode: Record<string, number> }).GPUMapMode = {
-      READ: 1,
-      WRITE: 2,
-    }
-  }
-}
-
 async function createGraphHarness(pass: WebGPURenderPass) {
-  ensureGPUConstants()
   const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
 
   const beginRenderPass = vi.fn((_: GPURenderPassDescriptor) => createNoopRenderPassEncoder())
@@ -230,7 +213,11 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     if (!descriptor) {
       throw new Error('Expected render pass descriptor to be captured')
     }
-    expect(descriptor.timestampWrites).toBeDefined()
+    expect(descriptor.timestampWrites).toMatchObject({
+      querySet: expect.anything(),
+      beginningOfPassWriteIndex: expect.any(Number),
+      endOfPassWriteIndex: expect.any(Number),
+    })
     expect(resolveQuerySet).toHaveBeenCalledTimes(1)
     expect(copyBufferToBuffer).toHaveBeenCalledTimes(1)
   })
@@ -258,7 +245,11 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     if (!descriptor) {
       throw new Error('Expected compute pass descriptor to be captured')
     }
-    expect(descriptor.timestampWrites).toBeDefined()
+    expect(descriptor.timestampWrites).toMatchObject({
+      querySet: expect.anything(),
+      beginningOfPassWriteIndex: expect.any(Number),
+      endOfPassWriteIndex: expect.any(Number),
+    })
     expect(resolveQuerySet).toHaveBeenCalledTimes(1)
     expect(copyBufferToBuffer).toHaveBeenCalledTimes(1)
   })
@@ -335,10 +326,13 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
 
     expect(hook).toHaveBeenCalledTimes(1)
     const hookContext = hook.mock.calls[0]?.[0]
-    expect(hookContext).toBeDefined()
-    expect(hookContext.encoder).toBeDefined()
-    expect(hookContext.canvasTexture).toBeDefined()
-    expect(hookContext.size).toEqual({ width: 64, height: 64 })
+    expect(hookContext).toEqual(
+      expect.objectContaining({
+        encoder: expect.anything(),
+        canvasTexture: expect.anything(),
+        size: { width: 64, height: 64 },
+      })
+    )
 
     graph.unregisterBeforeSubmitHook('test-before-submit')
     graph.execute(1 / 60)

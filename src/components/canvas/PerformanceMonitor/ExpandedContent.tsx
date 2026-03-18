@@ -1,8 +1,10 @@
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Tabs } from '@/components/ui/Tabs'
 import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import { useUIStore } from '@/stores/uiStore'
-import React, { useMemo } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+
 import { Icons } from './icons'
 import { Sparkline } from './subcomponents'
 import { BuffersTabContent, ShaderTabContent, StatsTabContent, SystemTabContent } from './tabs'
@@ -87,16 +89,12 @@ export const ExpandedContent = React.memo(function ExpandedContent({
   const perfMonitorTab = useUIStore((s) => s.perfMonitorTab)
   const setPerfMonitorTab = useUIStore((s) => s.setPerfMonitorTab)
 
-  // Memoize tab definitions to prevent recreation
-  const tabs = useMemo(
-    () => [
-      { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
-      { id: 'sys', label: 'System', content: <SystemTabContent /> },
-      { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
-      { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> },
-    ],
-    []
-  )
+  const tabs = [
+    { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
+    { id: 'sys', label: 'System', content: <SystemTabContent /> },
+    { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
+    { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> },
+  ]
 
   return (
     <>

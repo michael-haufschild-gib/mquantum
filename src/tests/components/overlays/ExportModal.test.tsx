@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { ExportModal } from '@/components/overlays/ExportModal'
 import { useExportStore } from '@/stores/exportStore'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 // Mock dependencies
 vi.mock('@/components/ui/Icon', () => ({

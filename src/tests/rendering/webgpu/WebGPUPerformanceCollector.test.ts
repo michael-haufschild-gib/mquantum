@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { WebGPUFrameStats } from '@/rendering/webgpu/core/types'
+import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
 import { WebGPUStatsCollector } from '@/rendering/webgpu/WebGPUPerformanceCollector'
 import { GRAPH_POINTS, usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import { UI_INITIAL_STATE } from '@/stores/slices/uiSlice'
 import { useUIStore } from '@/stores/uiStore'
-import type { WebGPUFrameStats } from '@/rendering/webgpu/core/types'
-import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
 
 function resetMetricsStore(): void {
   usePerformanceMetricsStore.setState({

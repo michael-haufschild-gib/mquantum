@@ -20,40 +20,32 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
 import {
   comptonWavelength,
-  zitterbewegungFrequency,
   kleinThreshold,
+  zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
-import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import {
-  DENSITY_GRID_SIZE,
-  DIAG_DECIMATION,
-  FFT_UNIFORM_SIZE,
-  GRID_WG,
-  LINEAR_WG,
-  MAX_DIM,
-  PACK_UNIFORM_SIZE,
-  nearestPow2,
-} from './computePassUtils'
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
-import { diracUniformsBlock } from '../shaders/schroedinger/compute/diracUniforms.wgsl'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { diracInitBlock } from '../shaders/schroedinger/compute/diracInit.wgsl'
-import { diracPotentialHalfBlock } from '../shaders/schroedinger/compute/diracPotentialHalf.wgsl'
-import { diracKineticBlock } from '../shaders/schroedinger/compute/diracKinetic.wgsl'
-import { diracWriteGridBlock } from '../shaders/schroedinger/compute/diracWriteGrid.wgsl'
-import { diracPotentialBlock } from '../shaders/schroedinger/compute/diracPotential.wgsl'
+import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { diracAbsorberBlock } from '../shaders/schroedinger/compute/diracAbsorber.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
-  diracDiagNormReduceBlock,
   diracDiagNormFinalizeBlock,
+  diracDiagNormReduceBlock,
 } from '../shaders/schroedinger/compute/diracDiagnostics.wgsl'
+import { diracInitBlock } from '../shaders/schroedinger/compute/diracInit.wgsl'
+import { diracKineticBlock } from '../shaders/schroedinger/compute/diracKinetic.wgsl'
+import { diracPotentialBlock } from '../shaders/schroedinger/compute/diracPotential.wgsl'
+import { diracPotentialHalfBlock } from '../shaders/schroedinger/compute/diracPotentialHalf.wgsl'
+import { diracUniformsBlock } from '../shaders/schroedinger/compute/diracUniforms.wgsl'
+import { diracWriteGridBlock } from '../shaders/schroedinger/compute/diracWriteGrid.wgsl'
+import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
   tdseComplexPackBlock,
   tdseComplexUnpackBlock,
@@ -62,6 +54,17 @@ import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import {
+  DENSITY_GRID_SIZE,
+  DIAG_DECIMATION,
+  FFT_UNIFORM_SIZE,
+  GRID_WG,
+  LINEAR_WG,
+  MAX_DIM,
+  nearestPow2,
+  PACK_UNIFORM_SIZE,
+  reduceGridToFit,
+} from './computePassUtils'
 
 /** DiracUniforms struct size in bytes (544) */
 const UNIFORM_SIZE = 544
@@ -220,19 +223,15 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     return this.densityTexture
   }
 
+  /** Ensure all grid sizes are power-of-2 and total sites fit GPU dispatch limits. */
   private sanitizeGridSizes(config: DiracConfig): DiracConfig {
-    let needsFix = false
-    for (let d = 0; d < config.latticeDim; d++) {
-      const g = config.gridSize[d]!
-      if ((g & (g - 1)) !== 0 || g < 2) {
-        needsFix = true
-        break
-      }
-    }
-    if (!needsFix) return config
-    const fixed = config.gridSize.map((g) => nearestPow2(g))
+    const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
+    const activeGrid = pow2Grid.slice(0, config.latticeDim)
+    const fittedActive = reduceGridToFit(activeGrid)
+    const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
+    if (fixed.every((g, i) => g === config.gridSize[i])) return config
     if (import.meta.env.DEV) {
-      console.warn(`[Dirac] Non-power-of-2 grid sizes clamped: ${config.gridSize} → ${fixed}`)
+      console.warn(`[Dirac] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
     }
     return { ...config, gridSize: fixed }
   }
@@ -324,7 +323,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       })
       .catch((err) => {
         if (requestEpoch !== this.gammaRequestEpoch) return
-        console.error('[Dirac] Failed to generate gamma matrices:', err)
+        logger.error('[Dirac] Failed to generate gamma matrices:', err)
       })
 
     // FFT scratch buffers (used for one component at a time)

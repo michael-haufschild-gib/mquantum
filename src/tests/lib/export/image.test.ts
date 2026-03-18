@@ -2,9 +2,10 @@
  * Tests for image export utilities
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export/image'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
+import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export/image'
 
 const { openModalMock, showMsgBoxMock } = vi.hoisted(() => ({
   openModalMock: vi.fn(),

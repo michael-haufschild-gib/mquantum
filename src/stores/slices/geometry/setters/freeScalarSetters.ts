@@ -8,8 +8,14 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+
 import type { SchroedingerSliceActions } from '../types'
-import { type SetterContext, clampDtWithCfl, defaultGridPerDim, MAX_TOTAL_SITES } from './sliceSetterUtils'
+import {
+  clampDtWithCfl,
+  defaultGridPerDim,
+  MAX_TOTAL_SITES,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 type FreeScalarActions = Pick<
   SchroedingerSliceActions,

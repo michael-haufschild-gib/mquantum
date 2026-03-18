@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
+
+import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
 import {
   freeScalarInitBlock,
   freeScalarUniformsBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl'
-import { freeScalarUpdatePiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
+import { freeScalarUpdatePiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
-import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
 
 describe('Free Scalar Field WGSL Shaders', () => {
   describe('uniforms block', () => {

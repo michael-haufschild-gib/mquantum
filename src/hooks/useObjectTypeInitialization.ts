@@ -10,6 +10,7 @@
  */
 
 import { useEffect } from 'react'
+
 import type { ObjectType } from '@/lib/geometry/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { usePerformanceStore } from '@/stores/performanceStore'

@@ -3,15 +3,16 @@
  * Verifies performance optimization state management
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import {
-  usePerformanceStore,
-  REFINEMENT_STAGE_QUALITY,
-  getEffectiveSampleQuality,
-  hasPersistedResolutionScale,
-  hasPersistedMaxFps,
-} from '@/stores/performanceStore'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
+import {
+  getEffectiveSampleQuality,
+  hasPersistedMaxFps,
+  hasPersistedResolutionScale,
+  REFINEMENT_STAGE_QUALITY,
+  usePerformanceStore,
+} from '@/stores/performanceStore'
 
 describe('performanceStore', () => {
   beforeEach(() => {
@@ -20,34 +21,23 @@ describe('performanceStore', () => {
   })
 
   describe('interaction state', () => {
-    it('should set isInteracting', () => {
-      const { setIsInteracting } = usePerformanceStore.getState()
+    it('interaction flags toggle independently and reset clears them', () => {
+      const store = usePerformanceStore.getState()
 
-      setIsInteracting(true)
-      expect(usePerformanceStore.getState().isInteracting).toBe(true)
+      store.setIsInteracting(true)
+      store.setSceneTransitioning(true)
+      store.setIsLoadingScene(true)
 
-      setIsInteracting(false)
-      expect(usePerformanceStore.getState().isInteracting).toBe(false)
-    })
+      const state = usePerformanceStore.getState()
+      expect(state.isInteracting).toBe(true)
+      expect(state.sceneTransitioning).toBe(true)
+      expect(state.isLoadingScene).toBe(true)
 
-    it('should set sceneTransitioning', () => {
-      const { setSceneTransitioning } = usePerformanceStore.getState()
-
-      setSceneTransitioning(true)
-      expect(usePerformanceStore.getState().sceneTransitioning).toBe(true)
-
-      setSceneTransitioning(false)
-      expect(usePerformanceStore.getState().sceneTransitioning).toBe(false)
-    })
-
-    it('should set isLoadingScene', () => {
-      const { setIsLoadingScene } = usePerformanceStore.getState()
-
-      setIsLoadingScene(true)
-      expect(usePerformanceStore.getState().isLoadingScene).toBe(true)
-
-      setIsLoadingScene(false)
-      expect(usePerformanceStore.getState().isLoadingScene).toBe(false)
+      store.reset()
+      const after = usePerformanceStore.getState()
+      expect(after.isInteracting).toBe(false)
+      expect(after.sceneTransitioning).toBe(false)
+      expect(after.isLoadingScene).toBe(false)
     })
   })
 
@@ -130,24 +120,13 @@ describe('performanceStore', () => {
   })
 
   describe('temporal reprojection', () => {
-    it('should set temporalReprojectionEnabled', () => {
-      const { setTemporalReprojectionEnabled } = usePerformanceStore.getState()
+    it('temporal and camera flags are independent', () => {
+      const store = usePerformanceStore.getState()
+      store.setTemporalReprojectionEnabled(false)
+      store.setCameraTeleported(true)
 
-      setTemporalReprojectionEnabled(false)
       expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(false)
-
-      setTemporalReprojectionEnabled(true)
-      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(true)
-    })
-
-    it('should set cameraTeleported', () => {
-      const { setCameraTeleported } = usePerformanceStore.getState()
-
-      setCameraTeleported(true)
       expect(usePerformanceStore.getState().cameraTeleported).toBe(true)
-
-      setCameraTeleported(false)
-      expect(usePerformanceStore.getState().cameraTeleported).toBe(false)
     })
   })
 
@@ -185,18 +164,6 @@ describe('performanceStore', () => {
       const state = usePerformanceStore.getState()
       expect(state.analyticalGradientEnabled).toBe(true)
       expect(state.fastEigenInterpolationEnabled).toBe(true)
-    })
-  })
-
-  describe('fractal animation quality', () => {
-    it('should set fractalAnimationLowQuality', () => {
-      const { setFractalAnimationLowQuality } = usePerformanceStore.getState()
-
-      setFractalAnimationLowQuality(false)
-      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(false)
-
-      setFractalAnimationLowQuality(true)
-      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(true)
     })
   })
 

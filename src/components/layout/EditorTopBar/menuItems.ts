@@ -12,6 +12,7 @@ import { applySceneExample, getSceneExamples } from '@/lib/sceneExamples'
 import { applyStyleExample, getStyleExamples } from '@/lib/styleExamples'
 import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
 import { THEME_PRESETS, type ThemeAccent, type ThemeMode } from '@/stores/themeStore'
+
 import type { MenuContext, MenuItem } from './types'
 
 /**

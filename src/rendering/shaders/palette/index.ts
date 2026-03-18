@@ -48,38 +48,38 @@ ${GLSL_PALETTE_FUNCTIONS}
 export {
   COLOR_ALGORITHM_OPTIONS,
   COLOR_ALGORITHM_TO_INT,
-  DEFAULT_COLOR_ALGORITHM,
-  getAvailableColorAlgorithms,
-  DEFAULT_COSINE_COEFFICIENTS,
-  DEFAULT_DOMAIN_COLORING_SETTINGS,
-  DEFAULT_DIVERGING_PSI_SETTINGS,
-  DEFAULT_PHASE_DIVERGING_SETTINGS,
-  DEFAULT_DISTRIBUTION,
-  DEFAULT_MULTI_SOURCE_WEIGHTS,
-  LCH_PRESET_OPTIONS,
   // Color algorithm types
   type ColorAlgorithm,
   // Cosine palette types
   type CosineCoefficients,
+  DEFAULT_COLOR_ALGORITHM,
+  DEFAULT_COSINE_COEFFICIENTS,
+  DEFAULT_DISTRIBUTION,
+  DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_DOMAIN_COLORING_SETTINGS,
+  DEFAULT_MULTI_SOURCE_WEIGHTS,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
+  // Distribution types
+  type DistributionSettings,
   type DivergingPsiSettings,
   type DomainColoringModulusMode,
   type DomainColoringSettings,
-  type PhaseDivergingSettings,
-  // Distribution types
-  type DistributionSettings,
+  getAvailableColorAlgorithms,
+  LCH_PRESET_OPTIONS,
   // LCH preset types
   type LchPreset,
   // Multi-source types
   type MultiSourceWeights,
+  type PhaseDivergingSettings,
 } from './types'
 
 // Presets
 export {
   BUILT_IN_PRESETS,
+  type ColorPreset,
   COSINE_PRESET_OPTIONS,
   COSINE_PRESETS,
   getDefaultPresetForAlgorithm,
   getPresetById,
-  type ColorPreset,
   type PresetOption,
 } from './presets'

@@ -1,6 +1,6 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
 
-const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100);
+const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100)
 
 export default defineConfig({
   testDir: './scripts/playwright',
@@ -16,14 +16,23 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: [
+            // Enable WebGPU in headless mode
+            '--enable-unsafe-webgpu',
+            '--enable-features=Vulkan',
+          ],
+        },
+      },
     },
   ],
   webServer: {
     command: `npm run dev -- --port ${devServerPort} --strictPort`,
     url: `http://localhost:${devServerPort}`,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     stdout: 'ignore',
     stderr: 'pipe',
   },
-});
+})

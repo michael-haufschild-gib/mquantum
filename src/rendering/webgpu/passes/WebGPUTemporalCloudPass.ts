@@ -12,10 +12,12 @@
  * @module rendering/webgpu/passes/WebGPUTemporalCloudPass
  */
 
+import { logger } from '@/lib/logger'
+
 import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import { temporalReprojectionShader } from '../shaders/temporal/reprojection.wgsl'
 import { temporalReconstructionShader } from '../shaders/temporal/reconstruction.wgsl'
+import { temporalReprojectionShader } from '../shaders/temporal/reprojection.wgsl'
 
 /** Configuration for temporal cloud pass */
 export interface TemporalCloudPassConfig {
@@ -639,7 +641,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
 
     if (!quarterColorView || !quarterPositionView || !outputView) {
-      console.warn('TemporalCloudPass: Missing input/output textures')
+      logger.warn(
+        `TemporalCloudPass: Missing textures — qColor=${!!quarterColorView} qPos=${!!quarterPositionView} out=${!!outputView}`
+      )
       return
     }
 

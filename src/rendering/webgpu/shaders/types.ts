@@ -48,9 +48,7 @@ export type LightingMode =
   | 'simple' // Basic diffuse only (no modules needed)
   | 'pbr' // GGX + Multi-Light
 
-/**
- *
- */
+/** Base configuration used to compose WGSL shader variants via assembleShaderBlocks. */
 export interface WGSLShaderConfig {
   dimension: number
   temporal: boolean

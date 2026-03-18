@@ -1,7 +1,8 @@
-import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
+
+import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('CrossSectionAnalysisContent controls', () => {
   beforeEach(() => {

@@ -5,6 +5,9 @@
  * Renders Schroedinger quantum wavefunctions using WebGPU.
  */
 
+import { domMax, LazyMotion, MotionConfig } from 'motion/react'
+import { useMemo } from 'react'
+
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
@@ -13,19 +16,17 @@ import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { ToastProvider } from '@/contexts/ToastContext'
-
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useUrlState } from '@/hooks/useUrlState'
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
+import { logger } from '@/lib/logger'
 import { WebGPUCanvas, WebGPUScene } from '@/rendering/webgpu'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
-import { domMax, LazyMotion, MotionConfig } from 'motion/react'
-import { useCallback, useMemo } from 'react'
 
 /**
  * Inner app content that requires ToastProvider context.
@@ -61,10 +62,9 @@ function AppContent() {
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
 
-  // Stable callback to prevent WebGPUCanvas init effect from re-running on every render
-  const handleWebGPUError = useCallback((error: Error) => {
-    console.error('[App] WebGPU error:', error)
-  }, [])
+  const handleWebGPUError = (error: Error) => {
+    logger.error('[App] WebGPU error:', error)
+  }
 
   const canvasStyle = useMemo(() => ({ background: backgroundColor }), [backgroundColor])
 

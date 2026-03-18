@@ -7,17 +7,17 @@
  * - Light editor (selected light properties)
  */
 
-import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Switch } from '@/components/ui/Switch'
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Switch } from '@/components/ui/Switch'
+import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
+
 import { LightEditor } from './LightEditor'
 import { LightList } from './LightList'
 
-/**
- *
- */
+/** Props for the global lighting parameter controls. */
 export interface LightingControlsProps {
   className?: string
 }

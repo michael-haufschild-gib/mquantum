@@ -8,8 +8,9 @@
  */
 
 import React from 'react'
-import { ToggleGroup } from '@/components/ui/ToggleGroup'
+
 import { Switch } from '@/components/ui/Switch'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { PauliFieldView } from '@/lib/geometry/extended/types'
 
 const FIELD_VIEW_OPTIONS: { value: PauliFieldView; label: string }[] = [

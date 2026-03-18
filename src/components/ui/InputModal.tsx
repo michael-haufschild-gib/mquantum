@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import React, { useCallback, useEffect, useState } from 'react'
+
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 
 interface InputModalProps {
   isOpen: boolean

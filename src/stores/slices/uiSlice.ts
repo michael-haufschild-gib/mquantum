@@ -8,6 +8,7 @@
  */
 
 import type { StateCreator } from 'zustand'
+
 import {
   DEFAULT_ANIMATION_BIAS,
   DEFAULT_SHOW_AXIS_HELPER,

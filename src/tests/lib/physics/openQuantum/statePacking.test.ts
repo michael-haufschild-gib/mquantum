@@ -8,14 +8,15 @@
  * Total: 400 floats = 1600 bytes
  */
 import { describe, expect, it } from 'vitest'
+
+import { densityMatrixFromCoefficients, MAX_K } from '@/lib/physics/openQuantum/integrator'
 import {
   createPackedBuffer,
+  OPEN_QUANTUM_BUFFER_BYTES,
+  OPEN_QUANTUM_BUFFER_FLOATS,
   packForGPU,
   unpackFromGPU,
-  OPEN_QUANTUM_BUFFER_FLOATS,
-  OPEN_QUANTUM_BUFFER_BYTES,
 } from '@/lib/physics/openQuantum/statePacking'
-import { densityMatrixFromCoefficients, MAX_K } from '@/lib/physics/openQuantum/integrator'
 import type { OpenQuantumMetrics } from '@/lib/physics/openQuantum/types'
 
 /** RHO_FLOATS = MAX_K × MAX_K × 2 */

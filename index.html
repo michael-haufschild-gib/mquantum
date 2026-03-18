@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Security -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' ws: wss:; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+
     <!-- SEO Meta -->
     <title>MDimension - N-Dimensional Quantum Physics Visualizer</title>
     <meta name="description" content="Visualize quantum wavefunctions in 2 to 11 dimensions. Harmonic oscillators, hydrogen orbitals, TDSE dynamics, and more — rendered in real-time via WebGPU." />

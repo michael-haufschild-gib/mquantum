@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+
 import { getModifierKey, getModifierSymbols, getPlatformKeyLabel, isMac } from '@/lib/platform'
 
 describe('platform detection', () => {

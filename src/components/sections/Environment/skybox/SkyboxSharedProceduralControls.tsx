@@ -2,9 +2,10 @@
  * Shared controls for all procedural skybox modes
  * Includes: Structure, Appearance, and Delight Features
  */
+import React, { useCallback } from 'react'
+
 import { Slider } from '@/components/ui/Slider'
 import { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
-import React, { useCallback } from 'react'
 
 interface SkyboxSharedProceduralControlsProps {
   proceduralSettings: SkyboxProceduralSettings

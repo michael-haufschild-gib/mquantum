@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  GOLDEN_RATIO,
-  MIN_MULTIPLIER,
-  MAX_MULTIPLIER,
-  MAX_DEVIATION,
   getPlaneMultiplier,
+  GOLDEN_RATIO,
+  MAX_DEVIATION,
+  MAX_MULTIPLIER,
+  MIN_MULTIPLIER,
 } from '@/lib/animation/biasCalculation'
 
 describe('biasCalculation', () => {

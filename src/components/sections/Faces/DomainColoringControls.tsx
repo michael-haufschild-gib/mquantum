@@ -1,9 +1,10 @@
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 
 const MODULUS_MODE_OPTIONS = [
   { value: 'logPsiAbsSquared', label: 'log(|psi|^2)' },

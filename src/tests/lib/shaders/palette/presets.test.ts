@@ -2,13 +2,14 @@
  * Tests for Cosine Gradient Palette Presets
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  COSINE_PRESETS,
-  COSINE_PRESET_OPTIONS,
   BUILT_IN_PRESETS,
-  getPresetById,
+  COSINE_PRESET_OPTIONS,
+  COSINE_PRESETS,
   getDefaultPresetForAlgorithm,
+  getPresetById,
   type PresetKey,
 } from '@/rendering/shaders/palette/presets'
 
@@ -62,7 +63,7 @@ describe('COSINE_PRESETS', () => {
     ]
 
     for (const key of expectedKeys) {
-      expect(COSINE_PRESETS[key]).toBeDefined()
+      expect(COSINE_PRESETS[key]).toHaveProperty('a')
     }
   })
 
@@ -73,10 +74,9 @@ describe('COSINE_PRESETS', () => {
       expect(coeffs.c).toHaveLength(3)
       expect(coeffs.d).toHaveLength(3)
 
-      // All values should be numbers
+      // All values should be finite numbers
       for (const arr of [coeffs.a, coeffs.b, coeffs.c, coeffs.d]) {
         for (const val of arr) {
-          expect(typeof val).toBe('number')
           expect(Number.isFinite(val)).toBe(true)
         }
       }
@@ -118,19 +118,18 @@ describe('COSINE_PRESET_OPTIONS', () => {
 
     for (const key of presetKeys) {
       const option = COSINE_PRESET_OPTIONS.find((o) => o.value === key)
-      expect(option).toBeDefined()
+      expect(option).toHaveProperty('value', key)
       expect(option!.coefficients).toBe(COSINE_PRESETS[key as PresetKey])
     }
   })
 
-  it('should have valid option structure', () => {
+  it('every option has a label and full coefficient set', () => {
     for (const option of COSINE_PRESET_OPTIONS) {
-      expect(typeof option.value).toBe('string')
-      expect(option.value.length).toBeGreaterThan(0)
-      expect(typeof option.label).toBe('string')
       expect(option.label.length).toBeGreaterThan(0)
-      expect(option.coefficients).toBeDefined()
       expect(option.coefficients.a).toHaveLength(3)
+      expect(option.coefficients.b).toHaveLength(3)
+      expect(option.coefficients.c).toHaveLength(3)
+      expect(option.coefficients.d).toHaveLength(3)
     }
   })
 
@@ -143,16 +142,15 @@ describe('COSINE_PRESET_OPTIONS', () => {
 })
 
 describe('BUILT_IN_PRESETS', () => {
-  it('should have all required fields', () => {
+  it('should have all required fields with valid values', () => {
+    const validAlgorithms = ['radial', 'lch']
     for (const preset of BUILT_IN_PRESETS) {
-      expect(preset.id).toBeDefined()
-      expect(typeof preset.id).toBe('string')
-      expect(preset.name).toBeDefined()
-      expect(typeof preset.name).toBe('string')
-      expect(preset.algorithm).toBeDefined()
-      expect(preset.coefficients).toBeDefined()
-      expect(preset.distribution).toBeDefined()
-      expect(typeof preset.isBuiltIn).toBe('boolean')
+      expect(preset.id.length).toBeGreaterThan(0)
+      expect(preset.name.length).toBeGreaterThan(0)
+      expect(validAlgorithms).toContain(preset.algorithm)
+      expect(preset.coefficients.a).toHaveLength(3)
+      expect(preset.distribution.power).toBeGreaterThan(0)
+      expect(preset.isBuiltIn).toBe(true)
     }
   })
 
@@ -166,11 +164,9 @@ describe('BUILT_IN_PRESETS', () => {
 
   it('should have valid distribution settings', () => {
     for (const preset of BUILT_IN_PRESETS) {
-      expect(typeof preset.distribution.power).toBe('number')
       expect(preset.distribution.power).toBeGreaterThan(0)
-      expect(typeof preset.distribution.cycles).toBe('number')
       expect(preset.distribution.cycles).toBeGreaterThan(0)
-      expect(typeof preset.distribution.offset).toBe('number')
+      expect(Number.isFinite(preset.distribution.offset)).toBe(true)
     }
   })
 
@@ -190,9 +186,7 @@ describe('BUILT_IN_PRESETS', () => {
 describe('getPresetById', () => {
   it('should return preset for valid ID', () => {
     const preset = getPresetById('powderBlue')
-    expect(preset).toBeDefined()
-    expect(preset!.id).toBe('powderBlue')
-    expect(preset!.name).toBe('Powder Blue')
+    expect(preset).toMatchObject({ id: 'powderBlue', name: 'Powder Blue' })
   })
 
   it('should return undefined for invalid ID', () => {
@@ -213,8 +207,7 @@ describe('getPresetById', () => {
   it('should return all built-in presets by ID', () => {
     for (const builtIn of BUILT_IN_PRESETS) {
       const preset = getPresetById(builtIn.id)
-      expect(preset).toBeDefined()
-      expect(preset!.id).toBe(builtIn.id)
+      expect(preset).toMatchObject({ id: builtIn.id })
     }
   })
 })
@@ -222,20 +215,17 @@ describe('getPresetById', () => {
 describe('getDefaultPresetForAlgorithm', () => {
   it('should return a preset for radial algorithm', () => {
     const preset = getDefaultPresetForAlgorithm('radial')
-    expect(preset).toBeDefined()
     expect(preset.algorithm).toBe('radial')
   })
 
   it('should return a preset for lch algorithm', () => {
     const preset = getDefaultPresetForAlgorithm('lch')
-    expect(preset).toBeDefined()
     expect(preset.algorithm).toBe('lch')
   })
 
   it('should return fallback preset for unknown algorithm', () => {
     // @ts-expect-error - Testing with invalid algorithm
     const preset = getDefaultPresetForAlgorithm('unknown-algorithm')
-    expect(preset).toBeDefined()
     // Should return first preset as fallback
     expect(preset.id).toBe(BUILT_IN_PRESETS[0]!.id)
   })

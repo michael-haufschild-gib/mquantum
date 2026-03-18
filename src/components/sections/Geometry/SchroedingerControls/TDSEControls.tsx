@@ -9,21 +9,23 @@
  */
 
 import React, { useCallback, useMemo } from 'react'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import type { TdseControlsProps } from './types'
-import type { TdseInitialCondition, TdseFieldView } from '@/lib/geometry/extended/types'
-import { TDSEPotentialControls } from './TDSEPotentialControls'
+import type { TdseFieldView, TdseInitialCondition } from '@/lib/geometry/extended/types'
+
 import {
-  AXIS_LABELS,
-  TDSE_MAX_TOTAL_SITES,
   ALL_GRID_SIZE_OPTIONS,
-  INITIAL_CONDITION_OPTIONS,
-  FIELD_VIEW_OPTIONS,
-  SCENARIO_PRESET_OPTIONS,
+  AXIS_LABELS,
   detectActivePreset,
+  FIELD_VIEW_OPTIONS,
+  INITIAL_CONDITION_OPTIONS,
+  SCENARIO_PRESET_OPTIONS,
+  TDSE_MAX_TOTAL_SITES,
 } from './tdseControlsConstants'
+import { TDSEPotentialControls } from './TDSEPotentialControls'
+import type { TdseControlsProps } from './types'
 
 /**
  * TDSE Dynamics configuration panel.

@@ -7,19 +7,18 @@
  * - Extended: Root System, Clifford Torus, Mandelbulb, Quaternion Julia
  */
 
-import React, { useMemo, useCallback } from 'react'
-import { Select } from '@/components/ui/Select'
-import { Tooltip } from '@/components/ui/Tooltip'
-import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
-import { useRotationStore } from '@/stores/rotationStore'
-import { getAvailableTypesForDimension } from '@/lib/geometry'
-import type { ObjectType } from '@/lib/geometry/types'
-import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Select } from '@/components/ui/Select'
+import { Tooltip } from '@/components/ui/Tooltip'
+import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
+import { getAvailableTypesForDimension } from '@/lib/geometry'
+import type { ObjectType } from '@/lib/geometry/types'
+import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
+import { useRotationStore } from '@/stores/rotationStore'
+
+/** Props for the object type selection cards. */
 export interface ObjectTypeSelectorProps {
   className?: string
   disabled?: boolean

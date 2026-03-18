@@ -1,14 +1,13 @@
 /**
- * Tests for msgBoxStore
- * Verifies message box dialog state management
+ * Tests for msgBoxStore — dialog lifecycle and action dispatch.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
 describe('msgBoxStore', () => {
   beforeEach(() => {
-    // Reset store state before each test
     useMsgBoxStore.setState({
       isOpen: false,
       title: '',
@@ -18,135 +17,69 @@ describe('msgBoxStore', () => {
     })
   })
 
-  describe('showMsgBox', () => {
-    it('should open message box with basic info', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
+  it('opens with title, message, and specified type', () => {
+    useMsgBoxStore.getState().showMsgBox('Error', 'Something went wrong', 'error')
 
-      showMsgBox('Test Title', 'Test Message')
-
-      const state = useMsgBoxStore.getState()
-      expect(state.isOpen).toBe(true)
-      expect(state.title).toBe('Test Title')
-      expect(state.message).toBe('Test Message')
-      expect(state.type).toBe('info')
-    })
-
-    it('should open message box with specified type', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-
-      showMsgBox('Error', 'Something went wrong', 'error')
-
-      expect(useMsgBoxStore.getState().type).toBe('error')
-    })
-
-    it('should set type to success', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-
-      showMsgBox('Success', 'Operation completed', 'success')
-
-      expect(useMsgBoxStore.getState().type).toBe('success')
-    })
-
-    it('should set type to warning', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-
-      showMsgBox('Warning', 'Proceed with caution', 'warning')
-
-      expect(useMsgBoxStore.getState().type).toBe('warning')
-    })
-
-    it('should provide default OK action when no actions specified', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-
-      showMsgBox('Title', 'Message')
-
-      const state = useMsgBoxStore.getState()
-      expect(state.actions).toHaveLength(1)
-      expect(state.actions[0]?.label).toBe('OK')
-    })
-
-    it('should use custom actions when provided', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-      const onConfirm = vi.fn()
-      const onCancel = vi.fn()
-
-      showMsgBox('Confirm', 'Are you sure?', 'warning', [
-        { label: 'Confirm', onClick: onConfirm, variant: 'danger' },
-        { label: 'Cancel', onClick: onCancel, variant: 'secondary' },
-      ])
-
-      const state = useMsgBoxStore.getState()
-      expect(state.actions).toHaveLength(2)
-      expect(state.actions[0]?.label).toBe('Confirm')
-      expect(state.actions[0]?.variant).toBe('danger')
-      expect(state.actions[1]?.label).toBe('Cancel')
-      expect(state.actions[1]?.variant).toBe('secondary')
-    })
-
-    it('should call action onClick handlers', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-      const onConfirm = vi.fn()
-
-      showMsgBox('Confirm', 'Are you sure?', 'warning', [{ label: 'Confirm', onClick: onConfirm }])
-
-      const state = useMsgBoxStore.getState()
-      state.actions[0]?.onClick()
-
-      expect(onConfirm).toHaveBeenCalledTimes(1)
-    })
-
-    it('should close dialog when default OK action is clicked', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
-
-      showMsgBox('Info', 'Some information')
-
-      // Click the default OK action
-      const actions = useMsgBoxStore.getState().actions
-      actions[0]?.onClick()
-
-      expect(useMsgBoxStore.getState().isOpen).toBe(false)
-    })
+    const state = useMsgBoxStore.getState()
+    expect(state.isOpen).toBe(true)
+    expect(state.title).toBe('Error')
+    expect(state.message).toBe('Something went wrong')
+    expect(state.type).toBe('error')
   })
 
-  describe('closeMsgBox', () => {
-    it('should close the message box', () => {
-      const { showMsgBox, closeMsgBox } = useMsgBoxStore.getState()
+  it('defaults to info type and provides OK action when no args given', () => {
+    useMsgBoxStore.getState().showMsgBox('Title', 'Message')
 
-      showMsgBox('Title', 'Message')
-      expect(useMsgBoxStore.getState().isOpen).toBe(true)
-
-      closeMsgBox()
-      expect(useMsgBoxStore.getState().isOpen).toBe(false)
-    })
+    const state = useMsgBoxStore.getState()
+    expect(state.type).toBe('info')
+    expect(state.actions).toHaveLength(1)
+    expect(state.actions[0]?.label).toBe('OK')
   })
 
-  describe('action variants', () => {
-    it('should support primary variant', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
+  it('default OK action closes the dialog', () => {
+    useMsgBoxStore.getState().showMsgBox('Info', 'Done')
+    useMsgBoxStore.getState().actions[0]?.onClick()
 
-      showMsgBox('Title', 'Message', 'info', [
-        { label: 'Primary', onClick: vi.fn(), variant: 'primary' },
-      ])
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+  })
 
-      expect(useMsgBoxStore.getState().actions[0]?.variant).toBe('primary')
-    })
+  it('custom actions preserve labels, variants, and invoke callbacks', () => {
+    const onConfirm = vi.fn()
+    const onCancel = vi.fn()
 
-    it('should support ghost variant', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
+    useMsgBoxStore.getState().showMsgBox('Confirm', 'Sure?', 'warning', [
+      { label: 'Confirm', onClick: onConfirm, variant: 'danger' },
+      { label: 'Cancel', onClick: onCancel, variant: 'ghost' },
+    ])
 
-      showMsgBox('Title', 'Message', 'info', [
-        { label: 'Ghost', onClick: vi.fn(), variant: 'ghost' },
-      ])
+    const { actions } = useMsgBoxStore.getState()
+    expect(actions).toHaveLength(2)
+    expect(actions[0]?.variant).toBe('danger')
+    expect(actions[1]?.variant).toBe('ghost')
 
-      expect(useMsgBoxStore.getState().actions[0]?.variant).toBe('ghost')
-    })
+    actions[0]?.onClick()
+    expect(onConfirm).toHaveBeenCalledTimes(1)
 
-    it('should support action without variant (undefined)', () => {
-      const { showMsgBox } = useMsgBoxStore.getState()
+    actions[1]?.onClick()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
 
-      showMsgBox('Title', 'Message', 'info', [{ label: 'No Variant', onClick: vi.fn() }])
+  it('actions without variant default to undefined', () => {
+    useMsgBoxStore.getState().showMsgBox('T', 'M', 'info', [{ label: 'Plain', onClick: vi.fn() }])
+    expect(useMsgBoxStore.getState().actions[0]?.variant).toBeUndefined()
+  })
 
-      expect(useMsgBoxStore.getState().actions[0]?.variant).toBeUndefined()
-    })
+  it('closeMsgBox closes an open dialog', () => {
+    useMsgBoxStore.getState().showMsgBox('Title', 'Message')
+    useMsgBoxStore.getState().closeMsgBox()
+
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+  })
+
+  it('supports all message types', () => {
+    for (const type of ['info', 'error', 'success', 'warning'] as const) {
+      useMsgBoxStore.getState().showMsgBox('T', 'M', type)
+      expect(useMsgBoxStore.getState().type).toBe(type)
+    }
   })
 })

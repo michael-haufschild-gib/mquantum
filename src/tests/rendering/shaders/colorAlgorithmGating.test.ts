@@ -2,9 +2,10 @@
  * Tests for color algorithm gating — open quantum algorithms 16-18.
  */
 import { describe, expect, it } from 'vitest'
+
 import {
-  getAvailableColorAlgorithms,
   COLOR_ALGORITHM_TO_INT,
+  getAvailableColorAlgorithms,
 } from '@/rendering/shaders/palette/types'
 
 describe('COLOR_ALGORITHM_TO_INT open quantum entries', () => {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 

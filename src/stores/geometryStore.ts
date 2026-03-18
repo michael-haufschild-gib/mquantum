@@ -5,6 +5,8 @@
  * Schroedinger quantum wavefunction visualizer.
  */
 
+import { create } from 'zustand'
+
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   getRecommendedDimension,
@@ -13,8 +15,9 @@ import {
   isValidObjectType as isValidObjectTypeRegistry,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/passes'
-import { create } from 'zustand'
+import { logger } from '@/lib/logger'
+import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/utils/temporalDepthRegistry'
+
 import { useAnimationStore } from './animationStore'
 import { usePerformanceStore } from './performanceStore'
 import { useRotationStore } from './rotationStore'
@@ -201,7 +204,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
     if (!validation.valid) {
       // Don't allow setting invalid type - keep current
-      console.warn(
+      logger.warn(
         `Object type ${type} is not valid for dimension ${currentDimension}: ${validation.message}`
       )
       return
@@ -259,13 +262,13 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
     // Validate that objectType is valid for dimension
     if (!isValidObjectType(objectType)) {
-      console.warn(`Invalid object type for scene load: ${objectType}, using schroedinger`)
+      logger.warn(`Invalid object type for scene load: ${objectType}, using schroedinger`)
       objectType = 'schroedinger'
     }
 
     const validation = validateObjectTypeForDimension(objectType, clampedDimension)
     if (!validation.valid) {
-      console.warn(
+      logger.warn(
         `Object type ${objectType} is not valid for dimension ${clampedDimension} during scene load: ${validation.message}`
       )
       objectType = validation.fallbackType ?? 'schroedinger'

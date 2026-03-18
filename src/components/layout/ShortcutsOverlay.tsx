@@ -1,10 +1,11 @@
-import { Button } from '@/components/ui/Button'
-import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts'
-import { useIsMobile } from '@/hooks/useMediaQuery'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { AnimatePresence, m } from 'motion/react'
-import React, { useEffect, useCallback } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
+import { getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
 
 export const ShortcutsOverlay: React.FC = React.memo(() => {
   const isMobile = useIsMobile()
@@ -34,9 +35,9 @@ export const ShortcutsOverlay: React.FC = React.memo(() => {
     setShowShortcuts(false)
   }, [setShowShortcuts])
 
-  const handlePropagationStop = useCallback((e: React.MouseEvent) => {
+  const handlePropagationStop = (e: React.MouseEvent) => {
     e.stopPropagation()
-  }, [])
+  }
 
   // Don't render on mobile devices - keyboard shortcuts are not useful without a physical keyboard
   if (isMobile) {

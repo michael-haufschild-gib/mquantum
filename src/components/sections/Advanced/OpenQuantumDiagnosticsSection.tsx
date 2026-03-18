@@ -9,13 +9,14 @@
  * @module components/sections/Advanced/OpenQuantumDiagnosticsSection
  */
 
-import React, { useState, useCallback } from 'react'
-import { Button } from '@/components/ui/Button'
+import React, { useCallback, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
+import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
-import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Diagnostics readout for the open quantum system.

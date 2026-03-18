@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('Schroedinger cross-section slice settings', () => {

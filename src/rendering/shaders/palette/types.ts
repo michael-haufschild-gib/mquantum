@@ -24,9 +24,7 @@
  * - relativePhase: Relative phase map hue=arg(conj(ψ_ref)*ψ), lightness≈|ψ|²
  */
 
-/**
- *
- */
+/** Identifier for a color mapping algorithm applied to wavefunction density or phase. */
 export type ColorAlgorithm =
   | 'lch'
   | 'multiSource'
@@ -152,14 +150,10 @@ export interface DistributionSettings {
   offset: number
 }
 
-/**
- *
- */
+/** Modulus source for domain coloring: log of probability density or log of amplitude. */
 export type DomainColoringModulusMode = 'logPsiAbsSquared' | 'logPsiAbs'
 
-/**
- *
- */
+/** Configuration for domain coloring visualization with optional contour lines. */
 export interface DomainColoringSettings {
   /** Log modulus source: log(|psi|^2) or log(|psi|) */
   modulusMode: DomainColoringModulusMode
@@ -173,9 +167,7 @@ export interface DomainColoringSettings {
   contourStrength: number
 }
 
-/**
- *
- */
+/** Three-color diverging palette driven by the sign of cos(phase). */
 export interface PhaseDivergingSettings {
   /** Center color pinned at cos(phase) = 0 crossings. */
   neutralColor: string
@@ -185,9 +177,7 @@ export interface PhaseDivergingSettings {
   negativeColor: string
 }
 
-/**
- *
- */
+/** Three-color diverging palette for signed real or imaginary wavefunction components. */
 export interface DivergingPsiSettings {
   /** Center color pinned at zero crossing. */
   neutralColor: string

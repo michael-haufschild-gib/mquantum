@@ -1,6 +1,7 @@
+import { useLayoutEffect, useRef, useState } from 'react'
+
 import { Icon } from '@/components/ui/Icon'
 import { useExportStore } from '@/stores/exportStore'
-import { useLayoutEffect, useRef, useState } from 'react'
 
 /**
  * Get export width in pixels based on resolution setting
@@ -44,6 +45,54 @@ export const ExportPreview = () => {
     return () => observer.disconnect()
   }, [resolution, customWidth, crop.enabled, crop.width, crop.height])
 
+  const textOverlayNode = textOverlay.enabled
+    ? (() => {
+        const { verticalPlacement, horizontalPlacement, padding } = textOverlay
+        const scaledPadding = padding * previewScale
+        const scaledFontSize = textOverlay.fontSize * previewScale
+        const scaledLetterSpacing = textOverlay.letterSpacing * previewScale
+        const scaledShadowBlur = textOverlay.shadowBlur * previewScale
+        const left =
+          horizontalPlacement === 'left'
+            ? `${scaledPadding}px`
+            : horizontalPlacement === 'right'
+              ? `calc(100% - ${scaledPadding}px)`
+              : '50%'
+        const translateX =
+          horizontalPlacement === 'left' ? '0%' : horizontalPlacement === 'right' ? '-100%' : '-50%'
+        const top =
+          verticalPlacement === 'top'
+            ? `${scaledPadding}px`
+            : verticalPlacement === 'bottom'
+              ? `calc(100% - ${scaledPadding}px)`
+              : '50%'
+        const translateY =
+          verticalPlacement === 'top' ? '0%' : verticalPlacement === 'bottom' ? '-100%' : '-50%'
+        return (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div
+              className="absolute"
+              style={{
+                left,
+                top,
+                transform: `translate(${translateX}, ${translateY})`,
+                color: textOverlay.color,
+                fontFamily: textOverlay.fontFamily || 'Inter, sans-serif',
+                fontSize: `${scaledFontSize}px`,
+                fontWeight: textOverlay.fontWeight,
+                letterSpacing: `${scaledLetterSpacing}px`,
+                opacity: textOverlay.opacity,
+                textShadow: `0px 0px ${scaledShadowBlur}px ${textOverlay.shadowColor}`,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {textOverlay.text}
+            </div>
+          </div>
+        )
+      })()
+    : null
+
   return (
     <div className="relative w-full h-full bg-[var(--bg-app)]/50 flex items-center justify-center p-4">
       {/* Aspect Ratio Container (Represents the Full Canvas) */}
@@ -74,62 +123,7 @@ export const ExportPreview = () => {
               }}
             >
               {/* Text Overlay - Positioned relative to crop box */}
-              {textOverlay.enabled &&
-                (() => {
-                  const { verticalPlacement, horizontalPlacement, padding } = textOverlay
-                  const scaledPadding = padding * previewScale
-                  const scaledFontSize = textOverlay.fontSize * previewScale
-                  const scaledLetterSpacing = textOverlay.letterSpacing * previewScale
-                  const scaledShadowBlur = textOverlay.shadowBlur * previewScale
-
-                  const left =
-                    horizontalPlacement === 'left'
-                      ? `${scaledPadding}px`
-                      : horizontalPlacement === 'right'
-                        ? `calc(100% - ${scaledPadding}px)`
-                        : '50%'
-                  const translateX =
-                    horizontalPlacement === 'left'
-                      ? '0%'
-                      : horizontalPlacement === 'right'
-                        ? '-100%'
-                        : '-50%'
-                  const top =
-                    verticalPlacement === 'top'
-                      ? `${scaledPadding}px`
-                      : verticalPlacement === 'bottom'
-                        ? `calc(100% - ${scaledPadding}px)`
-                        : '50%'
-                  const translateY =
-                    verticalPlacement === 'top'
-                      ? '0%'
-                      : verticalPlacement === 'bottom'
-                        ? '-100%'
-                        : '-50%'
-
-                  return (
-                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                      <div
-                        className="absolute"
-                        style={{
-                          left,
-                          top,
-                          transform: `translate(${translateX}, ${translateY})`,
-                          color: textOverlay.color,
-                          fontFamily: textOverlay.fontFamily || 'Inter, sans-serif',
-                          fontSize: `${scaledFontSize}px`,
-                          fontWeight: textOverlay.fontWeight,
-                          letterSpacing: `${scaledLetterSpacing}px`,
-                          opacity: textOverlay.opacity,
-                          textShadow: `0px 0px ${scaledShadowBlur}px ${textOverlay.shadowColor}`,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {textOverlay.text}
-                      </div>
-                    </div>
-                  )
-                })()}
+              {textOverlayNode}
             </div>
           </>
         ) : (

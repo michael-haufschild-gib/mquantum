@@ -6,13 +6,12 @@
  * automatic checking of the dismissed dialogs store.
  */
 
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { useMsgBoxStore, type MsgBoxAction, type MsgBoxType } from '@/stores/msgBoxStore'
 import { useCallback } from 'react'
 
-/**
- *
- */
+import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import { type MsgBoxAction, type MsgBoxType, useMsgBoxStore } from '@/stores/msgBoxStore'
+
+/** Return type for the {@link useConditionalMsgBox} hook. */
 export interface UseConditionalMsgBoxResult {
   /**
    * Shows a message box only if it hasn't been permanently dismissed.
@@ -97,7 +96,7 @@ export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
     [showMsgBox]
   )
 
-  const isDismissed = useCallback((dialogId: string): boolean => {
+  const isDismissed = (dialogId: string): boolean => {
     // For immediate checks, always get fresh state and respect hydration
     if (!useDismissedDialogsStore.persist.hasHydrated()) {
       // Not hydrated - can't reliably know if dismissed
@@ -106,7 +105,7 @@ export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
       return false
     }
     return useDismissedDialogsStore.getState().isDismissed(dialogId)
-  }, [])
+  }
 
   return { showOnce, isDismissed }
 }

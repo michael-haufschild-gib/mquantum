@@ -14,9 +14,10 @@
  * @module rendering/webgpu/passes/PaperTexturePass
  */
 
-import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
+
+import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 
 /**

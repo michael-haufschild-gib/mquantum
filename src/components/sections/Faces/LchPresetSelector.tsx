@@ -5,15 +5,14 @@
  * These presets configure the perceptually uniform color space parameters.
  */
 
-import { Select } from '@/components/ui/Select'
-import { LCH_PRESET_OPTIONS } from '@/rendering/shaders/palette'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useMemo, useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Select } from '@/components/ui/Select'
+import { LCH_PRESET_OPTIONS } from '@/rendering/shaders/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+
+/** Props for the LCH color space preset selector. */
 export interface LchPresetSelectorProps {
   className?: string
 }

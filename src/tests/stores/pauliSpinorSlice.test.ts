@@ -2,9 +2,10 @@
  * Unit tests for the Pauli spinor store slice.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('pauliSpinorSlice', () => {
   beforeEach(() => {

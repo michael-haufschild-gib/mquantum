@@ -3,7 +3,8 @@
  * Verifies rotation state management and dimension-based plane filtering
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useRotationStore } from '@/stores/rotationStore'
 
 describe('rotationStore', () => {

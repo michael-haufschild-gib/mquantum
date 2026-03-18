@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 
 interface ScreenshotStore {

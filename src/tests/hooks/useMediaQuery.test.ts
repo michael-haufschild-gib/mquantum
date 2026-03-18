@@ -1,12 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import {
-  useMediaQuery,
+  BREAKPOINTS,
   useBreakpoint,
   useCurrentBreakpoint,
-  useIsMobile,
   useIsDesktop,
-  BREAKPOINTS,
+  useIsMobile,
+  useMediaQuery,
 } from '@/hooks/useMediaQuery'
 
 const mockMatchMedia = (matches: boolean) => {

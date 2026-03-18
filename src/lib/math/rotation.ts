@@ -5,10 +5,11 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
+import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
+
 import { copyMatrix, createIdentityMatrix, multiplyMatricesInto } from './matrix'
 import { fcos, fsin } from './trig'
 import type { MatrixND, RotationPlane } from './types'
-import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
 
 /**
  * Axis naming convention for display

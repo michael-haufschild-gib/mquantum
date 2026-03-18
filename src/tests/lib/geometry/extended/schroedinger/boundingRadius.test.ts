@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  computeHOBoundingRadius,
-  computeHydrogenBoundingRadius,
-  computeHOMomentumBoundingRadius,
-  computeHydrogenMomentumBoundingRadius,
   computeBoundingRadius,
+  computeHOBoundingRadius,
+  computeHOMomentumBoundingRadius,
+  computeHydrogenBoundingRadius,
+  computeHydrogenMomentumBoundingRadius,
 } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 

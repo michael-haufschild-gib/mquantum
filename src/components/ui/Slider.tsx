@@ -1,5 +1,6 @@
-import React, { useEffect, useId, useState, useRef, useCallback } from 'react'
-import { m, AnimatePresence } from 'motion/react'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Drag sensitivity when Shift key is not pressed */
@@ -9,9 +10,7 @@ const DRAG_SENSITIVITY_PRECISE = 0.05
 /** Pixels of mouse movement to traverse full range */
 const DRAG_PIXELS_TO_FULL_RANGE = 200
 
-/**
- *
- */
+/** Props for the {@link Slider} range input component. */
 export interface SliderProps {
   label: string
   value: number

@@ -1,3 +1,6 @@
+import React, { useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
 import { ObjectSettingsSection } from '@/components/sections/Geometry/ObjectSettingsSection'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
@@ -5,10 +8,8 @@ import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React, { useMemo, useState } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
 
@@ -36,39 +37,36 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
     setIsoEnabled(mode === 'isosurface')
   }
 
-  const tabs: Tab[] = useMemo(
-    () => [
-      {
-        id: 'type',
-        label: (
-          <div className="flex items-center gap-2">
-            <Icon name="sparkles" size={14} />
-            <span>Type</span>
-          </div>
-        ),
-        content: (
-          <div className="p-4 bg-[var(--bg-hover)] min-h-full">
-            <ObjectTypeExplorer />
-          </div>
-        ),
-      },
-      {
-        id: 'geometry',
-        label: (
-          <div className="flex items-center gap-2">
-            <Icon name="layers" size={14} />
-            <span>Geometry</span>
-          </div>
-        ),
-        content: (
-          <div className="min-h-full">
-            <ObjectSettingsSection />
-          </div>
-        ),
-      },
-    ],
-    []
-  )
+  const tabs: Tab[] = [
+    {
+      id: 'type',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="sparkles" size={14} />
+          <span>Type</span>
+        </div>
+      ),
+      content: (
+        <div className="p-4 bg-[var(--bg-hover)] min-h-full">
+          <ObjectTypeExplorer />
+        </div>
+      ),
+    },
+    {
+      id: 'geometry',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="layers" size={14} />
+          <span>Geometry</span>
+        </div>
+      ),
+      content: (
+        <div className="min-h-full">
+          <ObjectSettingsSection />
+        </div>
+      ),
+    },
+  ]
 
   return (
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">

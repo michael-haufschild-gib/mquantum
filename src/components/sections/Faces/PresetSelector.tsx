@@ -4,15 +4,14 @@
  * Dropdown for selecting pre-configured cosine palette presets.
  */
 
-import { Select } from '@/components/ui/Select'
-import { COSINE_PRESET_OPTIONS } from '@/rendering/shaders/palette'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useMemo, useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+import { Select } from '@/components/ui/Select'
+import { COSINE_PRESET_OPTIONS } from '@/rendering/shaders/palette'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
+
+/** Props for the color preset selector dropdown. */
 export interface PresetSelectorProps {
   className?: string
 }

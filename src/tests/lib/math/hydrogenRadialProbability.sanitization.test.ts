@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 
 describe('computeRadialProbabilityNorm input sanitization', () => {

@@ -1,9 +1,10 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import {
-  DEFAULT_SIDEBAR_WIDTH_LARGE,
   clampSidebarWidth,
+  DEFAULT_SIDEBAR_WIDTH_LARGE,
   useLayoutStore,
 } from '@/stores/layoutStore'
-import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('layoutStore', () => {
   beforeEach(() => {

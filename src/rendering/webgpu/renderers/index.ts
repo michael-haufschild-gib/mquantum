@@ -6,8 +6,7 @@
  * @module rendering/webgpu/renderers
  */
 
-export { WebGPUSchrodingerRenderer } from './WebGPUSchrodingerRenderer'
 export type { SchrodingerRendererConfig } from './WebGPUSchrodingerRenderer'
-
-export { WebGPUSkyboxRenderer } from './WebGPUSkyboxRenderer'
+export { WebGPUSchrodingerRenderer } from './WebGPUSchrodingerRenderer'
 export type { SkyboxRendererConfig } from './WebGPUSkyboxRenderer'
+export { WebGPUSkyboxRenderer } from './WebGPUSkyboxRenderer'

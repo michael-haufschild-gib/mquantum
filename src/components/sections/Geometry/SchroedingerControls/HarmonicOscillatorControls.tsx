@@ -5,13 +5,15 @@
  * Includes preset selection, seed, quantum parameters, and slice controls.
  */
 
+import React from 'react'
+
+import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { Section } from '@/components/sections/Section'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/types'
-import React from 'react'
+
 import type { HarmonicOscillatorControlsProps } from './types'
 
 /**

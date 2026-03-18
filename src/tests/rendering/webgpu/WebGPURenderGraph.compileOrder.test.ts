@@ -1,31 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { WebGPURenderPass, WebGPURenderPassConfig } from '@/rendering/webgpu/core/types'
+import { describe, expect, it } from 'vitest'
 
-function createPass(config: WebGPURenderPassConfig): WebGPURenderPass {
-  return {
-    id: config.id,
-    config,
-    initialize: vi.fn().mockResolvedValue(undefined),
-    execute: vi.fn(),
-    dispose: vi.fn(),
-  }
-}
-
-function ensureGPUConstants(): void {
-  if (!('GPUTextureUsage' in globalThis)) {
-    ;(globalThis as unknown as { GPUTextureUsage: Record<string, number> }).GPUTextureUsage = {
-      TEXTURE_BINDING: 1 << 0,
-      RENDER_ATTACHMENT: 1 << 1,
-      COPY_SRC: 1 << 2,
-      COPY_DST: 1 << 3,
-      STORAGE_BINDING: 1 << 4,
-    }
-  }
-}
+import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
+import { createMockPass } from '@/tests/factories'
 
 describe('WebGPURenderGraph compile ordering', () => {
   it('keeps producer passes before dependent consumers even with conflicting priorities', async () => {
-    ensureGPUConstants()
     const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
     const graph = new WebGPURenderGraph()
     const graphInternals = graph as unknown as {
@@ -34,19 +13,19 @@ describe('WebGPURenderGraph compile ordering', () => {
       compiled: boolean
     }
 
-    const tonemap = createPass({
+    const tonemap = createMockPass({
       id: 'tonemap',
       priority: 900,
       inputs: [{ resourceId: 'hdr-color', access: 'read', binding: 0 }],
       outputs: [{ resourceId: 'ldr-color', access: 'write', binding: 0 }],
     })
-    const paper = createPass({
+    const paper = createMockPass({
       id: 'paper-texture',
       priority: 195,
       inputs: [{ resourceId: 'ldr-color', access: 'read', binding: 0 }],
       outputs: [{ resourceId: 'paper-output', access: 'write', binding: 0 }],
     })
-    const toScreen = createPass({
+    const toScreen = createMockPass({
       id: 'to-screen',
       priority: 1000,
       inputs: [{ resourceId: 'paper-output', access: 'read', binding: 0 }],
@@ -74,7 +53,6 @@ describe('WebGPURenderGraph compile ordering', () => {
   })
 
   it('uses priority order for independent passes', async () => {
-    ensureGPUConstants()
     const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
     const graph = new WebGPURenderGraph()
     const graphInternals = graph as unknown as {
@@ -83,13 +61,13 @@ describe('WebGPURenderGraph compile ordering', () => {
       compiled: boolean
     }
 
-    const highPriority = createPass({
+    const highPriority = createMockPass({
       id: 'priority-100',
       priority: 100,
       inputs: [],
       outputs: [{ resourceId: 'a', access: 'write', binding: 0 }],
     })
-    const lowPriority = createPass({
+    const lowPriority = createMockPass({
       id: 'priority-300',
       priority: 300,
       inputs: [],

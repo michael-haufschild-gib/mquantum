@@ -3,12 +3,13 @@
  * Controls for temporal accumulation and reprojection.
  */
 
-import { Switch } from '@/components/ui/Switch'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+import { Switch } from '@/components/ui/Switch'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 /**
  * Temporal reprojection controls for the Performance section.

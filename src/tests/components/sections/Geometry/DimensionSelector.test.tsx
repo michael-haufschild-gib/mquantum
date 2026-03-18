@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
 import { useGeometryStore } from '@/stores/geometryStore'
 

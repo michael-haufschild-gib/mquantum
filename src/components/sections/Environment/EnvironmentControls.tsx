@@ -3,14 +3,14 @@
  * Controls for scene environment settings (background and skybox)
  */
 
+import React, { useCallback, useState } from 'react'
+
 import { Tabs } from '@/components/ui/Tabs'
-import React, { useState, useCallback, useMemo } from 'react'
+
 import { BackgroundColorControls } from './BackgroundColorControls'
 import { SkyboxControls } from './SkyboxControls'
 
-/**
- *
- */
+/** Props for the environment detail controls. */
 export interface EnvironmentControlsProps {
   className?: string
 }
@@ -23,13 +23,10 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
       setActiveTab(id)
     }, [])
 
-    const tabs = useMemo(
-      () => [
-        { id: 'color', label: 'Color', content: <BackgroundColorControls /> },
-        { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },
-      ],
-      []
-    )
+    const tabs = [
+      { id: 'color', label: 'Color', content: <BackgroundColorControls /> },
+      { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },
+    ]
 
     return (
       <div className={className}>

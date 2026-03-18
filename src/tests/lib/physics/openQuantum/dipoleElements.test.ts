@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+
 import {
+  angularFactor,
+  clearDipoleCache,
+  dipoleMatrixElementSquared,
   radialDipoleIntegral,
   wigner3j,
-  angularFactor,
-  dipoleMatrixElementSquared,
-  clearDipoleCache,
 } from '@/lib/physics/openQuantum/dipoleElements'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
 

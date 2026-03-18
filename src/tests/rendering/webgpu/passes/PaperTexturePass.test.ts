@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+
 import { PAPER_TEXTURE_SHADER } from '@/rendering/webgpu/passes/PaperTexturePass'
 
 describe('PaperTexturePass shader parity', () => {

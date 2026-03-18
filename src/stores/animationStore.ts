@@ -3,8 +3,9 @@
  * Manages auto-rotation animation for n-dimensional objects
  */
 
-import { getRotationPlanes } from '@/lib/math/rotation'
 import { create } from 'zustand'
+
+import { getRotationPlanes } from '@/lib/math/rotation'
 
 /** Minimum animation speed multiplier */
 export const MIN_SPEED = 0.1

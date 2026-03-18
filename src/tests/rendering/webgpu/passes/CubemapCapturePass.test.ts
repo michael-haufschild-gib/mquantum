@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+
 import type { WebGPUSetupContext } from '@/rendering/webgpu/core/types'
 import { CubemapCapturePass } from '@/rendering/webgpu/passes/CubemapCapturePass'
 

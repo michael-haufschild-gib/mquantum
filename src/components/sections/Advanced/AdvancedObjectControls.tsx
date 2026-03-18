@@ -1,6 +1,8 @@
+import React from 'react'
+
 import { Section } from '@/components/sections/Section'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React from 'react'
+
 import { SchroedingerAdvanced } from './SchroedingerAdvanced'
 import { SharedAdvancedControls } from './SharedAdvancedControls'
 

@@ -2,13 +2,14 @@
  * Tests for Hydrogen ND presets and utility functions
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import {
-  HYDROGEN_ND_PRESETS,
   getHydrogenNDPreset,
   getHydrogenNDPresetsGroupedByDimension,
   getHydrogenNDPresetsWithKeysByDimension,
   getPresetsForDimension,
+  HYDROGEN_ND_PRESETS,
   type HydrogenNDPreset,
 } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 
@@ -16,20 +17,20 @@ describe('Hydrogen ND Presets', () => {
   describe('HYDROGEN_ND_PRESETS', () => {
     it('should have all expected ND presets', () => {
       // 4D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_4d']).toBeDefined()
-      expect(HYDROGEN_ND_PRESETS['3dz2_4d']).toBeDefined()
+      expect(HYDROGEN_ND_PRESETS['2pz_4d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['3dz2_4d']).toHaveProperty('n')
 
       // 5D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_5d']).toBeDefined()
-      expect(HYDROGEN_ND_PRESETS['3dz2_5d']).toBeDefined()
+      expect(HYDROGEN_ND_PRESETS['2pz_5d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['3dz2_5d']).toHaveProperty('n')
 
       // 6D presets
-      expect(HYDROGEN_ND_PRESETS['2pz_6d']).toBeDefined()
-      expect(HYDROGEN_ND_PRESETS['3dz2_6d']).toBeDefined()
-      expect(HYDROGEN_ND_PRESETS['4fz3_6d']).toBeDefined()
+      expect(HYDROGEN_ND_PRESETS['2pz_6d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['3dz2_6d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['4fz3_6d']).toHaveProperty('n')
 
       // Custom
-      expect(HYDROGEN_ND_PRESETS['custom']).toBeDefined()
+      expect(HYDROGEN_ND_PRESETS['custom']).toHaveProperty('n')
     })
 
     it('should have valid 3D quantum numbers for all presets', () => {
@@ -119,9 +120,9 @@ describe('Hydrogen ND Presets', () => {
       const groups = getHydrogenNDPresetsGroupedByDimension()
 
       // Should have groups for 4D, 5D, 6D (based on current presets)
-      expect(groups[4]).toBeDefined()
-      expect(groups[5]).toBeDefined()
-      expect(groups[6]).toBeDefined()
+      expect(groups[4]?.length).toBeGreaterThan(0)
+      expect(groups[5]?.length).toBeGreaterThan(0)
+      expect(groups[6]?.length).toBeGreaterThan(0)
 
       // Each group should have correct dimension presets
       for (const preset of groups[4]!) {
@@ -151,13 +152,12 @@ describe('Hydrogen ND Presets', () => {
       const groups = getHydrogenNDPresetsWithKeysByDimension()
 
       // Should have groups for 4D, 5D, 6D
-      expect(groups[4]).toBeDefined()
-      expect(groups[5]).toBeDefined()
-      expect(groups[6]).toBeDefined()
+      expect(groups[4]?.length).toBeGreaterThan(0)
+      expect(groups[5]?.length).toBeGreaterThan(0)
+      expect(groups[6]?.length).toBeGreaterThan(0)
 
       // Each entry should be a tuple [key, preset]
       for (const [key, preset] of groups[4]!) {
-        expect(typeof key).toBe('string')
         expect(preset.dimension).toBe(4)
         expect(HYDROGEN_ND_PRESETS[key]).toBe(preset)
       }

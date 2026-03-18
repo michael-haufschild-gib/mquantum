@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useRef, useCallback } from 'react'
+import React, { useCallback, useEffect, useId, useRef } from 'react'
+
 import { Button } from '@/components/ui/Button'
 
 /** Props for Modal component */

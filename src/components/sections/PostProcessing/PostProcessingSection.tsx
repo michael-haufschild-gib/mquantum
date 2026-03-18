@@ -3,13 +3,13 @@
  * Section wrapper for post-processing effect controls
  */
 
-import { Section } from '@/components/sections/Section'
 import React from 'react'
+
+import { Section } from '@/components/sections/Section'
+
 import { PostProcessingControls } from './PostProcessingControls'
 
-/**
- *
- */
+/** Props for the post-processing effects section. */
 export interface PostProcessingSectionProps {
   defaultOpen?: boolean
 }

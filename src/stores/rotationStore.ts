@@ -3,9 +3,10 @@
  * Manages n-dimensional rotation angles
  */
 
-import { getRotationPlanes } from '@/lib/math/rotation'
 import { create } from 'zustand'
+
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { getRotationPlanes } from '@/lib/math/rotation'
 
 /**
  * Cache for valid plane names by dimension.

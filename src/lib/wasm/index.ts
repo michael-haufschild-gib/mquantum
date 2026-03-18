@@ -6,19 +6,19 @@
  */
 
 export {
+  // Phase 1: Animation functions
+  composeRotationsIndexedWasm,
+  dotProductWasm,
+  flattenVertices,
+  // Data conversion helpers
+  float64ToVector,
   // Initialization
   initAnimationWasm,
   isAnimationWasmReady,
-  // Phase 1: Animation functions
-  composeRotationsIndexedWasm,
-  multiplyMatrixVectorWasm,
+  magnitudeWasm,
   // Phase 2: Matrix and vector functions
   multiplyMatricesWasm,
-  dotProductWasm,
-  magnitudeWasm,
+  multiplyMatrixVectorWasm,
   normalizeVectorWasm,
   subtractVectorsWasm,
-  // Data conversion helpers
-  float64ToVector,
-  flattenVertices,
 } from './animation-wasm'

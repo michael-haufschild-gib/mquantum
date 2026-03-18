@@ -20,9 +20,7 @@ interface DropdownActions {
   toggleDropdown: (id: string) => void
 }
 
-/**
- *
- */
+/** Combined dropdown state and actions. */
 export type DropdownStore = DropdownState & DropdownActions
 
 // ============================================================================

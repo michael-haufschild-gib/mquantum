@@ -5,10 +5,12 @@
  *
  */
 
-import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { create } from 'zustand'
-import { createSchroedingerSlice } from './slices/geometry/schroedingerSlice'
+
+import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+
 import { createPauliSpinorSlice } from './slices/geometry/pauliSpinorSlice'
+import { createSchroedingerSlice } from './slices/geometry/schroedingerSlice'
 import { ExtendedObjectSlice } from './slices/geometry/types'
 
 // Re-export type for consumers

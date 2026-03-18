@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 
 describe('screenshotCaptureStore', () => {

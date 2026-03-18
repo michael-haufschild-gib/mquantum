@@ -5,16 +5,15 @@
  * Shows collapsible advanced mode with individual RGB sliders.
  */
 
+import React, { useCallback, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Button } from '@/components/ui/Button'
 import { Slider } from '@/components/ui/Slider'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useState, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 
-/**
- *
- */
+/** Props for the cosine gradient coefficient editor. */
 export interface CosineGradientEditorProps {
   className?: string
 }

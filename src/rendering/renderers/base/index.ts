@@ -9,10 +9,10 @@
 
 // Types and utilities
 export {
-  MAX_DIMENSION,
-  QUALITY_RESTORE_DELAY_MS,
   applyRotationInPlace,
   createWorkingArrays,
+  MAX_DIMENSION,
+  QUALITY_RESTORE_DELAY_MS,
   type QualityState,
   type RotationState,
   type WorkingArrays,
@@ -20,9 +20,9 @@ export {
 
 // Hooks
 export {
-  useRotationUpdates,
   type BasisVectorsResult,
   type OriginResult,
+  useRotationUpdates,
   type UseRotationUpdatesOptions,
   type UseRotationUpdatesResult,
 } from './useRotationUpdates'

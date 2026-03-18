@@ -3,13 +3,12 @@
  * Section wrapper for keyboard shortcuts display
  */
 
-import { Section } from '@/components/sections/Section'
 import React from 'react'
+
+import { Section } from '@/components/sections/Section'
 import { KeyboardShortcuts } from '@/components/sections/Shortcuts/KeyboardShortcuts'
 
-/**
- *
- */
+/** Props for the keyboard shortcuts sidebar section. */
 export interface ShortcutsSectionProps {
   defaultOpen?: boolean
 }

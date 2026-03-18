@@ -9,12 +9,11 @@
  */
 
 import { assembleShaderBlocks } from '../../shared/compose-helpers'
-
 // Reconstruct-specific blocks
 import {
-  wignerReconstructParamsBlock,
   generateWignerReconstructBindingsBlock,
   wignerReconstructComputeBlock,
+  wignerReconstructParamsBlock,
 } from './wignerReconstruct.wgsl'
 
 /**

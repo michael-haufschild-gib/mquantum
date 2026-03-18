@@ -13,6 +13,7 @@
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'

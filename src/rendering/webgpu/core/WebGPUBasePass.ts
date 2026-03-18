@@ -8,10 +8,12 @@
  * @module rendering/webgpu/core/WebGPUBasePass
  */
 
+import { logger } from '@/lib/logger'
+
 import type {
+  WebGPURenderContext,
   WebGPURenderPass,
   WebGPURenderPassConfig,
-  WebGPURenderContext,
   WebGPUSetupContext,
 } from './types'
 
@@ -120,9 +122,9 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
       .then((info) => {
         for (const message of info.messages) {
           if (message.type === 'error') {
-            console.error(`[WGSL ERROR] ${shaderLabel}: ${message.message}`)
+            logger.error(`[WGSL ERROR] ${shaderLabel}: ${message.message}`)
           } else if (message.type === 'warning') {
-            console.warn(`[WGSL WARN] ${shaderLabel}: ${message.message}`)
+            logger.warn(`[WGSL WARN] ${shaderLabel}: ${message.message}`)
           } else if (import.meta.env.DEV) {
             console.log(`[WGSL INFO] ${shaderLabel}: ${message.message}`)
           }
@@ -137,7 +139,7 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
         }
       })
       .catch((error) => {
-        console.warn(`[WGSL] Failed to get compilation info for ${shaderLabel}:`, error)
+        logger.warn(`[WGSL] Failed to get compilation info for ${shaderLabel}:`, error)
       })
 
     return module

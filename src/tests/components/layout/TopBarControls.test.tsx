@@ -1,10 +1,11 @@
-import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { TopBarControls } from '@/components/layout/TopBarControls'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { useUIStore } from '@/stores/uiStore'
 
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({

@@ -8,8 +8,8 @@
  */
 
 import type { ObjectType } from '../types'
-import type { AvailableTypeInfo, DimensionConstraints, ObjectTypeEntry } from './types'
 import { OBJECT_TYPE_REGISTRY } from './registry'
+import type { AvailableTypeInfo, DimensionConstraints, ObjectTypeEntry } from './types'
 
 // ============================================================================
 // Core Lookups

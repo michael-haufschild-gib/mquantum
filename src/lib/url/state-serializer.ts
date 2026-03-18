@@ -13,8 +13,8 @@
  * (IndexedDB). Do NOT extend the URL serializer with additional parameters.
  */
 
-import { isValidObjectType } from '@/lib/geometry/registry'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/stores/geometryStore'
 

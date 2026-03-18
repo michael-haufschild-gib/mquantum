@@ -3,19 +3,18 @@
  * Provides keyboard shortcuts for common actions
  */
 
+import { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
+import { useExportStore } from '@/stores/exportStore'
 import { MAX_DIMENSION, useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { useLightingStore } from '@/stores/lightingStore'
-import { useExportStore } from '@/stores/exportStore'
-import { useCallback, useEffect } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
-/**
- *
- */
+/** Configuration for a single keyboard shortcut binding. */
 export interface ShortcutConfig {
   key: string
   ctrl?: boolean
@@ -25,9 +24,7 @@ export interface ShortcutConfig {
   action: () => void
 }
 
-/**
- *
- */
+/** Options for the {@link useKeyboardShortcuts} hook. */
 export interface UseKeyboardShortcutsOptions {
   enabled?: boolean
 }
@@ -109,8 +106,12 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       }))
     )
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
+  useEffect(() => {
+    if (!enabled) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in input fields
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return
@@ -223,33 +224,27 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       }
 
       // Note: WASD keys are handled by useCameraMovement hook for camera movement
-    },
-    [
-      dimension,
-      setDimension,
-      selectedLightId,
-      setTransformMode,
-      selectLight,
-      removeLight,
-      duplicateLight,
-      toggleCinematicMode,
-      toggleCollapsed,
-      toggleLeftPanel,
-      toggleShortcuts,
-      resetCamera,
-    ]
-  )
-
-  useEffect(() => {
-    if (!enabled) {
-      return
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [enabled, handleKeyDown])
+  }, [
+    enabled,
+    dimension,
+    setDimension,
+    selectedLightId,
+    setTransformMode,
+    selectLight,
+    removeLight,
+    duplicateLight,
+    toggleCinematicMode,
+    toggleCollapsed,
+    toggleLeftPanel,
+    toggleShortcuts,
+    resetCamera,
+  ])
 }
 
 /**

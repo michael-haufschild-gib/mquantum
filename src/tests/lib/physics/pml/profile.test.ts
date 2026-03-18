@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
 import { computePMLSigmaMax, computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 
 describe('computePMLSigmaMax (legacy per-step formula)', () => {

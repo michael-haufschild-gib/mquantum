@@ -10,6 +10,8 @@
  * @module rendering/webgpu/graph/WebGPURenderGraph
  */
 
+import { logger } from '@/lib/logger'
+
 import type {
   ResourceSize,
   WebGPUCapabilities,
@@ -80,7 +82,7 @@ class RenderContextImpl implements WebGPURenderContext {
 
     while (this.resourceAliases.has(current)) {
       if (depth >= maxDepth) {
-        console.warn(`WebGPURenderGraph: Alias chain too long at '${current}' (possible cycle)`)
+        logger.warn(`WebGPURenderGraph: Alias chain too long at '${current}' (possible cycle)`)
         return current
       }
       depth++
@@ -213,9 +215,7 @@ class SetupContextImpl implements WebGPUSetupContext {
 // Render Graph
 // =============================================================================
 
-/**
- *
- */
+/** Context passed to pre-submit hooks for late-stage command buffer injection. */
 export interface WebGPUBeforeSubmitHookContext {
   device: GPUDevice
   encoder: GPUCommandEncoder
@@ -385,7 +385,7 @@ export class WebGPURenderGraph {
       })
       .catch((err) => {
         if (!this.initialized) return // Buffer destroyed by dispose() — expected
-        console.warn('[WebGPU RenderGraph] Timestamp readback failed:', err)
+        logger.warn('[WebGPU RenderGraph] Timestamp readback failed:', err)
       })
       .finally(() => {
         this.timestampReadbackInFlight = false
@@ -459,7 +459,7 @@ export class WebGPURenderGraph {
    */
   async addPass(pass: WebGPURenderPass): Promise<void> {
     if (this.passes.has(pass.id)) {
-      console.warn(`WebGPURenderGraph: Pass '${pass.id}' already exists`)
+      logger.warn(`WebGPURenderGraph: Pass '${pass.id}' already exists`)
       return
     }
 
@@ -568,7 +568,7 @@ export class WebGPURenderGraph {
     for (const [id, pass] of this.passes) {
       // Defensive: check if outputs exists and is iterable
       if (!pass.config.outputs || !Array.isArray(pass.config.outputs)) {
-        console.error(`WebGPURenderGraph: Pass '${id}' has invalid outputs:`, pass.config.outputs)
+        logger.error(`WebGPURenderGraph: Pass '${id}' has invalid outputs:`, pass.config.outputs)
         continue
       }
       for (const output of pass.config.outputs) {
@@ -598,7 +598,7 @@ export class WebGPURenderGraph {
 
     for (const [id, pass] of this.passes) {
       if (!pass.config.inputs || !Array.isArray(pass.config.inputs)) {
-        console.error(`WebGPURenderGraph: Pass '${id}' has invalid inputs:`, pass.config.inputs)
+        logger.error(`WebGPURenderGraph: Pass '${id}' has invalid inputs:`, pass.config.inputs)
         continue
       }
       for (const input of pass.config.inputs) {
@@ -641,7 +641,7 @@ export class WebGPURenderGraph {
     if (sorted.length !== this.passes.size) {
       const remaining = [...this.passes.keys()].filter((id) => !sorted.includes(id))
       remaining.sort(sortByPriority)
-      console.error(
+      logger.error(
         `WebGPURenderGraph: Cycle detected among passes (${remaining.join(', ')}); appending remaining passes by priority`
       )
       sorted.push(...remaining)
@@ -694,7 +694,7 @@ export class WebGPURenderGraph {
       try {
         stores[key] = getter()
       } catch (e) {
-        console.error(`Failed to capture store '${key}':`, e)
+        logger.error(`Failed to capture store '${key}':`, e)
       }
     }
 
@@ -744,7 +744,7 @@ export class WebGPURenderGraph {
       import.meta.env.DEV &&
       (canvasTexture.width !== this.width || canvasTexture.height !== this.height)
     ) {
-      console.warn(
+      logger.warn(
         `[RenderGraph] Dimension mismatch: canvasTexture ${canvasTexture.width}×${canvasTexture.height}, graph ${this.width}×${this.height}`
       )
     }
@@ -810,7 +810,7 @@ export class WebGPURenderGraph {
     for (const passId of this.passOrder) {
       const pass = this.passes.get(passId)
       if (!pass) {
-        if (shouldLog) console.warn(`[WebGPU RenderGraph] Pass '${passId}' not found in map`)
+        if (shouldLog) logger.warn(`[WebGPU RenderGraph] Pass '${passId}' not found in map`)
         continue
       }
 
@@ -855,7 +855,7 @@ export class WebGPURenderGraph {
           if (writtenByEnabledPass.has(outputId)) {
             passTimings.set(passId, 0)
             if (shouldLog)
-              console.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
+              logger.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
             continue
           }
 
@@ -866,7 +866,7 @@ export class WebGPURenderGraph {
             // Aliasing: output resolves to input (zero GPU cost)
             this.resourceAliases.set(outputId, inputId)
             if (shouldLog)
-              console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
+              logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
           } else {
             // Passthrough: copy input texture to output target using GPU copy
             const inputTexture = this.pool.getTexture(inputId)
@@ -892,7 +892,7 @@ export class WebGPURenderGraph {
                   { width: inputWidth, height: inputHeight }
                 )
                 if (shouldLog)
-                  console.log(
+                  logger.log(
                     `[WebGPU RenderGraph] Pass '${passId}' passthrough copy ${inputId} → ${outputId}`
                   )
               } else {
@@ -902,7 +902,7 @@ export class WebGPURenderGraph {
                   ? 'size mismatch'
                   : `format mismatch (${inputFormat} → ${outputFormat})`
                 if (shouldLog)
-                  console.log(
+                  logger.log(
                     `[WebGPU RenderGraph] Pass '${passId}' aliasing (${reason}) ${outputId} → ${inputId}`
                   )
               }
@@ -928,7 +928,7 @@ export class WebGPURenderGraph {
       try {
         pass.execute(ctx)
       } catch (e) {
-        console.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
+        logger.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
       } finally {
         if (canCollectGpuTimings) {
           const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
@@ -973,7 +973,7 @@ export class WebGPURenderGraph {
         try {
           hook(hookContext)
         } catch (error) {
-          console.error(`[WebGPU RenderGraph] beforeSubmit hook '${hookId}' failed:`, error)
+          logger.error(`[WebGPU RenderGraph] beforeSubmit hook '${hookId}' failed:`, error)
         }
       }
     }

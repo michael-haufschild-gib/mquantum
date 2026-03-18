@@ -78,7 +78,12 @@ export default defineConfig((_env) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+          // React + its internal deps (scheduler) in one chunk
+          if (
+            id.includes('node_modules/react-dom') ||
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/scheduler')
+          ) {
             return 'react-vendor'
           }
           if (id.includes('node_modules/zustand')) return 'zustand'
@@ -87,15 +92,14 @@ export default defineConfig((_env) => ({
           // Split shaders by subdomain
           if (id.includes('/rendering/webgpu/shaders/schroedinger/')) return 'shaders-schroedinger'
           if (id.includes('/rendering/webgpu/shaders/')) return 'shaders'
-          // Split rendering passes into own chunk
-          if (id.includes('/rendering/webgpu/passes/')) return 'render-passes'
-          // Split rendering core + renderers
+          // Rendering: passes + core + renderers + graph (tightly coupled via BasePass)
           if (
+            id.includes('/rendering/webgpu/passes/') ||
             id.includes('/rendering/webgpu/core/') ||
             id.includes('/rendering/webgpu/renderers/') ||
             id.includes('/rendering/webgpu/graph/')
           ) {
-            return 'render-core'
+            return 'rendering'
           }
           // Split physics/math
           if (id.includes('/lib/physics/') || id.includes('/lib/math/')) return 'physics'

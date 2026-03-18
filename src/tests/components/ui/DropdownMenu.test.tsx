@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { useDropdownStore } from '@/stores/dropdownStore'

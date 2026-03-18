@@ -9,12 +9,13 @@
  */
 
 import {
-  usePerformanceMetricsStore,
-  GRAPH_POINTS,
-  type GPUStats,
   type BufferStats,
+  type GPUStats,
+  GRAPH_POINTS,
+  usePerformanceMetricsStore,
 } from '@/stores/performanceMetricsStore'
 import { useUIStore } from '@/stores/uiStore'
+
 import type { WebGPUFrameStats } from './core/types'
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 

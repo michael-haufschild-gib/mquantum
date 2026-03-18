@@ -2,9 +2,10 @@
  * Tests for useKeyboardShortcuts hook
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useKeyboardShortcuts, getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
+import { act, renderHook } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { getShortcutLabel, SHORTCUTS, useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useRotationStore } from '@/stores/rotationStore'
@@ -156,16 +157,16 @@ describe('SHORTCUTS', () => {
     expect(SHORTCUTS.length).toBeGreaterThan(0)
 
     SHORTCUTS.forEach((shortcut) => {
-      expect(shortcut.key).toBeDefined()
-      expect(shortcut.description).toBeDefined()
+      expect(shortcut.key).toEqual(expect.any(String))
+      expect(shortcut.description).toEqual(expect.any(String))
     })
   })
 
   it('should have arrow shortcuts for dimension', () => {
     const upShortcut = SHORTCUTS.find((s) => s.key === 'ArrowUp')
     const downShortcut = SHORTCUTS.find((s) => s.key === 'ArrowDown')
-    expect(upShortcut).toBeDefined()
-    expect(downShortcut).toBeDefined()
+    expect(upShortcut).toEqual(expect.objectContaining({ key: 'ArrowUp' }))
+    expect(downShortcut).toEqual(expect.objectContaining({ key: 'ArrowDown' }))
   })
 
   it('should have WASD shortcuts for camera movement', () => {
@@ -174,14 +175,10 @@ describe('SHORTCUTS', () => {
     const sShortcut = SHORTCUTS.find((s) => s.key === 's' && !s.ctrl && !s.shift)
     const dShortcut = SHORTCUTS.find((s) => s.key === 'd' && !s.shift)
 
-    expect(wShortcut).toBeDefined()
-    expect(wShortcut?.description).toContain('forward')
-    expect(aShortcut).toBeDefined()
-    expect(aShortcut?.description).toContain('left')
-    expect(sShortcut).toBeDefined()
-    expect(sShortcut?.description).toContain('backward')
-    expect(dShortcut).toBeDefined()
-    expect(dShortcut?.description).toContain('right')
+    expect(wShortcut).toMatchObject({ description: expect.stringContaining('forward') })
+    expect(aShortcut).toMatchObject({ description: expect.stringContaining('left') })
+    expect(sShortcut).toMatchObject({ description: expect.stringContaining('backward') })
+    expect(dShortcut).toMatchObject({ description: expect.stringContaining('right') })
   })
 
   it('should have Shift+WASD shortcuts for camera rotation', () => {
@@ -190,23 +187,17 @@ describe('SHORTCUTS', () => {
     const sShiftShortcut = SHORTCUTS.find((s) => s.key === 's' && s.shift)
     const dShiftShortcut = SHORTCUTS.find((s) => s.key === 'd' && s.shift)
 
-    expect(wShiftShortcut).toBeDefined()
-    expect(wShiftShortcut?.description).toContain('Rotate')
-    expect(aShiftShortcut).toBeDefined()
-    expect(aShiftShortcut?.description).toContain('Rotate')
-    expect(sShiftShortcut).toBeDefined()
-    expect(sShiftShortcut?.description).toContain('Rotate')
-    expect(dShiftShortcut).toBeDefined()
-    expect(dShiftShortcut?.description).toContain('Rotate')
+    expect(wShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
+    expect(aShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
+    expect(sShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
+    expect(dShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
   })
 
   it('should have 0 and Shift+0 shortcuts for camera origin', () => {
     const moveToOrigin = SHORTCUTS.find((s) => s.key === '0' && !s.shift)
     const lookAtOrigin = SHORTCUTS.find((s) => s.key === '0' && s.shift)
 
-    expect(moveToOrigin).toBeDefined()
-    expect(moveToOrigin?.description).toContain('origin')
-    expect(lookAtOrigin).toBeDefined()
-    expect(lookAtOrigin?.description).toContain('origin')
+    expect(moveToOrigin).toMatchObject({ description: expect.stringContaining('origin') })
+    expect(lookAtOrigin).toMatchObject({ description: expect.stringContaining('origin') })
   })
 })

@@ -6,22 +6,48 @@
  * @module rendering/webgpu/shaders/schroedinger
  */
 
-export { schroedingerUniformsBlock, MAX_DIM, MAX_TERMS, MAX_EXTRA_DIM } from './uniforms.wgsl'
+export type { QuantumModeForShader, SchroedingerWGSLShaderConfig } from './compose'
 export { composeSchroedingerShader, composeSchroedingerVertexShader } from './compose'
-export type { SchroedingerWGSLShaderConfig, QuantumModeForShader } from './compose'
+export { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS, schroedingerUniformsBlock } from './uniforms.wgsl'
 
 // Quantum math modules (foundational math functions)
 export {
   // Core math
   complexMathBlock,
+  densityBlock,
+  densityPostMapBlock,
+  // Density field calculations
+  densityPreMapBlock,
+  EIGEN_CACHE_SAMPLES,
+  // Eigenfunction cache
+  eigenfunctionCacheBindingsBlock,
+  eigenfunctionCacheLookupBlock,
+  generateAnalyticalGradientBlock,
+  generateHOCachedDispatchBlock,
+  generateHODispatchBlock,
+  // HO ND cached variants
+  generateHoNDCachedBlock,
+  generateHoNDCachedDispatchBlock,
+  generateHoNDDispatchBlock,
+  // Hydrogen ND cached variants
+  generateHydrogenNDCachedBlock,
+  generateHydrogenNDCachedDispatchBlock,
+  generateHydrogenNDDispatchBlock,
+  generateMapPosToND,
+  getHOCachedUnrolledBlocks,
+  getHoNDBlockForDimension,
+  getHOUnrolledBlocks,
+  getHydrogenNDBlockForDimension,
   hermiteBlock,
-  laguerreBlock,
-  legendreBlock,
-  sphericalHarmonicsBlock,
   ho1dBlock,
-  // Hydrogen atom
-  hydrogenRadialBlock,
-  hydrogenNDCommonBlock,
+  hoCombined1Block,
+  hoCombined2Block,
+  hoCombined3Block,
+  hoCombined4Block,
+  hoCombined5Block,
+  hoCombined6Block,
+  hoCombined7Block,
+  hoCombined8Block,
   // HO ND variants and generators
   hoND3dBlock,
   hoND4dBlock,
@@ -32,8 +58,14 @@ export {
   hoND9dBlock,
   hoND10dBlock,
   hoND11dBlock,
-  generateHoNDDispatchBlock,
-  getHoNDBlockForDimension,
+  hoSpatial1Block,
+  hoSpatial2Block,
+  hoSpatial3Block,
+  hoSpatial4Block,
+  hoSpatial5Block,
+  hoSpatial6Block,
+  hoSpatial7Block,
+  hoSpatial8Block,
   // HO superposition variants and generators
   hoSuperposition1Block,
   hoSuperposition2Block,
@@ -43,35 +75,8 @@ export {
   hoSuperposition6Block,
   hoSuperposition7Block,
   hoSuperposition8Block,
-  hoSpatial1Block,
-  hoSpatial2Block,
-  hoSpatial3Block,
-  hoSpatial4Block,
-  hoSpatial5Block,
-  hoSpatial6Block,
-  hoSpatial7Block,
-  hoSpatial8Block,
-  hoCombined1Block,
-  hoCombined2Block,
-  hoCombined3Block,
-  hoCombined4Block,
-  hoCombined5Block,
-  hoCombined6Block,
-  hoCombined7Block,
-  hoCombined8Block,
-  getHOUnrolledBlocks,
-  generateHODispatchBlock,
-  getHOCachedUnrolledBlocks,
-  generateHOCachedDispatchBlock,
-  // HO ND cached variants
-  generateHoNDCachedBlock,
-  generateHoNDCachedDispatchBlock,
-  // Eigenfunction cache
-  eigenfunctionCacheBindingsBlock,
-  eigenfunctionCacheLookupBlock,
-  EIGEN_CACHE_SAMPLES,
-  MAX_EIGEN_FUNCS,
-  generateAnalyticalGradientBlock,
+  hydrogenFamilyFallbackBlock,
+  hydrogenNDCommonBlock,
   // Hydrogen ND variants and generators
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
@@ -82,32 +87,27 @@ export {
   hydrogenNDGen9dBlock,
   hydrogenNDGen10dBlock,
   hydrogenNDGen11dBlock,
-  generateHydrogenNDDispatchBlock,
-  getHydrogenNDBlockForDimension,
-  // Hydrogen ND cached variants
-  generateHydrogenNDCachedBlock,
-  generateHydrogenNDCachedDispatchBlock,
+  // Hydrogen atom
+  hydrogenRadialBlock,
+  laguerreBlock,
+  legendreBlock,
+  MAX_EIGEN_FUNCS,
   // Mode-switching wavefunction evaluation
   psiBlock,
   psiBlockDynamic,
-  psiBlockHarmonic,
   psiBlockDynamicHarmonic,
+  psiBlockHarmonic,
   psiBlockHydrogenND,
-  hydrogenFamilyFallbackBlock,
-  // Density field calculations
-  densityPreMapBlock,
-  generateMapPosToND,
-  densityPostMapBlock,
-  densityBlock,
+  sphericalHarmonicsBlock,
 } from './quantum'
 
 // Compute shader modules for density grid pre-computation (uncertainty boundary)
 export {
-  gridParamsBlock,
-  densityGridComputeBlock,
   composeDensityGridComputeShader,
-  type DensityGridComputeConfig,
   type ComputeQuantumMode,
+  densityGridComputeBlock,
+  type DensityGridComputeConfig,
+  gridParamsBlock,
 } from './compute'
 
 // Compute shader modules for eigenfunction cache (HO mode acceleration)

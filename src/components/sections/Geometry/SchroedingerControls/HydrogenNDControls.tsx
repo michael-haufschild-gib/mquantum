@@ -5,19 +5,21 @@
  * Extends 3D hydrogen orbitals with extra dimension quantum numbers.
  */
 
+import React, { useMemo } from 'react'
+
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import {
-  HYDROGEN_ND_PRESETS,
   getHydrogenNDPresetsWithKeysByDimension,
+  HYDROGEN_ND_PRESETS,
 } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import {
   maxAzimuthalForPrincipal,
   orbitalShapeLetter,
 } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
 import type { HydrogenNDPresetName } from '@/lib/geometry/extended/types'
-import React, { useMemo } from 'react'
+
 import type { HydrogenNDControlsProps } from './types'
 
 /**

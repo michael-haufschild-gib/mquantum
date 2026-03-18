@@ -14,6 +14,10 @@
  * @module rendering/webgpu/shaders/schroedinger/compose
  */
 
+// Color blocks
+import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
+import { hslBlock } from '../shared/color/hsl.wgsl'
+import { oklabBlock } from '../shared/color/oklab.wgsl'
 import {
   assembleShaderBlocks,
   generateConsolidatedBindGroups,
@@ -21,47 +25,40 @@ import {
   singleOutputBlock,
   type WGSLShaderConfig,
 } from '../shared/compose-helpers'
-
 // Core blocks
 import { constantsBlock } from '../shared/core/constants.wgsl'
 import { uniformsBlock } from '../shared/core/uniforms.wgsl'
-
-// Color blocks
-import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
-import { hslBlock } from '../shared/color/hsl.wgsl'
-import { oklabBlock } from '../shared/color/oklab.wgsl'
-
+// Feature blocks
+import { temporalBlock } from '../shared/features/temporal.wgsl'
 // Lighting blocks (for isosurface mode)
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
-
 // Raymarching blocks
 import { sphereIntersectBlock } from '../shared/raymarch/sphere-intersect.wgsl'
-
-// Feature blocks
-import { temporalBlock } from '../shared/features/temporal.wgsl'
-
-// Schroedinger-specific blocks
-import { schroedingerUniformsBlock } from './uniforms.wgsl'
+import type { ColorAlgorithm } from '../types'
 import {
-  generateMainBlockVolumetric,
   generateMainBlockIsosurface,
   generateMainBlockIsosurfaceTemporal,
   generateMainBlockTemporal,
+  generateMainBlockVolumetric,
   temporalMRTOutputBlock,
 } from './main.wgsl'
-
 // 2D-specific blocks
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
 import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
-import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
-import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
-
+import { generateAnalyticalGradientBlock } from './quantum/analyticalGradient.wgsl'
 // Quantum math blocks
 import { complexMathBlock } from './quantum/complex.wgsl'
+import { densityPostMapBlock, densityPreMapBlock, generateMapPosToND } from './quantum/density.wgsl'
+// Eigenfunction cache blocks (for HO mode acceleration)
+import {
+  eigenfunctionCacheBindingsBlock,
+  eigenfunctionCacheLookupBlock,
+} from './quantum/eigenfunctionCache.wgsl'
 import { hermiteBlock } from './quantum/hermite.wgsl'
 import { ho1dBlock } from './quantum/ho1d.wgsl'
 import {
+  generateHoNDDispatchBlock,
   hoND2dBlock,
   hoND3dBlock,
   hoND4dBlock,
@@ -72,27 +69,25 @@ import {
   hoND9dBlock,
   hoND10dBlock,
   hoND11dBlock,
-  generateHoNDDispatchBlock,
 } from './quantum/hoNDVariants.wgsl'
 import {
-  getHOUnrolledBlocks,
-  generateHODispatchBlock,
-} from './quantum/hoSuperpositionVariants.wgsl'
-import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from './quantum/psi.wgsl'
-import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from './quantum/density.wgsl'
-
-// Wigner phase-space blocks
-import { wignerHOBlock } from './quantum/wignerHO.wgsl'
-import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
-
-// Hydrogen blocks (conditional)
-import { laguerreBlock } from './quantum/laguerre.wgsl'
-import { legendreBlock } from './quantum/legendre.wgsl'
-import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.wgsl'
-import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
-import { hydrogenNDCommonBlock } from './quantum/hydrogenNDCommon.wgsl'
-import { hydrogenFamilyFallbackBlock } from './quantum/hydrogenFallback.wgsl'
+  generateHoNDCachedBlock,
+  generateHoNDCachedDispatchBlock,
+} from './quantum/hoNDVariants.wgsl'
 import {
+  generateHODispatchBlock,
+  getHOUnrolledBlocks,
+} from './quantum/hoSuperpositionVariants.wgsl'
+import {
+  generateHOCachedDispatchBlock,
+  getHOCachedUnrolledBlocks,
+} from './quantum/hoSuperpositionVariants.wgsl'
+import { hydrogenFamilyFallbackBlock } from './quantum/hydrogenFallback.wgsl'
+import { hydrogenNDCommonBlock } from './quantum/hydrogenNDCommon.wgsl'
+import {
+  generateHydrogenNDCachedBlock,
+  generateHydrogenNDCachedDispatchBlock,
+  generateHydrogenNDDispatchBlock,
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
   hydrogenNDGen5dBlock,
@@ -102,49 +97,41 @@ import {
   hydrogenNDGen9dBlock,
   hydrogenNDGen10dBlock,
   hydrogenNDGen11dBlock,
-  generateHydrogenNDDispatchBlock,
-  generateHydrogenNDCachedBlock,
-  generateHydrogenNDCachedDispatchBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
-
-// Eigenfunction cache blocks (for HO mode acceleration)
-import {
-  eigenfunctionCacheBindingsBlock,
-  eigenfunctionCacheLookupBlock,
-} from './quantum/eigenfunctionCache.wgsl'
-import { generateAnalyticalGradientBlock } from './quantum/analyticalGradient.wgsl'
-import {
-  generateHoNDCachedBlock,
-  generateHoNDCachedDispatchBlock,
-} from './quantum/hoNDVariants.wgsl'
-import {
-  getHOCachedUnrolledBlocks,
-  generateHOCachedDispatchBlock,
-} from './quantum/hoSuperpositionVariants.wgsl'
-
+import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
+// Hydrogen blocks (conditional)
+import { laguerreBlock } from './quantum/laguerre.wgsl'
+import { legendreBlock } from './quantum/legendre.wgsl'
+import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from './quantum/psi.wgsl'
+import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.wgsl'
+// Wigner phase-space blocks
+import { wignerHOBlock } from './quantum/wignerHO.wgsl'
+import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
+// Schroedinger-specific blocks
+import { schroedingerUniformsBlock } from './uniforms.wgsl'
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
 import {
-  generateDensityGridFragmentBindings,
-  generateAnalysisTextureBindings,
-  densityGridSamplingBlock,
   analysisTextureSamplingBlock,
+  densityGridSamplingBlock,
+  generateAnalysisTextureBindings,
+  generateDensityGridFragmentBindings,
 } from './volume/densityGridSampling.wgsl'
 import {
-  generateEmissionPreBlock,
-  generateComputeBaseColor,
-  emissionPostBlock,
   COLOR_ALG_NAMES,
+  emissionPostBlock,
+  generateComputeBaseColor,
+  generateEmissionPreBlock,
 } from './volume/emission.wgsl'
 import {
   volumeGradientBlock,
   volumeIntegrationBlock,
   volumeRaymarchGridBlock,
 } from './volume/integration.wgsl'
+import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
+import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
 import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
-
-import type { ColorAlgorithm } from '../types'
 
 /** Quantum physics mode for Schrödinger visualization */
 export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND'
@@ -199,6 +186,147 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
  * Compose complete Schrödinger fragment shader.
  * @param config
  */
+/** Select the main entry-point shader block based on rendering mode. */
+function selectMainBlock(
+  isWigner: boolean,
+  is2D: boolean,
+  isosurface: boolean,
+  enableTemporal: boolean,
+  useDensityGrid: boolean,
+  useDensityMatrix: boolean,
+  useWignerCache: boolean
+): string {
+  if (isWigner) return generateMainBlockWigner2D(useWignerCache)
+  if (is2D) return isosurface ? generateMainBlock2DIsolines() : generateMainBlock2D()
+  if (isosurface) {
+    return enableTemporal
+      ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
+      : generateMainBlockIsosurface({ useDensityGrid })
+  }
+  return enableTemporal
+    ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
+    : generateMainBlockVolumetric({ useDensityGrid })
+}
+
+/** Build WGSL compile-time defines and human-readable feature tags. */
+function buildShaderDefinesAndFeatures(flags: {
+  dimension: number
+  actualDim: number
+  is2D: boolean
+  isWigner: boolean
+  enableTemporal: boolean
+  includeHydrogen: boolean
+  includeHydrogenND: boolean
+  hydrogenNDDimension: number
+  useUnrolledHO: boolean
+  termCount: number | undefined
+  useCache: boolean
+  useAnalyticalGradient: boolean
+  useRobustEigenInterpolation: boolean
+  quantumMode: string
+  isosurface: boolean
+  nodal: boolean
+  phaseMateriality: boolean
+  interference: boolean
+  uncertaintyBoundary: boolean
+  colorAlgorithm: number
+  isDualChannel: boolean
+  useDensityGrid: boolean
+  densityGridHasPhase: boolean
+  densityGridSize: number
+  isFreeScalar: boolean
+  isPauli: boolean
+  useWignerCache: boolean
+}): { defines: string[]; features: string[] } {
+  const defines: string[] = []
+  const features: string[] = []
+
+  defines.push(`const DIMENSION: i32 = ${flags.dimension};`)
+  defines.push(`const ACTUAL_DIM: i32 = ${flags.actualDim};`)
+  defines.push(`const IS_2D: bool = ${flags.is2D};`)
+  defines.push(`const IS_WIGNER: bool = ${flags.isWigner};`)
+  features.push(`${flags.dimension}D Quantum`)
+
+  if (flags.enableTemporal) {
+    defines.push('const TEMPORAL_ENABLED: bool = true;')
+    features.push('Temporal Accumulation')
+  } else {
+    defines.push('const TEMPORAL_ENABLED: bool = false;')
+  }
+
+  defines.push('const SKIP_DENSITY_EMPHASIS: bool = false;')
+  defines.push(`const HYDROGEN_MODE_ENABLED: bool = ${flags.includeHydrogen};`)
+  if (flags.includeHydrogenND) {
+    defines.push('const HYDROGEN_ND_MODE_ENABLED: bool = true;')
+    defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${flags.hydrogenNDDimension};`)
+  } else {
+    defines.push('const HYDROGEN_ND_MODE_ENABLED: bool = false;')
+  }
+
+  if (flags.useUnrolledHO && flags.termCount) {
+    defines.push('const HO_UNROLLED: bool = true;')
+    defines.push(`const HO_TERM_COUNT: i32 = ${flags.termCount};`)
+  } else {
+    defines.push('const HO_UNROLLED: bool = false;')
+  }
+
+  if (flags.useCache) {
+    defines.push('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    features.push('Eigenfunction Cache')
+  } else {
+    defines.push('const USE_EIGENFUNCTION_CACHE: bool = false;')
+  }
+  defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${flags.useAnalyticalGradient};`)
+  defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${flags.useRobustEigenInterpolation};`)
+  defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
+
+  if (flags.quantumMode === 'hydrogenND') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
+    features.push('Hydrogen ND')
+  } else {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
+    features.push('Harmonic Oscillator')
+  }
+
+  if (flags.isWigner) {
+    features.push('Wigner Phase-Space Mode')
+  } else if (flags.is2D) {
+    features.push(flags.isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
+  } else if (flags.isosurface) {
+    features.push('Isosurface Mode')
+  } else {
+    features.push('Volumetric Mode')
+  }
+
+  if (!flags.is2D) features.push('Beer-Lambert')
+
+  defines.push(`const FEATURE_NODAL: bool = ${flags.nodal};`)
+  defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${flags.phaseMateriality};`)
+  defines.push(`const FEATURE_INTERFERENCE: bool = ${flags.interference};`)
+  defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${flags.uncertaintyBoundary};`)
+  defines.push(`const COLOR_ALGORITHM: i32 = ${flags.colorAlgorithm};`)
+  defines.push(`const IS_DUAL_CHANNEL: bool = ${flags.isDualChannel};`)
+  defines.push(`const USE_DENSITY_GRID: bool = ${flags.useDensityGrid};`)
+  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${flags.densityGridHasPhase};`)
+  defines.push(`const DENSITY_GRID_SIZE: f32 = ${flags.densityGridSize}.0;`)
+  defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
+  defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
+
+  if (flags.useDensityGrid) features.push('Density Grid Raymarching')
+  if (flags.isWigner && flags.useWignerCache) features.push('Wigner Cache')
+
+  return { defines, features }
+}
+
+/**
+ * Compose a complete Schrödinger fragment shader from modular WGSL blocks.
+ *
+ * Selects quantum mode blocks (HO/hydrogen), rendering pipeline (2D/volumetric/isosurface),
+ * and optional features (eigenfunction cache, density grid, Wigner) based on the config.
+ *
+ * @param config - Shader composition configuration
+ * @returns Assembled WGSL source, module names, and human-readable feature tags
+ */
 export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig): {
   wgsl: string
   modules: string[]
@@ -230,167 +358,66 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     overrides = [],
   } = config
 
-  const defines: string[] = []
-  const features: string[] = []
-
-  // Compile-time dimension
-  // For HO: actualDim matches dimension (2-11). For hydrogen: always at least 3.
-  // Wigner mode uses the 2D pipeline but with the full ND quantum system
+  // Derived shader flags
   const is2D = dimension === 2 || isWigner
   const isHydrogenFamily = quantumMode === 'hydrogenND'
-  // Wigner: keep full ND dimension for quantum evaluation even though pipeline is 2D
-  const actualDim = isHydrogenFamily
-    ? Math.min(Math.max(dimension, 3), 11)
-    : isWigner
+  const actualDim =
+    isHydrogenFamily || isWigner
       ? Math.min(Math.max(dimension, 3), 11)
       : Math.min(Math.max(dimension, 2), 11)
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily
-
-  // For hydrogenND mode, include only the specific dimension block
   const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
-
-  // Determine if we should use unrolled HO superposition
   const useUnrolledHO = includeHarmonic && termCount !== undefined
-
-  // Eigenfunction cache is only valid for 3D volumetric/isosurface pipelines.
-  // In 2D/Wigner pipelines, group(2) bindings 2/3 are reserved for Wigner cache texture/sampler.
   const useCache = useEigenfunctionCache && !is2D
-  // Analytical gradient: for pure HO mode (all dimensions are HO eigenfunctions).
-  // HO momentum uses CPU uniform transform (1/ω), so gradient d/dx becomes d/dk automatically.
   const useAnalyticalGradient = useCache && includeHarmonic && useAnalyticalGradientFlag
   const useRobustEigenInterpolation = useCache && useRobustEigenInterpolationFlag
-
-  // Add dimension define
-  defines.push(`const DIMENSION: i32 = ${dimension};`)
-  defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
-  defines.push(`const IS_2D: bool = ${is2D};`)
-  defines.push(`const IS_WIGNER: bool = ${isWigner};`)
-  features.push(`${dimension}D Quantum`)
-
-  // Add temporal define (for volumetric and isosurface modes)
-  if (enableTemporal) {
-    defines.push('const TEMPORAL_ENABLED: bool = true;')
-    features.push('Temporal Accumulation')
-  } else {
-    defines.push('const TEMPORAL_ENABLED: bool = false;')
-  }
-
-  // Fragment shader always applies uncertainty emphasis per-pixel (not baked into grid)
-  defines.push('const SKIP_DENSITY_EMPHASIS: bool = false;')
-
-  // Add quantum mode defines
-  if (includeHydrogen) {
-    defines.push('const HYDROGEN_MODE_ENABLED: bool = true;')
-  } else {
-    defines.push('const HYDROGEN_MODE_ENABLED: bool = false;')
-  }
-  if (includeHydrogenND) {
-    defines.push('const HYDROGEN_ND_MODE_ENABLED: bool = true;')
-    defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${hydrogenNDDimension};`)
-  } else {
-    defines.push('const HYDROGEN_ND_MODE_ENABLED: bool = false;')
-  }
-
-  // Add HO unrolled define when using compile-time term count
-  if (useUnrolledHO && termCount) {
-    defines.push('const HO_UNROLLED: bool = true;')
-    defines.push(`const HO_TERM_COUNT: i32 = ${termCount};`)
-  } else {
-    defines.push('const HO_UNROLLED: bool = false;')
-  }
-
-  // Add eigenfunction cache defines
-  if (useCache) {
-    defines.push('const USE_EIGENFUNCTION_CACHE: bool = true;')
-    features.push('Eigenfunction Cache')
-  } else {
-    defines.push('const USE_EIGENFUNCTION_CACHE: bool = false;')
-  }
-  // Analytical gradient: only for pure HO mode (hydrogen ND keeps tetrahedral for 3D core)
-  defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${useAnalyticalGradient};`)
-  defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${useRobustEigenInterpolation};`)
-
-  // Radial probability overlay: compile-time guard (hydrogen only)
-  defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${includeHydrogen};`)
-
-  // Add quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenND') {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
-    features.push('Hydrogen ND')
-  } else {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
-    features.push('Harmonic Oscillator')
-  }
-
-  if (isWigner) {
-    features.push('Wigner Phase-Space Mode')
-  } else if (is2D) {
-    features.push(isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
-  } else if (isosurface) {
-    features.push('Isosurface Mode')
-  } else {
-    features.push('Volumetric Mode')
-  }
-
-  if (!is2D) {
-    features.push('Beer-Lambert')
-  }
-
-  defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
-  defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
-  defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
-  defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
-  // Compile-time color algorithm selection used by phase channel routing.
-  defines.push(`const COLOR_ALGORITHM: i32 = ${colorAlgorithm};`)
-  // Dual-channel density: R and G carry separate densities (Dirac particle/antiparticle,
-  // Pauli spin-up/down, Pauli spin-expectation). Raymarcher sums R+G for opacity.
   const isDualChannel = [23, 24, 25].includes(colorAlgorithm)
-  defines.push(`const IS_DUAL_CHANNEL: bool = ${isDualChannel};`)
-
-  // Density grid defines: use 3D texture for hydrogen raymarching
-  defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)
-  // Phase data (logRho, spatialPhase) available only when rgba16float format is used.
-  // r16float stores only rho in the R channel; G/B/A are 0.
-  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${densityGridHasPhase};`)
-  // Grid resolution for gradient central-difference step size
-  defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
-  // Free scalar field: cubic lattice geometry, no Gaussian envelope optimization
-  defines.push(`const IS_FREE_SCALAR: bool = ${isFreeScalar};`)
-  // Pauli spinor: alpha channel is total density, not potential overlay
-  defines.push(`const IS_PAULI: bool = ${isPauli};`)
-  if (useDensityGrid) {
-    features.push('Density Grid Raymarching')
-  }
-  if (isWigner && useWignerCache) {
-    features.push('Wigner Cache')
-  }
-
-  // Color module dependency flags (compile-time specialization)
-  // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab.
-  // 3,4,7,8,9,10,11 are HSL-based and do not need cosine/oklab helper blocks.
   const needsCosine = [1, 2].includes(colorAlgorithm)
   const needsOklab = [0, 6].includes(colorAlgorithm)
+
+  // Build compile-time defines and feature tags
+  const { defines, features } = buildShaderDefinesAndFeatures({
+    dimension,
+    actualDim,
+    is2D,
+    isWigner,
+    enableTemporal,
+    includeHydrogen,
+    includeHydrogenND,
+    hydrogenNDDimension,
+    useUnrolledHO,
+    termCount,
+    useCache,
+    useAnalyticalGradient,
+    useRobustEigenInterpolation,
+    quantumMode,
+    isosurface,
+    nodal,
+    phaseMateriality,
+    interference,
+    uncertaintyBoundary,
+    colorAlgorithm,
+    isDualChannel,
+    useDensityGrid,
+    densityGridHasPhase,
+    densityGridSize,
+    isFreeScalar,
+    isPauli,
+    useWignerCache,
+  })
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
 
-  // Select main block based on mode
-  // Wigner: dedicated phase-space evaluation (2D pipeline, ND quantum system)
-  // 2D mode: direct evaluation (no raymarching). Isolines = 2D isosurface equivalent.
-  // 3D+ modes: temporal modes output MRT (color + world position)
-  const selectedMainBlock = isWigner
-    ? generateMainBlockWigner2D(useWignerCache)
-    : is2D
-      ? isosurface
-        ? generateMainBlock2DIsolines()
-        : generateMainBlock2D()
-      : isosurface
-        ? enableTemporal
-          ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
-          : generateMainBlockIsosurface({ useDensityGrid })
-        : enableTemporal
-          ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
-          : generateMainBlockVolumetric({ useDensityGrid })
+  const selectedMainBlock = selectMainBlock(
+    isWigner,
+    is2D,
+    isosurface,
+    enableTemporal,
+    useDensityGrid,
+    useDensityMatrix,
+    useWignerCache
+  )
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {

@@ -8,7 +8,9 @@
  * @see src/components/sections/Geometry/ObjectSettingsSection.tsx for usage
  */
 
-import { lazy, type ComponentType } from 'react'
+import { type ComponentType, lazy } from 'react'
+
+import { logger } from '@/lib/logger'
 
 /**
  * Cache for lazily loaded components.
@@ -55,7 +57,7 @@ export function getControlsComponent(componentKey: string): ComponentType<unknow
   // Check if we have a loader for this key
   const loader = componentLoaders[componentKey]
   if (!loader) {
-    console.warn(`[Registry] No component loader found for key: ${componentKey}`)
+    logger.warn(`[Registry] No component loader found for key: ${componentKey}`)
     return null
   }
 

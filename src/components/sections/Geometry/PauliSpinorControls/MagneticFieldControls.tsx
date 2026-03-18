@@ -8,8 +8,9 @@
  */
 
 import React from 'react'
-import { Slider } from '@/components/ui/Slider'
+
 import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
 import type { PauliFieldType } from '@/lib/geometry/extended/types'
 
 const FIELD_TYPE_OPTIONS: { value: PauliFieldType; label: string }[] = [

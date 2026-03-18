@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/geometry/extended/types'
+
 import type { SchroedingerSliceActions } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 

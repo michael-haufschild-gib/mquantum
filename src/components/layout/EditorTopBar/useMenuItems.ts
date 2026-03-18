@@ -4,10 +4,12 @@
  * These hooks memoize menu item construction to prevent unnecessary re-renders.
  */
 
+import { useMemo } from 'react'
+
 import type { ToastType } from '@/contexts/ToastContextInstance'
 import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
 import type { ThemeAccent, ThemeMode } from '@/stores/themeStore'
-import { useMemo } from 'react'
+
 import {
   buildAccentItems,
   buildExampleSceneItems,

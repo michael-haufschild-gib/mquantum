@@ -1,16 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// Heavy computation: FFTs and Gaussian broadening on 64^3 grids.
+// Runs ~3s in isolation, can exceed the 5s default under CI load.
+vi.setConfig({ testTimeout: 15_000 })
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
-import { PASSTHROUGH_KSPACE_VIZ, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import {
+  applyBroadening,
+  applyExposureTransfer,
+  buildKSpaceDisplayTextures,
+  packDisplayTextures,
+  projectToDisplayGrid,
+} from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
-import {
-  projectToDisplayGrid,
-  applyExposureTransfer,
-  applyBroadening,
-  packDisplayTextures,
-  buildKSpaceDisplayTextures,
-} from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 
 // ============================================================================
 // Helpers

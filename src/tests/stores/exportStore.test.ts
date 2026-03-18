@@ -2,10 +2,11 @@
  * Tests for exportStore
  */
 
-import { getCompressionFactor, getRecommendedBitrate, useExportStore } from '@/stores/exportStore'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import type { ExportResolution } from '@/stores/exportStore'
 import type { TextOverlaySettings } from '@/stores/exportStore'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getCompressionFactor, getRecommendedBitrate, useExportStore } from '@/stores/exportStore'
 
 // Mock URL.createObjectURL and URL.revokeObjectURL
 const mockCreateObjectURL = vi.fn(() => 'blob:mock-url')

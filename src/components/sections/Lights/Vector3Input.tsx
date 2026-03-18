@@ -5,12 +5,11 @@
  * Used for light position and rotation inputs.
  */
 
-import React, { memo, useCallback, useState, useEffect, useRef } from 'react'
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
+
 import { Input } from '@/components/ui/Input'
 
-/**
- *
- */
+/** Props for the 3D vector (x, y, z) input group. */
 export interface Vector3InputProps {
   label: string
   value: [number, number, number]

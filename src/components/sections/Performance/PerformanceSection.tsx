@@ -3,18 +3,18 @@
  * Top-level sidebar section for performance optimization controls
  */
 
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import React from 'react'
-import { useShallow } from 'zustand/react/shallow'
+
 import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
 import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
-/**
- *
- */
+/** Props for the rendering performance controls section. */
 export interface PerformanceSectionProps {
   defaultOpen?: boolean
 }

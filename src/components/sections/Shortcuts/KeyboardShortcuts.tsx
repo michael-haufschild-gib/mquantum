@@ -4,11 +4,10 @@
  */
 
 import React from 'react'
-import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts'
 
-/**
- *
- */
+import { getShortcutLabel, SHORTCUTS } from '@/hooks/useKeyboardShortcuts'
+
+/** Props for the keyboard shortcuts display table. */
 export interface KeyboardShortcutsProps {
   className?: string
 }

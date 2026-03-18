@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { MIN_DIMENSION, MAX_DIMENSION } from '@/constants/dimension'
+import { describe, expect, it } from 'vitest'
+
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 describe('dimension constants', () => {
   it('MIN_DIMENSION is 2', () => {

@@ -1,22 +1,22 @@
+import React, { useEffect, useSyncExternalStore } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+import FullscreenIcon from '@/assets/icons/enlarge.svg?react'
+// SVGR icon imports
+import CinematicIcon from '@/assets/icons/film.svg?react'
+import PerfIcon from '@/assets/icons/perf.svg?react'
+import TargetIcon from '@/assets/icons/target.svg?react'
+import SoundOnIcon from '@/assets/icons/volume-high.svg?react'
+import SoundOffIcon from '@/assets/icons/volume-mute2.svg?react'
+import WaveIcon from '@/assets/icons/wave.svg?react'
+import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { useAnimationStore } from '@/stores/animationStore'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
-import { useUIStore, type UISlice } from '@/stores/uiStore'
-import React, { useEffect, useSyncExternalStore } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { Button } from '@/components/ui/Button'
-
-// SVGR icon imports
-import CinematicIcon from '@/assets/icons/film.svg?react'
-import FullscreenIcon from '@/assets/icons/enlarge.svg?react'
-import PerfIcon from '@/assets/icons/perf.svg?react'
-import SoundOffIcon from '@/assets/icons/volume-mute2.svg?react'
-import SoundOnIcon from '@/assets/icons/volume-high.svg?react'
-import TargetIcon from '@/assets/icons/target.svg?react'
-import WaveIcon from '@/assets/icons/wave.svg?react'
+import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
+import { type UISlice, useUIStore } from '@/stores/uiStore'
 
 interface TopBarControlsProps {
   compact?: boolean
