@@ -94,8 +94,8 @@ ${outputBlock}
 export function generateVertexMain(effects: { vignette: boolean }): string {
   const outputAssignments = [
     'output.position = clipPos;',
-    '// Force to background (z = w)',
-    'output.position.z = output.position.w;',
+    '// Force to background: reverse-Z far plane = 0',
+    'output.position.z = 0.0;',
     '',
     'output.worldDirection = rotationMatrix * normalize(worldPos);',
   ]

@@ -91,9 +91,9 @@ fn loadTexel(uv: vec2f) -> vec4f {
   return textureLoad(tInput, coord, 0);
 }
 
-// Convert perspective depth to view Z
+// Convert reverse-Z perspective depth to view-space Z
 fn perspectiveDepthToViewZ(depth: f32, near: f32, far: f32) -> f32 {
-  return (near * far) / ((far - near) * depth - far);
+  return -(near * far) / (depth * (far - near) + near);
 }
 
 @fragment
@@ -105,22 +105,22 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   if (uniforms.bufferType == 1) {
     let depth = texel.x;
 
-    // Mode 0: Raw Depth (Inverted: near=white, far=black)
+    // Mode 0: Raw Depth (near=white, far=black — natural with reverse-Z)
     if (uniforms.depthMode == 0) {
-      return vec4f(vec3f(1.0 - depth), 1.0);
+      return vec4f(vec3f(depth), 1.0);
     }
 
-    let viewZ = -perspectiveDepthToViewZ(depth, uniforms.nearClip, uniforms.farClip);
+    let viewZ = perspectiveDepthToViewZ(depth, uniforms.nearClip, uniforms.farClip);
 
     // Mode 1: Linear Depth (normalized)
     if (uniforms.depthMode == 1) {
-      let normalized = (viewZ - uniforms.nearClip) / (uniforms.farClip - uniforms.nearClip);
+      let normalized = (-viewZ - uniforms.nearClip) / (uniforms.farClip - uniforms.nearClip);
       return vec4f(vec3f(clamp(normalized, 0.0, 1.0)), 1.0);
     }
 
     // Mode 2: Focus Zones (Green=In Focus, Red=Behind, Blue=In Front)
     if (uniforms.depthMode == 2) {
-      let diff = viewZ - uniforms.focus;
+      let diff = -viewZ - uniforms.focus;
       let absDiff = abs(diff);
       let safeFocusRange = max(uniforms.focusRange, 0.0001);
 

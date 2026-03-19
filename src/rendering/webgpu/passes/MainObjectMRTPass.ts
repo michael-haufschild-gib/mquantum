@@ -68,7 +68,7 @@ export interface MainObjectMRTPassConfig {
   layers?: number[]
   /** Whether to clear depth buffer */
   clearDepth?: boolean
-  /** Depth clear value (default: 1.0) */
+  /** Depth clear value (default: 0.0, reverse-Z) */
   depthClearValue?: number
 }
 
@@ -135,7 +135,7 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     this.passConfig = config
     this.layers = config.layers ?? null
     this.clearDepth = config.clearDepth ?? true
-    this.depthClearValue = config.depthClearValue ?? 1.0
+    this.depthClearValue = config.depthClearValue ?? 0.0
   }
 
   /**

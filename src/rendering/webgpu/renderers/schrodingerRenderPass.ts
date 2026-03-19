@@ -128,7 +128,7 @@ function encode3DRenderPass(
           view: depthView,
           depthLoadOp: 'clear' as const,
           depthStoreOp: 'store' as const,
-          depthClearValue: 1.0,
+          depthClearValue: 0.0,
         }
       : undefined,
   })

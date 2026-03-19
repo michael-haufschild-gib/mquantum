@@ -362,7 +362,7 @@ async function createSchrodingerPipelineImpl(
           : {
               format: 'depth24plus' as GPUTextureFormat,
               depthWriteEnabled: true,
-              depthCompare: 'less' as GPUCompareFunction,
+              depthCompare: 'greater' as GPUCompareFunction,
             },
     })
   }

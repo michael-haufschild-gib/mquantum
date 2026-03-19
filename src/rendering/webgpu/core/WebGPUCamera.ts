@@ -115,8 +115,9 @@ function writeLookAtMatrix(
 }
 
 /**
- * Create a perspective projection matrix (column-major).
- * Uses reverse-Z for better depth precision (common in modern renderers).
+ * Create a reverse-Z perspective projection matrix (column-major).
+ * Maps near plane to depth 1 and far plane to depth 0, concentrating
+ * floating-point precision near the camera where it matters most.
  *
  * @param fovY - Vertical field of view in degrees
  * @param aspect - Aspect ratio (width / height)
@@ -132,7 +133,7 @@ function writePerspectiveMatrix(
 ): void {
   const fovRad = (fovY * Math.PI) / 180
   const f = 1.0 / Math.tan(fovRad / 2)
-  const nf = 1 / (near - far)
+  const rangeInv = 1 / (far - near)
 
   out[0] = f / aspect
   out[1] = 0
@@ -144,11 +145,11 @@ function writePerspectiveMatrix(
   out[7] = 0
   out[8] = 0
   out[9] = 0
-  out[10] = far * nf
+  out[10] = near * rangeInv
   out[11] = -1
   out[12] = 0
   out[13] = 0
-  out[14] = near * far * nf
+  out[14] = far * near * rangeInv
   out[15] = 0
 }
 

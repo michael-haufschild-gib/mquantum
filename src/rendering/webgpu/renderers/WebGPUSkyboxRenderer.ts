@@ -250,7 +250,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       depthStencil: {
         format: 'depth24plus',
         depthWriteEnabled: false,
-        depthCompare: 'less-equal', // Skybox renders at far plane
+        depthCompare: 'greater-equal', // Skybox renders at far plane (reverse-Z: far = 0)
       },
     })
 
@@ -691,7 +691,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
             view: depthView,
             depthLoadOp: 'clear',
             depthStoreOp: 'store',
-            depthClearValue: 1.0,
+            depthClearValue: 0.0,
           }
         : undefined,
     })

@@ -60,10 +60,10 @@ fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
   return viewPos.xyz;
 }
 
-// Linearize depth for better precision - WebGPU uses [0, 1] depth range
+// Linearize reverse-Z depth to view distance
+// Reverse-Z maps near→1, far→0 for better floating-point precision
 fn linearizeDepth(depth: f32) -> f32 {
-  // WebGPU depth is already in [0, 1], use the correct formula
-  return (uniforms.near * uniforms.far) / (uniforms.far - depth * (uniforms.far - uniforms.near));
+  return (uniforms.near * uniforms.far) / (depth * (uniforms.far - uniforms.near) + uniforms.near);
 }
 
 @fragment

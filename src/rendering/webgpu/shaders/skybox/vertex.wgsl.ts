@@ -64,8 +64,8 @@ struct VertexOutput {
 export function composeSkyboxVertexShader(effects: SkyboxEffects): string {
   const outputAssignments = [
     'output.position = clipPos;',
-    '// Force to background (z = w)',
-    'output.position.z = output.position.w;',
+    '// Force to background: reverse-Z far plane = 0',
+    'output.position.z = 0.0;',
     '',
     'output.worldDirection = vertexUniforms.rotationMatrix * normalize(worldPos);',
   ]

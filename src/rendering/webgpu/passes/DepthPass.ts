@@ -70,15 +70,16 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
-// Convert perspective depth to linear view-space Z
+// Convert reverse-Z perspective depth to view-space Z
+// Reverse-Z maps near→1, far→0 for better floating-point precision
 fn perspectiveDepthToViewZ(depth: f32, near: f32, far: f32) -> f32 {
-  return (near * far) / ((far - near) * depth - far);
+  return -(near * far) / (depth * (far - near) + near);
 }
 
-// Linearize depth to 0-1 range based on near/far planes
+// Linearize reverse-Z depth to 0-1 range based on near/far planes
 fn linearizeDepth(depth: f32, near: f32, far: f32) -> f32 {
-  let viewZ = -perspectiveDepthToViewZ(depth, near, far);
-  return (viewZ - near) / (far - near);
+  let viewZ = perspectiveDepthToViewZ(depth, near, far);
+  return (-viewZ - near) / (far - near);
 }
 
 // Pack depth into RGBA (standard RGBA depth packing)
