@@ -14,6 +14,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -643,6 +644,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       this.prefixMass = null
       this.totalMass = 0
       this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
+      useDensityDiagnosticsStore.getState().pushSnapshot({
+        maxDensity: 0,
+        totalDensityMass: 0,
+        activeVoxelCount: 0,
+        centerDensity: 0,
+        gridSize: this.gridSize,
+        worldBound: this.worldBound,
+      })
       return
     }
 
@@ -656,6 +665,22 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     }
     this.totalMass = cumulativeMass
     this.recomputeUncertaintyThresholdFromDistribution()
+
+    // Push density diagnostics for GPU correctness oracle (e2e tests)
+    const half = Math.floor(this.gridSize / 2)
+    const centerZ = half * this.gridSize * texelsPerRow
+    const centerY = half * texelsPerRow
+    const centerOffset = (centerZ + centerY + half) * this.readbackTexelStrideHalfs
+    const centerDensity = this.decodeFloat16(halfView[centerOffset] ?? 0)
+
+    useDensityDiagnosticsStore.getState().pushSnapshot({
+      maxDensity: this.sortedRhoValues[0] ?? 0,
+      totalDensityMass: cumulativeMass,
+      activeVoxelCount: count,
+      centerDensity,
+      gridSize: this.gridSize,
+      worldBound: this.worldBound,
+    })
   }
 
   /**
