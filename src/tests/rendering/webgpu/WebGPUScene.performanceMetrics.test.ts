@@ -31,6 +31,11 @@ describe('WebGPUScene frame metric collection', () => {
         lines: 0,
         points: 0,
       },
+      cpuBreakdown: {
+        setupMs: 0.5,
+        passesMs: 15.0,
+        submitMs: 1.17,
+      },
     }
 
     const graph = {

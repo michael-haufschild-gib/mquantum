@@ -1,22 +1,16 @@
 /**
- * Render pass setup, configuration, and lifecycle for the WebGPU scene.
+ * Render pass setup, cleanup, and lifecycle for the WebGPU scene.
  *
- * Contains pass configuration types, pass setup/cleanup functions,
- * config extraction and normalization helpers, and the object renderer factory.
+ * Pass construction, graph resource registration, and warm-swap logic.
+ * Config types and normalization live in scenePassConfig.ts.
  *
  * @module rendering/webgpu/scenePassSetup
  */
 
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import {
-  COLOR_ALGORITHM_TO_INT,
-  type ColorAlgorithm as PaletteColorAlgorithm,
-  getAvailableColorAlgorithms,
-} from '@/rendering/shaders/palette/types'
-import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 
-import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
+import type { WebGPURenderPass } from './core/types'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { BloomPass } from './passes/BloomPass'
 import { BufferPreviewPass } from './passes/BufferPreviewPass'
@@ -26,322 +20,37 @@ import { FrameBlendingPass } from './passes/FrameBlendingPass'
 import { FXAAPass } from './passes/FXAAPass'
 import { LightGizmoPass } from './passes/LightGizmoPass'
 import { PaperTexturePass } from './passes/PaperTexturePass'
-// Passes
 import { ScenePass } from './passes/ScenePass'
 import { SMAAPass } from './passes/SMAAPass'
 import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
 import { ToScreenPass } from './passes/ToScreenPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
-// Object Renderers
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
 import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
+import {
+  computeCasSharpnessFromRenderScale,
+  type PassConfig,
+  resolveColorAlgorithmInt,
+} from './scenePassConfig'
 import { parseHexColorToLinearRgb } from './utils/color'
-import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Arguments for frame execution and metrics collection. */
-export interface FrameMetricsArgs {
-  graph: WebGPURenderGraph
-  collector: WebGPUStatsCollector
-  deltaTime: number
-  size: { width: number; height: number }
-  dpr: number
-}
-
-/** Full pass configuration controlling which render passes are enabled and how they compile. */
-export interface PassConfig {
-  objectType: ObjectType
-  dimension: number
-  bloomEnabled: boolean
-  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  paperEnabled: boolean
-  frameBlendingEnabled: boolean
-  isosurface: boolean
-  quantumMode:
-    | 'harmonicOscillator'
-    | 'hydrogenND'
-    | 'freeScalarField'
-    | 'tdseDynamics'
-    | 'becDynamics'
-    | 'diracEquation'
-  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  nodalEnabled: boolean
-  phaseMaterialityEnabled: boolean
-  interferenceEnabled: boolean
-  uncertaintyBoundaryEnabled: boolean
-  temporalReprojectionEnabled: boolean
-  eigenfunctionCacheEnabled: boolean
-  analyticalGradientEnabled: boolean
-  fastEigenInterpolationEnabled: boolean
-  renderResolutionScale?: number
-  colorAlgorithm: PaletteColorAlgorithm
-  diracFieldView?: string
-  pauliFieldView?: string
-  representation: 'position' | 'momentum' | 'wigner'
-  openQuantumEnabled: boolean
-  skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
-  backgroundColor: string
-}
-
-/** Subset of PassConfig fields that trigger Schroedinger renderer rebuild when changed. */
-export interface SchrodingerPassConfig {
-  objectType: ObjectType
-  dimension: number
-  quantumMode:
-    | 'harmonicOscillator'
-    | 'hydrogenND'
-    | 'freeScalarField'
-    | 'tdseDynamics'
-    | 'becDynamics'
-    | 'diracEquation'
-  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  colorAlgorithm: PaletteColorAlgorithm
-  isosurface: boolean
-  nodalEnabled: boolean
-  phaseMaterialityEnabled: boolean
-  interferenceEnabled: boolean
-  uncertaintyBoundaryEnabled: boolean
-  representation: 'position' | 'momentum' | 'wigner'
-  eigenfunctionCacheEnabled: boolean
-  analyticalGradientEnabled: boolean
-  fastEigenInterpolationEnabled: boolean
-  temporalReprojectionEnabled: boolean
-  openQuantumEnabled: boolean
-}
-
-/** Subset of PassConfig fields that trigger post-processing pass rebuild when changed. */
-export interface PPPassConfig {
-  bloomEnabled: boolean
-  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  paperEnabled: boolean
-  frameBlendingEnabled: boolean
-  skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
-  temporalReprojectionEnabled: boolean
-}
-
-interface ScenePassBackgroundColorUpdateArgs {
-  graph: Pick<WebGPURenderGraph, 'getPass'>
-  skyboxEnabled: boolean
-  backgroundColor: string
-}
-
-interface ToScreenPassSharpnessUpdateArgs {
-  graph: Pick<WebGPURenderGraph, 'getPass'>
-  renderResolutionScale: number
-}
-
-// ============================================================================
-// Frame Metrics
-// ============================================================================
-
-/**
- * Execute one render-graph frame and publish the resulting metrics to the
- * performance monitor store.
- */
-export function executeFrameAndCollectMetrics({
-  graph,
-  collector,
-  deltaTime,
-  size,
-  dpr,
-}: FrameMetricsArgs): WebGPUFrameStats {
-  const cpuStartMs = performance.now()
-  const frameStats = graph.execute(deltaTime)
-  const cpuTimeMs = performance.now() - cpuStartMs
-  collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
-  return frameStats
-}
-
-// ============================================================================
-// Config Normalization & Extraction
-// ============================================================================
-
-/** Map a color algorithm to the Pauli writeGrid fieldView that encodes matching channels. */
-export function pauliFieldViewForColorAlgorithm(algo: string): string {
-  switch (algo) {
-    case 'pauliSpinDensity':
-      return 'spinDensity'
-    case 'pauliSpinExpectation':
-      return 'spinExpectation'
-    case 'pauliCoherence':
-      return 'coherence'
-    default:
-      return 'totalDensity'
-  }
-}
-
-/** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */
-export function normalizeColorAlgorithmForQuantumMode(
-  quantumMode: PassConfig['quantumMode'],
-  colorAlgorithm: PaletteColorAlgorithm,
-  openQuantumEnabled: boolean = false,
-  diracFieldView?: string,
-  _pauliFieldView?: string,
-  objectType: string = 'schroedinger'
-): PaletteColorAlgorithm {
-  if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
-    return 'particleAntiparticle'
-  }
-
-  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled, objectType).some(
-    (option) => option.value === colorAlgorithm
-  )
-  if (isAvailable) return colorAlgorithm
-
-  if (openQuantumEnabled) return 'purityMap'
-  if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
-  if (
-    quantumMode === 'tdseDynamics' ||
-    quantumMode === 'becDynamics' ||
-    quantumMode === 'freeScalarField' ||
-    quantumMode === 'diracEquation'
-  ) {
-    return 'phaseDensity'
-  }
-  return 'radialDistance'
-}
-
-/** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
-export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
-  const isFreeScalar = config.quantumMode === 'freeScalarField'
-  const isTdse = config.quantumMode === 'tdseDynamics'
-  const isBec = config.quantumMode === 'becDynamics'
-  const isDirac = config.quantumMode === 'diracEquation'
-  const isPauli = config.objectType === 'pauliSpinor'
-  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
-  // 2D pipelines (dim=2 or Wigner) disable temporal, eigenfunction cache, etc.
-  // Must match applyModeOverrides in rendererConfigUtils.ts
-  const is2D = !isComputeMode && (config.dimension === 2 || config.representation === 'wigner')
-  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
-    config.quantumMode,
-    config.colorAlgorithm,
-    config.openQuantumEnabled,
-    config.diracFieldView,
-    isPauli ? config.pauliFieldView : undefined,
-    config.objectType
-  )
-  return {
-    objectType: config.objectType,
-    dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
-    quantumMode: config.quantumMode,
-    termCount: isComputeMode ? 1 : config.termCount,
-    colorAlgorithm: normalizedColorAlgorithm,
-    isosurface: config.isosurface,
-    nodalEnabled: isComputeMode || config.openQuantumEnabled ? false : config.nodalEnabled,
-    phaseMaterialityEnabled:
-      isComputeMode || config.openQuantumEnabled ? false : config.phaseMaterialityEnabled,
-    interferenceEnabled:
-      isComputeMode || config.openQuantumEnabled ? false : config.interferenceEnabled,
-    uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
-    representation: isComputeMode ? 'position' : config.representation,
-    eigenfunctionCacheEnabled: isComputeMode || is2D ? false : config.eigenfunctionCacheEnabled,
-    analyticalGradientEnabled: isComputeMode || is2D ? false : config.analyticalGradientEnabled,
-    fastEigenInterpolationEnabled:
-      isComputeMode || is2D ? false : config.fastEigenInterpolationEnabled,
-    temporalReprojectionEnabled: isComputeMode || is2D ? false : config.temporalReprojectionEnabled,
-    openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
-  }
-}
-
-/** @returns Post-processing fields extracted from the full pass config. */
-export function extractPPConfig(config: PassConfig): PPPassConfig {
-  return {
-    bloomEnabled: config.bloomEnabled,
-    antiAliasingMethod: config.antiAliasingMethod,
-    paperEnabled: config.paperEnabled,
-    frameBlendingEnabled: config.frameBlendingEnabled,
-    skyboxEnabled: config.skyboxEnabled,
-    skyboxMode: config.skyboxMode,
-    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
-  }
-}
-
-/** @returns True if all keys of `b` match the corresponding values in `a`. */
-export function shallowEqual<T extends object>(a: T | null, b: T): boolean {
-  if (!a) return false
-  const keys = Object.keys(b) as (keyof T)[]
-  return keys.every((k) => a[k] === b[k])
-}
-
-/**
- * Free-scalar mode has a distinct rendering data path (lattice compute grid).
- * Warm-swapping between free-scalar and non-free-scalar keeps stale visuals visible
- * during async compilation, so these transitions should force a cold rebuild.
- */
-export function shouldForceFullRebuildForQuantumModeTransition(
-  previous: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'> | null,
-  next: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'>
-): boolean {
-  if (!previous) return false
-
-  if (previous.objectType !== next.objectType) return true
-
-  if (previous.quantumMode === next.quantumMode) return false
-
-  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
-  return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
-}
-
-// ============================================================================
-// Runtime Updates (no rebuild)
-// ============================================================================
-
-/**
- * Compute CAS sharpening intensity from render resolution scale.
- *
- * Below 95% render scale, sharpening increases as scale decreases:
- * `min(0.7, (1 - scale) * 1.5)`.
- */
-export function computeCasSharpnessFromRenderScale(renderResolutionScale: number): number {
-  const normalizedScale = Number.isFinite(renderResolutionScale)
-    ? Math.max(0, Math.min(1, renderResolutionScale))
-    : 1
-
-  if (normalizedScale >= 0.95) return 0
-
-  return Math.min(0.7, (1 - normalizedScale) * 1.5)
-}
-
-/**
- * Update ScenePass clear color at runtime without rebuilding passes/pipelines.
- */
-export function updateScenePassBackgroundColor({
-  graph,
-  skyboxEnabled,
-  backgroundColor,
-}: ScenePassBackgroundColorUpdateArgs): void {
-  if (skyboxEnabled) return
-
-  const scenePass = graph.getPass('scene')
-  if (!(scenePass instanceof ScenePass)) return
-
-  const backgroundLinear = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
-  scenePass.setClearColor({
-    r: backgroundLinear[0],
-    g: backgroundLinear[1],
-    b: backgroundLinear[2],
-    a: 1,
-  })
-}
-
-/**
- * Update ToScreen CAS sharpness at runtime without rebuilding passes/pipelines.
- */
-export function updateToScreenPassSharpness({
-  graph,
-  renderResolutionScale,
-}: ToScreenPassSharpnessUpdateArgs): void {
-  const toScreenPass = graph.getPass('toScreen')
-  if (!(toScreenPass instanceof ToScreenPass)) return
-
-  toScreenPass.setSharpness(computeCasSharpnessFromRenderScale(renderResolutionScale))
-}
+// Re-export everything from scenePassConfig so existing consumers keep working
+export {
+  computeCasSharpnessFromRenderScale,
+  executeFrameAndCollectMetrics,
+  extractPPConfig,
+  extractSchrodingerConfig,
+  type FrameMetricsArgs,
+  normalizeColorAlgorithmForQuantumMode,
+  type PassConfig,
+  pauliFieldViewForColorAlgorithm,
+  type PPPassConfig,
+  type SchrodingerPassConfig,
+  shallowEqual,
+  shouldForceFullRebuildForQuantumModeTransition,
+  updateScenePassBackgroundColor,
+  updateToScreenPassSharpness,
+} from './scenePassConfig'
 
 // ============================================================================
 // Pass Setup & Cleanup
@@ -389,7 +98,6 @@ async function safeAddPass(
 
 /**
  * Register always-present GPU resources needed by both pass groups.
- * Called once on initial setup or after a full rebuild.
  */
 export function setupSharedResources(graph: WebGPURenderGraph, config: PassConfig): void {
   const useTemporalCloudAccumulation =
@@ -780,7 +488,7 @@ export function cleanupPPPasses(graph: WebGPURenderGraph, config: PassConfig): v
   }
 }
 
-/** Pre-swap: add temporal resources if the new config requires them. Safe before warm swap. */
+/** Pre-swap: add temporal resources if the new config requires them. */
 export function ensureTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
   const needsTemporal = config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
 
@@ -800,7 +508,7 @@ export function ensureTemporalResources(graph: WebGPURenderGraph, config: PassCo
   }
 }
 
-/** Post-swap: remove temporal resources if no longer needed. Only call after new pass is active. */
+/** Post-swap: remove temporal resources if no longer needed. */
 export function removeStaleTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
   const needsTemporal = config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
 
@@ -810,9 +518,7 @@ export function removeStaleTemporalResources(graph: WebGPURenderGraph, config: P
   }
 }
 
-/**
- * Set up render passes for the WebGPU pipeline.
- */
+/** Set up all render passes for the WebGPU pipeline. */
 export async function setupRenderPasses(
   graph: WebGPURenderGraph,
   config: PassConfig,
@@ -831,6 +537,7 @@ export async function setupRenderPasses(
 
 /**
  * Create the appropriate object renderer based on object type.
+ *
  * @param objectType - The type of object to render
  * @param config - Pass configuration including shader feature flags from stores
  * @returns The Schroedinger renderer pass or null if not supported
@@ -846,17 +553,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     interferenceEnabled,
     uncertaintyBoundaryEnabled,
   } = config
-  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
-    quantumMode,
-    config.colorAlgorithm,
-    config.openQuantumEnabled,
-    config.diracFieldView,
-    config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
-    config.objectType
-  )
-  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
-    | WGSLColorAlgorithm
-    | undefined
+  const colorAlgorithm = resolveColorAlgorithmInt(config)
   const useTemporalCloudAccumulation =
     objectType === 'schroedinger' && config.temporalReprojectionEnabled
 

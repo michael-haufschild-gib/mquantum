@@ -226,6 +226,93 @@ export interface SchroedingerUpdateResult {
   newBoundingRadius?: number
 }
 
+/** Read store snapshots and compute derived frame values. */
+function readFrameInputs(
+  ctx: WebGPURenderContext,
+  config: SchrodingerRendererConfig,
+  strategy: QuantumModeStrategy
+) {
+  const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+  const schroedinger = extended?.schroedinger
+  const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
+  const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+  const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+  const dimension = geometry?.dimension ?? config.dimension ?? 3
+  const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
+
+  let uncertaintyLogRhoThreshold = -2.0
+  if (strategy.setUncertaintyConfidenceMass) {
+    const threshold = strategy.setUncertaintyConfidenceMass(
+      schroedinger?.uncertaintyConfidenceMass ?? 0.68
+    )
+    if (threshold !== null) uncertaintyLogRhoThreshold = threshold
+  }
+
+  const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
+
+  return {
+    extended,
+    schroedinger,
+    pbr,
+    appearance,
+    animationTime,
+    dimension,
+    performance,
+    uncertaintyLogRhoThreshold,
+    quantumModeStr,
+    quantumModeInt: QUANTUM_MODE_MAP[quantumModeStr] ?? 0,
+    uncertaintyConfidenceMass: schroedinger?.uncertaintyConfidenceMass ?? 0.68,
+    uncertaintyBoundaryWidth: schroedinger?.uncertaintyBoundaryWidth ?? 0.3,
+    isUniformComputeMode:
+      quantumModeStr === 'freeScalarField' ||
+      quantumModeStr === 'tdseDynamics' ||
+      quantumModeStr === 'becDynamics' ||
+      quantumModeStr === 'diracEquation',
+    isDensityMatrixMode: config.openQuantumEnabled ?? false,
+  }
+}
+
+/** Build the packing parameters object from frame inputs and state. */
+function buildPackParams(
+  inputs: ReturnType<typeof readFrameInputs>,
+  config: SchrodingerRendererConfig,
+  state: SchrodingerFrameState,
+  effectiveMomentumScale: number,
+  hbar: number,
+  effectiveSampleCount: number,
+  colorAlgorithm: number
+) {
+  return {
+    quantumModeInt: inputs.quantumModeInt,
+    quantumModeStr: inputs.quantumModeStr,
+    isUniformComputeMode: inputs.isUniformComputeMode,
+    isDensityMatrixMode: inputs.isDensityMatrixMode,
+    dimension: inputs.dimension,
+    presetTermCount: state.cachedPreset?.termCount ?? 1,
+    presetData: state.flattenedPreset,
+    boundingRadius: state.boundingRadius,
+    canonicalDensityCompensation: state.canonicalDensityCompensation,
+    cachedPeakDensity: state.cachedPeakDensity,
+    colorAlgorithm,
+    effectiveSampleCount,
+    effectiveMomentumScale,
+    hbar,
+    animationTime: inputs.animationTime,
+    uncertaintyLogRhoThreshold: inputs.uncertaintyLogRhoThreshold,
+    uncertaintyConfidenceMass: inputs.uncertaintyConfidenceMass,
+    uncertaintyBoundaryWidth: inputs.uncertaintyBoundaryWidth,
+    schroedinger: inputs.schroedinger,
+    appearance: inputs.appearance,
+    pbr: inputs.pbr,
+    pauliSpinor: inputs.extended?.pauliSpinor,
+    rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
+    rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
+    rendererTermCount: config.termCount,
+  }
+}
+
 /**
  * Compute Schrödinger uniform data.
  * Mutates `state` (preset cache, compensation, bounding radius) and typed arrays.
@@ -239,135 +326,99 @@ export function computeSchroedingerUpdate(
   floatView: Float32Array,
   intView: Int32Array
 ): SchroedingerUpdateResult {
-  const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
-  const schroedinger = extended?.schroedinger
-  const schroedingerVersion = extended?.schroedingerVersion ?? 0
-  const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
-  const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
-  const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
-  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-
-  const uncertaintyConfidenceMass = schroedinger?.uncertaintyConfidenceMass ?? 0.68
-  const uncertaintyBoundaryWidth = schroedinger?.uncertaintyBoundaryWidth ?? 0.3
-  let uncertaintyLogRhoThreshold = -2.0
-  if (strategy.setUncertaintyConfidenceMass) {
-    const threshold = strategy.setUncertaintyConfidenceMass(uncertaintyConfidenceMass)
-    if (threshold !== null) {
-      uncertaintyLogRhoThreshold = threshold
-    }
-  }
+  const inputs = readFrameInputs(ctx, config, strategy)
 
   // === DIRTY-FLAG OPTIMIZATION ===
   const storeVersions = {
-    schroedingerVersion,
-    appearanceVersion: appearance?.appearanceVersion ?? 0,
-    pbrVersion: pbr?.pbrVersion ?? 0,
-    pauliSpinorVersion: extended?.pauliSpinorVersion ?? 0,
+    schroedingerVersion: inputs.extended?.schroedingerVersion ?? 0,
+    appearanceVersion: inputs.appearance?.appearanceVersion ?? 0,
+    pbrVersion: inputs.pbr?.pbrVersion ?? 0,
+    pauliSpinorVersion: inputs.extended?.pauliSpinorVersion ?? 0,
   }
 
   if (!isSchroedingerDirty(state.versions, storeVersions)) {
     return {
       writeMode: 'partial',
-      partialTime: animationTime,
-      partialUncertaintyThreshold: uncertaintyLogRhoThreshold,
+      partialTime: inputs.animationTime,
+      partialUncertaintyThreshold: inputs.uncertaintyLogRhoThreshold,
     }
   }
-
   updateSchroedingerVersions(state.versions, storeVersions)
 
-  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
-  const dimension = geometry?.dimension ?? config.dimension ?? 3
-  const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
-  const quantumModeInt = QUANTUM_MODE_MAP[quantumModeStr] ?? 0
-  const isUniformComputeMode =
-    quantumModeStr === 'freeScalarField' ||
-    quantumModeStr === 'tdseDynamics' ||
-    quantumModeStr === 'becDynamics' ||
-    quantumModeStr === 'diracEquation'
+  // Quantum preset generation
+  const needsPresetRegen = maybeRegeneratePreset(
+    state,
+    strategy,
+    inputs.schroedinger,
+    inputs.dimension
+  )
 
-  // --- Quantum preset generation ---
-  const needsPresetRegen = maybeRegeneratePreset(state, strategy, schroedinger, dimension)
+  // Momentum scale
+  const isPSpace = inputs.schroedinger?.momentumDisplayUnits === 'p'
+  const hbar = isPSpace ? Math.max(inputs.schroedinger?.momentumHbar ?? 1.0, 1e-4) : 1.0
+  const effectiveMomentumScale = (inputs.schroedinger?.momentumScale ?? 1.0) / hbar
 
-  // --- Momentum scale ---
-  const isPSpace = schroedinger?.momentumDisplayUnits === 'p'
-  const hbar = isPSpace ? Math.max(schroedinger?.momentumHbar ?? 1.0, 1e-4) : 1.0
-  const effectiveMomentumScale = (schroedinger?.momentumScale ?? 1.0) / hbar
-
-  // --- Bounding radius ---
+  // Bounding radius
   const newBoundR = computeNewBoundingRadius(
     state,
     config,
     strategy,
-    schroedinger,
-    extended,
-    dimension,
-    quantumModeStr,
-    isUniformComputeMode,
+    inputs.schroedinger,
+    inputs.extended,
+    inputs.dimension,
+    inputs.quantumModeStr,
+    inputs.isUniformComputeMode,
     effectiveMomentumScale
   )
 
-  // --- Canonical compensation ---
+  // Canonical compensation
   if (strategy.isComputeMode) {
     state.canonicalDensityCompensation = 1.0
     state.cachedPeakDensity = 1.0
   } else if (needsPresetRegen && state.cachedPreset) {
-    const result = computeCanonicalCompensation(state.cachedPreset, dimension, state.boundingRadius)
+    const result = computeCanonicalCompensation(
+      state.cachedPreset,
+      inputs.dimension,
+      state.boundingRadius
+    )
     state.canonicalDensityCompensation = result.compensation
     state.cachedPeakDensity = result.peakDensity
   }
 
-  // --- Derived values for packing ---
-  const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
-  const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
+  // Derived values for packing
+  const qualityMultiplier = inputs.performance?.qualityMultiplier ?? 1.0
   const fastMode = qualityMultiplier < 0.75
-  const defaultSampleCount = fastMode ? 32 : 64
-  const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
+  const baseSampleCount = inputs.schroedinger?.sampleCount ?? (fastMode ? 32 : 64)
   const radiusScale = state.boundingRadius / 2.0
   const effectiveSampleCount = Math.min(Math.max(8, Math.ceil(baseSampleCount * radiusScale)), 96)
 
   const colorAlgorithm =
     config.colorAlgorithm ??
-    COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ??
+    COLOR_ALGORITHM_MAP[inputs.appearance?.colorAlgorithm ?? 'radialDistance'] ??
     11
 
-  const isDensityMatrixMode = config.openQuantumEnabled ?? false
-
-  // --- Pack uniform buffer ---
-  packSchroedingerUniforms(floatView, intView, {
-    quantumModeInt,
-    quantumModeStr,
-    isUniformComputeMode,
-    isDensityMatrixMode,
-    dimension,
-    presetTermCount: state.cachedPreset?.termCount ?? 1,
-    presetData: state.flattenedPreset,
-    boundingRadius: state.boundingRadius,
-    canonicalDensityCompensation: state.canonicalDensityCompensation,
-    cachedPeakDensity: state.cachedPeakDensity,
-    colorAlgorithm,
-    effectiveSampleCount,
-    effectiveMomentumScale,
-    hbar,
-    animationTime,
-    uncertaintyLogRhoThreshold,
-    uncertaintyConfidenceMass,
-    uncertaintyBoundaryWidth,
-    schroedinger,
-    appearance,
-    pbr,
-    pauliSpinor: extended?.pauliSpinor,
-    rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
-    rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
-    rendererTermCount: config.termCount,
-  })
+  // Pack uniform buffer
+  packSchroedingerUniforms(
+    floatView,
+    intView,
+    buildPackParams(
+      inputs,
+      config,
+      state,
+      effectiveMomentumScale,
+      hbar,
+      effectiveSampleCount,
+      colorAlgorithm
+    )
+  )
 
   // HO momentum transform (in-place on already-packed buffer)
-  const isHOMomentum =
-    !isUniformComputeMode &&
-    schroedinger?.representation === 'momentum' &&
-    quantumModeStr !== 'hydrogenND'
-  if (isHOMomentum) {
-    applyHOMomentumTransform(floatView, intView, dimension, hbar)
+  if (
+    !inputs.isUniformComputeMode &&
+    inputs.schroedinger?.representation === 'momentum' &&
+    inputs.quantumModeStr !== 'hydrogenND'
+  ) {
+    applyHOMomentumTransform(floatView, intView, inputs.dimension, hbar)
   }
 
   return {

@@ -25,53 +25,19 @@ import { composeWignerSpatialComputeShader } from '../shaders/schroedinger/compu
 import { WIGNER_GRID_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerCache.wgsl'
 import { WIGNER_RECONSTRUCT_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerReconstruct.wgsl'
 import { WIGNER_SPATIAL_PARAMS_SIZE } from '../shaders/schroedinger/compute/wignerSpatial.wgsl'
+import {
+  BASIS_UNIFORM_SIZE,
+  buildCrossPairMap,
+  computeReconstructCoefficients,
+  type CrossPairInfo,
+  SCHROEDINGER_UNIFORM_SIZE,
+  TIME_FIELD_OFFSET,
+  WIGNER_WORKGROUP_SIZE as WORKGROUP_SIZE,
+  type WignerCacheComputeConfig,
+  type WignerUpdateFlags,
+} from './wignerCacheTypes'
 
-/** Workgroup size — must match @workgroup_size(16, 16) in shaders */
-const WORKGROUP_SIZE = 16
-
-/** Schroedinger uniform buffer size (must match renderer constant) */
-const SCHROEDINGER_UNIFORM_SIZE = 1520
-
-/** BasisVectors uniform size: 4 vec3f padded to vec4f = 4 × 48 = 192 bytes */
-const BASIS_UNIFORM_SIZE = 192
-
-/** Offset of the `time` field in SchroedingerUniforms (f32 at offset 908) */
-const TIME_FIELD_OFFSET = 908
-
-/**
- * Configuration for the Wigner cache compute pass.
- */
-export interface WignerCacheComputeConfig {
-  /** Grid resolution (128-1024, default: 256) */
-  gridSize?: number
-  /** Number of dimensions (3-11) */
-  dimension: number
-  /** Quantum mode */
-  quantumMode?: 'harmonicOscillator' | 'hydrogenND'
-  /** Number of HO superposition terms (1-8) */
-  termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-}
-
-/**
- * Update flags returned by needsUpdate() for granular dispatch control.
- */
-export interface WignerUpdateFlags {
-  /** Whether spatial precompute needs to run */
-  spatial: boolean
-  /** Whether reconstruction needs to run */
-  reconstruct: boolean
-}
-
-/**
- * Cross-pair info for CPU-side coefficient computation.
- */
-interface CrossPairInfo {
-  termJ: number
-  termK: number
-  layerIndex: number
-  /** 0 = .rg channel, 1 = .ba channel */
-  channelOffset: number
-}
+export type { WignerCacheComputeConfig, WignerUpdateFlags } from './wignerCacheTypes'
 
 /**
  * Two-phase Wigner cache compute pass.
@@ -193,24 +159,10 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     }
   }
 
-  /**
-   * Build the pair mapping: assigns each cross pair (j,k) to a layer and channel.
-   * Two pairs per layer: first in .rg, second in .ba.
-   */
   private buildPairMap(termCount: number): void {
-    this.crossPairs = []
-    let pairIdx = 0
-
-    for (let j = 0; j < termCount; j++) {
-      for (let k = j + 1; k < termCount; k++) {
-        const layerIndex = Math.floor(pairIdx / 2)
-        const channelOffset = pairIdx % 2
-        this.crossPairs.push({ termJ: j, termK: k, layerIndex, channelOffset })
-        pairIdx++
-      }
-    }
-
-    this.numCrossLayers = Math.ceil(this.crossPairs.length / 2)
+    const { crossPairs, numCrossLayers } = buildCrossPairMap(termCount)
+    this.crossPairs = crossPairs
+    this.numCrossLayers = numCrossLayers
   }
 
   /**
@@ -595,17 +547,6 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
   /**
    * Update the reconstruction params buffer with time-dependent phased coefficients.
-   *
-   * For each cross pair (j, k):
-   *   phasedRe = 2 * Re(c_j* c_k * e^{-i*(E_j - E_k)*t})
-   *   phasedIm = 2 * Im(c_j* c_k * e^{-i*(E_j - E_k)*t})
-   *
-   * The factor of 2 is baked in so the GPU shader just does multiply-accumulate.
-   *
-   * @param device - GPU device
-   * @param schroedingerData - Raw Schroedinger uniform buffer data
-   * @param time - Current animation time
-   * @param timeScale - Time scaling factor
    */
   updateReconstructParams(
     device: GPUDevice,
@@ -615,91 +556,16 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   ): void {
     if (!this.reconstructParamsBuffer || !this.twoPhaseActive) return
 
-    const floatView = new Float32Array(schroedingerData)
-
-    // Clear reconstruct params
-    this.reconstructParamsF32View.fill(0)
-    this.reconstructParamsU32View[0] = this.crossPairs.length
-
-    const t = time * timeScale
-
-    // For each cross pair, compute the phased coefficient on CPU
-    for (let i = 0; i < this.crossPairs.length; i++) {
-      const pair = this.crossPairs[i]!
-      const { termJ, termK, layerIndex, channelOffset } = pair
-
-      // Read coefficients from SchroedingerUniforms
-      // coeff layout: array<vec4f, 8> at some offset — we need getCoeff equivalent
-      // In the uniform buffer, coeff[k] is a vec4f where .xy = (real, imag)
-      // The coeff array starts after the quantum number arrays
-      const coeffBase = this.getCoeffOffset()
-      const cjRe = floatView[coeffBase + termJ * 4]!
-      const cjIm = floatView[coeffBase + termJ * 4 + 1]!
-      const ckRe = floatView[coeffBase + termK * 4]!
-      const ckIm = floatView[coeffBase + termK * 4 + 1]!
-
-      // Read energies
-      const energyBase = this.getEnergyOffset()
-      const Ej = this.getPackedF32(floatView, energyBase, termJ)
-      const Ek = this.getPackedF32(floatView, energyBase, termK)
-
-      // c_j* c_k = (cjRe - i*cjIm)(ckRe + i*ckIm)
-      const prodRe = cjRe * ckRe + cjIm * ckIm
-      const prodIm = cjRe * ckIm - cjIm * ckRe
-
-      // Time phase: e^{-i*(Ej - Ek)*t}
-      const dE = Ej - Ek
-      const phaseAngle = -dE * t
-      const timeCos = Math.cos(phaseAngle)
-      const timeSin = Math.sin(phaseAngle)
-
-      // Phased = c_j* c_k * e^{-i*dE*t}
-      const phasedRe = prodRe * timeCos - prodIm * timeSin
-      const phasedIm = prodRe * timeSin + prodIm * timeCos
-
-      // Store with factor of 2 baked in
-      // pairData[i] = vec4f(2*phasedRe, 2*phasedIm, layerIndex, channelOffset)
-      const offset = 4 + i * 4 // Skip header (16 bytes = 4 floats)
-      this.reconstructParamsF32View[offset + 0] = 2.0 * phasedRe
-      this.reconstructParamsF32View[offset + 1] = 2.0 * phasedIm
-      this.reconstructParamsF32View[offset + 2] = layerIndex
-      this.reconstructParamsF32View[offset + 3] = channelOffset
-    }
+    computeReconstructCoefficients(
+      this.crossPairs,
+      schroedingerData,
+      time,
+      timeScale,
+      this.reconstructParamsF32View,
+      this.reconstructParamsU32View
+    )
 
     device.queue.writeBuffer(this.reconstructParamsBuffer, 0, this.reconstructParamsData)
-  }
-
-  /**
-   * Get the byte offset of the coeff array in SchroedingerUniforms.
-   * coeff is array<vec4f, 8> — each vec4f holds one coefficient as (re, im, 0, 0).
-   *
-   * From the uniform layout: coeff starts at offset 416 (104 floats).
-   * This is after: flags/params (various), omega array, quantum number arrays.
-   */
-  private getCoeffOffset(): number {
-    // SchroedingerUniforms.coeff offset = 416 bytes / 4 = 104 float index
-    return 104
-  }
-
-  /**
-   * Get the byte offset of the energy array in SchroedingerUniforms.
-   * energy is array<vec4f, 2> — packed, energy[k] accessed via vecIdx/compIdx.
-   *
-   * From the uniform layout: energy starts at offset 544 (136 floats).
-   */
-  private getEnergyOffset(): number {
-    // SchroedingerUniforms.energy offset = 544 bytes / 4 = 136 float index
-    return 136
-  }
-
-  /**
-   * Get a packed f32 from a vec4f array at a given base offset.
-   * element k is at vec4f[k/4] component [k%4].
-   */
-  private getPackedF32(view: Float32Array, baseFloatIdx: number, k: number): number {
-    const vecIdx = Math.floor(k / 4)
-    const compIdx = k % 4
-    return view[baseFloatIdx + vecIdx * 4 + compIdx]!
   }
 
   /**
@@ -716,44 +582,26 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     termCount: number,
     isHydrogen: boolean
   ): WignerUpdateFlags {
+    const animatingCrossTerms = isAnimating && crossTermsEnabled && termCount > 1
     if (this.twoPhaseActive) {
-      // Two-phase mode
-      const spatial = this.needsSpatialRecompute
-      let reconstruct = this.needsReconstructRecompute
-
-      // Time-dependent: reconstruct every frame during animation with cross terms
-      if (isAnimating && crossTermsEnabled && termCount > 1) {
-        reconstruct = true
+      return {
+        spatial: this.needsSpatialRecompute,
+        reconstruct: this.needsReconstructRecompute || animatingCrossTerms,
       }
-
-      return { spatial, reconstruct }
-    } else {
-      // Legacy single-pass mode
-      let needsRecompute = this.needsSpatialRecompute
-
-      // Time-dependent: full recompute every frame during animation with cross terms
-      if (isAnimating && !isHydrogen && crossTermsEnabled && termCount > 1) {
-        needsRecompute = true
-      }
-
-      return { spatial: needsRecompute, reconstruct: false }
+    }
+    return {
+      spatial: this.needsSpatialRecompute || (animatingCrossTerms && !isHydrogen),
+      reconstruct: false,
     }
   }
 
-  /**
-   * Execute the legacy single-pass compute shader (original behavior).
-   */
   execute(ctx: WebGPURenderContext): void {
     if (this.twoPhaseActive) {
-      // In two-phase mode, use executeSpatial + executeReconstruct instead
       this.executeSpatial(ctx)
       this.executeReconstruct(ctx)
       return
     }
-
-    // Legacy path
     if (!this.legacyPipeline || !this.legacyBindGroup) return
-
     const computePass = ctx.beginComputePass({ label: 'wigner-cache-legacy-pass' })
     this.dispatchCompute(
       computePass,
@@ -764,7 +612,6 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       1
     )
     computePass.end()
-
     this.needsSpatialRecompute = false
     this.needsReconstructRecompute = false
   }

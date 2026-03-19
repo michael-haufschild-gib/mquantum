@@ -17,28 +17,30 @@
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
-import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import { freeScalarAbsorberBlock } from '../shaders/schroedinger/compute/freeScalarAbsorber.wgsl'
-import {
-  freeScalarInitBlock,
-  freeScalarUniformsBlock,
-} from '../shaders/schroedinger/compute/freeScalarInit.wgsl'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
-import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
-import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import {
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
-  MAX_DIM,
 } from './computePassUtils'
+import type {
+  FsfBindGroupResult,
+  FsfPassHelpers,
+  FsfPipelineResult,
+} from './FreeScalarFieldComputePassSetup'
+import { buildFsfPipelines, rebuildFsfBindGroups } from './FreeScalarFieldComputePassSetup'
+import {
+  computeFsfConfigHash,
+  computeFsfDiagnostics,
+  computeFsfInitHash,
+  computeFsfMaxPhiEstimate,
+  estimateFsfMaxFieldValue,
+  writeFsfUniforms,
+} from './FreeScalarFieldComputePassUniforms'
 
 /** Uniform buffer size: FreeScalarUniforms struct = 512 bytes (added PML absorber fields) */
 const UNIFORM_SIZE = 512
@@ -59,22 +61,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private analysisTexture: GPUTexture | null = null
   private analysisTextureView: GPUTextureView | null = null
 
-  // Pipelines (5 separate compute pipelines)
-  private initPipeline: GPUComputePipeline | null = null
-  private updatePiPipeline: GPUComputePipeline | null = null
-  private updatePhiPipeline: GPUComputePipeline | null = null
-  private absorberPipeline: GPUComputePipeline | null = null
-  private writeGridPipeline: GPUComputePipeline | null = null
+  // Pipeline + bind group bundles (created by setup functions)
+  private pl: FsfPipelineResult | null = null
+  private bg: FsfBindGroupResult | null = null
 
-  // Bind groups
-  private initBindGroupLayout: GPUBindGroupLayout | null = null
-  private initBindGroup: GPUBindGroup | null = null
-  private updatePiBindGroupLayout: GPUBindGroupLayout | null = null
-  private updatePiBindGroup: GPUBindGroup | null = null
-  private updatePhiBindGroupLayout: GPUBindGroupLayout | null = null
-  private updatePhiBindGroup: GPUBindGroup | null = null
-  private writeGridBindGroupLayout: GPUBindGroupLayout | null = null
-  private writeGridBindGroup: GPUBindGroup | null = null
+  /** Helper callbacks bridging base-class protected methods to standalone setup functions. */
+  private readonly setupHelpers: FsfPassHelpers = {
+    createShaderModule: (d, code, label) => this.createShaderModule(d, code, label),
+    createComputePipeline: (d, sm, bgls, label) => this.createComputePipeline(d, sm, bgls, label),
+  }
 
   // State tracking
   private initialized = false
@@ -107,11 +102,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private diagPhiReadbackBuffer: GPUBuffer | null = null
   private diagPiReadbackBuffer: GPUBuffer | null = null
 
-  // Pre-allocated uniform data views (reused each frame to avoid GC pressure)
+  // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
-  private readonly uniformF32 = new Float32Array(this.uniformData)
-  private readonly uniformI32 = new Int32Array(this.uniformData)
 
   constructor() {
     super({
@@ -211,28 +204,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Compute a hash of the config fields that require buffer rebuild (grid shape changes).
-   * @param config - Free scalar field configuration
-   */
-  private computeConfigHash(config: FreeScalarConfig): string {
-    return `${config.gridSize.join('x')}_d${config.latticeDim}`
-  }
-
-  /**
-   * Compute a hash of the config fields that require field reinitialization
-   * without buffer rebuild. Covers physics params that change the initial
-   * condition but not the grid shape.
-   * @param config - Free scalar field configuration
-   */
-  private computeInitHash(config: FreeScalarConfig): string {
-    const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
-    if (config.selfInteractionEnabled) {
-      return `${base}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
-    }
-    return base
-  }
-
-  /**
    * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
    * The density texture is NOT recreated here — it has a fixed size (DENSITY_GRID_SIZE³)
    * and persists across grid size changes to avoid invalidating the renderer's bind group.
@@ -305,7 +276,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Ensure density texture exists (creates if not yet initialized)
     this.initializeDensityTexture(device)
 
-    this.lastConfigHash = this.computeConfigHash(config)
+    this.lastConfigHash = computeFsfConfigHash(config)
   }
 
   /**
@@ -318,143 +289,21 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Build pipelines for all 4 compute stages.
+   * Build pipelines for all compute stages via the setup module.
    * @param device - GPU device
    */
   private buildPipelines(device: GPUDevice): void {
-    const uniformsAndIndex = freeScalarUniformsBlock + freeScalarNDIndexBlock
-
-    // === Init pipeline (phi + pi read_write) ===
-    const initShader = this.createShaderModule(
-      device,
-      uniformsAndIndex + freeScalarInitBlock,
-      'free-scalar-init'
-    )
-
-    this.initBindGroupLayout = device.createBindGroupLayout({
-      label: 'free-scalar-init-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    this.initPipeline = this.createComputePipeline(
-      device,
-      initShader,
-      [this.initBindGroupLayout],
-      'free-scalar-init'
-    )
-
-    // === PML absorber pipeline (reuses init bind group layout: uniform + phi + pi) ===
-    const absorberShader = this.createShaderModule(
-      device,
-      uniformsAndIndex + pmlProfileBlock + freeScalarAbsorberBlock,
-      'free-scalar-absorber'
-    )
-    this.absorberPipeline = this.createComputePipeline(
-      device,
-      absorberShader,
-      [this.initBindGroupLayout],
-      'free-scalar-absorber'
-    )
-
-    // === Update Pi pipeline (phi read-only, pi read_write) ===
-    const updatePiShader = this.createShaderModule(
-      device,
-      uniformsAndIndex + freeScalarUpdatePiBlock,
-      'free-scalar-update-pi'
-    )
-
-    this.updatePiBindGroupLayout = device.createBindGroupLayout({
-      label: 'free-scalar-update-pi-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    this.updatePiPipeline = this.createComputePipeline(
-      device,
-      updatePiShader,
-      [this.updatePiBindGroupLayout],
-      'free-scalar-update-pi'
-    )
-
-    // === Update Phi pipeline (phi read_write, pi read-only) ===
-    const updatePhiShader = this.createShaderModule(
-      device,
-      freeScalarUniformsBlock + freeScalarUpdatePhiBlock,
-      'free-scalar-update-phi'
-    )
-
-    this.updatePhiBindGroupLayout = device.createBindGroupLayout({
-      label: 'free-scalar-update-phi-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      ],
-    })
-
-    this.updatePhiPipeline = this.createComputePipeline(
-      device,
-      updatePhiShader,
-      [this.updatePhiBindGroupLayout],
-      'free-scalar-update-phi'
-    )
-
-    // === Write Grid pipeline (phi + pi read-only, texture write) ===
-    const writeGridShader = this.createShaderModule(
-      device,
-      uniformsAndIndex + freeScalarWriteGridBlock,
-      'free-scalar-write-grid'
-    )
-
-    this.writeGridBindGroupLayout = device.createBindGroupLayout({
-      label: 'free-scalar-write-grid-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '3d',
-          },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '3d',
-          },
-        },
-      ],
-    })
-
-    this.writeGridPipeline = this.createComputePipeline(
-      device,
-      writeGridShader,
-      [this.writeGridBindGroupLayout],
-      'free-scalar-write-grid'
-    )
+    this.pl = buildFsfPipelines(device, this.setupHelpers)
   }
 
   /**
-   * Create bind groups for all 4 compute stages.
+   * Create bind groups for all compute stages via the setup module.
    * Must be called after rebuildFieldBuffers and buildPipelines.
    * @param device - GPU device
    */
   private rebuildBindGroups(device: GPUDevice): void {
     if (
+      !this.pl ||
       !this.uniformBuffer ||
       !this.phiBuffer ||
       !this.piBuffer ||
@@ -463,85 +312,128 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     )
       return
 
-    // Init bind group (phi + pi read-write)
-    if (this.initBindGroupLayout) {
-      this.initBindGroup = device.createBindGroup({
-        label: 'free-scalar-init-bg',
-        layout: this.initBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.phiBuffer } },
-          { binding: 2, resource: { buffer: this.piBuffer } },
-        ],
-      })
-    }
-
-    // Update Pi bind group (phi read-only, pi read-write)
-    if (this.updatePiBindGroupLayout) {
-      this.updatePiBindGroup = device.createBindGroup({
-        label: 'free-scalar-update-pi-bg',
-        layout: this.updatePiBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.phiBuffer } },
-          { binding: 2, resource: { buffer: this.piBuffer } },
-        ],
-      })
-    }
-
-    // Update Phi bind group (phi read-write, pi read-only)
-    if (this.updatePhiBindGroupLayout) {
-      this.updatePhiBindGroup = device.createBindGroup({
-        label: 'free-scalar-update-phi-bg',
-        layout: this.updatePhiBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.phiBuffer } },
-          { binding: 2, resource: { buffer: this.piBuffer } },
-        ],
-      })
-    }
-
-    // Write Grid bind group (phi + pi read-only, density + analysis texture write)
-    if (this.writeGridBindGroupLayout) {
-      this.writeGridBindGroup = device.createBindGroup({
-        label: 'free-scalar-write-grid-bg',
-        layout: this.writeGridBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.phiBuffer } },
-          { binding: 2, resource: { buffer: this.piBuffer } },
-          { binding: 3, resource: this.densityTextureView },
-          { binding: 4, resource: this.analysisTextureView },
-        ],
-      })
-    }
+    this.bg = rebuildFsfBindGroups(device, this.pl, {
+      uniformBuffer: this.uniformBuffer,
+      phiBuffer: this.phiBuffer,
+      piBuffer: this.piBuffer,
+      densityTextureView: this.densityTextureView,
+      analysisTextureView: this.analysisTextureView,
+    })
   }
 
-  /**
-   * Compute strides for N-D indexing (C-order / last-dimension-fastest):
-   * strides[latticeDim-1] = 1, strides[d] = strides[d+1] * gridSize[d+1]
-   * @param config - Free scalar field configuration
-   * @returns Array of strides (length MAX_DIM, unused entries = 0)
-   */
-  private computeStrides(config: FreeScalarConfig): number[] {
-    const strides = new Array(MAX_DIM).fill(0)
-    strides[config.latticeDim - 1] = 1
-    for (let d = config.latticeDim - 2; d >= 0; d--) {
-      strides[d] = strides[d + 1]! * config.gridSize[d + 1]!
+  /** Check if config changed and rebuild buffers/pipelines/bind groups as needed. */
+  private maybeRebuild(device: GPUDevice, config: FreeScalarConfig): void {
+    const configHash = computeFsfConfigHash(config)
+    if (configHash !== this.lastConfigHash || !this.phiBuffer) {
+      if (import.meta.env.DEV) {
+        console.log(
+          `[FSF-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}` +
+            ` (latticeDim=${config.latticeDim}, grid=${config.gridSize}, needsReset=${config.needsReset})`
+        )
+      }
+      this.rebuildFieldBuffers(device, config)
+      this.buildPipelines(device)
+      this.rebuildBindGroups(device)
+      this.initialized = false
     }
-    return strides
+    const initHash = computeFsfInitHash(config)
+    if (initHash !== this.lastInitHash && this.lastInitHash !== '') {
+      this.initialized = false
+    }
+    this.lastInitHash = initHash
+  }
+
+  /** Upload pending k-space texture data from the async worker. */
+  private flushKSpaceData(device: GPUDevice): void {
+    if (!this.pendingKSpaceData || !this.densityTexture || !this.analysisTexture) return
+    const { density, analysis } = this.pendingKSpaceData
+    const bytesPerTexel = 8 // rgba16float = 4 × 2
+    const outputVoxels = density.length / 4
+    const outputGridSize = Math.round(Math.cbrt(outputVoxels))
+    const bytesPerRow = outputGridSize * bytesPerTexel
+    const rowsPerImage = outputGridSize
+    const size = {
+      width: outputGridSize,
+      height: outputGridSize,
+      depthOrArrayLayers: outputGridSize,
+    }
+    device.queue.writeTexture(
+      { texture: this.densityTexture },
+      density.buffer,
+      { offset: density.byteOffset, bytesPerRow, rowsPerImage },
+      size
+    )
+    device.queue.writeTexture(
+      { texture: this.analysisTexture },
+      analysis.buffer,
+      { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
+      size
+    )
+    this.pendingKSpaceData = null
+  }
+
+  /** Initialize field state and perform leapfrog kickstart. */
+  private initializeField(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    config: FreeScalarConfig
+  ): void {
+    if (config.initialCondition === 'vacuumNoise') {
+      const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
+      device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
+      device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
+    } else if (this.pl && this.bg) {
+      const pass = encoder.beginComputePass({ label: 'free-scalar-init-pass' })
+      this.dispatchCompute(
+        pass,
+        this.pl.initPipeline,
+        [this.bg.initBG],
+        Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
+      )
+      pass.end()
+    }
+
+    // Leapfrog half-step kickstart: advance pi from t=0 to t=dt/2
+    if (this.pl && this.bg && this.uniformBuffer) {
+      const halfDtStaging = device.createBuffer({
+        label: 'free-scalar-half-dt-staging',
+        size: 4,
+        usage: GPUBufferUsage.COPY_SRC,
+        mappedAtCreation: true,
+      })
+      new Float32Array(halfDtStaging.getMappedRange()).set([config.dt * 0.5])
+      halfDtStaging.unmap()
+      encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
+
+      const kickPass = encoder.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
+      this.dispatchCompute(
+        kickPass,
+        this.pl.updatePiPipeline,
+        [this.bg.updatePiBG],
+        Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
+      )
+      kickPass.end()
+
+      const fullDtStaging = device.createBuffer({
+        label: 'free-scalar-full-dt-staging',
+        size: 4,
+        usage: GPUBufferUsage.COPY_SRC,
+        mappedAtCreation: true,
+      })
+      new Float32Array(fullDtStaging.getMappedRange()).set([config.dt])
+      fullDtStaging.unmap()
+      encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
+      this.pendingStagingBuffers.push(halfDtStaging, fullDtStaging)
+    }
+
+    this.initialized = true
+    this.stepAccumulator = 0
+    useFsfDiagnosticsStore.getState().reset()
   }
 
   /**
    * Write the uniform buffer with current config values.
-   * Layout matches the N-D FreeScalarUniforms struct (512 bytes).
-   * @param device - GPU device
-   * @param config - Free scalar field configuration
-   * @param basisX - Basis vector X (length = dimension, up to 11)
-   * @param basisY - Basis vector Y
-   * @param basisZ - Basis vector Z
-   * @param boundingRadius - Bounding radius from Schroedinger uniforms
+   * Delegates to the standalone writeFsfUniforms function.
    */
   updateUniforms(
     device: GPUDevice,
@@ -554,194 +446,17 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   ): void {
     if (!this.uniformBuffer) return
 
-    const initConditionMap: Record<string, number> = {
-      vacuumNoise: 0,
-      singleMode: 1,
-      gaussianPacket: 2,
-      kinkProfile: 3,
-    }
-    const fieldViewMap: Record<string, number> = {
-      phi: 0,
-      pi: 1,
-      energyDensity: 2,
-      wallDensity: 3,
-    }
-
-    const u32 = this.uniformU32
-    const f32 = this.uniformF32
-    const i32 = this.uniformI32
-
-    // Zero out the entire buffer first (ensures unused array slots are 0)
-    u32.fill(0)
-
-    const strides = this.computeStrides(config)
-
-    // Scalars (offset 0-15, 4 u32s)
-    u32[0] = config.latticeDim // offset 0
-    u32[1] = this.totalSites // offset 4
-    f32[2] = config.mass // offset 8
-    f32[3] = config.dt // offset 12
-
-    // gridSize: array<u32, 12> (offset 16, indices 4-15)
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[4 + d] = config.gridSize[d]!
-    }
-
-    // strides: array<u32, 12> (offset 64, indices 16-27)
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[16 + d] = strides[d]!
-    }
-
-    // spacing: array<f32, 12> (offset 112, indices 28-39)
-    for (let d = 0; d < config.latticeDim; d++) {
-      f32[28 + d] = config.spacing[d]!
-    }
-
-    // Init/display scalars (offset 160-191, indices 40-47)
-    u32[40] = initConditionMap[config.initialCondition] ?? 2 // offset 160
-    u32[41] = fieldViewMap[config.fieldView] ?? 0 // offset 164
-    u32[42] = config.stepsPerFrame // offset 168
-    f32[43] = config.packetWidth // offset 172
-    f32[44] = config.packetAmplitude // offset 176
-    this.maxFieldValue = this.estimateMaxFieldValue(config)
-    f32[45] = this.maxFieldValue // offset 180
-    f32[46] = boundingRadius ?? 2.0 // offset 184
-    // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux, 3=kSpace
-    // Derived from the numeric color algorithm: 12/13 → mode 1, 14 → mode 2, 15 → mode 3
-    const alg = colorAlgorithm ?? 0
-    u32[47] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : alg === 15 ? 3 : 0
-
-    // packetCenter: array<f32, 12> (offset 192, indices 48-59)
-    for (let d = 0; d < config.latticeDim; d++) {
-      f32[48 + d] = config.packetCenter[d] ?? 0
-    }
-
-    // modeK: array<i32, 12> (offset 240, indices 60-71)
-    for (let d = 0; d < config.latticeDim; d++) {
-      i32[60 + d] = config.modeK[d] ?? 0
-    }
-
-    // slicePositions: array<f32, 12> (offset 288, indices 72-83)
-    // Store slicePositions[i] maps to extra dims i=0,1,... (dim 3,4,...).
-    // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3),
-    // so write at index 72 + 3 + i to align with WGSL array indexing.
-    for (let i = 0; i < config.slicePositions.length; i++) {
-      f32[72 + 3 + i] = config.slicePositions[i]!
-    }
-
-    // basisX: array<f32, 12> (offset 336, indices 84-95)
-    if (basisX) {
-      for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) {
-        f32[84 + d] = basisX[d]!
-      }
-    } else {
-      // Default identity: basisX = [1,0,0,...], basisY = [0,1,0,...], basisZ = [0,0,1,...]
-      f32[84] = 1.0
-    }
-
-    // basisY: array<f32, 12> (offset 384, indices 96-107)
-    if (basisY) {
-      for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) {
-        f32[96 + d] = basisY[d]!
-      }
-    } else {
-      f32[97] = 1.0
-    }
-
-    // basisZ: array<f32, 12> (offset 432, indices 108-119)
-    if (basisZ) {
-      for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) {
-        f32[108 + d] = basisZ[d]!
-      }
-    } else {
-      f32[110] = 1.0
-    }
-
-    // Self-interaction params (offset 480, indices 120-123)
-    u32[120] = config.selfInteractionEnabled ? 1 : 0 // offset 480
-    f32[121] = config.selfInteractionLambda // offset 484
-    f32[122] = config.selfInteractionVev // offset 488
-    u32[123] = config.absorberEnabled ? 1 : 0 // offset 492 (absorberEnabled)
-
-    // PML absorber parameters (offset 496-511, indices 124-127)
-    f32[124] = config.absorberWidth ?? 0.2 // offset 496
-    f32[125] = config.absorberEnabled // offset 500 (σ_max)
-      ? computePMLSigmaMaxND(
-          config.pmlTargetReflection ?? 1e-6,
-          config.absorberWidth ?? 0.2,
-          config.gridSize,
-          config.dt,
-          3, // cubic grading (hardcoded to match WGSL shader)
-          config.latticeDim
-        )
-      : 0
-    u32[126] = 0 // offset 504 (padding)
-    u32[127] = 0 // offset 508 (padding)
-
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
-  }
-
-  /**
-   * Estimate maxFieldValue for auto-scale normalization, accounting for
-   * initial condition type and current field view.
-   * @param config - Free scalar field configuration
-   * @returns Estimated maximum field value for normalization
-   */
-  private estimateMaxFieldValue(config: FreeScalarConfig): number {
-    if (!config.autoScale) return 1.0
-
-    const phi0 = this.maxPhiEstimate
-
-    if (config.fieldView === 'phi') {
-      return phi0
-    }
-
-    // wallDensity: V(phi) = lambda * (phi² - v²)², max at phi=0 → lambda * v^4
-    if (config.fieldView === 'wallDensity') {
-      if (config.selfInteractionEnabled) {
-        const v = config.selfInteractionVev
-        return config.selfInteractionLambda * v * v * v * v
-      }
-      return 1.0
-    }
-
-    // Compute omega from lattice dispersion relation.
-    // For vacuum noise all modes are excited, so omega_max (Nyquist) is correct.
-    // For singleMode / gaussianPacket, use the actual mode wavevector to avoid
-    // overestimating by 10-100x (which makes pi/energy views appear too dim).
-    let omegaSq = config.mass * config.mass
-    if (config.initialCondition === 'vacuumNoise') {
-      // omega_max² = m² + sum_d (2/a_d)² — conservative upper bound
-      for (let d = 0; d < config.latticeDim; d++) {
-        const a = config.spacing[d]!
-        omegaSq += (2 / a) * (2 / a)
-      }
-    } else {
-      // Lattice dispersion for the actual mode: sk = (2/a) sin(k_phys * a / 2)
-      for (let d = 0; d < config.latticeDim; d++) {
-        const N = config.gridSize[d]!
-        const a = config.spacing[d]!
-        if (N <= 1 || a <= 0) continue
-        const latticeL = N * a
-        const kPhys = (2 * Math.PI * (config.modeK[d] ?? 0)) / latticeL
-        const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
-        omegaSq += sk * sk
-      }
-    }
-    const omega = Math.sqrt(omegaSq)
-
-    if (config.fieldView === 'pi') {
-      return phi0 * omega
-    }
-
-    // energyDensity: E ~ 0.5 * (pi² + (grad phi)² + m² phi²) + V(phi)
-    let energy = phi0 * phi0 * omegaSq * 0.5
-    if (config.selfInteractionEnabled) {
-      // Max potential energy at phi=0: V(0) = lambda * v^4
-      const v = config.selfInteractionVev
-      energy += config.selfInteractionLambda * v * v * v * v
-    }
-    return energy
+    this.maxFieldValue = estimateFsfMaxFieldValue(config, this.maxPhiEstimate)
+    writeFsfUniforms(device, this.uniformBuffer, this.uniformData, {
+      config,
+      totalSites: this.totalSites,
+      maxFieldValue: this.maxFieldValue,
+      basisX,
+      basisY,
+      basisZ,
+      boundingRadius,
+      colorAlgorithm,
+    })
   }
 
   /**
@@ -768,66 +483,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   ): void {
     const { device, encoder } = ctx
 
-    // Clean up staging buffers from previous frame's kickstart
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
+    this.flushKSpaceData(device)
 
-    // Flush pending k-space texture data (computed async in previous frame).
-    // Worker produces data at OUTPUT_GRID_SIZE (64³), which may differ from
-    // DENSITY_GRID_SIZE (96³). Copy dimensions must match the data source.
-    if (this.pendingKSpaceData && this.densityTexture && this.analysisTexture) {
-      const { density, analysis } = this.pendingKSpaceData
-      const bytesPerTexel = 8 // rgba16float = 4 × 2
-      // Infer the worker's output grid size from the actual buffer length
-      const outputVoxels = density.length / 4 // 4 channels (rgba)
-      const outputGridSize = Math.round(Math.cbrt(outputVoxels))
-      const bytesPerRow = outputGridSize * bytesPerTexel
-      const rowsPerImage = outputGridSize
-      device.queue.writeTexture(
-        { texture: this.densityTexture },
-        density.buffer,
-        { offset: density.byteOffset, bytesPerRow, rowsPerImage },
-        {
-          width: outputGridSize,
-          height: outputGridSize,
-          depthOrArrayLayers: outputGridSize,
-        }
-      )
-      device.queue.writeTexture(
-        { texture: this.analysisTexture },
-        analysis.buffer,
-        { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
-        {
-          width: outputGridSize,
-          height: outputGridSize,
-          depthOrArrayLayers: outputGridSize,
-        }
-      )
-      this.pendingKSpaceData = null
-    }
-
-    // Check if field buffers need rebuild (grid size changed)
-    const configHash = this.computeConfigHash(config)
-
-    if (configHash !== this.lastConfigHash || !this.phiBuffer) {
-      if (import.meta.env.DEV) {
-        console.log(
-          `[FSF-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}` +
-            ` (latticeDim=${config.latticeDim}, grid=${config.gridSize}, needsReset=${config.needsReset})`
-        )
-      }
-      this.rebuildFieldBuffers(device, config)
-      this.buildPipelines(device)
-      this.rebuildBindGroups(device)
-      this.initialized = false
-    }
-
-    // Check if physics params changed (requires reinit but not buffer rebuild)
-    const initHash = this.computeInitHash(config)
-    if (initHash !== this.lastInitHash && this.lastInitHash !== '') {
-      this.initialized = false
-    }
-    this.lastInitHash = initHash
+    this.maybeRebuild(device, config)
 
     // Recompute maxPhiEstimate when autoScale transitions off→on
     const autoScaleTransition = config.autoScale && !this.lastAutoScale
@@ -836,16 +496,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Pre-compute maxPhiEstimate before updateUniforms so the first frame
     // after a reset uses the correct normalization (not the stale value).
     if (!this.initialized || config.needsReset || autoScaleTransition) {
-      if (config.autoScale) {
-        this.maxPhiEstimate =
-          config.initialCondition === 'vacuumNoise'
-            ? estimateVacuumMaxPhi(config)
-            : config.initialCondition === 'kinkProfile'
-              ? config.selfInteractionVev
-              : config.packetAmplitude
-      } else {
-        this.maxPhiEstimate = 1.0
-      }
+      this.maxPhiEstimate = computeFsfMaxPhiEstimate(config)
     }
 
     // Update uniforms every frame (includes basis vectors for writeGrid)
@@ -853,82 +504,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // Initialize or reset field
     if (!this.initialized || config.needsReset) {
-      if (config.initialCondition === 'vacuumNoise') {
-        // CPU-side exact vacuum spectrum sampling
-        const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
-        device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
-        device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
-      } else if (this.initPipeline && this.initBindGroup) {
-        // WGSL init shader for singleMode, gaussianPacket
-        const pass = encoder.beginComputePass({ label: 'free-scalar-init-pass' })
-        this.dispatchCompute(
-          pass,
-          this.initPipeline,
-          [this.initBindGroup],
-          Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
-        )
-        pass.end()
-      }
-
-      // Leapfrog half-step kickstart: advance pi from t=0 to t=dt/2
-      // so that the main loop's (pi, phi) are staggered for second-order accuracy.
-      // Uses encoder.copyBufferToBuffer (not queue.writeBuffer) to ensure the dt
-      // override happens in command buffer order between compute passes.
-      if (this.updatePiPipeline && this.updatePiBindGroup && this.uniformBuffer) {
-        // Staging buffer with dt/2 (mappedAtCreation for synchronous write)
-        const halfDtStaging = device.createBuffer({
-          label: 'free-scalar-half-dt-staging',
-          size: 4,
-          usage: GPUBufferUsage.COPY_SRC,
-          mappedAtCreation: true,
-        })
-        new Float32Array(halfDtStaging.getMappedRange()).set([config.dt * 0.5])
-        halfDtStaging.unmap()
-
-        // Copy dt/2 into uniform buffer within command buffer timeline
-        // dt is at byte offset DT_BYTE_OFFSET (field index 3)
-        encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
-
-        const kickPass = encoder.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
-        this.dispatchCompute(
-          kickPass,
-          this.updatePiPipeline,
-          [this.updatePiBindGroup],
-          Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
-        )
-        kickPass.end()
-
-        // Staging buffer with full dt to restore
-        const fullDtStaging = device.createBuffer({
-          label: 'free-scalar-full-dt-staging',
-          size: 4,
-          usage: GPUBufferUsage.COPY_SRC,
-          mappedAtCreation: true,
-        })
-        new Float32Array(fullDtStaging.getMappedRange()).set([config.dt])
-        fullDtStaging.unmap()
-
-        // Restore full dt within command buffer timeline
-        encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
-
-        // Schedule cleanup for next frame (GPU retains references until submit completes)
-        this.pendingStagingBuffers.push(halfDtStaging, fullDtStaging)
-      }
-
-      this.initialized = true
-      this.stepAccumulator = 0
-      // Reset diagnostics store so energy drift is recalculated from new initial state
-      useFsfDiagnosticsStore.getState().reset()
+      this.initializeField(device, encoder, config)
     }
 
     // Leapfrog time steps (only when playing)
-    if (
-      isPlaying &&
-      this.updatePiPipeline &&
-      this.updatePhiPipeline &&
-      this.updatePiBindGroup &&
-      this.updatePhiBindGroup
-    ) {
+    if (isPlaying && this.pl && this.bg) {
       // Speed-scaled step count using fractional accumulator
       const scaledSteps = config.stepsPerFrame * speed
       this.stepAccumulator += scaledSteps
@@ -946,8 +526,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         const phiPass = encoder.beginComputePass({ label: `free-scalar-update-phi-${step}` })
         this.dispatchCompute(
           phiPass,
-          this.updatePhiPipeline,
-          [this.updatePhiBindGroup],
+          this.pl.updatePhiPipeline,
+          [this.bg.updatePhiBG],
           linearWorkgroups
         )
         phiPass.end()
@@ -956,19 +536,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         const piPass = encoder.beginComputePass({ label: `free-scalar-update-pi-${step}` })
         this.dispatchCompute(
           piPass,
-          this.updatePiPipeline,
-          [this.updatePiBindGroup],
+          this.pl.updatePiPipeline,
+          [this.bg.updatePiBG],
           linearWorkgroups
         )
         piPass.end()
 
         // Step 3: PML absorber (damp phi and pi near boundaries)
-        if (config.absorberEnabled && this.absorberPipeline && this.initBindGroup) {
+        if (config.absorberEnabled) {
           const absPass = encoder.beginComputePass({ label: `free-scalar-absorber-${step}` })
           this.dispatchCompute(
             absPass,
-            this.absorberPipeline,
-            [this.initBindGroup], // reuses init bind group: uniform + phi + pi
+            this.pl.absorberPipeline,
+            [this.bg.initBG], // reuses init bind group: uniform + phi + pi
             linearWorkgroups
           )
           absPass.end()
@@ -977,13 +557,13 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
 
     // Write to 3D density grid texture
-    if (this.writeGridPipeline && this.writeGridBindGroup) {
+    if (this.pl && this.bg) {
       const gridWorkgroups = Math.ceil(DENSITY_GRID_SIZE / GRID_WORKGROUP_SIZE)
       const gridPass = encoder.beginComputePass({ label: 'free-scalar-write-grid-pass' })
       this.dispatchCompute(
         gridPass,
-        this.writeGridPipeline,
-        [this.writeGridBindGroup],
+        this.pl.writeGridPipeline,
+        [this.bg.writeGridBG],
         gridWorkgroups,
         gridWorkgroups,
         gridWorkgroups
@@ -991,7 +571,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       gridPass.end()
     } else {
       logger.warn(
-        `[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`
+        `[FreeScalarFieldComputePass] writeGrid skipped: pl=${!!this.pl}, bg=${!!this.bg}`
       )
     }
 
@@ -1196,87 +776,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
       const phi = new Float32Array(phiBuf.getMappedRange())
       const pi = new Float32Array(piBuf.getMappedRange())
-      const N = phi.length
-
-      // Compute cell volume (product of spacings)
-      let dV = 1
-      for (let d = 0; d < config.latticeDim; d++) dV *= config.spacing[d]!
-
-      // Single pass: accumulate all statistics
-      let sumPhi = 0,
-        sumPhi2 = 0,
-        sumPi2 = 0,
-        maxPhi = 0,
-        maxPi = 0
-
-      for (let i = 0; i < N; i++) {
-        const p = phi[i]!
-        const q = pi[i]!
-        sumPhi += p
-        sumPhi2 += p * p
-        sumPi2 += q * q
-        const ap = Math.abs(p)
-        const aq = Math.abs(q)
-        if (ap > maxPhi) maxPhi = ap
-        if (aq > maxPi) maxPi = aq
-      }
-
-      // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
-      // All dimensions contribute to total energy (including slice dims d>=3)
-      let gradEnergy = 0
-      const dimsForGrad = config.latticeDim
-      const strides = this.computeStrides(config)
-      for (let d = 0; d < dimsForGrad; d++) {
-        const stride = strides[d]!
-        const Nd = config.gridSize[d]!
-        const a = config.spacing[d]!
-        const invA2 = 1 / (a * a)
-        for (let i = 0; i < N; i++) {
-          const iNext = i + stride
-          const dimPos = Math.floor((i / stride) % Nd)
-          // With PML, boundaries are absorbing — don't wrap gradients across faces
-          const jNext =
-            dimPos === Nd - 1 ? (config.absorberEnabled ? -1 : i - stride * (Nd - 1)) : iNext
-          if (jNext >= 0 && jNext < N) {
-            const diff = phi[jNext]! - phi[i]!
-            gradEnergy += diff * diff * invA2
-          }
-        }
-      }
-      gradEnergy *= 0.5 * dV
-
-      const totalNorm = sumPhi2 * dV
-      const kineticEnergy = 0.5 * sumPi2 * dV
-      const massEnergy = 0.5 * config.mass * config.mass * sumPhi2 * dV
-      let potentialEnergy = 0
-      if (config.selfInteractionEnabled) {
-        const lambda = config.selfInteractionLambda
-        const v2 = config.selfInteractionVev * config.selfInteractionVev
-        for (let i = 0; i < N; i++) {
-          const p = phi[i]!
-          const diff = p * p - v2
-          potentialEnergy += lambda * diff * diff
-        }
-        potentialEnergy *= dV
-      }
-
-      const totalEnergy = kineticEnergy + gradEnergy + massEnergy + potentialEnergy
-      const meanPhi = sumPhi / N
-      const variancePhi = sumPhi2 / N - meanPhi * meanPhi
+      const snapshot = computeFsfDiagnostics(phi, pi, config)
 
       phiBuf.unmap()
       piBuf.unmap()
 
-      useFsfDiagnosticsStore.getState().pushSnapshot({
-        totalEnergy,
-        totalNorm,
-        maxPhi,
-        maxPi,
-        energyDrift: 0, // computed by store
-        meanPhi,
-        variancePhi,
-      })
-
+      useFsfDiagnosticsStore.getState().pushSnapshot(snapshot)
       this.diagMappingInFlight = false
     } catch {
       this.diagMappingInFlight = false
@@ -1323,21 +828,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.kSpaceWorker?.terminate()
     this.kSpaceWorker = null
 
-    this.initPipeline = null
-    this.absorberPipeline = null
-    this.updatePiPipeline = null
-    this.updatePhiPipeline = null
-    this.writeGridPipeline = null
-
-    this.initBindGroup = null
-    this.updatePiBindGroup = null
-    this.updatePhiBindGroup = null
-    this.writeGridBindGroup = null
-
-    this.initBindGroupLayout = null
-    this.updatePiBindGroupLayout = null
-    this.updatePhiBindGroupLayout = null
-    this.writeGridBindGroupLayout = null
+    this.pl = null
+    this.bg = null
 
     this.initialized = false
     this.lastConfigHash = ''

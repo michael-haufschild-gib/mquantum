@@ -162,21 +162,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
    * split-operator TDSE pipeline, with mode-specific initial conditions
    * (Thomas-Fermi, vortex imprint, dark soliton) and an anisotropic trap.
    */
-  private static buildBecConfig(
-    bec: BecConfig,
-    schroedinger:
-      | {
-          absorberEnabled?: boolean
-          absorberWidth?: number
-          pmlTargetReflection?: number
-        }
-      | undefined
-  ): { config: TdseConfig } {
+  /** Validate BEC initial condition and compute mapped init type + momentum params. */
+  private static prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
     let initCond = bec.initialCondition ?? 'thomasFermi'
-    const g = bec.interactionStrength ?? 500
-    const omega = bec.trapOmega ?? 1.0
-    const latDim = bec.latticeDim ?? 3
-    const initOmega = bec.initTrapOmega ?? omega
 
     // Attractive BEC (g < 0): Thomas-Fermi doesn't apply → force Gaussian
     if (
@@ -192,6 +180,39 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // Map vortexLattice to vortexImprint (same shader, different count)
     const mappedInit = initCond === 'vortexLattice' ? 'vortexImprint' : initCond
 
+    // Build momentum vector — encode BEC-specific params
+    const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
+    if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
+      mom[0] = bec.vortexCharge ?? 1
+      if (initCond === 'vortexLattice') {
+        mom[3] = bec.vortexLatticeCount ?? 4
+        mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
+      }
+    }
+    if (initCond === 'darkSoliton') {
+      mom[1] = bec.solitonDepth ?? 1.0
+      mom[2] = bec.solitonVelocity ?? 0.0
+    }
+    return { mappedInit, mom }
+  }
+
+  /**
+   * Map BEC store config to TDSE config format.
+   */
+  private static buildBecConfig(
+    bec: BecConfig,
+    schroedinger:
+      | {
+          absorberEnabled?: boolean
+          absorberWidth?: number
+          pmlTargetReflection?: number
+        }
+      | undefined
+  ): { config: TdseConfig } {
+    const g = bec.interactionStrength ?? 500
+    const omega = bec.trapOmega ?? 1.0
+    const latDim = bec.latticeDim ?? 3
+    const initOmega = bec.initTrapOmega ?? omega
     const anisotropy = bec.trapAnisotropy ?? (new Array(latDim).fill(1.0) as number[])
 
     // Chemical potential for init shader
@@ -208,19 +229,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         ? thomasFermiMuND(latDim, g, effectiveInitOmega)
         : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
-    // Build momentum vector — encode BEC-specific params
-    const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
-    if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
-      mom[0] = bec.vortexCharge ?? 1
-      if (initCond === 'vortexLattice') {
-        mom[3] = bec.vortexLatticeCount ?? 4
-        mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
-      }
-    }
-    if (initCond === 'darkSoliton') {
-      mom[1] = bec.solitonDepth ?? 1.0
-      mom[2] = bec.solitonVelocity ?? 0.0
-    }
+    const { mappedInit, mom } = TdseBecStrategy.prepareBecInitCondition(bec, g, latDim)
 
     return {
       config: {

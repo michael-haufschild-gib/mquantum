@@ -7,7 +7,7 @@
  * @module rendering/webgpu/useExportRuntime
  */
 
-import React, { useCallback } from 'react'
+import { useCallback } from 'react'
 
 import { VideoRecorder } from '@/lib/export/video'
 import {
@@ -16,75 +16,29 @@ import {
   ensureEvenDimensions,
   resolveExportDimensions,
 } from '@/lib/export/videoExportPlanning'
-import { type ExportSettings, useExportStore } from '@/stores/exportStore'
+import { useExportStore } from '@/stores/exportStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useRotationStore } from '@/stores/rotationStore'
 
-import type { WebGPUCamera } from './core/WebGPUCamera'
-import type { WebGPUDevice } from './core/WebGPUDevice'
-import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import {
   cloneExportSettings,
+  createExportRecorder,
   createInitialExportLoopState,
-  type ExportRuntimeState,
   isExportRuntimeActive,
   resolveRuntimeExportMode,
+  triggerSegmentDownload,
+  type UseExportRuntimeParams,
+  type UseExportRuntimeReturn,
+  validateExportSettings,
   waitForPaint,
 } from './sceneExportRuntime'
 
-// ============================================================================
-// Hook Interface
-// ============================================================================
-
-/**
- * Dependencies injected from the parent WebGPUScene component.
- */
-export interface UseExportRuntimeParams {
-  canvas: HTMLCanvasElement
-  device: WebGPUDevice
-  graph: WebGPURenderGraph
-  cameraRef: React.RefObject<WebGPUCamera | null>
-  size: { width: number; height: number }
-  /** Advance animation/rotation state by a fixed time delta. */
-  advanceSceneStateByDelta: (deltaTime: number) => void
-  /** Execute one render frame with the given time delta. */
-  executeSceneFrame: (deltaTime: number) => void
-  /** Externally owned ref for the export runtime state. */
-  exportRuntimeRef: React.RefObject<ExportRuntimeState>
-}
-
-/** Return type of {@link useExportRuntime}: per-frame tick and cleanup handles. */
-export interface UseExportRuntimeReturn {
-  /**
-   * Called once per rAF tick. Handles export start/cancel dispatch and batch
-   * processing. Returns `true` if an export is active (caller should skip
-   * normal rendering).
-   */
-  tickExport: () => boolean
-  /** Cleanup function to call in the component's teardown effect. */
-  cleanupExport: () => void
-}
+// Re-export interfaces for consumers
+export type { UseExportRuntimeParams, UseExportRuntimeReturn } from './sceneExportRuntime'
 
 // ============================================================================
 // Hook
 // ============================================================================
-
-/** Download a recorded video segment as a file. */
-function triggerSegmentDownload(
-  blob: Blob,
-  segmentIndex: number,
-  format: ExportSettings['format']
-): void {
-  const ext = format === 'webm' ? 'webm' : 'mp4'
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `mdimension-${Date.now()}-part${segmentIndex}.${ext}`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
 
 /**
  * Encapsulates all video export orchestration: start, cancel, finish,
@@ -401,15 +355,7 @@ export function useExportRuntime({
         return
       }
 
-      if (!Number.isFinite(settings.fps) || settings.fps <= 0) {
-        throw new Error(`Invalid FPS: ${settings.fps}`)
-      }
-      if (!Number.isFinite(settings.duration) || settings.duration <= 0) {
-        throw new Error(`Invalid duration: ${settings.duration}`)
-      }
-      if (!Number.isFinite(settings.bitrate) || settings.bitrate <= 0) {
-        throw new Error(`Invalid bitrate: ${settings.bitrate}`)
-      }
+      validateExportSettings(settings)
 
       const resolved = resolveExportDimensions(
         settings.resolution,
@@ -479,26 +425,13 @@ export function useExportRuntime({
       if (mode !== 'stream') {
         const firstRecorderDuration =
           mode === 'segmented' ? segmentDurationFrames / settings.fps : settings.duration
-        const recorder = new VideoRecorder(canvas, {
-          width: runtime.exportWidth,
-          height: runtime.exportHeight,
-          fps: settings.fps,
-          duration: firstRecorderDuration,
-          totalDuration: settings.duration,
-          bitrate: settings.bitrate,
-          format: settings.format,
-          codec: settings.codec,
-          onProgress: (progress) => {
-            if (mode !== 'segmented') {
-              useExportStore.getState().setProgress(progress)
-            }
-          },
-          hardwareAcceleration: settings.hardwareAcceleration,
-          bitrateMode: settings.bitrateMode,
-          textOverlay: settings.textOverlay,
-          crop: settings.crop,
-          rotation: settings.rotation,
-        })
+        const recorder = createExportRecorder(
+          canvas,
+          settings,
+          runtime.exportWidth,
+          runtime.exportHeight,
+          firstRecorderDuration
+        )
         await recorder.initialize()
         runtime.recorder = recorder
       }
@@ -565,20 +498,13 @@ export function useExportRuntime({
             loop.frameId = 0
             loop.totalFrames = Math.max(1, Math.ceil(previewDuration * settings.fps))
 
-            const previewRecorder = new VideoRecorder(canvas, {
-              width: runtime.exportWidth,
-              height: runtime.exportHeight,
-              fps: settings.fps,
-              duration: previewDuration,
-              bitrate: settings.bitrate,
-              format: settings.format,
-              codec: settings.codec,
-              hardwareAcceleration: settings.hardwareAcceleration,
-              bitrateMode: settings.bitrateMode,
-              textOverlay: settings.textOverlay,
-              crop: settings.crop,
-              rotation: settings.rotation,
-            })
+            const previewRecorder = createExportRecorder(
+              canvas,
+              settings,
+              runtime.exportWidth,
+              runtime.exportHeight,
+              previewDuration
+            )
             await previewRecorder.initialize()
             runtime.recorder = previewRecorder
             exportStore.setStatus('previewing')
@@ -684,21 +610,13 @@ export function useExportRuntime({
           const remainingFrames = loop.totalFrames - loop.frameId
           const nextSegmentFrames = Math.min(loop.segmentDurationFrames, remainingFrames)
 
-          const nextRecorder = new VideoRecorder(canvas, {
-            width: runtime.exportWidth,
-            height: runtime.exportHeight,
-            fps: settings.fps,
-            duration: nextSegmentFrames / settings.fps,
-            totalDuration: settings.duration,
-            bitrate: settings.bitrate,
-            format: settings.format,
-            codec: settings.codec,
-            hardwareAcceleration: settings.hardwareAcceleration,
-            bitrateMode: settings.bitrateMode,
-            textOverlay: settings.textOverlay,
-            crop: settings.crop,
-            rotation: settings.rotation,
-          })
+          const nextRecorder = createExportRecorder(
+            canvas,
+            settings,
+            runtime.exportWidth,
+            runtime.exportHeight,
+            nextSegmentFrames / settings.fps
+          )
           await nextRecorder.initialize()
           runtime.recorder = nextRecorder
         }

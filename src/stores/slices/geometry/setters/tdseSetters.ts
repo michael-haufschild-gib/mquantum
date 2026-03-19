@@ -18,6 +18,7 @@ import {
   type SetterContext,
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
+import { createTdsePotentialSetters } from './tdsePotentialSetters'
 
 type TdseActions = Pick<
   SchroedingerSliceActions,
@@ -311,308 +312,34 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         },
       }))
     },
-    setTdseBarrierHeight: (height) => {
-      if (!isFinite(height)) {
-        warnNonFinite('tdse.barrierHeight', height)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierHeight: clamped },
-        },
-      }))
-    },
-    setTdseBarrierWidth: (width) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.barrierWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierWidth: clamped },
-        },
-      }))
-    },
-    setTdseBarrierCenter: (center) => {
-      if (!isFinite(center)) {
-        warnNonFinite('tdse.barrierCenter', center)
-        return
-      }
-      const clamped = Math.max(-10.0, Math.min(10.0, center))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierCenter: clamped },
-        },
-      }))
-    },
-    setTdseWellDepth: (depth) => {
-      if (!isFinite(depth)) {
-        warnNonFinite('tdse.wellDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellDepth: clamped },
-        },
-      }))
-    },
-    setTdseWellWidth: (width) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.wellWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellWidth: clamped },
-        },
-      }))
-    },
-    setTdseHarmonicOmega: (omega) => {
-      if (!isFinite(omega)) {
-        warnNonFinite('tdse.harmonicOmega', omega)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100.0, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, harmonicOmega: clamped },
-        },
-      }))
-    },
-    setTdseStepHeight: (height) => {
-      if (!isFinite(height)) {
-        warnNonFinite('tdse.stepHeight', height)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stepHeight: clamped },
-        },
-      }))
-    },
-    setTdseSlitSeparation: (separation) => {
-      if (!isFinite(separation)) {
-        warnNonFinite('tdse.slitSeparation', separation)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(10.0, separation))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitSeparation: clamped },
-        },
-      }))
-    },
-    setTdseSlitWidth: (width) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.slitWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitWidth: clamped },
-        },
-      }))
-    },
-    setTdseWallThickness: (thickness) => {
-      if (!isFinite(thickness)) {
-        warnNonFinite('tdse.wallThickness', thickness)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(3.0, thickness))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallThickness: clamped },
-        },
-      }))
-    },
-    setTdseWallHeight: (height) => {
-      if (!isFinite(height)) {
-        warnNonFinite('tdse.wallHeight', height)
-        return
-      }
-      const clamped = Math.max(1.0, Math.min(500.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallHeight: clamped },
-        },
-      }))
-    },
-    setTdseLatticeDepth: (depth) => {
-      if (!isFinite(depth)) {
-        warnNonFinite('tdse.latticeDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticeDepth: clamped },
-        },
-      }))
-    },
-    setTdseLatticePeriod: (period) => {
-      if (!isFinite(period)) {
-        warnNonFinite('tdse.latticePeriod', period)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(10.0, period))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticePeriod: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellLambda: (lambda) => {
-      if (!isFinite(lambda)) {
-        warnNonFinite('tdse.doubleWellLambda', lambda)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100.0, lambda))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellLambda: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellSeparation: (separation) => {
-      if (!isFinite(separation)) {
-        warnNonFinite('tdse.doubleWellSeparation', separation)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(5.0, separation))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellSeparation: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellAsymmetry: (asymmetry) => {
-      if (!isFinite(asymmetry)) {
-        warnNonFinite('tdse.doubleWellAsymmetry', asymmetry)
-        return
-      }
-      const clamped = Math.max(0, Math.min(50.0, asymmetry))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellInner: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('tdse.radialWellInner', r)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellInner: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellOuter: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('tdse.radialWellOuter', r)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellOuter: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellDepth: (depth) => {
-      if (!isFinite(depth)) {
-        warnNonFinite('tdse.radialWellDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(500.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellDepth: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellTilt: (tilt) => {
-      if (!isFinite(tilt)) {
-        warnNonFinite('tdse.radialWellTilt', tilt)
-        return
-      }
-      const clamped = Math.max(0, Math.min(50.0, tilt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellTilt: clamped },
-        },
-      }))
-    },
-    setTdseDriveEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDriveWaveform: (waveform) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveWaveform: waveform },
-        },
-      }))
-    },
-    setTdseDriveFrequency: (frequency) => {
-      if (!isFinite(frequency)) {
-        warnNonFinite('tdse.driveFrequency', frequency)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100.0, frequency))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveFrequency: clamped },
-        },
-      }))
-    },
-    setTdseDriveAmplitude: (amplitude) => {
-      if (!isFinite(amplitude)) {
-        warnNonFinite('tdse.driveAmplitude', amplitude)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, amplitude))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveAmplitude: clamped },
-        },
-      }))
-    },
+    // Potential and drive parameter setters (data-driven, extracted to tdsePotentialSetters.ts)
+    ...(createTdsePotentialSetters(ctx) as unknown as Pick<
+      TdseActions,
+      | 'setTdseBarrierHeight'
+      | 'setTdseBarrierWidth'
+      | 'setTdseBarrierCenter'
+      | 'setTdseWellDepth'
+      | 'setTdseWellWidth'
+      | 'setTdseHarmonicOmega'
+      | 'setTdseStepHeight'
+      | 'setTdseSlitSeparation'
+      | 'setTdseSlitWidth'
+      | 'setTdseWallThickness'
+      | 'setTdseWallHeight'
+      | 'setTdseLatticeDepth'
+      | 'setTdseLatticePeriod'
+      | 'setTdseDoubleWellLambda'
+      | 'setTdseDoubleWellSeparation'
+      | 'setTdseDoubleWellAsymmetry'
+      | 'setTdseRadialWellInner'
+      | 'setTdseRadialWellOuter'
+      | 'setTdseRadialWellDepth'
+      | 'setTdseRadialWellTilt'
+      | 'setTdseDriveEnabled'
+      | 'setTdseDriveWaveform'
+      | 'setTdseDriveFrequency'
+      | 'setTdseDriveAmplitude'
+    >),
     setTdseAbsorberEnabled: (enabled) => {
       setWithVersion((state) => ({
         schroedinger: {

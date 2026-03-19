@@ -105,6 +105,8 @@ export default defineConfig((_env) => ({
           if (id.includes('/lib/physics/') || id.includes('/lib/math/')) return 'physics'
           // Split stores
           if (id.includes('/stores/')) return 'stores'
+          // Split components to keep index chunk under 500KB
+          if (id.includes('/components/')) return 'components'
         },
       },
     },

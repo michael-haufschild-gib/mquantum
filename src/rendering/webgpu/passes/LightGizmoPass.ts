@@ -351,6 +351,170 @@ export class LightGizmoPass extends WebGPUBasePass {
   /**
    * Execute the gizmo render pass.
    */
+  /** Generate vertices for a single light's gizmo, ground visualization, and selection ring. */
+  private generateLightVertices(
+    light: LightSource,
+    allVertices: number[],
+    camPos: [number, number, number],
+    camRight: [number, number, number],
+    camUp: [number, number, number],
+    selectedLightId: string | null | undefined
+  ): void {
+    const alpha = light.enabled ? 1.0 : 0.3
+    const pos = light.position
+    const scale = computeGizmoScale(pos, camPos)
+    const isSelected = selectedLightId === light.id
+
+    if (light.type === 'point') {
+      const ico = generateIcosahedronWireframe(light.color, alpha)
+      transformAndAppend(ico, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
+    } else if (light.type === 'directional') {
+      const oct = generateOctahedronWireframe(light.color, alpha)
+      transformAndAppend(oct, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
+      const arrowColor = light.enabled ? ARROW_COLOR_ENABLED : ARROW_COLOR_DISABLED
+      const arrow = generateArrow(arrowColor, alpha)
+      const dir = rotationToDirection(light.rotation)
+      const [qx, qy, qz, qw] = quaternionFromDefaultToDirection(dir[0], dir[1], dir[2])
+      transformAndAppend(arrow, allVertices, scale, qx, qy, qz, qw, pos[0], pos[1], pos[2])
+    } else if (light.type === 'spot') {
+      const sphere = generateSphereWireframe(light.color, alpha)
+      transformAndAppend(sphere, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
+      const cone = generateConeWireframe(light.coneAngle, light.color, alpha * 0.5)
+      const dir = rotationToDirection(light.rotation)
+      const [qx, qy, qz, qw] = quaternionFromDefaultToDirection(dir[0], dir[1], dir[2])
+      transformAndAppend(cone, allVertices, scale, qx, qy, qz, qw, pos[0], pos[1], pos[2])
+    }
+
+    if (isSelected) {
+      transformBillboardAndAppend(
+        selectionRingTemplate,
+        allVertices,
+        scale,
+        camRight,
+        camUp,
+        pos[0],
+        pos[1],
+        pos[2]
+      )
+    }
+
+    this.generateGroundVisualization(light, allVertices, isSelected)
+  }
+
+  /** Generate ground intersection visualizations for directional/spot/point lights. */
+  private generateGroundVisualization(
+    light: LightSource,
+    allVertices: number[],
+    isSelected: boolean
+  ): void {
+    const pos = light.position
+    const groundColor = light.enabled ? light.color : '#666666'
+    const groundAlpha = light.enabled ? 0.6 : 0.3
+
+    if (light.type === 'spot' || light.type === 'directional') {
+      const dir = rotationToDirection(light.rotation)
+      const groundHit = calculateGroundIntersection(pos, dir)
+      if (!groundHit) return
+
+      const dashVerts = generateDashedLine(
+        pos[0],
+        pos[1],
+        pos[2],
+        groundHit[0],
+        groundHit[1],
+        groundHit[2],
+        groundColor,
+        groundAlpha
+      )
+      for (let i = 0; i < dashVerts.length; i++) allVertices.push(dashVerts[i]!)
+
+      if (light.type === 'spot') {
+        const ellipseVerts = generateGroundEllipse(
+          pos,
+          dir,
+          light.coneAngle,
+          groundHit,
+          groundColor,
+          light.enabled ? 0.8 : 0.4
+        )
+        for (let i = 0; i < ellipseVerts.length; i++) allVertices.push(ellipseVerts[i]!)
+      }
+
+      const targetColor = isSelected ? '#00ff00' : groundColor
+      const targetAlpha = isSelected ? 0.7 : 0.5
+      const targetVerts = generateGroundTarget(groundHit[0], groundHit[2], targetColor, targetAlpha)
+      for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
+    } else if (light.type === 'point') {
+      const sphereHit = calculateSphereGroundIntersection(pos, light.range)
+      if (!sphereHit) return
+
+      const circleVerts = generateGroundCircle(
+        sphereHit.center[0],
+        sphereHit.center[2],
+        sphereHit.radius,
+        groundColor,
+        light.enabled ? 0.8 : 0.4
+      )
+      for (let i = 0; i < circleVerts.length; i++) allVertices.push(circleVerts[i]!)
+
+      const targetColor = isSelected ? '#00ff00' : groundColor
+      const targetAlpha = isSelected ? 0.7 : 0.5
+      const targetVerts = generateGroundTarget(
+        sphereHit.center[0],
+        sphereHit.center[2],
+        targetColor,
+        targetAlpha
+      )
+      for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
+    }
+  }
+
+  /** Generate transform gizmo (translate/rotate) for the selected light. */
+  private generateTransformGizmo(
+    lighting: {
+      lights?: LightSource[]
+      selectedLightId?: string | null
+      transformMode?: TransformMode
+    },
+    allVertices: number[],
+    camPos: [number, number, number]
+  ): void {
+    const selectedLight = lighting.lights?.find((l) => l.id === lighting.selectedLightId)
+    if (!selectedLight) return
+
+    const selScale = computeGizmoScale(selectedLight.position, camPos)
+    const sp = selectedLight.position
+    const mode = lighting.transformMode ?? 'translate'
+
+    if (mode === 'translate') {
+      transformAndAppend(
+        translateGizmoTemplate,
+        allVertices,
+        selScale,
+        0,
+        0,
+        0,
+        1,
+        sp[0],
+        sp[1],
+        sp[2]
+      )
+    } else if (mode === 'rotate') {
+      transformAndAppend(
+        rotateGizmoTemplate,
+        allVertices,
+        selScale,
+        0,
+        0,
+        0,
+        1,
+        sp[0],
+        sp[1],
+        sp[2]
+      )
+    }
+  }
+
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
@@ -406,161 +570,18 @@ export class LightGizmoPass extends WebGPUBasePass {
     const allVertices: number[] = []
 
     for (const light of lighting.lights) {
-      const alpha = light.enabled ? 1.0 : 0.3
-      const pos = light.position
-      const scale = computeGizmoScale(pos, camPos)
-      const isSelected = lighting.selectedLightId === light.id
-
-      if (light.type === 'point') {
-        // Wireframe icosahedron in light color
-        const ico = generateIcosahedronWireframe(light.color, alpha)
-        transformAndAppend(ico, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
-      } else if (light.type === 'directional') {
-        // Wireframe octahedron in light color
-        const oct = generateOctahedronWireframe(light.color, alpha)
-        transformAndAppend(oct, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
-
-        // Direction arrow (yellow when enabled, grey when disabled)
-        const arrowColor = light.enabled ? ARROW_COLOR_ENABLED : ARROW_COLOR_DISABLED
-        const arrow = generateArrow(arrowColor, alpha)
-        const dir = rotationToDirection(light.rotation)
-        const [qx, qy, qz, qw] = quaternionFromDefaultToDirection(dir[0], dir[1], dir[2])
-        transformAndAppend(arrow, allVertices, scale, qx, qy, qz, qw, pos[0], pos[1], pos[2])
-      } else if (light.type === 'spot') {
-        // Small sphere at apex
-        const sphere = generateSphereWireframe(light.color, alpha)
-        transformAndAppend(sphere, allVertices, scale, 0, 0, 0, 1, pos[0], pos[1], pos[2])
-
-        // Wireframe cone showing beam
-        const cone = generateConeWireframe(light.coneAngle, light.color, alpha * 0.5)
-        const dir = rotationToDirection(light.rotation)
-        const [qx, qy, qz, qw] = quaternionFromDefaultToDirection(dir[0], dir[1], dir[2])
-        transformAndAppend(cone, allVertices, scale, qx, qy, qz, qw, pos[0], pos[1], pos[2])
-      }
-
-      // Selection ring (billboarded)
-      if (isSelected) {
-        transformBillboardAndAppend(
-          selectionRingTemplate,
-          allVertices,
-          scale,
-          camRight,
-          camUp,
-          pos[0],
-          pos[1],
-          pos[2]
-        )
-      }
-
-      // ---- Ground visualizations ----
-      const groundColor = light.enabled ? light.color : '#666666'
-      const groundAlpha = light.enabled ? 0.6 : 0.3
-
-      if (light.type === 'spot' || light.type === 'directional') {
-        const dir = rotationToDirection(light.rotation)
-        const groundHit = calculateGroundIntersection(pos, dir)
-
-        if (groundHit) {
-          // Dashed ray from light to ground
-          const dashVerts = generateDashedLine(
-            pos[0],
-            pos[1],
-            pos[2],
-            groundHit[0],
-            groundHit[1],
-            groundHit[2],
-            groundColor,
-            groundAlpha
-          )
-          for (let i = 0; i < dashVerts.length; i++) allVertices.push(dashVerts[i]!)
-
-          // Spot: cone ellipse on ground
-          if (light.type === 'spot') {
-            const ellipseVerts = generateGroundEllipse(
-              pos,
-              dir,
-              light.coneAngle,
-              groundHit,
-              groundColor,
-              light.enabled ? 0.8 : 0.4
-            )
-            for (let i = 0; i < ellipseVerts.length; i++) allVertices.push(ellipseVerts[i]!)
-          }
-
-          // Draggable ground target
-          const targetColor = isSelected ? '#00ff00' : groundColor
-          const targetAlpha = isSelected ? 0.7 : 0.5
-          const targetVerts = generateGroundTarget(
-            groundHit[0],
-            groundHit[2],
-            targetColor,
-            targetAlpha
-          )
-          for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
-        }
-      } else if (light.type === 'point') {
-        const sphereHit = calculateSphereGroundIntersection(pos, light.range)
-
-        if (sphereHit) {
-          // Circle outline on ground
-          const circleVerts = generateGroundCircle(
-            sphereHit.center[0],
-            sphereHit.center[2],
-            sphereHit.radius,
-            groundColor,
-            light.enabled ? 0.8 : 0.4
-          )
-          for (let i = 0; i < circleVerts.length; i++) allVertices.push(circleVerts[i]!)
-
-          // Draggable ground target at center
-          const targetColor = isSelected ? '#00ff00' : groundColor
-          const targetAlpha = isSelected ? 0.7 : 0.5
-          const targetVerts = generateGroundTarget(
-            sphereHit.center[0],
-            sphereHit.center[2],
-            targetColor,
-            targetAlpha
-          )
-          for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
-        }
-      }
+      this.generateLightVertices(
+        light,
+        allVertices,
+        camPos,
+        camRight,
+        camUp,
+        lighting.selectedLightId
+      )
     }
 
     // ---- Transform gizmo for selected light ----
-    const selectedLight = lighting.lights.find((l) => l.id === lighting.selectedLightId)
-    if (selectedLight) {
-      const selScale = computeGizmoScale(selectedLight.position, camPos)
-      const sp = selectedLight.position
-      const mode = lighting.transformMode ?? 'translate'
-
-      if (mode === 'translate') {
-        transformAndAppend(
-          translateGizmoTemplate,
-          allVertices,
-          selScale,
-          0,
-          0,
-          0,
-          1,
-          sp[0],
-          sp[1],
-          sp[2]
-        )
-      } else if (mode === 'rotate') {
-        transformAndAppend(
-          rotateGizmoTemplate,
-          allVertices,
-          selScale,
-          0,
-          0,
-          0,
-          1,
-          sp[0],
-          sp[1],
-          sp[2]
-        )
-      }
-    }
+    this.generateTransformGizmo(lighting, allVertices, camPos)
 
     this.vertexCount = allVertices.length / VERTEX_STRIDE
     if (this.vertexCount === 0) return

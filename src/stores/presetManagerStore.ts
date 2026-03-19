@@ -58,6 +58,45 @@ let pendingSceneLoadRafId: number | null = null
  * Schedules scene load completion after React settles.
  * Cancels any pending callback to prevent race conditions.
  */
+/** Restore rotation state from serialized scene data. */
+function restoreRotationState(rotationData: Record<string, unknown>): void {
+  const rotState = sanitizeLoadedState({ ...rotationData })
+  const rotationUpdates = new Map<string, number>()
+  if (rotState.rotations instanceof Map) {
+    for (const [plane, angle] of rotState.rotations.entries()) {
+      if (typeof angle === 'number') rotationUpdates.set(plane, angle)
+    }
+  } else if (
+    rotState.rotations &&
+    typeof rotState.rotations === 'object' &&
+    !Array.isArray(rotState.rotations)
+  ) {
+    for (const [plane, angle] of Object.entries(rotState.rotations as Record<string, unknown>)) {
+      if (typeof angle === 'number') rotationUpdates.set(plane, angle)
+    }
+  }
+  const rotationStore = useRotationStore.getState()
+  rotationStore.resetAllRotations()
+  if (rotationUpdates.size > 0) rotationStore.updateRotations(rotationUpdates)
+}
+
+/** Restore animation state from serialized scene data. */
+function restoreAnimationState(animationData: Record<string, unknown>): void {
+  const animState = normalizeAnimationLoadData(sanitizeLoadedState({ ...animationData }))
+  if (Array.isArray(animState.animatingPlanes)) {
+    animState.animatingPlanes = new Set(animState.animatingPlanes)
+  }
+  useAnimationStore.setState({
+    isPlaying: true,
+    speed: DEFAULT_SPEED,
+    direction: 1 as const,
+    animatingPlanes: new Set(['XY', 'YZ', 'XZ']),
+    accumulatedTime: 0,
+    ...animState,
+  })
+  useAnimationStore.getState().setDimension(useGeometryStore.getState().dimension)
+}
+
 function scheduleSceneLoadComplete(): void {
   // Cancel any pending callback to prevent premature completion
   if (pendingSceneLoadRafId !== null) {
@@ -479,54 +518,12 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
         // Special handling for Rotation
         if (scene.data.rotation) {
-          const rotState = sanitizeLoadedState({ ...scene.data.rotation })
-          const rotationUpdates = new Map<string, number>()
-          if (rotState.rotations instanceof Map) {
-            for (const [plane, angle] of rotState.rotations.entries()) {
-              if (typeof angle === 'number') {
-                rotationUpdates.set(plane, angle)
-              }
-            }
-          } else if (
-            rotState.rotations &&
-            typeof rotState.rotations === 'object' &&
-            !Array.isArray(rotState.rotations)
-          ) {
-            for (const [plane, angle] of Object.entries(
-              rotState.rotations as Record<string, unknown>
-            )) {
-              if (typeof angle === 'number') {
-                rotationUpdates.set(plane, angle)
-              }
-            }
-          }
-          const rotationStore = useRotationStore.getState()
-          rotationStore.resetAllRotations()
-          if (rotationUpdates.size > 0) {
-            rotationStore.updateRotations(rotationUpdates)
-          }
+          restoreRotationState(scene.data.rotation)
         }
 
         // Special handling for Animation (Array -> Set)
         if (scene.data.animation) {
-          const animState = normalizeAnimationLoadData(
-            sanitizeLoadedState({ ...scene.data.animation })
-          )
-          if (Array.isArray(animState.animatingPlanes)) {
-            animState.animatingPlanes = new Set(animState.animatingPlanes)
-          }
-          // Spread animation defaults first so missing/stripped fields reset to
-          // defaults instead of retaining the current store value.
-          useAnimationStore.setState({
-            isPlaying: true,
-            speed: DEFAULT_SPEED,
-            direction: 1 as const,
-            animatingPlanes: new Set(['XY', 'YZ', 'XZ']),
-            accumulatedTime: 0,
-            ...animState,
-          })
-          // Enforce dimension-dependent plane validity after direct hydration.
-          useAnimationStore.getState().setDimension(useGeometryStore.getState().dimension)
+          restoreAnimationState(scene.data.animation)
         }
 
         // Special handling for Camera

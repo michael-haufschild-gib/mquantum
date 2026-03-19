@@ -9,16 +9,13 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
-import type { QuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { logger } from '@/lib/logger'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb } from '../utils/color'
-import type { CameraSnapshot, TransformSnapshot } from './schrodingerRendererTypes'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
   CROSS_SECTION_SCALAR_MAP,
@@ -346,56 +343,64 @@ function packNodalAndColorSystem(
   intView[1036 / 4] = 0
 }
 
+/** Pack phase materiality and interference fields (offsets 1040-1068). */
+function packPhaseAndInterference(
+  floatView: Float32Array,
+  intView: Int32Array,
+  boundingRadius: number,
+  isDensityMatrixMode: boolean,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  floatView[1040 / 4] = boundingRadius
+  floatView[1044 / 4] = 1.0 / boundingRadius
+  intView[1048 / 4] = !isDensityMatrixMode && schroedinger?.phaseMaterialityEnabled ? 1 : 0
+  floatView[1052 / 4] = schroedinger?.phaseMaterialityStrength ?? 1.0
+  intView[1056 / 4] = !isDensityMatrixMode && schroedinger?.interferenceEnabled ? 1 : 0
+  floatView[1060 / 4] = schroedinger?.interferenceAmp ?? 0.5
+  floatView[1064 / 4] = schroedinger?.interferenceFreq ?? 10.0
+  floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
+}
+
+/** Pack nodal surface controls (offsets 1072-1212). */
+function packNodalControls(
+  floatView: Float32Array,
+  intView: Int32Array,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
+  intView[1072 / 4] = NODAL_DEFINITION_MAP[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
+  floatView[1076 / 4] = schroedinger?.nodalTolerance ?? 0.02
+  intView[1080 / 4] = NODAL_FAMILY_MAP[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
+  intView[1084 / 4] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
+  packColorRgba(floatView, 1088 / 4, schroedinger?.nodalColorReal ?? '#00ffff')
+  packColorRgba(floatView, 1104 / 4, schroedinger?.nodalColorImag ?? '#ff66ff')
+  packColorRgba(floatView, 1120 / 4, schroedinger?.nodalColorPositive ?? '#22c55e')
+  packColorRgba(floatView, 1136 / 4, schroedinger?.nodalColorNegative ?? '#ef4444')
+  intView[1200 / 4] = NODAL_RENDER_MODE_MAP[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
+  intView[1204 / 4] = 0
+  floatView[1208 / 4] = 0.0
+  floatView[1212 / 4] = 0.0
+}
+
 /** Pack bounding radius, interference, physical nodal controls, and flow (offsets 1040-1212). */
 function packOverlayControls(
   floatView: Float32Array,
   intView: Int32Array,
   p: SchroedingerPackParams
 ): void {
-  const {
-    isDensityMatrixMode,
-    schroedinger,
-    appearance,
-    boundingRadius,
-    uncertaintyConfidenceMass,
-    uncertaintyBoundaryWidth,
-    uncertaintyLogRhoThreshold,
-  } = p
+  const { isDensityMatrixMode, schroedinger, appearance } = p
 
-  // Dynamic bounding radius (offset 1040+)
-  floatView[1040 / 4] = boundingRadius
-  floatView[1044 / 4] = 1.0 / boundingRadius
-  intView[1048 / 4] = !isDensityMatrixMode && schroedinger?.phaseMaterialityEnabled ? 1 : 0
-  floatView[1052 / 4] = schroedinger?.phaseMaterialityStrength ?? 1.0
+  packPhaseAndInterference(floatView, intView, p.boundingRadius, isDensityMatrixMode, schroedinger)
+  packNodalControls(floatView, intView, schroedinger)
 
-  // Interference fringing (offset 1056+)
-  intView[1056 / 4] = !isDensityMatrixMode && schroedinger?.interferenceEnabled ? 1 : 0
-  floatView[1060 / 4] = schroedinger?.interferenceAmp ?? 0.5
-  floatView[1064 / 4] = schroedinger?.interferenceFreq ?? 10.0
-  floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
-
-  // Physical nodal controls (offset 1072+)
-  intView[1072 / 4] = NODAL_DEFINITION_MAP[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
-  floatView[1076 / 4] = schroedinger?.nodalTolerance ?? 0.02
-  intView[1080 / 4] = NODAL_FAMILY_MAP[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
-  intView[1084 / 4] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
-
-  packColorRgba(floatView, 1088 / 4, schroedinger?.nodalColorReal ?? '#00ffff')
-  packColorRgba(floatView, 1104 / 4, schroedinger?.nodalColorImag ?? '#ff66ff')
-  packColorRgba(floatView, 1120 / 4, schroedinger?.nodalColorPositive ?? '#22c55e')
-  packColorRgba(floatView, 1136 / 4, schroedinger?.nodalColorNegative ?? '#ef4444')
-
-  // Probability flow + uncertainty (offset 1152-1164)
+  // Probability flow + uncertainty (offset 1152-1180)
   intView[1152 / 4] = schroedinger?.probabilityFlowEnabled ? 1 : 0
   floatView[1156 / 4] = schroedinger?.probabilityFlowSpeed ?? 1.0
   floatView[1160 / 4] = schroedinger?.probabilityFlowStrength ?? 0.3
-  floatView[1164 / 4] = uncertaintyConfidenceMass
-
-  // LCH + uncertainty boundary (offset 1168-1180)
+  floatView[1164 / 4] = p.uncertaintyConfidenceMass
   floatView[1168 / 4] = appearance?.lchLightness ?? 0.7
   floatView[1172 / 4] = appearance?.lchChroma ?? 0.15
-  floatView[1176 / 4] = uncertaintyBoundaryWidth
-  floatView[1180 / 4] = uncertaintyLogRhoThreshold
+  floatView[1176 / 4] = p.uncertaintyBoundaryWidth
+  floatView[1180 / 4] = p.uncertaintyLogRhoThreshold
 
   // Multi-source blend weights (offset 1184-1200)
   const msWeights = appearance?.multiSourceWeights
@@ -403,23 +408,15 @@ function packOverlayControls(
   floatView[1188 / 4] = msWeights?.orbitTrap ?? 0.3
   floatView[1192 / 4] = msWeights?.normal ?? 0.2
   floatView[1196 / 4] = 0.0
-
-  // Nodal render mode (offset 1200-1216)
-  intView[1200 / 4] = NODAL_RENDER_MODE_MAP[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
-  intView[1204 / 4] = 0
-  floatView[1208 / 4] = 0.0
-  floatView[1212 / 4] = 0.0
 }
 
-/** Pack cross-section and probability current controls (offsets 1216-1328). */
-function packCrossSectionAndCurrent(
+/** Pack cross-section slice controls (offsets 1216-1280). */
+function packCrossSectionSlice(
   floatView: Float32Array,
   intView: Int32Array,
-  p: SchroedingerPackParams
+  isUniformComputeMode: boolean,
+  schroedinger: Partial<SchroedingerConfig> | undefined
 ): void {
-  const { isUniformComputeMode, isDensityMatrixMode, schroedinger } = p
-
-  // Cross-section slice controls (offset 1216-1280)
   const crossSectionNormal = schroedinger?.crossSectionPlaneNormal ?? [0, 0, 1]
   const nx = Number(crossSectionNormal[0] ?? 0)
   const ny = Number(crossSectionNormal[1] ?? 0)
@@ -444,8 +441,16 @@ function packCrossSectionAndCurrent(
   floatView[1260 / 4] = schroedinger?.crossSectionThickness ?? 0.02
 
   packColorRgba(floatView, 1264 / 4, schroedinger?.crossSectionPlaneColor ?? '#66ccff')
+}
 
-  // Physical probability current controls (offset 1280-1328)
+/** Pack physical probability current controls (offsets 1280-1328). */
+function packProbabilityCurrent(
+  floatView: Float32Array,
+  intView: Int32Array,
+  isUniformComputeMode: boolean,
+  isDensityMatrixMode: boolean,
+  schroedinger: Partial<SchroedingerConfig> | undefined
+): void {
   const probabilityCurrentEnabled =
     !isDensityMatrixMode &&
     !isUniformComputeMode &&
@@ -472,6 +477,22 @@ function packCrossSectionAndCurrent(
   floatView[1316 / 4] = isMomentum ? Math.max(stepSize, 0.02) : stepSize
   intView[1320 / 4] = isMomentum ? Math.min(integrationSteps, 8) : integrationSteps
   floatView[1324 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
+}
+
+/** Pack cross-section and probability current controls (offsets 1216-1328). */
+function packCrossSectionAndCurrent(
+  floatView: Float32Array,
+  intView: Int32Array,
+  p: SchroedingerPackParams
+): void {
+  packCrossSectionSlice(floatView, intView, p.isUniformComputeMode, p.schroedinger)
+  packProbabilityCurrent(
+    floatView,
+    intView,
+    p.isUniformComputeMode,
+    p.isDensityMatrixMode,
+    p.schroedinger
+  )
 }
 
 /** Pack representation, radial probability, domain coloring, and diverging (offsets 1328-1456). */
@@ -676,488 +697,15 @@ function packVec4Color(
   floatView[idx + 3] = 0.0
 }
 
-// =========================================================================
-// HO momentum transform
-// =========================================================================
-
-/**
- * In-place transform of already-packed Schroedinger uniforms for HO momentum space.
- *
- * Physics: HO eigenfunctions are eigenfunctions of the Fourier transform.
- * phi_n(k, omega) = (-i)^n * phi_n(k, 1/omega).
- * This inverts omegas and applies phase rotations to coefficients so the GPU shader
- * runs the normal position-mode path and produces correct momentum-space results.
- *
- * Must be called AFTER packSchroedingerUniforms and BEFORE the buffer write.
- *
- * @param floatView - Float32 view of the Schroedinger uniform buffer
- * @param intView - Int32 view of the same buffer
- * @param dimension - Number of spatial dimensions
- * @param hbar - Reduced Planck constant (1.0 for k-space, user value for p-space)
- */
-export function applyHOMomentumTransform(
-  floatView: Float32Array,
-  intView: Int32Array,
-  dimension: number,
-  hbar: number
-): void {
-  // 1. Invert omegas: omega_j -> 1/(hbar^2 * omega_j)
-  const hbar2 = hbar * hbar
-  const omegaOff = 16 / 4
-  for (let j = 0; j < MAX_DIM; j++) {
-    const omega = floatView[omegaOff + j]!
-    floatView[omegaOff + j] = 1.0 / (hbar2 * Math.max(omega, 0.01))
-  }
-
-  // 2. Rotate coefficients by (-i)^{sum n_j} per term
-  const quantumOff = 64 / 4
-  const coeffOff = 416 / 4
-  const termCount = Math.min(Math.max(intView[1]!, 1), MAX_TERMS)
-
-  for (let k = 0; k < termCount; k++) {
-    let totalN = 0
-    for (let j = 0; j < dimension; j++) {
-      totalN += intView[quantumOff + k * MAX_DIM + j]!
-    }
-
-    const re = floatView[coeffOff + k * 4]!
-    const im = floatView[coeffOff + k * 4 + 1]!
-    const mod = ((totalN % 4) + 4) % 4
-    switch (mod) {
-      case 0:
-        break // x1
-      case 1:
-        floatView[coeffOff + k * 4] = im
-        floatView[coeffOff + k * 4 + 1] = -re
-        break // x(-i)
-      case 2:
-        floatView[coeffOff + k * 4] = -re
-        floatView[coeffOff + k * 4 + 1] = -im
-        break // x(-1)
-      case 3:
-        floatView[coeffOff + k * 4] = -im
-        floatView[coeffOff + k * 4 + 1] = re
-        break // x(i)
-    }
-  }
-
-  // 3. Force representationMode = 0 (position) — shader runs normal path
-  intView[1328 / 4] = 0
-}
-
-// =========================================================================
-// Camera uniform buffer
-// =========================================================================
-
-/** All values needed to pack the camera uniform buffer (512 bytes). */
-export interface CameraPackParams {
-  camera: CameraSnapshot
-  animationTime: number
-  is2D: boolean
-  transform?: TransformSnapshot
-  bayerOffset: readonly [number, number]
-  size: { width: number; height: number }
-  frameDelta: number
-  frameNumber: number
-}
-
-/**
- * Pack camera matrices, model matrix, and per-frame scalars into the camera uniform buffer.
- *
- * @param data - Float32Array(128) for the camera uniform buffer
- * @param dataView - DataView of the same buffer (for uint32 writes)
- * @param p - Camera pack parameters
- */
-export function packCameraUniforms(
-  data: Float32Array,
-  dataView: DataView,
-  p: CameraPackParams
-): void {
-  const { camera, animationTime, is2D, transform, bayerOffset, size, frameDelta, frameNumber } = p
-
-  // Matrices at correct offsets (each mat4x4f = 16 floats)
-  if (camera.viewMatrix) data.set(camera.viewMatrix.elements, 0)
-  if (camera.projectionMatrix) data.set(camera.projectionMatrix.elements, 16)
-  if (camera.viewProjectionMatrix) data.set(camera.viewProjectionMatrix.elements, 32)
-  if (camera.inverseViewMatrix) data.set(camera.inverseViewMatrix.elements, 48)
-  if (camera.inverseProjectionMatrix) data.set(camera.inverseProjectionMatrix.elements, 64)
-
-  // Model matrix computation
-  let scale: number
-  let posX: number
-  let posY: number
-  let posZ: number
-
-  if (is2D) {
-    const camPos = camera.position ?? { x: 0, y: 0, z: 8 }
-    const camTarget = camera.target ?? { x: 0, y: 0, z: 0 }
-    const dx = camPos.x - (camTarget.x ?? 0)
-    const dy = camPos.y - (camTarget.y ?? 0)
-    const dz = camPos.z - (camTarget.z ?? 0)
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
-    const defaultDistance = 8.0
-    scale = distance > 0 ? distance / defaultDistance : 1.0
-    posX = camTarget.x ?? 0
-    posY = camTarget.y ?? 0
-    posZ = 0
-  } else {
-    scale = transform?.uniformScale ?? 1.0
-    const position = transform?.position ?? [0, 0, 0]
-    posX = position[0] ?? 0
-    posY = position[1] ?? 0
-    posZ = position[2] ?? 0
-  }
-
-  // modelMatrix (offset 80, column-major)
-  data[80] = scale
-  data[81] = 0
-  data[82] = 0
-  data[83] = 0
-  data[84] = 0
-  data[85] = scale
-  data[86] = 0
-  data[87] = 0
-  data[88] = 0
-  data[89] = 0
-  data[90] = scale
-  data[91] = 0
-  data[92] = posX
-  data[93] = posY
-  data[94] = posZ
-  data[95] = 1.0
-
-  // inverseModelMatrix (offset 96)
-  const invScale = scale !== 0 ? 1.0 / scale : 1.0
-  data[96] = invScale
-  data[97] = 0
-  data[98] = 0
-  data[99] = 0
-  data[100] = 0
-  data[101] = invScale
-  data[102] = 0
-  data[103] = 0
-  data[104] = 0
-  data[105] = 0
-  data[106] = invScale
-  data[107] = 0
-  data[108] = -posX * invScale
-  data[109] = -posY * invScale
-  data[110] = -posZ * invScale
-  data[111] = 1.0
-
-  // Camera position (offset 112)
-  if (camera.position) {
-    data[112] = camera.position.x
-    data[113] = camera.position.y
-    data[114] = camera.position.z
-  }
-  data[115] = camera.near || 0.1
-  data[116] = camera.far || 1000
-  data[117] = ((camera.fov || 50) * Math.PI) / 180 // radians
-  data[118] = size.width
-  data[119] = size.height
-  data[120] = size.width / size.height
-
-  // DEV diagnostic
-  if (import.meta.env.DEV && camera.projectionMatrix?.elements) {
-    const projAspect = camera.projectionMatrix.elements[5]! / camera.projectionMatrix.elements[0]!
-    const ctxAspect = size.width / size.height
-    if (Math.abs(projAspect - ctxAspect) > 0.01) {
-      logger.warn(
-        `[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${ctxAspect.toFixed(4)} (${size.width}x${size.height})`
-      )
-    }
-  }
-
-  data[121] = animationTime
-  data[122] = frameDelta
-  dataView.setUint32(123 * 4, frameNumber, true)
-
-  data[124] = bayerOffset[0]
-  data[125] = bayerOffset[1]
-  data[126] = 0
-  data[127] = 0
-}
-
-// =========================================================================
-// Material uniform buffer
-// =========================================================================
-
-/** All values needed to pack the material uniform buffer (160 bytes). */
-export interface MaterialPackParams {
-  appearance: AppearanceStoreState | undefined
-  pbr: PBRSliceState | undefined
-}
-
-/**
- * Pack PBR material parameters into the material uniform buffer.
- *
- * @param data - Float32Array(40) for the material uniform buffer
- * @param dataView - DataView of the same buffer (for uint32 writes)
- * @param p - Material pack parameters
- */
-export function packMaterialUniforms(
-  data: Float32Array,
-  dataView: DataView,
-  p: MaterialPackParams
-): void {
-  const { appearance, pbr } = p
-
-  // baseColor: vec4f (idx 0-3)
-  const faceColor = parseColor(appearance?.faceColor ?? '#ffffff')
-  data[0] = faceColor[0]
-  data[1] = faceColor[1]
-  data[2] = faceColor[2]
-  data[3] = 1.0
-
-  // metallic, roughness, reflectance, ao (idx 4-7)
-  data[4] = pbr?.face?.metallic ?? 0.0
-  data[5] = pbr?.face?.roughness ?? 0.5
-  data[6] = pbr?.face?.reflectance ?? 0.5
-  data[7] = 1.0
-
-  // emissive + emissiveIntensity (idx 8-11)
-  const faceEmission = appearance?.faceEmission ?? 0.0
-  data[8] = faceColor[0]
-  data[9] = faceColor[1]
-  data[10] = faceColor[2]
-  data[11] = faceEmission
-
-  // ior, transmission, thickness (idx 12-14)
-  data[12] = pbr?.face?.ior ?? 1.5
-  data[13] = pbr?.face?.transmission ?? 0.0
-  data[14] = pbr?.face?.thickness ?? 1.0
-
-  // sssEnabled: u32 (idx 15)
-  const sssEnabled = appearance?.sssEnabled ?? false
-  dataView.setUint32(15 * 4, sssEnabled ? 1 : 0, true)
-
-  // sssIntensity (idx 16)
-  data[16] = appearance?.sssIntensity ?? 1.0
-
-  // sssColor: vec3f (idx 20-22, aligned to byte 80)
-  const sssColor = parseColor(appearance?.sssColor ?? '#ff8844')
-  data[20] = sssColor[0]
-  data[21] = sssColor[1]
-  data[22] = sssColor[2]
-
-  // sssThickness, sssJitter (idx 23-24)
-  data[23] = appearance?.sssThickness ?? 1.0
-  data[24] = appearance?.sssJitter ?? 0.2
-
-  // Reserved (Fresnel rim removed, idx 25-31)
-  data[25] = 0.0
-  data[26] = 0.0
-  data[28] = 0.0
-  data[29] = 0.0
-  data[30] = 0.0
-  data[31] = 0.0
-
-  // specularIntensity (idx 32)
-  data[32] = pbr?.face?.specularIntensity ?? 0.8
-
-  // specularColor: vec3f (idx 36-38, aligned to byte 144)
-  const specularColor = parseColor(pbr?.face?.specularColor ?? '#ffffff')
-  data[36] = specularColor[0]
-  data[37] = specularColor[1]
-  data[38] = specularColor[2]
-}
-
-// =========================================================================
-// Quality uniform buffer
-// =========================================================================
-
-/**
- * Pack quality/performance parameters into the quality uniform buffer.
- *
- * @param data - Float32Array(12) for the quality uniform buffer
- * @param dataView - DataView of the same buffer (for int32 writes)
- * @param qualityMultiplier - Current quality multiplier (0.0-1.0+)
- */
-export function packQualityUniforms(
-  data: Float32Array,
-  dataView: DataView,
-  qualityMultiplier: number
-): void {
-  data[1] = 0.001 / qualityMultiplier
-  data[3] = 0
-  data[6] = 0
-  data[7] = 0
-  data[8] = qualityMultiplier
-
-  dataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true)
-  dataView.setInt32(2 * 4, 0, true)
-  dataView.setInt32(4 * 4, 0, true)
-  dataView.setInt32(5 * 4, 0, true)
-  dataView.setInt32(9 * 4, 0, true)
-}
-
-// =========================================================================
-// Basis vectors uniform buffer
-// =========================================================================
-
-/** All values needed to pack the basis vectors uniform buffer (192 bytes). */
-export interface BasisPackParams {
-  dimension: number
-  basisX?: Float32Array
-  basisY?: Float32Array
-  basisZ?: Float32Array
-  origin?: Float32Array
-  sliceAnimationEnabled: boolean
-  sliceSpeed: number
-  sliceAmplitude: number
-  accumulatedTime: number
-}
-
-/** Golden ratio for incommensurate phase offsets in slice animation. */
-const PHI = 1.618033988749895
-
-/**
- * Pack N-dimensional basis vectors and origin into the basis uniform buffer.
- *
- * @param data - Float32Array(48) for the basis uniform buffer
- * @param p - Basis pack parameters
- */
-export function packBasisVectors(data: Float32Array, p: BasisPackParams): void {
-  const STRIDE = 12
-
-  // Zero-fill for clean slate
-  data.fill(0)
-
-  // Default basis vectors (identity for first 3 dims)
-  data[0] = 1.0 // X: [1, 0, 0, ...]
-  data[STRIDE + 1] = 1.0 // Y: [0, 1, 0, ...]
-  data[STRIDE * 2 + 2] = 1.0 // Z: [0, 0, 1, ...]
-
-  // Override with stored basis
-  if (p.basisX) {
-    for (let i = 0; i < Math.min(p.basisX.length, MAX_DIM); i++) {
-      data[i] = p.basisX[i] ?? 0
-    }
-  }
-  if (p.basisY) {
-    for (let i = 0; i < Math.min(p.basisY.length, MAX_DIM); i++) {
-      data[STRIDE + i] = p.basisY[i] ?? 0
-    }
-  }
-  if (p.basisZ) {
-    for (let i = 0; i < Math.min(p.basisZ.length, MAX_DIM); i++) {
-      data[STRIDE * 2 + i] = p.basisZ[i] ?? 0
-    }
-  }
-
-  // Origin (rotated N-D point from store)
-  const originOffset = STRIDE * 3
-  if (p.origin) {
-    for (let i = 0; i < Math.min(p.origin.length, MAX_DIM); i++) {
-      data[originOffset + i] = p.origin[i] ?? 0
-    }
-  }
-
-  // Slice animation: time-varying offset on extra dimensions (4D+)
-  if (p.sliceAnimationEnabled && p.dimension > 3) {
-    for (let i = 3; i < Math.min(p.dimension, MAX_DIM); i++) {
-      const extraDimIndex = i - 3
-      const phase = extraDimIndex * PHI
-      const t1 = p.accumulatedTime * p.sliceSpeed * 2 * Math.PI + phase
-      const t2 = p.accumulatedTime * p.sliceSpeed * 1.3 * 2 * Math.PI + phase * 1.5
-      const offset = p.sliceAmplitude * (0.7 * Math.sin(t1) + 0.3 * Math.sin(t2))
-      data[originOffset + i] = (data[originOffset + i] ?? 0) + offset
-    }
-  }
-}
-
-// =========================================================================
-// Canonical density compensation
-// =========================================================================
-
-/**
- * Compute the auto-compensation factor for canonical HO normalization.
- *
- * Evaluates the peak |psi|^2 of the dominant superposition term using
- * physicists' Hermite polynomials, then derives a densityGain multiplier
- * so that the default gain=2.0 produces alpha ~0.7 at peak density.
- *
- * @param preset - The quantum preset with coefficients and quantum numbers
- * @param dimension - Number of spatial dimensions
- * @param boundingRadius - Current bounding radius (for step length estimate)
- * @returns Object with `compensation` factor and `peakDensity` value
- */
-export function computeCanonicalCompensation(
-  preset: QuantumPreset,
-  dimension: number,
-  boundingRadius: number
-): { compensation: number; peakDensity: number } {
-  // Physicists' Hermite polynomial coefficients H_n(u), stored as [u^0, u^1, ..., u^6]
-  const HERMITE_COEFFS: number[][] = [
-    [1], // H_0
-    [0, 2], // H_1
-    [-2, 0, 4], // H_2
-    [0, -12, 0, 8], // H_3
-    [12, 0, -48, 0, 16], // H_4
-    [0, 120, 0, -160, 0, 32], // H_5
-    [-120, 0, 720, 0, -480, 0, 64], // H_6
-  ]
-  const FACTORIALS = [1, 1, 2, 6, 24, 120, 720]
-
-  if (preset.termCount === 0) return { compensation: 1.0, peakDensity: 0.1 }
-
-  // Find the dominant term (largest |c_k|^2)
-  let dominantIdx = 0
-  let maxCoeffMag = 0
-  for (let k = 0; k < preset.termCount; k++) {
-    const coeff = preset.coefficients[k]
-    if (!coeff) continue
-    const [cRe, cIm] = coeff
-    const mag = cRe * cRe + cIm * cIm
-    if (mag > maxCoeffMag) {
-      maxCoeffMag = mag
-      dominantIdx = k
-    }
-  }
-
-  const qn = preset.quantumNumbers[dominantIdx]
-  if (!qn) return { compensation: 1.0, peakDensity: 0.1 }
-  const dim = Math.min(dimension, qn.length)
-
-  // Compute peak |psi|^2 = |c_dominant|^2 * prod_i peak_1D(n_i, omega_i)
-  let peakDensity = maxCoeffMag
-  for (let j = 0; j < dim; j++) {
-    const nRaw = qn[j]
-    if (nRaw == null) continue
-    const n = Math.max(0, Math.min(6, Math.round(nRaw)))
-    const omega = Math.max(preset.omega[j] ?? 1.0, 0.01)
-    const coeffs = HERMITE_COEFFS[n]
-    if (!coeffs) continue
-
-    // Find max of H_n^2(u) * exp(-u^2) numerically over u in [0, 5]
-    let maxHermiteSq = 0
-    for (let i = 0; i <= 500; i++) {
-      const u = (i / 500) * 5.0
-      let hn = 0
-      for (let k = coeffs.length - 1; k >= 0; k--) {
-        hn = hn * u + (coeffs[k] ?? 0)
-      }
-      const val = hn * hn * Math.exp(-u * u)
-      if (val > maxHermiteSq) maxHermiteSq = val
-    }
-
-    const factorial = FACTORIALS[n] ?? 1
-    const twoN_nFact = Math.pow(2, n) * factorial
-    const peak1D = (Math.sqrt(omega / Math.PI) / twoN_nFact) * maxHermiteSq
-    peakDensity *= peak1D
-  }
-
-  if (peakDensity <= 0) return { compensation: 1.0, peakDensity: 0.1 }
-
-  const TARGET_ALPHA = 0.7
-  const DEFAULT_DENSITY_GAIN = 2.0
-  const TYPICAL_SAMPLES = 32
-  const estimatedStepLen = (2 * boundingRadius) / TYPICAL_SAMPLES
-  const neededGain = -Math.log(1 - TARGET_ALPHA) / (peakDensity * estimatedStepLen)
-
-  return {
-    compensation: neededGain / DEFAULT_DENSITY_GAIN,
-    peakDensity,
-  }
-}
+// Re-export support functions from the split module
+export {
+  applyHOMomentumTransform,
+  type BasisPackParams,
+  type CameraPackParams,
+  computeCanonicalCompensation,
+  type MaterialPackParams,
+  packBasisVectors,
+  packCameraUniforms,
+  packMaterialUniforms,
+  packQualityUniforms,
+} from './uniformPackingSupport'

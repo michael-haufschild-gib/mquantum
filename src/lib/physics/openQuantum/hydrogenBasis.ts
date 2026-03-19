@@ -66,7 +66,7 @@ export function hydrogenEnergy(n: number): number {
  * @param dim - Spatial dimension D (≥ 3)
  * @returns Energy in Hartree atomic units
  */
-export function hydrogenEnergyND(n: number, l: number, dim: number): number {
+export function hydrogenEnergyND(n: number, _l: number, dim: number): number {
   const nEff = n + (dim - 3) / 2
   return -0.5 / (nEff * nEff)
 }

@@ -22,7 +22,6 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import {
   computeReflectionTransmission,
   TdseDiagnosticsHistory,
@@ -32,28 +31,6 @@ import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
-import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
-import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.wgsl'
-import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
-import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
-import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
-} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import {
-  tdseDiagNormFinalizeBlock,
-  tdseDiagNormReduceBlock,
-} from '../shaders/schroedinger/compute/tdseDiagnostics.wgsl'
-import { tdseInitBlock } from '../shaders/schroedinger/compute/tdseInit.wgsl'
-import { tdsePotentialBlock } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
-import {
-  tdseFFTStageUniformsBlock,
-  tdseStockhamFFTBlock,
-} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
-import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
-import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 import {
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
@@ -62,14 +39,19 @@ import {
   LINEAR_WG,
   MAX_DIM,
   nearestPow2,
-  PACK_UNIFORM_SIZE,
   reduceGridToFit,
 } from './computePassUtils'
+import { rebuildTdseBuffers } from './TDSEComputePassBuffers'
+import type {
+  TdseBindGroupResult,
+  TdsePassHelpers,
+  TdsePipelineResult,
+} from './TDSEComputePassSetup'
+import { buildTdsePipelines, rebuildTdseBindGroups } from './TDSEComputePassSetup'
+import { writeTdseUniforms } from './TDSEComputePassUniforms'
 
 /** TDSEUniforms struct size in bytes (704 = 636 + 48 trapAnisotropy + 16 radialWell + 4 pad) */
 const UNIFORM_SIZE = 704
-/** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
-const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes: totalSites, numWorkgroups, barrierCenter, gridSize0, spacing0, stride0, pad, pad) */
 const DIAG_UNIFORM_SIZE = 32
 /** Number of f32 values in diagnostic result buffer (totalNorm, maxDensity, normLeft, normRight) */
@@ -97,41 +79,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
 
-  // Pipelines
-  private initPipeline: GPUComputePipeline | null = null
-  private potentialPipeline: GPUComputePipeline | null = null
-  private potentialHalfPipeline: GPUComputePipeline | null = null
-  private renormalizePipeline: GPUComputePipeline | null = null
-  private renormalizeBGL: GPUBindGroupLayout | null = null
-  private renormalizeBG: GPUBindGroup | null = null
-  private renormalizeUniformBuffer: GPUBuffer | null = null
-  private absorberPipeline: GPUComputePipeline | null = null
-  private packPipeline: GPUComputePipeline | null = null
-  private unpackPipeline: GPUComputePipeline | null = null
-  private fftStagePipeline: GPUComputePipeline | null = null
-  private kineticPipeline: GPUComputePipeline | null = null
-  private writeGridPipeline: GPUComputePipeline | null = null
+  // Pipelines + bind group layouts (created together by buildTdsePipelines)
+  private pl: TdsePipelineResult | null = null
 
-  // Bind group layouts
-  private initBGL: GPUBindGroupLayout | null = null
-  private potentialBGL: GPUBindGroupLayout | null = null
-  private potentialHalfBGL: GPUBindGroupLayout | null = null
-  private packBGL: GPUBindGroupLayout | null = null
-  private unpackBGL: GPUBindGroupLayout | null = null
-  private fftStageBGL: GPUBindGroupLayout | null = null
-  private kineticBGL: GPUBindGroupLayout | null = null
-  private writeGridBGL: GPUBindGroupLayout | null = null
-
-  // Bind groups
-  private initBG: GPUBindGroup | null = null
-  private potentialBG: GPUBindGroup | null = null
-  private potentialHalfBG: GPUBindGroup | null = null
-  private packBG: GPUBindGroup | null = null
-  private unpackBG: GPUBindGroup | null = null
-  private fftStageABBG: GPUBindGroup | null = null // A->B
-  private fftStageBABG: GPUBindGroup | null = null // B->A
-  private kineticBG: GPUBindGroup | null = null
-  private writeGridBG: GPUBindGroup | null = null
+  // Bind groups + renormalize uniform buffer (created by rebuildTdseBindGroups)
+  private bg: TdseBindGroupResult | null = null
 
   // Diagnostics: GPU norm reduction
   private diagUniformBuffer: GPUBuffer | null = null
@@ -141,12 +93,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private diagPartialRightBuffer: GPUBuffer | null = null
   private diagResultBuffer: GPUBuffer | null = null
   private diagStagingBuffer: GPUBuffer | null = null
-  private diagReducePipeline: GPUComputePipeline | null = null
-  private diagFinalizePipeline: GPUComputePipeline | null = null
-  private diagReduceBGL: GPUBindGroupLayout | null = null
-  private diagFinalizeBGL: GPUBindGroupLayout | null = null
-  private diagReduceBG: GPUBindGroup | null = null
-  private diagFinalizeBG: GPUBindGroup | null = null
+  // Diagnostics pipelines and bind groups are in this.pl and this.bg
   private diagNumWorkgroups = 0
   private diagFrameCounter = 0
   private diagMappingInFlight = false
@@ -256,134 +203,54 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   private rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
-    this.psiReBuffer?.destroy()
-    this.psiImBuffer?.destroy()
-    this.potentialBuffer?.destroy()
-    this.fftScratchA?.destroy()
-    this.fftScratchB?.destroy()
-    this.uniformBuffer?.destroy()
-    this.fftUniformBuffer?.destroy()
-    this.fftStagingBuffer?.destroy()
-    this.packUniformBuffer?.destroy()
-    this.omegaStagingBuffer?.destroy()
-    this.diagUniformBuffer?.destroy()
-    this.diagPartialSumsBuffer?.destroy()
-    this.diagPartialMaxBuffer?.destroy()
-    this.diagPartialLeftBuffer?.destroy()
-    this.diagPartialRightBuffer?.destroy()
-    this.diagResultBuffer?.destroy()
-    this.diagStagingBuffer?.destroy()
-
-    this.totalSites = 1
-    for (let d = 0; d < config.latticeDim; d++) this.totalSites *= config.gridSize[d]!
-    const siteBytes = this.totalSites * 4
-    const complexBytes = this.totalSites * 8 // 2 floats per complex
-
-    this.psiReBuffer = device.createBuffer({
-      label: 'tdse-psiRe',
-      size: siteBytes,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    })
-    this.psiImBuffer = device.createBuffer({
-      label: 'tdse-psiIm',
-      size: siteBytes,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    })
-    this.potentialBuffer = device.createBuffer({
-      label: 'tdse-potential',
-      size: siteBytes,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    })
-    this.fftScratchA = device.createBuffer({
-      label: 'tdse-fft-scratch-a',
-      size: complexBytes,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    })
-    this.fftScratchB = device.createBuffer({
-      label: 'tdse-fft-scratch-b',
-      size: complexBytes,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    })
-    this.uniformBuffer = this.createUniformBuffer(device, UNIFORM_SIZE, 'tdse-uniforms')
-    this.fftUniformBuffer = this.createUniformBuffer(device, FFT_UNIFORM_SIZE, 'tdse-fft-uniforms')
-    this.packUniformBuffer = this.createUniformBuffer(
+    const result = rebuildTdseBuffers(
       device,
-      PACK_UNIFORM_SIZE,
-      'tdse-pack-uniforms'
+      config,
+      {
+        psiReBuffer: this.psiReBuffer,
+        psiImBuffer: this.psiImBuffer,
+        potentialBuffer: this.potentialBuffer,
+        fftScratchA: this.fftScratchA,
+        fftScratchB: this.fftScratchB,
+        uniformBuffer: this.uniformBuffer,
+        fftUniformBuffer: this.fftUniformBuffer,
+        fftStagingBuffer: this.fftStagingBuffer,
+        packUniformBuffer: this.packUniformBuffer,
+        omegaStagingBuffer: this.omegaStagingBuffer,
+        diagUniformBuffer: this.diagUniformBuffer,
+        diagPartialSumsBuffer: this.diagPartialSumsBuffer,
+        diagPartialMaxBuffer: this.diagPartialMaxBuffer,
+        diagPartialLeftBuffer: this.diagPartialLeftBuffer,
+        diagPartialRightBuffer: this.diagPartialRightBuffer,
+        diagResultBuffer: this.diagResultBuffer,
+        diagStagingBuffer: this.diagStagingBuffer,
+      },
+      { createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label) }
     )
 
-    // FFT staging buffer: pre-computed stage uniforms for all axes × both directions.
-    // encoder.copyBufferToBuffer from staging to fftUniformBuffer before each dispatch
-    // ensures correct per-stage data (device.queue.writeBuffer would race with command buffer).
-    this.fwdStageCount = 0
-    for (let d = 0; d < config.latticeDim; d++) {
-      this.fwdStageCount += Math.log2(config.gridSize[d]!)
-    }
-    const totalFFTStages = this.fwdStageCount * 2 // forward + inverse
-    this.fftStagingBuffer = device.createBuffer({
-      label: 'tdse-fft-staging',
-      size: Math.max(FFT_UNIFORM_SIZE, totalFFTStages * FFT_UNIFORM_SIZE),
-      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    })
-    // Pre-compute and upload FFT staging data once (only depends on grid config)
-    const fftStagingData = this.buildFFTStagingData(config)
-    device.queue.writeBuffer(this.fftStagingBuffer, 0, fftStagingData)
+    // Apply buffer results to instance fields
+    this.psiReBuffer = result.psiReBuffer
+    this.psiImBuffer = result.psiImBuffer
+    this.potentialBuffer = result.potentialBuffer
+    this.fftScratchA = result.fftScratchA
+    this.fftScratchB = result.fftScratchB
+    this.uniformBuffer = result.uniformBuffer
+    this.fftUniformBuffer = result.fftUniformBuffer
+    this.fftStagingBuffer = result.fftStagingBuffer
+    this.packUniformBuffer = result.packUniformBuffer
+    this.omegaStagingBuffer = result.omegaStagingBuffer
+    this.diagUniformBuffer = result.diagUniformBuffer
+    this.diagPartialSumsBuffer = result.diagPartialSumsBuffer
+    this.diagPartialMaxBuffer = result.diagPartialMaxBuffer
+    this.diagPartialLeftBuffer = result.diagPartialLeftBuffer
+    this.diagPartialRightBuffer = result.diagPartialRightBuffer
+    this.diagResultBuffer = result.diagResultBuffer
+    this.diagStagingBuffer = result.diagStagingBuffer
+    this.totalSites = result.totalSites
+    this.fwdStageCount = result.fwdStageCount
+    this.diagNumWorkgroups = result.diagNumWorkgroups
 
-    // Pack uniforms: totalSites and invN don't change between frames
-    const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
-    const pu32 = new Uint32Array(packData)
-    const pf32 = new Float32Array(packData)
-    pu32[0] = this.totalSites
-    pf32[1] = 1.0 / this.totalSites
-    device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
-
-    // Staging buffer for trap-frequency quench: holds evolution harmonicOmega (4 bytes)
-    // to overwrite the init-time value between init and potential fill passes.
-    this.omegaStagingBuffer = device.createBuffer({
-      label: 'tdse-omega-staging',
-      size: 4,
-      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    })
-
-    // Diagnostics: norm reduction buffers
-    this.diagNumWorkgroups = Math.ceil(this.totalSites / DIAG_WG)
-    this.diagUniformBuffer = this.createUniformBuffer(
-      device,
-      DIAG_UNIFORM_SIZE,
-      'tdse-diag-uniforms'
-    )
-    this.diagPartialSumsBuffer = device.createBuffer({
-      label: 'tdse-diag-partial-sums',
-      size: this.diagNumWorkgroups * 4,
-      usage: GPUBufferUsage.STORAGE,
-    })
-    this.diagPartialMaxBuffer = device.createBuffer({
-      label: 'tdse-diag-partial-max',
-      size: this.diagNumWorkgroups * 4,
-      usage: GPUBufferUsage.STORAGE,
-    })
-    this.diagPartialLeftBuffer = device.createBuffer({
-      label: 'tdse-diag-partial-left',
-      size: this.diagNumWorkgroups * 4,
-      usage: GPUBufferUsage.STORAGE,
-    })
-    this.diagPartialRightBuffer = device.createBuffer({
-      label: 'tdse-diag-partial-right',
-      size: this.diagNumWorkgroups * 4,
-      usage: GPUBufferUsage.STORAGE,
-    })
-    this.diagResultBuffer = device.createBuffer({
-      label: 'tdse-diag-result',
-      size: DIAG_RESULT_COUNT * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    })
-    this.diagStagingBuffer = device.createBuffer({
-      label: 'tdse-diag-staging',
-      size: DIAG_RESULT_COUNT * 4,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
     this.diagHistory.clear()
-    useTdseDiagnosticsStore.getState().reset()
     this.diagFrameCounter = 0
     this.diagMappingInFlight = false
 
@@ -395,434 +262,97 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // Pipelines created lazily on first execute
   }
 
+  /** Bridge object exposing base-class helpers to the extracted setup functions. */
+  private get setupHelpers(): TdsePassHelpers {
+    return {
+      createShaderModule: (d, code, label) => this.createShaderModule(d, code, label),
+      createComputePipeline: (d, sm, bgls, label) => this.createComputePipeline(d, sm, bgls, label),
+      createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
+    }
+  }
+
   private buildPipelines(device: GPUDevice): void {
-    const unifAndIndex = tdseUniformsBlock + freeScalarNDIndexBlock
+    this.pl = buildTdsePipelines(device, this.setupHelpers)
+  }
 
-    // Init
-    this.initBGL = device.createBindGroupLayout({
-      label: 'tdse-init-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.initPipeline = this.createComputePipeline(
+  /** Called immediately after rebuildBuffers + buildPipelines, so all fields are non-null. */
+  private rebuildBindGroups(device: GPUDevice): void {
+    if (!this.pl || !this.densityTextureView) return
+    this.bg = rebuildTdseBindGroups(
       device,
-      this.createShaderModule(device, unifAndIndex + tdseInitBlock, 'tdse-init'),
-      [this.initBGL],
-      'tdse-init'
-    )
-
-    // Potential fill
-    this.potentialBGL = device.createBindGroupLayout({
-      label: 'tdse-potential-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.potentialPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(device, unifAndIndex + tdsePotentialBlock, 'tdse-potential'),
-      [this.potentialBGL],
-      'tdse-potential'
-    )
-
-    // Potential half-step
-    this.potentialHalfBGL = device.createBindGroupLayout({
-      label: 'tdse-potential-half-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      ],
-    })
-    this.potentialHalfPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(
-        device,
-        unifAndIndex + tdseApplyPotentialHalfBlock,
-        'tdse-potential-half'
-      ),
-      [this.potentialHalfBGL],
-      'tdse-potential-half'
-    )
-
-    // Absorber (separate pass after Strang step — NOT merged into potential half-step).
-    // Running absorption after the FFT kinetic step prevents the FFT from scattering
-    // the spatially-modulated absorber profile across k-space.
-    // Reuses initBGL layout (uniform + psiRe + psiIm).
-    this.absorberPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(
-        device,
-        unifAndIndex + pmlProfileBlock + tdseAbsorberBlock,
-        'tdse-absorber'
-      ),
-      [this.initBGL],
-      'tdse-absorber'
-    )
-
-    // Renormalization: reads diagResult[0] (totalNorm) and scales ψ by 1/√(totalNorm).
-    // Layout: uniform(totalElements) + diagResult(read) + psiRe(rw) + psiIm(rw)
-    this.renormalizeBGL = device.createBindGroupLayout({
-      label: 'tdse-renormalize-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.renormalizePipeline = device.createComputePipeline({
-      label: 'tdse-renormalize-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [this.renormalizeBGL] }),
-      compute: {
-        module: device.createShaderModule({ label: 'tdse-renormalize', code: renormalizeBlock }),
-        entryPoint: 'main',
+      this.pl,
+      {
+        uniformBuffer: this.uniformBuffer!,
+        psiReBuffer: this.psiReBuffer!,
+        psiImBuffer: this.psiImBuffer!,
+        potentialBuffer: this.potentialBuffer!,
+        fftScratchA: this.fftScratchA!,
+        fftScratchB: this.fftScratchB!,
+        fftUniformBuffer: this.fftUniformBuffer!,
+        packUniformBuffer: this.packUniformBuffer!,
+        densityTextureView: this.densityTextureView,
+        diagUniformBuffer: this.diagUniformBuffer!,
+        diagPartialSumsBuffer: this.diagPartialSumsBuffer!,
+        diagPartialMaxBuffer: this.diagPartialMaxBuffer!,
+        diagPartialLeftBuffer: this.diagPartialLeftBuffer!,
+        diagPartialRightBuffer: this.diagPartialRightBuffer!,
+        diagResultBuffer: this.diagResultBuffer!,
+        totalSites: this.totalSites,
       },
-    })
-
-    // Pack
-    const packUnifBlock = /* wgsl */ `
-struct PackUniforms {
-  totalElements: u32,
-  invN: f32,
-  _pad0: u32,
-  _pad1: u32,
-}
-`
-    this.packBGL = device.createBindGroupLayout({
-      label: 'tdse-pack-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.packPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(
-        device,
-        packUnifBlock + tdseComplexPackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
-        'tdse-pack'
-      ),
-      [this.packBGL],
-      'tdse-pack'
-    )
-
-    // Unpack
-    this.unpackBGL = device.createBindGroupLayout({
-      label: 'tdse-unpack-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.unpackPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(
-        device,
-        packUnifBlock + tdseComplexUnpackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
-        'tdse-unpack'
-      ),
-      [this.unpackBGL],
-      'tdse-unpack'
-    )
-
-    // FFT stage
-    this.fftStageBGL = device.createBindGroupLayout({
-      label: 'tdse-fft-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.fftStagePipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(
-        device,
-        tdseFFTStageUniformsBlock + tdseStockhamFFTBlock,
-        'tdse-fft-stage'
-      ),
-      [this.fftStageBGL],
-      'tdse-fft-stage'
-    )
-
-    // Kinetic (operates on interleaved complex buffer)
-    this.kineticBGL = device.createBindGroupLayout({
-      label: 'tdse-kinetic-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.kineticPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(device, unifAndIndex + tdseApplyKineticBlock, 'tdse-kinetic'),
-      [this.kineticBGL],
-      'tdse-kinetic'
-    )
-
-    // Write grid
-    this.writeGridBGL = device.createBindGroupLayout({
-      label: 'tdse-write-grid-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only',
-            format: 'rgba16float',
-            viewDimension: '3d',
-          },
-        },
-      ],
-    })
-    this.writeGridPipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(device, unifAndIndex + tdseWriteGridBlock, 'tdse-write-grid'),
-      [this.writeGridBGL],
-      'tdse-write-grid'
-    )
-
-    // Diagnostics: norm reduction (pass 1)
-    this.diagReduceBGL = device.createBindGroupLayout({
-      label: 'tdse-diag-reduce-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.diagReducePipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(device, tdseDiagNormReduceBlock, 'tdse-diag-reduce'),
-      [this.diagReduceBGL],
-      'tdse-diag-reduce'
-    )
-
-    // Diagnostics: norm finalize (pass 2)
-    this.diagFinalizeBGL = device.createBindGroupLayout({
-      label: 'tdse-diag-finalize-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      ],
-    })
-    this.diagFinalizePipeline = this.createComputePipeline(
-      device,
-      this.createShaderModule(device, tdseDiagNormFinalizeBlock, 'tdse-diag-finalize'),
-      [this.diagFinalizeBGL],
-      'tdse-diag-finalize'
+      this.bg?.renormalizeUniformBuffer ?? null
     )
   }
 
-  private rebuildBindGroups(device: GPUDevice): void {
-    if (
-      !this.uniformBuffer ||
-      !this.psiReBuffer ||
-      !this.psiImBuffer ||
-      !this.potentialBuffer ||
-      !this.fftScratchA ||
-      !this.fftScratchB ||
-      !this.densityTextureView ||
-      !this.fftUniformBuffer ||
-      !this.packUniformBuffer
-    )
-      return
+  /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
+  private maybeInitialize(device: GPUDevice, encoder: GPUCommandEncoder, config: TdseConfig): void {
+    if (this.initialized && !config.needsReset && !this.pendingAutoReset) return
 
-    if (this.initBGL)
-      this.initBG = device.createBindGroup({
-        label: 'tdse-init-bg',
-        layout: this.initBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.psiReBuffer } },
-          { binding: 2, resource: { buffer: this.psiImBuffer } },
-        ],
-      })
+    const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
+    const hasOmegaQuench =
+      config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
 
-    if (this.potentialBGL)
-      this.potentialBG = device.createBindGroup({
-        label: 'tdse-potential-bg',
-        layout: this.potentialBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.potentialBuffer } },
-        ],
-      })
-
-    if (this.potentialHalfBGL)
-      this.potentialHalfBG = device.createBindGroup({
-        label: 'tdse-potential-half-bg',
-        layout: this.potentialHalfBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.psiReBuffer } },
-          { binding: 2, resource: { buffer: this.psiImBuffer } },
-          { binding: 3, resource: { buffer: this.potentialBuffer } },
-        ],
-      })
-
-    if (this.packBGL)
-      this.packBG = device.createBindGroup({
-        label: 'tdse-pack-bg',
-        layout: this.packBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.packUniformBuffer } },
-          { binding: 1, resource: { buffer: this.psiReBuffer } },
-          { binding: 2, resource: { buffer: this.psiImBuffer } },
-          { binding: 3, resource: { buffer: this.fftScratchA } },
-        ],
-      })
-
-    if (this.unpackBGL)
-      this.unpackBG = device.createBindGroup({
-        label: 'tdse-unpack-bg',
-        layout: this.unpackBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.packUniformBuffer } },
-          { binding: 1, resource: { buffer: this.fftScratchA } },
-          { binding: 2, resource: { buffer: this.psiReBuffer } },
-          { binding: 3, resource: { buffer: this.psiImBuffer } },
-        ],
-      })
-
-    // FFT bind groups for A->B and B->A ping-pong
-    if (this.fftStageBGL) {
-      this.fftStageABBG = device.createBindGroup({
-        label: 'tdse-fft-ab-bg',
-        layout: this.fftStageBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.fftUniformBuffer } },
-          { binding: 1, resource: { buffer: this.fftScratchA } },
-          { binding: 2, resource: { buffer: this.fftScratchB } },
-        ],
-      })
-      this.fftStageBABG = device.createBindGroup({
-        label: 'tdse-fft-ba-bg',
-        layout: this.fftStageBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.fftUniformBuffer } },
-          { binding: 1, resource: { buffer: this.fftScratchB } },
-          { binding: 2, resource: { buffer: this.fftScratchA } },
-        ],
-      })
+    // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
+    if (this.pl && this.bg) {
+      const pass = encoder.beginComputePass({ label: 'tdse-init-pass' })
+      this.dispatchCompute(pass, this.pl.initPipeline, [this.bg.initBG], linearWG)
+      pass.end()
     }
 
-    if (this.kineticBGL)
-      this.kineticBG = device.createBindGroup({
-        label: 'tdse-kinetic-bg',
-        layout: this.kineticBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.fftScratchA } },
-        ],
-      })
-
-    if (this.writeGridBGL)
-      this.writeGridBG = device.createBindGroup({
-        label: 'tdse-write-grid-bg',
-        layout: this.writeGridBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: { buffer: this.psiReBuffer } },
-          { binding: 2, resource: { buffer: this.psiImBuffer } },
-          { binding: 3, resource: { buffer: this.potentialBuffer } },
-          { binding: 4, resource: this.densityTextureView },
-        ],
-      })
-
-    // Diagnostics bind groups
-    if (
-      this.diagReduceBGL &&
-      this.diagUniformBuffer &&
-      this.diagPartialSumsBuffer &&
-      this.diagPartialMaxBuffer &&
-      this.diagPartialLeftBuffer &&
-      this.diagPartialRightBuffer
-    ) {
-      this.diagReduceBG = device.createBindGroup({
-        label: 'tdse-diag-reduce-bg',
-        layout: this.diagReduceBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.diagUniformBuffer } },
-          { binding: 1, resource: { buffer: this.psiReBuffer } },
-          { binding: 2, resource: { buffer: this.psiImBuffer } },
-          { binding: 3, resource: { buffer: this.diagPartialSumsBuffer } },
-          { binding: 4, resource: { buffer: this.diagPartialMaxBuffer } },
-          { binding: 5, resource: { buffer: this.diagPartialLeftBuffer } },
-          { binding: 6, resource: { buffer: this.diagPartialRightBuffer } },
-        ],
-      })
-    }
-    if (
-      this.diagFinalizeBGL &&
-      this.diagUniformBuffer &&
-      this.diagPartialSumsBuffer &&
-      this.diagPartialMaxBuffer &&
-      this.diagResultBuffer &&
-      this.diagPartialLeftBuffer &&
-      this.diagPartialRightBuffer
-    ) {
-      this.diagFinalizeBG = device.createBindGroup({
-        label: 'tdse-diag-finalize-bg',
-        layout: this.diagFinalizeBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.diagUniformBuffer } },
-          { binding: 1, resource: { buffer: this.diagPartialSumsBuffer } },
-          { binding: 2, resource: { buffer: this.diagPartialMaxBuffer } },
-          { binding: 3, resource: { buffer: this.diagResultBuffer } },
-          { binding: 4, resource: { buffer: this.diagPartialLeftBuffer } },
-          { binding: 5, resource: { buffer: this.diagPartialRightBuffer } },
-        ],
-      })
+    // For trap-frequency quench: restore evolution omega before filling the potential.
+    if (hasOmegaQuench && this.uniformBuffer && this.omegaStagingBuffer) {
+      const omegaBuf = new Float32Array([config.harmonicOmega])
+      device.queue.writeBuffer(this.omegaStagingBuffer, 0, omegaBuf)
+      encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
     }
 
-    // Renormalization bind group
-    if (this.renormalizeBGL && this.diagResultBuffer && this.psiReBuffer && this.psiImBuffer) {
-      this.renormalizeUniformBuffer?.destroy()
-      this.renormalizeUniformBuffer = device.createBuffer({
-        label: 'tdse-renormalize-uniforms',
-        size: 16,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-      // TDSE has 1 component; BEC also has 1 component (shared pass)
-      // targetNorm (f32 at offset 4) starts at 0; updated when initialNorm is captured
-      const renormBuf = new ArrayBuffer(16)
-      new Uint32Array(renormBuf)[0] = this.totalSites
-      new Float32Array(renormBuf)[1] = 0 // targetNorm = 0 → shader skips until set
-      device.queue.writeBuffer(this.renormalizeUniformBuffer, 0, renormBuf)
-      this.renormalizeBG = device.createBindGroup({
-        label: 'tdse-renormalize-bg',
-        layout: this.renormalizeBGL,
-        entries: [
-          { binding: 0, resource: { buffer: this.renormalizeUniformBuffer } },
-          { binding: 1, resource: { buffer: this.diagResultBuffer } },
-          { binding: 2, resource: { buffer: this.psiReBuffer } },
-          { binding: 3, resource: { buffer: this.psiImBuffer } },
-        ],
-      })
+    // Fill potential buffer
+    if (this.pl && this.bg) {
+      const pass = encoder.beginComputePass({ label: 'tdse-potential-fill' })
+      this.dispatchCompute(pass, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
+      pass.end()
     }
+
+    // Estimate initial peak |ψ|² for display normalization.
+    const initStr = config.initialCondition as string
+    const isBecInit =
+      initStr === 'thomasFermi' || initStr === 'vortexImprint' || initStr === 'darkSoliton'
+    if (isBecInit) {
+      const mu = config.packetAmplitude
+      const g = Math.abs(config.interactionStrength ?? 1)
+      this.maxDensity = g > 1e-10 ? mu / g : mu * mu
+    } else if (config.initialCondition === 'superposition') {
+      this.maxDensity = config.packetAmplitude * config.packetAmplitude * 0.5
+    } else {
+      this.maxDensity = config.packetAmplitude * config.packetAmplitude
+    }
+    this.initialNorm = -1.0
+    this.simTime = 0
+    this.stepAccumulator = 0
+    this.pendingAutoReset = false
+    this.diagGeneration++
+    this.initialized = true
+    this.diagHistory.clear()
+    useTdseDiagnosticsStore.getState().reset()
   }
 
   /** Write main uniform buffer with current config. */
@@ -835,214 +365,25 @@ struct PackUniforms {
     boundingRadius?: number
   ): void {
     if (!this.uniformBuffer) return
-    const u32 = this.uniformU32
-    const f32 = this.uniformF32
-    u32.fill(0)
-
-    const strides = this.computeStrides(config)
-
-    const initMap: Record<string, number> = {
-      gaussianPacket: 0,
-      planeWave: 1,
-      superposition: 2,
-      thomasFermi: 3,
-      vortexImprint: 4,
-      darkSoliton: 5,
-    }
-    const potMap: Record<string, number> = {
-      free: 0,
-      barrier: 1,
-      step: 2,
-      finiteWell: 3,
-      harmonicTrap: 4,
-      driven: 5,
-      doubleSlit: 6,
-      periodicLattice: 7,
-      doubleWell: 8,
-      becTrap: 9,
-      radialDoubleWell: 10,
-    }
-    const viewMap: Record<string, number> = {
-      density: 0,
-      phase: 1,
-      current: 2,
-      potential: 3,
-      superfluidVelocity: 4,
-      healingLength: 5,
-    }
-    const waveformMap: Record<string, number> = { sine: 0, pulse: 1, chirp: 2 }
-
-    // Lattice params (0-15)
-    u32[0] = config.latticeDim
-    u32[1] = this.totalSites
-    f32[2] = config.dt
-    f32[3] = config.hbar
-
-    // Physics (16-31)
-    f32[4] = config.mass
-    u32[5] = config.stepsPerFrame
-    u32[6] = initMap[config.initialCondition] ?? 0
-    u32[7] = potMap[config.potentialType] ?? 0
-
-    // gridSize (32, indices 8-19)
-    for (let d = 0; d < config.latticeDim; d++) u32[8 + d] = config.gridSize[d]!
-    // strides (80, indices 20-31)
-    for (let d = 0; d < config.latticeDim; d++) u32[20 + d] = strides[d]!
-    // spacing (128, indices 32-43)
-    for (let d = 0; d < config.latticeDim; d++) f32[32 + d] = config.spacing[d]!
-    // packetCenter (176, indices 44-55)
-    for (let d = 0; d < config.latticeDim; d++) f32[44 + d] = config.packetCenter[d] ?? 0
-    // packetMomentum (224, indices 56-67)
-    for (let d = 0; d < config.latticeDim; d++) f32[56 + d] = config.packetMomentum[d] ?? 0
-
-    // Packet scalars (272-287, indices 68-71)
-    f32[68] = config.packetWidth
-    f32[69] = config.packetAmplitude
-    f32[70] = boundingRadius ?? 2.0
-    u32[71] = viewMap[config.fieldView] ?? 0
-
-    // Potential params (288-319, indices 72-79)
-    f32[72] = config.barrierHeight
-    f32[73] = config.barrierWidth
-    f32[74] = config.barrierCenter
-    f32[75] = config.wellDepth
-    f32[76] = config.wellWidth
-    // Use init omega for the init pass when a quench is configured.
-    // The evolution omega is restored via copyBufferToBuffer before potential fill.
-    const needsInit = !this.initialized || config.needsReset || this.pendingAutoReset
-    const hasOmegaQuench =
-      config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
-    f32[77] = needsInit && hasOmegaQuench ? config.harmonicOmegaInit! : config.harmonicOmega
-    f32[78] = config.stepHeight
-    u32[79] = config.absorberEnabled ? 1 : 0
-
-    // Absorber + drive (320-351, indices 80-87)
-    // absorberWidth is PML fraction; absorberStrength is σ_max computed from PML target reflection
-    f32[80] = config.absorberWidth
-    f32[81] = config.absorberEnabled
-      ? computePMLSigmaMaxND(
-          config.pmlTargetReflection ?? 1e-6,
-          config.absorberWidth,
-          config.gridSize,
-          config.dt,
-          3, // cubic grading (hardcoded to match WGSL shader)
-          config.latticeDim
-        )
-      : 0
-    u32[82] = config.driveEnabled ? 1 : 0
-    u32[83] = waveformMap[config.driveWaveform] ?? 0
-    f32[84] = config.driveFrequency
-    f32[85] = config.driveAmplitude
-    f32[86] = this.simTime
-    f32[87] = config.autoScale ? this.maxDensity : 1.0
-
-    // slicePositions (352, indices 88-99)
-    for (let i = 0; i < config.slicePositions.length; i++)
-      f32[88 + 3 + i] = config.slicePositions[i]!
-
-    // Basis vectors (400-543, indices 100-135)
-    const writeBasis = (offset: number, b?: Float32Array) => {
-      if (b) {
-        for (let d = 0; d < Math.min(b.length, MAX_DIM); d++) f32[offset + d] = b[d]!
+    writeTdseUniforms(
+      device,
+      this.uniformBuffer,
+      this.uniformData,
+      this.uniformU32,
+      this.uniformF32,
+      {
+        config,
+        totalSites: this.totalSites,
+        simTime: this.simTime,
+        maxDensity: this.maxDensity,
+        strides: this.computeStrides(config),
+        needsInit: !this.initialized || config.needsReset || this.pendingAutoReset,
+        basisX,
+        basisY,
+        basisZ,
+        boundingRadius,
       }
-    }
-    writeBasis(100, basisX)
-    if (!basisX) f32[100] = 1.0
-    writeBasis(112, basisY)
-    if (!basisY) f32[113] = 1.0
-    writeBasis(124, basisZ)
-    if (!basisZ) f32[126] = 1.0
-
-    // kGridScale (544, indices 136-147): 2*pi / (N * a)
-    for (let d = 0; d < config.latticeDim; d++) {
-      const N = config.gridSize[d]!
-      const a = config.spacing[d]!
-      f32[136 + d] = (2 * Math.PI) / (N * a)
-    }
-
-    // Double slit params (592, indices 148-151)
-    f32[148] = config.slitSeparation
-    f32[149] = config.slitWidth
-    f32[150] = config.wallThickness
-    f32[151] = config.wallHeight
-
-    // Periodic lattice params (608, indices 152-153)
-    f32[152] = config.latticeDepth
-    f32[153] = config.latticePeriod
-
-    // Display overlay (616, index 154)
-    u32[154] = config.showPotential ? 1 : 0
-
-    // Double well params (620-631, indices 155-157)
-    f32[155] = config.doubleWellLambda
-    f32[156] = config.doubleWellSeparation
-    f32[157] = config.doubleWellAsymmetry
-
-    // BEC interaction strength (632, index 158)
-    f32[158] = config.interactionStrength ?? 0.0
-
-    // BEC trap anisotropy ratios (636, indices 159-170)
-    const anisotropy = config.trapAnisotropy
-    for (let d = 0; d < MAX_DIM; d++) {
-      f32[159 + d] = anisotropy?.[d] ?? 1.0
-    }
-
-    // Radial double well params (684-699, indices 171-174)
-    f32[171] = config.radialWellInner
-    f32[172] = config.radialWellOuter
-    f32[173] = config.radialWellDepth
-    f32[174] = config.radialWellTilt
-
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
-  }
-
-  /**
-   * Pre-compute all FFT stage uniforms for all axes and both directions into a
-   * single ArrayBuffer. Slots are laid out in execution order: forward FFT axes
-   * (from latticeDim-1 down to 0), then inverse FFT axes (same order).
-   *
-   * This data is written to fftStagingBuffer once per frame. Individual slots
-   * are then copied to fftUniformBuffer via encoder.copyBufferToBuffer before
-   * each dispatch, ensuring correct per-stage data within the command buffer.
-   *
-   * (device.queue.writeBuffer cannot be used per-stage because all writeBuffer
-   * calls complete before the command buffer executes, so only the last write
-   * would be visible to the GPU.)
-   */
-  private buildFFTStagingData(config: TdseConfig): ArrayBuffer {
-    let totalSlots = 0
-    for (let d = 0; d < config.latticeDim; d++) {
-      totalSlots += Math.log2(config.gridSize[d]!)
-    }
-    totalSlots *= 2 // forward + inverse
-
-    const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
-    let slotIdx = 0
-
-    for (const direction of [1.0, -1.0]) {
-      let axisStride = 1
-      for (let d = config.latticeDim - 1; d >= 0; d--) {
-        const axisDim = config.gridSize[d]!
-        const stages = Math.log2(axisDim)
-
-        for (let s = 0; s < stages; s++) {
-          const offset = slotIdx * FFT_UNIFORM_SIZE
-          const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-          view.setUint32(0, axisDim, true)
-          view.setUint32(4, s, true)
-          view.setFloat32(8, direction, true)
-          view.setUint32(12, this.totalSites, true)
-          view.setUint32(16, axisStride, true)
-          view.setUint32(20, this.totalSites / axisDim, true)
-          view.setFloat32(24, 1.0 / axisDim, true)
-          view.setUint32(28, 0, true)
-          slotIdx++
-        }
-        axisStride *= axisDim
-      }
-    }
-
-    return data
+    )
   }
 
   /**
@@ -1053,14 +394,7 @@ struct PackUniforms {
    * @returns The next slot offset for subsequent axis dispatches.
    */
   private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
-    if (
-      !this.fftStagePipeline ||
-      !this.fftStageABBG ||
-      !this.fftStageBABG ||
-      !this.fftUniformBuffer ||
-      !this.fftStagingBuffer
-    )
-      return slotOffset
+    if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
 
     const stages = Math.log2(axisDim)
     const halfTotal = this.totalSites / 2
@@ -1076,9 +410,14 @@ struct PackUniforms {
         FFT_UNIFORM_SIZE
       )
 
-      const bg = s % 2 === 0 ? this.fftStageABBG : this.fftStageBABG
+      const fftBG = s % 2 === 0 ? this.bg.fftStageABBG : this.bg.fftStageBABG
       const pass = encoder.beginComputePass({ label: `tdse-fft-stage-${s}` })
-      this.dispatchCompute(pass, this.fftStagePipeline, [bg], Math.ceil(halfTotal / LINEAR_WG))
+      this.dispatchCompute(
+        pass,
+        this.pl.fftStagePipeline,
+        [fftBG],
+        Math.ceil(halfTotal / LINEAR_WG)
+      )
       pass.end()
     }
 
@@ -1119,69 +458,7 @@ struct PackUniforms {
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
-    // Init or reset (includes auto-loop triggered reinit)
-    const hasOmegaQuench =
-      config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
-    if (!this.initialized || config.needsReset || this.pendingAutoReset) {
-      // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
-      if (this.initPipeline && this.initBG) {
-        const pass = encoder.beginComputePass({ label: 'tdse-init-pass' })
-        this.dispatchCompute(
-          pass,
-          this.initPipeline,
-          [this.initBG],
-          Math.ceil(this.totalSites / LINEAR_WG)
-        )
-        pass.end()
-      }
-
-      // For trap-frequency quench: restore evolution omega before filling the potential.
-      // The init pass used harmonicOmegaInit; the potential buffer must use harmonicOmega.
-      if (hasOmegaQuench && this.uniformBuffer && this.omegaStagingBuffer) {
-        const omegaBuf = new Float32Array([config.harmonicOmega])
-        device.queue.writeBuffer(this.omegaStagingBuffer, 0, omegaBuf)
-        // Copy the 4-byte staging buffer into uniformBuffer at offset 308 (f32[77] = harmonicOmega)
-        encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
-      }
-
-      // Fill potential buffer (uses evolution omega, restored above for quench scenarios)
-      if (this.potentialPipeline && this.potentialBG) {
-        const pass = encoder.beginComputePass({ label: 'tdse-potential-fill' })
-        this.dispatchCompute(
-          pass,
-          this.potentialPipeline,
-          [this.potentialBG],
-          Math.ceil(this.totalSites / LINEAR_WG)
-        )
-        pass.end()
-      }
-
-      // Estimate initial peak |ψ|² for display normalization.
-      // - superposition: two packets each scaled by 1/√2 → peak A²/2
-      // - BEC (Thomas-Fermi, vortex, soliton): ψ = √(n), peak n = μ/g
-      //   where μ = packetAmplitude, g = interactionStrength
-      // - standard TDSE: peak = A²
-      const initStr = config.initialCondition as string
-      const isBecInit =
-        initStr === 'thomasFermi' || initStr === 'vortexImprint' || initStr === 'darkSoliton'
-      if (isBecInit) {
-        const mu = config.packetAmplitude
-        const g = Math.abs(config.interactionStrength ?? 1)
-        this.maxDensity = g > 1e-10 ? mu / g : mu * mu
-      } else if (config.initialCondition === 'superposition') {
-        this.maxDensity = config.packetAmplitude * config.packetAmplitude * 0.5
-      } else {
-        this.maxDensity = config.packetAmplitude * config.packetAmplitude
-      }
-      this.initialNorm = -1.0 // Will be captured from first diagnostics readback
-      this.simTime = 0
-      this.stepAccumulator = 0
-      this.pendingAutoReset = false
-      this.diagGeneration++ // Invalidate any in-flight readbacks from before reset
-      this.initialized = true
-      this.diagHistory.clear()
-      useTdseDiagnosticsStore.getState().reset()
-    }
+    this.maybeInitialize(device, encoder, config)
 
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
@@ -1194,12 +471,15 @@ struct PackUniforms {
       : `${config.potentialType}|${config.barrierHeight}|${config.barrierWidth}|${config.barrierCenter}|${config.harmonicOmega}|${config.wellDepth}|${config.wellWidth}|${config.stepHeight}|${config.mass}|${config.interactionStrength}|${config.slitSeparation}|${config.slitWidth}|${config.wallThickness}|${config.wallHeight}|${config.latticeDepth}|${config.latticePeriod}|${config.doubleWellLambda}|${config.doubleWellSeparation}|${config.doubleWellAsymmetry}|${config.radialWellInner}|${config.radialWellOuter}|${config.radialWellDepth}|${config.radialWellTilt}|${(config.trapAnisotropy ?? []).join(',')}|${config.spacing.join(',')}`
     if (potHash !== this.lastPotentialHash) {
       this.lastPotentialHash = potHash
-      if (this.potentialPipeline && this.potentialBG) {
+      if (this.pl && this.bg) {
         const p = encoder.beginComputePass({ label: 'tdse-potential-update' })
-        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
+        this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
         p.end()
       }
     }
+
+    const { pl, bg } = this
+    if (!pl || !bg) return
 
     if (isPlaying) {
       // Compute speed-scaled step count using fractional accumulator.
@@ -1212,18 +492,14 @@ struct PackUniforms {
 
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential
-        if (this.potentialHalfPipeline && this.potentialHalfBG) {
-          const p = encoder.beginComputePass({ label: `tdse-V-half-1-${step}` })
-          this.dispatchCompute(p, this.potentialHalfPipeline, [this.potentialHalfBG], linearWG)
-          p.end()
-        }
+        const vHalf = encoder.beginComputePass({ label: `tdse-V-half-1-${step}` })
+        this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
+        vHalf.end()
 
         // 2. Pack psiRe+psiIm into interleaved complex
-        if (this.packPipeline && this.packBG) {
-          const p = encoder.beginComputePass({ label: `tdse-pack-${step}` })
-          this.dispatchCompute(p, this.packPipeline, [this.packBG], linearWG)
-          p.end()
-        }
+        const packPass = encoder.beginComputePass({ label: `tdse-pack-${step}` })
+        this.dispatchCompute(packPass, pl.packPipeline, [bg.packBG], linearWG)
+        packPass.end()
 
         // 3. Forward FFT (for each spatial axis)
         let fftSlot = 0
@@ -1232,11 +508,9 @@ struct PackUniforms {
         }
 
         // 4. Apply kinetic propagator in k-space
-        if (this.kineticPipeline && this.kineticBG) {
-          const p = encoder.beginComputePass({ label: `tdse-kinetic-${step}` })
-          this.dispatchCompute(p, this.kineticPipeline, [this.kineticBG], linearWG)
-          p.end()
-        }
+        const kinPass = encoder.beginComputePass({ label: `tdse-kinetic-${step}` })
+        this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
+        kinPass.end()
 
         // 5. Inverse FFT
         fftSlot = this.fwdStageCount
@@ -1245,68 +519,52 @@ struct PackUniforms {
         }
 
         // 6. Unpack with 1/N normalization
-        if (this.unpackPipeline && this.unpackBG) {
-          const p = encoder.beginComputePass({ label: `tdse-unpack-${step}` })
-          this.dispatchCompute(p, this.unpackPipeline, [this.unpackBG], linearWG)
-          p.end()
-        }
+        const unpackPass = encoder.beginComputePass({ label: `tdse-unpack-${step}` })
+        this.dispatchCompute(unpackPass, pl.unpackPipeline, [bg.unpackBG], linearWG)
+        unpackPass.end()
 
         // 7. Second half-step potential
-        if (this.potentialHalfPipeline && this.potentialHalfBG) {
-          const p = encoder.beginComputePass({ label: `tdse-V-half-2-${step}` })
-          this.dispatchCompute(p, this.potentialHalfPipeline, [this.potentialHalfBG], linearWG)
-          p.end()
-        }
+        const vHalf2 = encoder.beginComputePass({ label: `tdse-V-half-2-${step}` })
+        this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
+        vHalf2.end()
 
         // 8. Absorber (separate pass AFTER the Strang step)
         // Applied once per step, after the FFT kinetic step has completed.
         // This prevents the FFT from seeing the absorber's spatial modulation
         // and scattering it across k-space (which creates spurious emission artifacts).
-        if (this.absorberPipeline && this.initBG) {
-          const p = encoder.beginComputePass({ label: `tdse-absorber-${step}` })
-          this.dispatchCompute(p, this.absorberPipeline, [this.initBG], linearWG)
-          p.end()
-        }
+        const absPass = encoder.beginComputePass({ label: `tdse-absorber-${step}` })
+        this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
+        absPass.end()
 
         this.simTime += config.dt
 
         // 9. Periodic renormalization: counteract f32 norm drift.
         // Once per frame (last substep), run GPU norm reduction + rescale.
-        if (
-          step === stepsThisFrame - 1 &&
-          this.diagReducePipeline &&
-          this.diagReduceBG &&
-          this.diagFinalizePipeline &&
-          this.diagFinalizeBG &&
-          this.renormalizePipeline &&
-          this.renormalizeBG
-        ) {
+        if (step === stepsThisFrame - 1) {
           const rPass = encoder.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,
-            this.diagReducePipeline,
-            [this.diagReduceBG],
+            pl.diagReducePipeline,
+            [bg.diagReduceBG],
             this.diagNumWorkgroups
           )
           rPass.end()
           const fPass = encoder.beginComputePass({ label: `tdse-renorm-finalize-${step}` })
-          this.dispatchCompute(fPass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
+          this.dispatchCompute(fPass, pl.diagFinalizePipeline, [bg.diagFinalizeBG], 1)
           fPass.end()
           const sPass = encoder.beginComputePass({ label: `tdse-renorm-scale-${step}` })
           const renormWG = Math.ceil(this.totalSites / LINEAR_WG)
-          this.dispatchCompute(sPass, this.renormalizePipeline, [this.renormalizeBG], renormWG)
+          this.dispatchCompute(sPass, pl.renormalizePipeline, [bg.renormalizeBG], renormWG)
           sPass.end()
         }
       }
     }
 
     // Write density grid
-    if (this.writeGridPipeline && this.writeGridBG) {
-      const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
-      const pass = encoder.beginComputePass({ label: 'tdse-write-grid-pass' })
-      this.dispatchCompute(pass, this.writeGridPipeline, [this.writeGridBG], gridWG, gridWG, gridWG)
-      pass.end()
-    }
+    const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
+    const wgPass = encoder.beginComputePass({ label: 'tdse-write-grid-pass' })
+    this.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG], gridWG, gridWG, gridWG)
+    wgPass.end()
 
     // Always run decimated norm reduction to keep maxDensity updated for
     // display normalization. Without this, a spreading wavepacket fades to
@@ -1333,15 +591,8 @@ struct PackUniforms {
     config: TdseConfig,
     recordHistory: boolean
   ): void {
-    if (
-      !this.diagReducePipeline ||
-      !this.diagReduceBG ||
-      !this.diagFinalizePipeline ||
-      !this.diagFinalizeBG ||
-      !this.diagResultBuffer ||
-      !this.diagStagingBuffer ||
-      !this.diagUniformBuffer
-    )
+    const { pl, bg } = this
+    if (!pl || !bg || !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer)
       return
 
     // Write diagnostic uniforms (updated per-frame for barrierCenter etc.)
@@ -1361,15 +612,15 @@ struct PackUniforms {
     const reducePass = encoder.beginComputePass({ label: 'tdse-diag-reduce' })
     this.dispatchCompute(
       reducePass,
-      this.diagReducePipeline,
-      [this.diagReduceBG],
+      pl.diagReducePipeline,
+      [bg.diagReduceBG],
       this.diagNumWorkgroups
     )
     reducePass.end()
 
     // Pass 2: finalize partial sums -> result
     const finalizePass = encoder.beginComputePass({ label: 'tdse-diag-finalize' })
-    this.dispatchCompute(finalizePass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
+    this.dispatchCompute(finalizePass, pl.diagFinalizePipeline, [bg.diagFinalizeBG], 1)
     finalizePass.end()
 
     // Schedule async readback (fire-and-forget, skip if previous is still in flight)
@@ -1388,6 +639,7 @@ struct PackUniforms {
       const staging = this.diagStagingBuffer
       const simTime = this.simTime
       const gen = this.diagGeneration
+      const renormBuf = bg.renormalizeUniformBuffer
 
       // Submit current commands, then map
       device.queue
@@ -1429,9 +681,8 @@ struct PackUniforms {
               if (this.initialNorm < 0) {
                 this.initialNorm = totalNorm
                 // Upload targetNorm to renormalize uniform buffer
-                if (this.renormalizeUniformBuffer) {
-                  const buf = new Float32Array([totalNorm])
-                  device.queue.writeBuffer(this.renormalizeUniformBuffer, 4, buf)
+                if (renormBuf) {
+                  device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
                 }
               } else if (this.initialNorm > 0) {
                 // Reset on norm decay (wavepacket absorbed / left the domain)
@@ -1501,7 +752,7 @@ struct PackUniforms {
     this.diagPartialRightBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
-    this.renormalizeUniformBuffer?.destroy()
+    this.bg?.renormalizeUniformBuffer?.destroy()
 
     this.psiReBuffer = null
     this.psiImBuffer = null
@@ -1523,29 +774,8 @@ struct PackUniforms {
     this.diagResultBuffer = null
     this.diagStagingBuffer = null
 
-    this.initPipeline = null
-    this.potentialPipeline = null
-    this.potentialHalfPipeline = null
-    this.absorberPipeline = null
-    this.packPipeline = null
-    this.unpackPipeline = null
-    this.fftStagePipeline = null
-    this.kineticPipeline = null
-    this.writeGridPipeline = null
-    this.diagReducePipeline = null
-    this.diagFinalizePipeline = null
-
-    this.initBG = null
-    this.potentialBG = null
-    this.potentialHalfBG = null
-    this.packBG = null
-    this.unpackBG = null
-    this.fftStageABBG = null
-    this.fftStageBABG = null
-    this.kineticBG = null
-    this.writeGridBG = null
-    this.diagReduceBG = null
-    this.diagFinalizeBG = null
+    this.pl = null
+    this.bg = null
 
     this.diagHistory.clear()
     useTdseDiagnosticsStore.getState().reset()

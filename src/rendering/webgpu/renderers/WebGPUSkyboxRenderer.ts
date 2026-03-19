@@ -22,6 +22,7 @@ import {
   SKYBOX_BIND_GROUPS,
   type SkyboxMode as ShaderSkyboxMode,
 } from '../shaders/skybox'
+import { generateSkyboxCubeVertices, loadSkyboxCubeTexture } from './skyboxVertexData'
 
 /**
  * Resolved URLs for skybox face PNG images (eagerly loaded by Vite).
@@ -44,87 +45,14 @@ export interface SkyboxRendererConfig {
   vignette?: boolean
 }
 
-/**
- * Maps store skybox mode to shader mode string.
- * @param storeMode
- */
-function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
-  switch (storeMode) {
-    case 'procedural_aurora':
-      return 'aurora'
-    case 'procedural_nebula':
-      return 'nebula'
-    case 'procedural_crystalline':
-      return 'crystalline'
-    case 'procedural_horizon':
-      return 'horizon'
-    case 'procedural_ocean':
-      return 'ocean'
-    case 'procedural_twilight':
-      return 'twilight'
-    case 'classic':
-    default:
-      return 'classic'
-  }
-}
-
-/**
- * Maps shader mode string to numeric mode value for uniforms.
- * @param mode
- */
-function modeToNumeric(mode: ShaderSkyboxMode): number {
-  switch (mode) {
-    case 'classic':
-      return 0
-    case 'aurora':
-      return 1
-    case 'nebula':
-      return 2
-    case 'crystalline':
-      return 4
-    case 'horizon':
-      return 5
-    case 'ocean':
-      return 6
-    case 'twilight':
-      return 7
-    default:
-      return 0
-  }
-}
-
-/** Pack cosine palette coefficients into skybox uniform data (indices 16-39). */
-function packSkyboxPalette(
-  data: Float32Array,
-  coeffs: { a?: number[]; b?: number[]; c?: number[]; d?: number[] } | undefined
-): void {
-  const a = coeffs?.a
-  const b = coeffs?.b
-  const c = coeffs?.c
-  const d = coeffs?.d
-
-  // color1 (= palA), color2 (= palB)
-  data[16] = a?.[0] ?? 0.5
-  data[17] = a?.[1] ?? 0.5
-  data[18] = a?.[2] ?? 0.5
-  data[20] = b?.[0] ?? 0.5
-  data[21] = b?.[1] ?? 0.5
-  data[22] = b?.[2] ?? 0.5
-
-  // palA-D (explicit palette coefficients)
-  data[24] = a?.[0] ?? 0.5
-  data[25] = a?.[1] ?? 0.5
-  data[26] = a?.[2] ?? 0.5
-  data[28] = b?.[0] ?? 0.5
-  data[29] = b?.[1] ?? 0.5
-  data[30] = b?.[2] ?? 0.5
-  data[32] = c?.[0] ?? 1.0
-  data[33] = c?.[1] ?? 1.0
-  data[34] = c?.[2] ?? 1.0
-  data[36] = d?.[0] ?? 0.0
-  data[37] = d?.[1] ?? 0.33
-  data[38] = d?.[2] ?? 0.67
-}
+// Skybox helper functions extracted to skyboxVertexData.ts
+import {
+  computeSkyboxAnimationEffects,
+  mapSkyboxModeToShader,
+  packSkyboxCoreUniforms,
+  packSkyboxModeSettings,
+  packSkyboxPalette,
+} from './skyboxVertexData'
 
 /**
  * WebGPU renderer for procedural skybox backgrounds.
@@ -378,87 +306,20 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     textureName: string,
     highQuality: boolean
   ): Promise<void> {
-    // Face names in WebGPU cubemap layer order: +X, -X, +Y, -Y, +Z, -Z
-    const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'] as const
-
-    // Resolve face URLs from Vite glob
-    const faceURLs: string[] = []
-    for (const face of faceNames) {
-      const key = `/src/assets/skyboxes/${textureName}/${face}.png`
-      const url = skyboxFaceAssets[key]
-      if (!url) {
-        logger.warn(`[WebGPU Skybox] Missing face asset: ${key}`)
-        return
-      }
-      faceURLs.push(url)
-    }
-
-    // Load all 6 face images in parallel
-    const bitmaps = await Promise.all(
-      faceURLs.map(async (url) => {
-        const response = await fetch(url)
-        const blob = await response.blob()
-        return createImageBitmap(blob, { colorSpaceConversion: 'none' })
-      })
+    const cubeTexture = await loadSkyboxCubeTexture(
+      device,
+      textureName,
+      highQuality,
+      skyboxFaceAssets
     )
-
-    const width = bitmaps[0]!.width
-    const height = bitmaps[0]!.height
-    const mipLevelCount = highQuality ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
-
-    // Create cube texture
-    const cubeTexture = device.createTexture({
-      label: `skybox-cube-${textureName}`,
-      size: { width, height, depthOrArrayLayers: 6 },
-      format: 'rgba8unorm',
-      mipLevelCount,
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
-    })
-
-    // Upload base level for each face
-    for (let i = 0; i < 6; i++) {
-      device.queue.copyExternalImageToTexture(
-        { source: bitmaps[i]! },
-        { texture: cubeTexture, origin: { x: 0, y: 0, z: i } },
-        { width, height }
-      )
+    if (!cubeTexture) {
+      logger.warn(`[WebGPU Skybox] Missing face assets for: ${textureName}`)
+      return
     }
 
-    // Generate mipmaps by progressively downscaling with createImageBitmap
-    if (highQuality && mipLevelCount > 1) {
-      for (let face = 0; face < 6; face++) {
-        let mipW = width
-        let mipH = height
-        for (let level = 1; level < mipLevelCount; level++) {
-          mipW = Math.max(1, mipW >> 1)
-          mipH = Math.max(1, mipH >> 1)
-          const mipBitmap = await createImageBitmap(bitmaps[face]!, {
-            resizeWidth: mipW,
-            resizeHeight: mipH,
-            resizeQuality: 'high',
-            colorSpaceConversion: 'none',
-          })
-          device.queue.copyExternalImageToTexture(
-            { source: mipBitmap },
-            { texture: cubeTexture, origin: { x: 0, y: 0, z: face }, mipLevel: level },
-            { width: mipW, height: mipH }
-          )
-          mipBitmap.close()
-        }
-      }
-    }
-
-    // Clean up source ImageBitmaps
-    for (const bm of bitmaps) bm.close()
-
-    // Destroy previous loaded texture (not the placeholder — keep it for fallback)
     this.loadedCubeTexture?.destroy()
     this.loadedCubeTexture = cubeTexture
 
-    // Update bind groups to use the new texture
     if (this.textureBindGroupLayout && this.placeholderCubeSampler) {
       this.textureBindGroup = device.createBindGroup({
         label: 'skybox-texture-bg',
@@ -469,12 +330,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
         ],
       })
     }
-
-    if (import.meta.env.DEV) {
-      console.log(
-        `[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height}, mips: ${mipLevelCount})`
-      )
-    }
   }
 
   /**
@@ -483,132 +338,13 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
    * @param device
    */
   private createVertexBuffer(device: GPUDevice): void {
-    const size = 1.0
-
-    // Cube vertices (position only) - 36 vertices (6 faces x 2 triangles x 3 vertices)
-    const vertices = new Float32Array([
-      // Front face
-      -size,
-      -size,
-      size,
-      size,
-      -size,
-      size,
-      size,
-      size,
-      size,
-      -size,
-      -size,
-      size,
-      size,
-      size,
-      size,
-      -size,
-      size,
-      size,
-      // Back face
-      size,
-      -size,
-      -size,
-      -size,
-      -size,
-      -size,
-      -size,
-      size,
-      -size,
-      size,
-      -size,
-      -size,
-      -size,
-      size,
-      -size,
-      size,
-      size,
-      -size,
-      // Top face
-      -size,
-      size,
-      size,
-      size,
-      size,
-      size,
-      size,
-      size,
-      -size,
-      -size,
-      size,
-      size,
-      size,
-      size,
-      -size,
-      -size,
-      size,
-      -size,
-      // Bottom face
-      -size,
-      -size,
-      -size,
-      size,
-      -size,
-      -size,
-      size,
-      -size,
-      size,
-      -size,
-      -size,
-      -size,
-      size,
-      -size,
-      size,
-      -size,
-      -size,
-      size,
-      // Right face
-      size,
-      -size,
-      size,
-      size,
-      -size,
-      -size,
-      size,
-      size,
-      -size,
-      size,
-      -size,
-      size,
-      size,
-      size,
-      -size,
-      size,
-      size,
-      size,
-      // Left face
-      -size,
-      -size,
-      -size,
-      -size,
-      -size,
-      size,
-      -size,
-      size,
-      size,
-      -size,
-      -size,
-      -size,
-      -size,
-      size,
-      size,
-      -size,
-      size,
-      -size,
-    ])
-
+    const vertices = generateSkyboxCubeVertices()
     this.vertexBuffer = device.createBuffer({
       label: 'skybox-vertices',
       size: vertices.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     })
-    device.queue.writeBuffer(this.vertexBuffer, 0, vertices)
+    device.queue.writeBuffer(this.vertexBuffer, 0, vertices as Float32Array<ArrayBuffer>)
   }
 
   /**
@@ -729,42 +465,11 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     const t = this.skyboxTime
 
-    // --- Compute animation mode effects (classic mode only, matches WebGL) ---
-    this.animRotX = 0
-    this.animRotY = 0
-    this.animRotZ = 0
-    let animHue = 0
-    let animIntensityMul = 1.0
-    let animDistortion = 0
-
-    if (isPlaying && storeMode === 'classic' && skyboxAnimationMode !== 'none') {
-      switch (skyboxAnimationMode) {
-        case 'cinematic':
-          this.animRotY = t * 0.1
-          this.animRotX = Math.sin(t * 0.5) * 0.005
-          this.animRotZ = Math.cos(t * 0.3) * 0.003
-          break
-        case 'heatwave':
-          animDistortion = 1.0 + Math.sin(t * 0.5) * 0.5
-          this.animRotY = t * 0.02
-          break
-        case 'tumble':
-          this.animRotX = t * 0.05
-          this.animRotY = t * 0.07
-          this.animRotZ = t * 0.03
-          break
-        case 'ethereal':
-          this.animRotY = t * 0.05
-          animHue = Math.sin(t * 0.1) * 0.1
-          animIntensityMul = 1.0 + Math.sin(t * 10) * 0.02
-          break
-        case 'nebula':
-          animHue = (t * 0.05) % 1.0
-          this.animRotY = t * 0.03
-          animIntensityMul = 1.1
-          break
-      }
-    }
+    // Compute animation mode effects (classic mode only, matches WebGL)
+    const animFx = computeSkyboxAnimationEffects(isPlaying, storeMode, skyboxAnimationMode, t)
+    this.animRotX = animFx.rotX
+    this.animRotY = animFx.rotY
+    this.animRotZ = animFx.rotZ
 
     // Pack and write skybox uniform data
     this.packSkyboxData(
@@ -772,9 +477,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       env?.skyboxIntensity ?? 1.0,
       settings,
       t,
-      animHue,
-      animIntensityMul,
-      animDistortion
+      animFx.hue,
+      animFx.intensityMul,
+      animFx.distortion
     )
 
     // Update vertex uniforms (offset 256)
@@ -794,48 +499,22 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const data = this.skyboxUniformData
     data.fill(0)
 
-    const baseHue = settings?.hue ?? 0.0
-    const baseDistortion = settings?.turbulence ?? 0.3
-
     // Core uniforms (first 64 bytes / 16 floats)
-    data[0] = modeToNumeric(shaderMode)
-    data[1] = t
-    data[2] = baseIntensity * animIntensityMul
-    data[3] = baseHue + animHue
+    packSkyboxCoreUniforms(
+      data,
+      shaderMode,
+      settings,
+      t,
+      baseIntensity * animIntensityMul,
+      (settings?.hue ?? 0.0) + animHue,
+      animDistortion
+    )
 
-    data[4] = settings?.saturation ?? 1.0
-    data[5] = settings?.scale ?? 1.0
-    data[6] = settings?.complexity ?? 0.5
-    data[7] = settings?.timeScale ?? 0.2
-
-    data[8] = settings?.evolution ?? 0.0
-    data[9] = 0.0
-    data[10] = animDistortion
-    data[11] = 0.0
-
-    data[12] = baseDistortion
-    data[13] = settings?.dualToneContrast ?? 0.5
-    data[14] = settings?.sunIntensity ?? 0.0
-    data[15] = 0.0
-
-    // Cosine palette: color1/color2 at indices 16-23, palA/B/C/D at 24-39
+    // Cosine palette (indices 16-39)
     packSkyboxPalette(data, settings?.cosineCoefficients)
 
-    // sunPosition (vec3 + padding)
-    const sunPos = settings?.sunPosition ?? [10, 10, 10]
-    data[40] = sunPos[0]
-    data[41] = sunPos[1]
-    data[42] = sunPos[2]
-
-    // Mode-specific settings
-    data[44] = settings?.aurora?.curtainHeight ?? 0.5
-    data[45] = settings?.aurora?.waveFrequency ?? 1.0
-    data[46] = settings?.horizonGradient?.gradientContrast ?? 0.5
-    data[47] = settings?.horizonGradient?.spotlightFocus ?? 0.5
-    data[48] = settings?.ocean?.causticIntensity ?? 0.5
-    data[49] = settings?.ocean?.depthGradient ?? 0.5
-    data[50] = settings?.ocean?.bubbleDensity ?? 0.3
-    data[51] = settings?.ocean?.surfaceShimmer ?? 0.4
+    // Sun position + mode-specific settings (indices 40-51)
+    packSkyboxModeSettings(data, settings)
 
     this.writeUniformBuffer(this.device!, this.uniformBuffer!, data, 0)
   }

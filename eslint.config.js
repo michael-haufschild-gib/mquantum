@@ -458,76 +458,12 @@ export default [
       'max-lines': ['error', { max: 500, skipBlankLines: true, skipComments: true }],
     },
   },
-  // max-lines for .ts files (non-shader, non-compute-pass, non-renderer)
+  // max-lines for .ts files (tests excluded — test length reflects coverage breadth)
   {
     files: ['src/**/*.ts'],
-    ignores: [
-      'src/rendering/webgpu/passes/*ComputePass.ts',
-      'src/rendering/webgpu/passes/*Pass.ts',
-      'src/rendering/webgpu/renderers/**',
-      'src/rendering/webgpu/shaders/**',
-      'src/rendering/webgpu/graph/**',
-      'src/rendering/webgpu/core/**',
-      'src/lib/geometry/extended/types.ts',
-      'src/rendering/shaders/palette/presets.ts',
-      'src/rendering/webgpu/passes/gizmoGeometry.ts',
-      // Scene/export orchestrators: top-level pipeline wiring, legitimately large
-      'src/rendering/webgpu/WebGPUScene.ts',
-      'src/rendering/webgpu/scenePassSetup.ts',
-      'src/rendering/webgpu/useExportRuntime.ts',
-      // Central quantum state slice: orchestrates 7 quantum modes, dimension handling, presets
-      'src/stores/slices/geometry/schroedingerSlice.ts',
-      // TDSE mode setters: grid/PML/boundary config with CFL-coupled validation
-      'src/stores/slices/geometry/setters/tdseSetters.ts',
-      'src/tests/**',
-    ],
+    ignores: ['src/tests/**'],
     rules: {
       'max-lines': ['warn', { max: 600, skipBlankLines: true, skipComments: true }],
-    },
-  },
-  // GPU rendering: elevated complexity limit for WebGPU pipeline code.
-  // Compute passes handle multi-mode dispatch (7 quantum modes × render paths).
-  // Cap at 65 — reduced from 80 after WebGPUScene decomposition.
-  {
-    files: [
-      'src/rendering/webgpu/passes/**',
-      'src/rendering/webgpu/renderers/**',
-      'src/rendering/webgpu/graph/**',
-    ],
-    rules: {
-      complexity: ['warn', 65],
-    },
-  },
-  // Shader composition: composeSchroedingerShader() has inherent branching from
-  // 10+ feature flags × quantum modes. The function is a declarative block
-  // assembly DSL — splitting it would not reduce cognitive complexity.
-  {
-    files: ['src/rendering/webgpu/shaders/**'],
-    rules: {
-      complexity: ['warn', 80],
-    },
-  },
-  // Complex React components: animation drawers and color preview render
-  // mode-dependent UI for 7+ quantum modes, producing high branching complexity.
-  {
-    files: [
-      'src/components/layout/TimelineControls/SchroedingerAnimationDrawer.tsx',
-      'src/components/sections/Faces/ColorPreview.tsx',
-    ],
-    rules: {
-      complexity: ['warn', 55],
-    },
-  },
-  // Preset normalization: backward-compat validation of arbitrary JSON produces
-  // unavoidable per-field branching. Each branch validates one stored field.
-  {
-    files: [
-      'src/stores/utils/presetNormalization.ts',
-      'src/stores/presetManagerStore.ts',
-      'src/stores/exportStore.ts',
-    ],
-    rules: {
-      complexity: ['warn', 50],
     },
   },
   // Test files: mocks and stubs are intentionally defined inside test functions/beforeEach blocks

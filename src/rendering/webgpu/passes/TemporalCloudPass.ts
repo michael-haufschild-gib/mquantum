@@ -29,6 +29,12 @@
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
+import {
+  BAYER_OFFSETS,
+  FULLSCREEN_VERTEX_SHADER,
+  RECONSTRUCTION_SHADER,
+  REPROJECTION_SHADER,
+} from '../shaders/temporal/temporalCloudShaders.wgsl'
 
 /**
  * Configuration for the Temporal Cloud Pass.
@@ -51,373 +57,6 @@ export interface TemporalCloudPassConfig {
   /** Disocclusion threshold for validity rejection */
   disocclusionThreshold?: number
 }
-
-/** Bayer pattern offsets for 4-frame cycle */
-const BAYER_OFFSETS: [number, number][] = [
-  [0.0, 0.0],
-  [1.0, 1.0],
-  [1.0, 0.0],
-  [0.0, 1.0],
-]
-
-// =============================================================================
-// WGSL Shaders
-// =============================================================================
-
-/**
- * Reprojection Fragment Shader (WGSL)
- *
- * Takes previous frame's accumulated data and reprojects it to current view.
- * Outputs reprojected color and validity mask.
- */
-const REPROJECTION_SHADER = /* wgsl */ `
-struct Uniforms {
-  prevViewProjectionMatrix: mat4x4f,
-  viewProjectionMatrix: mat4x4f,
-  cameraPosition: vec3f,
-  _pad0: f32,
-  accumulationResolution: vec2f,
-  disocclusionThreshold: f32,
-  _pad1: f32,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var texSampler: sampler;
-@group(0) @binding(2) var tPrevAccumulation: texture_2d<f32>;
-@group(0) @binding(3) var tPrevPositionBuffer: texture_2d<f32>;
-
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-
-struct FragmentOutput {
-  @location(0) color: vec4f,
-  @location(1) validity: vec4f,
-}
-
-@fragment
-fn main(input: VertexOutput) -> FragmentOutput {
-  var output: FragmentOutput;
-  let uv = input.uv;
-
-  // Sample previous frame's data at this screen location
-  let prevColor = textureSample(tPrevAccumulation, texSampler, uv);
-  let prevPosition = textureSample(tPrevPositionBuffer, texSampler, uv);
-
-  // Early out if no valid history at this location
-  if (prevColor.a < 0.001 || prevPosition.w < 0.001) {
-    output.color = vec4f(0.0);
-    output.validity = vec4f(0.0);
-    return output;
-  }
-
-  let worldPos = prevPosition.xyz;
-
-  // Project this world position to CURRENT frame to see where it went
-  let currentClip = uniforms.viewProjectionMatrix * vec4f(worldPos, 1.0);
-
-  // Guard against division by zero in perspective divide
-  var safeW = currentClip.w;
-  if (abs(safeW) < 0.0001) {
-    safeW = select(-0.0001, 0.0001, safeW >= 0.0);
-  }
-
-  let currentUV = (currentClip.xy / safeW) * 0.5 + 0.5;
-
-  // Compute how far the content has "moved" on screen
-  let screenMotion = currentUV - uv;
-  let motionMagnitude = length(screenMotion * uniforms.accumulationResolution);
-
-  // Start with full validity
-  var validity: f32 = 1.0;
-
-  // MOTION-BASED REJECTION
-  let MOTION_THRESHOLD_MIN: f32 = 2.0;
-  let MOTION_THRESHOLD_MAX: f32 = 8.0;
-
-  if (motionMagnitude > MOTION_THRESHOLD_MIN) {
-    let motionFactor = 1.0 - smoothstep(MOTION_THRESHOLD_MIN, MOTION_THRESHOLD_MAX, motionMagnitude);
-    validity *= motionFactor;
-  }
-
-  // OFF-SCREEN REJECTION
-  if (currentUV.x < -0.1 || currentUV.x > 1.1 || currentUV.y < -0.1 || currentUV.y > 1.1) {
-    validity = 0.0;
-  }
-
-  // EDGE DETECTION - check for position discontinuities
-  let texelSize = 1.0 / uniforms.accumulationResolution;
-
-  let posL = textureSample(tPrevPositionBuffer, texSampler, uv - vec2f(texelSize.x, 0.0));
-  let posR = textureSample(tPrevPositionBuffer, texSampler, uv + vec2f(texelSize.x, 0.0));
-  let posU = textureSample(tPrevPositionBuffer, texSampler, uv + vec2f(0.0, texelSize.y));
-  let posD = textureSample(tPrevPositionBuffer, texSampler, uv - vec2f(0.0, texelSize.y));
-
-  let maxPosDiff = max(
-    max(length(worldPos - posL.xyz), length(worldPos - posR.xyz)),
-    max(length(worldPos - posU.xyz), length(worldPos - posD.xyz))
-  );
-
-  let POS_DISCONTINUITY_THRESHOLD: f32 = 0.3;
-  if (maxPosDiff > POS_DISCONTINUITY_THRESHOLD) {
-    validity *= 0.5;
-  }
-
-  // ALPHA DISCONTINUITY
-  let colorL = textureSample(tPrevAccumulation, texSampler, uv - vec2f(texelSize.x, 0.0));
-  let colorR = textureSample(tPrevAccumulation, texSampler, uv + vec2f(texelSize.x, 0.0));
-  let colorU = textureSample(tPrevAccumulation, texSampler, uv + vec2f(0.0, texelSize.y));
-  let colorD = textureSample(tPrevAccumulation, texSampler, uv - vec2f(0.0, texelSize.y));
-
-  let maxAlphaDiff = max(
-    max(abs(prevColor.a - colorL.a), abs(prevColor.a - colorR.a)),
-    max(abs(prevColor.a - colorU.a), abs(prevColor.a - colorD.a))
-  );
-
-  if (maxAlphaDiff > uniforms.disocclusionThreshold) {
-    validity *= 0.5;
-  }
-
-  // SCREEN EDGE REJECTION
-  let edgeDist = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
-  if (edgeDist < 0.03) {
-    validity *= edgeDist / 0.03;
-  }
-
-  output.color = prevColor;
-  output.validity = vec4f(validity, 0.0, 0.0, 1.0);
-  return output;
-}
-`
-
-/**
- * Reconstruction Fragment Shader (WGSL)
- *
- * Combines freshly rendered quarter-res pixels with reprojected history
- * to produce full-resolution accumulated cloud image.
- */
-const RECONSTRUCTION_SHADER = /* wgsl */ `
-struct Uniforms {
-  bayerOffset: vec2f,
-  frameIndex: i32,
-  hasValidHistory: i32,
-  cloudResolution: vec2f,
-  accumulationResolution: vec2f,
-  historyWeight: f32,
-  _pad0: f32,
-  _pad1: f32,
-  _pad2: f32,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var texSampler: sampler;
-@group(0) @binding(2) var tCloudRender: texture_2d<f32>;
-@group(0) @binding(3) var tCloudPosition: texture_2d<f32>;
-@group(0) @binding(4) var tReprojectedHistory: texture_2d<f32>;
-@group(0) @binding(5) var tReprojectedPositionHistory: texture_2d<f32>;
-@group(0) @binding(6) var tValidityMask: texture_2d<f32>;
-
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-
-struct FragmentOutput {
-  @location(0) color: vec4f,
-  @location(1) position: vec4f,
-}
-
-// Sample color from quarter-res cloud buffer for a given full-res pixel coordinate
-fn sampleCloudColorAtPixel(fullResPixel: vec2i) -> vec4f {
-  let quarterUV = (vec2f(fullResPixel / 2) + 0.5) / uniforms.cloudResolution;
-  return textureSample(tCloudRender, texSampler, quarterUV);
-}
-
-// Sample position from quarter-res cloud buffer
-fn sampleCloudPositionAtPixel(fullResPixel: vec2i) -> vec4f {
-  let quarterUV = (vec2f(fullResPixel / 2) + 0.5) / uniforms.cloudResolution;
-  return textureSample(tCloudPosition, texSampler, quarterUV);
-}
-
-// Spatial interpolation from quarter-res cloud buffer (no history)
-fn spatialInterpolationColorFromCloud(fullResPixel: vec2i) -> vec4f {
-  let blockBase = (fullResPixel / 2) * 2;
-  let bayerInt = vec2i(uniforms.bayerOffset);
-  let renderedPixel = blockBase + bayerInt;
-  return sampleCloudColorAtPixel(renderedPixel);
-}
-
-fn spatialInterpolationPositionFromCloud(fullResPixel: vec2i) -> vec4f {
-  let blockBase = (fullResPixel / 2) * 2;
-  let bayerInt = vec2i(uniforms.bayerOffset);
-  let renderedPixel = blockBase + bayerInt;
-  return sampleCloudPositionAtPixel(renderedPixel);
-}
-
-// Spatial interpolation from history buffer
-fn spatialInterpolationColorFromHistory(uv: vec2f) -> vec4f {
-  let texelSize = 1.0 / uniforms.accumulationResolution;
-
-  let c0 = textureSample(tReprojectedHistory, texSampler, uv + vec2f(-texelSize.x, 0.0));
-  let c1 = textureSample(tReprojectedHistory, texSampler, uv + vec2f(texelSize.x, 0.0));
-  let c2 = textureSample(tReprojectedHistory, texSampler, uv + vec2f(0.0, -texelSize.y));
-  let c3 = textureSample(tReprojectedHistory, texSampler, uv + vec2f(0.0, texelSize.y));
-
-  var sum = vec4f(0.0);
-  var count: f32 = 0.0;
-
-  if (c0.a > 0.001) { sum += c0; count += 1.0; }
-  if (c1.a > 0.001) { sum += c1; count += 1.0; }
-  if (c2.a > 0.001) { sum += c2; count += 1.0; }
-  if (c3.a > 0.001) { sum += c3; count += 1.0; }
-
-  if (count > 0.0) {
-    return sum / count;
-  }
-  return vec4f(0.0);
-}
-
-fn spatialInterpolationPositionFromHistory(uv: vec2f) -> vec4f {
-  let texelSize = 1.0 / uniforms.accumulationResolution;
-
-  let p0 = textureSample(tReprojectedPositionHistory, texSampler, uv + vec2f(-texelSize.x, 0.0));
-  let p1 = textureSample(tReprojectedPositionHistory, texSampler, uv + vec2f(texelSize.x, 0.0));
-  let p2 = textureSample(tReprojectedPositionHistory, texSampler, uv + vec2f(0.0, -texelSize.y));
-  let p3 = textureSample(tReprojectedPositionHistory, texSampler, uv + vec2f(0.0, texelSize.y));
-
-  var sum = vec4f(0.0);
-  var count: f32 = 0.0;
-
-  if (p0.w > 0.001) { sum += p0; count += 1.0; }
-  if (p1.w > 0.001) { sum += p1; count += 1.0; }
-  if (p2.w > 0.001) { sum += p2; count += 1.0; }
-  if (p3.w > 0.001) { sum += p3; count += 1.0; }
-
-  if (count > 0.0) {
-    return sum / count;
-  }
-  return vec4f(0.0);
-}
-
-// Neighborhood clamping - critical for preventing ghosting
-fn computeNeighborhoodBounds(centerPixel: vec2i) -> array<vec4f, 2> {
-  var minBound = vec4f(1e10);
-  var maxBound = vec4f(-1e10);
-
-  for (var dy: i32 = -1; dy <= 1; dy++) {
-    for (var dx: i32 = -1; dx <= 1; dx++) {
-      var samplePixel = centerPixel + vec2i(dx, dy) * 2;
-      samplePixel = clamp(samplePixel, vec2i(0), vec2i(uniforms.accumulationResolution) - 1);
-
-      let neighborColor = sampleCloudColorAtPixel(samplePixel);
-
-      if (neighborColor.a > 0.001) {
-        minBound = min(minBound, neighborColor);
-        maxBound = max(maxBound, neighborColor);
-      }
-    }
-  }
-
-  if (minBound.a > 1e9) {
-    minBound = vec4f(0.0);
-    maxBound = vec4f(1.0);
-  }
-
-  return array<vec4f, 2>(minBound, maxBound);
-}
-
-fn clampToNeighborhood(color: vec4f, minBound: vec4f, maxBound: vec4f) -> vec4f {
-  return clamp(color, minBound, maxBound);
-}
-
-@fragment
-fn main(input: VertexOutput) -> FragmentOutput {
-  var output: FragmentOutput;
-  let uv = input.uv;
-
-  let pixelCoordInt = vec2i(floor(uv * uniforms.accumulationResolution));
-  let blockPosInt = pixelCoordInt % 2;
-  let bayerOffsetInt = vec2i(uniforms.bayerOffset);
-
-  let renderedThisFrame = (blockPosInt.x == bayerOffsetInt.x && blockPosInt.y == bayerOffsetInt.y);
-
-  var newColor = vec4f(0.0);
-  var newPosition = vec4f(0.0);
-  var historyColor = vec4f(0.0);
-  var historyPosition = vec4f(0.0);
-  var validity: f32 = 0.0;
-
-  // Get new rendered color/position for pixels rendered this frame
-  if (renderedThisFrame) {
-    newColor = sampleCloudColorAtPixel(pixelCoordInt);
-    newPosition = sampleCloudPositionAtPixel(pixelCoordInt);
-  }
-
-  // Get reprojected history if available
-  if (uniforms.hasValidHistory != 0) {
-    historyColor = textureSample(tReprojectedHistory, texSampler, uv);
-    historyPosition = textureSample(tReprojectedPositionHistory, texSampler, uv);
-    validity = textureSample(tValidityMask, texSampler, uv).r;
-  }
-
-  var finalColor: vec4f;
-  var finalPosition: vec4f;
-
-  let FRESH_PIXEL_HISTORY_REDUCTION: f32 = 0.5;
-
-  // Neighborhood clamping
-  let bounds = computeNeighborhoodBounds(pixelCoordInt);
-  let neighborMin = bounds[0];
-  let neighborMax = bounds[1];
-
-  let clampedHistoryColor = clampToNeighborhood(historyColor, neighborMin, neighborMax);
-
-  if (renderedThisFrame) {
-    if (uniforms.hasValidHistory != 0 && validity > 0.5 && historyColor.a > 0.001) {
-      let blendWeight = uniforms.historyWeight * validity * FRESH_PIXEL_HISTORY_REDUCTION;
-      finalColor = mix(newColor, clampedHistoryColor, blendWeight);
-      finalPosition = mix(newPosition, historyPosition, blendWeight);
-
-      if (newColor.a >= 0.99) {
-        finalColor.a = 1.0;
-      }
-    } else {
-      finalColor = newColor;
-      finalPosition = newPosition;
-    }
-  } else {
-    if (uniforms.hasValidHistory != 0 && validity > 0.5 && historyColor.a > 0.001) {
-      finalColor = clampedHistoryColor;
-      finalPosition = historyPosition;
-
-      if (historyColor.a >= 0.99) {
-        finalColor.a = 1.0;
-      }
-    } else if (uniforms.hasValidHistory != 0 && historyColor.a > 0.001) {
-      let spatialColor = spatialInterpolationColorFromHistory(uv);
-      let spatialPosition = spatialInterpolationPositionFromHistory(uv);
-      let clampedSpatial = clampToNeighborhood(spatialColor, neighborMin, neighborMax);
-      finalColor = mix(clampedSpatial, clampedHistoryColor, validity);
-      finalPosition = mix(spatialPosition, historyPosition, validity);
-
-      if (historyColor.a >= 0.99 || spatialColor.a >= 0.99) {
-        finalColor.a = 1.0;
-      }
-    } else {
-      finalColor = spatialInterpolationColorFromCloud(pixelCoordInt);
-      finalPosition = spatialInterpolationPositionFromCloud(pixelCoordInt);
-    }
-  }
-
-  finalColor = max(finalColor, vec4f(0.0));
-  finalPosition.w = max(finalPosition.w, 0.0);
-
-  output.color = finalColor;
-  output.position = finalPosition;
-  return output;
-}
-`
 
 // =============================================================================
 // Pass Implementation
@@ -740,7 +379,42 @@ export class TemporalCloudPass extends WebGPUBasePass {
    * Execute the temporal cloud pass.
    * @param ctx
    */
-  execute(ctx: WebGPURenderContext): void {
+  /** Extract VP matrix and camera position from store snapshot. */
+  private extractCameraState(
+    camera:
+      | {
+          viewProjectionMatrix?: { elements: number[] }
+          position?: { x: number; y: number; z: number } | [number, number, number]
+        }
+      | undefined
+  ): { currentVP: Float32Array; camPos: [number, number, number] } {
+    const currentVP = this.currentViewProjectionMatrix
+    currentVP.fill(0)
+    if (camera?.viewProjectionMatrix?.elements) {
+      for (let i = 0; i < 16; i++) {
+        currentVP[i] = camera.viewProjectionMatrix.elements[i] ?? 0
+      }
+    } else {
+      currentVP[0] = 1
+      currentVP[5] = 1
+      currentVP[10] = 1
+      currentVP[15] = 1
+    }
+
+    let camPos: [number, number, number] = [0, 0, 0]
+    if (camera?.position) {
+      if (Array.isArray(camera.position)) {
+        camPos = [camera.position[0] ?? 0, camera.position[1] ?? 0, camera.position[2] ?? 0]
+      } else {
+        camPos = [camera.position.x ?? 0, camera.position.y ?? 0, camera.position.z ?? 0]
+      }
+    }
+
+    return { currentVP, camPos }
+  }
+
+  /** Acquire all required resources for temporal cloud execution. Returns null if any are missing. */
+  private acquireResources(ctx: WebGPURenderContext) {
     if (
       !this.device ||
       !this.reprojectionPipeline ||
@@ -751,22 +425,17 @@ export class TemporalCloudPass extends WebGPUBasePass {
       !this.reconstructionBindGroupLayout ||
       !this.sampler
     ) {
-      return
+      return null
     }
 
-    // Get input textures
     const cloudColorView = ctx.getTextureView(this.passConfig.cloudColorInput)
     const cloudPositionView = ctx.getTextureView(this.passConfig.cloudPositionInput)
+    if (!cloudColorView || !cloudPositionView) return null
 
-    if (!cloudColorView || !cloudPositionView) return
-
-    // Get accumulation buffers (ping-pong)
     const accumColorReadView = ctx.getReadTextureView(this.passConfig.accumulationColorBuffer)
     const accumPositionReadView = ctx.getReadTextureView(this.passConfig.accumulationPositionBuffer)
     const accumColorWriteView = ctx.getWriteTarget(this.passConfig.accumulationColorBuffer)
     const accumPositionWriteView = ctx.getWriteTarget(this.passConfig.accumulationPositionBuffer)
-
-    // Get reprojection outputs
     const reprojColorView = ctx.getWriteTarget(this.passConfig.reprojectionColorOutput)
     const reprojValidityView = ctx.getWriteTarget(this.passConfig.reprojectionValidityOutput)
 
@@ -778,8 +447,37 @@ export class TemporalCloudPass extends WebGPUBasePass {
       !reprojColorView ||
       !reprojValidityView
     ) {
-      return
+      return null
     }
+
+    return {
+      cloudColorView,
+      cloudPositionView,
+      accumColorReadView,
+      accumPositionReadView,
+      accumColorWriteView,
+      accumPositionWriteView,
+      reprojColorView,
+      reprojValidityView,
+    }
+  }
+
+  execute(ctx: WebGPURenderContext): void {
+    const resources = this.acquireResources(ctx)
+    if (!resources) return
+
+    // acquireResources verified all required resources are non-null
+
+    const {
+      cloudColorView,
+      cloudPositionView,
+      accumColorReadView,
+      accumPositionReadView,
+      accumColorWriteView,
+      accumPositionWriteView,
+      reprojColorView,
+      reprojValidityView,
+    } = resources
 
     const { width, height } = ctx.size
     const bayerOffset = BAYER_OFFSETS[this.frameIndex] ?? [0, 0]
@@ -795,36 +493,8 @@ export class TemporalCloudPass extends WebGPUBasePass {
       position?: { x: number; y: number; z: number } | [number, number, number]
     }
 
-    // Extract current viewProjectionMatrix from camera store
-    const currentViewProjectionMatrix = this.currentViewProjectionMatrix
-    currentViewProjectionMatrix.fill(0)
-    if (camera?.viewProjectionMatrix?.elements) {
-      for (let i = 0; i < 16; i++) {
-        currentViewProjectionMatrix[i] = camera.viewProjectionMatrix.elements[i] ?? 0
-      }
-    } else {
-      // Identity matrix fallback
-      currentViewProjectionMatrix[0] = 1
-      currentViewProjectionMatrix[5] = 1
-      currentViewProjectionMatrix[10] = 1
-      currentViewProjectionMatrix[15] = 1
-    }
-
-    // Extract camera position
-    let cameraX = 0,
-      cameraY = 0,
-      cameraZ = 0
-    if (camera?.position) {
-      if (Array.isArray(camera.position)) {
-        cameraX = camera.position[0] ?? 0
-        cameraY = camera.position[1] ?? 0
-        cameraZ = camera.position[2] ?? 0
-      } else {
-        cameraX = camera.position.x ?? 0
-        cameraY = camera.position.y ?? 0
-        cameraZ = camera.position.z ?? 0
-      }
-    }
+    // Extract camera state
+    const { currentVP, camPos } = this.extractCameraState(camera)
 
     // === REPROJECTION PASS ===
     if (this.hasValidHistory) {
@@ -837,13 +507,13 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
       // viewProjectionMatrix (offset 64, 64 bytes) - current frame's matrix
       for (let i = 0; i < 16; i++) {
-        reprojData[16 + i] = currentViewProjectionMatrix[i] ?? 0
+        reprojData[16 + i] = currentVP[i] ?? 0
       }
 
       // cameraPosition (offset 128, 12 bytes) + pad
-      reprojData[32] = cameraX
-      reprojData[33] = cameraY
-      reprojData[34] = cameraZ
+      reprojData[32] = camPos[0]
+      reprojData[33] = camPos[1]
+      reprojData[34] = camPos[2]
       reprojData[35] = 0
 
       // accumulationResolution (offset 144, 8 bytes) + disocclusionThreshold + pad
@@ -852,19 +522,19 @@ export class TemporalCloudPass extends WebGPUBasePass {
       reprojData[38] = this.disocclusionThreshold
       reprojData[39] = 0
 
-      this.writeUniformBuffer(this.device, this.reprojectionUniformBuffer, reprojData)
+      this.writeUniformBuffer(this.device!, this.reprojectionUniformBuffer!, reprojData)
 
       if (
         !this.reprojectionBindGroup ||
         this.reprojectionBindGroupAccumColorView !== accumColorReadView ||
         this.reprojectionBindGroupAccumPositionView !== accumPositionReadView
       ) {
-        this.reprojectionBindGroup = this.device.createBindGroup({
+        this.reprojectionBindGroup = this.device!.createBindGroup({
           label: 'temporal-cloud-reprojection-bg',
-          layout: this.passBindGroupLayout,
+          layout: this.passBindGroupLayout!,
           entries: [
-            { binding: 0, resource: { buffer: this.reprojectionUniformBuffer } },
-            { binding: 1, resource: this.sampler },
+            { binding: 0, resource: { buffer: this.reprojectionUniformBuffer! } },
+            { binding: 1, resource: this.sampler! },
             { binding: 2, resource: accumColorReadView },
             { binding: 3, resource: accumPositionReadView },
           ],
@@ -891,7 +561,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
         ],
       })
 
-      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline, [
+      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline!, [
         this.reprojectionBindGroup!,
       ])
       reprojPassEncoder.end()
@@ -919,7 +589,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
     reconData[10] = 0
     reconData[11] = 0
 
-    this.writeUniformBuffer(this.device, this.reconstructionUniformBuffer, reconData)
+    this.writeUniformBuffer(this.device!, this.reconstructionUniformBuffer!, reconData)
 
     // For reconstruction, we need reprojection outputs as inputs
     // IMPORTANT: Use getTextureView() for reading, not the write targets, to avoid read-after-write hazard
@@ -945,12 +615,12 @@ export class TemporalCloudPass extends WebGPUBasePass {
       this.reconstructionHistoryPositionView !== reprojPositionView ||
       this.reconstructionValidityView !== validityReadView
     ) {
-      this.reconstructionBindGroup = this.device.createBindGroup({
+      this.reconstructionBindGroup = this.device!.createBindGroup({
         label: 'temporal-cloud-reconstruction-bg',
-        layout: this.reconstructionBindGroupLayout,
+        layout: this.reconstructionBindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.reconstructionUniformBuffer } },
-          { binding: 1, resource: this.sampler },
+          { binding: 0, resource: { buffer: this.reconstructionUniformBuffer! } },
+          { binding: 1, resource: this.sampler! },
           { binding: 2, resource: cloudColorView },
           { binding: 3, resource: cloudPositionView },
           { binding: 4, resource: reprojHistoryReadView },
@@ -983,7 +653,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline, [
+    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline!, [
       this.reconstructionBindGroup!,
     ])
     reconPassEncoder.end()
@@ -993,7 +663,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
     this.hasValidHistory = true
 
     // Store current viewProjectionMatrix for next frame's reprojection
-    this.prevViewProjectionMatrix.set(currentViewProjectionMatrix)
+    this.prevViewProjectionMatrix.set(currentVP)
   }
 
   /**
@@ -1046,28 +716,3 @@ export class TemporalCloudPass extends WebGPUBasePass {
     super.dispose()
   }
 }
-
-// =============================================================================
-// Shared Shader
-// =============================================================================
-
-/**
- * Standard fullscreen vertex shader (WGSL).
- */
-const FULLSCREEN_VERTEX_SHADER = /* wgsl */ `
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-
-@vertex
-fn main(
-  @location(0) position: vec2f,
-  @location(1) uv: vec2f
-) -> VertexOutput {
-  var output: VertexOutput;
-  output.position = vec4f(position, 0.0, 1.0);
-  output.uv = uv;
-  return output;
-}
-`

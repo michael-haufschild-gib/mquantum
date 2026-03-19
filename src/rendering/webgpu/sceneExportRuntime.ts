@@ -4,9 +4,15 @@
  * @module rendering/webgpu/sceneExportRuntime
  */
 
+import type React from 'react'
+
 import { VideoRecorder } from '@/lib/export/video'
 import type { ExportMode, ExportSettings } from '@/stores/exportStore'
 import { useExportStore } from '@/stores/exportStore'
+
+import type { WebGPUCamera } from './core/WebGPUCamera'
+import type { WebGPUDevice } from './core/WebGPUDevice'
+import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 
 /** Current phase of the export pipeline. */
 export type ExportPhase = 'warmup' | 'preview' | 'recording'
@@ -169,4 +175,81 @@ export function waitForPaint(): Promise<void> {
       requestAnimationFrame(() => resolve())
     })
   })
+}
+
+/**
+ * Dependencies injected from the parent WebGPUScene component.
+ */
+export interface UseExportRuntimeParams {
+  canvas: HTMLCanvasElement
+  device: WebGPUDevice
+  graph: WebGPURenderGraph
+  cameraRef: React.RefObject<WebGPUCamera | null>
+  size: { width: number; height: number }
+  advanceSceneStateByDelta: (deltaTime: number) => void
+  executeSceneFrame: (deltaTime: number) => void
+  exportRuntimeRef: React.RefObject<ExportRuntimeState>
+}
+
+/** Return type of useExportRuntime: per-frame tick and cleanup handles. */
+export interface UseExportRuntimeReturn {
+  tickExport: () => boolean
+  cleanupExport: () => void
+}
+
+/**
+ * Create a VideoRecorder with standard config derived from export settings.
+ */
+export function createExportRecorder(
+  canvas: HTMLCanvasElement,
+  settings: ExportSettings,
+  width: number,
+  height: number,
+  duration: number
+): VideoRecorder {
+  return new VideoRecorder(canvas, {
+    width,
+    height,
+    fps: settings.fps,
+    duration,
+    totalDuration: settings.duration,
+    bitrate: settings.bitrate,
+    format: settings.format,
+    codec: settings.codec,
+    hardwareAcceleration: settings.hardwareAcceleration,
+    bitrateMode: settings.bitrateMode,
+    textOverlay: settings.textOverlay,
+    crop: settings.crop,
+    rotation: settings.rotation,
+  })
+}
+
+/** Validate export settings. Throws on invalid values. */
+export function validateExportSettings(settings: ExportSettings): void {
+  if (!Number.isFinite(settings.fps) || settings.fps <= 0) {
+    throw new Error(`Invalid FPS: ${settings.fps}`)
+  }
+  if (!Number.isFinite(settings.duration) || settings.duration <= 0) {
+    throw new Error(`Invalid duration: ${settings.duration}`)
+  }
+  if (!Number.isFinite(settings.bitrate) || settings.bitrate <= 0) {
+    throw new Error(`Invalid bitrate: ${settings.bitrate}`)
+  }
+}
+
+/** Download a recorded video segment as a file. */
+export function triggerSegmentDownload(
+  blob: Blob,
+  segmentIndex: number,
+  format: ExportSettings['format']
+): void {
+  const ext = format === 'webm' ? 'webm' : 'mp4'
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `mdimension-${Date.now()}-part${segmentIndex}.${ext}`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

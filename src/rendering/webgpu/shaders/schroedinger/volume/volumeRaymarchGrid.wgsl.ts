@@ -1,0 +1,257 @@
+/**
+ * Grid-Based Volume Raymarching
+ *
+ * Uses pre-computed 3D density grid texture instead of inline wavefunction evaluation.
+ * Extracted from integration.wgsl.ts for file-size management.
+ *
+ * @module rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl
+ */
+
+export const volumeRaymarchGridBlock = /* wgsl */ `
+// ============================================
+// Grid-Based Volume Raymarching
+// ============================================
+
+fn volumeRaymarchGrid(
+  rayOrigin: vec3f,
+  rayDir: vec3f,
+  tNear: f32,
+  tFar: f32,
+  uniforms: SchroedingerUniforms
+) -> VolumeResult {
+  var accColor = vec3f(0.0);
+  var iterCount: i32 = 0;
+  var primaryHitT: f32 = -1.0;
+  let primaryHitThreshold: f32 = 0.01;
+
+  // Sample count scaled by per-pixel path length to keep step SIZE constant
+  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
+  let stepLen = (tFar - tNear) / f32(sampleCount);
+  var t = tNear;
+
+  let animTime = getVolumeTime(uniforms);
+  let viewDir = -rayDir;
+  let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
+
+  var transmittance: f32 = 1.0;
+
+  for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
+    if (i >= sampleCount) { break; }
+    iterCount = i + 1;
+
+    if (transmittance < MIN_TRANSMITTANCE) { break; }
+    let remainingDistance = max(tFar - t, 0.0);
+    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
+    let remainingContributionBound = transmittance * maxRemainingOpacity;
+    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
+
+    let pos = rayOrigin + rayDir * t;
+
+    // Sample density from pre-computed 3D grid texture
+    // Returns (rho, logRho, spatialPhase, relativePhase) for rgba16float
+    // Returns (rho, 0, 0, 0) for r16float
+    let gridSample = sampleDensityFromGrid(pos, uniforms);
+    var rho = gridSample.r;
+
+    // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
+    //   R = primary density, G = secondary density (NOT logRho)
+    //   Opacity/absorption must use total density (R + G) so that
+    //   secondary-only regions remain visible.
+    //   colorRho/colorS preserve the raw channels for computeBaseColor.
+    // For all other modes: G = logRho as usual.
+    var sCenter: f32;
+    var colorRho: f32 = rho;
+    var colorS: f32 = 0.0;
+    if (IS_DUAL_CHANNEL) {
+      colorS = gridSample.g;        // secondary density for computeBaseColor 's'
+      sCenter = gridSample.g;       // (also kept in sCenter for backward compat)
+      rho = rho + gridSample.g;     // total density for alpha/skip/adaptive stepping
+      colorRho = gridSample.r;      // primary density for computeBaseColor 'rho'
+    } else if (DENSITY_GRID_HAS_PHASE) {
+      sCenter = gridSample.g; // logRho from grid
+      colorS = sCenter;
+    } else {
+      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      colorS = sCenter;
+    }
+
+    // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
+    var phase: f32;
+    if (DENSITY_GRID_HAS_PHASE) {
+      phase = select(gridSample.b, gridSample.a, COLOR_ALGORITHM == 10);
+    } else {
+      phase = 0.0;
+    }
+
+    // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
+    // PERF: Only recompute log(rho) when emphasis actually modifies rho
+    // Skip for dual-channel modes since sCenter is secondary density, not logRho.
+    if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) {
+      rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
+      // Update logRho to reflect emphasis so emission color/brightness matches inline path
+      // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
+      sCenter = select(-20.0, log(rho), rho > 1e-9);
+      colorRho = rho;
+      colorS = sCenter;
+    }
+
+    // Skip near-zero density regions (but not potential overlay regions).
+    // Potential overlay only applies to compute modes (TDSE/BEC/Dirac/FSF) where the
+    // alpha channel encodes |V|/Vmax. For HO/hydrogen modes, alpha is relativePhase.
+    // Pauli spinor: alpha is total density, not potential — skip potential check.
+    let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
+        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
+        let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+        // For dual-channel modes, include secondary density (G channel) in skip check
+        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
+        let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
+        if (midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
+
+    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6 (sub-pixel alpha), -8 → ρ≈3.4e-4 (sub-pixel at σ≤10).
+    // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
+    // Use logRho of total density for adaptive stepping.
+    var stepMultiplier = 1.0;
+    if (!hasPotOverlay) {
+      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), IS_DUAL_CHANNEL);
+      if (logRhoForStep < -12.0) {
+        stepMultiplier = 4.0;
+      } else if (logRhoForStep < -8.0) {
+        stepMultiplier = 2.0;
+      }
+    }
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Potential overlay: render V(x) as a solid semi-transparent wall.
+    // Alpha channel encodes normalized |V|/Vmax from the write-grid shader.
+    // Only active for compute modes (IS_FREE_SCALAR) where alpha IS potential.
+    // For HO/hydrogen modes, alpha is relativePhase — must NOT be rendered as potential.
+    // For Pauli spinor mode, alpha encodes total density — must NOT be rendered as potential.
+    if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
+      let potColor = vec3f(0.35, 0.45, 0.55);
+      let potOpacity = clamp(gridSample.a * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
+      accColor += transmittance * potOpacity * potColor;
+      transmittance *= (1.0 - potOpacity);
+    }
+
+    // Nodal surface overlay (uses inline evaluation, not grid)
+    if (
+      FEATURE_NODAL &&
+      uniforms.nodalEnabled != 0u &&
+      uniforms.nodalStrength > 0.0 &&
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
+    ) {
+      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      let fadedIntensity = nodal.intensity * nodal.envelopeWeight;
+      if (fadedIntensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalOpticalStep = min(adaptiveStep, stepLen * 1.5);
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensity * uniforms.nodalStrength, 0.0) * nodalOpticalStep),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= (1.0 - nodalAlpha * 0.6);
+        }
+      }
+    }
+
+    // Probability current overlay
+    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling
+    let momentumOverlaySubsample =
+      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    if (
+      !momentumOverlaySubsample &&
+      uniforms.probabilityCurrentEnabled != 0u &&
+      uniforms.probabilityCurrentScale > 0.0 &&
+      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
+    ) {
+      let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
+      let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
+      let currentOverlay = computeProbabilityCurrentOverlay(
+        pos,
+        currentSample,
+        rho,
+        normalProxy,
+        viewDir,
+        uniforms
+      );
+      if (currentOverlay.a > 1e-5) {
+        let overlayAlpha = clamp(
+          currentOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0),
+          0.0,
+          1.0
+        );
+        accColor += transmittance * overlayAlpha * currentOverlay.rgb;
+        transmittance *= (1.0 - overlayAlpha * 0.45);
+      }
+    }
+
+    // Radial probability overlay (hydrogen P(r) shells)
+    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      if (rProbOverlay.a > 1e-5) {
+        let rProbAlpha = clamp(
+          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
+        );
+        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
+        transmittance *= (1.0 - rProbAlpha * 0.5);
+      }
+    }
+
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    var effectiveRho = applyDensityContrast(rho, uniforms);
+    // Phase materiality: smoke regions are denser (more absorbing)
+    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
+      let pmPhase = fract((phase + PI) / TAU);
+      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
+      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+    }
+    // Nodal plane softening: density floor AFTER contrast so sigmoid doesn't kill it
+    let cloudDepth = 1.0 - transmittance;
+    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+
+    if (alpha > 0.001) {
+      if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {
+        primaryHitT = t;
+      }
+
+      // Compute gradient from grid (central differences on texture)
+      let gradient = computeGradientFromGrid(pos, uniforms);
+
+      // Compute emission with lighting
+      // For algo 23: pass particle (colorRho) and antiparticle (colorS) to color function.
+      // For other algos: colorRho == rho and colorS == sCenter (no difference).
+      let emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
+
+      // Front-to-back compositing
+      accColor += transmittance * alpha * emission;
+      transmittance *= (1.0 - alpha);
+    }
+
+    t += adaptiveStep;
+  }
+
+  // Final alpha
+  let finalAlpha = 1.0 - transmittance;
+  if (primaryHitT < 0.0) {
+    primaryHitT = (tNear + tFar) * 0.5;
+  }
+
+  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
+}
+`

@@ -1,0 +1,323 @@
+/**
+ * Scene pass configuration types, config extraction, normalization,
+ * and runtime-update helpers.
+ *
+ * Pure logic — no pass instantiation or graph mutation.
+ *
+ * @module rendering/webgpu/scenePassConfig
+ */
+
+import type { ObjectType } from '@/lib/geometry/types'
+import {
+  COLOR_ALGORITHM_TO_INT,
+  type ColorAlgorithm as PaletteColorAlgorithm,
+  getAvailableColorAlgorithms,
+} from '@/rendering/shaders/palette/types'
+import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
+
+import type { WebGPUFrameStats } from './core/types'
+import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
+import { ScenePass } from './passes/ScenePass'
+import { ToScreenPass } from './passes/ToScreenPass'
+import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
+import { parseHexColorToLinearRgb } from './utils/color'
+import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Arguments for frame execution and metrics collection. */
+export interface FrameMetricsArgs {
+  graph: WebGPURenderGraph
+  collector: WebGPUStatsCollector
+  deltaTime: number
+  size: { width: number; height: number }
+  dpr: number
+}
+
+/** Full pass configuration controlling which render passes are enabled and how they compile. */
+export interface PassConfig {
+  objectType: ObjectType
+  dimension: number
+  bloomEnabled: boolean
+  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
+  paperEnabled: boolean
+  frameBlendingEnabled: boolean
+  isosurface: boolean
+  quantumMode:
+    | 'harmonicOscillator'
+    | 'hydrogenND'
+    | 'freeScalarField'
+    | 'tdseDynamics'
+    | 'becDynamics'
+    | 'diracEquation'
+  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  nodalEnabled: boolean
+  phaseMaterialityEnabled: boolean
+  interferenceEnabled: boolean
+  uncertaintyBoundaryEnabled: boolean
+  temporalReprojectionEnabled: boolean
+  eigenfunctionCacheEnabled: boolean
+  analyticalGradientEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
+  renderResolutionScale?: number
+  colorAlgorithm: PaletteColorAlgorithm
+  diracFieldView?: string
+  pauliFieldView?: string
+  representation: 'position' | 'momentum' | 'wigner'
+  openQuantumEnabled: boolean
+  skyboxEnabled: boolean
+  skyboxMode: SkyboxMode
+  backgroundColor: string
+}
+
+/** Subset of PassConfig fields that trigger Schroedinger renderer rebuild when changed. */
+export interface SchrodingerPassConfig {
+  objectType: ObjectType
+  dimension: number
+  quantumMode:
+    | 'harmonicOscillator'
+    | 'hydrogenND'
+    | 'freeScalarField'
+    | 'tdseDynamics'
+    | 'becDynamics'
+    | 'diracEquation'
+  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  colorAlgorithm: PaletteColorAlgorithm
+  isosurface: boolean
+  nodalEnabled: boolean
+  phaseMaterialityEnabled: boolean
+  interferenceEnabled: boolean
+  uncertaintyBoundaryEnabled: boolean
+  representation: 'position' | 'momentum' | 'wigner'
+  eigenfunctionCacheEnabled: boolean
+  analyticalGradientEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
+  temporalReprojectionEnabled: boolean
+  openQuantumEnabled: boolean
+}
+
+/** Subset of PassConfig fields that trigger post-processing pass rebuild when changed. */
+export interface PPPassConfig {
+  bloomEnabled: boolean
+  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
+  paperEnabled: boolean
+  frameBlendingEnabled: boolean
+  skyboxEnabled: boolean
+  skyboxMode: SkyboxMode
+  temporalReprojectionEnabled: boolean
+}
+
+// ============================================================================
+// Frame Metrics
+// ============================================================================
+
+/**
+ * Execute one render-graph frame and publish the resulting metrics to the
+ * performance monitor store.
+ */
+export function executeFrameAndCollectMetrics({
+  graph,
+  collector,
+  deltaTime,
+  size,
+  dpr,
+}: FrameMetricsArgs): WebGPUFrameStats {
+  const cpuStartMs = performance.now()
+  const frameStats = graph.execute(deltaTime)
+  const cpuTimeMs = performance.now() - cpuStartMs
+  collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
+  return frameStats
+}
+
+// ============================================================================
+// Config Normalization & Extraction
+// ============================================================================
+
+/** Map a color algorithm to the Pauli writeGrid fieldView that encodes matching channels. */
+export function pauliFieldViewForColorAlgorithm(algo: string): string {
+  switch (algo) {
+    case 'pauliSpinDensity':
+      return 'spinDensity'
+    case 'pauliSpinExpectation':
+      return 'spinExpectation'
+    case 'pauliCoherence':
+      return 'coherence'
+    default:
+      return 'totalDensity'
+  }
+}
+
+/** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */
+export function normalizeColorAlgorithmForQuantumMode(
+  quantumMode: PassConfig['quantumMode'],
+  colorAlgorithm: PaletteColorAlgorithm,
+  openQuantumEnabled: boolean = false,
+  diracFieldView?: string,
+  _pauliFieldView?: string,
+  objectType: string = 'schroedinger'
+): PaletteColorAlgorithm {
+  if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
+    return 'particleAntiparticle'
+  }
+
+  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled, objectType).some(
+    (option) => option.value === colorAlgorithm
+  )
+  if (isAvailable) return colorAlgorithm
+
+  if (openQuantumEnabled) return 'purityMap'
+  if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
+  if (
+    quantumMode === 'tdseDynamics' ||
+    quantumMode === 'becDynamics' ||
+    quantumMode === 'freeScalarField' ||
+    quantumMode === 'diracEquation'
+  ) {
+    return 'phaseDensity'
+  }
+  return 'radialDistance'
+}
+
+/** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
+export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
+  const isFreeScalar = config.quantumMode === 'freeScalarField'
+  const isTdse = config.quantumMode === 'tdseDynamics'
+  const isBec = config.quantumMode === 'becDynamics'
+  const isDirac = config.quantumMode === 'diracEquation'
+  const isPauli = config.objectType === 'pauliSpinor'
+  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
+  const is2D = !isComputeMode && (config.dimension === 2 || config.representation === 'wigner')
+
+  const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
+    config.quantumMode,
+    config.colorAlgorithm,
+    config.openQuantumEnabled,
+    config.diracFieldView,
+    isPauli ? config.pauliFieldView : undefined,
+    config.objectType
+  )
+
+  return {
+    objectType: config.objectType,
+    dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
+    quantumMode: config.quantumMode,
+    termCount: isComputeMode ? 1 : config.termCount,
+    colorAlgorithm,
+    isosurface: config.isosurface,
+    nodalEnabled: isComputeMode || config.openQuantumEnabled ? false : config.nodalEnabled,
+    phaseMaterialityEnabled:
+      isComputeMode || config.openQuantumEnabled ? false : config.phaseMaterialityEnabled,
+    interferenceEnabled:
+      isComputeMode || config.openQuantumEnabled ? false : config.interferenceEnabled,
+    uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
+    representation: isComputeMode ? 'position' : config.representation,
+    eigenfunctionCacheEnabled: isComputeMode || is2D ? false : config.eigenfunctionCacheEnabled,
+    analyticalGradientEnabled: isComputeMode || is2D ? false : config.analyticalGradientEnabled,
+    fastEigenInterpolationEnabled:
+      isComputeMode || is2D ? false : config.fastEigenInterpolationEnabled,
+    temporalReprojectionEnabled: isComputeMode || is2D ? false : config.temporalReprojectionEnabled,
+    openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
+  }
+}
+
+/** @returns Post-processing config subset. */
+export function extractPPConfig(config: PassConfig): PPPassConfig {
+  return {
+    bloomEnabled: config.bloomEnabled,
+    antiAliasingMethod: config.antiAliasingMethod,
+    paperEnabled: config.paperEnabled,
+    frameBlendingEnabled: config.frameBlendingEnabled,
+    skyboxEnabled: config.skyboxEnabled,
+    skyboxMode: config.skyboxMode,
+    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
+  }
+}
+
+/** @returns True if all keys of `b` match the corresponding values in `a`. */
+export function shallowEqual<T extends object>(a: T | null, b: T): boolean {
+  if (!a) return false
+  const keys = Object.keys(b) as (keyof T)[]
+  return keys.every((k) => a[k] === b[k])
+}
+
+/**
+ * Free-scalar mode has a distinct rendering data path (lattice compute grid).
+ * Warm-swapping between free-scalar and non-free-scalar keeps stale visuals visible
+ * during async compilation, so these transitions should force a cold rebuild.
+ */
+export function shouldForceFullRebuildForQuantumModeTransition(
+  previous: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'> | null,
+  next: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'>
+): boolean {
+  if (!previous) return false
+  if (previous.objectType !== next.objectType) return true
+  if (previous.quantumMode === next.quantumMode) return false
+  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
+  return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
+}
+
+// ============================================================================
+// Runtime Updates (no rebuild)
+// ============================================================================
+
+/**
+ * Compute CAS sharpening intensity from render resolution scale.
+ * Below 95% render scale, sharpening increases as scale decreases.
+ */
+export function computeCasSharpnessFromRenderScale(renderResolutionScale: number): number {
+  const normalizedScale = Number.isFinite(renderResolutionScale)
+    ? Math.max(0, Math.min(1, renderResolutionScale))
+    : 1
+  if (normalizedScale >= 0.95) return 0
+  return Math.min(0.7, (1 - normalizedScale) * 1.5)
+}
+
+/** Update ScenePass clear color at runtime without rebuilding passes/pipelines. */
+export function updateScenePassBackgroundColor({
+  graph,
+  skyboxEnabled,
+  backgroundColor,
+}: {
+  graph: Pick<WebGPURenderGraph, 'getPass'>
+  skyboxEnabled: boolean
+  backgroundColor: string
+}): void {
+  if (skyboxEnabled) return
+  const scenePass = graph.getPass('scene')
+  if (!(scenePass instanceof ScenePass)) return
+  const backgroundLinear = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
+  scenePass.setClearColor({
+    r: backgroundLinear[0],
+    g: backgroundLinear[1],
+    b: backgroundLinear[2],
+    a: 1,
+  })
+}
+
+/** Update ToScreen CAS sharpness at runtime without rebuilding passes/pipelines. */
+export function updateToScreenPassSharpness({
+  graph,
+  renderResolutionScale,
+}: {
+  graph: Pick<WebGPURenderGraph, 'getPass'>
+  renderResolutionScale: number
+}): void {
+  const toScreenPass = graph.getPass('toScreen')
+  if (!(toScreenPass instanceof ToScreenPass)) return
+  toScreenPass.setSharpness(computeCasSharpnessFromRenderScale(renderResolutionScale))
+}
+
+/** Resolve a PaletteColorAlgorithm to the WGSL integer constant. */
+export function resolveColorAlgorithmInt(config: PassConfig): WGSLColorAlgorithm | undefined {
+  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
+    config.quantumMode,
+    config.colorAlgorithm,
+    config.openQuantumEnabled,
+    config.diracFieldView,
+    config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
+    config.objectType
+  )
+  return COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as WGSLColorAlgorithm | undefined
+}

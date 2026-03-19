@@ -83,7 +83,7 @@ const HERMITE_20 = {
 function gaussLaguerre(f: (x: number) => number): number {
   let sum = 0
   for (let i = 0; i < 10; i++) {
-    sum += LAGUERRE_10.w[i] * f(LAGUERRE_10.x[i])
+    sum += LAGUERRE_10.w[i]! * f(LAGUERRE_10.x[i]!)
   }
   return sum
 }
@@ -96,8 +96,8 @@ function gaussLaguerre(f: (x: number) => number): number {
 function gaussHermite(f: (x: number) => number): number {
   let sum = 0
   for (let i = 0; i < 10; i++) {
-    const x = HERMITE_20.x[i]
-    const w = HERMITE_20.w[i]
+    const x = HERMITE_20.x[i]!
+    const w = HERMITE_20.w[i]!
     sum += w * (f(x) + f(-x))
   }
   return sum
