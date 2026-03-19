@@ -774,3 +774,527 @@ describe('WGSL hardcoded constants cross-check', () => {
     expect(laguerre(2, 1, 1)).toBeCloseTo(0.5, 10)
   })
 })
+
+// ============================================================================
+// Associated Legendre polynomial known values
+// ============================================================================
+
+describe('associated Legendre polynomial known values', () => {
+  // Reference: NIST DLMF 14.7, Abramowitz & Stegun 8.6
+  //
+  // P_l^m(x) with Condon-Shortley phase (-1)^m included for m > 0.
+  // The legendreP() mirror matches the WGSL legendre() function.
+
+  describe('low-degree exact values', () => {
+    it('P_0^0(x) = 1 for all x', () => {
+      for (const x of [-1, -0.5, 0, 0.5, 1]) {
+        expect(legendreP(0, 0, x)).toBeCloseTo(1, 12)
+      }
+    })
+
+    it('P_1^0(x) = x', () => {
+      for (const x of [-1, -0.5, 0, 0.5, 1]) {
+        expect(legendreP(1, 0, x)).toBeCloseTo(x, 12)
+      }
+    })
+
+    it('P_1^1(x) = -sqrt(1-x^2) (Condon-Shortley)', () => {
+      for (const x of [-0.8, -0.3, 0, 0.3, 0.8]) {
+        const expected = -Math.sqrt(1 - x * x)
+        expect(legendreP(1, 1, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('P_2^0(x) = (3x^2 - 1)/2', () => {
+      for (const x of [-1, -0.5, 0, 0.5, 1]) {
+        const expected = (3 * x * x - 1) / 2
+        expect(legendreP(2, 0, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('P_2^1(x) = -3x * sqrt(1-x^2)', () => {
+      for (const x of [-0.8, -0.3, 0, 0.3, 0.8]) {
+        const expected = -3 * x * Math.sqrt(1 - x * x)
+        expect(legendreP(2, 1, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('P_2^2(x) = 3(1-x^2)', () => {
+      for (const x of [-0.8, -0.3, 0, 0.3, 0.8]) {
+        const expected = 3 * (1 - x * x)
+        expect(legendreP(2, 2, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('P_3^0(x) = (5x^3 - 3x)/2', () => {
+      for (const x of [-0.8, -0.3, 0, 0.5, 0.9]) {
+        const expected = (5 * x * x * x - 3 * x) / 2
+        expect(legendreP(3, 0, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('P_3^3(x) = -15(1-x^2)^{3/2}', () => {
+      for (const x of [-0.5, 0, 0.5]) {
+        const expected = -15 * Math.pow(1 - x * x, 1.5)
+        expect(legendreP(3, 3, x)).toBeCloseTo(expected, 8)
+      }
+    })
+  })
+
+  describe('endpoint values', () => {
+    // P_l^0(1) = 1 for all l; P_l^m(1) = 0 for m > 0
+    for (let l = 0; l <= 6; l++) {
+      it(`P_${l}^0(1) = 1`, () => {
+        expect(legendreP(l, 0, 1)).toBeCloseTo(1, 10)
+      })
+    }
+
+    for (const [l, m] of [
+      [1, 1],
+      [2, 1],
+      [2, 2],
+      [3, 1],
+      [3, 2],
+      [3, 3],
+      [4, 2],
+      [6, 3],
+    ] as [number, number][]) {
+      it(`P_${l}^${m}(1) = 0 (m > 0)`, () => {
+        expect(Math.abs(legendreP(l, m, 1))).toBeLessThan(1e-10)
+      })
+    }
+
+    // P_l^0(-1) = (-1)^l
+    for (let l = 0; l <= 6; l++) {
+      it(`P_${l}^0(-1) = (-1)^${l} = ${Math.pow(-1, l)}`, () => {
+        expect(legendreP(l, 0, -1)).toBeCloseTo(Math.pow(-1, l), 10)
+      })
+    }
+  })
+
+  describe('boundary: |m| > l returns 0', () => {
+    it('P_2^3(0.5) = 0', () => {
+      expect(legendreP(2, 3, 0.5)).toBe(0)
+    })
+
+    it('P_0^1(0.5) = 0', () => {
+      expect(legendreP(0, 1, 0.5)).toBe(0)
+    })
+  })
+
+  describe('three-term recurrence', () => {
+    // (l-m+1) P_{l+1}^m(x) = (2l+1) x P_l^m(x) - (l+m) P_{l-1}^m(x)
+    // Reference: NIST DLMF 14.10.3
+
+    const xValues = [0, 0.3, -0.5, 0.8, -0.9]
+
+    for (let m = 0; m <= 3; m++) {
+      for (let l = m + 1; l <= 5; l++) {
+        it(`recurrence holds for l=${l}, m=${m}`, () => {
+          for (const x of xValues) {
+            const lhs = (l - m + 1) * legendreP(l + 1, m, x)
+            const rhs = (2 * l + 1) * x * legendreP(l, m, x) - (l + m) * legendreP(l - 1, m, x)
+            expect(lhs).toBeCloseTo(rhs, 8)
+          }
+        })
+      }
+    }
+  })
+
+  describe('high-l values used by hydrogen (l=4..6)', () => {
+    // P_4^0(x) = (35x^4 - 30x^2 + 3)/8
+    it('P_4^0(x) = (35x^4 - 30x^2 + 3)/8', () => {
+      for (const x of [-0.7, 0, 0.5, 0.9]) {
+        const expected = (35 * x ** 4 - 30 * x * x + 3) / 8
+        expect(legendreP(4, 0, x)).toBeCloseTo(expected, 8)
+      }
+    })
+
+    // P_6^0(x) = (231x^6 - 315x^4 + 105x^2 - 5)/16
+    it('P_6^0(x) = (231x^6 - 315x^4 + 105x^2 - 5)/16', () => {
+      for (const x of [-0.6, 0, 0.4, 0.8]) {
+        const expected = (231 * x ** 6 - 315 * x ** 4 + 105 * x * x - 5) / 16
+        expect(legendreP(6, 0, x)).toBeCloseTo(expected, 7)
+      }
+    })
+
+    // P_6^6(x) = 10395 (1-x^2)^3 — maximum m stress test
+    it('P_6^6(x) = 10395 (1-x^2)^3', () => {
+      for (const x of [-0.5, 0, 0.5]) {
+        const expected = 10395 * Math.pow(1 - x * x, 3)
+        expect(legendreP(6, 6, x)).toBeCloseTo(expected, 4)
+      }
+    })
+  })
+})
+
+// ============================================================================
+// Associated Laguerre polynomial known values
+// ============================================================================
+
+describe('associated Laguerre polynomial known values', () => {
+  // Reference: Abramowitz & Stegun 22.3.9, NIST DLMF 18.5.12
+  //
+  // L_k^α(x) — generalized (associated) Laguerre polynomial.
+  // Used in hydrogen radial wavefunctions: R_nl(r) ∝ L_{n-l-1}^{2l+1}(2r/(na₀))
+
+  describe('base cases', () => {
+    it('L_0^α(x) = 1 for all α and x', () => {
+      for (const alpha of [0, 1, 3, 5.5]) {
+        for (const x of [0, 1, 5, 10]) {
+          expect(laguerre(0, alpha, x)).toBeCloseTo(1, 12)
+        }
+      }
+    })
+
+    it('L_1^α(x) = 1 + α - x', () => {
+      const cases = [
+        { k: 1, alpha: 0, x: 2, expected: -1 },
+        { k: 1, alpha: 3, x: 1, expected: 3 },
+        { k: 1, alpha: 1, x: 0, expected: 2 },
+        { k: 1, alpha: 5, x: 3, expected: 3 },
+      ]
+      for (const { k, alpha, x, expected } of cases) {
+        expect(laguerre(k, alpha, x)).toBeCloseTo(expected, 10)
+      }
+    })
+  })
+
+  describe('ordinary Laguerre polynomials (α=0)', () => {
+    // L_0(x) = 1, L_1(x) = 1-x, L_2(x) = (x^2-4x+2)/2
+    // L_3(x) = (-x^3+9x^2-18x+6)/6, L_4(x) = (x^4-16x^3+72x^2-96x+24)/24
+    // Reference: Abramowitz & Stegun Table 22.9
+
+    it('L_2^0(x) = (x^2 - 4x + 2)/2', () => {
+      for (const x of [0, 1, 2, 3, 5]) {
+        const expected = (x * x - 4 * x + 2) / 2
+        expect(laguerre(2, 0, x)).toBeCloseTo(expected, 10)
+      }
+    })
+
+    it('L_3^0(x) = (-x^3 + 9x^2 - 18x + 6)/6', () => {
+      for (const x of [0, 1, 2, 3, 5]) {
+        const expected = (-x * x * x + 9 * x * x - 18 * x + 6) / 6
+        expect(laguerre(3, 0, x)).toBeCloseTo(expected, 9)
+      }
+    })
+
+    it('L_4^0(x) = (x^4 - 16x^3 + 72x^2 - 96x + 24)/24', () => {
+      for (const x of [0, 1, 2, 4]) {
+        const expected = (x ** 4 - 16 * x ** 3 + 72 * x * x - 96 * x + 24) / 24
+        expect(laguerre(4, 0, x)).toBeCloseTo(expected, 8)
+      }
+    })
+  })
+
+  describe('generalized Laguerre — values used by hydrogen', () => {
+    // For hydrogen: α = 2l+1, k = n-l-1
+    // L^α_k(x) = Σ (-1)^j C(k+α, k-j) x^j / j!
+
+    it('L_0^1(x) = 1 (hydrogen 2p radial)', () => {
+      expect(laguerre(0, 1, 3)).toBeCloseTo(1, 12)
+    })
+
+    it('L_1^1(x) = 2-x (hydrogen 2s radial)', () => {
+      for (const x of [0, 1, 2, 3]) {
+        expect(laguerre(1, 1, x)).toBeCloseTo(2 - x, 10)
+      }
+    })
+
+    it('L_1^3(x) = 4-x (hydrogen 3p: k=1, α=3)', () => {
+      for (const x of [0, 2, 4, 6]) {
+        expect(laguerre(1, 3, x)).toBeCloseTo(4 - x, 10)
+      }
+    })
+
+    // L^α_2(x) = [(α+1)(α+2) - 2(α+2)x + x²] / 2
+    it('L_2^1(x) = [(2)(3) - 2(3)x + x²]/2 = (x²-6x+6)/2', () => {
+      for (const x of [0, 1, 3, 5]) {
+        const expected = (x * x - 6 * x + 6) / 2
+        expect(laguerre(2, 1, x)).toBeCloseTo(expected, 9)
+      }
+    })
+
+    it('L_2^3(x) = [(4)(5) - 2(5)x + x²]/2 = (x²-10x+20)/2', () => {
+      for (const x of [0, 2, 5, 8]) {
+        const expected = (x * x - 10 * x + 20) / 2
+        expect(laguerre(2, 3, x)).toBeCloseTo(expected, 9)
+      }
+    })
+
+    it('L_2^5(x) = [(6)(7) - 2(7)x + x²]/2 = (x²-14x+42)/2', () => {
+      for (const x of [0, 3, 7, 10]) {
+        const expected = (x * x - 14 * x + 42) / 2
+        expect(laguerre(2, 5, x)).toBeCloseTo(expected, 9)
+      }
+    })
+  })
+
+  describe('three-term recurrence', () => {
+    // (k+1) L_{k+1}^α(x) = (2k+1+α-x) L_k^α(x) - (k+α) L_{k-1}^α(x)
+    // Reference: NIST DLMF 18.9.1
+
+    const xValues = [0, 1, 3, 5, 10]
+
+    for (const alpha of [0, 1, 3, 5]) {
+      for (let k = 1; k <= 5; k++) {
+        it(`recurrence holds for k=${k}, α=${alpha}`, () => {
+          for (const x of xValues) {
+            const lhs = (k + 1) * laguerre(k + 1, alpha, x)
+            const rhs =
+              (2 * k + 1 + alpha - x) * laguerre(k, alpha, x) -
+              (k + alpha) * laguerre(k - 1, alpha, x)
+            expect(lhs).toBeCloseTo(rhs, 7)
+          }
+        })
+      }
+    }
+  })
+})
+
+// ============================================================================
+// Spherical harmonic orthonormality for higher l (l=3..6)
+// ============================================================================
+
+describe('spherical harmonic orthonormality — higher l', () => {
+  // Extends the l ≤ 2 tests above to cover hydrogen orbitals up to n=7 (l=6).
+  // Higher l integrands oscillate faster, requiring a finer grid.
+  //
+  // Method: Midpoint rule on 800×800 (θ,φ) grid.
+  // Error ≈ h² × max|f''| / 24. For l=6, the Legendre polynomial has
+  // degree 6, so f'' scales as l⁴. With h = π/800 ≈ 0.004, error ≈ 10⁻³.
+
+  const N_THETA = 800
+  const N_PHI = 800
+
+  function integrateYlmProduct(l1: number, m1: number, l2: number, m2: number): number {
+    let sum = 0
+    const dTheta = Math.PI / N_THETA
+    const dPhi = (2 * Math.PI) / N_PHI
+
+    for (let iTheta = 0; iTheta < N_THETA; iTheta++) {
+      const theta = (iTheta + 0.5) * dTheta
+      const sinTheta = Math.sin(theta)
+
+      for (let iPhi = 0; iPhi < N_PHI; iPhi++) {
+        const phi = (iPhi + 0.5) * dPhi
+        const [re1, im1] = sphericalHarmonic(l1, m1, theta, phi)
+        const [re2, im2] = sphericalHarmonic(l2, m2, theta, phi)
+        sum += (re1 * re2 + im1 * im2) * sinTheta * dTheta * dPhi
+      }
+    }
+    return sum
+  }
+
+  // Normalization: ∫|Y_lm|² dΩ = 1 for l=3..6, representative m values
+  const higherLStates: [number, number][] = [
+    [3, 0],
+    [3, 1],
+    [3, -2],
+    [3, 3],
+    [4, 0],
+    [4, 2],
+    [4, -3],
+    [4, 4],
+    [5, 0],
+    [5, 3],
+    [5, -5],
+    [6, 0],
+    [6, 3],
+    [6, -6],
+    [6, 6],
+  ]
+
+  for (const [l, m] of higherLStates) {
+    it(`∫|Y_${l},${m}|² dΩ = 1.0 ± 10⁻³`, () => {
+      const result = integrateYlmProduct(l, m, l, m)
+      expect(result).toBeCloseTo(1.0, 3)
+    })
+  }
+
+  // Orthogonality: ⟨Y_{l1,m1}|Y_{l2,m2}⟩ = 0 for different (l,m) pairs
+  const higherLOrthoPairs: [[number, number], [number, number]][] = [
+    [
+      [3, 0],
+      [3, 1],
+    ],
+    [
+      [3, 0],
+      [4, 0],
+    ],
+    [
+      [3, 2],
+      [5, 2],
+    ],
+    [
+      [4, 0],
+      [6, 0],
+    ],
+    [
+      [4, 3],
+      [4, -3],
+    ],
+    [
+      [5, 0],
+      [6, 0],
+    ],
+    [
+      [6, 5],
+      [6, -5],
+    ],
+  ]
+
+  for (const [[l1, m1], [l2, m2]] of higherLOrthoPairs) {
+    it(`⟨Y_${l1},${m1}|Y_${l2},${m2}⟩ = 0 ± 10⁻³`, () => {
+      const result = integrateYlmProduct(l1, m1, l2, m2)
+      expect(Math.abs(result)).toBeLessThan(1e-3)
+    })
+  }
+})
+
+describe('full hydrogen wavefunction normalization — higher orbitals', () => {
+  // Extends the l ≤ 3 tests above to cover orbitals used by n=5..7.
+  // Uses the same GL (radial) × midpoint (angular) product method.
+
+  const a0 = 1.0
+  const N_TH = 800
+  const N_PH = 800
+
+  function radialNorm(n: number, l: number): number {
+    const twoOverNa = 2 / (n * a0)
+    const front = twoOverNa * Math.sqrt(twoOverNa)
+    const factRatio = FACTORIAL[n - l - 1]! / (2 * n * FACTORIAL[n + l]!)
+    const N = front * Math.sqrt(factRatio)
+    const nr = n - l - 1
+    const alpha = 2 * l + 1
+    const scale3 = Math.pow((n * a0) / 2, 3)
+
+    return gaussLaguerre((rho) => {
+      const L = laguerre(nr, alpha, rho)
+      return N * N * scale3 * Math.pow(rho, 2 * l + 2) * L * L
+    })
+  }
+
+  function angularNorm(l: number, m: number): number {
+    const dTheta = Math.PI / N_TH
+    const dPhi = (2 * Math.PI) / N_PH
+    let sum = 0
+    for (let iT = 0; iT < N_TH; iT++) {
+      const theta = (iT + 0.5) * dTheta
+      const sinTheta = Math.sin(theta)
+      for (let iP = 0; iP < N_PH; iP++) {
+        const phi = (iP + 0.5) * dPhi
+        const [re, im] = sphericalHarmonic(l, m, theta, phi)
+        sum += (re * re + im * im) * sinTheta * dTheta * dPhi
+      }
+    }
+    return sum
+  }
+
+  // States with higher quantum numbers that stress the Laguerre recurrence
+  // and Legendre evaluation at high l. Limited to n ≤ 6 because the
+  // FACTORIAL LUT covers up to 12! and n+l must be ≤ 12.
+  const states: [number, number, number][] = [
+    [4, 3, 0], // 4f₀
+    [4, 3, 3], // 4f₊₃ (max m for f orbital)
+    [5, 0, 0], // 5s
+    [5, 4, 0], // 5g₀ (l=n-1)
+    [5, 4, 4], // 5g₊₄ (max m for g orbital)
+    [6, 0, 0], // 6s (many radial nodes)
+    [6, 5, 0], // 6h₀ (l=n-1)
+    [6, 3, -2], // 6f₋₂ (mid-range)
+  ]
+
+  for (const [n, l, m] of states) {
+    it(`∫|ψ_${n}${l}${m}|² dV = 1.0 ± 10⁻²`, () => {
+      const result = radialNorm(n, l) * angularNorm(l, m)
+      // Tolerance: 10⁻² — higher l increases angular quadrature error.
+      // Radial is still exact via GL; angular limits precision.
+      expect(result).toBeCloseTo(1.0, 2)
+    })
+  }
+})
+
+// ============================================================================
+// f32 overflow canary — extreme hydrogen-valid inputs
+// ============================================================================
+
+describe('f32 overflow canary', () => {
+  // Evaluates polynomials at the most extreme hydrogen-valid inputs through
+  // Math.fround() to detect intermediate overflow that might cancel in f64
+  // but produce NaN/Inf in f32. Catches the one failure mode that the GPU
+  // density oracle cannot: intermediate overflow that results in a zero
+  // density voxel (indistinguishable from "outside bounding sphere").
+
+  const f = Math.fround
+
+  function legendreP_f32(l: number, m: number, x: number): number {
+    const xf = f(x)
+    let pmm = f(1.0)
+    if (m > 0) {
+      const somx2 = f(Math.sqrt(f(f(1 - xf) * f(1 + xf))))
+      let fact = f(1.0)
+      for (let i = 1; i <= m; i++) {
+        pmm = f(f(-pmm) * f(fact * somx2))
+        fact = f(fact + f(2.0))
+      }
+    }
+    if (l === m) return pmm
+    let pmmp1 = f(xf * f(f(2 * m + 1) * pmm))
+    if (l === m + 1) return pmmp1
+    let pll = pmmp1
+    for (let ll = m + 2; ll <= l; ll++) {
+      pll = f(f(f(xf * f(f(2 * ll - 1) * pmmp1)) - f(f(ll + m - 1) * pmm)) / f(ll - m))
+      pmm = pmmp1
+      pmmp1 = pll
+    }
+    return pll
+  }
+
+  function laguerre_f32(k: number, alpha: number, x: number): number {
+    if (k <= 0) return f(1.0)
+    const L1 = f(f(1 + alpha) - f(x))
+    if (k === 1) return L1
+    let Lkm1 = f(1.0)
+    let Lk = L1
+    for (let i = 1; i < k; i++) {
+      const Lkp1 = f(f(f(f(2 * i + 1 + alpha) - f(x)) * Lk - f(f(i + alpha) * Lkm1)) / f(i + 1))
+      Lkm1 = Lk
+      Lk = Lkp1
+    }
+    return Lk
+  }
+
+  // All valid (l, m) for n ≤ 7 hydrogen orbitals
+  const legendreCases: [number, number][] = [
+    [6, 0],
+    [6, 3],
+    [6, 6],
+    [5, 5],
+    [4, 4],
+    [3, 3],
+  ]
+
+  for (const [l, m] of legendreCases) {
+    it(`legendreP_f32(${l}, ${m}, 0.5) is finite`, () => {
+      const result = legendreP_f32(l, m, 0.5)
+      expect(Number.isFinite(result), `P_${l}^${m}(0.5) = ${result}`).toBe(true)
+    })
+  }
+
+  // Laguerre with hydrogen-relevant alpha = 2l+1, k = n-l-1
+  const laguerreCases: { k: number; alpha: number; label: string }[] = [
+    { k: 0, alpha: 13, label: 'n=7,l=6: L_0^13' },
+    { k: 6, alpha: 1, label: 'n=7,l=0: L_6^1' },
+    { k: 3, alpha: 7, label: 'n=7,l=3: L_3^7' },
+    { k: 5, alpha: 1, label: 'n=6,l=0: L_5^1' },
+    { k: 4, alpha: 9, label: 'n=9,l=4: L_4^9 (ND extended)' },
+  ]
+
+  for (const { k, alpha, label } of laguerreCases) {
+    it(`laguerre_f32 ${label}(2.0) is finite`, () => {
+      const result = laguerre_f32(k, alpha, 2.0)
+      expect(Number.isFinite(result), `${label}(2.0) = ${result}`).toBe(true)
+    })
+  }
+})

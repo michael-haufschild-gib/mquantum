@@ -19,6 +19,19 @@ export const legendreBlock = /* wgsl */ `
 // For hydrogen orbitals: l can be up to n-1, so for n=7: l=6
 const MAX_LEGENDRE_L: i32 = 7;
 
+// Precomputed 1/k for k=0..7 — replaces per-iteration division in the recurrence.
+// Division is ~4-10x slower than multiplication on GPU ALUs.
+const LEGENDRE_INV_K: array<f32, 8> = array<f32, 8>(
+  1.0,               // 1/1 (unused, index 0)
+  1.0,               // 1/1
+  0.5,               // 1/2
+  0.3333333333,      // 1/3
+  0.25,              // 1/4
+  0.2,               // 1/5
+  0.1666666667,      // 1/6
+  0.1428571429       // 1/7
+);
+
 /**
  * Evaluate associated Legendre polynomial P^m_l(x)
  *
@@ -76,7 +89,9 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
 
   for (var ll = absM + 2; ll <= min(l, MAX_LEGENDRE_L); ll++) {
     let fll = f32(ll);
-    pll = (xClamped * (2.0 * fll - 1.0) * pmmp1 - (fll + fm - 1.0) * pmm) / (fll - fm);
+    // PERF: multiply by precomputed 1/(ll-|m|) instead of dividing
+    let invDen = LEGENDRE_INV_K[ll - absM];
+    pll = (xClamped * (2.0 * fll - 1.0) * pmmp1 - (fll + fm - 1.0) * pmm) * invDen;
     pmm = pmmp1;
     pmmp1 = pll;
   }

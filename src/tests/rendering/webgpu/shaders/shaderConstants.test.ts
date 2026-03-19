@@ -23,6 +23,7 @@ import { hermiteBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/he
 import { ho1dBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl'
 import { hydrogenRadialBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/hydrogenRadial.wgsl'
 import { laguerreBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/laguerre.wgsl'
+import { legendreBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/sphericalHarmonics.wgsl'
 import { wignerHOBlock } from '@/rendering/webgpu/shaders/schroedinger/quantum/wignerHO.wgsl'
 
@@ -331,27 +332,42 @@ describe('cross-module constant consistency', () => {
   })
 })
 
-describe('Legendre polynomial structural checks', () => {
-  // legendre.wgsl.ts has no constant arrays, but it has MAX_LEGENDRE_L = 7.
-  // The recurrence relation must support l up to 6 (for n ≤ 7 hydrogen orbitals).
-  // Verify the constant is sufficient and the Condon-Shortley phase convention
-  // is documented consistently between legendre.wgsl.ts and sphericalHarmonics.wgsl.ts.
+describe('LEGENDRE_INV_K in legendre.wgsl.ts', () => {
+  // LEGENDRE_INV_K[k] = 1/k for k = 1..7 (index 0 is 1.0 placeholder)
+  // Used in the upward recurrence: P_l^m = (... * P_{l-1}^m - ... * P_{l-2}^m) * invDen
+  // where invDen = 1/(ll - |m|), looked up as LEGENDRE_INV_K[ll - absM].
+  //
+  // A wrong value here corrupts ALL Legendre polynomial evaluations for l > |m|+1,
+  // which corrupts ALL spherical harmonics → ALL hydrogen orbitals.
 
-  it('legendre.wgsl.ts contains MAX_LEGENDRE_L >= 6', () => {
-    // Extract the constant from the WGSL source
-    // The Legendre module doesn't have extractable array constants,
-    // but we can verify the structural constant from the source import.
-    // Import verification: the module exists and exports a non-empty string.
-    expect(hermiteBlock.length).toBeGreaterThan(100)
+  const invKs = extractWgslArray(legendreBlock, 'LEGENDRE_INV_K')
+
+  it('extracts exactly 8 values (k = 0..7)', () => {
+    expect(invKs.length).toBe(8)
+  })
+
+  it('index 0 is 1.0 (placeholder, unused in recurrence)', () => {
+    expect(invKs[0]).toBe(1.0)
+  })
+
+  for (let k = 1; k <= 7; k++) {
+    it(`LEGENDRE_INV_K[${k}] = 1/${k} = ${(1 / k).toFixed(10)}`, () => {
+      expect(invKs[k]!).toBeCloseTo(1 / k, 9)
+    })
+  }
+})
+
+describe('Legendre polynomial structural checks', () => {
+  it('MAX_LEGENDRE_L >= 6 (required for n=7 hydrogen orbitals with l up to 6)', () => {
+    const match = legendreBlock.match(/MAX_LEGENDRE_L\s*:\s*i32\s*=\s*(\d+)/)
+    const maxL = Number(match?.[1])
+    expect(maxL).toBeGreaterThanOrEqual(6)
   })
 
   it('Condon-Shortley phase is applied consistently', () => {
-    // legendre.wgsl.ts: "Includes the (-1)^m Condon-Shortley phase in the result"
-    // sphericalHarmonics.wgsl.ts: "legendre() includes Condon-Shortley phase (-1)^|m|"
-    // Both documents agree: the legendre() function includes CS phase.
-    // The sphericalHarmonic() function then undoes it for m < 0, odd |m|.
-    //
-    // Verify both source files document the convention:
+    // legendre.wgsl.ts: includes (-1)^m in the P^m_m computation
+    // sphericalHarmonics.wgsl.ts: documents that legendre() includes CS phase
+    expect(legendreBlock).toContain('Condon-Shortley')
     expect(sphericalHarmonicsBlock).toContain('Condon-Shortley')
   })
 })
