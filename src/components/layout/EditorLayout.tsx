@@ -1,5 +1,5 @@
 import { AnimatePresence, m } from 'motion/react'
-import React, { useEffect } from 'react'
+import React, { Suspense, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
@@ -15,10 +15,18 @@ import { soundManager } from '@/lib/audio/SoundManager'
 import { type LayoutStore, useLayoutStore } from '@/stores/layoutStore'
 import { useThemeStore } from '@/stores/themeStore'
 
-import { EditorBottomPanel } from './EditorBottomPanel'
-import { EditorLeftPanel } from './EditorLeftPanel'
-import { EditorRightPanel } from './EditorRightPanel'
 import { EditorTopBar } from './EditorTopBar'
+
+// Lazy-load panel content to defer sidebar sections (~13K lines) until after first frame
+const EditorLeftPanel = React.lazy(() =>
+  import('./EditorLeftPanel').then((m) => ({ default: m.EditorLeftPanel }))
+)
+const EditorRightPanel = React.lazy(() =>
+  import('./EditorRightPanel').then((m) => ({ default: m.EditorRightPanel }))
+)
+const EditorBottomPanel = React.lazy(() =>
+  import('./EditorBottomPanel').then((m) => ({ default: m.EditorBottomPanel }))
+)
 
 interface EditorLayoutProps {
   children?: React.ReactNode
@@ -254,7 +262,9 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                   }
                 >
                   <div className="w-full h-full overflow-hidden">
-                    <EditorLeftPanel />
+                    <Suspense fallback={null}>
+                      <EditorLeftPanel />
+                    </Suspense>
                   </div>
                 </ErrorBoundary>
               </m.div>
@@ -281,7 +291,9 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
             </div>
             {!isCinematicMode && isDesktop && (
               <div className="pointer-events-auto shrink-0 mx-2">
-                <EditorBottomPanel />
+                <Suspense fallback={null}>
+                  <EditorBottomPanel />
+                </Suspense>
               </div>
             )}
           </div>
@@ -309,7 +321,9 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                   }
                 >
                   <div id="inspector-panel" className="w-full h-full overflow-hidden">
-                    <EditorRightPanel />
+                    <Suspense fallback={null}>
+                      <EditorRightPanel />
+                    </Suspense>
                   </div>
                 </ErrorBoundary>
               </m.div>

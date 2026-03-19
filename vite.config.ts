@@ -84,6 +84,10 @@ export default defineConfig((_env) => ({
           }
           if (id.includes('node_modules/zustand')) return 'zustand'
           if (id.includes('node_modules/motion')) return 'motion'
+          // detect-gpu and mediabunny are dynamically imported — let Rollup
+          // split them into async chunks instead of bundling with vendor.
+          if (id.includes('node_modules/detect-gpu')) return 'detect-gpu'
+          if (id.includes('node_modules/mediabunny')) return 'mediabunny'
           if (id.includes('node_modules/')) return 'vendor'
           // Split shaders by subdomain
           if (id.includes('/rendering/webgpu/shaders/schroedinger/')) return 'shaders-schroedinger'
@@ -101,7 +105,11 @@ export default defineConfig((_env) => ({
           if (id.includes('/lib/physics/') || id.includes('/lib/math/')) return 'physics'
           // Split stores
           if (id.includes('/stores/')) return 'stores'
-          // Split components to keep index chunk under 500KB
+          // Split components: panel content is lazy-loaded after first frame
+          if (id.includes('/components/layout/EditorLeftPanel')) return 'components-panels'
+          if (id.includes('/components/layout/EditorRightPanel')) return 'components-panels'
+          if (id.includes('/components/layout/EditorBottomPanel')) return 'components-panels'
+          if (id.includes('/components/sections/')) return 'components-panels'
           if (id.includes('/components/')) return 'components'
         },
       },

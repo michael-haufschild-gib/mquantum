@@ -10,7 +10,9 @@
  * @see https://github.com/pmndrs/detect-gpu
  */
 
-import { getGPUTier, type TierResult } from 'detect-gpu'
+// detect-gpu is loaded dynamically to keep it out of the critical bundle path (~134KB).
+// It's only needed once at startup for GPU tier classification.
+type TierResult = Awaited<ReturnType<(typeof import('detect-gpu'))['getGPUTier']>>
 
 // ============================================================================
 // Types
@@ -94,6 +96,7 @@ export function isWebGL2Supported(): boolean {
  * @returns Promise resolving to TierResult from detect-gpu
  */
 export async function detectGPUTier(): Promise<TierResult> {
+  const { getGPUTier } = await import('detect-gpu')
   return getGPUTier({
     benchmarksURL: '/gpu-benchmarks',
     failIfMajorPerformanceCaveat: false,

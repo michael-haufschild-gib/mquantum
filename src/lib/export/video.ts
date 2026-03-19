@@ -1,14 +1,20 @@
-import {
-  BufferTarget,
-  CanvasSource,
-  Mp4OutputFormat,
-  Output,
-  StreamTarget,
-  VideoEncodingConfig,
-  WebMOutputFormat,
-} from 'mediabunny'
+// mediabunny is loaded dynamically to keep it out of the critical bundle path (~164KB).
+// It's only needed when the user initiates a video export.
+type MediaBunny = typeof import('mediabunny')
+type Output = InstanceType<MediaBunny['Output']>
+type BufferTarget = InstanceType<MediaBunny['BufferTarget']>
+type StreamTarget = InstanceType<MediaBunny['StreamTarget']>
+type CanvasSource = InstanceType<MediaBunny['CanvasSource']>
 
 import { CropSettings, TextOverlaySettings, VideoCodec } from '@/stores/exportStore'
+
+let _mediabunny: MediaBunny | null = null
+async function loadMediaBunny(): Promise<MediaBunny> {
+  if (!_mediabunny) {
+    _mediabunny = await import('mediabunny')
+  }
+  return _mediabunny
+}
 
 /**
  * Runtime video encoding and composition options for export sessions.
@@ -48,6 +54,7 @@ export class VideoRecorder {
   private compositionCtx: CanvasRenderingContext2D | null = null
   private options: VideoExportOptions
   private isRecording: boolean = false
+  private isBufferMode: boolean = false
   private writableStream: FileSystemWritableFileStream | null = null
 
   constructor(canvas: HTMLCanvasElement, options: VideoExportOptions) {
@@ -57,6 +64,8 @@ export class VideoRecorder {
 
   async initialize(): Promise<void> {
     try {
+      const mb = await loadMediaBunny()
+
       const validatePositiveFinite = (name: string, value: number): number => {
         if (!Number.isFinite(value) || value <= 0) {
           throw new Error(`Invalid ${name}: ${value}`)
@@ -128,10 +137,10 @@ export class VideoRecorder {
       // WebM: appendOnly for streaming avoids seeking during writes
       const format =
         safeFormat === 'webm'
-          ? new WebMOutputFormat({
+          ? new mb.WebMOutputFormat({
               appendOnly: isStreaming, // Enable append-only for streaming (no seeking during write)
             })
-          : new Mp4OutputFormat({
+          : new mb.Mp4OutputFormat({
               // 'reserve' works with FileSystemWritableFileStream (supports seek)
               // and produces proper MP4 with moov at front for good seeking support
               fastStart: isStreaming ? 'reserve' : 'in-memory',
@@ -141,17 +150,18 @@ export class VideoRecorder {
         // Stream Mode - use chunked writes for batched disk I/O
         const writable = await this.options.streamHandle.createWritable()
         this.writableStream = writable
-        this.target = new StreamTarget(writable, {
+        this.target = new mb.StreamTarget(writable, {
           chunked: true,
           chunkSize: 16 * 1024 * 1024, // 16 MiB chunks
         })
       } else {
         // Memory Mode
-        this.target = new BufferTarget()
+        this.target = new mb.BufferTarget()
+        this.isBufferMode = true
       }
 
       // 2. Create Output
-      this.output = new Output({
+      this.output = new mb.Output({
         format,
         target: this.target,
       })
@@ -165,17 +175,17 @@ export class VideoRecorder {
           ? this.options.rotation
           : 0
 
-      const config: VideoEncodingConfig = {
+      const config = {
         codec: safeCodec,
         bitrate: safeBitrate * 1_000_000, // Convert Mbps to bps
         bitrateMode: safeBitrateMode, // VBR is WebCodecs default, ~20% smaller files
-        latencyMode: 'quality', // Prioritize visual quality over encoding speed
+        latencyMode: 'quality' as const, // Prioritize visual quality over encoding speed
         keyFrameInterval: safeFps * 2, // Keyframe every 2 seconds for good seeking + quality
         hardwareAcceleration: safeHardwareAcceleration,
       }
 
       // 4. Create Source
-      this.source = new CanvasSource(sourceCanvas, config)
+      this.source = new mb.CanvasSource(sourceCanvas, config)
 
       // 5. Add Track with metadata
       this.output.addVideoTrack(this.source, {
@@ -415,9 +425,9 @@ export class VideoRecorder {
         this.compositionCtx = null
       }
 
-      if (this.target instanceof BufferTarget) {
+      if (this.isBufferMode) {
         // Get the buffer
-        const buffer = this.target.buffer
+        const buffer = (this.target as BufferTarget).buffer
         if (!buffer) {
           throw new Error('Buffer is empty after finalization')
         }
