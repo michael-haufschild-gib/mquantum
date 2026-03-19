@@ -33,7 +33,7 @@ vi.mock('@/lib/audio/SoundManager', () => ({
   },
 }))
 
-describe('CanvasContextMenu', () => {
+describe('CanvasContextMenu (invariants)', () => {
   const DROPDOWN_ID = 'canvas-context-menu'
 
   beforeEach(() => {
@@ -79,7 +79,7 @@ describe('CanvasContextMenu', () => {
     return { canvas, container }
   }
 
-  describe('opening via right-click', () => {
+  describe('invariant: opens only on canvas right-click with correct positioning', () => {
     it('should open when right-clicking on canvas', () => {
       render(<CanvasContextMenu />)
 
@@ -137,7 +137,7 @@ describe('CanvasContextMenu', () => {
     })
   })
 
-  describe('closing', () => {
+  describe('invariant: closes on item click and Escape key', () => {
     it('should close when clicking a menu item', async () => {
       const user = userEvent.setup()
       render(<CanvasContextMenu />)
@@ -163,7 +163,7 @@ describe('CanvasContextMenu', () => {
     })
   })
 
-  describe('store coordination', () => {
+  describe('invariant: mutual exclusion with other dropdowns', () => {
     it('should close when another dropdown opens', () => {
       render(<CanvasContextMenu />)
 

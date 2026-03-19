@@ -24,7 +24,7 @@ vi.mock('@/stores/msgBoxStore', () => ({
   },
 }))
 
-describe('presetManagerStore', () => {
+describe('presetManagerStore (invariants)', () => {
   beforeEach(() => {
     usePresetManagerStore.setState({ savedStyles: [], savedScenes: [] })
     useAppearanceStore.setState({ edgeColor: '#ffffff' }) // minimal reset for test
@@ -32,7 +32,7 @@ describe('presetManagerStore', () => {
     useRotationStore.getState().reset()
   })
 
-  describe('style management', () => {
+  describe('invariant: style save/load round-trips and normalizes imported data', () => {
     it('should save and load a style', () => {
       // Setup initial state
       useAppearanceStore.setState({ edgeColor: '#ff0000' })
@@ -793,7 +793,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('scene management', () => {
+  describe('invariant: scene save/load round-trips with cross-store coordination', () => {
     it('should save and load a scene with animation', () => {
       // Setup animation state
       const animStore = useAnimationStore.getState()
@@ -1342,7 +1342,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('import validation', () => {
+  describe('invariant: import rejects malformed payloads', () => {
     it('should reject invalid JSON for styles', () => {
       const ok = usePresetManagerStore.getState().importStyles('not valid json')
       expect(ok).toBe(false)
@@ -1475,7 +1475,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('import duplicate handling', () => {
+  describe('invariant: import deduplicates names and regenerates IDs', () => {
     it('should regenerate IDs for imported styles', () => {
       const style = {
         id: 'original-id',
@@ -1667,7 +1667,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('export functionality', () => {
+  describe('invariant: export produces valid round-trippable JSON', () => {
     it('should export styles as valid JSON', () => {
       usePresetManagerStore.getState().saveStyle('Style 1')
       usePresetManagerStore.getState().saveStyle('Style 2')
@@ -1693,7 +1693,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('edge cases', () => {
+  describe('invariant: graceful handling of missing IDs and empty imports', () => {
     it('should handle loading non-existent style gracefully', () => {
       // Should not throw
       expect(() => {
@@ -1719,7 +1719,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('legacy data handling', () => {
+  describe('invariant: legacy data migration normalizes removed and renamed fields', () => {
     it('should handle legacy style without skyboxEnabled', () => {
       // Import legacy style missing skyboxEnabled field
       const legacyStyle = {
@@ -2023,7 +2023,7 @@ describe('presetManagerStore', () => {
     })
   })
 
-  describe('name validation', () => {
+  describe('invariant: name validation rejects empty and whitespace-only names', () => {
     it('should reject empty style name', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       usePresetManagerStore.getState().saveStyle('')

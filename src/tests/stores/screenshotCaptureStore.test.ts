@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 
-describe('screenshotCaptureStore', () => {
+describe('screenshotCaptureStore (invariants: stale request rejection)', () => {
   beforeEach(() => {
     useScreenshotCaptureStore.setState({
       status: 'idle',

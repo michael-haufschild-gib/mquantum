@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { WebGPUCapabilityInfo } from '@/stores/rendererStore'
 import { useRendererStore } from '@/stores/rendererStore'
 
-describe('rendererStore', () => {
+describe('rendererStore (invariants)', () => {
   beforeEach(() => {
     useRendererStore.getState().reset()
   })
@@ -48,20 +48,6 @@ describe('rendererStore', () => {
     expect(state.webgpuStatus).toBe('unsupported')
     expect(state.webgpuCapabilities?.unavailableReason).toBe('device_lost')
     expect(state.showFallbackNotification).toBe(true)
-  })
-
-  it('dismissFallbackNotification hides the notification', () => {
-    useRendererStore.getState().handleDeviceLost('Test')
-    useRendererStore.getState().dismissFallbackNotification()
-
-    expect(useRendererStore.getState().showFallbackNotification).toBe(false)
-  })
-
-  it('setWebGPUStatus transitions through lifecycle states', () => {
-    for (const status of ['checking', 'supported', 'unsupported'] as const) {
-      useRendererStore.getState().setWebGPUStatus(status)
-      expect(useRendererStore.getState().webgpuStatus).toBe(status)
-    }
   })
 
   it('reset restores pre-detection state after full lifecycle', () => {

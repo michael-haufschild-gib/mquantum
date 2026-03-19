@@ -15,7 +15,7 @@ vi.mock('@/lib/audio/SoundManager', () => ({
   },
 }))
 
-describe('DropdownMenu', () => {
+describe('DropdownMenu (invariants)', () => {
   const mockItems: DropdownMenuItem[] = [
     { label: 'Item 1', onClick: vi.fn() },
     { label: 'Item 2', onClick: vi.fn() },
@@ -33,7 +33,7 @@ describe('DropdownMenu', () => {
     cleanup()
   })
 
-  describe('rendering', () => {
+  describe('invariant: menu visibility follows open state', () => {
     it('should not render menu content when closed', () => {
       render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
@@ -51,7 +51,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('store integration', () => {
+  describe('invariant: trigger clicks synchronize with dropdown store', () => {
     it('should update store when opening dropdown', async () => {
       const user = userEvent.setup()
       render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
@@ -73,7 +73,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('multiple dropdowns', () => {
+  describe('invariant: only one dropdown visible at a time', () => {
     it('should close first dropdown when opening second', async () => {
       const user = userEvent.setup()
       render(
@@ -120,7 +120,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('click outside', () => {
+  describe('invariant: click-outside closes menu, click-inside preserves it', () => {
     it('should close dropdown when clicking outside', async () => {
       render(
         <div>
@@ -151,7 +151,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('escape key', () => {
+  describe('invariant: Escape key closes dropdown', () => {
     it('should close dropdown when pressing Escape', async () => {
       const user = userEvent.setup()
       render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
@@ -164,7 +164,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('item clicks', () => {
+  describe('invariant: item click fires handler and closes, disabled items blocked', () => {
     it('should call onClick handler and close menu when clicking item', async () => {
       const handleClick = vi.fn()
       const items: DropdownMenuItem[] = [{ label: 'Clickable Item', onClick: handleClick }]
@@ -196,7 +196,7 @@ describe('DropdownMenu', () => {
     })
   })
 
-  describe('onClose callback', () => {
+  describe('invariant: onClose fires only when transitioning from open to closed', () => {
     it('should call onClose when dropdown closes', async () => {
       const handleClose = vi.fn()
       const user = userEvent.setup()

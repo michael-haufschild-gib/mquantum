@@ -25,12 +25,12 @@ function createMockCamera(
   }
 }
 
-describe('useCameraStore', () => {
+describe('cameraStore (invariants)', () => {
   beforeEach(() => {
     useCameraStore.setState({ camera: null, pendingState: null })
   })
 
-  describe('registerCamera', () => {
+  describe('invariant: registration flushes pending state and validates coordinates', () => {
     it('stores the camera instance', () => {
       const camera = createMockCamera()
       useCameraStore.getState().registerCamera(camera)
@@ -85,7 +85,7 @@ describe('useCameraStore', () => {
     })
   })
 
-  describe('captureState', () => {
+  describe('invariant: capture returns isolated copies, null when unregistered', () => {
     it('returns null when no camera registered', () => {
       expect(useCameraStore.getState().captureState()).toBeNull()
     })
@@ -112,7 +112,7 @@ describe('useCameraStore', () => {
     })
   })
 
-  describe('applyState', () => {
+  describe('invariant: apply queues without camera, rejects malformed coordinates', () => {
     it('queues as pending when camera not registered', () => {
       const state = {
         position: [1, 2, 3] as [number, number, number],
@@ -155,7 +155,7 @@ describe('useCameraStore', () => {
     })
   })
 
-  describe('reset', () => {
+  describe('invariant: reset restores default position', () => {
     it('resets camera to default position and target', () => {
       const camera = createMockCamera([99, 99, 99], [99, 99, 99])
       useCameraStore.getState().registerCamera(camera)

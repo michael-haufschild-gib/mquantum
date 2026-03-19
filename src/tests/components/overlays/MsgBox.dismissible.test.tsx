@@ -51,7 +51,7 @@ beforeEach(() => {
   })
 })
 
-describe('MsgBox dismissible functionality', () => {
+describe('MsgBox dismissible (invariants)', () => {
   beforeEach(() => {
     cleanup()
     // Reset stores before each test
@@ -71,7 +71,7 @@ describe('MsgBox dismissible functionality', () => {
     vi.clearAllMocks()
   })
 
-  describe('checkbox visibility', () => {
+  describe('invariant: checkbox requires both dismissible flag and dismissId', () => {
     it('render_dismissibleTrue_showsCheckbox', () => {
       useMsgBoxStore.setState({
         isOpen: true,
@@ -186,7 +186,7 @@ describe('MsgBox dismissible functionality', () => {
     })
   })
 
-  describe('dismiss persistence', () => {
+  describe('invariant: dismiss persists only when checkbox checked before action', () => {
     it('actionClick_checkboxChecked_persistsDismiss', async () => {
       const user = userEvent.setup()
       const onClickAction = vi.fn()
@@ -306,7 +306,7 @@ describe('MsgBox dismissible functionality', () => {
   })
 })
 
-describe('msgBoxStore dismissible options', () => {
+describe('msgBoxStore dismissible options (invariants)', () => {
   beforeEach(() => {
     useMsgBoxStore.setState({
       isOpen: false,

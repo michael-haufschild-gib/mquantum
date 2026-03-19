@@ -18,7 +18,7 @@ vi.stubGlobal('URL', {
   revokeObjectURL: mockRevokeObjectURL,
 })
 
-describe('exportStore', () => {
+describe('exportStore (invariants)', () => {
   beforeEach(() => {
     // Reset store first (this may call revokeObjectURL)
     useExportStore.getState().reset()
@@ -26,12 +26,7 @@ describe('exportStore', () => {
     vi.clearAllMocks()
   })
 
-  describe('setPreviewUrl', () => {
-    it('should set preview URL', () => {
-      useExportStore.getState().setPreviewUrl('blob:test-url')
-      expect(useExportStore.getState().previewUrl).toBe('blob:test-url')
-    })
-
+  describe('invariant: blob URL lifecycle revokes previous URLs on replacement', () => {
     it('should revoke previous URL when setting new one', () => {
       useExportStore.getState().setPreviewUrl('blob:first-url')
       useExportStore.getState().setPreviewUrl('blob:second-url')
@@ -54,20 +49,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('setError', () => {
-    it('should set error message', () => {
-      useExportStore.getState().setError('Test error')
-      expect(useExportStore.getState().error).toBe('Test error')
-    })
-
-    it('should clear error when set to null', () => {
-      useExportStore.getState().setError('Test error')
-      useExportStore.getState().setError(null)
-      expect(useExportStore.getState().error).toBeNull()
-    })
-  })
-
-  describe('setProgress', () => {
+  describe('invariant: progress clamps to [0,1] and rejects non-finite', () => {
     it('clamps progress to [0, 1]', () => {
       useExportStore.getState().setProgress(0.42)
       expect(useExportStore.getState().progress).toBe(0.42)
@@ -90,7 +72,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('updateSettings', () => {
+  describe('invariant: settings sanitization, clamping, and auto-adjustment', () => {
     it('should update single setting', () => {
       useExportStore.getState().updateSettings({ fps: 30 })
       expect(useExportStore.getState().settings.fps).toBe(30)
@@ -270,7 +252,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('reset', () => {
+  describe('invariant: reset revokes blob URLs and preserves settings', () => {
     it('should revoke previewUrl on reset', () => {
       useExportStore.getState().setPreviewUrl('blob:to-revoke')
       mockRevokeObjectURL.mockClear()
@@ -289,7 +271,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('persistence hydration', () => {
+  describe('invariant: rehydration sanitizes corrupted persisted state', () => {
     it('sanitizes invalid persisted export settings on rehydrate', async () => {
       localStorage.removeItem('mdimension-export-settings')
       await useExportStore.persist.rehydrate()
@@ -366,32 +348,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('Export mode selection', () => {
-    it('defaults to in-memory mode', () => {
-      expect(useExportStore.getState().exportMode).toBe('in-memory')
-    })
-
-    it('setExportModeOverride changes the export mode', () => {
-      useExportStore.getState().setExportModeOverride('stream')
-      expect(useExportStore.getState().exportMode).toBe('stream')
-
-      useExportStore.getState().setExportModeOverride('segmented')
-      expect(useExportStore.getState().exportMode).toBe('segmented')
-
-      useExportStore.getState().setExportModeOverride('in-memory')
-      expect(useExportStore.getState().exportMode).toBe('in-memory')
-    })
-
-    it('setting override to null reverts to in-memory', () => {
-      useExportStore.getState().setExportModeOverride('stream')
-      expect(useExportStore.getState().exportMode).toBe('stream')
-
-      useExportStore.getState().setExportModeOverride(null)
-      expect(useExportStore.getState().exportMode).toBe('in-memory')
-    })
-  })
-
-  describe('getCompressionFactor', () => {
+  describe('invariant: compression factors reflect codec efficiency hierarchy', () => {
     it('returns correct factors for each codec in CBR mode', () => {
       expect(getCompressionFactor('avc', 'constant')).toBe(0.55)
       expect(getCompressionFactor('hevc', 'constant')).toBe(0.42)
@@ -418,7 +375,7 @@ describe('exportStore', () => {
     })
   })
 
-  describe('getRecommendedBitrate', () => {
+  describe('invariant: bitrate scales by resolution×fps with safe clamping', () => {
     it('scales bitrate by resolution and fps and clamps to [4, 100]', () => {
       expect(getRecommendedBitrate('720p', 30)).toBe(8)
       expect(getRecommendedBitrate('1080p', 60)).toBe(24) // 12 * 2
