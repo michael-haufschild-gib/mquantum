@@ -23,7 +23,7 @@ import { useUIStore } from '@/stores/uiStore'
 
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { type ExportRuntimeState, isExportRuntimeActive } from './sceneExportRuntime'
-import { executeFrameAndCollectMetrics } from './scenePassConfig'
+import { executeFrameAndCollectMetrics, type FrameMetricsArgs } from './scenePassConfig'
 import { evaluateFpsLimit } from './utils/fpsLimiter'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
@@ -81,6 +81,16 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
   const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
   const rotationUpdatesRef = useRef<Map<string, number>>(new Map())
   const originValuesWorkRef = useRef(new Array<number>(11).fill(0))
+
+  // PERF: Pre-allocated per-frame objects to avoid GC pressure
+  const frameSizeRef = useRef({ width: 0, height: 0 })
+  const frameMetricsArgsRef = useRef<FrameMetricsArgs>({
+    graph: null as unknown as WebGPURenderGraph,
+    collector: null as unknown as WebGPUStatsCollector,
+    deltaTime: 0,
+    size: { width: 0, height: 0 },
+    dpr: 1,
+  })
 
   const advanceSceneStateByDelta = useCallback(
     (deltaTime: number) => {
@@ -162,10 +172,9 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
         }
       }
 
-      const frameSize = {
-        width: canvas.width > 0 ? canvas.width : size.width,
-        height: canvas.height > 0 ? canvas.height : size.height,
-      }
+      const frameSize = frameSizeRef.current
+      frameSize.width = canvas.width > 0 ? canvas.width : size.width
+      frameSize.height = canvas.height > 0 ? canvas.height : size.height
 
       const effectiveDpr =
         canvas.clientWidth > 0
@@ -174,13 +183,13 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
             ? window.devicePixelRatio
             : 1
 
-      executeFrameAndCollectMetrics({
-        graph,
-        collector: statsCollectorRef.current,
-        deltaTime,
-        size: frameSize,
-        dpr: effectiveDpr,
-      })
+      const args = frameMetricsArgsRef.current
+      args.graph = graph
+      args.collector = statsCollectorRef.current
+      args.deltaTime = deltaTime
+      args.size = frameSize
+      args.dpr = effectiveDpr
+      executeFrameAndCollectMetrics(args)
 
       // Update frame counter attribute for e2e test automation.
       // Written sparsely (first 10 frames + every 60th) to avoid DOM thrashing.

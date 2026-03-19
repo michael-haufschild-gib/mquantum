@@ -22,6 +22,7 @@ import type {
 } from '../core/types'
 import { WebGPUDevice } from '../core/WebGPUDevice'
 import { WebGPUResourcePool } from '../core/WebGPUResourcePool'
+import { handleDisabledPassthrough } from './disabledPassthrough'
 import { RenderContextImpl, SetupContextImpl } from './RenderGraphContexts'
 import { computePassOrder } from './topologicalSort'
 
@@ -66,12 +67,23 @@ export class WebGPURenderGraph {
   private lastPassTimings: Map<string, number> = new Map()
   private timestampReadbackInFlight = false
 
-  // Frame context
+  // Frame context — pre-allocated to avoid per-frame GC pressure
   private frameContext: WebGPUFrameContext | null = null
   private storeGetters: Map<string, () => unknown> = new Map()
+  private _reusableStores: Record<string, unknown> = {}
+  private _reusableFrameContext: WebGPUFrameContext = {
+    frameNumber: 0,
+    delta: 0,
+    time: 0,
+    size: { width: 0, height: 0 },
+    stores: {},
+  }
 
   // Setup context
   private setupContext: SetupContextImpl | null = null
+  // PERF: Reusable render context to avoid per-frame class instantiation
+  private _reusableRenderCtx: RenderContextImpl | null = null
+  private _reusableCtxSize: { width: number; height: number } = { width: 0, height: 0 }
 
   // Debug
   private _lastPassLog: number = 0
@@ -96,6 +108,14 @@ export class WebGPURenderGraph {
   }> = []
   private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
     new Map()
+  // PERF: Pre-allocated hook context to avoid per-frame allocation
+  private _reusableHookContext: WebGPUBeforeSubmitHookContext = {
+    device: null as unknown as GPUDevice,
+    encoder: null as unknown as GPUCommandEncoder,
+    canvasTexture: null as unknown as GPUTexture,
+    frame: null,
+    size: { width: 0, height: 0 },
+  }
 
   /** Default grace period in frames before resource deallocation (~1s at 60fps) */
   private static readonly DEFAULT_DISABLE_GRACE_PERIOD = 60
@@ -342,7 +362,7 @@ export class WebGPURenderGraph {
   }
 
   private captureFrameContext(delta: number): WebGPUFrameContext {
-    const stores: Record<string, unknown> = {}
+    const stores = this._reusableStores
     for (const [key, getter] of this.storeGetters) {
       try {
         stores[key] = getter()
@@ -351,13 +371,14 @@ export class WebGPURenderGraph {
       }
     }
 
-    return {
-      frameNumber: this.frameNumber,
-      delta,
-      time: this.elapsedTime,
-      size: { width: this.width, height: this.height },
-      stores,
-    }
+    const ctx = this._reusableFrameContext
+    ctx.frameNumber = this.frameNumber
+    ctx.delta = delta
+    ctx.time = this.elapsedTime
+    ctx.size.width = this.width
+    ctx.size.height = this.height
+    ctx.stores = stores
+    return ctx
   }
 
   /** Track pass disable/enable state for lazy resource deallocation. */
@@ -374,63 +395,6 @@ export class WebGPURenderGraph {
     if (!keepResources && disabledFrameCount === gracePeriod && pass.releaseInternalResources) {
       pass.releaseInternalResources()
     }
-  }
-
-  /** Handle resource chain maintenance for disabled passes. */
-  private handleDisabledPassthrough(
-    pass: WebGPURenderPass,
-    passId: string,
-    encoder: GPUCommandEncoder,
-    passTimings: Map<string, number>,
-    writtenByEnabledPass: Set<string>,
-    shouldLog: boolean
-  ): void {
-    const inputs = pass.config.inputs ?? []
-    const outputs = pass.config.outputs ?? []
-
-    if (inputs.length < 1 || outputs.length < 1) {
-      passTimings.set(passId, 0)
-      return
-    }
-
-    const inputId = inputs[0]!.resourceId
-    const outputId = outputs[0]!.resourceId
-
-    if (writtenByEnabledPass.has(outputId)) {
-      passTimings.set(passId, 0)
-      if (shouldLog)
-        logger.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
-      return
-    }
-
-    const skipPassthrough = pass.config.skipPassthrough ?? false
-
-    if (skipPassthrough) {
-      this.resourceAliases.set(outputId, inputId)
-      if (shouldLog)
-        logger.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
-    } else {
-      const inputTexture = this.pool.getTexture(inputId)
-      const outputTexture = this.pool.getTexture(outputId)
-
-      if (inputTexture && outputTexture) {
-        const dimMatch =
-          inputTexture.width === outputTexture.width && inputTexture.height === outputTexture.height
-        const fmtMatch = inputTexture.format === outputTexture.format
-
-        if (dimMatch && fmtMatch) {
-          encoder.copyTextureToTexture(
-            { texture: inputTexture },
-            { texture: outputTexture },
-            { width: inputTexture.width, height: inputTexture.height }
-          )
-        } else {
-          this.resourceAliases.set(outputId, inputId)
-        }
-      }
-    }
-
-    passTimings.set(passId, 0)
   }
 
   execute(delta: number): WebGPUFrameStats {
@@ -475,15 +439,33 @@ export class WebGPURenderGraph {
 
     this.resourceAliases.clear()
 
-    const ctx = new RenderContextImpl(
-      device,
-      encoder,
-      this.frameContext,
-      { width: this.width, height: this.height },
-      this.pool,
-      canvasTextureView,
-      this.resourceAliases
-    )
+    this._reusableCtxSize.width = this.width
+    this._reusableCtxSize.height = this.height
+
+    let ctx: RenderContextImpl
+    if (this._reusableRenderCtx) {
+      ctx = this._reusableRenderCtx
+      ctx.reset(
+        device,
+        encoder,
+        this.frameContext,
+        this._reusableCtxSize,
+        this.pool,
+        canvasTextureView,
+        this.resourceAliases
+      )
+    } else {
+      ctx = new RenderContextImpl(
+        device,
+        encoder,
+        this.frameContext,
+        this._reusableCtxSize,
+        this.pool,
+        canvasTextureView,
+        this.resourceAliases
+      )
+      this._reusableRenderCtx = ctx
+    }
 
     const cpuPassesStart = performance.now()
     const cpuSetupMs = cpuPassesStart - cpuSetupStart
@@ -532,7 +514,9 @@ export class WebGPURenderGraph {
       this.trackPassDisableState(pass, passId, enabled)
 
       if (!enabled) {
-        this.handleDisabledPassthrough(
+        handleDisabledPassthrough(
+          this.pool,
+          this.resourceAliases,
           pass,
           passId,
           encoder,
@@ -591,13 +575,13 @@ export class WebGPURenderGraph {
     }
 
     if (this.beforeSubmitHooks.size > 0) {
-      const hookContext: WebGPUBeforeSubmitHookContext = {
-        device,
-        encoder,
-        canvasTexture,
-        frame: this.frameContext,
-        size: { width: this.width, height: this.height },
-      }
+      const hookContext = this._reusableHookContext
+      hookContext.device = device
+      hookContext.encoder = encoder
+      hookContext.canvasTexture = canvasTexture
+      hookContext.frame = this.frameContext
+      hookContext.size.width = this.width
+      hookContext.size.height = this.height
 
       for (const [hookId, hook] of this.beforeSubmitHooks) {
         try {

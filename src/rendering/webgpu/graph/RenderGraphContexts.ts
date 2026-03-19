@@ -60,6 +60,27 @@ export class RenderContextImpl implements WebGPURenderContext {
     this.resourceAliases = resourceAliases
   }
 
+  /** Reset fields for reuse across frames (avoids per-frame allocation). */
+  reset(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    frame: WebGPUFrameContext | null,
+    size: { width: number; height: number },
+    pool: WebGPUResourcePool,
+    canvasTextureView: GPUTextureView,
+    resourceAliases: Map<string, string>
+  ): void {
+    this.device = device
+    this.encoder = encoder
+    this.frame = frame
+    this.size = size
+    this.pool = pool
+    this.canvasTextureView = canvasTextureView
+    this.resourceAliases = resourceAliases
+    this.activeTimestampWrites = null
+    this.passUsedTimestampWrites = false
+  }
+
   /**
    * Resolve resource alias chain to find actual resource ID.
    *
