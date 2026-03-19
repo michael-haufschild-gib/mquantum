@@ -130,8 +130,18 @@ fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
 // ============================================
 
 // Log-factorial LUT: ln(k!) for k = 0..22.
-// Max needed index: n + l + D - 2 = 7 + 6 + 11 - 2 = 22.
-// Precomputed from f64, stored as f32. Exact for all our quantum number ranges.
+//
+// Max needed index derivation:
+//   denomFactIdx = nr + (2λ + 1)
+//                = (n - l - 1) + (2l + D - 2)       [since 2λ+1 = 2l + D - 2]
+//                = n + l + D - 3
+//   Maximum at UI limits (n=7, l=6, D=11): 7 + 6 + 11 - 3 = 21.
+//   LUT covers 0..22, so index 21 is always in bounds.
+//
+// Note: nr and λ are anti-correlated through l (nr = n-l-1, λ = l+(D-3)/2),
+// so the worst case is NOT nr_max + λ_max but rather n + l + D - 3.
+//
+// Precomputed from f64, stored as f32.
 const LN_FACTORIAL_LUT: array<f32, 23> = array<f32, 23>(
   0.0,                  // ln(0!) = 0
   0.0,                  // ln(1!) = 0
@@ -166,9 +176,13 @@ const LN_FACTORIAL_LUT: array<f32, 23> = array<f32, 23>(
  * because 2λ = 2l + D - 3 is always integer (l, D are integers).
  *
  * No Lanczos/Stirling approximation needed — this is exact.
+ *
+ * Out-of-range returns 0.0 (= ln(0!) = ln(1)), which would make any
+ * normalization visibly wrong rather than silently off by orders of magnitude.
  */
 fn lnFactorial(k: i32) -> f32 {
-  return LN_FACTORIAL_LUT[clamp(k, 0, 22)];
+  if (k < 0 || k > 22) { return 0.0; }
+  return LN_FACTORIAL_LUT[k];
 }
 
 /**
@@ -193,8 +207,8 @@ fn hydrogenRadialNormND(nr: i32, lambda: f32, nEff: f32, a0: f32) -> f32 {
   let front = twoOverNa * sqrt(twoOverNa);
 
   // n_r! / (2·n_eff · (n_r + 2λ + 1)!)
-  // Both arguments are integers: nr and nr + 2l + D - 1
-  let denomFactIdx = nr + i32(2.0 * lambda + 1.0 + 0.5);  // round to nearest int
+  // Both arguments are integers: nr ∈ [0,6] and denomFactIdx = n+l+D-3 ∈ [0,21]
+  let denomFactIdx = nr + i32(2.0 * lambda + 1.0 + 0.5);  // = nr + (2l + D - 2), +0.5 for rounding
   let lnNum = lnFactorial(nr);
   let lnDen = log(2.0 * nEff) + lnFactorial(denomFactIdx);
   let lnRatio = lnNum - lnDen;
@@ -356,7 +370,7 @@ fn hydrogenRadialMomentumND(n: i32, l: i32, k: f32, a0: f32, dim: i32) -> f32 {
   let qPow = pow(max(q, 1e-20), lambda);
 
   // Normalization via log-factorial ratio: sqrt(nr! / (nr + 2λ + 1)!)
-  // Both arguments are always integers (see hydrogenRadialNormND comment).
+  // Both arguments are always integers. denomFactIdx = n+l+D-3 ≤ 21 (see LUT comment).
   let denomFactIdx = nr + i32(2.0 * lambda + 1.0 + 0.5);
   let lnRatio = lnFactorial(nr) - lnFactorial(denomFactIdx);
   let norm = sqrt(max(exp(lnRatio), 1e-8));

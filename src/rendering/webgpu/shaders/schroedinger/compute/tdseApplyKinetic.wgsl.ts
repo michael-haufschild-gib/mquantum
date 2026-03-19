@@ -41,8 +41,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Phase rotation: exp(-i * hbar * k^2 * dt / (2*m))
   let phase = -params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
-  let cosP = cos(phase);
-  let sinP = sin(phase);
+  // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
+  let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+  let cosP = cos(reduced);
+  let sinP = sin(reduced);
 
   // Read interleaved complex value
   let re = complexBuf[idx * 2u];
