@@ -18,7 +18,7 @@ import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } 
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { temporalReconstructionShader } from '../shaders/temporal/reconstruction.wgsl'
 import { temporalReprojectionShader } from '../shaders/temporal/reprojection.wgsl'
-import { invertMatrix4 } from '../utils/invertMatrix4'
+import { writeInvertMat4 } from '../utils/mat4'
 
 /** Configuration for temporal cloud pass */
 export interface TemporalCloudPassConfig {
@@ -406,7 +406,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
    * @param m
    * @param out
    */
-  // invertMatrix4 extracted to @/rendering/webgpu/utils/invertMatrix4
 
   /**
    * Extract camera matrices from frame context.
@@ -436,7 +435,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
 
     // Compute inverse view-projection matrix
     const inverseViewProjectionMatrix = this._inverseViewProjectionMatrix
-    if (!invertMatrix4(viewProjectionMatrix, inverseViewProjectionMatrix)) {
+    if (!writeInvertMat4(inverseViewProjectionMatrix, viewProjectionMatrix)) {
       // If inversion fails, use identity
       inverseViewProjectionMatrix.fill(0)
       inverseViewProjectionMatrix[0] = inverseViewProjectionMatrix[5] = 1
