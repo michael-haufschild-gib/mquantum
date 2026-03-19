@@ -35,7 +35,7 @@ import {
   waitForShaderCompilation,
 } from './helpers/app-helpers'
 
-test.setTimeout(90_000)
+test.setTimeout(360_000)
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

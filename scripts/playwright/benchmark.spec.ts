@@ -15,6 +15,9 @@
  * flaking on different GPU hardware.
  */
 
+import { execSync } from 'child_process'
+import { mkdirSync, writeFileSync } from 'fs'
+
 import { expect, test } from '@playwright/test'
 
 import {
@@ -340,6 +343,21 @@ test.describe('performance benchmark', () => {
   test.afterAll(() => {
     if (results.length > 0) {
       printResultsTable(results)
+
+      const outputDir = 'test-results'
+      mkdirSync(outputDir, { recursive: true })
+      writeFileSync(
+        `${outputDir}/benchmark.json`,
+        JSON.stringify(
+          {
+            timestamp: new Date().toISOString(),
+            gitSha: execSync('git rev-parse --short HEAD').toString().trim(),
+            results,
+          },
+          null,
+          2
+        )
+      )
     }
   })
 })

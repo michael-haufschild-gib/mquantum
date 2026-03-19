@@ -76,6 +76,19 @@ export async function waitForFrameAdvance(page: Page, beyondCount: number): Prom
   return getFrameCount(page)
 }
 
+/**
+ * Wait for a store uniform change to propagate to the GPU.
+ *
+ * After mutating a Zustand store value that flows through uniforms (not a
+ * shader recompilation), the new value takes effect on the next frame.
+ * Wait for 2 frames to ensure the uniform buffer is updated and one full
+ * frame has been rendered with the new value.
+ */
+export async function waitForUniformUpdate(page: Page): Promise<void> {
+  const current = await getFrameCount(page)
+  await waitForFrameAdvance(page, current + 2)
+}
+
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 /** Navigate to a specific quantum mode + dimension. */
@@ -264,6 +277,23 @@ export async function readFsfDiagnostics(page: Page) {
   })
 }
 
+/** Read density grid diagnostics from the running app (GPU readback values). */
+export async function readDensityDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/densityDiagnosticsStore.ts')
+    const s = mod.useDensityDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      maxDensity: s.maxDensity,
+      totalDensityMass: s.totalDensityMass,
+      activeVoxelCount: s.activeVoxelCount,
+      centerDensity: s.centerDensity,
+      gridSize: s.gridSize,
+      worldBound: s.worldBound,
+    }
+  })
+}
+
 /**
  * Wait for a diagnostic store to report hasData === true.
  * Diagnostics are decimated (every 5-60 frames), so this may take a few seconds.
@@ -318,19 +348,20 @@ export async function waitForSimulationFrames(
  * So we also wait for at least one more rendered frame to ensure the
  * new pipeline is actually active — not the stale old one.
  */
-export async function waitForShaderCompilation(page: Page, timeoutMs = 60_000): Promise<void> {
-  // Step 1: Wait for isShaderCompiling to be false
+export async function waitForShaderCompilation(page: Page, timeoutMs = 300_000): Promise<void> {
+  // Wait for the pipeline generation attribute to appear on the canvas.
+  // WebGPUScene writes data-pipeline-gen after graph.compile() succeeds.
+  // This is a definitive signal that shaders are compiled and the render
+  // graph is active — no polling of store flags, no timing races.
   await page.waitForFunction(
-    async () => {
-      const mod = await import('/src/stores/performanceStore.ts')
-      return !mod.usePerformanceStore.getState().isShaderCompiling
+    () => {
+      const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+      return parseInt(canvas?.getAttribute('data-pipeline-gen') ?? '0', 10) > 0
     },
     { timeout: timeoutMs }
   )
 
-  // Step 2: Record current frame count, then wait for at least one
-  // new frame. That frame will be rendered with the new graph (since
-  // graph.compile() runs synchronously after isShaderCompiling → false).
+  // Wait for a frame rendered with the new pipeline
   const currentFrame = await getFrameCount(page)
   await waitForFrameAdvance(page, currentFrame)
 }

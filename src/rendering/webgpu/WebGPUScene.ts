@@ -449,6 +449,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       lastSchrodingerConfigRef.current = { ...schrodingerConfig }
       lastPPConfigRef.current = { ...ppConfig }
 
+      // E2E testability: expose pipeline generation on the canvas so tests can
+      // wait for the new pipeline to be active instead of polling isShaderCompiling.
+      canvas.setAttribute('data-pipeline-gen', String(setupGeneration))
+
       if (import.meta.env.DEV) {
         logger.log(
           `[WebGPUScene] setup COMPLETE (gen=${setupGeneration}), isFullRebuild=${isFullRebuild}`
