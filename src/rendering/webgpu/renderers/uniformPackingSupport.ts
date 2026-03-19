@@ -16,6 +16,9 @@ import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 import { MAX_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import type { CameraSnapshot, TransformSnapshot } from './schrodingerRendererTypes'
+import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+
+const I = SCHROEDINGER_LAYOUT.index
 
 // ---------------------------------------------------------------------------
 // Shared helper
@@ -53,46 +56,43 @@ export function applyHOMomentumTransform(
 ): void {
   // 1. Invert omegas: omega_j -> 1/(hbar^2 * omega_j)
   const hbar2 = hbar * hbar
-  const omegaOff = 16 / 4
   for (let j = 0; j < MAX_DIM; j++) {
-    const omega = floatView[omegaOff + j]!
-    floatView[omegaOff + j] = 1.0 / (hbar2 * Math.max(omega, 0.01))
+    const omega = floatView[I.omega + j]!
+    floatView[I.omega + j] = 1.0 / (hbar2 * Math.max(omega, 0.01))
   }
 
   // 2. Rotate coefficients by (-i)^{sum n_j} per term
-  const quantumOff = 64 / 4
-  const coeffOff = 416 / 4
-  const termCount = Math.min(Math.max(intView[1]!, 1), MAX_TERMS)
+  const termCount = Math.min(Math.max(intView[I.termCount]!, 1), MAX_TERMS)
 
   for (let k = 0; k < termCount; k++) {
     let totalN = 0
     for (let j = 0; j < dimension; j++) {
-      totalN += intView[quantumOff + k * MAX_DIM + j]!
+      totalN += intView[I.quantum + k * MAX_DIM + j]!
     }
 
-    const re = floatView[coeffOff + k * 4]!
-    const im = floatView[coeffOff + k * 4 + 1]!
+    const re = floatView[I.coeff + k * 4]!
+    const im = floatView[I.coeff + k * 4 + 1]!
     const mod = ((totalN % 4) + 4) % 4
     switch (mod) {
       case 0:
         break // x1
       case 1:
-        floatView[coeffOff + k * 4] = im
-        floatView[coeffOff + k * 4 + 1] = -re
+        floatView[I.coeff + k * 4] = im
+        floatView[I.coeff + k * 4 + 1] = -re
         break // x(-i)
       case 2:
-        floatView[coeffOff + k * 4] = -re
-        floatView[coeffOff + k * 4 + 1] = -im
+        floatView[I.coeff + k * 4] = -re
+        floatView[I.coeff + k * 4 + 1] = -im
         break // x(-1)
       case 3:
-        floatView[coeffOff + k * 4] = -im
-        floatView[coeffOff + k * 4 + 1] = re
+        floatView[I.coeff + k * 4] = -im
+        floatView[I.coeff + k * 4 + 1] = re
         break // x(i)
     }
   }
 
   // 3. Force representationMode = 0 (position) — shader runs normal path
-  intView[1328 / 4] = 0
+  intView[I.representationMode] = 0
 }
 
 // =========================================================================

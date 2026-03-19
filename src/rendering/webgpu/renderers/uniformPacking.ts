@@ -2,9 +2,10 @@
  * Pure uniform-packing functions for the Schrodinger renderer.
  *
  * Every function in this module writes pre-computed values into typed arrays
- * at exact byte offsets matching the WGSL struct layouts. No GPU resources,
- * no class state, no store access. The renderer orchestrates store reads,
- * dirty checks, and buffer uploads; this module only does the packing.
+ * at byte offsets derived from the declarative struct layout in
+ * `schroedingerLayout.ts`. No GPU resources, no class state, no store access.
+ * The renderer orchestrates store reads, dirty checks, and buffer uploads;
+ * this module only does the packing.
  *
  * @module rendering/webgpu/renderers/uniformPacking
  */
@@ -16,6 +17,7 @@ import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb } from '../utils/color'
+import { zeroReservedFields } from '../utils/structLayout'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
   CROSS_SECTION_SCALAR_MAP,
@@ -28,6 +30,10 @@ import {
   PROBABILITY_CURRENT_STYLE_MAP,
   REPRESENTATION_MODE_MAP,
 } from './schrodingerRendererTypes'
+import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+
+// Field name → float32/int32 index (byte offset / 4)
+const I = SCHROEDINGER_LAYOUT.index
 
 // ---------------------------------------------------------------------------
 // Shared helper
@@ -91,23 +97,23 @@ export interface SchroedingerPackParams {
 /**
  * Pack all Schroedinger uniform values into the pre-allocated typed-array views.
  *
- * Byte offsets match the WGSL `SchroedingerUniforms` struct layout exactly.
- * See `uniforms.wgsl.ts` for the authoritative struct definition.
+ * Byte offsets are derived from the declarative struct layout, which mirrors
+ * the WGSL `SchroedingerUniforms` struct and is validated by tests.
  */
 export function packSchroedingerUniforms(
   floatView: Float32Array,
   intView: Int32Array,
   p: SchroedingerPackParams
 ): void {
-  // --- Scalars (offset 0-15) ---
-  intView[0] = p.quantumModeInt
-  intView[1] = p.presetTermCount
-  intView[2] = 0 // _padScalar0
-  intView[3] = 0 // _padScalar1
+  // Zero all reserved and padding fields in one declarative pass
+  zeroReservedFields(floatView, SCHROEDINGER_LAYOUT)
+
+  intView[I.quantumMode] = p.quantumModeInt
+  intView[I.termCount] = p.presetTermCount
 
   packQuantumArrays(floatView, intView, p)
   const hydrogenResult = packHydrogenAndExtraDims(floatView, intView, p)
-  packVisualAndReserved(floatView, intView, p)
+  packVisualFields(floatView, intView, p)
   packNodalAndColorSystem(floatView, intView, p)
   packOverlayControls(floatView, intView, p)
   packCrossSectionAndCurrent(floatView, intView, p)
@@ -116,7 +122,7 @@ export function packSchroedingerUniforms(
 }
 
 // ---------------------------------------------------------------------------
-// Sub-packers — each handles a contiguous block of byte offsets
+// Sub-packers — each handles a contiguous block of fields
 // ---------------------------------------------------------------------------
 
 /** Result from hydrogen packing needed by downstream sub-packers. */
@@ -126,7 +132,7 @@ interface HydrogenResult {
   bohrRadius: number
 }
 
-/** Pack omega, quantum, coeff, energy arrays (offsets 16-575). */
+/** Pack omega, quantum, coeff, energy arrays. */
 function packQuantumArrays(
   floatView: Float32Array,
   intView: Int32Array,
@@ -134,37 +140,33 @@ function packQuantumArrays(
 ): void {
   const { presetData } = p
 
-  // omega array (offset 16, 3 vec4f = 12 floats, use 11)
-  const omegaOffset = 16 / 4
+  // omega: 3 vec4f = 12 floats, use 11
   for (let i = 0; i < MAX_DIM; i++) {
-    floatView[omegaOffset + i] = presetData?.omega[i] ?? 1.0
+    floatView[I.omega + i] = presetData?.omega[i] ?? 1.0
   }
-  floatView[omegaOffset + 11] = 0.0
+  floatView[I.omega + 11] = 0.0
 
-  // quantum array (offset 64, 22 vec4i = 88 ints)
-  const quantumOffset = 64 / 4
+  // quantum: 22 vec4i = 88 ints
   for (let i = 0; i < MAX_TERMS * MAX_DIM; i++) {
-    intView[quantumOffset + i] = presetData?.quantum[i] ?? 0
+    intView[I.quantum + i] = presetData?.quantum[i] ?? 0
   }
 
-  // coeff array (offset 416, 8 vec4f, xy = complex value, zw = padding)
-  const coeffOffset = 416 / 4
+  // coeff: 8 vec4f, xy = complex value, zw = padding
   for (let i = 0; i < MAX_TERMS; i++) {
-    const baseIdx = coeffOffset + i * 4
+    const baseIdx = I.coeff + i * 4
     floatView[baseIdx] = presetData?.coeff[i * 2] ?? (i === 0 ? 1.0 : 0.0)
     floatView[baseIdx + 1] = presetData?.coeff[i * 2 + 1] ?? 0.0
     floatView[baseIdx + 2] = 0.0
     floatView[baseIdx + 3] = 0.0
   }
 
-  // energy array (offset 544, 2 vec4f = 8 floats)
-  const energyOffset = 544 / 4
+  // energy: 2 vec4f = 8 floats
   for (let i = 0; i < MAX_TERMS; i++) {
-    floatView[energyOffset + i] = presetData?.energy[i] ?? 0.5
+    floatView[I.energy + i] = presetData?.energy[i] ?? 0.5
   }
 }
 
-/** Pack hydrogen quantum numbers, boosts, and extra-dimension arrays (offsets 576-671). */
+/** Pack hydrogen quantum numbers, boosts, and extra-dimension arrays. */
 function packHydrogenAndExtraDims(
   floatView: Float32Array,
   intView: Int32Array,
@@ -181,16 +183,16 @@ function packHydrogenAndExtraDims(
   const validL = Math.max(0, Math.min(azimuthalL, validN - 1))
   const validM = Math.max(-validL, Math.min(magneticM, validL))
 
-  intView[576 / 4] = validN
-  intView[580 / 4] = validL
-  intView[584 / 4] = validM
-  floatView[588 / 4] = bohrRadius
-  intView[592 / 4] = schroedinger?.useRealOrbitals ? 1 : 0
+  intView[I.principalN] = validN
+  intView[I.azimuthalL] = validL
+  intView[I.magneticM] = validM
+  floatView[I.bohrRadius] = bohrRadius
+  intView[I.useRealOrbitals] = schroedinger?.useRealOrbitals ? 1 : 0
 
   // hydrogenBoost = 50 * n^2 * 3^l
   const lBoost = Math.pow(3.0, validL)
   const hydrogenBoost = 50.0 * validN * validN * lBoost
-  floatView[596 / 4] = hydrogenBoost
+  floatView[I.hydrogenBoost] = hydrogenBoost
 
   // hydrogenNDBoost: compensate for HO normalization in extra dimensions
   const numExtraDims = Math.max(0, dimension - 3)
@@ -201,87 +203,55 @@ function packHydrogenAndExtraDims(
     const effectiveOmega = Math.max(baseOmega * spread, 0.01)
     normCompensation *= Math.sqrt(Math.PI / effectiveOmega)
   }
-  floatView[600 / 4] = hydrogenBoost * normCompensation
+  floatView[I.hydrogenNDBoost] = hydrogenBoost * normCompensation
 
   // hydrogenRadialThreshold — uses D-dimensional n_eff = n + (D-3)/2
   const hydrogenFieldScale = schroedinger?.fieldScale ?? 1.0
   const nEff = validN + (dimension - 3) / 2
-  floatView[604 / 4] = 25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
+  floatView[I.hydrogenRadialThreshold] =
+    25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
 
-  // extraDimN array (offset 608, 2 vec4i = 8 ints)
+  // extraDimN: 2 vec4i = 8 ints
   const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
-    intView[608 / 4 + i] = extraDimQuantumNumbers?.[i] ?? 0
+    intView[I.extraDimN + i] = extraDimQuantumNumbers?.[i] ?? 0
   }
 
-  // extraDimOmega array (offset 640, 2 vec4f = 8 floats)
+  // extraDimOmega: 2 vec4f = 8 floats
   const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
   const extraDimFrequencySpread = schroedinger?.extraDimFrequencySpread ?? 0
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
     const baseOmega = extraDimOmega?.[i] ?? 1.0
     const spread = 1.0 + (i - 3.5) * extraDimFrequencySpread
-    floatView[640 / 4 + i] = baseOmega * spread
+    floatView[I.extraDimOmega + i] = baseOmega * spread
   }
 
   return { validN, validL, bohrRadius }
 }
 
-/** Pack visual/appearance fields and reserved padding (offsets 672-860). */
-function packVisualAndReserved(
+/** Pack visual/appearance fields (active fields only — reserved fields zeroed by caller). */
+function packVisualFields(
   floatView: Float32Array,
   intView: Int32Array,
   p: SchroedingerPackParams
 ): void {
   const { schroedinger, appearance, pbr, canonicalDensityCompensation, cachedPeakDensity } = p
 
-  intView[672 / 4] = schroedinger?.phaseAnimationEnabled ? 1 : 0
-  floatView[676 / 4] = schroedinger?.timeScale ?? 0.8
-  floatView[680 / 4] = schroedinger?.fieldScale ?? 1.0
-  floatView[684 / 4] = (schroedinger?.densityGain ?? 2.0) * canonicalDensityCompensation
-  floatView[688 / 4] = schroedinger?.powderScale ?? 1.0
-  floatView[692 / 4] = appearance?.faceEmission ?? 0.0
-  floatView[696 / 4] = appearance?.faceEmissionThreshold ?? 0.0
-  floatView[700 / 4] = appearance?.faceEmissionColorShift ?? 0.0
-  floatView[704 / 4] = cachedPeakDensity
-  floatView[708 / 4] = schroedinger?.densityContrast ?? 1.8
-  floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
-  floatView[716 / 4] = pbr?.face?.roughness ?? 0.3
-
-  // Reserved padding at offset 720-860 (formerly SSS, erosion, curl noise, dispersion, shadows)
-  intView[720 / 4] = 0
-  floatView[724 / 4] = 0.0
-  floatView[736 / 4] = 0.0
-  floatView[740 / 4] = 0.0
-  floatView[744 / 4] = 0.0
-  floatView[748 / 4] = 0.0
-  floatView[752 / 4] = 0.0
-  floatView[756 / 4] = 0.0
-  floatView[760 / 4] = 0.0
-  floatView[764 / 4] = 0.0
-  floatView[768 / 4] = 0.0
-  intView[772 / 4] = 0
-  intView[776 / 4] = 0
-  floatView[780 / 4] = 0.0
-  floatView[784 / 4] = 0.0
-  floatView[788 / 4] = 0.0
-  intView[792 / 4] = 0
-  intView[796 / 4] = 0
-  floatView[800 / 4] = 0.0
-  intView[804 / 4] = 0
-  intView[808 / 4] = 0
-  intView[812 / 4] = 0
-  floatView[816 / 4] = 0
-  intView[820 / 4] = 0
-  floatView[824 / 4] = 0
-  intView[828 / 4] = 0
-  floatView[832 / 4] = 0
-  floatView[848 / 4] = 0
-  floatView[852 / 4] = 0
-  floatView[856 / 4] = 0
-  floatView[860 / 4] = 0
+  intView[I.phaseAnimationEnabled] = schroedinger?.phaseAnimationEnabled ? 1 : 0
+  floatView[I.timeScale] = schroedinger?.timeScale ?? 0.8
+  floatView[I.fieldScale] = schroedinger?.fieldScale ?? 1.0
+  floatView[I.densityGain] = (schroedinger?.densityGain ?? 2.0) * canonicalDensityCompensation
+  floatView[I.powderScale] = schroedinger?.powderScale ?? 1.0
+  floatView[I.emissionIntensity] = appearance?.faceEmission ?? 0.0
+  floatView[I.emissionThreshold] = appearance?.faceEmissionThreshold ?? 0.0
+  floatView[I.emissionColorShift] = appearance?.faceEmissionColorShift ?? 0.0
+  floatView[I.peakDensity] = cachedPeakDensity
+  floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
+  floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
+  floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
 }
 
-/** Pack nodal fields, color algorithm, and cosine palette (offsets 864-1036). */
+/** Pack nodal fields, color algorithm, and cosine palette. */
 function packNodalAndColorSystem(
   floatView: Float32Array,
   intView: Int32Array,
@@ -296,54 +266,41 @@ function packNodalAndColorSystem(
     animationTime,
   } = p
 
-  intView[864 / 4] = !isDensityMatrixMode && schroedinger?.nodalEnabled ? 1 : 0
+  intView[I.nodalEnabled] = !isDensityMatrixMode && schroedinger?.nodalEnabled ? 1 : 0
 
   const nodalColor = parseColor(schroedinger?.nodalColor ?? '#00ffff')
-  floatView[880 / 4] = nodalColor[0]
-  floatView[884 / 4] = nodalColor[1]
-  floatView[888 / 4] = nodalColor[2]
-  floatView[892 / 4] = schroedinger?.nodalStrength ?? 1.0
+  floatView[I.nodalColor] = nodalColor[0]
+  floatView[I.nodalColor + 1] = nodalColor[1]
+  floatView[I.nodalColor + 2] = nodalColor[2]
+  floatView[I.nodalStrength] = schroedinger?.nodalStrength ?? 1.0
 
-  intView[896 / 4] = 0 // _padEnergy
-  intView[900 / 4] = schroedinger?.uncertaintyBoundaryEnabled ? 1 : 0
-  floatView[904 / 4] = schroedinger?.uncertaintyBoundaryStrength ?? 0.5
-  floatView[908 / 4] = animationTime
-  intView[912 / 4] = schroedinger?.isoEnabled ? 1 : 0
-  floatView[916 / 4] = schroedinger?.isoThreshold ?? -3.0
-  intView[920 / 4] = effectiveSampleCount
+  intView[I.uncertaintyBoundaryEnabled] = schroedinger?.uncertaintyBoundaryEnabled ? 1 : 0
+  floatView[I.uncertaintyBoundaryStrength] = schroedinger?.uncertaintyBoundaryStrength ?? 0.5
+  floatView[I.time] = animationTime
+  intView[I.isoEnabled] = schroedinger?.isoEnabled ? 1 : 0
+  floatView[I.isoThreshold] = schroedinger?.isoThreshold ?? -3.0
+  intView[I.sampleCount] = effectiveSampleCount
 
-  // Reserved (formerly phase shift)
-  intView[924 / 4] = 0
-  floatView[928 / 4] = 0.0
-  floatView[932 / 4] = 0.0
-  floatView[936 / 4] = 0.0
+  // Color algorithm system
+  intView[I.colorAlgorithm] = colorAlgorithm
+  floatView[I.distPower] = appearance?.distribution?.power ?? 1.0
+  floatView[I.distCycles] = appearance?.distribution?.cycles ?? 1.0
+  floatView[I.distOffset] = appearance?.distribution?.offset ?? 0.0
 
-  // Color algorithm system (offset 940+)
-  intView[940 / 4] = colorAlgorithm
-  floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
-  floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0
-  floatView[952 / 4] = appearance?.distribution?.offset ?? 0.0
-
-  // Cosine palette coefficients (offset 960-1024)
+  // Cosine palette coefficients
   const cosineCoeffs = appearance?.cosineCoefficients ?? {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 1.0, 1.0],
     d: [0.0, 0.33, 0.67],
   }
-  packVec4Color(floatView, 960 / 4, cosineCoeffs.a, [0.5, 0.5, 0.5])
-  packVec4Color(floatView, 976 / 4, cosineCoeffs.b, [0.5, 0.5, 0.5])
-  packVec4Color(floatView, 992 / 4, cosineCoeffs.c, [1.0, 1.0, 1.0])
-  packVec4Color(floatView, 1008 / 4, cosineCoeffs.d, [0.0, 0.33, 0.67])
-
-  // Reserved padding
-  intView[1024 / 4] = 0
-  floatView[1028 / 4] = 0.0
-  floatView[1032 / 4] = 0.0
-  intView[1036 / 4] = 0
+  packVec4Color(floatView, I.cosineA, cosineCoeffs.a, [0.5, 0.5, 0.5])
+  packVec4Color(floatView, I.cosineB, cosineCoeffs.b, [0.5, 0.5, 0.5])
+  packVec4Color(floatView, I.cosineC, cosineCoeffs.c, [1.0, 1.0, 1.0])
+  packVec4Color(floatView, I.cosineD, cosineCoeffs.d, [0.0, 0.33, 0.67])
 }
 
-/** Pack phase materiality and interference fields (offsets 1040-1068). */
+/** Pack phase materiality and interference fields. */
 function packPhaseAndInterference(
   floatView: Float32Array,
   intView: Int32Array,
@@ -351,37 +308,35 @@ function packPhaseAndInterference(
   isDensityMatrixMode: boolean,
   schroedinger: Partial<SchroedingerConfig> | undefined
 ): void {
-  floatView[1040 / 4] = boundingRadius
-  floatView[1044 / 4] = 1.0 / boundingRadius
-  intView[1048 / 4] = !isDensityMatrixMode && schroedinger?.phaseMaterialityEnabled ? 1 : 0
-  floatView[1052 / 4] = schroedinger?.phaseMaterialityStrength ?? 1.0
-  intView[1056 / 4] = !isDensityMatrixMode && schroedinger?.interferenceEnabled ? 1 : 0
-  floatView[1060 / 4] = schroedinger?.interferenceAmp ?? 0.5
-  floatView[1064 / 4] = schroedinger?.interferenceFreq ?? 10.0
-  floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
+  floatView[I.boundingRadius] = boundingRadius
+  floatView[I.invBoundingRadius] = 1.0 / boundingRadius
+  intView[I.phaseMaterialityEnabled] =
+    !isDensityMatrixMode && schroedinger?.phaseMaterialityEnabled ? 1 : 0
+  floatView[I.phaseMaterialityStrength] = schroedinger?.phaseMaterialityStrength ?? 1.0
+  intView[I.interferenceEnabled] = !isDensityMatrixMode && schroedinger?.interferenceEnabled ? 1 : 0
+  floatView[I.interferenceAmp] = schroedinger?.interferenceAmp ?? 0.5
+  floatView[I.interferenceFreq] = schroedinger?.interferenceFreq ?? 10.0
+  floatView[I.interferenceSpeed] = schroedinger?.interferenceSpeed ?? 1.0
 }
 
-/** Pack nodal surface controls (offsets 1072-1212). */
+/** Pack nodal surface controls. */
 function packNodalControls(
   floatView: Float32Array,
   intView: Int32Array,
   schroedinger: Partial<SchroedingerConfig> | undefined
 ): void {
-  intView[1072 / 4] = NODAL_DEFINITION_MAP[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
-  floatView[1076 / 4] = schroedinger?.nodalTolerance ?? 0.02
-  intView[1080 / 4] = NODAL_FAMILY_MAP[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
-  intView[1084 / 4] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
-  packColorRgba(floatView, 1088 / 4, schroedinger?.nodalColorReal ?? '#00ffff')
-  packColorRgba(floatView, 1104 / 4, schroedinger?.nodalColorImag ?? '#ff66ff')
-  packColorRgba(floatView, 1120 / 4, schroedinger?.nodalColorPositive ?? '#22c55e')
-  packColorRgba(floatView, 1136 / 4, schroedinger?.nodalColorNegative ?? '#ef4444')
-  intView[1200 / 4] = NODAL_RENDER_MODE_MAP[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
-  intView[1204 / 4] = 0
-  floatView[1208 / 4] = 0.0
-  floatView[1212 / 4] = 0.0
+  intView[I.nodalDefinition] = NODAL_DEFINITION_MAP[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
+  floatView[I.nodalTolerance] = schroedinger?.nodalTolerance ?? 0.02
+  intView[I.nodalFamilyFilter] = NODAL_FAMILY_MAP[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
+  intView[I.nodalLobeColoringEnabled] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
+  packColorRgba(floatView, I.nodalColorReal, schroedinger?.nodalColorReal ?? '#00ffff')
+  packColorRgba(floatView, I.nodalColorImag, schroedinger?.nodalColorImag ?? '#ff66ff')
+  packColorRgba(floatView, I.nodalColorPositive, schroedinger?.nodalColorPositive ?? '#22c55e')
+  packColorRgba(floatView, I.nodalColorNegative, schroedinger?.nodalColorNegative ?? '#ef4444')
+  intView[I.nodalRenderMode] = NODAL_RENDER_MODE_MAP[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
 }
 
-/** Pack bounding radius, interference, physical nodal controls, and flow (offsets 1040-1212). */
+/** Pack bounding radius, interference, physical nodal controls, and flow. */
 function packOverlayControls(
   floatView: Float32Array,
   intView: Int32Array,
@@ -392,25 +347,25 @@ function packOverlayControls(
   packPhaseAndInterference(floatView, intView, p.boundingRadius, isDensityMatrixMode, schroedinger)
   packNodalControls(floatView, intView, schroedinger)
 
-  // Probability flow + uncertainty (offset 1152-1180)
-  intView[1152 / 4] = schroedinger?.probabilityFlowEnabled ? 1 : 0
-  floatView[1156 / 4] = schroedinger?.probabilityFlowSpeed ?? 1.0
-  floatView[1160 / 4] = schroedinger?.probabilityFlowStrength ?? 0.3
-  floatView[1164 / 4] = p.uncertaintyConfidenceMass
-  floatView[1168 / 4] = appearance?.lchLightness ?? 0.7
-  floatView[1172 / 4] = appearance?.lchChroma ?? 0.15
-  floatView[1176 / 4] = p.uncertaintyBoundaryWidth
-  floatView[1180 / 4] = p.uncertaintyLogRhoThreshold
+  // Probability flow + uncertainty
+  intView[I.probabilityFlowEnabled] = schroedinger?.probabilityFlowEnabled ? 1 : 0
+  floatView[I.probabilityFlowSpeed] = schroedinger?.probabilityFlowSpeed ?? 1.0
+  floatView[I.probabilityFlowStrength] = schroedinger?.probabilityFlowStrength ?? 0.3
+  floatView[I.uncertaintyConfidenceMass] = p.uncertaintyConfidenceMass
+  floatView[I.lchLightness] = appearance?.lchLightness ?? 0.7
+  floatView[I.lchChroma] = appearance?.lchChroma ?? 0.15
+  floatView[I.uncertaintyBoundaryWidth] = p.uncertaintyBoundaryWidth
+  floatView[I.uncertaintyLogRhoThreshold] = p.uncertaintyLogRhoThreshold
 
-  // Multi-source blend weights (offset 1184-1200)
+  // Multi-source blend weights
   const msWeights = appearance?.multiSourceWeights
-  floatView[1184 / 4] = msWeights?.depth ?? 0.5
-  floatView[1188 / 4] = msWeights?.orbitTrap ?? 0.3
-  floatView[1192 / 4] = msWeights?.normal ?? 0.2
-  floatView[1196 / 4] = 0.0
+  floatView[I.multiSourceWeights] = msWeights?.depth ?? 0.5
+  floatView[I.multiSourceWeights + 1] = msWeights?.orbitTrap ?? 0.3
+  floatView[I.multiSourceWeights + 2] = msWeights?.normal ?? 0.2
+  floatView[I.multiSourceWeights + 3] = 0.0
 }
 
-/** Pack cross-section slice controls (offsets 1216-1280). */
+/** Pack cross-section slice controls. */
 function packCrossSectionSlice(
   floatView: Float32Array,
   intView: Int32Array,
@@ -424,26 +379,32 @@ function packCrossSectionSlice(
   const nLen = Math.hypot(nx, ny, nz)
   const invNLen = nLen > 1e-6 ? 1.0 / nLen : 1.0
 
-  intView[1216 / 4] = !isUniformComputeMode && schroedinger?.crossSectionEnabled ? 1 : 0
-  intView[1220 / 4] =
+  intView[I.crossSectionEnabled] =
+    !isUniformComputeMode && schroedinger?.crossSectionEnabled ? 1 : 0
+  intView[I.crossSectionCompositeMode] =
     CROSS_SECTION_COMPOSITE_MODE_MAP[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
-  intView[1224 / 4] = CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
-  intView[1228 / 4] = schroedinger?.crossSectionAutoWindow ? 1 : 0
+  intView[I.crossSectionScalar] =
+    CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
+  intView[I.crossSectionAutoWindow] = schroedinger?.crossSectionAutoWindow ? 1 : 0
 
-  floatView[1232 / 4] = nx * invNLen
-  floatView[1236 / 4] = ny * invNLen
-  floatView[1240 / 4] = nz * invNLen
-  floatView[1244 / 4] = schroedinger?.crossSectionPlaneOffset ?? 0.0
+  floatView[I.crossSectionPlane] = nx * invNLen
+  floatView[I.crossSectionPlane + 1] = ny * invNLen
+  floatView[I.crossSectionPlane + 2] = nz * invNLen
+  floatView[I.crossSectionPlane + 3] = schroedinger?.crossSectionPlaneOffset ?? 0.0
 
-  floatView[1248 / 4] = schroedinger?.crossSectionWindowMin ?? 0.0
-  floatView[1252 / 4] = schroedinger?.crossSectionWindowMax ?? 1.0
-  floatView[1256 / 4] = schroedinger?.crossSectionOpacity ?? 0.75
-  floatView[1260 / 4] = schroedinger?.crossSectionThickness ?? 0.02
+  floatView[I.crossSectionWindow] = schroedinger?.crossSectionWindowMin ?? 0.0
+  floatView[I.crossSectionWindow + 1] = schroedinger?.crossSectionWindowMax ?? 1.0
+  floatView[I.crossSectionWindow + 2] = schroedinger?.crossSectionOpacity ?? 0.75
+  floatView[I.crossSectionWindow + 3] = schroedinger?.crossSectionThickness ?? 0.02
 
-  packColorRgba(floatView, 1264 / 4, schroedinger?.crossSectionPlaneColor ?? '#66ccff')
+  packColorRgba(
+    floatView,
+    I.crossSectionPlaneColor,
+    schroedinger?.crossSectionPlaneColor ?? '#66ccff'
+  )
 }
 
-/** Pack physical probability current controls (offsets 1280-1328). */
+/** Pack physical probability current controls. */
 function packProbabilityCurrent(
   floatView: Float32Array,
   intView: Int32Array,
@@ -455,31 +416,33 @@ function packProbabilityCurrent(
     !isDensityMatrixMode &&
     !isUniformComputeMode &&
     (schroedinger?.probabilityCurrentEnabled ?? false)
-  intView[1280 / 4] = probabilityCurrentEnabled ? 1 : 0
-  intView[1284 / 4] =
+  intView[I.probabilityCurrentEnabled] = probabilityCurrentEnabled ? 1 : 0
+  intView[I.probabilityCurrentStyle] =
     PROBABILITY_CURRENT_STYLE_MAP[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
-  intView[1288 / 4] =
+  intView[I.probabilityCurrentPlacement] =
     PROBABILITY_CURRENT_PLACEMENT_MAP[schroedinger?.probabilityCurrentPlacement ?? 'isosurface'] ??
     0
-  intView[1292 / 4] =
+  intView[I.probabilityCurrentColorMode] =
     PROBABILITY_CURRENT_COLOR_MODE_MAP[schroedinger?.probabilityCurrentColorMode ?? 'magnitude'] ??
     0
 
-  floatView[1296 / 4] = schroedinger?.probabilityCurrentScale ?? 1.0
-  floatView[1300 / 4] = schroedinger?.probabilityCurrentSpeed ?? 1.0
-  floatView[1304 / 4] = schroedinger?.probabilityCurrentDensityThreshold ?? 0.01
-  floatView[1308 / 4] = schroedinger?.probabilityCurrentMagnitudeThreshold ?? 0.0
+  floatView[I.probabilityCurrentScale] = schroedinger?.probabilityCurrentScale ?? 1.0
+  floatView[I.probabilityCurrentSpeed] = schroedinger?.probabilityCurrentSpeed ?? 1.0
+  floatView[I.probabilityCurrentDensityThreshold] =
+    schroedinger?.probabilityCurrentDensityThreshold ?? 0.01
+  floatView[I.probabilityCurrentMagnitudeThreshold] =
+    schroedinger?.probabilityCurrentMagnitudeThreshold ?? 0.0
   const lineDensity = schroedinger?.probabilityCurrentLineDensity ?? 8.0
   const stepSize = schroedinger?.probabilityCurrentStepSize ?? 0.04
   const integrationSteps = schroedinger?.probabilityCurrentSteps ?? 20
   const isMomentum = !isUniformComputeMode && schroedinger?.representation === 'momentum'
-  floatView[1312 / 4] = isMomentum ? Math.min(lineDensity, 3.0) : lineDensity
-  floatView[1316 / 4] = isMomentum ? Math.max(stepSize, 0.02) : stepSize
-  intView[1320 / 4] = isMomentum ? Math.min(integrationSteps, 8) : integrationSteps
-  floatView[1324 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
+  floatView[I.probabilityCurrentLineDensity] = isMomentum ? Math.min(lineDensity, 3.0) : lineDensity
+  floatView[I.probabilityCurrentStepSize] = isMomentum ? Math.max(stepSize, 0.02) : stepSize
+  intView[I.probabilityCurrentSteps] = isMomentum ? Math.min(integrationSteps, 8) : integrationSteps
+  floatView[I.probabilityCurrentOpacity] = schroedinger?.probabilityCurrentOpacity ?? 0.7
 }
 
-/** Pack cross-section and probability current controls (offsets 1216-1328). */
+/** Pack cross-section and probability current controls. */
 function packCrossSectionAndCurrent(
   floatView: Float32Array,
   intView: Int32Array,
@@ -495,7 +458,7 @@ function packCrossSectionAndCurrent(
   )
 }
 
-/** Pack representation, radial probability, domain coloring, and diverging (offsets 1328-1456). */
+/** Pack representation, radial probability, domain coloring, and diverging. */
 function packRepresentationAndColorOverlays(
   floatView: Float32Array,
   intView: Int32Array,
@@ -504,22 +467,23 @@ function packRepresentationAndColorOverlays(
 ): void {
   const { isUniformComputeMode, isDensityMatrixMode, quantumModeStr, schroedinger, appearance } = p
 
-  // Representation + momentum controls (offset 1328-1344)
+  // Representation + momentum controls
   const forcePosition =
     isUniformComputeMode || (isDensityMatrixMode && quantumModeStr === 'hydrogenND')
-  intView[1328 / 4] = forcePosition
+  intView[I.representationMode] = forcePosition
     ? 0
     : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
-  intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
-  floatView[1336 / 4] = p.effectiveMomentumScale
-  floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
+  intView[I.momentumDisplayMode] =
+    MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
+  floatView[I.momentumScale] = p.effectiveMomentumScale
+  floatView[I.momentumHbar] = schroedinger?.momentumHbar ?? 1.0
 
-  // Radial probability overlay (offset 1344-1376)
+  // Radial probability overlay
   const isMomentumRep = !isUniformComputeMode && schroedinger?.representation === 'momentum'
   const radialProbEnabled = (schroedinger?.radialProbabilityEnabled ?? false) && !isMomentumRep
-  intView[1344 / 4] = radialProbEnabled ? 1 : 0
-  floatView[1348 / 4] = schroedinger?.radialProbabilityOpacity ?? 0.6
-  floatView[1352 / 4] =
+  intView[I.radialProbabilityEnabled] = radialProbEnabled ? 1 : 0
+  floatView[I.radialProbabilityOpacity] = schroedinger?.radialProbabilityOpacity ?? 0.6
+  floatView[I.radialProbabilityNorm] =
     radialProbEnabled && quantumModeStr !== 'harmonicOscillator'
       ? computeRadialProbabilityNorm(
           hydrogen.validN,
@@ -528,25 +492,28 @@ function packRepresentationAndColorOverlays(
           p.dimension
         )
       : 1.0
-  floatView[1356 / 4] = 0.0
-  packColorRgba(floatView, 1360 / 4, schroedinger?.radialProbabilityColor ?? '#44aaff')
+  packColorRgba(
+    floatView,
+    I.radialProbabilityColor,
+    schroedinger?.radialProbabilityColor ?? '#44aaff'
+  )
 
-  // Domain coloring controls (offset 1376-1408)
+  // Domain coloring controls
   const domainColoring = appearance?.domainColoring
-  floatView[1376 / 4] = domainColoring?.modulusMode === 'logPsiAbs' ? 1.0 : 0.0
-  floatView[1380 / 4] = domainColoring?.contoursEnabled ? 1.0 : 0.0
-  floatView[1384 / 4] = domainColoring?.contourDensity ?? 8.0
-  floatView[1388 / 4] = domainColoring?.contourWidth ?? 0.08
-  floatView[1392 / 4] = domainColoring?.contourStrength ?? 0.45
-  floatView[1396 / 4] = 0.0
-  floatView[1400 / 4] = 0.0
-  floatView[1404 / 4] = 0.0
+  floatView[I.domainColoringParams0] = domainColoring?.modulusMode === 'logPsiAbs' ? 1.0 : 0.0
+  floatView[I.domainColoringParams0 + 1] = domainColoring?.contoursEnabled ? 1.0 : 0.0
+  floatView[I.domainColoringParams0 + 2] = domainColoring?.contourDensity ?? 8.0
+  floatView[I.domainColoringParams0 + 3] = domainColoring?.contourWidth ?? 0.08
+  floatView[I.domainColoringParams1] = domainColoring?.contourStrength ?? 0.45
+  floatView[I.domainColoringParams1 + 1] = 0.0
+  floatView[I.domainColoringParams1 + 2] = 0.0
+  floatView[I.domainColoringParams1 + 3] = 0.0
 
-  // Diverging color controls (offset 1408-1456)
+  // Diverging color controls
   packDivergingColors(floatView, appearance)
 }
 
-/** Pack diverging color palette controls (offsets 1408-1456). */
+/** Pack diverging color palette controls. */
 function packDivergingColors(
   floatView: Float32Array,
   appearance: AppearanceStoreState | undefined
@@ -569,29 +536,29 @@ function packDivergingColors(
       ? (phaseDiverging?.negativeColor ?? '#3866f2')
       : (divergingPsi?.negativeColor ?? '#3166f5')
   )
-  floatView[1408 / 4] = divergingNeutral[0]
-  floatView[1412 / 4] = divergingNeutral[1]
-  floatView[1416 / 4] = divergingNeutral[2]
-  floatView[1420 / 4] = usePhaseDivergingPalette
+  floatView[I.divergingNeutralParams] = divergingNeutral[0]
+  floatView[I.divergingNeutralParams + 1] = divergingNeutral[1]
+  floatView[I.divergingNeutralParams + 2] = divergingNeutral[2]
+  floatView[I.divergingNeutralParams + 3] = usePhaseDivergingPalette
     ? 0.2
     : Math.max(0, Math.min(1, divergingPsi?.intensityFloor ?? 0.2))
 
-  floatView[1424 / 4] = divergingPositive[0]
-  floatView[1428 / 4] = divergingPositive[1]
-  floatView[1432 / 4] = divergingPositive[2]
-  floatView[1436 / 4] = usePhaseDivergingPalette
+  floatView[I.divergingPositiveParams] = divergingPositive[0]
+  floatView[I.divergingPositiveParams + 1] = divergingPositive[1]
+  floatView[I.divergingPositiveParams + 2] = divergingPositive[2]
+  floatView[I.divergingPositiveParams + 3] = usePhaseDivergingPalette
     ? 0.0
     : divergingPsi?.component === 'imag'
       ? 1.0
       : 0.0
 
-  floatView[1440 / 4] = divergingNegative[0]
-  floatView[1444 / 4] = divergingNegative[1]
-  floatView[1448 / 4] = divergingNegative[2]
-  floatView[1452 / 4] = 0.0
+  floatView[I.divergingNegativeParams] = divergingNegative[0]
+  floatView[I.divergingNegativeParams + 1] = divergingNegative[1]
+  floatView[I.divergingNegativeParams + 2] = divergingNegative[2]
+  floatView[I.divergingNegativeParams + 3] = 0.0
 }
 
-/** Pack Wigner phase-space and Pauli spinor color fields (offsets 1456-1520). */
+/** Pack Wigner phase-space and Pauli spinor color fields. */
 function packWignerAndPauliFields(
   floatView: Float32Array,
   intView: Int32Array,
@@ -599,34 +566,30 @@ function packWignerAndPauliFields(
 ): void {
   const { schroedinger, pauliSpinor, dimension } = p
 
-  // Wigner phase-space controls (offset 1456-1488)
+  // Wigner phase-space controls
   const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
-  intView[1456 / 4] = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
-  intView[1460 / 4] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
+  intView[I.wignerDimensionIndex] = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
+  intView[I.wignerCrossTermsEnabled] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
 
   const wignerAutoRange = schroedinger?.wignerAutoRange ?? true
   if (wignerAutoRange) {
     packWignerAutoRange(floatView, intView, p, wignerDimIdx)
   } else {
-    floatView[1464 / 4] = schroedinger?.wignerXRange ?? 6.0
-    floatView[1468 / 4] = schroedinger?.wignerPRange ?? 6.0
+    floatView[I.wignerXRange] = schroedinger?.wignerXRange ?? 6.0
+    floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
   }
-  intView[1472 / 4] = schroedinger?.wignerQuadPoints ?? 32
-  intView[1476 / 4] = schroedinger?.wignerClassicalOverlay ? 1 : 0
-  floatView[1480 / 4] = 0.0
-  floatView[1484 / 4] = 0.0
+  intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
+  intView[I.wignerClassicalOverlay] = schroedinger?.wignerClassicalOverlay ? 1 : 0
 
-  // Pauli spinor colors (offset 1488-1520)
+  // Pauli spinor colors
   const spinUp = pauliSpinor?.spinUpColor ?? [0.0, 0.898, 1.0]
   const spinDown = pauliSpinor?.spinDownColor ?? [1.0, 0.0, 0.898]
-  floatView[1488 / 4] = spinUp[0]!
-  floatView[1492 / 4] = spinUp[1]!
-  floatView[1496 / 4] = spinUp[2]!
-  floatView[1500 / 4] = 0.0
-  floatView[1504 / 4] = spinDown[0]!
-  floatView[1508 / 4] = spinDown[1]!
-  floatView[1512 / 4] = spinDown[2]!
-  floatView[1516 / 4] = 0.0
+  floatView[I.pauliSpinUpColor] = spinUp[0]!
+  floatView[I.pauliSpinUpColor + 1] = spinUp[1]!
+  floatView[I.pauliSpinUpColor + 2] = spinUp[2]!
+  floatView[I.pauliSpinDownColor] = spinDown[0]!
+  floatView[I.pauliSpinDownColor + 1] = spinDown[1]!
+  floatView[I.pauliSpinDownColor + 2] = spinDown[2]!
 }
 
 /** Compute Wigner auto-range values based on quantum mode and state. */
@@ -645,8 +608,8 @@ function packWignerAutoRange(
     const rCenter = n * n * a0
     const rMax = rCenter * 2.5
     const halfExtent = Math.max(rCenter, rMax - rCenter)
-    floatView[1464 / 4] = halfExtent
-    floatView[1468 / 4] = 3.0 / (n * a0)
+    floatView[I.wignerXRange] = halfExtent
+    floatView[I.wignerPRange] = 3.0 / (n * a0)
     return
   }
 
@@ -654,21 +617,21 @@ function packWignerAutoRange(
   let maxN: number
   if (isHydrogenMode && wignerDimIdx >= 3) {
     const extraIdx = wignerDimIdx - 3
-    selectedOmega = floatView[640 / 4 + extraIdx] ?? 1.0
-    maxN = intView[608 / 4 + extraIdx] ?? 0
+    selectedOmega = floatView[I.extraDimOmega + extraIdx] ?? 1.0
+    maxN = intView[I.extraDimN + extraIdx] ?? 0
   } else {
-    selectedOmega = floatView[16 / 4 + Math.min(wignerDimIdx, 10)] ?? 1.0
+    selectedOmega = floatView[I.omega + Math.min(wignerDimIdx, 10)] ?? 1.0
     maxN = 0
     const tc = p.rendererTermCount ?? 1
     for (let k = 0; k < tc; k++) {
-      const qn = intView[64 / 4 + k * 11 + Math.min(wignerDimIdx, 10)] ?? 0
+      const qn = intView[I.quantum + k * 11 + Math.min(wignerDimIdx, 10)] ?? 0
       if (qn > maxN) maxN = qn
     }
   }
   const xScale = Math.sqrt(Math.max(2 * maxN + 1, 1) / Math.max(selectedOmega, 0.01))
   const pScale = Math.sqrt(Math.max(2 * maxN + 1, 1) * Math.max(selectedOmega, 0.01))
-  floatView[1464 / 4] = xScale * 3.5
-  floatView[1468 / 4] = pScale * 3.5
+  floatView[I.wignerXRange] = xScale * 3.5
+  floatView[I.wignerPRange] = pScale * 3.5
 }
 
 // ---------------------------------------------------------------------------
