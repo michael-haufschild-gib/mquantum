@@ -89,7 +89,16 @@ function createGraphHarness() {
     addPass: vi.fn(async (pass: WebGPURenderPass) => {
       passes.push(pass)
     }),
+    addInitializedPass: vi.fn((pass: WebGPURenderPass) => {
+      passes.push(pass)
+    }),
     getPass: vi.fn((id: string) => passes.find((pass) => pass.id === id)),
+    removePass: vi.fn((id: string) => {
+      const idx = passes.findIndex((p) => p.id === id)
+      if (idx >= 0) passes.splice(idx, 1)
+    }),
+    removeResource: vi.fn((id: string) => resources.delete(id)),
+    getSetupContext: vi.fn(() => null),
   }
 
   return { graph, resources, passes }
@@ -97,7 +106,7 @@ function createGraphHarness() {
 
 describe('WebGPUScene CAS sharpening', () => {
   it('maps render scale to CAS sharpness with threshold and clamp', async () => {
-    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+    const sceneModule = (await import('@/rendering/webgpu/scenePassConfig')) as unknown as Record<
       string,
       unknown
     >
@@ -114,7 +123,7 @@ describe('WebGPUScene CAS sharpening', () => {
   })
 
   it('initializes ToScreenPass sharpness from render resolution scale', async () => {
-    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+    const sceneModule = (await import('@/rendering/webgpu/scenePassSetup')) as unknown as Record<
       string,
       unknown
     >

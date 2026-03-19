@@ -15,6 +15,7 @@
  * @module rendering/webgpu/passes/ToneMappingCinematicPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -373,9 +374,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
   private uniformArrayBuffer = new ArrayBuffer(48)
   private uniformFloatView = new Float32Array(this.uniformArrayBuffer)
   private uniformIntView = new Int32Array(this.uniformArrayBuffer)
-  // PERF: Cached bind group to avoid per-frame GPU driver calls
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedColorView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -661,20 +660,17 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // PERF: Cache bind group, invalidate only when input texture view changes
-    if (!this.cachedBindGroup || this.cachedColorView !== colorView) {
-      this.cachedBindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([colorView], () =>
+      this.device!.createBindGroup({
         label: 'tonemapping-cinematic-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.sampler },
+          { binding: 0, resource: { buffer: this.uniformBuffer! } },
+          { binding: 1, resource: this.sampler! },
           { binding: 2, resource: colorView },
         ],
       })
-      this.cachedColorView = colorView
-    }
-    const bindGroup = this.cachedBindGroup
+    )
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -704,8 +700,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
-    this.cachedBindGroup = null
-    this.cachedColorView = null
+    this.bgCache.invalidate()
 
     super.dispose()
   }

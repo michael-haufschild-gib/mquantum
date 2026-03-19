@@ -8,6 +8,7 @@
  * @module rendering/webgpu/passes/EnvironmentCompositePass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -83,10 +84,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
 
   // Sampler
   private sampler: GPUSampler | null = null
-  private bindGroup: GPUBindGroup | null = null
-  private bindGroupLensedEnvView: GPUTextureView | null = null
-  private bindGroupMainObjectView: GPUTextureView | null = null
-  private bindGroupMainObjectDepthView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   constructor(config: EnvironmentCompositePassConfig) {
     super({
@@ -185,27 +183,18 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.rendererConfig.outputResource)
     if (!outputView) return
 
-    // Recreate bind group only when texture views change
-    if (
-      !this.bindGroup ||
-      this.bindGroupLensedEnvView !== lensedEnvView ||
-      this.bindGroupMainObjectView !== mainObjectView ||
-      this.bindGroupMainObjectDepthView !== mainObjectDepthView
-    ) {
-      this.bindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([lensedEnvView, mainObjectView, mainObjectDepthView], () =>
+      this.device!.createBindGroup({
         label: 'environment-composite-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           { binding: 1, resource: lensedEnvView },
           { binding: 2, resource: mainObjectView },
           { binding: 3, resource: mainObjectDepthView },
         ],
       })
-      this.bindGroupLensedEnvView = lensedEnvView
-      this.bindGroupMainObjectView = mainObjectView
-      this.bindGroupMainObjectDepthView = mainObjectDepthView
-    }
+    )
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -221,7 +210,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     })
 
     // Render fullscreen
-    this.renderFullscreen(passEncoder, this.renderPipeline, [this.bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
 
     passEncoder.end()
   }
@@ -232,10 +221,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
-    this.bindGroup = null
-    this.bindGroupLensedEnvView = null
-    this.bindGroupMainObjectView = null
-    this.bindGroupMainObjectDepthView = null
+    this.bgCache.invalidate()
     this.sampler = null
 
     super.dispose()

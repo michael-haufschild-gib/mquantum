@@ -13,6 +13,7 @@
  * @module rendering/webgpu/passes/BufferPreviewPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -185,9 +186,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
   private uniformArrayBuffer = new ArrayBuffer(32)
   private uniformIntView = new Int32Array(this.uniformArrayBuffer, 0, 2)
   private uniformFloatView = new Float32Array(this.uniformArrayBuffer, 8, 6)
-  // PERF: Cached bind group to avoid per-frame GPU driver calls
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedInputView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   // Configuration
   private bufferType: number
@@ -387,19 +386,16 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // PERF: Cache bind group, invalidate only when input texture view changes
-    if (!this.cachedBindGroup || this.cachedInputView !== inputView) {
-      this.cachedBindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([inputView], () =>
+      this.device!.createBindGroup({
         label: 'buffer-preview-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 0, resource: { buffer: this.uniformBuffer! } },
           { binding: 1, resource: inputView },
         ],
       })
-      this.cachedInputView = inputView
-    }
-    const bindGroup = this.cachedBindGroup
+    )
 
     // Begin render pass — clear canvas and overwrite with buffer visualization
     const passEncoder = ctx.beginRenderPass({
@@ -428,8 +424,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     this.passBindGroupLayout = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
-    this.cachedBindGroup = null
-    this.cachedInputView = null
+    this.bgCache.invalidate()
 
     super.dispose()
   }

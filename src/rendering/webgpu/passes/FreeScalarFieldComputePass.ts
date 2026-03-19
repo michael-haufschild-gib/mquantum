@@ -347,26 +347,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private flushKSpaceData(device: GPUDevice): void {
     if (!this.pendingKSpaceData || !this.densityTexture || !this.analysisTexture) return
     const { density, analysis } = this.pendingKSpaceData
-    const bytesPerTexel = 8 // rgba16float = 4 × 2
-    const outputVoxels = density.length / 4
-    const outputGridSize = Math.round(Math.cbrt(outputVoxels))
-    const bytesPerRow = outputGridSize * bytesPerTexel
-    const rowsPerImage = outputGridSize
-    const size = {
-      width: outputGridSize,
-      height: outputGridSize,
-      depthOrArrayLayers: outputGridSize,
-    }
+    const gs = Math.round(Math.cbrt(density.length / 4))
+    const layout = { bytesPerRow: gs * 8, rowsPerImage: gs } // rgba16float = 8 bytes/texel
+    const size = { width: gs, height: gs, depthOrArrayLayers: gs }
     device.queue.writeTexture(
       { texture: this.densityTexture },
       density.buffer,
-      { offset: density.byteOffset, bytesPerRow, rowsPerImage },
+      { offset: density.byteOffset, ...layout },
       size
     )
     device.queue.writeTexture(
       { texture: this.analysisTexture },
       analysis.buffer,
-      { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
+      { offset: analysis.byteOffset, ...layout },
       size
     )
     this.pendingKSpaceData = null
@@ -800,40 +793,34 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * Release all GPU resources.
    */
   dispose(): void {
-    this.phiBuffer?.destroy()
-    this.piBuffer?.destroy()
-    this.uniformBuffer?.destroy()
+    // prettier-ignore
+    const gpuBuffers: (GPUBuffer | null)[] = [
+      this.phiBuffer, this.piBuffer, this.uniformBuffer,
+      this.phiReadbackBuffer, this.piReadbackBuffer,
+      this.diagPhiReadbackBuffer, this.diagPiReadbackBuffer,
+    ]
+    for (const buf of gpuBuffers) buf?.destroy()
     this.densityTexture?.destroy()
     this.analysisTexture?.destroy()
-    this.phiReadbackBuffer?.destroy()
-    this.piReadbackBuffer?.destroy()
-    this.diagPhiReadbackBuffer?.destroy()
-    this.diagPiReadbackBuffer?.destroy()
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 
-    this.phiBuffer = null
-    this.piBuffer = null
-    this.uniformBuffer = null
+    this.phiBuffer = this.piBuffer = this.uniformBuffer = null
+    this.phiReadbackBuffer = this.piReadbackBuffer = null
     this.densityTexture = null
     this.densityTextureView = null
     this.analysisTexture = null
     this.analysisTextureView = null
-    this.phiReadbackBuffer = null
-    this.piReadbackBuffer = null
     this.kSpacePending = false
     this.kSpaceFrameCounter = 0
     this.kSpaceReadbackEpoch++
     this.pendingKSpaceData = null
     this.kSpaceWorker?.terminate()
     this.kSpaceWorker = null
-
     this.pl = null
     this.bg = null
-
     this.initialized = false
     this.lastConfigHash = ''
-
     super.dispose()
   }
 }

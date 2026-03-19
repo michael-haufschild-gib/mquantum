@@ -97,6 +97,9 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   private spatialParamsU32View = new Uint32Array(this.spatialParamsData)
   private spatialParamsI32View = new Int32Array(this.spatialParamsData)
 
+  // Reusable single-float buffer for time updates (avoids per-frame allocation)
+  private timeUpdateBuf = new Float32Array(1)
+
   // Cross-pair mapping (CPU side)
   private crossPairs: CrossPairInfo[] = []
   private numCrossLayers = 0
@@ -497,8 +500,8 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     if (!this.schroedingerBuffer) return
     if (!this.twoPhaseActive) {
       // Legacy path: write time directly to schroedinger buffer
-      const buf = new Float32Array([time])
-      device.queue.writeBuffer(this.schroedingerBuffer, TIME_FIELD_OFFSET, buf)
+      this.timeUpdateBuf[0] = time
+      device.queue.writeBuffer(this.schroedingerBuffer, TIME_FIELD_OFFSET, this.timeUpdateBuf)
     }
     // Two-phase path: time is handled via updateReconstructParams()
   }
@@ -793,45 +796,33 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
-    // Final cache
-    this.cacheTexture?.destroy()
-    this.cacheTexture = null
-    this.cacheTextureView = null
+    const textures: (GPUTexture | null)[] = [
+      this.cacheTexture,
+      this.diagTexture,
+      this.crossTexArray,
+    ]
+    for (const t of textures) t?.destroy()
+    this.cacheTexture = this.diagTexture = this.crossTexArray = null
+    this.cacheTextureView = this.diagTextureView = this.crossTexArrayView = null
     this.cacheSampler = null
 
-    // Spatial textures
-    this.diagTexture?.destroy()
-    this.diagTexture = null
-    this.diagTextureView = null
-    this.crossTexArray?.destroy()
-    this.crossTexArray = null
-    this.crossTexArrayView = null
+    const buffers: (GPUBuffer | null)[] = [
+      this.gridParamsBuffer,
+      this.schroedingerBuffer,
+      this.basisBuffer,
+      this.spatialParamsBuffer,
+      this.reconstructParamsBuffer,
+    ]
+    for (const b of buffers) b?.destroy()
+    this.gridParamsBuffer = this.schroedingerBuffer = this.basisBuffer = null
+    this.spatialParamsBuffer = this.reconstructParamsBuffer = null
 
-    // Uniform buffers
-    this.gridParamsBuffer?.destroy()
-    this.gridParamsBuffer = null
-    this.schroedingerBuffer?.destroy()
-    this.schroedingerBuffer = null
-    this.basisBuffer?.destroy()
-    this.basisBuffer = null
-    this.spatialParamsBuffer?.destroy()
-    this.spatialParamsBuffer = null
-    this.reconstructParamsBuffer?.destroy()
-    this.reconstructParamsBuffer = null
-
-    // Bind groups
-    this.legacyBindGroup = null
-    this.legacyBindGroupLayout = null
-    this.spatialBindGroup = null
-    this.spatialBindGroupLayout = null
-    this.reconstructBindGroup = null
-    this.reconstructBindGroupLayout = null
-
-    // Pipelines
-    this.legacyPipeline = null
-    this.spatialPipeline = null
-    this.reconstructPipeline = null
-
+    this.legacyBindGroup = this.spatialBindGroup = this.reconstructBindGroup = null
+    this.legacyBindGroupLayout =
+      this.spatialBindGroupLayout =
+      this.reconstructBindGroupLayout =
+        null
+    this.legacyPipeline = this.spatialPipeline = this.reconstructPipeline = null
     super.dispose()
   }
 }

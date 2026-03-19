@@ -709,49 +709,26 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
-    this.spinorReBuffer?.destroy()
-    this.spinorImBuffer?.destroy()
-    this.potentialBuffer?.destroy()
-    this.gammaBuffer?.destroy()
-    this.fftScratchA?.destroy()
-    this.fftScratchB?.destroy()
-    this.uniformBuffer?.destroy()
-    this.fftUniformBuffer?.destroy()
-    this.fftStagingBuffer?.destroy()
-    this.packUniformBuffer?.destroy()
-    this.packUniformBufferNoNorm?.destroy()
+    // prettier-ignore
+    const gpuBuffers: (GPUBuffer | null | undefined)[] = [
+      this.spinorReBuffer, this.spinorImBuffer, this.potentialBuffer, this.gammaBuffer,
+      this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
+      this.fftStagingBuffer, this.packUniformBuffer, this.packUniformBufferNoNorm,
+      this.diagUniformBuffer, this.diagPartialNormBuffer, this.diagPartialMaxBuffer,
+      this.diagPartialParticleBuffer, this.diagPartialAntiBuffer,
+      this.diagResultBuffer, this.diagStagingBuffer, this.bg?.renormalizeUniformBuffer,
+    ]
+    for (const buf of gpuBuffers) buf?.destroy()
     this.densityTexture?.destroy()
-    this.diagUniformBuffer?.destroy()
-    this.diagPartialNormBuffer?.destroy()
-    this.diagPartialMaxBuffer?.destroy()
-    this.diagPartialParticleBuffer?.destroy()
-    this.diagPartialAntiBuffer?.destroy()
-    this.diagResultBuffer?.destroy()
-    this.diagStagingBuffer?.destroy()
-    this.bg?.renormalizeUniformBuffer?.destroy()
 
-    this.spinorReBuffer = null
-    this.spinorImBuffer = null
-    this.potentialBuffer = null
-    this.gammaBuffer = null
-    this.fftScratchA = null
-    this.fftScratchB = null
-    this.uniformBuffer = null
-    this.fftUniformBuffer = null
-    this.fftStagingBuffer = null
-    this.packUniformBuffer = null
-    this.packUniformBufferNoNorm = null
+    this.spinorReBuffer = this.spinorImBuffer = this.potentialBuffer = this.gammaBuffer = null
+    this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null
+    this.fftStagingBuffer = this.packUniformBuffer = this.packUniformBufferNoNorm = null
+    this.diagUniformBuffer = this.diagPartialNormBuffer = this.diagPartialMaxBuffer = null
+    this.diagPartialParticleBuffer = this.diagPartialAntiBuffer = null
+    this.diagResultBuffer = this.diagStagingBuffer = null
     this.densityTexture = null
     this.densityTextureView = null
-
-    this.diagUniformBuffer = null
-    this.diagPartialNormBuffer = null
-    this.diagPartialMaxBuffer = null
-    this.diagPartialParticleBuffer = null
-    this.diagPartialAntiBuffer = null
-    this.diagResultBuffer = null
-    this.diagStagingBuffer = null
-
     this.pl = null
     this.bg = null
 

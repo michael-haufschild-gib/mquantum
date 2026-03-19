@@ -9,7 +9,7 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: './src/tests/setup.ts',
     css: true,
-    pool: 'threads',
+    pool: 'vmThreads',
     maxWorkers: 4,
     exclude: [
       '**/node_modules/**',

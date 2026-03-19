@@ -23,7 +23,7 @@ import { useUIStore } from '@/stores/uiStore'
 
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { type ExportRuntimeState, isExportRuntimeActive } from './sceneExportRuntime'
-import { executeFrameAndCollectMetrics } from './scenePassSetup'
+import { executeFrameAndCollectMetrics } from './scenePassConfig'
 import { evaluateFpsLimit } from './utils/fpsLimiter'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 

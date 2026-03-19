@@ -17,6 +17,7 @@
  * @module rendering/webgpu/passes/ScenePass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -117,9 +118,7 @@ export class ScenePass extends WebGPUBasePass {
   private passBindGroupLayout: GPUBindGroupLayout | null = null
   private sampler: GPUSampler | null = null
 
-  // Bind group cache (avoids per-frame createBindGroup in passthrough mode)
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedSourceView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   // Configuration
   private clearColor: { r: number; g: number; b: number; a: number }
@@ -343,19 +342,16 @@ export class ScenePass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!sourceView || !outputView) return
 
-    // Cache bind group — only recreate when source view changes
-    if (!this.cachedBindGroup || sourceView !== this.cachedSourceView) {
-      this.cachedBindGroup = this.device!.createBindGroup({
+    const bindGroup = this.bgCache.get([sourceView], () =>
+      this.device!.createBindGroup({
         label: 'scene-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           { binding: 1, resource: sourceView },
         ],
       })
-      this.cachedSourceView = sourceView
-    }
-    const bindGroup = this.cachedBindGroup
+    )
 
     const passEncoder = ctx.beginRenderPass({
       label: 'scene-passthrough',
@@ -380,8 +376,7 @@ export class ScenePass extends WebGPUBasePass {
     this.renderPipeline = null
     this.passBindGroupLayout = null
     this.sampler = null
-    this.cachedBindGroup = null
-    this.cachedSourceView = null
+    this.bgCache.invalidate()
 
     super.dispose()
   }

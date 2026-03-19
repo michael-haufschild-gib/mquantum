@@ -10,47 +10,12 @@
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 
-import type { WebGPURenderPass } from './core/types'
+import type { WebGPURenderPass, WebGPUSetupContext } from './core/types'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
-import { BloomPass } from './passes/BloomPass'
-import { BufferPreviewPass } from './passes/BufferPreviewPass'
-import { DebugOverlayPass } from './passes/DebugOverlayPass'
-import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
-import { FrameBlendingPass } from './passes/FrameBlendingPass'
-import { FXAAPass } from './passes/FXAAPass'
-import { LightGizmoPass } from './passes/LightGizmoPass'
-import { PaperTexturePass } from './passes/PaperTexturePass'
-import { ScenePass } from './passes/ScenePass'
-import { SMAAPass } from './passes/SMAAPass'
-import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
-import { ToScreenPass } from './passes/ToScreenPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
-import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
-import {
-  computeCasSharpnessFromRenderScale,
-  type PassConfig,
-  resolveColorAlgorithmInt,
-} from './scenePassConfig'
-import { parseHexColorToLinearRgb } from './utils/color'
-
-// Re-export everything from scenePassConfig so existing consumers keep working
-export {
-  computeCasSharpnessFromRenderScale,
-  executeFrameAndCollectMetrics,
-  extractPPConfig,
-  extractSchrodingerConfig,
-  type FrameMetricsArgs,
-  normalizeColorAlgorithmForQuantumMode,
-  type PassConfig,
-  pauliFieldViewForColorAlgorithm,
-  type PPPassConfig,
-  type SchrodingerPassConfig,
-  shallowEqual,
-  shouldForceFullRebuildForQuantumModeTransition,
-  updateScenePassBackgroundColor,
-  updateToScreenPassSharpness,
-} from './scenePassConfig'
+import { type PassConfig, resolveColorAlgorithmInt } from './scenePassConfig'
+import { constructPPPasses, registerPasses } from './scenePassConstruction'
 
 // ============================================================================
 // Pass Setup & Cleanup
@@ -65,31 +30,23 @@ async function safeAddPass(
 ): Promise<boolean> {
   if (shouldAbort?.()) return false
 
-  const graphLike = graph as unknown as {
-    getPass?: (id: string) => WebGPURenderPass | undefined
-    removePass?: (id: string) => void
-  }
-  const getPass = typeof graphLike.getPass === 'function' ? graphLike.getPass.bind(graphLike) : null
-  const removePass =
-    typeof graphLike.removePass === 'function' ? graphLike.removePass.bind(graphLike) : null
-
   try {
-    const existing = getPass?.(pass.id)
-    if (existing && removePass) {
-      removePass(pass.id)
+    const existing = graph.getPass(pass.id)
+    if (existing) {
+      graph.removePass(pass.id)
       if (shouldAbort?.()) return false
     }
 
     await graph.addPass(pass)
 
     if (shouldAbort?.()) {
-      if (getPass && removePass && getPass(pass.id) === pass) {
-        removePass(pass.id)
+      if (graph.getPass(pass.id) === pass) {
+        graph.removePass(pass.id)
       }
       return false
     }
 
-    return getPass ? getPass(pass.id) === pass : true
+    return graph.getPass(pass.id) === pass
   } catch (err) {
     logger.error(`[WebGPU setupRenderPasses] Failed to add pass '${label}':`, err)
     return false
@@ -246,6 +203,58 @@ export async function warmSwapSchrodingerPasses(
   }
 }
 
+/**
+ * Pre-initialize a pass (compile shaders), returning the initialized pass or null on failure.
+ * Does NOT add the pass to the graph — caller registers it after all passes are ready.
+ */
+async function preInitPass<T extends WebGPURenderPass>(
+  pass: T,
+  setupCtx: WebGPUSetupContext,
+  label: string
+): Promise<T | null> {
+  try {
+    await pass.initialize(setupCtx)
+    return pass
+  } catch (err) {
+    logger.error(`[WebGPU setupRenderPasses] Failed to pre-init pass '${label}':`, err)
+    pass.dispose()
+    return null
+  }
+}
+
+/**
+ * Sequential PP pass setup — adds passes one-at-a-time via `safeAddPass`.
+ * Used when `getSetupContext()` returns null (graph not yet initialized,
+ * or test environments without a real GPUDevice).
+ *
+ * Reuses `constructPPPasses` for the pass list so there is a single
+ * source of truth for which passes exist and in what order.
+ */
+async function setupPPPassesSequential(
+  graph: WebGPURenderGraph,
+  config: PassConfig,
+  shouldAbort?: () => boolean
+): Promise<void> {
+  const passes = constructPPPasses(config)
+
+  for (const { pass, label, resource } of passes) {
+    if (shouldAbort?.()) return
+
+    if (resource) {
+      graph.addResource(resource.name, {
+        type: 'texture',
+        format: resource.format,
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING |
+          (resource.extraUsage ?? 0),
+      })
+    }
+
+    await safeAddPass(graph, pass, label, shouldAbort)
+  }
+}
+
 /** Set up post-processing passes: scene, environment composite, bloom, tonemapping, AA, etc. */
 export async function setupPPPasses(
   graph: WebGPURenderGraph,
@@ -254,201 +263,29 @@ export async function setupPPPasses(
 ): Promise<void> {
   if (shouldAbort?.()) return
 
-  const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-  const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
+  // getSetupContext may not exist on test mocks; also may return null before device init
+  const setupCtx = typeof graph.getSetupContext === 'function' ? graph.getSetupContext() : null
+  const canParallelInit = setupCtx !== null && typeof graph.addInitializedPass === 'function'
 
-  if (config.skyboxEnabled) {
-    await safeAddPass(
-      graph,
-      new WebGPUSkyboxRenderer({
-        mode: config.skyboxMode,
-        sun: false,
-        vignette: false,
-      }),
-      'skybox',
-      shouldAbort
-    )
-  } else {
-    await safeAddPass(
-      graph,
-      new ScenePass({
-        outputResource: 'scene-render',
-        depthResource: 'depth-buffer',
-        mode: 'clear',
-        clearColor: {
-          r: backgroundLinear[0],
-          g: backgroundLinear[1],
-          b: backgroundLinear[2],
-          a: 1,
-        },
-      }),
-      'scene-pass',
-      shouldAbort
-    )
+  // Fall back to sequential safeAddPass when setup context is unavailable (tests, early init)
+  if (!canParallelInit) {
+    return setupPPPassesSequential(graph, config, shouldAbort)
   }
 
-  await safeAddPass(
-    graph,
-    new EnvironmentCompositePass({
-      lensedEnvironmentInput: 'scene-render',
-      mainObjectInput: 'object-color',
-      mainObjectDepthInput: 'depth-buffer',
-      outputResource: 'hdr-color',
-    }),
-    'environment-composite',
-    shouldAbort
-  )
+  const passes = constructPPPasses(config)
 
-  let currentHDRBuffer = 'hdr-color'
-
-  if (config.bloomEnabled) {
-    graph.addResource('bloom-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new BloomPass({
-        inputResource: currentHDRBuffer,
-        bloomInputResource: 'object-color',
-        outputResource: 'bloom-output',
-      }),
-      'bloom',
-      shouldAbort
-    )
-    if (ok) currentHDRBuffer = 'bloom-output'
+  // Phase 1: Pre-initialize all passes in parallel (shader compilation)
+  if (!shouldAbort?.()) {
+    await Promise.all(passes.map(({ pass, label }) => preInitPass(pass, setupCtx, label)))
   }
 
-  if (config.frameBlendingEnabled) {
-    graph.addResource('frame-blend-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage:
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new FrameBlendingPass({
-        colorInput: currentHDRBuffer,
-        outputResource: 'frame-blend-output',
-        blendFactor: 0.15,
-      }),
-      'frame-blending',
-      shouldAbort
-    )
-    if (ok) currentHDRBuffer = 'frame-blend-output'
+  if (shouldAbort?.()) {
+    passes.forEach(({ pass }) => pass.dispose())
+    return
   }
 
-  await safeAddPass(
-    graph,
-    new ToneMappingCinematicPass({
-      colorInput: currentHDRBuffer,
-      outputResource: 'ldr-color',
-    }),
-    'tonemapping-cinematic',
-    shouldAbort
-  )
-
-  let currentLDRBuffer = 'ldr-color'
-
-  if (config.paperEnabled) {
-    graph.addResource('paper-output', {
-      type: 'texture',
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new PaperTexturePass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'paper-output',
-      }),
-      'paper-texture',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'paper-output'
-  }
-
-  if (config.antiAliasingMethod === 'fxaa') {
-    const ok = await safeAddPass(
-      graph,
-      new FXAAPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'final-color',
-        subpixelQuality: 0.75,
-      }),
-      'fxaa',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'final-color'
-  } else if (config.antiAliasingMethod === 'smaa') {
-    const ok = await safeAddPass(
-      graph,
-      new SMAAPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'final-color',
-        threshold: 0.1,
-        maxSearchSteps: 16,
-      }),
-      'smaa',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'final-color'
-  }
-
-  await safeAddPass(
-    graph,
-    new ToScreenPass({
-      inputResource: currentLDRBuffer,
-      gammaCorrection: true,
-      sharpness: computeCasSharpnessFromRenderScale(config.renderResolutionScale ?? 1),
-    }),
-    'to-screen',
-    shouldAbort
-  )
-
-  const bufferPreviewInputs = ['depth-buffer']
-  if (useTemporalCloudAccumulation) {
-    bufferPreviewInputs.push('quarter-position')
-  }
-  await safeAddPass(
-    graph,
-    new BufferPreviewPass({
-      bufferInput: 'depth-buffer',
-      additionalInputs: bufferPreviewInputs.length > 1 ? bufferPreviewInputs.slice(1) : undefined,
-      bufferType: 'depth',
-      depthMode: 'linear',
-    }),
-    'buffer-preview',
-    shouldAbort
-  )
-
-  graph.addResource('gizmo-texture', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  await safeAddPass(
-    graph,
-    new LightGizmoPass({ outputResource: 'gizmo-texture' }),
-    'light-gizmo',
-    shouldAbort
-  )
-
-  await safeAddPass(
-    graph,
-    new DebugOverlayPass({ debugInput: 'gizmo-texture' }),
-    'debug-overlay',
-    shouldAbort
-  )
+  // Phase 2: Register in pipeline order
+  registerPasses(graph, passes)
 }
 
 /** Remove Schroedinger-group passes that should no longer exist. */

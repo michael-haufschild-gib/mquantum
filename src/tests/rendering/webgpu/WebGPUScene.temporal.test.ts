@@ -94,6 +94,16 @@ function createGraphHarness() {
     addPass: vi.fn(async (pass: WebGPURenderPass) => {
       passes.push(pass)
     }),
+    addInitializedPass: vi.fn((pass: WebGPURenderPass) => {
+      passes.push(pass)
+    }),
+    getPass: vi.fn((id: string) => passes.find((p) => p.id === id)),
+    removePass: vi.fn((id: string) => {
+      const idx = passes.findIndex((p) => p.id === id)
+      if (idx >= 0) passes.splice(idx, 1)
+    }),
+    removeResource: vi.fn((id: string) => resources.delete(id)),
+    getSetupContext: vi.fn(() => null),
   }
 
   return { graph, resources, passes }
@@ -102,7 +112,7 @@ function createGraphHarness() {
 describe('WebGPUScene mode-switch rebuild strategy', () => {
   it('forces full rebuild when switching into or out of free scalar mode', async () => {
     const { shouldForceFullRebuildForQuantumModeTransition } =
-      await import('@/rendering/webgpu/WebGPUScene')
+      await import('@/rendering/webgpu/scenePassConfig')
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
@@ -121,7 +131,7 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
   it('forces full rebuild when switching objectType between schroedinger and pauliSpinor', async () => {
     const { shouldForceFullRebuildForQuantumModeTransition } =
-      await import('@/rendering/webgpu/WebGPUScene')
+      await import('@/rendering/webgpu/scenePassConfig')
 
     // schroedinger → pauliSpinor
     expect(
@@ -142,7 +152,7 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
   it('keeps warm-swap eligibility for non-free-scalar transitions', async () => {
     const { shouldForceFullRebuildForQuantumModeTransition } =
-      await import('@/rendering/webgpu/WebGPUScene')
+      await import('@/rendering/webgpu/scenePassConfig')
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
@@ -169,7 +179,7 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
 describe('WebGPUScene temporal reprojection wiring', () => {
   it('maps domainColoringPsi to compile-time colorAlgorithm=8', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -185,7 +195,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('maps diverging to compile-time colorAlgorithm=9', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -201,7 +211,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('maps relativePhase to compile-time colorAlgorithm=10', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -217,7 +227,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('falls back kSpaceOccupation to radialDistance for non-free-scalar modes', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -234,7 +244,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('falls back relativePhase to phaseDensity in free scalar mode', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -253,7 +263,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('keeps kSpaceOccupation in free scalar mode', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -270,7 +280,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('creates Schrödinger renderer in quarter-res temporal mode when enabled', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer('schroedinger', createPassConfig())
 
     if (!renderer) {
@@ -282,7 +292,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('uses quarter-res temporal outputs for isosurface + temporal mode', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -300,7 +310,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('uses full-resolution color + depth outputs for isosurface without temporal', async () => {
-    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
@@ -318,7 +328,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('adds quarter-res resources and temporal cloud pass when temporal reprojection is enabled', async () => {
-    const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
+    const { setupRenderPasses } = await import('@/rendering/webgpu/scenePassSetup')
     const { graph, resources, passes } = createGraphHarness()
 
     await setupRenderPasses(graph as unknown as WebGPURenderGraph, createPassConfig())
@@ -343,7 +353,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('does not add temporal resources when the feature is disabled', async () => {
-    const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
+    const { setupRenderPasses } = await import('@/rendering/webgpu/scenePassSetup')
     const { graph, resources, passes } = createGraphHarness()
 
     await setupRenderPasses(
@@ -361,7 +371,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
   })
 
   it('uses configured background color for no-skybox scene clear pass', async () => {
-    const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
+    const { setupRenderPasses } = await import('@/rendering/webgpu/scenePassSetup')
     const { graph, passes } = createGraphHarness()
     const backgroundColor = '#4080ff'
 
@@ -392,7 +402,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
 
 describe('WebGPUScene background color runtime updates', () => {
   it('updates scene pass clear color without requiring pass rebuild', async () => {
-    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+    const sceneModule = (await import('@/rendering/webgpu/scenePassConfig')) as unknown as Record<
       string,
       unknown
     >
@@ -431,7 +441,7 @@ describe('WebGPUScene background color runtime updates', () => {
   })
 
   it('does not update scene pass clear color when skybox is enabled', async () => {
-    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+    const sceneModule = (await import('@/rendering/webgpu/scenePassConfig')) as unknown as Record<
       string,
       unknown
     >

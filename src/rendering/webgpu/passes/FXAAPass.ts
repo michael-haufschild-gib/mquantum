@@ -6,6 +6,7 @@
  * @module rendering/webgpu/passes/FXAAPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { fxaaShader } from '../shaders/postprocessing/fxaa.wgsl'
@@ -26,8 +27,7 @@ export interface FXAAPassOptions {
  */
 export class FXAAPass extends WebGPUBasePass {
   private uniformBuffer: GPUBuffer | null = null
-  private bindGroup: GPUBindGroup | null = null
-  private bindGroupInputView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
   private sampler: GPUSampler | null = null
 
   private subpixelQuality = 0.75
@@ -164,19 +164,18 @@ export class FXAAPass extends WebGPUBasePass {
 
     if (!inputView) return
 
-    if (!this.bindGroup || this.bindGroupInputView !== inputView) {
-      this.bindGroup = this.createBindGroup(
-        this.device,
-        this.bindGroupLayout,
+    const bindGroup = this.bgCache.get([inputView], () =>
+      this.createBindGroup(
+        this.device!,
+        this.bindGroupLayout!,
         [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 0, resource: { buffer: this.uniformBuffer! } },
           { binding: 1, resource: inputView },
-          { binding: 2, resource: this.sampler },
+          { binding: 2, resource: this.sampler! },
         ],
         'fxaa-bindgroup'
       )
-      this.bindGroupInputView = inputView
-    }
+    )
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -191,15 +190,14 @@ export class FXAAPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.pipeline as GPURenderPipeline, [this.bindGroup])
+    this.renderFullscreen(passEncoder, this.pipeline as GPURenderPipeline, [bindGroup])
     passEncoder.end()
   }
 
   dispose(): void {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
-    this.bindGroup = null
-    this.bindGroupInputView = null
+    this.bgCache.invalidate()
     this.sampler = null
     super.dispose()
   }

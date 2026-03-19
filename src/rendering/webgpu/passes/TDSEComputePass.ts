@@ -125,6 +125,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
+  private readonly omegaUploadBuf = new Float32Array(1)
 
   constructor() {
     super({
@@ -320,8 +321,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     // For trap-frequency quench: restore evolution omega before filling the potential.
     if (hasOmegaQuench && this.uniformBuffer && this.omegaStagingBuffer) {
-      const omegaBuf = new Float32Array([config.harmonicOmega])
-      device.queue.writeBuffer(this.omegaStagingBuffer, 0, omegaBuf)
+      this.omegaUploadBuf[0] = config.harmonicOmega
+      device.queue.writeBuffer(this.omegaStagingBuffer, 0, this.omegaUploadBuf)
       encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
     }
 

@@ -232,6 +232,10 @@ export class LightGizmoPass extends WebGPUBasePass {
   // Frame state
   private vertexCount = 0
 
+  // Pre-allocated staging buffers to avoid per-frame allocation
+  private vpUploadData = new Float32Array(16)
+  private vertexUploadData = new Float32Array(MAX_VERTEX_BUFFER_BYTES / 4)
+
   constructor(config: LightGizmoPassConfig) {
     super({
       id: 'lightGizmo',
@@ -587,26 +591,20 @@ export class LightGizmoPass extends WebGPUBasePass {
     if (this.vertexCount === 0) return
 
     // ---- Upload to GPU ----
-    const vertexData = new Float32Array(allVertices)
-    const byteSize = vertexData.byteLength
-    if (byteSize > MAX_VERTEX_BUFFER_BYTES) {
-      // Truncate if somehow too large
+    if (allVertices.length > this.vertexUploadData.length) {
       this.vertexCount = Math.floor(MAX_VERTEX_BUFFER_BYTES / VERTEX_STRIDE_BYTES)
     }
-    this.device.queue.writeBuffer(
-      this.vertexBuffer,
-      0,
-      vertexData,
-      0,
-      this.vertexCount * VERTEX_STRIDE
-    )
+    const uploadCount = this.vertexCount * VERTEX_STRIDE
+    for (let i = 0; i < uploadCount; i++) {
+      this.vertexUploadData[i] = allVertices[i]!
+    }
+    this.device.queue.writeBuffer(this.vertexBuffer, 0, this.vertexUploadData, 0, uploadCount)
 
     // Upload VP matrix
-    const vpData = new Float32Array(16)
     for (let i = 0; i < 16; i++) {
-      vpData[i] = (vpElements[i] as number) ?? 0
+      this.vpUploadData[i] = (vpElements[i] as number) ?? 0
     }
-    this.device.queue.writeBuffer(this.uniformBuffer, 0, vpData)
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, this.vpUploadData)
 
     // ---- Render ----
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)

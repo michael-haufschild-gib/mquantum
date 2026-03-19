@@ -7,6 +7,7 @@
  * @module rendering/webgpu/passes/CompositePass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -209,9 +210,7 @@ export class CompositePass extends WebGPUBasePass {
   private uniformIntView = new Int32Array(this.uniformArrayBuffer)
   private weightsBuffer = new Float32Array(4)
   private blendModesBuffer = new Int32Array(4)
-  // PERF: Cached bind group to avoid per-frame GPU driver calls
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedTextureViews: GPUTextureView[] = []
+  private bgCache = new BindGroupCache()
   private sampler: GPUSampler | null = null
 
   // Dummy texture for unused slots
@@ -429,26 +428,20 @@ export class CompositePass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // PERF: Cache bind group, invalidate only when input texture views change
-    const viewsChanged =
-      textureViews.length !== this.cachedTextureViews.length ||
-      textureViews.some((v, i) => v !== this.cachedTextureViews[i])
-    if (!this.cachedBindGroup || viewsChanged) {
-      this.cachedBindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get(textureViews, () =>
+      this.device!.createBindGroup({
         label: 'composite-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.sampler },
+          { binding: 0, resource: { buffer: this.uniformBuffer! } },
+          { binding: 1, resource: this.sampler! },
           { binding: 2, resource: textureViews[0]! },
           { binding: 3, resource: textureViews[1]! },
           { binding: 4, resource: textureViews[2]! },
           { binding: 5, resource: textureViews[3]! },
         ],
       })
-      this.cachedTextureViews = [...textureViews]
-    }
-    const bindGroup = this.cachedBindGroup
+    )
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -481,8 +474,7 @@ export class CompositePass extends WebGPUBasePass {
     this.dummyTexture?.destroy()
     this.dummyTexture = null
     this.dummyTextureView = null
-    this.cachedBindGroup = null
-    this.cachedTextureViews = []
+    this.bgCache.invalidate()
 
     super.dispose()
   }

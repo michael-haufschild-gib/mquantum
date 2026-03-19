@@ -15,6 +15,7 @@
  * @module rendering/webgpu/passes/DebugOverlayPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -96,9 +97,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
   // Sampler
   private sampler: GPUSampler | null = null
 
-  // PERF: Cached bind group
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedDebugView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   // Configuration
   private premultipliedAlpha: boolean
@@ -206,18 +205,16 @@ export class DebugOverlayPass extends WebGPUBasePass {
     // Get canvas for output (we composite directly onto it)
     const canvasView = ctx.getCanvasTextureView()
 
-    // PERF: Cache bind group, invalidate only when debug texture view changes
-    if (!this.cachedBindGroup || this.cachedDebugView !== debugView) {
-      this.cachedBindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([debugView], () =>
+      this.device!.createBindGroup({
         label: 'debug-overlay-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           { binding: 1, resource: debugView },
         ],
       })
-      this.cachedDebugView = debugView
-    }
+    )
 
     // Begin render pass with 'load' to preserve existing canvas content
     const passEncoder = ctx.beginRenderPass({
@@ -233,7 +230,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
     })
 
     // Render fullscreen with alpha blending
-    this.renderFullscreen(passEncoder, this.renderPipeline, [this.cachedBindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
 
     passEncoder.end()
   }
@@ -245,8 +242,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
     this.renderPipeline = null
     this.passBindGroupLayout = null
     this.sampler = null
-    this.cachedBindGroup = null
-    this.cachedDebugView = null
+    this.bgCache.invalidate()
 
     super.dispose()
   }

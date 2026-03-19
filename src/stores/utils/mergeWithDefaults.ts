@@ -60,21 +60,25 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
       continue
     }
 
+    const defaultIsObject =
+      defaultVal !== null && typeof defaultVal === 'object' && !Array.isArray(defaultVal)
+
+    if (loadedVal === null && defaultIsObject) {
+      // Null loaded where default is an object: keep the default to prevent
+      // downstream property-access crashes (e.g., cosineParams: null → cosineParams.a fails)
+      continue
+    }
+
     if (Array.isArray(loadedVal)) {
       // Arrays are replaced, not merged
       // (e.g., parameterValues, center, juliaConstant are position-specific)
       ;(result as Record<string, unknown>)[key] = loadedVal
-    } else if (
-      loadedVal !== null &&
-      typeof loadedVal === 'object' &&
-      defaultVal !== null &&
-      typeof defaultVal === 'object' &&
-      !Array.isArray(defaultVal)
-    ) {
+    } else if (loadedVal !== null && typeof loadedVal === 'object' && defaultIsObject) {
       // Recursively merge nested objects (e.g., cosineParams, customPalette)
       ;(result as Record<string, unknown>)[key] = deepMerge(defaultVal as object, loadedVal)
-    } else {
-      // Primitives: loaded value overrides default
+    } else if (!defaultIsObject || typeof loadedVal === typeof defaultVal) {
+      // Primitives: loaded value overrides default, but only if types match
+      // (prevents a number replacing an expected object, e.g., cosineParams: 42)
       ;(result as Record<string, unknown>)[key] = loadedVal
     }
   }

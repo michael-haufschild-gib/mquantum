@@ -4,9 +4,7 @@ import path from 'path'
 import { defineConfig } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import svgr from 'vite-plugin-svgr'
-import topLevelAwait from 'vite-plugin-top-level-await'
 import wasm from 'vite-plugin-wasm'
-import wasmPack from 'vite-plugin-wasm-pack'
 
 // Favicon and meta image files to copy to dist root
 const faviconFiles = [
@@ -31,8 +29,6 @@ export default defineConfig((_env) => ({
       },
     }),
     wasm(),
-    topLevelAwait(),
-    wasmPack('./src/wasm/mdimension_core'),
     viteStaticCopy({
       targets: faviconFiles.map((file) => ({
         src: `src/assets/logo/${file}`,

@@ -12,6 +12,7 @@
  * @module rendering/webgpu/passes/TemporalCloudDepthPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -121,8 +122,7 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
 
   // Sampler
   private sampler: GPUSampler | null = null
-  private bindGroup: GPUBindGroup | null = null
-  private bindGroupPositionView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
 
   // Configuration
   private cameraNear: number
@@ -284,18 +284,17 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, floatView)
 
-    if (!this.bindGroup || this.bindGroupPositionView !== positionView) {
-      this.bindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([positionView], () =>
+      this.device!.createBindGroup({
         label: 'temporal-cloud-depth-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.sampler },
+          { binding: 0, resource: { buffer: this.uniformBuffer! } },
+          { binding: 1, resource: this.sampler! },
           { binding: 2, resource: positionView },
         ],
       })
-      this.bindGroupPositionView = positionView
-    }
+    )
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -311,7 +310,7 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     })
 
     // Render fullscreen
-    this.renderFullscreen(passEncoder, this.renderPipeline, [this.bindGroup!])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
 
     passEncoder.end()
   }
@@ -325,8 +324,7 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
-    this.bindGroup = null
-    this.bindGroupPositionView = null
+    this.bgCache.invalidate()
 
     super.dispose()
   }

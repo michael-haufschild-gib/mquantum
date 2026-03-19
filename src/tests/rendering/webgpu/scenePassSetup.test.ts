@@ -5,16 +5,16 @@
 
 import { describe, expect, it } from 'vitest'
 
-import type { PassConfig } from '@/rendering/webgpu/scenePassSetup'
 import {
   computeCasSharpnessFromRenderScale,
   extractPPConfig,
   extractSchrodingerConfig,
   normalizeColorAlgorithmForQuantumMode,
+  type PassConfig,
   pauliFieldViewForColorAlgorithm,
   shallowEqual,
   shouldForceFullRebuildForQuantumModeTransition,
-} from '@/rendering/webgpu/scenePassSetup'
+} from '@/rendering/webgpu/scenePassConfig'
 
 function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
   return {

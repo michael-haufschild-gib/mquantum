@@ -6,12 +6,12 @@ import type { WebGPUStatsCollector } from '@/rendering/webgpu/WebGPUPerformanceC
 
 describe('WebGPUScene frame metric collection', () => {
   it('executes graph and forwards frame metrics to the collector', async () => {
-    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+    const configModule = (await import('@/rendering/webgpu/scenePassConfig')) as unknown as Record<
       string,
       unknown
     >
 
-    const executeFrameAndCollectMetrics = sceneModule['executeFrameAndCollectMetrics'] as (args: {
+    const executeFrameAndCollectMetrics = configModule['executeFrameAndCollectMetrics'] as (args: {
       graph: WebGPURenderGraph
       collector: WebGPUStatsCollector
       deltaTime: number

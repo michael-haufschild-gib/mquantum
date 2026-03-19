@@ -550,40 +550,26 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 import { logger } from '@/lib/logger'
 
 import {
-  cleanupPPPasses,
-  cleanupSchrodingerPasses,
-  computeCasSharpnessFromRenderScale,
-  createObjectRenderer,
-  ensureTemporalResources,
-  executeFrameAndCollectMetrics,
   extractPPConfig,
   extractSchrodingerConfig,
   type PassConfig,
   pauliFieldViewForColorAlgorithm,
   type PPPassConfig,
-  removeStaleTemporalResources,
   type SchrodingerPassConfig,
-  setupPPPasses,
-  setupRenderPasses,
-  setupSchrodingerPasses,
-  setupSharedResources,
   shallowEqual,
   shouldForceFullRebuildForQuantumModeTransition,
   updateScenePassBackgroundColor,
   updateToScreenPassSharpness,
+} from './scenePassConfig'
+import {
+  cleanupPPPasses,
+  cleanupSchrodingerPasses,
+  ensureTemporalResources,
+  removeStaleTemporalResources,
+  setupPPPasses,
+  setupSchrodingerPasses,
+  setupSharedResources,
   warmSwapSchrodingerPasses,
 } from './scenePassSetup'
-
-// Re-export for backward compat (tests import from this module path)
-export {
-  computeCasSharpnessFromRenderScale,
-  createObjectRenderer,
-  executeFrameAndCollectMetrics,
-  setupRenderPasses,
-  shouldForceFullRebuildForQuantumModeTransition,
-  updateScenePassBackgroundColor,
-  updateToScreenPassSharpness,
-}
-export type { PassConfig }
 
 export default WebGPUScene

@@ -7,6 +7,7 @@
  * @module rendering/webgpu/passes/CopyPass
  */
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -47,10 +48,8 @@ export class CopyPass extends WebGPUBasePass {
   private passConfig: CopyPassConfig
 
   private renderPipeline: GPURenderPipeline | null = null
-  // PERF: Cached bind group to avoid per-frame GPU driver calls
-  private cachedBindGroup: GPUBindGroup | null = null
-  private cachedSourceView: GPUTextureView | null = null
   private passBindGroupLayout: GPUBindGroupLayout | null = null
+  private bgCache = new BindGroupCache()
   private sampler: GPUSampler | null = null
 
   constructor(config: CopyPassConfig) {
@@ -107,19 +106,16 @@ export class CopyPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!sourceView || !outputView) return
 
-    // PERF: Cache bind group, invalidate only when input texture view changes
-    if (!this.cachedBindGroup || this.cachedSourceView !== sourceView) {
-      this.cachedBindGroup = this.device.createBindGroup({
+    const bindGroup = this.bgCache.get([sourceView], () =>
+      this.device!.createBindGroup({
         label: 'copy-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           { binding: 1, resource: sourceView },
         ],
       })
-      this.cachedSourceView = sourceView
-    }
-    const bindGroup = this.cachedBindGroup
+    )
 
     const passEncoder = ctx.beginRenderPass({
       label: 'copy-render',
@@ -141,8 +137,7 @@ export class CopyPass extends WebGPUBasePass {
     this.renderPipeline = null
     this.passBindGroupLayout = null
     this.sampler = null
-    this.cachedBindGroup = null
-    this.cachedSourceView = null
+    this.bgCache.invalidate()
     super.dispose()
   }
 }

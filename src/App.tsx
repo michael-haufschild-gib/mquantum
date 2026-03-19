@@ -28,6 +28,11 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 
+/** Stable error handler for WebGPU initialization failures. */
+function handleWebGPUErrorStable(error: Error) {
+  logger.error('[App] WebGPU error:', error)
+}
+
 /**
  * Inner app content that requires ToastProvider context.
  * @returns The main application layout with all UI components
@@ -62,9 +67,7 @@ function AppContent() {
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
 
-  const handleWebGPUError = (error: Error) => {
-    logger.error('[App] WebGPU error:', error)
-  }
+  const handleWebGPUError = handleWebGPUErrorStable
 
   const canvasStyle = useMemo(() => ({ background: backgroundColor }), [backgroundColor])
 

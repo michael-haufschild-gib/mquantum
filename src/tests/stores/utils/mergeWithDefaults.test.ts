@@ -243,13 +243,20 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
     expect(s.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
   })
 
-  // PRODUCTION BUG: deepMerge's recursive path assigns primitive values (number, string)
-  // to nested object fields instead of falling back to defaults. If a user edits a saved
-  // preset JSON and sets cosineParams to a number, loading it will replace the object with
-  // a primitive, causing downstream property access to fail.
-  it.todo(
-    'handles number where object expected for cosineParams — deepMerge assigns primitive instead of falling back to defaults'
-  )
+  it('preserves default cosineParams when loaded value is a number instead of object', () => {
+    const loaded = {
+      schroedinger: {
+        cosineParams: 42 as unknown, // corrupt: number instead of object
+      },
+    }
+    const merged = mergeExtendedObjectState(loaded)
+    const s = merged.schroedinger as Record<string, unknown>
+    const cp = s.cosineParams as { a: number[]; b: number[]; c: number[]; d: number[] }
+    // cosineParams must remain a valid object with array properties (from defaults)
+    expect(cp.a).toBeInstanceOf(Array)
+    expect(cp.a).toHaveLength(3)
+    expect(cp.b).toBeInstanceOf(Array)
+  })
 
   it('strips keys that exist in loaded but not in defaults', () => {
     const loaded = {
@@ -284,11 +291,18 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
     expect(s.parameterValues).toEqual(['not', 'numbers'])
   })
 
-  // PRODUCTION BUG: deepMerge's recursive case assigns null to nested object fields
-  // instead of falling back to defaults. The top-level guard checks (!loaded), but the
-  // per-key loop falls through: loadedVal=null fails the "typeof === 'object'" check on
-  // line 68, so the else branch assigns null. Downstream code then crashes on property access.
-  it.todo(
-    'handles deeply nested null values — deepMerge assigns null instead of falling back to defaults'
-  )
+  it('preserves default cosineParams when loaded value is null', () => {
+    const loaded = {
+      schroedinger: {
+        cosineParams: null as unknown, // corrupt: null instead of object
+      },
+    }
+    const merged = mergeExtendedObjectState(loaded)
+    const s = merged.schroedinger as Record<string, unknown>
+    const cp = s.cosineParams as { a: number[]; b: number[]; c: number[]; d: number[] }
+    // cosineParams must remain a valid object from defaults, not null
+    expect(cp.a).toBeInstanceOf(Array)
+    expect(cp.a).toHaveLength(3)
+    expect(cp.b).toBeInstanceOf(Array)
+  })
 })

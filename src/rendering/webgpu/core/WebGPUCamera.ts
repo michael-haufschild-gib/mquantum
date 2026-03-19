@@ -62,11 +62,12 @@ export interface WebGPUCameraMatrices {
  * @param target
  * @param up
  */
-function createLookAtMatrix(
+function writeLookAtMatrix(
+  out: Float32Array,
   eye: [number, number, number],
   target: [number, number, number],
   up: [number, number, number]
-): Float32Array {
+): void {
   // Compute forward (z-axis, pointing towards target)
   let fx = target[0] - eye[0]
   let fy = target[1] - eye[1]
@@ -94,36 +95,23 @@ function createLookAtMatrix(
   const uy = rz * fx - rx * fz
   const uz = rx * fy - ry * fx
 
-  // Create view matrix (column-major)
-  // View matrix = inverse of camera matrix
-  // For orthonormal basis, inverse = transpose of rotation part + negated translation
-  const m = new Float32Array(16)
-
-  // Column 0 (right)
-  m[0] = rx
-  m[1] = ux
-  m[2] = -fx
-  m[3] = 0
-
-  // Column 1 (up)
-  m[4] = ry
-  m[5] = uy
-  m[6] = -fy
-  m[7] = 0
-
-  // Column 2 (forward, negated for view)
-  m[8] = rz
-  m[9] = uz
-  m[10] = -fz
-  m[11] = 0
-
-  // Column 3 (translation)
-  m[12] = -(rx * eye[0] + ry * eye[1] + rz * eye[2])
-  m[13] = -(ux * eye[0] + uy * eye[1] + uz * eye[2])
-  m[14] = fx * eye[0] + fy * eye[1] + fz * eye[2]
-  m[15] = 1
-
-  return m
+  // Write view matrix (column-major) into pre-allocated output
+  out[0] = rx
+  out[1] = ux
+  out[2] = -fx
+  out[3] = 0
+  out[4] = ry
+  out[5] = uy
+  out[6] = -fy
+  out[7] = 0
+  out[8] = rz
+  out[9] = uz
+  out[10] = -fz
+  out[11] = 0
+  out[12] = -(rx * eye[0] + ry * eye[1] + rz * eye[2])
+  out[13] = -(ux * eye[0] + uy * eye[1] + uz * eye[2])
+  out[14] = fx * eye[0] + fy * eye[1] + fz * eye[2]
+  out[15] = 1
 }
 
 /**
@@ -135,46 +123,33 @@ function createLookAtMatrix(
  * @param near - Near clipping plane
  * @param far - Far clipping plane
  */
-function createPerspectiveMatrix(
+function writePerspectiveMatrix(
+  out: Float32Array,
   fovY: number,
   aspect: number,
   near: number,
   far: number
-): Float32Array {
+): void {
   const fovRad = (fovY * Math.PI) / 180
   const f = 1.0 / Math.tan(fovRad / 2)
-
-  const m = new Float32Array(16)
-
-  // Standard perspective matrix (column-major)
-  // Note: WebGPU uses clip space z in [0, 1] not [-1, 1] like OpenGL
   const nf = 1 / (near - far)
 
-  // Column 0
-  m[0] = f / aspect
-  m[1] = 0
-  m[2] = 0
-  m[3] = 0
-
-  // Column 1
-  m[4] = 0
-  m[5] = f
-  m[6] = 0
-  m[7] = 0
-
-  // Column 2 - WebGPU depth range is [0, 1]
-  m[8] = 0
-  m[9] = 0
-  m[10] = far * nf
-  m[11] = -1
-
-  // Column 3
-  m[12] = 0
-  m[13] = 0
-  m[14] = near * far * nf
-  m[15] = 0
-
-  return m
+  out[0] = f / aspect
+  out[1] = 0
+  out[2] = 0
+  out[3] = 0
+  out[4] = 0
+  out[5] = f
+  out[6] = 0
+  out[7] = 0
+  out[8] = 0
+  out[9] = 0
+  out[10] = far * nf
+  out[11] = -1
+  out[12] = 0
+  out[13] = 0
+  out[14] = near * far * nf
+  out[15] = 0
 }
 
 /**
@@ -182,20 +157,16 @@ function createPerspectiveMatrix(
  * @param a
  * @param b
  */
-function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
-  const result = new Float32Array(16)
-
+function writeMultiplyMat4(out: Float32Array, a: Float32Array, b: Float32Array): void {
   for (let col = 0; col < 4; col++) {
     for (let row = 0; row < 4; row++) {
       let sum = 0
       for (let k = 0; k < 4; k++) {
         sum += (a[row + k * 4] ?? 0) * (b[k + col * 4] ?? 0)
       }
-      result[row + col * 4] = sum
+      out[row + col * 4] = sum
     }
   }
-
-  return result
 }
 
 /**
@@ -203,10 +174,12 @@ function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
  * Returns identity matrix if singular.
  * @param m
  */
-function invertMat4(m: Float32Array): Float32Array {
-  const inv = new Float32Array(16)
+/** Scratch space for cofactor computation — avoids per-call allocation. */
+const _invertCofactors = new Float32Array(16)
 
-  // Extract matrix elements with null coalescing for TypeScript
+function writeInvertMat4(out: Float32Array, m: Float32Array): void {
+  const inv = _invertCofactors
+
   const m0 = m[0] ?? 0,
     m1 = m[1] ?? 0,
     m2 = m[2] ?? 0,
@@ -277,21 +250,22 @@ function invertMat4(m: Float32Array): Float32Array {
   inv[15] =
     m0 * m5 * m10 - m0 * m6 * m9 - m4 * m1 * m10 + m4 * m2 * m9 + m8 * m1 * m6 - m8 * m2 * m5
 
-  let det = m0 * (inv[0] ?? 0) + m1 * (inv[4] ?? 0) + m2 * (inv[8] ?? 0) + m3 * (inv[12] ?? 0)
+  let det = m0 * inv[0]! + m1 * inv[4]! + m2 * inv[8]! + m3 * inv[12]!
 
   if (Math.abs(det) < 1e-10) {
-    // Return identity if singular
-    return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+    // Write identity if singular
+    out.fill(0)
+    out[0] = 1
+    out[5] = 1
+    out[10] = 1
+    out[15] = 1
+    return
   }
 
   det = 1.0 / det
-
-  const result = new Float32Array(16)
   for (let i = 0; i < 16; i++) {
-    result[i] = (inv[i] ?? 0) * det
+    out[i] = inv[i]! * det
   }
-
-  return result
 }
 
 // ============================================================================
@@ -391,8 +365,8 @@ export class WebGPUCamera {
   /**
    * Get current camera state.
    */
-  getState(): WebGPUCameraState {
-    return { ...this.state }
+  getState(): Readonly<WebGPUCameraState> {
+    return this.state
   }
 
   /**
@@ -409,37 +383,30 @@ export class WebGPUCamera {
    * Recompute all matrices from current state.
    */
   private updateMatrices(): void {
-    // View matrix
-    this.matrices.viewMatrix = createLookAtMatrix(
+    writeLookAtMatrix(
+      this.matrices.viewMatrix,
       this.state.position,
       this.state.target,
       this.state.up
     )
-
-    // Projection matrix
-    this.matrices.projectionMatrix = createPerspectiveMatrix(
+    writePerspectiveMatrix(
+      this.matrices.projectionMatrix,
       this.state.fov,
       this.state.aspect,
       this.state.near,
       this.state.far
     )
-
-    // ViewProjection = Projection * View
-    this.matrices.viewProjectionMatrix = multiplyMat4(
+    writeMultiplyMat4(
+      this.matrices.viewProjectionMatrix,
       this.matrices.projectionMatrix,
       this.matrices.viewMatrix
     )
+    writeInvertMat4(this.matrices.inverseViewMatrix, this.matrices.viewMatrix)
+    writeInvertMat4(this.matrices.inverseProjectionMatrix, this.matrices.projectionMatrix)
 
-    // Inverse matrices
-    this.matrices.inverseViewMatrix = invertMat4(this.matrices.viewMatrix)
-    this.matrices.inverseProjectionMatrix = invertMat4(this.matrices.projectionMatrix)
-
-    // Camera position and parameters
-    this.matrices.cameraPosition = {
-      x: this.state.position[0],
-      y: this.state.position[1],
-      z: this.state.position[2],
-    }
+    this.matrices.cameraPosition.x = this.state.position[0]
+    this.matrices.cameraPosition.y = this.state.position[1]
+    this.matrices.cameraPosition.z = this.state.position[2]
     this.matrices.cameraNear = this.state.near
     this.matrices.cameraFar = this.state.far
     this.matrices.fov = this.state.fov

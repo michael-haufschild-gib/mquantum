@@ -15,6 +15,7 @@
 
 import { logger } from '@/lib/logger'
 
+import { BindGroupCache } from '../core/BindGroupCache'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -165,8 +166,7 @@ export class ToScreenPass extends WebGPUBasePass {
 
   private renderPipeline: GPURenderPipeline | null = null
   private passBindGroupLayout: GPUBindGroupLayout | null = null
-  private passBindGroup: GPUBindGroup | null = null
-  private bindGroupSourceView: GPUTextureView | null = null
+  private bgCache = new BindGroupCache()
   private sampler: GPUSampler | null = null
   private uniformBuffer: GPUBuffer | null = null
   private uniformData = new ArrayBuffer(16)
@@ -270,18 +270,17 @@ export class ToScreenPass extends WebGPUBasePass {
 
     const canvasView = ctx.getCanvasTextureView()
 
-    if (!this.passBindGroup || this.bindGroupSourceView !== sourceView) {
-      this.passBindGroup = this.device.createBindGroup({
+    const passBindGroup = this.bgCache.get([sourceView], () =>
+      this.device!.createBindGroup({
         label: 'toScreen-bg',
-        layout: this.passBindGroupLayout,
+        layout: this.passBindGroupLayout!,
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           { binding: 1, resource: sourceView },
-          { binding: 2, resource: { buffer: this.uniformBuffer } },
+          { binding: 2, resource: { buffer: this.uniformBuffer! } },
         ],
       })
-      this.bindGroupSourceView = sourceView
-    }
+    )
 
     const passEncoder = ctx.beginRenderPass({
       label: 'toScreen-render',
@@ -295,7 +294,7 @@ export class ToScreenPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.renderPipeline, [this.passBindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [passBindGroup])
     passEncoder.end()
   }
 
@@ -367,8 +366,7 @@ export class ToScreenPass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
-    this.passBindGroup = null
-    this.bindGroupSourceView = null
+    this.bgCache.invalidate()
     this.sampler = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null

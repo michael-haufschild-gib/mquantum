@@ -123,6 +123,9 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
   // Temp matrices to avoid per-frame allocations
   private tempViewProjMatrix = new Float32Array(16)
   private tempInverseViewProjMatrix = new Float32Array(16)
+  private tempInvertAugmented = new Float32Array(32)
+  private tempProjMatrix = new Float32Array(16)
+  private tempViewMatrix = new Float32Array(16)
 
   // Cached bind group for position copy
   private copyBindGroup: GPUBindGroup | null = null
@@ -183,7 +186,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
    * @param m
    */
   private invertMatrix(result: Float32Array, m: Float32Array): boolean {
-    const augmented = new Float32Array(32)
+    const augmented = this.tempInvertAugmented
 
     // Build augmented matrix [M | I]
     for (let i = 0; i < 4; i++) {
@@ -483,9 +486,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     const projMatrixElements = camera?.projectionMatrix?.elements
 
     if (projMatrixElements && viewMatrixElements) {
-      // Convert projection and view matrices to Float32Arrays
-      const projMatrix = new Float32Array(16)
-      const viewMatrix = new Float32Array(16)
+      const projMatrix = this.tempProjMatrix
+      const viewMatrix = this.tempViewMatrix
 
       for (let i = 0; i < 16; i++) {
         projMatrix[i] = projMatrixElements[i] ?? 0
