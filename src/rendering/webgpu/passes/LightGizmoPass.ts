@@ -22,21 +22,21 @@ import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
   calculateGroundIntersection,
   calculateSphereGroundIntersection,
-  generateArrow,
-  generateConeWireframe,
   generateDashedLine,
   generateGroundCircle,
   generateGroundEllipse,
   generateGroundTarget,
+} from './gizmoGround'
+import {
+  generateArrow,
+  generateConeWireframe,
   generateIcosahedronWireframe,
   generateOctahedronWireframe,
-  generateRotateGizmo,
   generateSelectionRing,
   generateSphereWireframe,
-  generateTranslateGizmo,
-  transformAndAppend,
-  transformBillboardAndAppend,
-} from './gizmoGeometry'
+} from './gizmoShapes'
+import { generateRotateGizmo, generateTranslateGizmo } from './gizmoTransformGeometry'
+import { transformAndAppend, transformBillboardAndAppend } from './gizmoTransforms'
 
 // ==========================================================================
 // Constants

@@ -12,7 +12,7 @@ import { rotationToDirection } from '@/rendering/lights/types'
 import {
   calculateGroundIntersection,
   calculateSphereGroundIntersection,
-} from '../passes/gizmoGeometry'
+} from '../passes/gizmoGround'
 import { invertMat4, multiplyMat4, transformPoint } from './sceneMath'
 
 /** Gizmo scale formula (matches LightGizmoPass) */
