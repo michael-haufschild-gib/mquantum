@@ -606,8 +606,8 @@ export default [
       // ErrorBoundary files are exempt — they must log in production.
       'no-console': 'error',
 
-      // Complexity: error at 40 (hard limit)
-      complexity: ['error', 40],
+      // Complexity: error at 30 (hard limit for most code)
+      complexity: ['error', 30],
 
       // Custom project rules
       'project-rules/no-direct-asset-imports': 'error',
@@ -643,7 +643,7 @@ export default [
     files: ['src/**/*.ts'],
     ignores: ['src/tests/**'],
     rules: {
-      'max-lines': ['warn', { max: 600, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['error', { max: 600, skipBlankLines: true, skipComments: true }],
     },
   },
   // ─── Test files: anti-slop rules for AI coding agents ─────────────────────
@@ -735,6 +735,74 @@ export default [
     ],
     rules: {
       'no-useless-assignment': 'off',
+    },
+  },
+  // GPU pipeline code: uniform packing, compute pass orchestration, and render graph
+  // execution have inherently high cyclomatic complexity from branching on quantum modes,
+  // representation types, and feature flags. These functions are linear sequences of
+  // conditional setup, not deeply nested logic. Limit raised to 40.
+  {
+    files: [
+      'src/rendering/webgpu/passes/**/*.ts',
+      'src/rendering/webgpu/renderers/**/*.ts',
+      'src/rendering/webgpu/graph/WebGPURenderGraph.ts',
+      'src/rendering/webgpu/useExportRuntime.ts',
+    ],
+    rules: {
+      complexity: ['error', 40],
+    },
+  },
+  // Complex form components, hooks, and store orchestration: conditional rendering for
+  // quantum mode configurations, keyboard shortcuts dispatch tables, video capture,
+  // and scene load/save orchestration create inherent branching. Limit raised to 35.
+  {
+    files: [
+      'src/components/sections/Advanced/SchroedingerQuantumEffectsSection.tsx',
+      'src/components/layout/TimelineControls/SchroedingerAnimationDrawer.tsx',
+      'src/hooks/useKeyboardShortcuts.ts',
+      'src/lib/export/video.ts',
+      'src/stores/presetManagerStore.ts',
+    ],
+    rules: {
+      complexity: ['error', 35],
+    },
+  },
+  // Import boundary: render passes must not import state stores directly.
+  // Store reads go through the render graph's ctx.stores pattern (set up in useSceneStoreWiring).
+  // Allowed exceptions:
+  //   - Diagnostic stores (*DiagnosticsStore) — write-direction: passes push metrics to UI
+  //   - Type-only imports from store defaults — no runtime coupling
+  //   - TemporalDepthCapturePass.ts — reads performanceStore.temporalReprojectionEnabled
+  //     outside frame context (getTemporalUniforms is called by external consumers)
+  {
+    files: ['src/rendering/webgpu/passes/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/stores/*'],
+          allowTypeImports: true,
+          message: 'Render passes access stores via ctx.stores, not direct imports. Diagnostic stores (write-direction) and type-only imports are exempt.',
+        }],
+      }],
+    },
+  },
+  // Exempt diagnostic stores and the one known performanceStore usage in passes
+  {
+    files: [
+      'src/rendering/webgpu/passes/TDSEComputePass.ts',
+      'src/rendering/webgpu/passes/TDSEComputePassBuffers.ts',
+      'src/rendering/webgpu/passes/PauliComputePass.ts',
+      'src/rendering/webgpu/passes/PauliComputePassBuffers.ts',
+      'src/rendering/webgpu/passes/DiracComputePass.ts',
+      'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
+      'src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts',
+      'src/rendering/webgpu/passes/FreeScalarFieldKSpace.ts',
+      'src/rendering/webgpu/passes/DensityDistributionAnalysis.ts',
+      'src/rendering/webgpu/passes/TemporalDepthCapturePass.ts',
+      'src/rendering/webgpu/passes/BloomPass.ts',
+    ],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 ]

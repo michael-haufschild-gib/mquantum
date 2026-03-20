@@ -16,12 +16,13 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
 const config = readFileSync(resolve(ROOT, 'eslint.config.js'), 'utf8')
 
 describe('eslint config: no per-file exemptions for structural quality rules', () => {
-  it('complexity rule is defined exactly once (in the base config block)', () => {
-    // Matches "complexity:" as a rule key assignment in a rules object.
-    // One occurrence: the base config at complexity: ['error', 40].
-    // If this fails, someone added a per-file complexity override — split the file instead.
+  it('complexity rule has exactly 3 definitions (base at 30 + GPU override at 40 + form/orchestration override at 35)', () => {
+    // Base config: complexity 30 for most code.
+    // GPU pipeline override: 40 for inherently-complex render passes, uniform packing, render graph.
+    // Form/orchestration override: 35 for complex quantum-mode forms, keyboard shortcuts, video export, scene load.
+    // If this fails, someone added a new per-file complexity override — split the file instead.
     const matches = [...config.matchAll(/^\s+complexity\s*:/gm)]
-    expect(matches).toHaveLength(1)
+    expect(matches).toHaveLength(3)
   })
 
   it('max-lines rule is defined exactly twice (tsx at 500 + ts at 600)', () => {
@@ -37,5 +38,13 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     // If this fails, someone broadened the exemption — use logger instead.
     const ruleMatches = [...config.matchAll(/^\s+'no-console'\s*:/gm)]
     expect(ruleMatches).toHaveLength(3) // 1 enable + 2 off overrides (error-boundaries + tests)
+  })
+
+  it('no-restricted-imports boundary exists for render passes with exactly one exemption block', () => {
+    // Render passes must access stores via ctx.stores, not direct imports.
+    // One enforcement block + one exemption block (for diagnostic stores and known exceptions).
+    // If this test fails, someone widened the exemption — route store access through ctx.stores.
+    const ruleMatches = [...config.matchAll(/^\s+'no-restricted-imports'\s*:/gm)]
+    expect(ruleMatches).toHaveLength(2) // 1 enforcement + 1 exemption
   })
 })
