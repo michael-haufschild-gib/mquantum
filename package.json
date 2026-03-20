@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings 0 --no-warn-ignored",
+    "lint:css": "stylelint \"src/**/*.css\" --max-warnings 0",
     "lint:rust": "cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,css}\"",
     "format:rust": "cargo fmt --manifest-path src/wasm/mdimension_core/Cargo.toml",
@@ -56,6 +57,8 @@
     "png-to-ico": "^3.0.1",
     "prettier": "^3.4.1",
     "sharp": "^0.34.5",
+    "stylelint": "^17.5.0",
+    "stylelint-config-standard": "^40.0.0",
     "ttf2woff2": "^8.0.0",
     "typescript": "^5.6.3",
     "vite": "^7.3.1",
@@ -76,7 +79,11 @@
       "eslint --fix --max-warnings 0 --no-warn-ignored",
       "prettier --write"
     ],
-    "*.{json,css}": [
+    "*.css": [
+      "stylelint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "*.json": [
       "prettier --write"
     ]
   },

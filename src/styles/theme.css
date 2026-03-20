@@ -19,13 +19,13 @@
        BACKGROUNDS
        ═══════════════════════════════════════════════════════════════════ */
     --bg-app: var(--token-slate-1000);
-    --bg-panel: oklch(from var(--token-slate-950) l c h / 0.75);
+    --bg-panel: oklch(from var(--token-slate-950) l c h / 75%);
     --bg-surface: var(--token-slate-900);
     --bg-elevated: var(--token-slate-800);
-    --bg-glass: oklch(from var(--token-slate-900) l c h / 0.6);
-    --bg-hover: oklch(100% 0 0 / 0.08);
-    --bg-active: oklch(100% 0 0 / 0.12);
-    --bg-overlay: oklch(0% 0 0 / 0.6);
+    --bg-glass: oklch(from var(--token-slate-900) l c h / 60%);
+    --bg-hover: oklch(100% 0 0deg / 8%);
+    --bg-active: oklch(100% 0 0deg / 12%);
+    --bg-overlay: oklch(0% 0 0deg / 60%);
 
     /* ═══════════════════════════════════════════════════════════════════
        TEXT
@@ -39,9 +39,9 @@
     /* ═══════════════════════════════════════════════════════════════════
        BORDERS
        ═══════════════════════════════════════════════════════════════════ */
-    --border-subtle: oklch(100% 0 0 / 0.08);
-    --border-default: oklch(100% 0 0 / 0.12);
-    --border-strong: oklch(100% 0 0 / 0.2);
+    --border-subtle: oklch(100% 0 0deg / 8%);
+    --border-default: oklch(100% 0 0deg / 12%);
+    --border-strong: oklch(100% 0 0deg / 20%);
     --border-highlight: var(--border-strong); /* Legacy alias */
 
     /* ═══════════════════════════════════════════════════════════════════
@@ -55,10 +55,10 @@
     /* ═══════════════════════════════════════════════════════════════════
        SHADOWS
        ═══════════════════════════════════════════════════════════════════ */
-    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.2);
-    --shadow-lg: 0 4px 12px -2px oklch(0% 0 0 / 0.4);
-    --shadow-xl: 0 8px 24px -4px oklch(0% 0 0 / 0.5);
+    --shadow-sm: 0 1px 2px oklch(0% 0 0deg / 10%);
+    --shadow-md: 0 4px 6px -1px oklch(0% 0 0deg / 20%);
+    --shadow-lg: 0 4px 12px -2px oklch(0% 0 0deg / 40%);
+    --shadow-xl: 0 8px 24px -4px oklch(0% 0 0deg / 50%);
 
     /* Legacy aliases */
     --shadow-soft: var(--shadow-md);
@@ -69,78 +69,78 @@
        ═══════════════════════════════════════════════════════════════════ */
     --theme-accent: oklch(var(--token-accent-l) var(--token-accent-c) var(--token-accent-h));
     --theme-accent-glow: var(--theme-accent);
-    --accent-subtle: oklch(from var(--theme-accent) l c h / 0.15);
-    --accent-muted: oklch(from var(--theme-accent) l c h / 0.3);
+    --accent-subtle: oklch(from var(--theme-accent) l c h / 15%);
+    --accent-muted: oklch(from var(--theme-accent) l c h / 30%);
 
     /* ═══════════════════════════════════════════════════════════════════
        STATUS: DANGER (Red)
        Used for errors, destructive actions, and critical warnings.
        ═══════════════════════════════════════════════════════════════════ */
-    --bg-danger: oklch(from var(--token-red-500) l c h / 0.15);
+    --bg-danger: oklch(from var(--token-red-500) l c h / 15%);
     --bg-danger-solid: var(--token-red-600);
     --text-danger: var(--token-red-400);
-    --border-danger: oklch(from var(--token-red-500) l c h / 0.3);
+    --border-danger: oklch(from var(--token-red-500) l c h / 30%);
 
     /* ═══════════════════════════════════════════════════════════════════
        STATUS: SUCCESS (Green)
        Used for success states, confirmations, and positive indicators.
        ═══════════════════════════════════════════════════════════════════ */
-    --bg-success: oklch(from var(--token-green-500) l c h / 0.15);
+    --bg-success: oklch(from var(--token-green-500) l c h / 15%);
     --bg-success-solid: var(--token-green-500);
     --text-success: var(--token-green-400);
-    --border-success: oklch(from var(--token-green-500) l c h / 0.3);
+    --border-success: oklch(from var(--token-green-500) l c h / 30%);
 
     /* ═══════════════════════════════════════════════════════════════════
        STATUS: WARNING (Amber)
        Used for warnings, cautions, and attention-needed states.
        ═══════════════════════════════════════════════════════════════════ */
-    --bg-warning: oklch(from var(--token-amber-500) l c h / 0.15);
+    --bg-warning: oklch(from var(--token-amber-500) l c h / 15%);
     --bg-warning-solid: var(--token-amber-500);
     --text-warning: var(--token-amber-400);
-    --border-warning: oklch(from var(--token-amber-500) l c h / 0.3);
+    --border-warning: oklch(from var(--token-amber-500) l c h / 30%);
 
     /* ═══════════════════════════════════════════════════════════════════
        HEALTH INDICATORS (Performance Monitor)
        Used for FPS and performance visualization.
        ═══════════════════════════════════════════════════════════════════ */
     --health-high: var(--token-green-400);
-    --health-high-bg: oklch(from var(--token-green-500) l c h / 0.1);
+    --health-high-bg: oklch(from var(--token-green-500) l c h / 10%);
     --health-high-stroke: var(--token-green-400);
 
     --health-medium: var(--token-amber-400);
-    --health-medium-bg: oklch(from var(--token-amber-500) l c h / 0.1);
+    --health-medium-bg: oklch(from var(--token-amber-500) l c h / 10%);
     --health-medium-stroke: var(--token-amber-400);
 
     --health-low: var(--token-red-400);
-    --health-low-bg: oklch(from var(--token-red-500) l c h / 0.1);
+    --health-low-bg: oklch(from var(--token-red-500) l c h / 10%);
     --health-low-stroke: var(--token-red-400);
 
     /* ═══════════════════════════════════════════════════════════════════
        CHART: PASS TIMING
        Distinct colors for per-pass GPU timing bars and table indicators.
        ═══════════════════════════════════════════════════════════════════ */
-    --chart-pass-1: oklch(0.75 0.18 145);
-    --chart-pass-2: oklch(0.72 0.18 250);
-    --chart-pass-3: oklch(0.75 0.17 55);
-    --chart-pass-4: oklch(0.7 0.19 310);
-    --chart-pass-5: oklch(0.78 0.16 95);
-    --chart-pass-6: oklch(0.68 0.17 200);
-    --chart-pass-7: oklch(0.72 0.2 25);
-    --chart-pass-8: oklch(0.74 0.14 170);
+    --chart-pass-1: oklch(75% 0.18 145deg);
+    --chart-pass-2: oklch(72% 0.18 250deg);
+    --chart-pass-3: oklch(75% 0.17 55deg);
+    --chart-pass-4: oklch(70% 0.19 310deg);
+    --chart-pass-5: oklch(78% 0.16 95deg);
+    --chart-pass-6: oklch(68% 0.17 200deg);
+    --chart-pass-7: oklch(72% 0.2 25deg);
+    --chart-pass-8: oklch(74% 0.14 170deg);
 
-    --chart-cpu-setup: oklch(0.72 0.18 250);
-    --chart-cpu-passes: oklch(0.75 0.18 145);
-    --chart-cpu-submit: oklch(0.75 0.17 55);
+    --chart-cpu-setup: oklch(72% 0.18 250deg);
+    --chart-cpu-passes: oklch(75% 0.18 145deg);
+    --chart-cpu-submit: oklch(75% 0.17 55deg);
 
-    --chart-cost-hot: oklch(0.72 0.2 25);
-    --chart-cost-warm: oklch(0.75 0.17 55);
+    --chart-cost-hot: oklch(72% 0.2 25deg);
+    --chart-cost-warm: oklch(75% 0.17 55deg);
 
     /* ═══════════════════════════════════════════════════════════════════
        PHYSICS: DIRAC DISPERSION
        Particle and antiparticle branch colors for dispersion diagrams.
        ═══════════════════════════════════════════════════════════════════ */
-    --dirac-particle: oklch(0.7 0.15 220);
-    --dirac-antiparticle: oklch(0.7 0.15 0);
+    --dirac-particle: oklch(70% 0.15 220deg);
+    --dirac-antiparticle: oklch(70% 0.15 0deg);
 
     /* ═══════════════════════════════════════════════════════════════════
        LEGACY COMPATIBILITY
@@ -170,13 +170,13 @@
   [data-mode='light'] {
     /* Backgrounds */
     --bg-app: var(--token-slate-50);
-    --bg-panel: oklch(from var(--token-slate-0) l c h / 0.85);
+    --bg-panel: oklch(from var(--token-slate-0) l c h / 85%);
     --bg-surface: var(--token-slate-100);
     --bg-elevated: var(--token-slate-0);
-    --bg-glass: oklch(from var(--token-slate-100) l c h / 0.7);
-    --bg-hover: oklch(0% 0 0 / 0.05);
-    --bg-active: oklch(0% 0 0 / 0.1);
-    --bg-overlay: oklch(0% 0 0 / 0.4);
+    --bg-glass: oklch(from var(--token-slate-100) l c h / 70%);
+    --bg-hover: oklch(0% 0 0deg / 5%);
+    --bg-active: oklch(0% 0 0deg / 10%);
+    --bg-overlay: oklch(0% 0 0deg / 40%);
 
     /* Text */
     --text-primary: var(--token-slate-900);
@@ -186,15 +186,15 @@
     --text-inverse: var(--token-slate-50);
 
     /* Borders */
-    --border-subtle: oklch(0% 0 0 / 0.06);
-    --border-default: oklch(0% 0 0 / 0.12);
-    --border-strong: oklch(0% 0 0 / 0.2);
+    --border-subtle: oklch(0% 0 0deg / 6%);
+    --border-default: oklch(0% 0 0deg / 12%);
+    --border-strong: oklch(0% 0 0deg / 20%);
 
     /* Shadows (lighter in light mode) */
-    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.08);
-    --shadow-lg: 0 8px 20px -4px oklch(0% 0 0 / 0.12);
-    --shadow-xl: 0 12px 32px -6px oklch(0% 0 0 / 0.15);
+    --shadow-sm: 0 1px 2px oklch(0% 0 0deg / 5%);
+    --shadow-md: 0 4px 6px -1px oklch(0% 0 0deg / 8%);
+    --shadow-lg: 0 8px 20px -4px oklch(0% 0 0deg / 12%);
+    --shadow-xl: 0 12px 32px -6px oklch(0% 0 0deg / 15%);
 
     /* Status colors (slightly darker for light mode contrast) */
     --text-danger: var(--token-red-600);
@@ -221,30 +221,30 @@
 
   /* Explicit accent overrides ensure glow matches */
   [data-accent='cyan'] {
-    --theme-accent-glow: oklch(70% 0.14 200);
+    --theme-accent-glow: oklch(70% 0.14 200deg);
   }
 
   [data-accent='green'] {
-    --theme-accent-glow: oklch(75% 0.18 145);
+    --theme-accent-glow: oklch(75% 0.18 145deg);
   }
 
   [data-accent='magenta'] {
-    --theme-accent-glow: oklch(70% 0.22 330);
+    --theme-accent-glow: oklch(70% 0.22 330deg);
   }
 
   [data-accent='orange'] {
-    --theme-accent-glow: oklch(75% 0.18 40);
+    --theme-accent-glow: oklch(75% 0.18 40deg);
   }
 
   [data-accent='blue'] {
-    --theme-accent-glow: oklch(70% 0.14 260);
+    --theme-accent-glow: oklch(70% 0.14 260deg);
   }
 
   [data-accent='violet'] {
-    --theme-accent-glow: oklch(70% 0.18 290);
+    --theme-accent-glow: oklch(70% 0.18 290deg);
   }
 
   [data-accent='red'] {
-    --theme-accent-glow: oklch(65% 0.2 25);
+    --theme-accent-glow: oklch(65% 0.2 25deg);
   }
 }

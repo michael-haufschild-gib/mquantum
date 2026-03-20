@@ -73,14 +73,15 @@
   --animate-spin-slow: spin 3s linear infinite;
   --animate-float: float 6s ease-in-out infinite;
   --animate-shimmer: shimmer 2s linear infinite;
-  --animate-fade-in: fadeIn 0.5s ease-out forwards;
-  --animate-scale-in: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fadein 0.5s ease-out forwards;
+  --animate-scale-in: scalein 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 
   @keyframes float {
     0%,
     100% {
       transform: translateY(0);
     }
+
     50% {
       transform: translateY(-5px);
     }
@@ -90,6 +91,7 @@
     from {
       background-position: 0 0;
     }
+
     to {
       background-position: -200% 0;
     }
@@ -100,6 +102,7 @@
       opacity: 0;
       transform: translateY(5px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -111,6 +114,7 @@
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
@@ -174,27 +178,32 @@
 /* Hide scrollbar utility */
 @utility scrollbar-none {
   -ms-overflow-style: none;
+  /* stylelint-disable-next-line declaration-no-important -- utility must override any scrollbar setting */
   scrollbar-width: none !important;
+
   &::-webkit-scrollbar {
     display: none;
   }
 }
 
 @layer base {
-  /* Prevent text selection during resize drag */
+  /* Prevent text selection during resize drag —
+     !important required: JS-applied class must override all element styles */
+  /* stylelint-disable declaration-no-important */
   .resize-dragging {
     cursor: col-resize !important;
-    -webkit-user-select: none !important;
     user-select: none !important;
   }
 
   .resize-dragging * {
     cursor: col-resize !important;
   }
+  /* stylelint-enable declaration-no-important */
 
   /* Keyboard Key Style */
   kbd {
     @apply font-mono text-xs px-1.5 py-0.5 rounded-md border border-b-2 bg-white/5 text-text-secondary;
+
     border-color: var(--border-subtle);
   }
 
@@ -226,7 +235,7 @@
   /* Remove default number arrows for cleaner look */
   input[type='number']::-webkit-inner-spin-button,
   input[type='number']::-webkit-outer-spin-button {
-    -webkit-appearance: none;
+    appearance: none;
     margin: 0;
   }
 }
@@ -241,8 +250,9 @@
   border: 1px solid var(--border-subtle);
   box-shadow:
     var(--shadow-soft),
-    inset 0 1px 0 0 oklch(100% 0 0 / 0.05),
-    /* Inner Top Light */ inset 0 0 0 1px oklch(100% 0 0 / 0.02); /* Inner Ring */
+    inset 0 1px 0 0 oklch(100% 0 0deg / 5%),
+    /* Inner Top Light */ inset 0 0 0 1px oklch(100% 0 0deg / 2%); /* Inner Ring */
+
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease,
@@ -253,7 +263,7 @@
   background-color: var(--bg-panel); /* Unified */
   backdrop-filter: blur(32px);
   border: 1px solid var(--border-subtle);
-  box-shadow: inset 0 0 20px oklch(0% 0 0 / 0.1); /* Softer shadow */
+  box-shadow: inset 0 0 20px oklch(0% 0 0deg / 10%); /* Softer shadow */
 }
 
 @utility glass-separator {
@@ -271,7 +281,7 @@
 @utility glass-input {
   background-color: var(--color-glass);
   border: 1px solid var(--border-subtle);
-  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.05);
+  box-shadow: inset 0 1px 2px oklch(0% 0 0deg / 5%);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   color: var(--text-primary);
 
@@ -285,7 +295,7 @@
     border-color: var(--theme-accent);
     background-color: color-mix(in oklch, var(--color-glass), var(--theme-accent) 5%);
     box-shadow:
-      inset 0 1px 2px oklch(0% 0 0 / 0.05),
+      inset 0 1px 2px oklch(0% 0 0deg / 5%),
       0 0 0 1px var(--theme-accent),
       0 0 12px -2px color-mix(in oklch, var(--theme-accent-glow) 30%, transparent);
   }
@@ -300,9 +310,9 @@
   background: linear-gradient(to bottom, var(--border-subtle), transparent);
   border: 1px solid var(--border-default);
   box-shadow:
-    0 1px 2px oklch(0% 0 0 / 0.05),
-    inset 0 1px 0 0 oklch(100% 0 0 / 0.1),
-    inset 0 0 0 1px oklch(100% 0 0 / 0.02);
+    0 1px 2px oklch(0% 0 0deg / 5%),
+    inset 0 1px 0 0 oklch(100% 0 0deg / 10%),
+    inset 0 0 0 1px oklch(100% 0 0deg / 2%);
   backdrop-filter: blur(8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
@@ -314,14 +324,14 @@
     color: var(--text-primary);
     box-shadow:
       var(--shadow-soft),
-      inset 0 1px 0 0 oklch(100% 0 0 / 0.1);
+      inset 0 1px 0 0 oklch(100% 0 0deg / 10%);
     transform: translateY(-0.5px);
   }
 
   &:active {
     background: var(--border-subtle);
     transform: translateY(0.5px);
-    box-shadow: inset 0 2px 4px oklch(0% 0 0 / 0.1);
+    box-shadow: inset 0 2px 4px oklch(0% 0 0deg / 10%);
     border-color: var(--border-subtle);
   }
 
@@ -333,7 +343,7 @@
     left: -100%;
     width: 50%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, oklch(100% 0 0 / 0.1), transparent);
+    background: linear-gradient(90deg, transparent, oklch(100% 0 0deg / 10%), transparent);
     transform: skewX(-20deg);
     transition: left 0.5s ease;
     pointer-events: none;
@@ -353,7 +363,7 @@
   );
   border: 1px solid color-mix(in oklch, var(--theme-accent) 30%, transparent);
   box-shadow: 0 4px 12px color-mix(in oklch, var(--theme-accent-glow) 20%, transparent);
-  color: white; /* Always white text on primary accent */
+  color: oklch(100% 0 0deg); /* Always white text on primary accent */
 
   &:hover {
     background: linear-gradient(
