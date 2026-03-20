@@ -69,7 +69,6 @@ test.describe('URL → store', () => {
 
     // URL is NOT updated on keyboard change — this is by design.
     // The URL serializer has minimal scope (read on load only).
-    // Full state persistence uses IndexedDB scene presets.
     expect(page.url()).toContain('d=4')
   })
 })

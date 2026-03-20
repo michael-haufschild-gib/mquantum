@@ -17,7 +17,7 @@ mquantum/
 │   ├── lib/                 # Pure logic (no React)
 │   │   ├── math/            # N-dimensional math utilities
 │   │   ├── geometry/        # Object type registry, Schroedinger config, presets
-│   │   ├── cache/           # IndexedDB cache + Hermite polynomial constants
+│   │   ├── cache/           # Hermite polynomial constants
 │   │   ├── wasm/            # WASM bridge (animation math only)
 │   │   ├── url/             # URL state serialization
 │   │   ├── colors/          # Color utilities

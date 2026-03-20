@@ -1,6 +1,4 @@
 import '@testing-library/jest-dom'
-// Polyfill IndexedDB for happy-dom test environment
-import 'fake-indexeddb/auto'
 // Custom domain-specific matchers (WGSL, quantum physics, vectors)
 import './matchers'
 

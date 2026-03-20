@@ -17,7 +17,7 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 - Raymarches volumetric probability densities on the GPU via custom WebGPU shaders
 - Post-processing pipeline: bloom, tonemapping, temporal reprojection, paper texture, FXAA/SMAA
 - Interactive orbit camera, N-dimensional rotation controls, animation
-- Scene and style preset system with IndexedDB persistence
+- Scene and style preset system
 
 ## Tech Stack
 

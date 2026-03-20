@@ -9,8 +9,8 @@
  *   - Open quantum on/off and basic rates
  *
  * Detailed state (quantum numbers, orbital config, visual settings, etc.)
- * is NOT included by design. Full state persistence uses scene presets
- * (IndexedDB). Do NOT extend the URL serializer with additional parameters.
+ * is NOT included by design. Do NOT extend the URL serializer with
+ * additional parameters.
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
