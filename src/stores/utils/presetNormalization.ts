@@ -305,62 +305,41 @@ export function normalizeLoadedLight(rawLight: unknown, index: number): LightSou
   }
 }
 
-/** Normalize imported lighting data: clamp scalars, validate lights array. */
-export function normalizeLightingLoadData(
-  rawLighting: Record<string, unknown>
-): Record<string, unknown> {
-  const lighting = { ...rawLighting }
-
-  if ('lightHorizontalAngle' in lighting) {
-    if (
-      typeof lighting.lightHorizontalAngle === 'number' &&
-      Number.isFinite(lighting.lightHorizontalAngle)
-    ) {
-      lighting.lightHorizontalAngle = ((lighting.lightHorizontalAngle % 360) + 360) % 360
-    } else {
-      delete lighting.lightHorizontalAngle
-    }
+/**
+ * Validate and clamp a numeric field in a record. If the field exists and is a
+ * finite number, apply the transform (default: clamp to [min, max]). Otherwise
+ * delete the field.
+ */
+function clampNumericField(
+  obj: Record<string, unknown>,
+  key: string,
+  min: number,
+  max: number,
+  transform?: (v: number) => number
+): void {
+  if (!(key in obj)) return
+  const v = obj[key]
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    obj[key] = transform ? transform(v) : Math.max(min, Math.min(max, v))
+  } else {
+    delete obj[key]
   }
+}
 
-  if ('lightVerticalAngle' in lighting) {
-    if (
-      typeof lighting.lightVerticalAngle === 'number' &&
-      Number.isFinite(lighting.lightVerticalAngle)
-    ) {
-      lighting.lightVerticalAngle = Math.max(-90, Math.min(90, lighting.lightVerticalAngle))
-    } else {
-      delete lighting.lightVerticalAngle
-    }
+/**
+ * Validate a boolean field in a record. If the field exists but is not boolean,
+ * delete it.
+ */
+function validateBooleanField(obj: Record<string, unknown>, key: string): void {
+  if (key in obj && typeof obj[key] !== 'boolean') {
+    delete obj[key]
   }
+}
 
-  if ('ambientIntensity' in lighting) {
-    if (
-      typeof lighting.ambientIntensity === 'number' &&
-      Number.isFinite(lighting.ambientIntensity)
-    ) {
-      lighting.ambientIntensity = Math.max(0, Math.min(1, lighting.ambientIntensity))
-    } else {
-      delete lighting.ambientIntensity
-    }
-  }
-
-  if ('lightStrength' in lighting) {
-    if (typeof lighting.lightStrength === 'number' && Number.isFinite(lighting.lightStrength)) {
-      lighting.lightStrength = Math.max(0, Math.min(3, lighting.lightStrength))
-    } else {
-      delete lighting.lightStrength
-    }
-  }
-
-  if ('exposure' in lighting) {
-    if (typeof lighting.exposure === 'number' && Number.isFinite(lighting.exposure)) {
-      lighting.exposure = Math.max(0.1, Math.min(3, lighting.exposure))
-    } else {
-      delete lighting.exposure
-    }
-  }
-
+/** Normalize the lights array and selected light id within a lighting record. */
+function normalizeLightsArray(lighting: Record<string, unknown>): LightSource[] | null {
   let normalizedLights: LightSource[] | null = null
+
   if ('lights' in lighting) {
     if (Array.isArray(lighting.lights)) {
       normalizedLights = lighting.lights
@@ -392,19 +371,31 @@ export function normalizeLightingLoadData(
     lighting.selectedLightId = hasValidSelected ? currentSelected : normalizedLights[0]!.id
   }
 
+  return normalizedLights
+}
+
+/** Normalize imported lighting data: clamp scalars, validate lights array. */
+export function normalizeLightingLoadData(
+  rawLighting: Record<string, unknown>
+): Record<string, unknown> {
+  const lighting = { ...rawLighting }
+
+  clampNumericField(lighting, 'lightHorizontalAngle', 0, 360, (v) => ((v % 360) + 360) % 360)
+  clampNumericField(lighting, 'lightVerticalAngle', -90, 90)
+  clampNumericField(lighting, 'ambientIntensity', 0, 1)
+  clampNumericField(lighting, 'lightStrength', 0, 3)
+  clampNumericField(lighting, 'exposure', 0.1, 3)
+
+  normalizeLightsArray(lighting)
+
   if ('transformMode' in lighting) {
     if (lighting.transformMode !== 'translate' && lighting.transformMode !== 'rotate') {
       delete lighting.transformMode
     }
   }
 
-  if ('showLightGizmos' in lighting && typeof lighting.showLightGizmos !== 'boolean') {
-    delete lighting.showLightGizmos
-  }
-
-  if ('isDraggingLight' in lighting && typeof lighting.isDraggingLight !== 'boolean') {
-    delete lighting.isDraggingLight
-  }
+  validateBooleanField(lighting, 'showLightGizmos')
+  validateBooleanField(lighting, 'isDraggingLight')
 
   const normalized: Record<string, unknown> = {}
   for (const key of LIGHTING_LOAD_KEYS) {

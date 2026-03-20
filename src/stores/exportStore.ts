@@ -18,6 +18,7 @@ import {
   isVideoCodec,
   sanitizeCropPatch,
   sanitizeTextOverlayPatch,
+  stripInvalidEnum,
 } from './utils/exportValidation'
 
 // Re-export for backward compatibility with tests and consumers
@@ -419,41 +420,12 @@ export const useExportStore = create<ExportStore>()(
           }
         }
 
-        if (newSettings.format !== undefined && !isExportFormat(newSettings.format)) {
-          logger.warn('[exportStore] Ignoring invalid format update:', newSettings.format)
-          delete newSettings.format
-        }
-
-        if (newSettings.codec !== undefined && !isVideoCodec(newSettings.codec)) {
-          logger.warn('[exportStore] Ignoring invalid codec update:', newSettings.codec)
-          delete newSettings.codec
-        }
-
-        if (newSettings.resolution !== undefined && !isExportResolution(newSettings.resolution)) {
-          logger.warn('[exportStore] Ignoring invalid resolution update:', newSettings.resolution)
-          delete newSettings.resolution
-        }
-
-        if (newSettings.bitrateMode !== undefined && !isBitrateMode(newSettings.bitrateMode)) {
-          logger.warn('[exportStore] Ignoring invalid bitrateMode update:', newSettings.bitrateMode)
-          delete newSettings.bitrateMode
-        }
-
-        if (
-          newSettings.hardwareAcceleration !== undefined &&
-          !isHardwareAcceleration(newSettings.hardwareAcceleration)
-        ) {
-          logger.warn(
-            '[exportStore] Ignoring invalid hardwareAcceleration update:',
-            newSettings.hardwareAcceleration
-          )
-          delete newSettings.hardwareAcceleration
-        }
-
-        if (newSettings.rotation !== undefined && !isRotation(newSettings.rotation)) {
-          logger.warn('[exportStore] Ignoring invalid rotation update:', newSettings.rotation)
-          delete newSettings.rotation
-        }
+        stripInvalidEnum(newSettings, 'format', isExportFormat)
+        stripInvalidEnum(newSettings, 'codec', isVideoCodec)
+        stripInvalidEnum(newSettings, 'resolution', isExportResolution)
+        stripInvalidEnum(newSettings, 'bitrateMode', isBitrateMode)
+        stripInvalidEnum(newSettings, 'hardwareAcceleration', isHardwareAcceleration)
+        stripInvalidEnum(newSettings, 'rotation', isRotation)
 
         if (newSettings.textOverlay) {
           newSettings.textOverlay = sanitizeTextOverlayPatch(

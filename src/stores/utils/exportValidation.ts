@@ -122,6 +122,22 @@ export const isHardwareAcceleration = (
 export const isRotation = (value: unknown): value is ExportSettings['rotation'] =>
   value === 0 || value === 90 || value === 180 || value === 270
 
+/**
+ * Validate an enum field in a settings partial. If the field exists but fails
+ * the type guard, log a warning and delete it.
+ */
+export function stripInvalidEnum<K extends keyof ExportSettings>(
+  settings: Partial<ExportSettings>,
+  key: K,
+  guard: (v: unknown) => v is ExportSettings[K]
+): void {
+  if (settings[key] === undefined) return
+  if (!guard(settings[key])) {
+    logger.warn(`[exportStore] Ignoring invalid ${key} update:`, settings[key])
+    delete settings[key]
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Sanitizers
 // ---------------------------------------------------------------------------

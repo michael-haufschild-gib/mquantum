@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ExportSettings } from '@/stores/exportStore'
 import {
   clampMin,
   clampToRange,
@@ -14,6 +15,7 @@ import {
   isVideoCodec,
   sanitizeCropPatch,
   sanitizeTextOverlayPatch,
+  stripInvalidEnum,
 } from '@/stores/utils/exportValidation'
 
 describe('getCompressionFactor', () => {
@@ -315,5 +317,47 @@ describe('sanitizeCropPatch', () => {
     const input = { x: 0.1, y: 0.2, width: 0.5, height: 0.3 }
     const result = sanitizeCropPatch(input)
     expect(result).toEqual(input)
+  })
+})
+
+describe('stripInvalidEnum', () => {
+  it('keeps valid enum values', () => {
+    const settings: Partial<ExportSettings> = { format: 'mp4' }
+    stripInvalidEnum(settings, 'format', isExportFormat)
+    expect(settings.format).toBe('mp4')
+  })
+
+  it('deletes invalid enum values', () => {
+    const settings: Partial<ExportSettings> = { format: 'avi' as ExportSettings['format'] }
+    stripInvalidEnum(settings, 'format', isExportFormat)
+    expect(settings).not.toHaveProperty('format')
+  })
+
+  it('does nothing when field is undefined', () => {
+    const settings: Partial<ExportSettings> = { fps: 30 }
+    stripInvalidEnum(settings, 'format', isExportFormat)
+    expect(settings).toEqual({ fps: 30 })
+  })
+
+  it('works with all enum validators', () => {
+    const s1: Partial<ExportSettings> = { codec: 'fake' as ExportSettings['codec'] }
+    stripInvalidEnum(s1, 'codec', isVideoCodec)
+    expect(s1).not.toHaveProperty('codec')
+
+    const s2: Partial<ExportSettings> = { resolution: '1080p' }
+    stripInvalidEnum(s2, 'resolution', isExportResolution)
+    expect(s2.resolution).toBe('1080p')
+
+    const s3: Partial<ExportSettings> = { bitrateMode: 'variable' }
+    stripInvalidEnum(s3, 'bitrateMode', isBitrateMode)
+    expect(s3.bitrateMode).toBe('variable')
+
+    const s4: Partial<ExportSettings> = { hardwareAcceleration: 'prefer-hardware' }
+    stripInvalidEnum(s4, 'hardwareAcceleration', isHardwareAcceleration)
+    expect(s4.hardwareAcceleration).toBe('prefer-hardware')
+
+    const s5: Partial<ExportSettings> = { rotation: 90 }
+    stripInvalidEnum(s5, 'rotation', isRotation)
+    expect(s5.rotation).toBe(90)
   })
 })

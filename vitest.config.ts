@@ -23,9 +23,9 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/tests/**', 'src/**/*.d.ts', 'src/vite-env.d.ts', 'src/wasm/**/pkg/**'],
       thresholds: {
-        statements: 48,
+        statements: 48.5,
         branches: 44,
-        functions: 46,
+        functions: 47,
         lines: 49,
       },
     },

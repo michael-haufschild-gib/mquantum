@@ -152,141 +152,106 @@ function normalizeAppearanceDivergingFields(
   }
 }
 
+/**
+ * If a field exists and is a non-array object, pass it to the builder; otherwise delete it.
+ * Returns the parsed sub-object or null.
+ */
+function normalizeObjectField<T>(
+  obj: Record<string, unknown>,
+  key: string,
+  builder: (raw: Record<string, unknown>) => T
+): void {
+  if (!(key in obj)) return
+  const v = obj[key]
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    obj[key] = builder(v as Record<string, unknown>)
+  } else {
+    delete obj[key]
+  }
+}
+
 /** Normalize the nested object fields of appearance data (cosine, distribution, etc.). */
 function normalizeAppearanceObjects(
   appearance: Record<string, unknown>,
   fallback: ReturnType<typeof useAppearanceStore.getState>
 ): void {
-  if ('cosineCoefficients' in appearance) {
-    if (
-      appearance.cosineCoefficients &&
-      typeof appearance.cosineCoefficients === 'object' &&
-      !Array.isArray(appearance.cosineCoefficients)
-    ) {
-      const coefficients = appearance.cosineCoefficients as Record<string, unknown>
-      appearance.cosineCoefficients = {
-        a: normalizeCosineVector(coefficients.a, fallback.cosineCoefficients.a),
-        b: normalizeCosineVector(coefficients.b, fallback.cosineCoefficients.b),
-        c: normalizeCosineVector(coefficients.c, fallback.cosineCoefficients.c),
-        d: normalizeCosineVector(coefficients.d, fallback.cosineCoefficients.d),
-      }
-    } else {
-      delete appearance.cosineCoefficients
-    }
-  }
+  normalizeObjectField(appearance, 'cosineCoefficients', (coefficients) => ({
+    a: normalizeCosineVector(coefficients.a, fallback.cosineCoefficients.a),
+    b: normalizeCosineVector(coefficients.b, fallback.cosineCoefficients.b),
+    c: normalizeCosineVector(coefficients.c, fallback.cosineCoefficients.c),
+    d: normalizeCosineVector(coefficients.d, fallback.cosineCoefficients.d),
+  }))
 
-  if ('distribution' in appearance) {
-    if (
-      appearance.distribution &&
-      typeof appearance.distribution === 'object' &&
-      !Array.isArray(appearance.distribution)
-    ) {
-      const d = appearance.distribution as Record<string, unknown>
-      appearance.distribution = {
-        power: clampFiniteOrFallback(d.power, 0.25, 4, fallback.distribution.power),
-        cycles: clampFiniteOrFallback(d.cycles, 0.5, 5, fallback.distribution.cycles),
-        offset: clampFiniteOrFallback(d.offset, 0, 1, fallback.distribution.offset),
-      }
-    } else {
-      delete appearance.distribution
-    }
-  }
+  normalizeObjectField(appearance, 'distribution', (d) => ({
+    power: clampFiniteOrFallback(d.power, 0.25, 4, fallback.distribution.power),
+    cycles: clampFiniteOrFallback(d.cycles, 0.5, 5, fallback.distribution.cycles),
+    offset: clampFiniteOrFallback(d.offset, 0, 1, fallback.distribution.offset),
+  }))
 
-  if ('multiSourceWeights' in appearance) {
-    if (
-      appearance.multiSourceWeights &&
-      typeof appearance.multiSourceWeights === 'object' &&
-      !Array.isArray(appearance.multiSourceWeights)
-    ) {
-      const w = appearance.multiSourceWeights as Record<string, unknown>
-      appearance.multiSourceWeights = {
-        depth: clampFiniteOrFallback(w.depth, 0, 1, fallback.multiSourceWeights.depth),
-        orbitTrap: clampFiniteOrFallback(w.orbitTrap, 0, 1, fallback.multiSourceWeights.orbitTrap),
-        normal: clampFiniteOrFallback(w.normal, 0, 1, fallback.multiSourceWeights.normal),
-      }
-    } else {
-      delete appearance.multiSourceWeights
-    }
-  }
+  normalizeObjectField(appearance, 'multiSourceWeights', (w) => ({
+    depth: clampFiniteOrFallback(w.depth, 0, 1, fallback.multiSourceWeights.depth),
+    orbitTrap: clampFiniteOrFallback(w.orbitTrap, 0, 1, fallback.multiSourceWeights.orbitTrap),
+    normal: clampFiniteOrFallback(w.normal, 0, 1, fallback.multiSourceWeights.normal),
+  }))
 
-  if ('domainColoring' in appearance) {
-    if (
-      appearance.domainColoring &&
-      typeof appearance.domainColoring === 'object' &&
-      !Array.isArray(appearance.domainColoring)
-    ) {
-      const dc = appearance.domainColoring as Record<string, unknown>
-      appearance.domainColoring = {
-        modulusMode: DOMAIN_COLORING_MODULUS_MODE_SET.has(dc.modulusMode as never)
-          ? dc.modulusMode
-          : fallback.domainColoring.modulusMode,
-        contoursEnabled:
-          typeof dc.contoursEnabled === 'boolean'
-            ? dc.contoursEnabled
-            : fallback.domainColoring.contoursEnabled,
-        contourDensity: clampFiniteOrFallback(
-          dc.contourDensity,
-          1,
-          32,
-          fallback.domainColoring.contourDensity
-        ),
-        contourWidth: clampFiniteOrFallback(
-          dc.contourWidth,
-          0.005,
-          0.25,
-          fallback.domainColoring.contourWidth
-        ),
-        contourStrength: clampFiniteOrFallback(
-          dc.contourStrength,
-          0,
-          1,
-          fallback.domainColoring.contourStrength
-        ),
-      }
-    } else {
-      delete appearance.domainColoring
-    }
-  }
+  normalizeObjectField(appearance, 'domainColoring', (dc) => ({
+    modulusMode: DOMAIN_COLORING_MODULUS_MODE_SET.has(dc.modulusMode as never)
+      ? dc.modulusMode
+      : fallback.domainColoring.modulusMode,
+    contoursEnabled:
+      typeof dc.contoursEnabled === 'boolean'
+        ? dc.contoursEnabled
+        : fallback.domainColoring.contoursEnabled,
+    contourDensity: clampFiniteOrFallback(
+      dc.contourDensity,
+      1,
+      32,
+      fallback.domainColoring.contourDensity
+    ),
+    contourWidth: clampFiniteOrFallback(
+      dc.contourWidth,
+      0.005,
+      0.25,
+      fallback.domainColoring.contourWidth
+    ),
+    contourStrength: clampFiniteOrFallback(
+      dc.contourStrength,
+      0,
+      1,
+      fallback.domainColoring.contourStrength
+    ),
+  }))
 
   normalizeAppearanceDivergingFields(appearance, fallback)
 
-  if ('shaderSettings' in appearance) {
-    if (
-      appearance.shaderSettings &&
-      typeof appearance.shaderSettings === 'object' &&
-      !Array.isArray(appearance.shaderSettings)
-    ) {
-      const ss = appearance.shaderSettings as Record<string, unknown>
-      const wireframe =
-        ss.wireframe && typeof ss.wireframe === 'object' && !Array.isArray(ss.wireframe)
-          ? (ss.wireframe as Record<string, unknown>)
-          : null
-      const surface =
-        ss.surface && typeof ss.surface === 'object' && !Array.isArray(ss.surface)
-          ? (ss.surface as Record<string, unknown>)
-          : null
-      appearance.shaderSettings = {
-        wireframe: {
-          lineThickness: clampFiniteOrFallback(
-            wireframe?.lineThickness,
-            1,
-            5,
-            fallback.shaderSettings.wireframe.lineThickness
-          ),
-        },
-        surface: {
-          specularIntensity: clampFiniteOrFallback(
-            surface?.specularIntensity,
-            0,
-            2,
-            fallback.shaderSettings.surface.specularIntensity
-          ),
-        },
-      }
-    } else {
-      delete appearance.shaderSettings
+  normalizeObjectField(appearance, 'shaderSettings', (ss) => {
+    const wireframe =
+      ss.wireframe && typeof ss.wireframe === 'object' && !Array.isArray(ss.wireframe)
+        ? (ss.wireframe as Record<string, unknown>)
+        : null
+    const surface =
+      ss.surface && typeof ss.surface === 'object' && !Array.isArray(ss.surface)
+        ? (ss.surface as Record<string, unknown>)
+        : null
+    return {
+      wireframe: {
+        lineThickness: clampFiniteOrFallback(
+          wireframe?.lineThickness,
+          1,
+          5,
+          fallback.shaderSettings.wireframe.lineThickness
+        ),
+      },
+      surface: {
+        specularIntensity: clampFiniteOrFallback(
+          surface?.specularIntensity,
+          0,
+          2,
+          fallback.shaderSettings.surface.specularIntensity
+        ),
+      },
     }
-  }
+  })
 }
 
 /** Normalize imported appearance data: validate types, clamp ranges, apply defaults. */
