@@ -21,10 +21,7 @@ import {
 } from '@/lib/physics/openQuantum/hydrogenBasis'
 import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
 import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
-import {
-  densityMatrixFromCoefficients,
-  evolveMultiStep,
-} from '@/lib/physics/openQuantum/integrator'
+import { densityMatrixFromCoefficients } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import { computeMetrics } from '@/lib/physics/openQuantum/metrics'
 import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'
@@ -64,6 +61,7 @@ export class AnalyticOpenQuantumExecutor {
   private hoCacheKey = ''
   private hoChannels: LindbladChannel[] = []
   private hoEnergies: Float64Array | null = null
+  private hoPropagator: ComplexMatrix | null = null
   private hoPopulationLabels: string[] | null = null
 
   // Hydrogen caches
@@ -224,6 +222,8 @@ export class AnalyticOpenQuantumExecutor {
     const presetKey = cachedPresetConfig
       ? `${cachedPresetConfig.presetName}:${cachedPresetConfig.seed}:${cachedPresetConfig.termCount}:${cachedPresetConfig.dimension}`
       : `k:${K}`
+    const dt = oqConfig.dt ?? 0.01
+    const substeps = oqConfig.substeps ?? 4
     const hoCacheKey = [
       presetKey,
       oqConfig.dephasingRate ?? 0,
@@ -232,6 +232,8 @@ export class AnalyticOpenQuantumExecutor {
       oqConfig.dephasingEnabled ? 1 : 0,
       oqConfig.relaxationEnabled ? 1 : 0,
       oqConfig.thermalEnabled ? 1 : 0,
+      dt,
+      substeps,
     ].join(':')
 
     if (hoCacheKey !== this.hoCacheKey || !this.hoEnergies || this.hoEnergies.length !== K) {
@@ -241,6 +243,8 @@ export class AnalyticOpenQuantumExecutor {
         energies[k] = cachedPreset.energies[k] ?? 0
       }
       this.hoEnergies = energies
+      const liouvillian = buildLiouvillian(energies, this.hoChannels, K)
+      this.hoPropagator = computePropagator(liouvillian, dt * substeps, K)
       this.hoCacheKey = hoCacheKey
       this.initialized = false
       forceUpdate = true
@@ -248,9 +252,7 @@ export class AnalyticOpenQuantumExecutor {
 
     if (!this.shouldUpdateThisFrame(performance, K, forceUpdate || stateReinitialized)) return
 
-    const dt = oqConfig.dt ?? 0.01
-    const substeps = oqConfig.substeps ?? 4
-    evolveMultiStep(this.state, this.hoEnergies!, this.hoChannels, dt, substeps)
+    evolvePropagatorStep(this.hoPropagator!, this.state)
 
     this.publishMetricsAndPack(K, gridPass, shared, schroedingerVersion, performance)
   }
@@ -375,6 +377,7 @@ export class AnalyticOpenQuantumExecutor {
     this.hoCacheKey = ''
     this.hoChannels = []
     this.hoEnergies = null
+    this.hoPropagator = null
     this.hydrogenBasis = null
     this.hydrogenRates = null
     this.hydrogenChannels = null

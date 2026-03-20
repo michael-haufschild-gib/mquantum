@@ -60,43 +60,24 @@ export function buildLiouvillian(
   }
 
   // --- Dissipative part ---
-  // For each rank-1 Lindblad operator L_r = amp_r |a⟩⟨b| where a=row, b=col:
+  // Each rank-1 Lindblad operator L = α|a⟩⟨b| yields:
   //
-  // D[L_r](ρ)_{kl} = amp_r amp_r* (δ_{ka} δ_{la} ρ_{bb}
-  //                  - 0.5 δ_{kb} ρ_{al} - 0.5 ρ_{ka} δ_{bl})  ... simplified wrong
+  //   L ρ L†  = |α|² ρ_{bb} |a⟩⟨a|
+  //   L†L     = |α|² |b⟩⟨b|
   //
-  // Actually the full dissipator is:
-  // D[L](ρ) = L ρ L† - 0.5{L†L, ρ}
+  // Lindblad dissipator D[L](ρ) = L ρ L† − ½{L†L, ρ} in components:
   //
-  // For L = α|a⟩⟨b|:
-  //   L ρ L† = |α|² |a⟩⟨b|ρ|b⟩⟨a| = |α|² ρ_{bb} |a⟩⟨a|
-  //   L†L = |α|² |b⟩⟨b|
-  //   {L†L, ρ} = |α|² (|b⟩⟨b|ρ + ρ|b⟩⟨b|)
+  //   D[L](ρ)_{kl} = |α|² [ δ_{ka} δ_{la} ρ_{bb}
+  //                        − ½ δ_{kb} ρ_{bl}
+  //                        − ½ ρ_{kb} δ_{bl} ]
   //
-  // So D[L](ρ)_{kl} = |α|² [δ_{ka} δ_{la} ρ_{bb}
-  //                    - 0.5 δ_{kb} ρ_{bl} - 0.5 ρ_{kb} δ_{lb}]
+  // Superoperator L_D[kl, mn] = coefficient of ρ_{mn} in dρ_{kl}/dt:
   //
-  // Wait, let me be more careful:
-  // (L ρ L†)_{kl} = |α|² ⟨k|a⟩⟨b|ρ|b⟩⟨a|l⟩ = |α|² δ_{ka} δ_{la} ρ_{bb}
-  // (L†L ρ)_{kl} = |α|² ⟨k|b⟩⟨b|ρ|·⟩ → |α|² δ_{kb} ρ_{bl}
-  // (ρ L†L)_{kl} = |α|² ⟨·|ρ|b⟩⟨b|l⟩ → |α|² ρ_{kb} δ_{bl}
+  //   Term 1: δ_{ka}δ_{la}ρ_{bb}  →  L[a*K+a, b*K+b] += |α|²
+  //   Term 2: −½ δ_{kb} ρ_{bl}    →  L[b*K+l, b*K+l] -= ½|α|²  ∀l
+  //   Term 3: −½ ρ_{kb} δ_{bl}    →  L[k*K+b, k*K+b] -= ½|α|²  ∀k
   //
-  // D[L](ρ)_{kl} = |α|² [δ_{ka} δ_{la} ρ_{bb}
-  //                 - 0.5 δ_{kb} ρ_{bl} - 0.5 ρ_{kb} δ_{bl}]
-  //
-  // In the vectorized form L · vec(ρ):
-  // The superoperator element L[kl, mn] gives the coefficient of ρ_{mn} in dρ_{kl}/dt.
-  //
-  // Term 1: δ_{ka} δ_{la} ρ_{bb} → contributes to L[a*K+a, b*K+b] += |α|²
-  // Term 2: -0.5 δ_{kb} ρ_{bl} → contributes to L[k*K+l, b*K+l] -= 0.5|α|² for k=b
-  //         i.e., L[b*K+l, b*K+l] -= 0.5|α|² for all l
-  // Term 3: -0.5 ρ_{kb} δ_{bl} → contributes to L[k*K+l, k*K+b] -= 0.5|α|² for l=b
-  //         i.e., L[k*K+b, k*K+b] -= 0.5|α|² for all k
-
-  // Wait, I need to reconsider. Let me use the correct (but general) amplitude.
-  // Actually, for complex amplitude: L = (αr + i·αi)|a⟩⟨b|
-  // |α|² = αr² + αi²
-  // All the dissipator terms only depend on |α|², not on the phase of α.
+  // Phase of α cancels — all terms depend only on |α|².
 
   for (const ch of channels) {
     const a = ch.row
