@@ -271,6 +271,7 @@ export function buildViewItems(
         ctx.toggleLeftPanel()
         soundManager.playClick()
       },
+      'data-testid': 'menu-view-explorer',
     },
     {
       label: ctx.showRightPanel ? 'Hide Inspector' : 'Show Inspector',
@@ -278,13 +279,24 @@ export function buildViewItems(
         ctx.toggleRightPanel()
         soundManager.playClick()
       },
+      'data-testid': 'menu-view-inspector',
     },
-    { label: 'Cinematic Mode', onClick: ctx.toggleCinematicMode, shortcut: 'C' },
+    {
+      label: 'Cinematic Mode',
+      onClick: ctx.toggleCinematicMode,
+      shortcut: 'C',
+      'data-testid': 'menu-view-cinematic',
+    },
   ]
 
   // Only show keyboard shortcuts option on desktop (not useful on mobile)
   if (!ctx.isMobile) {
-    items.push({ label: 'Keyboard Shortcuts', onClick: ctx.toggleShortcuts, shortcut: '?' })
+    items.push({
+      label: 'Keyboard Shortcuts',
+      onClick: ctx.toggleShortcuts,
+      shortcut: '?',
+      'data-testid': 'menu-view-shortcuts',
+    })
   }
 
   items.push({ label: '---' })

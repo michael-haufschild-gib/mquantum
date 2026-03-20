@@ -248,14 +248,10 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
               { binding: 4, resource: view },
               { binding: 5, resource: densityGridSamplerRef }
             )
-          }
-          // Pre-computed gradient normal texture (always available when density grid exists)
-          const normalView = densityGridRef.getNormalTextureView()
-          if (normalView) {
-            entries.push({ binding: 7, resource: normalView })
-          } else {
-            // Fallback: bind the density texture view to avoid layout/entry mismatch
-            entries.push({ binding: 7, resource: view })
+            // Pre-computed gradient normal texture; fall back to density view
+            // to avoid bind group layout/entry mismatch
+            const normalView = densityGridRef.getNormalTextureView()
+            entries.push({ binding: 7, resource: normalView ?? view })
           }
         }
 
