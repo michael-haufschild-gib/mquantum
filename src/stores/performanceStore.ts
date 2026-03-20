@@ -10,6 +10,7 @@ import { create } from 'zustand'
 
 import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'
 import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
+import { logger } from '@/lib/logger'
 import type { ShaderDebugInfo } from '@/types/shaderDebug'
 
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from './defaults/visualDefaults'
@@ -415,9 +416,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   setRefinementProgress: (progress: number) => {
     if (!Number.isFinite(progress)) {
-      if (import.meta.env.DEV) {
-        console.warn('[performanceStore] Ignoring non-finite refinement progress:', progress)
-      }
+      logger.warn('[performanceStore] Ignoring non-finite refinement progress:', progress)
       return
     }
     set({ refinementProgress: Math.max(0, Math.min(100, progress)) })
@@ -463,9 +462,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => {
     if (!Number.isFinite(scale)) {
-      if (import.meta.env.DEV) {
-        console.warn('[performanceStore] Ignoring non-finite render resolution scale:', scale)
-      }
+      logger.warn('[performanceStore] Ignoring non-finite render resolution scale:', scale)
       return
     }
     const clampedScale = Math.max(0.1, Math.min(1.0, scale))
@@ -476,9 +473,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // FPS Limiting
   setMaxFps: (fps: number) => {
     if (!Number.isFinite(fps)) {
-      if (import.meta.env.DEV) {
-        console.warn('[performanceStore] Ignoring non-finite max FPS:', fps)
-      }
+      logger.warn('[performanceStore] Ignoring non-finite max FPS:', fps)
       return
     }
     // 0 = uncapped (transient, not persisted). Used by benchmarks/profiling.

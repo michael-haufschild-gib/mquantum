@@ -13,6 +13,7 @@ import {
   SchroedingerPresetName,
   type TdseConfig,
 } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
@@ -52,9 +53,7 @@ export const createSchroedingerSlice: StateCreator<
     values.every((value) => Number.isFinite(value))
 
   const warnNonFiniteSchroedingerInput = (name: string, value: unknown): void => {
-    if (import.meta.env.DEV) {
-      console.warn(`[schroedingerSlice] Ignoring non-finite input for ${name}:`, value)
-    }
+    logger.warn(`[schroedingerSlice] Ignoring non-finite input for ${name}:`, value)
   }
 
   // === Setter Factories ===
@@ -77,12 +76,10 @@ export const createSchroedingerSlice: StateCreator<
     <K extends keyof typeof DEFAULT_SCHROEDINGER_CONFIG>(key: K, min: number, max: number) =>
     (value: number) => {
       if (!isFiniteSchroedingerInput(value)) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[schroedingerSlice] Ignoring non-finite numeric update for ${String(key)}:`,
-            value
-          )
-        }
+        logger.warn(
+          `[schroedingerSlice] Ignoring non-finite numeric update for ${String(key)}:`,
+          value
+        )
         return
       }
       const clamped = Math.max(min, Math.min(max, value))
@@ -107,9 +104,7 @@ export const createSchroedingerSlice: StateCreator<
     // === Geometry Settings ===
     setSchroedingerScale: (scale) => {
       if (!isFiniteSchroedingerInput(scale)) {
-        if (import.meta.env.DEV) {
-          console.warn('[schroedingerSlice] Ignoring non-finite scale:', scale)
-        }
+        logger.warn('[schroedingerSlice] Ignoring non-finite scale:', scale)
         return
       }
       const clampedScale = Math.max(0.1, Math.min(2.0, scale))
@@ -167,11 +162,9 @@ export const createSchroedingerSlice: StateCreator<
     // === Slice Parameters ===
     setSchroedingerParameterValue: (dimIndex, value) => {
       if (!Number.isInteger(dimIndex)) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            `setSchroedingerParameterValue: Invalid non-integer dimension index ${dimIndex}`
-          )
-        }
+        logger.warn(
+          `setSchroedingerParameterValue: Invalid non-integer dimension index ${dimIndex}`
+        )
         return
       }
       if (!isFiniteSchroedingerInput(value)) {
@@ -180,11 +173,9 @@ export const createSchroedingerSlice: StateCreator<
       }
       const values = [...get().schroedinger.parameterValues]
       if (dimIndex < 0 || dimIndex >= values.length) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            `setSchroedingerParameterValue: Invalid dimension index ${dimIndex} (valid range: 0-${values.length - 1})`
-          )
-        }
+        logger.warn(
+          `setSchroedingerParameterValue: Invalid dimension index ${dimIndex} (valid range: 0-${values.length - 1})`
+        )
         return
       }
       const clampedValue = Math.max(-2.0, Math.min(2.0, value))

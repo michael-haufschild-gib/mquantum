@@ -325,12 +325,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private maybeRebuild(device: GPUDevice, config: FreeScalarConfig): void {
     const configHash = computeFsfConfigHash(config)
     if (configHash !== this.lastConfigHash || !this.phiBuffer) {
-      if (import.meta.env.DEV) {
-        console.log(
-          `[FSF-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}` +
-            ` (latticeDim=${config.latticeDim}, grid=${config.gridSize}, needsReset=${config.needsReset})`
-        )
-      }
+      logger.log(
+        `[FSF-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}` +
+          ` (latticeDim=${config.latticeDim}, grid=${config.gridSize}, needsReset=${config.needsReset})`
+      )
       this.rebuildFieldBuffers(device, config)
       this.buildPipelines(device)
       this.rebuildBindGroups(device)
@@ -661,9 +659,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.kSpacePending = false
       }
       this.kSpaceWorker.onerror = (e) => {
-        if (import.meta.env.DEV) {
-          console.warn('[FreeScalarFieldComputePass] k-space worker error:', e.message)
-        }
+        logger.warn('[FreeScalarFieldComputePass] k-space worker error:', e.message)
         this.kSpacePending = false
       }
     }
@@ -735,9 +731,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       // Worker will set pendingKSpaceData and clear kSpacePending via onmessage
     } catch (e) {
-      if (import.meta.env.DEV) {
-        console.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
-      }
+      logger.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
       this.kSpacePending = false
     }
   }

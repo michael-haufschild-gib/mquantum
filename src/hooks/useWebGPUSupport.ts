@@ -213,12 +213,10 @@ export function useWebGPUSupport(): UseWebGPUSupportResult {
 
       const caps = await detectWebGPUCapabilities()
 
-      if (import.meta.env.DEV) {
-        if (caps.supported) {
-          logger.log('[useWebGPUSupport] WebGPU supported:', caps)
-        } else {
-          logger.log('[useWebGPUSupport] WebGPU not available:', caps.unavailableReason)
-        }
+      if (caps.supported) {
+        logger.log('[useWebGPUSupport] WebGPU supported:', caps)
+      } else {
+        logger.log('[useWebGPUSupport] WebGPU not available:', caps.unavailableReason)
       }
 
       completeDetection(caps)

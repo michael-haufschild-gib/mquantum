@@ -358,11 +358,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       )
       const isFullRebuild = needsFullRebuildRef.current || forceFullRebuildForModeTransition
 
-      if (import.meta.env.DEV) {
-        logger.log(
-          `[WebGPUScene] pass-setup: isFullRebuild=${isFullRebuild} schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} forceMode=${forceFullRebuildForModeTransition} needsRebuild=${needsFullRebuildRef.current}`
-        )
-      }
+      logger.log(
+        `[WebGPUScene] pass-setup: isFullRebuild=${isFullRebuild} schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} forceMode=${forceFullRebuildForModeTransition} needsRebuild=${needsFullRebuildRef.current}`
+      )
 
       currentObjectTypeRef.current = objectType
 
@@ -434,9 +432,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       }
 
       if (shouldAbortSetup()) {
-        if (import.meta.env.DEV) {
-          logger.warn(`[WebGPUScene] ABORT mid-rebuild (gen=${setupGeneration}), clearing graph`)
-        }
+        logger.warn(`[WebGPUScene] ABORT mid-rebuild (gen=${setupGeneration}), clearing graph`)
         graph.clearPasses()
         needsFullRebuildRef.current = true
         lastSchrodingerConfigRef.current = null
@@ -453,11 +449,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // wait for the new pipeline to be active instead of polling isShaderCompiling.
       canvas.setAttribute('data-pipeline-gen', String(setupGeneration))
 
-      if (import.meta.env.DEV) {
-        logger.log(
-          `[WebGPUScene] setup COMPLETE (gen=${setupGeneration}), isFullRebuild=${isFullRebuild}`
-        )
-      }
+      logger.log(
+        `[WebGPUScene] setup COMPLETE (gen=${setupGeneration}), isFullRebuild=${isFullRebuild}`
+      )
 
       if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
         const renderScale = usePerformanceStore.getState().renderResolutionScale

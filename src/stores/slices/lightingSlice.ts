@@ -180,9 +180,7 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setLightHorizontalAngle: (angle: number) => {
     if (!isValidLightingNumber(angle)) {
-      if (import.meta.env.DEV) {
-        console.warn('[lightingSlice] Ignoring non-finite horizontal angle:', angle)
-      }
+      logger.warn('[lightingSlice] Ignoring non-finite horizontal angle:', angle)
       return
     }
     const normalized = ((angle % 360) + 360) % 360
@@ -191,9 +189,7 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setLightVerticalAngle: (angle: number) => {
     if (!isValidLightingNumber(angle)) {
-      if (import.meta.env.DEV) {
-        console.warn('[lightingSlice] Ignoring non-finite vertical angle:', angle)
-      }
+      logger.warn('[lightingSlice] Ignoring non-finite vertical angle:', angle)
       return
     }
     set({ lightVerticalAngle: Math.max(-90, Math.min(90, angle)) })
@@ -208,9 +204,7 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setAmbientIntensity: (intensity: number) => {
     if (!isValidLightingNumber(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[lightingSlice] Ignoring non-finite ambient intensity:', intensity)
-      }
+      logger.warn('[lightingSlice] Ignoring non-finite ambient intensity:', intensity)
       return
     }
     set((state) => ({
@@ -233,9 +227,7 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   // --- Enhanced Lighting Actions ---
   setLightStrength: (strength: number) => {
     if (!isValidLightingNumber(strength)) {
-      if (import.meta.env.DEV) {
-        console.warn('[lightingSlice] Ignoring non-finite light strength:', strength)
-      }
+      logger.warn('[lightingSlice] Ignoring non-finite light strength:', strength)
       return
     }
     set({ lightStrength: Math.max(0, Math.min(3, strength)) })
@@ -251,9 +243,7 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setExposure: (exposure: number) => {
     if (!isValidLightingNumber(exposure)) {
-      if (import.meta.env.DEV) {
-        console.warn('[lightingSlice] Ignoring non-finite exposure:', exposure)
-      }
+      logger.warn('[lightingSlice] Ignoring non-finite exposure:', exposure)
       return
     }
     set({ exposure: Math.max(0.1, Math.min(3, exposure)) })
@@ -300,28 +290,26 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
         const hasInvalidRotation =
           updates.rotation !== undefined && !isValidRotationTuple(updates.rotation)
 
-        if (import.meta.env.DEV) {
-          if (hasInvalidIntensity) {
-            logger.warn(
-              '[lightingSlice] Ignoring non-finite light intensity update:',
-              updates.intensity
-            )
-          }
-          if (hasInvalidConeAngle) {
-            logger.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
-          }
-          if (hasInvalidPenumbra) {
-            logger.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
-          }
-          if (hasInvalidRange) {
-            logger.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
-          }
-          if (hasInvalidDecay) {
-            logger.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
-          }
-          if (hasInvalidRotation) {
-            logger.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
-          }
+        if (hasInvalidIntensity) {
+          logger.warn(
+            '[lightingSlice] Ignoring non-finite light intensity update:',
+            updates.intensity
+          )
+        }
+        if (hasInvalidConeAngle) {
+          logger.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
+        }
+        if (hasInvalidPenumbra) {
+          logger.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
+        }
+        if (hasInvalidRange) {
+          logger.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
+        }
+        if (hasInvalidDecay) {
+          logger.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
+        }
+        if (hasInvalidRotation) {
+          logger.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
         }
 
         const sanitizedUpdates: Partial<Omit<LightSource, 'id'>> = { ...updates }

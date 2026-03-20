@@ -22,6 +22,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import {
   computeReflectionTransmission,
   TdseDiagnosticsHistory,
@@ -184,9 +185,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const fittedActive = reduceGridToFit(activeGrid)
     const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
     if (fixed.every((g, i) => g === config.gridSize[i])) return config
-    if (import.meta.env.DEV) {
-      console.warn(`[TDSE] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
-    }
+    logger.warn(`[TDSE] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
     return { ...config, gridSize: fixed }
   }
 
@@ -448,9 +447,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const configHash = this.computeConfigHash(config)
 
     if (configHash !== this.lastConfigHash || !this.psiReBuffer) {
-      if (import.meta.env.DEV) {
-        console.log(`[TDSE-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
-      }
+      logger.log(`[TDSE-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
       this.buildPipelines(device)
       this.rebuildBindGroups(device)

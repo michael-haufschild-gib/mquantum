@@ -156,9 +156,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const currentType = get().objectType
 
     if (!Number.isFinite(dimension)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[geometryStore] Ignoring non-finite dimension: ${dimension}`)
-      }
+      logger.warn(`[geometryStore] Ignoring non-finite dimension: ${dimension}`)
       return
     }
 
@@ -254,8 +252,8 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const currentDimension = get().dimension
     const currentType = get().objectType
 
-    if (!Number.isFinite(dimension) && import.meta.env.DEV) {
-      console.warn(
+    if (!Number.isFinite(dimension)) {
+      logger.warn(
         `[geometryStore] Non-finite scene dimension ${dimension}; using default ${DEFAULT_DIMENSION}`
       )
     }

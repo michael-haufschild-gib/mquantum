@@ -5,6 +5,7 @@
 
 import { create } from 'zustand'
 
+import { logger } from '@/lib/logger'
 import { getRotationPlanes } from '@/lib/math/rotation'
 
 /** Minimum animation speed multiplier */
@@ -118,9 +119,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
 
   setSpeed: (speed: number) => {
     if (!isValidSpeedInput(speed)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[animationStore] Ignoring non-finite speed: ${speed}`)
-      }
+      logger.warn(`[animationStore] Ignoring non-finite speed: ${speed}`)
       return
     }
     set({ speed: clampSpeed(speed) })
@@ -194,9 +193,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
 
   setDimension: (dimension: number) => {
     if (!isValidDimensionInput(dimension)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[animationStore] Ignoring invalid dimension: ${dimension}`)
-      }
+      logger.warn(`[animationStore] Ignoring invalid dimension: ${dimension}`)
       return
     }
 
@@ -217,9 +214,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
 
   updateAccumulatedTime: (delta: number) => {
     if (!Number.isFinite(delta)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[animationStore] Ignoring non-finite accumulated-time delta: ${delta}`)
-      }
+      logger.warn(`[animationStore] Ignoring non-finite accumulated-time delta: ${delta}`)
       return
     }
 

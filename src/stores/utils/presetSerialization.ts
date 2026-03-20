@@ -149,9 +149,7 @@ export const TRANSIENT_FIELDS = new Set([
 ])
 
 function warnDroppedNonFinitePresetValue(path: string, value: number): void {
-  if (import.meta.env.DEV) {
-    console.warn(`[presetSerialization] Dropping non-finite numeric value at "${path}":`, value)
-  }
+  logger.warn(`[presetSerialization] Dropping non-finite numeric value at "${path}":`, value)
 }
 
 function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | undefined {

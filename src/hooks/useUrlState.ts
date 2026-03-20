@@ -51,9 +51,7 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       }
     }
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.warn('[useUrlState] Failed to apply URL state:', error)
-    }
+    logger.warn('[useUrlState] Failed to apply URL state:', error)
   }
 }
 
@@ -68,14 +66,10 @@ function loadSceneByName(sceneName: string): void {
   if (result) {
     if (result.source === 'saved') {
       usePresetManagerStore.getState().loadScene(result.id)
-      if (import.meta.env.DEV) {
-        console.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
-      }
+      logger.log(`[useUrlState] Loaded saved scene: "${sceneName}"`)
     } else {
       applySceneExample(result.id)
-      if (import.meta.env.DEV) {
-        console.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
-      }
+      logger.log(`[useUrlState] Loaded example scene: "${sceneName}"`)
     }
   } else {
     logger.warn(`[useUrlState] Scene "${sceneName}" not found in saved or example scenes`)

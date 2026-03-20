@@ -1,5 +1,7 @@
 import type { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_SKYBOX_ANIMATION_MODE,
@@ -113,9 +115,7 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function warnInvalidProceduralSetting(path: string, value: unknown): void {
-  if (import.meta.env.DEV) {
-    console.warn(`[skyboxSlice] Ignoring invalid procedural setting "${path}":`, value)
-  }
+  logger.warn(`[skyboxSlice] Ignoring invalid procedural setting "${path}":`, value)
 }
 
 function sanitizeProceduralValue(
@@ -322,18 +322,14 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
   },
   setSkyboxIntensity: (intensity: number) => {
     if (!isFiniteSkyboxNumericInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[skyboxSlice] Ignoring non-finite skybox intensity:', intensity)
-      }
+      logger.warn('[skyboxSlice] Ignoring non-finite skybox intensity:', intensity)
       return
     }
     set({ skyboxIntensity: Math.max(0, Math.min(10, intensity)) })
   },
   setSkyboxRotation: (rotation: number) => {
     if (!isFiniteSkyboxNumericInput(rotation)) {
-      if (import.meta.env.DEV) {
-        console.warn('[skyboxSlice] Ignoring non-finite skybox rotation:', rotation)
-      }
+      logger.warn('[skyboxSlice] Ignoring non-finite skybox rotation:', rotation)
       return
     }
     // Normalize rotation to [0, 2π) range to prevent precision issues
@@ -343,9 +339,7 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
   setSkyboxAnimationMode: (mode: SkyboxAnimationMode) => set({ skyboxAnimationMode: mode }),
   setSkyboxAnimationSpeed: (speed: number) => {
     if (!isFiniteSkyboxNumericInput(speed)) {
-      if (import.meta.env.DEV) {
-        console.warn('[skyboxSlice] Ignoring non-finite skybox animation speed:', speed)
-      }
+      logger.warn('[skyboxSlice] Ignoring non-finite skybox animation speed:', speed)
       return
     }
     set({ skyboxAnimationSpeed: Math.max(0, Math.min(5, speed)) })

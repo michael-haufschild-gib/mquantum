@@ -6,6 +6,7 @@
 import { create } from 'zustand'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { logger } from '@/lib/logger'
 import { getRotationPlanes } from '@/lib/math/rotation'
 
 /**
@@ -114,9 +115,7 @@ export const useRotationStore = create<RotationState>((set) => ({
 
   setRotation: (plane: string, angle: number) => {
     if (!isValidRotationAngle(angle)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[rotationStore] Ignoring non-finite angle for ${plane}: ${angle}`)
-      }
+      logger.warn(`[rotationStore] Ignoring non-finite angle for ${plane}: ${angle}`)
       return
     }
 
@@ -183,9 +182,7 @@ export const useRotationStore = create<RotationState>((set) => ({
 
   setDimension: (dimension: number) => {
     if (!Number.isFinite(dimension) || !Number.isInteger(dimension)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[rotationStore] Ignoring invalid dimension: ${dimension}`)
-      }
+      logger.warn(`[rotationStore] Ignoring invalid dimension: ${dimension}`)
       return
     }
 

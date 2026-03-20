@@ -173,13 +173,11 @@ export class WebGPUDevice {
     this.format = format
     this.capabilities = capabilities
 
-    if (import.meta.env.DEV) {
-      console.log('[WebGPU] Initialized:', {
-        adapter: adapterInfoString,
-        format,
-        timestampQuery: supportsTimestamp,
-      })
-    }
+    logger.log('[WebGPU] Initialized:', {
+      adapter: adapterInfoString,
+      format,
+      timestampQuery: supportsTimestamp,
+    })
 
     return { adapter, device, context, format, capabilities }
   }
@@ -200,7 +198,7 @@ export class WebGPUDevice {
 
     // Attempt automatic recovery
     if (this.canvas && reason !== 'destroyed') {
-      if (import.meta.env.DEV) logger.log('[WebGPU] Attempting device recovery...')
+      logger.log('[WebGPU] Attempting device recovery...')
       this.initialize(this.canvas).catch((err) => {
         logger.error('[WebGPU] Recovery failed:', err)
       })

@@ -9,6 +9,8 @@
 
 import { create } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 /** Default camera position and target (matches WebGPUCamera constructor defaults) */
 const DEFAULT_POSITION: [number, number, number] = [0, 3.125, 7.5]
 const DEFAULT_TARGET: [number, number, number] = [0, 0, 0]
@@ -81,14 +83,10 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
         camera.setPosition(...normalized.position)
         camera.setTarget(...normalized.target)
         set({ pendingState: null })
-        if (import.meta.env.DEV) {
-          console.log('[cameraStore] Applied pending camera state after camera registered')
-        }
+        logger.log('[cameraStore] Applied pending camera state after camera registered')
       } else if (pendingState) {
         set({ pendingState: null })
-        if (import.meta.env.DEV) {
-          console.warn('[cameraStore] Dropped invalid pending camera state')
-        }
+        logger.warn('[cameraStore] Dropped invalid pending camera state')
       }
     }
   },
@@ -100,9 +98,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     const state = camera.getState()
     const normalized = normalizeCameraState(state)
     if (!normalized) {
-      if (import.meta.env.DEV) {
-        console.warn('[cameraStore] captureState received invalid camera coordinates')
-      }
+      logger.warn('[cameraStore] captureState received invalid camera coordinates')
       return null
     }
     return normalized
@@ -114,9 +110,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
 
     if (!normalized) {
       set({ pendingState: null })
-      if (import.meta.env.DEV) {
-        console.warn('[cameraStore] Ignoring invalid camera state')
-      }
+      logger.warn('[cameraStore] Ignoring invalid camera state')
       return
     }
 
@@ -124,9 +118,7 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     // This handles the race condition when scene loads before WebGPUScene mounts
     if (!camera) {
       set({ pendingState: normalized })
-      if (import.meta.env.DEV) {
-        console.log('[cameraStore] Camera not ready, storing pending camera state')
-      }
+      logger.log('[cameraStore] Camera not ready, storing pending camera state')
       return
     }
 

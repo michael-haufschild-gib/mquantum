@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { logger } from '@/lib/logger'
+
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 import {
   clampMin,
@@ -343,9 +345,7 @@ export const useExportStore = create<ExportStore>()(
       setCropEditorOpen: (isOpen) => set({ isCropEditorOpen: isOpen }),
       setCanvasAspectRatio: (ratio) => {
         if (!Number.isFinite(ratio) || ratio <= 0) {
-          if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid canvas aspect ratio:', ratio)
-          }
+          logger.warn('[exportStore] Ignoring invalid canvas aspect ratio:', ratio)
           return
         }
         set({ canvasAspectRatio: ratio })
@@ -354,9 +354,7 @@ export const useExportStore = create<ExportStore>()(
       setStatus: (status) => set({ status }),
       setProgress: (progress) => {
         if (!Number.isFinite(progress)) {
-          if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring non-finite progress:', progress)
-          }
+          logger.warn('[exportStore] Ignoring non-finite progress:', progress)
           return
         }
         set({ progress: Math.max(0, Math.min(1, progress)) })
@@ -385,9 +383,7 @@ export const useExportStore = create<ExportStore>()(
             return
           }
           if (!Number.isFinite(value) || value <= 0) {
-            if (import.meta.env.DEV) {
-              console.warn(`[exportStore] Ignoring invalid ${key} update:`, value)
-            }
+            logger.warn(`[exportStore] Ignoring invalid ${key} update:`, value)
             delete newSettings[key]
           }
         }
@@ -416,9 +412,7 @@ export const useExportStore = create<ExportStore>()(
         if (newSettings.warmupFrames !== undefined) {
           const { warmupFrames } = newSettings
           if (!Number.isFinite(warmupFrames) || warmupFrames < 0) {
-            if (import.meta.env.DEV) {
-              console.warn('[exportStore] Ignoring invalid warmupFrames update:', warmupFrames)
-            }
+            logger.warn('[exportStore] Ignoring invalid warmupFrames update:', warmupFrames)
             delete newSettings.warmupFrames
           } else {
             newSettings.warmupFrames = Math.max(0, Math.round(warmupFrames))
@@ -426,36 +420,22 @@ export const useExportStore = create<ExportStore>()(
         }
 
         if (newSettings.format !== undefined && !isExportFormat(newSettings.format)) {
-          if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid format update:', newSettings.format)
-          }
+          logger.warn('[exportStore] Ignoring invalid format update:', newSettings.format)
           delete newSettings.format
         }
 
         if (newSettings.codec !== undefined && !isVideoCodec(newSettings.codec)) {
-          if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid codec update:', newSettings.codec)
-          }
+          logger.warn('[exportStore] Ignoring invalid codec update:', newSettings.codec)
           delete newSettings.codec
         }
 
         if (newSettings.resolution !== undefined && !isExportResolution(newSettings.resolution)) {
-          if (import.meta.env.DEV) {
-            console.warn(
-              '[exportStore] Ignoring invalid resolution update:',
-              newSettings.resolution
-            )
-          }
+          logger.warn('[exportStore] Ignoring invalid resolution update:', newSettings.resolution)
           delete newSettings.resolution
         }
 
         if (newSettings.bitrateMode !== undefined && !isBitrateMode(newSettings.bitrateMode)) {
-          if (import.meta.env.DEV) {
-            console.warn(
-              '[exportStore] Ignoring invalid bitrateMode update:',
-              newSettings.bitrateMode
-            )
-          }
+          logger.warn('[exportStore] Ignoring invalid bitrateMode update:', newSettings.bitrateMode)
           delete newSettings.bitrateMode
         }
 
@@ -463,19 +443,15 @@ export const useExportStore = create<ExportStore>()(
           newSettings.hardwareAcceleration !== undefined &&
           !isHardwareAcceleration(newSettings.hardwareAcceleration)
         ) {
-          if (import.meta.env.DEV) {
-            console.warn(
-              '[exportStore] Ignoring invalid hardwareAcceleration update:',
-              newSettings.hardwareAcceleration
-            )
-          }
+          logger.warn(
+            '[exportStore] Ignoring invalid hardwareAcceleration update:',
+            newSettings.hardwareAcceleration
+          )
           delete newSettings.hardwareAcceleration
         }
 
         if (newSettings.rotation !== undefined && !isRotation(newSettings.rotation)) {
-          if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid rotation update:', newSettings.rotation)
-          }
+          logger.warn('[exportStore] Ignoring invalid rotation update:', newSettings.rotation)
           delete newSettings.rotation
         }
 

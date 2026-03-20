@@ -6,6 +6,7 @@
 import { create } from 'zustand'
 
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { logger } from '@/lib/logger'
 import { createScaleMatrix } from '@/lib/math'
 import type { MatrixND } from '@/lib/math/types'
 
@@ -95,9 +96,7 @@ export const useTransformStore = create<TransformState>((set, get) => ({
   // Scale actions
   setUniformScale: (value: number) => {
     if (!isValidScaleInput(value)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[transformStore] Ignoring non-finite uniform scale: ${value}`)
-      }
+      logger.warn(`[transformStore] Ignoring non-finite uniform scale: ${value}`)
       return
     }
 
@@ -116,9 +115,7 @@ export const useTransformStore = create<TransformState>((set, get) => ({
 
   setAxisScale: (axis: number, value: number) => {
     if (!isValidScaleInput(value)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[transformStore] Ignoring non-finite axis scale: ${value}`)
-      }
+      logger.warn(`[transformStore] Ignoring non-finite axis scale: ${value}`)
       return
     }
 
@@ -176,9 +173,7 @@ export const useTransformStore = create<TransformState>((set, get) => ({
   // General actions
   setDimension: (dimension: number) => {
     if (!Number.isFinite(dimension) || !Number.isInteger(dimension)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[transformStore] Ignoring invalid dimension: ${dimension}`)
-      }
+      logger.warn(`[transformStore] Ignoring invalid dimension: ${dimension}`)
       return
     }
     if (dimension < MIN_DIMENSION || dimension > MAX_DIMENSION) {

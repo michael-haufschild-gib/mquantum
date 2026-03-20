@@ -30,4 +30,12 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     const matches = [...config.matchAll(/^\s+'max-lines'\s*:/gm)]
     expect(matches).toHaveLength(2)
   })
+
+  it('no-console rule is defined with exactly 3 exemptions', () => {
+    // Base config enables no-console as error.
+    // 3 exemption blocks: logger.ts, ErrorBoundary files, and test files.
+    // If this fails, someone broadened the exemption — use logger instead.
+    const ruleMatches = [...config.matchAll(/^\s+'no-console'\s*:/gm)]
+    expect(ruleMatches).toHaveLength(3) // 1 enable + 2 off overrides (error-boundaries + tests)
+  })
 })

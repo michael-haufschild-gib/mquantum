@@ -10,6 +10,8 @@
 
 import { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 import { AppearanceSlice, MaterialSlice, MaterialSliceState } from './types'
 
 function isFiniteMaterialInput(value: number): boolean {
@@ -28,27 +30,21 @@ export const createMaterialSlice: StateCreator<AppearanceSlice, [], [], Material
 
   setFaceEmission: (emission) => {
     if (!isFiniteMaterialInput(emission)) {
-      if (import.meta.env.DEV) {
-        console.warn('[materialSlice] Ignoring non-finite face emission:', emission)
-      }
+      logger.warn('[materialSlice] Ignoring non-finite face emission:', emission)
       return
     }
     set({ faceEmission: Math.max(0, Math.min(5, emission)) })
   },
   setFaceEmissionThreshold: (threshold) => {
     if (!isFiniteMaterialInput(threshold)) {
-      if (import.meta.env.DEV) {
-        console.warn('[materialSlice] Ignoring non-finite face emission threshold:', threshold)
-      }
+      logger.warn('[materialSlice] Ignoring non-finite face emission threshold:', threshold)
       return
     }
     set({ faceEmissionThreshold: Math.max(0, Math.min(1, threshold)) })
   },
   setFaceEmissionColorShift: (shift) => {
     if (!isFiniteMaterialInput(shift)) {
-      if (import.meta.env.DEV) {
-        console.warn('[materialSlice] Ignoring non-finite face emission color shift:', shift)
-      }
+      logger.warn('[materialSlice] Ignoring non-finite face emission color shift:', shift)
       return
     }
     set({ faceEmissionColorShift: Math.max(-1, Math.min(1, shift)) })

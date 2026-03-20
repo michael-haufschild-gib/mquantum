@@ -23,6 +23,7 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
@@ -350,9 +351,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
     // Rebuild if config changed
     if (configHash !== this.lastConfigHash || !this.buf) {
-      if (import.meta.env.DEV) {
-        console.log(`[Pauli-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
-      }
+      logger.log(`[Pauli-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
       this.pl = buildPauliPipelines(device)
       this.rebuildBindGroups(device)

@@ -602,7 +602,11 @@ export default [
       'jsdoc/require-returns': 'off',
       'jsdoc/require-example': 'off',
 
-      // Complexity: error at 40 (hard limit), warn at 25 (aspiration)
+      // Logging: use structured logger from @/lib/logger instead of console.*
+      // ErrorBoundary files are exempt — they must log in production.
+      'no-console': 'error',
+
+      // Complexity: error at 40 (hard limit)
       complexity: ['error', 40],
 
       // Custom project rules
@@ -612,6 +616,18 @@ export default [
       'project-rules/no-raw-html-controls': 'error',
       'project-rules/no-shallow-matchers': 'error',
       'project-rules/no-dom-node-access': 'error',
+    },
+  },
+
+  // Allow console.* in error boundaries (must log in production) and the logger itself
+  {
+    files: [
+      'src/lib/logger.ts',
+      'src/components/ui/ErrorBoundary.tsx',
+      'src/components/canvas/CanvasErrorBoundary.tsx',
+    ],
+    rules: {
+      'no-console': 'off',
     },
   },
 
@@ -680,6 +696,7 @@ export default [
       '@eslint-react/no-unnecessary-use-callback': 'off',
       '@eslint-react/no-unnecessary-use-memo': 'off',
       '@eslint-react/purity': 'off',
+      'no-console': 'off',
     },
   },
   // Non-component tests: local render() helpers are not @testing-library/react render

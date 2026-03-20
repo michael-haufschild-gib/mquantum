@@ -20,6 +20,7 @@ import {
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
+import { logger } from '@/lib/logger'
 import { useLightingStore } from '@/stores/lightingStore'
 import {
   hasPersistedMaxFps,
@@ -81,28 +82,25 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
           lightingStore.removeLight(spotlight.id)
         }
 
-        if (import.meta.env.DEV) {
-          console.log('[DeviceCapabilities] Mobile GPU detected:', {
-            tier: capabilities.gpuTier,
-            gpu: capabilities.gpuName,
-            userHasResolutionPreference,
-            userHasFpsPreference,
-            renderResolutionScale: userHasResolutionPreference
-              ? perfStore.renderResolutionScale
-              : MOBILE_DEFAULT_RESOLUTION_SCALE,
-            maxFps: userHasFpsPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
-            spotlightsRemoved: spotlights.length,
-          })
-        }
-      } else if (import.meta.env.DEV) {
-        console.log('[DeviceCapabilities] Detection complete:', {
+        logger.log('[DeviceCapabilities] Mobile GPU detected:', {
+          tier: capabilities.gpuTier,
+          gpu: capabilities.gpuName,
+          userHasResolutionPreference,
+          userHasFpsPreference,
+          renderResolutionScale: userHasResolutionPreference
+            ? perfStore.renderResolutionScale
+            : MOBILE_DEFAULT_RESOLUTION_SCALE,
+          maxFps: userHasFpsPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
+          spotlightsRemoved: spotlights.length,
+        })
+      } else
+        logger.log('[DeviceCapabilities] Detection complete:', {
           webgl2: capabilities.webgl2Supported,
           tier: capabilities.gpuTier,
           gpu: capabilities.gpuName,
           isMobile: capabilities.isMobileGPU,
           type: capabilities.detectionType,
         })
-      }
     }
 
     runDetection()

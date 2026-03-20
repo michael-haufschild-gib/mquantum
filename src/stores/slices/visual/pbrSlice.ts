@@ -17,6 +17,7 @@
 
 import { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
 import { DEFAULT_FACE_PBR, type PBRConfig } from '@/stores/defaults/visualDefaults'
 
 // ============================================================================
@@ -111,9 +112,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
   // --- Face Setters ---
   setFaceRoughness: (roughness) => {
     if (!isFinitePBRInput(roughness)) {
-      if (import.meta.env.DEV) {
-        console.warn('[pbrSlice] Ignoring non-finite roughness:', roughness)
-      }
+      logger.warn('[pbrSlice] Ignoring non-finite roughness:', roughness)
       return
     }
     set((state) => ({
@@ -124,9 +123,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
 
   setFaceMetallic: (metallic) => {
     if (!isFinitePBRInput(metallic)) {
-      if (import.meta.env.DEV) {
-        console.warn('[pbrSlice] Ignoring non-finite metallic:', metallic)
-      }
+      logger.warn('[pbrSlice] Ignoring non-finite metallic:', metallic)
       return
     }
     set((state) => ({
@@ -137,9 +134,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
 
   setFaceReflectance: (reflectance) => {
     if (!isFinitePBRInput(reflectance)) {
-      if (import.meta.env.DEV) {
-        console.warn('[pbrSlice] Ignoring non-finite reflectance:', reflectance)
-      }
+      logger.warn('[pbrSlice] Ignoring non-finite reflectance:', reflectance)
       return
     }
     set((state) => ({
@@ -150,9 +145,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
 
   setFaceSpecularIntensity: (intensity) => {
     if (!isFinitePBRInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[pbrSlice] Ignoring non-finite specular intensity:', intensity)
-      }
+      logger.warn('[pbrSlice] Ignoring non-finite specular intensity:', intensity)
       return
     }
     set((state) => ({
@@ -174,39 +167,35 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
       if (config.roughness !== undefined) {
         if (isFinitePBRInput(config.roughness)) {
           nextFace.roughness = clampRoughness(config.roughness)
-        } else if (import.meta.env.DEV) {
-          console.warn('[pbrSlice] Ignoring non-finite roughness in setFacePBR:', config.roughness)
-        }
+        } else
+          logger.warn('[pbrSlice] Ignoring non-finite roughness in setFacePBR:', config.roughness)
       }
 
       if (config.metallic !== undefined) {
         if (isFinitePBRInput(config.metallic)) {
           nextFace.metallic = clampMetallic(config.metallic)
-        } else if (import.meta.env.DEV) {
-          console.warn('[pbrSlice] Ignoring non-finite metallic in setFacePBR:', config.metallic)
-        }
+        } else
+          logger.warn('[pbrSlice] Ignoring non-finite metallic in setFacePBR:', config.metallic)
       }
 
       if (config.reflectance !== undefined) {
         if (isFinitePBRInput(config.reflectance)) {
           nextFace.reflectance = clampReflectance(config.reflectance)
-        } else if (import.meta.env.DEV) {
-          console.warn(
+        } else
+          logger.warn(
             '[pbrSlice] Ignoring non-finite reflectance in setFacePBR:',
             config.reflectance
           )
-        }
       }
 
       if (config.specularIntensity !== undefined) {
         if (isFinitePBRInput(config.specularIntensity)) {
           nextFace.specularIntensity = clampSpecularIntensity(config.specularIntensity)
-        } else if (import.meta.env.DEV) {
-          console.warn(
+        } else
+          logger.warn(
             '[pbrSlice] Ignoring non-finite specular intensity in setFacePBR:',
             config.specularIntensity
           )
-        }
       }
 
       if (config.specularColor !== undefined) {

@@ -1,5 +1,7 @@
 import type { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 import type { AdvancedRenderingSlice } from './types'
 
 function isFiniteAdvancedRenderingInput(value: number): boolean {
@@ -29,9 +31,7 @@ export const createAdvancedRenderingSlice: StateCreator<
   setSssEnabled: (sssEnabled) => set({ sssEnabled }),
   setSssIntensity: (sssIntensity) => {
     if (!isFiniteAdvancedRenderingInput(sssIntensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[advancedRenderingSlice] Ignoring non-finite SSS intensity:', sssIntensity)
-      }
+      logger.warn('[advancedRenderingSlice] Ignoring non-finite SSS intensity:', sssIntensity)
       return
     }
     set({ sssIntensity: clampAdvancedRenderingValue(sssIntensity, 0.0, 2.0) })
@@ -39,18 +39,14 @@ export const createAdvancedRenderingSlice: StateCreator<
   setSssColor: (sssColor) => set({ sssColor }),
   setSssThickness: (sssThickness) => {
     if (!isFiniteAdvancedRenderingInput(sssThickness)) {
-      if (import.meta.env.DEV) {
-        console.warn('[advancedRenderingSlice] Ignoring non-finite SSS thickness:', sssThickness)
-      }
+      logger.warn('[advancedRenderingSlice] Ignoring non-finite SSS thickness:', sssThickness)
       return
     }
     set({ sssThickness: clampAdvancedRenderingValue(sssThickness, 0.1, 5.0) })
   },
   setSssJitter: (sssJitter) => {
     if (!isFiniteAdvancedRenderingInput(sssJitter)) {
-      if (import.meta.env.DEV) {
-        console.warn('[advancedRenderingSlice] Ignoring non-finite SSS jitter:', sssJitter)
-      }
+      logger.warn('[advancedRenderingSlice] Ignoring non-finite SSS jitter:', sssJitter)
       return
     }
     set({ sssJitter: clampAdvancedRenderingValue(sssJitter, 0.0, 1.0) })

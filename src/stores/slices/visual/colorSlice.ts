@@ -81,25 +81,14 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
             isFiniteColorInput(values[2]) ? clampColorValue(values[2], 0, 2) : prev[2],
           ]
 
-          if (import.meta.env.DEV) {
-            if (!isFiniteColorInput(values[0])) {
-              logger.warn(
-                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[0]:`,
-                values[0]
-              )
-            }
-            if (!isFiniteColorInput(values[1])) {
-              logger.warn(
-                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[1]:`,
-                values[1]
-              )
-            }
-            if (!isFiniteColorInput(values[2])) {
-              logger.warn(
-                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[2]:`,
-                values[2]
-              )
-            }
+          if (!isFiniteColorInput(values[0])) {
+            logger.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[0]:`, values[0])
+          }
+          if (!isFiniteColorInput(values[1])) {
+            logger.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[1]:`, values[1])
+          }
+          if (!isFiniteColorInput(values[2])) {
+            logger.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[2]:`, values[2])
           }
         }
         return { cosineCoefficients: next }
@@ -108,15 +97,11 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     setCosineCoefficient: (key: 'a' | 'b' | 'c' | 'd', index: number, value: number) =>
       set((state) => {
         if (!isValidCosineIndex(index)) {
-          if (import.meta.env.DEV) {
-            console.warn('[colorSlice] Ignoring invalid cosine coefficient index:', index)
-          }
+          logger.warn('[colorSlice] Ignoring invalid cosine coefficient index:', index)
           return state
         }
         if (!isFiniteColorInput(value)) {
-          if (import.meta.env.DEV) {
-            console.warn('[colorSlice] Ignoring non-finite cosine coefficient value:', value)
-          }
+          logger.warn('[colorSlice] Ignoring non-finite cosine coefficient value:', value)
           return state
         }
         const newCoefficients = { ...state.cosineCoefficients }
@@ -178,18 +163,14 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
 
     setLchLightness: (lightness: number) => {
       if (!isFiniteColorInput(lightness)) {
-        if (import.meta.env.DEV) {
-          console.warn('[colorSlice] Ignoring non-finite LCH lightness:', lightness)
-        }
+        logger.warn('[colorSlice] Ignoring non-finite LCH lightness:', lightness)
         return
       }
       set({ lchLightness: clampColorValue(lightness, 0.1, 1) })
     },
     setLchChroma: (chroma: number) => {
       if (!isFiniteColorInput(chroma)) {
-        if (import.meta.env.DEV) {
-          console.warn('[colorSlice] Ignoring non-finite LCH chroma:', chroma)
-        }
+        logger.warn('[colorSlice] Ignoring non-finite LCH chroma:', chroma)
         return
       }
       set({ lchChroma: clampColorValue(chroma, 0, 0.4) })

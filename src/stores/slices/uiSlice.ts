@@ -9,6 +9,8 @@
 
 import type { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 import {
   DEFAULT_ANIMATION_BIAS,
   DEFAULT_SHOW_AXIS_HELPER,
@@ -126,9 +128,7 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set) => ({
   // --- Animation Actions ---
   setAnimationBias: (bias: number) => {
     if (!Number.isFinite(bias)) {
-      if (import.meta.env.DEV) {
-        console.warn('[uiSlice] Ignoring non-finite animation bias:', bias)
-      }
+      logger.warn('[uiSlice] Ignoring non-finite animation bias:', bias)
       return
     }
     set({ animationBias: Math.max(0, Math.min(1, bias)) })

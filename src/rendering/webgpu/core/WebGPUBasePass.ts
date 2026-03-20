@@ -125,15 +125,15 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
             logger.error(`[WGSL ERROR] ${shaderLabel}: ${message.message}`)
           } else if (message.type === 'warning') {
             logger.warn(`[WGSL WARN] ${shaderLabel}: ${message.message}`)
-          } else if (import.meta.env.DEV) {
-            console.log(`[WGSL INFO] ${shaderLabel}: ${message.message}`)
+          } else {
+            logger.log(`[WGSL INFO] ${shaderLabel}: ${message.message}`)
           }
           if (message.lineNum && (message.type !== 'info' || import.meta.env.DEV)) {
-            const logger = message.type === 'error' ? console.error : console.warn
-            logger(`  at line ${message.lineNum}, col ${message.linePos}`)
+            const logFn = message.type === 'error' ? logger.error : logger.warn
+            logFn(`  at line ${message.lineNum}, col ${message.linePos}`)
             const lines = code.split('\n')
             if (lines[message.lineNum - 1]) {
-              logger(`  > ${lines[message.lineNum - 1]}`)
+              logFn(`  > ${lines[message.lineNum - 1]}`)
             }
           }
         }

@@ -6,6 +6,7 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
+import { logger } from '@/lib/logger'
 import {
   float64ToVector,
   isAnimationWasmReady,
@@ -278,7 +279,7 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
   // If reusing array, ensure it has correct length (caller should manage this for perf)
   if (out && out.length < dim) {
     if (import.meta.env.DEV) {
-      console.warn(
+      logger.warn(
         `multiplyMatrixVector: Output array length (${out.length}) is smaller than result rows (${dim}). Results may be truncated.`
       )
     }

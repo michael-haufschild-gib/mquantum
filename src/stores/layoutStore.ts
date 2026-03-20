@@ -15,6 +15,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+import { logger } from '@/lib/logger'
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -183,12 +185,10 @@ export const useLayoutStore = create<LayoutStore>()(
 
       setSidebarWidth: (width: number, viewportWidth: number) => {
         if (!Number.isFinite(width) || !Number.isFinite(viewportWidth)) {
-          if (import.meta.env.DEV) {
-            console.warn('[layoutStore] Ignoring non-finite sidebar width update:', {
-              width,
-              viewportWidth,
-            })
-          }
+          logger.warn('[layoutStore] Ignoring non-finite sidebar width update:', {
+            width,
+            viewportWidth,
+          })
           return
         }
         const clampedWidth = clampSidebarWidth(width, viewportWidth)

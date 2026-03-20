@@ -7,6 +7,8 @@
 
 import type { StateCreator } from 'zustand'
 
+import { logger } from '@/lib/logger'
+
 import {
   type AntiAliasingMethod,
   DEFAULT_ANTI_ALIASING_METHOD,
@@ -224,9 +226,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setBloomGain: (gain: number) => {
     if (!isFinitePostProcessingInput(gain)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite bloom gain:', gain)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite bloom gain:', gain)
       return
     }
     set({ bloomGain: clamp(gain, 0, 3) })
@@ -234,9 +234,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setBloomThreshold: (threshold: number) => {
     if (!isFinitePostProcessingInput(threshold)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite bloom threshold:', threshold)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite bloom threshold:', threshold)
       return
     }
     set({ bloomThreshold: clamp(threshold, 0, 5) })
@@ -244,9 +242,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setBloomKnee: (knee: number) => {
     if (!isFinitePostProcessingInput(knee)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite bloom knee:', knee)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite bloom knee:', knee)
       return
     }
     set({ bloomKnee: clamp(knee, 0, 5) })
@@ -254,9 +250,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setBloomRadius: (radius: number) => {
     if (!isFinitePostProcessingInput(radius)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite bloom radius:', radius)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite bloom radius:', radius)
       return
     }
     set({ bloomRadius: clamp(radius, 0.25, 4) })
@@ -274,9 +268,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setCinematicAberration: (intensity: number) => {
     if (!isFinitePostProcessingInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite cinematic aberration:', intensity)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite cinematic aberration:', intensity)
       return
     }
     set({ cinematicAberration: Math.max(0, Math.min(0.1, intensity)) })
@@ -284,9 +276,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setCinematicVignette: (intensity: number) => {
     if (!isFinitePostProcessingInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite cinematic vignette:', intensity)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite cinematic vignette:', intensity)
       return
     }
     set({ cinematicVignette: Math.max(0, Math.min(3.0, intensity)) })
@@ -294,9 +284,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setCinematicGrain: (intensity: number) => {
     if (!isFinitePostProcessingInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite cinematic grain:', intensity)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite cinematic grain:', intensity)
       return
     }
     set({ cinematicGrain: Math.max(0, Math.min(0.2, intensity)) })
@@ -309,9 +297,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperContrast: (contrast: number) => {
     if (!isFinitePostProcessingInput(contrast)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper contrast:', contrast)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper contrast:', contrast)
       return
     }
     set({ paperContrast: Math.max(0, Math.min(1, contrast)) })
@@ -319,9 +305,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperRoughness: (roughness: number) => {
     if (!isFinitePostProcessingInput(roughness)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper roughness:', roughness)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper roughness:', roughness)
       return
     }
     set({ paperRoughness: Math.max(0, Math.min(1, roughness)) })
@@ -329,9 +313,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperFiber: (fiber: number) => {
     if (!isFinitePostProcessingInput(fiber)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper fiber:', fiber)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper fiber:', fiber)
       return
     }
     set({ paperFiber: Math.max(0, Math.min(1, fiber)) })
@@ -339,9 +321,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperFiberSize: (size: number) => {
     if (!isFinitePostProcessingInput(size)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper fiber size:', size)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper fiber size:', size)
       return
     }
     set({ paperFiberSize: Math.max(0.1, Math.min(2, size)) })
@@ -349,9 +329,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperCrumples: (crumples: number) => {
     if (!isFinitePostProcessingInput(crumples)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper crumples:', crumples)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper crumples:', crumples)
       return
     }
     set({ paperCrumples: Math.max(0, Math.min(1, crumples)) })
@@ -359,9 +337,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperCrumpleSize: (size: number) => {
     if (!isFinitePostProcessingInput(size)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper crumple size:', size)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper crumple size:', size)
       return
     }
     set({ paperCrumpleSize: Math.max(0.1, Math.min(2, size)) })
@@ -369,9 +345,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperFolds: (folds: number) => {
     if (!isFinitePostProcessingInput(folds)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper folds:', folds)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper folds:', folds)
       return
     }
     set({ paperFolds: Math.max(0, Math.min(1, folds)) })
@@ -379,9 +353,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperFoldCount: (count: number) => {
     if (!isFinitePostProcessingInput(count)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper fold count:', count)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper fold count:', count)
       return
     }
     set({ paperFoldCount: Math.max(1, Math.min(15, Math.round(count))) })
@@ -389,9 +361,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperDrops: (drops: number) => {
     if (!isFinitePostProcessingInput(drops)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper drops:', drops)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper drops:', drops)
       return
     }
     set({ paperDrops: Math.max(0, Math.min(1, drops)) })
@@ -399,9 +369,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperFade: (fade: number) => {
     if (!isFinitePostProcessingInput(fade)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper fade:', fade)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper fade:', fade)
       return
     }
     set({ paperFade: Math.max(0, Math.min(1, fade)) })
@@ -409,9 +377,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperSeed: (seed: number) => {
     if (!isFinitePostProcessingInput(seed)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper seed:', seed)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper seed:', seed)
       return
     }
     set({ paperSeed: Math.max(0, Math.min(1000, seed)) })
@@ -431,9 +397,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperIntensity: (intensity: number) => {
     if (!isFinitePostProcessingInput(intensity)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite paper intensity:', intensity)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite paper intensity:', intensity)
       return
     }
     set({ paperIntensity: Math.max(0, Math.min(1, intensity)) })
@@ -446,9 +410,7 @@ export const createPostProcessingSlice: StateCreator<
 
   setFrameBlendingFactor: (factor: number) => {
     if (!isFinitePostProcessingInput(factor)) {
-      if (import.meta.env.DEV) {
-        console.warn('[postProcessingSlice] Ignoring non-finite frame blending factor:', factor)
-      }
+      logger.warn('[postProcessingSlice] Ignoring non-finite frame blending factor:', factor)
       return
     }
     set({ frameBlendingFactor: Math.max(0, Math.min(1, factor)) })

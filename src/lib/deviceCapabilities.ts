@@ -10,6 +10,8 @@
  * @see https://github.com/pmndrs/detect-gpu
  */
 
+import { logger } from '@/lib/logger'
+
 // detect-gpu is loaded dynamically to keep it out of the critical bundle path (~134KB).
 // It's only needed once at startup for GPU tier classification.
 type TierResult = Awaited<ReturnType<(typeof import('detect-gpu'))['getGPUTier']>>
@@ -145,9 +147,7 @@ export async function detectDeviceCapabilities(): Promise<DeviceCapabilities> {
     }
   } catch (error) {
     // Detection failed - assume desktop tier 3 for best experience
-    if (import.meta.env.DEV) {
-      console.warn('[DeviceCapabilities] GPU detection failed:', error)
-    }
+    logger.warn('[DeviceCapabilities] GPU detection failed:', error)
 
     return {
       webgl2Supported: true,

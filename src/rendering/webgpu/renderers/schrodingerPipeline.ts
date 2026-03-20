@@ -211,11 +211,9 @@ async function createSchrodingerPipelineImpl(
   const cacheKey = computePipelineCacheKey(shaderConfig, rendererConfig)
   const cachedPipeline = pipelineCache.get(cacheKey)
 
-  if (import.meta.env.DEV) {
-    console.log(
-      `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
-    )
-  }
+  logger.log(
+    `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
+  )
 
   // Always create bind group layouts (cheap, needed for bind groups regardless of cache)
   const cameraBindGroupLayout = device.createBindGroupLayout({
@@ -396,9 +394,7 @@ async function createSchrodingerPipelineImpl(
     )
   }
 
-  if (import.meta.env.DEV) {
-    console.log(`[SchrodingerRenderer] Phase 4 complete: pipeline=${!!renderPipeline}`)
-  }
+  logger.log(`[SchrodingerRenderer] Phase 4 complete: pipeline=${!!renderPipeline}`)
 
   // =====================================================================
   // Phase 5: Create uniform buffers, bind groups, geometry

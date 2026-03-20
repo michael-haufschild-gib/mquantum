@@ -7,6 +7,8 @@
  * @module stores/utils/exportValidation
  */
 
+import { logger } from '@/lib/logger'
+
 import type {
   CropSettings,
   ExportFormat,
@@ -136,9 +138,7 @@ export function sanitizeTextOverlayPatch(
     const value = patch[key]
     if (value === undefined) return undefined
     if (!Number.isFinite(value)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, value)
-      }
+      logger.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, value)
       delete patch[key]
       return undefined
     }
@@ -163,17 +163,13 @@ export function sanitizeTextOverlayPatch(
   if (padding !== undefined) patch.padding = clampMin(padding, 0)
 
   if ('enabled' in patch && typeof patch.enabled !== 'boolean') {
-    if (import.meta.env.DEV) {
-      console.warn('[exportStore] Ignoring invalid textOverlay.enabled update:', patch.enabled)
-    }
+    logger.warn('[exportStore] Ignoring invalid textOverlay.enabled update:', patch.enabled)
     delete patch.enabled
   }
 
   for (const key of ['text', 'fontFamily', 'color', 'shadowColor'] as const) {
     if (key in patch && typeof patch[key] !== 'string') {
-      if (import.meta.env.DEV) {
-        console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, patch[key])
-      }
+      logger.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, patch[key])
       delete patch[key]
     }
   }
@@ -184,12 +180,10 @@ export function sanitizeTextOverlayPatch(
     patch.verticalPlacement !== 'center' &&
     patch.verticalPlacement !== 'bottom'
   ) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[exportStore] Ignoring invalid textOverlay.verticalPlacement update:',
-        patch.verticalPlacement
-      )
-    }
+    logger.warn(
+      '[exportStore] Ignoring invalid textOverlay.verticalPlacement update:',
+      patch.verticalPlacement
+    )
     delete patch.verticalPlacement
   }
 
@@ -199,12 +193,10 @@ export function sanitizeTextOverlayPatch(
     patch.horizontalPlacement !== 'center' &&
     patch.horizontalPlacement !== 'right'
   ) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        '[exportStore] Ignoring invalid textOverlay.horizontalPlacement update:',
-        patch.horizontalPlacement
-      )
-    }
+    logger.warn(
+      '[exportStore] Ignoring invalid textOverlay.horizontalPlacement update:',
+      patch.horizontalPlacement
+    )
     delete patch.horizontalPlacement
   }
 
@@ -220,9 +212,7 @@ export function sanitizeCropPatch(raw: Partial<CropSettings>): Partial<CropSetti
     const value = patch[key]
     if (value === undefined) continue
     if (!Number.isFinite(value)) {
-      if (import.meta.env.DEV) {
-        console.warn(`[exportStore] Ignoring invalid crop.${key} update:`, value)
-      }
+      logger.warn(`[exportStore] Ignoring invalid crop.${key} update:`, value)
       delete patch[key]
     } else {
       patch[key] = clampUnitRange(value)
@@ -230,9 +220,7 @@ export function sanitizeCropPatch(raw: Partial<CropSettings>): Partial<CropSetti
   }
 
   if ('enabled' in patch && typeof patch.enabled !== 'boolean') {
-    if (import.meta.env.DEV) {
-      console.warn('[exportStore] Ignoring invalid crop.enabled update:', patch.enabled)
-    }
+    logger.warn('[exportStore] Ignoring invalid crop.enabled update:', patch.enabled)
     delete patch.enabled
   }
 

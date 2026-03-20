@@ -6,6 +6,13 @@
  * This replaces scattered `console.log/warn/error` calls throughout the
  * codebase with a single, controllable logging interface.
  *
+ * Do NOT wrap logger calls in `if (import.meta.env.DEV)` — the logger
+ * already handles this internally. Redundant guards are dead code.
+ *
+ * Enforced by `no-console` ESLint rule: raw `console.*` calls are banned
+ * in source files. Only ErrorBoundary files are exempt (they must log
+ * in production for crash reporting).
+ *
  * Usage:
  * ```ts
  * import { logger } from '@/lib/logger'

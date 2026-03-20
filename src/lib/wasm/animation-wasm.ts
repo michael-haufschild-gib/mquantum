@@ -82,9 +82,7 @@ export async function initAnimationWasm(): Promise<void> {
       wasmModule = wasm as unknown as WasmModule
       wasmReady = true
 
-      if (import.meta.env.DEV) {
-        console.log('[AnimationWASM] Initialized successfully')
-      }
+      logger.log('[AnimationWASM] Initialized successfully')
     } catch (err) {
       const wasmError = err instanceof Error ? err : new Error(String(err))
       logger.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
@@ -144,9 +142,7 @@ export function composeRotationsIndexedWasm(
   try {
     return indexedFn(dimension, planeIndices, angles, rotationCount)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] compose_rotations_indexed_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] compose_rotations_indexed_wasm failed:', err)
     return null
   }
 }
@@ -182,9 +178,7 @@ export function multiplyMatrixVectorWasm(
   try {
     return wasmModule.multiply_matrix_vector_wasm(matrix, vector, dimension)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] multiply_matrix_vector_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] multiply_matrix_vector_wasm failed:', err)
     return null
   }
 }
@@ -222,9 +216,7 @@ export function multiplyMatricesWasm(
   try {
     return wasmModule.multiply_matrices_wasm(a, b, dimension)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] multiply_matrices_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] multiply_matrices_wasm failed:', err)
     return null
   }
 }
@@ -244,9 +236,7 @@ export function dotProductWasm(a: Float64Array, b: Float64Array): number | null 
   try {
     return wasmModule.dot_product_wasm(a, b)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] dot_product_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] dot_product_wasm failed:', err)
     return null
   }
 }
@@ -265,9 +255,7 @@ export function magnitudeWasm(v: Float64Array): number | null {
   try {
     return wasmModule.magnitude_wasm(v)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] magnitude_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] magnitude_wasm failed:', err)
     return null
   }
 }
@@ -286,9 +274,7 @@ export function normalizeVectorWasm(v: Float64Array): Float64Array | null {
   try {
     return wasmModule.normalize_vector_wasm(v)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] normalize_vector_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] normalize_vector_wasm failed:', err)
     return null
   }
 }
@@ -308,9 +294,7 @@ export function subtractVectorsWasm(a: Float64Array, b: Float64Array): Float64Ar
   try {
     return wasmModule.subtract_vectors_wasm(a, b)
   } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] subtract_vectors_wasm failed:', err)
-    }
+    logger.warn('[AnimationWASM] subtract_vectors_wasm failed:', err)
     return null
   }
 }
