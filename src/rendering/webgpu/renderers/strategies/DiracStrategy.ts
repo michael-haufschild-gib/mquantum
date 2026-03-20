@@ -125,6 +125,10 @@ export class DiracStrategy implements QuantumModeStrategy {
     }
   }
 
+  getDensityTextureView(): GPUTextureView | null {
+    return this.diracPass?.getDensityTextureView() ?? null
+  }
+
   dispose(): void {
     this.diracPass?.dispose()
     this.diracPass = null

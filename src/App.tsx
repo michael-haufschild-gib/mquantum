@@ -9,6 +9,7 @@ import { domMax, LazyMotion, MotionConfig } from 'motion/react'
 import { useMemo } from 'react'
 
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
+import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { MsgBox } from '@/components/overlays/MsgBox'
@@ -115,6 +116,9 @@ function AppContent() {
         <MsgBox />
 
         {showPerfMonitor && <PerformanceMonitor />}
+
+        {/* Quantum Carpet Panel */}
+        <QuantumCarpetPanel />
 
         {/* Screenshot Preview Modal */}
         <ScreenshotModal />

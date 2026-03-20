@@ -1,0 +1,316 @@
+/**
+ * Carpet Slice Compute Pass
+ *
+ * Extracts a 1D spatial slice from the 3D density texture each frame
+ * and writes it as a row into a rolling 2D carpet texture.
+ * Performs periodic GPU readback to provide CPU-side data for the
+ * QuantumCarpetPanel React component.
+ *
+ * NOT a render graph pass — dispatched directly by WebGPUSchrodingerRenderer
+ * after the quantum mode strategy compute, since it reads from the
+ * density texture that the strategy just wrote.
+ *
+ * @module rendering/webgpu/passes/CarpetSliceComputePass
+ */
+
+import { DENSITY_GRID_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
+import { carpetSliceShader } from '@/rendering/webgpu/shaders/schroedinger/compute/carpetSlice.wgsl'
+
+/** Uniform buffer size for CarpetSliceParams (8 u32/f32 fields x 4 bytes = 32 bytes). */
+const PARAMS_SIZE = 32
+
+/** Workgroup size — must match @workgroup_size in carpet slice shader. */
+const WORKGROUP_SIZE = 64
+
+/** Readback throttle: perform GPU->CPU readback every N frames. */
+const READBACK_INTERVAL = 3
+
+/** Parameters for a carpet slice dispatch (read from store by caller). */
+export interface CarpetDispatchParams {
+  sliceAxis: number
+  slicePositionY: number
+  slicePositionZ: number
+  logScale: boolean
+  historyLength: number
+  writeHead: number
+  totalFrames: number
+}
+
+/** Callback to deliver readback data to the store with capture-time metadata. */
+export type CarpetReadbackCallback = (
+  data: Float32Array,
+  gridSize: number,
+  captureWriteHead: number,
+  captureTotalFrames: number
+) => void
+
+/**
+ * GPU compute pass that extracts 1D spatial slices from a 3D density texture
+ * and accumulates them into a rolling 2D carpet texture for spacetime diagrams.
+ */
+export class CarpetSliceComputePass {
+  private device: GPUDevice | null = null
+  private pipeline: GPUComputePipeline | null = null
+  private bindGroupLayout: GPUBindGroupLayout | null = null
+  private uniformBuffer: GPUBuffer | null = null
+  private uniformData = new ArrayBuffer(PARAMS_SIZE)
+  private uniformU32 = new Uint32Array(this.uniformData)
+  private uniformF32 = new Float32Array(this.uniformData)
+
+  // Carpet texture (rolling 2D buffer)
+  private carpetTexture: GPUTexture | null = null
+  private carpetTextureView: GPUTextureView | null = null
+  private currentHistoryLength = 0
+
+  // Readback
+  private stagingBuffer: GPUBuffer | null = null
+  private readbackInFlight = false
+  private framesSinceReadback = 0
+
+  // Bind group cache
+  private lastDensityView: GPUTextureView | null = null
+  private bindGroup: GPUBindGroup | null = null
+
+  /**
+   * Initialize GPU resources (pipeline, bind group layout, uniform buffer).
+   * @param device - GPUDevice
+   */
+  initialize(device: GPUDevice): void {
+    this.device = device
+
+    const shaderModule = device.createShaderModule({
+      label: 'carpet-slice-compute',
+      code: carpetSliceShader,
+    })
+
+    this.bindGroupLayout = device.createBindGroupLayout({
+      label: 'carpet-slice-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: { type: 'uniform' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'float', viewDimension: '3d' },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'r32float',
+            viewDimension: '2d',
+          },
+        },
+      ],
+    })
+
+    const pipelineLayout = device.createPipelineLayout({
+      label: 'carpet-slice-pl',
+      bindGroupLayouts: [this.bindGroupLayout],
+    })
+
+    this.pipeline = device.createComputePipeline({
+      label: 'carpet-slice-pipeline',
+      layout: pipelineLayout,
+      compute: {
+        module: shaderModule,
+        entryPoint: 'main',
+      },
+    })
+
+    this.uniformBuffer = device.createBuffer({
+      label: 'carpet-slice-uniforms',
+      size: PARAMS_SIZE,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+  }
+
+  /**
+   * Ensure the carpet texture and staging buffer exist with the correct size.
+   * Recreates them if historyLength changed.
+   */
+  private ensureTextures(historyLength: number): void {
+    if (!this.device) return
+    if (this.carpetTexture && this.currentHistoryLength === historyLength) return
+
+    this.carpetTexture?.destroy()
+    this.stagingBuffer?.destroy()
+
+    this.carpetTexture = this.device.createTexture({
+      label: 'carpet-rolling-2d',
+      size: { width: DENSITY_GRID_SIZE, height: historyLength },
+      format: 'r32float',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
+    })
+    this.carpetTextureView = this.carpetTexture.createView({
+      label: 'carpet-rolling-2d-view',
+    })
+
+    // Staging buffer — row stride must be 256-byte aligned for copyTextureToBuffer
+    const bytesPerRow = Math.ceil((DENSITY_GRID_SIZE * 4) / 256) * 256
+    this.stagingBuffer = this.device.createBuffer({
+      label: 'carpet-staging',
+      size: bytesPerRow * historyLength,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    })
+
+    this.currentHistoryLength = historyLength
+    this.bindGroup = null
+    this.lastDensityView = null
+  }
+
+  /**
+   * Dispatch the carpet slice compute shader and schedule readback.
+   *
+   * @param encoder - Command encoder for the current frame
+   * @param densityTextureView - The 3D density texture view from the active strategy
+   * @param params - Carpet configuration (read from store by caller)
+   * @param onReadback - Callback to deliver readback data
+   */
+  dispatch(
+    encoder: GPUCommandEncoder,
+    densityTextureView: GPUTextureView,
+    params: CarpetDispatchParams,
+    onReadback: CarpetReadbackCallback
+  ): void {
+    if (!this.device || !this.pipeline || !this.uniformBuffer || !this.bindGroupLayout) return
+
+    const { sliceAxis, slicePositionY, slicePositionZ, logScale, historyLength, writeHead } = params
+
+    this.ensureTextures(historyLength)
+    if (!this.carpetTextureView) return
+
+    // Write uniforms
+    this.uniformU32[0] = sliceAxis
+    this.uniformU32[1] = writeHead
+    this.uniformF32[2] = slicePositionY
+    this.uniformF32[3] = slicePositionZ
+    this.uniformU32[4] = logScale ? 1 : 0
+    this.uniformU32[5] = DENSITY_GRID_SIZE
+    this.uniformU32[6] = 0
+    this.uniformU32[7] = 0
+    this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
+
+    // Rebuild bind group if density view changed
+    if (densityTextureView !== this.lastDensityView || !this.bindGroup) {
+      this.bindGroup = this.device.createBindGroup({
+        label: 'carpet-slice-bg',
+        layout: this.bindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: densityTextureView },
+          { binding: 2, resource: this.carpetTextureView },
+        ],
+      })
+      this.lastDensityView = densityTextureView
+    }
+
+    // Dispatch compute (2 workgroups for 96 threads)
+    const computePass = encoder.beginComputePass({ label: 'carpet-slice' })
+    computePass.setPipeline(this.pipeline)
+    computePass.setBindGroup(0, this.bindGroup)
+    computePass.dispatchWorkgroups(Math.ceil(DENSITY_GRID_SIZE / WORKGROUP_SIZE))
+    computePass.end()
+
+    // Throttled readback — capture writeHead/totalFrames at submission time
+    this.framesSinceReadback++
+    if (this.framesSinceReadback >= READBACK_INTERVAL && !this.readbackInFlight) {
+      this.performReadback(historyLength, writeHead, params.totalFrames, onReadback)
+      this.framesSinceReadback = 0
+    }
+  }
+
+  /**
+   * Copy carpet texture to staging buffer and map for CPU read.
+   */
+  private performReadback(
+    historyLength: number,
+    captureWriteHead: number,
+    captureTotalFrames: number,
+    onReadback: CarpetReadbackCallback
+  ): void {
+    if (!this.device || !this.carpetTexture || !this.stagingBuffer) return
+
+    const bytesPerRow = Math.ceil((DENSITY_GRID_SIZE * 4) / 256) * 256
+    const readbackEncoder = this.device.createCommandEncoder({
+      label: 'carpet-readback',
+    })
+
+    readbackEncoder.copyTextureToBuffer(
+      { texture: this.carpetTexture },
+      { buffer: this.stagingBuffer, bytesPerRow, rowsPerImage: historyLength },
+      { width: DENSITY_GRID_SIZE, height: historyLength }
+    )
+
+    this.device.queue.submit([readbackEncoder.finish()])
+    this.readbackInFlight = true
+
+    const staging = this.stagingBuffer
+    const gridSize = DENSITY_GRID_SIZE
+    const hl = historyLength
+
+    staging.mapAsync(GPUMapMode.READ).then(
+      () => {
+        const mapped = staging.getMappedRange()
+        const result = new Float32Array(gridSize * hl)
+        const src = new Float32Array(mapped)
+        const paddedRowFloats = bytesPerRow / 4
+
+        for (let row = 0; row < hl; row++) {
+          const srcOffset = row * paddedRowFloats
+          const dstOffset = row * gridSize
+          for (let col = 0; col < gridSize; col++) {
+            result[dstOffset + col] = src[srcOffset + col]
+          }
+        }
+
+        staging.unmap()
+        onReadback(result, gridSize, captureWriteHead, captureTotalFrames)
+        this.readbackInFlight = false
+      },
+      () => {
+        this.readbackInFlight = false
+      }
+    )
+  }
+
+  /**
+   * Release all GPU resources.
+   */
+  dispose(): void {
+    this.carpetTexture?.destroy()
+    this.carpetTexture = null
+    this.carpetTextureView = null
+    this.stagingBuffer?.destroy()
+    this.stagingBuffer = null
+    this.uniformBuffer?.destroy()
+    this.uniformBuffer = null
+    this.bindGroup = null
+    this.lastDensityView = null
+    this.pipeline = null
+    this.bindGroupLayout = null
+    this.device = null
+    this.currentHistoryLength = 0
+    this.readbackInFlight = false
+  }
+
+  /**
+   * Release carpet textures without destroying the pipeline.
+   * Called when carpet is disabled for quick re-enable.
+   */
+  releaseTextures(): void {
+    this.carpetTexture?.destroy()
+    this.carpetTexture = null
+    this.carpetTextureView = null
+    this.stagingBuffer?.destroy()
+    this.stagingBuffer = null
+    this.bindGroup = null
+    this.lastDensityView = null
+    this.currentHistoryLength = 0
+    this.readbackInFlight = false
+  }
+}

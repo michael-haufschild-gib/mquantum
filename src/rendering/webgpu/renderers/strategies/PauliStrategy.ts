@@ -141,6 +141,10 @@ export class PauliStrategy implements QuantumModeStrategy {
     }
   }
 
+  getDensityTextureView(): GPUTextureView | null {
+    return this.pauliPass?.getDensityTextureView() ?? null
+  }
+
   dispose(): void {
     this.pauliPass?.dispose()
     this.pauliPass = null

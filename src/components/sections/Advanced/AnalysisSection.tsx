@@ -21,6 +21,8 @@ import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalys
 import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
 import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
+import { Switch } from '@/components/ui/Switch'
+import { useCarpetStore } from '@/stores/carpetStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -106,6 +108,9 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       ]
     )
 
+    const carpetEnabled = useCarpetStore((s) => s.enabled)
+    const setCarpetEnabled = useCarpetStore((s) => s.setEnabled)
+
     const isPauli = objectType === 'pauliSpinor'
 
     // Pauli spinor has its own analysis path
@@ -142,6 +147,13 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
+        {dimension >= 3 && (
+          <Switch
+            label="Quantum Carpet"
+            checked={carpetEnabled}
+            onCheckedChange={setCarpetEnabled}
+          />
+        )}
       </Section>
     )
   }

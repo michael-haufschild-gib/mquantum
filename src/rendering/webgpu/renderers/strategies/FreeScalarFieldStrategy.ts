@@ -192,6 +192,10 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
   }
 
+  getDensityTextureView(): GPUTextureView | null {
+    return this.freeScalarFieldPass?.getDensityTextureView() ?? null
+  }
+
   dispose(): void {
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = null

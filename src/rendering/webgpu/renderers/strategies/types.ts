@@ -222,6 +222,12 @@ export interface QuantumModeStrategy {
   resetOpenQuantumState?(): void
 
   /**
+   * Return the density texture view for external consumers (e.g. quantum carpet).
+   * Returns null if the density texture is not yet initialized.
+   */
+  getDensityTextureView?(): GPUTextureView | null
+
+  /**
    * Release all mode-specific GPU resources and state.
    */
   dispose(): void

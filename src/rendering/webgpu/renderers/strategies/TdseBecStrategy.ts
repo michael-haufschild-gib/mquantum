@@ -333,6 +333,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     })
   }
 
+  getDensityTextureView(): GPUTextureView | null {
+    return this.tdsePass?.getDensityTextureView() ?? null
+  }
+
   dispose(): void {
     this.tdsePass?.dispose()
     this.tdsePass = null

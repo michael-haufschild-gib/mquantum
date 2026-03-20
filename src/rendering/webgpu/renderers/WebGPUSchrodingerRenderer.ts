@@ -13,6 +13,8 @@
  */
 
 import { logger } from '@/lib/logger'
+import { CarpetSliceComputePass } from '@/rendering/webgpu/passes/CarpetSliceComputePass'
+import { useCarpetStore } from '@/stores/carpetStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
@@ -85,6 +87,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   // Mode strategy
   private strategy: QuantumModeStrategy
+
+  // Quantum carpet slice compute (dispatched after strategy executeFrame)
+  private carpetSlicePass: CarpetSliceComputePass | null = null
 
   // Configuration
   private rendererConfig: SchrodingerRendererConfig
@@ -208,6 +213,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.vertexBuffer = resources.vertexBuffer
     this.indexBuffer = resources.indexBuffer
     this.indexCount = resources.indexCount
+
+    // Dispose previous carpet pass — lazy-initialized on first enable
+    this.carpetSlicePass?.dispose()
+    this.carpetSlicePass = null
   }
 
   // =========================================================================
@@ -404,6 +413,29 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.strategy.executeFrame(ctx, frameContext)
 
     // ============================================
+    // QUANTUM CARPET SLICE (after density texture is populated)
+    // ============================================
+    const carpetState = useCarpetStore.getState()
+    if (carpetState.enabled && !carpetState.paused) {
+      const densityView = this.strategy.getDensityTextureView?.()
+      if (densityView && this.device) {
+        if (!this.carpetSlicePass) {
+          this.carpetSlicePass = new CarpetSliceComputePass()
+          this.carpetSlicePass.initialize(this.device)
+        }
+        this.carpetSlicePass.dispatch(
+          ctx.encoder,
+          densityView,
+          carpetState,
+          (data, gridSize, wh, tf) => {
+            useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
+          }
+        )
+        carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
+      }
+    }
+
+    // ============================================
     // RENDER PASS ENCODING (delegated)
     // ============================================
     const renderResources: SchrodingerRenderResources = {
@@ -428,7 +460,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     return this.lastDrawStats
   }
 
+  /** Expose the density texture view for external consumers (e.g. quantum carpet). */
+  getDensityTextureView(): GPUTextureView | null {
+    return this.strategy.getDensityTextureView?.() ?? null
+  }
+
   dispose(): void {
+    this.carpetSlicePass?.dispose()
+    this.carpetSlicePass = null
     this.strategy.dispose()
 
     this.vertexBuffer?.destroy()

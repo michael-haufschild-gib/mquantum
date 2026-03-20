@@ -477,6 +477,10 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
   // DISPOSE
   // ═══════════════════════════════════════════════════════════════════════
 
+  getDensityTextureView(): GPUTextureView | null {
+    return this.densityGridPass?.getDensityTextureView() ?? null
+  }
+
   dispose(): void {
     this.densityGridPass?.dispose()
     this.densityGridPass = null
