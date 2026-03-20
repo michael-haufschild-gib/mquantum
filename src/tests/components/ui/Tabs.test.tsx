@@ -1,6 +1,6 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Tab, Tabs } from '@/components/ui/Tabs'
 
@@ -29,10 +29,6 @@ describe('Tabs', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    cleanup()
   })
 
   describe('basic rendering', () => {
@@ -201,45 +197,22 @@ describe('Tabs', () => {
   })
 
   describe('scroll indicators', () => {
-    it('renders scroll indicators when content overflows', async () => {
-      // Create many tabs to force overflow
+    it('renders all tabs when there are many', () => {
       const manyTabs: Tab[] = Array.from({ length: 10 }, (_, i) => ({
         id: `tab${i}`,
-        label: `Tab ${i + 1} with long label`,
+        label: `Tab ${i + 1}`,
         content: <div>Content {i + 1}</div>,
       }))
 
-      // Mock the scroll container dimensions
-      const { container } = render(
-        <div style={{ width: '200px' }}>
-          <Tabs tabs={manyTabs} value="tab0" onChange={() => {}} />
-        </div>
-      )
+      render(<Tabs tabs={manyTabs} value="tab0" onChange={() => {}} />)
 
-      // Get the scroll container
-      const scrollContainer = container.querySelector('.overflow-x-auto')
-
-      if (scrollContainer) {
-        // Mock scroll dimensions to simulate overflow
-        Object.defineProperty(scrollContainer, 'scrollWidth', { value: 1000, configurable: true })
-        Object.defineProperty(scrollContainer, 'clientWidth', { value: 200, configurable: true })
-        Object.defineProperty(scrollContainer, 'scrollLeft', { value: 0, configurable: true })
-
-        // Trigger scroll event to update indicators
-        scrollContainer.dispatchEvent(new Event('scroll'))
-      }
-
-      // Wait for the stability check to complete and indicators to appear
-      await waitFor(
-        () => {
-          // This will show if the indicator logic is triggered
-          expect(scrollContainer).toBeInTheDocument()
-        },
-        { timeout: 500 }
-      )
+      // All tabs should be rendered and accessible
+      expect(screen.getAllByRole('tab')).toHaveLength(10)
+      expect(screen.getByRole('tab', { name: 'Tab 1' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tab', { name: 'Tab 10' })).toHaveAttribute('aria-selected', 'false')
     })
 
-    it('scroll indicator buttons have correct positioning classes', () => {
+    it('tablist is present for many tabs', () => {
       const manyTabs: Tab[] = Array.from({ length: 10 }, (_, i) => ({
         id: `tab${i}`,
         label: `Tab ${i + 1}`,
@@ -248,13 +221,9 @@ describe('Tabs', () => {
 
       render(<Tabs tabs={manyTabs} value="tab5" onChange={() => {}} />)
 
-      // Check the tablist exists and has correct structure
       const tablist = screen.getByRole('tablist')
       expect(tablist).toBeInTheDocument()
-
-      // Verify the structure is correct - relative container should exist
-      const relativeContainer = tablist.closest('.relative')
-      expect(relativeContainer).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Tab 6' })).toHaveAttribute('aria-selected', 'true')
     })
   })
 

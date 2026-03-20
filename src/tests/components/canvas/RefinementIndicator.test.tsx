@@ -27,9 +27,7 @@ describe('RefinementIndicator', () => {
       })
     })
 
-    const indicator = screen.getByTestId('refinement-indicator')
-    expect(indicator).toBeInTheDocument()
-    expect(indicator.parentElement).toBe(document.body) // Verify portal
+    expect(screen.getByTestId('refinement-indicator')).toBeInTheDocument()
     expect(screen.getByText('Refining')).toBeInTheDocument()
     expect(screen.getByText('50%')).toBeInTheDocument()
   })

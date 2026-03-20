@@ -322,7 +322,15 @@ function FockOccupationTable({
             <div key={n} className="flex items-center gap-1">
               <span className="w-4 text-end text-text-tertiary">{n}</span>
               <div className="flex-1 h-2 rounded-full bg-panel-border overflow-hidden">
-                <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+                <div
+                  role="meter"
+                  aria-valuenow={percent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label={`Fock state |${n}⟩ probability`}
+                  className="h-full rounded-full bg-accent"
+                  style={{ width: `${percent}%` }}
+                />
               </div>
               <span className="w-10 text-end text-text-tertiary">{percent.toFixed(1)}%</span>
             </div>

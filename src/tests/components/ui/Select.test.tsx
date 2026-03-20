@@ -19,8 +19,8 @@ describe('Select', () => {
       <Select options={mockOptions} value="option1" onChange={handleChange} label="Choose option" />
     )
 
-    const select = screen.getByRole('combobox') as HTMLSelectElement
-    expect(select.value).toBe('option1')
+    const select = screen.getByRole('combobox')
+    expect(select).toHaveValue('option1')
     expect(screen.getByLabelText('Choose option')).toBe(select)
 
     await user.selectOptions(select, 'option3')

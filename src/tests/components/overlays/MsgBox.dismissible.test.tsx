@@ -9,7 +9,7 @@
  * - Trustworthy: Deterministic results
  */
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -53,7 +53,6 @@ beforeEach(() => {
 
 describe('MsgBox dismissible (invariants)', () => {
   beforeEach(() => {
-    cleanup()
     // Reset stores before each test
     useMsgBoxStore.setState({
       isOpen: false,

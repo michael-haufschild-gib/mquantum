@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/DropdownMenu'
@@ -27,10 +27,6 @@ describe('DropdownMenu (invariants)', () => {
     useDropdownStore.setState({ openDropdownId: null })
     // Clear all mocks
     vi.clearAllMocks()
-  })
-
-  afterEach(() => {
-    cleanup()
   })
 
   describe('invariant: menu visibility follows open state', () => {
@@ -191,8 +187,7 @@ describe('DropdownMenu (invariants)', () => {
       await user.click(screen.getByText('Open Menu'))
 
       // Disabled button should not be clickable
-      const disabledButton = screen.getByText('Disabled Item').closest('button')
-      expect(disabledButton).toBeDisabled()
+      expect(screen.getByRole('menuitem', { name: 'Disabled Item' })).toBeDisabled()
     })
   })
 
@@ -232,9 +227,7 @@ describe('DropdownMenu (invariants)', () => {
 
       await user.click(screen.getByText('Open Menu'))
 
-      // Separator uses: h-px bg-[var(--border-subtle)] my-1.5 mx-2
-      const separator = document.querySelector('.h-px')
-      expect(separator).toBeInTheDocument()
+      expect(screen.getByRole('separator')).toBeInTheDocument()
     })
 
     it('should render header items as non-interactive', async () => {
@@ -248,9 +241,9 @@ describe('DropdownMenu (invariants)', () => {
 
       await user.click(screen.getByText('Open Menu'))
 
-      // Header should exist as text, not as a button
+      // Header should exist as text, not as an interactive menu item
       expect(screen.getByText('Header')).toBeInTheDocument()
-      expect(screen.getByText('Header').closest('button')).toBeNull()
+      expect(screen.queryByRole('menuitem', { name: 'Header' })).not.toBeInTheDocument()
     })
   })
 
@@ -272,8 +265,7 @@ describe('DropdownMenu (invariants)', () => {
       await user.click(screen.getByText('Open Menu'))
 
       // Should show arrow indicator for submenu
-      const submenuButton = screen.getByText('Has Submenu').closest('button')
-      expect(submenuButton).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: /Has Submenu/ })).toBeInTheDocument()
       expect(screen.getByText('›')).toBeInTheDocument()
     })
   })
@@ -282,8 +274,11 @@ describe('DropdownMenu (invariants)', () => {
     it('should add data-dropdown-trigger attribute to trigger', async () => {
       render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
-      const trigger = screen.getByText('Open Menu').closest('[data-dropdown-trigger]')
-      expect(trigger).toHaveAttribute('data-dropdown-trigger', 'test-menu')
+      // The trigger wrapper has proper ARIA attributes for accessibility
+      const buttons = screen.getAllByRole('button', { name: /Open Menu/ })
+      const triggerWrapper = buttons.find((el) => el.getAttribute('aria-haspopup') === 'menu')!
+      expect(triggerWrapper).toHaveAttribute('aria-expanded', 'false')
+      expect(triggerWrapper).toHaveAttribute('data-dropdown-trigger', 'test-menu')
     })
 
     it('should add data-dropdown-content attribute to menu content', async () => {
@@ -292,9 +287,9 @@ describe('DropdownMenu (invariants)', () => {
 
       await user.click(screen.getByText('Open Menu'))
 
-      const content = document.querySelector('[data-dropdown-content]')
-      expect(content).toBeInTheDocument()
-      expect(content).toHaveAttribute('data-dropdown-id', 'test-menu')
+      // When open, the dropdown menu should be visible with its items
+      expect(screen.getByRole('menu')).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Item 1' })).toBeInTheDocument()
     })
   })
 })

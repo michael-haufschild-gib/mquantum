@@ -210,6 +210,9 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               </ToggleButton>
             </div>
             <div
+              role="group"
+              aria-label="Interference parameters"
+              aria-disabled={!config.interferenceEnabled}
               className={`space-y-3 ${!config.interferenceEnabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Slider
@@ -263,6 +266,9 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               </ToggleButton>
             </div>
             <div
+              role="group"
+              aria-label="Probability flow parameters"
+              aria-disabled={!config.probabilityFlowEnabled}
               className={`space-y-3 ${!config.probabilityFlowEnabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Slider
@@ -324,6 +330,9 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             </div>
 
             <div
+              role="group"
+              aria-label="Slice animation parameters"
+              aria-disabled={!config.sliceAnimationEnabled}
               className={`space-y-3 ${!config.sliceAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Slider

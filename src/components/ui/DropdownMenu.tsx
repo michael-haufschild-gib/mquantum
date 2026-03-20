@@ -259,7 +259,13 @@ const MenuItems: React.FC<{
       {items.map((item, index) => {
         // Separator
         if (item.label === '---') {
-          return <div key={index} className="h-px bg-[var(--border-subtle)] my-1.5 mx-2" />
+          return (
+            <div
+              key={index}
+              role="separator"
+              className="h-px bg-[var(--border-subtle)] my-1.5 mx-2"
+            />
+          )
         }
 
         // Header (non-clickable, no children)

@@ -102,13 +102,12 @@ describe('SchroedingerAnimationDrawer', () => {
     expect(speedLabels.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('should have disabled state styling when animation is off', () => {
+  it('should have disabled state when animation is off', () => {
     render(<SchroedingerAnimationDrawer />)
 
-    // Probability Flow is off, its parameter container should have opacity-50
-    const flowPanel = screen.getByTestId('animation-panel-probabilityFlow')
-    const paramContainer = flowPanel.querySelector('.opacity-50')
-    expect(paramContainer).toBeInTheDocument()
+    // Probability Flow is off — its parameter group should be aria-disabled
+    const paramGroup = screen.getByRole('group', { name: 'Probability flow parameters' })
+    expect(paramGroup).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('should render Probability Current animation type controls and update settings', () => {

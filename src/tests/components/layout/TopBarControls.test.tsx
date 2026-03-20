@@ -39,21 +39,21 @@ describe('TopBarControls', () => {
 
     const toggle = screen.getByTestId('control-representation-toggle')
     expect(toggle).toHaveTextContent('Position')
-    const initialClassName = toggle.className
+    const initialClasses = [...toggle.classList]
 
     await user.click(toggle)
     expect(toggle).toHaveTextContent('Momentum')
-    expect(toggle.className).toBe(initialClassName)
+    expect([...toggle.classList]).toEqual(initialClasses)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
     await user.click(toggle)
     expect(toggle).toHaveTextContent('Wigner')
-    expect(toggle.className).toBe(initialClassName)
+    expect([...toggle.classList]).toEqual(initialClasses)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
 
     await user.click(toggle)
     expect(toggle).toHaveTextContent('Position')
-    expect(toggle.className).toBe(initialClassName)
+    expect([...toggle.classList]).toEqual(initialClasses)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
   })
 
@@ -62,13 +62,13 @@ describe('TopBarControls', () => {
     render(<TopBarControls compact={true} />)
 
     const repButton = screen.getByLabelText('Representation: Position')
-    const initialClassName = repButton.className
+    const initialClasses = [...repButton.classList]
     await user.click(repButton)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
     const momentumButton = screen.getByLabelText('Representation: Momentum')
     expect(momentumButton).toBeInTheDocument()
-    expect(momentumButton.className).toBe(initialClassName)
+    expect([...momentumButton.classList]).toEqual(initialClasses)
 
     await user.click(momentumButton)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')

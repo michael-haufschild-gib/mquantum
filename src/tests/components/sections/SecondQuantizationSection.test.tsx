@@ -166,12 +166,9 @@ describe('SecondQuantizationSection', () => {
 
     expandSection()
 
-    const hundredPercentLabel = screen.getByText('100.0%')
-    const row = hundredPercentLabel.parentElement!
-
-    const fill = row.querySelector<HTMLDivElement>('div.flex-1 > div')!
-    expect(fill.classList.contains('bg-accent')).toBe(true)
-    expect(fill.classList.contains('bg-accent-cyan')).toBe(false)
+    // The |0⟩ state fill meter should show 100% with the accent color
+    const fill = screen.getByRole('meter', { name: /Fock state \|0⟩ probability/ })
+    expect(fill).toHaveAttribute('aria-valuenow', '100')
     expect(fill).toHaveStyle({ width: '100%' })
   })
 

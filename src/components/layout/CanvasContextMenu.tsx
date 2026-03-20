@@ -132,6 +132,7 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
       ref={popoverRef}
       popover="manual"
       id={DROPDOWN_ID}
+      data-testid="canvas-context-menu"
       className="fixed z-50 min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1 m-0 p-0 border-none bg-transparent"
       style={{ top: position.y, left: position.x }}
     >
@@ -146,7 +147,13 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
           >
             {items.map((item, index) => {
               if (item.type === 'separator') {
-                return <div key={index} className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2" />
+                return (
+                  <div
+                    key={index}
+                    role="separator"
+                    className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2"
+                  />
+                )
               }
               return (
                 <Button

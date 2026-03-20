@@ -29,6 +29,6 @@ describe('ExportPreview', () => {
 
   it('uses textOverlay.fontFamily when rendering preview text', () => {
     render(<ExportPreview />)
-    expect(screen.getByText('Font parity').getAttribute('style')).toContain('Courier New')
+    expect(screen.getByText('Font parity')).toHaveStyle({ fontFamily: 'Courier New, monospace' })
   })
 })

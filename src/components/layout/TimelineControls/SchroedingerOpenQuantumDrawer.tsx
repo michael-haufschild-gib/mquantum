@@ -166,7 +166,12 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
               </div>
             )}
 
-            <div className={`space-y-4 ${!enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div
+              role="group"
+              aria-label="Open quantum parameters"
+              aria-disabled={!enabled}
+              className={`space-y-4 ${!enabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
               {isHydrogen ? (
                 /* ── Hydrogen mode: physics-based controls ── */
                 <>

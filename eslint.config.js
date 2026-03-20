@@ -5,6 +5,7 @@ import tsparser from '@typescript-eslint/parser'
 import jsdoc from 'eslint-plugin-jsdoc'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import testingLibrary from 'eslint-plugin-testing-library'
 import globals from 'globals'
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,19 @@ const EMOJI_RE =
   /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{231A}\u{231B}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{200D}\u{FE0F}]/u
 
 const RAW_HTML_CONTROLS = new Set(['input', 'select', 'button', 'textarea'])
+
+// DOM traversal methods and properties that bypass testing-library's
+// user-centric query model, coupling tests to implementation details.
+const DOM_TRAVERSAL_METHODS = new Set([
+  'querySelector', 'querySelectorAll', 'closest',
+  'getElementsByClassName', 'getElementsByTagName', 'getElementById',
+])
+const DOM_TRAVERSAL_PROPS = new Set([
+  'parentElement', 'parentNode',
+  'children', 'childNodes',
+  'firstChild', 'lastChild', 'firstElementChild', 'lastElementChild',
+  'nextSibling', 'previousSibling', 'nextElementSibling', 'previousElementSibling',
+])
 
 // Matchers that assert existence/type but not correctness — they catch zero real bugs.
 // Maps matcher name → custom error message.
@@ -273,6 +287,155 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- no-dom-node-access ----
+    'no-dom-node-access': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Disallow direct DOM traversal in test files — use testing-library queries instead',
+        },
+        messages: {
+          noDomAccess:
+            'Direct DOM traversal ({{ name }}) couples tests to implementation details. Use testing-library queries (getByRole, getByText, getByTestId) instead.',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('.test.') && !fp.includes('.spec.')) return {}
+        // Allow in mock/helper files — they legitimately simulate DOM behavior
+        if (fp.includes('__mocks__') || fp.includes('/helpers/')) return {}
+
+        return {
+          MemberExpression(node) {
+            const prop = node.property
+            if (!prop) return
+            const name = prop.type === 'Identifier' ? prop.name : undefined
+            if (!name) return
+
+            if (DOM_TRAVERSAL_PROPS.has(name)) {
+              context.report({ node: prop, messageId: 'noDomAccess', data: { name } })
+            }
+          },
+          // Catches .querySelector(), .closest(), etc. as call expressions
+          CallExpression(node) {
+            if (node.callee.type !== 'MemberExpression') return
+            const prop = node.callee.property
+            const name = prop.type === 'Identifier' ? prop.name : undefined
+            if (name && DOM_TRAVERSAL_METHODS.has(name)) {
+              context.report({ node: prop, messageId: 'noDomAccess', data: { name } })
+            }
+          },
+        }
+      },
+    },
+
+    // ---- prefer-jest-dom-matchers ----
+    // Replaces eslint-plugin-jest-dom (incompatible with ESLint 10).
+    // Catches AI agents manually checking DOM properties instead of using
+    // @testing-library/jest-dom matchers that produce better error messages.
+    'prefer-jest-dom-matchers': {
+      meta: {
+        type: 'suggestion',
+        docs: {
+          description:
+            'Prefer @testing-library/jest-dom matchers over manual DOM property assertions',
+        },
+        messages: {
+          preferMatcher: '{{ message }}',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('.test.') && !fp.includes('.spec.')) return {}
+
+        // Property access patterns inside expect() that should use jest-dom matchers
+        const DOM_PROPERTY_MATCHERS = {
+          textContent: 'Use expect(element).toHaveTextContent() instead of accessing .textContent directly.',
+          innerHTML: 'Use expect(element).toContainHTML() or toHaveTextContent() instead of accessing .innerHTML.',
+          className: 'Use expect(element).toHaveClass() instead of accessing .className directly.',
+          value: 'Use expect(element).toHaveValue() instead of accessing .value directly.',
+          disabled: 'Use expect(element).toBeDisabled() / toBeEnabled() instead of accessing .disabled directly.',
+          checked: 'Use expect(element).toBeChecked() instead of accessing .checked directly.',
+          selected: 'Use expect(element).toBeChecked() instead of accessing .selected directly.',
+          required: 'Use expect(element).toBeRequired() instead of accessing .required directly.',
+          readOnly: 'Use expect(element).toHaveAttribute("readonly") instead of accessing .readOnly directly.',
+        }
+
+        // classList.contains('x') → toHaveClass('x')
+        const CLASSLIST_METHODS = new Set(['contains', 'toggle'])
+
+        function report(node, message) {
+          context.report({ node, messageId: 'preferMatcher', data: { message } })
+        }
+
+        return {
+          CallExpression(node) {
+            // Pattern: expect(el.property).toBe/toEqual/toContain(...)
+            if (
+              node.callee.type === 'Identifier' &&
+              node.callee.name === 'expect' &&
+              node.arguments.length >= 1
+            ) {
+              const arg = node.arguments[0]
+              if (arg.type === 'MemberExpression' && arg.property.type === 'Identifier') {
+                const propName = arg.property.name
+                if (DOM_PROPERTY_MATCHERS[propName]) {
+                  report(arg.property, DOM_PROPERTY_MATCHERS[propName])
+                }
+                // expect(el.classList.contains('x')).toBe(true) → toHaveClass
+                if (propName === 'classList') {
+                  report(arg.property, 'Use expect(element).toHaveClass() instead of accessing .classList directly.')
+                }
+              }
+              // expect(el.classList.contains('x')) — nested call
+              if (
+                arg.type === 'CallExpression' &&
+                arg.callee.type === 'MemberExpression' &&
+                arg.callee.property.type === 'Identifier' &&
+                CLASSLIST_METHODS.has(arg.callee.property.name) &&
+                arg.callee.object.type === 'MemberExpression' &&
+                arg.callee.object.property.type === 'Identifier' &&
+                arg.callee.object.property.name === 'classList'
+              ) {
+                report(arg, 'Use expect(element).toHaveClass() instead of classList.contains().')
+              }
+              // expect(el.getAttribute('x')).toBe('y') → toHaveAttribute
+              if (
+                arg.type === 'CallExpression' &&
+                arg.callee.type === 'MemberExpression' &&
+                arg.callee.property.type === 'Identifier' &&
+                arg.callee.property.name === 'getAttribute'
+              ) {
+                report(arg, 'Use expect(element).toHaveAttribute() instead of getAttribute().')
+              }
+              // expect(el.style.prop) → toHaveStyle
+              if (
+                arg.type === 'MemberExpression' &&
+                arg.object.type === 'MemberExpression' &&
+                arg.object.property.type === 'Identifier' &&
+                arg.object.property.name === 'style'
+              ) {
+                report(arg, 'Use expect(element).toHaveStyle() instead of accessing .style directly.')
+              }
+              // expect(document.activeElement).toBe(el) → toHaveFocus
+              if (
+                arg.type === 'MemberExpression' &&
+                arg.object.type === 'Identifier' &&
+                arg.object.name === 'document' &&
+                arg.property.type === 'Identifier' &&
+                arg.property.name === 'activeElement'
+              ) {
+                report(arg, 'Use expect(element).toHaveFocus() instead of checking document.activeElement.')
+              }
+            }
+          },
+        }
+      },
+    },
+
     // ---- no-raw-html-controls ----
     'no-raw-html-controls': {
       meta: {
@@ -448,6 +611,7 @@ export default [
       'project-rules/no-emoji': 'error',
       'project-rules/no-raw-html-controls': 'error',
       'project-rules/no-shallow-matchers': 'error',
+      'project-rules/no-dom-node-access': 'error',
     },
   },
 
@@ -466,7 +630,49 @@ export default [
       'max-lines': ['warn', { max: 600, skipBlankLines: true, skipComments: true }],
     },
   },
-  // Test files: mocks and stubs are intentionally defined inside test functions/beforeEach blocks
+  // ─── Test files: anti-slop rules for AI coding agents ─────────────────────
+  {
+    files: ['src/tests/**/*.{test,spec}.{ts,tsx}'],
+    plugins: {
+      'testing-library': testingLibrary,
+    },
+    rules: {
+      // testing-library/flat/react recommended (all rules from the preset)
+      ...testingLibrary.configs['flat/react'].rules,
+
+      // Escalate: force screen.* queries, ban DOM traversal, ban container usage
+      'testing-library/prefer-screen-queries': 'error',
+      'testing-library/no-node-access': 'error',
+      'testing-library/no-container': 'error',
+      'testing-library/await-async-queries': 'error',
+      'testing-library/prefer-find-by': 'error',
+      'testing-library/prefer-presence-queries': 'error',
+      'testing-library/no-render-in-lifecycle': 'error',
+      'testing-library/no-debugging-utils': 'warn',
+      'testing-library/prefer-explicit-assert': 'warn',
+
+      // Custom jest-dom replacement (eslint-plugin-jest-dom is ESLint 10 incompatible)
+      'project-rules/prefer-jest-dom-matchers': 'error',
+
+      // Ban .skip abuse — AI agents love to skip failing tests instead of fixing them
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.object.name="it"][callee.property.name="skip"]',
+          message: 'No it.skip — fix or remove the test.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="test"][callee.property.name="skip"]',
+          message: 'No test.skip — fix or remove the test.',
+        },
+        {
+          selector: 'CallExpression[callee.object.name="describe"][callee.property.name="skip"]',
+          message: 'No describe.skip — fix or remove the test suite.',
+        },
+      ],
+    },
+  },
+  // Test files (all): relax React rules that conflict with test patterns
   {
     files: ['src/tests/**/*.{ts,tsx}'],
     rules: {
@@ -474,6 +680,18 @@ export default [
       '@eslint-react/no-unnecessary-use-callback': 'off',
       '@eslint-react/no-unnecessary-use-memo': 'off',
       '@eslint-react/purity': 'off',
+    },
+  },
+  // Non-component tests: local render() helpers are not @testing-library/react render
+  {
+    files: [
+      'src/tests/rendering/**/*.test.{ts,tsx}',
+      'src/tests/lib/**/*.test.{ts,tsx}',
+      'src/tests/wasm/**/*.test.{ts,tsx}',
+      'src/tests/integration/**/*.test.{ts,tsx}',
+    ],
+    rules: {
+      'testing-library/render-result-naming-convention': 'off',
     },
   },
   // WebGPU renderer classes: not React components; purity rule does not apply

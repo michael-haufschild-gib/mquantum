@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -46,11 +46,8 @@ describe('CanvasContextMenu (invariants)', () => {
   let createdElements: HTMLElement[] = []
 
   afterEach(() => {
-    cleanup()
     // Clean up any DOM elements created during tests
-    createdElements.forEach((el) => {
-      if (el.parentNode) el.parentNode.removeChild(el)
-    })
+    createdElements.forEach((el) => el.remove())
     createdElements = []
   })
 
@@ -132,7 +129,7 @@ describe('CanvasContextMenu (invariants)', () => {
         clientY: 250,
       })
 
-      const menu = document.querySelector('.glass-panel')
+      const menu = screen.getByTestId('canvas-context-menu')
       expect(menu).toHaveStyle({ top: '250px', left: '150px' })
     })
   })
@@ -202,10 +199,7 @@ describe('CanvasContextMenu (invariants)', () => {
 
       rightClickCanvas()
 
-      // Should have a separator element with the correct CSS class
-      // The separator uses: h-[1px] bg-[var(--border-subtle)] my-1 mx-2
-      const separator = document.querySelector('.h-\\[1px\\]')
-      expect(separator).toBeInTheDocument()
+      expect(screen.getByRole('separator')).toBeInTheDocument()
     })
 
     it('should display keyboard shortcuts', () => {
