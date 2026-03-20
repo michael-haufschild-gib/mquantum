@@ -181,6 +181,11 @@ export class WebGPUStatsCollector {
   ): void {
     this.updateMeasurementTier()
 
+    // Tell the render graph whether to collect GPU timestamps on the next frame.
+    // Only TIER_FULL_STATS consumes per-pass GPU timing; skip the per-frame
+    // onSubmittedWorkDone fence + buffer readback otherwise.
+    graph.setTimestampCollectionActive(this.measurementTier === TIER_FULL_STATS)
+
     // Skip if hidden
     if (this.measurementTier === TIER_HIDDEN) {
       return

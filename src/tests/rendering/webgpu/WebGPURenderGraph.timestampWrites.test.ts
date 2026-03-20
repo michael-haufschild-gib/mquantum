@@ -108,11 +108,25 @@ async function createGraphHarness(pass: WebGPURenderPass) {
     passes: Map<string, WebGPURenderPass>
     passOrder: string[]
     storeGetters: Map<string, () => unknown>
-    gpuTimingEnabled: boolean
-    timestampQuerySet: GPUQuerySet | null
-    timestampBuffer: GPUBuffer | null
-    timestampReadBuffer: GPUBuffer | null
-    timestampReadbackInFlight: boolean
+    timestampCollector: {
+      enabled: boolean
+      collectionActive: boolean
+      querySet: GPUQuerySet | null
+      resolveBuffer: GPUBuffer | null
+      readBuffer: GPUBuffer | null
+      readbackInFlight: boolean
+      canCollect: () => boolean
+      getQuerySet: () => GPUQuerySet | null
+      getLastTimings: () => ReadonlyMap<string, unknown>
+      resolveAndCopy: (encoder: GPUCommandEncoder, count: number) => void
+      scheduleReadback: (
+        device: GPUDevice,
+        count: number,
+        ids: string[],
+        phases: Array<{ hasCompute: boolean; hasRender: boolean }>
+      ) => void
+      setCollectionActive: (active: boolean) => void
+    }
   }
 
   graphInternals.deviceManager = {
@@ -130,11 +144,15 @@ async function createGraphHarness(pass: WebGPURenderPass) {
   graphInternals.passes = new Map([[pass.id, pass]])
   graphInternals.passOrder = [pass.id]
   graphInternals.storeGetters = new Map()
-  graphInternals.gpuTimingEnabled = true
-  graphInternals.timestampQuerySet = {} as GPUQuerySet
-  graphInternals.timestampBuffer = {} as GPUBuffer
-  graphInternals.timestampReadBuffer = timestampReadBuffer
-  graphInternals.timestampReadbackInFlight = false
+
+  // Initialize the timestamp collector with active collection enabled
+  const querySet = {} as GPUQuerySet
+  graphInternals.timestampCollector.enabled = true
+  graphInternals.timestampCollector.collectionActive = true
+  graphInternals.timestampCollector.querySet = querySet
+  graphInternals.timestampCollector.resolveBuffer = {} as GPUBuffer
+  graphInternals.timestampCollector.readBuffer = timestampReadBuffer
+  graphInternals.timestampCollector.readbackInFlight = false
 
   return {
     graph,
@@ -279,8 +297,10 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     }
 
     const harness = await createGraphHarness(pass)
-    const graphInternals = harness.graph as unknown as { timestampReadbackInFlight: boolean }
-    graphInternals.timestampReadbackInFlight = true
+    const graphInternals = harness.graph as unknown as {
+      timestampCollector: { readbackInFlight: boolean }
+    }
+    graphInternals.timestampCollector.readbackInFlight = true
 
     harness.graph.execute(1 / 60)
 

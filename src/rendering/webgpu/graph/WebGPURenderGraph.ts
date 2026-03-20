@@ -619,6 +619,17 @@ export class WebGPURenderGraph {
     return this.timestampCollector.isEnabled()
   }
 
+  /**
+   * Activate or deactivate per-frame GPU timestamp collection.
+   * Call with `true` when a consumer needs per-pass GPU timing data
+   * (e.g. expanded performance monitor), `false` otherwise.
+   *
+   * @param active - Whether to collect GPU timestamps this frame
+   */
+  setTimestampCollectionActive(active: boolean): void {
+    this.timestampCollector.setCollectionActive(active)
+  }
+
   dispose(): void {
     for (const pass of this.passes.values()) {
       pass.dispose()

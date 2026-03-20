@@ -26,6 +26,7 @@ export interface PassGPUTiming {
  */
 export class WebGPUTimestampCollector {
   private enabled = false
+  private collectionActive = false
   private querySet: GPUQuerySet | null = null
   private resolveBuffer: GPUBuffer | null = null
   private readBuffer: GPUBuffer | null = null
@@ -64,6 +65,17 @@ export class WebGPUTimestampCollector {
     return this.enabled
   }
 
+  /**
+   * Activate or deactivate per-frame timestamp collection.
+   * When inactive, GPU resources remain allocated but no queries are written
+   * or read back, eliminating the per-frame `onSubmittedWorkDone` fence cost.
+   *
+   * @param active - Whether a consumer (e.g. expanded perf monitor) needs GPU timing data
+   */
+  setCollectionActive(active: boolean): void {
+    this.collectionActive = active
+  }
+
   getQuerySet(): GPUQuerySet | null {
     return this.querySet
   }
@@ -74,11 +86,12 @@ export class WebGPUTimestampCollector {
 
   /**
    * Whether timestamp collection can proceed this frame
-   * (enabled, resources exist, no pending readback).
+   * (enabled, actively requested, resources exist, no pending readback).
    */
   canCollect(): boolean {
     return (
       this.enabled &&
+      this.collectionActive &&
       !!this.querySet &&
       !!this.resolveBuffer &&
       !!this.readBuffer &&

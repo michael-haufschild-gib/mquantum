@@ -64,6 +64,7 @@ function createGraphMock() {
           ['quarter-position', { width: 640, height: 360 }],
         ])
     ),
+    setTimestampCollectionActive: vi.fn(),
   }
 }
 
