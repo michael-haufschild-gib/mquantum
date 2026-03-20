@@ -1,17 +1,19 @@
-// mediabunny is loaded dynamically to keep it out of the critical bundle path (~164KB).
-// It's only needed when the user initiates a video export.
-type MediaBunny = typeof import('mediabunny')
-type Output = InstanceType<MediaBunny['Output']>
-type BufferTarget = InstanceType<MediaBunny['BufferTarget']>
-type StreamTarget = InstanceType<MediaBunny['StreamTarget']>
-type CanvasSource = InstanceType<MediaBunny['CanvasSource']>
+// mediabunny is loaded dynamically to keep it out of the critical bundle path.
+// Only the 6 classes needed for video export are imported via mediabunny-subset.ts,
+// which allows Vite/Rollup to tree-shake the unused demuxers, audio codecs,
+// subtitle support, and input format parsers (~67% size reduction).
+type MediaBunnySubset = typeof import('./mediabunny-subset')
+type Output = InstanceType<MediaBunnySubset['Output']>
+type BufferTarget = InstanceType<MediaBunnySubset['BufferTarget']>
+type StreamTarget = InstanceType<MediaBunnySubset['StreamTarget']>
+type CanvasSource = InstanceType<MediaBunnySubset['CanvasSource']>
 
 import { CropSettings, TextOverlaySettings, VideoCodec } from '@/stores/exportStore'
 
-let _mediabunny: MediaBunny | null = null
-async function loadMediaBunny(): Promise<MediaBunny> {
+let _mediabunny: MediaBunnySubset | null = null
+async function loadMediaBunny(): Promise<MediaBunnySubset> {
   if (!_mediabunny) {
-    _mediabunny = await import('mediabunny')
+    _mediabunny = await import('./mediabunny-subset')
   }
   return _mediabunny
 }

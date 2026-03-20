@@ -43,3 +43,6 @@ jobs:
       # If Rust code breaks, the app degrades gracefully to JS animation.
       - name: Build
         run: npm run build:web
+
+      - name: Bundle size budget
+        run: node scripts/check-bundle-size.js
