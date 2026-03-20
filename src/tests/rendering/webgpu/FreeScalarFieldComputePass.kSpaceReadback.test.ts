@@ -24,7 +24,7 @@ vi.mock('@/lib/physics/freeScalar/vacuumSpectrum', () => ({
   sampleVacuumSpectrum: vi.fn(() => ({ phi: new Float32Array(0), pi: new Float32Array(0) })),
 }))
 
-import { FreeScalarFieldComputePass } from '@/rendering/webgpu/passes/FreeScalarFieldComputePass'
+import { FsfKSpaceManager } from '@/rendering/webgpu/passes/FreeScalarFieldKSpace'
 
 function ensureGPUMapMode(): void {
   if (!('GPUMapMode' in globalThis)) {
@@ -91,14 +91,14 @@ function makeDeferred<T>() {
   return { promise, resolve }
 }
 
-describe('FreeScalarFieldComputePass k-space readback', () => {
+describe('FsfKSpaceManager readback', () => {
   beforeEach(() => {
     ensureGPUMapMode()
     vi.clearAllMocks()
   })
 
   it('uses readback buffer references captured when readback starts', async () => {
-    const pass = new FreeScalarFieldComputePass() as unknown as {
+    const mgr = new FsfKSpaceManager() as unknown as {
       phiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       readbackAndComputeKSpace: (
@@ -112,8 +112,8 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
     const newPhi = makeReadbackBuffer([9, 10, 11, 12])
     const newPi = makeReadbackBuffer([13, 14, 15, 16])
 
-    pass.phiReadbackBuffer = oldPhi
-    pass.piReadbackBuffer = oldPi
+    mgr.phiReadbackBuffer = oldPhi
+    mgr.piReadbackBuffer = oldPi
 
     const gate = makeDeferred<void>()
     const device = {
@@ -122,9 +122,9 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
       },
     }
 
-    const task = pass.readbackAndComputeKSpace(device, makeConfig())
-    pass.phiReadbackBuffer = newPhi
-    pass.piReadbackBuffer = newPi
+    const task = mgr.readbackAndComputeKSpace(device, makeConfig())
+    mgr.phiReadbackBuffer = newPhi
+    mgr.piReadbackBuffer = newPi
     gate.resolve()
     await task
 
@@ -135,8 +135,8 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
   })
 
   it('drops stale readback results when epoch advances mid-flight', async () => {
-    const pass = new FreeScalarFieldComputePass() as unknown as {
-      kSpaceReadbackEpoch?: number
+    const mgr = new FsfKSpaceManager() as unknown as {
+      kSpaceReadbackEpoch: number
       kSpacePending: boolean
       pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null
       phiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
@@ -147,11 +147,11 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
       ) => Promise<void>
     }
 
-    pass.kSpaceReadbackEpoch = 0
-    pass.kSpacePending = false
-    pass.pendingKSpaceData = null
-    pass.phiReadbackBuffer = makeReadbackBuffer([1, 2, 3, 4])
-    pass.piReadbackBuffer = makeReadbackBuffer([5, 6, 7, 8])
+    mgr.kSpaceReadbackEpoch = 0
+    mgr.kSpacePending = false
+    mgr.pendingKSpaceData = null
+    mgr.phiReadbackBuffer = makeReadbackBuffer([1, 2, 3, 4])
+    mgr.piReadbackBuffer = makeReadbackBuffer([5, 6, 7, 8])
 
     const gate = makeDeferred<void>()
     const device = {
@@ -160,12 +160,12 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
       },
     }
 
-    const task = pass.readbackAndComputeKSpace(device, makeConfig())
-    pass.kSpaceReadbackEpoch += 1
+    const task = mgr.readbackAndComputeKSpace(device, makeConfig())
+    mgr.kSpaceReadbackEpoch += 1
     gate.resolve()
     await task
 
-    expect(pass.pendingKSpaceData).toBeNull()
+    expect(mgr.pendingKSpaceData).toBeNull()
     expect(buildKSpaceDisplayTexturesMock).not.toHaveBeenCalled()
   })
 })

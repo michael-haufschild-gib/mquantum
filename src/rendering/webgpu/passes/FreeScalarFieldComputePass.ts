@@ -35,12 +35,12 @@ import type {
 import { buildFsfPipelines, rebuildFsfBindGroups } from './FreeScalarFieldComputePassSetup'
 import {
   computeFsfConfigHash,
-  computeFsfDiagnostics,
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
+import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 
 /** Uniform buffer size: FreeScalarUniforms struct = 512 bytes (added PML absorber fields) */
 const UNIFORM_SIZE = 512
@@ -83,28 +83,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private maxPhiEstimate = 1.0
   private pendingStagingBuffers: GPUBuffer[] = []
 
-  // k-Space readback state
-  private phiReadbackBuffer: GPUBuffer | null = null
-  private piReadbackBuffer: GPUBuffer | null = null
-  private kSpacePending = false
-  private kSpaceFrameCounter = 0
-  private readonly K_SPACE_UPDATE_INTERVAL = 5
-  /** Monotonic epoch used to invalidate stale async readback jobs after rebuild/dispose. */
-  private kSpaceReadbackEpoch = 0
-  /** Pending k-space texture data computed async, uploaded synchronously next frame */
-  private pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null = null
-  /** Web Worker for offloading FFT + k-space CPU work from the main thread */
-  private kSpaceWorker: Worker | null = null
-
-  // Diagnostics readback state
-  private diagFrameCounter = 0
-  private diagMappingInFlight = false
-  private diagPhiReadbackBuffer: GPUBuffer | null = null
-  private diagPiReadbackBuffer: GPUBuffer | null = null
-
   // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
+
+  // K-space and diagnostics readback (delegated to FsfKSpaceManager)
+  private readonly kSpace = new FsfKSpaceManager()
 
   constructor() {
     super({
@@ -168,19 +152,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     })
   }
 
-  /**
-   * Get the density texture view for binding into the raymarching pipeline.
-   * @returns The 3D density texture view, or null if not initialized.
-   */
+  /** Get the density texture view for binding into the raymarching pipeline. */
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
   }
 
-  /**
-   * Get the analysis texture view for binding into the raymarching pipeline.
-   * Contains per-voxel physics analysis data (K/G/V/E or Sx/Sy/Sz/|S|).
-   * @returns The 3D analysis texture view, or null if not initialized.
-   */
+  /** Get the analysis texture view for binding into the raymarching pipeline. */
   getAnalysisTextureView(): GPUTextureView | null {
     return this.analysisTextureView
   }
@@ -195,10 +172,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     return this.maxFieldValue
   }
 
-  /**
-   * Get the density texture for direct access.
-   * @returns The 3D density texture, or null if not initialized.
-   */
+  /** Get the density texture for direct access. */
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture
   }
@@ -207,23 +181,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
    * The density texture is NOT recreated here — it has a fixed size (DENSITY_GRID_SIZE³)
    * and persists across grid size changes to avoid invalidating the renderer's bind group.
-   * @param device - GPU device
-   * @param config - Free scalar field configuration
    */
   private rebuildFieldBuffers(device: GPUDevice, config: FreeScalarConfig): void {
-    // Invalidate in-flight async readback jobs before replacing buffers.
-    this.kSpaceReadbackEpoch++
-    this.pendingKSpaceData = null
-    this.diagMappingInFlight = false
+    // Destroy old k-space staging buffers and invalidate in-flight jobs
+    this.kSpace.destroyBuffers()
 
     // Destroy old field buffers
     this.phiBuffer?.destroy()
     this.piBuffer?.destroy()
     this.uniformBuffer?.destroy()
-    this.phiReadbackBuffer?.destroy()
-    this.piReadbackBuffer?.destroy()
-    this.diagPhiReadbackBuffer?.destroy()
-    this.diagPiReadbackBuffer?.destroy()
 
     // Compute total sites as product of all active dimensions
     this.totalSites = 1
@@ -245,30 +211,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     })
 
-    // Staging buffers for k-space readback (MAP_READ | COPY_DST)
-    this.phiReadbackBuffer = device.createBuffer({
-      label: 'free-scalar-phi-readback',
-      size: bufferSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    this.piReadbackBuffer = device.createBuffer({
-      label: 'free-scalar-pi-readback',
-      size: bufferSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    // Separate staging buffers for diagnostics readback (independent of k-space)
-    this.diagPhiReadbackBuffer = device.createBuffer({
-      label: 'free-scalar-diag-phi-readback',
-      size: bufferSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-    this.diagPiReadbackBuffer = device.createBuffer({
-      label: 'free-scalar-diag-pi-readback',
-      size: bufferSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
+    // Create k-space and diagnostics staging buffers
+    this.kSpace.createBuffers(device, bufferSize)
 
     // Create uniform buffer
     this.uniformBuffer = this.createUniformBuffer(device, UNIFORM_SIZE, 'free-scalar-uniforms')
@@ -279,28 +223,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.lastConfigHash = computeFsfConfigHash(config)
   }
 
-  /**
-   * Create all compute pipelines and bind groups.
-   * Called during pass initialization.
-   * @param ctx - WebGPU setup context
-   */
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
     // Resources will be created on first execute when config is available
   }
 
-  /**
-   * Build pipelines for all compute stages via the setup module.
-   * @param device - GPU device
-   */
   private buildPipelines(device: GPUDevice): void {
     this.pl = buildFsfPipelines(device, this.setupHelpers)
   }
 
-  /**
-   * Create bind groups for all compute stages via the setup module.
-   * Must be called after rebuildFieldBuffers and buildPipelines.
-   * @param device - GPU device
-   */
   private rebuildBindGroups(device: GPUDevice): void {
     if (
       !this.pl ||
@@ -343,10 +273,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Upload pending k-space texture data from the async worker. */
   private flushKSpaceData(device: GPUDevice): void {
-    if (!this.pendingKSpaceData || !this.densityTexture || !this.analysisTexture) return
-    const { density, analysis } = this.pendingKSpaceData
+    const pending = this.kSpace.takePendingData()
+    if (!pending || !this.densityTexture || !this.analysisTexture) return
+    const { density, analysis } = pending
     const gs = Math.round(Math.cbrt(density.length / 4))
-    const layout = { bytesPerRow: gs * 8, rowsPerImage: gs } // rgba16float = 8 bytes/texel
+    const layout = { bytesPerRow: gs * 8, rowsPerImage: gs }
     const size = { width: gs, height: gs, depthOrArrayLayers: gs }
     device.queue.writeTexture(
       { texture: this.densityTexture },
@@ -360,7 +291,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       { offset: analysis.byteOffset, ...layout },
       size
     )
-    this.pendingKSpaceData = null
   }
 
   /** Initialize field state and perform leapfrog kickstart. */
@@ -450,13 +380,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /**
    * Execute the free scalar field compute pass.
    * Handles initialization, leapfrog steps, and grid write.
-   * @param ctx - WebGPU render context
-   * @param config - Free scalar field configuration
-   * @param isPlaying - Whether animation is playing (controls whether to step)
-   * @param basisX - Basis vector X from rotation (optional)
-   * @param basisY - Basis vector Y from rotation (optional)
-   * @param basisZ - Basis vector Z from rotation (optional)
-   * @param boundingRadius - Current bounding radius (optional)
    */
   executeField(
     ctx: WebGPURenderContext,
@@ -481,23 +404,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const autoScaleTransition = config.autoScale && !this.lastAutoScale
     this.lastAutoScale = config.autoScale
 
-    // Pre-compute maxPhiEstimate before updateUniforms so the first frame
-    // after a reset uses the correct normalization (not the stale value).
     if (!this.initialized || config.needsReset || autoScaleTransition) {
       this.maxPhiEstimate = computeFsfMaxPhiEstimate(config)
     }
 
-    // Update uniforms every frame (includes basis vectors for writeGrid)
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius, colorAlgorithm)
 
-    // Initialize or reset field
     if (!this.initialized || config.needsReset) {
       this.initializeField(ctx, config)
     }
 
     // Leapfrog time steps (only when playing)
     if (isPlaying && this.pl && this.bg) {
-      // Speed-scaled step count using fractional accumulator
       const scaledSteps = config.stepsPerFrame * speed
       this.stepAccumulator += scaledSteps
       const stepsThisFrame = Math.floor(this.stepAccumulator)
@@ -506,11 +424,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       const linearWorkgroups = Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
 
       for (let step = 0; step < stepsThisFrame; step++) {
-        // Leapfrog drift-kick ordering (after dt/2 pi kickstart):
-        //   phi_{n+1} = phi_n + dt * pi_{n+1/2}          (drift)
-        //   pi_{n+3/2} = pi_{n+1/2} + dt * F(phi_{n+1})  (kick)
-
-        // Step 1: Update phi (drift — reads staggered pi, writes phi)
         const phiPass = ctx.beginComputePass({ label: `free-scalar-update-phi-${step}` })
         this.dispatchCompute(
           phiPass,
@@ -520,7 +433,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         )
         phiPass.end()
 
-        // Step 2: Update pi (kick — reads new phi, writes pi)
         const piPass = ctx.beginComputePass({ label: `free-scalar-update-pi-${step}` })
         this.dispatchCompute(
           piPass,
@@ -530,13 +442,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         )
         piPass.end()
 
-        // Step 3: PML absorber (damp phi and pi near boundaries)
         if (config.absorberEnabled) {
           const absPass = ctx.beginComputePass({ label: `free-scalar-absorber-${step}` })
           this.dispatchCompute(
             absPass,
             this.pl.absorberPipeline,
-            [this.bg.initBG], // reuses init bind group: uniform + phi + pi
+            [this.bg.initBG],
             linearWorkgroups
           )
           absPass.end()
@@ -573,7 +484,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.densityTexture &&
       this.analysisTexture
     ) {
-      const bytesPerTexel = 8 // rgba16float = 4 × 2
+      const bytesPerTexel = 8
       const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
       const rowsPerImage = DENSITY_GRID_SIZE
       const totalBytes = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
@@ -598,198 +509,36 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
     this.lastAnalysisMode = analysisMode
 
-    if (analysisMode === 3 && this.initialized) {
-      this.kSpaceFrameCounter++
-      if (
-        !this.kSpacePending &&
-        this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL &&
-        this.phiBuffer &&
-        this.piBuffer &&
-        this.phiReadbackBuffer &&
-        this.piReadbackBuffer
-      ) {
-        this.kSpaceFrameCounter = 0
-        // Encode copies on the main encoder so they execute after this frame's
-        // compute dispatches, reading the current frame's phi/pi state.
-        const bufferSize = this.totalSites * 4
-        encoder.copyBufferToBuffer(this.phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
-        encoder.copyBufferToBuffer(this.piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-        this.readbackAndComputeKSpace(device, config) // fire-and-forget async
-      }
-    } else {
-      this.kSpaceFrameCounter = 0
-    }
-
-    // Diagnostics readback (independent of k-space, throttled by interval)
-    if (
-      config.diagnosticsEnabled &&
-      this.initialized &&
-      !this.diagMappingInFlight &&
-      this.phiBuffer &&
-      this.piBuffer &&
-      this.diagPhiReadbackBuffer &&
-      this.diagPiReadbackBuffer
-    ) {
-      this.diagFrameCounter++
-      if (this.diagFrameCounter >= config.diagnosticsInterval) {
-        this.diagFrameCounter = 0
-        const bufferSize = this.totalSites * 4
-        encoder.copyBufferToBuffer(this.phiBuffer, 0, this.diagPhiReadbackBuffer, 0, bufferSize)
-        encoder.copyBufferToBuffer(this.piBuffer, 0, this.diagPiReadbackBuffer, 0, bufferSize)
-        this.readbackDiagnostics(device, config)
-      }
-    }
-  }
-
-  /**
-   * Get or create the k-space Web Worker.
-   * Uses Vite's `?worker` import pattern for module workers with path alias support.
-   */
-  private getKSpaceWorker(): Worker {
-    if (!this.kSpaceWorker) {
-      this.kSpaceWorker = new Worker(
-        new URL('@/lib/physics/freeScalar/kSpaceWorker.ts', import.meta.url),
-        { type: 'module' }
+    // Delegate k-space and diagnostics readback to the manager
+    if (this.initialized && this.phiBuffer && this.piBuffer) {
+      this.kSpace.maybeStartKSpaceReadback(
+        device,
+        encoder,
+        this.phiBuffer,
+        this.piBuffer,
+        this.totalSites,
+        config,
+        analysisMode
       )
-      this.kSpaceWorker.onmessage = (e: MessageEvent) => {
-        const msg = e.data
-        if (msg.type === 'result' && msg.epoch === this.kSpaceReadbackEpoch) {
-          this.pendingKSpaceData = { density: msg.density, analysis: msg.analysis }
-        }
-        this.kSpacePending = false
-      }
-      this.kSpaceWorker.onerror = (e) => {
-        logger.warn('[FreeScalarFieldComputePass] k-space worker error:', e.message)
-        this.kSpacePending = false
-      }
-    }
-    return this.kSpaceWorker
-  }
-
-  private async readbackAndComputeKSpace(
-    device: GPUDevice,
-    config: FreeScalarConfig
-  ): Promise<void> {
-    const phiReadbackBuffer = this.phiReadbackBuffer
-    const piReadbackBuffer = this.piReadbackBuffer
-    const readbackEpoch = this.kSpaceReadbackEpoch
-    if (!phiReadbackBuffer || !piReadbackBuffer) {
-      return
-    }
-
-    this.kSpacePending = true
-
-    try {
-      // Wait for the main encoder (including our copy commands) to finish
-      await device.queue.onSubmittedWorkDone()
-      if (readbackEpoch !== this.kSpaceReadbackEpoch) {
-        this.kSpacePending = false
-        return
-      }
-
-      // Map staging buffers for CPU read
-      await phiReadbackBuffer.mapAsync(GPUMapMode.READ)
-      await piReadbackBuffer.mapAsync(GPUMapMode.READ)
-
-      // Read directly from mapped range (no intermediate .slice(0) copy)
-      // Use Float32 interleaved complex arrays for FFT — halves memory bandwidth
-      const phiMapped = new Float32Array(phiReadbackBuffer.getMappedRange())
-      const piMapped = new Float32Array(piReadbackBuffer.getMappedRange())
-      const totalSites = phiMapped.length
-      const phiComplex = new Float32Array(totalSites * 2)
-      const piComplex = new Float32Array(totalSites * 2)
-      for (let i = 0; i < totalSites; i++) {
-        phiComplex[i * 2] = phiMapped[i]!
-        piComplex[i * 2] = piMapped[i]!
-      }
-      phiReadbackBuffer.unmap()
-      piReadbackBuffer.unmap()
-
-      if (readbackEpoch !== this.kSpaceReadbackEpoch) {
-        this.kSpacePending = false
-        return
-      }
-
-      // Dispatch FFT + display pipeline to Web Worker (off main thread)
-      const activeDims = config.gridSize.slice(0, config.latticeDim)
-      const activeSpacing = config.spacing.slice(0, config.latticeDim)
-      const worker = this.getKSpaceWorker()
-      worker.postMessage(
-        {
-          type: 'compute',
-          epoch: readbackEpoch,
-          phiComplex,
-          piComplex,
-          gridSize: activeDims,
-          spacing: activeSpacing,
-          mass: config.mass,
-          latticeDim: config.latticeDim,
-          kSpaceViz: config.kSpaceViz,
-        },
-        // Transfer ownership of buffers to worker (zero-copy)
-        [phiComplex.buffer, piComplex.buffer]
+      this.kSpace.maybeStartDiagnosticsReadback(
+        device,
+        encoder,
+        this.phiBuffer,
+        this.piBuffer,
+        this.totalSites,
+        config
       )
-      // Worker will set pendingKSpaceData and clear kSpacePending via onmessage
-    } catch (e) {
-      logger.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
-      this.kSpacePending = false
     }
   }
 
-  /**
-   * Async CPU-side diagnostics readback.
-   * Maps the diagnostics staging buffers, computes field statistics, and pushes to the store.
-   */
-  private async readbackDiagnostics(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
-    const phiBuf = this.diagPhiReadbackBuffer
-    const piBuf = this.diagPiReadbackBuffer
-    if (!phiBuf || !piBuf) return
-
-    this.diagMappingInFlight = true
-    const epoch = this.kSpaceReadbackEpoch
-
-    try {
-      await device.queue.onSubmittedWorkDone()
-      if (epoch !== this.kSpaceReadbackEpoch) {
-        this.diagMappingInFlight = false
-        return
-      }
-
-      await phiBuf.mapAsync(GPUMapMode.READ)
-      await piBuf.mapAsync(GPUMapMode.READ)
-
-      const phi = new Float32Array(phiBuf.getMappedRange())
-      const pi = new Float32Array(piBuf.getMappedRange())
-      const snapshot = computeFsfDiagnostics(phi, pi, config)
-
-      phiBuf.unmap()
-      piBuf.unmap()
-
-      useFsfDiagnosticsStore.getState().pushSnapshot(snapshot)
-      this.diagMappingInFlight = false
-    } catch {
-      this.diagMappingInFlight = false
-    }
-  }
-
-  /**
-   * Standard execute method (required by base class but we use executeField instead).
-   * @param _ctx - Render context (unused)
-   */
+  /** Standard execute method (required by base class but we use executeField instead). */
   execute(_ctx: WebGPURenderContext): void {
     // No-op: use executeField() which takes the config parameter
   }
 
-  /**
-   * Release all GPU resources.
-   */
+  /** Release all GPU resources. */
   dispose(): void {
-    // prettier-ignore
-    const gpuBuffers: (GPUBuffer | null)[] = [
-      this.phiBuffer, this.piBuffer, this.uniformBuffer,
-      this.phiReadbackBuffer, this.piReadbackBuffer,
-      this.diagPhiReadbackBuffer, this.diagPiReadbackBuffer,
-    ]
+    const gpuBuffers: (GPUBuffer | null)[] = [this.phiBuffer, this.piBuffer, this.uniformBuffer]
     for (const buf of gpuBuffers) buf?.destroy()
     this.densityTexture?.destroy()
     this.analysisTexture?.destroy()
@@ -797,17 +546,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.pendingStagingBuffers.length = 0
 
     this.phiBuffer = this.piBuffer = this.uniformBuffer = null
-    this.phiReadbackBuffer = this.piReadbackBuffer = null
     this.densityTexture = null
     this.densityTextureView = null
     this.analysisTexture = null
     this.analysisTextureView = null
-    this.kSpacePending = false
-    this.kSpaceFrameCounter = 0
-    this.kSpaceReadbackEpoch++
-    this.pendingKSpaceData = null
-    this.kSpaceWorker?.terminate()
-    this.kSpaceWorker = null
+    this.kSpace.dispose()
     this.pl = null
     this.bg = null
     this.initialized = false

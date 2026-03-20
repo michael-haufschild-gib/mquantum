@@ -16,9 +16,13 @@ import { logger } from '@/lib/logger'
 
 import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import { temporalReconstructionShader } from '../shaders/temporal/reconstruction.wgsl'
-import { temporalReprojectionShader } from '../shaders/temporal/reprojection.wgsl'
 import { writeInvertMat4 } from '../utils/mat4'
+import {
+  buildTemporalPipelines,
+  TemporalBindGroupCache,
+  type TemporalPassHelpers,
+  type TemporalPipelineResult,
+} from './WebGPUTemporalCloudPassSetup'
 
 /** Configuration for temporal cloud pass */
 export interface TemporalCloudPassConfig {
@@ -34,23 +38,11 @@ export interface TemporalCloudPassConfig {
 
 /** Bayer pattern offsets for 4-frame cycle */
 const BAYER_OFFSETS: [number, number][] = [
-  [0.0, 0.0], // Frame 0
-  [1.0, 1.0], // Frame 1
-  [1.0, 0.0], // Frame 2
-  [0.0, 1.0], // Frame 3
+  [0.0, 0.0],
+  [1.0, 1.0],
+  [1.0, 0.0],
+  [0.0, 1.0],
 ]
-
-interface ReprojectionTextureBindGroupCacheEntry {
-  accumulationView: GPUTextureView
-  positionView: GPUTextureView
-  bindGroup: GPUBindGroup
-}
-
-interface ReconstructionTextureBindGroupCacheEntry {
-  quarterColorView: GPUTextureView
-  historyView: GPUTextureView
-  bindGroup: GPUBindGroup
-}
 
 /**
  * Temporal accumulation pass for volumetric rendering.
@@ -59,20 +51,14 @@ interface ReconstructionTextureBindGroupCacheEntry {
 export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private passConfig: TemporalCloudPassConfig
 
-  // Pipelines
-  private reprojectionPipeline: GPURenderPipeline | null = null
-  private reconstructionPipeline: GPURenderPipeline | null = null
+  // Pipeline bundle from setup module
+  private pipelines: TemporalPipelineResult | null = null
 
-  // Bind group layouts
-  private reprojectionBindGroupLayout0: GPUBindGroupLayout | null = null
-  private reprojectionBindGroupLayout1: GPUBindGroupLayout | null = null
-  private reconstructionBindGroupLayout0: GPUBindGroupLayout | null = null
-  private reconstructionBindGroupLayout1: GPUBindGroupLayout | null = null
+  // Bind group cache
+  private readonly bgCache = new TemporalBindGroupCache()
 
-  // Uniform buffers
-  private temporalUniformBuffer: GPUBuffer | null = null
-  private temporalUniformData = new ArrayBuffer(176) // 11 * 16 bytes aligned
-  // PERF: Pre-allocated typed views to avoid per-frame GC pressure
+  // Uniform buffer views (pre-allocated)
+  private temporalUniformData = new ArrayBuffer(176)
   private temporalUniformFloatView = new Float32Array(this.temporalUniformData)
   private temporalUniformUintView = new Uint32Array(this.temporalUniformData)
 
@@ -88,34 +74,29 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private frameIndex = 0
   private prevViewProjectionMatrix = new Float32Array(16)
   private prevCameraPosition = { x: 0, y: 0, z: 0 }
-  // PERF: Pre-allocated matrix buffers to avoid per-frame GC pressure
   private _viewProjectionMatrix = new Float32Array(16)
   private _inverseViewProjectionMatrix = new Float32Array(16)
   private _fallbackIdentityMatrix = new Float32Array([
     1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
   ])
   private hasValidHistory = false
-  // Static scene detection: freeze Bayer cycling when nothing changes
   private prevAnimationTime = Number.NaN
   private completedFullCycle = false
   private lastWidth = 0
   private lastHeight = 0
 
-  // Samplers
-  private linearSampler: GPUSampler | null = null
-  private nearestSampler: GPUSampler | null = null
-
-  // Cached bind groups to avoid per-frame allocations
-  private reprojectionBindGroup0: GPUBindGroup | null = null
-  private reprojectionBindGroup1Cache: ReprojectionTextureBindGroupCacheEntry[] = []
-  private reconstructionBindGroup0: GPUBindGroup | null = null
-  private reconstructionBindGroup1Cache: ReconstructionTextureBindGroupCacheEntry[] = []
-
   // Configuration
   private historyWeight: number
+  private static readonly CAMERA_CUT_THRESHOLD_SQ = 4.0
 
-  // Camera cut detection threshold (squared distance)
-  private static readonly CAMERA_CUT_THRESHOLD_SQ = 4.0 // ~2 units of movement
+  /** Helper callbacks bridging base-class protected methods to setup functions. */
+  private readonly setupHelpers: TemporalPassHelpers = {
+    createShaderModule: (d, code, label) => this.createShaderModule(d, code, label),
+    createFullscreenPipeline: (d, sm, bgls, fmt, opts) =>
+      this.createFullscreenPipeline(d, sm, bgls, fmt, opts),
+    createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
+    createBindGroup: (d, layout, entries, label) => this.createBindGroup(d, layout, entries, label),
+  }
 
   constructor(config: TemporalCloudPassConfig) {
     const passConfig: WebGPURenderPassConfig = {
@@ -126,7 +107,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
         { resourceId: config.quarterPositionInput, access: 'read', binding: 1, group: 1 },
       ],
       outputs: [{ resourceId: config.outputResource, access: 'write', binding: 0, group: 0 }],
-      priority: 50, // After volumetric render, before post-processing
+      priority: 50,
     }
 
     super(passConfig)
@@ -135,227 +116,16 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device } = ctx
-
-    // Create samplers
-    this.linearSampler = device.createSampler({
-      label: 'temporal-linear-sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    })
-
-    this.nearestSampler = device.createSampler({
-      label: 'temporal-nearest-sampler',
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    })
-
-    // Create temporal uniform buffer (176 bytes aligned)
-    this.temporalUniformBuffer = this.createUniformBuffer(device, 176, 'temporal-uniforms')
-
-    // Create reprojection bind group layouts
-    this.reprojectionBindGroupLayout0 = device.createBindGroupLayout({
-      label: 'temporal-reprojection-bgl0',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    })
-
-    this.reprojectionBindGroupLayout1 = device.createBindGroupLayout({
-      label: 'temporal-reprojection-bgl1',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          // prevAccumulation is rgba16float - filterable
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          // quarterPosition is rgba32float - UNFILTERABLE (32-bit float textures can't be filtered)
-          texture: { sampleType: 'unfilterable-float' },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' },
-        },
-      ],
-    })
-
-    // Create reconstruction bind group layouts
-    this.reconstructionBindGroupLayout0 = device.createBindGroupLayout({
-      label: 'temporal-reconstruction-bgl0',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          buffer: { type: 'uniform' },
-        },
-      ],
-    })
-
-    this.reconstructionBindGroupLayout1 = device.createBindGroupLayout({
-      label: 'temporal-reconstruction-bgl1',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'non-filtering' },
-        },
-      ],
-    })
-
-    // Create reprojection pipeline
-    const reprojectionShaderModule = this.createShaderModule(
-      device,
-      temporalReprojectionShader,
-      'temporal-reprojection-shader'
-    )
-
-    this.reprojectionPipeline = this.createFullscreenPipeline(
-      device,
-      reprojectionShaderModule,
-      [this.reprojectionBindGroupLayout0, this.reprojectionBindGroupLayout1],
-      'rgba16float',
-      { label: 'temporal-reprojection-pipeline' }
-    )
-
-    // Create reconstruction pipeline
-    const reconstructionShaderModule = this.createShaderModule(
-      device,
-      temporalReconstructionShader,
-      'temporal-reconstruction-shader'
-    )
-
-    this.reconstructionPipeline = this.createFullscreenPipeline(
-      device,
-      reconstructionShaderModule,
-      [this.reconstructionBindGroupLayout0, this.reconstructionBindGroupLayout1],
-      'rgba16float',
-      { label: 'temporal-reconstruction-pipeline' }
-    )
+    this.pipelines = buildTemporalPipelines(ctx.device, this.setupHelpers)
   }
 
-  private getOrCreateReprojectionUniformBindGroup(): GPUBindGroup {
-    if (!this.reprojectionBindGroup0) {
-      this.reprojectionBindGroup0 = this.createBindGroup(
-        this.device!,
-        this.reprojectionBindGroupLayout0!,
-        [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
-        'temporal-reprojection-bg0'
-      )
-    }
-
-    return this.reprojectionBindGroup0
-  }
-
-  private getOrCreateReprojectionTextureBindGroup(
-    accumulationView: GPUTextureView,
-    positionView: GPUTextureView
-  ): GPUBindGroup {
-    const cached = this.reprojectionBindGroup1Cache.find(
-      (entry) => entry.accumulationView === accumulationView && entry.positionView === positionView
-    )
-    if (cached) {
-      return cached.bindGroup
-    }
-
-    const bindGroup = this.createBindGroup(
-      this.device!,
-      this.reprojectionBindGroupLayout1!,
-      [
-        { binding: 0, resource: accumulationView },
-        { binding: 1, resource: positionView },
-        { binding: 2, resource: this.linearSampler! },
-      ],
-      'temporal-reprojection-bg1'
-    )
-    this.reprojectionBindGroup1Cache.push({ accumulationView, positionView, bindGroup })
-    return bindGroup
-  }
-
-  private getOrCreateReconstructionUniformBindGroup(): GPUBindGroup {
-    if (!this.reconstructionBindGroup0) {
-      this.reconstructionBindGroup0 = this.createBindGroup(
-        this.device!,
-        this.reconstructionBindGroupLayout0!,
-        [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
-        'temporal-reconstruction-bg0'
-      )
-    }
-
-    return this.reconstructionBindGroup0
-  }
-
-  private getOrCreateReconstructionTextureBindGroup(
-    quarterColorView: GPUTextureView,
-    historyView: GPUTextureView
-  ): GPUBindGroup {
-    const cached = this.reconstructionBindGroup1Cache.find(
-      (entry) => entry.quarterColorView === quarterColorView && entry.historyView === historyView
-    )
-    if (cached) {
-      return cached.bindGroup
-    }
-
-    const bindGroup = this.createBindGroup(
-      this.device!,
-      this.reconstructionBindGroupLayout1!,
-      [
-        { binding: 0, resource: quarterColorView },
-        { binding: 1, resource: historyView },
-        { binding: 2, resource: this.nearestSampler! },
-      ],
-      'temporal-reconstruction-bg1'
-    )
-    this.reconstructionBindGroup1Cache.push({ quarterColorView, historyView, bindGroup })
-    return bindGroup
-  }
-
-  private resetBindGroupCaches(): void {
-    this.reprojectionBindGroup0 = null
-    this.reprojectionBindGroup1Cache = []
-    this.reconstructionBindGroup0 = null
-    this.reconstructionBindGroup1Cache = []
-  }
-
-  /**
-   * Ensure internal textures are allocated at correct size.
-   * @param device
-   * @param width
-   * @param height
-   */
   private ensureInternalTextures(device: GPUDevice, width: number, height: number): void {
-    if (this.lastWidth === width && this.lastHeight === height) {
-      return
-    }
+    if (this.lastWidth === width && this.lastHeight === height) return
 
-    // Dispose old textures
     this.reprojectedHistoryTexture?.destroy()
     this.accumulationTextureA?.destroy()
     this.accumulationTextureB?.destroy()
 
-    // Create reprojected history texture (full resolution)
     this.reprojectedHistoryTexture = device.createTexture({
       label: 'temporal-reprojected-history',
       size: { width, height },
@@ -366,8 +136,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       label: 'temporal-reprojected-history-view',
     })
 
-    // Create ping-pong accumulation textures (full resolution)
-    // Add COPY_DST for accumulation buffer copy
     this.accumulationTextureA = device.createTexture({
       label: 'temporal-accumulation-a',
       size: { width, height },
@@ -397,21 +165,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.lastWidth = width
     this.lastHeight = height
     this.hasValidHistory = false
-    this.resetBindGroupCaches()
+    this.bgCache.reset()
   }
 
-  /**
-   * Invert a 4x4 matrix in-place (column-major order).
-   * Returns false if matrix is singular.
-   * @param m
-   * @param out
-   */
-
-  /**
-   * Extract camera matrices from frame context.
-   * Returns null if camera data is unavailable.
-   * @param ctx
-   */
   private getCameraMatrices(ctx: WebGPURenderContext): {
     viewProjectionMatrix: Float32Array
     inverseViewProjectionMatrix: Float32Array
@@ -424,25 +180,19 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
         }
       | undefined
 
-    if (!cameraStore?.viewProjectionMatrix?.elements) {
-      return null
-    }
+    if (!cameraStore?.viewProjectionMatrix?.elements) return null
 
     const vpElements = cameraStore.viewProjectionMatrix.elements
-    // PERF: Reuse pre-allocated matrix buffers
     const viewProjectionMatrix = this._viewProjectionMatrix
     viewProjectionMatrix.set(vpElements)
 
-    // Compute inverse view-projection matrix
     const inverseViewProjectionMatrix = this._inverseViewProjectionMatrix
     if (!writeInvertMat4(inverseViewProjectionMatrix, viewProjectionMatrix)) {
-      // If inversion fails, use identity
       inverseViewProjectionMatrix.fill(0)
       inverseViewProjectionMatrix[0] = inverseViewProjectionMatrix[5] = 1
       inverseViewProjectionMatrix[10] = inverseViewProjectionMatrix[15] = 1
     }
 
-    // Extract camera position
     let position: { x: number; y: number; z: number }
     if (Array.isArray(cameraStore.position)) {
       position = {
@@ -459,13 +209,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     return { viewProjectionMatrix, inverseViewProjectionMatrix, position }
   }
 
-  /**
-   * Detect camera cut (large camera movement) that should reset history.
-   * @param newPosition
-   * @param newPosition.x
-   * @param newPosition.y
-   * @param newPosition.z
-   */
   private detectCameraCut(newPosition: { x: number; y: number; z: number }): boolean {
     const dx = newPosition.x - this.prevCameraPosition.x
     const dy = newPosition.y - this.prevCameraPosition.y
@@ -474,14 +217,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     return distSq > WebGPUTemporalCloudPass.CAMERA_CUT_THRESHOLD_SQ
   }
 
-  /**
-   * Update temporal uniform buffer.
-   * @param device
-   * @param width
-   * @param height
-   * @param viewProjectionMatrix
-   * @param inverseViewProjectionMatrix
-   */
   private updateTemporalUniforms(
     device: GPUDevice,
     width: number,
@@ -489,60 +224,31 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     viewProjectionMatrix: Float32Array,
     inverseViewProjectionMatrix: Float32Array
   ): void {
-    // PERF: Reuse pre-allocated typed views instead of creating new ones per frame
     const floatView = this.temporalUniformFloatView
     const uintView = this.temporalUniformUintView
 
-    // Offset 0: prevViewProjection (64 bytes = 16 floats)
     floatView.set(this.prevViewProjectionMatrix, 0)
-
-    // Offset 64: inverseViewProjection (64 bytes = 16 floats)
     floatView.set(inverseViewProjectionMatrix, 16)
 
-    // Offset 128: bayerOffset (8 bytes = 2 floats)
     const bayerOffset = BAYER_OFFSETS[this.frameIndex % 4]!
     floatView[32] = bayerOffset[0]
     floatView[33] = bayerOffset[1]
-
-    // Offset 136: fullResolution (8 bytes = 2 floats)
     floatView[34] = width
     floatView[35] = height
-
-    // Offset 144: historyWeight (4 bytes)
     floatView[36] = this.historyWeight
-
-    // Offset 148: frameIndex (4 bytes)
     uintView[37] = this.frameIndex
 
-    // Write to buffer
-    device.queue.writeBuffer(this.temporalUniformBuffer!, 0, this.temporalUniformData)
-
-    // Store current view projection for next frame
+    device.queue.writeBuffer(this.pipelines!.temporalUniformBuffer, 0, this.temporalUniformData)
     this.prevViewProjectionMatrix.set(viewProjectionMatrix)
   }
 
   execute(ctx: WebGPURenderContext): void {
-    if (
-      !this.device ||
-      !this.reprojectionPipeline ||
-      !this.reconstructionPipeline ||
-      !this.temporalUniformBuffer ||
-      !this.reprojectionBindGroupLayout0 ||
-      !this.reprojectionBindGroupLayout1 ||
-      !this.reconstructionBindGroupLayout0 ||
-      !this.reconstructionBindGroupLayout1 ||
-      !this.linearSampler ||
-      !this.nearestSampler
-    ) {
-      return
-    }
+    const p = this.pipelines
+    if (!this.device || !p) return
 
     const { width, height } = ctx.size
-
-    // Ensure internal textures are allocated
     this.ensureInternalTextures(this.device, width, height)
 
-    // Get input textures
     const quarterColorView = ctx.getTextureView(this.passConfig.quarterColorInput)
     const quarterPositionView = ctx.getTextureView(this.passConfig.quarterPositionInput)
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
@@ -554,7 +260,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       return
     }
 
-    // Get camera matrices from frame context (BUG-T1, T2, T4 FIX)
     const cameraMatrices = this.getCameraMatrices(ctx)
 
     let viewProjectionMatrix: Float32Array
@@ -566,25 +271,20 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       inverseViewProjectionMatrix = cameraMatrices.inverseViewProjectionMatrix
       cameraPosition = cameraMatrices.position
 
-      // BUG-T5 FIX: Camera cut detection
       if (this.hasValidHistory && this.detectCameraCut(cameraPosition)) {
         this.hasValidHistory = false
       }
     } else {
-      // Fallback to identity if camera data unavailable
-      // PERF: Reuse pre-allocated identity matrix
       viewProjectionMatrix = this._fallbackIdentityMatrix
       inverseViewProjectionMatrix = this._fallbackIdentityMatrix
       cameraPosition = { x: 0, y: 0, z: 0 }
     }
 
-    // Determine which accumulation buffer is read/write (ping-pong)
     const readAccumulationView =
       this.frameIndex % 2 === 0 ? this.accumulationViewA! : this.accumulationViewB!
     const writeAccumulationTexture =
       this.frameIndex % 2 === 0 ? this.accumulationTextureB! : this.accumulationTextureA!
 
-    // Update uniforms with real camera matrices
     this.updateTemporalUniforms(
       this.device,
       width,
@@ -593,14 +293,21 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       inverseViewProjectionMatrix
     )
 
-    // ========================================
     // Pass 1: Reprojection (if we have history)
-    // ========================================
     if (this.hasValidHistory) {
-      const reprojectionBindGroup0 = this.getOrCreateReprojectionUniformBindGroup()
-      const reprojectionBindGroup1 = this.getOrCreateReprojectionTextureBindGroup(
+      const bg0 = this.bgCache.getOrCreateReprojectionUniformBG(
+        this.device,
+        p.reprojectionBGL0,
+        p.temporalUniformBuffer,
+        this.setupHelpers
+      )
+      const bg1 = this.bgCache.getOrCreateReprojectionTextureBG(
+        this.device,
+        p.reprojectionBGL1,
         readAccumulationView,
-        quarterPositionView
+        quarterPositionView,
+        p.linearSampler,
+        this.setupHelpers
       )
 
       const reprojectionPass = ctx.beginRenderPass({
@@ -613,19 +320,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
           },
         ],
       })
-
-      this.renderFullscreen(reprojectionPass, this.reprojectionPipeline!, [
-        reprojectionBindGroup0,
-        reprojectionBindGroup1,
-      ])
-
+      this.renderFullscreen(reprojectionPass, p.reprojectionPipeline, [bg0, bg1])
       reprojectionPass.end()
     } else {
-      // No valid history — clear the reprojected history texture to transparent.
-      // Previously, quarterColorView (half-res) was used as a fallback, but the
-      // reconstruction shader reads it at full-res coordinates via textureLoad(),
-      // causing a resolution mismatch: the top-left quadrant got wrong data that
-      // persisted as a ghost in the accumulation buffer.
       const clearPass = ctx.beginRenderPass({
         colorAttachments: [
           {
@@ -639,20 +336,22 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       clearPass.end()
     }
 
-    // ========================================
     // Pass 2: Reconstruction
-    // ========================================
-    const reconstructionBindGroup0 = this.getOrCreateReconstructionUniformBindGroup()
-
-    // Always use the full-res reprojected history texture (cleared when no history).
-    const reprojectedInput = this.reprojectedHistoryView!
-
-    const reconstructionBindGroup1 = this.getOrCreateReconstructionTextureBindGroup(
+    const reconBG0 = this.bgCache.getOrCreateReconstructionUniformBG(
+      this.device,
+      p.reconstructionBGL0,
+      p.temporalUniformBuffer,
+      this.setupHelpers
+    )
+    const reconBG1 = this.bgCache.getOrCreateReconstructionTextureBG(
+      this.device,
+      p.reconstructionBGL1,
       quarterColorView,
-      reprojectedInput
+      this.reprojectedHistoryView!,
+      p.nearestSampler,
+      this.setupHelpers
     )
 
-    // Render to output
     const reconstructionPass = ctx.beginRenderPass({
       colorAttachments: [
         {
@@ -663,18 +362,10 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
         },
       ],
     })
-
-    this.renderFullscreen(reconstructionPass, this.reconstructionPipeline!, [
-      reconstructionBindGroup0,
-      reconstructionBindGroup1,
-    ])
-
+    this.renderFullscreen(reconstructionPass, p.reconstructionPipeline, [reconBG0, reconBG1])
     reconstructionPass.end()
 
-    // ========================================
-    // Pass 3: Copy to accumulation buffer (BUG-T3 FIX)
-    // ========================================
-    // Copy the output to the write accumulation texture for next frame's history
+    // Pass 3: Copy to accumulation buffer
     const outputResource = ctx.getResource(this.passConfig.outputResource)
     if (outputResource?.texture) {
       ctx.encoder.copyTextureToTexture(
@@ -684,47 +375,31 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       )
     }
 
-    // Detect whether the scene has changed since the last frame.
-    // When static, freeze the Bayer offset cycle to prevent per-frame jitter.
+    // Static scene detection: freeze Bayer cycling when nothing changes
     const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
     const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)
-    // Must match renderer's sceneChanged logic exactly (animTimeChanged || cameraChanged)
-    // to keep Bayer cycling in sync. Do NOT include !hasValidHistory here — that would
-    // cause the temporal pass to advance one extra frame after a resize on a static scene,
-    // permanently desyncing from the renderer's Bayer offset.
     const sceneChanged = animTimeChanged || cameraChanged
 
-    // Update state for next frame
-    // Only advance frame index when scene content has changed.
-    // When static, we allow one full 4-frame cycle to accumulate all Bayer
-    // sub-pixel samples, then freeze to produce a stable output.
     if (sceneChanged) {
       this.frameIndex = (this.frameIndex + 1) % 4
       this.completedFullCycle = false
     } else if (!this.completedFullCycle) {
-      // Allow the remaining frames in the current 4-frame cycle to complete
       const nextIndex = (this.frameIndex + 1) % 4
       this.frameIndex = nextIndex
       if (nextIndex === 0) {
         this.completedFullCycle = true
       }
     }
-    // else: scene is static and full cycle completed → freeze frameIndex
     this.prevAnimationTime = currentAnimTime
     this.hasValidHistory = true
 
-    // Store camera position for cut detection (BUG-T5)
-    // PERF: Mutate in-place to avoid per-frame object allocation
     this.prevCameraPosition.x = cameraPosition.x
     this.prevCameraPosition.y = cameraPosition.y
     this.prevCameraPosition.z = cameraPosition.z
   }
 
-  /**
-   * Compare two Float32Array matrices for equality (exact bitwise).
-   */
   private matricesEqual(a: Float32Array, b: Float32Array): boolean {
     if (a.length !== b.length) return false
     for (let i = 0; i < a.length; i++) {
@@ -733,32 +408,23 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     return true
   }
 
-  /**
-   * Get current Bayer offset for external use.
-   */
+  /** Get current Bayer offset for external use. */
   getBayerOffset(): [number, number] {
     return BAYER_OFFSETS[this.frameIndex % 4]!
   }
 
-  /**
-   * Get frame index for external use.
-   */
+  /** Get frame index for external use. */
   getFrameIndex(): number {
     return this.frameIndex
   }
 
-  /**
-   * Reset temporal history (e.g., on camera cut).
-   */
+  /** Reset temporal history (e.g., on camera cut). */
   resetHistory(): void {
     this.hasValidHistory = false
     this.completedFullCycle = false
   }
 
-  /**
-   * Set history weight.
-   * @param weight
-   */
+  /** Set history weight. */
   setHistoryWeight(weight: number): void {
     this.historyWeight = Math.max(0, Math.min(1, weight))
   }
@@ -776,15 +442,13 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.lastWidth = 0
     this.lastHeight = 0
     this.hasValidHistory = false
-    this.resetBindGroupCaches()
+    this.bgCache.reset()
   }
 
   override dispose(): void {
     this.releaseInternalResources()
-    this.temporalUniformBuffer?.destroy()
-    this.temporalUniformBuffer = null
-    this.linearSampler = null
-    this.nearestSampler = null
+    this.pipelines?.temporalUniformBuffer.destroy()
+    this.pipelines = null
     super.dispose()
   }
 }
