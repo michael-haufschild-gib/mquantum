@@ -19,7 +19,7 @@ import {
   getAppState,
   getDimension,
   getQuantumMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForFirstFrame,
   waitForRendererReady,
@@ -69,7 +69,7 @@ test.describe('quantum mode switching via UI', () => {
   })
 
   test('mode switch produces rendered frames (GPU smoke test per mode)', async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const topBar = new TopBar(page)
     await topBar.openLeftPanel()

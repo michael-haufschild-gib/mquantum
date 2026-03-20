@@ -29,7 +29,7 @@ import {
   collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForUniformUpdate,
@@ -61,7 +61,7 @@ async function verifyShaderPath(
 test.describe('representation mode shader paths', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('momentum representation: compiles and renders (HO 3D)', async ({ page }) => {
@@ -126,7 +126,7 @@ test.describe('representation mode shader paths', () => {
 test.describe('post-processing shader paths', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -208,7 +208,7 @@ test.describe('post-processing shader paths', () => {
 test.describe('rendering variant shader paths', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('cross-section enabled: compiles and renders (HO 3D)', async ({ page }) => {
@@ -273,7 +273,7 @@ test.describe('rendering variant shader paths', () => {
 test.describe('combined shader paths', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('momentum + bloom + SMAA: all compile together', async ({ page }) => {

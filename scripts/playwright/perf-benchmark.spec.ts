@@ -12,7 +12,7 @@ import { test } from '@playwright/test'
 
 import {
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -52,7 +52,7 @@ test.setTimeout(300_000) // 5 min per test
 test.describe('render performance benchmark', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const scenarios = [

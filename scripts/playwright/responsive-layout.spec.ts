@@ -16,7 +16,7 @@
 import { expect, test } from '@playwright/test'
 
 import {
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -81,8 +81,7 @@ test.describe('responsive layout transitions', () => {
   })
 
   test('canvas survives resize cycle with rendering', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await page.setViewportSize(DESKTOP)
     await page.goto('/')

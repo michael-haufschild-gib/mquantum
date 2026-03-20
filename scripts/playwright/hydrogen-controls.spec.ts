@@ -19,7 +19,7 @@ import { test, expect } from './fixtures'
 import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  hasWebGPU,
+  requireWebGPU,
   pauseAnimation,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -129,8 +129,7 @@ test.describe('hydrogen quantum number UI controls', () => {
   })
 
   test('changing n via UI produces visual difference (GPU)', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)

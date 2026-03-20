@@ -20,7 +20,7 @@
 import { test, expect } from './fixtures'
 import {
   getAppState,
-  hasWebGPU,
+  requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -52,8 +52,7 @@ test.describe('Scenes menu', () => {
   })
 
   test('clicking an example scene changes app state', async ({ appPage: page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     // Record initial state
     const initialState = await getAppState(page)

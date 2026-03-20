@@ -16,7 +16,7 @@
 
 import { test, expect } from './fixtures'
 import {
-  hasWebGPU,
+  requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
   expectCanvasNotBlank,
@@ -61,8 +61,7 @@ test.describe('open quantum drawer', () => {
   })
 
   test('open quantum shader compiles without errors (HO 3D)', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
     await waitForRendererReady(page)

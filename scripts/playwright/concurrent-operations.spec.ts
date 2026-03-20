@@ -20,7 +20,7 @@ import {
   collectPageErrors,
   filterBenignErrors,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForRendererReady,
   waitForRendererSettled,
@@ -36,7 +36,7 @@ test.describe('concurrent operations', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('rapid mode + dimension cycling with no crashes', async ({ page }) => {

@@ -18,7 +18,7 @@ import {
   getFrameCount,
   getPerformanceMetrics,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -184,7 +184,7 @@ async function profileScenario(
 test.describe('TDSE profiling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const tdsePresets = [
@@ -212,7 +212,7 @@ test.describe('TDSE profiling', () => {
 test.describe('BEC profiling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const becPresets = [
@@ -240,7 +240,7 @@ test.describe('BEC profiling', () => {
 test.describe('Dirac profiling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const diracPresets = [
@@ -267,7 +267,7 @@ test.describe('Dirac profiling', () => {
 test.describe('Free Scalar Field profiling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('FSF: default gaussian packet', async ({ page }) => {

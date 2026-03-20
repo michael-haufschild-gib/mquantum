@@ -26,7 +26,7 @@ import {
   type PerfMetricsSnapshot,
   getPerformanceMetrics,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -209,7 +209,7 @@ test.describe('performance benchmark', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   for (const { mode, dim, label } of BENCHMARK_MATRIX) {
@@ -294,7 +294,7 @@ test.describe('performance benchmark', () => {
   test('scaling analysis: HO dimension sweep', async ({ page }) => {
     // This test runs after the individual benchmarks and validates scaling
     // relationships across the collected HO results.
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const hoResults = results
       .filter((r) => r.mode === 'harmonicOscillator')
@@ -334,7 +334,7 @@ test.describe('performance benchmark', () => {
   })
 
   test('scaling analysis: hydrogen dimension sweep', async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const hResults = results.filter((r) => r.mode === 'hydrogenND').sort((a, b) => a.dim - b.dim)
 

@@ -24,7 +24,7 @@ import {
   collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   expectSnapshotsDiffer,
-  hasWebGPU,
+  requireWebGPU,
   setHydrogenQuantumNumbers,
   setTermCount,
   setupRenderMode,
@@ -46,7 +46,7 @@ test.describe('HO mode: dimension gap coverage', () => {
   for (const dim of dimensions) {
     test(`HO ${dim}D: renders non-blank with no GPU errors`, async ({ page }) => {
       await page.goto('/')
-      test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+      await requireWebGPU(page, test.info())
       const gpuErrors = collectGpuWarningsAndErrors(page)
 
       await setupRenderMode(page, 'harmonicOscillator', dim, gpuErrors)
@@ -69,7 +69,7 @@ test.describe('HO mode: dimension gap coverage', () => {
 test.describe('HO mode: superposition terms', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const termCounts = [1, 2, 4, 8]
@@ -121,7 +121,7 @@ test.describe('hydrogen mode: dimension gap coverage', () => {
   for (const dim of dimensions) {
     test(`Hydrogen ${dim}D: renders non-blank with no GPU errors`, async ({ page }) => {
       await page.goto('/')
-      test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+      await requireWebGPU(page, test.info())
       const gpuErrors = collectGpuWarningsAndErrors(page)
 
       await setupRenderMode(page, 'hydrogenND', dim, gpuErrors)
@@ -142,7 +142,7 @@ test.describe('hydrogen mode: dimension gap coverage', () => {
 test.describe('hydrogen mode: quantum number coverage', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   // Test representative (n, l, m) combinations covering:
@@ -228,7 +228,7 @@ test.describe('hydrogen mode: quantum number coverage', () => {
 test.describe('hydrogen ND: quantum numbers in higher dimensions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   // Higher dimensions shift the effective angular momentum:
@@ -294,7 +294,7 @@ test.describe('hydrogen ND: quantum numbers in higher dimensions', () => {
 test.describe('HO mode: extreme configurations', () => {
   test('HO 11D with 4 superposition terms renders non-blank', async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
     const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupRenderMode(page, 'harmonicOscillator', 11, gpuErrors)
     await setTermCount(page, 4)

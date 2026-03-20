@@ -20,7 +20,7 @@ import {
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
-  hasWebGPU,
+  requireWebGPU,
 } from './helpers/app-helpers'
 
 test.setTimeout(60_000)
@@ -67,8 +67,7 @@ test.describe('representation toggle', () => {
   })
 
   test('representation produces visual change', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
     await waitForAppLoaded(page)

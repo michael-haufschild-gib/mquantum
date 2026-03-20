@@ -21,7 +21,7 @@ import { expect, test } from '@playwright/test'
 
 import {
   collectGpuWarningsAndErrors,
-  hasWebGPU,
+  requireWebGPU,
   readDensityDiagnostics,
   setHydrogenQuantumNumbers,
   setTermCount,
@@ -38,7 +38,7 @@ test.setTimeout(90_000)
 test.describe('HO density oracle', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('HO 3D ground state: center density ≈ (1/π)^{3/2}', async ({ page }) => {
@@ -100,7 +100,7 @@ test.describe('HO density oracle', () => {
 test.describe('hydrogen density oracle', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('hydrogen 1s: center density > 0 (s-orbital peaks at origin)', async ({ page }) => {
@@ -169,7 +169,7 @@ test.describe('hydrogen density oracle', () => {
 test.describe('density grid structural invariants', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const modes = [

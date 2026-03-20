@@ -31,6 +31,7 @@ import {
   gotoMode,
   gotoPauli,
   hasWebGPU,
+  requireWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
   waitForRendererReady,
@@ -45,7 +46,7 @@ test.setTimeout(360_000)
 test.describe('quantum mode rendering', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   const modes = [
@@ -180,7 +181,7 @@ test.describe('quantum mode rendering', () => {
 test.describe('shader compilation time gate', () => {
   test('HO 3D shader compiles within 30 seconds', async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const start = Date.now()
     await gotoMode(page, 'harmonicOscillator', 3)
@@ -193,7 +194,7 @@ test.describe('shader compilation time gate', () => {
 
   test('hydrogen 7D shader compiles within 30 seconds', async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const start = Date.now()
     await gotoMode(page, 'hydrogenND', 7)
@@ -208,7 +209,7 @@ test.describe('shader compilation time gate', () => {
 test.describe('viewport resize during rendering', () => {
   test('resize does not crash renderer', async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     const gpuErrors = collectFatalGpuErrors(page)
 
@@ -239,7 +240,7 @@ test.describe('viewport resize during rendering', () => {
 test.describe('VRAM stability', () => {
   test('VRAM does not grow unboundedly after mode switch cycle', async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     // Enable perf monitor so VRAM tracking is active
     await page.evaluate(async () => {

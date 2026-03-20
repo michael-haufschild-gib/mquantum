@@ -18,7 +18,7 @@ import { expect, test } from '@playwright/test'
 import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  hasWebGPU,
+  requireWebGPU,
   pauseAnimation,
   waitForAppLoaded,
   waitForRendererReady,
@@ -67,8 +67,7 @@ test.describe('isosurface threshold controls', () => {
   })
 
   test('different threshold values produce different images', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -97,8 +96,7 @@ test.describe('isosurface threshold controls', () => {
   })
 
   test('extreme threshold values do not crash renderer', async ({ page }) => {
-    const gpu = await hasWebGPU(page)
-    test.skip(!gpu, 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)

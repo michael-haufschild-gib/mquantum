@@ -23,7 +23,7 @@ import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   snapshotDistance,
   waitForAppLoaded,
   waitForRendererReady,
@@ -35,7 +35,7 @@ test.setTimeout(120_000)
 test.describe('differential rendering', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('different quantum modes produce different images', async ({ page }) => {

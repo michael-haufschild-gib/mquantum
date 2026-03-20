@@ -24,7 +24,7 @@ import {
   getFrameCount,
   getPerformanceMetrics,
   gotoMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -124,7 +124,7 @@ for (const { mode, dim, label } of MODES) {
         }
 
         await page.goto('/')
-        test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+        await requireWebGPU(page, test.info())
 
         // Navigate to mode — shader compiles with profiling flags already set
         await gotoMode(page, mode, dim)

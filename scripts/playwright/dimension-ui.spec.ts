@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test'
 
 import {
   getDimension,
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForFirstFrame,
   waitForRendererReady,
@@ -69,7 +69,7 @@ test.describe('dimension change via UI', () => {
   })
 
   test('dimension change triggers renderer re-initialization with frames', async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await waitForRendererReady(page)
     await waitForFirstFrame(page)

@@ -17,7 +17,7 @@ import {
   collectFatalGpuErrors,
   getFrameCount,
   getPerformanceMetrics,
-  hasWebGPU,
+  requireWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
   waitForRendererReady,
@@ -63,7 +63,7 @@ async function getPassTimingsFromStore(page: import('@playwright/test').Page) {
 test.describe('performance profiling', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
   })

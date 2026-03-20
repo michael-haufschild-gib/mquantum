@@ -18,7 +18,7 @@ import {
   getAppState,
   getDimension,
   getQuantumMode,
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForFirstFrame,
   waitForRendererReady,
@@ -133,7 +133,7 @@ test.describe('cross-feature interactions', () => {
   })
 
   test('mode switch + dimension change + renderer recovery', async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
 
     await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
     await waitForAppLoaded(page)

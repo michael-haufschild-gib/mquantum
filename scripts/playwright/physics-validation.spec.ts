@@ -24,7 +24,7 @@ import {
   applyTdsePreset,
   gotoMode,
   gotoPauli,
-  hasWebGPU,
+  requireWebGPU,
   readBecDiagnostics,
   readDiracDiagnostics,
   readFsfDiagnostics,
@@ -45,7 +45,7 @@ test.setTimeout(120_000)
 
 test.describe('TDSE physics invariants', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('norm conservation: normDrift does not increase (no probability creation)', async ({
@@ -104,7 +104,7 @@ test.describe('TDSE physics invariants', () => {
 
 test.describe('BEC physics invariants', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('ground state: norm does not increase (no probability creation)', async ({ page }) => {
@@ -159,7 +159,7 @@ test.describe('BEC physics invariants', () => {
 
 test.describe('Dirac equation physics invariants', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('free Dirac: |normDrift| < 10% after 200 frames', async ({ page }) => {
@@ -207,7 +207,7 @@ test.describe('Dirac equation physics invariants', () => {
 
 test.describe('Pauli spinor physics invariants', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('norm conservation: |normDrift| < 2% after 200 frames (no PML)', async ({ page }) => {
@@ -285,7 +285,7 @@ test.describe('Pauli spinor physics invariants', () => {
 
 test.describe('free scalar field physics invariants', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('energy remains finite and positive after 200 frames', async ({ page }) => {
@@ -324,7 +324,7 @@ test.describe('free scalar field physics invariants', () => {
 
 test.describe('Pauli spinor in higher dimensions', () => {
   test.beforeEach(async ({ page }) => {
-    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+    await requireWebGPU(page, test.info())
   })
 
   test('5D Pauli: norm conservation', async ({ page }) => {
