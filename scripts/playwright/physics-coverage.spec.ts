@@ -11,77 +11,31 @@
  * 3. Higher dimensions don't crash or produce degenerate output
  * 4. Edge-case quantum numbers (l=0, l=n-1, m=±l) render correctly
  *
+ * GPU contention mitigation: tests run serially with explicit GPU resource
+ * release between groups to prevent adapter/device accumulation.
+ *
  * Run: npx playwright test scripts/playwright/physics-coverage.spec.ts --workers=1
  */
 
 import { expect, test } from '@playwright/test'
 
 import {
-  collectFatalGpuErrors,
-  expectCanvasNotBlank,
   capturePixelSnapshot,
+  collectGpuWarningsAndErrors,
+  expectCanvasNotBlank,
   expectSnapshotsDiffer,
-  gotoMode,
   hasWebGPU,
-  waitForRendererReady,
-  waitForShaderCompilation,
+  setHydrogenQuantumNumbers,
+  setTermCount,
+  setupRenderMode,
   waitForUniformUpdate,
 } from './helpers/app-helpers'
 
-test.setTimeout(180_000)
+// Force serial execution — GPU tests must not overlap.
+test.describe.configure({ mode: 'serial' })
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Set hydrogen quantum numbers via store injection. */
-async function setHydrogenQuantumNumbers(
-  page: import('@playwright/test').Page,
-  n: number,
-  l: number,
-  m: number
-) {
-  await page.evaluate(
-    async ({ n, l, m }: { n: number; l: number; m: number }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      const store = mod.useExtendedObjectStore.getState()
-      store.setSchroedingerPrincipalQuantumNumber(n)
-      store.setSchroedingerAzimuthalQuantumNumber(l)
-      store.setSchroedingerMagneticQuantumNumber(m)
-    },
-    { n, l, m }
-  )
-}
-
-/** Set HO superposition term count via store injection. */
-async function setTermCount(page: import('@playwright/test').Page, count: number) {
-  await page.evaluate(async (tc: number) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    mod.useExtendedObjectStore.getState().setSchroedingerTermCount(tc)
-  }, count)
-}
-
-/** Pause animation to get deterministic snapshots. */
-async function pauseAnimation(page: import('@playwright/test').Page) {
-  await page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
-    const store = mod.useAnimationStore.getState()
-    if (store.isPlaying) store.toggle()
-  })
-}
-
-/** Navigate to mode, wait for render, pause animation, verify non-blank. */
-async function setupMode(
-  page: import('@playwright/test').Page,
-  mode: string,
-  dim: number,
-  gpuErrors: string[]
-) {
-  await gotoMode(page, mode, dim)
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-  await pauseAnimation(page)
-  await expectCanvasNotBlank(page)
-  expect(gpuErrors, `${mode} ${dim}D: no fatal GPU errors after setup`).toEqual([])
-}
+// Generous timeout: later tests in the run may be slower due to GPU resource pressure.
+test.setTimeout(90_000)
 
 // ─── HO Mode: Dimension Gap Coverage ────────────────────────────────────────
 // rendering.spec.ts covers HO 3D, 5D, 11D. Fill the gaps.
@@ -93,11 +47,21 @@ test.describe('HO mode: dimension gap coverage', () => {
     test(`HO ${dim}D: renders non-blank with no GPU errors`, async ({ page }) => {
       await page.goto('/')
       test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
-      const gpuErrors = collectFatalGpuErrors(page)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
 
-      await setupMode(page, 'harmonicOscillator', dim, gpuErrors)
+      await setupRenderMode(page, 'harmonicOscillator', dim, gpuErrors)
     })
   }
+
+  // Release GPU resources between groups
+  test.afterAll(async ({ browser }) => {
+    const contexts = browser.contexts()
+    for (const ctx of contexts) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
 })
 
 // ─── HO Mode: Superposition Terms ───────────────────────────────────────────
@@ -112,8 +76,8 @@ test.describe('HO mode: superposition terms', () => {
 
   for (const tc of termCounts) {
     test(`HO 3D with ${tc} superposition terms renders non-blank`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-      await setupMode(page, 'harmonicOscillator', 3, gpuErrors)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
+      await setupRenderMode(page, 'harmonicOscillator', 3, gpuErrors)
       await setTermCount(page, tc)
       // Term count change doesn't trigger shader recompilation in all cases,
       // but the uniform is updated. Wait a few frames for the new state to render.
@@ -124,8 +88,8 @@ test.describe('HO mode: superposition terms', () => {
   }
 
   test('different term counts produce different images', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-    await setupMode(page, 'harmonicOscillator', 3, gpuErrors)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
+    await setupRenderMode(page, 'harmonicOscillator', 3, gpuErrors)
 
     await setTermCount(page, 1)
     await waitForUniformUpdate(page)
@@ -137,6 +101,14 @@ test.describe('HO mode: superposition terms', () => {
 
     expectSnapshotsDiffer(snap1, snap4, '1 term vs 4 terms must differ')
     expect(gpuErrors).toEqual([])
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
   })
 })
 
@@ -150,11 +122,19 @@ test.describe('hydrogen mode: dimension gap coverage', () => {
     test(`Hydrogen ${dim}D: renders non-blank with no GPU errors`, async ({ page }) => {
       await page.goto('/')
       test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
-      const gpuErrors = collectFatalGpuErrors(page)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
 
-      await setupMode(page, 'hydrogenND', dim, gpuErrors)
+      await setupRenderMode(page, 'hydrogenND', dim, gpuErrors)
     })
   }
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
 })
 
 // ─── Hydrogen Mode: Quantum Number Coverage ─────────────────────────────────
@@ -202,8 +182,8 @@ test.describe('hydrogen mode: quantum number coverage', () => {
 
   for (const { n, l, m, label } of quantumNumbers) {
     test(`Hydrogen 3D ${label} (n=${n},l=${l},m=${m}): renders non-blank`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-      await setupMode(page, 'hydrogenND', 3, gpuErrors)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
+      await setupRenderMode(page, 'hydrogenND', 3, gpuErrors)
       await setHydrogenQuantumNumbers(page, n, l, m)
       await waitForUniformUpdate(page)
       await expectCanvasNotBlank(page)
@@ -213,8 +193,8 @@ test.describe('hydrogen mode: quantum number coverage', () => {
 
   // Verify that different orbitals look different
   test('1s vs 2p vs 3d produce visually distinct orbitals', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-    await setupMode(page, 'hydrogenND', 3, gpuErrors)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
+    await setupRenderMode(page, 'hydrogenND', 3, gpuErrors)
 
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
     await waitForUniformUpdate(page)
@@ -232,6 +212,14 @@ test.describe('hydrogen mode: quantum number coverage', () => {
     expectSnapshotsDiffer(snap2p, snap3d, '2p vs 3d must differ')
     expectSnapshotsDiffer(snap1s, snap3d, '1s vs 3d must differ')
     expect(gpuErrors).toEqual([])
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
   })
 })
 
@@ -267,8 +255,8 @@ test.describe('hydrogen ND: quantum numbers in higher dimensions', () => {
 
   for (const { dim, n, l, m, label } of hdScenarios) {
     test(`Hydrogen ${label}: renders non-blank`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-      await setupMode(page, 'hydrogenND', dim, gpuErrors)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
+      await setupRenderMode(page, 'hydrogenND', dim, gpuErrors)
       await setHydrogenQuantumNumbers(page, n, l, m)
       await waitForUniformUpdate(page)
       await expectCanvasNotBlank(page)
@@ -277,8 +265,8 @@ test.describe('hydrogen ND: quantum numbers in higher dimensions', () => {
   }
 
   test('Hydrogen 5D: different n values produce different images', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-    await setupMode(page, 'hydrogenND', 5, gpuErrors)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
+    await setupRenderMode(page, 'hydrogenND', 5, gpuErrors)
 
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
     await waitForUniformUpdate(page)
@@ -291,6 +279,14 @@ test.describe('hydrogen ND: quantum numbers in higher dimensions', () => {
     expectSnapshotsDiffer(snapN1, snapN3, '5D n=1 vs n=3 must differ')
     expect(gpuErrors).toEqual([])
   })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
 })
 
 // ─── HO Mode: Max Dimension with Superposition ──────────────────────────────
@@ -299,8 +295,8 @@ test.describe('HO mode: extreme configurations', () => {
   test('HO 11D with 4 superposition terms renders non-blank', async ({ page }) => {
     await page.goto('/')
     test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
-    const gpuErrors = collectFatalGpuErrors(page)
-    await setupMode(page, 'harmonicOscillator', 11, gpuErrors)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
+    await setupRenderMode(page, 'harmonicOscillator', 11, gpuErrors)
     await setTermCount(page, 4)
     await waitForUniformUpdate(page)
     await expectCanvasNotBlank(page)

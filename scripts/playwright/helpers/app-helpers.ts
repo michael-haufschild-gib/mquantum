@@ -642,3 +642,134 @@ export function expectSnapshotsSimilar(
     `${label}: pixel snapshots should be similar (distance=${dist.toFixed(2)})`
   ).toBeLessThan(maxDistance)
 }
+
+// ─── Store Mutation Helpers ──────────────────────────────────────────────────
+
+/** Set hydrogen quantum numbers via store injection. */
+export async function setHydrogenQuantumNumbers(
+  page: Page,
+  n: number,
+  l: number,
+  m: number
+): Promise<void> {
+  await page.evaluate(
+    async ({ n, l, m }: { n: number; l: number; m: number }) => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const store = mod.useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(n)
+      store.setSchroedingerAzimuthalQuantumNumber(l)
+      store.setSchroedingerMagneticQuantumNumber(m)
+    },
+    { n, l, m }
+  )
+}
+
+/** Set HO superposition term count via store injection. */
+export async function setTermCount(page: Page, count: number): Promise<void> {
+  await page.evaluate(async (tc: number) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    mod.useExtendedObjectStore.getState().setSchroedingerTermCount(tc)
+  }, count)
+}
+
+/** Pause animation for deterministic snapshots/readback. */
+export async function pauseAnimation(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/stores/animationStore.ts')
+    const store = mod.useAnimationStore.getState()
+    if (store.isPlaying) store.toggle()
+  })
+}
+
+/** Read animation store state. */
+export async function getAnimationState(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/animationStore.ts')
+    const s = mod.useAnimationStore.getState()
+    return {
+      isPlaying: s.isPlaying,
+      speed: s.speed,
+      direction: s.direction,
+    }
+  })
+}
+
+/** Navigate to a Pauli spinor mode at given dimension. */
+export async function gotoPauli(page: Page, dim = 3): Promise<void> {
+  await page.goto(`/?t=pauliSpinor&d=${dim}`)
+  await waitForRendererReady(page)
+}
+
+/** Apply a TDSE preset via store injection. */
+export async function applyTdsePreset(page: Page, presetId: string): Promise<void> {
+  await page.evaluate(async (id: string) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).applyTdsePreset(id)
+  }, presetId)
+}
+
+/** Apply a BEC preset via store injection. */
+export async function applyBecPreset(page: Page, presetId: string): Promise<void> {
+  await page.evaluate(async (id: string) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).applyBecPreset(id)
+  }, presetId)
+}
+
+/** Apply a Dirac preset via store injection. */
+export async function applyDiracPreset(page: Page, presetId: string): Promise<void> {
+  await page.evaluate(async (id: string) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).applyDiracPreset(id)
+  }, presetId)
+}
+
+/** Apply a Pauli preset via setPauliConfig. */
+export async function applyPauliPreset(page: Page, presetId: string): Promise<void> {
+  await page.evaluate(async (id: string) => {
+    const presetMod = await import('/src/lib/physics/pauli/presets.ts')
+    const storeMod = await import('/src/stores/extendedObjectStore.ts')
+    const preset = presetMod.PAULI_SCENARIO_PRESETS.find((p: { id: string }) => p.id === id)
+    if (preset) {
+      ;(
+        storeMod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+      ).setPauliConfig({ ...preset.overrides, needsReset: true })
+    }
+  }, presetId)
+}
+
+/**
+ * Navigate to mode, wait for render, pause animation, verify non-blank.
+ * Reusable setup for physics coverage and density oracle tests.
+ */
+export async function setupRenderMode(
+  page: Page,
+  mode: string,
+  dim: number,
+  gpuErrors: string[]
+): Promise<void> {
+  await gotoMode(page, mode, dim)
+  await waitForRendererReady(page)
+  await waitForShaderCompilation(page)
+  await pauseAnimation(page)
+  await expectCanvasNotBlank(page)
+  expect(gpuErrors, `${mode} ${dim}D: no fatal GPU errors after setup`).toEqual([])
+}
+
+/**
+ * Navigate to mode, wait for pipeline + density grid readback.
+ * Reusable setup for density oracle tests.
+ */
+export async function setupAndWaitForDensity(page: Page, mode: string, dim: number): Promise<void> {
+  await gotoMode(page, mode, dim)
+  await waitForRendererReady(page)
+  await waitForShaderCompilation(page)
+  await pauseAnimation(page)
+  await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+}

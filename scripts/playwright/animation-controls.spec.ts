@@ -10,69 +10,50 @@
  * - Animation drawer showing wrong drawer for object type
  * - Play button aria-label not reflecting state
  * - Reset button not resetting wavefunction state
+ * - Speed slider UI interaction not propagating to store
  */
 
-import { expect, test } from '@playwright/test'
-
-import { waitForAppLoaded } from './helpers/app-helpers'
+import { getAnimationState, waitForAppLoaded } from './helpers/app-helpers'
+import { test, expect } from './fixtures'
+import { EditorBottomPanel } from './pages/EditorBottomPanel'
 
 test.setTimeout(30_000)
 
-/** Read animation store state. */
-async function getAnimationState(page: import('@playwright/test').Page) {
-  return page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
-    const s = mod.useAnimationStore.getState()
-    return {
-      isPlaying: s.isPlaying,
-      speed: s.speed,
-      direction: s.direction,
-    }
-  })
-}
-
 test.describe('timeline controls', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
-    await waitForAppLoaded(page)
-  })
+  test('Play/Pause button toggles animation state', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
+    await panel.waitForVisible()
 
-  test('Play/Pause button toggles animation state', async ({ page }) => {
-    const bottomPanel = page.getByTestId('editor-bottom-panel')
-    await expect(bottomPanel).toBeVisible({ timeout: 5000 })
-
-    // Get initial state
     const initial = await getAnimationState(page)
 
-    // Find and click the play/pause button
-    const playPause = page.getByRole('button', { name: initial.isPlaying ? 'Pause' : 'Play' })
-    await playPause.click()
+    await panel.clickPlayPause()
 
-    // State should have toggled
     await expect(async () => {
       const after = await getAnimationState(page)
       expect(after.isPlaying).toBe(!initial.isPlaying)
     }).toPass({ timeout: 3000 })
 
     // Button aria-label should reflect new state
-    const expectedLabel = initial.isPlaying ? 'Play' : 'Pause'
-    await expect(page.getByRole('button', { name: expectedLabel })).toBeVisible({ timeout: 3000 })
+    if (initial.isPlaying) {
+      await panel.expectPaused()
+    } else {
+      await panel.expectPlaying()
+    }
   })
 
-  test('double-toggle: play → pause → play returns to original state', async ({ page }) => {
+  test('double-toggle: play → pause → play returns to original state', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
     const initial = await getAnimationState(page)
 
     // Toggle twice
-    const firstLabel = initial.isPlaying ? 'Pause' : 'Play'
-    await page.getByRole('button', { name: firstLabel }).click()
+    await panel.clickPlayPause()
 
     await expect(async () => {
       const mid = await getAnimationState(page)
       expect(mid.isPlaying).toBe(!initial.isPlaying)
     }).toPass({ timeout: 3000 })
 
-    const secondLabel = initial.isPlaying ? 'Play' : 'Pause'
-    await page.getByRole('button', { name: secondLabel }).click()
+    await panel.clickPlayPause()
 
     await expect(async () => {
       const after = await getAnimationState(page)
@@ -80,57 +61,77 @@ test.describe('timeline controls', () => {
     }).toPass({ timeout: 3000 })
   })
 
-  test('Effects toggle opens Schroedinger animation drawer', async ({ page }) => {
-    // Click the Effects button
-    const effectsBtn = page.getByRole('button', { name: 'Toggle animations drawer' })
-    await effectsBtn.click()
+  test('Effects toggle opens Schroedinger animation drawer', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
+    await panel.openEffectsDrawer()
+    await panel.expectSchroedingerDrawerVisible()
 
-    // Schroedinger animation drawer should appear
-    await expect(page.getByTestId('schroedinger-animation-drawer')).toBeVisible({ timeout: 5000 })
-
-    // Close it
-    await effectsBtn.click()
-    await expect(page.getByTestId('schroedinger-animation-drawer')).not.toBeVisible({
-      timeout: 5000,
-    })
+    await panel.closeEffectsDrawer()
+    await panel.expectSchroedingerDrawerHidden()
   })
 
-  test('Rotate toggle opens rotation plane selector', async ({ page }) => {
-    const rotateBtn = page.getByRole('button', { name: 'Toggle rotation drawer' })
-    await rotateBtn.click()
+  test('Rotate toggle opens rotation plane selector', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
+    await panel.openRotateDrawer()
 
-    // Rotation plane toggle buttons should appear
     // In 3D there are rotation planes like XY, XZ, YZ
     await expect(page.getByRole('button', { name: /Toggle.*rotation/i }).first()).toBeVisible({
       timeout: 5000,
     })
   })
 
-  test('Reset button is present and clickable', async ({ page }) => {
-    const resetBtn = page.getByRole('button', { name: 'Reset wavefunction' })
-    await expect(resetBtn).toBeVisible()
+  test('Reset button is present and clickable', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
+    await expect(panel.resetButton).toBeVisible()
 
-    // Click should not crash
-    await resetBtn.click()
+    await panel.clickReset()
 
     // App should still be running
     await expect(page.getByTestId('top-bar')).toBeVisible()
+  })
+
+  test('Speed slider UI interaction updates animation speed', async ({ hoPage: page }) => {
+    const panel = new EditorBottomPanel(page)
+    await panel.waitForVisible()
+
+    // Read initial speed from store
+    const initialSpeed = await page.evaluate(async () => {
+      const mod = await import('/src/stores/animationStore.ts')
+      return mod.useAnimationStore.getState().speed
+    })
+
+    // The speed slider has label "SPEED" — locate its text input via aria-label
+    const speedInput = page.getByRole('textbox', { name: 'SPEED value' })
+    await expect(speedInput).toBeVisible()
+
+    // Clear and type a new value
+    await speedInput.click()
+    await speedInput.fill('1.5')
+    await speedInput.press('Enter')
+
+    // Verify store updated to the new speed value
+    await expect(async () => {
+      const newSpeed = await page.evaluate(async () => {
+        const mod = await import('/src/stores/animationStore.ts')
+        return mod.useAnimationStore.getState().speed
+      })
+      expect(newSpeed).toBeCloseTo(1.5, 1)
+      expect(newSpeed).not.toBeCloseTo(initialSpeed, 1)
+    }).toPass({ timeout: 3000 })
   })
 })
 
 test.describe('timeline controls — Pauli mode', () => {
   test('Effects toggle opens Pauli animation drawer for Pauli Spinor', async ({ page }) => {
-    // Navigate to Pauli mode
     await page.goto('/?t=pauliSpinor&d=3')
     await waitForAppLoaded(page)
 
-    const effectsBtn = page.getByRole('button', { name: 'Toggle animations drawer' })
-    // Pauli might not have an Effects button — check if visible
-    const hasEffects = await effectsBtn.isVisible().catch(() => false)
+    const panel = new EditorBottomPanel(page)
+    const hasEffects = await panel.effectsToggle.isVisible().catch(() => false)
 
     if (hasEffects) {
-      await effectsBtn.click()
-      await expect(page.getByTestId('pauli-animation-drawer')).toBeVisible({ timeout: 5000 })
+      await panel.openEffectsDrawer()
+      await panel.expectPauliDrawerVisible()
     }
   })
 })

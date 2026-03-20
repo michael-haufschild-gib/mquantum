@@ -18,8 +18,12 @@
 import { expect, test } from '@playwright/test'
 
 import {
-  collectFatalGpuErrors,
+  applyBecPreset,
+  applyDiracPreset,
+  applyPauliPreset,
+  applyTdsePreset,
   gotoMode,
+  gotoPauli,
   hasWebGPU,
   readBecDiagnostics,
   readDiracDiagnostics,
@@ -27,65 +31,15 @@ import {
   readPauliDiagnostics,
   readTdseDiagnostics,
   waitForDiagnostics,
-  waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
 } from './helpers/app-helpers'
 
+// Force serial execution — GPU tests must not overlap.
+test.describe.configure({ mode: 'serial' })
+
 // Compute modes need longer timeout — GPU init + shader compilation + simulation frames
 test.setTimeout(120_000)
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-/** Navigate to a Pauli spinor mode at given dimension. */
-async function gotoPauli(page: import('@playwright/test').Page, dim = 3) {
-  await page.goto(`/?t=pauliSpinor&d=${dim}`)
-  await import('./helpers/app-helpers').then((h) => h.waitForRendererReady(page))
-}
-
-/** Apply a TDSE preset via store injection. */
-async function applyTdsePreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyTdsePreset(id)
-  }, presetId)
-}
-
-/** Apply a BEC preset via store injection. */
-async function applyBecPreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyBecPreset(id)
-  }, presetId)
-}
-
-/** Apply a Dirac preset via store injection. */
-async function applyDiracPreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyDiracPreset(id)
-  }, presetId)
-}
-
-/** Apply a Pauli preset via setPauliConfig. */
-async function applyPauliPreset(page: import('@playwright/test').Page, presetId: string) {
-  await page.evaluate(async (id: string) => {
-    const presetMod = await import('/src/lib/physics/pauli/presets.ts')
-    const storeMod = await import('/src/stores/extendedObjectStore.ts')
-    const preset = presetMod.PAULI_SCENARIO_PRESETS.find((p: { id: string }) => p.id === id)
-    if (preset) {
-      ;(
-        storeMod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-      ).setPauliConfig({ ...preset.overrides, needsReset: true })
-    }
-  }, presetId)
-}
 
 // ─── TDSE ───────────────────────────────────────────────────────────────────
 

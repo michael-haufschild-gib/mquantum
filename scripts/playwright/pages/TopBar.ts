@@ -82,6 +82,52 @@ export class TopBar {
     }
   }
 
+  // ─── View menu ──────────────────────────────────────────────────────
+
+  async openViewMenu(): Promise<void> {
+    await this.viewMenu.click()
+  }
+
+  async clickViewExplorer(): Promise<void> {
+    await this.openViewMenu()
+    const item = this.page.getByTestId('menu-view-explorer')
+    await expect(item).toBeVisible({ timeout: 3000 })
+    await item.click()
+  }
+
+  async clickViewInspector(): Promise<void> {
+    await this.openViewMenu()
+    const item = this.page.getByTestId('menu-view-inspector')
+    await expect(item).toBeVisible({ timeout: 3000 })
+    await item.click()
+  }
+
+  async clickViewCinematic(): Promise<void> {
+    await this.openViewMenu()
+    const item = this.page.getByTestId('menu-view-cinematic')
+    await expect(item).toBeVisible({ timeout: 3000 })
+    await item.click()
+  }
+
+  async clickViewShortcuts(): Promise<void> {
+    await this.openViewMenu()
+    const item = this.page.getByTestId('menu-view-shortcuts')
+    await expect(item).toBeVisible({ timeout: 3000 })
+    await item.click()
+  }
+
+  // ─── Scenes menu ──────────────────────────────────────────────────
+
+  async openScenesMenu(): Promise<void> {
+    await this.scenesMenu.click()
+  }
+
+  // ─── Styles menu ──────────────────────────────────────────────────
+
+  async openStylesMenu(): Promise<void> {
+    await this.stylesMenu.click()
+  }
+
   // ─── File menu ───────────────────────────────────────────────────────
 
   async openFileMenu(): Promise<void> {

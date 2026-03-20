@@ -1,3 +1,4 @@
+export { EditorBottomPanel } from './EditorBottomPanel'
 export { LeftPanel } from './LeftPanel'
 export { RightPanel } from './RightPanel'
 export { ScreenshotModal } from './ScreenshotModal'

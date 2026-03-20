@@ -78,10 +78,9 @@ export class LeftPanel {
     await card.click()
   }
 
-  /** Assert a quantum mode card is selected (has the accent border class). */
+  /** Assert a quantum mode card is selected. */
   async expectQuantumModeSelected(mode: string): Promise<void> {
     const card = this.page.getByTestId(`object-type-${mode}`)
-    // Selected cards have bg-accent/10 class — but we check for the LED glow indicator
-    await expect(card.locator('.led-glow')).toBeVisible({ timeout: UI_SETTLE_TIMEOUT })
+    await expect(card).toHaveAttribute('data-selected', 'true', { timeout: UI_SETTLE_TIMEOUT })
   }
 }

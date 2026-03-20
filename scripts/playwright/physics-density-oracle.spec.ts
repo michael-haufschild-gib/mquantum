@@ -20,67 +20,18 @@
 import { expect, test } from '@playwright/test'
 
 import {
-  collectFatalGpuErrors,
-  gotoMode,
+  collectGpuWarningsAndErrors,
   hasWebGPU,
   readDensityDiagnostics,
+  setHydrogenQuantumNumbers,
+  setTermCount,
+  setupAndWaitForDensity,
   waitForDiagnostics,
-  waitForRendererReady,
-  waitForShaderCompilation,
 } from './helpers/app-helpers'
 
-test.setTimeout(120_000)
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Set hydrogen quantum numbers via store injection. */
-async function setHydrogenQuantumNumbers(
-  page: import('@playwright/test').Page,
-  n: number,
-  l: number,
-  m: number
-) {
-  await page.evaluate(
-    async ({ n, l, m }: { n: number; l: number; m: number }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      const store = mod.useExtendedObjectStore.getState()
-      store.setSchroedingerPrincipalQuantumNumber(n)
-      store.setSchroedingerAzimuthalQuantumNumber(l)
-      store.setSchroedingerMagneticQuantumNumber(m)
-    },
-    { n, l, m }
-  )
-}
-
-/** Set HO superposition term count via store injection. */
-async function setTermCount(page: import('@playwright/test').Page, count: number) {
-  await page.evaluate(async (tc: number) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    mod.useExtendedObjectStore.getState().setSchroedingerTermCount(tc)
-  }, count)
-}
-
-/** Pause animation for deterministic density readback. */
-async function pauseAnimation(page: import('@playwright/test').Page) {
-  await page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
-    const store = mod.useAnimationStore.getState()
-    if (store.isPlaying) store.toggle()
-  })
-}
-
-/** Navigate to mode, wait for pipeline + density grid readback. */
-async function setupAndWaitForDensity(
-  page: import('@playwright/test').Page,
-  mode: string,
-  dim: number
-) {
-  await gotoMode(page, mode, dim)
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-  await pauseAnimation(page)
-  await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
-}
+// Force serial execution — GPU tests must not overlap.
+test.describe.configure({ mode: 'serial' })
+test.setTimeout(90_000)
 
 // ─── HO Ground State Density ────────────────────────────────────────────────
 
@@ -91,7 +42,7 @@ test.describe('HO density oracle', () => {
   })
 
   test('HO 3D ground state: center density ≈ (1/π)^{3/2}', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
 
     // Force single-term ground state (n=0 in all dimensions)
@@ -117,7 +68,7 @@ test.describe('HO density oracle', () => {
   })
 
   test('HO 3D: mass increases with superposition term count', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
 
     await setTermCount(page, 1)
@@ -134,6 +85,14 @@ test.describe('HO density oracle', () => {
     expect(diag4.activeVoxelCount).toBeGreaterThan(diag1.activeVoxelCount * 0.8)
     expect(gpuErrors).toEqual([])
   })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
 })
 
 // ─── Hydrogen Density Oracle ────────────────────────────────────────────────
@@ -145,7 +104,7 @@ test.describe('hydrogen density oracle', () => {
   })
 
   test('hydrogen 1s: center density > 0 (s-orbital peaks at origin)', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
     await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
@@ -161,7 +120,7 @@ test.describe('hydrogen density oracle', () => {
   })
 
   test('hydrogen 2p: center density ≈ 0 (p-orbital node at origin)', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 2, 1, 0)
     await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
@@ -177,7 +136,7 @@ test.describe('hydrogen density oracle', () => {
   test('hydrogen 3d vs 1s: different max density (quantum numbers reach shader)', async ({
     page,
   }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
+    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
 
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
@@ -194,6 +153,14 @@ test.describe('hydrogen density oracle', () => {
     const ratio = diag3d.maxDensity / Math.max(diag1s.maxDensity, 1e-20)
     expect(ratio < 0.9 || ratio > 1.1).toBe(true)
     expect(gpuErrors).toEqual([])
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
   })
 })
 
@@ -215,7 +182,7 @@ test.describe('density grid structural invariants', () => {
 
   for (const { mode, dim, label } of modes) {
     test(`${label}: maxDensity > 0 and totalMass finite`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
+      const gpuErrors = collectGpuWarningsAndErrors(page)
       await setupAndWaitForDensity(page, mode, dim)
 
       const diag = await readDensityDiagnostics(page)
