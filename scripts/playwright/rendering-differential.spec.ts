@@ -224,4 +224,54 @@ test.describe('differential rendering', () => {
 
     expectSnapshotsDiffer(tdseSnap, becSnap, 'TDSE vs BEC must differ')
   })
+
+  test('position vs momentum representation produce different images', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // Pause animation for deterministic snapshots
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/animationStore.ts')
+      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
+    })
+
+    // Position (default)
+    const positionSnap = await capturePixelSnapshot(page)
+
+    // Switch to momentum
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
+    })
+    await waitForShaderCompilation(page)
+    const momentumSnap = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(positionSnap, momentumSnap, 'Position vs Momentum must differ')
+  })
+
+  test('position vs wigner representation produce different images', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // Pause animation for deterministic snapshots
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/animationStore.ts')
+      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
+    })
+
+    // Position (default)
+    const positionSnap = await capturePixelSnapshot(page)
+
+    // Switch to wigner
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
+    })
+    await waitForShaderCompilation(page)
+    const wignerSnap = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(positionSnap, wignerSnap, 'Position vs Wigner must differ')
+  })
 })
