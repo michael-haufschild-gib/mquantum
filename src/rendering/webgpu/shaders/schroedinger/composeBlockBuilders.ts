@@ -70,6 +70,7 @@ import {
   densityGridSamplingBlock,
   generateAnalysisTextureBindings,
   generateDensityGridFragmentBindings,
+  generateNormalGridFragmentBinding,
 } from './volume/densityGridSampling.wgsl'
 import {
   emissionPostBlock,
@@ -77,10 +78,10 @@ import {
   generateEmissionPreBlock,
 } from './volume/emission.wgsl'
 import {
+  generateVolumeRaymarchGridBlock,
   volumeGradientBlock,
   volumeIntegrationBlock,
   volumeRaymarchBlock,
-  volumeRaymarchGridBlock,
 } from './volume/integration.wgsl'
 import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
 import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
@@ -99,6 +100,7 @@ export function buildBindGroupBlock(opts: {
   isWigner: boolean
   useWignerCache: boolean
   useDensityGrid: boolean
+  usePrecomputedNormals: boolean
   freeScalarAnalysis: boolean
 }): string {
   return (
@@ -116,7 +118,8 @@ export function buildBindGroupBlock(opts: {
 @group(2) @binding(3) var wignerCacheSampler: sampler;`
       : '') +
     (opts.useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : '') +
-    (opts.freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : '')
+    (opts.freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : '') +
+    (opts.usePrecomputedNormals ? '\n' + generateNormalGridFragmentBinding(7) : '')
   )
 }
 
@@ -286,6 +289,7 @@ export function buildVolumeBlocks(opts: {
   actualDim: number
   termCount: number | undefined
   useDensityGrid: boolean
+  usePrecomputedNormals: boolean
   freeScalarAnalysis: boolean
   nodal: boolean
 }): ShaderBlockEntry[] {
@@ -345,7 +349,7 @@ export function buildVolumeBlocks(opts: {
       name: 'Volume Raymarch Grid',
       condition: !opts.is2D,
       content: opts.useDensityGrid
-        ? volumeRaymarchGridBlock
+        ? generateVolumeRaymarchGridBlock(opts.usePrecomputedNormals)
         : [
             '// Stub: grid raymarching unavailable',
             'fn volumeRaymarchGrid(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',

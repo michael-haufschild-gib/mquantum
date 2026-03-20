@@ -35,11 +35,16 @@ export class RenderContextImpl implements WebGPURenderContext {
   private pool: WebGPUResourcePool
   private canvasTextureView: GPUTextureView
   private resourceAliases: Map<string, string>
-  private activeTimestampWrites: {
-    querySet: GPUQuerySet
-    beginningOfPassWriteIndex: number
-    endOfPassWriteIndex: number
-  } | null = null
+  // GPU timestamp infrastructure for per-render-graph-pass profiling.
+  // Uses 4 query slots per pass: [computeBegin, computeEnd, renderBegin, renderEnd]
+  // - computeBegin: written by first beginComputePass() only
+  // - computeEnd:   written by every beginComputePass() (last one wins)
+  // - renderBegin:  written by first beginRenderPass() only
+  // - renderEnd:    written by every beginRenderPass() (last one wins)
+  private timestampQuerySet: GPUQuerySet | null = null
+  private timestampBaseIndex = 0
+  private computeBeginWritten = false
+  private renderBeginWritten = false
   private passUsedTimestampWrites = false
 
   constructor(
@@ -77,7 +82,10 @@ export class RenderContextImpl implements WebGPURenderContext {
     this.pool = pool
     this.canvasTextureView = canvasTextureView
     this.resourceAliases = resourceAliases
-    this.activeTimestampWrites = null
+    this.timestampQuerySet = null
+    this.timestampBaseIndex = 0
+    this.computeBeginWritten = false
+    this.renderBeginWritten = false
     this.passUsedTimestampWrites = false
   }
 
@@ -135,48 +143,72 @@ export class RenderContextImpl implements WebGPURenderContext {
   }
 
   beginRenderPass(descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
-    const renderDescriptor: GPURenderPassDescriptor =
-      this.activeTimestampWrites && !descriptor.timestampWrites
-        ? {
-            ...descriptor,
-            timestampWrites: this.activeTimestampWrites as GPURenderPassTimestampWrites,
+    const qs = this.timestampQuerySet
+    if (qs && !descriptor.timestampWrites) {
+      // Render phase uses slots [base+2, base+3].
+      // beginningOfPassWriteIndex only on first render pass (preserve first-start timestamp).
+      const tw: GPURenderPassTimestampWrites = this.renderBeginWritten
+        ? { querySet: qs, endOfPassWriteIndex: this.timestampBaseIndex + 3 }
+        : {
+            querySet: qs,
+            beginningOfPassWriteIndex: this.timestampBaseIndex + 2,
+            endOfPassWriteIndex: this.timestampBaseIndex + 3,
           }
-        : descriptor
-    if (renderDescriptor.timestampWrites) {
+      this.renderBeginWritten = true
+      this.passUsedTimestampWrites = true
+      return this.encoder.beginRenderPass({ ...descriptor, timestampWrites: tw })
+    }
+    if (descriptor.timestampWrites) {
       this.passUsedTimestampWrites = true
     }
-    return this.encoder.beginRenderPass(renderDescriptor)
+    return this.encoder.beginRenderPass(descriptor)
   }
 
   beginComputePass(descriptor?: GPUComputePassDescriptor): GPUComputePassEncoder {
-    const computeDescriptor: GPUComputePassDescriptor | undefined =
-      this.activeTimestampWrites && !descriptor?.timestampWrites
-        ? {
-            ...descriptor,
-            timestampWrites: this.activeTimestampWrites as GPUComputePassTimestampWrites,
+    const qs = this.timestampQuerySet
+    if (qs && !descriptor?.timestampWrites) {
+      // Compute phase uses slots [base+0, base+1].
+      // beginningOfPassWriteIndex only on first compute pass (preserve first-start timestamp).
+      const tw: GPUComputePassTimestampWrites = this.computeBeginWritten
+        ? { querySet: qs, endOfPassWriteIndex: this.timestampBaseIndex + 1 }
+        : {
+            querySet: qs,
+            beginningOfPassWriteIndex: this.timestampBaseIndex,
+            endOfPassWriteIndex: this.timestampBaseIndex + 1,
           }
-        : descriptor
-    if (computeDescriptor?.timestampWrites) {
+      this.computeBeginWritten = true
+      this.passUsedTimestampWrites = true
+      return this.encoder.beginComputePass({ ...descriptor, timestampWrites: tw })
+    }
+    if (descriptor?.timestampWrites) {
       this.passUsedTimestampWrites = true
     }
-    return this.encoder.beginComputePass(computeDescriptor)
+    return this.encoder.beginComputePass(descriptor)
   }
 
   getCanvasTextureView(): GPUTextureView {
     return this.canvasTextureView
   }
 
-  setPassTimestampWrites(querySet: GPUQuerySet, startIndex: number): void {
-    this.activeTimestampWrites = {
-      querySet,
-      beginningOfPassWriteIndex: startIndex,
-      endOfPassWriteIndex: startIndex + 1,
-    }
+  /**
+   * Configure 4-slot timestamp writes for this render graph pass.
+   * Slots: [computeBegin, computeEnd, renderBegin, renderEnd]
+   * @param querySet - GPU query set for timestamp writes
+   * @param baseIndex - First of 4 consecutive query indices for this pass
+   */
+  setPassTimestampWrites(querySet: GPUQuerySet, baseIndex: number): void {
+    this.timestampQuerySet = querySet
+    this.timestampBaseIndex = baseIndex
+    this.computeBeginWritten = false
+    this.renderBeginWritten = false
     this.passUsedTimestampWrites = false
   }
 
   clearPassTimestampWrites(): void {
-    this.activeTimestampWrites = null
+    this.timestampQuerySet = null
+    this.timestampBaseIndex = 0
+    this.computeBeginWritten = false
+    this.renderBeginWritten = false
     this.passUsedTimestampWrites = false
   }
 
@@ -184,6 +216,11 @@ export class RenderContextImpl implements WebGPURenderContext {
     const used = this.passUsedTimestampWrites
     this.passUsedTimestampWrites = false
     return used
+  }
+
+  /** Return which GPU phases (compute, render) were used in the current render graph pass. */
+  getPassPhases(): { hasCompute: boolean; hasRender: boolean } {
+    return { hasCompute: this.computeBeginWritten, hasRender: this.renderBeginWritten }
   }
 }
 

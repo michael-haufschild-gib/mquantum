@@ -24,6 +24,7 @@ import { expect, test } from '@playwright/test'
 
 import {
   collectFatalGpuErrors,
+  collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   getFrameCount,
   gotoMode,
@@ -63,6 +64,7 @@ test.describe('quantum mode rendering', () => {
   for (const { mode, dim, label } of modes) {
     test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
       const gpuErrors = collectFatalGpuErrors(page)
+      const gpuWarnings = collectGpuWarningsAndErrors(page)
 
       await gotoMode(page, mode, dim)
       await waitForRendererReady(page)
@@ -73,15 +75,20 @@ test.describe('quantum mode rendering', () => {
       // before this point would measure the wrong configuration.
       await waitForShaderCompilation(page)
 
+      // Assert shader/pipeline health BEFORE pixel check — a blank canvas
+      // caused by a shader compilation error should report the shader error,
+      // not "canvas is blank".
+      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
+      expect(gpuWarnings, `${label}: no shader/pipeline warnings or errors`).toEqual([])
+
       // Verify actual pixels were rendered (not just blank clear color)
       await expectCanvasNotBlank(page)
-
-      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
     })
   }
 
   test('switching modes: renderer recovers and renders each mode', async ({ page }) => {
     const gpuErrors = collectFatalGpuErrors(page)
+    const gpuWarnings = collectGpuWarningsAndErrors(page)
 
     for (const mode of ['harmonicOscillator', 'hydrogenND', 'harmonicOscillator'] as const) {
       await gotoMode(page, mode, 3)
@@ -91,6 +98,7 @@ test.describe('quantum mode rendering', () => {
     }
 
     expect(gpuErrors).toEqual([])
+    expect(gpuWarnings, 'no shader/pipeline warnings during mode switching').toEqual([])
   })
 
   test('animation loop: frame count increases over time', async ({ page }) => {

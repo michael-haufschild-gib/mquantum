@@ -195,6 +195,11 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
           binding: 5,
           visibility: GPUShaderStage.FRAGMENT,
           sampler: { type: 'filtering' as const },
+        },
+        {
+          binding: 7,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
         }
       )
     }
@@ -243,6 +248,14 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
               { binding: 4, resource: view },
               { binding: 5, resource: densityGridSamplerRef }
             )
+          }
+          // Pre-computed gradient normal texture (always available when density grid exists)
+          const normalView = densityGridRef.getNormalTextureView()
+          if (normalView) {
+            entries.push({ binding: 7, resource: normalView })
+          } else {
+            // Fallback: bind the density texture view to avoid layout/entry mismatch
+            entries.push({ binding: 7, resource: view })
           }
         }
 

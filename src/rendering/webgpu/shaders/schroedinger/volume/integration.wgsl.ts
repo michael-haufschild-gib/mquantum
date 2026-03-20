@@ -681,4 +681,4 @@ fn computeProbabilityCurrentOverlay(
 export { volumeRaymarchBlock } from './volumeRaymarch.wgsl'
 
 // Re-export grid raymarching block from dedicated module
-export { volumeRaymarchGridBlock } from './volumeRaymarchGrid.wgsl'
+export { generateVolumeRaymarchGridBlock } from './volumeRaymarchGrid.wgsl'

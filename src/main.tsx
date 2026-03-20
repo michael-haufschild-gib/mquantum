@@ -11,24 +11,26 @@ import { initAnimationWasm } from '@/lib/wasm'
 import App from './App.tsx'
 initAnimationWasm()
 
-// Expose stores for e2e testing
+// Expose stores on window for e2e testing, benchmarking, and console debugging.
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useUIStore } from '@/stores/uiStore'
 
-if (import.meta.env.DEV) {
-  window.__GEOMETRY_STORE__ = useGeometryStore
-  window.__UI_STORE__ = useUIStore
-  window.__ENVIRONMENT_STORE__ = useEnvironmentStore
-  window.__APPEARANCE_STORE__ = useAppearanceStore
-  window.__LAYOUT_STORE__ = useLayoutStore
-  window.__POST_PROCESSING_STORE__ = usePostProcessingStore
-  window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
-}
+window.__GEOMETRY_STORE__ = useGeometryStore
+window.__UI_STORE__ = useUIStore
+window.__ENVIRONMENT_STORE__ = useEnvironmentStore
+window.__APPEARANCE_STORE__ = useAppearanceStore
+window.__LAYOUT_STORE__ = useLayoutStore
+window.__POST_PROCESSING_STORE__ = usePostProcessingStore
+window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
+window.__PERFORMANCE_STORE__ = usePerformanceStore
+window.__PERFORMANCE_METRICS_STORE__ = usePerformanceMetricsStore
 
 const rootElement = document.getElementById('root')
 

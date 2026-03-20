@@ -176,6 +176,47 @@ export function collectFatalGpuErrors(page: Page): string[] {
   return errors
 }
 
+/**
+ * Collect console errors and warnings that indicate GPU/shader problems.
+ * Catches: shader compilation failures, WGSL errors, pipeline errors,
+ * WebGPU validation, bind group mismatches, and renderer-level error logs.
+ *
+ * Returns the array (mutated in-place by the listener).
+ */
+export function collectGpuWarningsAndErrors(page: Page): string[] {
+  const issues: string[] = []
+  page.on('console', (msg) => {
+    const type = msg.type()
+    if (type !== 'error' && type !== 'warning') return
+    const text = msg.text()
+    // WGSL shader errors (unresolved values, syntax errors, etc.)
+    if (/\[WGSL ERROR\]|unresolved value|shader.*error/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+      return
+    }
+    // Shader / pipeline errors
+    if (/GPUPipelineError|shader.*compil|pipeline.*fail|binding.*doesn.*exist/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+      return
+    }
+    // WebGPU validation errors
+    if (/GPUValidationError|validation.*error/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+      return
+    }
+    // Renderer-level errors logged via logger.error
+    if (/\[SchrodingerRenderer\].*fail|\[WebGPU.*\].*fail|\[WebGPU.*\].*error/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+      return
+    }
+    // Device lost / fatal
+    if (/device.*lost|rendergraph.*cycle|unhandled.*gpu/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+    }
+  })
+  return issues
+}
+
 /** Attach a listener for all uncaught page errors. Returns the array (mutated in-place). */
 export function collectPageErrors(page: Page): string[] {
   const errors: string[] = []
@@ -456,6 +497,8 @@ export async function expectCanvasNotBlank(page: Page): Promise<void> {
 export interface PassTimingSnapshot {
   passId: string
   gpuTimeMs: number
+  computeGpuTimeMs: number
+  renderGpuTimeMs: number
   cpuTimeMs: number
   skipped: boolean
 }
@@ -475,8 +518,10 @@ export interface PerfMetricsSnapshot {
 /** Read a performance metrics snapshot from the performanceMetricsStore. */
 export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnapshot> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/performanceMetricsStore.ts')
-    const s = mod.usePerformanceMetricsStore.getState()
+    const store =
+      window.__PERFORMANCE_METRICS_STORE__ ??
+      (await import('/src/stores/performanceMetricsStore.ts')).usePerformanceMetricsStore
+    const s = store.getState()
     return {
       fps: s.fps,
       frameTime: s.frameTime,
@@ -487,6 +532,8 @@ export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnap
       passTimings: s.passTimings.map((p) => ({
         passId: p.passId,
         gpuTimeMs: p.gpuTimeMs,
+        computeGpuTimeMs: p.computeGpuTimeMs ?? 0,
+        renderGpuTimeMs: p.renderGpuTimeMs ?? 0,
         cpuTimeMs: p.cpuTimeMs,
         skipped: p.skipped,
       })),

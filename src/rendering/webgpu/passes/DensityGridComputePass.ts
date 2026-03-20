@@ -14,11 +14,12 @@
  */
 
 import { logger } from '@/lib/logger'
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
+import { gradientGridComputeShader } from '../shaders/schroedinger/compute/gradientGrid.wgsl'
+import { DensityDistributionAnalyzer } from './DensityDistributionAnalysis'
 
 // Grid parameters struct size (must match WGSL GridParams)
 // vec3u (12) + pad (4) + vec3f (12) + pad (4) + vec3f (12) + pad (4) = 48 bytes
@@ -32,20 +33,6 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 4
-// PERF: Precomputed 2^(exponent-15) lookup table for Float16 decoding.
-// Exponents 0..30 (31 is Inf/NaN handled separately). Avoids Math.pow per voxel.
-const F16_EXP_TABLE = new Float32Array(31)
-for (let e = 0; e < 31; e++) {
-  F16_EXP_TABLE[e] = 2 ** (e - 15)
-}
-const F16_SUBNORM_SCALE = 2 ** -14 / 1024 // for subnormals: 2^-14 * fraction/1024
-
-const CONFIDENCE_MASS_MIN = 0.5
-const CONFIDENCE_MASS_MAX = 0.99
-const DEFAULT_CONFIDENCE_MASS = 0.68
-const DEFAULT_LOG_RHO_THRESHOLD = -2.0
-const RHO_EPSILON = 1e-12
-
 /**
  * Configuration for the density grid compute pass.
  */
@@ -93,6 +80,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   // GPU resources
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
+  private normalTexture: GPUTexture | null = null
+  private normalTextureView: GPUTextureView | null = null
+  private gradientPipeline: GPUComputePipeline | null = null
+  private gradientBindGroup: GPUBindGroup | null = null
   private gridParamsBuffer: GPUBuffer | null = null
   private schroedingerBuffer: GPUBuffer | null = null
   private basisBuffer: GPUBuffer | null = null
@@ -129,15 +120,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   // Version tracking for uniform buffers - prevents unnecessary recomputation
   private lastSchroedingerVersion = -1
   private lastBasisVersion = -1
-  private confidenceMass = DEFAULT_CONFIDENCE_MASS
-  private logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-  private sortedRhoValues: Float32Array | null = null
-  private prefixMass: Float64Array | null = null
-  private totalMass = 0
   private readbackBytesPerTexel = 8
   private readbackTexelStrideHalfs = 4
-  // PERF: Reusable scratch buffer for density distribution (avoids 1MB allocation per readback)
-  private distributionScratch: Float32Array | null = null
+  private analyzer = new DensityDistributionAnalyzer()
 
   constructor(config: DensityGridComputeConfig) {
     super({
@@ -190,6 +175,23 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
     this.densityTextureView = this.densityTexture.createView({
       label: 'density-grid-view',
+      dimension: '3d',
+    })
+
+    // Pre-computed gradient normal texture (rgba8snorm: nx, ny, nz, gradMag indicator)
+    this.normalTexture = device.createTexture({
+      label: 'normal-grid-texture',
+      size: {
+        width: this.gridSize,
+        height: this.gridSize,
+        depthOrArrayLayers: this.gridSize,
+      },
+      format: 'rgba8snorm',
+      dimension: '3d',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    this.normalTextureView = this.normalTexture.createView({
+      label: 'normal-grid-view',
       dimension: '3d',
     })
 
@@ -332,6 +334,53 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       }
       DensityGridComputePass.pipelineCache.set(cacheKey, this.computePipeline)
     }
+
+    // ── Gradient normal compute pipeline ──
+    // Reads the density grid, computes central-difference gradient, writes normalized
+    // normals to the normal grid texture. Eliminates 6 texture fetches per visible
+    // sample in the fragment shader (~0.4-1.6ms savings at Retina resolution).
+    const hasLogDensity = this.densityTextureFormat === 'rgba16float'
+    const isDualChannel = false // analytic modes are never dual-channel
+    const gradientModule = device.createShaderModule({
+      label: 'gradient-grid-compute-shader',
+      code: gradientGridComputeShader,
+    })
+    const gradientBGL = device.createBindGroupLayout({
+      label: 'gradient-grid-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.COMPUTE,
+          texture: { sampleType: 'unfilterable-float', viewDimension: '3d' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: { access: 'write-only', format: 'rgba8snorm', viewDimension: '3d' },
+        },
+      ],
+    })
+    this.gradientBindGroup = device.createBindGroup({
+      label: 'gradient-grid-bg',
+      layout: gradientBGL,
+      entries: [
+        { binding: 0, resource: this.densityTextureView! },
+        { binding: 1, resource: this.normalTextureView! },
+      ],
+    })
+    this.gradientPipeline = await device.createComputePipelineAsync({
+      label: 'gradient-grid-pipeline',
+      layout: device.createPipelineLayout({ bindGroupLayouts: [gradientBGL] }),
+      compute: {
+        module: gradientModule,
+        entryPoint: 'main',
+        constants: {
+          GRID_SIZE: this.gridSize,
+          HAS_LOG_DENSITY: hasLogDensity ? 1 : 0,
+          IS_DUAL_CHANNEL_GRID: isDualChannel ? 1 : 0,
+        } as Record<string, number>,
+      },
+    })
   }
 
   private async selectGridTextureFormat(device: GPUDevice): Promise<'r16float' | 'rgba16float'> {
@@ -478,47 +527,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Reuses cached density distribution to avoid recomputing the grid.
    */
   setConfidenceMass(confidenceMass: number): void {
-    const clampedMass = Math.max(CONFIDENCE_MASS_MIN, Math.min(CONFIDENCE_MASS_MAX, confidenceMass))
-    if (Math.abs(clampedMass - this.confidenceMass) < 1e-6) {
-      return
-    }
-    this.confidenceMass = clampedMass
-    this.recomputeUncertaintyThresholdFromDistribution()
+    this.analyzer.setConfidenceMass(confidenceMass)
   }
 
   /**
    * Get current log-density threshold corresponding to configured confidence mass.
    */
   getLogRhoThreshold(): number {
-    return this.logRhoThreshold
-  }
-
-  /**
-   * Recompute uncertainty log-rho threshold from cached sorted density distribution.
-   */
-  private recomputeUncertaintyThresholdFromDistribution(): void {
-    const sortedRhoValues = this.sortedRhoValues
-    const prefixMass = this.prefixMass
-    if (!sortedRhoValues || !prefixMass || this.totalMass <= RHO_EPSILON) {
-      this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-      return
-    }
-
-    const targetMass = this.totalMass * this.confidenceMass
-    let lo = 0
-    let hi = prefixMass.length - 1
-
-    while (lo < hi) {
-      const mid = Math.floor((lo + hi) * 0.5)
-      if ((prefixMass[mid] ?? Number.POSITIVE_INFINITY) >= targetMass) {
-        hi = mid
-      } else {
-        lo = mid + 1
-      }
-    }
-
-    const rhoAtTarget = Math.max(sortedRhoValues[lo] ?? RHO_EPSILON, RHO_EPSILON)
-    this.logRhoThreshold = Math.log(rhoAtTarget)
+    return this.analyzer.getLogRhoThreshold()
   }
 
   /**
@@ -581,7 +597,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
         }
         const mapped = readbackBuffer.getMappedRange()
         const halfView = new Uint16Array(mapped)
-        this.buildDensityDistribution(halfView)
+        this.analyzer.buildDistribution(
+          halfView,
+          this.gridSize,
+          this.readbackBytesPerRow,
+          this.readbackBytesPerTexel,
+          this.readbackTexelStrideHalfs,
+          this.worldBound
+        )
         readbackBuffer.unmap()
       })
       .catch(() => {
@@ -590,97 +613,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       .finally(() => {
         this.readbackInFlight = false
       })
-  }
-
-  /**
-   * Decode a Float16 scalar to Float32.
-   * PERF: Uses precomputed exponent lookup table instead of Math.pow per call.
-   */
-  private decodeFloat16(value: number): number {
-    const sign = (value & 0x8000) !== 0 ? -1 : 1
-    const exponent = (value & 0x7c00) >> 10
-    const fraction = value & 0x03ff
-
-    if (exponent === 0) {
-      return fraction === 0 ? 0 : sign * F16_SUBNORM_SCALE * fraction
-    }
-
-    if (exponent === 0x1f) {
-      return fraction === 0 ? sign * Number.POSITIVE_INFINITY : Number.NaN
-    }
-
-    return sign * F16_EXP_TABLE[exponent]! * (1 + fraction / 1024)
-  }
-
-  /**
-   * Build sorted density values and cumulative mass arrays from readback texture data.
-   */
-  private buildDensityDistribution(halfView: Uint16Array): void {
-    const maxValues = this.gridSize * this.gridSize * this.gridSize
-    // PERF: Reuse scratch buffer to avoid 1MB allocation + GC per readback cycle
-    if (!this.distributionScratch || this.distributionScratch.length < maxValues) {
-      this.distributionScratch = new Float32Array(maxValues)
-    }
-    const values = this.distributionScratch
-    const texelsPerRow = this.readbackBytesPerRow / this.readbackBytesPerTexel
-    let count = 0
-
-    for (let z = 0; z < this.gridSize; z++) {
-      const zOffsetTexels = z * this.gridSize * texelsPerRow
-      for (let y = 0; y < this.gridSize; y++) {
-        const rowOffsetTexels = zOffsetTexels + y * texelsPerRow
-        for (let x = 0; x < this.gridSize; x++) {
-          const texelOffsetHalfs = (rowOffsetTexels + x) * this.readbackTexelStrideHalfs
-          const rho = this.decodeFloat16(halfView[texelOffsetHalfs] ?? 0)
-          if (rho > RHO_EPSILON && Number.isFinite(rho)) {
-            values[count++] = rho
-          }
-        }
-      }
-    }
-
-    if (count === 0) {
-      this.sortedRhoValues = null
-      this.prefixMass = null
-      this.totalMass = 0
-      this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-      useDensityDiagnosticsStore.getState().pushSnapshot({
-        maxDensity: 0,
-        totalDensityMass: 0,
-        activeVoxelCount: 0,
-        centerDensity: 0,
-        gridSize: this.gridSize,
-        worldBound: this.worldBound,
-      })
-      return
-    }
-
-    this.sortedRhoValues = values.slice(0, count).sort((a, b) => b - a)
-    this.prefixMass = new Float64Array(count)
-
-    let cumulativeMass = 0
-    for (let i = 0; i < count; i++) {
-      cumulativeMass += this.sortedRhoValues[i] ?? 0
-      this.prefixMass[i] = cumulativeMass
-    }
-    this.totalMass = cumulativeMass
-    this.recomputeUncertaintyThresholdFromDistribution()
-
-    // Push density diagnostics for GPU correctness oracle (e2e tests)
-    const half = Math.floor(this.gridSize / 2)
-    const centerZ = half * this.gridSize * texelsPerRow
-    const centerY = half * texelsPerRow
-    const centerOffset = (centerZ + centerY + half) * this.readbackTexelStrideHalfs
-    const centerDensity = this.decodeFloat16(halfView[centerOffset] ?? 0)
-
-    useDensityDiagnosticsStore.getState().pushSnapshot({
-      maxDensity: this.sortedRhoValues[0] ?? 0,
-      totalDensityMass: cumulativeMass,
-      activeVoxelCount: count,
-      centerDensity,
-      gridSize: this.gridSize,
-      worldBound: this.worldBound,
-    })
   }
 
   /**
@@ -750,6 +682,16 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     )
 
     computePass.end()
+
+    // Dispatch gradient normal computation (reads density grid, writes normal grid)
+    if (this.gradientPipeline && this.gradientBindGroup) {
+      const gradPass = ctx.beginComputePass({ label: 'gradient-grid-compute-pass' })
+      gradPass.setPipeline(this.gradientPipeline)
+      gradPass.setBindGroup(0, this.gradientBindGroup)
+      gradPass.dispatchWorkgroups(this.workgroupCount, this.workgroupCount, this.workgroupCount)
+      gradPass.end()
+    }
+
     this.refreshDensityDistribution(ctx)
 
     // Update tracking state
@@ -770,6 +712,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
+  }
+
+  getNormalTextureView(): GPUTextureView | null {
+    return this.normalTextureView
   }
 
   /**
@@ -805,6 +751,11 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.densityTexture?.destroy()
     this.densityTexture = null
     this.densityTextureView = null
+    this.normalTexture?.destroy()
+    this.normalTexture = null
+    this.normalTextureView = null
+    this.gradientPipeline = null
+    this.gradientBindGroup = null
     this.gridParamsBuffer?.destroy()
     this.gridParamsBuffer = null
     this.schroedingerBuffer?.destroy()
@@ -830,11 +781,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.readbackInFlight = false
     this.readbackPendingSubmit = false
     this.shouldRefreshDistribution = true
-    this.sortedRhoValues = null
-    this.prefixMass = null
-    this.totalMass = 0
-    this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-    this.distributionScratch = null
+    this.analyzer.reset()
 
     super.dispose()
   }

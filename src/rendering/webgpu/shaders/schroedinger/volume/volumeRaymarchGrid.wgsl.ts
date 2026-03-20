@@ -4,13 +4,40 @@
  * Uses pre-computed 3D density grid texture instead of inline wavefunction evaluation.
  * Extracted from integration.wgsl.ts for file-size management.
  *
+ * Profiling strip flags (compile-time, dead-code-eliminated when false):
+ * - PROFILING_STRIP_GRADIENT: replace 6-fetch gradient with constant normal
+ * - PROFILING_STRIP_LIGHTING: replace lit emission with flat baseColor
+ * - PROFILING_STRIP_EMPTY_SKIP: disable empty-region skip (force all samples to evaluate)
+ * - PROFILING_STRIP_ADAPTIVE_STEP: force stepMultiplier=1 (uniform stepping)
+ * - PROFILING_STRIP_COMPOSITING: skip gradient+emission+compositing entirely
+ * - PROFILING_HALF_SAMPLES: cap iteration budget at 64 instead of 128
+ *
  * @module rendering/webgpu/shaders/schroedinger/volume/volumeRaymarchGrid.wgsl
  */
 
-export const volumeRaymarchGridBlock = /* wgsl */ `
+/**
+ *
+ */
+export function generateVolumeRaymarchGridBlock(usePrecomputedNormals: boolean): string {
+  // Generate the gradient fetch function — either delegates to the precomputed
+  // normal grid (1 texture fetch) or the inline central differences (6 fetches).
+  // This avoids referencing sampleNormalFromGrid when the binding doesn't exist.
+  const gradientFetchFn = usePrecomputedNormals
+    ? `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  return sampleNormalFromGrid(pos, uniforms);
+}`
+    : `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  return computeGradientFromGrid(pos, uniforms);
+}`
+
+  return /* wgsl */ `
 // ============================================
 // Grid-Based Volume Raymarching
 // ============================================
+
+// Gradient fetch: delegates to precomputed normal grid or inline central differences.
+// Generated at shader composition time to avoid referencing undeclared bindings.
+${gradientFetchFn}
 
 fn volumeRaymarchGrid(
   rayOrigin: vec3f,
@@ -36,7 +63,11 @@ fn volumeRaymarchGrid(
 
   var transmittance: f32 = 1.0;
 
+  // Profiling: iteration budget override
+  let maxIter = select(MAX_VOLUME_SAMPLES, 64, PROFILING_HALF_SAMPLES);
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
+    if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
 
@@ -101,7 +132,7 @@ fn volumeRaymarchGrid(
     // alpha channel encodes |V|/Vmax. For HO/hydrogen modes, alpha is relativePhase.
     // Pauli spinor: alpha is total density, not potential — skip potential check.
     let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
-    if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
@@ -122,7 +153,7 @@ fn volumeRaymarchGrid(
     // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
     // Use logRho of total density for adaptive stepping.
     var stepMultiplier = 1.0;
-    if (!hasPotOverlay) {
+    if (!PROFILING_STRIP_ADAPTIVE_STEP && !hasPotOverlay) {
       let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), IS_DUAL_CHANNEL);
       if (logRhoForStep < -12.0) {
         stepMultiplier = 4.0;
@@ -230,16 +261,32 @@ fn volumeRaymarchGrid(
         primaryHitT = t;
       }
 
-      // Compute gradient from grid (central differences on texture)
-      let gradient = computeGradientFromGrid(pos, uniforms);
+      if (!PROFILING_STRIP_COMPOSITING) {
+        // Gradient normal: use pre-computed normal grid (1 fetch) or inline central
+        // differences (6 fetches). Pre-computed saves ~0.4-1.6ms at Retina resolution.
+        // Note: sampleNormalFromGrid is called via the PRECOMPUTED_GRADIENT macro
+        // to avoid referencing an undeclared function when the normal grid binding
+        // is not included (compute modes).
+        var gradient: vec3f;
+        if (PROFILING_STRIP_GRADIENT) {
+          gradient = vec3f(0.0, 1.0, 0.0); // profiling: constant up-normal
+        } else {
+          gradient = fetchGradient(pos, uniforms);
+        }
 
-      // Compute emission with lighting
-      // For algo 23: pass particle (colorRho) and antiparticle (colorS) to color function.
-      // For other algos: colorRho == rho and colorS == sCenter (no difference).
-      let emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
+        // Compute emission with lighting
+        var emission: vec3f;
+        if (PROFILING_STRIP_LIGHTING) {
+          emission = computeBaseColor(colorRho, colorS, phase, pos, uniforms);
+        } else {
+          // For algo 23: pass particle (colorRho) and antiparticle (colorS) to color function.
+          // For other algos: colorRho == rho and colorS == sCenter (no difference).
+          emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
+        }
 
-      // Front-to-back compositing
-      accColor += transmittance * alpha * emission;
+        // Front-to-back compositing
+        accColor += transmittance * alpha * emission;
+      }
       transmittance *= (1.0 - alpha);
     }
 
@@ -255,3 +302,4 @@ fn volumeRaymarchGrid(
   return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 `
+}

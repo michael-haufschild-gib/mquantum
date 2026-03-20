@@ -343,13 +343,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Refresh potential buffer when physics parameters change. */
-  private refreshPotentialIfDirty(encoder: GPUCommandEncoder, config: DiracConfig): void {
+  private refreshPotentialIfDirty(ctx: WebGPURenderContext, config: DiracConfig): void {
     const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
     if (potHash !== this.lastPotentialHash) {
       this.lastPotentialHash = potHash
       const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
       if (this.pl && this.bg) {
-        const p = encoder.beginComputePass({ label: 'dirac-potential-update' })
+        const p = ctx.beginComputePass({ label: 'dirac-potential-update' })
         this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG!], linearWG)
         p.end()
       }
@@ -357,14 +357,14 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize spinor wavepacket and potential if needed. */
-  private maybeInitialize(encoder: GPUCommandEncoder, config: DiracConfig): void {
+  private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): void {
     if (this.initialized && !config.needsReset) return
     if (this.pl && this.bg) {
       const wg = Math.ceil(this.totalSites / LINEAR_WG)
-      const initPass = encoder.beginComputePass({ label: 'dirac-init-pass' })
+      const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
       this.dispatchCompute(initPass, this.pl.initPipeline, [this.bg.initBG!], wg)
       initPass.end()
-      const potPass = encoder.beginComputePass({ label: 'dirac-potential-fill' })
+      const potPass = ctx.beginComputePass({ label: 'dirac-potential-fill' })
       this.dispatchCompute(potPass, this.pl.potentialPipeline, [this.bg.potentialBG!], wg)
       potPass.end()
     }
@@ -406,7 +406,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     )
   }
 
-  private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
+  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
+    const encoder = ctx.encoder
     if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
 
     const stages = Math.log2(axisDim)
@@ -421,7 +422,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         FFT_UNIFORM_SIZE
       )
       const fftBG = s % 2 === 0 ? this.bg.fftStageABBG! : this.bg.fftStageBABG!
-      const pass = encoder.beginComputePass({ label: `dirac-fft-stage-${s}` })
+      const pass = ctx.beginComputePass({ label: `dirac-fft-stage-${s}` })
       this.dispatchCompute(
         pass,
         this.pl.fftStagePipeline,
@@ -450,7 +451,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     boundingRadius?: number
   ): void {
     const config = this.sanitizeGridSizes(rawConfig)
-    const { device, encoder } = ctx
+    const { device } = ctx
     const configHash = this.computeConfigHash(config)
 
     if (configHash !== this.lastConfigHash || !this.spinorReBuffer) {
@@ -467,8 +468,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     this.flushGammaUpload(device)
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
-    this.maybeInitialize(encoder, config)
-    this.refreshPotentialIfDirty(encoder, config)
+    this.maybeInitialize(ctx, config)
+    this.refreshPotentialIfDirty(ctx, config)
 
     const { pl, bg } = this
     if (!pl || !bg) return
@@ -485,7 +486,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential (per-component phase rotation)
-        const vHalf = encoder.beginComputePass({ label: `dirac-V-half-1-${step}` })
+        const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
         this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
         vHalf.end()
 
@@ -493,24 +494,24 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         for (let c = 0; c < S; c++) {
           const packBG = bg.cachedPackBGs[c]
           if (packBG) {
-            const p = encoder.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
             this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
             p.end()
           }
           let fftSlot = 0
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = bg.cachedUnpackBGsNoNorm[c]
           if (unpackBG) {
-            const p = encoder.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
             p.end()
           }
         }
 
         // 4. Apply free Dirac propagator in k-space
-        const kinPass = encoder.beginComputePass({ label: `dirac-kinetic-${step}` })
+        const kinPass = ctx.beginComputePass({ label: `dirac-kinetic-${step}` })
         this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
         kinPass.end()
 
@@ -518,24 +519,24 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         for (let c = 0; c < S; c++) {
           const packBG = bg.cachedPackBGs[c]
           if (packBG) {
-            const p = encoder.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
             this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
             p.end()
           }
           let fftSlot = this.fwdStageCount
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = bg.cachedUnpackBGs[c]
           if (unpackBG) {
-            const p = encoder.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
             p.end()
           }
         }
 
         // 6. Second half-step potential
-        const vHalf2 = encoder.beginComputePass({ label: `dirac-V-half-2-${step}` })
+        const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })
         this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
         vHalf2.end()
 
@@ -543,7 +544,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         // Applied once per step, after the FFT kinetic step has completed.
         // This prevents the FFT from seeing the absorber's spatial modulation
         // and scattering it across k-space (which creates spurious emission artifacts).
-        const absPass = encoder.beginComputePass({ label: `dirac-absorber-${step}` })
+        const absPass = ctx.beginComputePass({ label: `dirac-absorber-${step}` })
         this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG!], linearWG)
         absPass.end()
 
@@ -551,7 +552,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
         // Periodic renormalization: counteract f32 norm drift.
         if (step === stepsThisFrame - 1 && bg.renormalizeBG) {
-          const rPass = encoder.beginComputePass({ label: `dirac-renorm-reduce-${step}` })
+          const rPass = ctx.beginComputePass({ label: `dirac-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,
             pl.diagReducePipeline,
@@ -559,10 +560,10 @@ export class DiracComputePass extends WebGPUBaseComputePass {
             this.diagNumWorkgroups
           )
           rPass.end()
-          const fPass = encoder.beginComputePass({ label: `dirac-renorm-finalize-${step}` })
+          const fPass = ctx.beginComputePass({ label: `dirac-renorm-finalize-${step}` })
           this.dispatchCompute(fPass, pl.diagFinalizePipeline, [bg.diagFinalizeBG!], 1)
           fPass.end()
-          const sPass = encoder.beginComputePass({ label: `dirac-renorm-scale-${step}` })
+          const sPass = ctx.beginComputePass({ label: `dirac-renorm-scale-${step}` })
           const renormWG = Math.ceil((this.currentSpinorSize * this.totalSites) / LINEAR_WG)
           this.dispatchCompute(sPass, pl.renormalizePipeline, [bg.renormalizeBG], renormWG)
           sPass.end()
@@ -572,7 +573,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     // Write density grid
     const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
-    const wgPass = encoder.beginComputePass({ label: 'dirac-write-grid-pass' })
+    const wgPass = ctx.beginComputePass({ label: 'dirac-write-grid-pass' })
     this.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG!], gridWG, gridWG, gridWG)
     wgPass.end()
 
@@ -583,15 +584,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
-      this.dispatchDiagnostics(encoder, device, config)
+      this.dispatchDiagnostics(ctx, config)
     }
   }
 
-  private dispatchDiagnostics(
-    encoder: GPUCommandEncoder,
-    device: GPUDevice,
-    config: DiracConfig
-  ): void {
+  private dispatchDiagnostics(ctx: WebGPURenderContext, config: DiracConfig): void {
+    const { device, encoder } = ctx
     const { pl, bg } = this
     if (!pl || !bg || !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer)
       return
@@ -605,7 +603,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
 
     // Pass 1: reduce
-    const reducePass = encoder.beginComputePass({ label: 'dirac-diag-reduce' })
+    const reducePass = ctx.beginComputePass({ label: 'dirac-diag-reduce' })
     this.dispatchCompute(
       reducePass,
       pl.diagReducePipeline,
@@ -615,7 +613,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     reducePass.end()
 
     // Pass 2: finalize
-    const finalizePass = encoder.beginComputePass({ label: 'dirac-diag-finalize' })
+    const finalizePass = ctx.beginComputePass({ label: 'dirac-diag-finalize' })
     this.dispatchCompute(finalizePass, pl.diagFinalizePipeline, [bg.diagFinalizeBG!], 1)
     finalizePass.end()
 

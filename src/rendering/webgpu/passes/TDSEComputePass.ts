@@ -305,7 +305,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
-  private maybeInitialize(device: GPUDevice, encoder: GPUCommandEncoder, config: TdseConfig): void {
+  private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
+    const { device, encoder } = ctx
     if (this.initialized && !config.needsReset && !this.pendingAutoReset) return
 
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
@@ -314,7 +315,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
     if (this.pl && this.bg) {
-      const pass = encoder.beginComputePass({ label: 'tdse-init-pass' })
+      const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
       this.dispatchCompute(pass, this.pl.initPipeline, [this.bg.initBG], linearWG)
       pass.end()
     }
@@ -328,7 +329,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     // Fill potential buffer
     if (this.pl && this.bg) {
-      const pass = encoder.beginComputePass({ label: 'tdse-potential-fill' })
+      const pass = ctx.beginComputePass({ label: 'tdse-potential-fill' })
       this.dispatchCompute(pass, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
       pass.end()
     }
@@ -394,7 +395,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
    *
    * @returns The next slot offset for subsequent axis dispatches.
    */
-  private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
+  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
+    const encoder = ctx.encoder
     if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
 
     const stages = Math.log2(axisDim)
@@ -412,7 +414,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       )
 
       const fftBG = s % 2 === 0 ? this.bg.fftStageABBG : this.bg.fftStageBABG
-      const pass = encoder.beginComputePass({ label: `tdse-fft-stage-${s}` })
+      const pass = ctx.beginComputePass({ label: `tdse-fft-stage-${s}` })
       this.dispatchCompute(
         pass,
         this.pl.fftStagePipeline,
@@ -442,7 +444,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     boundingRadius?: number
   ): void {
     const config = this.sanitizeGridSizes(rawConfig)
-    const { device, encoder } = ctx
+    const { device } = ctx
     const configHash = this.computeConfigHash(config)
 
     if (configHash !== this.lastConfigHash || !this.psiReBuffer) {
@@ -459,7 +461,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
-    this.maybeInitialize(device, encoder, config)
+    this.maybeInitialize(ctx, config)
 
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
@@ -473,7 +475,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     if (potHash !== this.lastPotentialHash) {
       this.lastPotentialHash = potHash
       if (this.pl && this.bg) {
-        const p = encoder.beginComputePass({ label: 'tdse-potential-update' })
+        const p = ctx.beginComputePass({ label: 'tdse-potential-update' })
         this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
         p.end()
       }
@@ -493,39 +495,39 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential
-        const vHalf = encoder.beginComputePass({ label: `tdse-V-half-1-${step}` })
+        const vHalf = ctx.beginComputePass({ label: `tdse-V-half-1-${step}` })
         this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
         vHalf.end()
 
         // 2. Pack psiRe+psiIm into interleaved complex
-        const packPass = encoder.beginComputePass({ label: `tdse-pack-${step}` })
+        const packPass = ctx.beginComputePass({ label: `tdse-pack-${step}` })
         this.dispatchCompute(packPass, pl.packPipeline, [bg.packBG], linearWG)
         packPass.end()
 
         // 3. Forward FFT (for each spatial axis)
         let fftSlot = 0
         for (let d = config.latticeDim - 1; d >= 0; d--) {
-          fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+          fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
         }
 
         // 4. Apply kinetic propagator in k-space
-        const kinPass = encoder.beginComputePass({ label: `tdse-kinetic-${step}` })
+        const kinPass = ctx.beginComputePass({ label: `tdse-kinetic-${step}` })
         this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
         kinPass.end()
 
         // 5. Inverse FFT
         fftSlot = this.fwdStageCount
         for (let d = config.latticeDim - 1; d >= 0; d--) {
-          fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+          fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
         }
 
         // 6. Unpack with 1/N normalization
-        const unpackPass = encoder.beginComputePass({ label: `tdse-unpack-${step}` })
+        const unpackPass = ctx.beginComputePass({ label: `tdse-unpack-${step}` })
         this.dispatchCompute(unpackPass, pl.unpackPipeline, [bg.unpackBG], linearWG)
         unpackPass.end()
 
         // 7. Second half-step potential
-        const vHalf2 = encoder.beginComputePass({ label: `tdse-V-half-2-${step}` })
+        const vHalf2 = ctx.beginComputePass({ label: `tdse-V-half-2-${step}` })
         this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
         vHalf2.end()
 
@@ -533,7 +535,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         // Applied once per step, after the FFT kinetic step has completed.
         // This prevents the FFT from seeing the absorber's spatial modulation
         // and scattering it across k-space (which creates spurious emission artifacts).
-        const absPass = encoder.beginComputePass({ label: `tdse-absorber-${step}` })
+        const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
         this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
         absPass.end()
 
@@ -542,7 +544,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         // 9. Periodic renormalization: counteract f32 norm drift.
         // Once per frame (last substep), run GPU norm reduction + rescale.
         if (step === stepsThisFrame - 1) {
-          const rPass = encoder.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
+          const rPass = ctx.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,
             pl.diagReducePipeline,
@@ -550,10 +552,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
             this.diagNumWorkgroups
           )
           rPass.end()
-          const fPass = encoder.beginComputePass({ label: `tdse-renorm-finalize-${step}` })
+          const fPass = ctx.beginComputePass({ label: `tdse-renorm-finalize-${step}` })
           this.dispatchCompute(fPass, pl.diagFinalizePipeline, [bg.diagFinalizeBG], 1)
           fPass.end()
-          const sPass = encoder.beginComputePass({ label: `tdse-renorm-scale-${step}` })
+          const sPass = ctx.beginComputePass({ label: `tdse-renorm-scale-${step}` })
           const renormWG = Math.ceil(this.totalSites / LINEAR_WG)
           this.dispatchCompute(sPass, pl.renormalizePipeline, [bg.renormalizeBG], renormWG)
           sPass.end()
@@ -563,7 +565,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     // Write density grid
     const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
-    const wgPass = encoder.beginComputePass({ label: 'tdse-write-grid-pass' })
+    const wgPass = ctx.beginComputePass({ label: 'tdse-write-grid-pass' })
     this.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG], gridWG, gridWG, gridWG)
     wgPass.end()
 
@@ -577,7 +579,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
-      this.dispatchDiagnostics(encoder, device, config, config.diagnosticsEnabled)
+      this.dispatchDiagnostics(ctx, config, config.diagnosticsEnabled)
     }
   }
 
@@ -587,11 +589,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
    *   When false, only update maxDensity for display normalization.
    */
   private dispatchDiagnostics(
-    encoder: GPUCommandEncoder,
-    device: GPUDevice,
+    ctx: WebGPURenderContext,
     config: TdseConfig,
     recordHistory: boolean
   ): void {
+    const { device, encoder } = ctx
     const { pl, bg } = this
     if (!pl || !bg || !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer)
       return
@@ -610,7 +612,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
 
     // Pass 1: reduce psi -> partial sums
-    const reducePass = encoder.beginComputePass({ label: 'tdse-diag-reduce' })
+    const reducePass = ctx.beginComputePass({ label: 'tdse-diag-reduce' })
     this.dispatchCompute(
       reducePass,
       pl.diagReducePipeline,
@@ -620,7 +622,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     reducePass.end()
 
     // Pass 2: finalize partial sums -> result
-    const finalizePass = encoder.beginComputePass({ label: 'tdse-diag-finalize' })
+    const finalizePass = ctx.beginComputePass({ label: 'tdse-diag-finalize' })
     this.dispatchCompute(finalizePass, pl.diagFinalizePipeline, [bg.diagFinalizeBG], 1)
     finalizePass.end()
 

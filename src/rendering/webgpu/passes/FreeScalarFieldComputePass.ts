@@ -366,17 +366,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /** Initialize field state and perform leapfrog kickstart. */
-  private initializeField(
-    device: GPUDevice,
-    encoder: GPUCommandEncoder,
-    config: FreeScalarConfig
-  ): void {
+  private initializeField(ctx: WebGPURenderContext, config: FreeScalarConfig): void {
+    const { device, encoder } = ctx
     if (config.initialCondition === 'vacuumNoise') {
       const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
       device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
       device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
     } else if (this.pl && this.bg) {
-      const pass = encoder.beginComputePass({ label: 'free-scalar-init-pass' })
+      const pass = ctx.beginComputePass({ label: 'free-scalar-init-pass' })
       this.dispatchCompute(
         pass,
         this.pl.initPipeline,
@@ -398,7 +395,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       halfDtStaging.unmap()
       encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
 
-      const kickPass = encoder.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
+      const kickPass = ctx.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
       this.dispatchCompute(
         kickPass,
         this.pl.updatePiPipeline,
@@ -497,7 +494,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // Initialize or reset field
     if (!this.initialized || config.needsReset) {
-      this.initializeField(device, encoder, config)
+      this.initializeField(ctx, config)
     }
 
     // Leapfrog time steps (only when playing)
@@ -516,7 +513,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         //   pi_{n+3/2} = pi_{n+1/2} + dt * F(phi_{n+1})  (kick)
 
         // Step 1: Update phi (drift — reads staggered pi, writes phi)
-        const phiPass = encoder.beginComputePass({ label: `free-scalar-update-phi-${step}` })
+        const phiPass = ctx.beginComputePass({ label: `free-scalar-update-phi-${step}` })
         this.dispatchCompute(
           phiPass,
           this.pl.updatePhiPipeline,
@@ -526,7 +523,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         phiPass.end()
 
         // Step 2: Update pi (kick — reads new phi, writes pi)
-        const piPass = encoder.beginComputePass({ label: `free-scalar-update-pi-${step}` })
+        const piPass = ctx.beginComputePass({ label: `free-scalar-update-pi-${step}` })
         this.dispatchCompute(
           piPass,
           this.pl.updatePiPipeline,
@@ -537,7 +534,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
         // Step 3: PML absorber (damp phi and pi near boundaries)
         if (config.absorberEnabled) {
-          const absPass = encoder.beginComputePass({ label: `free-scalar-absorber-${step}` })
+          const absPass = ctx.beginComputePass({ label: `free-scalar-absorber-${step}` })
           this.dispatchCompute(
             absPass,
             this.pl.absorberPipeline,
@@ -552,7 +549,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Write to 3D density grid texture
     if (this.pl && this.bg) {
       const gridWorkgroups = Math.ceil(DENSITY_GRID_SIZE / GRID_WORKGROUP_SIZE)
-      const gridPass = encoder.beginComputePass({ label: 'free-scalar-write-grid-pass' })
+      const gridPass = ctx.beginComputePass({ label: 'free-scalar-write-grid-pass' })
       this.dispatchCompute(
         gridPass,
         this.pl.writeGridPipeline,

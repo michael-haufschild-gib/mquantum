@@ -93,6 +93,25 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
   useDensityMatrix?: boolean
+  /**
+   * Profiling strip flags — compile out specific hot-path components to measure
+   * their actual GPU cost via A/B benchmarking. Each flag replaces the real
+   * computation with a cheap constant, preserving the shader structure.
+   */
+  profilingStrip?: {
+    /** Replace gradient (6 texture fetches) with constant up-normal */
+    gradient?: boolean
+    /** Replace emission+lighting with flat baseColor (no per-light loop) */
+    lighting?: boolean
+    /** Disable empty-skip (force every sample to evaluate) */
+    emptySkip?: boolean
+    /** Disable adaptive stepping (force stepMultiplier=1) */
+    adaptiveStep?: boolean
+    /** Cap MAX_VOLUME_SAMPLES at 64 instead of 128 */
+    halfSamples?: boolean
+    /** Skip alpha compositing entirely (no gradient, no emission, no color accumulation) */
+    compositing?: boolean
+  }
 }
 
 /** Select the main entry-point shader block based on rendering mode. */
@@ -146,6 +165,7 @@ function buildShaderDefinesAndFeatures(flags: {
   isFreeScalar: boolean
   isPauli: boolean
   useWignerCache: boolean
+  profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
 }): { defines: string[]; features: string[] } {
   const defines: string[] = []
   const features: string[] = []
@@ -220,11 +240,81 @@ function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const DENSITY_GRID_SIZE: f32 = ${flags.densityGridSize}.0;`)
   defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
   defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
+  // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen).
+  // Compute modes (TDSE/BEC/Dirac/FSF) don't yet have the gradient pass, so they fall
+  // back to inline 6-fetch central differences.
+  defines.push(
+    `const USE_PRECOMPUTED_NORMALS: bool = ${flags.useDensityGrid && !flags.isFreeScalar};`
+  )
+
+  // Profiling strip flags — default false, dead-code-eliminated when not profiling
+  const strip = flags.profilingStrip
+  defines.push(`const PROFILING_STRIP_GRADIENT: bool = ${strip?.gradient ?? false};`)
+  defines.push(`const PROFILING_STRIP_LIGHTING: bool = ${strip?.lighting ?? false};`)
+  defines.push(`const PROFILING_STRIP_EMPTY_SKIP: bool = ${strip?.emptySkip ?? false};`)
+  defines.push(`const PROFILING_STRIP_ADAPTIVE_STEP: bool = ${strip?.adaptiveStep ?? false};`)
+  defines.push(`const PROFILING_STRIP_COMPOSITING: bool = ${strip?.compositing ?? false};`)
+  if (strip?.halfSamples) {
+    defines.push('const PROFILING_HALF_SAMPLES: bool = true;')
+  } else {
+    defines.push('const PROFILING_HALF_SAMPLES: bool = false;')
+  }
 
   if (flags.useDensityGrid) features.push('Density Grid Raymarching')
   if (flags.isWigner && flags.useWignerCache) features.push('Wigner Cache')
 
   return { defines, features }
+}
+
+/** Derive boolean shader flags from the shader config. Extracted to reduce compose function complexity. */
+function derivedShaderFlags(config: SchroedingerWGSLShaderConfig) {
+  const {
+    dimension,
+    quantumMode = 'harmonicOscillator',
+    colorAlgorithm = 4,
+    useEigenfunctionCache = false,
+    useAnalyticalGradient: useAnalyticalGradientFlag = true,
+    useRobustEigenInterpolation: useRobustEigenInterpolationFlag = true,
+    isWigner = false,
+    isFreeScalar = false,
+    useDensityGrid = false,
+    termCount,
+  } = config
+  const is2D = dimension === 2 || isWigner
+  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const actualDim =
+    isHydrogenFamily || isWigner
+      ? Math.min(Math.max(dimension, 3), 11)
+      : Math.min(Math.max(dimension, 2), 11)
+  const includeHydrogen = isHydrogenFamily
+  const includeHydrogenND = isHydrogenFamily
+  const includeHarmonic = !isHydrogenFamily
+  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
+  const useUnrolledHO = includeHarmonic && termCount !== undefined
+  const useCache = useEigenfunctionCache && !is2D
+  const useAnalyticalGradient = useCache && includeHarmonic && useAnalyticalGradientFlag
+  const useRobustEigenInterpolation = useCache && useRobustEigenInterpolationFlag
+  const isDualChannel = [23, 24, 25].includes(colorAlgorithm)
+  const needsCosine = [1, 2].includes(colorAlgorithm)
+  const needsOklab = [0, 6].includes(colorAlgorithm)
+  const usePrecomputedNormals = useDensityGrid && !isFreeScalar
+  return {
+    is2D,
+    isHydrogenFamily,
+    actualDim,
+    includeHydrogen,
+    includeHydrogenND,
+    includeHarmonic,
+    hydrogenNDDimension,
+    useUnrolledHO,
+    useCache,
+    useAnalyticalGradient,
+    useRobustEigenInterpolation,
+    isDualChannel,
+    needsCosine,
+    needsOklab,
+    usePrecomputedNormals,
+  }
 }
 
 /**
@@ -255,9 +345,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     interference = true,
     uncertaintyBoundary = true,
     colorAlgorithm = 4,
-    useEigenfunctionCache = false,
-    useAnalyticalGradient: useAnalyticalGradientFlag = true,
-    useRobustEigenInterpolation: useRobustEigenInterpolationFlag = true,
     isWigner = false,
     useWignerCache = false,
     isFreeScalar = false,
@@ -267,24 +354,25 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     overrides = [],
   } = config
 
-  // Derived shader flags
-  const is2D = dimension === 2 || isWigner
-  const isHydrogenFamily = quantumMode === 'hydrogenND'
-  const actualDim =
-    isHydrogenFamily || isWigner
-      ? Math.min(Math.max(dimension, 3), 11)
-      : Math.min(Math.max(dimension, 2), 11)
-  const includeHydrogen = isHydrogenFamily
-  const includeHydrogenND = isHydrogenFamily
-  const includeHarmonic = !isHydrogenFamily
-  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
-  const useUnrolledHO = includeHarmonic && termCount !== undefined
-  const useCache = useEigenfunctionCache && !is2D
-  const useAnalyticalGradient = useCache && includeHarmonic && useAnalyticalGradientFlag
-  const useRobustEigenInterpolation = useCache && useRobustEigenInterpolationFlag
-  const isDualChannel = [23, 24, 25].includes(colorAlgorithm)
-  const needsCosine = [1, 2].includes(colorAlgorithm)
-  const needsOklab = [0, 6].includes(colorAlgorithm)
+  // Derived shader flags (extracted to reduce function complexity)
+  const derived = derivedShaderFlags(config)
+  const {
+    is2D,
+    isHydrogenFamily,
+    actualDim,
+    includeHydrogen,
+    includeHydrogenND,
+    includeHarmonic,
+    hydrogenNDDimension,
+    useUnrolledHO,
+    useCache,
+    useAnalyticalGradient,
+    useRobustEigenInterpolation,
+    isDualChannel,
+    needsCosine,
+    needsOklab,
+    usePrecomputedNormals,
+  } = derived
 
   // Build compile-time defines and feature tags
   const { defines, features } = buildShaderDefinesAndFeatures({
@@ -315,6 +403,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isFreeScalar,
     isPauli,
     useWignerCache,
+    profilingStrip: config.profilingStrip,
   })
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
 
@@ -357,6 +446,7 @@ struct VertexOutput {
         isWigner,
         useWignerCache,
         useDensityGrid,
+        usePrecomputedNormals,
         freeScalarAnalysis,
       }),
     },
@@ -393,6 +483,7 @@ struct VertexOutput {
       actualDim,
       termCount,
       useDensityGrid,
+      usePrecomputedNormals,
       freeScalarAnalysis,
       nodal,
     }),

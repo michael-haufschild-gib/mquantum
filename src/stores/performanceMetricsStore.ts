@@ -48,6 +48,10 @@ export interface BufferStats {
 export interface PassTimingEntry {
   passId: string
   gpuTimeMs: number
+  /** GPU time in compute passes (FFT, density grid). 0 if no compute work. */
+  computeGpuTimeMs: number
+  /** GPU time in render passes (volume raymarch, post-processing). 0 if no render work. */
+  renderGpuTimeMs: number
   cpuTimeMs: number
   skipped: boolean
 }

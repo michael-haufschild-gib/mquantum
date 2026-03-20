@@ -25,6 +25,7 @@ import { WebGPUResourcePool } from '../core/WebGPUResourcePool'
 import { handleDisabledPassthrough } from './disabledPassthrough'
 import { RenderContextImpl, SetupContextImpl } from './RenderGraphContexts'
 import { computePassOrder } from './topologicalSort'
+import { WebGPUTimestampCollector } from './WebGPUTimestampCollector'
 
 /** Context passed to pre-submit hooks for late-stage command buffer injection. */
 export interface WebGPUBeforeSubmitHookContext {
@@ -60,12 +61,7 @@ export class WebGPURenderGraph {
   private initialized = false
 
   // Timing
-  private gpuTimingEnabled = false
-  private timestampQuerySet: GPUQuerySet | null = null
-  private timestampBuffer: GPUBuffer | null = null
-  private timestampReadBuffer: GPUBuffer | null = null
-  private lastPassTimings: Map<string, number> = new Map()
-  private timestampReadbackInFlight = false
+  private timestampCollector = new WebGPUTimestampCollector()
 
   // Frame context — pre-allocated to avoid per-frame GC pressure
   private frameContext: WebGPUFrameContext | null = null
@@ -99,10 +95,13 @@ export class WebGPURenderGraph {
   private _frameWrittenByEnabledPass: Set<string> = new Set()
   private _framePassEnabledMemo: Map<string, boolean> = new Map()
   private _frameTimedPassIds: string[] = []
+  private _frameTimedPassPhases: Array<{ hasCompute: boolean; hasRender: boolean }> = []
   private _frameCpuPassTimings: Map<string, number> = new Map()
   private _framePassTimingResult: Array<{
     passId: string
     gpuTimeMs: number
+    computeGpuTimeMs: number
+    renderGpuTimeMs: number
     cpuTimeMs: number
     skipped: boolean
   }> = []
@@ -144,79 +143,10 @@ export class WebGPURenderGraph {
     this.setupContext = new SetupContextImpl(device, format, capabilities)
 
     if (capabilities?.timestampQuery) {
-      this.enableGPUTiming(device)
+      this.timestampCollector.initialize(device)
     }
 
     this.initialized = true
-  }
-
-  private enableGPUTiming(device: GPUDevice): void {
-    const maxPasses = 64
-    const queryCount = maxPasses * 2
-
-    this.timestampQuerySet = device.createQuerySet({
-      type: 'timestamp',
-      count: queryCount,
-    })
-
-    this.timestampBuffer = device.createBuffer({
-      size: queryCount * 8,
-      usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
-    })
-
-    this.timestampReadBuffer = device.createBuffer({
-      size: queryCount * 8,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    this.gpuTimingEnabled = true
-  }
-
-  private scheduleTimestampReadback(
-    device: GPUDevice,
-    measuredPassCount: number,
-    timedPassIds: string[]
-  ): void {
-    if (measuredPassCount <= 0 || this.timestampReadbackInFlight || !this.timestampReadBuffer) {
-      return
-    }
-
-    const byteLength = measuredPassCount * 16
-    const readBuffer = this.timestampReadBuffer
-    const passIds = timedPassIds.slice(0, measuredPassCount)
-    this.timestampReadbackInFlight = true
-
-    device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (!this.initialized || this.timestampReadBuffer !== readBuffer) {
-          return
-        }
-        await readBuffer.mapAsync(GPUMapMode.READ, 0, byteLength)
-        try {
-          const range = readBuffer.getMappedRange(0, byteLength)
-          const timestamps = new BigUint64Array(range)
-          const nextTimings = new Map<string, number>()
-
-          for (let i = 0; i < passIds.length; i++) {
-            const start = timestamps[i * 2]!
-            const end = timestamps[i * 2 + 1]!
-            const delta = end > start ? Number(end - start) : 0
-            nextTimings.set(passIds[i]!, delta / 1_000_000)
-          }
-
-          this.lastPassTimings = nextTimings
-        } finally {
-          readBuffer.unmap()
-        }
-      })
-      .catch((err) => {
-        if (!this.initialized) return
-        logger.warn('[WebGPU RenderGraph] Timestamp readback failed:', err)
-      })
-      .finally(() => {
-        this.timestampReadbackInFlight = false
-      })
   }
 
   setSize(width: number, height: number): void {
@@ -477,12 +407,9 @@ export class WebGPURenderGraph {
     let timestampIndex = 0
     const timedPassIds = this._frameTimedPassIds
     timedPassIds.length = 0
-    const canCollectGpuTimings =
-      this.gpuTimingEnabled &&
-      !!this.timestampQuerySet &&
-      !!this.timestampBuffer &&
-      !!this.timestampReadBuffer &&
-      !this.timestampReadbackInFlight
+    const timedPassPhases = this._frameTimedPassPhases
+    timedPassPhases.length = 0
+    const canCollectGpuTimings = this.timestampCollector.canCollect()
 
     const now = Date.now()
     const shouldLog = import.meta.env.DEV && (!this._lastPassLog || now - this._lastPassLog > 1000)
@@ -532,7 +459,7 @@ export class WebGPURenderGraph {
       }
 
       if (canCollectGpuTimings) {
-        ctx.setPassTimestampWrites(this.timestampQuerySet!, timestampIndex * 2)
+        ctx.setPassTimestampWrites(this.timestampCollector.getQuerySet()!, timestampIndex * 4)
       }
 
       const passCpuStart = performance.now()
@@ -544,9 +471,11 @@ export class WebGPURenderGraph {
         cpuPassTimings.set(passId, performance.now() - passCpuStart)
         if (canCollectGpuTimings) {
           const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
+          const phases = ctx.getPassPhases()
           ctx.clearPassTimestampWrites()
           if (usedTimestampWrites) {
             timedPassIds.push(passId)
+            timedPassPhases.push(phases)
             timestampIndex++
           }
         }
@@ -556,22 +485,8 @@ export class WebGPURenderGraph {
     const cpuSubmitStart = performance.now()
     const cpuPassesMs = cpuSubmitStart - cpuPassesStart
 
-    const resolvedTimestampCount = timestampIndex * 2
-    if (canCollectGpuTimings && resolvedTimestampCount > 0) {
-      encoder.resolveQuerySet(
-        this.timestampQuerySet!,
-        0,
-        resolvedTimestampCount,
-        this.timestampBuffer!,
-        0
-      )
-      encoder.copyBufferToBuffer(
-        this.timestampBuffer!,
-        0,
-        this.timestampReadBuffer!,
-        0,
-        resolvedTimestampCount * 8
-      )
+    if (canCollectGpuTimings) {
+      this.timestampCollector.resolveAndCopy(encoder, timestampIndex)
     }
 
     if (this.beforeSubmitHooks.size > 0) {
@@ -594,7 +509,7 @@ export class WebGPURenderGraph {
 
     const commandBuffer = encoder.finish()
     device.queue.submit([commandBuffer])
-    this.scheduleTimestampReadback(device, timestampIndex, timedPassIds)
+    this.timestampCollector.scheduleReadback(device, timestampIndex, timedPassIds, timedPassPhases)
 
     for (const pass of this.passes.values()) {
       pass.postFrame?.()
@@ -648,14 +563,26 @@ export class WebGPURenderGraph {
     }
   }
 
-  private buildPassTimingResult(
-    passEnabledMemo: Map<string, boolean>
-  ): Array<{ passId: string; gpuTimeMs: number; cpuTimeMs: number; skipped: boolean }> {
+  private buildPassTimingResult(passEnabledMemo: Map<string, boolean>): Array<{
+    passId: string
+    gpuTimeMs: number
+    computeGpuTimeMs: number
+    renderGpuTimeMs: number
+    cpuTimeMs: number
+    skipped: boolean
+  }> {
     const result = this._framePassTimingResult
     const passCount = this.passOrder.length
 
     while (result.length < passCount) {
-      result.push({ passId: '', gpuTimeMs: 0, cpuTimeMs: 0, skipped: false })
+      result.push({
+        passId: '',
+        gpuTimeMs: 0,
+        computeGpuTimeMs: 0,
+        renderGpuTimeMs: 0,
+        cpuTimeMs: 0,
+        skipped: false,
+      })
     }
     if (result.length > passCount) {
       result.length = passCount
@@ -664,8 +591,11 @@ export class WebGPURenderGraph {
     for (let i = 0; i < passCount; i++) {
       const id = this.passOrder[i]!
       const entry = result[i]!
+      const timing = this.timestampCollector.getLastTimings().get(id)
       entry.passId = id
-      entry.gpuTimeMs = this.lastPassTimings.get(id) ?? 0
+      entry.gpuTimeMs = timing?.total ?? 0
+      entry.computeGpuTimeMs = timing?.compute ?? 0
+      entry.renderGpuTimeMs = timing?.render ?? 0
       entry.cpuTimeMs = this._frameCpuPassTimings.get(id) ?? 0
       entry.skipped = !(passEnabledMemo.get(id) ?? true)
     }
@@ -686,7 +616,7 @@ export class WebGPURenderGraph {
   }
 
   isGPUTimingAvailable(): boolean {
-    return this.gpuTimingEnabled
+    return this.timestampCollector.isEnabled()
   }
 
   dispose(): void {
@@ -699,12 +629,7 @@ export class WebGPURenderGraph {
     this.beforeSubmitHooks.clear()
 
     this.pool.dispose()
-
-    this.timestampQuerySet = null
-    this.timestampBuffer?.destroy()
-    this.timestampBuffer = null
-    this.timestampReadBuffer?.destroy()
-    this.timestampReadBuffer = null
+    this.timestampCollector.dispose()
 
     this.initialized = false
     this.compiled = false

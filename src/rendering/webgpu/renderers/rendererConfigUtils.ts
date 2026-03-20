@@ -101,6 +101,25 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
 // Shader config builder
 // ---------------------------------------------------------------------------
 
+/** Compute density grid resolution and mode from renderer parameters. */
+function computeDensityGridConfig(
+  computeMode: boolean,
+  isosurface: boolean,
+  pipelineIs2D: boolean,
+  dim: number,
+  openQuantumEnabled: boolean,
+  isHydrogen: boolean,
+  termCount: number | undefined
+): { useDensityGrid: boolean; densityGridSize: number } {
+  const useDensityGrid = computeMode || (!isosurface && !pipelineIs2D)
+  const baseDensityGridSize = computeMode ? 96 : !useDensityGrid ? 64 : dim <= 5 ? 96 : 128
+  const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (termCount ?? 4)) : 0
+  const densityGridSize = openQuantumEnabled
+    ? computeOpenQuantumGridSize(baseDensityGridSize, estimatedK)
+    : baseDensityGridSize
+  return { useDensityGrid, densityGridSize }
+}
+
 /**
  * Derive the compile-time shader configuration from the renderer config.
  * This determines which shader blocks are included (nodal, phase materiality, etc.)
@@ -121,12 +140,15 @@ export function buildShaderConfig(
   const isosurface = rendererConfig.isosurface ?? false
   const openQuantumEnabled = rendererConfig.openQuantumEnabled ?? false
 
-  const useDensityGrid = computeMode || (!isosurface && !pipelineIs2D)
-  const baseDensityGridSize = computeMode ? 96 : !useDensityGrid ? 64 : dim <= 5 ? 96 : 128
-  const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (rendererConfig.termCount ?? 4)) : 0
-  const densityGridSize = openQuantumEnabled
-    ? computeOpenQuantumGridSize(baseDensityGridSize, estimatedK)
-    : baseDensityGridSize
+  const { useDensityGrid, densityGridSize } = computeDensityGridConfig(
+    computeMode,
+    isosurface,
+    pipelineIs2D,
+    dim,
+    openQuantumEnabled,
+    isHydrogen,
+    rendererConfig.termCount
+  )
 
   const useEigenfunctionCache = useDensityGrid || pipelineIs2D ? false : enableCache
   const useAnalyticalGradient = computeMode
@@ -167,6 +189,12 @@ export function buildShaderConfig(
       rendererConfig.colorAlgorithm >= 12 &&
       rendererConfig.colorAlgorithm <= 15,
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
+    // Profiling strip flags: read from window global (set by A/B benchmark tests)
+    profilingStrip:
+      typeof globalThis !== 'undefined'
+        ? ((globalThis as Record<string, unknown>)
+            .__PROFILING_STRIP__ as SchroedingerWGSLShaderConfig['profilingStrip'])
+        : undefined,
   }
 }
 

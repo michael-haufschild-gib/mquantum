@@ -224,10 +224,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
   // ============================================================================
   /** Initialize spinor state if not yet initialized or reset requested. */
-  private maybeInitialize(encoder: GPUCommandEncoder, config: PauliConfig): void {
+  private maybeInitialize(ctx: WebGPURenderContext, config: PauliConfig): void {
     if (this.initialized && !config.needsReset) return
     if (this.pl && this.bg && this.buf) {
-      const pass = encoder.beginComputePass({ label: 'pauli-init-pass' })
+      const pass = ctx.beginComputePass({ label: 'pauli-init-pass' })
       this.dispatchCompute(
         pass,
         this.pl.initPipeline,
@@ -285,7 +285,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
    *
    * @returns Next slot offset for subsequent axis dispatches.
    */
-  private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
+  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
+    const encoder = ctx.encoder
     if (!this.pl || !this.bg || !this.buf) return slotOffset
 
     const stages = Math.round(Math.log2(axisDim))
@@ -301,7 +302,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       )
 
       const bg = s % 2 === 0 ? this.bg.fftStageABBG : this.bg.fftStageBABG
-      const pass = encoder.beginComputePass({ label: `pauli-fft-stage-${s}` })
+      const pass = ctx.beginComputePass({ label: `pauli-fft-stage-${s}` })
       this.dispatchCompute(pass, this.pl.fftStagePipeline, [bg], Math.ceil(halfTotal / LINEAR_WG))
       pass.end()
     }
@@ -344,7 +345,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     boundingRadius?: number
   ): void {
     const config = this.sanitizeGridSizes(rawConfig)
-    const { device, encoder } = ctx
+    const { device } = ctx
     const configHash = this.computeConfigHash(config)
 
     // Rebuild if config changed
@@ -360,7 +361,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     }
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
-    this.maybeInitialize(encoder, config)
+    this.maybeInitialize(ctx, config)
 
     if (!this.pl || !this.bg || !this.buf) return
     const linearWG = Math.ceil(this.buf.totalSites / LINEAR_WG)
@@ -375,7 +376,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential + Zeeman rotation
         {
-          const p = encoder.beginComputePass({ label: `pauli-V-half-1-${step}` })
+          const p = ctx.beginComputePass({ label: `pauli-V-half-1-${step}` })
           this.dispatchCompute(p, this.pl.potentialHalfPipeline, [this.bg.spinorBG], linearWG)
           p.end()
         }
@@ -384,17 +385,17 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         for (let c = 0; c < 2; c++) {
           const packBG = this.bg.cachedPackBGs[c]
           if (packBG) {
-            const p = encoder.beginComputePass({ label: `pauli-pack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `pauli-pack-c${c}-${step}` })
             this.dispatchCompute(p, this.pl.packPipeline, [packBG], linearWG)
             p.end()
           }
           let fftSlot = 0
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = this.bg.cachedUnpackBGsNoNorm[c]
           if (unpackBG) {
-            const p = encoder.beginComputePass({ label: `pauli-fft-unpack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `pauli-fft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, this.pl.unpackPipeline, [unpackBG], linearWG)
             p.end()
           }
@@ -402,7 +403,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
         // 4. Kinetic phase kick (scalar, applied to each component independently)
         {
-          const p = encoder.beginComputePass({ label: `pauli-kinetic-${step}` })
+          const p = ctx.beginComputePass({ label: `pauli-kinetic-${step}` })
           this.dispatchCompute(p, this.pl.kineticPipeline, [this.bg.spinorBG], linearWG)
           p.end()
         }
@@ -411,17 +412,17 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         for (let c = 0; c < 2; c++) {
           const packBG = this.bg.cachedPackBGs[c]
           if (packBG) {
-            const p = encoder.beginComputePass({ label: `pauli-ifft-pack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `pauli-ifft-pack-c${c}-${step}` })
             this.dispatchCompute(p, this.pl.packPipeline, [packBG], linearWG)
             p.end()
           }
           let fftSlot = this.buf.fwdStageCount
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = this.bg.cachedUnpackBGs[c]
           if (unpackBG) {
-            const p = encoder.beginComputePass({ label: `pauli-ifft-unpack-c${c}-${step}` })
+            const p = ctx.beginComputePass({ label: `pauli-ifft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, this.pl.unpackPipeline, [unpackBG], linearWG)
             p.end()
           }
@@ -429,14 +430,14 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
         // 6. Second half-step potential + Zeeman rotation
         {
-          const p = encoder.beginComputePass({ label: `pauli-V-half-2-${step}` })
+          const p = ctx.beginComputePass({ label: `pauli-V-half-2-${step}` })
           this.dispatchCompute(p, this.pl.potentialHalfPipeline, [this.bg.spinorBG], linearWG)
           p.end()
         }
 
         // 7. Absorber (separate pass AFTER the Strang step)
         {
-          const p = encoder.beginComputePass({ label: `pauli-absorber-${step}` })
+          const p = ctx.beginComputePass({ label: `pauli-absorber-${step}` })
           this.dispatchCompute(p, this.pl.absorberPipeline, [this.bg.spinorBG], linearWG)
           p.end()
         }
@@ -445,7 +446,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
         // 8. Periodic renormalization: counteract f32 norm drift.
         if (step === stepsThisFrame - 1) {
-          const rPass = encoder.beginComputePass({ label: `pauli-renorm-reduce-${step}` })
+          const rPass = ctx.beginComputePass({ label: `pauli-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,
             this.pl.diagReducePipeline,
@@ -453,10 +454,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
             this.buf.diagNumWorkgroups
           )
           rPass.end()
-          const fPass = encoder.beginComputePass({ label: `pauli-renorm-finalize-${step}` })
+          const fPass = ctx.beginComputePass({ label: `pauli-renorm-finalize-${step}` })
           this.dispatchCompute(fPass, this.pl.diagFinalizePipeline, [this.bg.diagFinalizeBG], 1)
           fPass.end()
-          const sPass = encoder.beginComputePass({ label: `pauli-renorm-scale-${step}` })
+          const sPass = ctx.beginComputePass({ label: `pauli-renorm-scale-${step}` })
           const renormWG = Math.ceil((2 * this.buf.totalSites) / LINEAR_WG)
           this.dispatchCompute(
             sPass,
@@ -471,7 +472,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
     // Write density grid
     const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
-    const wgPass = encoder.beginComputePass({ label: 'pauli-write-grid-pass' })
+    const wgPass = ctx.beginComputePass({ label: 'pauli-write-grid-pass' })
     this.dispatchCompute(
       wgPass,
       this.pl.writeGridPipeline,
@@ -491,7 +492,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       this.diagFrameCounter = 0
       this.cachedFieldStrength = config.fieldStrength
       this.cachedHbar = config.hbar
-      this.dispatchDiagnostics(encoder, device)
+      this.dispatchDiagnostics(ctx)
     }
   }
 
@@ -500,10 +501,11 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   /** Dispatch GPU diagnostics reduction and readback */
-  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice): void {
+  private dispatchDiagnostics(ctx: WebGPURenderContext): void {
+    const { device, encoder } = ctx
     if (!this.pl || !this.bg || !this.buf) return
 
-    const pass = encoder.beginComputePass({ label: 'pauli-diag-reduce' })
+    const pass = ctx.beginComputePass({ label: 'pauli-diag-reduce' })
     this.dispatchCompute(
       pass,
       this.pl.diagReducePipeline,
@@ -512,7 +514,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     )
     pass.end()
 
-    const fPass = encoder.beginComputePass({ label: 'pauli-diag-finalize' })
+    const fPass = ctx.beginComputePass({ label: 'pauli-diag-finalize' })
     this.dispatchCompute(fPass, this.pl.diagFinalizePipeline, [this.bg.diagFinalizeBG], 1)
     fPass.end()
 

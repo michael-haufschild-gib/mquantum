@@ -32,6 +32,34 @@ export function generateDensityGridFragmentBindings(startBinding: number = 4): s
 }
 
 /**
+ * Bind group declaration + sampling function for pre-computed gradient normals.
+ * Only included when USE_PRECOMPUTED_NORMALS is true (analytic modes with density grid).
+ */
+export function generateNormalGridFragmentBinding(startBinding: number = 7): string {
+  return /* wgsl */ `
+@group(2) @binding(${startBinding}) var normalGridTexture: texture_3d<f32>;
+
+/**
+ * Sample pre-computed gradient normal from the normal grid texture.
+ * Returns vec3f normal direction. Returns zero-length vector when
+ * gradient magnitude is too small (density peak / empty region),
+ * signaling the caller to fall back to viewDir.
+ */
+fn sampleNormalFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  let uvw = worldToDensityGridUVW(pos, uniforms);
+  if (any(uvw < vec3f(0.0)) || any(uvw > vec3f(1.0))) {
+    return vec3f(0.0, 1.0, 0.0);
+  }
+  let packed = textureSampleLevel(normalGridTexture, densityGridSampler, uvw, 0.0);
+  if (packed.w < 0.01) {
+    return vec3f(0.0);
+  }
+  return packed.xyz;
+}
+`
+}
+
+/**
  * Bind group declarations for free-scalar analysis texture.
  * Reuses the same sampler as the density grid (trilinear filtering).
  * Added to Group 2 (object-specific) after density grid bindings.

@@ -87,6 +87,8 @@ interface BenchmarkResult {
   vramMB: number
   totalGpuMs: number
   passTimings: Record<string, number>
+  /** Per-pass compute/render GPU time split (ms). */
+  passSubTimings: Record<string, { compute: number; render: number }>
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -194,8 +196,14 @@ function printResultsTable(results: BenchmarkResult[]): void {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
+// DPR override: set BENCHMARK_DPR=2 for Retina-resolution benchmarking.
+// Default 1 matches Playwright's default (1280x800 = 1.024M pixels).
+// DPR 2 → 2560x1600 = 4.096M pixels — real MacBook Pro resolution.
+const BENCHMARK_DPR = Number(process.env.BENCHMARK_DPR ?? 1)
+
 test.describe('performance benchmark', () => {
   test.setTimeout(300_000) // 5 min — full matrix takes time
+  test.use({ deviceScaleFactor: BENCHMARK_DPR })
 
   const results: BenchmarkResult[] = []
 
@@ -216,11 +224,15 @@ test.describe('performance benchmark', () => {
       // Uncap FPS limiter so frame times reflect actual GPU workload,
       // not the 60fps vsync ceiling. 0 = uncapped (transient, not persisted).
       // Also enable perf monitor so WebGPUStatsCollector publishes metrics.
+      // Uses window globals (works in both dev and production ?_bench builds)
+      // with dynamic import fallback for dev-only compatibility.
       await page.evaluate(async () => {
-        const perfMod = await import('/src/stores/performanceStore.ts')
-        perfMod.usePerformanceStore.getState().setMaxFps(0)
-        const uiMod = await import('/src/stores/uiStore.ts')
-        uiMod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+        const perfStore =
+          window.__PERFORMANCE_STORE__ ??
+          (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+        perfStore.getState().setMaxFps(0)
+        const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
+        uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
       })
 
       // Warm-up: discard initial frames (driver JIT, cache fill, FPS limiter transition)
@@ -236,11 +248,16 @@ test.describe('performance benchmark', () => {
       const fpsValues = samples.map((s) => s.fps).filter((f) => f > 0)
       const lastSample = samples[samples.length - 1]!
 
-      // Capture per-pass GPU timing from the last sample
+      // Capture per-pass GPU timing from the last sample (total + compute/render split)
       const passTimings: Record<string, number> = {}
+      const passSubTimings: Record<string, { compute: number; render: number }> = {}
       for (const pt of lastSample.passTimings) {
         if (!pt.skipped && pt.gpuTimeMs > 0) {
           passTimings[pt.passId] = pt.gpuTimeMs
+          passSubTimings[pt.passId] = {
+            compute: pt.computeGpuTimeMs,
+            render: pt.renderGpuTimeMs,
+          }
         }
       }
 
@@ -255,6 +272,7 @@ test.describe('performance benchmark', () => {
         vramMB: lastSample.vramMB,
         totalGpuMs: lastSample.totalGpuTimeMs,
         passTimings,
+        passSubTimings,
       }
 
       results.push(result)
@@ -352,6 +370,13 @@ test.describe('performance benchmark', () => {
           {
             timestamp: new Date().toISOString(),
             gitSha: execSync('git rev-parse --short HEAD').toString().trim(),
+            dpr: BENCHMARK_DPR,
+            viewport: { width: 1280, height: 800 },
+            effectiveResolution: {
+              width: 1280 * BENCHMARK_DPR,
+              height: 800 * BENCHMARK_DPR,
+              pixels: 1280 * BENCHMARK_DPR * 800 * BENCHMARK_DPR,
+            },
             results,
           },
           null,

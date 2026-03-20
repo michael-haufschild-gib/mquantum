@@ -333,6 +333,8 @@ export class WebGPUStatsCollector {
           return {
             passId: pt.passId,
             gpuTimeMs: pt.gpuTimeMs,
+            computeGpuTimeMs: (pt as { computeGpuTimeMs?: number }).computeGpuTimeMs ?? 0,
+            renderGpuTimeMs: (pt as { renderGpuTimeMs?: number }).renderGpuTimeMs ?? 0,
             cpuTimeMs: pt.cpuTimeMs,
             skipped: pt.skipped,
           }
