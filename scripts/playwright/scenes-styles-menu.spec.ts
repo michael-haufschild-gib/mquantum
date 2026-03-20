@@ -64,18 +64,22 @@ test.describe('Scenes menu', () => {
     // Click any example scene item that's not a header/separator
     const menuItems = page.locator('[role="menuitem"]')
     const count = await menuItems.count()
+    expect(count, 'Menu should have enough items to include example scenes').toBeGreaterThan(3)
 
-    // Find and click the last menu item (likely an example scene)
-    if (count > 3) {
-      await menuItems.nth(count - 1).click()
+    // Click the last menu item (an example scene)
+    await menuItems.nth(count - 1).click()
 
-      // Wait for scene to apply and renderer to recover
-      await waitForRendererReady(page)
-      await waitForShaderCompilation(page)
+    // Wait for scene to apply and renderer to recover
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
 
-      // App should still be running
-      await expect(page.getByTestId('top-bar')).toBeVisible()
-    }
+    // Verify state actually changed
+    const newState = await getAppState(page)
+    const stateChanged =
+      newState.dimension !== initialState.dimension ||
+      newState.objectType !== initialState.objectType ||
+      newState.quantumMode !== initialState.quantumMode
+    expect(stateChanged, 'Scene preset must change at least one state field').toBe(true)
   })
 })
 
@@ -101,19 +105,35 @@ test.describe('Styles menu', () => {
   })
 
   test('clicking an example style applies it without crash', async ({ appPage: page }) => {
+    // Capture initial visual state for comparison
+    const initialStyle = await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      const s = mod.useAppearanceStore.getState()
+      return JSON.stringify({ opacity: s.opacity, wireframe: s.wireframe })
+    })
+
     const topBar = new TopBar(page)
     await topBar.openStylesMenu()
 
     const menuItems = page.locator('[role="menuitem"]')
     const count = await menuItems.count()
+    expect(count, 'Styles menu should have enough items to include example styles').toBeGreaterThan(
+      3
+    )
 
-    // Click the last menu item (likely an example style)
-    if (count > 3) {
-      await menuItems.nth(count - 1).click()
+    // Click the last menu item (an example style)
+    await menuItems.nth(count - 1).click()
 
-      // App should survive style application
-      await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 5000 })
-    }
+    // App should survive style application
+    await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 5000 })
+
+    // Verify at least one visual store changed (style presets mutate appearance/theme/PBR stores)
+    const newStyle = await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      const s = mod.useAppearanceStore.getState()
+      return JSON.stringify({ opacity: s.opacity, wireframe: s.wireframe })
+    })
+    expect(newStyle, 'Style preset must change visual state').not.toBe(initialStyle)
   })
 
   test('Save Current Scene opens save dialog', async ({ appPage: page }) => {
@@ -122,13 +142,12 @@ test.describe('Styles menu', () => {
 
     await page.getByText('+ Save Current Scene...').click()
 
-    // A save dialog/modal should appear (InputModal for scene name)
+    // The save dialog (InputModal for scene name) must appear
     const dialog = page.getByRole('dialog')
-    const hasDialog = await dialog.isVisible().catch(() => false)
-    if (hasDialog) {
-      await expect(dialog).toBeVisible()
-      // Close it
-      await page.keyboard.press('Escape')
-    }
+    await expect(dialog).toBeVisible({ timeout: 5000 })
+
+    // Close it
+    await page.keyboard.press('Escape')
+    await expect(dialog).not.toBeVisible({ timeout: 3000 })
   })
 })

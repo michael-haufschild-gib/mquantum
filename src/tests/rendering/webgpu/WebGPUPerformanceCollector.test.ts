@@ -257,4 +257,61 @@ describe('WebGPUStatsCollector', () => {
     expect(metrics.fps).toBeGreaterThanOrEqual(49)
     expect(metrics.fps).toBeLessThanOrEqual(51)
   })
+
+  it('enables timestamp collection when monitor is expanded (TIER_FULL_STATS)', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    expect(graph.setTimestampCollectionActive).toHaveBeenCalledWith(true)
+    nowSpy.mockRestore()
+  })
+
+  it('disables timestamp collection when monitor is collapsed (TIER_FPS_ONLY)', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    expect(graph.setTimestampCollectionActive).toHaveBeenCalledWith(false)
+    nowSpy.mockRestore()
+  })
+
+  it('disables timestamp collection when monitor is hidden (TIER_HIDDEN)', () => {
+    useUIStore.setState({ showPerfMonitor: false, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000)
+
+    collector.recordFrame(
+      4,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 800, height: 600 },
+      1
+    )
+
+    expect(graph.setTimestampCollectionActive).toHaveBeenCalledWith(false)
+    nowSpy.mockRestore()
+  })
 })

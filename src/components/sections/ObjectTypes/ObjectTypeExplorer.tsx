@@ -205,6 +205,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         whileHover={{ scale: 1.01, x: 2 }}
         whileTap={{ scale: 0.98 }}
         data-testid="object-type-pauliSpinor"
+        data-selected={isPauliSelected}
       >
         <div className="flex items-center justify-between w-full mb-1">
           <span className="font-medium text-sm">Pauli Spinor</span>

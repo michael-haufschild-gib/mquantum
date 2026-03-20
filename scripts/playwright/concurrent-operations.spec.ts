@@ -31,6 +31,9 @@ import { TopBar } from './pages/TopBar'
 test.setTimeout(120_000)
 
 test.describe('concurrent operations', () => {
+  // GPU-heavy tests must run serially to avoid adapter/device contention
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     test.skip(!(await hasWebGPU(page)), 'WebGPU not available')

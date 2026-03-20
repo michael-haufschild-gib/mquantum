@@ -82,6 +82,7 @@ test.describe('timeline controls', () => {
 
   test('Reset button is present and clickable', async ({ hoPage: page }) => {
     const panel = new EditorBottomPanel(page)
+    await panel.waitForVisible()
     await expect(panel.resetButton).toBeVisible()
 
     await panel.clickReset()
@@ -94,11 +95,12 @@ test.describe('timeline controls', () => {
     const panel = new EditorBottomPanel(page)
     await panel.waitForVisible()
 
-    // Read initial speed from store
+    // Read initial speed from store and pick a target that's guaranteed different
     const initialSpeed = await page.evaluate(async () => {
       const mod = await import('/src/stores/animationStore.ts')
       return mod.useAnimationStore.getState().speed
     })
+    const targetSpeed = Math.abs(initialSpeed - 1.5) < 0.2 ? 2.5 : 1.5
 
     // The speed slider has label "SPEED" — locate its text input via aria-label
     const speedInput = page.getByRole('textbox', { name: 'SPEED value' })
@@ -106,7 +108,7 @@ test.describe('timeline controls', () => {
 
     // Clear and type a new value
     await speedInput.click()
-    await speedInput.fill('1.5')
+    await speedInput.fill(String(targetSpeed))
     await speedInput.press('Enter')
 
     // Verify store updated to the new speed value
@@ -115,7 +117,7 @@ test.describe('timeline controls', () => {
         const mod = await import('/src/stores/animationStore.ts')
         return mod.useAnimationStore.getState().speed
       })
-      expect(newSpeed).toBeCloseTo(1.5, 1)
+      expect(newSpeed).toBeCloseTo(targetSpeed, 1)
       expect(newSpeed).not.toBeCloseTo(initialSpeed, 1)
     }).toPass({ timeout: 3000 })
   })
