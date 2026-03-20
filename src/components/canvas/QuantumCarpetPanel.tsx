@@ -196,6 +196,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
       onDragEnd={() => setTimeout(() => setIsDragging(false), 100)}
       className="absolute top-20 left-4 z-[45] pointer-events-auto select-none"
       data-testid="quantum-carpet-panel"
+      data-carpet-frames={totalFrames}
     >
       <div
         className="flex flex-col overflow-hidden rounded-2xl shadow-[var(--shadow-hard)]"
@@ -212,18 +213,21 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               value={String(sliceAxis)}
               onChange={handleAxisChange}
               className="!w-16 !text-xs"
+              data-testid="carpet-axis-select"
             />
             <Select
               options={COLORMAP_OPTIONS}
               value={colormap}
               onChange={handleColormapChange}
               className="!w-20 !text-xs"
+              data-testid="carpet-colormap-select"
             />
             <ToggleButton
               pressed={logScale}
               onToggle={setLogScale}
               ariaLabel="Toggle log scale"
               className="!text-xs !px-1.5 !py-0.5"
+              data-testid="carpet-log-toggle"
             >
               log
             </ToggleButton>
@@ -234,6 +238,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               ariaLabel={paused ? 'Resume' : 'Pause'}
               className="!p-1 !min-w-0"
               title={paused ? 'Resume accumulation' : 'Pause accumulation'}
+              data-testid="carpet-play-pause"
             >
               <Icon name={paused ? 'play' : 'pause'} size={10} />
             </Button>
@@ -244,6 +249,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               ariaLabel="Clear carpet"
               className="!p-1 !min-w-0"
               title="Clear carpet"
+              data-testid="carpet-clear"
             >
               <Icon name="reset" size={10} />
             </Button>
@@ -254,6 +260,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               ariaLabel="Close carpet panel"
               className="!p-1 !min-w-0"
               title="Close"
+              data-testid="carpet-close"
             >
               <Icon name="cross" size={10} />
             </Button>
@@ -270,6 +277,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               height={CARPET_CANVAS_H}
               className="block rounded-sm"
               style={{ width: CARPET_CANVAS_W, height: CARPET_CANVAS_H }}
+              data-testid="carpet-canvas"
             />
             {/* X-axis label */}
             <div className="flex justify-between mt-0.5 px-0.5">

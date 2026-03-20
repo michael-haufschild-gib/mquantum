@@ -152,6 +152,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
             label="Quantum Carpet"
             checked={carpetEnabled}
             onCheckedChange={setCarpetEnabled}
+            data-testid="carpet-toggle"
           />
         )}
       </Section>
