@@ -190,6 +190,17 @@ test.describe('post-processing shader paths', () => {
       })
     })
   })
+
+  test('frame blending enabled: compiles and renders', async ({ page }) => {
+    const gpuIssues = collectGpuWarningsAndErrors(page)
+
+    await verifyShaderPath(page, 'frame blending', gpuIssues, async () => {
+      await page.evaluate(async () => {
+        const mod = await import('/src/stores/postProcessingStore.ts')
+        mod.usePostProcessingStore.getState().setFrameBlendingEnabled(true)
+      })
+    })
+  })
 })
 
 // ─── Rendering Variants ───────────────────────────────────────────────────────
@@ -344,6 +355,45 @@ test.describe('combined shader paths', () => {
     await waitForShaderCompilation(page)
 
     expect(gpuIssues, 'HO 9D + temporal + bloom: no errors').toEqual([])
+    await expectCanvasNotBlank(page)
+  })
+
+  test('kitchen sink: all post-processing enabled simultaneously', async ({ page }) => {
+    const gpuIssues = collectGpuWarningsAndErrors(page)
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // Enable every toggleable post-processing feature at once.
+    // This exercises maximum bind group pressure, resource allocation,
+    // and pass graph complexity — the highest-risk configuration.
+    await page.evaluate(async () => {
+      const extMod = await import('/src/stores/extendedObjectStore.ts')
+      const extStore = extMod.useExtendedObjectStore.getState()
+      extStore.setSchroedingerRepresentation('momentum')
+      extStore.setSchroedingerCrossSectionEnabled(true)
+      extStore.setOpenQuantumEnabled(true)
+
+      const ppMod = await import('/src/stores/postProcessingStore.ts')
+      const ppStore = ppMod.usePostProcessingStore.getState()
+      ppStore.setBloomEnabled(true)
+      ppStore.setAntiAliasingMethod('smaa')
+      ppStore.setCinematicEnabled(true)
+      ppStore.setCinematicAberration(0.5)
+      ppStore.setCinematicVignette(0.5)
+      ppStore.setCinematicGrain(0.3)
+      ppStore.setPaperEnabled(true)
+      ppStore.setFrameBlendingEnabled(true)
+
+      const lightMod = await import('/src/stores/lightingStore.ts')
+      lightMod.useLightingStore.getState().setToneMappingEnabled(true)
+
+      const perfMod = await import('/src/stores/performanceStore.ts')
+      perfMod.usePerformanceStore.getState().setTemporalReprojectionEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+
+    expect(gpuIssues, 'kitchen sink: no GPU/shader errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 })

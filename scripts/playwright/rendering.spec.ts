@@ -27,7 +27,9 @@ import {
   collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   getFrameCount,
+  getPerformanceMetrics,
   gotoMode,
+  gotoPauli,
   hasWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
@@ -60,6 +62,29 @@ test.describe('quantum mode rendering', () => {
     { mode: 'diracEquation', dim: 3, label: 'Dirac' },
     { mode: 'harmonicOscillator', dim: 11, label: 'HO 11D (max dim)' },
   ] as const
+
+  // Pauli spinor uses a different objectType ('pauliSpinor'), so it needs
+  // gotoPauli() instead of gotoMode(). Test it with the same triple check:
+  // shader compiles + no GPU errors + non-blank pixels.
+  const pauliModes = [
+    { dim: 3, label: 'Pauli 3D' },
+    { dim: 5, label: 'Pauli 5D' },
+  ] as const
+
+  for (const { dim, label } of pauliModes) {
+    test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
+      const gpuErrors = collectFatalGpuErrors(page)
+      const gpuWarnings = collectGpuWarningsAndErrors(page)
+
+      await gotoPauli(page, dim)
+      await waitForShaderCompilation(page)
+
+      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
+      expect(gpuWarnings, `${label}: no shader/pipeline warnings or errors`).toEqual([])
+
+      await expectCanvasNotBlank(page)
+    })
+  }
 
   for (const { mode, dim, label } of modes) {
     test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
@@ -149,6 +174,122 @@ test.describe('quantum mode rendering', () => {
     await expectCanvasNotBlank(page)
 
     expect(gpuErrors).toEqual([])
+  })
+})
+
+test.describe('shader compilation time gate', () => {
+  test('HO 3D shader compiles within 30 seconds', async ({ page }) => {
+    await page.goto('/')
+    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+
+    const start = Date.now()
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    const elapsed = Date.now() - start
+
+    expect(elapsed, 'shader compilation should complete within 30s').toBeLessThan(30_000)
+  })
+
+  test('hydrogen 7D shader compiles within 30 seconds', async ({ page }) => {
+    await page.goto('/')
+    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+
+    const start = Date.now()
+    await gotoMode(page, 'hydrogenND', 7)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    const elapsed = Date.now() - start
+
+    expect(elapsed, 'shader compilation should complete within 30s').toBeLessThan(30_000)
+  })
+})
+
+test.describe('viewport resize during rendering', () => {
+  test('resize does not crash renderer', async ({ page }) => {
+    await page.goto('/')
+    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+
+    const gpuErrors = collectFatalGpuErrors(page)
+
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await expectCanvasNotBlank(page)
+
+    // Resize to a smaller viewport — forces render target recreation
+    await page.setViewportSize({ width: 800, height: 600 })
+
+    // Renderer must recover: frames advance, canvas not blank
+    const count = await getFrameCount(page)
+    await waitForFrameAdvance(page, count)
+    await expectCanvasNotBlank(page)
+
+    // Resize to a larger viewport
+    await page.setViewportSize({ width: 1600, height: 1000 })
+
+    const count2 = await getFrameCount(page)
+    await waitForFrameAdvance(page, count2)
+    await expectCanvasNotBlank(page)
+
+    expect(gpuErrors, 'no fatal GPU errors after resize').toEqual([])
+  })
+})
+
+test.describe('VRAM stability', () => {
+  test('VRAM does not grow unboundedly after mode switch cycle', async ({ page }) => {
+    await page.goto('/')
+    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+
+    // Enable perf monitor so VRAM tracking is active
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/uiStore.ts')
+      mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+    })
+
+    // Baseline: measure VRAM after initial HO 3D render
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    const baselineCount = await getFrameCount(page)
+    await waitForFrameAdvance(page, baselineCount + 30)
+    const baseline = await getPerformanceMetrics(page)
+
+    // Cycle through all modes twice
+    const cycleModes = [
+      'hydrogenND',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'freeScalarField',
+      'harmonicOscillator',
+      'hydrogenND',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'freeScalarField',
+      'harmonicOscillator',
+    ]
+
+    for (const mode of cycleModes) {
+      await gotoMode(page, mode, 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+    }
+
+    // Let GC and buffer cleanup settle
+    const finalCount = await getFrameCount(page)
+    await waitForFrameAdvance(page, finalCount + 30)
+    const final = await getPerformanceMetrics(page)
+
+    // VRAM should not have grown by more than 50% over baseline.
+    // Some growth is expected from shader pipeline caches, but
+    // unbounded growth indicates a GPU resource leak.
+    const ratio = final.vramMB / Math.max(baseline.vramMB, 1)
+    expect(
+      ratio,
+      `VRAM ratio after mode cycling: ${ratio.toFixed(2)}x (baseline=${baseline.vramMB.toFixed(1)}MB, final=${final.vramMB.toFixed(1)}MB)`
+    ).toBeLessThan(1.5)
   })
 })
 
