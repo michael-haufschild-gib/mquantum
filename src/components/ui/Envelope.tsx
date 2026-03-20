@@ -138,7 +138,11 @@ export const Envelope: React.FC<EnvelopeProps> = React.memo(
     )
 
     return (
-      <div className={`relative ${className}`} style={{ width, height }}>
+      <div
+        className={`relative ${className}`}
+        data-testid="envelope-wrapper"
+        style={{ width, height }}
+      >
         <svg
           viewBox={`0 0 ${viewWidth} ${viewHeight}`}
           className="w-full h-full overflow-visible"
@@ -167,6 +171,7 @@ export const Envelope: React.FC<EnvelopeProps> = React.memo(
 
           {/* Stroke Line */}
           <path
+            data-testid="envelope-stroke"
             d={path}
             fill="none"
             stroke="var(--color-accent)"
@@ -183,6 +188,7 @@ export const Envelope: React.FC<EnvelopeProps> = React.memo(
               !p.hidden && (
                 <g
                   key={i}
+                  data-testid={`envelope-point-${p.label}`}
                   className="transition-transform duration-300 ease-out"
                   style={{ transform: `translate(${p.x}px, ${p.y}px)` }}
                 >

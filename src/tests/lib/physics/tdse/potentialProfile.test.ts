@@ -157,6 +157,32 @@ describe('evaluatePotential1D', () => {
     expect(vLeft).toBeGreaterThan(vRight)
   })
 
+  it('driven potential matches static barrier shape', () => {
+    const cfg = createConfig({
+      potentialType: 'driven',
+      barrierCenter: 0,
+      barrierWidth: 2.0,
+      barrierHeight: 10,
+    })
+    expect(evaluatePotential1D(0, cfg)).toBe(10) // inside
+    expect(evaluatePotential1D(0.5, cfg)).toBe(10) // inside
+    expect(evaluatePotential1D(2.0, cfg)).toBe(0) // outside
+  })
+
+  it('doubleSlit returns wallHeight inside wall region', () => {
+    const cfg = createConfig({
+      potentialType: 'doubleSlit',
+      barrierCenter: 0,
+      wallThickness: 1.0,
+      wallHeight: 20,
+    })
+    // Inside wall (|x - center| < halfThickness)
+    expect(evaluatePotential1D(0, cfg)).toBe(20)
+    expect(evaluatePotential1D(0.3, cfg)).toBe(20)
+    // Outside wall
+    expect(evaluatePotential1D(2.0, cfg)).toBe(0)
+  })
+
   it('unknown potential type returns 0', () => {
     const cfg = createConfig({ potentialType: 'unknown' as never })
     expect(evaluatePotential1D(5, cfg)).toBe(0)
@@ -190,6 +216,49 @@ describe('samplePotentialProfile', () => {
     const { vMin, vMax } = samplePotentialProfile(cfg)
     expect(vMin).toBe(0)
     expect(vMax).toBe(0)
+  })
+
+  it('step potential inserts discontinuity edge points', () => {
+    const cfg = createConfig({ potentialType: 'step', barrierCenter: 0, stepHeight: 8 })
+    const { xs, vs } = samplePotentialProfile(cfg, 50)
+    // Should have more points than the uniform 50 due to edge insertion
+    expect(xs.length).toBeGreaterThan(50)
+    // Should contain the step value
+    expect(vs.some((v) => v === 8)).toBe(true)
+  })
+
+  it('doubleSlit potential inserts wall edge points', () => {
+    const cfg = createConfig({
+      potentialType: 'doubleSlit',
+      barrierCenter: 0,
+      wallThickness: 0.2,
+      wallHeight: 20,
+    })
+    const { xs, vs } = samplePotentialProfile(cfg, 50)
+    expect(xs.length).toBeGreaterThan(50)
+    expect(vs.some((v) => v === 20)).toBe(true)
+  })
+
+  it('finiteWell inserts well edge points', () => {
+    const cfg = createConfig({
+      potentialType: 'finiteWell',
+      wellWidth: 2.0,
+      wellDepth: 5,
+    })
+    const { vs, vMin } = samplePotentialProfile(cfg, 50)
+    expect(vs.some((v) => v === -5)).toBe(true)
+    expect(vMin).toBe(-5)
+  })
+
+  it('driven potential inserts barrier edge points', () => {
+    const cfg = createConfig({
+      potentialType: 'driven',
+      barrierCenter: 0,
+      barrierWidth: 1.0,
+      barrierHeight: 10,
+    })
+    const { xs } = samplePotentialProfile(cfg, 50)
+    expect(xs.length).toBeGreaterThan(50)
   })
 })
 

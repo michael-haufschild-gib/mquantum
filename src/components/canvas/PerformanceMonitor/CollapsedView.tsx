@@ -141,6 +141,7 @@ export const CollapsedView = React.memo(function CollapsedView() {
         <div className="flex flex-col">
           <span
             ref={fpsContainerRef}
+            data-testid="fps-value"
             className={`text-lg font-bold font-mono leading-none ${initialColor.text}`}
           >
             <span ref={fpsRef}>{initialState.fps}</span>
@@ -157,6 +158,7 @@ export const CollapsedView = React.memo(function CollapsedView() {
         <svg width={64} height={20} className="overflow-visible">
           <path
             ref={sparklineRef}
+            data-testid="sparkline-path"
             d={initialPath}
             fill="none"
             stroke={initialColor.stroke}

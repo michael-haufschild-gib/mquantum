@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 import { densityMatrixFromCoefficients, MAX_K } from '@/lib/physics/openQuantum/integrator'
 import {
+  computeActiveK,
   createPackedBuffer,
   OPEN_QUANTUM_BUFFER_BYTES,
   OPEN_QUANTUM_BUFFER_FLOATS,
@@ -97,5 +98,59 @@ describe('packForGPU / unpackFromGPU round-trip', () => {
     packForGPU(rho, metrics, buf, 5)
     // maxK slot at RHO_FLOATS + 5
     expect(buf[RHO_FLOATS + 5]).toBe(5)
+  })
+})
+
+describe('computeActiveK', () => {
+  it('returns minK when all diagonal populations are zero', () => {
+    // Bug caught: returns 0 for empty density matrix, causing zero-length
+    // GPU loop and missing all quantum states.
+    const K = 5
+    const elements = new Float64Array(K * K * 2) // all zeros
+    const rho = { K, elements }
+    expect(computeActiveK(rho)).toBe(2) // default minK=2
+  })
+
+  it('returns K when last state has population above threshold', () => {
+    // Bug caught: off-by-one in the lastActive+1 return value.
+    const K = 4
+    const elements = new Float64Array(K * K * 2)
+    // Set ρ_{33} = 0.05 (above default threshold 0.01)
+    elements[2 * (3 * K + 3)] = 0.05
+    const rho = { K, elements }
+    expect(computeActiveK(rho)).toBe(4) // lastActive=3, so 3+1=4
+  })
+
+  it('trims trailing unpopulated states', () => {
+    // K=6 but only states 0,1,2 have population → returns 3
+    const K = 6
+    const elements = new Float64Array(K * K * 2)
+    elements[2 * (0 * K + 0)] = 0.5 // ρ_{00}
+    elements[2 * (1 * K + 1)] = 0.3 // ρ_{11}
+    elements[2 * (2 * K + 2)] = 0.2 // ρ_{22}
+    // States 3,4,5 have zero population
+    const rho = { K, elements }
+    expect(computeActiveK(rho)).toBe(3)
+  })
+
+  it('respects custom populationThreshold', () => {
+    const K = 4
+    const elements = new Float64Array(K * K * 2)
+    elements[2 * (0 * K + 0)] = 0.9
+    elements[2 * (1 * K + 1)] = 0.08 // above default 0.01 but below custom 0.1
+    const rho = { K, elements }
+    // With default threshold: lastActive=1, returns 2
+    expect(computeActiveK(rho, 0.01)).toBe(2)
+    // With higher threshold: lastActive=0, but minK=2 clamps to 2
+    expect(computeActiveK(rho, 0.1)).toBe(2)
+  })
+
+  it('respects custom minK', () => {
+    const K = 8
+    const elements = new Float64Array(K * K * 2)
+    elements[2 * (0 * K + 0)] = 1.0 // only ground state
+    const rho = { K, elements }
+    // lastActive=0, returns max(minK, 1) = minK
+    expect(computeActiveK(rho, 0.01, 4)).toBe(4)
   })
 })

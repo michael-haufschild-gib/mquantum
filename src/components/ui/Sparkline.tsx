@@ -131,8 +131,9 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
         </defs>
         {count >= 2 && (
           <>
-            <path d={fillPath} fill={`url(#${gradientId})`} />
+            <path data-testid="sparkline-fill" d={fillPath} fill={`url(#${gradientId})`} />
             <polyline
+              data-testid="sparkline-line"
               points={polyline}
               fill="none"
               stroke="var(--theme-accent)"

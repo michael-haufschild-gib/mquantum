@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import {
   complexMatAdd,
+  complexMatCopy,
   complexMatIdentity,
   complexMatMul,
   complexMatNorm1,
@@ -371,5 +372,122 @@ describe('solveLinearSystem', () => {
     expect(X.real[1]).toBeCloseTo(-1.4, 10)
     expect(X.real[2]).toBeCloseTo(-1, 10)
     expect(X.real[3]).toBeCloseTo(2.8, 10)
+  })
+
+  it('solves a system requiring row pivoting (zero diagonal)', () => {
+    // Bug caught: solver fails when A[0,0] = 0 and row swap is needed.
+    // Q = [[0, 1], [1, 0]] (permutation matrix), P = [[3, 0], [0, 7]] (real)
+    // Q * X = P → X = Q^{-1} * P = Q * P = [[0, 7], [3, 0]]
+    const N = 2
+    const Q = mat(N, [
+      [0, 0],
+      [1, 0],
+      [1, 0],
+      [0, 0],
+    ])
+    const P = mat(N, [
+      [3, 0],
+      [0, 0],
+      [0, 0],
+      [7, 0],
+    ])
+
+    const X = solveLinearSystem(Q, P, N)
+
+    // Q is its own inverse (permutation), so X = Q * P
+    expect(X.real[0]).toBeCloseTo(0, 10) // (0,0)
+    expect(X.real[1]).toBeCloseTo(7, 10) // (0,1)
+    expect(X.real[2]).toBeCloseTo(3, 10) // (1,0)
+    expect(X.real[3]).toBeCloseTo(0, 10) // (1,1)
+  })
+})
+
+describe('complexMatCopy', () => {
+  it('produces an independent copy', () => {
+    const N = 2
+    const src = mat(N, [
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
+    ])
+    const dst = complexMatZero(N)
+    complexMatCopy(src, dst, N)
+
+    // dst matches src
+    expectMatClose(dst, src, N)
+
+    // Mutating dst does not affect src
+    dst.real[0] = 999
+    expect(src.real[0]).toBe(1)
+  })
+})
+
+describe('matrixExponentialPade — large norm (squaring phase)', () => {
+  it('exp(10i·σ_z) is unitary and matches cos(10) + i·sin(10)', () => {
+    // Bug caught: squaring phase (s > 0) introduces accumulated rounding error
+    // that breaks unitarity for large-norm matrices.
+    //
+    // σ_z = [[1,0],[0,-1]], so 10i·σ_z = [[10i,0],[0,-10i]]
+    // exp(10i·σ_z) = [[exp(10i), 0], [0, exp(-10i)]]
+    //              = [[cos10 + i·sin10, 0], [0, cos10 - i·sin10]]
+    //
+    // ||10i·σ_z||₁ = 10 > θ₁₃ ≈ 5.37, so s = ceil(log2(10/5.37)) = 1.
+    // This forces the squaring phase to run.
+    const N = 2
+    const A = complexMatZero(N)
+    A.imag[0] = 10 // (0,0) = 10i
+    A.imag[3] = -10 // (1,1) = -10i
+
+    const result = matrixExponentialPade(A, N)
+
+    const c = Math.cos(10)
+    const s = Math.sin(10)
+
+    // Diagonal: exp(±10i) = cos(10) ± i·sin(10)
+    expect(result.real[0]).toBeCloseTo(c, 8)
+    expect(result.imag[0]).toBeCloseTo(s, 8)
+    expect(result.real[3]).toBeCloseTo(c, 8)
+    expect(result.imag[3]).toBeCloseTo(-s, 8)
+
+    // Off-diagonal: zero
+    expect(Math.abs(result.real[1]!)).toBeLessThan(1e-10)
+    expect(Math.abs(result.real[2]!)).toBeLessThan(1e-10)
+  })
+
+  it('exp(A) · exp(-A) = I (unitarity for anti-Hermitian A)', () => {
+    // Tests the squaring phase with a 3×3 anti-Hermitian matrix.
+    // For anti-Hermitian A (A† = -A), exp(A) is unitary: U†U = I.
+    // Build A = i·H where H is Hermitian with large norm.
+    const N = 3
+    const A = complexMatZero(N)
+    // A = i * [[8, 2+i, 0], [2-i, 6, 3], [0, 3, 7]]  (anti-Hermitian)
+    // ||A||₁ will be > θ₁₃, forcing squaring
+    A.imag[0] = 8 // (0,0)
+    A.real[1] = -1
+    A.imag[1] = 2 // (0,1) = i*(2+i) = -1+2i
+    A.real[3] = 1
+    A.imag[3] = 2 // (1,0) = i*(2-i) = 1+2i
+    A.imag[4] = 6 // (1,1)
+    A.imag[5] = 3 // (1,2)
+    A.imag[7] = 3 // (2,1)
+    A.imag[8] = 7 // (2,2)
+
+    const expA = matrixExponentialPade(A, N)
+
+    // Compute exp(-A)
+    const negA = complexMatZero(N)
+    complexMatScale(A, -1, 0, negA, N)
+    const expNegA = matrixExponentialPade(negA, N)
+
+    // exp(A) * exp(-A) should equal I
+    const product = complexMatZero(N)
+    complexMatMul(expA, expNegA, product, N)
+
+    const I = complexMatIdentity(N)
+    for (let i = 0; i < N * N; i++) {
+      expect(product.real[i]).toBeCloseTo(I.real[i]!, 6)
+      expect(Math.abs(product.imag[i]!)).toBeLessThan(1e-6)
+    }
   })
 })
