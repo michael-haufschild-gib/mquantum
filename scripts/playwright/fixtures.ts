@@ -20,7 +20,7 @@ import { test as base, expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 import {
-  hasWebGPU,
+  requireWebGPU,
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -34,7 +34,7 @@ export interface AppFixtures {
   appPage: Page
   /** Page navigated to HO 3D mode with app loaded. */
   hoPage: Page
-  /** Page with WebGPU ready — skips test if GPU unavailable. */
+  /** Page with WebGPU ready — hard-fails if GPU unavailable (skip only with ALLOW_GPU_SKIP=1). */
   gpuPage: Page
 }
 
@@ -54,10 +54,7 @@ export const test = base.extend<AppFixtures>({
   gpuPage: async ({ page }, use, testInfo) => {
     await page.goto('/')
     await waitForAppLoaded(page)
-    const gpu = await hasWebGPU(page)
-    if (!gpu) {
-      testInfo.skip(true, 'WebGPU not available')
-    }
+    await requireWebGPU(page, testInfo)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await use(page)

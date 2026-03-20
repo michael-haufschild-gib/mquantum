@@ -98,7 +98,7 @@ export async function gotoMode(page: Page, mode: string, dim = 3): Promise<void>
 }
 
 /**
- * Check whether WebGPU is available. Use in beforeEach to skip tests.
+ * Check whether WebGPU is available.
  *
  * IMPORTANT: WebGPU requires a secure context (https: or localhost).
  * This function navigates to baseURL first if the page is on about:blank,
@@ -114,6 +114,33 @@ export async function hasWebGPU(page: Page): Promise<boolean> {
     if (!navigator.gpu) return false
     return !!(await navigator.gpu.requestAdapter())
   })
+}
+
+/**
+ * Assert WebGPU is available — hard fail if not.
+ *
+ * Use this instead of `test.skip(!(await hasWebGPU(page)))`.
+ * Only falls back to skip if ALLOW_GPU_SKIP=1 is set.
+ *
+ * This prevents AI agents from silently skipping GPU tests and claiming
+ * "all tests passed" when WebGPU was never actually tested.
+ */
+export async function requireWebGPU(
+  page: Page,
+  testInfo: { skip: (skip: boolean, description?: string) => void }
+): Promise<void> {
+  const available = await hasWebGPU(page)
+  if (available) return
+
+  if (process.env.ALLOW_GPU_SKIP === '1') {
+    testInfo.skip(true, 'WebGPU not available (ALLOW_GPU_SKIP=1)')
+    return
+  }
+
+  throw new Error(
+    'WebGPU is NOT available but ALLOW_GPU_SKIP is not set. ' +
+      'This test requires GPU. Fix the Chrome launch flags or set ALLOW_GPU_SKIP=1.'
+  )
 }
 
 // ─── Store Access ────────────────────────────────────────────────────────────

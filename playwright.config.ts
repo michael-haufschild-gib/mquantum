@@ -4,11 +4,12 @@ const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100)
 
 export default defineConfig({
   testDir: './scripts/playwright',
+  globalSetup: './scripts/playwright/global-setup.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'line',
+  reporter: [['line'], ['./scripts/playwright/gpu-enforcement-reporter.ts']],
 
   use: {
     baseURL: `http://localhost:${devServerPort}`,
