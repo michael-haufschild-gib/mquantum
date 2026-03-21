@@ -1,0 +1,133 @@
+/**
+ * Simulation State Save/Load Store
+ *
+ * Mediates between UI buttons and the GPU render loop for saving and loading
+ * full simulation state (.mqstate files). Uses a request/fulfillment pattern:
+ * UI sets a request, the render loop fulfills it asynchronously.
+ *
+ * Also tracks eigenstate storage requests for Gram-Schmidt orthogonalization.
+ *
+ * @module stores/simulationStateStore
+ */
+
+import { create } from 'zustand'
+
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+
+/** Status of save/load operations */
+export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
+
+/** Loaded wavefunction data pending injection into GPU buffers */
+export interface PendingLoadData {
+  quantumMode: SchroedingerQuantumMode
+  latticeDim: number
+  gridSize: number[]
+  totalSites: number
+  config: Record<string, unknown>
+  psiRe: Float32Array
+  psiIm: Float32Array
+}
+
+interface SimulationStateState {
+  status: SimulationStateStatus
+  error: string | null
+
+  /** True when UI has requested a save; cleared by the render loop after initiating readback */
+  saveRequested: boolean
+  /** Loaded data waiting to be injected into GPU buffers */
+  pendingLoadData: PendingLoadData | null
+
+  /** True when UI requests storing the current eigenstate for Gram-Schmidt */
+  storeEigenstateRequested: boolean
+  /** Number of eigenstates currently stored */
+  storedEigenstateCount: number
+
+  /** Request saving the current simulation state */
+  requestSave: () => void
+  /** Load a .mqstate file — reads and parses the file, stores data for GPU injection */
+  loadFromFile: (file: File) => void
+  /** Called by the render loop after initiating the save readback */
+  clearSaveRequest: () => void
+  /** Called by the render loop after save completes */
+  setSaveComplete: () => void
+  /** Called by the render loop after save fails */
+  setSaveError: (error: string) => void
+  /** Called by the render loop after load data has been injected */
+  clearLoadData: () => void
+  /** Called by the render loop after load fails */
+  setLoadError: (error: string) => void
+
+  /** Request storing the current wavefunction as an eigenstate */
+  requestStoreEigenstate: () => void
+  /** Called by the render loop after eigenstate is stored */
+  clearStoreEigenstateRequest: (newCount: number) => void
+  /** Called when eigenstates are cleared (grid rebuild) */
+  clearStoredEigenstates: () => void
+
+  /** Reset to idle */
+  reset: () => void
+}
+
+/**
+ * Zustand store for simulation state save/load operations.
+ *
+ * @example
+ * ```ts
+ * useSimulationStateStore.getState().requestSave()
+ * ```
+ */
+export const useSimulationStateStore = create<SimulationStateState>((set) => ({
+  status: 'idle',
+  error: null,
+  saveRequested: false,
+  pendingLoadData: null,
+  storeEigenstateRequested: false,
+  storedEigenstateCount: 0,
+
+  requestSave: () => set({ saveRequested: true, status: 'saving', error: null }),
+
+  loadFromFile: (file: File) => {
+    set({ status: 'loading', error: null })
+    file
+      .arrayBuffer()
+      .then(async (data) => {
+        const { deserializeSimulationState } = await import('@/lib/export/simulationState')
+        const result = await deserializeSimulationState(data)
+        set({
+          pendingLoadData: {
+            quantumMode: result.quantumMode,
+            latticeDim: result.latticeDim,
+            gridSize: result.gridSize,
+            totalSites: result.totalSites,
+            config: result.config,
+            psiRe: result.psiRe,
+            psiIm: result.psiIm,
+          },
+        })
+      })
+      .catch((err) => {
+        set({ status: 'error', error: String(err) })
+      })
+  },
+
+  clearSaveRequest: () => set({ saveRequested: false }),
+  setSaveComplete: () => set({ status: 'done', saveRequested: false }),
+  setSaveError: (error) => set({ status: 'error', error, saveRequested: false }),
+  clearLoadData: () => set({ pendingLoadData: null, status: 'done' }),
+  setLoadError: (error) => set({ status: 'error', error, pendingLoadData: null }),
+
+  requestStoreEigenstate: () => set({ storeEigenstateRequested: true }),
+  clearStoreEigenstateRequest: (newCount) =>
+    set({ storeEigenstateRequested: false, storedEigenstateCount: newCount }),
+  clearStoredEigenstates: () => set({ storedEigenstateCount: 0 }),
+
+  reset: () =>
+    set({
+      status: 'idle',
+      error: null,
+      saveRequested: false,
+      pendingLoadData: null,
+      storeEigenstateRequested: false,
+      storedEigenstateCount: 0,
+    }),
+}))

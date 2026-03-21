@@ -1,14 +1,4 @@
-/**
- * TDSE Compute Pass — Pipeline & Bind Group Setup
- *
- * Extracted from TDSEComputePass to keep file sizes manageable.
- * Contains pipeline compilation and bind group assembly.
- *
- * These functions operate on plain parameter objects rather than class
- * instances, receiving only the GPU resources they need and returning
- * the resources they create.
- */
-
+/** TDSE Compute Pass — Pipeline & Bind Group Setup */
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
@@ -31,6 +21,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
+import { buildObsGSPipelines } from './TDSEObservablesGSPipelines'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Types
@@ -52,10 +43,12 @@ export interface TdsePassHelpers {
   createUniformBuffer: (device: GPUDevice, size: number, label: string) => GPUBuffer
 }
 
+import type { ObsGSPipelineResult } from './TDSEObservablesGSPipelines'
+
 /**
  * Pipeline and bind group layout objects created by {@link buildTdsePipelines}.
  */
-export interface TdsePipelineResult {
+export interface TdsePipelineResult extends ObsGSPipelineResult {
   initPipeline: GPUComputePipeline
   initBGL: GPUBindGroupLayout
   potentialPipeline: GPUComputePipeline
@@ -375,6 +368,9 @@ struct PackUniforms {
     'tdse-diag-finalize'
   )
 
+  // Observable + Gram-Schmidt pipelines (extracted to separate file for line limit)
+  const obsGS = buildObsGSPipelines(device, helpers)
+
   return {
     initPipeline,
     initBGL,
@@ -399,6 +395,7 @@ struct PackUniforms {
     diagReduceBGL,
     diagFinalizePipeline,
     diagFinalizeBGL,
+    ...obsGS,
   }
 }
 

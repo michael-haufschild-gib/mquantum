@@ -14,13 +14,17 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
+import { Sparkline } from '@/components/ui/Sparkline'
+import { Switch } from '@/components/ui/Switch'
 import {
   computePacketKineticEnergy,
   getPotentialPlotScale,
   samplePotentialProfile,
 } from '@/lib/physics/tdse/potentialProfile'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /* ── SVG layout constants ── */
@@ -43,10 +47,11 @@ const PLOT_H = HEIGHT - 2 * PADDING_Y
  * ```
  */
 export const TDSEAnalysisContent: React.FC = React.memo(() => {
-  const { tdse, setDiagnosticsInterval } = useExtendedObjectStore(
+  const { tdse, setDiagnosticsInterval, setObservablesEnabled } = useExtendedObjectStore(
     useShallow((s) => ({
       tdse: s.schroedinger.tdse,
       setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
+      setObservablesEnabled: s.setTdseObservablesEnabled,
     }))
   )
 
@@ -54,6 +59,7 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
     <>
       <Slider
         label="Diagnostics Interval (frames)"
+        tooltip="How often to compute norm, R/T coefficients, and observables. Lower values update faster but use more GPU time."
         min={1}
         max={60}
         step={1}
@@ -65,6 +71,12 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
 
       {/* Inline energy diagram */}
       <EnergyDiagramInline tdse={tdse} />
+
+      {/* Observable expectation values */}
+      <ObservablesDisplay
+        enabled={tdse.observablesEnabled}
+        onEnabledChange={setObservablesEnabled}
+      />
     </>
   )
 })
@@ -307,3 +319,117 @@ function formatNum(v: number): string {
   if (Math.abs(v) >= 1) return v.toFixed(1)
   return v.toFixed(2)
 }
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Observable Expectation Values Display                        */
+/* ────────────────────────────────────────────────────────────── */
+
+const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+
+interface ObservablesDisplayProps {
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+}
+
+const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
+  ({ enabled, onEnabledChange }) => {
+    const obs = useObservablesDiagnosticsStore(
+      useShallow((s) => ({
+        hasData: s.hasData,
+        activeDims: s.activeDims,
+        positionMean: s.positionMean,
+        positionVariance: s.positionVariance,
+        momentumMean: s.momentumMean,
+        momentumVariance: s.momentumVariance,
+        uncertaintyProduct: s.uncertaintyProduct,
+        totalEnergy: s.totalEnergy,
+        historyEnergy: s.historyEnergy,
+        historyUncertainty: s.historyUncertainty,
+        historyHead: s.historyHead,
+        historyCount: s.historyCount,
+      }))
+    )
+
+    return (
+      <ControlGroup
+        title="Observables"
+        collapsible
+        defaultOpen={false}
+        rightElement={
+          <Switch
+            checked={enabled}
+            onCheckedChange={onEnabledChange}
+            data-testid="observables-toggle"
+          />
+        }
+      >
+        {enabled && obs.hasData && (
+          <div className="space-y-3">
+            {/* Per-dimension table */}
+            <div className="text-[10px] font-mono space-y-0.5">
+              <div className="flex gap-2 text-text-tertiary font-semibold">
+                <span className="w-4">d</span>
+                <span className="w-16 text-right">&lt;x&gt;</span>
+                <span className="w-12 text-right">&Delta;x</span>
+                <span className="w-16 text-right">&lt;p&gt;</span>
+                <span className="w-12 text-right">&Delta;p</span>
+                <span className="w-14 text-right">&Delta;x&Delta;p</span>
+              </div>
+              {Array.from({ length: obs.activeDims }, (_, d) => {
+                const dx = Math.sqrt(Math.max(0, obs.positionVariance[d]!))
+                const dp = Math.sqrt(Math.max(0, obs.momentumVariance[d]!))
+                return (
+                  <div key={d} className="flex gap-2 text-text-secondary">
+                    <span className="w-4 text-text-tertiary">{DIM_LABELS[d]}</span>
+                    <span className="w-16 text-right">{obs.positionMean[d]!.toFixed(3)}</span>
+                    <span className="w-12 text-right">{dx.toFixed(3)}</span>
+                    <span className="w-16 text-right">{obs.momentumMean[d]!.toFixed(3)}</span>
+                    <span className="w-12 text-right">{dp.toFixed(3)}</span>
+                    <span className="w-14 text-right">{obs.uncertaintyProduct[d]!.toFixed(4)}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Energy sparkline */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-text-tertiary">
+                &lt;E&gt; = {obs.totalEnergy.toFixed(4)}
+              </div>
+              <Sparkline
+                data={obs.historyEnergy}
+                head={obs.historyHead}
+                count={obs.historyCount}
+                height={28}
+                className="w-full"
+              />
+            </div>
+
+            {/* First dimension uncertainty sparkline */}
+            {obs.activeDims > 0 && obs.historyUncertainty[0] && (
+              <div className="space-y-1">
+                <div className="text-[10px] text-text-tertiary">
+                  &Delta;x&Delta;p ({DIM_LABELS[0]})
+                </div>
+                <Sparkline
+                  data={obs.historyUncertainty[0]}
+                  head={obs.historyHead}
+                  count={obs.historyCount}
+                  height={28}
+                  min={0}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {enabled && !obs.hasData && (
+          <div className="text-[10px] text-text-tertiary">Waiting for GPU readback...</div>
+        )}
+      </ControlGroup>
+    )
+  }
+)
+
+ObservablesDisplay.displayName = 'ObservablesDisplay'

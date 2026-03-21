@@ -11,6 +11,8 @@ import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/tdse'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { TDSEComputePass } from '../../passes/TDSEComputePass'
@@ -150,6 +152,31 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     if (isBecMode) {
       this.updateBecDiagnostics(tdsePass, extended)
     }
+
+    // B1: Simulation state save/load
+    const simState = useSimulationStateStore.getState()
+    if (simState.saveRequested) {
+      simState.clearSaveRequest()
+      tdsePass.requestStateSave(ctx)
+    }
+    if (simState.pendingLoadData) {
+      const loadData = simState.pendingLoadData
+      useExtendedObjectStore.getState().setSchroedingerConfig({
+        quantumMode: loadData.quantumMode,
+        ...(loadData.config as Record<string, unknown>),
+      })
+      // Inject the loaded wavefunction data — will be written on next frame's maybeInitialize
+      tdsePass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+      simState.clearLoadData()
+    }
+
+    // B3: Eigenstate storage for Gram-Schmidt
+    if (simState.storeEigenstateRequested) {
+      const newCount = tdsePass.storeCurrentEigenstate(ctx.device)
+      simState.clearStoreEigenstateRequest(
+        newCount >= 0 ? newCount : tdsePass.getStoredEigenstateCount()
+      )
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -284,6 +311,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         needsReset: bec.needsReset ?? false,
         slicePositions: bec.slicePositions ?? [],
         interactionStrength: g,
+        customPotentialExpression: '',
+        observablesEnabled: false,
+        imaginaryTimeEnabled: false,
       },
     }
   }

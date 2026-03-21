@@ -68,6 +68,9 @@ type TdseActions = Pick<
   | 'setTdseAutoLoop'
   | 'setTdseDiagnosticsEnabled'
   | 'setTdseDiagnosticsInterval'
+  | 'setTdseObservablesEnabled'
+  | 'setTdseImaginaryTimeEnabled'
+  | 'setTdseCustomPotentialExpression'
   | 'setTdseSlicePosition'
   | 'applyTdsePreset'
   | 'resetTdseField'
@@ -424,6 +427,30 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
+        },
+      }))
+    },
+    setTdseObservablesEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, observablesEnabled: enabled },
+        },
+      }))
+    },
+    setTdseImaginaryTimeEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, imaginaryTimeEnabled: enabled },
+        },
+      }))
+    },
+    setTdseCustomPotentialExpression: (expression) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, customPotentialExpression: expression },
         },
       }))
     },

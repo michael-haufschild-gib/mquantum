@@ -47,6 +47,7 @@ const POT_MAP: Record<string, number> = {
   doubleWell: 8,
   becTrap: 9,
   radialDoubleWell: 10,
+  custom: 0, // GPU shader skipped; buffer filled from JS
 }
 
 /** Enum maps for TDSE field view modes. */
@@ -203,6 +204,9 @@ export function writeTdseUniforms(
   f32[172] = config.radialWellOuter
   f32[173] = config.radialWellDepth
   f32[174] = config.radialWellTilt
+
+  // Imaginary-time mode flag (offset 700, index 175)
+  u32[175] = config.imaginaryTimeEnabled ? 1 : 0
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
