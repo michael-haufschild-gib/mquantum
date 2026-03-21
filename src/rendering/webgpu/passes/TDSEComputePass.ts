@@ -151,17 +151,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     pendingInjection: null,
   }
 
-  // Convenience aliases for direct field access within this class
-  private get gsEigenstates() {
-    return this._gsState.gsEigenstates
-  }
-  private get pendingInjection() {
-    return this._slState.pendingInjection
-  }
-  private set pendingInjection(v) {
-    this._slState.pendingInjection = v
-  }
-
   // Observables state (shared mutable object for extracted module)
   private readonly _obsState: ObservablesState = {
     obsResources: null,
@@ -252,7 +241,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Set loaded wavefunction data for injection on next frame. */
   setLoadedWavefunction(re: Float32Array, im: Float32Array): void {
-    this.pendingInjection = { re, im }
+    this._slState.pendingInjection = { re, im }
   }
 
   /** Copy the current wavefunction into eigenstate storage. */
@@ -262,7 +251,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Get the number of stored eigenstates. */
   getStoredEigenstateCount(): number {
-    return this.gsEigenstates.length
+    return this._gsState.gsEigenstates.length
   }
 
   /** Sync shared state objects with current buffer references. */
@@ -410,7 +399,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     // Check for pending loaded wavefunction data — skip init shader and inject directly
     if (injectLoadedWavefunction(device, this._slState, this.totalSites)) {
-      this.pendingInjection = null
+      this._slState.pendingInjection = null
     } else {
       // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
       if (this.pl && this.bg) {
@@ -649,7 +638,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           sPass.end()
 
           // Gram-Schmidt: orthogonalize against stored eigenstates (imaginary-time only)
-          if (isImaginaryTime && this.gsEigenstates.length > 0) {
+          if (isImaginaryTime && this._gsState.gsEigenstates.length > 0) {
             gsDispatch(ctx, this._gsState, (pe, pl, bgs, x, y, z) =>
               this.dispatchCompute(pe, pl, bgs, x, y ?? 1, z ?? 1)
             )

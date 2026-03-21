@@ -23,11 +23,6 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
-import {
-  comptonWavelength,
-  kleinThreshold,
-  zitterbewegungFrequency,
-} from '@/lib/physics/dirac/scales'
 import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -35,13 +30,14 @@ import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
-  FFT_UNIFORM_SIZE,
   GRID_WG,
   LINEAR_WG,
   MAX_DIM,
   nearestPow2,
   reduceGridToFit,
 } from './computePassUtils'
+import type { DiagDispatchParams, FFTAxisParams } from './DiracComputePassDispatchers'
+import { dispatchDiagnostics, dispatchFFTAxis } from './DiracComputePassDispatchers'
 import {
   buildDiracPipelines,
   rebuildDiracBindGroups,
@@ -53,11 +49,6 @@ import type {
   DiracPipelineResult,
 } from './DiracComputePassTypes'
 import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
-
-/** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
-const DIAG_UNIFORM_SIZE = 16
-/** Number of f32 values in diagnostic result buffer */
-const DIAG_RESULT_COUNT = 4
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -404,37 +395,23 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     )
   }
 
-  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
-    const encoder = ctx.encoder
+  private dispatchFFTAxisDelegated(
+    ctx: WebGPURenderContext,
+    axisDim: number,
+    slotOffset: number
+  ): number {
     if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
-
-    const stages = Math.log2(axisDim)
-    const halfTotal = this.totalSites / 2
-
-    for (let s = 0; s < stages; s++) {
-      encoder.copyBufferToBuffer(
-        this.fftStagingBuffer,
-        (slotOffset + s) * FFT_UNIFORM_SIZE,
-        this.fftUniformBuffer,
-        0,
-        FFT_UNIFORM_SIZE
-      )
-      const fftBG = s % 2 === 0 ? this.bg.fftStageABBG! : this.bg.fftStageBABG!
-      const pass = ctx.beginComputePass({ label: `dirac-fft-stage-${s}` })
-      this.dispatchCompute(
-        pass,
-        this.pl.fftStagePipeline,
-        [fftBG],
-        Math.ceil(halfTotal / LINEAR_WG)
-      )
-      pass.end()
+    const params: FFTAxisParams = {
+      pl: this.pl,
+      bg: this.bg,
+      fftUniformBuffer: this.fftUniformBuffer,
+      fftStagingBuffer: this.fftStagingBuffer,
+      fftScratchA: this.fftScratchA!,
+      fftScratchB: this.fftScratchB!,
+      totalSites: this.totalSites,
+      dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
     }
-
-    if (stages % 2 !== 0) {
-      encoder.copyBufferToBuffer(this.fftScratchB!, 0, this.fftScratchA!, 0, this.totalSites * 8)
-    }
-
-    return slotOffset + stages
+    return dispatchFFTAxis(ctx, axisDim, slotOffset, params)
   }
 
   /** Execute the full Dirac compute pipeline. */
@@ -496,7 +473,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
           }
           let fftSlot = 0
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = bg.cachedUnpackBGsNoNorm[c]
           if (unpackBG) {
@@ -521,7 +498,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
           }
           let fftSlot = this.fwdStageCount
           for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+            fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
           }
           const unpackBG = bg.cachedUnpackBGs[c]
           if (unpackBG) {
@@ -580,122 +557,33 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
-      this.dispatchDiagnostics(ctx, config)
+      this.dispatchDiagnosticsDelegated(ctx, config)
     }
   }
 
-  private dispatchDiagnostics(ctx: WebGPURenderContext, config: DiracConfig): void {
-    const { device, encoder } = ctx
+  private dispatchDiagnosticsDelegated(ctx: WebGPURenderContext, config: DiracConfig): void {
     const { pl, bg } = this
     if (!pl || !bg || !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer)
       return
-
-    // Write diagnostic uniforms
-    const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
-    const diagU32 = new Uint32Array(diagData)
-    diagU32[0] = this.totalSites
-    diagU32[1] = this.diagNumWorkgroups
-    diagU32[2] = this.currentSpinorSize
-    device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
-
-    // Pass 1: reduce
-    const reducePass = ctx.beginComputePass({ label: 'dirac-diag-reduce' })
-    this.dispatchCompute(
-      reducePass,
-      pl.diagReducePipeline,
-      [bg.diagReduceBG!],
-      this.diagNumWorkgroups
-    )
-    reducePass.end()
-
-    // Pass 2: finalize
-    const finalizePass = ctx.beginComputePass({ label: 'dirac-diag-finalize' })
-    this.dispatchCompute(finalizePass, pl.diagFinalizePipeline, [bg.diagFinalizeBG!], 1)
-    finalizePass.end()
-
-    // Async readback
-    if (!this.diagMappingInFlight) {
-      encoder.copyBufferToBuffer(
-        this.diagResultBuffer,
-        0,
-        this.diagStagingBuffer,
-        0,
-        DIAG_RESULT_COUNT * 4
-      )
-      this.diagMappingInFlight = true
-      const staging = this.diagStagingBuffer
-      const renormBuf = bg.renormalizeUniformBuffer
-
-      device.queue
-        .onSubmittedWorkDone()
-        .then(() => {
-          if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging) {
-            this.diagMappingInFlight = false
-            return
-          }
-          staging
-            .mapAsync(GPUMapMode.READ)
-            .then(() => {
-              const data = new Float32Array(staging.getMappedRange())
-              const totalNorm = data[0]!
-              const maxDens = data[1]!
-              const particleNorm = data[2]!
-              const antiNorm = data[3]!
-              staging.unmap()
-
-              // Asymmetric maxDensity smoothing
-              if (maxDens > 0) {
-                if (this.maxDensity <= 0 || maxDens >= this.maxDensity) {
-                  this.maxDensity = maxDens
-                } else {
-                  this.maxDensity += 0.4 * (maxDens - this.maxDensity)
-                }
-              }
-
-              if (this.initialNorm < 0) {
-                this.initialNorm = totalNorm
-                if (renormBuf) {
-                  device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
-                }
-              }
-
-              // Update diagnostics store
-              if (config.diagnosticsEnabled) {
-                const norm0 = this.initialNorm > 0 ? this.initialNorm : totalNorm
-                const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
-                const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
-                const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
-
-                useDiracDiagnosticsStore.getState().update({
-                  totalNorm,
-                  normDrift,
-                  maxDensity: maxDens,
-                  particleFraction: pFrac,
-                  antiparticleFraction: aFrac,
-                  comptonWavelength: comptonWavelength(
-                    config.hbar,
-                    config.mass,
-                    config.speedOfLight
-                  ),
-                  zitterbewegungFreq: zitterbewegungFrequency(
-                    config.mass,
-                    config.speedOfLight,
-                    config.hbar
-                  ),
-                  kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
-                })
-              }
-
-              this.diagMappingInFlight = false
-            })
-            .catch(() => {
-              this.diagMappingInFlight = false
-            })
-        })
-        .catch(() => {
-          this.diagMappingInFlight = false
-        })
+    const params: DiagDispatchParams = {
+      pl,
+      bg,
+      diagResultBuffer: this.diagResultBuffer,
+      diagStagingBuffer: this.diagStagingBuffer,
+      diagUniformBuffer: this.diagUniformBuffer,
+      totalSites: this.totalSites,
+      diagNumWorkgroups: this.diagNumWorkgroups,
+      currentSpinorSize: this.currentSpinorSize,
+      initialNorm: this.initialNorm,
+      maxDensity: this.maxDensity,
+      diagMappingInFlight: this.diagMappingInFlight,
+      dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
     }
+    dispatchDiagnostics(ctx, config, params, (result) => {
+      this.maxDensity = result.maxDensity
+      this.initialNorm = result.initialNorm
+      this.diagMappingInFlight = result.diagMappingInFlight
+    })
   }
 
   execute(_ctx: WebGPURenderContext): void {

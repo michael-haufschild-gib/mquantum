@@ -31,7 +31,10 @@ export default defineConfig({
         // These are verified by Playwright e2e tests (rendering.spec.ts,
         // shader-compilation-matrix.spec.ts, physics-validation.spec.ts).
         'src/rendering/webgpu/passes/TDSEComputePass.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassDispatchers.ts',
+        'src/rendering/webgpu/passes/DensityGridGradientSetup.ts',
         'src/rendering/webgpu/passes/DiracComputePass.ts',
+        'src/rendering/webgpu/passes/DiracComputePassDispatchers.ts',
         'src/rendering/webgpu/passes/DiracComputePassSetup.ts',
         'src/rendering/webgpu/passes/DiracComputePassUniforms.ts',
         'src/rendering/webgpu/passes/PauliComputePass.ts',

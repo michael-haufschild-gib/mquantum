@@ -789,6 +789,7 @@ export default [
       'src/rendering/webgpu/passes/PauliComputePass.ts',
       'src/rendering/webgpu/passes/PauliComputePassBuffers.ts',
       'src/rendering/webgpu/passes/DiracComputePass.ts',
+      'src/rendering/webgpu/passes/DiracComputePassDispatchers.ts',
       'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
       'src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts',
       'src/rendering/webgpu/passes/FreeScalarFieldKSpace.ts',

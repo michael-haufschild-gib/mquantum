@@ -18,8 +18,8 @@ import { logger } from '@/lib/logger'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
-import { gradientGridComputeShader } from '../shaders/schroedinger/compute/gradientGrid.wgsl'
 import { DensityDistributionAnalyzer } from './DensityDistributionAnalysis'
+import { createGradientPipeline } from './DensityGridGradientSetup'
 
 // Grid parameters struct size (must match WGSL GridParams)
 // vec3u (12) + pad (4) + vec3f (12) + pad (4) + vec3f (12) + pad (4) = 48 bytes
@@ -336,51 +336,15 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     }
 
     // ── Gradient normal compute pipeline ──
-    // Reads the density grid, computes central-difference gradient, writes normalized
-    // normals to the normal grid texture. Eliminates 6 texture fetches per visible
-    // sample in the fragment shader (~0.4-1.6ms savings at Retina resolution).
-    const hasLogDensity = this.densityTextureFormat === 'rgba16float'
-    const isDualChannel = false // analytic modes are never dual-channel
-    const gradientModule = device.createShaderModule({
-      label: 'gradient-grid-compute-shader',
-      code: gradientGridComputeShader,
-    })
-    const gradientBGL = device.createBindGroupLayout({
-      label: 'gradient-grid-bgl',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          texture: { sampleType: 'unfilterable-float', viewDimension: '3d' },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: { access: 'write-only', format: 'rgba8snorm', viewDimension: '3d' },
-        },
-      ],
-    })
-    this.gradientBindGroup = device.createBindGroup({
-      label: 'gradient-grid-bg',
-      layout: gradientBGL,
-      entries: [
-        { binding: 0, resource: this.densityTextureView! },
-        { binding: 1, resource: this.normalTextureView! },
-      ],
-    })
-    this.gradientPipeline = await device.createComputePipelineAsync({
-      label: 'gradient-grid-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [gradientBGL] }),
-      compute: {
-        module: gradientModule,
-        entryPoint: 'main',
-        constants: {
-          GRID_SIZE: this.gridSize,
-          HAS_LOG_DENSITY: hasLogDensity ? 1 : 0,
-          IS_DUAL_CHANNEL_GRID: isDualChannel ? 1 : 0,
-        } as Record<string, number>,
-      },
-    })
+    const gradient = await createGradientPipeline(
+      device,
+      this.densityTextureView!,
+      this.normalTextureView!,
+      this.densityTextureFormat,
+      this.gridSize
+    )
+    this.gradientPipeline = gradient.pipeline
+    this.gradientBindGroup = gradient.bindGroup
   }
 
   private async selectGridTextureFormat(device: GPUDevice): Promise<'r16float' | 'rgba16float'> {
