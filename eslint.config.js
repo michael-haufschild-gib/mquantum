@@ -92,7 +92,7 @@ const projectRulesPlugin = {
       },
       create(context) {
         const fp = normalizePath(context.filename)
-        if (!fp.endsWith('.tsx')) return {}
+        if (!fp.endsWith('.ts') && !fp.endsWith('.tsx')) return {}
         if (
           fp.endsWith('.wgsl.ts') ||
           fp.includes('.test.') ||
@@ -104,6 +104,20 @@ const projectRulesPlugin = {
           fp.includes('vitest.config') ||
           fp.includes('tailwind.config')
         ) {
+          return {}
+        }
+        // .ts files in rendering, stores, color/geometry/export libraries,
+        // test infrastructure, and canvas-based hooks define canonical defaults
+        // or operate below Tailwind.
+        if (fp.endsWith('.ts') && (
+          fp.includes('src/rendering/') ||
+          fp.includes('src/stores/') ||
+          fp.includes('src/tests/') ||
+          fp.includes('src/lib/colors/') ||
+          fp.includes('src/lib/geometry/') ||
+          fp.includes('src/lib/export/') ||
+          fp.includes('useDynamicFavicon')
+        )) {
           return {}
         }
 
@@ -644,10 +658,13 @@ export default [
       '@eslint-react/no-forward-ref': 'off',          // forwardRef is legitimate in this codebase
 
       // Disable rules that generate noise for legitimate patterns in this codebase
-      '@eslint-react/set-state-in-effect': 'off',         // syncing external data into state via effect is intentional
+      // set-state-in-effect: 10+ components sync external data (GPU state, subscriptions,
+      // browser APIs) into React state via effects — all conditionally guarded.
+      // With --max-warnings 0 in lint-staged, scoping to individual files would add
+      // noise without preventing real bugs; the pattern is pervasive and correct here.
+      '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/naming-convention/ref-name': 'off',  // cosmetic; large existing ref surface
       '@eslint-react/use-state': 'off',                   // setter naming convention is cosmetic
-      '@eslint-react/no-array-index-key': 'off',          // static render lists use index as the only stable key
 
       // JSDoc
       'jsdoc/require-jsdoc': [
@@ -663,6 +680,10 @@ export default [
           contexts: ['TSInterfaceDeclaration', 'TSTypeAliasDeclaration'],
         },
       ],
+      // require-param/returns/example: not enforced via lint. JSDoc presence is
+      // required (require-jsdoc: error); content quality is enforced via code review.
+      // Enabling these at 'error' would flag hundreds of existing functions;
+      // 'warn' is equivalent to 'error' under --max-warnings 0 in lint-staged.
       'jsdoc/require-param': 'off',
       'jsdoc/require-returns': 'off',
       'jsdoc/require-example': 'off',
@@ -829,41 +850,44 @@ export default [
   },
   // Import boundary: render passes must not import state stores directly.
   // Store reads go through the render graph's ctx.stores pattern (set up in useSceneStoreWiring).
-  // Allowed exceptions:
+  // Allowed via negation patterns:
   //   - Diagnostic stores (*DiagnosticsStore) — write-direction: passes push metrics to UI
-  //   - Type-only imports from store defaults — no runtime coupling
-  //   - TemporalDepthCapturePass.ts — reads performanceStore.temporalReprojectionEnabled
-  //     outside frame context (getTemporalUniforms is called by external consumers)
+  //   - simulationStateStore — TDSE compute pass manages simulation lifecycle
+  //   - performanceStore — TemporalDepthCapturePass reads temporal reprojection flag
+  //   - Store defaults — static config, no runtime coupling
+  //   - Type-only imports (allowTypeImports: true)
   {
     files: ['src/rendering/webgpu/passes/**/*.ts'],
     rules: {
       'no-restricted-imports': ['error', {
         patterns: [{
-          group: ['@/stores/*'],
+          group: [
+            '@/stores/*',
+            '!@/stores/defaults',
+            '!@/stores/defaults/*',
+            '!@/stores/*DiagnosticsStore',
+            '!@/stores/simulationStateStore',
+            '!@/stores/performanceStore',
+          ],
           allowTypeImports: true,
-          message: 'Render passes access stores via ctx.stores, not direct imports. Diagnostic stores (write-direction) and type-only imports are exempt.',
+          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, performanceStore, and defaults/* are exempt.',
         }],
       }],
     },
   },
-  // Exempt diagnostic stores and the one known performanceStore usage in passes
+  // Static render lists (ticks, swatches, menu items, energy diagrams, key bindings)
+  // use array index as key because items are never reordered, added, or removed.
+  // Components outside these dirs (canvas, controls, presets) keep the rule active
+  // to catch index-key bugs in dynamic lists.
   {
     files: [
-      'src/rendering/webgpu/passes/TDSEComputePass.ts',
-      'src/rendering/webgpu/passes/TDSEComputePassBuffers.ts',
-      'src/rendering/webgpu/passes/PauliComputePass.ts',
-      'src/rendering/webgpu/passes/PauliComputePassBuffers.ts',
-      'src/rendering/webgpu/passes/DiracComputePass.ts',
-      'src/rendering/webgpu/passes/DiracComputePassDispatchers.ts',
-      'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
-      'src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts',
-      'src/rendering/webgpu/passes/FreeScalarFieldKSpace.ts',
-      'src/rendering/webgpu/passes/DensityDistributionAnalysis.ts',
-      'src/rendering/webgpu/passes/TemporalDepthCapturePass.ts',
-      'src/rendering/webgpu/passes/BloomPass.ts',
+      'src/components/ui/**/*.tsx',
+      'src/components/layout/**/*.tsx',
+      'src/components/sections/**/*.tsx',
+      'src/components/overlays/**/*.tsx',
     ],
     rules: {
-      'no-restricted-imports': 'off',
+      '@eslint-react/no-array-index-key': 'off',
     },
   },
   // ─── E2E spec files: enforce stable selectors ────────────────────────────
@@ -890,8 +914,6 @@ export default [
       // E2E specs run in Node.js (Playwright) but contain browser code inside page.evaluate()
       'jsdoc/require-jsdoc': 'off',
       'no-console': 'off',
-      'project-rules/no-hardcoded-colors': 'off',
-      'project-rules/no-raw-html-controls': 'off',
       // E2E selector discipline
       'project-rules/no-flaky-click-selectors': 'error',
     },

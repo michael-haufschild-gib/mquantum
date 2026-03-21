@@ -5,7 +5,6 @@ import {
   type TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
-// eslint-disable-next-line no-restricted-imports -- diagnostic store write-direction access
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** Number of f32 values in diagnostic result buffer */

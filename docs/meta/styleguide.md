@@ -58,7 +58,7 @@ const { dimension } = useGeometryStore()
 
 ## JSDoc
 
-All exported components, hooks, and public APIs require JSDoc with `@param`, `@returns`, `@example`.
+All exported components, hooks, and public APIs require a JSDoc block (enforced by `jsdoc/require-jsdoc`). Include `@param` and `@returns` when they add clarity beyond what TypeScript types convey. `@example` is encouraged for non-obvious APIs.
 
 ## On-Demand References
 

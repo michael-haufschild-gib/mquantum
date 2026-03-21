@@ -1,7 +1,6 @@
 /** TDSE Observables — Resource Management, Dispatch & Readback */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-// eslint-disable-next-line no-restricted-imports -- diagnostic store write-direction access
 import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 
 import { DIAG_DECIMATION } from './computePassUtils'
