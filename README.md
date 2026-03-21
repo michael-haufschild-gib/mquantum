@@ -119,6 +119,19 @@ src/
   wasm/             # Rust/WASM bridge (animation math)
 ```
 
+## Physics Validation
+
+The quantum math implementations are validated by an extensive automated test suite:
+
+- **Hermite polynomials**: Orthogonality, recurrence relations, normalization for harmonic oscillator basis functions
+- **Hydrogen wavefunctions**: Quantum number constraints, radial node counts, angular momentum coupling
+- **Colormaps**: Phase-to-color mapping continuity, domain coloring accuracy
+- **Cross-store interactions**: Quantum mode transitions preserve physical constraints (e.g., `0 <= l < n`, `-l <= m <= l`)
+- **TDSE dynamics**: Energy conservation, probability normalization, potential evaluation
+- **BEC/Dirac/Pauli**: Mode-specific diagnostics and state evolution correctness
+
+Run `npx vitest run` to execute the full suite (2000+ tests).
+
 ## CI/CD
 
 GitHub Actions runs on every push/PR to `main`: format check, lint, type check, test, build. See `.github/workflows/ci.yml`.
