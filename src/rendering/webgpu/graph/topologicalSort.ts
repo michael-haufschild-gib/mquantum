@@ -93,11 +93,10 @@ export function computePassOrder(passes: Map<string, WebGPURenderPass>): string[
 
   if (sorted.length !== passes.size) {
     const remaining = [...passes.keys()].filter((id) => !sorted.includes(id))
-    remaining.sort(sortByPriority)
-    logger.error(
-      `WebGPURenderGraph: Cycle detected among passes (${remaining.join(', ')}); appending remaining passes by priority`
+    throw new Error(
+      `WebGPURenderGraph: Dependency cycle detected among passes: [${remaining.join(', ')}]. ` +
+        `Sorted ${sorted.length} of ${passes.size} passes before cycle.`
     )
-    sorted.push(...remaining)
   }
 
   return sorted

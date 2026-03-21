@@ -8,6 +8,7 @@ type BufferTarget = InstanceType<MediaBunnySubset['BufferTarget']>
 type StreamTarget = InstanceType<MediaBunnySubset['StreamTarget']>
 type CanvasSource = InstanceType<MediaBunnySubset['CanvasSource']>
 
+import { logger } from '@/lib/logger'
 import { CropSettings, TextOverlaySettings, VideoCodec } from '@/stores/exportStore'
 
 let _mediabunny: MediaBunnySubset | null = null
@@ -443,8 +444,9 @@ export class VideoRecorder {
       if (this.writableStream) {
         try {
           await this.writableStream.close()
-        } catch {
-          // Stream may already be closed by mediabunny - that's fine
+        } catch (err) {
+          // Stream may already be closed by mediabunny — log for debugging
+          logger.warn('[VideoRecorder] writable stream close failed during finalize:', err)
         }
       }
       return null
@@ -484,7 +486,11 @@ export class VideoRecorder {
     this.compositionCtx = null
     // Best-effort close of writable stream (streaming mode)
     if (this.writableStream) {
-      void this.writableStream.close().catch(() => {})
+      void this.writableStream
+        .close()
+        .catch((err) =>
+          logger.warn('[VideoRecorder] writable stream close failed during dispose:', err)
+        )
       this.writableStream = null
     }
   }

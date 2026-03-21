@@ -190,7 +190,7 @@ export class FXAAPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.pipeline as GPURenderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.pipeline!, [bindGroup])
     passEncoder.end()
   }
 

@@ -34,7 +34,7 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
   readonly config: WebGPURenderPassConfig
 
   protected device: GPUDevice | null = null
-  protected pipeline: GPURenderPipeline | GPUComputePipeline | null = null
+  protected pipeline: GPURenderPipeline | null = null
   protected bindGroupLayout: GPUBindGroupLayout | null = null
   protected pipelineLayout: GPUPipelineLayout | null = null
 
@@ -460,6 +460,14 @@ export abstract class WebGPUBaseComputePass extends WebGPUBasePass {
         entryPoint: 'main',
       },
     })
+  }
+
+  /**
+   * Cleanup GPU resources including the compute pipeline.
+   */
+  dispose(): void {
+    this.computePipeline = null
+    super.dispose()
   }
 
   /**

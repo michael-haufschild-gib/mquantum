@@ -38,12 +38,13 @@ const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
  * @returns Merged object with all default keys present
  */
 function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
-  // If loaded is null/undefined/not-object, return copy of defaults
-  if (!loaded || typeof loaded !== 'object') {
+  // If loaded is null/undefined/not-object/array, return copy of defaults
+  if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) {
     return { ...defaults }
   }
 
   const result = { ...defaults } as T
+  // After the guard above, loaded is a non-null, non-array object
   const loadedObj = loaded as Record<string, unknown>
 
   for (const key of Object.keys(loadedObj)) {
