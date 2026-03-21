@@ -219,6 +219,11 @@ export interface SchroedingerSliceActions {
   setSchroedingerWignerClassicalOverlay: (enabled: boolean) => void
   setSchroedingerWignerCacheResolution: (resolution: number) => void
 
+  // Classical-Quantum Correspondence Overlay
+  setSchroedingerClassicalOverlayEnabled: (enabled: boolean) => void
+  setSchroedingerClassicalOverlayTrailFraction: (fraction: number) => void
+  setSchroedingerClassicalOverlayColor: (color: string) => void
+
   // Second Quantization Educational Layer
   setSchroedingerSqLayerEnabled: (enabled: boolean) => void
   setSchroedingerSqLayerMode: (mode: SecondQuantizationMode) => void
@@ -327,6 +332,9 @@ export interface SchroedingerSliceActions {
   setTdseAutoLoop: (autoLoop: boolean) => void
   setTdseDiagnosticsEnabled: (enabled: boolean) => void
   setTdseDiagnosticsInterval: (interval: number) => void
+  setTdseObservablesEnabled: (enabled: boolean) => void
+  setTdseImaginaryTimeEnabled: (enabled: boolean) => void
+  setTdseCustomPotentialExpression: (expression: string) => void
   setTdseSlicePosition: (dimIndex: number, value: number) => void
   applyTdsePreset: (presetId: string) => void
   resetTdseField: () => void
@@ -393,6 +401,9 @@ export interface SchroedingerSliceActions {
   clearDiracNeedsReset: () => void
   setDiracSlicePosition: (dimIndex: number, value: number) => void
   applyDiracPreset: (presetId: string) => void
+
+  // Quantum Walk
+  clearQuantumWalkNeedsReset: () => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void

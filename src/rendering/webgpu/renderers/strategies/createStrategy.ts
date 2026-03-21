@@ -9,6 +9,7 @@ import { AnalyticModeStrategy } from './AnalyticModeStrategy'
 import { DiracStrategy } from './DiracStrategy'
 import { FreeScalarFieldStrategy } from './FreeScalarFieldStrategy'
 import { PauliStrategy } from './PauliStrategy'
+import { QuantumWalkStrategy } from './QuantumWalkStrategy'
 import { TdseBecStrategy } from './TdseBecStrategy'
 import type { QuantumModeStrategy } from './types'
 
@@ -32,6 +33,8 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
       return new TdseBecStrategy()
     case 'diracEquation':
       return new DiracStrategy()
+    case 'quantumWalk':
+      return new QuantumWalkStrategy()
     case 'harmonicOscillator':
     case 'hydrogenND':
     default:

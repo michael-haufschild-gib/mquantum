@@ -7,6 +7,7 @@
  * @module rendering/webgpu/renderers/schrodingerRendererTypes
  */
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum'
 import type { AnimationState } from '@/stores/animationStore'
@@ -16,7 +17,6 @@ import type { RotationState } from '@/stores/rotationStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import type { WebGPURenderContext } from '../core/types'
-import type { QuantumModeForShader } from '../shaders/schroedinger/compose'
 import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
 import type { packLightingUniforms } from '../utils/lighting'
 
@@ -181,6 +181,7 @@ export interface ExtendedStoreSnapshot {
   clearTdseNeedsReset?: () => void
   clearBecNeedsReset?: () => void
   clearDiracNeedsReset?: () => void
+  clearQuantumWalkNeedsReset?: () => void
   pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
   pauliSpinorVersion?: number
   clearPauliNeedsReset?: () => void
@@ -214,12 +215,7 @@ export type { AnimationState, AppearanceStoreState, GeometryState, PBRSliceState
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
-  quantumMode?:
-    | QuantumModeForShader
-    | 'freeScalarField'
-    | 'tdseDynamics'
-    | 'becDynamics'
-    | 'diracEquation'
+  quantumMode?: SchroedingerQuantumMode
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm

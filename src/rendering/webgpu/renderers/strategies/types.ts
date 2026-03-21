@@ -68,6 +68,13 @@ export interface SchroedingerSnapshot {
     pmlTargetReflection?: number
     [key: string]: unknown
   }
+  quantumWalk?: {
+    latticeDim?: number
+    gridSize?: number[]
+    spacing?: number[]
+    needsReset?: boolean
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number

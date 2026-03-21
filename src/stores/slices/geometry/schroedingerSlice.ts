@@ -348,6 +348,16 @@ export const createSchroedingerSlice: StateCreator<
     ...createDiracSetters(ctx),
     ...createOpenQuantumSetters(ctx),
 
+    // === Quantum Walk ===
+    clearQuantumWalkNeedsReset: () => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumWalk: { ...state.schroedinger.quantumWalk, needsReset: false },
+        },
+      }))
+    },
+
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => ({
