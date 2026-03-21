@@ -22,11 +22,21 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
     return (
       <Section title="Geometry" defaultOpen={defaultOpen} data-testid="geometry-section">
         <div className="space-y-1">
-          <ControlGroup title="Dimensions" collapsible defaultOpen>
+          <ControlGroup
+            title="Dimensions"
+            collapsible
+            defaultOpen
+            data-testid="control-group-dimensions"
+          >
             <DimensionSelector />
           </ControlGroup>
 
-          <ControlGroup title="Object Type" collapsible defaultOpen>
+          <ControlGroup
+            title="Object Type"
+            collapsible
+            defaultOpen
+            data-testid="control-group-object-type"
+          >
             <ObjectTypeSelector />
           </ControlGroup>
 

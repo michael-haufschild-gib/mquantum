@@ -15,6 +15,8 @@ interface InputModalProps {
   cancelText?: string
   allowEmpty?: boolean
   readOnly?: boolean
+  /** Prefix for data-testid attributes (e.g. "save-scene" → "save-scene-input", "save-scene-confirm") */
+  'data-testid'?: string
 }
 
 export const InputModal: React.FC<InputModalProps> = React.memo(
@@ -30,6 +32,7 @@ export const InputModal: React.FC<InputModalProps> = React.memo(
     cancelText = 'Cancel',
     allowEmpty = false,
     readOnly = false,
+    'data-testid': testId = 'input-modal',
   }) => {
     const [value, setValue] = useState(initialValue)
     const inputRef = React.useRef<HTMLInputElement>(null)
@@ -97,10 +100,11 @@ export const InputModal: React.FC<InputModalProps> = React.memo(
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               readOnly={readOnly}
+              data-testid={`${testId}-input`}
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={onClose} size="sm">
+            <Button variant="ghost" onClick={onClose} size="sm" data-testid={`${testId}-cancel`}>
               {cancelText}
             </Button>
             <Button
@@ -108,6 +112,7 @@ export const InputModal: React.FC<InputModalProps> = React.memo(
               onClick={handleConfirm}
               size="sm"
               disabled={!allowEmpty && !value.trim()}
+              data-testid={`${testId}-confirm`}
             >
               {confirmText}
             </Button>

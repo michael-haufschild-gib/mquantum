@@ -11,8 +11,8 @@ import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
-/** TDSEUniforms struct size in bytes (704 = 636 + 48 trapAnisotropy + 16 radialWell + 4 pad) */
-const UNIFORM_SIZE = 704
+/** TDSEUniforms struct size in bytes (708 = 636 + 48 trapAnisotropy + 16 radialWell + 4 imagTime + 4 customScale) */
+const UNIFORM_SIZE = 708
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */
@@ -118,12 +118,12 @@ export function rebuildTdseBuffers(
   const psiReBuffer = device.createBuffer({
     label: 'tdse-psiRe',
     size: siteBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   const psiImBuffer = device.createBuffer({
     label: 'tdse-psiIm',
     size: siteBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   const potentialBuffer = device.createBuffer({
     label: 'tdse-potential',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { renormalizeBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/renormalize.wgsl'
 import { tdseApplyKineticBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdseApplyPotentialHalfBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import {
@@ -45,6 +46,7 @@ describe('TDSE uniform struct', () => {
     expect(tdseUniformsBlock).toContain('barrierWidth')
     expect(tdseUniformsBlock).toContain('wellDepth')
     expect(tdseUniformsBlock).toContain('harmonicOmega')
+    expect(tdseUniformsBlock).toContain('customPotentialScale')
   })
 })
 
@@ -160,6 +162,11 @@ describe('TDSE write grid shader', () => {
     expect(tdseWriteGridBlock).toContain('basisY')
     expect(tdseWriteGridBlock).toContain('basisZ')
   })
+
+  it('handles custom potential type (11) in getPotentialScale', () => {
+    expect(tdseWriteGridBlock).toContain('potentialType == 11u')
+    expect(tdseWriteGridBlock).toContain('customPotentialScale')
+  })
 })
 
 describe('TDSE complex pack/unpack shaders', () => {
@@ -206,5 +213,98 @@ describe('TDSE diagnostics shaders', () => {
   it('finalize pass computes final norm and maxDensity', () => {
     expect(tdseDiagNormFinalizeBlock).toContain('result[0]')
     expect(tdseDiagNormFinalizeBlock).toContain('result[1]')
+  })
+})
+
+// ── Imaginary-Time Propagation (Wick Rotation) ──────────────────────────────
+
+describe('imaginary-time: uniform struct', () => {
+  it('declares imaginaryTime field as u32', () => {
+    expect(tdseUniformsBlock).toContain('imaginaryTime: u32')
+  })
+
+  it('places imaginaryTime at offset 700 (after radialWellTilt)', () => {
+    // imaginaryTime must be the last field to maintain struct layout compatibility
+    const lines = tdseUniformsBlock.split('\n')
+    const radialTiltIdx = lines.findIndex((l) => l.includes('radialWellTilt'))
+    const itIdx = lines.findIndex((l) => l.includes('imaginaryTime'))
+    expect(radialTiltIdx).toBeGreaterThan(-1)
+    expect(itIdx).toBeGreaterThan(radialTiltIdx)
+  })
+})
+
+describe('imaginary-time: potential half-step', () => {
+  it('branches on imaginaryTime flag', () => {
+    expect(tdseApplyPotentialHalfBlock).toContain('params.imaginaryTime')
+  })
+
+  it('applies real exponential decay in imaginary-time mode', () => {
+    expect(tdseApplyPotentialHalfBlock).toContain('exp(-arg)')
+  })
+
+  it('applies unitary phase rotation in real-time mode', () => {
+    expect(tdseApplyPotentialHalfBlock).toContain('cos(phase)')
+    expect(tdseApplyPotentialHalfBlock).toContain('sin(phase)')
+  })
+
+  it('uses V*dt/(2*hbar) as the argument for both branches', () => {
+    // Both branches compute arg from potential and dt, differing only in exp(-arg) vs exp(-i*arg)
+    expect(tdseApplyPotentialHalfBlock).toContain('effectiveV * params.dt / (2.0')
+  })
+
+  it('includes GPE nonlinear term in effective potential', () => {
+    expect(tdseApplyPotentialHalfBlock).toContain('interactionStrength')
+    expect(tdseApplyPotentialHalfBlock).toContain('density')
+  })
+})
+
+describe('imaginary-time: kinetic step', () => {
+  it('branches on imaginaryTime flag', () => {
+    expect(tdseApplyKineticBlock).toContain('params.imaginaryTime')
+  })
+
+  it('applies real exponential decay in imaginary-time mode', () => {
+    expect(tdseApplyKineticBlock).toContain('exp(-arg)')
+  })
+
+  it('applies unitary phase rotation in real-time mode', () => {
+    expect(tdseApplyKineticBlock).toContain('cosP')
+    expect(tdseApplyKineticBlock).toContain('sinP')
+  })
+
+  it('uses hbar*k2*dt/(2*mass) as the argument for both branches', () => {
+    expect(tdseApplyKineticBlock).toContain('params.hbar * k2 * params.dt / (2.0')
+  })
+})
+
+describe('renormalization shader', () => {
+  it('declares RenormUniforms struct', () => {
+    expect(renormalizeBlock).toContain('struct RenormUniforms')
+    expect(renormalizeBlock).toContain('totalElements: u32')
+    expect(renormalizeBlock).toContain('targetNorm: f32')
+  })
+
+  it('reads currentNorm from diagResult[0]', () => {
+    expect(renormalizeBlock).toContain('diagResult[0]')
+  })
+
+  it('computes sqrt(target/current) scale factor', () => {
+    expect(renormalizeBlock).toContain('sqrt(targetNorm / currentNorm)')
+  })
+
+  it('guards against invalid norms (zero, negative, NaN)', () => {
+    // NaN check: currentNorm != currentNorm
+    expect(renormalizeBlock).toContain('currentNorm != currentNorm')
+    expect(renormalizeBlock).toContain('currentNorm <= 0.0')
+    expect(renormalizeBlock).toContain('targetNorm <= 0.0')
+  })
+
+  it('scales both real and imaginary components', () => {
+    expect(renormalizeBlock).toContain('psiRe[idx] = psiRe[idx] * scale')
+    expect(renormalizeBlock).toContain('psiIm[idx] = psiIm[idx] * scale')
+  })
+
+  it('has workgroup size 64', () => {
+    expect(renormalizeBlock).toContain('@compute @workgroup_size(64)')
   })
 })

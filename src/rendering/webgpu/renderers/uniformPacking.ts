@@ -18,6 +18,9 @@ import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { zeroReservedFields } from '../utils/structLayout'
+import { packClassicalOverlay } from './uniformPackingClassical'
+
+export { projectNDToModelSpace } from './uniformPackingClassical'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
   CROSS_SECTION_SCALAR_MAP,
@@ -56,6 +59,18 @@ export interface FlattenedPreset {
   energy: Float32Array
 }
 
+/** Observables position history for TDSE/BEC Ehrenfest trail. */
+export interface ObservablesTrailData {
+  /** Per-dimension ⟨x_i⟩(t) ring buffer */
+  historyPositionMean: Float64Array[]
+  /** Current write head */
+  historyHead: number
+  /** Number of valid entries */
+  historyCount: number
+  /** Number of active dimensions */
+  activeDims: number
+}
+
 /** All values needed to pack the Schroedinger uniform buffer. */
 export interface SchroedingerPackParams {
   // Mode classification
@@ -92,6 +107,9 @@ export interface SchroedingerPackParams {
   rendererOpenQuantumEnabled: boolean
   rendererQuantumMode: string
   rendererTermCount: number | undefined
+
+  // A3 observables position history for TDSE/BEC Ehrenfest trail
+  observablesTrailData: ObservablesTrailData | null
 }
 
 /**
@@ -250,80 +268,8 @@ function packVisualFields(
   floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
   floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
 
-  // Classical-quantum correspondence overlay
-  const classicalEnabled = schroedinger?.classicalOverlayEnabled ?? false
-  intView[I.classicalOverlayEnabled] = classicalEnabled ? 1 : 0
-  floatView[I.classicalOverlayTrailFraction] = schroedinger?.classicalOverlayTrailFraction ?? 0.15
-  const trailColor = parseColor(schroedinger?.classicalOverlayColor ?? '#fff2cc')
-  floatView[I.classicalOverlayColor] = trailColor[0]
-  floatView[I.classicalOverlayColor + 1] = trailColor[1]
-  floatView[I.classicalOverlayColor + 2] = trailColor[2]
-
-  // CPU-precomputed classical trail points
-  intView[I.classicalTrailCount] = 0
-  if (
-    classicalEnabled &&
-    p.quantumModeStr === 'harmonicOscillator' &&
-    p.dimension <= 3 &&
-    p.presetData
-  ) {
-    packClassicalTrailPoints(floatView, intView, p, schroedinger)
-  }
-}
-
-/** Compute and pack classical Ehrenfest trail points into uniform buffer. */
-function packClassicalTrailPoints(
-  floatView: Float32Array,
-  intView: Int32Array,
-  p: SchroedingerPackParams,
-  schroedinger: SchroedingerPackParams['schroedinger']
-): void {
-  const TRAIL_POINTS = 6
-  const fieldScale = schroedinger?.fieldScale ?? 1.0
-  const invFS = 1.0 / Math.max(fieldScale, 0.01)
-  const animTime = p.animationTime * (schroedinger?.timeScale ?? 0.8)
-  const dim = Math.min(p.dimension, 3)
-  const preset = p.presetData!
-  const tc = p.presetTermCount
-  const trailFrac = schroedinger?.classicalOverlayTrailFraction ?? 0.15
-
-  // Precompute per-dimension amplitudes and omegas
-  const amps: number[] = []
-  const omegas: number[] = []
-  let minOmega = 100.0
-  for (let d = 0; d < dim; d++) {
-    const omega = preset.omega[d] ?? 1.0
-    omegas.push(omega)
-    minOmega = Math.min(minOmega, Math.max(omega, 0.01))
-    let avgNHalf = 0
-    let totalW = 0
-    for (let k = 0; k < tc; k++) {
-      const re = preset.coeff[k * 2] ?? 0
-      const im = preset.coeff[k * 2 + 1] ?? 0
-      const w = re * re + im * im
-      const n = preset.quantum[k * MAX_DIM + d] ?? 0
-      avgNHalf += w * (n + 0.5)
-      totalW += w
-    }
-    if (totalW > 0) avgNHalf /= totalW
-    amps.push(Math.sqrt(Math.max((2.0 * avgNHalf) / Math.max(omega, 0.01), 0)) * invFS)
-  }
-
-  // Compute trail points spaced over trailFrac of the Lissajous period
-  const fullPeriod = (2 * Math.PI) / minOmega
-  const trailDuration = fullPeriod * trailFrac
-  const dt = trailDuration / (TRAIL_POINTS - 1)
-
-  intView[I.classicalTrailCount] = TRAIL_POINTS
-  for (let i = 0; i < TRAIL_POINTS; i++) {
-    const t = animTime - i * dt
-    const fade = 1.0 - i / (TRAIL_POINTS - 1)
-    const base = I.classicalTrail + i * 4
-    for (let d = 0; d < 3; d++) {
-      floatView[base + d] = d < dim ? amps[d]! * Math.cos(omegas[d]! * t) : 0
-    }
-    floatView[base + 3] = fade
-  }
+  // Classical-quantum correspondence overlay (delegated to extracted module)
+  packClassicalOverlay(floatView, intView, p, parseColor)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */

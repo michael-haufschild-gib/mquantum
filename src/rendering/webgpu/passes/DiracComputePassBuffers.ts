@@ -73,12 +73,12 @@ export function rebuildDiracBuffers(
   const spinorReBuffer = device.createBuffer({
     label: 'dirac-spinorRe',
     size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   const spinorImBuffer = device.createBuffer({
     label: 'dirac-spinorIm',
     size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
 
   // Potential buffer (scalar, one per site)

@@ -223,6 +223,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerClassicalOverlayEnabled: (enabled: boolean) => void
   setSchroedingerClassicalOverlayTrailFraction: (fraction: number) => void
   setSchroedingerClassicalOverlayColor: (color: string) => void
+  setSchroedingerClassicalOverlayHbar: (hbar: number) => void
 
   // Second Quantization Educational Layer
   setSchroedingerSqLayerEnabled: (enabled: boolean) => void

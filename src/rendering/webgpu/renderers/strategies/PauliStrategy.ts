@@ -5,6 +5,7 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { PauliComputePass } from '../../passes/PauliComputePass'
@@ -138,6 +139,22 @@ export class PauliStrategy implements QuantumModeStrategy {
 
     if (pauliConfig.needsReset) {
       extended?.clearPauliNeedsReset?.()
+    }
+
+    // Simulation state save/load
+    const simState = useSimulationStateStore.getState()
+    if (simState.saveRequested) {
+      simState.clearSaveRequest()
+      pauliPass.requestStateSave(ctx)
+    }
+    if (simState.pendingLoadData) {
+      const loadData = simState.pendingLoadData
+      // Pauli states are saved with quantumMode = 'tdseDynamics' (shared pipeline)
+      // but they should also check for explicit pauli config in the data
+      if (loadData.config && 'pauli' in loadData.config) {
+        pauliPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+        simState.clearLoadData()
+      }
     }
   }
 

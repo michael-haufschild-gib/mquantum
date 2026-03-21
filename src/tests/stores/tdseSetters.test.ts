@@ -46,6 +46,7 @@ describe('TDSE dynamics setters', () => {
 
   it('sets potential type', () => {
     const s = useExtendedObjectStore.getState()
+    // @ts-expect-error intentional invalid input
     s.setTdsePotentialType('harmonic')
     expect(getTdse().potentialType).toBe('harmonic')
     s.setTdsePotentialType('barrier')
@@ -104,6 +105,7 @@ describe('TDSE dynamics setters', () => {
 
   it('sets initial condition type', () => {
     const s = useExtendedObjectStore.getState()
+    // @ts-expect-error intentional invalid input
     s.setTdseInitialCondition('gaussian')
     expect(getTdse().initialCondition).toBe('gaussian')
   })

@@ -94,12 +94,12 @@ export function rebuildPauliBuffers(
   const spinorReBuffer = device.createBuffer({
     label: 'pauli-spinor-re',
     size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
   const spinorImBuffer = device.createBuffer({
     label: 'pauli-spinor-im',
     size: spinorBytes,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
   })
 
   // FFT scratch (interleaved complex: 2 floats per site)

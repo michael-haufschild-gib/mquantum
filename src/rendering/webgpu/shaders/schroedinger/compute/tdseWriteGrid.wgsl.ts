@@ -54,6 +54,9 @@ fn getPotentialScale() -> f32 {
     let halfDr = (params.radialWellOuter - params.radialWellInner) * 0.5;
     let h4 = halfDr * halfDr * halfDr * halfDr;
     return max(params.radialWellDepth * h4, 1.0);
+  } else if (params.potentialType == 11u) {
+    // Custom expression: max|V| computed JS-side and passed via uniform
+    return max(params.customPotentialScale, 1.0);
   }
   return 1.0;
 }

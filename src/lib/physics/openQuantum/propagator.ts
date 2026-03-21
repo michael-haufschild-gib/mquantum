@@ -13,7 +13,7 @@
 
 import type { ComplexMatrix } from './complexMatrix'
 import { complexMatScale, complexMatZero, matrixExponentialPade } from './complexMatrix'
-import { eigenvalueFloor, MAX_K } from './integrator'
+import { eigenvalueFloor, hermitianize, MAX_K, traceNormalize } from './integrator'
 import type { DensityMatrix } from './types'
 
 // Pre-allocated scratch arrays for applyPropagator (avoids per-frame allocation)
@@ -112,40 +112,8 @@ export function applyPropagator(propagator: ComplexMatrix, rho: DensityMatrix): 
 export function evolvePropagatorStep(propagator: ComplexMatrix, rho: DensityMatrix): void {
   applyPropagator(propagator, rho)
 
-  // Physicality guards (same as split-step integrator)
-  const K = rho.K
-  const el = rho.elements
-
-  // Hermitianize
-  for (let k = 0; k < K; k++) {
-    el[2 * (k * K + k) + 1] = 0
-    for (let l = k + 1; l < K; l++) {
-      const idxKL = 2 * (k * K + l)
-      const idxLK = 2 * (l * K + k)
-      const avgRe = 0.5 * (el[idxKL]! + el[idxLK]!)
-      const avgIm = 0.5 * (el[idxKL + 1]! - el[idxLK + 1]!)
-      el[idxKL] = avgRe
-      el[idxKL + 1] = avgIm
-      el[idxLK] = avgRe
-      el[idxLK + 1] = -avgIm
-    }
-  }
-
-  // Trace normalize
-  let trace = 0
-  for (let k = 0; k < K; k++) {
-    trace += el[2 * (k * K + k)]!
-  }
-  if (trace > 1e-15) {
-    const invTrace = 1 / trace
-    const size = K * K * 2
-    for (let i = 0; i < size; i++) {
-      el[i] = el[i]! * invTrace
-    }
-  }
-
-  // Eigenvalue floor: clamp negative eigenvalues to ε and reconstruct.
-  // A Hermitian matrix can have non-negative diagonals yet negative eigenvalues,
-  // so a diagonal-only proxy is insufficient. This matches evolveStep behavior.
+  // Physicality guards (shared with split-step integrator)
+  hermitianize(rho)
+  traceNormalize(rho)
   eigenvalueFloor(rho)
 }

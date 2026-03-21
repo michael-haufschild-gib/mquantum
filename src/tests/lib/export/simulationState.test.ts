@@ -1,0 +1,214 @@
+/**
+ * Unit tests for simulation state serialization (.mqstate format).
+ *
+ * Verifies:
+ * - Round-trip serialize → deserialize preserves data
+ * - Header magic and version validation
+ * - Multi-component wavefunction support (Dirac spinors)
+ * - Grid size encoding/decoding
+ * - Config JSON round-trip
+ * - Error handling for invalid files
+ *
+ * Note: happy-dom's Blob implementation has issues with ArrayBuffer parts,
+ * so we extract raw bytes via the response() trick instead of blob.arrayBuffer().
+ */
+
+import { describe, expect, it } from 'vitest'
+
+import { deserializeSimulationState, serializeSimulationState } from '@/lib/export/simulationState'
+
+/**
+ * Convert a Blob to ArrayBuffer reliably in happy-dom.
+ * happy-dom's Blob.arrayBuffer() incorrectly stringifies ArrayBuffer parts;
+ * reading via Response works correctly in all environments.
+ */
+async function blobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  return new Response(blob).arrayBuffer()
+}
+
+describe('simulationState serialization', () => {
+  const makeWavefunction = (totalSites: number, componentCount: number) => {
+    const n = totalSites * componentCount
+    const re = new Float32Array(n)
+    const im = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      re[i] = Math.sin(i * 0.1)
+      im[i] = Math.cos(i * 0.1)
+    }
+    return { re, im, totalSites, componentCount }
+  }
+
+  it('round-trips TDSE state (single component, 1D)', async () => {
+    const gridSize = [64]
+    const totalSites = 64
+    const wf = makeWavefunction(totalSites, 1)
+    const config = {
+      quantumMode: 'tdseDynamics',
+      tdse: { dt: 0.001, mass: 1.0, hbar: 1.0, latticeDim: 1, gridSize: [64] },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('tdseDynamics')
+    expect(result.latticeDim).toBe(1)
+    expect(result.gridSize).toEqual([64])
+    expect(result.totalSites).toBe(64)
+    expect(result.componentCount).toBe(1)
+    expect(result.config).toEqual(config)
+
+    // Verify wavefunction data matches within floating point tolerance
+    for (let i = 0; i < totalSites; i++) {
+      expect(result.psiRe[i]).toBeCloseTo(wf.re[i]!, 5)
+      expect(result.psiIm[i]).toBeCloseTo(wf.im[i]!, 5)
+    }
+  })
+
+  it('round-trips Dirac state (multi-component, 3D)', async () => {
+    const gridSize = [8, 8, 8]
+    const totalSites = 512
+    const componentCount = 4 // 2^ceil(3/2) = 4 for 3D Dirac
+    const wf = makeWavefunction(totalSites, componentCount)
+    const config = {
+      quantumMode: 'diracEquation',
+      dirac: { mass: 1.0, latticeDim: 3, gridSize: [8, 8, 8] },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'diracEquation', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('diracEquation')
+    expect(result.latticeDim).toBe(3)
+    expect(result.gridSize).toEqual([8, 8, 8])
+    expect(result.totalSites).toBe(512)
+    expect(result.componentCount).toBe(4)
+
+    const totalElements = totalSites * componentCount
+    for (let i = 0; i < totalElements; i++) {
+      expect(result.psiRe[i]).toBeCloseTo(wf.re[i]!, 5)
+      expect(result.psiIm[i]).toBeCloseTo(wf.im[i]!, 5)
+    }
+  })
+
+  it('round-trips BEC state (single component, 2D)', async () => {
+    const gridSize = [32, 32]
+    const totalSites = 1024
+    const wf = makeWavefunction(totalSites, 1)
+    const config = {
+      quantumMode: 'becDynamics',
+      bec: { interactionStrength: 10.0, trapOmega: 1.0 },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'becDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('becDynamics')
+    expect(result.latticeDim).toBe(2)
+    expect(result.gridSize).toEqual([32, 32])
+    expect(result.totalSites).toBe(1024)
+  })
+
+  it('round-trips FSF state', async () => {
+    const gridSize = [16, 16]
+    const totalSites = 256
+    const wf = makeWavefunction(totalSites, 1)
+    const config = {
+      quantumMode: 'freeScalarField',
+      freeScalar: { mass: 0.5, latticeDim: 2 },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'freeScalarField', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('freeScalarField')
+    expect(result.config).toEqual(config)
+  })
+
+  it('rejects invalid magic bytes', async () => {
+    const data = new ArrayBuffer(128)
+    const u8 = new Uint8Array(data)
+    u8[0] = 'B'.charCodeAt(0)
+    u8[1] = 'A'.charCodeAt(0)
+    u8[2] = 'D'.charCodeAt(0)
+    u8[3] = '!'.charCodeAt(0)
+
+    await expect(deserializeSimulationState(data)).rejects.toThrow('bad magic')
+  })
+
+  it('rejects unsupported version', async () => {
+    const data = new ArrayBuffer(128)
+    const u8 = new Uint8Array(data)
+    const view = new DataView(data)
+    u8[0] = 'M'.charCodeAt(0)
+    u8[1] = 'Q'.charCodeAt(0)
+    u8[2] = 'S'.charCodeAt(0)
+    u8[3] = 'T'.charCodeAt(0)
+    view.setUint32(4, 999, true) // version 999
+
+    await expect(deserializeSimulationState(data)).rejects.toThrow('Unsupported .mqstate version')
+  })
+
+  it('preserves config with nested objects', async () => {
+    const gridSize = [32]
+    const totalSites = 32
+    const wf = makeWavefunction(totalSites, 1)
+    const config = {
+      quantumMode: 'tdseDynamics',
+      tdse: {
+        dt: 0.001,
+        mass: 1.0,
+        hbar: 1.0,
+        potentialType: 'harmonic',
+        potentialParams: { omega: 1.0 },
+        packetCenter: [0.0],
+        packetMomentum: [2.0],
+      },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.config).toEqual(config)
+  })
+
+  it('handles all quantum mode indices correctly', async () => {
+    const modes = [
+      'harmonicOscillator',
+      'hydrogenND',
+      'freeScalarField',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'quantumWalk',
+    ] as const
+
+    for (const mode of modes) {
+      const wf = makeWavefunction(4, 1)
+      const config = { quantumMode: mode }
+      const blob = await serializeSimulationState(config, wf, mode, [4])
+      const data = await blobToArrayBuffer(blob)
+      const result = await deserializeSimulationState(data)
+      expect(result.quantumMode).toBe(mode)
+    }
+  })
+
+  it('handles high-dimensional grid sizes (up to 11D)', async () => {
+    const gridSize = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] // 11D
+    const totalSites = Math.pow(2, 11) // 2048
+    const wf = makeWavefunction(totalSites, 1)
+    const config = { quantumMode: 'tdseDynamics' }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.latticeDim).toBe(11)
+    expect(result.gridSize).toEqual(gridSize)
+    expect(result.totalSites).toBe(totalSites)
+  })
+})

@@ -15,6 +15,8 @@ export interface ControlGroupProps {
   variant?: 'default' | 'card'
   /** Tooltip text shown on hover over the title */
   tooltip?: string
+  /** Stable test ID for the collapsible header button. Required when collapsible. */
+  'data-testid'?: string
 }
 
 export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
@@ -27,6 +29,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
     rightElement,
     variant = 'default',
     tooltip,
+    'data-testid': testId,
   }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -67,6 +70,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
       ${isCard ? 'border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-hover)] overflow-hidden' : 'border-b border-[var(--border-subtle)] pb-2 last:border-0'}
       ${className}
     `}
+        data-testid={testId}
       >
         {showTitleSection && (
           <div
@@ -76,6 +80,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
             aria-label={
               collapsible ? `${title} section, ${isOpen ? 'expanded' : 'collapsed'}` : undefined
             }
+            data-testid={collapsible ? `${testId}-header` : undefined}
             className={`
             flex items-center justify-between py-1.5
             ${isCard ? 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]' : ''}

@@ -93,6 +93,15 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
       .then(async (data) => {
         const { deserializeSimulationState } = await import('@/lib/export/simulationState')
         const result = await deserializeSimulationState(data)
+
+        // Apply config immediately so mode/grid changes trigger pipeline rebuild
+        // before the strategy checks pendingLoadData for wavefunction injection.
+        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
+        useExtendedObjectStore.getState().setSchroedingerConfig({
+          quantumMode: result.quantumMode,
+          ...(result.config as Record<string, unknown>),
+        })
+
         set({
           pendingLoadData: {
             quantumMode: result.quantumMode,

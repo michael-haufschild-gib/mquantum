@@ -11,8 +11,12 @@
 import { logger } from '@/lib/logger'
 import type { ObservablesSnapshot } from '@/stores/observablesDiagnosticsStore'
 
-/** Maximum observable channels: 1 norm + 2 * 11 dims = 23 */
-const MAX_CHANNELS = 23
+/**
+ * Maximum observable channels: 1 norm + 2 * 11 dims + 1 potential = 24
+ * Position layout: [norm, x0_mean, x0_sq, ..., xD_mean, xD_sq, potentialEnergy]
+ * Momentum layout: [knorm, k0_mean, k0_sq, ..., kD_mean, kD_sq]
+ */
+export const MAX_OBS_CHANNELS = 24
 
 /** GPU resources for observable reduction passes. */
 export interface ObservablesResources {
@@ -25,7 +29,10 @@ export interface ObservablesResources {
   momResultBuffer: GPUBuffer
   momStagingBuffer: GPUBuffer
   numWorkgroups: number
-  numChannels: number
+  /** Position channels: 2 + 2 * latticeDim (includes ⟨V⟩) */
+  posNumChannels: number
+  /** Momentum channels: 1 + 2 * latticeDim */
+  momNumChannels: number
 }
 
 /**
@@ -41,12 +48,14 @@ export function createObservablesBuffers(
   totalSites: number,
   latticeDim: number
 ): ObservablesResources {
-  const numChannels = 1 + 2 * latticeDim
+  const posNumChannels = 2 + 2 * latticeDim
+  const momNumChannels = 1 + 2 * latticeDim
   const wgCount = Math.max(1, Math.ceil(totalSites / 256))
 
   const uniformSize = 16 + 12 * 4 * 3 // ObsReduceUniforms: 4 scalars + 3 arrays of 12
-  const partialSize = wgCount * numChannels * 4
-  const resultSize = MAX_CHANNELS * 4
+  const posPartialSize = wgCount * posNumChannels * 4
+  const momPartialSize = wgCount * momNumChannels * 4
+  const resultSize = MAX_OBS_CHANNELS * 4
 
   const makeBuffer = (label: string, size: number, usage: number) =>
     device.createBuffer({ label, size: Math.max(size, 4), usage })
@@ -57,7 +66,7 @@ export function createObservablesBuffers(
       uniformSize,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     ),
-    posPartialBuffer: makeBuffer('obs-pos-partials', partialSize, GPUBufferUsage.STORAGE),
+    posPartialBuffer: makeBuffer('obs-pos-partials', posPartialSize, GPUBufferUsage.STORAGE),
     posResultBuffer: makeBuffer(
       'obs-pos-result',
       resultSize,
@@ -73,7 +82,7 @@ export function createObservablesBuffers(
       uniformSize,
       GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     ),
-    momPartialBuffer: makeBuffer('obs-mom-partials', partialSize, GPUBufferUsage.STORAGE),
+    momPartialBuffer: makeBuffer('obs-mom-partials', momPartialSize, GPUBufferUsage.STORAGE),
     momResultBuffer: makeBuffer(
       'obs-mom-result',
       resultSize,
@@ -85,7 +94,8 @@ export function createObservablesBuffers(
       GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
     ),
     numWorkgroups: wgCount,
-    numChannels,
+    posNumChannels,
+    momNumChannels,
   }
 }
 
@@ -107,8 +117,11 @@ export function destroyObservablesBuffers(resources: ObservablesResources | null
 /**
  * Process the GPU readback results and push to the observables store.
  *
- * @param posData - Position-space reduction result [norm, x0_mean, x0_sq, ...]
- * @param momData - Momentum-space reduction result [knorm, k0_mean, k0_sq, ...]
+ * Position data layout: [norm, x0_mean, x0_sq, ..., xD_mean, xD_sq, potentialEnergy]
+ * Momentum data layout: [knorm, k0_mean, k0_sq, ..., kD_mean, kD_sq]
+ *
+ * @param posData - Position-space reduction result
+ * @param momData - Momentum-space reduction result
  * @param latticeDim - Number of active dimensions
  * @param hbar - Reduced Planck constant
  * @returns Snapshot to push to store, or null if data is invalid
@@ -148,8 +161,12 @@ export function processObservablesReadback(
     momentumVariance[d] = varP
     uncertaintyProduct[d] = Math.sqrt(varX) * Math.sqrt(varP)
 
-    kineticEnergy += (hbar * hbar * meanK2) / 2 // ℏ²⟨k²⟩/(2m) — mass=1 for now
+    kineticEnergy += (hbar * hbar * meanK2) / 2 // ℏ²⟨k²⟩/(2m), mass=1
   }
+
+  // Potential energy: last channel in position data = Σ V(x)|ψ|² dV
+  const potentialEnergyRaw = posData[1 + 2 * latticeDim]
+  const potentialEnergy = potentialEnergyRaw != null ? potentialEnergyRaw / posNorm : 0
 
   const minUncertainty = hbar / 2
   for (let d = 0; d < latticeDim; d++) {
@@ -167,7 +184,7 @@ export function processObservablesReadback(
     momentumMean,
     momentumVariance,
     uncertaintyProduct,
-    totalEnergy: kineticEnergy,
+    totalEnergy: kineticEnergy + potentialEnergy,
     positionNorm: posNorm,
     momentumNorm: momNorm,
   }

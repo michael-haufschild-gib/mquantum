@@ -3,11 +3,10 @@
  *
  * Initializes app state from URL parameters on mount.
  * Supports loading scene presets via `?scene=<name>` or
- * object type via `?t=schroedinger&d=5&qm=hydrogenND`.
+ * full scene configuration via `?t=schroedinger&d=5&qm=tdseDynamics&obs=1`.
  *
- * INTENTIONAL SCOPE LIMIT: Only basic scene identification params are
- * restored from URLs. Detailed state (quantum numbers, visual settings,
- * etc.) requires scene presets. See state-serializer.ts for rationale.
+ * All extended params are optional — missing params keep app defaults.
+ * Unknown params are silently ignored (forward compatible).
  */
 
 import { useEffect, useRef } from 'react'
@@ -25,31 +24,56 @@ import { usePresetManagerStore } from '@/stores/presetManagerStore'
  */
 function applyUrlStateParams(urlState: ParsedShareableState): void {
   try {
-    // Set dimension FIRST (enables more object types), then objectType
-    if (urlState.dimension !== undefined) {
-      useGeometryStore.getState().setDimension(urlState.dimension)
-    }
-    if (urlState.objectType !== undefined) {
-      useGeometryStore.getState().setObjectType(urlState.objectType)
-    }
-    if (urlState.quantumMode !== undefined) {
-      // Dimension enforcement is handled by setSchroedingerQuantumMode in the store
-      useExtendedObjectStore.getState().setSchroedingerQuantumMode(urlState.quantumMode)
-    }
-    // Apply open-quantum settings if present in URL
+    const geo = useGeometryStore.getState()
+    const ext = useExtendedObjectStore.getState()
+
+    // ── Core identity (order matters: dimension → objectType → quantumMode) ──
+    if (urlState.dimension !== undefined) geo.setDimension(urlState.dimension)
+    if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
+    if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
+
+    // ── Rendering ────────────────────────────────────────────────────────────
+    if (urlState.representation !== undefined)
+      ext.setSchroedingerRepresentation(urlState.representation)
+    if (urlState.isoEnabled !== undefined) ext.setSchroedingerIsoEnabled(urlState.isoEnabled)
+    if (urlState.isoThreshold !== undefined) ext.setSchroedingerIsoThreshold(urlState.isoThreshold)
+    if (urlState.crossSectionEnabled !== undefined)
+      ext.setSchroedingerCrossSectionEnabled(urlState.crossSectionEnabled)
+    if (urlState.densityGain !== undefined) ext.setSchroedingerDensityGain(urlState.densityGain)
+    if (urlState.scale !== undefined) geo.setSchroedingerScale(urlState.scale)
+
+    // ── Quantum numbers ──────────────────────────────────────────────────────
+    if (urlState.termCount !== undefined) ext.setSchroedingerTermCount(urlState.termCount)
+    if (urlState.seed !== undefined) ext.setSchroedingerSeed(urlState.seed)
+    if (urlState.hydrogenN !== undefined)
+      ext.setSchroedingerPrincipalQuantumNumber(urlState.hydrogenN)
+    if (urlState.hydrogenL !== undefined)
+      ext.setSchroedingerAzimuthalQuantumNumber(urlState.hydrogenL)
+    if (urlState.hydrogenM !== undefined)
+      ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
+
+    // ── TDSE config ──────────────────────────────────────────────────────────
+    if (urlState.potentialType !== undefined) ext.setTdsePotentialType(urlState.potentialType)
+    if (urlState.absorberEnabled !== undefined) ext.setTdseAbsorberEnabled(urlState.absorberEnabled)
+    if (urlState.diagnosticsEnabled !== undefined)
+      ext.setTdseDiagnosticsEnabled(urlState.diagnosticsEnabled)
+    if (urlState.observablesEnabled !== undefined)
+      ext.setTdseObservablesEnabled(urlState.observablesEnabled)
+    if (urlState.imaginaryTimeEnabled !== undefined)
+      ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
+
+    // ── Features ─────────────────────────────────────────────────────────────
     if (urlState.openQuantumEnabled !== undefined) {
-      const ext = useExtendedObjectStore.getState()
       ext.setOpenQuantumEnabled(urlState.openQuantumEnabled)
-      if (urlState.openQuantumDephasingRate !== undefined) {
+      if (urlState.openQuantumDephasingRate !== undefined)
         ext.setOpenQuantumDephasingRate(urlState.openQuantumDephasingRate)
-      }
-      if (urlState.openQuantumRelaxationRate !== undefined) {
+      if (urlState.openQuantumRelaxationRate !== undefined)
         ext.setOpenQuantumRelaxationRate(urlState.openQuantumRelaxationRate)
-      }
-      if (urlState.openQuantumThermalUpRate !== undefined) {
+      if (urlState.openQuantumThermalUpRate !== undefined)
         ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
-      }
     }
+    if (urlState.classicalOverlayEnabled !== undefined)
+      ext.setSchroedingerClassicalOverlayEnabled(urlState.classicalOverlayEnabled)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   }

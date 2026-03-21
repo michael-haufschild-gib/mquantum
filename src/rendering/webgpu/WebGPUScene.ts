@@ -7,7 +7,7 @@
  * @module rendering/webgpu/WebGPUScene
  */
 
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import type { ObjectType } from '@/lib/geometry/types'
@@ -16,6 +16,7 @@ import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useMeasurementStore } from '@/stores/measurementStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
@@ -523,6 +524,51 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     updateToScreenPassSharpness({ graph, renderResolutionScale })
   }, [graph, renderResolutionScale])
 
+  // ── Measurement click handler ──
+  const measurementEnabled = useMeasurementStore((s) => s.enabled)
+
+  const handleMeasurementClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!measurementEnabled) return
+      const mState = useMeasurementStore.getState()
+      if (mState.isCollapsing || mState.cooldownFrames > 0) return
+
+      const cam = cameraRef.current
+      const overlay = overlayRef.current
+      if (!cam || !overlay) return
+
+      const rect = overlay.getBoundingClientRect()
+      const clickX = e.clientX - rect.left
+      const clickY = e.clientY - rect.top
+
+      const matrices = cam.getMatrices()
+      // Estimate bounding radius from TDSE grid config, or use default
+      const schState = useExtendedObjectStore.getState().schroedinger
+      const tdse = schState?.tdse ?? schState?.bec
+      let br = 2.0
+      if (tdse?.gridSize && tdse?.spacing) {
+        // Half-extent of the computational domain
+        const halfExtent = tdse.gridSize[0]! * tdse.spacing[0]! * 0.5
+        br = Math.max(halfExtent, 1.0)
+      }
+
+      const result = raycastCanvas(
+        clickX,
+        clickY,
+        rect.width,
+        rect.height,
+        matrices.viewMatrix,
+        matrices.projectionMatrix,
+        br
+      )
+
+      if (result.hit) {
+        mState.requestMeasurement(result.worldPosition)
+      }
+    },
+    [measurementEnabled, cameraRef, overlayRef]
+  )
+
   // ── Render event capture overlay ──
   return React.createElement('div', {
     ref: overlayRef,
@@ -532,12 +578,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       left: 0,
       width: '100%',
       height: '100%',
-      cursor: 'grab',
+      cursor: measurementEnabled ? 'crosshair' : 'grab',
     },
     onMouseDown: handleMouseDown,
     onMouseUp: handleMouseUp,
     onMouseMove: handleMouseMove,
     onMouseLeave: handleMouseUp,
+    onClick: handleMeasurementClick,
   })
 }
 
@@ -569,5 +616,6 @@ import {
   setupSharedResources,
   warmSwapSchrodingerPasses,
 } from './scenePassSetup'
+import { raycastCanvas } from './utils/raycasting'
 
 export default WebGPUScene

@@ -18,23 +18,68 @@
  * - loadStyle not restoring visual stores
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import { getAppState, waitForAppLoaded } from './helpers/app-helpers'
 import { TopBar } from './pages/TopBar'
 
 test.setTimeout(60_000)
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Save a scene via menu → input modal → confirm. Returns the saved scene id. */
+async function saveSceneViaUI(
+  page: import('@playwright/test').Page,
+  topBar: TopBar,
+  name: string
+): Promise<string> {
+  await topBar.openScenesMenu()
+  await page.getByTestId('menu-save-scene').click()
+  await expect(page.getByTestId('save-scene-modal-input')).toBeVisible({ timeout: 5000 })
+  await page.getByTestId('save-scene-modal-input').fill(name)
+  // Wait for React to process the fill (controlled input state update) before Enter
+  await expect(page.getByTestId('save-scene-modal-confirm')).toBeEnabled({ timeout: 3000 })
+  await page.getByTestId('save-scene-modal-input').press('Enter')
+  await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 3000 })
+
+  // Read back the id of the scene we just saved
+  return page.evaluate(async (n: string) => {
+    const mod = await import('/src/stores/presetManagerStore.ts')
+    const scene = mod.usePresetManagerStore.getState().savedScenes.find((s) => s.name === n)
+    return scene?.id ?? ''
+  }, name)
+}
+
+/** Save a style via menu → input modal → confirm. Returns the saved style id. */
+async function saveStyleViaUI(
+  page: import('@playwright/test').Page,
+  topBar: TopBar,
+  name: string
+): Promise<string> {
+  await topBar.openStylesMenu()
+  await page.getByTestId('menu-save-style').click()
+  await expect(page.getByTestId('save-style-modal-input')).toBeVisible({ timeout: 5000 })
+  await page.getByTestId('save-style-modal-input').fill(name)
+  // Wait for React to process the fill before pressing Enter
+  await expect(page.getByTestId('save-style-modal-confirm')).toBeEnabled({ timeout: 3000 })
+  await page.getByTestId('save-style-modal-input').press('Enter')
+  await expect(page.getByTestId('save-style-modal-input')).not.toBeVisible({ timeout: 3000 })
+
+  return page.evaluate(async (n: string) => {
+    const mod = await import('/src/stores/presetManagerStore.ts')
+    const style = mod.usePresetManagerStore.getState().savedStyles.find((s) => s.name === n)
+    return style?.id ?? ''
+  }, name)
+}
+
 test.describe('scene preset CRUD', () => {
   const SCENE_NAME = `Test Scene ${Date.now()}`
 
   test.beforeEach(async ({ page }) => {
-    // Clear any previously saved presets to start fresh
     await page.goto('/?t=schroedinger&d=5&qm=harmonicOscillator')
     await waitForAppLoaded(page)
     await page.evaluate(async () => {
       const mod = await import('/src/stores/presetManagerStore.ts')
       const store = mod.usePresetManagerStore.getState()
-      // Delete all saved scenes to start clean
       for (const scene of store.savedScenes) {
         store.deleteScene(scene.id)
       }
@@ -43,41 +88,17 @@ test.describe('scene preset CRUD', () => {
 
   test('save scene: dialog accepts name and scene appears in menu', async ({ page }) => {
     const topBar = new TopBar(page)
+    const id = await saveSceneViaUI(page, topBar, SCENE_NAME)
+    expect(id).not.toBe('')
 
-    // Open Scenes menu → Save Current Scene
+    // Reopen Scenes menu — saved scene should appear
     await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
-
-    // InputModal should appear with title "Save Scene"
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-
-    // Type a scene name
-    const input = dialog.locator('input[type="text"]')
-    await input.fill(SCENE_NAME)
-
-    // Click Save
-    await dialog.getByRole('button', { name: 'Save' }).click()
-
-    // Dialog should close
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
-
-    // Reopen Scenes menu — saved scene should appear under "Saved Scenes"
-    await topBar.openScenesMenu()
-    await expect(page.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
   })
 
   test('load saved scene restores state from different mode', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    // Save current state (5D HO from beforeEach)
-    await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await dialog.locator('input[type="text"]').fill(SCENE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveSceneViaUI(page, topBar, SCENE_NAME)
 
     // Navigate to a different mode
     await page.goto('/?t=schroedinger&d=3&qm=hydrogenND')
@@ -89,7 +110,7 @@ test.describe('scene preset CRUD', () => {
 
     // Load the saved scene via Scenes menu
     await topBar.openScenesMenu()
-    await page.getByText(SCENE_NAME).click()
+    await page.getByTestId(`menu-saved-scene-${id}`).click()
 
     // State should revert to saved: 5D HO
     await expect(async () => {
@@ -101,24 +122,16 @@ test.describe('scene preset CRUD', () => {
 
   test('delete scene via Manage Scenes dialog removes it from menu', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    // Save a scene first
-    await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
-    const saveDialog = page.getByRole('dialog')
-    await expect(saveDialog).toBeVisible({ timeout: 5000 })
-    await saveDialog.locator('input[type="text"]').fill(SCENE_NAME)
-    await saveDialog.getByRole('button', { name: 'Save' }).click()
-    await expect(saveDialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveSceneViaUI(page, topBar, SCENE_NAME)
 
     // Verify it exists in the menu
     await topBar.openScenesMenu()
-    await expect(page.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
     await page.keyboard.press('Escape')
 
     // Open Manage Scenes dialog via the menu
     await topBar.openScenesMenu()
-    await page.getByText('Manage Scenes...').click()
+    await page.getByTestId('menu-manage-scenes').click()
 
     // The Manage Scenes modal should appear with our saved scene
     const manageDialog = page.getByRole('dialog')
@@ -126,15 +139,14 @@ test.describe('scene preset CRUD', () => {
     await expect(manageDialog.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
 
     // Click the delete button for our scene (hidden until hover, use force: true)
-    const deleteBtn = manageDialog.getByRole('button', {
-      name: new RegExp(`Delete scene.*${SCENE_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
-    })
+    const deleteBtn = manageDialog.getByTestId(`delete-scene-${id}`)
     await deleteBtn.click({ force: true })
 
     // Confirmation dialog should appear
-    const confirmBtn = page.getByRole('button', { name: 'Delete' }).last()
-    await expect(confirmBtn).toBeVisible({ timeout: 3000 })
-    await confirmBtn.click()
+    await expect(page.getByTestId('delete-scene-confirm-modal-confirm')).toBeVisible({
+      timeout: 3000,
+    })
+    await page.getByTestId('delete-scene-confirm-modal-confirm').click()
 
     // Scene should be removed from the manage dialog
     await expect(manageDialog.getByText(SCENE_NAME)).not.toBeVisible({ timeout: 3000 })
@@ -144,62 +156,49 @@ test.describe('scene preset CRUD', () => {
 
     // Reopen Scenes menu — scene should be gone
     await topBar.openScenesMenu()
-    await expect(page.getByText(SCENE_NAME)).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).not.toBeVisible({ timeout: 3000 })
   })
 
   test('saving scene with Enter key works', async ({ page }) => {
     const topBar = new TopBar(page)
 
     await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
+    await page.getByTestId('menu-save-scene').click()
+    await expect(page.getByTestId('save-scene-modal-input')).toBeVisible({ timeout: 5000 })
+    await page.getByTestId('save-scene-modal-input').fill(SCENE_NAME)
+    await page.getByTestId('save-scene-modal-input').press('Enter')
 
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 3000 })
 
-    const input = dialog.locator('input[type="text"]')
-    await input.fill(SCENE_NAME)
-    await input.press('Enter')
-
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
-
-    // Verify saved
+    // Verify saved — at least one saved scene item should exist
     await topBar.openScenesMenu()
-    await expect(page.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('[data-testid^="menu-saved-scene-"]').first()).toBeVisible({
+      timeout: 3000,
+    })
   })
 
   test('empty name cannot be saved', async ({ page }) => {
     const topBar = new TopBar(page)
 
     await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
-
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
+    await page.getByTestId('menu-save-scene').click()
+    await expect(page.getByTestId('save-scene-modal-input')).toBeVisible({ timeout: 5000 })
 
     // Leave input empty — Save button should be disabled
-    const saveBtn = dialog.getByRole('button', { name: 'Save' })
-    await expect(saveBtn).toBeDisabled()
+    await expect(page.getByTestId('save-scene-modal-confirm')).toBeDisabled()
 
     // Type whitespace only — still disabled
-    await dialog.locator('input[type="text"]').fill('   ')
-    await expect(saveBtn).toBeDisabled()
+    await page.getByTestId('save-scene-modal-input').fill('   ')
+    await expect(page.getByTestId('save-scene-modal-confirm')).toBeDisabled()
   })
 
   test('saved scene persists across full page reload (IndexedDB)', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    // Save a scene
-    await topBar.openScenesMenu()
-    await page.getByText('+ Save Current Scene...').click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await dialog.locator('input[type="text"]').fill(SCENE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveSceneViaUI(page, topBar, SCENE_NAME)
 
     // Verify it exists before reload
     await topBar.openScenesMenu()
-    await expect(page.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
     await page.keyboard.press('Escape')
 
     // Full page reload — forces IndexedDB rehydration
@@ -209,7 +208,7 @@ test.describe('scene preset CRUD', () => {
     // Saved scene must survive the reload
     await topBar.openScenesMenu()
     await expect(
-      page.getByText(SCENE_NAME),
+      page.getByTestId(`menu-saved-scene-${id}`),
       'Saved scene must persist in IndexedDB across page reload'
     ).toBeVisible({ timeout: 5000 })
   })
@@ -221,7 +220,6 @@ test.describe('style preset CRUD', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await waitForAppLoaded(page)
-    // Clear saved styles
     await page.evaluate(async () => {
       const mod = await import('/src/stores/presetManagerStore.ts')
       const store = mod.usePresetManagerStore.getState()
@@ -233,87 +231,59 @@ test.describe('style preset CRUD', () => {
 
   test('save style and verify it appears in Styles menu', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    await topBar.openStylesMenu()
-    await page.getByText('+ Save Current Style...').click()
-
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-
-    await dialog.locator('input[type="text"]').fill(STYLE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveStyleViaUI(page, topBar, STYLE_NAME)
+    expect(id).not.toBe('')
 
     // Verify in menu
     await topBar.openStylesMenu()
-    await expect(page.getByText(STYLE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
   })
 
   test('load saved style changes visual state', async ({ page }) => {
-    // Capture initial visual state
-    const initialOpacity = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
-      return mod.useAppearanceStore.getState().opacity
-    })
-
-    // Change opacity to something distinctive
+    // Change colorAlgorithm to something distinctive
     await page.evaluate(async () => {
       const mod = await import('/src/stores/appearanceStore.ts')
-      mod.useAppearanceStore.getState().setOpacity(0.42)
+      mod.useAppearanceStore.setState({ colorAlgorithm: 'blackbody' })
     })
 
     // Save this style
     const topBar = new TopBar(page)
-    await topBar.openStylesMenu()
-    await page.getByText('+ Save Current Style...').click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await dialog.locator('input[type="text"]').fill(STYLE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveStyleViaUI(page, topBar, STYLE_NAME)
 
-    // Restore original opacity
-    await page.evaluate(async (original: number) => {
+    // Change to a different value
+    await page.evaluate(async () => {
       const mod = await import('/src/stores/appearanceStore.ts')
-      mod.useAppearanceStore.getState().setOpacity(original)
-    }, initialOpacity)
-
-    // Verify opacity changed back
-    const middleOpacity = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
-      return mod.useAppearanceStore.getState().opacity
+      mod.useAppearanceStore.setState({ colorAlgorithm: 'phase' })
     })
-    expect(middleOpacity).toBeCloseTo(initialOpacity, 1)
 
-    // Load saved style
+    // Verify it changed
+    const middleAlgo = await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      return mod.useAppearanceStore.getState().colorAlgorithm
+    })
+    expect(middleAlgo).toBe('phase')
+
+    // Load saved style via testid
     await topBar.openStylesMenu()
-    await page.getByText(STYLE_NAME).click()
+    await page.getByTestId(`menu-saved-style-${id}`).click()
 
-    // Opacity should be restored to 0.42
+    // colorAlgorithm should be restored to 'blackbody'
     await expect(async () => {
       const restored = await page.evaluate(async () => {
         const mod = await import('/src/stores/appearanceStore.ts')
-        return mod.useAppearanceStore.getState().opacity
+        return mod.useAppearanceStore.getState().colorAlgorithm
       })
-      expect(restored).toBeCloseTo(0.42, 1)
+      expect(restored).toBe('blackbody')
     }).toPass({ timeout: 3000 })
   })
 
   test('saved style persists across full page reload (IndexedDB)', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    // Save a style with a distinctive name
-    await topBar.openStylesMenu()
-    await page.getByText('+ Save Current Style...').click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await dialog.locator('input[type="text"]').fill(STYLE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveStyleViaUI(page, topBar, STYLE_NAME)
 
     // Verify it exists before reload
     await topBar.openStylesMenu()
-    await expect(page.getByText(STYLE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
     await page.keyboard.press('Escape')
 
     // Full page reload
@@ -323,26 +293,18 @@ test.describe('style preset CRUD', () => {
     // Saved style must survive the reload (IndexedDB persistence)
     await topBar.openStylesMenu()
     await expect(
-      page.getByText(STYLE_NAME),
+      page.getByTestId(`menu-saved-style-${id}`),
       'Saved style must persist in IndexedDB across page reload'
     ).toBeVisible({ timeout: 5000 })
   })
 
   test('delete saved style removes it from menu', async ({ page }) => {
     const topBar = new TopBar(page)
-
-    // Save a style
-    await topBar.openStylesMenu()
-    await page.getByText('+ Save Current Style...').click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible({ timeout: 5000 })
-    await dialog.locator('input[type="text"]').fill(STYLE_NAME)
-    await dialog.getByRole('button', { name: 'Save' }).click()
-    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+    const id = await saveStyleViaUI(page, topBar, STYLE_NAME)
 
     // Verify exists
     await topBar.openStylesMenu()
-    await expect(page.getByText(STYLE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
     await page.keyboard.press('Escape')
 
     // Delete via store
@@ -355,6 +317,6 @@ test.describe('style preset CRUD', () => {
 
     // Verify removed
     await topBar.openStylesMenu()
-    await expect(page.getByText(STYLE_NAME)).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).not.toBeVisible({ timeout: 3000 })
   })
 })

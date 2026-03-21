@@ -5,7 +5,8 @@
  * Heisenberg uncertainty product per spatial dimension. Updated by
  * TDSEComputePass GPU readback when observables are enabled.
  *
- * Ring buffer history enables sparkline time-series display.
+ * Ring buffer history enables sparkline time-series display and
+ * classical trajectory overlay (A2: Ehrenfest trail from ⟨x⟩(t)).
  *
  * @module stores/observablesDiagnosticsStore
  */
@@ -15,7 +16,7 @@ import { create } from 'zustand'
 /** Maximum supported spatial dimensions */
 const MAX_DIM = 11
 /** Ring buffer length — ~2s at 60fps */
-const HISTORY_LENGTH = 120
+export const HISTORY_LENGTH = 120
 
 /**
  * Per-snapshot observable data pushed from GPU readback.
@@ -49,6 +50,8 @@ interface ObservablesDiagnosticsState extends ObservablesSnapshot {
   historyUncertainty: Float32Array[]
   /** Total energy history (ring buffer) */
   historyEnergy: Float32Array
+  /** Position mean ⟨x_i⟩(t) history per dimension (ring buffer for Ehrenfest trail) */
+  historyPositionMean: Float64Array[]
   /** Current write head in ring buffer */
   historyHead: number
   /** Number of valid entries (up to HISTORY_LENGTH) */
@@ -64,6 +67,10 @@ function createEmptyHistoryArrays(): Float32Array[] {
   return Array.from({ length: MAX_DIM }, () => new Float32Array(HISTORY_LENGTH))
 }
 
+function createEmptyPositionMeanHistory(): Float64Array[] {
+  return Array.from({ length: MAX_DIM }, () => new Float64Array(HISTORY_LENGTH))
+}
+
 const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'reset'> = {
   hasData: false,
   activeDims: 0,
@@ -77,6 +84,7 @@ const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'reset'>
   momentumNorm: 0,
   historyUncertainty: createEmptyHistoryArrays(),
   historyEnergy: new Float32Array(HISTORY_LENGTH),
+  historyPositionMean: createEmptyPositionMeanHistory(),
   historyHead: 0,
   historyCount: 0,
 }
@@ -96,9 +104,10 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
     set((state) => {
       const head = state.historyHead
 
-      // Write uncertainty products into per-dimension ring buffers
+      // Write uncertainty products and position means into per-dimension ring buffers
       for (let d = 0; d < snapshot.activeDims; d++) {
         state.historyUncertainty[d]![head] = snapshot.uncertaintyProduct[d]!
+        state.historyPositionMean[d]![head] = snapshot.positionMean[d]!
       }
       state.historyEnergy[head] = snapshot.totalEnergy
 
@@ -121,5 +130,6 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
       uncertaintyProduct: new Float64Array(MAX_DIM),
       historyUncertainty: createEmptyHistoryArrays(),
       historyEnergy: new Float32Array(HISTORY_LENGTH),
+      historyPositionMean: createEmptyPositionMeanHistory(),
     }),
 }))

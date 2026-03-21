@@ -54,3 +54,49 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
   spacing: [0.1, 0.1],
   needsReset: false,
 }
+
+/** Maximum total lattice sites for quantum walk (matches MAX_LINEAR_DISPATCH_SITES) */
+const QW_MAX_TOTAL_SITES = 65535 * 64
+
+/**
+ * Compute the default per-dimension grid size for quantum walk, capped
+ * so that gridSize^dim stays within the GPU dispatch limit.
+ *
+ * @param dim - Number of lattice dimensions
+ * @returns Power-of-2 grid size per dimension
+ */
+function defaultQwGridPerDim(dim: number): number {
+  let pow2 = 64
+  while (pow2 > 2 && Math.pow(pow2, dim) > QW_MAX_TOTAL_SITES) {
+    pow2 = pow2 / 2
+  }
+  return pow2
+}
+
+/**
+ * Resize quantum walk arrays to match a new lattice dimension, computing appropriate
+ * grid sizes and recentering the initial walker position.
+ *
+ * @param prev - Previous quantum walk configuration
+ * @param newDim - New lattice dimensionality
+ * @returns Partial config with resized arrays and needsReset=true
+ */
+export function resizeQuantumWalkArrays(
+  prev: QuantumWalkConfig,
+  newDim: number
+): Partial<QuantumWalkConfig> {
+  const gridDefault = defaultQwGridPerDim(newDim)
+  const gridSize = Array.from({ length: newDim }, () => gridDefault)
+  const spacing = Array.from({ length: newDim }, (_, i) =>
+    i < prev.spacing.length ? prev.spacing[i]! : 0.1
+  )
+  const initialPosition = gridSize.map((s) => Math.floor(s / 2))
+  return {
+    latticeDim: newDim,
+    gridSize,
+    spacing,
+    initialPosition,
+    steps: 0,
+    needsReset: true,
+  }
+}

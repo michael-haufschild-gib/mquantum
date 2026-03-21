@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand'
 
+import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
@@ -429,6 +430,16 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
+      let quantumWalkUpdate:
+        | Partial<import('@/lib/geometry/extended/quantumWalk').QuantumWalkConfig>
+        | undefined
+      if (currentState.quantumMode === 'quantumWalk') {
+        const prev = currentState.quantumWalk
+        if (prev.latticeDim !== dimension) {
+          quantumWalkUpdate = resizeQuantumWalkArrays(prev, dimension)
+        }
+      }
+
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -449,6 +460,9 @@ export const createSchroedingerSlice: StateCreator<
           ...(tdseUpdate ? { tdse: { ...state.schroedinger.tdse, ...tdseUpdate } } : {}),
           ...(becUpdate ? { bec: { ...state.schroedinger.bec, ...becUpdate } } : {}),
           ...(diracUpdate ? { dirac: { ...state.schroedinger.dirac, ...diracUpdate } } : {}),
+          ...(quantumWalkUpdate
+            ? { quantumWalk: { ...state.schroedinger.quantumWalk, ...quantumWalkUpdate } }
+            : {}),
         },
       }))
     },

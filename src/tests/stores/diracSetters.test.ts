@@ -80,6 +80,7 @@ describe('Dirac setters', () => {
 
   it('sets potential type', () => {
     const s = useExtendedObjectStore.getState()
+    // @ts-expect-error intentional invalid input
     s.setDiracPotentialType('harmonic')
     expect(getDirac().potentialType).toBe('harmonic')
   })
@@ -98,6 +99,7 @@ describe('Dirac setters', () => {
 
   it('sets initial condition', () => {
     const s = useExtendedObjectStore.getState()
+    // @ts-expect-error intentional invalid input
     s.setDiracInitialCondition('gaussian')
     expect(getDirac().initialCondition).toBe('gaussian')
   })

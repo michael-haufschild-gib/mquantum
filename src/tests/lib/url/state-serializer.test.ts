@@ -81,8 +81,8 @@ describe('state-serializer', () => {
     it('should clamp dimension to valid range', () => {
       const tooLow = deserializeState('d=0')
       const tooHigh = deserializeState('d=99')
-      expect(tooLow.dimension).toBeUndefined()
-      expect(tooHigh.dimension).toBeUndefined()
+      expect(tooLow.dimension).toBe(2) // clamped to MIN_DIMENSION
+      expect(tooHigh.dimension).toBe(11) // clamped to MAX_DIMENSION
     })
 
     it('should reject malformed dimension tokens', () => {
@@ -231,6 +231,119 @@ describe('state-serializer', () => {
       expect(deserialized.openQuantumDephasingRate).toBeCloseTo(2.5)
       expect(deserialized.openQuantumRelaxationRate).toBeCloseTo(1.0)
       expect(deserialized.openQuantumThermalUpRate).toBeCloseTo(0.5)
+    })
+  })
+
+  describe('extended params', () => {
+    it('roundtrips representation mode', () => {
+      for (const repr of ['position', 'momentum', 'wigner'] as const) {
+        const s = serializeState({ dimension: 3, objectType: 'schroedinger', representation: repr })
+        const d = deserializeState(s)
+        expect(d.representation, `roundtrip failed for repr=${repr}`).toBe(repr)
+      }
+    })
+
+    it('roundtrips boolean flags', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        isoEnabled: true,
+        crossSectionEnabled: true,
+        observablesEnabled: true,
+        diagnosticsEnabled: true,
+        absorberEnabled: false,
+        imaginaryTimeEnabled: true,
+        classicalOverlayEnabled: true,
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.isoEnabled).toBe(true)
+      expect(d.crossSectionEnabled).toBe(true)
+      expect(d.observablesEnabled).toBe(true)
+      expect(d.diagnosticsEnabled).toBe(true)
+      expect(d.absorberEnabled).toBe(false)
+      expect(d.imaginaryTimeEnabled).toBe(true)
+      expect(d.classicalOverlayEnabled).toBe(true)
+    })
+
+    it('roundtrips numeric params with clamping', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        isoThreshold: -3,
+        densityGain: 5.0,
+        scale: 1.5,
+        termCount: 4,
+        seed: 42,
+        hydrogenN: 3,
+        hydrogenL: 2,
+        hydrogenM: -1,
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.isoThreshold).toBeCloseTo(-3)
+      expect(d.densityGain).toBeCloseTo(5.0)
+      expect(d.scale).toBeCloseTo(1.5)
+      expect(d.termCount).toBe(4)
+      expect(d.seed).toBe(42)
+      expect(d.hydrogenN).toBe(3)
+      expect(d.hydrogenL).toBe(2)
+      expect(d.hydrogenM).toBe(-1)
+    })
+
+    it('roundtrips TDSE potential type', () => {
+      for (const pot of ['free', 'barrier', 'harmonicTrap', 'doubleSlit'] as const) {
+        const s = serializeState({ dimension: 3, objectType: 'schroedinger', potentialType: pot })
+        expect(deserializeState(s).potentialType, `roundtrip failed for pot=${pot}`).toBe(pot)
+      }
+    })
+
+    it('clamps numeric params to valid ranges', () => {
+      const d = deserializeState('tc=99&hyd_n=-5&hyd_l=99&hyd_m=-99&scale=100&dg=-1&iso_t=5')
+      expect(d.termCount).toBe(8) // clamped to max
+      expect(d.hydrogenN).toBe(1) // clamped to min
+      expect(d.hydrogenL).toBe(6) // clamped to max
+      expect(d.hydrogenM).toBe(-6) // clamped to min
+      expect(d.scale).toBeCloseTo(2.0) // clamped to max
+      expect(d.densityGain).toBeCloseTo(0.01) // clamped to min
+      expect(d.isoThreshold).toBeCloseTo(0) // clamped to max
+    })
+
+    it('ignores invalid enum values', () => {
+      const d = deserializeState('repr=invalid&pot=unknown')
+      expect(d.representation).toBeUndefined()
+      expect(d.potentialType).toBeUndefined()
+    })
+
+    it('omits undefined extended params from serialized output', () => {
+      const s = serializeState({ dimension: 3, objectType: 'schroedinger' })
+      expect(s).not.toContain('repr=')
+      expect(s).not.toContain('iso=')
+      expect(s).not.toContain('tc=')
+      expect(s).not.toContain('obs=')
+    })
+
+    it('strips undefined keys from deserialized output', () => {
+      const d = deserializeState('d=3&t=schroedinger')
+      expect(Object.keys(d)).toEqual(['dimension', 'objectType'])
+    })
+
+    it('full TDSE scene roundtrip with all extended params', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        potentialType: 'harmonicTrap',
+        absorberEnabled: false,
+        diagnosticsEnabled: true,
+        observablesEnabled: true,
+        imaginaryTimeEnabled: false,
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.quantumMode).toBe('tdseDynamics')
+      expect(d.potentialType).toBe('harmonicTrap')
+      expect(d.absorberEnabled).toBe(false)
+      expect(d.diagnosticsEnabled).toBe(true)
+      expect(d.observablesEnabled).toBe(true)
+      expect(d.imaginaryTimeEnabled).toBe(false)
     })
   })
 

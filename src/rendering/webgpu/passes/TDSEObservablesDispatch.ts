@@ -8,6 +8,7 @@ import { DIAG_DECIMATION } from './computePassUtils'
 import {
   createObservablesBuffers,
   destroyObservablesBuffers,
+  MAX_OBS_CHANNELS,
   type ObservablesResources,
   processObservablesReadback,
 } from './ObservablesComputeSetup'
@@ -25,6 +26,7 @@ export interface ObservablesState {
   // References to pass state
   psiReBuffer: GPUBuffer | null
   psiImBuffer: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
   fftScratchA: GPUBuffer | null
   totalSites: number
   pl: TdsePipelineResult | null
@@ -54,7 +56,14 @@ export function updateObservablesResources(
     return
   }
 
-  if (!state.pl || !state.psiReBuffer || !state.psiImBuffer || !state.fftScratchA) return
+  if (
+    !state.pl ||
+    !state.psiReBuffer ||
+    !state.psiImBuffer ||
+    !state.potentialBuffer ||
+    !state.fftScratchA
+  )
+    return
 
   destroyObservablesBuffers(state.obsResources)
   state.obsResources = createObservablesBuffers(device, state.totalSites, config.latticeDim)
@@ -67,6 +76,7 @@ export function updateObservablesResources(
       { binding: 1, resource: { buffer: state.psiReBuffer } },
       { binding: 2, resource: { buffer: state.psiImBuffer } },
       { binding: 3, resource: { buffer: res.posPartialBuffer } },
+      { binding: 4, resource: { buffer: state.potentialBuffer } },
     ],
   })
   state.obsPosFinalBG = device.createBindGroup({
@@ -113,7 +123,7 @@ export function writeObservablesUniforms(
   obsU32[0] = state.totalSites
   obsU32[1] = res.numWorkgroups
   obsU32[2] = config.latticeDim
-  obsU32[3] = res.numChannels
+  obsU32[3] = res.posNumChannels
   for (let d = 0; d < config.latticeDim; d++) obsU32[4 + d] = config.gridSize[d] ?? 64
   for (let d = 0; d < config.latticeDim; d++) obsU32[16 + d] = strides[d] ?? 1
   for (let d = 0; d < config.latticeDim; d++) obsF32[28 + d] = config.spacing[d] ?? 0.1
@@ -125,7 +135,7 @@ export function writeObservablesUniforms(
   momU32[0] = state.totalSites
   momU32[1] = res.numWorkgroups
   momU32[2] = config.latticeDim
-  momU32[3] = res.numChannels
+  momU32[3] = res.momNumChannels
   for (let d = 0; d < config.latticeDim; d++) momU32[4 + d] = config.gridSize[d] ?? 64
   for (let d = 0; d < config.latticeDim; d++) momU32[16 + d] = strides[d] ?? 1
   for (let d = 0; d < config.latticeDim; d++) {
@@ -159,8 +169,7 @@ export function dispatchObservablesReadback(
   const res = state.obsResources
   if (!res || state.obsMappingInFlight) return
 
-  const maxChannels = 23
-  const resultBytes = maxChannels * 4
+  const resultBytes = MAX_OBS_CHANNELS * 4
   encoder.copyBufferToBuffer(res.posResultBuffer, 0, res.posStagingBuffer, 0, resultBytes)
   encoder.copyBufferToBuffer(res.momResultBuffer, 0, res.momStagingBuffer, 0, resultBytes)
 

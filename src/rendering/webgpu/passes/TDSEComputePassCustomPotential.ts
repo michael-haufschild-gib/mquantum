@@ -58,22 +58,27 @@ export function computePotentialHash(config: TdseConfig, simTime: number): strin
 /**
  * Parse and evaluate a custom potential expression, upload to GPU buffer.
  *
+ * Returns the maximum absolute potential value for display normalization.
+ * The caller writes this scale into the TDSE uniform buffer so the WGSL
+ * shader can correctly normalize the potential overlay and field view.
+ *
  * @param device - GPU device for buffer write
  * @param potentialBuffer - Target GPU storage buffer
  * @param config - TDSE config containing the expression and grid parameters
+ * @returns Maximum |V| across the grid, or 0 if parsing fails
  */
 export function uploadCustomPotentialBuffer(
   device: GPUDevice,
   potentialBuffer: GPUBuffer | null,
   config: TdseConfig
-): void {
-  if (!potentialBuffer) return
+): number {
+  if (!potentialBuffer) return 0
 
   const expr = config.customPotentialExpression ?? '0'
   const result = parseExpression(expr)
   if (!result.success) {
     logger.warn(`[TDSE] Custom potential parse error: ${result.error}`)
-    return
+    return 0
   }
 
   const gridSize = config.gridSize.slice(0, config.latticeDim)
@@ -81,4 +86,12 @@ export function uploadCustomPotentialBuffer(
   const potential = evaluatePotentialGrid(result.evaluate, gridSize, spacing)
 
   device.queue.writeBuffer(potentialBuffer, 0, potential)
+
+  // Compute max|V| for display normalization
+  let maxAbsV = 0
+  for (let i = 0; i < potential.length; i++) {
+    const absV = Math.abs(potential[i]!)
+    if (absV > maxAbsV) maxAbsV = absV
+  }
+  return maxAbsV
 }

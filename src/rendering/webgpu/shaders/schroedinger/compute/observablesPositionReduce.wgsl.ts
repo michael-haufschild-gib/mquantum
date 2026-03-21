@@ -5,9 +5,11 @@
  *   - Σ |ψ|² · dV                    (norm)
  *   - Σ x_d · |ψ|² · dV             (position mean, per dimension d)
  *   - Σ x_d² · |ψ|² · dV            (position second moment, per dimension d)
+ *   - Σ V(x) · |ψ|² · dV            (potential energy expectation ⟨V⟩)
  *
- * Output layout per workgroup: [norm, x0_mean, x0_sq, x1_mean, x1_sq, ..., xD_mean, xD_sq]
- * Total channels = 1 + 2 * latticeDim
+ * Output layout per workgroup:
+ *   [norm, x0_mean, x0_sq, ..., xD_mean, xD_sq, potentialEnergy]
+ * Total channels = 2 + 2 * latticeDim
  *
  * Each workgroup reduces a chunk of sites into partial sums written to
  * storage buffers. A finalization pass combines them.
@@ -23,7 +25,7 @@ struct ObsReduceUniforms {
   totalSites: u32,
   numWorkgroups: u32,
   latticeDim: u32,
-  numChannels: u32,    // 1 + 2 * latticeDim
+  numChannels: u32,    // 2 + 2 * latticeDim
   gridSize: array<u32, 12>,
   strides: array<u32, 12>,
   spacing: array<f32, 12>,
@@ -33,13 +35,14 @@ struct ObsReduceUniforms {
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
 @group(0) @binding(3) var<storage, read_write> partials: array<f32>;
+@group(0) @binding(4) var<storage, read> potentialBuf: array<f32>;
 
-// Max channels: 1 + 2*11 = 23. Shared memory: 256 * 23 = 5888 floats.
+// Max channels: 2 + 2*11 = 24. Shared memory: 256 * 24 = 6144 floats.
 // WGSL requires compile-time constants for arrays, so use a flat block
 // and index as shared[local * MAX_CHANNELS + ch].
-const MAX_CHANNELS: u32 = 23u;
+const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 5888>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> shared: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
 
 @compute @workgroup_size(256)
 fn main(
@@ -81,6 +84,10 @@ fn main(
       shared[local * MAX_CHANNELS + chBase] = pos_d * weightedDensity;          // x_d * |ψ|² dV
       shared[local * MAX_CHANNELS + chBase + 1u] = pos_d * pos_d * weightedDensity; // x_d² * |ψ|² dV
     }
+
+    // Last channel: potential energy ⟨V⟩ = Σ V(x) |ψ|² dV
+    let vIdx = 1u + 2u * obsParams.latticeDim;
+    shared[local * MAX_CHANNELS + vIdx] = potentialBuf[idx] * weightedDensity;
   }
   workgroupBarrier();
 
@@ -107,7 +114,7 @@ fn main(
  * Position-Space Observable Reduction — Pass 2 (Finalize)
  *
  * Single-workgroup reduction of partial sums from Pass 1 into final results.
- * Output: [norm, x0_mean, x0_sq, x1_mean, x1_sq, ...]
+ * Output: [norm, x0_mean, x0_sq, ..., xD_mean, xD_sq, potentialEnergy]
  *
  * @workgroup_size(256)
  */
@@ -126,9 +133,9 @@ struct ObsReduceUniforms {
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 
-const MAX_CHANNELS: u32 = 23u;
+const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 5888>;
+var<workgroup> shared: array<f32, 6144>;
 
 @compute @workgroup_size(256)
 fn main(

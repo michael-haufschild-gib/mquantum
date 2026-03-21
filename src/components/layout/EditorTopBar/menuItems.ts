@@ -89,6 +89,7 @@ export function buildSavedSceneItems(
 ): MenuItem[] {
   return savedScenes.map((s: SavedScene) => ({
     label: s.name,
+    'data-testid': `menu-saved-scene-${s.id}`,
     onClick: () => {
       loadScene(s.id)
       soundManager.playClick()
@@ -131,9 +132,14 @@ export function buildSceneSubmenuItems(
 ): MenuItem[] {
   return [
     { label: 'Actions' },
-    { label: '+ Save Current Scene...', onClick: () => setSaveSceneOpen(true) },
+    {
+      label: '+ Save Current Scene...',
+      onClick: () => setSaveSceneOpen(true),
+      'data-testid': 'menu-save-scene',
+    },
     {
       label: 'Manage Scenes...',
+      'data-testid': 'menu-manage-scenes',
       onClick: () => {
         setIsSceneManagerOpen(true)
         soundManager.playClick()
@@ -161,6 +167,7 @@ export function buildSavedStyleItems(
 ): MenuItem[] {
   return savedStyles.map((s: SavedStyle) => ({
     label: s.name,
+    'data-testid': `menu-saved-style-${s.id}`,
     onClick: () => {
       loadStyle(s.id)
       soundManager.playClick()
@@ -203,9 +210,14 @@ export function buildStyleSubmenuItems(
 ): MenuItem[] {
   return [
     { label: 'Actions' },
-    { label: '+ Save Current Style...', onClick: () => setSaveStyleOpen(true) },
+    {
+      label: '+ Save Current Style...',
+      onClick: () => setSaveStyleOpen(true),
+      'data-testid': 'menu-save-style',
+    },
     {
       label: 'Manage Styles...',
+      'data-testid': 'menu-manage-styles',
       onClick: () => {
         setIsStyleManagerOpen(true)
         soundManager.playClick()

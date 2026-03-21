@@ -41,6 +41,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
           collapsible
           defaultOpen
           title="Scene Lights"
+          data-testid="control-group-scene-lights"
           rightElement={
             <div className="flex items-center gap-2" title="Show light indicators in scene">
               <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-semibold">
@@ -55,7 +56,12 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
 
         {/* Light Editor (when light selected - includes ambient light) */}
         {hasSelectedLight && (
-          <ControlGroup title="Light Properties" collapsible defaultOpen>
+          <ControlGroup
+            title="Light Properties"
+            collapsible
+            defaultOpen
+            data-testid="control-group-light-properties"
+          >
             <LightEditor />
           </ControlGroup>
         )}

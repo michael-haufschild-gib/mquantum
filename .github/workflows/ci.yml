@@ -41,11 +41,37 @@ jobs:
       - name: Test with coverage
         run: npx vitest run --coverage
 
-      # build:web skips wasm:build — Rust/wasm-pack not installed in CI.
-      # WASM is animation math only with a JS fallback, so this is safe.
-      # If Rust code breaks, the app degrades gracefully to JS animation.
+      # build:web skips wasm:build — the separate `wasm` job handles that.
+      # WASM has JS fallbacks, so the main build doesn't need it.
       - name: Build
         run: npm run build:web
 
       - name: Bundle size budget
         run: node scripts/check-bundle-size.js
+
+  # Separate optional job — verifies Rust/WASM compilation without blocking PRs.
+  # The main `ci` job does NOT depend on this; WASM has JS fallbacks.
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/wasm/mdimension_core
+
+      - uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Build WASM
+        run: wasm-pack build ./src/wasm/mdimension_core --target web
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src/wasm/mdimension_core/Cargo.toml --target wasm32-unknown-unknown -- -D warnings

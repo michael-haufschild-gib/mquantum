@@ -76,6 +76,7 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
       <ObservablesDisplay
         enabled={tdse.observablesEnabled}
         onEnabledChange={setObservablesEnabled}
+        hbar={tdse.hbar}
       />
     </>
   )
@@ -326,13 +327,26 @@ function formatNum(v: number): string {
 
 const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 
+/** Maximum number of per-dimension uncertainty sparklines to display */
+const MAX_SPARKLINE_DIMS = 3
+
 interface ObservablesDisplayProps {
   enabled: boolean
   onEnabledChange: (enabled: boolean) => void
+  /** Reduced Planck constant, used to display the ℏ/2 bound on sparklines */
+  hbar: number
 }
 
+/**
+ * Observable expectation values display.
+ * Shows per-dimension position/momentum statistics, energy sparkline,
+ * and uncertainty product sparklines with ℏ/2 reference lines.
+ *
+ * @param props - Component props
+ * @returns Observables control group
+ */
 const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
-  ({ enabled, onEnabledChange }) => {
+  ({ enabled, onEnabledChange, hbar }) => {
     const obs = useObservablesDiagnosticsStore(
       useShallow((s) => ({
         hasData: s.hasData,
@@ -350,11 +364,15 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
       }))
     )
 
+    const minUncertainty = hbar / 2
+    const sparklineDims = Math.min(obs.activeDims, MAX_SPARKLINE_DIMS)
+
     return (
       <ControlGroup
         title="Observables"
         collapsible
         defaultOpen={false}
+        data-testid="control-group-observables"
         rightElement={
           <Switch
             checked={enabled}
@@ -364,7 +382,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
         }
       >
         {enabled && obs.hasData && (
-          <div className="space-y-3">
+          <div className="space-y-3" data-testid="observables-panel">
             {/* Per-dimension table */}
             <div className="text-[10px] font-mono space-y-0.5">
               <div className="flex gap-2 text-text-tertiary font-semibold">
@@ -378,6 +396,8 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
               {Array.from({ length: obs.activeDims }, (_, d) => {
                 const dx = Math.sqrt(Math.max(0, obs.positionVariance[d]!))
                 const dp = Math.sqrt(Math.max(0, obs.momentumVariance[d]!))
+                const product = obs.uncertaintyProduct[d]!
+                const isViolation = product < minUncertainty * 0.9
                 return (
                   <div key={d} className="flex gap-2 text-text-secondary">
                     <span className="w-4 text-text-tertiary">{DIM_LABELS[d]}</span>
@@ -385,7 +405,12 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
                     <span className="w-12 text-right">{dx.toFixed(3)}</span>
                     <span className="w-16 text-right">{obs.momentumMean[d]!.toFixed(3)}</span>
                     <span className="w-12 text-right">{dp.toFixed(3)}</span>
-                    <span className="w-14 text-right">{obs.uncertaintyProduct[d]!.toFixed(4)}</span>
+                    <span
+                      className={`w-14 text-right ${isViolation ? 'text-red-400' : ''}`}
+                      data-testid={`uncertainty-product-${d}`}
+                    >
+                      {product.toFixed(4)}
+                    </span>
                   </div>
                 )
               })}
@@ -393,7 +418,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
 
             {/* Energy sparkline */}
             <div className="space-y-1">
-              <div className="text-[10px] text-text-tertiary">
+              <div className="text-[10px] text-text-tertiary" data-testid="energy-readout">
                 &lt;E&gt; = {obs.totalEnergy.toFixed(4)}
               </div>
               <Sparkline
@@ -405,27 +430,38 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
               />
             </div>
 
-            {/* First dimension uncertainty sparkline */}
-            {obs.activeDims > 0 && obs.historyUncertainty[0] && (
-              <div className="space-y-1">
-                <div className="text-[10px] text-text-tertiary">
-                  &Delta;x&Delta;p ({DIM_LABELS[0]})
+            {/* Per-dimension uncertainty sparklines (up to MAX_SPARKLINE_DIMS) */}
+            {Array.from({ length: sparklineDims }, (_, d) => {
+              const histData = obs.historyUncertainty[d]
+              if (!histData) return null
+              return (
+                <div key={d} className="space-y-1" data-testid={`uncertainty-sparkline-${d}`}>
+                  <div className="text-[10px] text-text-tertiary">
+                    &Delta;{DIM_LABELS[d]}&Delta;p
+                    <span className="text-text-quaternary ms-1">
+                      (bound: {minUncertainty.toFixed(2)})
+                    </span>
+                  </div>
+                  <Sparkline
+                    data={histData}
+                    head={obs.historyHead}
+                    count={obs.historyCount}
+                    height={28}
+                    min={0}
+                    className="w-full"
+                    referenceLine={minUncertainty}
+                    referenceLabel={`\u210F/2`}
+                  />
                 </div>
-                <Sparkline
-                  data={obs.historyUncertainty[0]}
-                  head={obs.historyHead}
-                  count={obs.historyCount}
-                  height={28}
-                  min={0}
-                  className="w-full"
-                />
-              </div>
-            )}
+              )
+            })}
           </div>
         )}
 
         {enabled && !obs.hasData && (
-          <div className="text-[10px] text-text-tertiary">Waiting for GPU readback...</div>
+          <div className="text-[10px] text-text-tertiary" data-testid="observables-waiting">
+            Waiting for GPU readback...
+          </div>
         )}
       </ControlGroup>
     )

@@ -51,6 +51,7 @@ export const QUANTUM_MODE_MAP: Record<string, number> = {
   tdseDynamics: 3,
   becDynamics: 4,
   diracEquation: 5,
+  quantumWalk: 6,
 }
 
 /** Maps color algorithm names to shader integer constants */

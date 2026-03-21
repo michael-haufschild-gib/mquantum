@@ -17,6 +17,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { BECAnalysisContent } from '@/components/sections/Advanced/BECAnalysisSection'
 import { DiracAnalysisContent } from '@/components/sections/Advanced/DiracAnalysisSection'
 import { FSFAnalysisContent } from '@/components/sections/Advanced/FSFAnalysisSection'
+import { MeasurementControls } from '@/components/sections/Advanced/MeasurementControls'
 import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalysisSection'
 import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
 import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
@@ -29,17 +30,23 @@ import { Switch } from '@/components/ui/Switch'
 import {
   downloadFile,
   exportBecDiagnosticsCSV,
+  exportDiagnosticsJSON,
+  exportDiracDiagnosticsCSV,
   exportFilename,
   exportFsfDiagnosticsCSV,
   exportObservablesDiagnosticsCSV,
   exportOpenQuantumDiagnosticsCSV,
+  exportPauliDiagnosticsCSV,
   exportTdseDiagnosticsCSV,
+  exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
 import { useCarpetStore } from '@/stores/carpetStore'
+import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
+import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
+import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 /**
  * Props for AnalysisSection.
@@ -80,9 +87,11 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       classicalOverlayEnabled,
       classicalOverlayTrailFraction,
       classicalOverlayColor,
+      classicalOverlayHbar,
       setClassicalOverlayEnabled,
       setClassicalOverlayTrailFraction,
       setClassicalOverlayColor,
+      setClassicalOverlayHbar,
       setFsfDiagnosticsEnabled,
       setTdseDiagnosticsEnabled,
       setBecDiagnosticsEnabled,
@@ -95,9 +104,11 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         classicalOverlayEnabled: s.schroedinger.classicalOverlayEnabled,
         classicalOverlayTrailFraction: s.schroedinger.classicalOverlayTrailFraction,
         classicalOverlayColor: s.schroedinger.classicalOverlayColor,
+        classicalOverlayHbar: s.schroedinger.classicalOverlayHbar,
         setClassicalOverlayEnabled: s.setSchroedingerClassicalOverlayEnabled,
         setClassicalOverlayTrailFraction: s.setSchroedingerClassicalOverlayTrailFraction,
         setClassicalOverlayColor: s.setSchroedingerClassicalOverlayColor,
+        setClassicalOverlayHbar: s.setSchroedingerClassicalOverlayHbar,
         setFsfDiagnosticsEnabled: s.setFreeScalarDiagnosticsEnabled,
         setTdseDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
         setBecDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
@@ -107,6 +118,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     )
     const objectType = useGeometryStore((s) => s.objectType)
     const dimension = useGeometryStore((s) => s.dimension)
+    const observablesHasData = useObservablesDiagnosticsStore((s) => s.hasData)
 
     // Wire diagnosticsEnabled to section open/close state for all dynamic modes
     const handleOpenChange = useCallback(
@@ -150,6 +162,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
           data-testid="analysis-section"
         >
           <PauliAnalysisContent />
+          <DataExportButtons quantumMode="pauliSpinor" />
         </Section>
       )
     }
@@ -174,11 +187,14 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
-        {quantumMode === 'harmonicOscillator' && dimension === 3 && (
+        {((quantumMode === 'harmonicOscillator' && dimension >= 3) ||
+          quantumMode === 'tdseDynamics' ||
+          quantumMode === 'becDynamics') && (
           <ControlGroup
             title="Classical Trajectory"
             collapsible
             defaultOpen={false}
+            data-testid="control-group-classical-trajectory"
             rightElement={
               <Switch
                 checked={classicalOverlayEnabled}
@@ -200,6 +216,25 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
                   showValue
                   data-testid="classical-overlay-trail"
                 />
+                {quantumMode === 'harmonicOscillator' && (
+                  <Slider
+                    label="Effective \u210F"
+                    tooltip="Scales the quantum wavepacket width. At small values the cloud narrows onto the classical trajectory; at 1.0 the cloud is physical."
+                    min={0.01}
+                    max={2.0}
+                    step={0.01}
+                    value={classicalOverlayHbar}
+                    onChange={setClassicalOverlayHbar}
+                    showValue
+                    data-testid="classical-overlay-hbar"
+                  />
+                )}
+                {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') &&
+                  !observablesHasData && (
+                    <p className="text-xs text-text-tertiary">
+                      Enable Observables to see the Ehrenfest trajectory.
+                    </p>
+                  )}
                 <div
                   className="flex items-center justify-between"
                   data-testid="classical-overlay-color"
@@ -231,65 +266,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && (
           <MeasurementControls />
         )}
-        {!isAnalytic && (
-          <ControlGroup title="Data Export" collapsible defaultOpen={false}>
-            <div className="space-y-1.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  let csv = ''
-                  let prefix = 'mdim'
-                  if (quantumMode === 'tdseDynamics') {
-                    csv = exportTdseDiagnosticsCSV()
-                    prefix = 'mdim-tdse'
-                  } else if (quantumMode === 'becDynamics') {
-                    csv = exportBecDiagnosticsCSV()
-                    prefix = 'mdim-bec'
-                  } else if (quantumMode === 'freeScalarField') {
-                    csv = exportFsfDiagnosticsCSV()
-                    prefix = 'mdim-fsf'
-                  }
-                  if (csv) downloadFile(csv, exportFilename(prefix, 'csv'))
-                }}
-                data-testid="export-diagnostics-csv"
-              >
-                Export Diagnostics (CSV)
-              </Button>
-              {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    const csv = exportObservablesDiagnosticsCSV()
-                    if (csv) downloadFile(csv, exportFilename('mdim-observables', 'csv'))
-                  }}
-                  data-testid="export-observables-csv"
-                >
-                  Export Observables (CSV)
-                </Button>
-              )}
-              {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && (
-                <SaveLoadButtons />
-              )}
-            </div>
-          </ControlGroup>
-        )}
-        {isAnalytic && (
-          <ControlGroup title="Data Export" collapsible defaultOpen={false}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const csv = exportOpenQuantumDiagnosticsCSV()
-                if (csv) downloadFile(csv, exportFilename('mdim-openquantum', 'csv'))
-              }}
-              data-testid="export-openquantum-csv"
-            >
-              Export Open Quantum (CSV)
-            </Button>
-          </ControlGroup>
-        )}
+        <DataExportButtons quantumMode={quantumMode} observablesHasData={observablesHasData} />
       </Section>
     )
   }
@@ -297,94 +274,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
 
 AnalysisSection.displayName = 'AnalysisSection'
 
-/* ────────────────────────────────────────────────────────────── */
-/*  Measurement Controls                                         */
-/* ────────────────────────────────────────────────────────────── */
-
-const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
-
-const MeasurementControls: React.FC = React.memo(() => {
-  const {
-    enabled,
-    measurements,
-    totalCount,
-    collapseWidth,
-    positionMean,
-    positionStd,
-    setEnabled,
-    setCollapseWidth,
-    clearMeasurements,
-  } = useMeasurementStore(
-    useShallow((s) => ({
-      enabled: s.enabled,
-      measurements: s.measurements,
-      totalCount: s.totalCount,
-      collapseWidth: s.collapseWidth,
-      positionMean: s.positionMean,
-      positionStd: s.positionStd,
-      setEnabled: s.setEnabled,
-      setCollapseWidth: s.setCollapseWidth,
-      clearMeasurements: s.clearMeasurements,
-    }))
-  )
-
-  return (
-    <ControlGroup
-      title="Measurement"
-      collapsible
-      defaultOpen={false}
-      rightElement={
-        <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="measurement-toggle" />
-      }
-    >
-      {enabled && (
-        <div className="space-y-3">
-          <Slider
-            label="Collapse Width"
-            tooltip="Width of the post-measurement Gaussian collapse. Smaller values give more localized collapse."
-            min={0.05}
-            max={2.0}
-            step={0.05}
-            value={collapseWidth}
-            onChange={setCollapseWidth}
-            showValue
-            data-testid="measurement-collapse-width"
-          />
-
-          <div className="text-[10px] text-text-secondary">Measurements: {totalCount}</div>
-
-          {measurements.length > 0 && positionMean.length > 0 && (
-            <div className="text-[10px] font-mono space-y-0.5">
-              <div className="flex gap-2 text-text-tertiary font-semibold">
-                <span className="w-4">d</span>
-                <span className="w-16 text-right">mean</span>
-                <span className="w-12 text-right">std</span>
-              </div>
-              {positionMean.map((mean, d) => (
-                <div key={d} className="flex gap-2 text-text-secondary">
-                  <span className="w-4 text-text-tertiary">{DIM_LABELS[d]}</span>
-                  <span className="w-16 text-right">{mean.toFixed(3)}</span>
-                  <span className="w-12 text-right">{(positionStd[d] ?? 0).toFixed(3)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearMeasurements}
-            data-testid="measurement-clear"
-          >
-            Clear Measurements
-          </Button>
-        </div>
-      )}
-    </ControlGroup>
-  )
-})
-
-MeasurementControls.displayName = 'MeasurementControls'
+/* MeasurementControls extracted to ./MeasurementControls.tsx */
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Save/Load State Buttons                                       */
@@ -435,3 +325,158 @@ const SaveLoadButtons: React.FC = React.memo(() => {
 })
 
 SaveLoadButtons.displayName = 'SaveLoadButtons'
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Data Export Buttons                                           */
+/* ────────────────────────────────────────────────────────────── */
+
+const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
+  tdseDynamics: { fn: exportTdseDiagnosticsCSV, prefix: 'mdim-tdse' },
+  becDynamics: { fn: exportBecDiagnosticsCSV, prefix: 'mdim-bec' },
+  freeScalarField: { fn: exportFsfDiagnosticsCSV, prefix: 'mdim-fsf' },
+  diracEquation: { fn: exportDiracDiagnosticsCSV, prefix: 'mdim-dirac' },
+  pauliSpinor: { fn: exportPauliDiagnosticsCSV, prefix: 'mdim-pauli' },
+}
+
+/**
+ * Unified data export controls for all quantum modes.
+ * Renders CSV and JSON export buttons, observables export, wavefunction
+ * slice export, and save/load controls as appropriate for the mode.
+ */
+const DataExportButtons: React.FC<{
+  quantumMode: string
+  observablesHasData?: boolean
+}> = React.memo(({ quantumMode, observablesHasData }) => {
+  const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
+  const isDynamic = !isAnalytic && quantumMode !== 'pauliSpinor'
+  const hasSaveLoad =
+    quantumMode === 'tdseDynamics' ||
+    quantumMode === 'becDynamics' ||
+    quantumMode === 'freeScalarField' ||
+    quantumMode === 'diracEquation' ||
+    quantumMode === 'pauliSpinor'
+
+  // Wavefunction slice availability
+  const densitySliceAvailable = useDensityDiagnosticsStore(
+    (s) => s.sliceX !== null && s.sliceGridSize > 0
+  )
+  const wfSliceHasData = useWavefunctionSliceStore((s) => s.hasData)
+
+  return (
+    <ControlGroup
+      title="Data Export"
+      collapsible
+      defaultOpen={false}
+      data-testid="data-export-group"
+    >
+      <div className="space-y-1.5">
+        {/* Mode-specific diagnostics CSV */}
+        {CSV_EXPORTERS[quantumMode] && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const exporter = CSV_EXPORTERS[quantumMode]!
+              const csv = exporter.fn()
+              if (csv) downloadFile(csv, exportFilename(exporter.prefix, 'csv'))
+            }}
+            data-testid="export-diagnostics-csv"
+          >
+            Export Diagnostics (CSV)
+          </Button>
+        )}
+
+        {/* Open quantum metrics CSV (analytic modes) */}
+        {isAnalytic && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const csv = exportOpenQuantumDiagnosticsCSV()
+              if (csv) downloadFile(csv, exportFilename('mdim-openquantum', 'csv'))
+            }}
+            data-testid="export-openquantum-csv"
+          >
+            Export Open Quantum (CSV)
+          </Button>
+        )}
+
+        {/* Observables CSV (TDSE/BEC with data) */}
+        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') &&
+          observablesHasData && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const csv = exportObservablesDiagnosticsCSV()
+                if (csv) downloadFile(csv, exportFilename('mdim-observables', 'csv'))
+              }}
+              data-testid="export-observables-csv"
+            >
+              Export Observables (CSV)
+            </Button>
+          )}
+
+        {/* Wavefunction slice CSV (analytic: from density grid) */}
+        {isAnalytic && densitySliceAvailable && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const csv = exportWavefunctionSliceCSV('density', 'x')
+              if (csv) downloadFile(csv, exportFilename('mdim-slice-x', 'csv'))
+            }}
+            data-testid="export-slice-csv"
+          >
+            Export |&psi;|&sup2; Slice (CSV)
+          </Button>
+        )}
+
+        {/* Wavefunction slice capture (dynamic modes) */}
+        {isDynamic && !wfSliceHasData && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              useWavefunctionSliceStore.getState().requestCapture('x')
+            }}
+            data-testid="capture-slice"
+          >
+            Capture |&psi;|&sup2; Slice
+          </Button>
+        )}
+        {isDynamic && wfSliceHasData && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const csv = exportWavefunctionSliceCSV('wavefunction', 'x')
+              if (csv) downloadFile(csv, exportFilename('mdim-slice', 'csv'))
+            }}
+            data-testid="export-slice-csv"
+          >
+            Export |&psi;|&sup2; Slice (CSV)
+          </Button>
+        )}
+
+        {/* JSON export (all modes) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            const json = exportDiagnosticsJSON(quantumMode)
+            downloadFile(json, exportFilename('mdim-diagnostics', 'json'), 'application/json')
+          }}
+          data-testid="export-diagnostics-json"
+        >
+          Export All (JSON)
+        </Button>
+
+        {/* Save/Load state (TDSE/BEC only) */}
+        {hasSaveLoad && <SaveLoadButtons />}
+      </div>
+    </ControlGroup>
+  )
+})
+
+DataExportButtons.displayName = 'DataExportButtons'

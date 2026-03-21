@@ -1,0 +1,217 @@
+/**
+ * TDSE Gram-Schmidt module tests.
+ *
+ * Tests the CPU-side state management for eigenstate storage and
+ * Gram-Schmidt orthogonalization dispatch. GPU buffer creation
+ * and dispatch calls are mocked since WebGPU is unavailable in vitest.
+ *
+ * Key behaviors tested:
+ * - ensureGSBuffers creates buffers only once
+ * - storeCurrentEigenstate copies psi and increments count
+ * - clearEigenstates destroys all eigenstate buffers
+ * - MAX_STORED_EIGENSTATES enforced
+ * - dispatchGramSchmidt skips when no eigenstates stored
+ */
+import { describe, expect, it, vi } from 'vitest'
+
+import {
+  clearEigenstates,
+  destroyGSBuffers,
+  ensureGSBuffers,
+  type GramSchmidtState,
+  MAX_STORED_EIGENSTATES,
+  storeCurrentEigenstate,
+} from '@/rendering/webgpu/passes/TDSEGramSchmidt'
+
+function createMockBuffer(label?: string): GPUBuffer {
+  return {
+    label: label ?? 'mock-buffer',
+    size: 1024,
+    usage: 0,
+    mapState: 'unmapped',
+    destroy: vi.fn(),
+    getMappedRange: vi.fn(),
+    mapAsync: vi.fn(),
+    unmap: vi.fn(),
+  } as unknown as GPUBuffer
+}
+
+function createMockDevice(): GPUDevice {
+  return {
+    createBuffer: vi.fn(() => createMockBuffer()),
+    createCommandEncoder: vi.fn(() => ({
+      copyBufferToBuffer: vi.fn(),
+      finish: vi.fn(() => 'command-buffer'),
+    })),
+    queue: {
+      submit: vi.fn(),
+      writeBuffer: vi.fn(),
+    },
+  } as unknown as GPUDevice
+}
+
+function createGSState(overrides: Partial<GramSchmidtState> = {}): GramSchmidtState {
+  return {
+    gsEigenstates: [],
+    gsUniformBuffer: null,
+    gsPartialReBuffer: null,
+    gsPartialImBuffer: null,
+    gsResultBuffer: null,
+    gsNumWorkgroups: 0,
+    psiReBuffer: null,
+    psiImBuffer: null,
+    totalSites: 0,
+    pl: null,
+    ...overrides,
+  }
+}
+
+describe('ensureGSBuffers', () => {
+  it('creates uniform, partial, and result buffers', () => {
+    const device = createMockDevice()
+    const state = createGSState({ totalSites: 1024 })
+
+    ensureGSBuffers(device, state)
+
+    // Verify all 4 buffers were created and assigned
+    expect(device.createBuffer).toHaveBeenCalledTimes(4)
+    expect(state.gsUniformBuffer).toHaveProperty('label', 'mock-buffer')
+    expect(state.gsPartialReBuffer).toHaveProperty('label', 'mock-buffer')
+    expect(state.gsPartialImBuffer).toHaveProperty('label', 'mock-buffer')
+    expect(state.gsResultBuffer).toHaveProperty('label', 'mock-buffer')
+  })
+
+  it('computes workgroup count from totalSites / 256', () => {
+    const device = createMockDevice()
+    const state = createGSState({ totalSites: 512 })
+
+    ensureGSBuffers(device, state)
+
+    // ceil(512 / 256) = 2
+    expect(state.gsNumWorkgroups).toBe(2)
+  })
+
+  it('does not recreate buffers on subsequent calls', () => {
+    const device = createMockDevice()
+    const state = createGSState({ totalSites: 1024 })
+
+    ensureGSBuffers(device, state)
+    ensureGSBuffers(device, state)
+
+    expect(device.createBuffer).toHaveBeenCalledTimes(4)
+  })
+})
+
+describe('storeCurrentEigenstate', () => {
+  it('returns -1 when psi buffers are null', () => {
+    const device = createMockDevice()
+    const state = createGSState()
+
+    const result = storeCurrentEigenstate(device, state)
+
+    expect(result).toBe(-1)
+  })
+
+  it('copies psi buffers and increments eigenstate count', () => {
+    const device = createMockDevice()
+    const state = createGSState({
+      psiReBuffer: createMockBuffer('psi-re'),
+      psiImBuffer: createMockBuffer('psi-im'),
+      totalSites: 256,
+    })
+
+    const count = storeCurrentEigenstate(device, state)
+
+    expect(count).toBe(1)
+    expect(state.gsEigenstates).toHaveLength(1)
+    // 2 buffers created for the eigenstate copy (re + im)
+    expect(device.createBuffer).toHaveBeenCalledTimes(2)
+    expect(device.queue.submit).toHaveBeenCalledTimes(1)
+  })
+
+  it('stores multiple eigenstates up to MAX_STORED_EIGENSTATES', () => {
+    const device = createMockDevice()
+    const state = createGSState({
+      psiReBuffer: createMockBuffer('psi-re'),
+      psiImBuffer: createMockBuffer('psi-im'),
+      totalSites: 256,
+    })
+
+    for (let i = 0; i < MAX_STORED_EIGENSTATES; i++) {
+      const count = storeCurrentEigenstate(device, state)
+      expect(count).toBe(i + 1)
+    }
+
+    expect(state.gsEigenstates).toHaveLength(MAX_STORED_EIGENSTATES)
+  })
+
+  it('returns -1 when storage is full', () => {
+    const device = createMockDevice()
+    const state = createGSState({
+      psiReBuffer: createMockBuffer('psi-re'),
+      psiImBuffer: createMockBuffer('psi-im'),
+      totalSites: 256,
+    })
+
+    for (let i = 0; i < MAX_STORED_EIGENSTATES; i++) {
+      storeCurrentEigenstate(device, state)
+    }
+
+    const result = storeCurrentEigenstate(device, state)
+    expect(result).toBe(-1)
+  })
+})
+
+describe('clearEigenstates', () => {
+  it('destroys all eigenstate buffers and resets array', () => {
+    const buf1Re = createMockBuffer('es-0-re')
+    const buf1Im = createMockBuffer('es-0-im')
+    const buf2Re = createMockBuffer('es-1-re')
+    const buf2Im = createMockBuffer('es-1-im')
+    const state = createGSState()
+    state.gsEigenstates = [
+      { re: buf1Re, im: buf1Im },
+      { re: buf2Re, im: buf2Im },
+    ]
+
+    clearEigenstates(state)
+
+    expect(buf1Re.destroy).toHaveBeenCalled()
+    expect(buf1Im.destroy).toHaveBeenCalled()
+    expect(buf2Re.destroy).toHaveBeenCalled()
+    expect(buf2Im.destroy).toHaveBeenCalled()
+    expect(state.gsEigenstates).toHaveLength(0)
+  })
+})
+
+describe('destroyGSBuffers', () => {
+  it('clears eigenstates and destroys all GS infrastructure buffers', () => {
+    const uniform = createMockBuffer('gs-uniform')
+    const partialRe = createMockBuffer('gs-partial-re')
+    const partialIm = createMockBuffer('gs-partial-im')
+    const result = createMockBuffer('gs-result')
+    const state = createGSState({
+      gsUniformBuffer: uniform,
+      gsPartialReBuffer: partialRe,
+      gsPartialImBuffer: partialIm,
+      gsResultBuffer: result,
+    })
+
+    destroyGSBuffers(state)
+
+    expect(uniform.destroy).toHaveBeenCalled()
+    expect(partialRe.destroy).toHaveBeenCalled()
+    expect(partialIm.destroy).toHaveBeenCalled()
+    expect(result.destroy).toHaveBeenCalled()
+    expect(state.gsUniformBuffer).toBeNull()
+    expect(state.gsPartialReBuffer).toBeNull()
+    expect(state.gsPartialImBuffer).toBeNull()
+    expect(state.gsResultBuffer).toBeNull()
+  })
+})
+
+describe('MAX_STORED_EIGENSTATES', () => {
+  it('is 8 (matches UI button disable threshold)', () => {
+    expect(MAX_STORED_EIGENSTATES).toBe(8)
+  })
+})

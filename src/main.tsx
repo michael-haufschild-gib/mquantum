@@ -22,15 +22,17 @@ import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useUIStore } from '@/stores/uiStore'
 
-window.__GEOMETRY_STORE__ = useGeometryStore
-window.__UI_STORE__ = useUIStore
-window.__ENVIRONMENT_STORE__ = useEnvironmentStore
-window.__APPEARANCE_STORE__ = useAppearanceStore
-window.__LAYOUT_STORE__ = useLayoutStore
-window.__POST_PROCESSING_STORE__ = usePostProcessingStore
-window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
-window.__PERFORMANCE_STORE__ = usePerformanceStore
-window.__PERFORMANCE_METRICS_STORE__ = usePerformanceMetricsStore
+if (import.meta.env.DEV) {
+  window.__GEOMETRY_STORE__ = useGeometryStore
+  window.__UI_STORE__ = useUIStore
+  window.__ENVIRONMENT_STORE__ = useEnvironmentStore
+  window.__APPEARANCE_STORE__ = useAppearanceStore
+  window.__LAYOUT_STORE__ = useLayoutStore
+  window.__POST_PROCESSING_STORE__ = usePostProcessingStore
+  window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
+  window.__PERFORMANCE_STORE__ = usePerformanceStore
+  window.__PERFORMANCE_METRICS_STORE__ = usePerformanceMetricsStore
+}
 
 const rootElement = document.getElementById('root')
 

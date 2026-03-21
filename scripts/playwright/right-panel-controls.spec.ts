@@ -15,7 +15,7 @@
  * - Performance section not mounting in System tab
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import {
   capturePixelSnapshot,
   pauseAnimation,
@@ -63,9 +63,7 @@ test.describe('right panel: post-processing controls', () => {
       return mod.usePostProcessingStore.getState().bloomEnabled
     })
 
-    // The Switch component uses an <input role="switch"> inside a <label>.
-    // Clicking the label text toggles the checkbox.
-    await page.getByText('Enable Bloom').click()
+    await page.getByTestId('bloom-enabled-switch').click()
 
     // Verify store updated
     await expect(async () => {

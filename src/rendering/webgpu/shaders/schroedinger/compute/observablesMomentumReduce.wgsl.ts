@@ -34,9 +34,9 @@ struct ObsMomReduceUniforms {
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> partials: array<f32>;
 
-const MAX_CHANNELS: u32 = 23u;
+const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 5888>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> shared: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
 
 @compute @workgroup_size(256)
 fn main(
@@ -119,9 +119,9 @@ struct ObsMomReduceUniforms {
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
 
-const MAX_CHANNELS: u32 = 23u;
+const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 5888>;
+var<workgroup> shared: array<f32, 6144>;
 
 @compute @workgroup_size(256)
 fn main(

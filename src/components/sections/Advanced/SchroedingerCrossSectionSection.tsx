@@ -151,6 +151,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
         title="Slice Plane"
         collapsible
         defaultOpen
+        data-testid="control-group-slice-plane"
         rightElement={
           <Switch
             checked={config.crossSectionEnabled ?? false}
@@ -335,6 +336,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
           title="Radial Probability P(r)"
           collapsible
           defaultOpen={false}
+          data-testid="control-group-radial-probability"
           rightElement={
             <Switch
               checked={config.radialProbabilityEnabled ?? false}

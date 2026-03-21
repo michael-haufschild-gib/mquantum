@@ -2,7 +2,8 @@
  * Measurement Store
  *
  * Tracks accumulated Born rule measurement results and statistics
- * for the measurement simulation feature (C3).
+ * for the measurement simulation feature (C3). Supports full and
+ * partial (per-axis) measurement in N dimensions.
  *
  * @module stores/measurementStore
  */
@@ -20,6 +21,14 @@ export interface MeasurementRecord {
   density: number
   /** Measurement index (sequential) */
   index: number
+  /** Which axis was measured (null = full measurement) */
+  measuredAxis: number | null
+}
+
+/** Pending measurement request from a canvas click. */
+export interface PendingMeasurement {
+  /** 3D world-space click position (from raycast) */
+  clickPosition: [number, number, number]
 }
 
 interface MeasurementState {
@@ -29,10 +38,19 @@ interface MeasurementState {
   measurements: MeasurementRecord[]
   /** Total number of measurements taken (including cleared) */
   totalCount: number
-  /** Collapse Gaussian width (σ in world units) */
+  /** Collapse Gaussian width (sigma in world units) */
   collapseWidth: number
   /** Auto-evolve: frames to evolve after collapse before next measurement */
   autoEvolveFrames: number
+
+  /** Axis to measure (null = full measurement of all axes) */
+  measureAxis: number | null
+  /** Whether a measurement readback/collapse is in progress */
+  isCollapsing: boolean
+  /** Pending measurement request from canvas click */
+  pendingMeasurement: PendingMeasurement | null
+  /** Post-collapse cooldown counter (frames remaining) */
+  cooldownFrames: number
 
   /** Per-dimension mean of measured positions */
   positionMean: number[]
@@ -42,6 +60,11 @@ interface MeasurementState {
   setEnabled: (enabled: boolean) => void
   setCollapseWidth: (width: number) => void
   setAutoEvolveFrames: (frames: number) => void
+  setMeasureAxis: (axis: number | null) => void
+  requestMeasurement: (clickPosition: [number, number, number]) => void
+  startCollapse: () => void
+  completeMeasurement: (position: number[], density: number, measuredAxis: number | null) => void
+  tickCooldown: () => void
   addMeasurement: (position: number[], density: number) => void
   clearMeasurements: () => void
 }
@@ -79,6 +102,10 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
   totalCount: 0,
   collapseWidth: 0.3,
   autoEvolveFrames: 30,
+  measureAxis: null,
+  isCollapsing: false,
+  pendingMeasurement: null,
+  cooldownFrames: 0,
   positionMean: [],
   positionStd: [],
 
@@ -86,6 +113,36 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
   setCollapseWidth: (width) => set({ collapseWidth: Math.max(0.05, Math.min(5, width)) }),
   setAutoEvolveFrames: (frames) =>
     set({ autoEvolveFrames: Math.max(1, Math.min(300, Math.floor(frames))) }),
+  setMeasureAxis: (axis) => set({ measureAxis: axis }),
+
+  requestMeasurement: (clickPosition) => set({ pendingMeasurement: { clickPosition } }),
+
+  startCollapse: () => set({ isCollapsing: true, pendingMeasurement: null }),
+
+  completeMeasurement: (position, density, measuredAxis) => {
+    set((state) => {
+      const record: MeasurementRecord = {
+        position: [...position],
+        density,
+        index: state.totalCount,
+        measuredAxis,
+      }
+      const measurements = [...state.measurements, record].slice(-MAX_MEASUREMENTS)
+      const stats = computeStats(measurements)
+      return {
+        measurements,
+        totalCount: state.totalCount + 1,
+        isCollapsing: false,
+        cooldownFrames: state.autoEvolveFrames,
+        ...stats,
+      }
+    })
+  },
+
+  tickCooldown: () =>
+    set((state) => ({
+      cooldownFrames: Math.max(0, state.cooldownFrames - 1),
+    })),
 
   addMeasurement: (position, density) => {
     set((state) => {
@@ -93,6 +150,7 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
         position: [...position],
         density,
         index: state.totalCount,
+        measuredAxis: null,
       }
       const measurements = [...state.measurements, record].slice(-MAX_MEASUREMENTS)
       const stats = computeStats(measurements)
@@ -110,5 +168,8 @@ export const useMeasurementStore = create<MeasurementState>((set) => ({
       totalCount: 0,
       positionMean: [],
       positionStd: [],
+      isCollapsing: false,
+      cooldownFrames: 0,
+      pendingMeasurement: null,
     }),
 }))

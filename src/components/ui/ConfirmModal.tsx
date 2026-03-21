@@ -12,6 +12,8 @@ interface ConfirmModalProps {
   confirmText?: string
   cancelText?: string
   isDestructive?: boolean
+  /** Prefix for data-testid attributes (e.g. "delete-scene" → "delete-scene-confirm") */
+  'data-testid'?: string
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = React.memo(
@@ -24,6 +26,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = React.memo(
     confirmText = 'Confirm',
     cancelText = 'Cancel',
     isDestructive = false,
+    'data-testid': testId = 'confirm-modal',
   }) => {
     const handleConfirm = useCallback(() => {
       onConfirm()
@@ -35,13 +38,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = React.memo(
         <div className="space-y-4">
           <div className="text-text-secondary text-sm">{message}</div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={onClose} size="sm">
+            <Button variant="ghost" onClick={onClose} size="sm" data-testid={`${testId}-cancel`}>
               {cancelText}
             </Button>
             <Button
               variant={isDestructive ? 'danger' : 'primary'}
               onClick={handleConfirm}
               size="sm"
+              data-testid={`${testId}-confirm`}
             >
               {confirmText}
             </Button>

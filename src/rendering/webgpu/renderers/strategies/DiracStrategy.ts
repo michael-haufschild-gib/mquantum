@@ -5,6 +5,7 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { DiracComputePass } from '../../passes/DiracComputePass'
@@ -122,6 +123,20 @@ export class DiracStrategy implements QuantumModeStrategy {
 
     if (diracConfig.needsReset) {
       extended?.clearDiracNeedsReset?.()
+    }
+
+    // Simulation state save/load
+    const simState = useSimulationStateStore.getState()
+    if (simState.saveRequested) {
+      simState.clearSaveRequest()
+      diracPass.requestStateSave(ctx)
+    }
+    if (simState.pendingLoadData) {
+      const loadData = simState.pendingLoadData
+      if (loadData.quantumMode === 'diracEquation') {
+        diracPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+        simState.clearLoadData()
+      }
     }
   }
 

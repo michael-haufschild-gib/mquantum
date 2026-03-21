@@ -421,6 +421,7 @@ function makeBaseParams(overrides: Partial<SchroedingerPackParams> = {}): Schroe
     rendererOpenQuantumEnabled: false,
     rendererQuantumMode: 'harmonicOscillator',
     rendererTermCount: 1,
+    observablesTrailData: null,
     ...overrides,
   }
 }

@@ -311,6 +311,7 @@ export function createVisualEffectSetters(
       }))
     },
     setSchroedingerClassicalOverlayColor: valueSetter('classicalOverlayColor'),
+    setSchroedingerClassicalOverlayHbar: clampedSetter('classicalOverlayHbar', 0.01, 2.0),
 
     // Second-quantization layer
     setSchroedingerSqLayerEnabled: valueSetter('sqLayerEnabled'),

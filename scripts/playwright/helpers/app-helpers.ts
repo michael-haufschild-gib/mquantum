@@ -98,6 +98,26 @@ export async function gotoMode(page: Page, mode: string, dim = 3): Promise<void>
 }
 
 /**
+ * Navigate to a quantum mode with extended URL params.
+ * Params are merged — only specified values override defaults.
+ *
+ * @example
+ * ```ts
+ * await gotoModeWithParams(page, 'tdseDynamics', 3, { obs: '1', diag: '1', pot: 'harmonicTrap' })
+ * ```
+ */
+export async function gotoModeWithParams(
+  page: Page,
+  mode: string,
+  dim: number,
+  params: Record<string, string>
+): Promise<void> {
+  const search = new URLSearchParams({ t: 'schroedinger', d: String(dim), qm: mode, ...params })
+  await page.goto(`/?${search.toString()}`)
+  await waitForAppLoaded(page)
+}
+
+/**
  * Check whether WebGPU is available.
  *
  * IMPORTANT: WebGPU requires a secure context (https: or localhost).

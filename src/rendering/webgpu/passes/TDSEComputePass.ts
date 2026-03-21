@@ -27,6 +27,7 @@ import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -52,8 +53,8 @@ import {
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
-/** TDSEUniforms struct size in bytes (704 = 636 + 48 trapAnisotropy + 16 radialWell + 4 pad) */
-const UNIFORM_SIZE = 704
+/** TDSEUniforms struct size in bytes (708 = 636 + 48 trapAnisotropy + 16 radialWell + 4 imagTime + 4 customScale) */
+const UNIFORM_SIZE = 708
 
 import type { DiagDispatchParams, FFTAxisParams } from './TDSEComputePassDispatchers'
 import {
@@ -70,8 +71,10 @@ import {
   type GramSchmidtState,
   storeCurrentEigenstate as gsStoreEigenstate,
 } from './TDSEGramSchmidt'
+import { requestMeasurementReadback as extRequestMeasurementReadback } from './TDSEMeasurementReadback'
 import {
   injectLoadedWavefunction,
+  requestSliceCapture as slRequestSlice,
   requestStateSave as slRequestSave,
   type SaveLoadState,
 } from './TDSEStateSaveLoad'
@@ -162,6 +165,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     obsEnabled: false,
     psiReBuffer: null,
     psiImBuffer: null,
+    potentialBuffer: null,
     fftScratchA: null,
     totalSites: 0,
     pl: null,
@@ -177,6 +181,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private fwdStageCount = 0
   private stepAccumulator = 0
   private omegaStagingBuffer: GPUBuffer | null = null
+  /** Max |V| from the last custom potential upload, for display normalization */
+  private customPotentialScale = 1.0
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -223,13 +229,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture
   }
-
-  /** Get latest diagnostics snapshot (totalNorm, maxDensity, normDrift) */
   getDiagnostics(): TdseDiagnosticsSnapshot | null {
     return this._diagState.diagHistory.getLatest()
   }
-
-  /** Get full diagnostics history */
   getDiagnosticsHistory(): readonly TdseDiagnosticsSnapshot[] {
     return this._diagState.diagHistory.getHistory()
   }
@@ -237,6 +239,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Delegate to extracted save/load module. */
   requestStateSave(ctx: WebGPURenderContext): void {
     slRequestSave(ctx, this._slState)
+  }
+
+  /** Delegate slice capture to the save/load module. */
+  requestSliceCapture(
+    ctx: WebGPURenderContext,
+    axis: 'x' | 'y' | 'z',
+    gridSize: number[],
+    worldBound: number
+  ): void {
+    slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
   }
 
   /** Set loaded wavefunction data for injection on next frame. */
@@ -254,6 +266,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     return this._gsState.gsEigenstates.length
   }
 
+  /** Request async readback of the current wavefunction for measurement. */
+  requestMeasurementReadback(
+    ctx: WebGPURenderContext
+  ): Promise<{ re: Float32Array; im: Float32Array } | null> {
+    return extRequestMeasurementReadback(ctx, {
+      psiReBuffer: this.psiReBuffer,
+      psiImBuffer: this.psiImBuffer,
+      totalSites: this.totalSites,
+    })
+  }
+
   /** Sync shared state objects with current buffer references. */
   private syncSharedState(): void {
     this._gsState.psiReBuffer = this.psiReBuffer
@@ -269,6 +292,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private syncObsState(): void {
     this._obsState.psiReBuffer = this.psiReBuffer
     this._obsState.psiImBuffer = this.psiImBuffer
+    this._obsState.potentialBuffer = this.potentialBuffer
     this._obsState.fftScratchA = this.fftScratchA
     this._obsState.totalSites = this.totalSites
     this._obsState.pl = this.pl
@@ -419,7 +443,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     // Fill potential buffer
     if (this.pl && this.bg) {
       if (config.potentialType === 'custom') {
-        uploadCustomPotentialBuffer(device, this.potentialBuffer, config)
+        this.customPotentialScale = uploadCustomPotentialBuffer(
+          device,
+          this.potentialBuffer,
+          config
+        )
       } else {
         const pass = ctx.beginComputePass({ label: 'tdse-potential-fill' })
         this.dispatchCompute(pass, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
@@ -481,6 +509,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.lastPotentialHash = ''
       this._obsState.obsEnabled = false // force rebuild on next check
       gsClearEigenstates(this._gsState) // eigenstates are grid-size-specific
+      useSimulationStateStore.getState().clearStoredEigenstates()
     }
 
     // Create/destroy observables resources when toggle changes or after rebuild
@@ -507,6 +536,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           basisY,
           basisZ,
           boundingRadius,
+          customPotentialScale: this.customPotentialScale,
         }
       )
     }
@@ -522,7 +552,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.lastPotentialHash = fullPotHash
       if (this.pl && this.bg) {
         if (config.potentialType === 'custom') {
-          uploadCustomPotentialBuffer(device, this.potentialBuffer, config)
+          this.customPotentialScale = uploadCustomPotentialBuffer(
+            device,
+            this.potentialBuffer,
+            config
+          )
         } else {
           const p = ctx.beginComputePass({ label: 'tdse-potential-update' })
           this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)

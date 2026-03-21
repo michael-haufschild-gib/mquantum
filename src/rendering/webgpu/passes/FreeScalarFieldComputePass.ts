@@ -83,6 +83,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private maxPhiEstimate = 1.0
   private pendingStagingBuffers: GPUBuffer[] = []
 
+  // Save/load state
+  private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
+  private saveMappingInFlight = false
+
   // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
@@ -175,6 +179,96 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /** Get the density texture for direct access. */
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture
+  }
+
+  /**
+   * Set loaded field data for injection on next initialization.
+   * For FSF, "re" maps to phi (field) and "im" maps to pi (conjugate momentum).
+   *
+   * @param re - phi buffer data (totalSites floats)
+   * @param im - pi buffer data (totalSites floats)
+   */
+  setLoadedWavefunction(re: Float32Array, im: Float32Array): void {
+    this.pendingInjection = { re, im }
+  }
+
+  /**
+   * Initiate async save of the current field state.
+   * Copies phi/pi buffers to staging within the current command encoder,
+   * then maps async after GPU submit.
+   *
+   * @param ctx - Render context (device + encoder)
+   */
+  requestStateSave(ctx: WebGPURenderContext): void {
+    if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return
+    const { device, encoder } = ctx
+    const byteSize = this.totalSites * 4
+
+    const stagingRe = device.createBuffer({
+      label: 'fsf-save-staging-phi',
+      size: byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+    const stagingIm = device.createBuffer({
+      label: 'fsf-save-staging-pi',
+      size: byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    encoder.copyBufferToBuffer(this.phiBuffer, 0, stagingRe, 0, byteSize)
+    encoder.copyBufferToBuffer(this.piBuffer, 0, stagingIm, 0, byteSize)
+    this.saveMappingInFlight = true
+
+    const totalSites = this.totalSites
+
+    device.queue
+      .onSubmittedWorkDone()
+      .then(async () => {
+        if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
+          this.saveMappingInFlight = false
+          return
+        }
+        await Promise.all([
+          stagingRe.mapAsync(GPUMapMode.READ),
+          stagingIm.mapAsync(GPUMapMode.READ),
+        ])
+
+        const re = new Float32Array(new Float32Array(stagingRe.getMappedRange()).slice(0))
+        const im = new Float32Array(new Float32Array(stagingIm.getMappedRange()).slice(0))
+        stagingRe.unmap()
+        stagingIm.unmap()
+        stagingRe.destroy()
+        stagingIm.destroy()
+
+        const { serializeSimulationState } = await import('@/lib/export/simulationState')
+        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
+        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
+        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
+
+        const extState = useExtendedObjectStore.getState()
+        const schroedinger = extState.schroedinger
+        const fsfConfig = schroedinger.freeScalar
+        const gridSize = fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64]
+
+        const blob = await serializeSimulationState(
+          { quantumMode: 'freeScalarField', freeScalar: schroedinger.freeScalar } as Record<
+            string,
+            unknown
+          >,
+          { re, im, totalSites, componentCount: 1 },
+          'freeScalarField',
+          gridSize
+        )
+        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
+        useSimulationStateStore.getState().setSaveComplete()
+        this.saveMappingInFlight = false
+      })
+      .catch((err) => {
+        import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+          useSimulationStateStore.getState().setSaveError(String(err))
+        })
+        this.saveMappingInFlight = false
+      })
   }
 
   /**
@@ -296,7 +390,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /** Initialize field state and perform leapfrog kickstart. */
   private initializeField(ctx: WebGPURenderContext, config: FreeScalarConfig): void {
     const { device, encoder } = ctx
-    if (config.initialCondition === 'vacuumNoise') {
+
+    // Check for pending loaded wavefunction data — skip init and inject directly
+    if (this.pendingInjection && this.phiBuffer && this.piBuffer) {
+      const { re, im } = this.pendingInjection
+      const elementCount = Math.min(re.length, this.totalSites)
+      const reData = re.slice(0, elementCount)
+      const imData = im.slice(0, elementCount)
+      device.queue.writeBuffer(this.phiBuffer, 0, reData)
+      device.queue.writeBuffer(this.piBuffer, 0, imData)
+      this.pendingInjection = null
+      logger.log(`[FSF] Injected loaded field state (${elementCount} sites)`)
+    } else if (config.initialCondition === 'vacuumNoise') {
       const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
       device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
       device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)

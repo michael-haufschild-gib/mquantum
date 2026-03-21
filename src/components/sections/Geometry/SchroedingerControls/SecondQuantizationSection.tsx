@@ -83,6 +83,7 @@ export function SecondQuantizationSection({
       title="2nd Quantization"
       collapsible
       defaultOpen={false}
+      data-testid="control-group-2nd-quantization"
       rightElement={
         <Switch
           checked={sqLayerEnabled}

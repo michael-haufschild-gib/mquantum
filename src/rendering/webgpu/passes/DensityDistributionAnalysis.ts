@@ -152,13 +152,47 @@ export class DensityDistributionAnalyzer {
     const centerOffset = (centerZ + centerY + half) * readbackTexelStrideHalfs
     const centerDensity = decodeFloat16(halfView[centerOffset] ?? 0)
 
-    useDensityDiagnosticsStore.getState().pushSnapshot({
+    const store = useDensityDiagnosticsStore.getState()
+    store.pushSnapshot({
       maxDensity: this.sortedRhoValues[0] ?? 0,
       totalDensityMass: cumulativeMass,
       activeVoxelCount: count,
       centerDensity,
       gridSize,
       worldBound,
+    })
+
+    // Extract center-plane 1D slices along each axis for wavefunction export.
+    // sliceX: vary x, fix y=center, z=center → |ψ(x, y₀, z₀)|²
+    // sliceY: vary y, fix x=center, z=center → |ψ(x₀, y, z₀)|²
+    // sliceZ: vary z, fix x=center, y=center → |ψ(x₀, y₀, z)|²
+    const sliceX = new Float32Array(gridSize)
+    const sliceY = new Float32Array(gridSize)
+    const sliceZ = new Float32Array(gridSize)
+
+    for (let i = 0; i < gridSize; i++) {
+      // sliceX: (x=i, y=half, z=half)
+      const xOffset =
+        (half * gridSize * texelsPerRow + half * texelsPerRow + i) * readbackTexelStrideHalfs
+      sliceX[i] = decodeFloat16(halfView[xOffset] ?? 0)
+
+      // sliceY: (x=half, y=i, z=half)
+      const yOffset =
+        (half * gridSize * texelsPerRow + i * texelsPerRow + half) * readbackTexelStrideHalfs
+      sliceY[i] = decodeFloat16(halfView[yOffset] ?? 0)
+
+      // sliceZ: (x=half, y=half, z=i)
+      const zOffset =
+        (i * gridSize * texelsPerRow + half * texelsPerRow + half) * readbackTexelStrideHalfs
+      sliceZ[i] = decodeFloat16(halfView[zOffset] ?? 0)
+    }
+
+    store.pushSlices({
+      sliceX,
+      sliceY,
+      sliceZ,
+      sliceGridSize: gridSize,
+      sliceWorldBound: worldBound,
     })
   }
 

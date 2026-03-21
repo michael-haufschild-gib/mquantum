@@ -143,7 +143,7 @@ struct SchroedingerUniforms {
   classicalOverlayTrailFraction: f32, // offset 724: fraction of period to show (0.1-1.0)
   classicalOverlayColor: vec3f,       // offset 736 (16-byte aligned): trail glow color
   _padClassical0: f32,                // offset 748
-  _reservedClassical1: f32,           // offset 752: reserved
+  classicalOverlayHbar: f32,          // offset 752: effective ℏ for wavepacket width (HO only)
   _reservedClassical0: f32,           // offset 756: reserved
 
   // Classical overlay: CPU-precomputed trail points (offset 760)

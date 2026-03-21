@@ -65,7 +65,7 @@ const SCHROEDINGER_FIELDS = [
   { name: 'classicalOverlayTrailFraction', type: 'f32' },
   { name: 'classicalOverlayColor', type: 'vec3f' },
   { name: '_padClassical0', type: 'f32' },
-  { name: '_reservedClassical1', type: 'f32' },
+  { name: 'classicalOverlayHbar', type: 'f32' },
   { name: '_reservedClassical0', type: 'f32' },
 
   // --- Classical overlay: CPU-precomputed trail (offset 760) ---

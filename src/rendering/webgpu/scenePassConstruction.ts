@@ -16,6 +16,7 @@ import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
 import { FrameBlendingPass } from './passes/FrameBlendingPass'
 import { FXAAPass } from './passes/FXAAPass'
 import { LightGizmoPass } from './passes/LightGizmoPass'
+import { MeasurementPointCloudPass } from './passes/MeasurementPointCloudPass'
 import { PaperTexturePass } from './passes/PaperTexturePass'
 import { ScenePass } from './passes/ScenePass'
 import { SMAAPass } from './passes/SMAAPass'
@@ -67,6 +68,13 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
           },
         }),
     label: config.skyboxEnabled ? 'skybox' : 'scene-pass',
+    resource: null,
+  })
+
+  // Measurement point cloud (renders into scene-render before environment composite)
+  passes.push({
+    pass: new MeasurementPointCloudPass(),
+    label: 'measurement-point-cloud',
     resource: null,
   })
 

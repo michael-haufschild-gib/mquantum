@@ -122,4 +122,42 @@ describe('Sparkline', () => {
     const cls = svg.getAttribute('class') ?? ''
     expect(cls).toContain('my-sparkline')
   })
+
+  it('renders reference line when referenceLine prop is set', () => {
+    const { data, head, count } = makeRingBuffer([0.3, 0.5, 0.7, 0.6])
+    render(
+      <Sparkline
+        data={data}
+        head={head}
+        count={count}
+        min={0}
+        max={1}
+        referenceLine={0.5}
+        referenceLabel="bound"
+      />
+    )
+    const refLine = screen.getByTestId('sparkline-reference')
+    expect(refLine).toBeInTheDocument()
+    expect(refLine.tagName.toLowerCase()).toBe('line')
+    // Check the reference line is at approximately the correct Y position
+    // (50% of the way between min=0 and max=1)
+    const y1 = parseFloat(refLine.getAttribute('y1')!)
+    expect(y1).toBeGreaterThan(15)
+    expect(y1).toBeLessThan(35)
+  })
+
+  it('does not render reference line when prop omitted', () => {
+    const { data, head, count } = makeRingBuffer([1, 2, 3])
+    render(<Sparkline data={data} head={head} count={count} />)
+    expect(screen.queryByTestId('sparkline-reference')).not.toBeInTheDocument()
+  })
+
+  it('ensures reference line is visible by expanding bounds', () => {
+    // All data is well above the reference line
+    const { data, head, count } = makeRingBuffer([10, 11, 12])
+    render(<Sparkline data={data} head={head} count={count} referenceLine={0.5} />)
+    // Reference line should be rendered (bounds expanded to include it)
+    const refLine = screen.getByTestId('sparkline-reference')
+    expect(refLine).toBeInTheDocument()
+  })
 })

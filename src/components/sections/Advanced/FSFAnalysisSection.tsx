@@ -298,7 +298,12 @@ const MetricsDisplay: React.FC = React.memo(() => {
   if (!hasData) return null
 
   return (
-    <ControlGroup title="Field Observables" collapsible defaultOpen>
+    <ControlGroup
+      title="Field Observables"
+      collapsible
+      defaultOpen
+      data-testid="control-group-field-observables"
+    >
       <div className="space-y-0.5 px-1">
         <MetricRow label="Total Energy" value={totalEnergy} digits={6} />
         <MetricRow label="Energy Drift" value={energyDrift * 100} digits={4} unit="%" />

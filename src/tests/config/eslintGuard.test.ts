@@ -32,12 +32,12 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     expect(matches).toHaveLength(2)
   })
 
-  it('no-console rule is defined with exactly 3 exemptions', () => {
+  it('no-console rule is defined with exactly 4 occurrences', () => {
     // Base config enables no-console as error.
-    // 3 exemption blocks: logger.ts, ErrorBoundary files, and test files.
+    // 3 off overrides: logger.ts, ErrorBoundary files, unit test files, and e2e spec files.
     // If this fails, someone broadened the exemption — use logger instead.
     const ruleMatches = [...config.matchAll(/^\s+'no-console'\s*:/gm)]
-    expect(ruleMatches).toHaveLength(3) // 1 enable + 2 off overrides (error-boundaries + tests)
+    expect(ruleMatches).toHaveLength(4) // 1 enable + 3 off overrides
   })
 
   it('no-restricted-imports boundary exists for render passes with exactly one exemption block', () => {

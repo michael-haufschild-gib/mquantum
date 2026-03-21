@@ -61,6 +61,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
           title="Subsurface Scattering"
           collapsible
           defaultOpen={false}
+          data-testid="control-group-subsurface-scattering"
           rightElement={
             <Switch
               checked={sssEnabled}

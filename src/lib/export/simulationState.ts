@@ -113,7 +113,7 @@ export async function serializeSimulationState(
   hView.setUint32(56, wavefunction.totalSites, true)
   hView.setUint32(60, configBytes.length, true)
 
-  return new Blob([header, configBytes, compressedWav], {
+  return new Blob([hU8, configBytes, compressedWav], {
     type: 'application/octet-stream',
   })
 }
@@ -171,7 +171,18 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   }
 
   const totalElements = componentCount * totalSites
-  const wavData = new Float32Array(wavBytes.buffer, wavBytes.byteOffset, totalElements * 2)
+
+  // Ensure 4-byte alignment for Float32Array view.
+  // When configLength is not a multiple of 4, wavBytes.byteOffset is misaligned.
+  let alignedBytes: Uint8Array<ArrayBuffer>
+  if (wavBytes.byteOffset % 4 !== 0) {
+    alignedBytes = new Uint8Array(wavBytes.length)
+    alignedBytes.set(wavBytes)
+  } else {
+    alignedBytes = wavBytes as Uint8Array<ArrayBuffer>
+  }
+
+  const wavData = new Float32Array(alignedBytes.buffer, alignedBytes.byteOffset, totalElements * 2)
   const psiRe = wavData.slice(0, totalElements)
   const psiIm = wavData.slice(totalElements, totalElements * 2)
 

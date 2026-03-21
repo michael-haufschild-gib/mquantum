@@ -1,17 +1,23 @@
 /**
  * Data Export Utilities
  *
- * Serialize diagnostic time-series from Zustand stores to CSV format
- * for download. Designed for one-click export of simulation data.
+ * Serialize diagnostic time-series from Zustand stores to CSV and JSON
+ * formats for download. Designed for one-click export of simulation data.
  *
  * @module lib/export/dataExport
  */
 
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
+import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
 import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
+import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
+
+// ─── Ring buffer utility ──────────────────────────────────────────────────
 
 /**
  * Read a ring buffer in chronological order.
@@ -21,7 +27,7 @@ import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
  * @param count - Number of valid entries
  * @returns Array of values in chronological order (oldest first)
  */
-function readRingBuffer(buffer: Float32Array, head: number, count: number): number[] {
+export function readRingBuffer(buffer: Float32Array, head: number, count: number): number[] {
   const result: number[] = []
   const len = buffer.length
   const start = (head - count + len) % len
@@ -30,6 +36,8 @@ function readRingBuffer(buffer: Float32Array, head: number, count: number): numb
   }
   return result
 }
+
+// ─── CSV exporters ────────────────────────────────────────────────────────
 
 /**
  * Export TDSE diagnostics time-series as CSV.
@@ -152,6 +160,299 @@ export function exportOpenQuantumDiagnosticsCSV(): string {
   }
   return lines.join('\n')
 }
+
+/**
+ * Export Dirac diagnostics time-series as CSV.
+ *
+ * @returns CSV string with columns: frame, norm, particleFraction, antiparticleFraction
+ */
+export function exportDiracDiagnosticsCSV(): string {
+  const state = useDiracDiagnosticsStore.getState()
+  const { historyHead: head, historyCount: count } = state
+
+  if (count === 0) return ''
+
+  const norm = readRingBuffer(state.historyNorm, head, count)
+  const particleFrac = readRingBuffer(state.historyParticleFrac, head, count)
+  const antiparticleFrac = readRingBuffer(state.historyAntiparticleFrac, head, count)
+
+  const lines = ['frame,norm,particleFraction,antiparticleFraction']
+  for (let i = 0; i < count; i++) {
+    lines.push(`${i},${norm[i]},${particleFrac[i]},${antiparticleFrac[i]}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Export Pauli diagnostics time-series as CSV.
+ *
+ * @returns CSV string with columns: frame, norm, spinUpFraction, spinExpectationZ
+ */
+export function exportPauliDiagnosticsCSV(): string {
+  const state = usePauliDiagnosticsStore.getState()
+  const { historyHead: head, historyCount: count } = state
+
+  if (count === 0) return ''
+
+  const norm = readRingBuffer(state.historyNorm, head, count)
+  const spinUp = readRingBuffer(state.historySpinUpFrac, head, count)
+  const spinExpZ = readRingBuffer(state.historySpinExpZ, head, count)
+
+  const lines = ['frame,norm,spinUpFraction,spinExpectationZ']
+  for (let i = 0; i < count; i++) {
+    lines.push(`${i},${norm[i]},${spinUp[i]},${spinExpZ[i]}`)
+  }
+  return lines.join('\n')
+}
+
+function readSliceSource(
+  source: 'density' | 'wavefunction',
+  axis: 'x' | 'y' | 'z'
+): { data: Float32Array; gridSize: number; worldBound: number } | null {
+  if (source === 'density') {
+    const state = useDensityDiagnosticsStore.getState()
+    const axisMap = { x: state.sliceX, y: state.sliceY, z: state.sliceZ }
+    const data = axisMap[axis]
+    if (!data || state.sliceGridSize === 0) return null
+    return { data, gridSize: state.sliceGridSize, worldBound: state.sliceWorldBound }
+  }
+  const state = useWavefunctionSliceStore.getState()
+  if (!state.hasData || !state.sliceData || state.sliceGridSize === 0) return null
+  return { data: state.sliceData, gridSize: state.sliceGridSize, worldBound: state.sliceWorldBound }
+}
+
+/**
+ * Export wavefunction slice |ψ(x)|² as CSV.
+ * Uses density grid slices (analytic modes) or the wavefunction slice store (dynamic modes).
+ *
+ * @param source - 'density' for analytic mode grid slices, 'wavefunction' for dynamic mode capture
+ * @param axis - Which axis slice to export ('x', 'y', or 'z')
+ * @returns CSV string with columns: position, density
+ */
+export function exportWavefunctionSliceCSV(
+  source: 'density' | 'wavefunction',
+  axis: 'x' | 'y' | 'z'
+): string {
+  const slice = readSliceSource(source, axis)
+  if (!slice) return ''
+
+  const { data, gridSize, worldBound } = slice
+
+  const lines = [`position_${axis},density`]
+  for (let i = 0; i < gridSize; i++) {
+    const pos = -worldBound + (2 * worldBound * i) / (gridSize - 1 || 1)
+    lines.push(`${pos},${data[i]}`)
+  }
+  return lines.join('\n')
+}
+
+// ─── JSON export ──────────────────────────────────────────────────────────
+
+/**
+ * Export all active diagnostics as a single JSON object.
+ * Includes metadata, current snapshot values, and full time-series histories.
+ *
+ * @param quantumMode - Current quantum mode identifier
+ * @returns JSON string with all diagnostics data
+ */
+export function exportDiagnosticsJSON(quantumMode: string): string {
+  const payload: Record<string, unknown> = {
+    _meta: {
+      version: 1,
+      quantumMode,
+      exportedAt: new Date().toISOString(),
+      application: 'mdimension',
+    },
+  }
+
+  // TDSE diagnostics
+  if (quantumMode === 'tdseDynamics') {
+    const s = useTdseDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.tdse = {
+        current: {
+          totalNorm: s.totalNorm,
+          normDrift: s.normDrift,
+          maxDensity: s.maxDensity,
+          R: s.R,
+          T: s.T,
+          simTime: s.simTime,
+        },
+        timeSeries: {
+          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+          R: readRingBuffer(s.historyR, s.historyHead, s.historyCount),
+          T: readRingBuffer(s.historyT, s.historyHead, s.historyCount),
+        },
+      }
+    }
+  }
+
+  // BEC diagnostics
+  if (quantumMode === 'becDynamics') {
+    const s = useBecDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.bec = {
+        current: {
+          totalNorm: s.totalNorm,
+          normDrift: s.normDrift,
+          chemicalPotential: s.chemicalPotential,
+          healingLength: s.healingLength,
+          soundSpeed: s.soundSpeed,
+          thomasFermiRadius: s.thomasFermiRadius,
+        },
+        timeSeries: {
+          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+          chemicalPotential: readRingBuffer(s.historyChemPot, s.historyHead, s.historyCount),
+          healingLength: readRingBuffer(s.historyHealingLen, s.historyHead, s.historyCount),
+        },
+      }
+    }
+  }
+
+  // FSF diagnostics
+  if (quantumMode === 'freeScalarField') {
+    const s = useFsfDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.fsf = {
+        current: {
+          totalEnergy: s.totalEnergy,
+          totalNorm: s.totalNorm,
+          energyDrift: s.energyDrift,
+          maxPhi: s.maxPhi,
+          maxPi: s.maxPi,
+          meanPhi: s.meanPhi,
+          variancePhi: s.variancePhi,
+        },
+        timeSeries: {
+          energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
+          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+        },
+      }
+    }
+  }
+
+  // Dirac diagnostics
+  if (quantumMode === 'diracEquation') {
+    const s = useDiracDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.dirac = {
+        current: {
+          totalNorm: s.totalNorm,
+          normDrift: s.normDrift,
+          maxDensity: s.maxDensity,
+          particleFraction: s.particleFraction,
+          antiparticleFraction: s.antiparticleFraction,
+          comptonWavelength: s.comptonWavelength,
+          zitterbewegungFreq: s.zitterbewegungFreq,
+          kleinThreshold: s.kleinThreshold,
+          meanPosition: s.meanPosition,
+        },
+        timeSeries: {
+          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+          particleFraction: readRingBuffer(s.historyParticleFrac, s.historyHead, s.historyCount),
+          antiparticleFraction: readRingBuffer(
+            s.historyAntiparticleFrac,
+            s.historyHead,
+            s.historyCount
+          ),
+        },
+      }
+    }
+  }
+
+  // Observables diagnostics (TDSE/BEC modes)
+  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
+    const s = useObservablesDiagnosticsStore.getState()
+    if (s.historyCount > 0 && s.activeDims > 0) {
+      const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+      const uncertaintyTimeSeries: Record<string, number[]> = {}
+      const currentUncertainty: Record<string, number> = {}
+      for (let d = 0; d < s.activeDims; d++) {
+        const label = dimLabels[d]!
+        uncertaintyTimeSeries[`dxdp_${label}`] = readRingBuffer(
+          s.historyUncertainty[d]!,
+          s.historyHead,
+          s.historyCount
+        )
+        currentUncertainty[`dxdp_${label}`] = s.uncertaintyProduct[d]!
+      }
+      payload.observables = {
+        current: {
+          totalEnergy: s.totalEnergy,
+          positionNorm: s.positionNorm,
+          momentumNorm: s.momentumNorm,
+          ...currentUncertainty,
+        },
+        timeSeries: {
+          energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
+          ...uncertaintyTimeSeries,
+        },
+      }
+    }
+  }
+
+  // Open quantum diagnostics (analytic modes)
+  if (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') {
+    const s = useOpenQuantumDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.openQuantum = {
+        current: {
+          purity: s.purity,
+          linearEntropy: s.linearEntropy,
+          vonNeumannEntropy: s.vonNeumannEntropy,
+          coherenceMagnitude: s.coherenceMagnitude,
+          groundPopulation: s.groundPopulation,
+          trace: s.trace,
+        },
+        timeSeries: {
+          purity: readRingBuffer(s.historyPurity, s.historyHead, s.historyCount),
+          vonNeumannEntropy: readRingBuffer(s.historyEntropy, s.historyHead, s.historyCount),
+          coherence: readRingBuffer(s.historyCoherence, s.historyHead, s.historyCount),
+        },
+      }
+    }
+  }
+
+  // Wavefunction slices (if available)
+  const density = useDensityDiagnosticsStore.getState()
+  if (density.sliceX && density.sliceGridSize > 0) {
+    const positions = Array.from(
+      { length: density.sliceGridSize },
+      (_, i) =>
+        -density.sliceWorldBound +
+        (2 * density.sliceWorldBound * i) / (density.sliceGridSize - 1 || 1)
+    )
+    payload.wavefunctionSlices = {
+      gridSize: density.sliceGridSize,
+      worldBound: density.sliceWorldBound,
+      positions,
+      x: Array.from(density.sliceX),
+      y: density.sliceY ? Array.from(density.sliceY) : null,
+      z: density.sliceZ ? Array.from(density.sliceZ) : null,
+    }
+  }
+
+  const wfSlice = useWavefunctionSliceStore.getState()
+  if (wfSlice.hasData && wfSlice.sliceData) {
+    const positions = Array.from(
+      { length: wfSlice.sliceGridSize },
+      (_, i) =>
+        -wfSlice.sliceWorldBound +
+        (2 * wfSlice.sliceWorldBound * i) / (wfSlice.sliceGridSize - 1 || 1)
+    )
+    payload.wavefunctionSlice = {
+      axis: wfSlice.sliceAxis,
+      gridSize: wfSlice.sliceGridSize,
+      worldBound: wfSlice.sliceWorldBound,
+      positions,
+      density: Array.from(wfSlice.sliceData),
+    }
+  }
+
+  return JSON.stringify(payload, null, 2)
+}
+
+// ─── Download helpers ─────────────────────────────────────────────────────
 
 /**
  * Trigger browser download of a string or Blob as a file.

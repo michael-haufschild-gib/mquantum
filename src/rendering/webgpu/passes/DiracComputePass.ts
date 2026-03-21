@@ -115,6 +115,10 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private fwdStageCount = 0
   private stepAccumulator = 0
 
+  // Save/load state
+  private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
+  private saveMappingInFlight = false
+
   // Dirac algebra bridge (generates gamma matrices off main thread)
   private readonly algebraBridge = new DiracAlgebraBridge()
 
@@ -159,6 +163,93 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
+  }
+
+  /**
+   * Set loaded wavefunction data for injection on next maybeInitialize.
+   *
+   * @param re - Real part of the spinor buffer (S * totalSites floats)
+   * @param im - Imaginary part of the spinor buffer (S * totalSites floats)
+   */
+  setLoadedWavefunction(re: Float32Array, im: Float32Array): void {
+    this.pendingInjection = { re, im }
+  }
+
+  /**
+   * Initiate async save of the current spinor state.
+   * Copies spinor buffers to staging within the current command encoder,
+   * then maps async after GPU submit.
+   *
+   * @param ctx - Render context (device + encoder)
+   */
+  requestStateSave(ctx: WebGPURenderContext): void {
+    if (!this.spinorReBuffer || !this.spinorImBuffer || this.saveMappingInFlight) return
+    const { device, encoder } = ctx
+    const byteSize = this.currentSpinorSize * this.totalSites * 4
+
+    const stagingRe = device.createBuffer({
+      label: 'dirac-save-staging-re',
+      size: byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+    const stagingIm = device.createBuffer({
+      label: 'dirac-save-staging-im',
+      size: byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    encoder.copyBufferToBuffer(this.spinorReBuffer, 0, stagingRe, 0, byteSize)
+    encoder.copyBufferToBuffer(this.spinorImBuffer, 0, stagingIm, 0, byteSize)
+    this.saveMappingInFlight = true
+
+    const totalSites = this.totalSites
+    const componentCount = this.currentSpinorSize
+
+    device.queue
+      .onSubmittedWorkDone()
+      .then(async () => {
+        if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
+          this.saveMappingInFlight = false
+          return
+        }
+        await Promise.all([
+          stagingRe.mapAsync(GPUMapMode.READ),
+          stagingIm.mapAsync(GPUMapMode.READ),
+        ])
+
+        const re = new Float32Array(new Float32Array(stagingRe.getMappedRange()).slice(0))
+        const im = new Float32Array(new Float32Array(stagingIm.getMappedRange()).slice(0))
+        stagingRe.unmap()
+        stagingIm.unmap()
+        stagingRe.destroy()
+        stagingIm.destroy()
+
+        const { serializeSimulationState } = await import('@/lib/export/simulationState')
+        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
+        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
+        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
+
+        const extState = useExtendedObjectStore.getState()
+        const schroedinger = extState.schroedinger
+        const diracConfig = schroedinger.dirac
+        const gridSize = diracConfig.gridSize?.slice(0, diracConfig.latticeDim ?? 3) ?? [64]
+
+        const blob = await serializeSimulationState(
+          { quantumMode: 'diracEquation', dirac: schroedinger.dirac } as Record<string, unknown>,
+          { re, im, totalSites, componentCount },
+          'diracEquation',
+          gridSize
+        )
+        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
+        useSimulationStateStore.getState().setSaveComplete()
+        this.saveMappingInFlight = false
+      })
+      .catch((err) => {
+        import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+          useSimulationStateStore.getState().setSaveError(String(err))
+        })
+        this.saveMappingInFlight = false
+      })
   }
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture
@@ -348,15 +439,33 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   /** Initialize spinor wavepacket and potential if needed. */
   private maybeInitialize(ctx: WebGPURenderContext, config: DiracConfig): void {
     if (this.initialized && !config.needsReset) return
-    if (this.pl && this.bg) {
+    const { device } = ctx
+
+    // Check for pending loaded wavefunction data — skip init shader and inject directly
+    if (this.pendingInjection && this.spinorReBuffer && this.spinorImBuffer) {
+      const { re, im } = this.pendingInjection
+      const elementCount = Math.min(re.length, this.currentSpinorSize * this.totalSites)
+      const reData = re.slice(0, elementCount)
+      const imData = im.slice(0, elementCount)
+      device.queue.writeBuffer(this.spinorReBuffer, 0, reData)
+      device.queue.writeBuffer(this.spinorImBuffer, 0, imData)
+      this.pendingInjection = null
+      logger.log(`[Dirac] Injected loaded wavefunction (${elementCount} elements)`)
+    } else if (this.pl && this.bg) {
       const wg = Math.ceil(this.totalSites / LINEAR_WG)
       const initPass = ctx.beginComputePass({ label: 'dirac-init-pass' })
       this.dispatchCompute(initPass, this.pl.initPipeline, [this.bg.initBG!], wg)
       initPass.end()
+    }
+
+    // Always fill potential (needed for both init and load)
+    if (this.pl && this.bg) {
+      const wg = Math.ceil(this.totalSites / LINEAR_WG)
       const potPass = ctx.beginComputePass({ label: 'dirac-potential-fill' })
       this.dispatchCompute(potPass, this.pl.potentialPipeline, [this.bg.potentialBG!], wg)
       potPass.end()
     }
+
     this.maxDensity = 1.0
     this.initialNorm = -1.0
     this.simTime = 0

@@ -74,6 +74,7 @@ describe('free scalar field setters', () => {
 
   it('sets initial condition type', () => {
     const s = useExtendedObjectStore.getState()
+    // @ts-expect-error intentional invalid input
     s.setFreeScalarInitialCondition('plane')
     expect(getFSF().initialCondition).toBe('plane')
   })

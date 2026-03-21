@@ -66,6 +66,8 @@ export class CarpetSliceComputePass {
   private stagingBuffer: GPUBuffer | null = null
   private readbackInFlight = false
   private framesSinceReadback = 0
+  /** Set by dispose/releaseTextures to guard in-flight readback callbacks. */
+  private disposed = false
 
   // Bind group cache
   private lastDensityView: GPUTextureView | null = null
@@ -77,6 +79,7 @@ export class CarpetSliceComputePass {
    */
   initialize(device: GPUDevice): void {
     this.device = device
+    this.disposed = false
 
     const shaderModule = device.createShaderModule({
       label: 'carpet-slice-compute',
@@ -255,6 +258,17 @@ export class CarpetSliceComputePass {
 
     staging.mapAsync(GPUMapMode.READ).then(
       () => {
+        // Guard: if dispose/releaseTextures ran while readback was in flight,
+        // the staging buffer is destroyed and getMappedRange/unmap would throw.
+        if (this.disposed) {
+          try {
+            staging.unmap()
+          } catch {
+            // Buffer already destroyed — safe to ignore
+          }
+          return
+        }
+
         const mapped = staging.getMappedRange()
         const result = new Float32Array(gridSize * hl)
         const src = new Float32Array(mapped)
@@ -282,6 +296,7 @@ export class CarpetSliceComputePass {
    * Release all GPU resources.
    */
   dispose(): void {
+    this.disposed = true
     this.carpetTexture?.destroy()
     this.carpetTexture = null
     this.carpetTextureView = null
@@ -303,6 +318,7 @@ export class CarpetSliceComputePass {
    * Called when carpet is disabled for quick re-enable.
    */
   releaseTextures(): void {
+    this.disposed = true
     this.carpetTexture?.destroy()
     this.carpetTexture = null
     this.carpetTextureView = null

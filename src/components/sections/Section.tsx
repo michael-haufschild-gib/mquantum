@@ -61,7 +61,7 @@ export const Section: React.FC<SectionProps> = React.memo(
     // `isOpen` is intentionally omitted: toggling fires in handleToggle, not here.
     useEffect(() => {
       onOpenChange?.(isOpen)
-      // eslint-disable-next-line @eslint-react/exhaustive-deps
+      // eslint-disable-next-line @eslint-react/exhaustive-deps -- isOpen omitted: toggles notify via handleToggle, this effect only syncs on callback identity change
     }, [onOpenChange])
 
     const handleToggle = useCallback(() => {

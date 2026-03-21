@@ -46,6 +46,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
               onCheckedChange={setBloomEnabled}
               label="Enable Bloom"
               tooltip="Add a luminous glow around bright regions of the wavefunction. Creates a more cinematic, photorealistic appearance."
+              data-testid="bloom-enabled-switch"
             />
             <div className={!bloomEnabled ? 'opacity-50 pointer-events-none' : ''}>
               <BloomControls />

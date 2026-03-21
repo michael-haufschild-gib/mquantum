@@ -243,6 +243,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                       }}
                       className={`p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
                       ariaLabel={`Delete scene "${scene.name}"`}
+                      data-testid={`delete-scene-${scene.id}`}
                     >
                       <svg
                         width="14"
@@ -275,6 +276,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
         message={`Are you sure you want to delete scene "${sceneToDelete?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         isDestructive
+        data-testid="delete-scene-confirm-modal"
       />
     </div>
   )

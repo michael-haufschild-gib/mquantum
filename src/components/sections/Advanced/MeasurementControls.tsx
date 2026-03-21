@@ -1,0 +1,157 @@
+/**
+ * Measurement Controls
+ *
+ * Born rule measurement UI: toggle, collapse width, partial measurement
+ * axis selector, statistics display, and clear button.
+ *
+ * @module components/sections/Advanced/MeasurementControls
+ */
+
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { useMeasurementStore } from '@/stores/measurementStore'
+
+const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+
+/**
+ * Born rule measurement controls: enable/disable, collapse width,
+ * partial measurement axis, statistics.
+ */
+export const MeasurementControls: React.FC = React.memo(() => {
+  const dimension = useGeometryStore((s) => s.dimension)
+  const {
+    enabled,
+    measurements,
+    totalCount,
+    collapseWidth,
+    measureAxis,
+    isCollapsing,
+    cooldownFrames,
+    positionMean,
+    positionStd,
+    setEnabled,
+    setCollapseWidth,
+    setMeasureAxis,
+    clearMeasurements,
+  } = useMeasurementStore(
+    useShallow((s) => ({
+      enabled: s.enabled,
+      measurements: s.measurements,
+      totalCount: s.totalCount,
+      collapseWidth: s.collapseWidth,
+      measureAxis: s.measureAxis,
+      isCollapsing: s.isCollapsing,
+      cooldownFrames: s.cooldownFrames,
+      positionMean: s.positionMean,
+      positionStd: s.positionStd,
+      setEnabled: s.setEnabled,
+      setCollapseWidth: s.setCollapseWidth,
+      setMeasureAxis: s.setMeasureAxis,
+      clearMeasurements: s.clearMeasurements,
+    }))
+  )
+
+  const axisOptions = [
+    { value: 'full', label: 'All axes' },
+    ...Array.from({ length: Math.min(dimension, 11) }, (_, i) => ({
+      value: String(i),
+      label: `Axis ${DIM_LABELS[i] ?? i}`,
+    })),
+  ]
+
+  const handleAxisChange = useCallback(
+    (v: string) => {
+      setMeasureAxis(v === 'full' ? null : parseInt(v, 10))
+    },
+    [setMeasureAxis]
+  )
+
+  return (
+    <ControlGroup
+      title="Measurement"
+      collapsible
+      defaultOpen={false}
+      data-testid="control-group-measurement"
+      rightElement={
+        <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="measurement-toggle" />
+      }
+    >
+      {enabled && (
+        <div className="space-y-3">
+          <div className="text-[10px] text-text-tertiary">
+            Click the volume to sample from |psi|^2
+          </div>
+
+          <Slider
+            label="Collapse Width"
+            tooltip="Width of the post-measurement Gaussian collapse. Smaller values give more localized collapse."
+            min={0.05}
+            max={2.0}
+            step={0.05}
+            value={collapseWidth}
+            onChange={setCollapseWidth}
+            showValue
+            data-testid="measurement-collapse-width"
+          />
+
+          {dimension >= 2 && (
+            <Select
+              label="Measure Axis"
+              tooltip="Full: measure all axes and collapse to a point. Partial: measure one axis, preserving the conditional wavefunction in other dimensions."
+              options={axisOptions}
+              value={measureAxis === null ? 'full' : String(measureAxis)}
+              onChange={handleAxisChange}
+              data-testid="measurement-axis"
+            />
+          )}
+
+          {isCollapsing && (
+            <div className="text-[10px] text-accent-primary animate-pulse">Collapsing...</div>
+          )}
+          {!isCollapsing && cooldownFrames > 0 && (
+            <div className="text-[10px] text-text-tertiary">
+              Evolving... ({cooldownFrames} frames)
+            </div>
+          )}
+
+          <div className="text-[10px] text-text-secondary">Measurements: {totalCount}</div>
+
+          {measurements.length > 0 && positionMean.length > 0 && (
+            <div className="text-[10px] font-mono space-y-0.5">
+              <div className="flex gap-2 text-text-tertiary font-semibold">
+                <span className="w-4">d</span>
+                <span className="w-16 text-right">mean</span>
+                <span className="w-12 text-right">std</span>
+              </div>
+              {positionMean.map((mean, d) => (
+                <div key={d} className="flex gap-2 text-text-secondary">
+                  <span className="w-4 text-text-tertiary">{DIM_LABELS[d]}</span>
+                  <span className="w-16 text-right">{mean.toFixed(3)}</span>
+                  <span className="w-12 text-right">{(positionStd[d] ?? 0).toFixed(3)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearMeasurements}
+            data-testid="measurement-clear"
+          >
+            Clear Measurements
+          </Button>
+        </div>
+      )}
+    </ControlGroup>
+  )
+})
+
+MeasurementControls.displayName = 'MeasurementControls'

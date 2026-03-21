@@ -8,6 +8,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { parseExpression } from '@/lib/physics/expressionParser'
 
 /**
  * Compute V(x) for the given potential type and config at position x along axis 0.
@@ -57,6 +58,16 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       const eps = config.doubleWellAsymmetry
       const x2a2 = x * x - a * a
       return lam * x2a2 * x2a2 - eps * x
+    }
+
+    case 'custom': {
+      const result = parseExpression(config.customPotentialExpression ?? '0')
+      if (!result.success) return 0
+      // Evaluate V(x, 0, 0, ...) along axis 0
+      const coords = new Array<number>(config.latticeDim).fill(0)
+      coords[0] = x
+      const v = result.evaluate(coords)
+      return Number.isFinite(v) ? v : 0
     }
 
     default:
@@ -193,6 +204,27 @@ export function getPotentialPlotScale(config: TdseConfig): number {
     case 'doubleWell': {
       const a2 = config.doubleWellSeparation ** 2
       return Math.max(config.doubleWellLambda * a2 * a2, 1)
+    }
+    case 'custom': {
+      // Sample the custom expression along axis 0 to find max|V|
+      const result = parseExpression(config.customPotentialExpression ?? '0')
+      if (!result.success) return 1
+      const gridSize0 = config.gridSize[0] ?? 64
+      const spacing0 = config.spacing[0] ?? 0.1
+      const halfExtent = gridSize0 * spacing0 * 0.5
+      const coords = new Array<number>(config.latticeDim).fill(0)
+      let maxAbsV = 0
+      const numSamples = 50
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / (numSamples - 1)
+        coords[0] = -halfExtent + t * 2 * halfExtent
+        const v = result.evaluate(coords)
+        if (Number.isFinite(v)) {
+          const absV = Math.abs(v)
+          if (absV > maxAbsV) maxAbsV = absV
+        }
+      }
+      return Math.max(maxAbsV, 1)
     }
     default:
       return 1

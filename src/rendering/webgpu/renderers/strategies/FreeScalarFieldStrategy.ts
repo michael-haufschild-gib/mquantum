@@ -5,6 +5,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { FreeScalarFieldComputePass } from '../../passes/FreeScalarFieldComputePass'
@@ -156,6 +157,20 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     // Clear needsReset after processing
     if (freeScalarConfig.needsReset) {
       extended?.clearFreeScalarNeedsReset?.()
+    }
+
+    // Simulation state save/load
+    const simState = useSimulationStateStore.getState()
+    if (simState.saveRequested) {
+      simState.clearSaveRequest()
+      freeScalarPass.requestStateSave(ctx)
+    }
+    if (simState.pendingLoadData) {
+      const loadData = simState.pendingLoadData
+      if (loadData.quantumMode === 'freeScalarField') {
+        freeScalarPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+        simState.clearLoadData()
+      }
     }
 
     // FSF diagnostic: log state changes once per second (dev only)

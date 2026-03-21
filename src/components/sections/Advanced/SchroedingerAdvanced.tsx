@@ -44,7 +44,12 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
   return (
     <div className="space-y-4">
       {/* Emission & Rim */}
-      <ControlGroup title="Emission & Rim" collapsible defaultOpen>
+      <ControlGroup
+        title="Emission & Rim"
+        collapsible
+        defaultOpen
+        data-testid="control-group-emission-rim"
+      >
         <Slider
           label="Emission Strength"
           tooltip="Self-illumination intensity. Makes the wavefunction glow from within, independent of lighting."
@@ -81,7 +86,12 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
       </ControlGroup>
 
       {/* Volume Rendering (includes Volume Effects) */}
-      <ControlGroup title="Volume Rendering" collapsible defaultOpen>
+      <ControlGroup
+        title="Volume Rendering"
+        collapsible
+        defaultOpen
+        data-testid="control-group-volume-rendering"
+      >
         <Slider
           label="Density Gain"
           tooltip="Multiplier for the volumetric density. Increase to make faint regions visible; decrease to reveal inner structure."

@@ -1,24 +1,28 @@
 /**
  * URL State Serializer
  *
- * Serializes and deserializes a minimal set of scene params to/from URL.
+ * Serializes and deserializes scene configuration to/from URL query params.
+ * Unknown params are ignored (forward compatible). Missing params use app defaults.
  *
- * INTENTIONAL SCOPE LIMIT: The URL format only supports:
- *   - Scene preset name (`?scene=...`)
- *   - Object type + dimension + quantum mode (`?t=...&d=...&qm=...`)
- *   - Open quantum on/off and basic rates
+ * Core params (scene identity):
+ *   `?scene=<name>` | `?t=<objectType>&d=<dim>&qm=<mode>`
  *
- * Detailed state (quantum numbers, orbital config, visual settings, etc.)
- * is NOT included by design. Do NOT extend the URL serializer with
- * additional parameters.
+ * Extended params (merged into defaults):
+ *   Rendering: `repr`, `iso`, `iso_t`, `cs`, `dg`, `scale`
+ *   Quantum numbers: `hyd_n`, `hyd_l`, `hyd_m`, `tc`, `seed`
+ *   TDSE config: `pot`, `abs`, `diag`, `obs`, `it`
+ *   Features: `oq`, `co`
  */
 
+import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
+import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/stores/geometryStore'
 
-/** Valid quantum modes for URL validation */
+// ─── Validation Sets ─────────────────────────────────────────────────────────
+
 const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',
@@ -26,17 +30,75 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'tdseDynamics',
   'becDynamics',
   'diracEquation',
+  'quantumWalk',
 ]
 
+const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
+
+const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
+  'free',
+  'barrier',
+  'step',
+  'finiteWell',
+  'harmonicTrap',
+  'driven',
+  'doubleSlit',
+  'periodicLattice',
+  'doubleWell',
+]
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 /**
- * URL-shareable subset of application state.
- * Either a scene name or object type + dimension + quantum mode.
+ * URL-shareable application state.
+ * All fields except dimension and objectType are optional — missing fields
+ * keep their app defaults.
  */
 export interface ShareableObjectState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
-  /** Open quantum system enabled (0/1) */
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+  /** Wavefunction representation: position, momentum, or wigner */
+  representation?: SchroedingerRepresentation
+  /** Isosurface mode enabled */
+  isoEnabled?: boolean
+  /** Isosurface threshold (log scale, typically -6 to 0) */
+  isoThreshold?: number
+  /** Cross-section slice enabled */
+  crossSectionEnabled?: boolean
+  /** Density gain multiplier */
+  densityGain?: number
+  /** Object scale (0.1 to 2.0) */
+  scale?: number
+
+  // ── Quantum numbers (HO / hydrogen) ──────────────────────────────────────
+  /** HO superposition term count (1-8) */
+  termCount?: number
+  /** HO random seed for superposition coefficients */
+  seed?: number
+  /** Hydrogen principal quantum number n (1-7) */
+  hydrogenN?: number
+  /** Hydrogen azimuthal quantum number l (0 to n-1) */
+  hydrogenL?: number
+  /** Hydrogen magnetic quantum number m (-l to l) */
+  hydrogenM?: number
+
+  // ── TDSE config ──────────────────────────────────────────────────────────
+  /** TDSE potential type */
+  potentialType?: TdsePotentialType
+  /** TDSE PML absorber enabled */
+  absorberEnabled?: boolean
+  /** TDSE diagnostics readback enabled */
+  diagnosticsEnabled?: boolean
+  /** TDSE observable expectation values enabled */
+  observablesEnabled?: boolean
+  /** TDSE imaginary-time propagation enabled */
+  imaginaryTimeEnabled?: boolean
+
+  // ── Features ─────────────────────────────────────────────────────────────
+  /** Open quantum system enabled */
   openQuantumEnabled?: boolean
   /** Open quantum dephasing rate */
   openQuantumDephasingRate?: number
@@ -44,6 +106,8 @@ export interface ShareableObjectState {
   openQuantumRelaxationRate?: number
   /** Open quantum thermal excitation rate */
   openQuantumThermalUpRate?: number
+  /** Classical-quantum correspondence overlay enabled */
+  classicalOverlayEnabled?: boolean
 }
 
 /**
@@ -60,15 +124,89 @@ export type ShareableState = ShareableObjectState | ShareableSceneState
 
 /**
  * Parsed URL state where each shareable field is optional.
- * This intentionally supports partial payloads while parsing query params.
+ * Supports partial payloads — missing fields keep app defaults.
  */
 export type ParsedShareableState = Partial<ShareableObjectState> & Partial<ShareableSceneState>
 
-/** Strict integer parser for dimension URL params. */
-const INTEGER_PARAM_PATTERN = /^-?\d+$/
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const INTEGER_RE = /^-?\d+$/
+const FLOAT_RE = /^-?\d+(\.\d+)?$/
+
+/** Parse a URL param as a clamped integer. Returns undefined on invalid input. */
+function parseIntParam(
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined {
+  const raw = params.get(key)
+  if (!raw || !INTEGER_RE.test(raw)) return undefined
+  const v = Number(raw)
+  if (!Number.isSafeInteger(v)) return undefined
+  return Math.max(min, Math.min(max, v))
+}
+
+/** Parse a URL param as a clamped float. Returns undefined on invalid input. */
+function parseFloatParam(
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined {
+  const raw = params.get(key)
+  if (!raw || !FLOAT_RE.test(raw)) return undefined
+  const v = Number(raw)
+  if (!Number.isFinite(v)) return undefined
+  return Math.max(min, Math.min(max, v))
+}
+
+/** Parse a URL param as a boolean (0/1). Returns undefined on invalid input. */
+function parseBoolParam(params: URLSearchParams, key: string): boolean | undefined {
+  const raw = params.get(key)
+  if (raw === '1') return true
+  if (raw === '0') return false
+  return undefined
+}
+
+/** Parse a URL param as an enum value. Returns undefined if not in the set. */
+function parseEnumParam<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  valid: readonly T[]
+): T | undefined {
+  const raw = params.get(key)
+  if (raw && (valid as readonly string[]).includes(raw)) return raw as T
+  return undefined
+}
+
+/** Set a URL param only when the value is defined and differs from default. */
+function setBoolParam(params: URLSearchParams, key: string, value: boolean | undefined): void {
+  if (value !== undefined) params.set(key, value ? '1' : '0')
+}
+
+function setFloatParam(
+  params: URLSearchParams,
+  key: string,
+  value: number | undefined,
+  omitZero = false
+): void {
+  if (value !== undefined && !(omitZero && value === 0)) params.set(key, value.toFixed(2))
+}
+
+function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
+  if (value !== undefined) params.set(key, value.toString())
+}
+
+function setStringParam(params: URLSearchParams, key: string, value: string | undefined): void {
+  if (value !== undefined) params.set(key, value)
+}
+
+// ─── Serialize ───────────────────────────────────────────────────────────────
 
 /**
  * Serializes state to URL search params.
+ * Only emits params that are explicitly set (not undefined).
  * @param state - The state to serialize
  * @returns URL search params string
  */
@@ -77,37 +215,56 @@ export function serializeState(state: ShareableState): string {
 
   if ('scene' in state) {
     const scene = state.scene.trim()
-    if (scene) {
-      params.set('scene', scene)
-    }
+    if (scene) params.set('scene', scene)
     return params.toString()
   }
 
+  // Core identity
   params.set('d', state.dimension.toString())
   params.set('t', state.objectType)
   if (state.quantumMode && state.quantumMode !== 'harmonicOscillator') {
     params.set('qm', state.quantumMode)
   }
 
-  // Open quantum params (only serialized when enabled)
+  // Rendering
+  setStringParam(params, 'repr', state.representation)
+  setBoolParam(params, 'iso', state.isoEnabled)
+  setFloatParam(params, 'iso_t', state.isoThreshold)
+  setBoolParam(params, 'cs', state.crossSectionEnabled)
+  setFloatParam(params, 'dg', state.densityGain)
+  setFloatParam(params, 'scale', state.scale)
+
+  // Quantum numbers
+  setIntParam(params, 'tc', state.termCount)
+  setIntParam(params, 'seed', state.seed)
+  setIntParam(params, 'hyd_n', state.hydrogenN)
+  setIntParam(params, 'hyd_l', state.hydrogenL)
+  setIntParam(params, 'hyd_m', state.hydrogenM)
+
+  // TDSE
+  setStringParam(params, 'pot', state.potentialType)
+  setBoolParam(params, 'abs', state.absorberEnabled)
+  setBoolParam(params, 'diag', state.diagnosticsEnabled)
+  setBoolParam(params, 'obs', state.observablesEnabled)
+  setBoolParam(params, 'it', state.imaginaryTimeEnabled)
+
+  // Features
   if (state.openQuantumEnabled) {
     params.set('oq', '1')
-    if (state.openQuantumDephasingRate !== undefined && state.openQuantumDephasingRate > 0) {
-      params.set('oq_dp', state.openQuantumDephasingRate.toFixed(2))
-    }
-    if (state.openQuantumRelaxationRate !== undefined && state.openQuantumRelaxationRate > 0) {
-      params.set('oq_rx', state.openQuantumRelaxationRate.toFixed(2))
-    }
-    if (state.openQuantumThermalUpRate !== undefined && state.openQuantumThermalUpRate > 0) {
-      params.set('oq_th', state.openQuantumThermalUpRate.toFixed(2))
-    }
+    setFloatParam(params, 'oq_dp', state.openQuantumDephasingRate, true)
+    setFloatParam(params, 'oq_rx', state.openQuantumRelaxationRate, true)
+    setFloatParam(params, 'oq_th', state.openQuantumThermalUpRate, true)
   }
+  setBoolParam(params, 'co', state.classicalOverlayEnabled)
 
   return params.toString()
 }
 
+// ─── Deserialize ─────────────────────────────────────────────────────────────
+
 /**
  * Deserializes state from URL search params.
+ * Unknown params are silently ignored. Missing params stay undefined (use app defaults).
  * @param searchParams - URL search params string
  * @returns Partial state object
  */
@@ -115,7 +272,7 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   const params = new URLSearchParams(searchParams)
   const state: ParsedShareableState = {}
 
-  // Scene parameter (mutually exclusive with other params)
+  // Scene (mutually exclusive with other params)
   const sceneParam = params.get('scene')
   if (sceneParam) {
     const trimmed = sceneParam.trim()
@@ -125,47 +282,53 @@ export function deserializeState(searchParams: string): ParsedShareableState {
     }
   }
 
-  const dimension = params.get('d')
-  if (dimension && INTEGER_PARAM_PATTERN.test(dimension)) {
-    const parsed = Number(dimension)
-    if (Number.isSafeInteger(parsed) && parsed >= MIN_DIMENSION && parsed <= MAX_DIMENSION) {
-      state.dimension = parsed
-    }
-  }
-
+  // Core identity
+  state.dimension = parseIntParam(params, 'd', MIN_DIMENSION, MAX_DIMENSION)
   const objectType = params.get('t')
-  if (objectType && isValidObjectType(objectType)) {
-    state.objectType = objectType
-  }
+  if (objectType && isValidObjectType(objectType)) state.objectType = objectType
+  state.quantumMode = parseEnumParam(params, 'qm', VALID_QUANTUM_MODES)
 
-  const quantumMode = params.get('qm')
-  if (quantumMode && VALID_QUANTUM_MODES.includes(quantumMode as SchroedingerQuantumMode)) {
-    state.quantumMode = quantumMode as SchroedingerQuantumMode
-  }
+  // Rendering
+  state.representation = parseEnumParam(params, 'repr', VALID_REPRESENTATIONS)
+  state.isoEnabled = parseBoolParam(params, 'iso')
+  state.isoThreshold = parseFloatParam(params, 'iso_t', -6, 0)
+  state.crossSectionEnabled = parseBoolParam(params, 'cs')
+  state.densityGain = parseFloatParam(params, 'dg', 0.01, 50)
+  state.scale = parseFloatParam(params, 'scale', 0.1, 2.0)
 
-  // Open quantum params
-  const oq = params.get('oq')
-  if (oq === '1') {
-    state.openQuantumEnabled = true
-    const dp = params.get('oq_dp')
-    if (dp) {
-      const v = Number(dp)
-      if (Number.isFinite(v)) state.openQuantumDephasingRate = Math.max(0, Math.min(5, v))
-    }
-    const rx = params.get('oq_rx')
-    if (rx) {
-      const v = Number(rx)
-      if (Number.isFinite(v)) state.openQuantumRelaxationRate = Math.max(0, Math.min(5, v))
-    }
-    const th = params.get('oq_th')
-    if (th) {
-      const v = Number(th)
-      if (Number.isFinite(v)) state.openQuantumThermalUpRate = Math.max(0, Math.min(5, v))
-    }
+  // Quantum numbers
+  state.termCount = parseIntParam(params, 'tc', 1, 8)
+  state.seed = parseIntParam(params, 'seed', 0, 999999)
+  state.hydrogenN = parseIntParam(params, 'hyd_n', 1, 7)
+  state.hydrogenL = parseIntParam(params, 'hyd_l', 0, 6)
+  state.hydrogenM = parseIntParam(params, 'hyd_m', -6, 6)
+
+  // TDSE
+  state.potentialType = parseEnumParam(params, 'pot', VALID_POTENTIAL_TYPES)
+  state.absorberEnabled = parseBoolParam(params, 'abs')
+  state.diagnosticsEnabled = parseBoolParam(params, 'diag')
+  state.observablesEnabled = parseBoolParam(params, 'obs')
+  state.imaginaryTimeEnabled = parseBoolParam(params, 'it')
+
+  // Features — open quantum
+  const oq = parseBoolParam(params, 'oq')
+  if (oq !== undefined) {
+    state.openQuantumEnabled = oq
+    state.openQuantumDephasingRate = parseFloatParam(params, 'oq_dp', 0, 5)
+    state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
+    state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
+  }
+  state.classicalOverlayEnabled = parseBoolParam(params, 'co')
+
+  // Strip undefined values so Object.keys(state).length reflects actual params
+  for (const key of Object.keys(state) as Array<keyof typeof state>) {
+    if (state[key] === undefined) delete state[key]
   }
 
   return state
 }
+
+// ─── URL Helpers ─────────────────────────────────────────────────────────────
 
 /**
  * Generates a shareable URL with current state.
@@ -184,8 +347,6 @@ export function generateShareUrl(state: ShareableState): string {
  * @returns Partial state object from current URL
  */
 export function parseCurrentUrl(): ParsedShareableState {
-  if (typeof window === 'undefined') {
-    return {}
-  }
+  if (typeof window === 'undefined') return {}
   return deserializeState(window.location.search)
 }

@@ -438,6 +438,9 @@ export interface SchroedingerConfig {
   classicalOverlayTrailFraction: number
   /** Trail glow color (hex string) */
   classicalOverlayColor: string
+  /** Effective ℏ for wavepacket width scaling (0.01-2.0, default 1.0). HO only.
+   *  At hbar=1.0, physical quantum cloud. At hbar→0, cloud narrows to classical trail. */
+  classicalOverlayHbar: number
 
   // === Second Quantization Educational Layer ===
   /** Master toggle for second-quantization interpretation overlay */
@@ -689,6 +692,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   classicalOverlayEnabled: false,
   classicalOverlayTrailFraction: 0.15,
   classicalOverlayColor: '#fff2cc',
+  classicalOverlayHbar: 1.0,
 
   // Second Quantization Educational Layer
   sqLayerEnabled: false,

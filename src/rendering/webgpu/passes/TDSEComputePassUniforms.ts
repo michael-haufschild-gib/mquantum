@@ -22,6 +22,8 @@ export interface TdseUniformParams {
   basisY?: Float32Array
   basisZ?: Float32Array
   boundingRadius?: number
+  /** Max |V| for custom potential display normalization (set by uploadCustomPotentialBuffer) */
+  customPotentialScale?: number
 }
 
 /** Enum maps for TDSE initial conditions. */
@@ -47,7 +49,7 @@ const POT_MAP: Record<string, number> = {
   doubleWell: 8,
   becTrap: 9,
   radialDoubleWell: 10,
-  custom: 0, // GPU shader skipped; buffer filled from JS
+  custom: 11, // GPU potential shader skipped; buffer filled from JS
 }
 
 /** Enum maps for TDSE field view modes. */
@@ -207,6 +209,9 @@ export function writeTdseUniforms(
 
   // Imaginary-time mode flag (offset 700, index 175)
   u32[175] = config.imaginaryTimeEnabled ? 1 : 0
+
+  // Custom potential display scale (offset 704, index 176)
+  f32[176] = params.customPotentialScale ?? 1.0
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

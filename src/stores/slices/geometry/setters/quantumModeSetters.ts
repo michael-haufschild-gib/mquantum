@@ -7,6 +7,7 @@
  * @module stores/slices/geometry/setters/quantumModeSetters
  */
 
+import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -23,7 +24,13 @@ const COMPUTE_MODES_3D = new Set([
 ])
 
 /** Quantum modes that use compute pipelines (no inline wavefunction). */
-const COMPUTE_MODES = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
+const COMPUTE_MODES = new Set([
+  'freeScalarField',
+  'tdseDynamics',
+  'becDynamics',
+  'diracEquation',
+  'quantumWalk',
+])
 
 /**
  * Create quantum mode, representation, and quantum number setters.
@@ -104,6 +111,12 @@ export function createQuantumModeSetters(
           if (prev.latticeDim !== dim) {
             const resized = resizers.resizeDiracArrays(prev, dim)
             updates.dirac = { ...prev, ...resized, needsReset: true }
+          }
+        } else if (mode === 'quantumWalk') {
+          const prev = state.schroedinger.quantumWalk
+          if (prev.latticeDim !== dim) {
+            const resized = resizeQuantumWalkArrays(prev, dim)
+            updates.quantumWalk = { ...prev, ...resized }
           }
         }
         return { schroedinger: { ...state.schroedinger, ...updates } }

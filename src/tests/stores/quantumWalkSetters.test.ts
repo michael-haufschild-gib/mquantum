@@ -1,0 +1,109 @@
+/**
+ * Tests for quantum walk store setters.
+ *
+ * Validates:
+ * - Mode selection wires quantum walk config correctly
+ * - Dimension changes resize quantum walk arrays
+ * - clearQuantumWalkNeedsReset clears the flag
+ * - setSchroedingerConfig patch merges correctly
+ * - Representation is forced to position for compute modes including quantumWalk
+ */
+
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
+describe('Quantum walk store setters', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().setDimension(3)
+  })
+
+  const getQW = () => useExtendedObjectStore.getState().schroedinger.quantumWalk
+
+  it('switches to quantumWalk mode and preserves config', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('quantumWalk')
+    // Config should have arrays sized to current dimension (3)
+    const qw = getQW()
+    expect(qw.latticeDim).toBe(3)
+    expect(qw.gridSize).toHaveLength(3)
+    expect(qw.spacing).toHaveLength(3)
+    expect(qw.initialPosition).toHaveLength(3)
+  })
+
+  it('forces representation to position when switching to quantumWalk', () => {
+    const s = useExtendedObjectStore.getState()
+    // First set momentum representation
+    s.setSchroedingerRepresentation('momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
+    // Now switch to quantum walk
+    s.setSchroedingerQuantumMode('quantumWalk')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+  })
+
+  it('blocks non-position representation in quantumWalk mode', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+    s.setSchroedingerRepresentation('momentum')
+    // Should remain position since quantumWalk is a compute mode
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+  })
+
+  it('resizes quantum walk arrays on dimension change via initializeSchroedingerForDimension', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+    // Verify initial dimension
+    expect(getQW().latticeDim).toBe(3)
+
+    // Change dimension to 5
+    s.initializeSchroedingerForDimension(5)
+    const qw = getQW()
+    expect(qw.latticeDim).toBe(5)
+    expect(qw.gridSize).toHaveLength(5)
+    expect(qw.spacing).toHaveLength(5)
+    expect(qw.initialPosition).toHaveLength(5)
+    expect(qw.needsReset).toBe(true)
+  })
+
+  it('does not resize quantum walk arrays when dimension is unchanged', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+    const originalGridSize = [...getQW().gridSize]
+
+    // Re-initialize with same dimension
+    s.initializeSchroedingerForDimension(3)
+    expect(getQW().gridSize).toEqual(originalGridSize)
+  })
+
+  it('clearQuantumWalkNeedsReset clears the needsReset flag', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerConfig({ quantumWalk: { ...getQW(), needsReset: true } })
+    expect(getQW().needsReset).toBe(true)
+
+    s.clearQuantumWalkNeedsReset()
+    expect(getQW().needsReset).toBe(false)
+  })
+
+  it('setSchroedingerConfig can update quantum walk config', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerConfig({
+      quantumWalk: { ...getQW(), coinType: 'dft', stepsPerFrame: 4 },
+    })
+    const qw = getQW()
+    expect(qw.coinType).toBe('dft')
+    expect(qw.stepsPerFrame).toBe(4)
+  })
+
+  it('total sites stay within limits for high dimensions', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setSchroedingerQuantumMode('quantumWalk')
+    s.initializeSchroedingerForDimension(8)
+    const qw = getQW()
+    const totalSites = qw.gridSize.reduce((a, b) => a * b, 1)
+    expect(totalSites).toBeLessThanOrEqual(65535 * 64)
+    expect(totalSites).toBeGreaterThan(0)
+  })
+})

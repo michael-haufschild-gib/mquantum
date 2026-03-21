@@ -167,7 +167,7 @@ function dissipativeStep(
  *
  * @param rho - Density matrix (mutated in place)
  */
-function hermitianize(rho: DensityMatrix): void {
+export function hermitianize(rho: DensityMatrix): void {
   const K = rho.K
   const el = rho.elements
   for (let k = 0; k < K; k++) {
@@ -191,7 +191,7 @@ function hermitianize(rho: DensityMatrix): void {
  *
  * @param rho - Density matrix (mutated in place)
  */
-function traceNormalize(rho: DensityMatrix): void {
+export function traceNormalize(rho: DensityMatrix): void {
   const K = rho.K
   const el = rho.elements
   let trace = 0

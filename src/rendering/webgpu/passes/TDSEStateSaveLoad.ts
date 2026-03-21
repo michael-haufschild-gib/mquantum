@@ -79,7 +79,13 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
       const gridSize = tdseConfig.gridSize?.slice(0, tdseConfig.latticeDim ?? 3) ?? [64]
 
       const blob = await serializeSimulationState(
-        { quantumMode, tdse: schroedinger.tdse, bec: schroedinger.bec } as Record<string, unknown>,
+        {
+          quantumMode,
+          tdse: schroedinger.tdse,
+          bec: schroedinger.bec,
+          dirac: schroedinger.dirac,
+          freeScalar: schroedinger.freeScalar,
+        } as Record<string, unknown>,
         { re, im, totalSites, componentCount: 1 },
         quantumMode,
         gridSize
@@ -93,6 +99,112 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
         useSimulationStateStore.getState().setSaveError(String(err))
       })
       state.saveMappingInFlight = false
+    })
+}
+
+/**
+ * Initiate async capture of a 1D wavefunction slice |ψ(x)|².
+ * Copies psi buffers to staging, maps, extracts a center-plane 1D cross-section,
+ * and delivers the result to the wavefunctionSliceStore.
+ *
+ * @param ctx - Render context (device + encoder)
+ * @param state - Shared save/load state with buffer references
+ * @param axis - Axis to slice along ('x', 'y', or 'z')
+ * @param gridSize - Per-dimension grid sizes
+ * @param worldBound - World-space half-extent
+ */
+export function requestSliceCapture(
+  ctx: WebGPURenderContext,
+  state: SaveLoadState,
+  axis: 'x' | 'y' | 'z',
+  gridSize: number[],
+  worldBound: number
+): void {
+  if (!state.psiReBuffer || !state.psiImBuffer || state.saveMappingInFlight) return
+  const { device, encoder } = ctx
+  const byteSize = state.totalSites * 4
+
+  // Create temporary staging buffers for the readback
+  const stagingRe = device.createBuffer({
+    label: 'slice-staging-re',
+    size: byteSize,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  })
+  const stagingIm = device.createBuffer({
+    label: 'slice-staging-im',
+    size: byteSize,
+    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+  })
+
+  encoder.copyBufferToBuffer(state.psiReBuffer, 0, stagingRe, 0, byteSize)
+  encoder.copyBufferToBuffer(state.psiImBuffer, 0, stagingIm, 0, byteSize)
+  state.saveMappingInFlight = true
+
+  const totalSites = state.totalSites
+
+  device.queue
+    .onSubmittedWorkDone()
+    .then(async () => {
+      if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
+        state.saveMappingInFlight = false
+        stagingRe.destroy()
+        stagingIm.destroy()
+        return
+      }
+      await Promise.all([stagingRe.mapAsync(GPUMapMode.READ), stagingIm.mapAsync(GPUMapMode.READ)])
+
+      const re = new Float32Array(stagingRe.getMappedRange())
+      const im = new Float32Array(stagingIm.getMappedRange())
+
+      // Extract a 1D slice through the center of the grid
+      const dims = gridSize.length
+      const nx = gridSize[0] ?? 1
+      const ny = dims > 1 ? (gridSize[1] ?? 1) : 1
+      const nz = dims > 2 ? (gridSize[2] ?? 1) : 1
+      const cx = Math.floor(nx / 2)
+      const cy = Math.floor(ny / 2)
+      const cz = Math.floor(nz / 2)
+
+      const axisMap = { x: 0, y: 1, z: 2 }
+      const axisIdx = axisMap[axis]
+      const sliceSize = gridSize[axisIdx] ?? 1
+      const sliceData = new Float32Array(sliceSize)
+
+      for (let i = 0; i < sliceSize; i++) {
+        let ix = cx,
+          iy = cy,
+          iz = cz
+        if (axisIdx === 0) ix = i
+        else if (axisIdx === 1) iy = i
+        else iz = i
+
+        const flatIdx = ix + iy * nx + iz * nx * ny
+        if (flatIdx < totalSites) {
+          const r = re[flatIdx]!
+          const j = im[flatIdx]!
+          sliceData[i] = r * r + j * j
+        }
+      }
+
+      stagingRe.unmap()
+      stagingIm.unmap()
+      stagingRe.destroy()
+      stagingIm.destroy()
+
+      const { useWavefunctionSliceStore } = await import('@/stores/wavefunctionSliceStore')
+      useWavefunctionSliceStore.getState().fulfillCapture({
+        sliceData,
+        axis,
+        gridSize: sliceSize,
+        worldBound,
+      })
+
+      state.saveMappingInFlight = false
+    })
+    .catch(() => {
+      state.saveMappingInFlight = false
+      stagingRe.destroy()
+      stagingIm.destroy()
     })
 }
 

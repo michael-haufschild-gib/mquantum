@@ -16,6 +16,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -269,8 +270,27 @@ function readFrameInputs(
       quantumModeStr === 'freeScalarField' ||
       quantumModeStr === 'tdseDynamics' ||
       quantumModeStr === 'becDynamics' ||
-      quantumModeStr === 'diracEquation',
+      quantumModeStr === 'diracEquation' ||
+      quantumModeStr === 'quantumWalk',
     isDensityMatrixMode: config.openQuantumEnabled ?? false,
+  }
+}
+
+/**
+ * Read position mean history from the observables diagnostics store for TDSE/BEC modes.
+ * Returns null for modes that don't use observables-derived trajectories.
+ */
+function readObservablesTrailData(
+  quantumModeStr: string
+): import('./uniformPacking').ObservablesTrailData | null {
+  if (quantumModeStr !== 'tdseDynamics' && quantumModeStr !== 'becDynamics') return null
+  const obs = useObservablesDiagnosticsStore.getState()
+  if (!obs.hasData || obs.historyCount < 2) return null
+  return {
+    historyPositionMean: obs.historyPositionMean,
+    historyHead: obs.historyHead,
+    historyCount: obs.historyCount,
+    activeDims: obs.activeDims,
   }
 }
 
@@ -310,6 +330,7 @@ function buildPackParams(
     rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
     rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
     rendererTermCount: config.termCount,
+    observablesTrailData: readObservablesTrailData(inputs.quantumModeStr),
   }
 }
 

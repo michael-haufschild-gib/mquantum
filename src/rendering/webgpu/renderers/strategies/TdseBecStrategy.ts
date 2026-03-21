@@ -11,8 +11,9 @@ import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/tdse'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useMeasurementStore } from '@/stores/measurementStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
+import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { TDSEComputePass } from '../../passes/TDSEComputePass'
@@ -159,15 +160,25 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       simState.clearSaveRequest()
       tdsePass.requestStateSave(ctx)
     }
+
+    // B2: Wavefunction slice capture
+    const sliceStore = useWavefunctionSliceStore.getState()
+    if (sliceStore.captureRequested) {
+      sliceStore.clearRequest()
+      tdsePass.requestSliceCapture(
+        ctx,
+        sliceStore.requestedAxis,
+        tdseConfig.gridSize ?? [64],
+        shared.boundingRadius
+      )
+    }
     if (simState.pendingLoadData) {
       const loadData = simState.pendingLoadData
-      useExtendedObjectStore.getState().setSchroedingerConfig({
-        quantumMode: loadData.quantumMode,
-        ...(loadData.config as Record<string, unknown>),
-      })
-      // Inject the loaded wavefunction data — will be written on next frame's maybeInitialize
-      tdsePass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-      simState.clearLoadData()
+      // Only inject if this strategy handles the loaded mode (TDSE or BEC)
+      if (loadData.quantumMode === 'tdseDynamics' || loadData.quantumMode === 'becDynamics') {
+        tdsePass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+        simState.clearLoadData()
+      }
     }
 
     // B3: Eigenstate storage for Gram-Schmidt
@@ -177,6 +188,73 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         newCount >= 0 ? newCount : tdsePass.getStoredEigenstateCount()
       )
     }
+
+    // C3: Born rule measurement
+    TdseBecStrategy.handleMeasurement(ctx, tdsePass, tdseConfig)
+  }
+
+  /**
+   * Handle measurement readback and collapse injection.
+   * Checks the measurement store for pending requests, triggers async
+   * readback, samples from |psi|^2, and injects collapsed wavefunction.
+   */
+  private static handleMeasurement(
+    ctx: WebGPURenderContext,
+    tdsePass: TDSEComputePass,
+    tdseConfig: TdseConfig
+  ): void {
+    const mState = useMeasurementStore.getState()
+
+    // Tick cooldown each frame
+    if (mState.cooldownFrames > 0) {
+      mState.tickCooldown()
+    }
+
+    // Check for pending measurement
+    if (!mState.pendingMeasurement || mState.isCollapsing) return
+
+    const gridSize = tdseConfig.gridSize.slice(0, tdseConfig.latticeDim)
+    const spacing = tdseConfig.spacing.slice(0, tdseConfig.latticeDim)
+    const measureAxis = mState.measureAxis
+    const collapseWidth = mState.collapseWidth
+
+    mState.startCollapse()
+
+    // Request async readback
+    const readbackPromise = tdsePass.requestMeasurementReadback(ctx)
+
+    readbackPromise.then(async (data) => {
+      if (!data) {
+        useMeasurementStore.getState().completeMeasurement([], 0, null)
+        return
+      }
+
+      const { executeFullMeasurement, executePartialMeasurement } =
+        await import('@/lib/physics/measurementOrchestrator')
+
+      const config = { latticeDim: gridSize.length, gridSize, spacing }
+
+      const inject = (re: Float32Array, im: Float32Array) => {
+        tdsePass.setLoadedWavefunction(re, im)
+      }
+      const record = (pos: number[], density: number, axis: number | null) => {
+        useMeasurementStore.getState().completeMeasurement(pos, density, axis)
+      }
+
+      if (measureAxis !== null && measureAxis < gridSize.length) {
+        executePartialMeasurement(
+          data.re,
+          data.im,
+          config,
+          measureAxis,
+          collapseWidth,
+          inject,
+          record
+        )
+      } else {
+        executeFullMeasurement(data.re, data.im, config, collapseWidth, inject, record)
+      }
+    })
   }
 
   // ═══════════════════════════════════════════════════════════════════════

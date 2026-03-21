@@ -471,6 +471,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
           title="Save Style"
           placeholder="Enter style name..."
           confirmText="Save"
+          data-testid="save-style-modal"
         />
 
         <InputModal
@@ -480,6 +481,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
           title="Save Scene"
           placeholder="Enter scene name..."
           confirmText="Save"
+          data-testid="save-scene-modal"
         />
       </>
     )

@@ -303,7 +303,9 @@ const projectRulesPlugin = {
       },
       create(context) {
         const fp = normalizePath(context.filename)
-        if (!fp.includes('.test.') && !fp.includes('.spec.')) return {}
+        // Only apply to unit/component tests (.test.), not Playwright e2e specs (.spec.)
+        // E2e specs use querySelector inside page.evaluate() which is browser code, not test queries
+        if (!fp.includes('.test.')) return {}
         // Allow in mock/helper files — they legitimately simulate DOM behavior
         if (fp.includes('__mocks__') || fp.includes('/helpers/')) return {}
 
@@ -436,6 +438,69 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- no-flaky-click-selectors ----
+    // E2E tests: .click() targets must be obtained via getByTestId, not getByText/getByRole/etc.
+    // Flaky selectors couple tests to display text or DOM structure that breaks on any UI change.
+    'no-flaky-click-selectors': {
+      meta: {
+        type: 'problem',
+        docs: { description: 'E2E click targets must use getByTestId, not text/role/label selectors' },
+        messages: {
+          noFlakyClick:
+            '.click() target must be obtained via getByTestId(). Using {{ method }}() produces flaky selectors that break on text or DOM changes.',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('.spec.')) return {}
+
+        // Methods that produce flaky locators when used as click targets
+        const FLAKY_METHODS = new Set([
+          'getByText', 'getByRole', 'getByLabel', 'getByPlaceholder',
+          'getByAltText', 'getByTitle',
+        ])
+
+        return {
+          CallExpression(node) {
+            // Match: <expr>.click(...)
+            if (
+              node.callee.type !== 'MemberExpression' ||
+              node.callee.property.type !== 'Identifier' ||
+              node.callee.property.name !== 'click'
+            ) return
+
+            // Walk back through the chain to find the query method
+            let obj = node.callee.object
+            // Handle chained calls like page.getByText('x').first().click()
+            while (obj.type === 'CallExpression' && obj.callee.type === 'MemberExpression') {
+              const method = obj.callee.property
+              if (method.type === 'Identifier' && FLAKY_METHODS.has(method.name)) {
+                context.report({
+                  node: method,
+                  messageId: 'noFlakyClick',
+                  data: { method: method.name },
+                })
+                return
+              }
+              obj = obj.callee.object
+            }
+            // Direct call: page.getByText('x').click()
+            if (obj.type === 'CallExpression' && obj.callee.type === 'Identifier') {
+              const name = obj.callee.name
+              if (FLAKY_METHODS.has(name)) {
+                context.report({
+                  node: obj.callee,
+                  messageId: 'noFlakyClick',
+                  data: { method: name },
+                })
+              }
+            }
+          },
+        }
+      },
+    },
+
     // ---- no-raw-html-controls ----
     'no-raw-html-controls': {
       meta: {
@@ -467,7 +532,7 @@ const projectRulesPlugin = {
 
 export default [
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'scripts/**', 'playwright.config.ts', 'src/wasm/**/pkg/**'],
+    ignores: ['dist', 'coverage', 'node_modules', 'scripts/!(playwright)/**', 'playwright.config.ts', 'src/wasm/**/pkg/**'],
   },
 
   // @eslint-react strict-typescript: registers all @eslint-react/* plugins + sets strict rule
@@ -799,6 +864,36 @@ export default [
     ],
     rules: {
       'no-restricted-imports': 'off',
+    },
+  },
+  // ─── E2E spec files: enforce stable selectors ────────────────────────────
+  {
+    files: ['scripts/playwright/**/*.{ts,spec.ts}'],
+    plugins: {
+      'project-rules': projectRulesPlugin,
+    },
+    languageOptions: {
+      ecmaVersion: 'latest',
+      parser: tsparser,
+      parserOptions: {
+        project: null,
+      },
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      // Disable type-aware rules that require tsconfig project
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      // E2E specs run in Node.js (Playwright) but contain browser code inside page.evaluate()
+      'jsdoc/require-jsdoc': 'off',
+      'no-console': 'off',
+      'project-rules/no-hardcoded-colors': 'off',
+      'project-rules/no-raw-html-controls': 'off',
+      // E2E selector discipline
+      'project-rules/no-flaky-click-selectors': 'error',
     },
   },
 ]

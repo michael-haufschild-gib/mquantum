@@ -27,6 +27,10 @@ export interface SparklineProps {
   height?: number
   /** Additional CSS class names */
   className?: string
+  /** Optional horizontal reference line value (e.g., theoretical bound) */
+  referenceLine?: number
+  /** Label for the reference line @default "" */
+  referenceLabel?: string
 }
 
 /**
@@ -34,6 +38,7 @@ export interface SparklineProps {
  *
  * Reads the ring buffer in chronological order (oldest to newest) and maps
  * values to SVG coordinates. Includes a gradient fill below the line.
+ * Optionally renders a dashed horizontal reference line.
  *
  * @param props - Sparkline configuration
  * @returns SVG sparkline element, or empty SVG when count < 2
@@ -47,11 +52,23 @@ export interface SparklineProps {
  *   min={0}
  *   max={1}
  *   height={32}
+ *   referenceLine={0.5}
+ *   referenceLabel="ℏ/2"
  * />
  * ```
  */
 export const Sparkline: React.FC<SparklineProps> = React.memo(
-  ({ data, head, count, min: minProp, max: maxProp, height = 32, className = '' }) => {
+  ({
+    data,
+    head,
+    count,
+    min: minProp,
+    max: maxProp,
+    height = 32,
+    className = '',
+    referenceLine,
+    referenceLabel,
+  }) => {
     const id = useId()
     const gradientId = `sparkline-fill-${id}`
 
@@ -59,8 +76,8 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
     const viewHeight = 50
     const padding = 2
 
-    const { polyline, fillPath } = useMemo(() => {
-      if (count < 2) return { polyline: '', fillPath: '' }
+    const { polyline, fillPath, refLineY, lo, hi } = useMemo(() => {
+      if (count < 2) return { polyline: '', fillPath: '', refLineY: null, lo: 0, hi: 1 }
 
       const len = data.length
       const n = Math.min(count, len)
@@ -82,6 +99,11 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
           if (hi === -Infinity || v > hi) hi = v
         }
       }
+      // Ensure reference line is within visible range
+      if (referenceLine != null) {
+        if (lo !== -Infinity && referenceLine < lo) lo = referenceLine
+        if (hi !== Infinity && referenceLine > hi) hi = referenceLine
+      }
       // Avoid division by zero when all values are equal
       if (hi - lo < 1e-10) {
         lo -= 0.5
@@ -100,7 +122,7 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
       }
 
       const line = pts.join(' ')
-      // Closed fill path: line points → bottom-right → bottom-left
+      // Closed fill path: line points -> bottom-right -> bottom-left
       const fill =
         `M ${pts[0]} ` +
         pts
@@ -110,8 +132,14 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
         ` L ${(padding + usableWidth).toFixed(1)},${(padding + usableHeight).toFixed(1)}` +
         ` L ${padding.toFixed(1)},${(padding + usableHeight).toFixed(1)} Z`
 
-      return { polyline: line, fillPath: fill }
-    }, [data, head, count, minProp, maxProp])
+      // Compute reference line Y position
+      let refLineY: number | null = null
+      if (referenceLine != null) {
+        refLineY = padding + usableHeight - ((referenceLine - lo) / (hi - lo)) * usableHeight
+      }
+
+      return { polyline: line, fillPath: fill, refLineY, lo, hi }
+    }, [data, head, count, minProp, maxProp, referenceLine])
 
     return (
       <svg
@@ -140,6 +168,35 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
               strokeWidth="1.5"
               vectorEffect="non-scaling-stroke"
             />
+          </>
+        )}
+        {refLineY != null && lo !== hi && (
+          <>
+            <line
+              data-testid="sparkline-reference"
+              x1={padding}
+              y1={refLineY}
+              x2={viewWidth - padding}
+              y2={refLineY}
+              stroke="var(--color-warning)"
+              strokeWidth="1"
+              strokeDasharray="4,3"
+              vectorEffect="non-scaling-stroke"
+              opacity={0.7}
+            />
+            {referenceLabel && (
+              <text
+                x={viewWidth - padding - 2}
+                y={refLineY - 2}
+                textAnchor="end"
+                fill="var(--color-warning)"
+                fontSize="8"
+                fontFamily="monospace"
+                opacity={0.8}
+              >
+                {referenceLabel}
+              </text>
+            )}
           </>
         )}
       </svg>

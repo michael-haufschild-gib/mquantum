@@ -187,6 +187,44 @@ describe('evaluatePotential1D', () => {
     const cfg = createConfig({ potentialType: 'unknown' as never })
     expect(evaluatePotential1D(5, cfg)).toBe(0)
   })
+
+  it('custom expression evaluates V(x) along axis 0', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: '0.5 * x^2',
+      latticeDim: 1,
+    } as Partial<TdseConfig>)
+    // V(2) = 0.5 * 4 = 2
+    expect(evaluatePotential1D(2, cfg)).toBeCloseTo(2, 10)
+    expect(evaluatePotential1D(0, cfg)).toBeCloseTo(0, 10)
+    expect(evaluatePotential1D(-3, cfg)).toBeCloseTo(4.5, 10)
+  })
+
+  it('custom expression with multiple variables evaluates along axis 0 (others = 0)', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: 'x^2 + y^2',
+      latticeDim: 2,
+    } as Partial<TdseConfig>)
+    // y=0 in 1D profile, so V(x) = x^2
+    expect(evaluatePotential1D(3, cfg)).toBeCloseTo(9, 10)
+  })
+
+  it('custom expression returns 0 for invalid expression', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: 'invalid!!!',
+    } as Partial<TdseConfig>)
+    expect(evaluatePotential1D(1, cfg)).toBe(0)
+  })
+
+  it('custom expression returns 0 for missing expression', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+    } as Partial<TdseConfig>)
+    // customPotentialExpression defaults to undefined → fallback to '0'
+    expect(evaluatePotential1D(5, cfg)).toBe(0)
+  })
 })
 
 describe('samplePotentialProfile', () => {
@@ -260,6 +298,25 @@ describe('samplePotentialProfile', () => {
     const { xs } = samplePotentialProfile(cfg, 50)
     expect(xs.length).toBeGreaterThan(50)
   })
+
+  it('custom expression profiles contain the evaluated V(x)', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: '5 * x^2',
+      latticeDim: 1,
+      gridSize: [64],
+      spacing: [0.1],
+    } as Partial<TdseConfig>)
+    const profile = samplePotentialProfile(cfg, 100)
+    expect(profile.xs.length).toBe(profile.vs.length)
+    // At x=0 the value should be near 0
+    const centerIdx = profile.xs.findIndex((x) => Math.abs(x) < 0.05)
+    if (centerIdx >= 0) {
+      expect(profile.vs[centerIdx]).toBeCloseTo(0, 0)
+    }
+    // Profile should have non-zero max for a quadratic
+    expect(profile.vMax).toBeGreaterThan(0)
+  })
 })
 
 describe('getPotentialPlotScale', () => {
@@ -283,6 +340,29 @@ describe('getPotentialPlotScale', () => {
   it('returns barrierHeight for barrier type', () => {
     const cfg = createConfig({ potentialType: 'barrier', barrierHeight: 15 })
     expect(getPotentialPlotScale(cfg)).toBe(15)
+  })
+
+  it('returns max|V| for custom expression', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: '10 * x^2',
+      latticeDim: 1,
+      gridSize: [64],
+      spacing: [0.1],
+    } as Partial<TdseConfig>)
+    const scale = getPotentialPlotScale(cfg)
+    // At grid edge: x = 64 * 0.1 * 0.5 = 3.2, V = 10 * 10.24 = 102.4
+    // Scale should be at least the max value at the edge
+    expect(scale).toBeGreaterThan(1)
+    expect(scale).toBeGreaterThan(50) // conservative lower bound
+  })
+
+  it('returns 1 for custom expression that fails to parse', () => {
+    const cfg = createConfig({
+      potentialType: 'custom',
+      customPotentialExpression: '!!!invalid',
+    } as Partial<TdseConfig>)
+    expect(getPotentialPlotScale(cfg)).toBe(1)
   })
 })
 

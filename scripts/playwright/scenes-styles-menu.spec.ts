@@ -17,7 +17,7 @@
  * - Scene load shows toast but doesn't actually change state
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import {
   getAppState,
   requireWebGPU,
@@ -139,7 +139,7 @@ test.describe('Styles menu', () => {
     const topBar = new TopBar(page)
     await topBar.openScenesMenu()
 
-    await page.getByText('+ Save Current Scene...').click()
+    await page.getByTestId('menu-save-scene').click()
 
     // The save dialog (InputModal for scene name) must appear
     const dialog = page.getByRole('dialog')

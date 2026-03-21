@@ -18,6 +18,7 @@ import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore } from '@/stores/lightingStore'
+import { useMeasurementStore } from '@/stores/measurementStore'
 import { usePBRStore } from '@/stores/pbrStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
@@ -142,6 +143,7 @@ export function useSceneStoreWiring(deps: SceneStoreWiringDeps): void {
     graph.setStoreGetter('transform', () => useTransformStore.getState())
     graph.setStoreGetter('pbr', () => usePBRStore.getState())
     graph.setStoreGetter('geometry', () => useGeometryStore.getState())
+    graph.setStoreGetter('measurement', () => useMeasurementStore.getState())
 
     // Buffer preview: maps UI toggle flags to pass configuration
     graph.setStoreGetter('bufferPreview', () => {

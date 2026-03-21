@@ -70,6 +70,9 @@ function createTdseConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
     becEnabled: false,
     becInteractionStrength: 0,
     trapAnisotropy: [1, 1, 1],
+    imaginaryTimeEnabled: false,
+    observablesEnabled: false,
+    needsReset: false,
     ...overrides,
   } as TdseConfig
 }
@@ -126,6 +129,35 @@ describe('writeTdseUniforms', () => {
       needsInit: false,
     })
     expect(u32[7]).toBe(6) // doubleSlit → 6
+
+    u32.fill(0)
+    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
+      config: createTdseConfig({ potentialType: 'custom' }),
+      totalSites: 262144,
+      simTime: 0,
+      maxDensity: 1,
+      strides: [4096, 64, 1],
+      needsInit: false,
+    })
+    expect(u32[7]).toBe(11) // custom → 11
+  })
+
+  it('writes customPotentialScale at index 176', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
+      config: createTdseConfig({ potentialType: 'custom' }),
+      totalSites: 262144,
+      simTime: 0,
+      maxDensity: 1,
+      strides: [4096, 64, 1],
+      needsInit: false,
+      customPotentialScale: 42.5,
+    })
+    expect(f32[176]).toBeCloseTo(42.5)
   })
 
   it('packs gridSize starting at index 8', () => {
@@ -207,6 +239,43 @@ describe('writeTdseUniforms', () => {
     })
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
+  })
+
+  it('sets imaginaryTime flag at u32[175] when enabled', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
+      config: createTdseConfig({ imaginaryTimeEnabled: true }),
+      totalSites: 262144,
+      simTime: 0,
+      maxDensity: 1,
+      strides: [4096, 64, 1],
+      needsInit: false,
+    })
+
+    // Offset 700 / 4 = index 175
+    expect(u32[175]).toBe(1)
+  })
+
+  it('clears imaginaryTime flag at u32[175] when disabled', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
+      config: createTdseConfig({ imaginaryTimeEnabled: false }),
+      totalSites: 262144,
+      simTime: 0,
+      maxDensity: 1,
+      strides: [4096, 64, 1],
+      needsInit: false,
+    })
+
+    expect(u32[175]).toBe(0)
   })
 })
 
