@@ -71,6 +71,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
         >
           <Slider
             label="Intensity"
+            tooltip="Strength of the subsurface scattering effect. Higher values simulate more translucent materials where light penetrates and scatters inside."
             min={0.0}
             max={2.0}
             step={0.1}
@@ -90,6 +91,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
           </div>
           <Slider
             label="Thickness"
+            tooltip="Penetration depth of the subsurface scatter. Larger values let light travel further into the volume before scattering back."
             min={0.1}
             max={5.0}
             step={0.1}
@@ -100,6 +102,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
           />
           <Slider
             label="Sample Jitter"
+            tooltip="Random offset applied to scatter sample positions. Reduces visible banding artifacts at the cost of slight noise."
             min={0.0}
             max={1.0}
             step={0.05}

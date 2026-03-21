@@ -73,6 +73,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
       <div className="space-y-3">
         <Select
           label="Initial Condition"
+          tooltip="Shape of the initial spinor wavepacket. Gaussian is localized; plane wave fills space uniformly."
           options={INITIAL_CONDITION_OPTIONS}
           value={initialCondition}
           onChange={(v) => onInitialConditionChange(v as PauliInitialCondition)}
@@ -90,6 +91,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
 
         <Slider
           label="Spin θ (polar)"
+          tooltip="Polar angle on the Bloch sphere. 0 = spin-up (↑), π = spin-down (↓), π/2 = equatorial superposition."
           value={initialSpinDirection[0]}
           onChange={(v) => onSpinDirectionChange([v, initialSpinDirection[1]])}
           min={0}
@@ -99,6 +101,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
 
         <Slider
           label="Spin φ (azimuthal)"
+          tooltip="Azimuthal angle on the Bloch sphere. Controls the relative phase between spin-up and spin-down components."
           value={initialSpinDirection[1]}
           onChange={(v) => onSpinDirectionChange([initialSpinDirection[0], v])}
           min={0}
@@ -108,6 +111,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
 
         <Slider
           label="Packet Width σ"
+          tooltip="Spatial width of the initial Gaussian wavepacket. Narrower packets spread faster due to the uncertainty principle."
           value={packetWidth}
           onChange={onPacketWidthChange}
           min={0.2}

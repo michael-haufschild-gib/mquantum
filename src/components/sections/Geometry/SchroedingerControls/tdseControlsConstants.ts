@@ -45,6 +45,7 @@ export const ALL_POTENTIAL_TYPE_OPTIONS: { value: string; label: string; minDims
   { value: 'periodicLattice', label: 'Periodic Lattice' },
   { value: 'doubleWell', label: 'Double Well' },
   { value: 'radialDoubleWell', label: 'Radial Double Well' },
+  { value: 'custom', label: 'Custom Expression' },
 ]
 
 /** Drive waveform options. */

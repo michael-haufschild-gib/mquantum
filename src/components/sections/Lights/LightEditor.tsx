@@ -255,6 +255,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <div className="flex-1">
           <Select
             label="Type"
+            tooltip="Point emits in all directions, Directional is parallel (like sunlight), Spot emits in a cone."
             options={LIGHT_TYPE_OPTIONS}
             value={selectedLight.type}
             onChange={handleTypeChange}
@@ -273,6 +274,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       {/* Intensity slider */}
       <Slider
         label="Intensity"
+        tooltip="Brightness multiplier for the light source. Values above 1 create brighter-than-default illumination."
         min={0.1}
         max={3}
         step={0.1}
@@ -286,6 +288,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <>
           <Slider
             label="Range"
+            tooltip="Maximum distance the light reaches. Beyond this range, the light has no effect on surfaces."
             min={0}
             max={100}
             step={1}
@@ -296,6 +299,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
 
           <Slider
             label="Decay"
+            tooltip="Rate of intensity falloff with distance. 0 = no falloff, 1 = linear, 2 = physically accurate inverse-square."
             min={0}
             max={3}
             step={0.1}
@@ -331,6 +335,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <>
           <Slider
             label="Cone Angle"
+            tooltip="Half-angle of the spotlight cone in degrees. Wider angles illuminate a larger area."
             min={1}
             max={120}
             step={1}
@@ -342,6 +347,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
 
           <Slider
             label="Penumbra"
+            tooltip="Softness of the spotlight edge. 0 = hard edge, 1 = fully soft falloff from center to cone boundary."
             min={0}
             max={1}
             step={0.05}

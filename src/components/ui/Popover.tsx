@@ -118,8 +118,8 @@ export const Popover: React.FC<PopoverProps> = React.memo(
           const triggerRect = triggerRef.current.getBoundingClientRect()
           const popoverRect = popoverRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
 
-          let top = 0
-          let left = 0
+          let top: number
+          let left: number
 
           // Vertical Positioning
           if (side === 'bottom') {

@@ -105,7 +105,7 @@ fn getIsosurfaceLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
   }
 }
 
-// Helper to get light attenuation (Three.js physically-based falloff)
+// Helper to get light attenuation (physically-based inverse-range falloff)
 fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
   let light = lighting.lights[lightIdx];
   let lightRange = light.direction.w;

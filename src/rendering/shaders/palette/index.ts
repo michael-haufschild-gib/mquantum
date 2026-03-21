@@ -1,15 +1,12 @@
 /**
  * Color Palette Module
  *
- * Unified color palette system for surface rendering.
- * Provides both GLSL functions (for shaders) and TypeScript types (for UI/store).
+ * Unified color palette system for quantum visualization rendering.
+ * Provides TypeScript color evaluation functions for UI preview and
+ * CPU-side palette computation.
  *
  * @example
  * ```typescript
- * // In a shader file:
- * import { GLSL_ALL_PALETTE_FUNCTIONS } from '@/rendering/shaders/palette';
- * const fragmentShader = GLSL_ALL_PALETTE_FUNCTIONS + myShaderCode;
- *
  * // In a component:
  * import { COLOR_ALGORITHM_OPTIONS, COSINE_PRESET_OPTIONS } from '@/rendering/shaders/palette';
  *
@@ -20,29 +17,8 @@
  *
  */
 
-// Legacy palette functions (still used for 'legacy' algorithm)
-export { GLSL_PALETTE_FUNCTIONS } from './palette.glsl'
-
-// New cosine palette functions
-export {
-  applyDistributionTS,
-  calculateCosineColor,
-  getCosinePaletteColorTS,
-  GLSL_COSINE_PALETTE,
-} from './cosine.glsl'
-
-// Combined GLSL for shaders that need everything
-import { GLSL_COSINE_PALETTE } from './cosine.glsl'
-import { GLSL_PALETTE_FUNCTIONS } from './palette.glsl'
-
-/**
- * All palette GLSL functions combined.
- * Use this when you need both legacy and new algorithms.
- */
-export const GLSL_ALL_PALETTE_FUNCTIONS = /* glsl */ `
-${GLSL_COSINE_PALETTE}
-${GLSL_PALETTE_FUNCTIONS}
-`
+// Cosine palette evaluation functions (CPU-side)
+export { applyDistributionTS, calculateCosineColor, getCosinePaletteColorTS } from './cosine.glsl'
 
 // Types
 export {

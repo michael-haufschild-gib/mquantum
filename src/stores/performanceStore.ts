@@ -215,12 +215,6 @@ interface PerformanceState {
   fastEigenInterpolationEnabled: boolean
 
   // -------------------------------------------------------------------------
-  // Schroedinger Animation Quality
-  // -------------------------------------------------------------------------
-
-  /** Whether to use lower quality during schroedinger animation for smoother interaction */
-  fractalAnimationLowQuality: boolean
-
   // -------------------------------------------------------------------------
   // Render Resolution Scale
   // -------------------------------------------------------------------------
@@ -279,9 +273,6 @@ interface PerformanceState {
   setEigenfunctionCacheEnabled: (enabled: boolean) => void
   setAnalyticalGradientEnabled: (enabled: boolean) => void
   setFastEigenInterpolationEnabled: (enabled: boolean) => void
-
-  // Fractal Animation Quality
-  setFractalAnimationLowQuality: (enabled: boolean) => void
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => void
@@ -342,9 +333,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   eigenfunctionCacheEnabled: true,
   analyticalGradientEnabled: true,
   fastEigenInterpolationEnabled: true,
-
-  // Schroedinger Animation Quality
-  fractalAnimationLowQuality: true,
 
   // Render Resolution Scale (load from localStorage, default to desktop default)
   renderResolutionScale: loadPersistedResolutionScale() ?? DESKTOP_DEFAULT_RESOLUTION_SCALE,
@@ -454,11 +442,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ fastEigenInterpolationEnabled: enabled })
   },
 
-  // Fractal Animation Quality
-  setFractalAnimationLowQuality: (enabled: boolean) => {
-    set({ fractalAnimationLowQuality: enabled })
-  },
-
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => {
     if (!Number.isFinite(scale)) {
@@ -558,7 +541,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       eigenfunctionCacheEnabled: true,
       analyticalGradientEnabled: true,
       fastEigenInterpolationEnabled: true,
-      fractalAnimationLowQuality: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
       maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},

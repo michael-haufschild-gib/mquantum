@@ -7,6 +7,7 @@
  * @module rendering/webgpu/scenePassConfig
  */
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { ObjectType } from '@/lib/geometry/types'
 import {
   COLOR_ALGORITHM_TO_INT,
@@ -45,13 +46,7 @@ export interface PassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   isosurface: boolean
-  quantumMode:
-    | 'harmonicOscillator'
-    | 'hydrogenND'
-    | 'freeScalarField'
-    | 'tdseDynamics'
-    | 'becDynamics'
-    | 'diracEquation'
+  quantumMode: SchroedingerQuantumMode
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -76,13 +71,7 @@ export interface PassConfig {
 export interface SchrodingerPassConfig {
   objectType: ObjectType
   dimension: number
-  quantumMode:
-    | 'harmonicOscillator'
-    | 'hydrogenND'
-    | 'freeScalarField'
-    | 'tdseDynamics'
-    | 'becDynamics'
-    | 'diracEquation'
+  quantumMode: SchroedingerQuantumMode
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean

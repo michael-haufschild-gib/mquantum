@@ -141,6 +141,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Intensity"
+        tooltip="Overall strength of the paper texture overlay. 0 = invisible, 1 = fully opaque."
         min={0}
         max={1}
         step={0.01}
@@ -151,6 +152,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Contrast"
+        tooltip="Contrast of the paper grain pattern. Higher values create more pronounced light/dark variation."
         min={0}
         max={1}
         step={0.01}
@@ -161,6 +163,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Roughness"
+        tooltip="Surface roughness of the simulated paper. Higher values produce a coarser, more textured appearance."
         min={0}
         max={1}
         step={0.01}
@@ -171,6 +174,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Select
         label="Quality"
+        tooltip="Noise resolution for the paper texture. Higher quality uses more texture samples for finer grain detail."
         value={paperQuality}
         options={QUALITY_OPTIONS}
         onChange={(value) => setPaperQuality(value as PaperQuality)}
@@ -198,6 +202,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Fiber Amount"
+        tooltip="Visibility of individual fiber strands in the paper texture."
         min={0}
         max={1}
         step={0.01}
@@ -208,6 +213,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Size"
+        tooltip="Scale of the fiber pattern. Larger values produce thicker, more visible fiber strands."
         min={0.1}
         max={2}
         step={0.1}
@@ -220,6 +226,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
       <CollapsibleSection title="Details" defaultOpen={false}>
         <Slider
           label="Crumples"
+          tooltip="Amount of crumple/wrinkle noise added to the paper surface."
           min={0}
           max={1}
           step={0.01}
@@ -230,6 +237,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Crumple Size"
+          tooltip="Scale of the crumple wrinkles. Larger values produce broader, gentler wrinkles."
           min={0.1}
           max={2}
           step={0.1}
@@ -240,6 +248,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Folds"
+          tooltip="Intensity of sharp fold/crease lines across the paper."
           min={0}
           max={1}
           step={0.01}
@@ -250,6 +259,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Fold Count"
+          tooltip="Number of fold lines. More folds simulate a paper that has been folded many times."
           min={1}
           max={15}
           step={1}
@@ -260,6 +270,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Drops"
+          tooltip="Amount of water drop stain marks on the paper surface."
           min={0}
           max={1}
           step={0.01}
@@ -270,6 +281,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Fade"
+          tooltip="Edge-to-center fade effect simulating aged, yellowed paper edges."
           min={0}
           max={1}
           step={0.01}
@@ -280,6 +292,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
         <Slider
           label="Seed"
+          tooltip="Random seed for the procedural paper pattern. Different seeds generate different fiber and crumple layouts."
           min={0}
           max={1000}
           step={1}

@@ -109,4 +109,40 @@ test.describe('responsive layout transitions', () => {
     expect(gpuErrors, 'no GPU errors during resize cycle').toEqual([])
     await expect(page.getByTestId('top-bar')).toBeVisible()
   })
+
+  test('canvas dimensions adapt to viewport size', async ({ page }) => {
+    await requireWebGPU(page, test.info())
+
+    // Start at desktop with both panels closed to maximize canvas area
+    await page.setViewportSize(DESKTOP)
+    await page.goto('/')
+    await waitForAppLoaded(page)
+    await waitForRendererReady(page)
+
+    const topBar = new TopBar(page)
+    await topBar.closeLeftPanel()
+    await topBar.closeRightPanel()
+
+    const canvas = page.getByTestId('webgpu-canvas')
+    const desktopBox = await canvas.boundingBox()
+    expect(desktopBox, 'Canvas must have a bounding box at desktop size').not.toBeNull()
+
+    // Resize to a smaller viewport
+    const SMALL = { width: 640, height: 480 }
+    await page.setViewportSize(SMALL)
+
+    // Wait for resize to take effect (frame must render at new size)
+    const count = await getFrameCount(page)
+    await waitForFrameAdvance(page, count)
+
+    const smallBox = await canvas.boundingBox()
+    expect(smallBox, 'Canvas must have a bounding box at small size').not.toBeNull()
+
+    // Canvas width must be smaller after viewport shrink.
+    // We can't assert exact dimensions (CSS layout depends on padding, chrome),
+    // but the canvas must not stay at the old size.
+    expect(smallBox!.width, 'Canvas width must decrease when viewport shrinks').toBeLessThan(
+      desktopBox!.width
+    )
+  })
 })

@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: npx eslint . --max-warnings 0 --no-warn-ignored
 
+      - name: Lint CSS
+        run: npx stylelint "src/**/*.css" --max-warnings 0
+
       - name: Type check
         run: npx tsc -b
 

@@ -20,6 +20,7 @@ const MODE_FEATURES: Record<
   tdseDynamics: { minDim: 3, category: 'compute' },
   becDynamics: { minDim: 3, category: 'compute' },
   diracEquation: { minDim: 3, category: 'compute' },
+  quantumWalk: { minDim: 1, category: 'compute' },
 }
 
 const MODE_OPTIONS: {
@@ -57,6 +58,11 @@ const MODE_OPTIONS: {
     label: 'Dirac',
     description: 'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
   },
+  {
+    value: 'quantumWalk',
+    label: 'Quantum Walk',
+    description: 'Discrete-time quantum walk on N-D lattice: Grover search, interference topology.',
+  },
 ]
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
@@ -75,7 +81,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     }))
   )
 
-  // Handle object type initialization (fractals, polytopes, raymarching visibility)
+  // Handle object type initialization (rendering config, quantum mode setup)
   useObjectTypeInitialization(objectType, dimension)
 
   const { addToast } = useToast()

@@ -73,7 +73,7 @@ export const FRAME_PRIORITY = {
   UNIFORM_MANAGER_UPDATE: 0.5,
 
   /**
-   * Renderer uniform updates (Mandelbulb, Schrödinger, Quaternion Julia, etc.).
+   * Renderer uniform updates (Schroedinger, Pauli, TDSE, etc.).
    * Runs AFTER camera update to get fresh camera position for ray computation.
    * This is between CAMERA (0) and POST_EFFECTS (10).
    */

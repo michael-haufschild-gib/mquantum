@@ -4,8 +4,8 @@
  * Catches rendering errors in the WebGPU canvas and displays
  * a user-friendly error message with recovery options.
  *
- * This prevents the entire application from crashing when a WebGL
- * context is lost or a shader compilation fails.
+ * This prevents the entire application from crashing when a WebGPU
+ * device is lost or a shader compilation fails.
  */
 
 import { Component, type ErrorInfo, type ReactNode } from 'react'

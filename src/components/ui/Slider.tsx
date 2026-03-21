@@ -1,6 +1,7 @@
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Drag sensitivity when Shift key is not pressed */
@@ -43,6 +44,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
     disabled = false,
     minLabel,
     maxLabel,
+    tooltip,
     formatValue,
     'data-testid': dataTestId,
   }) => {
@@ -222,7 +224,13 @@ export const Slider: React.FC<SliderProps> = React.memo(
             title="Drag label to adjust value"
             onMouseDown={handleLabelMouseDown}
           >
-            {label}
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
           </label>
 
           {showValue && (

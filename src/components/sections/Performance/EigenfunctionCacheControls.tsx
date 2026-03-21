@@ -39,6 +39,7 @@ export const EigenfunctionCacheControls: React.FC = () => {
         checked={cacheEnabled}
         onCheckedChange={setCacheEnabled}
         label="Eigenfunction Cache"
+        tooltip="Cache computed eigenfunctions in GPU textures for faster rendering. Trades memory for performance on repeated evaluations."
         data-testid="eigenfunction-cache-toggle"
       />
       <div className="ml-4 space-y-2">
@@ -46,6 +47,7 @@ export const EigenfunctionCacheControls: React.FC = () => {
           checked={analyticalGradientEnabled}
           onCheckedChange={setAnalyticalGradientEnabled}
           label="Analytical Gradient"
+          tooltip="Use analytically computed gradients for surface normals instead of finite differences. More accurate lighting at no extra GPU cost."
           disabled={!cacheEnabled}
           data-testid="analytical-gradient-toggle"
         />
@@ -53,6 +55,7 @@ export const EigenfunctionCacheControls: React.FC = () => {
           checked={fastEigenInterpolationEnabled}
           onCheckedChange={setFastEigenInterpolationEnabled}
           label="Fast Eigen Interpolation"
+          tooltip="Use bilinear texture interpolation for cached eigenfunctions. Faster but less precise than the robust path."
           disabled={!cacheEnabled}
           data-testid="fast-eigen-interpolation-toggle"
         />

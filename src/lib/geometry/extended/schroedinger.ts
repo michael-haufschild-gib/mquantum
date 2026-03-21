@@ -24,6 +24,8 @@ import type { DiracConfig } from './dirac'
 import { DEFAULT_DIRAC_CONFIG } from './dirac'
 import type { FreeScalarConfig } from './freeScalar'
 import { DEFAULT_FREE_SCALAR_CONFIG } from './freeScalar'
+import type { QuantumWalkConfig } from './quantumWalk'
+import { DEFAULT_QUANTUM_WALK_CONFIG } from './quantumWalk'
 import type { TdseConfig } from './tdse'
 import { DEFAULT_TDSE_CONFIG } from './tdse'
 
@@ -429,6 +431,14 @@ export interface SchroedingerConfig {
   /** Resolution of the pre-computed Wigner cache texture (128-1024) */
   wignerCacheResolution: number
 
+  // === Classical-Quantum Correspondence Overlay ===
+  /** Enable classical energy-shell Lissajous trajectory overlay in 3D volume */
+  classicalOverlayEnabled: boolean
+  /** Fraction of the Lissajous period to display as trail (0.05-0.5) */
+  classicalOverlayTrailFraction: number
+  /** Trail glow color (hex string) */
+  classicalOverlayColor: string
+
   // === Second Quantization Educational Layer ===
   /** Master toggle for second-quantization interpretation overlay */
   sqLayerEnabled: boolean
@@ -466,6 +476,10 @@ export interface SchroedingerConfig {
   // === Dirac Equation Configuration (when quantumMode === 'diracEquation') ===
   /** Relativistic Dirac equation solver configuration */
   dirac: DiracConfig
+
+  // === Quantum Walk Configuration (when quantumMode === 'quantumWalk') ===
+  /** Discrete-time quantum walk on N-D lattice */
+  quantumWalk: QuantumWalkConfig
 
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
@@ -671,6 +685,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   wignerClassicalOverlay: false,
   wignerCacheResolution: 256,
 
+  // Classical-Quantum Correspondence Overlay
+  classicalOverlayEnabled: false,
+  classicalOverlayTrailFraction: 0.15,
+  classicalOverlayColor: '#fff2cc',
+
   // Second Quantization Educational Layer
   sqLayerEnabled: false,
   sqLayerMode: 'fock' as SecondQuantizationMode,
@@ -694,6 +713,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Dirac
   dirac: DEFAULT_DIRAC_CONFIG,
+
+  // Quantum Walk
+  quantumWalk: DEFAULT_QUANTUM_WALK_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

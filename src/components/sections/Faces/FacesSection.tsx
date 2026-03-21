@@ -274,6 +274,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
               value={lchLightness}
               onChange={setLchLightness}
               showValue
+              tooltip="Perceptual lightness (L) in the LCH color space"
             />
             <Slider
               label="Chroma"
@@ -283,6 +284,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
               value={lchChroma}
               onChange={setLchChroma}
               showValue
+              tooltip="Color saturation (C) in the LCH perceptual color space"
             />
           </>
         )}
@@ -484,7 +486,7 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
         value={multiSourceWeights.orbitTrap}
         onChange={handleOrbitTrapChange}
         showValue
-        tooltip="Weight for orbit trap coloring (fractals)"
+        tooltip="Weight for secondary color source"
       />
 
       <Slider

@@ -16,7 +16,7 @@ function bec() {
 
 /** Helper to call BEC setters. */
 function store() {
-  return useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+  return useExtendedObjectStore.getState()
 }
 
 describe('BEC setters', () => {
@@ -86,8 +86,8 @@ describe('BEC setters', () => {
 
   describe('setBecInitialCondition', () => {
     it('sets condition and triggers needsReset', () => {
-      store().setBecInitialCondition('vortex')
-      expect(bec().initialCondition).toBe('vortex')
+      store().setBecInitialCondition('vortexImprint')
+      expect(bec().initialCondition).toBe('vortexImprint')
       expect(bec().needsReset).toBe(true)
     })
   })

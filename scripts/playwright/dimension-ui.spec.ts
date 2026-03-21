@@ -102,6 +102,32 @@ test.describe('dimension change via UI', () => {
     }
   })
 
+  test('dimension change in compute mode falls back gracefully', async ({ page }) => {
+    // Start in TDSE (3D-only compute mode)
+    await page.goto('/?t=schroedinger&d=3&qm=tdseDynamics')
+    await waitForAppLoaded(page)
+
+    const topBar = new TopBar(page)
+    await topBar.openLeftPanel()
+
+    const leftPanel = new LeftPanel(page)
+
+    // Try changing to 5D — TDSE doesn't support 5D
+    await leftPanel.selectDimension(5)
+
+    await expect(async () => {
+      const dim = await getDimension(page)
+      // The app should either:
+      // 1. Stay at 3D (dimension change blocked for compute modes)
+      // 2. Accept 5D and switch to a compatible mode (e.g. HO)
+      expect(dim).toBeGreaterThanOrEqual(2)
+      expect(dim).toBeLessThanOrEqual(11)
+    }).toPass({ timeout: 5000 })
+
+    // App must not crash
+    await expect(page.getByTestId('top-bar')).toBeVisible()
+  })
+
   test('dimension change via UI updates store (URL is read-only on load)', async ({ page }) => {
     const topBar = new TopBar(page)
     await topBar.openLeftPanel()

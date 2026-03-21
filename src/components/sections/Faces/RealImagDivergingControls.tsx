@@ -93,6 +93,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
         value={divergingPsi.intensityFloor}
         onChange={handleIntensityFloor}
         showValue
+        tooltip="Minimum brightness for near-zero regions of the diverging colormap"
       />
     </div>
   )

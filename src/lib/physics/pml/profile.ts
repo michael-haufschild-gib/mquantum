@@ -23,6 +23,12 @@
  */
 
 /**
+ * Polynomial grading order for PML absorption profile.
+ * Cubic grading (p=3) matches the WGSL shader σ(x) = σ_max · (d/L_pml)^p.
+ */
+export const PML_GRADING_EXPONENT = 3
+
+/**
  * Compute the peak PML absorption coefficient σ_max.
  *
  * σ_max is independent of PML width and grid geometry. It depends only

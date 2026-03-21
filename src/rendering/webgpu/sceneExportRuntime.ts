@@ -39,7 +39,6 @@ export interface ExportLoopState {
 /** Snapshot of performance settings to restore after export completes. */
 export interface ExportPerformanceSnapshot {
   progressiveRefinementEnabled: boolean
-  fractalAnimationLowQuality: boolean
   renderResolutionScale: number
 }
 
@@ -126,7 +125,6 @@ export function createInitialExportRuntimeState(): ExportRuntimeState {
     renderHeight: 0,
     originalPerf: {
       progressiveRefinementEnabled: true,
-      fractalAnimationLowQuality: true,
       renderResolutionScale: 1,
     },
     loop: createInitialExportLoopState(),

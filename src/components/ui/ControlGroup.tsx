@@ -7,7 +7,7 @@ import { soundManager } from '@/lib/audio/SoundManager'
 /** Props for the collapsible control group container. */
 export interface ControlGroupProps {
   title: string
-  children: React.ReactNode
+  children?: React.ReactNode
   defaultOpen?: boolean
   collapsible?: boolean
   className?: string

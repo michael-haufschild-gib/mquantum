@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Single option in a Select dropdown */
@@ -24,6 +25,8 @@ export interface SelectProps<T extends string = string> {
   className?: string
   /** Whether the select is disabled */
   disabled?: boolean
+  /** Tooltip text shown on hover over the label */
+  tooltip?: string
   /** Test ID for testing */
   'data-testid'?: string
 }
@@ -55,6 +58,7 @@ export const Select = React.memo(
     onChange,
     className = '',
     disabled = false,
+    tooltip,
     'data-testid': testId,
     ref,
   }: SelectProps<T> & { ref?: React.Ref<HTMLSelectElement> }) => {
@@ -78,7 +82,13 @@ export const Select = React.memo(
       <div className={`flex flex-col gap-2 ${className}`}>
         {label && (
           <label htmlFor={selectId} className="text-sm font-medium text-text-secondary">
-            {label}
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
           </label>
         )}
         <div className="relative group">

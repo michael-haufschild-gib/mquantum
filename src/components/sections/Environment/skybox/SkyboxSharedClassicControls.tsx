@@ -50,10 +50,12 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         checked={skyboxHighQuality}
         onCheckedChange={setSkyboxHighQuality}
         label="High Quality (Mipmaps)"
+        tooltip="Enable trilinear mipmap filtering for smoother skybox textures at oblique angles. Slightly higher GPU cost."
       />
 
       <Select
         label="Animation"
+        tooltip="Animate the skybox texture with various motion effects. Adds movement and atmosphere to the background."
         options={ANIMATION_MODES}
         value={skyboxAnimationMode}
         onChange={setSkyboxAnimationMode}
@@ -62,6 +64,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
       {skyboxAnimationMode !== 'none' && (
         <Slider
           label="Animation Speed"
+          tooltip="Rate of the skybox animation. Subtle values (0.01–0.03) create a gentle drift."
           value={skyboxAnimationSpeed}
           min={0.001}
           max={0.1}
@@ -77,6 +80,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         </span>
         <Slider
           label="Brightness"
+          tooltip="Overall brightness of the skybox texture. Zero produces a black background."
           value={skyboxIntensity}
           min={0}
           max={2}
@@ -85,6 +89,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         />
         <Slider
           label="Hue Shift"
+          tooltip="Rotates the color hue of the entire skybox. Useful for recoloring a space texture without changing the scene."
           value={proceduralSettings.hue ?? 0}
           min={-0.5}
           max={0.5}
@@ -93,6 +98,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         />
         <Slider
           label="Saturation"
+          tooltip="Color saturation of the skybox. Zero is grayscale; values above 1 are hyper-saturated."
           value={proceduralSettings.saturation ?? 1}
           min={0}
           max={2}

@@ -2,12 +2,9 @@
  * WebGPU Scene Pass
  *
  * Coordination pass for scene rendering in the WebGPU render graph.
- * Unlike the WebGL version which directly renders via Three.js renderer,
- * this pass serves as a marker and initializer for scene rendering.
- *
- * In the WebGPU architecture, actual scene rendering is handled by dedicated
- * renderers (e.g., WebGPUMandelbulbRenderer, WebGPUBlackHoleRenderer) that
- * write directly to textures. This pass provides:
+ * Actual scene rendering is handled by dedicated renderers
+ * (e.g., WebGPUSchrodingerRenderer) that write directly to textures.
+ * This pass provides:
  *
  * - Clear color initialization for scene targets
  * - Pass ordering marker for the render graph

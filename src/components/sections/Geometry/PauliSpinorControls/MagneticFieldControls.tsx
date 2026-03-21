@@ -56,6 +56,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
       <div className="space-y-3">
         <Select
           label="Field Type"
+          tooltip="Spatial profile of the external magnetic field. Uniform for Larmor precession, Gradient for Stern-Gerlach splitting, Rotating for NMR-like dynamics."
           options={FIELD_TYPE_OPTIONS}
           value={fieldType}
           onChange={(v) => onFieldTypeChange(v as PauliFieldType)}
@@ -63,6 +64,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         <Slider
           label="Field Strength B₀"
+          tooltip="Magnitude of the magnetic field. Higher values increase the Larmor precession frequency ω_L = gμ_B B₀/ℏ."
           value={fieldStrength}
           onChange={onFieldStrengthChange}
           min={0}
@@ -72,6 +74,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         <Slider
           label="Field θ (polar)"
+          tooltip="Polar angle of the magnetic field direction. 0 = along +z (standard quantization axis)."
           value={fieldDirection[0]}
           onChange={(v) => onFieldDirectionChange([v, fieldDirection[1]])}
           min={0}
@@ -81,6 +84,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
 
         <Slider
           label="Field φ (azimuthal)"
+          tooltip="Azimuthal angle of the magnetic field direction in the x-y plane."
           value={fieldDirection[1]}
           onChange={(v) => onFieldDirectionChange([fieldDirection[0], v])}
           min={0}
@@ -91,6 +95,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         {fieldType === 'gradient' && (
           <Slider
             label="Gradient Strength b'"
+            tooltip="Spatial gradient dB/dz of the magnetic field. Creates position-dependent Zeeman splitting for Stern-Gerlach separation."
             value={gradientStrength}
             onChange={onGradientStrengthChange}
             min={0}
@@ -102,6 +107,7 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
         {fieldType === 'rotating' && (
           <Slider
             label="Rotation Frequency ω"
+            tooltip="Angular frequency of the rotating magnetic field component. Resonance occurs when ω matches the Larmor frequency."
             value={rotatingFrequency}
             onChange={onRotatingFrequencyChange}
             min={0}

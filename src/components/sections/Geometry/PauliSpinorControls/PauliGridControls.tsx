@@ -75,6 +75,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
           <Select
             key={`grid-${d}`}
             label={`Grid N${AXIS_LABELS[d] ?? d}`}
+            tooltip="Number of lattice points along this axis. More points increase spatial resolution but require more GPU memory."
             options={gridSizeOptions}
             value={String(gridSize[d] ?? 64)}
             onChange={(v) => {
@@ -90,6 +91,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
           <Slider
             key={`spacing-${d}`}
             label={`Spacing Δ${AXIS_LABELS[d] ?? d}`}
+            tooltip="Distance between adjacent lattice points. Smaller spacing resolves finer wavefunction features but reduces the total domain size."
             value={spacing[d] ?? 0.15}
             onChange={(v) => {
               const newSpacing = [...spacing]
@@ -105,6 +107,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
         {/* Time stepping */}
         <Slider
           label="Time Step dt"
+          tooltip="Integration time step. Smaller values improve accuracy but slow evolution. Too large may cause numerical instability."
           value={dt}
           onChange={onDtChange}
           min={0.0001}
@@ -114,6 +117,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
 
         <Slider
           label="Steps / Frame"
+          tooltip="Number of integration steps computed per animation frame. Higher values evolve the simulation faster."
           value={stepsPerFrame}
           onChange={onStepsPerFrameChange}
           min={1}
@@ -124,6 +128,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
         {/* Physical constants */}
         <Slider
           label="ℏ (Planck)"
+          tooltip="Reduced Planck constant. Controls the quantum-to-classical ratio — smaller ℏ approaches classical behavior."
           value={hbar}
           onChange={onHbarChange}
           min={0.01}
@@ -133,6 +138,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
 
         <Slider
           label="Mass m"
+          tooltip="Particle mass in natural units. Affects wavepacket dispersion rate and the Zeeman splitting magnitude."
           value={mass}
           onChange={onMassChange}
           min={0.01}

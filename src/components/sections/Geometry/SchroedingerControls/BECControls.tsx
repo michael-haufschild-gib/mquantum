@@ -108,6 +108,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Scenario Preset */}
         <Select
           label="Scenario"
+          tooltip="Pre-configured BEC scenarios with tuned interaction strength, trap, and initial state."
           value={activePreset}
           onChange={(v) => v && actions.applyPreset(v)}
           options={SCENARIO_PRESET_OPTIONS}
@@ -116,6 +117,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Initial Condition */}
         <Select
           label="Initial Condition"
+          tooltip="Starting wavefunction shape: Thomas-Fermi ground state, Gaussian, vortex, or soliton."
           value={bec.initialCondition}
           onChange={(v) => actions.setInitialCondition(v as BecInitialCondition)}
           options={INITIAL_CONDITION_OPTIONS}
@@ -126,6 +128,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           <>
             <Slider
               label="Vortex Charge"
+              tooltip="Topological charge (winding number) of the vortex. Higher magnitude = more angular momentum. Sign determines rotation direction."
               value={bec.vortexCharge}
               onChange={actions.setVortexCharge}
               min={-4}
@@ -135,6 +138,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
             {bec.initialCondition === 'vortexLattice' && (
               <Slider
                 label="Vortex Count"
+                tooltip="Number of quantized vortices in the Abrikosov-like lattice arrangement."
                 value={bec.vortexLatticeCount}
                 onChange={actions.setVortexLatticeCount}
                 min={1}
@@ -150,6 +154,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           <>
             <Slider
               label="Soliton Depth"
+              tooltip="Density notch depth of the dark soliton. 1.0 = fully dark (stationary), lower = grey soliton."
               value={bec.solitonDepth}
               onChange={actions.setSolitonDepth}
               min={0}
@@ -158,6 +163,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
             />
             <Slider
               label="Soliton Velocity"
+              tooltip="Initial velocity of the dark soliton in units of the speed of sound. Sign sets propagation direction."
               value={bec.solitonVelocity}
               onChange={actions.setSolitonVelocity}
               min={-1}
@@ -170,6 +176,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Physics */}
         <Slider
           label="Interaction g̃"
+          tooltip="Dimensionless contact interaction strength. Positive = repulsive (stable BEC), negative = attractive (collapse). Controls nonlinearity in the Gross-Pitaevskii equation."
           value={bec.interactionStrength}
           onChange={actions.setInteractionStrength}
           min={-1000}
@@ -178,6 +185,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         />
         <Slider
           label="Trap ω"
+          tooltip="Harmonic trap frequency. Higher values confine the condensate more tightly, increasing the density and interaction energy."
           value={bec.trapOmega}
           onChange={actions.setTrapOmega}
           min={0.01}
@@ -191,6 +199,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
             <Slider
               key={`aniso-${i}`}
               label={`ω ratio ${AXIS_LABELS[i]}`}
+              tooltip="Trap anisotropy ratio for this axis. Multiplies the base trap frequency to create elongated or pancake traps."
               value={bec.trapAnisotropy?.[i] ?? 1.0}
               onChange={(v) => actions.setTrapAnisotropy(i, v)}
               min={0.1}
@@ -202,17 +211,24 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Display */}
         <Select
           label="Field View"
+          tooltip="Which physical observable to visualize: condensate density, phase, probability current, or potential."
           value={bec.fieldView}
           onChange={(v) => actions.setFieldView(v as BecFieldView)}
           options={FIELD_VIEW_OPTIONS}
         />
-        <Switch label="Auto-Scale" checked={bec.autoScale} onCheckedChange={actions.setAutoScale} />
+        <Switch
+          label="Auto-Scale"
+          tooltip="Automatically rescale the color map range to the current density extrema each frame."
+          checked={bec.autoScale}
+          onCheckedChange={actions.setAutoScale}
+        />
 
         {/* Numerics: Grid */}
         {Array.from({ length: activeDims }, (_, i) => (
           <Select
             key={`grid-${i}`}
             label={`Grid ${AXIS_LABELS[i]}`}
+            tooltip="Number of lattice points along this axis. Higher values increase spatial resolution but cost O(N^D) memory."
             value={String(bec.gridSize[i] ?? 64)}
             onChange={(v) => {
               const arr = [...bec.gridSize]
@@ -228,6 +244,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           <Slider
             key={`spacing-${i}`}
             label={`Spacing ${AXIS_LABELS[i]}`}
+            tooltip="Distance between adjacent grid points (dx). Smaller spacing resolves finer features but requires more points."
             value={bec.spacing[i] ?? 0.15}
             onChange={(v) => {
               const arr = [...bec.spacing]
@@ -243,6 +260,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Numerics: Particle */}
         <Slider
           label="Mass"
+          tooltip="Particle mass in the GP equation. Affects kinetic energy scale and healing length of the condensate."
           value={bec.mass}
           onChange={actions.setMass}
           min={0.1}
@@ -251,6 +269,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         />
         <Slider
           label="ℏ"
+          tooltip="Reduced Planck constant. Scales the kinetic term and sets the quantum pressure in the Gross-Pitaevskii equation."
           value={bec.hbar}
           onChange={actions.setHbar}
           min={0.1}
@@ -261,6 +280,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         {/* Numerics: Time */}
         <Slider
           label="dt"
+          tooltip="Time step for split-step Fourier integration. Too large causes numerical instability; too small slows evolution."
           value={bec.dt}
           onChange={actions.setDt}
           min={0.0001}
@@ -269,6 +289,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         />
         <Slider
           label="Steps/Frame"
+          tooltip="Number of GP integration steps per rendered frame. More steps = faster physical time per frame."
           value={bec.stepsPerFrame}
           onChange={actions.setStepsPerFrame}
           min={1}
@@ -287,6 +308,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                 <Slider
                   key={`slice-${dimIdx}`}
                   label={`Slice ${AXIS_LABELS[dimIdx]}`}
+                  tooltip="Cross-section position along this extra dimension for 3D visualization of the higher-D condensate."
                   value={bec.slicePositions[i] ?? 0}
                   onChange={(v) => actions.setSlicePosition(i, v)}
                   min={-halfExtent}

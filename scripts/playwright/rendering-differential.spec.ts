@@ -23,11 +23,13 @@ import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
   gotoMode,
+  pauseAnimation,
   requireWebGPU,
   snapshotDistance,
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
+  waitForUniformUpdate,
 } from './helpers/app-helpers'
 
 test.setTimeout(120_000)
@@ -273,5 +275,82 @@ test.describe('differential rendering', () => {
     const wignerSnap = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(positionSnap, wignerSnap, 'Position vs Wigner must differ')
+  })
+
+  test('different color algorithms produce different images', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await pauseAnimation(page)
+
+    // Set blackbody colormap
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      mod.useAppearanceStore.getState().setColorAlgorithm('blackbody')
+    })
+    await waitForShaderCompilation(page)
+    await waitForUniformUpdate(page)
+    const snapBlackbody = await capturePixelSnapshot(page)
+
+    // Set phase colormap — fundamentally different color mapping
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      mod.useAppearanceStore.getState().setColorAlgorithm('phase')
+    })
+    await waitForShaderCompilation(page)
+    await waitForUniformUpdate(page)
+    const snapPhase = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(snapBlackbody, snapPhase, 'Blackbody vs Phase colormap must differ')
+  })
+
+  test('density gain slider changes the rendered image', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await pauseAnimation(page)
+
+    // Set very low density gain
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(0.1)
+    })
+    await waitForUniformUpdate(page)
+    const snapLow = await capturePixelSnapshot(page)
+
+    // Set very high density gain
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      mod.useExtendedObjectStore.getState().setSchroedingerDensityGain(10.0)
+    })
+    await waitForUniformUpdate(page)
+    const snapHigh = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(snapLow, snapHigh, 'Low vs high density gain must differ')
+  })
+
+  test('scale change produces different images', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await pauseAnimation(page)
+
+    // Small scale — object appears smaller
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/geometryStore.ts')
+      mod.useGeometryStore.getState().setSchroedingerScale(0.3)
+    })
+    await waitForUniformUpdate(page)
+    const snapSmall = await capturePixelSnapshot(page)
+
+    // Large scale — object appears larger
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/geometryStore.ts')
+      mod.useGeometryStore.getState().setSchroedingerScale(2.0)
+    })
+    await waitForUniformUpdate(page)
+    const snapLarge = await capturePixelSnapshot(page)
+
+    expectSnapshotsDiffer(snapSmall, snapLarge, 'Small vs large scale must differ')
   })
 })

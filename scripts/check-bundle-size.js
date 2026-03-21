@@ -12,10 +12,9 @@
  * Usage: node scripts/check-bundle-size.js
  */
 
-import { readdirSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { readFileSync } from 'node:fs'
 
 const DIST_DIR = join(import.meta.dirname, '..', 'dist', 'assets')
 
@@ -35,8 +34,10 @@ const CHUNK_BUDGETS = {
   'index': 25,
 }
 
-/** Total JS gzip budget in KB (all .js chunks combined). */
-const TOTAL_JS_BUDGET_KB = 570
+/** Total JS gzip budget in KB (all .js chunks combined).
+ *  Bumped 570→580 to accommodate roadmap Phase B/C features
+ *  (expression parser, potential evaluator, quantum walk, measurement, observables). */
+const TOTAL_JS_BUDGET_KB = 580
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

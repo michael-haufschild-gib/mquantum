@@ -1,6 +1,7 @@
 import { LayoutGroup, m } from 'motion/react'
 import React, { useCallback } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Single option within a {@link ToggleGroup}. */
@@ -18,6 +19,8 @@ export interface ToggleGroupProps<T extends string = string> {
   className?: string
   disabled?: boolean
   ariaLabel?: string
+  /** Tooltip text shown on hover over the group label area. */
+  tooltip?: string
   'data-testid'?: string
 }
 
@@ -90,11 +93,12 @@ export const ToggleGroup = React.memo(
     className = '',
     disabled = false,
     ariaLabel,
+    tooltip,
     'data-testid': testId,
   }: ToggleGroupProps<T>) => {
     const layoutId = React.useId()
 
-    return (
+    const group = (
       <LayoutGroup id={layoutId}>
         <div
           className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${className}`}
@@ -120,6 +124,16 @@ export const ToggleGroup = React.memo(
         </div>
       </LayoutGroup>
     )
+
+    if (tooltip) {
+      return (
+        <Tooltip content={tooltip} position="top">
+          {group}
+        </Tooltip>
+      )
+    }
+
+    return group
   }
 ) as <T extends string = string>(props: ToggleGroupProps<T>) => React.ReactElement
 ;(ToggleGroup as React.FC).displayName = 'ToggleGroup'

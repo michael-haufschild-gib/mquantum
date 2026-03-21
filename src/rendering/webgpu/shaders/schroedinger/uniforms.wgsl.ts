@@ -138,43 +138,19 @@ struct SchroedingerUniforms {
   // Material properties
   roughness: f32,                // GGX roughness (0.0-1.0)
 
-  // Reserved (formerly SSS in Schroedinger uniforms — shader reads from MaterialUniforms)
-  _reservedSSS0: u32,
-  _reservedSSS1: f32,
-  _reservedSSS2: vec3f,
-  _pad1: f32,
-  _reservedSSS3: f32,
-  _reservedSSS4: f32,
+  // Classical-quantum correspondence overlay
+  classicalOverlayEnabled: u32,       // offset 720: enable energy-shell Lissajous trajectory
+  classicalOverlayTrailFraction: f32, // offset 724: fraction of period to show (0.1-1.0)
+  classicalOverlayColor: vec3f,       // offset 736 (16-byte aligned): trail glow color
+  _padClassical0: f32,                // offset 748
+  _reservedClassical1: f32,           // offset 752: reserved
+  _reservedClassical0: f32,           // offset 756: reserved
 
-  // Reserved (formerly erosion, removed)
-  _reservedErosion0: f32,
-  _reservedErosion1: f32,
-  _reservedErosion2: f32,
-  _reservedErosion3: i32,
-
-  // Reserved (formerly curl noise flow, removed)
-  _reservedCurl0: u32,
-  _reservedCurl1: f32,
-  _reservedCurl2: f32,
-  _reservedCurl3: f32,
-  _reservedCurl4: i32,
-
-  // Reserved (formerly dispersion, removed)
-  _reservedDispersion0: u32,
-  _reservedDispersion1: f32,
-  _reservedDispersion2: i32,
-
-  _reservedDispersion3: i32,
-
-  // Reserved (formerly shadows + AO — removed, keeping layout for buffer compatibility)
-  _reservedShadow0: u32,
-  _reservedShadow1: f32,
-  _reservedShadow2: i32,
-  _reservedAo0: f32,
-  _reservedAo1: i32,
-  _reservedAo2: f32,
-  _reservedAoColor: vec3f,
-  _pad2: f32,
+  // Classical overlay: CPU-precomputed trail points (offset 760)
+  // xyz = model-space position, w = fade (1.0=head, 0.0=tail)
+  classicalTrailCount: i32,          // offset 760: number of active trail points
+  _padTrail0: i32,                   // offset 764
+  classicalTrail: array<vec4f, 6>,   // offset 768: 6 trail points (96 bytes, ends at 864)
 
   // Nodal surfaces
   nodalEnabled: u32,             // Enable nodal surface highlighting

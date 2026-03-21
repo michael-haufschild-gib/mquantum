@@ -72,7 +72,7 @@ describe('carpetStore', () => {
     store.advanceHead(0.01)
     store.advanceHead(0.01)
     store.advanceHead(0.01)
-    useCarpetStore.getState().setCarpetData(new Float32Array(10), 96)
+    useCarpetStore.getState().setCarpetData(new Float32Array(10), 96, 0, 1)
 
     expect(useCarpetStore.getState().totalFrames).toBe(3)
     expect(useCarpetStore.getState().carpetData).not.toBe(null)
@@ -115,7 +115,7 @@ describe('carpetStore', () => {
 
   it('setCarpetData stores Float32Array and gridSize', () => {
     const data = new Float32Array([1, 2, 3, 4])
-    useCarpetStore.getState().setCarpetData(data, 48)
+    useCarpetStore.getState().setCarpetData(data, 48, 0, 1)
     expect(useCarpetStore.getState().carpetData).toBe(data)
     expect(useCarpetStore.getState().gridSize).toBe(48)
   })

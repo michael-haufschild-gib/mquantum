@@ -13,7 +13,7 @@ function oq() {
 }
 
 function store() {
-  return useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+  return useExtendedObjectStore.getState()
 }
 
 describe('Open Quantum setters', () => {
@@ -109,8 +109,8 @@ describe('Open Quantum setters', () => {
 
   describe('setOpenQuantumVisualizationMode', () => {
     it('sets visualization mode', () => {
-      store().setOpenQuantumVisualizationMode('densityMatrix')
-      expect(oq().visualizationMode).toBe('densityMatrix')
+      store().setOpenQuantumVisualizationMode('purityMap')
+      expect(oq().visualizationMode).toBe('purityMap')
     })
   })
 
@@ -145,8 +145,8 @@ describe('Open Quantum setters', () => {
 
   describe('setOpenQuantumDephasingModel', () => {
     it('sets dephasing model', () => {
-      store().setOpenQuantumDephasingModel('gaussian')
-      expect(oq().dephasingModel).toBe('gaussian')
+      store().setOpenQuantumDephasingModel('uniform')
+      expect(oq().dephasingModel).toBe('uniform')
     })
   })
 

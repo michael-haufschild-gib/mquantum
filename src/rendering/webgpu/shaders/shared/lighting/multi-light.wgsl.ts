@@ -98,7 +98,7 @@ fn getDistanceAttenuation(light: LightData, distance: f32) -> f32 {
   // Clamp distance to prevent division by zero
   let d = max(distance, EPS_DIVISION);
 
-  // Three.js attenuation formula
+  // Inverse-range attenuation with power-law decay
   let rangeAttenuation = clamp(1.0 - d / range, 0.0, 1.0);
   return pow(rangeAttenuation, decay);
 }

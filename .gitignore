@@ -41,8 +41,10 @@ build
 .cache
 *.tsbuildinfo
 
-# Temporary task state
-task_state.md
+# Temporary task/session files
+task_*.md
+godmode_*.md
+market_readiness_*.md
 
 # Screenshots and test artifacts
 screenshots/

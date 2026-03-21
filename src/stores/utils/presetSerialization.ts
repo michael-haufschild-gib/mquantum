@@ -24,7 +24,7 @@ export const TRANSIENT_FIELDS = new Set([
   // Lighting - UI interaction state and gizmo visibility
   'isDraggingLight',
   'showLightGizmos',
-  // Camera - runtime THREE.js control objects
+  // Camera - legacy runtime control objects (strip from imported presets)
   'controls',
   'savedState',
   // UI - helper visibility (excluded per user specification)
@@ -126,6 +126,9 @@ export const TRANSIENT_FIELDS = new Set([
   // Free scalar field runtime trigger (not persisted in presets)
   'needsReset',
 
+  // Imaginary-time propagation mode — runtime toggle, not scene state
+  'imaginaryTimeEnabled',
+
   // Second quantization educational layer — session-specific interpretive UI, not scene state
   'sqLayerEnabled',
   'sqLayerMode',
@@ -146,6 +149,9 @@ export const TRANSIENT_FIELDS = new Set([
 
   // Legacy absorber strength — replaced by auto-computed σ_max from pmlTargetReflection
   'absorberStrength',
+
+  // Legacy fractal animation quality toggle — removed with fractal object types
+  'fractalAnimationLowQuality',
 ])
 
 function warnDroppedNonFinitePresetValue(path: string, value: number): void {
@@ -191,7 +197,6 @@ function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | unde
 /**
  * Deep clones state and removes functions and transient fields to ensure JSON serializability.
  * Prevents reference mutation issues where saved presets would change when store changes.
- * Also handles non-serializable THREE.js objects by excluding them.
  * @param state - The state object to serialize.
  * @returns A JSON-serializable version of the state.
  */
@@ -239,7 +244,7 @@ export const serializeRotationState = <T extends object>(state: T): Record<strin
 
 /**
  * Serializes only the relevant extended object config for the given object type.
- * This prevents saving irrelevant configs (e.g., blackhole config when saving a hypercube).
+ * Only the config matching the active object type is included in the preset.
  *
  * @param state - The full extended object store state
  * @param objectType - The current object type being saved

@@ -451,7 +451,6 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
         // Restore Geometry atomically using loadGeometry
         // This sets both dimension and objectType without auto-adjustments
-        // (e.g., won't auto-switch to "recommended" dimension for fractals)
         const geometryData = sanitizeLoadedState(scene.data.geometry) as {
           dimension?: number
           objectType?: string

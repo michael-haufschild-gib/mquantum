@@ -19,6 +19,7 @@ import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
+import { QuantumWalkControls } from './QuantumWalkControls'
 import { TDSEControls } from './TDSEControls'
 import { useSchroedingerActions } from './useSchroedingerActions'
 import { WignerControls } from './WignerControls'
@@ -63,86 +64,97 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isTdseDynamics = config.quantumMode === 'tdseDynamics'
     const isBecDynamics = config.quantumMode === 'becDynamics'
     const isDiracEquation = config.quantumMode === 'diracEquation'
+    const isQuantumWalk = config.quantumMode === 'quantumWalk'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
         {/* Representation Selection — hidden for compute modes */}
-        {!isFreeScalarField && !isTdseDynamics && !isBecDynamics && !isDiracEquation && (
-          <Section title="Representation" defaultOpen={true}>
-            <div className="space-y-3">
-              <ToggleGroup
-                options={[
-                  { value: 'position', label: 'Position' },
-                  { value: 'momentum', label: 'Momentum' },
-                  { value: 'wigner', label: 'Wigner' },
-                ]}
-                value={config.representation}
-                onChange={(v) => setRepresentation(v as 'position' | 'momentum' | 'wigner')}
-                ariaLabel="Select representation space"
-                data-testid="representation-selector"
-              />
+        {!isFreeScalarField &&
+          !isTdseDynamics &&
+          !isBecDynamics &&
+          !isDiracEquation &&
+          !isQuantumWalk && (
+            <Section title="Representation" defaultOpen={true}>
+              <div className="space-y-3">
+                <ToggleGroup
+                  options={[
+                    { value: 'position', label: 'Position' },
+                    { value: 'momentum', label: 'Momentum' },
+                    { value: 'wigner', label: 'Wigner' },
+                  ]}
+                  value={config.representation}
+                  onChange={(v) => setRepresentation(v as 'position' | 'momentum' | 'wigner')}
+                  ariaLabel="Select representation space"
+                  data-testid="representation-selector"
+                />
 
-              {config.representation === 'momentum' && (
-                <div className="space-y-3">
-                  <ToggleGroup
-                    options={[
-                      { value: 'k', label: 'k-Space' },
-                      { value: 'p', label: 'p-Space' },
-                    ]}
-                    value={config.momentumDisplayUnits}
-                    onChange={(v) => setMomentumDisplayUnits(v as 'k' | 'p')}
-                    ariaLabel="Select momentum display units"
-                    data-testid="momentum-units-selector"
-                  />
-                  <Slider
-                    label="Momentum Scale"
-                    min={0.1}
-                    max={4.0}
-                    step={0.05}
-                    value={config.momentumScale}
-                    onChange={setMomentumScale}
-                    showValue
-                    data-testid="momentum-scale-slider"
-                  />
-                  {config.momentumDisplayUnits === 'p' && (
-                    <Slider
-                      label="Reduced Planck Constant (ħ)"
-                      min={0.01}
-                      max={10.0}
-                      step={0.01}
-                      value={config.momentumHbar}
-                      onChange={setMomentumHbar}
-                      showValue
-                      data-testid="momentum-hbar-slider"
+                {config.representation === 'momentum' && (
+                  <div className="space-y-3">
+                    <ToggleGroup
+                      options={[
+                        { value: 'k', label: 'k-Space' },
+                        { value: 'p', label: 'p-Space' },
+                      ]}
+                      value={config.momentumDisplayUnits}
+                      onChange={(v) => setMomentumDisplayUnits(v as 'k' | 'p')}
+                      ariaLabel="Select momentum display units"
+                      data-testid="momentum-units-selector"
                     />
-                  )}
-                </div>
-              )}
+                    <Slider
+                      label="Momentum Scale"
+                      tooltip="Spatial extent of the momentum-space visualization. Increase to see higher-momentum components."
+                      min={0.1}
+                      max={4.0}
+                      step={0.05}
+                      value={config.momentumScale}
+                      onChange={setMomentumScale}
+                      showValue
+                      data-testid="momentum-scale-slider"
+                    />
+                    {config.momentumDisplayUnits === 'p' && (
+                      <Slider
+                        label="Reduced Planck Constant (ħ)"
+                        tooltip="ħ used to convert between k-space (k) and momentum-space (p = ħk). Only affects display units, not the physics."
+                        min={0.01}
+                        max={10.0}
+                        step={0.01}
+                        value={config.momentumHbar}
+                        onChange={setMomentumHbar}
+                        showValue
+                        data-testid="momentum-hbar-slider"
+                      />
+                    )}
+                  </div>
+                )}
 
-              {config.representation === 'wigner' && (
-                <WignerControls config={config} dimension={dimension} actions={wignerActions} />
-              )}
+                {config.representation === 'wigner' && (
+                  <WignerControls config={config} dimension={dimension} actions={wignerActions} />
+                )}
 
-              {config.representation === 'momentum' && (
-                <p className="text-xs text-text-tertiary">
-                  Internal momentum rendering uses k-space; display units affect interpretation
-                  only.
-                </p>
-              )}
-            </div>
-          </Section>
-        )}
+                {config.representation === 'momentum' && (
+                  <p className="text-xs text-text-tertiary">
+                    Internal momentum rendering uses k-space; display units affect interpretation
+                    only.
+                  </p>
+                )}
+              </div>
+            </Section>
+          )}
 
         {/* Quantum State / Field Config Section */}
         <Section
           title={
             isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
               ? 'Field Configuration'
-              : 'Quantum State'
+              : isQuantumWalk
+                ? 'Walk Configuration'
+                : 'Quantum State'
           }
           defaultOpen={true}
         >
-          {isDiracEquation ? (
+          {isQuantumWalk ? (
+            <QuantumWalkControls />
+          ) : isDiracEquation ? (
             <DiracControls config={config} dimension={dimension} actions={diracActions} />
           ) : isBecDynamics ? (
             <BECControls config={config} dimension={dimension} actions={becActions} />
@@ -197,6 +209,12 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               {config.dirac.latticeDim}D Dirac,{' '}
               {config.dirac.gridSize.slice(0, config.dirac.latticeDim).join('\u00D7')} sites, S=
               {Math.pow(2, Math.floor((config.dirac.latticeDim + 1) / 2))} spinor
+            </p>
+          )}
+          {isQuantumWalk && (
+            <p className="text-text-tertiary mt-1">
+              {dimension}D quantum walk, {config.quantumWalk.coinType} coin,{' '}
+              {config.quantumWalk.gridSize.slice(0, dimension).join('\u00D7')} lattice
             </p>
           )}
         </div>

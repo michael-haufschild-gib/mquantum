@@ -117,6 +117,39 @@ test.describe('performance monitor toggle', () => {
   })
 })
 
+test.describe('performance monitor UI', () => {
+  test('enabling perf monitor shows FPS display on canvas', async ({ appPage: page }) => {
+    // Ensure perf monitor is visible
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/uiStore.ts')
+      mod.useUIStore.setState({ showPerfMonitor: true })
+    })
+
+    // The FPS value element should be visible
+    await expect(page.getByTestId('fps-value')).toBeVisible({ timeout: 5000 })
+
+    // It should show a number (FPS)
+    const fpsText = await page.getByTestId('fps-value').textContent()
+    expect(fpsText, 'FPS value should contain a number').toMatch(/\d+/)
+  })
+
+  test('disabling perf monitor hides FPS display', async ({ appPage: page }) => {
+    // First enable, then disable
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/uiStore.ts')
+      mod.useUIStore.setState({ showPerfMonitor: true })
+    })
+    await expect(page.getByTestId('fps-value')).toBeVisible({ timeout: 5000 })
+
+    // Disable
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/uiStore.ts')
+      mod.useUIStore.setState({ showPerfMonitor: false })
+    })
+    await expect(page.getByTestId('fps-value')).not.toBeVisible({ timeout: 5000 })
+  })
+})
+
 test.describe('cinematic mode button', () => {
   test('cinematic mode button enters and exits', async ({ appPage: page }) => {
     const cinematicButton = page.getByTestId('control-cinematic-mode')

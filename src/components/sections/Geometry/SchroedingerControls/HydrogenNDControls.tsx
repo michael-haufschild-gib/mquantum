@@ -75,6 +75,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
         <div className="space-y-2">
           <Select
             label="ND Orbital Preset"
+            tooltip="Preconfigured hydrogen orbital states for different dimensions, with curated quantum numbers for visually interesting patterns."
             options={flatOptions}
             value={config.hydrogenNDPreset}
             onChange={(v) => setHydrogenNDPreset(v as HydrogenNDPresetName)}
@@ -98,6 +99,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
 
           <Slider
             label="n (Principal)"
+            tooltip="Principal quantum number — determines the energy level and orbital size. Higher n = larger, more energetic orbitals."
             min={1}
             max={7}
             step={1}
@@ -109,6 +111,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
 
           <Slider
             label={`l (Shape: ${orbitalShapeLetter(config.azimuthalQuantumNumber)})`}
+            tooltip="Angular momentum quantum number — determines orbital shape. l=0 (s) is spherical, l=1 (p) has lobes, l=2 (d) has clover shapes."
             min={0}
             max={maxL}
             step={1}
@@ -121,6 +124,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
           {config.azimuthalQuantumNumber > 0 && (
             <Slider
               label="m (Orientation)"
+              tooltip="Magnetic quantum number — determines spatial orientation of the orbital. Ranges from −l to +l."
               min={-maxM}
               max={maxM}
               step={1}
@@ -140,6 +144,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
               <Slider
                 key={`extra-dim-n-${i}`}
                 label={`n${i + 4} (Dim ${i + 4})`}
+                tooltip="Harmonic oscillator quantum number for this extra dimension. Higher values add more nodes along this axis."
                 min={0}
                 max={6}
                 step={1}
@@ -160,6 +165,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
           <div className="space-y-2 pt-2 border-t border-border-subtle">
             <Slider
               label="Extra Dim Frequency Spread"
+              tooltip="Variation in oscillation frequency across extra dimensions. Creates anisotropic confinement in dimensions 4+."
               min={0}
               max={0.5}
               step={0.01}
@@ -191,6 +197,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
         <div className="space-y-2 pt-2 border-t border-border-subtle">
           <Slider
             label="Bohr Radius Scale"
+            tooltip="Scales the Bohr radius (a₀ ≈ 0.529 Å), controlling how spread out the orbital appears. Larger values reveal outer orbital structure."
             min={0.5}
             max={3.0}
             step={0.1}

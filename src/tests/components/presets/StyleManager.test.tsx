@@ -13,13 +13,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StyleManager } from '@/components/presets/StyleManager'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import type { SavedStyle } from '@/stores/utils/presetTypes'
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>)
 }
 
-function createStyle(id: string, name: string, timestamp = Date.now()) {
-  return { id, name, timestamp, data: {} }
+const emptyStyleData: SavedStyle['data'] = {
+  appearance: {},
+  lighting: {},
+  postProcessing: {},
+  environment: {},
+  pbr: {},
+}
+
+function createStyle(id: string, name: string, timestamp = Date.now()): SavedStyle {
+  return { id, name, timestamp, data: emptyStyleData }
 }
 
 describe('StyleManager', () => {
@@ -62,7 +71,7 @@ describe('StyleManager', () => {
       renderWithProviders(<StyleManager onClose={onClose} />)
 
       const applyButtons = screen.getAllByRole('button', { name: /apply style/i })
-      await user.click(applyButtons[0])
+      await user.click(applyButtons[0]!)
 
       expect(onClose).toHaveBeenCalled()
     })
@@ -72,7 +81,7 @@ describe('StyleManager', () => {
       renderWithProviders(<StyleManager onClose={() => {}} />)
 
       const deleteButtons = screen.getAllByRole('button', { name: /delete style/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       expect(screen.getByText('Delete Style')).toBeInTheDocument()
       expect(screen.getByText(/Are you sure you want to delete style/)).toBeInTheDocument()
@@ -83,7 +92,7 @@ describe('StyleManager', () => {
       renderWithProviders(<StyleManager onClose={() => {}} />)
 
       const deleteButtons = screen.getAllByRole('button', { name: /delete style/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       const confirmBtn = screen.getByRole('button', { name: /delete$/i })
       await user.click(confirmBtn)
@@ -97,7 +106,7 @@ describe('StyleManager', () => {
       renderWithProviders(<StyleManager onClose={() => {}} />)
 
       const deleteButtons = screen.getAllByRole('button', { name: /delete style/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       const cancelBtn = screen.getByRole('button', { name: /cancel/i })
       await user.click(cancelBtn)

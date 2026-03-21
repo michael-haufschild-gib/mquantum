@@ -6,6 +6,7 @@
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
  * Total size: 704 bytes (aligned to 16-byte boundaries).
+ * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  *
  * @module
  */
@@ -96,6 +97,6 @@ struct TDSEUniforms {
   radialWellDepth: f32,      // offset 692 — well depth scale λ
   radialWellTilt: f32,       // offset 696 — asymmetry tilt ε
 
-  _pad: f32,                 // offset 700 (pad to 704 bytes, 16-byte aligned)
+  imaginaryTime: u32,        // offset 700 (0 = real-time, 1 = imaginary-time/Wick rotation)
 }
 `

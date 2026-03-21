@@ -17,7 +17,7 @@ import type { ObjectType } from '../types'
 /**
  * Category classification for object types
  */
-export type ObjectCategory = 'fractal'
+export type ObjectCategory = 'quantum'
 
 /**
  * Render method determines which renderer handles the object
@@ -68,7 +68,7 @@ export interface RenderingCapabilities {
   /** Face detection algorithm */
   faceDetection: FaceDetectionMethod
   /**
-   * Whether faces require raymarching (for fractals).
+   * Whether faces require raymarching (volumetric rendering).
    * When true, faces are rendered via shader, not geometry.
    */
   requiresRaymarching?: boolean
@@ -120,7 +120,7 @@ export interface AnimationSystemDef {
   minDimension?: number
   /**
    * Store key for the enabled flag.
-   * e.g., "powerAnimationEnabled" for mandelbulb powerAnimation system
+   * e.g., "phaseAnimationEnabled" for schroedinger phase animation
    */
   enabledKey: string
   /**
@@ -172,12 +172,12 @@ export interface UiComponentMapping {
   /**
    * Key for the controls component.
    * Used by the dynamic component loader to import the right component.
-   * e.g., "PolytopeSettings", "MandelbulbControls"
+   * e.g., "SchroedingerControls", "PauliSpinorControls"
    */
   controlsComponentKey: string
   /**
-   * Whether this type has controls in the TimelineControls fractal drawer.
-   * If true, the FractalAnimationDrawer will render animation panels.
+   * Whether this type has controls in the TimelineControls animation drawer.
+   * If true, the SchroedingerAnimationDrawer will render animation panels.
    */
   hasTimelineControls: boolean
   /**

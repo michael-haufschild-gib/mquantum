@@ -21,6 +21,39 @@ import {
   buildStyleSubmenuItems,
   buildViewItems,
 } from '@/components/layout/EditorTopBar/menuItems'
+import type { SavedScene } from '@/stores/utils/presetTypes'
+import type { SavedStyle } from '@/stores/utils/presetTypes'
+
+const emptySceneData: SavedScene['data'] = {
+  appearance: {},
+  lighting: {},
+  postProcessing: {},
+  environment: {},
+  pbr: {},
+  geometry: {},
+  extended: {},
+  transform: {},
+  rotation: {},
+  animation: {},
+  camera: {},
+  ui: {},
+}
+
+const emptyStyleData: SavedStyle['data'] = {
+  appearance: {},
+  lighting: {},
+  postProcessing: {},
+  environment: {},
+  pbr: {},
+}
+
+function makeScene(id: string, name: string): SavedScene {
+  return { id, name, timestamp: Date.now(), data: emptySceneData }
+}
+
+function makeStyle(id: string, name: string): SavedStyle {
+  return { id, name, timestamp: Date.now(), data: emptyStyleData }
+}
 
 describe('buildAccentItems', () => {
   it('returns 7 accent color options', () => {
@@ -78,23 +111,20 @@ describe('buildSavedSceneItems', () => {
   })
 
   it('returns menu items for each saved scene', () => {
-    const scenes = [
-      { id: '1', name: 'Scene A', timestamp: Date.now(), data: {} },
-      { id: '2', name: 'Scene B', timestamp: Date.now(), data: {} },
-    ]
+    const scenes = [makeScene('1', 'Scene A'), makeScene('2', 'Scene B')]
     const items = buildSavedSceneItems(scenes, vi.fn(), vi.fn())
     expect(items).toHaveLength(2)
-    expect(items[0].label).toBe('Scene A')
-    expect(items[1].label).toBe('Scene B')
+    expect(items[0]!.label).toBe('Scene A')
+    expect(items[1]!.label).toBe('Scene B')
   })
 
   it('clicking a scene calls loadScene with its id and shows toast', () => {
     const loadScene = vi.fn()
     const addToast = vi.fn()
-    const scenes = [{ id: 's1', name: 'My Scene', timestamp: Date.now(), data: {} }]
+    const scenes = [makeScene('s1', 'My Scene')]
 
     const items = buildSavedSceneItems(scenes, loadScene, addToast)
-    items[0].onClick?.()
+    items[0]!.onClick?.()
 
     expect(loadScene).toHaveBeenCalledWith('s1')
     expect(addToast).toHaveBeenCalledWith('Loaded scene: My Scene', 'info')
@@ -129,10 +159,10 @@ describe('buildSavedStyleItems', () => {
   it('clicking a style calls loadStyle and shows toast', () => {
     const loadStyle = vi.fn()
     const addToast = vi.fn()
-    const styles = [{ id: 'st1', name: 'Neon', timestamp: Date.now(), data: {} }]
+    const styles = [makeStyle('st1', 'Neon')]
 
     const items = buildSavedStyleItems(styles, loadStyle, addToast)
-    items[0].onClick?.()
+    items[0]!.onClick?.()
 
     expect(loadStyle).toHaveBeenCalledWith('st1')
     expect(addToast).toHaveBeenCalledWith('Applied style: Neon', 'info')
@@ -152,13 +182,13 @@ describe('buildExampleSceneItems / buildExampleStyleItems', () => {
   it('buildExampleSceneItems returns non-empty array with labels', () => {
     const items = buildExampleSceneItems(vi.fn())
     expect(items.length).toBeGreaterThan(0)
-    expect(items[0].label?.length).toBeGreaterThan(0)
+    expect(items[0]!.label?.length).toBeGreaterThan(0)
   })
 
   it('buildExampleStyleItems returns non-empty array with labels', () => {
     const items = buildExampleStyleItems(vi.fn())
     expect(items.length).toBeGreaterThan(0)
-    expect(items[0].label?.length).toBeGreaterThan(0)
+    expect(items[0]!.label?.length).toBeGreaterThan(0)
   })
 })
 
@@ -166,16 +196,16 @@ describe('buildFileItems', () => {
   it('returns Export Image and Export Video items with shortcuts', () => {
     const items = buildFileItems(vi.fn(), vi.fn())
     expect(items).toHaveLength(2)
-    expect(items[0].label).toContain('Export Image')
-    expect(items[1].label).toContain('Export Video')
-    expect(items[0].shortcut?.length).toBeGreaterThan(0)
-    expect(items[1].shortcut?.length).toBeGreaterThan(0)
+    expect(items[0]!.label).toContain('Export Image')
+    expect(items[1]!.label).toContain('Export Video')
+    expect(items[0]!.shortcut?.length).toBeGreaterThan(0)
+    expect(items[1]!.shortcut?.length).toBeGreaterThan(0)
   })
 
   it('clicking Export Image calls the handler', () => {
     const handleExport = vi.fn()
     const items = buildFileItems(handleExport, vi.fn())
-    items[0].onClick?.()
+    items[0]!.onClick?.()
     expect(handleExport).toHaveBeenCalled()
   })
 })

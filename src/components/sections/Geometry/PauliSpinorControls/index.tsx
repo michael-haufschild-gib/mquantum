@@ -125,6 +125,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       <div className="px-4 py-2">
         <Select
           label="Scenario Preset"
+          tooltip="Load a preconfigured scenario demonstrating spin dynamics, Stern-Gerlach splitting, Larmor precession, or other spinor phenomena."
           options={PRESET_OPTIONS}
           value=""
           onChange={handlePresetChange}
@@ -163,6 +164,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
             <Slider
               key={`center-${d}`}
               label={`x${d}`}
+              tooltip="Initial center position of the spinor wavepacket along this axis."
               min={-5}
               max={5}
               step={0.1}
@@ -178,6 +180,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
             <Slider
               key={`momentum-${d}`}
               label={`p${d}`}
+              tooltip="Initial momentum of the wavepacket along this axis. Determines propagation direction and speed."
               min={-10}
               max={10}
               step={0.1}
@@ -199,6 +202,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
                 <Slider
                   key={`slice-${d}`}
                   label={`Dim ${d}`}
+                  tooltip="Cross-section position for this extra dimension. Explore different slices of the higher-dimensional spinor field."
                   min={-1}
                   max={1}
                   step={0.01}

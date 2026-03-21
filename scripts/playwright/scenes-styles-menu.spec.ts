@@ -149,4 +149,22 @@ test.describe('Styles menu', () => {
     await page.keyboard.press('Escape')
     await expect(dialog).not.toBeVisible({ timeout: 3000 })
   })
+
+  test('loading an example scene shows toast notification', async ({ appPage: page }) => {
+    const topBar = new TopBar(page)
+    await topBar.openScenesMenu()
+
+    // Click an example scene (last menu item is an example scene)
+    const menuItems = page.locator('[role="menuitem"]')
+    const count = await menuItems.count()
+    if (count <= 3) {
+      test.skip(true, 'Not enough menu items to include example scenes')
+      return
+    }
+
+    await menuItems.nth(count - 1).click()
+
+    // A toast notification should appear confirming the scene was loaded
+    await expect(page.getByTestId('toast-message')).toBeVisible({ timeout: 5000 })
+  })
 })

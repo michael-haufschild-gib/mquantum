@@ -211,6 +211,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
 
           <Select
             label="Grid Size"
+            tooltip="Number of lattice sites per dimension. Total sites = N^d; larger grids resolve shorter wavelengths but cost more memory."
             options={filteredPow2Options}
             value={String(activeGridSize)}
             onChange={handlePow2GridSize}
@@ -218,6 +219,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           />
           <Slider
             label="Spacing (a)"
+            tooltip="Lattice spacing in natural units. Smaller spacing resolves higher momenta but requires smaller dt for stability (CFL condition)."
             min={0.01}
             max={1.0}
             step={0.01}
@@ -228,6 +230,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           />
           <Slider
             label="Mass (m)"
+            tooltip="Klein-Gordon mass parameter. At m=0, the field is massless (like photons). Higher mass shortens the Compton wavelength and increases the energy gap."
             min={0.0}
             max={10.0}
             step={0.1}
@@ -238,6 +241,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           />
           <Slider
             label="Time Step (dt)"
+            tooltip="Discrete time step for the leapfrog integrator. Must satisfy dt < a for CFL stability on the lattice."
             min={0.001}
             max={0.1}
             step={0.001}
@@ -248,6 +252,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           />
           <Slider
             label="Steps / Frame"
+            tooltip="Number of leapfrog integration steps computed per rendered frame. More steps per frame speeds up the simulation."
             min={1}
             max={16}
             step={1}
@@ -275,6 +280,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`slice-${dimIdx}`}
                   label={`${AXIS_LABELS[dimIdx] ?? `d${dimIdx}`} slice`}
+                  tooltip="Position along this extra dimension at which the field is sliced for 3D visualization."
                   min={-halfExtent}
                   max={halfExtent}
                   step={halfExtent / 20}
@@ -291,6 +297,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         <div className="space-y-3 border-t border-border-subtle pt-3">
           <Switch
             label="Self-Interaction V(φ)"
+            tooltip="Enable quartic self-interaction potential V(φ) = λ(φ² − v²)². Creates domain walls (kinks) between degenerate vacua."
             checked={fs.selfInteractionEnabled}
             onCheckedChange={setSelfInteractionEnabled}
           />
@@ -298,6 +305,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             <>
               <Slider
                 label="λ"
+                tooltip="Self-interaction coupling constant. Controls the strength of the quartic potential V(φ) = λ(φ² − v²)². Larger λ gives steeper potential walls."
                 min={0.01}
                 max={10.0}
                 step={0.01}
@@ -307,6 +315,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               />
               <Slider
                 label="v (VEV)"
+                tooltip="Vacuum expectation value — the field's ground state value. The potential has minima at φ = ±v, enabling domain wall (kink) solutions."
                 min={0.1}
                 max={5.0}
                 step={0.01}
@@ -323,6 +332,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         <div className="space-y-3 border-t border-border-subtle pt-3">
           <Select
             label="Initial Condition"
+            tooltip="Starting field configuration: vacuum fluctuations, a plane-wave mode, or a localized Gaussian wave packet."
             options={initConditionOptions}
             value={fs.initialCondition}
             onChange={handleInitCondition}
@@ -356,6 +366,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           {!isVacuum && (
             <Slider
               label="Amplitude"
+              tooltip="Peak field amplitude of the initial excitation. Larger values store more energy in the field configuration."
               min={0.1}
               max={5.0}
               step={0.1}
@@ -372,6 +383,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`modeK-${d}`}
                   label={`k_${AXIS_LABELS[d] ?? d}`}
+                  tooltip="Integer lattice momentum quantum number along this axis. Frequency is ω² = Σ(2sin(kπ/N)/a)² + m²."
                   min={-8}
                   max={8}
                   step={1}
@@ -387,6 +399,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             <div className="space-y-2">
               <Slider
                 label="Packet Width (\u03C3)"
+                tooltip="Gaussian envelope width in lattice units. Narrower packets have broader momentum spread (Heisenberg uncertainty)."
                 min={0.05}
                 max={2.0}
                 step={0.05}
@@ -398,6 +411,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`center-${d}`}
                   label={`Center ${AXIS_LABELS[d] ?? d}`}
+                  tooltip="Initial center position of the Gaussian wave packet along this axis."
                   min={-5.0}
                   max={5.0}
                   step={0.1}
@@ -410,6 +424,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 <Slider
                   key={`modeK-${d}`}
                   label={`k_${AXIS_LABELS[d] ?? d}`}
+                  tooltip="Central momentum of the wave packet along this axis. Determines the packet's group velocity."
                   min={-8}
                   max={8}
                   step={1}
@@ -429,10 +444,12 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             value={fs.fieldView}
             onChange={handleFieldView}
             ariaLabel="Field view"
+            tooltip="Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density)."
             data-testid="field-view-selector"
           />
           <Switch
             label="Auto-Scale"
+            tooltip="Automatically normalize the color map range to the current field extrema each frame."
             checked={fs.autoScale}
             onCheckedChange={setAutoScale}
             data-testid="auto-scale-switch"

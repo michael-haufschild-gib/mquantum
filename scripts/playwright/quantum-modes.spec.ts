@@ -169,4 +169,61 @@ test.describe('quantum mode switching via UI', () => {
       expect(await getQuantumMode(page)).toBe('diracEquation')
     }).toPass({ timeout: 5000 })
   })
+
+  test('rapid mode switching via UI cards does not crash', async ({ page }) => {
+    const topBar = new TopBar(page)
+    await topBar.openLeftPanel()
+
+    const leftPanel = new LeftPanel(page)
+
+    // Rapidly click through all mode cards without waiting for shader compilation
+    for (const mode of QUANTUM_MODES) {
+      await leftPanel.selectQuantumMode(mode)
+    }
+    // Click a few more times to stress the cancellation
+    await leftPanel.selectQuantumMode('harmonicOscillator')
+    await leftPanel.selectQuantumMode('tdseDynamics')
+    await leftPanel.selectQuantumMode('harmonicOscillator')
+
+    // After rapid switching, the final mode should be active
+    await expect(async () => {
+      expect(await getQuantumMode(page)).toBe('harmonicOscillator')
+    }).toPass({ timeout: 10_000 })
+
+    // App must survive without crashing
+    await expect(page.getByTestId('top-bar')).toBeVisible()
+  })
+
+  test('TDSE scenario preset selector updates store via UI', async ({ page }) => {
+    const topBar = new TopBar(page)
+    await topBar.openLeftPanel()
+
+    const leftPanel = new LeftPanel(page)
+
+    // Switch to TDSE mode
+    await leftPanel.selectQuantumMode('tdseDynamics')
+    await expect(async () => {
+      expect(await getQuantumMode(page)).toBe('tdseDynamics')
+    }).toPass({ timeout: 5000 })
+
+    // Open Geometry tab to access TDSE controls
+    await leftPanel.switchTab('Geometry')
+    const presetSelect = page.getByTestId('tdse-scenario-preset')
+    await expect(presetSelect).toBeVisible({ timeout: 5000 })
+
+    // Select a specific preset from the dropdown
+    await presetSelect.selectOption('doubleSlit')
+
+    // Verify the store updated with the new preset
+    await expect(async () => {
+      const preset = await page.evaluate(async () => {
+        const mod = await import('/src/stores/extendedObjectStore.ts')
+        const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
+        const schroedinger = s.schroedinger as Record<string, unknown> | undefined
+        const tdse = schroedinger?.tdseDynamics as Record<string, unknown> | undefined
+        return tdse?.activePreset
+      })
+      expect(preset).toBe('doubleSlit')
+    }).toPass({ timeout: 5000 })
+  })
 })

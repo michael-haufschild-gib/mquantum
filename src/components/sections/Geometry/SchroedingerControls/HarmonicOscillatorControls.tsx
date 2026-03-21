@@ -56,6 +56,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
         <div className="space-y-2">
           <Select
             label="Quantum Preset"
+            tooltip="Predefined superposition states with curated quantum numbers, frequencies, and amplitudes for interesting visual patterns."
             options={presetOptions}
             value={config.presetName}
             onChange={(v) => setPresetName(v as SchroedingerPresetName)}
@@ -81,6 +82,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
           </div>
           <Slider
             label="Seed"
+            tooltip="Random seed for generating quantum number combinations. Different seeds produce different superposition states."
             min={0}
             max={999999}
             step={1}
@@ -95,6 +97,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
         <div className="space-y-2 pt-2 border-t border-border-subtle">
           <Slider
             label="Superposition Terms"
+            tooltip="Number of energy eigenstates combined in the superposition. More terms create richer interference patterns."
             min={1}
             max={8}
             step={1}
@@ -106,6 +109,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
 
           <Slider
             label="Max Quantum Number (n)"
+            tooltip="Highest energy level included in the superposition. Higher n means more spatial nodes and finer structure."
             min={2}
             max={6}
             step={1}
@@ -117,6 +121,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
 
           <Slider
             label="Frequency Spread"
+            tooltip="Variation in oscillation frequency across dimensions. Zero means isotropic; higher values create anisotropic potentials."
             min={0}
             max={0.5}
             step={0.0001}
@@ -131,6 +136,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
         <div className="space-y-2 pt-2 border-t border-border-subtle">
           <Slider
             label="Field Scale"
+            tooltip="Scales the spatial extent of the wavefunction visualization. Increase to see further from the origin."
             min={0.5}
             max={2.0}
             step={0.1}
@@ -151,6 +157,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
               <Slider
                 key={`slice-dim-${i + 3}`}
                 label={`Dim ${i + 3}`}
+                tooltip="Cross-section position for this extra dimension. Explore different slices of the higher-dimensional wavefunction."
                 min={-2.0}
                 max={2.0}
                 step={0.1}

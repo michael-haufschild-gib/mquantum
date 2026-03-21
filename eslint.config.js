@@ -724,13 +724,8 @@ export default [
   // and makes adding new fields safe.
   {
     files: [
-      'src/rendering/webgpu/passes/*ComputePass.ts',
+      'src/rendering/webgpu/passes/*ComputePass*.ts',
       'src/rendering/webgpu/shaders/**/*.wgsl.ts',
-      'src/stores/presetManagerStore.ts',
-      'src/stores/utils/presetNormalization.ts',
-      'src/components/ui/Popover.tsx',
-      'src/components/ui/Tabs.tsx',
-      'src/components/sections/Faces/ColorPreview.tsx',
       'src/tests/rendering/shaders/**/*.test.ts',
     ],
     rules: {

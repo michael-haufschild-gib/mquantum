@@ -60,42 +60,19 @@ const SCHROEDINGER_FIELDS = [
   { name: 'scatteringAnisotropy', type: 'f32' },
   { name: 'roughness', type: 'f32' },
 
-  // --- Reserved: formerly SSS (offset 720) ---
-  { name: '_reservedSSS0', type: 'u32' },
-  { name: '_reservedSSS1', type: 'f32' },
-  { name: '_reservedSSS2', type: 'vec3f' },
-  { name: '_pad1', type: 'f32' },
-  { name: '_reservedSSS3', type: 'f32' },
-  { name: '_reservedSSS4', type: 'f32' },
+  // --- Classical-quantum correspondence overlay (offset 720) ---
+  { name: 'classicalOverlayEnabled', type: 'u32' },
+  { name: 'classicalOverlayTrailFraction', type: 'f32' },
+  { name: 'classicalOverlayColor', type: 'vec3f' },
+  { name: '_padClassical0', type: 'f32' },
+  { name: '_reservedClassical1', type: 'f32' },
+  { name: '_reservedClassical0', type: 'f32' },
 
-  // --- Reserved: formerly erosion (offset 760) ---
-  { name: '_reservedErosion0', type: 'f32' },
-  { name: '_reservedErosion1', type: 'f32' },
-  { name: '_reservedErosion2', type: 'f32' },
-  { name: '_reservedErosion3', type: 'i32' },
-
-  // --- Reserved: formerly curl noise (offset 776) ---
-  { name: '_reservedCurl0', type: 'u32' },
-  { name: '_reservedCurl1', type: 'f32' },
-  { name: '_reservedCurl2', type: 'f32' },
-  { name: '_reservedCurl3', type: 'f32' },
-  { name: '_reservedCurl4', type: 'i32' },
-
-  // --- Reserved: formerly dispersion (offset 796) ---
-  { name: '_reservedDispersion0', type: 'u32' },
-  { name: '_reservedDispersion1', type: 'f32' },
-  { name: '_reservedDispersion2', type: 'i32' },
-  { name: '_reservedDispersion3', type: 'i32' },
-
-  // --- Reserved: formerly shadows + AO (offset 812) ---
-  { name: '_reservedShadow0', type: 'u32' },
-  { name: '_reservedShadow1', type: 'f32' },
-  { name: '_reservedShadow2', type: 'i32' },
-  { name: '_reservedAo0', type: 'f32' },
-  { name: '_reservedAo1', type: 'i32' },
-  { name: '_reservedAo2', type: 'f32' },
-  { name: '_reservedAoColor', type: 'vec3f' },
-  { name: '_pad2', type: 'f32' },
+  // --- Classical overlay: CPU-precomputed trail (offset 760) ---
+  { name: 'classicalTrailCount', type: 'i32' },
+  { name: '_padTrail0', type: 'i32' },
+  // 768 is 16-byte aligned: 6 × vec4f = 96 bytes → ends at 864
+  { name: 'classicalTrail', type: arr('vec4f', 6) },
 
   // --- Nodal surfaces (offset 864) ---
   { name: 'nodalEnabled', type: 'u32' },

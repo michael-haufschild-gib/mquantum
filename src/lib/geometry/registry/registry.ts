@@ -23,7 +23,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
       type: 'schroedinger',
       name: 'Schrödinger Slices',
       description: 'Organic volumes from an N-dimensional wavefunction.',
-      category: 'fractal',
+      category: 'quantum',
 
       dimensions: {
         min: 2,
@@ -94,7 +94,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
       name: 'Pauli Spinor',
       description:
         'Two-component spinor wavefunction in a magnetic field. Visualizes spin precession and Stern-Gerlach splitting.',
-      category: 'fractal',
+      category: 'quantum',
 
       dimensions: {
         min: 2,

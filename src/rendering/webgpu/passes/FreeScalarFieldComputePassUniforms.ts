@@ -8,7 +8,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { estimateVacuumMaxPhi } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/fsfDiagnosticsStore'
 
 import { MAX_DIM } from './computePassUtils'
@@ -211,7 +211,7 @@ export function writeFsfUniforms(
         config.absorberWidth ?? 0.2,
         config.gridSize,
         config.dt,
-        3, // cubic grading (hardcoded to match WGSL shader)
+        PML_GRADING_EXPONENT,
         config.latticeDim
       )
     : 0

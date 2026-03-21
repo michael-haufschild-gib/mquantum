@@ -23,6 +23,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
 
       <Slider
         label="Curtain Height"
+        tooltip="Vertical extent of the aurora curtains. Higher values stretch the lights further across the sky."
         value={proceduralSettings.aurora?.curtainHeight ?? 0.5}
         min={0}
         max={1}
@@ -36,6 +37,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
 
       <Slider
         label="Wave Frequency"
+        tooltip="Frequency of the undulating wave motion in the aurora curtains. Higher values create more rapid rippling."
         value={proceduralSettings.aurora?.waveFrequency ?? 1.0}
         min={0.3}
         max={3}

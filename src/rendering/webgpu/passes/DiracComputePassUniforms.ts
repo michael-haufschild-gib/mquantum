@@ -6,7 +6,7 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 
 import { FFT_UNIFORM_SIZE, MAX_DIM } from './computePassUtils'
 
@@ -123,7 +123,7 @@ export function writeDiracUniforms(
         config.absorberWidth,
         config.gridSize,
         config.dt,
-        3, // cubic grading (hardcoded to match WGSL shader)
+        PML_GRADING_EXPONENT,
         config.latticeDim
       )
     : 0

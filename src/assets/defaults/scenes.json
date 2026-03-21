@@ -481,7 +481,7 @@
   },
   {
     "id": "7cfb4f5b-45fc-4849-b9a5-e58b973f0c24",
-    "name": "Show me your nodal surfaces babe",
+    "name": "3D Harmonic Oscillator — Nodal Surfaces",
     "timestamp": 1772367757724,
     "data": {
       "appearance": {
@@ -933,7 +933,7 @@
   },
   {
     "id": "a4bf1959-f15c-492a-b23c-08a3fe1fd39c",
-    "name": "2D HO with nodal surface",
+    "name": "2D Harmonic Oscillator — Nodal Cross Section",
     "timestamp": 1772367884552,
     "data": {
       "appearance": {
@@ -1383,7 +1383,7 @@
   },
   {
     "id": "3c6991b8-1c35-4f55-9dde-b7f773780139",
-    "name": "Vacuum with radial coloring",
+    "name": "Vacuum — Radial Color Mapping",
     "timestamp": 1772368200114,
     "data": {
       "appearance": {
@@ -1833,7 +1833,7 @@
   },
   {
     "id": "27cc4c7e-2582-4996-878c-57f933c43d64",
-    "name": "2D Hydrogen - maybe a bug",
+    "name": "2D Hydrogen Orbital",
     "timestamp": 1772368520689,
     "data": {
       "appearance": {
@@ -2283,7 +2283,7 @@
   },
   {
     "id": "9322594c-b475-4295-9c18-cff8898d05b4",
-    "name": "Vacuum kspace",
+    "name": "Vacuum — k-Space Spectrum",
     "timestamp": 1772369387683,
     "data": {
       "appearance": {

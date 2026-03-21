@@ -60,6 +60,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {/* Dimension selector */}
         <Select
           label="Phase-Space Dimension"
+          tooltip="Select which (position, momentum) pair to visualize in the Wigner function. Each dimension corresponds to a 2D phase-space slice."
           options={dimensionOptions}
           value={currentDimIdx}
           onChange={(v) => actions.setDimensionIndex(Number(v))}
@@ -69,6 +70,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {/* Auto-range toggle */}
         <Switch
           label="Auto Range"
+          tooltip="Automatically compute axis ranges from the quantum state. Disable for manual control of the phase-space viewport."
           checked={config.wignerAutoRange}
           onCheckedChange={actions.setAutoRange}
           data-testid="wigner-auto-range"
@@ -79,6 +81,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
           <div className="space-y-3">
             <Slider
               label="X Range"
+              tooltip="Half-width of the position axis in the Wigner plot. Increase to see wider spatial extent."
               min={0.5}
               max={30.0}
               step={0.5}
@@ -89,6 +92,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
             />
             <Slider
               label="P Range"
+              tooltip="Half-width of the momentum axis in the Wigner plot. Increase to see higher momentum components."
               min={0.5}
               max={30.0}
               step={0.5}
@@ -104,6 +108,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {!isHydrogenMode && (
           <Switch
             label="Cross Terms"
+            tooltip="Include quantum interference cross-terms between superposition components. These produce the non-classical negative regions characteristic of quantum states."
             checked={config.wignerCrossTermsEnabled}
             onCheckedChange={actions.setCrossTermsEnabled}
             data-testid="wigner-cross-terms"
@@ -114,6 +119,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {isHydrogenMode && config.wignerDimensionIndex < 3 && (
           <Slider
             label="Quadrature Points"
+            tooltip="Number of Gauss-Laguerre quadrature points for the radial Wigner transform integral. More points increase numerical accuracy."
             min={8}
             max={96}
             step={4}
@@ -127,6 +133,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {/* Classical trajectory overlay */}
         <Switch
           label="Classical Overlay"
+          tooltip="Show the classical phase-space trajectory (ellipse for HO, Kepler orbit for hydrogen) for comparison with the quantum Wigner function."
           checked={config.wignerClassicalOverlay}
           onCheckedChange={actions.setClassicalOverlay}
           data-testid="wigner-classical-overlay"
@@ -135,6 +142,7 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
         {/* Cache resolution */}
         <Select
           label="Cache Resolution"
+          tooltip="Resolution of the cached Wigner function texture. Higher values show finer phase-space detail but use more GPU memory."
           options={[
             { value: '128', label: '128' },
             { value: '256', label: '256' },

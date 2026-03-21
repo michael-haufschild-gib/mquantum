@@ -195,15 +195,39 @@ test.describe('quantum carpet: GPU accumulation', () => {
     // Pause
     await page.getByTestId('carpet-play-pause').click()
 
-    // Record frame count after pause
-    // Small delay to let any in-flight dispatch complete
-    await page.waitForTimeout(500)
+    // Let any in-flight dispatch complete by waiting for 2 render frames to pass.
+    // The carpet dispatch runs on the render loop, so after 2 frames any
+    // in-flight work has drained and the carpet count has stabilized.
+    const renderCountAtPause = await page.evaluate(() => {
+      const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+      return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10)
+    })
+    await page.waitForFunction(
+      (min: number) => {
+        const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+        return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > min
+      },
+      renderCountAtPause + 2,
+      { timeout: 10_000 }
+    )
     const frozenCount = await getCarpetFrames(page)
 
-    // Wait and verify count hasn't changed
-    await page.waitForTimeout(1000)
+    // Verify carpet count stays frozen while render frames continue advancing.
+    // Wait for 5 more render frames — carpet count must not change.
+    const renderCountAfterFreeze = await page.evaluate(() => {
+      const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+      return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10)
+    })
+    await page.waitForFunction(
+      (min: number) => {
+        const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+        return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > min
+      },
+      renderCountAfterFreeze + 5,
+      { timeout: 10_000 }
+    )
     const afterWait = await getCarpetFrames(page)
-    expect(afterWait).toBe(frozenCount)
+    expect(afterWait, 'Carpet frame count must not advance while paused').toBe(frozenCount)
 
     // Resume
     await page.getByTestId('carpet-play-pause').click()

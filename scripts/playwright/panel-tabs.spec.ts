@@ -154,4 +154,30 @@ test.describe('right panel tabs', () => {
     await rightPanel.switchTab('Object')
     await rightPanel.expectFacesSectionVisible()
   })
+
+  test('keyboard arrow keys navigate between right panel tabs', async ({ page }) => {
+    const topBar = new TopBar(page)
+    await topBar.openRightPanel()
+
+    const rightPanel = new RightPanel(page)
+    await rightPanel.waitForVisible()
+
+    // Focus the first tab (Object)
+    const objectTab = rightPanel.tabs.getByRole('tab', { name: 'Object' })
+    await objectTab.focus()
+    await expect(objectTab).toHaveAttribute('aria-selected', 'true')
+
+    // ArrowRight should move to Scene tab
+    await page.keyboard.press('ArrowRight')
+    const sceneTab = rightPanel.tabs.getByRole('tab', { name: 'Scene' })
+    await expect(sceneTab).toBeFocused()
+    // Tab content should update
+    await rightPanel.expectEnvironmentSectionVisible()
+
+    // ArrowRight again should move to System tab
+    await page.keyboard.press('ArrowRight')
+    const systemTab = rightPanel.tabs.getByRole('tab', { name: 'System' })
+    await expect(systemTab).toBeFocused()
+    await rightPanel.expectSettingsVisible()
+  })
 })

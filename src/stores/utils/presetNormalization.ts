@@ -228,7 +228,7 @@ export function normalizeEnvironmentLoadData(
   const environment = { ...rawEnvironment }
   delete environment.classicSkyboxType
 
-  let selection: SkyboxSelection | null = null
+  let selection: SkyboxSelection
   if (isSkyboxSelection(environment.skyboxSelection)) {
     selection = environment.skyboxSelection
   } else if (environment.skyboxEnabled === false) {

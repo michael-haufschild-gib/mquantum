@@ -50,6 +50,7 @@ export const ProgressiveRefinementControls: React.FC = () => {
         checked={enabled}
         onCheckedChange={setEnabled}
         label="Progressive Refinement"
+        tooltip="Gradually increase rendering quality when the camera stops moving. Starts at 25% and refines to 100% for sharp static views."
         data-testid="progressive-refinement-toggle"
       />
 

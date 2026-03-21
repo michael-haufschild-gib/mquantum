@@ -40,12 +40,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let density = re * re + im * im;
   let effectiveV = potential[idx] + params.interactionStrength * density;
 
-  let phase = -effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
-  let cosP = cos(phase);
-  let sinP = sin(phase);
+  let arg = effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
 
-  // Complex rotation: (re + i*im) * (cosP + i*sinP)
-  psiRe[idx] = re * cosP - im * sinP;
-  psiIm[idx] = re * sinP + im * cosP;
+  if (params.imaginaryTime != 0u) {
+    // Imaginary-time (Wick rotation): exp(-V·dτ/(2ℏ)) — real exponential decay
+    let decay = exp(-arg);
+    psiRe[idx] = re * decay;
+    psiIm[idx] = im * decay;
+  } else {
+    // Real-time: exp(-i·V·dt/(2ℏ)) — unitary phase rotation
+    let phase = -arg;
+    let cosP = cos(phase);
+    let sinP = sin(phase);
+    psiRe[idx] = re * cosP - im * sinP;
+    psiIm[idx] = re * sinP + im * cosP;
+  }
 }
 `

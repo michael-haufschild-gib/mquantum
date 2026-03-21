@@ -92,6 +92,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
         label="Center Low |k|"
         checked={kv.fftShiftEnabled}
         onCheckedChange={setFftShift}
+        tooltip="Shift the FFT so low-momentum components are at the center"
         data-testid="kspace-fft-shift"
       />
 
@@ -113,6 +114,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           value={kv.lowPercentile}
           onChange={setLowPercentile}
           showValue
+          tooltip="Percentile below which k-space values are clipped to black"
           data-testid="kspace-low-percentile"
         />
         <Slider
@@ -123,6 +125,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           value={kv.highPercentile}
           onChange={setHighPercentile}
           showValue
+          tooltip="Percentile above which k-space values are clipped to white"
           data-testid="kspace-high-percentile"
         />
         <Slider
@@ -133,6 +136,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           value={kv.gamma}
           onChange={setGamma}
           showValue
+          tooltip="Gamma correction for the momentum-space intensity curve"
           data-testid="kspace-gamma"
         />
       </div>
@@ -144,6 +148,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           label="Enable"
           checked={kv.broadeningEnabled}
           onCheckedChange={setBroadeningEnabled}
+          tooltip="Apply Gaussian smoothing to the k-space display"
           data-testid="kspace-broadening-enabled"
         />
         {kv.broadeningEnabled && (
@@ -156,6 +161,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
               value={kv.broadeningRadius}
               onChange={setBroadeningRadius}
               showValue
+              tooltip="Kernel radius in grid cells for Gaussian broadening"
               data-testid="kspace-broadening-radius"
             />
             <Slider
@@ -166,6 +172,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
               value={kv.broadeningSigma}
               onChange={setBroadeningSigma}
               showValue
+              tooltip="Standard deviation of the Gaussian broadening kernel"
               data-testid="kspace-broadening-sigma"
             />
           </>
@@ -182,6 +189,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           value={kv.radialBinCount}
           onChange={setRadialBinCount}
           showValue
+          tooltip="Number of radial bins for the spherically averaged momentum distribution"
           data-testid="kspace-radial-bins"
         />
       )}

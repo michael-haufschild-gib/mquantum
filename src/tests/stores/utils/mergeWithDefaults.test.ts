@@ -7,12 +7,9 @@
 import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
-import {
-  mergeExtendedObjectState,
-  mergeExtendedObjectStateForType,
-} from '@/stores/utils/mergeWithDefaults'
+import { mergeExtendedObjectStateForType } from '@/stores/utils/mergeWithDefaults'
 
-describe('mergeExtendedObjectState', () => {
+describe('mergeExtendedObjectStateForType — schroedinger', () => {
   describe('handles missing config properties', () => {
     it('fills in missing properties with defaults for schroedinger', () => {
       // Simulate old saved scene without new properties
@@ -24,7 +21,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(oldSavedState)
+      const merged = mergeExtendedObjectStateForType(oldSavedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       // User's saved values should be preserved
@@ -47,7 +44,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       // User's explicit values should NOT be overridden
@@ -67,7 +64,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as Record<string, unknown>
       expect(schroedinger.sampleCount).toBe(64)
       expect(schroedinger.mysteryExtended).toBeUndefined()
@@ -87,7 +84,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       expect((schroedinger as unknown as Record<string, unknown>).uncertaintyBoundaryEnabled).toBe(
@@ -110,7 +107,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       // User's saved nested value should be preserved
@@ -131,7 +128,7 @@ describe('mergeExtendedObjectState', () => {
         },
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       // Arrays should be replaced, not merged
@@ -145,7 +142,7 @@ describe('mergeExtendedObjectState', () => {
         // schroedinger is completely missing
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       // Should be full defaults
@@ -158,7 +155,7 @@ describe('mergeExtendedObjectState', () => {
         schroedinger: null,
       }
 
-      const merged = mergeExtendedObjectState(savedState)
+      const merged = mergeExtendedObjectStateForType(savedState, 'schroedinger')
       const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
       expect(schroedinger.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
@@ -215,7 +212,7 @@ describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
   })
 })
 
-describe('mergeExtendedObjectState — adversarial inputs', () => {
+describe('mergeExtendedObjectStateForType — adversarial inputs', () => {
   it('handles string where number expected (user-edited JSON)', () => {
     const loaded = {
       schroedinger: {
@@ -223,7 +220,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
         densityGain: true as unknown, // boolean instead of number
       },
     }
-    const merged = mergeExtendedObjectState(loaded)
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
 
     // deepMerge replaces values by key — the wrong type will be passed through.
@@ -234,7 +231,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
   })
 
   it('handles empty object for schroedinger (no fields at all)', () => {
-    const merged = mergeExtendedObjectState({ schroedinger: {} })
+    const merged = mergeExtendedObjectStateForType({ schroedinger: {} }, 'schroedinger')
     const s = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
 
     // Should be entirely defaults
@@ -249,7 +246,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
         cosineParams: 42 as unknown, // corrupt: number instead of object
       },
     }
-    const merged = mergeExtendedObjectState(loaded)
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
     const cp = s.cosineParams as { a: number[]; b: number[]; c: number[]; d: number[] }
     // cosineParams must remain a valid object with array properties (from defaults)
@@ -271,7 +268,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
         },
       },
     }
-    const merged = mergeExtendedObjectState(loaded)
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
 
     expect(s.sampleCount).toBe(64)
@@ -286,7 +283,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
       },
     }
     // Should not throw — arrays are replaced wholesale
-    const merged = mergeExtendedObjectState(loaded)
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
     expect(s.parameterValues).toEqual(['not', 'numbers'])
   })
@@ -297,7 +294,7 @@ describe('mergeExtendedObjectState — adversarial inputs', () => {
         cosineParams: null as unknown, // corrupt: null instead of object
       },
     }
-    const merged = mergeExtendedObjectState(loaded)
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const s = merged.schroedinger as Record<string, unknown>
     const cp = s.cosineParams as { a: number[]; b: number[]; c: number[]; d: number[] }
     // cosineParams must remain a valid object from defaults, not null

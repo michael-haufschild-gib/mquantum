@@ -2,8 +2,8 @@
  * WebGPU Color Utilities
  *
  * WebGPU lighting shaders operate in linear space. Colors coming from Zustand stores
- * (hex strings like `#RRGGBB`) are sRGB and must be converted to linear to match
- * WebGL/Three.js `Color(...).convertSRGBToLinear()` behavior.
+ * (hex strings like `#RRGGBB`) are sRGB and must be converted to linear using the
+ * standard sRGB transfer function (IEC 61966-2-1).
  *
  * @module rendering/webgpu/utils/color
  */
@@ -18,8 +18,8 @@ function clamp01(value: number): number {
 }
 
 /**
- * Convert a single sRGB channel to linear using the standard sRGB transfer function.
- * Matches Three.js `Color.convertSRGBToLinear()` behavior.
+ * Convert a single sRGB channel to linear using the standard sRGB transfer function
+ * (IEC 61966-2-1).
  */
 export function srgbToLinearChannel(c: number): number {
   const clamped = clamp01(c)

@@ -1,6 +1,7 @@
 import { m } from 'motion/react'
 import React, { useCallback } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Props for the {@link Switch} toggle component. */
@@ -12,6 +13,7 @@ export interface SwitchProps {
   className?: string
   iconOn?: React.ReactNode
   iconOff?: React.ReactNode
+  tooltip?: string
   'data-testid'?: string
 }
 
@@ -24,6 +26,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
     className = '',
     iconOn,
     iconOff,
+    tooltip,
     'data-testid': dataTestId,
     ref,
   }: SwitchProps & { ref?: React.Ref<HTMLInputElement> }) => {
@@ -123,7 +126,13 @@ export const Switch: React.FC<SwitchProps> = React.memo(
 
         {label && (
           <span className="text-xs font-medium text-text-secondary group-hover/switch:text-text-primary transition-colors tracking-wide">
-            {label}
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
           </span>
         )}
       </label>

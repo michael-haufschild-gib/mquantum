@@ -168,6 +168,31 @@ test.describe('hydrogen quantum number UI controls', () => {
   })
 })
 
+test.describe('hydrogen ND extra-dimension controls', () => {
+  test('extra-dimension quantum number sliders appear in 5D but not in 3D', async ({ page }) => {
+    // Load hydrogen in 3D
+    await page.goto('/?t=schroedinger&d=3&qm=hydrogenND')
+    await new TopBar(page).waitForVisible()
+
+    const topBar = new TopBar(page)
+    await topBar.openLeftPanel()
+    const leftPanel = new LeftPanel(page)
+    await leftPanel.switchTab('Geometry')
+
+    // In 3D, no extra-dimension sliders should exist
+    await expect(page.getByTestId('hydrogen-nd-extra-n-0')).not.toBeVisible()
+
+    // Switch to 5D — extra-dimension sliders should appear (dims 4 and 5 are "extra")
+    await page.goto('/?t=schroedinger&d=5&qm=hydrogenND')
+    await new TopBar(page).waitForVisible()
+    await topBar.openLeftPanel()
+    await leftPanel.switchTab('Geometry')
+
+    // At least one extra-dimension quantum number slider should be visible
+    await expect(page.getByTestId('hydrogen-nd-extra-n-0')).toBeVisible({ timeout: 5000 })
+  })
+})
+
 test.describe('hydrogen dimension constraints', () => {
   test('hydrogen mode at dimension 2 auto-adjusts to minimum valid dimension', async ({ page }) => {
     // Load at 2D — hydrogen requires >=3D. The app should handle this gracefully.

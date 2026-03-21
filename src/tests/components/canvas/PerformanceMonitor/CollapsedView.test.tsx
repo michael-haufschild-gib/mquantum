@@ -35,7 +35,7 @@ describe('CollapsedView', () => {
     usePerformanceMetricsStore.setState({
       fps: 60,
       frameTime: 16.7,
-      history: { fps: [60, 59, 58, 60, 61], cpu: [] },
+      history: { fps: [60, 59, 58, 60, 61], cpu: [], mem: [] },
     })
 
     render(<CollapsedView />)
@@ -49,7 +49,7 @@ describe('CollapsedView', () => {
     usePerformanceMetricsStore.setState({
       fps: 60,
       frameTime: 16.7,
-      history: { fps: [60], cpu: [] },
+      history: { fps: [60], cpu: [], mem: [] },
     })
 
     render(<CollapsedView />)
@@ -68,7 +68,7 @@ describe('CollapsedView', () => {
       usePerformanceMetricsStore.setState({
         fps: 45,
         frameTime: 22.2,
-        history: { fps: [45], cpu: [] },
+        history: { fps: [45], cpu: [], mem: [] },
       })
     })
 

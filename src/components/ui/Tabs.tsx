@@ -282,7 +282,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
           return -1
         }
 
-        let newIndex = -1
+        let newIndex: number
         switch (event.key) {
           case 'ArrowLeft':
             newIndex = findNextEnabledIndex(index, -1)

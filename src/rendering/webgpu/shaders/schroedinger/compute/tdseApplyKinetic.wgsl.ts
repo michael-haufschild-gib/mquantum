@@ -39,19 +39,27 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     k2 += kVal * kVal;
   }
 
-  // Phase rotation: exp(-i * hbar * k^2 * dt / (2*m))
-  let phase = -params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
-  // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
-  let reduced = phase - round(phase * 0.15915494) * 6.28318530;
-  let cosP = cos(reduced);
-  let sinP = sin(reduced);
-
   // Read interleaved complex value
   let re = complexBuf[idx * 2u];
   let im = complexBuf[idx * 2u + 1u];
 
-  // Apply rotation
-  complexBuf[idx * 2u] = re * cosP - im * sinP;
-  complexBuf[idx * 2u + 1u] = re * sinP + im * cosP;
+  let arg = params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
+
+  if (params.imaginaryTime != 0u) {
+    // Imaginary-time (Wick rotation): exp(-ℏk²dτ/(2m)) — real exponential decay
+    // High-k modes decay exponentially, leaving the ground state
+    let decay = exp(-arg);
+    complexBuf[idx * 2u] = re * decay;
+    complexBuf[idx * 2u + 1u] = im * decay;
+  } else {
+    // Real-time: exp(-i·ℏk²dt/(2m)) — unitary phase rotation
+    let phase = -arg;
+    // Reduce to [-π, π] so f32 cos/sin stay precise for high-frequency k-modes
+    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let cosP = cos(reduced);
+    let sinP = sin(reduced);
+    complexBuf[idx * 2u] = re * cosP - im * sinP;
+    complexBuf[idx * 2u + 1u] = re * sinP + im * cosP;
+  }
 }
 `

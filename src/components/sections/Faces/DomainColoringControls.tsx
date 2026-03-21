@@ -62,12 +62,14 @@ export const DomainColoringControls: React.FC = React.memo(() => {
         options={MODULUS_MODE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
         value={domainColoring.modulusMode}
         onChange={handleModeChange}
+        tooltip="How the wavefunction modulus maps to brightness in the complex-plane visualization"
       />
 
       <Switch
         label="Modulus Contours"
         checked={domainColoring.contoursEnabled}
         onCheckedChange={handleContoursEnabled}
+        tooltip="Overlay equal-modulus contour lines on the domain coloring"
       />
 
       {domainColoring.contoursEnabled && (
@@ -80,6 +82,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
             value={domainColoring.contourDensity}
             onChange={handleDensityChange}
             showValue
+            tooltip="Number of contour lines per unit in the modulus scale"
           />
 
           <Slider
@@ -90,6 +93,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
             value={domainColoring.contourWidth}
             onChange={handleWidthChange}
             showValue
+            tooltip="Thickness of the contour lines"
           />
 
           <Slider
@@ -100,6 +104,7 @@ export const DomainColoringControls: React.FC = React.memo(() => {
             value={domainColoring.contourStrength}
             onChange={handleStrengthChange}
             showValue
+            tooltip="Opacity of the contour lines (0 = invisible, 1 = fully opaque)"
           />
         </>
       )}

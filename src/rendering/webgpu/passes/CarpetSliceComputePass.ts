@@ -264,7 +264,7 @@ export class CarpetSliceComputePass {
           const srcOffset = row * paddedRowFloats
           const dstOffset = row * gridSize
           for (let col = 0; col < gridSize; col++) {
-            result[dstOffset + col] = src[srcOffset + col]
+            result[dstOffset + col] = src[srcOffset + col]!
           }
         }
 

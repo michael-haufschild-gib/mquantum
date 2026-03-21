@@ -140,6 +140,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Scenario Preset */}
       <Select
         label="Scenario"
+        tooltip="Pre-configured Dirac equation setups demonstrating key relativistic phenomena."
         value={activePreset}
         options={PRESET_OPTIONS}
         onChange={(v) => {
@@ -150,6 +151,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Initial Condition */}
       <Select
         label="Initial Condition"
+        tooltip="Shape of the initial four-component Dirac spinor wavepacket at t=0."
         value={dirac.initialCondition}
         options={INITIAL_CONDITION_OPTIONS}
         onChange={(v) => actions.setInitialCondition(v as DiracInitialCondition)}
@@ -158,6 +160,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Field View */}
       <Select
         label="Field View"
+        tooltip="Which spinor observable to visualize: total density, individual components, spin, or current."
         value={dirac.fieldView}
         options={FIELD_VIEW_OPTIONS}
         onChange={(v) => actions.setFieldView(v as DiracFieldView)}
@@ -165,6 +168,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
 
       <Switch
         label="Show Potential Overlay"
+        tooltip="Overlay the electromagnetic potential on the spinor density visualization."
         checked={dirac.showPotential}
         onCheckedChange={actions.setShowPotential}
       />
@@ -172,6 +176,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Potential */}
       <Select
         label="Potential"
+        tooltip="External electromagnetic potential acting on the Dirac spinor field."
         value={potentialType}
         options={POTENTIAL_TYPE_OPTIONS}
         onChange={(v) => actions.setPotentialType(v as DiracPotentialType)}
@@ -181,6 +186,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         <>
           <Slider
             label="Potential Strength V₀"
+            tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
             value={dirac.potentialStrength}
             onChange={actions.setPotentialStrength}
             min={0}
@@ -190,6 +196,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           {showBarrierWidth && (
             <Slider
               label="Potential Width"
+              tooltip="Spatial extent of the barrier or well region in lattice units."
               value={dirac.potentialWidth}
               onChange={actions.setPotentialWidth}
               min={0.1}
@@ -200,6 +207,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           {showPotentialCenter && (
             <Slider
               label="Potential Center"
+              tooltip="Position of the potential along the primary axis relative to the lattice center."
               value={dirac.potentialCenter}
               onChange={actions.setPotentialCenter}
               min={-halfExtent}
@@ -210,6 +218,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           {showHarmonicOmega && (
             <Slider
               label="Trap Frequency ω"
+              tooltip="Angular frequency of the harmonic confining potential. Higher values produce tighter confinement."
               value={dirac.harmonicOmega}
               onChange={actions.setHarmonicOmega}
               min={0.01}
@@ -220,6 +229,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           {showCoulombZ && (
             <Slider
               label="Charge Z"
+              tooltip="Nuclear charge for the Coulomb potential V = -Z/r. Above Z ≈ 137 the Dirac equation becomes supercritical."
               value={dirac.coulombZ}
               onChange={actions.setCoulombZ}
               min={0.1}
@@ -233,6 +243,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Physics Parameters */}
       <Slider
         label="Mass m"
+        tooltip="Rest mass of the Dirac particle. Determines the gap between positive and negative energy solutions (mc²)."
         value={dirac.mass}
         onChange={actions.setMass}
         min={0.01}
@@ -241,6 +252,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       />
       <Slider
         label="Speed of Light c"
+        tooltip="Speed of light in natural units. Controls the relationship between energy and momentum in the dispersion relation E² = (pc)² + (mc²)²."
         value={dirac.speedOfLight}
         onChange={actions.setSpeedOfLight}
         min={0.1}
@@ -249,6 +261,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       />
       <Slider
         label="Packet Width σ"
+        tooltip="Spatial width of the initial wavepacket. Narrow packets spread quickly due to dispersion."
         value={dirac.packetWidth}
         onChange={actions.setPacketWidth}
         min={0.1}
@@ -257,6 +270,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       />
       <Slider
         label="Positive Energy Fraction"
+        tooltip="Fraction of positive-energy (particle) components vs negative-energy (antiparticle). At 0.5, equal mix produces Zitterbewegung."
         value={dirac.positiveEnergyFraction}
         onChange={actions.setPositiveEnergyFraction}
         min={0}
@@ -269,6 +283,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         <Slider
           key={`mom-${d}`}
           label={`Momentum k${AXIS_LABELS[d]}`}
+          tooltip="Initial crystal momentum of the wavepacket along this axis in units of 1/a."
           value={dirac.packetMomentum[d] ?? 0}
           onChange={(v) => actions.setPacketMomentum(d, v)}
           min={-20}
@@ -282,6 +297,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         <Select
           key={`grid-${d}`}
           label={`Grid ${AXIS_LABELS[d]}`}
+          tooltip="Number of lattice sites along this axis. Total sites across all axes is capped at 262144."
           value={String(dirac.gridSize[d] ?? 32)}
           options={gridSizeOptions}
           onChange={(v) => {
@@ -296,6 +312,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         <Slider
           key={`spacing-${d}`}
           label={`Spacing Δ${AXIS_LABELS[d]}`}
+          tooltip="Lattice spacing along this axis. Smaller values increase resolution but reduce the physical domain size."
           value={dirac.spacing[d] ?? 0.15}
           onChange={(v) => {
             const newSpacing = [...dirac.spacing]
@@ -317,6 +334,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
             <Slider
               key={`slice-${d}`}
               label={`Slice ${AXIS_LABELS[d]}`}
+              tooltip="Position of the 3D cross-section through this higher dimension."
               value={dirac.slicePositions[i] ?? 0}
               onChange={(v) => actions.setSlicePosition(i, v)}
               min={-halfExt}
@@ -329,6 +347,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       {/* Numerical Settings */}
       <Slider
         label="Time Step dt"
+        tooltip="Integration time step for the split-operator method. Smaller values improve accuracy but slow evolution."
         value={dirac.dt}
         onChange={actions.setDt}
         min={0.0001}
@@ -337,6 +356,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       />
       <Slider
         label="Steps per Frame"
+        tooltip="Number of time-integration steps computed per rendered frame. More steps speed up evolution."
         value={dirac.stepsPerFrame}
         onChange={actions.setStepsPerFrame}
         min={1}
@@ -345,7 +365,12 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
       />
 
       {/* Auto Scale */}
-      <Switch label="Auto Scale" checked={dirac.autoScale} onCheckedChange={actions.setAutoScale} />
+      <Switch
+        label="Auto Scale"
+        tooltip="Automatically normalize the visualization to the current peak density."
+        checked={dirac.autoScale}
+        onCheckedChange={actions.setAutoScale}
+      />
     </div>
   )
 })

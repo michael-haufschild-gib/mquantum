@@ -14,7 +14,7 @@ function dirac() {
 }
 
 function store() {
-  return useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+  return useExtendedObjectStore.getState()
 }
 
 describe('Dirac setters — extended coverage', () => {
@@ -176,13 +176,13 @@ describe('Dirac setters — extended coverage', () => {
 
   describe('setDiracParticleColor / setDiracAntiparticleColor', () => {
     it('sets particle color', () => {
-      store().setDiracParticleColor('#ff0000')
-      expect(dirac().particleColor).toBe('#ff0000')
+      store().setDiracParticleColor([1, 0, 0])
+      expect(dirac().particleColor).toEqual([1, 0, 0])
     })
 
     it('sets antiparticle color', () => {
-      store().setDiracAntiparticleColor('#0000ff')
-      expect(dirac().antiparticleColor).toBe('#0000ff')
+      store().setDiracAntiparticleColor([0, 0, 1])
+      expect(dirac().antiparticleColor).toEqual([0, 0, 1])
     })
   })
 

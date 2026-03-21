@@ -98,7 +98,13 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
 
     return (
       <div className={className}>
-        <Select options={selectOptions} value={colorAlgorithm} onChange={handleChange} />
+        <Select
+          label="Color Algorithm"
+          tooltip="How the wavefunction values are mapped to colors. Different algorithms reveal different aspects of the quantum state."
+          options={selectOptions}
+          value={colorAlgorithm}
+          onChange={handleChange}
+        />
       </div>
     )
   }

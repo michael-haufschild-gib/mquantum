@@ -65,6 +65,7 @@ export type TdsePotentialType =
   | 'doubleWell'
   | 'becTrap'
   | 'radialDoubleWell'
+  | 'custom'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -161,6 +162,10 @@ export interface TdseConfig {
   /** Asymmetry tilt ε (>0 = outer well deeper, drives bubble nucleation) */
   radialWellTilt: number
 
+  // === Custom Potential Expression (when potentialType === 'custom') ===
+  /** Mathematical expression for V(x,y,z,...) evaluated on the JS side */
+  customPotentialExpression: string
+
   /** Enable time-dependent drive */
   driveEnabled: boolean
   /** Drive waveform type */
@@ -191,6 +196,12 @@ export interface TdseConfig {
   diagnosticsEnabled: boolean
   /** Diagnostic computation interval in frames */
   diagnosticsInterval: number
+
+  /** Enable observable expectation value computation (⟨x⟩, ⟨p⟩, ΔxΔp) */
+  observablesEnabled: boolean
+
+  /** Imaginary-time propagation mode (Wick rotation for ground state search) */
+  imaginaryTimeEnabled: boolean
 
   /** Runtime flag to trigger wavefunction re-initialization (not persisted) */
   needsReset: boolean
@@ -258,6 +269,8 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   radialWellDepth: 50.0,
   radialWellTilt: 0.5,
 
+  customPotentialExpression: '0.5 * (x^2 + y^2)',
+
   driveEnabled: false,
   driveWaveform: 'sine',
   driveFrequency: 1.0,
@@ -274,6 +287,8 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   diagnosticsEnabled: false,
   diagnosticsInterval: 5,
+  observablesEnabled: false,
+  imaginaryTimeEnabled: false,
 
   needsReset: false,
   slicePositions: [],

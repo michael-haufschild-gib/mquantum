@@ -97,8 +97,9 @@ function generateLUT(controls: ColormapControlPoints): Uint8ClampedArray {
     const idx = Math.min(Math.floor(scaledT), n - 2)
     const frac = scaledT - idx
 
-    const c0 = controls[idx]
-    const c1 = controls[idx + 1]
+    // idx is clamped to [0, n-2] and controls has at least 2 entries
+    const c0 = controls[idx]!
+    const c1 = controls[idx + 1]!
     const r = c0[0] + (c1[0] - c0[0]) * frac
     const g = c0[1] + (c1[1] - c0[1]) * frac
     const b = c0[2] + (c1[2] - c0[2]) * frac
@@ -170,7 +171,8 @@ export function colormapRGBA(
   const lut = getColormapLUT(name)
   const idx = Math.max(0, Math.min(255, Math.round(value * 255)))
   const base = idx * 4
-  return [lut[base], lut[base + 1], lut[base + 2], lut[base + 3]]
+  // idx is clamped to [0, 255], lut is 1024 entries — always in bounds
+  return [lut[base]!, lut[base + 1]!, lut[base + 2]!, lut[base + 3]!]
 }
 
 /**
@@ -210,7 +212,7 @@ export function paintCarpetToCanvas(
   let maxVal = -Infinity
   const dataLen = data.length
   for (let i = 0; i < dataLen; i++) {
-    const v = data[i]
+    const v = data[i]! // i < dataLen guarantees in bounds
     if (v < minVal) minVal = v
     if (v > maxVal) maxVal = v
   }
@@ -248,14 +250,16 @@ export function paintCarpetToCanvas(
 
     for (let px = 0; px < canvasW; px++) {
       const dataCol = Math.min(Math.floor(px * xScale), gridSize - 1)
-      const raw = data[dataRowOffset + dataCol]
+      // dataRowOffset + dataCol is within data bounds (bounded by gridSize * historyLength)
+      const raw = data[dataRowOffset + dataCol]!
       const normalized = (raw - rangeMin) * invRange
 
+      // lutIdx clamped to [0, 255]*4 — always in bounds for 1024-entry LUT
       const lutIdx = Math.max(0, Math.min(255, Math.round(normalized * 255))) * 4
       const pBase = rowBase + px * 4
-      pixels[pBase] = lut[lutIdx]
-      pixels[pBase + 1] = lut[lutIdx + 1]
-      pixels[pBase + 2] = lut[lutIdx + 2]
+      pixels[pBase] = lut[lutIdx]!
+      pixels[pBase + 1] = lut[lutIdx + 1]!
+      pixels[pBase + 2] = lut[lutIdx + 2]!
       pixels[pBase + 3] = 255
     }
   }

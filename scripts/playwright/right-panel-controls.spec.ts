@@ -116,6 +116,54 @@ test.describe('right panel: environment section', () => {
 
     await rightPanel.expectEnvironmentSectionVisible()
   })
+
+  test('skybox option click updates environment store', async ({ appPage: page }) => {
+    const topBar = new TopBar(page)
+    await topBar.openRightPanel()
+
+    const rightPanel = new RightPanel(page)
+    await rightPanel.waitForVisible()
+    await rightPanel.switchTab('Scene')
+
+    // Get initial skybox from store
+    const initialSkybox = await page.evaluate(async () => {
+      const mod = await import('/src/stores/environmentStore.ts')
+      return mod.useEnvironmentStore.getState().skybox
+    })
+
+    // Find a skybox option that's different from the current one
+    const targetOption = initialSkybox === 'none' ? 'cosmos' : 'none'
+    const skyboxBtn = page.getByTestId(`skybox-option-${targetOption}`)
+    const hasSkyboxBtn = await skyboxBtn.isVisible().catch(() => false)
+
+    if (!hasSkyboxBtn) {
+      // The environment section may need expanding
+      const envHeader = page.getByTestId('section-environment-header')
+      const hasHeader = await envHeader.isVisible().catch(() => false)
+      if (hasHeader) await envHeader.click()
+    }
+
+    // Try to find any skybox option
+    const anyOption = page.locator('[data-testid^="skybox-option-"]').first()
+    const hasAny = await anyOption.isVisible({ timeout: 3000 }).catch(() => false)
+    if (!hasAny) {
+      test.skip(true, 'No skybox options visible in environment section')
+      return
+    }
+
+    // Click it and verify store updated
+    const optionTestId = await anyOption.getAttribute('data-testid')
+    const targetId = optionTestId?.replace('skybox-option-', '')
+    await anyOption.click()
+
+    await expect(async () => {
+      const newSkybox = await page.evaluate(async () => {
+        const mod = await import('/src/stores/environmentStore.ts')
+        return mod.useEnvironmentStore.getState().skybox
+      })
+      expect(newSkybox).toBe(targetId)
+    }).toPass({ timeout: 3000 })
+  })
 })
 
 test.describe('right panel: settings section', () => {

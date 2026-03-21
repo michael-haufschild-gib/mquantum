@@ -36,6 +36,7 @@ export const TemporalReprojectionControls: React.FC = () => {
         checked={enabled}
         onCheckedChange={setEnabled}
         label="Temporal Reprojection"
+        tooltip="Accumulate volumetric samples across frames at quarter resolution for smoother, less noisy rendering during motion."
         data-testid="temporal-reprojection-toggle"
       />
       <p className="text-xs text-text-tertiary ml-4">

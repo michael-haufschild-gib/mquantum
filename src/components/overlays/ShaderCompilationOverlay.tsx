@@ -113,6 +113,7 @@ export const ShaderCompilationOverlay: React.FC = () => {
           role="status"
           aria-live="polite"
           aria-label="Shader compilation in progress"
+          data-testid="shader-compilation-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

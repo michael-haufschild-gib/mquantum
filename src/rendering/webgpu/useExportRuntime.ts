@@ -81,7 +81,6 @@ export function useExportRuntime({
       runtime.renderHeight = 0
       runtime.originalPerf = {
         progressiveRefinementEnabled: true,
-        fractalAnimationLowQuality: true,
         renderResolutionScale: 1,
       }
       runtime.loop = createInitialExportLoopState()
@@ -111,7 +110,6 @@ export function useExportRuntime({
 
     const perfStore = usePerformanceStore.getState()
     perfStore.setProgressiveRefinementEnabled(runtime.originalPerf.progressiveRefinementEnabled)
-    perfStore.setFractalAnimationLowQuality(runtime.originalPerf.fractalAnimationLowQuality)
     perfStore.setRenderResolutionScale(runtime.originalPerf.renderResolutionScale)
     perfStore.setRefinementStage('final')
 
@@ -339,12 +337,10 @@ export function useExportRuntime({
         (size.width > 0 && size.height > 0 ? size.width / size.height : 1)
       runtime.originalPerf = {
         progressiveRefinementEnabled: perfStore.progressiveRefinementEnabled,
-        fractalAnimationLowQuality: perfStore.fractalAnimationLowQuality,
         renderResolutionScale: perfStore.renderResolutionScale,
       }
 
       perfStore.setProgressiveRefinementEnabled(false)
-      perfStore.setFractalAnimationLowQuality(false)
       perfStore.setRefinementStage('final')
       perfStore.setRenderResolutionScale(1)
 

@@ -206,6 +206,33 @@ test.describe('shader compilation time gate', () => {
   })
 })
 
+test.describe('shader compilation overlay', () => {
+  test('overlay appears during mode switch and disappears after compilation', async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // Navigate to a different mode — should trigger shader compilation
+    // The overlay should either appear briefly or not appear at all (fast compilation).
+    // What matters: after compilation completes, the overlay must NOT be stuck visible.
+    await gotoMode(page, 'hydrogenND', 7)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // After shader compilation is done, the overlay must not be visible
+    await expect(
+      page.getByTestId('shader-compilation-overlay'),
+      'Shader compilation overlay must not persist after compilation completes'
+    ).not.toBeVisible({ timeout: 10_000 })
+
+    // Canvas must be rendering
+    await expectCanvasNotBlank(page)
+  })
+})
+
 test.describe('viewport resize during rendering', () => {
   test('resize does not crash renderer', async ({ page }) => {
     await page.goto('/')

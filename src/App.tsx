@@ -80,8 +80,27 @@ function AppContent() {
 
         {!isComplete ? (
           // Detection in progress
-          <div className="flex h-full w-full items-center justify-center text-neutral-400 bg-black/90">
-            Detecting WebGPU support...
+          <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-black/95">
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MDimension</h1>
+            <div className="flex items-center gap-3 text-sm text-text-tertiary">
+              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  opacity="0.25"
+                />
+                <path
+                  d="M12 2a10 10 0 0 1 10 10"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              Initializing WebGPU renderer...
+            </div>
           </div>
         ) : isSupported ? (
           // WebGPU Renderer
@@ -103,11 +122,26 @@ function AppContent() {
           </ErrorBoundary>
         ) : (
           // WebGPU not supported
-          <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-black/90 text-neutral-300">
-            <div className="text-xl font-semibold text-red-400">WebGPU Required</div>
-            <div className="max-w-md text-center text-sm text-neutral-400">
-              This application requires WebGPU support. Please use a browser with WebGPU enabled
-              (Chrome 113+, Edge 113+, or Safari 18+).
+          <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-black/95 text-text-secondary px-6">
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MDimension</h1>
+            <div className="max-w-md text-center space-y-4">
+              <p className="text-sm text-text-tertiary">
+                This application requires{' '}
+                <span className="text-text-primary font-medium">WebGPU</span> for real-time quantum
+                wavefunction rendering. Your browser does not support WebGPU.
+              </p>
+              <div className="glass-panel border border-border-default rounded-lg p-4 text-left space-y-2">
+                <p className="text-xs font-semibold text-text-primary">Supported browsers:</p>
+                <ul className="text-xs text-text-tertiary space-y-1">
+                  <li>Chrome 113+ (desktop &amp; Android)</li>
+                  <li>Edge 113+</li>
+                  <li>Safari 18+ (macOS Sequoia / iOS 18)</li>
+                  <li>
+                    Firefox — enable via <code className="text-text-secondary">about:config</code>{' '}
+                    &rarr; <code className="text-text-secondary">dom.webgpu.enabled</code>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         )}

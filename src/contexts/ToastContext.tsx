@@ -33,7 +33,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="fixed bottom-6 end-6 z-[100] flex flex-col gap-2 pointer-events-none items-end">
+      <div
+        className="fixed bottom-6 end-6 z-[100] flex flex-col gap-2 pointer-events-none items-end"
+        data-testid="toast-container"
+      >
         <AnimatePresence mode="popLayout">
           {toasts.map((toast) => (
             <m.div
@@ -50,6 +53,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   setToasts((prev) => prev.filter((t) => t.id !== toast.id))
                 }
               }}
+              data-testid="toast-message"
+              data-toast-type={toast.type}
               className={`
                 pointer-events-auto relative overflow-hidden rounded-xl border backdrop-blur-xl shadow-2xl w-[320px]
                 ${toast.type === 'success' ? 'bg-success-bg border-success-border' : ''}

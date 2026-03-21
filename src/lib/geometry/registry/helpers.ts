@@ -138,7 +138,7 @@ export function getControlsComponentKey(type: ObjectType): string | undefined {
  * Checks if an object type has timeline controls.
  *
  * @param type - The object type
- * @returns true if the type shows in TimelineControls fractal drawer
+ * @returns true if the type shows in TimelineControls animation drawer
  */
 export function hasTimelineControls(type: ObjectType): boolean {
   return getObjectTypeEntry(type)?.ui.hasTimelineControls ?? false

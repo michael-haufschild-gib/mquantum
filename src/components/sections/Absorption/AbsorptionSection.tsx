@@ -165,11 +165,17 @@ const AbsorptionSectionInner: React.FC<{
 
   return (
     <Section title="Absorption" defaultOpen={defaultOpen} data-testid="absorption-section">
-      <Switch label="PML Boundary" checked={enabled} onCheckedChange={setEnabled} />
+      <Switch
+        label="PML Boundary"
+        tooltip="Enable Perfectly Matched Layer absorbing boundaries. Prevents artificial reflections at domain edges by gradually damping outgoing waves."
+        checked={enabled}
+        onCheckedChange={setEnabled}
+      />
       {enabled && (
         <>
           <Slider
             label="PML Width"
+            tooltip="Fraction of the domain used for the absorbing layer. Wider PML absorbs more effectively but reduces the usable simulation volume."
             value={width}
             onChange={setWidth}
             min={0.05}
@@ -180,6 +186,7 @@ const AbsorptionSectionInner: React.FC<{
           />
           <Slider
             label={`Reflection 10⁻${Math.round(logReflection)}`}
+            tooltip="Target reflection coefficient (log scale). Higher values mean stronger absorption — 10⁻⁶ is typical, 10⁻¹⁰ is very aggressive."
             value={logReflection}
             onChange={handleLogReflectionChange}
             min={3}

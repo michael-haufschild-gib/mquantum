@@ -64,6 +64,7 @@ import { wignerHOBlock } from './quantum/wignerHO.wgsl'
 import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
 import { schroedingerUniformsBlock } from './uniforms.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
+import { classicalOverlayWGSL } from './volume/classicalOverlay.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
 import {
   analysisTextureSamplingBlock,
@@ -305,6 +306,7 @@ export function buildVolumeBlocks(opts: {
     },
     { name: 'Volume Emission (Post)', content: emissionPostBlock, condition: !opts.is2D },
     { name: 'Cross-Section Slice', content: crossSectionBlock, condition: !opts.is2D },
+    { name: 'Classical Trajectory Overlay', content: classicalOverlayWGSL, condition: !opts.is2D },
     {
       name: 'Radial Probability Overlay',
       content:

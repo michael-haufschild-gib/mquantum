@@ -126,27 +126,6 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
 }
 
 /**
- * Merges loaded extended object state with all config defaults.
- *
- * @deprecated Use mergeExtendedObjectStateForType instead to only merge the relevant config.
- * This function merges ALL configs which can overwrite unrelated object type settings.
- *
- * @param loaded - The loaded extended object state from a saved scene
- * @returns Merged state with all defaults filled in
- */
-export function mergeExtendedObjectState(loaded: Record<string, unknown>): Record<string, unknown> {
-  const mergedSchroedinger = deepMerge(
-    DEFAULT_SCHROEDINGER_CONFIG,
-    migrateLegacyShimmerFields(loaded.schroedinger)
-  )
-  return {
-    ...loaded,
-    // Merge schroedinger config with its defaults
-    schroedinger: normalizeSchroedingerConfig(mergedSchroedinger),
-  }
-}
-
-/**
  * Merges loaded extended object state for a specific object type only.
  *
  * This is the preferred function for scene loading. It:

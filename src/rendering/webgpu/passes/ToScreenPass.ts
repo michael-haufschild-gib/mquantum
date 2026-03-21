@@ -70,7 +70,7 @@ fn linearToSRGB(color: vec3f) -> vec3f {
   // Clamp to avoid NaNs from pow() with negative values.
   let c = clamp(color, vec3f(0.0), vec3f(1.0));
 
-  // Standard sRGB OETF (matches Three.js output color space conversion).
+  // Standard sRGB OETF (IEC 61966-2-1).
   let cutoff = 0.0031308;
   let low = 12.92 * c;
   let high = 1.055 * pow(c, vec3f(1.0 / 2.4)) - 0.055;

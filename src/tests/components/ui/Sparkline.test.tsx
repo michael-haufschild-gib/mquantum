@@ -119,7 +119,7 @@ describe('Sparkline', () => {
     const { data, head, count } = makeRingBuffer([1, 2])
     render(<Sparkline data={data} head={head} count={count} className="my-sparkline" />)
     const svg = screen.getByRole('img')
-    const cls = typeof svg.className === 'string' ? svg.className : (svg.className?.baseVal ?? '')
+    const cls = svg.getAttribute('class') ?? ''
     expect(cls).toContain('my-sparkline')
   })
 })

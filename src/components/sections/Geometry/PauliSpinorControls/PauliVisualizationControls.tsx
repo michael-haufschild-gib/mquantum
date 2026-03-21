@@ -46,6 +46,7 @@ export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProp
 
         <Switch
           label="Auto-Scale Density"
+          tooltip="Automatically normalize the color range to the current peak density. Prevents saturation as the wavepacket evolves."
           checked={autoScale}
           onCheckedChange={onAutoScaleChange}
         />

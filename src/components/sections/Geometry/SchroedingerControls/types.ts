@@ -188,6 +188,8 @@ export interface TdseActions {
   setDiagnosticsEnabled: ExtendedObjectState['setTdseDiagnosticsEnabled']
   setDiagnosticsInterval: ExtendedObjectState['setTdseDiagnosticsInterval']
   setSlicePosition: ExtendedObjectState['setTdseSlicePosition']
+  setCustomPotentialExpression: ExtendedObjectState['setTdseCustomPotentialExpression']
+  setImaginaryTimeEnabled: ExtendedObjectState['setTdseImaginaryTimeEnabled']
   applyPreset: ExtendedObjectState['applyTdsePreset']
   resetField: ExtendedObjectState['resetTdseField']
 }

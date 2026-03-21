@@ -296,6 +296,22 @@ export function createVisualEffectSetters(
       }))
     },
 
+    // Classical-quantum correspondence overlay
+    setSchroedingerClassicalOverlayEnabled: valueSetter('classicalOverlayEnabled'),
+    setSchroedingerClassicalOverlayTrailFraction: (fraction: number) => {
+      if (!isFinite(fraction)) {
+        warnNonFinite('classicalOverlayTrailFraction', fraction)
+        return
+      }
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          classicalOverlayTrailFraction: Math.max(0.1, Math.min(1.0, fraction)),
+        },
+      }))
+    },
+    setSchroedingerClassicalOverlayColor: valueSetter('classicalOverlayColor'),
+
     // Second-quantization layer
     setSchroedingerSqLayerEnabled: valueSetter('sqLayerEnabled'),
     setSchroedingerSqLayerMode: valueSetter('sqLayerMode'),

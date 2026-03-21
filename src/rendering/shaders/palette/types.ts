@@ -381,7 +381,7 @@ export function getAvailableColorAlgorithms(
 export interface MultiSourceWeights {
   /** Weight for depth/iteration value */
   depth: number
-  /** Weight for orbit trap value (fractals only) */
+  /** Weight for orbit trap / secondary color source value */
   orbitTrap: number
   /** Weight for normal direction */
   normal: number

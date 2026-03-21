@@ -5,47 +5,49 @@
  * Updated by TDSEComputePass after each GPU readback.
  * UI components (energy diagram HUD) subscribe to individual fields.
  *
+ * Includes ring buffer history for time-series export and sparkline display.
+ *
  * @module stores/tdseDiagnosticsStore
  */
 
 import { create } from 'zustand'
 
-interface TdseDiagnosticsState {
-  /** Total norm ||psi||^2 */
-  totalNorm: number
-  /** Maximum probability density */
-  maxDensity: number
-  /** Fractional norm drift from initial */
-  normDrift: number
-  /** Norm of psi left of barrier */
-  normLeft: number
-  /** Norm of psi right of barrier */
-  normRight: number
-  /** Reflection coefficient */
-  R: number
-  /** Transmission coefficient */
-  T: number
-  /** Simulation time of latest snapshot */
+/** Ring buffer length — ~2s at 60fps */
+const HISTORY_LENGTH = 120
+
+interface TdseDiagnosticsSnapshot {
   simTime: number
+  totalNorm: number
+  maxDensity: number
+  normDrift: number
+  normLeft: number
+  normRight: number
+  R: number
+  T: number
+}
+
+interface TdseDiagnosticsState extends TdseDiagnosticsSnapshot {
   /** Whether any diagnostics data has been received */
   hasData: boolean
 
+  /** Norm time-series ring buffer */
+  historyNorm: Float32Array
+  /** Reflection coefficient time-series ring buffer */
+  historyR: Float32Array
+  /** Transmission coefficient time-series ring buffer */
+  historyT: Float32Array
+  /** Current write head in ring buffer */
+  historyHead: number
+  /** Number of valid entries (up to HISTORY_LENGTH) */
+  historyCount: number
+
   /** Push a new diagnostics snapshot */
-  pushSnapshot: (snapshot: {
-    simTime: number
-    totalNorm: number
-    maxDensity: number
-    normDrift: number
-    normLeft: number
-    normRight: number
-    R: number
-    T: number
-  }) => void
+  pushSnapshot: (snapshot: TdseDiagnosticsSnapshot) => void
   /** Reset to initial state */
   reset: () => void
 }
 
-export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
+const INITIAL_SNAPSHOT: TdseDiagnosticsSnapshot = {
   totalNorm: 1,
   maxDensity: 0,
   normDrift: 0,
@@ -54,33 +56,42 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   R: 0,
   T: 0,
   simTime: 0,
+}
+
+export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
+  ...INITIAL_SNAPSHOT,
   hasData: false,
+  historyNorm: new Float32Array(HISTORY_LENGTH),
+  historyR: new Float32Array(HISTORY_LENGTH),
+  historyT: new Float32Array(HISTORY_LENGTH),
+  historyHead: 0,
+  historyCount: 0,
 
   pushSnapshot: (snapshot) => {
-    set({
-      totalNorm: snapshot.totalNorm,
-      maxDensity: snapshot.maxDensity,
-      normDrift: snapshot.normDrift,
-      normLeft: snapshot.normLeft,
-      normRight: snapshot.normRight,
-      R: snapshot.R,
-      T: snapshot.T,
-      simTime: snapshot.simTime,
-      hasData: true,
+    set((state) => {
+      const head = state.historyHead
+      state.historyNorm[head] = snapshot.totalNorm
+      state.historyR[head] = snapshot.R
+      state.historyT[head] = snapshot.T
+
+      return {
+        ...snapshot,
+        hasData: true,
+        historyHead: (head + 1) % HISTORY_LENGTH,
+        historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
+      }
     })
   },
 
   reset: () => {
     set({
-      totalNorm: 1,
-      maxDensity: 0,
-      normDrift: 0,
-      normLeft: 0,
-      normRight: 0,
-      R: 0,
-      T: 0,
-      simTime: 0,
+      ...INITIAL_SNAPSHOT,
       hasData: false,
+      historyNorm: new Float32Array(HISTORY_LENGTH),
+      historyR: new Float32Array(HISTORY_LENGTH),
+      historyT: new Float32Array(HISTORY_LENGTH),
+      historyHead: 0,
+      historyCount: 0,
     })
   },
 }))

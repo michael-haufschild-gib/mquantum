@@ -48,7 +48,7 @@ export interface LightSource {
   penumbra: number
   /**
    * Maximum range/distance for light attenuation (point/spot only).
-   * 0 = infinite range (no distance falloff), matching Three.js default.
+   * 0 = infinite range (no distance falloff).
    * Range: 0-100, where 0 disables attenuation.
    */
   range: number
@@ -67,7 +67,7 @@ export const MAX_LIGHTS = 4
 export const MIN_LIGHTS = 0
 
 /**
- * Light type to GLSL shader integer mapping.
+ * Light type to WGSL shader integer mapping.
  * Must match constants in shader code.
  */
 export const LIGHT_TYPE_TO_INT: Record<LightType, number> = {

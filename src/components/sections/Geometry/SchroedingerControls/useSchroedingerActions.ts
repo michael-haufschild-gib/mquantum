@@ -144,6 +144,8 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setTdseDiagnosticsEnabled: state.setTdseDiagnosticsEnabled,
     setTdseDiagnosticsInterval: state.setTdseDiagnosticsInterval,
     setTdseSlicePosition: state.setTdseSlicePosition,
+    setTdseCustomPotentialExpression: state.setTdseCustomPotentialExpression,
+    setTdseImaginaryTimeEnabled: state.setTdseImaginaryTimeEnabled,
     applyTdsePreset: state.applyTdsePreset,
     resetTdseField: state.resetTdseField,
     // BEC dynamics actions
@@ -305,6 +307,8 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
     setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
     setSlicePosition: s.setTdseSlicePosition,
+    setCustomPotentialExpression: s.setTdseCustomPotentialExpression,
+    setImaginaryTimeEnabled: s.setTdseImaginaryTimeEnabled,
     applyPreset: s.applyTdsePreset,
     resetField: s.resetTdseField,
   }

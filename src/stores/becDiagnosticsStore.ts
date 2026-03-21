@@ -4,10 +4,15 @@
  * Updated by TDSEComputePass when in BEC mode, read by EnergyDiagramHUD
  * and BECControls for real-time diagnostic display.
  *
+ * Includes ring buffer history for time-series export and sparkline display.
+ *
  * @module
  */
 
 import { create } from 'zustand'
+
+/** Ring buffer length — ~2s at 60fps */
+const HISTORY_LENGTH = 120
 
 /**
  * BEC diagnostic observables state.
@@ -32,6 +37,17 @@ interface BecDiagnosticsState {
   /** Estimated vortex count (future: phase winding analysis) */
   vortexCount: number
 
+  /** Norm time-series ring buffer */
+  historyNorm: Float32Array
+  /** Chemical potential time-series ring buffer */
+  historyChemPot: Float32Array
+  /** Healing length time-series ring buffer */
+  historyHealingLen: Float32Array
+  /** Current write head in ring buffer */
+  historyHead: number
+  /** Number of valid entries (up to HISTORY_LENGTH) */
+  historyCount: number
+
   /** Push new diagnostic snapshot */
   update: (snapshot: Partial<BecDiagnosticsState>) => void
   /** Reset all diagnostics to defaults */
@@ -48,6 +64,11 @@ const INITIAL_STATE = {
   soundSpeed: 0,
   thomasFermiRadius: 0,
   vortexCount: 0,
+  historyNorm: new Float32Array(HISTORY_LENGTH),
+  historyChemPot: new Float32Array(HISTORY_LENGTH),
+  historyHealingLen: new Float32Array(HISTORY_LENGTH),
+  historyHead: 0,
+  historyCount: 0,
 }
 
 /**
@@ -60,6 +81,32 @@ const INITIAL_STATE = {
  */
 export const useBecDiagnosticsStore = create<BecDiagnosticsState>((set) => ({
   ...INITIAL_STATE,
-  update: (snapshot) => set({ ...snapshot, hasData: true }),
-  reset: () => set(INITIAL_STATE),
+
+  update: (snapshot) => {
+    set((state) => {
+      const head = state.historyHead
+      const norm = snapshot.totalNorm ?? state.totalNorm
+      const chemPot = snapshot.chemicalPotential ?? state.chemicalPotential
+      const healingLen = snapshot.healingLength ?? state.healingLength
+
+      state.historyNorm[head] = norm
+      state.historyChemPot[head] = chemPot
+      state.historyHealingLen[head] = healingLen
+
+      return {
+        ...snapshot,
+        hasData: true,
+        historyHead: (head + 1) % HISTORY_LENGTH,
+        historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
+      }
+    })
+  },
+
+  reset: () =>
+    set({
+      ...INITIAL_STATE,
+      historyNorm: new Float32Array(HISTORY_LENGTH),
+      historyChemPot: new Float32Array(HISTORY_LENGTH),
+      historyHealingLen: new Float32Array(HISTORY_LENGTH),
+    }),
 }))

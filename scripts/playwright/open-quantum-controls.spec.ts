@@ -97,6 +97,36 @@ test.describe('open quantum drawer', () => {
     await expect(page.getByTestId('openq-panel-controls')).toBeVisible({ timeout: 5000 })
   })
 
+  test('enabling open quantum with sufficient terms shows decoherence panel', async ({
+    hoPage: page,
+  }) => {
+    // Set term count >= 2 (required for open quantum)
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const store = mod.useExtendedObjectStore.getState()
+      store.setSchroedingerTermCount(4)
+      store.setOpenQuantumEnabled(true)
+    })
+
+    const panel = new EditorBottomPanel(page)
+    await panel.waitForVisible()
+
+    const hasToggle = await panel.openQToggle.isVisible().catch(() => false)
+    if (!hasToggle) {
+      test.skip(true, 'Open quantum toggle not visible')
+      return
+    }
+
+    await panel.openQToggle.click()
+    await panel.expectOpenQuantumDrawerVisible()
+
+    // With sufficient terms and open quantum enabled, the decoherence panel should appear
+    await expect(page.getByTestId('openq-panel-decoherence')).toBeVisible({ timeout: 5000 })
+
+    // Integrator settings should also be visible
+    await expect(page.getByTestId('openq-panel-integrator')).toBeVisible({ timeout: 5000 })
+  })
+
   test('term count warning shown when terms < 2', async ({ hoPage: page }) => {
     // Set term count to 1 — open quantum needs >= 2 terms
     await page.evaluate(async () => {

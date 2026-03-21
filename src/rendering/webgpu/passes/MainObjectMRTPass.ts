@@ -7,11 +7,9 @@
  *
  * ## WebGPU Architecture Notes
  *
- * Unlike the WebGL version which directly calls renderer.render(), this WebGPU
- * version integrates with the WebGPU render graph architecture where:
- * - Scene rendering is handled by dedicated renderer passes (e.g., MandelbulbRenderer)
+ * Integrates with the WebGPU render graph architecture where:
+ * - Scene rendering is handled by dedicated renderer passes (e.g., SchrodingerRenderer)
  * - This pass provides MRT target coordination and state management
- * - Material opacity forcing is handled differently in WebGPU pipelines
  *
  * ## MRT Output Layout
  *
@@ -149,7 +147,7 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     // MainObjectMRTPass doesn't create its own render pipeline.
     // It provides MRT configuration for object renderers that do the actual drawing.
     // Pipeline creation is handled by the specific object renderers
-    // (e.g., MandelbulbRenderer, PolytopeRenderer) that output to MRT.
+    // (e.g., SchrodingerRenderer) that output to MRT.
   }
 
   /**

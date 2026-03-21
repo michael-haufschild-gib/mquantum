@@ -282,4 +282,35 @@ describe('TDSE store slice', () => {
     const v1 = useExtendedObjectStore.getState().schroedingerVersion
     expect(v1).toBeGreaterThan(v0)
   })
+
+  it('setTdseObservablesEnabled toggles the flag', () => {
+    const store = useExtendedObjectStore.getState()
+    expect(store.schroedinger.tdse.observablesEnabled).toBe(false)
+    store.setTdseObservablesEnabled(true)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.observablesEnabled).toBe(true)
+    useExtendedObjectStore.getState().setTdseObservablesEnabled(false)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.observablesEnabled).toBe(false)
+  })
+
+  it('setTdseImaginaryTimeEnabled toggles the flag', () => {
+    const store = useExtendedObjectStore.getState()
+    expect(store.schroedinger.tdse.imaginaryTimeEnabled).toBe(false)
+    store.setTdseImaginaryTimeEnabled(true)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.imaginaryTimeEnabled).toBe(true)
+  })
+
+  it('setTdseCustomPotentialExpression stores the expression string', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setTdseCustomPotentialExpression('x^2 + y^2')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.customPotentialExpression).toBe(
+      'x^2 + y^2'
+    )
+  })
+
+  it('setTdseCustomPotentialExpression accepts empty string', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setTdseCustomPotentialExpression('some_expr')
+    store.setTdseCustomPotentialExpression('')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.customPotentialExpression).toBe('')
+  })
 })

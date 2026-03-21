@@ -109,7 +109,7 @@ describe('colormaps', () => {
       let decreaseCount = 0
       for (let i = 0; i < 256; i++) {
         const base = i * 4
-        const lum = 0.299 * lut[base] + 0.587 * lut[base + 1] + 0.114 * lut[base + 2]
+        const lum = 0.299 * lut[base]! + 0.587 * lut[base + 1]! + 0.114 * lut[base + 2]!
         if (lum < prevLum - 5) decreaseCount++ // allow small fluctuation
         prevLum = lum
       }

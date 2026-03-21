@@ -55,7 +55,10 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Anti-aliasing */}
-      <ControlGroup title="Anti-aliasing">
+      <ControlGroup
+        title="Anti-aliasing"
+        tooltip="Smooths jagged edges (aliasing) in the rendered image. FXAA is fast; SMAA is higher quality."
+      >
         <Select<AntiAliasingMethod>
           label=""
           options={ANTI_ALIASING_OPTIONS}
@@ -71,11 +74,13 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
           checked={frameBlendingEnabled}
           onCheckedChange={setFrameBlendingEnabled}
           label="Enable Frame Blending"
+          tooltip="Blends consecutive frames for smoother animation with temporal accumulation. Reduces noise in volumetric rendering."
           data-testid="frame-blending-switch"
         />
         <div className={!frameBlendingEnabled ? 'opacity-50 pointer-events-none' : ''}>
           <Slider
             label="Blend Factor"
+            tooltip="Weight given to the previous frame. Higher values create smoother motion but may cause ghosting on fast-moving features."
             min={0}
             max={0.95}
             step={0.05}

@@ -193,4 +193,68 @@ test.describe('concurrent operations', () => {
     // App should not have crashed — bottom panel should be accessible
     await expect(page.getByTestId('editor-bottom-panel')).toBeVisible()
   })
+
+  test('recovery after rapid mode cycling: final mode renders correctly', async ({ page }) => {
+    const gpuErrors = collectFatalGpuErrors(page)
+    const pageErrors = collectPageErrors(page)
+
+    // Stress test: rapidly cycle through every mode twice, then settle on a
+    // known-good mode and verify it renders. This tests pipeline teardown/setup
+    // interleaving and GPU resource lifecycle under pressure.
+    const stressCycle = [
+      'harmonicOscillator',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'freeScalarField',
+      'hydrogenND',
+      'tdseDynamics',
+      'harmonicOscillator',
+      'becDynamics',
+      'diracEquation',
+    ]
+
+    for (const mode of stressCycle) {
+      await gotoMode(page, mode, 3)
+      // Don't wait for compilation — navigate immediately to stress teardown
+    }
+
+    // Settle on the final mode and verify it works end-to-end
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    // Renderer must have recovered: no crashes, no stale pipeline
+    const realErrors = filterBenignErrors(pageErrors)
+    expect(realErrors, 'No page errors after stress cycle').toEqual([])
+    expect(gpuErrors, 'No GPU errors after stress cycle').toEqual([])
+
+    // Canvas must render the correct mode (not a stale pipeline from a mid-cycle mode)
+    await expect(page.getByTestId('top-bar')).toBeVisible()
+  })
+
+  test('mode switch via URL while export modal is open dismisses cleanly', async ({ page }) => {
+    await gotoMode(page, 'harmonicOscillator', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    const topBar = new TopBar(page)
+    await topBar.clickExportImage()
+
+    const modal = page.getByTestId('screenshot-modal')
+    const msgBox = page.getByText('Export Failed')
+    await expect(modal.or(msgBox)).toBeVisible({ timeout: 15_000 })
+
+    // Navigate to a completely different mode while modal is open
+    await page.goto('/?t=schroedinger&d=7&qm=hydrogenND')
+    await waitForAppLoaded(page)
+
+    // Modal must be gone (navigation forces full re-render)
+    await expect(modal).not.toBeVisible({ timeout: 5000 })
+
+    // App must be functional in the new mode
+    await expect(page.getByTestId('top-bar')).toBeVisible()
+    const pageErrors = collectPageErrors(page)
+    expect(filterBenignErrors(pageErrors)).toEqual([])
+  })
 })

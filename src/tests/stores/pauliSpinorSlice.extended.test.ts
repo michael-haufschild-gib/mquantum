@@ -10,7 +10,7 @@ function pauli() {
 }
 
 function store() {
-  return useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+  return useExtendedObjectStore.getState()
 }
 
 describe('Pauli spinor setters — extended', () => {
@@ -39,8 +39,8 @@ describe('Pauli spinor setters — extended', () => {
 
   it('setPauliInitialCondition triggers needsReset', () => {
     store().clearPauliNeedsReset()
-    store().setPauliInitialCondition('planeWave')
-    expect(pauli().initialCondition).toBe('planeWave')
+    store().setPauliInitialCondition('planeWaveSpinor')
+    expect(pauli().initialCondition).toBe('planeWaveSpinor')
     expect(pauli().needsReset).toBe(true)
   })
 
@@ -99,10 +99,10 @@ describe('Pauli spinor setters — extended', () => {
   })
 
   it('setPauliSpinUpColor / setPauliSpinDownColor set colors', () => {
-    store().setPauliSpinUpColor('#ff0000')
-    expect(pauli().spinUpColor).toBe('#ff0000')
-    store().setPauliSpinDownColor('#0000ff')
-    expect(pauli().spinDownColor).toBe('#0000ff')
+    store().setPauliSpinUpColor([1, 0, 0])
+    expect(pauli().spinUpColor).toEqual([1, 0, 0])
+    store().setPauliSpinDownColor([0, 0, 1])
+    expect(pauli().spinDownColor).toEqual([0, 0, 1])
   })
 
   it('setPauliAutoScale sets boolean', () => {

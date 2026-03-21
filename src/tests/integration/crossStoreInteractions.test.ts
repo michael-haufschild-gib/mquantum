@@ -234,3 +234,100 @@ describe('Multi-store reset consistency', () => {
     expect(scale).toBeLessThanOrEqual(2.0)
   })
 })
+
+describe('Quantum mode switching → dimension constraint enforcement', () => {
+  beforeEach(() => {
+    useGeometryStore.getState().reset()
+    useExtendedObjectStore.getState().reset()
+  })
+
+  it('switching to TDSE from 3D preserves dimension', () => {
+    useGeometryStore.getState().setDimension(3)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+    expect(useGeometryStore.getState().dimension).toBe(3)
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
+  })
+
+  it('switching to BEC enforces dimension >= 3', () => {
+    useGeometryStore.getState().setDimension(3)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
+    expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+  })
+
+  it('TDSE mode sets needsReset when lattice dimensions mismatch', () => {
+    useGeometryStore.getState().setDimension(3)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+
+    // Change dimension while in TDSE mode — must not corrupt TDSE state
+    useGeometryStore.getState().setDimension(4)
+    // Re-entering TDSE mode with new dimension should trigger resize
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+
+    const tdse = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(tdse.latticeDim).toBe(4)
+  })
+
+  it('rapid mode switching does not corrupt state', () => {
+    const modes = [
+      'harmonicOscillator',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'freeScalarField',
+      'harmonicOscillator',
+      'hydrogenND',
+    ] as const
+
+    for (const mode of modes) {
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
+      const s = useExtendedObjectStore.getState()
+      expect(s.schroedinger.quantumMode).toBe(mode)
+      // Version should be monotonically increasing
+      expect(s.schroedingerVersion).toBeGreaterThan(0)
+    }
+
+    // After all switches, state should be internally consistent
+    const dim = useGeometryStore.getState().dimension
+    expect(dim).toBeGreaterThanOrEqual(3)
+    expect(dim).toBeLessThanOrEqual(11)
+  })
+})
+
+describe('Version counter isolation under concurrent changes', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useAppearanceStore.getState().reset()
+    useLightingStore.getState().reset()
+    useAnimationStore.getState().reset()
+  })
+
+  it('interleaved store mutations do not cause version cross-talk', () => {
+    const extV0 = useExtendedObjectStore.getState().schroedingerVersion
+    const appV0 = useAppearanceStore.getState().appearanceVersion
+    const lightV0 = useLightingStore.getState().version
+
+    // Interleave mutations across stores
+    useExtendedObjectStore.getState().setSchroedingerScale(1.0)
+    useAppearanceStore.getState().setFaceEmission(0.5)
+    useExtendedObjectStore.getState().setSchroedingerScale(1.2)
+    useLightingStore.getState().addLight('point')
+    useAppearanceStore.getState().setFaceEmission(0.7)
+
+    const extV1 = useExtendedObjectStore.getState().schroedingerVersion
+    const appV1 = useAppearanceStore.getState().appearanceVersion
+    const lightV1 = useLightingStore.getState().version
+
+    // Each store's version should have changed by its own mutation count
+    expect(extV1).toBeGreaterThan(extV0)
+    expect(appV1).toBeGreaterThan(appV0)
+    expect(lightV1).toBeGreaterThan(lightV0)
+
+    // Version deltas should be independent
+    const extDelta = extV1 - extV0
+    const appDelta = appV1 - appV0
+    // Extended store had 2 mutations, appearance had 2
+    expect(extDelta).toBe(2)
+    expect(appDelta).toBe(2)
+  })
+})

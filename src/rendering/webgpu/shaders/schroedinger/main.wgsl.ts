@@ -19,6 +19,28 @@
  * @module rendering/webgpu/shaders/schroedinger/main.wgsl
  */
 
+import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
+
+// Phase-dependent color algorithms that require direct wavefunction sampling
+// (cannot use pre-computed density grid because they need complex phase information).
+const PHASE_COLOR_ALGS = [
+  COLOR_ALGORITHM_TO_INT.phase,
+  COLOR_ALGORITHM_TO_INT.mixed,
+  COLOR_ALGORITHM_TO_INT.phaseCyclicUniform,
+  COLOR_ALGORITHM_TO_INT.phaseDiverging,
+  COLOR_ALGORITHM_TO_INT.domainColoringPsi,
+  COLOR_ALGORITHM_TO_INT.diverging,
+  COLOR_ALGORITHM_TO_INT.relativePhase,
+] as const
+
+/**
+ * Generate the WGSL condition testing whether the current colorAlgorithm
+ * is a phase-dependent mode requiring direct wavefunction sampling.
+ */
+function phaseAlgorithmCondition(uniformName: string): string {
+  return PHASE_COLOR_ALGS.map((v) => `${uniformName}.colorAlgorithm == ${v}`).join(' ||\n    ')
+}
+
 /**
  * Configuration for volumetric main block generation.
  */
@@ -39,13 +61,7 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   // with automatic fallback when features require direct wavefunction sampling.
   const raymarchCall = useDensityGrid
     ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 3 ||
-    schroedinger.colorAlgorithm == 4 ||
-    schroedinger.colorAlgorithm == 6 ||
-    schroedinger.colorAlgorithm == 7 ||
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    schroedinger.colorAlgorithm == 10 ||
+    ${phaseAlgorithmCondition('schroedinger')} ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
@@ -181,6 +197,17 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
+  // Classical trajectory overlay (energy-shell Lissajous for HO)
+  let classicalResult = evaluateClassicalOverlay(
+    ro, rd, tNear, tFar, schroedinger, DIMENSION
+  );
+  if (classicalResult.alpha > 0.0) {
+    // Depth-aware compositing: blend based on whether trail is in front of or behind volume
+    let trailAlpha = classicalResult.alpha;
+    finalColor = mix(finalColor, classicalResult.color, trailAlpha);
+    finalAlpha = max(finalAlpha, trailAlpha);
+  }
+
   // Discard fully transparent pixels
   if (finalAlpha < 0.01) {
     discard;
@@ -295,13 +322,7 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
 
   const raymarchCall = useDensityGrid
     ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 3 ||
-    schroedinger.colorAlgorithm == 4 ||
-    schroedinger.colorAlgorithm == 6 ||
-    schroedinger.colorAlgorithm == 7 ||
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    schroedinger.colorAlgorithm == 10 ||
+    ${phaseAlgorithmCondition('schroedinger')} ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
@@ -467,6 +488,19 @@ ${bayerJitterSection}
     discard;
   }
 
+  // Classical trajectory overlay (energy-shell Lissajous for HO)
+  let classicalResult = evaluateClassicalOverlay(
+    ro, rd, tNear, tFar, schroedinger, DIMENSION
+  );
+  if (classicalResult.alpha > 0.0) {
+    let trailAlpha = classicalResult.alpha;
+    finalColor = mix(finalColor, classicalResult.color, trailAlpha);
+    finalAlpha = max(finalAlpha, trailAlpha);
+    if (hitT < 0.0) {
+      hitT = classicalResult.depth;
+    }
+  }
+
   // Discard fully transparent pixels
   if (finalAlpha < 0.01) {
     discard;
@@ -486,7 +520,7 @@ ${bayerJitterSection}
 
   // Output color
   output.color = vec4f(finalColor, finalAlpha);
-  
+
   // Output world position (xyz) and model-space ray distance (w) for reprojection
   // The ray distance in W is used for temporal depth optimization
   output.worldPosition = vec4f(hitPosWorld, hitT);

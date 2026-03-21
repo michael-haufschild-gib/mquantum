@@ -126,3 +126,32 @@ test.describe('invalid URL params', () => {
     expect(Number.isInteger(state.dimension)).toBe(true)
   })
 })
+
+test.describe('browser navigation', () => {
+  test('back navigation after URL-driven state change does not crash', async ({ page }) => {
+    // Navigate to mode A
+    await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
+    await waitForAppLoaded(page)
+
+    const stateA = await getAppState(page)
+    expect(stateA.dimension).toBe(3)
+    expect(stateA.quantumMode).toBe('harmonicOscillator')
+
+    // Navigate to mode B (creates a new history entry)
+    await page.goto('/?t=schroedinger&d=7&qm=hydrogenND')
+    await waitForAppLoaded(page)
+
+    const stateB = await getAppState(page)
+    expect(stateB.dimension).toBe(7)
+    expect(stateB.quantumMode).toBe('hydrogenND')
+
+    // Press browser back
+    await page.goBack()
+    await waitForAppLoaded(page)
+
+    // App must not crash — state should reflect original URL
+    const stateAfterBack = await getAppState(page)
+    expect(stateAfterBack.dimension).toBe(3)
+    expect(stateAfterBack.quantumMode).toBe('harmonicOscillator')
+  })
+})

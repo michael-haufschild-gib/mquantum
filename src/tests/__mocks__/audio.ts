@@ -61,15 +61,20 @@ class MockAudioContext {
   })
 }
 
+/** Window with AudioContext and vendor-prefixed variant (Safari). */
+interface WindowWithAudioContext extends Window {
+  AudioContext: typeof AudioContext
+  webkitAudioContext: typeof AudioContext
+}
+
 /**
  * Install AudioContext mock on globalThis and window.
  * Must be called during test setup.
  */
 export function installAudioMock(): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  globalThis.AudioContext = MockAudioContext as any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).AudioContext = MockAudioContext
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ;(window as any).webkitAudioContext = MockAudioContext
+  const mockCtor = MockAudioContext as unknown as typeof AudioContext
+  globalThis.AudioContext = mockCtor
+  const win = window as unknown as WindowWithAudioContext
+  win.AudioContext = mockCtor
+  win.webkitAudioContext = mockCtor
 }

@@ -60,6 +60,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
       <div className="space-y-3">
         <Select
           label="Potential Type"
+          tooltip="External scalar potential acting on the spinor. Harmonic trap confines the wavepacket; barrier and double-well create scattering/tunneling scenarios."
           options={POTENTIAL_TYPE_OPTIONS}
           value={potentialType}
           onChange={(v) => onPotentialTypeChange(v as PauliPotentialType)}
@@ -68,6 +69,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
         {showHarmonicParams && (
           <Slider
             label="Trap Frequency ω"
+            tooltip="Angular frequency of the harmonic confining potential V(x) = ½mω²x². Higher ω gives tighter confinement."
             value={harmonicOmega}
             onChange={onHarmonicOmegaChange}
             min={0.01}
@@ -80,6 +82,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
           <>
             <Slider
               label="Well Depth V₀"
+              tooltip="Height (barrier) or depth (well) of the potential in energy units. Controls tunneling probability and bound state count."
               value={wellDepth}
               onChange={onWellDepthChange}
               min={0}
@@ -89,6 +92,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
 
             <Slider
               label="Well Width"
+              tooltip="Spatial extent of the barrier or well region. Wider barriers reduce tunneling; wider wells support more bound states."
               value={wellWidth}
               onChange={onWellWidthChange}
               min={0.01}
@@ -101,6 +105,7 @@ export const PauliPotentialControls: React.FC<PauliPotentialControlsProps> = Rea
         {potentialType !== 'none' && (
           <Switch
             label="Show Potential Overlay"
+            tooltip="Overlay the scalar potential V(x) on the spinor density visualization."
             checked={showPotential}
             onCheckedChange={onShowPotentialChange}
           />

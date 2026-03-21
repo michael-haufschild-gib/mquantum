@@ -6,7 +6,7 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
-import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 
 import { FFT_UNIFORM_SIZE, MAX_DIM, PACK_UNIFORM_SIZE } from './computePassUtils'
@@ -399,7 +399,7 @@ export function writePauliUniforms(
         config.absorberWidth,
         config.gridSize,
         config.dt,
-        3, // cubic grading (hardcoded to match WGSL shader)
+        PML_GRADING_EXPONENT,
         config.latticeDim
       )
     : 0

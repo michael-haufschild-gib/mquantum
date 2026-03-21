@@ -165,9 +165,9 @@ const CarpetPanelInner: React.FC = React.memo(() => {
       const lutIdx = Math.round((1 - py / (h - 1)) * 255) * 4
       for (let px = 0; px < w; px++) {
         const base = (py * w + px) * 4
-        pixels[base] = lut[lutIdx]
-        pixels[base + 1] = lut[lutIdx + 1]
-        pixels[base + 2] = lut[lutIdx + 2]
+        pixels[base] = lut[lutIdx]!
+        pixels[base + 1] = lut[lutIdx + 1]!
+        pixels[base + 2] = lut[lutIdx + 2]!
         pixels[base + 3] = 255
       }
     }

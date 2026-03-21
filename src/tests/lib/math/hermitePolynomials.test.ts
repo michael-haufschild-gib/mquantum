@@ -169,4 +169,48 @@ describe('HO wavefunction properties', () => {
     // Higher omega → narrower → lower value at x=1
     expect(valAt1_highOmega).toBeLessThan(valAt1_lowOmega)
   })
+
+  it('wavefunction is normalized: integral(|psi_n|^2, -inf, inf) approx 1', () => {
+    // Numerical integration by trapezoidal rule over [-10, 10]
+    // Wide enough for n=0..6 with omega=1 (classical turning point at sqrt(2n+1))
+    const dx = 0.005
+    const xMin = -10
+    const xMax = 10
+
+    for (let n = 0; n <= 6; n++) {
+      let integral = 0
+      for (let x = xMin; x <= xMax; x += dx) {
+        const psi = ho1D(n, x, 1.0)
+        integral += psi * psi * dx
+      }
+      // Should be approximately 1 (tolerance accounts for numerical integration error
+      // and finite integration domain)
+      expect(integral).toBeCloseTo(1.0, 2)
+    }
+  })
+
+  it('different HO eigenstates are orthogonal: integral(psi_n * psi_m) approx 0 for n != m', () => {
+    const dx = 0.005
+    const xMin = -10
+    const xMax = 10
+
+    const pairs: [number, number][] = [
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [1, 2],
+      [1, 3],
+      [2, 3],
+      [0, 6],
+      [3, 5],
+    ]
+
+    for (const [n, m] of pairs) {
+      let integral = 0
+      for (let x = xMin; x <= xMax; x += dx) {
+        integral += ho1D(n, x, 1.0) * ho1D(m, x, 1.0) * dx
+      }
+      expect(integral).toBeCloseTo(0, 2)
+    }
+  })
 })

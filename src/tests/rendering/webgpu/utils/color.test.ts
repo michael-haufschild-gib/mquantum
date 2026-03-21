@@ -19,7 +19,7 @@ describe('rendering/webgpu/utils/color', () => {
     })
 
     it('converts mid-gray (~0.5) to expected linear value', () => {
-      // Reference: Three.js Color.convertSRGBToLinear()
+      // Reference: sRGB EOTF (IEC 61966-2-1)
       const expected = Math.pow((0.5 + 0.055) / 1.055, 2.4)
       expect(srgbToLinearChannel(0.5)).toBeCloseTo(expected, 7)
     })

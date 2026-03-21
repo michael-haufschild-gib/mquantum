@@ -23,6 +23,7 @@ export const HorizonControls: React.FC<HorizonControlsProps> = ({
 
       <Slider
         label="Gradient Contrast"
+        tooltip="Sharpness of the horizon gradient transition. Higher values create a more dramatic dark-to-light boundary."
         value={proceduralSettings.horizonGradient?.gradientContrast ?? 0.5}
         min={0}
         max={1}
@@ -36,6 +37,7 @@ export const HorizonControls: React.FC<HorizonControlsProps> = ({
 
       <Slider
         label="Spotlight Focus"
+        tooltip="Concentration of the directional spotlight. Higher values create a tighter, more focused hot spot."
         value={proceduralSettings.horizonGradient?.spotlightFocus ?? 0.5}
         min={0}
         max={1}

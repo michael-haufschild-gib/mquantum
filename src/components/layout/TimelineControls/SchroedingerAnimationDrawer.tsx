@@ -37,7 +37,7 @@ export interface SchroedingerAnimationDrawerProps {
 /**
  * SchroedingerAnimationDrawer component
  *
- * Renders animation controls for Schroedinger/Schroedinger fractals within
+ * Renders animation controls for Schroedinger quantum modes within
  * the timeline drawer. Uses consistent styling with other animation
  * system panels.
  *

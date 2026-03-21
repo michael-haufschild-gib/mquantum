@@ -14,15 +14,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SceneManager } from '@/components/presets/SceneManager'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
+import type { SavedScene } from '@/stores/utils/presetTypes'
 
 /** Wrap component with required providers. */
 function renderWithProviders(ui: React.ReactElement) {
   return render(<ToastProvider>{ui}</ToastProvider>)
 }
 
+const emptySceneData: SavedScene['data'] = {
+  appearance: {},
+  lighting: {},
+  postProcessing: {},
+  environment: {},
+  pbr: {},
+  geometry: {},
+  extended: {},
+  transform: {},
+  rotation: {},
+  animation: {},
+  camera: {},
+  ui: {},
+}
+
 /** Create a minimal saved scene for testing. */
-function createScene(id: string, name: string, timestamp = Date.now()) {
-  return { id, name, timestamp, data: {} }
+function createScene(id: string, name: string, timestamp = Date.now()): SavedScene {
+  return { id, name, timestamp, data: emptySceneData }
 }
 
 describe('SceneManager', () => {
@@ -74,7 +90,7 @@ describe('SceneManager', () => {
 
       // Click the scene row (has role="button")
       const loadButtons = screen.getAllByRole('button', { name: /load scene/i })
-      await user.click(loadButtons[0])
+      await user.click(loadButtons[0]!)
 
       expect(usePresetManagerStore.getState().savedScenes).toHaveLength(2)
       expect(onClose).toHaveBeenCalled()
@@ -86,7 +102,7 @@ describe('SceneManager', () => {
 
       // Find and click the delete button for the first scene
       const deleteButtons = screen.getAllByRole('button', { name: /delete scene/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       // Confirmation modal should appear
       expect(screen.getByText('Delete Scene')).toBeInTheDocument()
@@ -99,7 +115,7 @@ describe('SceneManager', () => {
 
       // Open delete confirmation for first scene
       const deleteButtons = screen.getAllByRole('button', { name: /delete scene/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       // Click the confirm delete button in the modal
       const confirmBtn = screen.getByRole('button', { name: /delete$/i })
@@ -115,7 +131,7 @@ describe('SceneManager', () => {
       renderWithProviders(<SceneManager onClose={() => {}} />)
 
       const deleteButtons = screen.getAllByRole('button', { name: /delete scene/i })
-      await user.click(deleteButtons[0])
+      await user.click(deleteButtons[0]!)
 
       // Cancel
       const cancelBtn = screen.getByRole('button', { name: /cancel/i })

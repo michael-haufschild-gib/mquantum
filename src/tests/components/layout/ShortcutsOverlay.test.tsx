@@ -50,7 +50,7 @@ describe('ShortcutsOverlay', () => {
 
     // Should display at least some of the registered shortcuts
     if (SHORTCUTS.length > 0) {
-      expect(screen.getByText(SHORTCUTS[0].description)).toBeInTheDocument()
+      expect(screen.getByText(SHORTCUTS[0]!.description)).toBeInTheDocument()
     }
 
     // Each shortcut should have a <kbd> element for the key

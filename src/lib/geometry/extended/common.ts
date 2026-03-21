@@ -109,3 +109,4 @@ export type SchroedingerQuantumMode =
   | 'tdseDynamics'
   | 'becDynamics'
   | 'diracEquation'
+  | 'quantumWalk'
