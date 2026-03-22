@@ -23,17 +23,17 @@ class SoundManager {
     }
   }
 
-  private attachInitListeners() {
+  private attachInitListeners(): void {
     window.addEventListener('click', this.init)
     window.addEventListener('keydown', this.init)
   }
 
-  private detachInitListeners() {
+  private detachInitListeners(): void {
     window.removeEventListener('click', this.init)
     window.removeEventListener('keydown', this.init)
   }
 
-  private init = () => {
+  private init = (): void => {
     if (this.initialized || typeof window === 'undefined') return
 
     const AudioContextCtor =
@@ -60,7 +60,7 @@ class SoundManager {
     }
   }
 
-  public playClick() {
+  public playClick(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
@@ -99,7 +99,7 @@ class SoundManager {
     source.stop(now + duration)
   }
 
-  public playHover() {
+  public playHover(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const osc = this.ctx.createOscillator()
@@ -124,7 +124,7 @@ class SoundManager {
     osc.stop(this.ctx.currentTime + 0.05)
   }
 
-  public playSnap() {
+  public playSnap(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
@@ -161,7 +161,7 @@ class SoundManager {
     source.stop(now + duration)
   }
 
-  public playSuccess() {
+  public playSuccess(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
     const ctx = this.ctx
     const masterGain = this.masterGain
@@ -192,7 +192,7 @@ class SoundManager {
    * Plays a soft "reverse hihat/cymbal tail" sound for opening UI elements.
    * Very subtle - like a whisper of air.
    */
-  public playSwish() {
+  public playSwish(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
@@ -232,12 +232,12 @@ class SoundManager {
     source.stop(now + duration)
   }
 
-  public toggle(enabled: boolean) {
+  public toggle(enabled: boolean): void {
     this.enabled = enabled
     this.listeners.forEach((l) => l())
   }
 
-  public get isEnabled() {
+  public get isEnabled(): boolean {
     return this.enabled
   }
 

@@ -477,7 +477,7 @@ export class VideoRecorder {
     }
   }
 
-  dispose() {
+  dispose(): void {
     this.isRecording = false
     this.source = null
     this.output = null

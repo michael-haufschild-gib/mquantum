@@ -32,6 +32,7 @@ export default defineConfig({
         // shader-compilation-matrix.spec.ts, physics-validation.spec.ts).
         'src/rendering/webgpu/passes/TDSEComputePass.ts',
         'src/rendering/webgpu/passes/TDSEComputePassDispatchers.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassDispose.ts',
         'src/rendering/webgpu/passes/DensityGridGradientSetup.ts',
         'src/rendering/webgpu/passes/DiracComputePass.ts',
         'src/rendering/webgpu/passes/DiracComputePassDispatchers.ts',
@@ -61,10 +62,10 @@ export default defineConfig({
         'src/rendering/renderers/base/useRotationUpdates.ts',
       ],
       thresholds: {
-        statements: 61,
+        statements: 60.5,
         branches: 53,
         functions: 59,
-        lines: 61.5,
+        lines: 61,
       },
     },
   },

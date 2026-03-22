@@ -107,12 +107,12 @@ const projectRulesPlugin = {
           return {}
         }
         // .ts files in rendering, stores, color/geometry/export libraries,
-        // test infrastructure, and canvas-based hooks define canonical defaults
+        // test factories, and canvas-based hooks define canonical defaults
         // or operate below Tailwind.
         if (fp.endsWith('.ts') && (
           fp.includes('src/rendering/') ||
           fp.includes('src/stores/') ||
-          fp.includes('src/tests/') ||
+          fp.includes('src/tests/factories/') ||
           fp.includes('src/lib/colors/') ||
           fp.includes('src/lib/geometry/') ||
           fp.includes('src/lib/export/') ||
@@ -802,6 +802,18 @@ export default [
     files: ['src/rendering/**/*.ts'],
     rules: {
       '@eslint-react/purity': 'off',
+    },
+  },
+  // Pure library functions: explicit return types prevent unintended type widening
+  // in physics, math, and utility code where type precision matters.
+  {
+    files: ['src/lib/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': ['error', {
+        allowExpressions: true,
+        allowTypedFunctionExpressions: true,
+        allowHigherOrderFunctions: true,
+      }],
     },
   },
   // Disable no-useless-assignment in GPU compute passes and shader files

@@ -170,8 +170,8 @@ describe('clearEigenstates', () => {
     const buf2Im = createMockBuffer('es-1-im')
     const state = createGSState()
     state.gsEigenstates = [
-      { re: buf1Re, im: buf1Im },
-      { re: buf2Re, im: buf2Im },
+      { re: buf1Re, im: buf1Im, normSquared: 1.0 },
+      { re: buf2Re, im: buf2Im, normSquared: 1.0 },
     ]
 
     clearEigenstates(state)

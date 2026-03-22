@@ -62,6 +62,15 @@ export class WebGPUDevice {
   }
 
   /**
+   * Reset the singleton for test isolation.
+   * Drops the cached instance so the next `getInstance()` creates a fresh one.
+   * Does NOT destroy the GPU device — call `dispose()` first if needed.
+   */
+  static resetForTesting(): void {
+    WebGPUDevice.instance = null
+  }
+
+  /**
    * Initialize WebGPU with the given canvas.
    *
    * @param canvas - Canvas element to render to

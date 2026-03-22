@@ -96,7 +96,7 @@ function getDiscontinuityEdges(config: TdseConfig): number[] {
   const EPS = 1e-6
   const edges: number[] = []
 
-  const addEdge = (x: number) => {
+  const addEdge = (x: number): void => {
     edges.push(x - EPS, x + EPS)
   }
 

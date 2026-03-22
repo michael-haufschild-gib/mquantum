@@ -48,7 +48,6 @@ import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassS
 import { buildTdsePipelines, rebuildTdseBindGroups } from './TDSEComputePassSetup'
 import { writeTdseUniforms } from './TDSEComputePassUniforms'
 import {
-  disposeObservables,
   type ObservablesState,
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
@@ -62,10 +61,10 @@ import {
   dispatchFFTAxis as extDispatchFFTAxis,
   estimateInitialDensity,
 } from './TDSEComputePassDispatchers'
+import { disposeTdseResources } from './TDSEComputePassDispose'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
   clearEigenstates as gsClearEigenstates,
-  destroyGSBuffers,
   dispatchGramSchmidt as gsDispatch,
   ensureGSBuffers as gsEnsureBuffers,
   type GramSchmidtState,
@@ -700,6 +699,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Destroy all GPU buffers and textures
     this.psiReBuffer?.destroy()
     this.psiImBuffer?.destroy()
     this.potentialBuffer?.destroy()
@@ -716,8 +716,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.diagPartialMaxBuffer?.destroy()
     this.diagPartialLeftBuffer?.destroy()
     this.diagPartialRightBuffer?.destroy()
-    this._diagState.diagResultBuffer?.destroy()
-    this._diagState.diagStagingBuffer?.destroy()
     this.bg?.renormalizeUniformBuffer?.destroy()
 
     this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
@@ -731,17 +729,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.densityTextureView = null
     this.diagUniformBuffer = this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
     this.diagPartialLeftBuffer = this.diagPartialRightBuffer = null
-    this._diagState.diagResultBuffer = this._diagState.diagStagingBuffer = null
     this.pl = this.bg = null
 
-    disposeObservables(this._obsState)
-    destroyGSBuffers(this._gsState)
-    this._slState.saveStagingRe?.destroy()
-    this._slState.saveStagingIm?.destroy()
-    this._slState.saveStagingRe = this._slState.saveStagingIm = null
-    this._slState.pendingInjection = null
-    this._diagState.diagHistory.clear()
-    useTdseDiagnosticsStore.getState().reset()
+    // Dispose extracted module state
+    disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)
     this.initialized = false
     this.lastConfigHash = ''
     super.dispose()

@@ -24,6 +24,18 @@ import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 
 /**
+ * Propagate a dimension change to all dimension-dependent stores.
+ * Must be called BEFORE updating geometry state so dependent stores
+ * can filter invalid planes/transforms for the new dimension.
+ * @param dimension - New dimension value
+ */
+function propagateDimensionToStores(dimension: number): void {
+  useAnimationStore.getState().setDimension(dimension)
+  useRotationStore.getState().setDimension(dimension)
+  useTransformStore.getState().setDimension(dimension)
+}
+
+/**
  * Pending rAF ID for scene transition completion.
  * Used to cancel stale callbacks when rapid changes occur.
  */
@@ -176,11 +188,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     usePerformanceStore.getState().setSceneTransitioning(true)
     usePerformanceStore.getState().setCameraTeleported(true)
 
-    // Update all dimension-dependent stores BEFORE setting geometry state
-    // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
-    useAnimationStore.getState().setDimension(clampedDimension)
-    useRotationStore.getState().setDimension(clampedDimension)
-    useTransformStore.getState().setDimension(clampedDimension)
+    propagateDimensionToStores(clampedDimension)
 
     set({
       dimension: clampedDimension,
@@ -228,11 +236,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     usePerformanceStore.getState().setCameraTeleported(true)
 
     if (targetDimension !== currentDimension) {
-      // Update all dimension-dependent stores BEFORE setting geometry state
-      // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
-      useAnimationStore.getState().setDimension(targetDimension)
-      useRotationStore.getState().setDimension(targetDimension)
-      useTransformStore.getState().setDimension(targetDimension)
+      propagateDimensionToStores(targetDimension)
 
       // Auto-switch to recommended dimension for optimal visualization
       set({
@@ -282,9 +286,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
     // Update dimension-dependent stores for new dimension
     if (clampedDimension !== currentDimension) {
-      useAnimationStore.getState().setDimension(clampedDimension)
-      useRotationStore.getState().setDimension(clampedDimension)
-      useTransformStore.getState().setDimension(clampedDimension)
+      propagateDimensionToStores(clampedDimension)
     }
 
     // Set both atomically - no auto-adjustments

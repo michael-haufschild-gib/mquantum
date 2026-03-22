@@ -32,6 +32,26 @@ interface EditorLayoutProps {
   children?: React.ReactNode
 }
 
+// ── Animation variants (module-level to avoid per-render recreation) ──
+
+const SPRING_CONFIG = {
+  type: 'spring' as const,
+  damping: 25,
+  stiffness: 300,
+  mass: 0.8,
+}
+
+const panelVariants = {
+  hiddenLeft: { x: -340, opacity: 0, scale: 0.95 },
+  visible: { x: 0, opacity: 1, scale: 1, transition: SPRING_CONFIG },
+  hiddenRight: { x: 340, opacity: 0, scale: 0.95 },
+}
+
+const mobileBottomVariants = {
+  visible: { y: 0, opacity: 1, transition: SPRING_CONFIG },
+  hidden: { y: 80, opacity: 0, transition: SPRING_CONFIG },
+}
+
 export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children }) => {
   const { accent, mode } = useThemeStore(
     useShallow((state) => ({ accent: state.accent, mode: state.mode }))
@@ -116,46 +136,6 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
       setCollapsed(false)
     }
   }, [isDesktop, setCollapsed, setLeftPanel])
-
-  const panelVariants = {
-    hiddenLeft: { x: -340, opacity: 0, scale: 0.95 },
-    visible: {
-      x: 0,
-      opacity: 1,
-      scale: 1,
-      transition: {
-        type: 'spring' as const,
-        damping: 25,
-        stiffness: 300,
-        mass: 0.8,
-      },
-    },
-    hiddenRight: { x: 340, opacity: 0, scale: 0.95 },
-  }
-
-  // Animation variants for mobile bottom app bar
-  const mobileBottomVariants = {
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: 'spring' as const,
-        damping: 25,
-        stiffness: 300,
-        mass: 0.8,
-      },
-    },
-    hidden: {
-      y: 80, // Slide below viewport (h-16 = 64px + safe margin)
-      opacity: 0,
-      transition: {
-        type: 'spring' as const,
-        damping: 25,
-        stiffness: 300,
-        mass: 0.8,
-      },
-    },
-  }
 
   // Mobile bottom panel visibility: shown when both side panels are closed
   const showMobileBottomPanel = useMobileBottomPanel()

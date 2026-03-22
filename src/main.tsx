@@ -11,7 +11,15 @@ import { initAnimationWasm } from '@/lib/wasm'
 import App from './App.tsx'
 initAnimationWasm()
 
-// Expose stores on window for e2e testing, benchmarking, and console debugging.
+// Expose stores on window for benchmark/profiling specs and console debugging.
+//
+// WHY window globals instead of dynamic imports:
+// Vite HMR can cause `await import('/src/stores/foo.ts')` inside page.evaluate()
+// to resolve to a fresh module instance that differs from the one the running
+// React tree holds. Window globals guarantee same-instance access regardless
+// of HMR state, which benchmark specs rely on for accurate profiling.
+//
+// These are dead-code-eliminated in production (import.meta.env.DEV guard).
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'

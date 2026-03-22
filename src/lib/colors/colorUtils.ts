@@ -138,7 +138,7 @@ export const hex8ToHsv = (hex8: string): HSVA => {
  * @param b - Blue (0-255).
  * @returns HSV object { h, s, v }.
  */
-const rgbToHsvStruct = (r: number, g: number, b: number) => {
+const rgbToHsvStruct = (r: number, g: number, b: number): { h: number; s: number; v: number } => {
   const rN = r / 255
   const gN = g / 255
   const bN = b / 255
@@ -239,7 +239,7 @@ export const rgbToHex = (r: number, g: number, b: number): string => {
  * @param v - Value.
  * @returns RGB struct.
  */
-const hsvToRgbStruct = (h: number, s: number, v: number) => {
+const hsvToRgbStruct = (h: number, s: number, v: number): { r: number; g: number; b: number } => {
   let r = 0,
     g = 0,
     b = 0
