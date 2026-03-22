@@ -350,6 +350,18 @@ export const createSchroedingerSlice: StateCreator<
     ...createOpenQuantumSetters(ctx),
 
     // === Quantum Walk ===
+    resetQuantumWalk: () => {
+      set((state) => {
+        const qw = state.schroedinger.quantumWalk
+        const initialPosition = qw.gridSize.map((s) => Math.floor(s / 2))
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            quantumWalk: { ...qw, steps: 0, initialPosition, needsReset: true },
+          },
+        }
+      })
+    },
     clearQuantumWalkNeedsReset: () => {
       set((state) => ({
         schroedinger: {

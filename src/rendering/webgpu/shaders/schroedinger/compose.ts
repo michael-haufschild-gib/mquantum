@@ -87,6 +87,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useWignerCache?: boolean
   /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
   isFreeScalar?: boolean
+  /** Quantum walk mode — discrete lattice, density brightness uses linear rho. */
+  isQuantumWalk?: boolean
   /** Pauli spinor mode — alpha encodes density, not potential. */
   isPauli?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
@@ -163,6 +165,7 @@ function buildShaderDefinesAndFeatures(flags: {
   densityGridHasPhase: boolean
   densityGridSize: number
   isFreeScalar: boolean
+  isQuantumWalk: boolean
   isPauli: boolean
   useWignerCache: boolean
   profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
@@ -239,6 +242,7 @@ function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${flags.densityGridHasPhase};`)
   defines.push(`const DENSITY_GRID_SIZE: f32 = ${flags.densityGridSize}.0;`)
   defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
+  defines.push(`const IS_QUANTUM_WALK: bool = ${flags.isQuantumWalk};`)
   defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
   // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen).
   // Compute modes (TDSE/BEC/Dirac/FSF) don't yet have the gradient pass, so they fall
@@ -348,6 +352,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isWigner = false,
     useWignerCache = false,
     isFreeScalar = false,
+    isQuantumWalk = false,
     isPauli = false,
     freeScalarAnalysis = false,
     useDensityMatrix = false,
@@ -401,6 +406,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     densityGridHasPhase,
     densityGridSize,
     isFreeScalar,
+    isQuantumWalk,
     isPauli,
     useWignerCache,
     profilingStrip: config.profilingStrip,

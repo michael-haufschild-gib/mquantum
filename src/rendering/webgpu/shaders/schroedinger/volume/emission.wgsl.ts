@@ -190,13 +190,16 @@ const ALGO_BRANCH: Record<number, string> = {
     // 8: Domain coloring for wavefunction psi (phase hue + log-modulus lightness)
     let phaseNorm = fract((phase + PI) / TAU);
     let modulusMode = uniforms.domainColoringParams0.x >= 0.5;
-    // s = log(|psi|^2).  Mode 0 uses s directly; mode 1 uses s*0.5 = log(|psi|).
-    // Both normalize against the same 8.0 window so the different log scaling
-    // produces visibly different tonal distributions:
-    //   log|psi|^2: full range [-8,0] -> lightness [0.08, 0.90]  (high contrast)
-    //   log|psi|:   half range [-4,0] -> lightness [0.49, 0.90]  (brighter, more tail detail)
-    let logModulus = select(s, s * 0.5, modulusMode);
-    let modulusValue = clamp((logModulus + 8.0) / 8.0, 0.0, 1.0);
+    // Quantum walk: density grid is already normalized by peak — use linear rho
+    // directly (log mapping crushes QW's sparse per-site probabilities to black).
+    // Continuous modes: s = log(|psi|^2), log mapping preserves tail detail.
+    var modulusValue: f32;
+    if (IS_QUANTUM_WALK) {
+      modulusValue = clamp(select(rho, sqrt(rho), modulusMode), 0.0, 1.0);
+    } else {
+      let logModulus = select(s, s * 0.5, modulusMode);
+      modulusValue = clamp((logModulus + 8.0) / 8.0, 0.0, 1.0);
+    }
     let baseLightness = clamp(0.08 + 0.82 * modulusValue, 0.0, 1.0);
     col = hsl2rgb(phaseNorm, 0.85, baseLightness);
 
@@ -402,7 +405,8 @@ const ALGO_BRANCH: Record<number, string> = {
     // Vortex cores appear dark (zero density) with phase winding (hue rotation).
     // Solitons appear as dark bands with π phase jump across the notch.
     let phaseNorm = fract((phase + PI) / TAU);
-    let brightness = clamp(normalized, 0.0, 1.0);
+    // Quantum walk: use linear rho (log mapping crushes sparse lattice to black).
+    let brightness = clamp(select(normalized, rho, IS_QUANTUM_WALK), 0.0, 1.0);
     // Use higher saturation at higher density for visual clarity
     let saturation = mix(0.3, 0.95, brightness);
     let lightness = brightness * 0.55;

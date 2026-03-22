@@ -79,6 +79,7 @@ export const TimelineControls: FC = () => {
       resetTdseField: state.resetTdseField,
       resetBecField: state.resetBecField,
       setDiracNeedsReset: state.setDiracNeedsReset,
+      resetQuantumWalk: state.resetQuantumWalk,
       setPauliNeedsReset: state.setPauliNeedsReset,
     }))
   )
@@ -138,6 +139,9 @@ export const TimelineControls: FC = () => {
         break
       case 'diracEquation':
         resetActions.setDiracNeedsReset()
+        break
+      case 'quantumWalk':
+        resetActions.resetQuantumWalk()
         break
     }
   }, [isPauliSpinor, schroedingerConfig.quantumMode, resetActions])

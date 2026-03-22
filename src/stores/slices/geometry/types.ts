@@ -404,6 +404,7 @@ export interface SchroedingerSliceActions {
   applyDiracPreset: (presetId: string) => void
 
   // Quantum Walk
+  resetQuantumWalk: () => void
   clearQuantumWalkNeedsReset: () => void
   setQwAbsorberEnabled: (enabled: boolean) => void
   setQwAbsorberWidth: (width: number) => void

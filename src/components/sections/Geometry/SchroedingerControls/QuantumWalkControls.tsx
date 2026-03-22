@@ -10,7 +10,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
@@ -63,16 +62,11 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
     (v: string) => {
       const size = Number(v)
       const gridSize = Array.from({ length: dimension }, () => size)
-      updateQW({ gridSize, latticeDim: dimension })
+      const initialPosition = gridSize.map((s) => Math.floor(s / 2))
+      updateQW({ gridSize, latticeDim: dimension, initialPosition, steps: 0, needsReset: true })
     },
     [dimension, updateQW]
   )
-
-  const handleReset = useCallback(() => {
-    const gridSize = qw.gridSize
-    const initialPosition = gridSize.map((s) => Math.floor(s / 2))
-    updateQW({ steps: 0, initialPosition, needsReset: true })
-  }, [qw.gridSize, updateQW])
 
   const activeGridSize = qw.gridSize[0] ?? 64
 
@@ -93,7 +87,9 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
       <ToggleGroup
         options={COIN_TYPE_OPTIONS}
         value={qw.coinType}
-        onChange={(v) => updateQW({ coinType: v as QuantumWalkCoinType })}
+        onChange={(v) =>
+          updateQW({ coinType: v as QuantumWalkCoinType, steps: 0, needsReset: true })
+        }
         ariaLabel="Coin operator type"
         data-testid="qw-coin-type"
       />
@@ -138,11 +134,6 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         onCheckedChange={(v) => updateQW({ autoScale: v })}
         data-testid="qw-auto-scale"
       />
-
-      {/* Reset */}
-      <Button variant="ghost" size="sm" onClick={handleReset} data-testid="qw-reset">
-        Reset Walker
-      </Button>
 
       {/* Info */}
       <div className="text-xs text-text-tertiary">

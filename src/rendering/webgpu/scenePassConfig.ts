@@ -158,9 +158,9 @@ export function normalizeColorAlgorithmForQuantumMode(
 
   if (openQuantumEnabled) return 'purityMap'
   if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
-  // Quantum Walk: use phase-only coloring (constant brightness from Oklab L=0.72).
-  // phaseDensity maps log-density to brightness, which produces near-black for
-  // QW's dilute per-site probability after spreading.
+  // Quantum Walk: default to phase-only coloring (constant brightness from Oklab L=0.72).
+  // Density-based algorithms (domainColoringPsi, phaseDensity) use linear rho via
+  // IS_QUANTUM_WALK flag to avoid log-mapping crushing sparse lattice sites to black.
   if (quantumMode === 'quantumWalk') return 'phaseCyclicUniform'
   if (
     quantumMode === 'tdseDynamics' ||

@@ -183,6 +183,7 @@ export function buildShaderConfig(
     isWigner: computeMode ? false : isWigner,
     useWignerCache: computeMode ? false : isWigner,
     isFreeScalar: computeMode,
+    isQuantumWalk: rendererConfig.quantumMode === 'quantumWalk',
     isPauli,
     freeScalarAnalysis:
       isFreeScalar &&
@@ -269,6 +270,7 @@ export function computePipelineCacheKey(
     config.useWignerCache ? 1 : 0,
     pipelineIs2D ? 1 : 0,
     config.isFreeScalar ? 1 : 0,
+    config.isQuantumWalk ? 1 : 0,
     config.freeScalarAnalysis ? 1 : 0,
     config.useDensityMatrix ? 1 : 0,
   ].join(':')
