@@ -23,16 +23,13 @@
  * Run: npx playwright test scripts/playwright/shader-compilation-matrix.spec.ts --workers=1
  */
 
-import { expect, test } from '@playwright/test'
-
+import { test } from './fixtures'
 import {
-  collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   gotoMode,
   requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
-  waitForUniformUpdate,
 } from './helpers/app-helpers'
 
 // Force serial — GPU tests must not overlap.
@@ -47,12 +44,10 @@ test.setTimeout(180_000)
 async function verifyShaderPath(
   page: import('@playwright/test').Page,
   label: string,
-  gpuIssues: string[],
   toggleFn: () => Promise<void>
 ): Promise<void> {
   await toggleFn()
   await waitForShaderCompilation(page)
-  expect(gpuIssues, `${label}: no GPU/shader errors`).toEqual([])
   await expectCanvasNotBlank(page)
 }
 
@@ -65,12 +60,11 @@ test.describe('representation mode shader paths', () => {
   })
 
   test('momentum representation: compiles and renders (HO 3D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'momentum', gpuIssues, async () => {
+    await verifyShaderPath(page, 'momentum', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
@@ -79,12 +73,11 @@ test.describe('representation mode shader paths', () => {
   })
 
   test('wigner representation: compiles and renders (HO 3D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'wigner', gpuIssues, async () => {
+    await verifyShaderPath(page, 'wigner', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
@@ -93,12 +86,11 @@ test.describe('representation mode shader paths', () => {
   })
 
   test('momentum representation: compiles with hydrogen 3D', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'hydrogenND', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'hydrogen momentum', gpuIssues, async () => {
+    await verifyShaderPath(page, 'hydrogen momentum', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
@@ -107,12 +99,11 @@ test.describe('representation mode shader paths', () => {
   })
 
   test('wigner representation: compiles with hydrogen 5D', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'hydrogenND', 5)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'hydrogen 5D wigner', gpuIssues, async () => {
+    await verifyShaderPath(page, 'hydrogen 5D wigner', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
@@ -133,9 +124,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('SMAA anti-aliasing: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'SMAA', gpuIssues, async () => {
+    await verifyShaderPath(page, 'SMAA', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setAntiAliasingMethod('smaa')
@@ -144,9 +133,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('FXAA anti-aliasing: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'FXAA', gpuIssues, async () => {
+    await verifyShaderPath(page, 'FXAA', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setAntiAliasingMethod('fxaa')
@@ -155,9 +142,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('cinematic effects: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'cinematic', gpuIssues, async () => {
+    await verifyShaderPath(page, 'cinematic', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/postProcessingStore.ts')
         const store = mod.usePostProcessingStore.getState()
@@ -170,9 +155,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('paper texture: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'paper texture', gpuIssues, async () => {
+    await verifyShaderPath(page, 'paper texture', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setPaperEnabled(true)
@@ -181,9 +164,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('tone mapping enabled: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'tone mapping', gpuIssues, async () => {
+    await verifyShaderPath(page, 'tone mapping', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/lightingStore.ts')
         mod.useLightingStore.getState().setToneMappingEnabled(true)
@@ -192,9 +173,7 @@ test.describe('post-processing shader paths', () => {
   })
 
   test('frame blending enabled: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
-
-    await verifyShaderPath(page, 'frame blending', gpuIssues, async () => {
+    await verifyShaderPath(page, 'frame blending', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/postProcessingStore.ts')
         mod.usePostProcessingStore.getState().setFrameBlendingEnabled(true)
@@ -212,12 +191,11 @@ test.describe('rendering variant shader paths', () => {
   })
 
   test('cross-section enabled: compiles and renders (HO 3D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'cross-section HO', gpuIssues, async () => {
+    await verifyShaderPath(page, 'cross-section HO', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
@@ -226,12 +204,11 @@ test.describe('rendering variant shader paths', () => {
   })
 
   test('cross-section enabled: compiles and renders (hydrogen 3D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'hydrogenND', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'cross-section hydrogen', gpuIssues, async () => {
+    await verifyShaderPath(page, 'cross-section hydrogen', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
@@ -240,12 +217,11 @@ test.describe('rendering variant shader paths', () => {
   })
 
   test('open quantum (decoherence) enabled: compiles and renders (HO 3D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'open quantum', gpuIssues, async () => {
+    await verifyShaderPath(page, 'open quantum', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         mod.useExtendedObjectStore.getState().setOpenQuantumEnabled(true)
@@ -254,12 +230,11 @@ test.describe('rendering variant shader paths', () => {
   })
 
   test('temporal reprojection enabled: compiles and renders', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    await verifyShaderPath(page, 'temporal reprojection', gpuIssues, async () => {
+    await verifyShaderPath(page, 'temporal reprojection', async () => {
       await page.evaluate(async () => {
         const mod = await import('/src/stores/performanceStore.ts')
         mod.usePerformanceStore.getState().setTemporalReprojectionEnabled(true)
@@ -277,7 +252,6 @@ test.describe('combined shader paths', () => {
   })
 
   test('momentum + bloom + SMAA: all compile together', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -293,12 +267,10 @@ test.describe('combined shader paths', () => {
     })
     await waitForShaderCompilation(page)
 
-    expect(gpuIssues, 'momentum + bloom + SMAA: no errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 
   test('cross-section + wigner + cinematic: all compile together', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -316,12 +288,10 @@ test.describe('combined shader paths', () => {
     })
     await waitForShaderCompilation(page)
 
-    expect(gpuIssues, 'cross-section + wigner + cinematic: no errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 
   test('open quantum + paper texture: compile together', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -335,12 +305,10 @@ test.describe('combined shader paths', () => {
     })
     await waitForShaderCompilation(page)
 
-    expect(gpuIssues, 'open quantum + paper: no errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 
   test('high-dimension + temporal + bloom: compile together (HO 9D)', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 9)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -354,12 +322,10 @@ test.describe('combined shader paths', () => {
     })
     await waitForShaderCompilation(page)
 
-    expect(gpuIssues, 'HO 9D + temporal + bloom: no errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 
   test('kitchen sink: all post-processing enabled simultaneously', async ({ page }) => {
-    const gpuIssues = collectGpuWarningsAndErrors(page)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -393,7 +359,6 @@ test.describe('combined shader paths', () => {
     })
     await waitForShaderCompilation(page)
 
-    expect(gpuIssues, 'kitchen sink: no GPU/shader errors').toEqual([])
     await expectCanvasNotBlank(page)
   })
 })

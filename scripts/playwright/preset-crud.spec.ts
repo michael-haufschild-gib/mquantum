@@ -1,5 +1,5 @@
 /**
- * IndexedDB scene and style preset CRUD tests.
+ * Scene and style preset CRUD tests (localStorage via Zustand persist).
  *
  * Tests the full preset lifecycle:
  * - Save → name → confirm → verify in menu
@@ -9,9 +9,9 @@
  *
  * Bugs caught:
  * - Save dialog onConfirm not calling presetManagerStore.saveScene
- * - Saved scene not persisted to IndexedDB (transient state only)
+ * - Saved preset not persisted to localStorage (transient state only)
  * - loadScene not restoring geometry/quantum mode stores
- * - deleteScene not removing from IndexedDB
+ * - deleteScene not removing from localStorage
  * - Saved scenes section shows "(None)" after save (stale menu cache)
  * - Scene name not appearing in menu after save (missing re-render)
  * - Style save not capturing current appearance/PBR/lighting state
@@ -36,10 +36,13 @@ async function saveSceneViaUI(
   await page.getByTestId('menu-save-scene').click()
   await expect(page.getByTestId('save-scene-modal-input')).toBeVisible({ timeout: 5000 })
   await page.getByTestId('save-scene-modal-input').fill(name)
-  // Wait for React to process the fill (controlled input state update) before Enter
+  // Wait for React to process the fill (controlled input state update) before confirm
   await expect(page.getByTestId('save-scene-modal-confirm')).toBeEnabled({ timeout: 3000 })
-  await page.getByTestId('save-scene-modal-input').press('Enter')
-  await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 3000 })
+  await page.getByTestId('save-scene-modal-confirm').click()
+  await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 5000 })
+  // Dismiss any lingering dialog backdrop — the native <dialog> close
+  // is async and may lag behind React's isOpen=false state update.
+  await page.keyboard.press('Escape')
 
   // Read back the id of the scene we just saved
   return page.evaluate(async (n: string) => {
@@ -59,10 +62,12 @@ async function saveStyleViaUI(
   await page.getByTestId('menu-save-style').click()
   await expect(page.getByTestId('save-style-modal-input')).toBeVisible({ timeout: 5000 })
   await page.getByTestId('save-style-modal-input').fill(name)
-  // Wait for React to process the fill before pressing Enter
+  // Wait for React to process the fill before confirm
   await expect(page.getByTestId('save-style-modal-confirm')).toBeEnabled({ timeout: 3000 })
-  await page.getByTestId('save-style-modal-input').press('Enter')
-  await expect(page.getByTestId('save-style-modal-input')).not.toBeVisible({ timeout: 3000 })
+  await page.getByTestId('save-style-modal-confirm').click()
+  await expect(page.getByTestId('save-style-modal-input')).not.toBeVisible({ timeout: 5000 })
+  // Dismiss any lingering dialog backdrop
+  await page.keyboard.press('Escape')
 
   return page.evaluate(async (n: string) => {
     const mod = await import('/src/stores/presetManagerStore.ts')
@@ -192,7 +197,20 @@ test.describe('scene preset CRUD', () => {
     await expect(page.getByTestId('save-scene-modal-confirm')).toBeDisabled()
   })
 
-  test('saved scene persists across full page reload (IndexedDB)', async ({ page }) => {
+  test('scene name with special characters saves and loads correctly', async ({ page }) => {
+    const topBar = new TopBar(page)
+    const specialName = 'Test <>&"\'/ Scene'
+    const id = await saveSceneViaUI(page, topBar, specialName)
+    expect(id).not.toBe('')
+
+    // Verify it appears in menu with correct name
+    await topBar.openScenesMenu()
+    const menuItem = page.getByTestId(`menu-saved-scene-${id}`)
+    await expect(menuItem).toBeVisible({ timeout: 3000 })
+    await expect(menuItem).toHaveText(specialName)
+  })
+
+  test('saved scene persists across full page reload (localStorage)', async ({ page }) => {
     const topBar = new TopBar(page)
     const id = await saveSceneViaUI(page, topBar, SCENE_NAME)
 
@@ -201,7 +219,7 @@ test.describe('scene preset CRUD', () => {
     await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
     await page.keyboard.press('Escape')
 
-    // Full page reload — forces IndexedDB rehydration
+    // Full page reload — forces localStorage rehydration
     await page.reload()
     await waitForAppLoaded(page)
 
@@ -209,8 +227,44 @@ test.describe('scene preset CRUD', () => {
     await topBar.openScenesMenu()
     await expect(
       page.getByTestId(`menu-saved-scene-${id}`),
-      'Saved scene must persist in IndexedDB across page reload'
+      'Saved scene must persist in localStorage across page reload'
     ).toBeVisible({ timeout: 5000 })
+  })
+
+  test('saving scene with duplicate name creates separate entry', async ({ page }) => {
+    const topBar = new TopBar(page)
+    const duplicateName = `Duplicate Test ${Date.now()}`
+
+    // Save first scene at 5D HO
+    const id1 = await saveSceneViaUI(page, topBar, duplicateName)
+    expect(id1).not.toBe('')
+
+    // Change state to a different mode/dimension
+    await page.goto('/?t=schroedinger&d=7&qm=hydrogenND')
+    await waitForAppLoaded(page)
+
+    // Save again with the same name — creates a second entry
+    const id2 = await saveSceneViaUI(page, topBar, duplicateName)
+    expect(id2).not.toBe('')
+
+    // Both scenes should exist in the store (duplicate names allowed)
+    const savedScenes = await page.evaluate(async (name: string) => {
+      const mod = await import('/src/stores/presetManagerStore.ts')
+      return mod.usePresetManagerStore
+        .getState()
+        .savedScenes.filter((s) => s.name === name)
+        .map((s) => s.id)
+    }, duplicateName)
+    expect(savedScenes.length, 'Duplicate names allowed — both entries should exist').toBe(2)
+
+    // Both IDs should be present
+    expect(savedScenes).toContain(id1)
+    expect(savedScenes).toContain(id2)
+
+    // Both should appear in the menu
+    await topBar.openScenesMenu()
+    await expect(page.getByTestId(`menu-saved-scene-${id1}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id2}`)).toBeVisible({ timeout: 3000 })
   })
 })
 
@@ -277,7 +331,7 @@ test.describe('style preset CRUD', () => {
     }).toPass({ timeout: 3000 })
   })
 
-  test('saved style persists across full page reload (IndexedDB)', async ({ page }) => {
+  test('saved style persists across full page reload (localStorage)', async ({ page }) => {
     const topBar = new TopBar(page)
     const id = await saveStyleViaUI(page, topBar, STYLE_NAME)
 
@@ -290,11 +344,11 @@ test.describe('style preset CRUD', () => {
     await page.reload()
     await waitForAppLoaded(page)
 
-    // Saved style must survive the reload (IndexedDB persistence)
+    // Saved style must survive the reload (localStorage persistence)
     await topBar.openStylesMenu()
     await expect(
       page.getByTestId(`menu-saved-style-${id}`),
-      'Saved style must persist in IndexedDB across page reload'
+      'Saved style must persist in localStorage across page reload'
     ).toBeVisible({ timeout: 5000 })
   })
 

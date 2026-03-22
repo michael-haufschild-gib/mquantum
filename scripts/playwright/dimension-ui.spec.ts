@@ -12,8 +12,7 @@
  * - Dimension selector disabled when it shouldn't be
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   getDimension,
   requireWebGPU,

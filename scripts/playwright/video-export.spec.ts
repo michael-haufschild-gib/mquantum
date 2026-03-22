@@ -14,8 +14,7 @@
  * - Modal not closable via Escape
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { waitForAppLoaded } from './helpers/app-helpers'
 import { TopBar } from './pages/TopBar'
 import { VideoExportModal } from './pages/VideoExportModal'
@@ -44,9 +43,6 @@ test.describe('video export modal', () => {
     const modal = new VideoExportModal(page)
     await modal.waitForVisible()
     await modal.expectQuickStatsVisible()
-
-    // Get initial stats text
-    const initialRes = await modal.getQuickStatText('Res')
 
     // Click a preset — should update stats
     await modal.clickPreset(/Instagram/i)

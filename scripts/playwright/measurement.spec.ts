@@ -10,8 +10,7 @@
  * - Partial measurement axis selector works
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,

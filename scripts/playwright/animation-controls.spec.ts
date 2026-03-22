@@ -13,8 +13,8 @@
  * - Speed slider UI interaction not propagating to store
  */
 
+import { expect, test } from './fixtures'
 import { getAnimationState, waitForAppLoaded } from './helpers/app-helpers'
-import { test, expect } from './fixtures'
 import { EditorBottomPanel } from './pages/EditorBottomPanel'
 
 test.setTimeout(30_000)
@@ -129,11 +129,9 @@ test.describe('timeline controls — Pauli mode', () => {
     await waitForAppLoaded(page)
 
     const panel = new EditorBottomPanel(page)
-    const hasEffects = await panel.effectsToggle.isVisible().catch(() => false)
-
-    if (hasEffects) {
-      await panel.openEffectsDrawer()
-      await panel.expectPauliDrawerVisible()
-    }
+    // Pauli spinor mode should always show the effects toggle
+    await expect(panel.effectsToggle).toBeVisible({ timeout: 5000 })
+    await panel.openEffectsDrawer()
+    await panel.expectPauliDrawerVisible()
   })
 })

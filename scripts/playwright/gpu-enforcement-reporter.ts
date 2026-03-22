@@ -42,7 +42,7 @@ export default class GpuEnforcementReporter implements Reporter {
     }
   }
 
-  onEnd(result: FullResult) {
+  onEnd(_result: FullResult) {
     if (process.env.ALLOW_GPU_SKIP === '1') return
 
     const nonExecuted = this.skipped + this.didNotRun

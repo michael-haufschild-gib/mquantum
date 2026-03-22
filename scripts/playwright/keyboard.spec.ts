@@ -10,9 +10,9 @@
  * - Shortcuts fire while typing in input fields (focus guard)
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { getDimension, waitForAppLoaded } from './helpers/app-helpers'
+import { LeftPanel } from './pages/LeftPanel'
 import { TopBar } from './pages/TopBar'
 
 test.setTimeout(30_000)
@@ -95,31 +95,28 @@ test.describe('keyboard shortcuts', () => {
   })
 
   test('shortcuts do not fire when a text input is focused', async ({ page }) => {
-    await page.goto('/?t=schroedinger&d=5')
+    // Enable isosurface mode to guarantee the threshold input exists
+    await page.goto('/?t=schroedinger&d=5&qm=harmonicOscillator&iso=1')
     await waitForAppLoaded(page)
 
     const initialDim = await getDimension(page)
 
-    // Find any input field in the app — use the iso threshold slider input if available
-    // Open the right panel to get access to inputs
+    // Open the left panel Geometry tab where the iso threshold input lives
     const topBar = new TopBar(page)
-    await topBar.openRightPanel()
+    await topBar.openLeftPanel()
+    const leftPanel = new LeftPanel(page)
+    await leftPanel.switchTab('Geometry')
 
-    // Look for any visible input element
-    const input = page.locator('input[type="text"], input[type="number"]').first()
-    const hasInput = await input.isVisible().catch(() => false)
+    // The iso threshold input should be visible since iso=1 was set via URL
+    const input = page.getByTestId('schroedinger-iso-threshold-input')
+    await expect(input).toBeVisible({ timeout: 5000 })
 
-    if (hasInput) {
-      await input.focus()
-      await page.keyboard.press('ArrowUp')
+    await input.focus()
+    await page.keyboard.press('ArrowUp')
 
-      // Dimension should NOT have changed — the keypress went to the input
-      const afterDim = await getDimension(page)
-      expect(afterDim, 'ArrowUp in input field should not change dimension').toBe(initialDim)
-    } else {
-      // If no input visible, skip this specific check
-      test.skip(true, 'No text input visible to test focus guard')
-    }
+    // Dimension should NOT have changed — the keypress went to the input
+    const afterDim = await getDimension(page)
+    expect(afterDim, 'ArrowUp in input field should not change dimension').toBe(initialDim)
   })
 
   test('multiple rapid ArrowUp presses increment correctly', async ({ page }) => {

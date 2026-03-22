@@ -13,11 +13,9 @@
  * - LED indicator not showing on selected mode
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   getAppState,
-  getDimension,
   getQuantumMode,
   requireWebGPU,
   waitForAppLoaded,
@@ -113,8 +111,6 @@ test.describe('quantum mode switching via UI', () => {
   test('Pauli Spinor card switches objectType to pauliSpinor', async ({ page }) => {
     const topBar = new TopBar(page)
     await topBar.openLeftPanel()
-
-    const leftPanel = new LeftPanel(page)
 
     // Click the Pauli Spinor card
     const pauliCard = page.getByTestId('object-type-pauliSpinor')
@@ -214,16 +210,14 @@ test.describe('quantum mode switching via UI', () => {
     // Select a specific preset from the dropdown
     await presetSelect.selectOption('doubleSlit')
 
-    // Verify the store updated with the new preset
+    // Verify the store updated — applyTdsePreset sets potentialType from the preset overrides.
+    // The doubleSlit preset sets potentialType to 'doubleSlit'.
     await expect(async () => {
-      const preset = await page.evaluate(async () => {
+      const potentialType = await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
-        const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
-        const schroedinger = s.schroedinger as Record<string, unknown> | undefined
-        const tdse = schroedinger?.tdseDynamics as Record<string, unknown> | undefined
-        return tdse?.activePreset
+        return mod.useExtendedObjectStore.getState().schroedinger.tdse.potentialType
       })
-      expect(preset).toBe('doubleSlit')
+      expect(potentialType).toBe('doubleSlit')
     }).toPass({ timeout: 5000 })
   })
 })

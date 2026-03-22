@@ -15,12 +15,12 @@
  * - Hydrogen mode forces dimension >=3 but UI doesn't enforce
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  requireWebGPU,
   pauseAnimation,
+  requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForUniformUpdate,

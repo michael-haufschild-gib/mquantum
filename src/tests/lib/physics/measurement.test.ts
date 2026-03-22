@@ -246,7 +246,7 @@ describe('sampleFromMarginalDensity', () => {
     const marginals0 = [0, 0, 0]
     for (let i = 0; i < 12; i++) {
       const row = Math.floor(i / 4)
-      marginals0[row] += psiRe[i]! * psiRe[i]!
+      marginals0[row] = (marginals0[row] ?? 0) + psiRe[i]! * psiRe[i]!
     }
     const marginalSum0 = marginals0.reduce((a, b) => a + b, 0)
     expect(marginalSum0).toBeCloseTo(totalProb)
@@ -255,7 +255,7 @@ describe('sampleFromMarginalDensity', () => {
     const marginals1 = [0, 0, 0, 0]
     for (let i = 0; i < 12; i++) {
       const col = i % 4
-      marginals1[col] += psiRe[i]! * psiRe[i]!
+      marginals1[col] = (marginals1[col] ?? 0) + psiRe[i]! * psiRe[i]!
     }
     const marginalSum1 = marginals1.reduce((a, b) => a + b, 0)
     expect(marginalSum1).toBeCloseTo(totalProb)

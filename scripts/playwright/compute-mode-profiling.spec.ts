@@ -12,8 +12,7 @@
  * Run: npx playwright test scripts/playwright/compute-mode-profiling.spec.ts --workers=1
  */
 
-import { test } from '@playwright/test'
-
+import { test } from './fixtures'
 import {
   getFrameCount,
   getPerformanceMetrics,
@@ -52,16 +51,6 @@ async function uncapAndEnablePerf(page: import('@playwright/test').Page) {
     perfStore.getState().setMaxFps(0)
     const uiStore = window.__UI_STORE__ ?? (await import('/src/stores/uiStore.ts')).useUIStore
     uiStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
-  })
-}
-
-/** Resolve extendedObjectStore from window global or dynamic import. */
-async function getExtendedStore(page: import('@playwright/test').Page) {
-  return page.evaluate(async () => {
-    const store =
-      window.__EXTENDED_OBJECT_STORE__ ??
-      (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
-    return store
   })
 }
 
@@ -138,8 +127,14 @@ async function profileScenario(
   const measureStart = await getFrameCount(page)
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
 
-  // Wait for stats to settle
-  await page.waitForTimeout(500)
+  // Wait for perf metrics to have valid data
+  await page.waitForFunction(
+    async () => {
+      const mod = await import('/src/stores/performanceMetricsStore.ts')
+      return mod.usePerformanceMetricsStore.getState().fps > 0
+    },
+    { timeout: 5_000 }
+  )
 
   const metrics = await getPerformanceMetrics(page)
 

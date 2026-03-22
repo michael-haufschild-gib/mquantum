@@ -208,9 +208,12 @@ describe('normalize — properties', () => {
     fc.assert(
       fc.property(arb, ({ dim, v, alpha }) => {
         const mag = magnitude(v)
-        if (mag < 1e-7 || Math.abs(alpha) < 1e-7) return
+        const scaled = scaleVector(v, alpha)
+        const scaledMag = magnitude(scaled)
+        // Skip when either vector is too small for stable normalization
+        if (mag < 1e-6 || Math.abs(alpha) < 1e-6 || scaledMag < 1e-6) return
         const n1 = normalize(v)
-        const n2 = normalize(scaleVector(v, alpha))
+        const n2 = normalize(scaled)
         const sign = Math.sign(alpha)
         for (let i = 0; i < dim; i++) {
           expect(n2[i]).toBeCloseTo(sign * n1[i]!, 5)

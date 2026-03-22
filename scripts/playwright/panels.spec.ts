@@ -10,8 +10,7 @@
  * - Left panel default-open state not reflected in button aria-expanded
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { waitForAppLoaded } from './helpers/app-helpers'
 import { TopBar } from './pages/TopBar'
 

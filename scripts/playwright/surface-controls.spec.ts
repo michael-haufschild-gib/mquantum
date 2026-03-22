@@ -13,13 +13,11 @@
  * - Surface mode + dimension change breaks rendering
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import {
   capturePixelSnapshot,
   pauseAnimation,
   snapshotDistance,
-  waitForAppLoaded,
-  waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
 import { LeftPanel } from './pages/LeftPanel'

@@ -18,8 +18,7 @@
  * - Modal not closable via Escape
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { waitForAppLoaded, waitForRendererSettled } from './helpers/app-helpers'
 import { ScreenshotModal } from './pages/ScreenshotModal'
 import { TopBar } from './pages/TopBar'
@@ -108,7 +107,7 @@ test.describe('screenshot export', () => {
   })
 
   test('second export after closing first produces fresh modal or error', async ({ page }) => {
-    const result1 = await triggerExportAndWait(page)
+    await triggerExportAndWait(page)
 
     // Dismiss whatever appeared
     await page.keyboard.press('Escape')

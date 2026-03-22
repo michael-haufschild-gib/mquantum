@@ -9,6 +9,7 @@
 
 import { vi } from 'vitest'
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 import type { WebGPURenderPass, WebGPURenderPassConfig } from '@/rendering/webgpu/core/types'
@@ -26,7 +27,7 @@ export interface ScenePassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
+  quantumMode: SchroedingerQuantumMode
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean

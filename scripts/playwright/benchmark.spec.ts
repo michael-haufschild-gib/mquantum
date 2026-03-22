@@ -18,14 +18,12 @@
 import { execSync } from 'child_process'
 import { mkdirSync, writeFileSync } from 'fs'
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectFatalGpuErrors,
   getFrameCount,
-  type PerfMetricsSnapshot,
   getPerformanceMetrics,
   gotoMode,
+  type PerfMetricsSnapshot,
   requireWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
@@ -158,7 +156,6 @@ function printResultsTable(results: BenchmarkResult[]): void {
 
   const table = ['\n## Performance Scaling Table\n', header, separator, ...rows, ''].join('\n')
 
-  // eslint-disable-next-line no-console
   console.log(table)
 
   // Print per-pass breakdown matrix
@@ -189,7 +186,6 @@ function printResultsTable(results: BenchmarkResult[]): void {
       '',
     ].join('\n')
 
-    // eslint-disable-next-line no-console
     console.log(passTable)
   }
 }
@@ -214,8 +210,6 @@ test.describe('performance benchmark', () => {
 
   for (const { mode, dim, label } of BENCHMARK_MATRIX) {
     test(`benchmark ${label}`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-
       // Navigate and wait for full pipeline readiness
       await gotoMode(page, mode, dim)
       await waitForRendererReady(page)
@@ -284,7 +278,6 @@ test.describe('performance benchmark', () => {
       })
 
       // Assert: no fatal GPU errors
-      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
 
       // Assert: renderer produced measurable frames
       expect(frameTimes.length, `${label}: collected timing samples`).toBeGreaterThan(0)

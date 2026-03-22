@@ -14,8 +14,7 @@
  * - Reload strips URL params (pushState vs replaceState bug)
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { getAppState, getDimension, waitForAppLoaded } from './helpers/app-helpers'
 
 test.setTimeout(30_000)

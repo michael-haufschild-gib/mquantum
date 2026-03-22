@@ -20,17 +20,15 @@
  * - Mode switch leaves stale pipeline producing wrong output
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectFatalGpuErrors,
-  collectGpuWarningsAndErrors,
   expectCanvasNotBlank,
   getFrameCount,
   getPerformanceMetrics,
   gotoMode,
   gotoPauli,
   hasWebGPU,
+  pauseAnimation,
   requireWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
@@ -76,14 +74,8 @@ test.describe('quantum mode rendering', () => {
 
   for (const { dim, label } of pauliModes) {
     test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-      const gpuWarnings = collectGpuWarningsAndErrors(page)
-
       await gotoPauli(page, dim)
       await waitForShaderCompilation(page)
-
-      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
-      expect(gpuWarnings, `${label}: no shader/pipeline warnings or errors`).toEqual([])
 
       await expectCanvasNotBlank(page)
     })
@@ -91,42 +83,33 @@ test.describe('quantum mode rendering', () => {
 
   for (const { mode, dim, label } of modes) {
     test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
-      const gpuErrors = collectFatalGpuErrors(page)
-      const gpuWarnings = collectGpuWarningsAndErrors(page)
-
+      // Quantum Walk: if this test fails with an empty screenshot, QW is
+      // broken — not "too faint". Nothing rendering at all is a real bug.
       await gotoMode(page, mode, dim)
       await waitForRendererReady(page)
-
-      // Wait for shader compilation to finish AND at least one frame
-      // rendered with the new pipeline. This is critical: the render loop
-      // keeps showing the old graph during compilation, so pixel checks
-      // before this point would measure the wrong configuration.
       await waitForShaderCompilation(page)
 
-      // Assert shader/pipeline health BEFORE pixel check — a blank canvas
-      // caused by a shader compilation error should report the shader error,
-      // not "canvas is blank".
-      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
-      expect(gpuWarnings, `${label}: no shader/pipeline warnings or errors`).toEqual([])
+      // Quantum Walk starts from a single lattice site (delta function).
+      // Let it evolve ~60 frames so the interference pattern is large enough
+      // to hit the 20×20 pixel sampling grid, then pause. The adaptive
+      // maxDensity normalization keeps colors bright as the walk spreads.
+      if (mode === 'quantumWalk') {
+        const fc = await getFrameCount(page)
+        await waitForFrameAdvance(page, fc + 60)
+        await pauseAnimation(page)
+      }
 
-      // Verify actual pixels were rendered (not just blank clear color)
       await expectCanvasNotBlank(page)
     })
   }
 
   test('switching modes: renderer recovers and renders each mode', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-    const gpuWarnings = collectGpuWarningsAndErrors(page)
-
     for (const mode of ['harmonicOscillator', 'hydrogenND', 'harmonicOscillator'] as const) {
       await gotoMode(page, mode, 3)
       await waitForRendererReady(page)
       await waitForShaderCompilation(page)
       await expectCanvasNotBlank(page)
     }
-
-    expect(gpuErrors).toEqual([])
-    expect(gpuWarnings, 'no shader/pipeline warnings during mode switching').toEqual([])
   })
 
   test('animation loop: frame count increases over time', async ({ page }) => {
@@ -147,8 +130,6 @@ test.describe('quantum mode rendering', () => {
   })
 
   test('dimension change does not crash renderer and renders new dimension', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -157,13 +138,9 @@ test.describe('quantum mode rendering', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await expectCanvasNotBlank(page)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test('rapid mode switching does not crash renderer', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     // Quick succession — only the last navigation's shader needs to compile
     const modeSequence = ['harmonicOscillator', 'tdseDynamics', 'becDynamics', 'hydrogenND']
 
@@ -175,8 +152,6 @@ test.describe('quantum mode rendering', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await expectCanvasNotBlank(page)
-
-    expect(gpuErrors).toEqual([])
   })
 })
 
@@ -240,8 +215,6 @@ test.describe('viewport resize during rendering', () => {
     await page.goto('/')
     await requireWebGPU(page, test.info())
 
-    const gpuErrors = collectFatalGpuErrors(page)
-
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -261,8 +234,6 @@ test.describe('viewport resize during rendering', () => {
     const count2 = await getFrameCount(page)
     await waitForFrameAdvance(page, count2)
     await expectCanvasNotBlank(page)
-
-    expect(gpuErrors, 'no fatal GPU errors after resize').toEqual([])
   })
 })
 

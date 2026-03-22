@@ -8,8 +8,7 @@
  * Output: structured JSON benchmark results to stdout
  */
 
-import { test } from '@playwright/test'
-
+import { test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,
@@ -20,7 +19,6 @@ import {
 // Benchmark configuration
 const WARMUP_FRAMES = 30
 const MEASURE_FRAMES = 120
-const PERF_MONITOR_SETTLE_MS = 2000
 
 interface PassTiming {
   passId: string
@@ -99,8 +97,14 @@ test.describe('render performance benchmark', () => {
         { timeout: 30_000 }
       )
 
-      // Let the perf collector publish at least one full stats cycle (500ms interval)
-      await page.waitForTimeout(PERF_MONITOR_SETTLE_MS)
+      // Wait for the perf collector to publish at least one stats cycle (fps > 0)
+      await page.waitForFunction(
+        async () => {
+          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          return mod.usePerformanceMetricsStore.getState().fps > 0
+        },
+        { timeout: 10_000 }
+      )
 
       // Wait for measurement frames
       const startFrame = await page.evaluate(() => {
@@ -117,8 +121,14 @@ test.describe('render performance benchmark', () => {
         { timeout: 60_000 }
       )
 
-      // Let final stats publish
-      await page.waitForTimeout(600)
+      // Wait for final stats to publish (fps history populated)
+      await page.waitForFunction(
+        async () => {
+          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          return mod.usePerformanceMetricsStore.getState().fpsHistory.length > 0
+        },
+        { timeout: 5_000 }
+      )
 
       // Collect metrics from performanceMetricsStore
       const sample = await page.evaluate(async (): Promise<BenchmarkSample> => {

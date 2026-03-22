@@ -17,8 +17,7 @@
  * - Cross-section toggle not reaching the shader
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
@@ -26,7 +25,6 @@ import {
   pauseAnimation,
   requireWebGPU,
   snapshotDistance,
-  waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForUniformUpdate,

@@ -77,3 +77,87 @@ describe('generateTextureBindings', () => {
     expect(wgsl).toContain('var depth: texture_depth_2d')
   })
 })
+
+describe('assembleShaderBlocks', () => {
+  // Dynamic import to match project pattern
+  async function getAssemble() {
+    const mod = await import('@/rendering/webgpu/shaders/shared/compose-helpers')
+    return mod.assembleShaderBlocks
+  }
+
+  it('returns valid output for empty block list', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks([])
+    expect(result.wgsl).toContain('Auto-generated')
+    expect(result.modules).toEqual([])
+  })
+
+  it('concatenates blocks in order with section headers', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks([
+      { name: 'defines', content: 'const X: f32 = 1.0;' },
+      { name: 'main', content: '@fragment fn main() -> @location(0) vec4f { return vec4f(1.0); }' },
+    ])
+    expect(result.modules).toEqual(['defines', 'main'])
+    expect(result.wgsl).toContain('====== defines ======')
+    expect(result.wgsl).toContain('const X: f32 = 1.0;')
+    expect(result.wgsl).toContain('====== main ======')
+    // defines must appear before main in the output
+    expect(result.wgsl.indexOf('defines')).toBeLessThan(result.wgsl.indexOf('main'))
+  })
+
+  it('skips blocks with condition === false', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks([
+      { name: 'always', content: 'const A: f32 = 1.0;' },
+      { name: 'skipped', content: 'const B: f32 = 2.0;', condition: false },
+      { name: 'also-always', content: 'const C: f32 = 3.0;' },
+    ])
+    expect(result.modules).toEqual(['always', 'also-always'])
+    expect(result.wgsl).toContain('const A')
+    expect(result.wgsl).not.toContain('const B')
+    expect(result.wgsl).toContain('const C')
+  })
+
+  it('includes blocks with condition === true', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks([
+      { name: 'conditional', content: 'const X: f32 = 42.0;', condition: true },
+    ])
+    expect(result.modules).toEqual(['conditional'])
+    expect(result.wgsl).toContain('const X: f32 = 42.0;')
+  })
+
+  it('includes blocks with condition === undefined (default)', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks([{ name: 'implicit', content: 'const Y: f32 = 99.0;' }])
+    expect(result.modules).toEqual(['implicit'])
+    expect(result.wgsl).toContain('const Y: f32 = 99.0;')
+  })
+
+  it('applies overrides by target name', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks(
+      [
+        { name: 'original', content: 'const X: f32 = 1.0;' },
+        { name: 'keep', content: 'const Y: f32 = 2.0;' },
+      ],
+      [{ target: 'original', replacement: 'const X: f32 = 999.0;' }]
+    )
+    expect(result.wgsl).toContain('const X: f32 = 999.0;')
+    expect(result.wgsl).not.toContain('const X: f32 = 1.0;')
+    expect(result.wgsl).toContain('const Y: f32 = 2.0;')
+    // Module list should still include the overridden block
+    expect(result.modules).toContain('original')
+  })
+
+  it('override for non-existent target is silently ignored', async () => {
+    const assembleShaderBlocks = await getAssemble()
+    const result = assembleShaderBlocks(
+      [{ name: 'real', content: 'fn main() {}' }],
+      [{ target: 'nonexistent', replacement: 'fn fake() {}' }]
+    )
+    expect(result.wgsl).toContain('fn main() {}')
+    expect(result.wgsl).not.toContain('fn fake() {}')
+  })
+})

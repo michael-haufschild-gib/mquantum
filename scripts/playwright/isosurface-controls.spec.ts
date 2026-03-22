@@ -13,19 +13,17 @@
  * - Slider input field not accepting typed values
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  requireWebGPU,
   pauseAnimation,
+  requireWebGPU,
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForUniformUpdate,
 } from './helpers/app-helpers'
-import { LeftPanel } from './pages/LeftPanel'
 import { TopBar } from './pages/TopBar'
 
 test.setTimeout(90_000)

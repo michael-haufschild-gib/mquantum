@@ -15,12 +15,12 @@
  * - aria-pressed not reflecting state
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import {
+  requireWebGPU,
   waitForAppLoaded,
   waitForRendererReady,
   waitForShaderCompilation,
-  requireWebGPU,
 } from './helpers/app-helpers'
 
 test.setTimeout(60_000)

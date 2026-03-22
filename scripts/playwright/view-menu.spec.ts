@@ -15,7 +15,7 @@
  * - Menu not closing after item click
  */
 
-import { test, expect } from './fixtures'
+import { expect, test } from './fixtures'
 import { TopBar } from './pages/TopBar'
 
 test.setTimeout(30_000)

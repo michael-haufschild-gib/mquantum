@@ -255,6 +255,107 @@ describe('fft throws on invalid input', () => {
   })
 })
 
+describe('fft linearity', () => {
+  it('FFT(a*x + b*y) = a*FFT(x) + b*FFT(y)', () => {
+    const n = 8
+    const a = 2.5
+    const b = -1.3
+
+    // Create two signals
+    const x = new Float64Array(2 * n)
+    const y = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      x[i * 2] = Math.cos((2 * Math.PI * i) / n)
+      y[i * 2] = Math.sin((2 * Math.PI * 2 * i) / n)
+    }
+
+    // FFT(a*x + b*y)
+    const combined = new Float64Array(2 * n)
+    for (let i = 0; i < 2 * n; i++) {
+      combined[i] = a * x[i]! + b * y[i]!
+    }
+    fft(combined, n)
+
+    // a*FFT(x) + b*FFT(y)
+    const xCopy = new Float64Array(x)
+    const yCopy = new Float64Array(y)
+    fft(xCopy, n)
+    fft(yCopy, n)
+    const expected = new Float64Array(2 * n)
+    for (let i = 0; i < 2 * n; i++) {
+      expected[i] = a * xCopy[i]! + b * yCopy[i]!
+    }
+
+    expectComplexClose(combined, expected)
+  })
+})
+
+describe('fft complex-valued signals', () => {
+  it('roundtrips a fully complex signal', () => {
+    const n = 16
+    const original = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      original[i * 2] = Math.cos((2 * Math.PI * i) / n) // real part
+      original[i * 2 + 1] = Math.sin((2 * Math.PI * 3 * i) / n) // imaginary part
+    }
+
+    const data = new Float64Array(original)
+    fft(data, n)
+    ifft(data, n)
+
+    expectComplexClose(data, original)
+  })
+})
+
+describe('fftNd non-uniform grid sizes', () => {
+  it('roundtrips a 4x8 signal (non-square 2D)', () => {
+    const dims = [4, 8]
+    const total = 32
+    const original = new Float64Array(2 * total)
+    for (let i = 0; i < total; i++) {
+      original[i * 2] = Math.sin((2 * Math.PI * i) / total)
+    }
+
+    const data = new Float64Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    expectComplexClose(data, original)
+  })
+
+  it('roundtrips a 2x4x8 signal (non-uniform 3D)', () => {
+    const dims = [2, 4, 8]
+    const total = 64
+    const original = new Float64Array(2 * total)
+    for (let i = 0; i < total; i++) {
+      original[i * 2] = Math.cos((2 * Math.PI * 5 * i) / total)
+      original[i * 2 + 1] = Math.sin((2 * Math.PI * 7 * i) / total)
+    }
+
+    const data = new Float64Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    expectComplexClose(data, original)
+  })
+
+  it('roundtrips a 4D signal (2x2x4x4)', () => {
+    const dims = [2, 2, 4, 4]
+    const total = 64
+    const original = new Float64Array(2 * total)
+    for (let i = 0; i < total; i++) {
+      original[i * 2] =
+        Math.sin((2 * Math.PI * i) / total) * (1 + 0.5 * Math.cos((4 * Math.PI * i) / total))
+    }
+
+    const data = new Float64Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    expectComplexClose(data, original)
+  })
+})
+
 /**
  * Helper: forward 3D FFT via row decomposition (used only for testing roundtrip).
  */

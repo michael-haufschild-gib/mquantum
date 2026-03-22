@@ -12,8 +12,7 @@
  * - Section components not mounting in their tab
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { waitForAppLoaded } from './helpers/app-helpers'
 import { LeftPanel } from './pages/LeftPanel'
 import { RightPanel } from './pages/RightPanel'

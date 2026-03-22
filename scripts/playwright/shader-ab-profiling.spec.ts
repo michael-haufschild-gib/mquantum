@@ -18,8 +18,7 @@
  *   BENCHMARK_DPR=2 npx playwright test scripts/playwright/shader-ab-profiling.spec.ts --workers=1
  */
 
-import { test } from '@playwright/test'
-
+import { test } from './fixtures'
 import {
   getFrameCount,
   getPerformanceMetrics,
@@ -100,7 +99,14 @@ async function measureSchroedinger(page: import('@playwright/test').Page) {
   // Measure
   const measureStart = await getFrameCount(page)
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
-  await page.waitForTimeout(300)
+  // Wait for perf metrics to have valid data
+  await page.waitForFunction(
+    async () => {
+      const mod = await import('/src/stores/performanceMetricsStore.ts')
+      return mod.usePerformanceMetricsStore.getState().fps > 0
+    },
+    { timeout: 5_000 }
+  )
 
   const metrics = await getPerformanceMetrics(page)
   const schrod = metrics.passTimings.find((p) => p.passId === 'schroedinger')

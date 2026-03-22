@@ -17,8 +17,7 @@
  * - Pause not stopping dispatch
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,

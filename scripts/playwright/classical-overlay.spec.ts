@@ -12,8 +12,7 @@
  * - Observables dependency note shown for TDSE without data
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,

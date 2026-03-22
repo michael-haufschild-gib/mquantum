@@ -12,8 +12,7 @@
  * - Panel toggle during animation drawer open leaves drawer orphaned
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   getAppState,
   getDimension,
@@ -163,15 +162,9 @@ test.describe('cross-feature interactions', () => {
     await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
     await waitForAppLoaded(page)
 
-    // Open effects drawer
+    // Open effects drawer — HO mode always has the animations drawer
     const effectsBtn = page.getByRole('button', { name: 'Toggle animations drawer' })
-    const hasEffects = await effectsBtn.isVisible().catch(() => false)
-
-    if (!hasEffects) {
-      test.skip(true, 'Effects button not visible for this mode')
-      return
-    }
-
+    await expect(effectsBtn).toBeVisible({ timeout: 5000 })
     await effectsBtn.click()
     await expect(page.getByTestId('schroedinger-animation-drawer')).toBeVisible({ timeout: 5000 })
 
@@ -210,14 +203,9 @@ test.describe('cross-feature interactions', () => {
     await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator')
     await waitForAppLoaded(page)
 
-    // Open the animation effects drawer
+    // Open the animation effects drawer — HO mode always has this
     const effectsBtn = page.getByRole('button', { name: 'Toggle animations drawer' })
-    const hasEffects = await effectsBtn.isVisible().catch(() => false)
-    if (!hasEffects) {
-      test.skip(true, 'Effects button not visible for HO mode')
-      return
-    }
-
+    await expect(effectsBtn).toBeVisible({ timeout: 5000 })
     await effectsBtn.click()
     // HO mode should show the schroedinger animation drawer
     await expect(page.getByTestId('schroedinger-animation-drawer')).toBeVisible({ timeout: 5000 })
@@ -281,32 +269,20 @@ test.describe('cross-feature interactions', () => {
     const termCountSlider = page.getByTestId('schroedinger-term-count')
     await expect(termCountSlider).toBeVisible({ timeout: 5000 })
 
-    // Get the number input associated with the slider
-    const termInput = termCountSlider.locator('input[type="text"], input[type="number"]').first()
-    const hasInput = await termInput.isVisible().catch(() => false)
+    // Use the dedicated data-testid for the slider input
+    const termInput = page.getByTestId('schroedinger-term-count-input')
+    await expect(termInput).toBeVisible({ timeout: 3000 })
+    await termInput.click()
+    await termInput.fill('4')
+    await termInput.press('Enter')
 
-    if (hasInput) {
-      await termInput.click()
-      await termInput.fill('4')
-      await termInput.press('Enter')
-
-      // Verify store updated
-      await expect(async () => {
-        const termCount = await page.evaluate(async () => {
-          const mod = await import('/src/stores/extendedObjectStore.ts')
-          return mod.useExtendedObjectStore.getState().schroedinger.termCount
-        })
-        expect(termCount).toBe(4)
-      }).toPass({ timeout: 3000 })
-    } else {
-      // Slider without text input — verify the slider is at least interactive
-      // by checking the current store value
+    // Verify store updated
+    await expect(async () => {
       const termCount = await page.evaluate(async () => {
         const mod = await import('/src/stores/extendedObjectStore.ts')
         return mod.useExtendedObjectStore.getState().schroedinger.termCount
       })
-      expect(termCount).toBeGreaterThanOrEqual(1)
-      expect(termCount).toBeLessThanOrEqual(8)
-    }
+      expect(termCount).toBe(4)
+    }).toPass({ timeout: 3000 })
   })
 })

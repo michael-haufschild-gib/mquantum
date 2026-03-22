@@ -20,10 +20,8 @@
  * @module scripts/playwright/physics-numerical-validation
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectGpuWarningsAndErrors,
   gotoMode,
   readDensityDiagnostics,
   readTdseDiagnostics,
@@ -55,8 +53,6 @@ test.describe('TDSE integrator unitarity', () => {
   })
 
   test('free potential, no absorber: |normDrift| < 0.5% after 300 frames', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
-
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForShaderCompilation(page)
 
@@ -97,15 +93,12 @@ test.describe('TDSE integrator unitarity', () => {
 
     // Simulation time must have advanced (time evolution is happening)
     expect(diag.simTime, 'simTime should advance').toBeGreaterThan(0)
-
-    expect(gpuErrors, 'no GPU errors').toEqual([])
   })
 
   test('harmonic trap, no absorber: norm stays within 1% over 200 frames', async ({ page }) => {
     // Harmonic potential is also integrable — the symplectic integrator should
     // conserve probability well. This tests the potential half-step in addition
     // to the kinetic FFT step.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForShaderCompilation(page)
@@ -134,7 +127,6 @@ test.describe('TDSE integrator unitarity', () => {
       Math.abs(diag.normDrift),
       `normDrift=${diag.normDrift}: harmonic trap should conserve probability`
     ).toBeLessThan(0.01)
-    expect(gpuErrors).toEqual([])
   })
 })
 
@@ -154,7 +146,6 @@ test.describe('hydrogen orbital density structure', () => {
   test('3s orbital: center density > 0 but less than 1s peak', async ({ page }) => {
     // 3s (n=3,l=0,m=0) has l=0 so |ψ(0)|² > 0, but two radial nodes
     // spread the probability outward, making the peak lower than 1s.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     // First measure 1s
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
@@ -178,14 +169,11 @@ test.describe('hydrogen orbital density structure', () => {
       diag3s.maxDensity,
       `3s max (${diag3s.maxDensity}) should be less than 1s max (${diag1s.maxDensity})`
     ).toBeLessThan(diag1s.maxDensity)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test('4f orbital: center density ≈ 0 (l=3 angular node)', async ({ page }) => {
     // 4f (n=4,l=3,m=0) has l=3 so the angular wavefunction vanishes at r=0.
     // |ψ₄₃₀(0)|² = 0 from the r^l factor in the radial wavefunction.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 4, 3, 0)
@@ -199,15 +187,12 @@ test.describe('hydrogen orbital density structure', () => {
       diag.centerDensity,
       `4f center (${diag.centerDensity}) should be ≈0 vs max (${diag.maxDensity})`
     ).toBeLessThan(diag.maxDensity * 0.01)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test('2s vs 2p: s-orbital has higher center density than p-orbital', async ({ page }) => {
     // 2s has l=0 (nonzero at origin), 2p has l=1 (node at origin).
     // This tests that the angular momentum quantum number reaches the shader
     // and the spherical harmonics Y_lm produce correct nodal structure.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
 
@@ -227,8 +212,6 @@ test.describe('hydrogen orbital density structure', () => {
       diag2s.centerDensity,
       `2s center (${diag2s.centerDensity}) > 2p center (${diag2p.centerDensity})`
     ).toBeGreaterThan(diag2p.centerDensity * 10)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test.afterAll(async ({ browser }) => {
@@ -255,7 +238,6 @@ test.describe('HO dimensional density scaling', () => {
 
   test('HO 3D ground state center density ≈ (1/π)^{3/2} ± 10%', async ({ page }) => {
     // This overlaps with physics-density-oracle but with explicit analytical value.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await setTermCount(page, 1)
@@ -271,13 +253,11 @@ test.describe('HO dimensional density scaling', () => {
     const expected3D = Math.pow(1 / Math.PI, 1.5) // ≈ 0.1795
     expect(diag.centerDensity).toBeGreaterThan(expected3D * 0.9)
     expect(diag.centerDensity).toBeLessThan(expected3D * 1.1)
-    expect(gpuErrors).toEqual([])
   })
 
   test('HO 5D ground state: center density ≈ (1/π)^{5/2} ± 15%', async ({ page }) => {
     // (1/π)^{5/2} ≈ 0.01013 — much smaller than 3D due to dimensional scaling.
     // 15% tolerance because higher-D density grids have coarser sampling.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await setupAndWaitForDensity(page, 'harmonicOscillator', 5)
     await setTermCount(page, 1)
@@ -296,13 +276,11 @@ test.describe('HO dimensional density scaling', () => {
       `5D center density (${diag.centerDensity}) should be near ${expected5D.toFixed(5)}`
     ).toBeGreaterThan(expected5D * 0.85)
     expect(diag.centerDensity).toBeLessThan(expected5D * 1.15)
-    expect(gpuErrors).toEqual([])
   })
 
   test('HO 3D center density > HO 5D center density (dimensional falloff)', async ({ page }) => {
     // The ground state density at the origin falls exponentially with dimension.
     // This is a sanity check that dimensional scaling works in the shader.
-    const gpuErrors = collectGpuWarningsAndErrors(page)
 
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await setTermCount(page, 1)
@@ -331,8 +309,6 @@ test.describe('HO dimensional density scaling', () => {
       diag3D.centerDensity,
       `3D center (${diag3D.centerDensity}) should be >> 5D center (${diag5D.centerDensity})`
     ).toBeGreaterThan(diag5D.centerDensity * 5)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test.afterAll(async ({ browser }) => {
@@ -356,8 +332,6 @@ test.describe('cross-mode density sanity', () => {
   })
 
   test('HO 3D and hydrogen 3D have different density profiles', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
-
     // HO ground state
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await setTermCount(page, 1)
@@ -390,8 +364,6 @@ test.describe('cross-mode density sanity', () => {
       ratio < 0.8 || ratio > 1.2,
       `HO/hydrogen maxDensity ratio ${ratio.toFixed(3)} should differ by >20%`
     ).toBe(true)
-
-    expect(gpuErrors).toEqual([])
   })
 
   test.afterAll(async ({ browser }) => {

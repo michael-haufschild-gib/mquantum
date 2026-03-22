@@ -6,8 +6,7 @@
  * failures that throw instead of showing fallback UI.
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   collectPageErrors,
   filterBenignErrors,

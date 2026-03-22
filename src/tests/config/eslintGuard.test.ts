@@ -40,11 +40,12 @@ describe('eslint config: no per-file exemptions for structural quality rules', (
     expect(ruleMatches).toHaveLength(4) // 1 enable + 3 off overrides
   })
 
-  it('no-restricted-imports boundary exists for render passes with exactly one exemption block', () => {
+  it('no-restricted-imports boundary exists for render passes with exactly one block', () => {
     // Render passes must access stores via ctx.stores, not direct imports.
-    // One enforcement block + one exemption block (for diagnostic stores and known exceptions).
-    // If this test fails, someone widened the exemption — route store access through ctx.stores.
+    // Single enforcement block with negation patterns for known exemptions
+    // (diagnostic stores, simulationStateStore, performanceStore, defaults).
+    // If this test fails, someone added a second override — consolidate into the existing block.
     const ruleMatches = [...config.matchAll(/^\s+'no-restricted-imports'\s*:/gm)]
-    expect(ruleMatches).toHaveLength(2) // 1 enforcement + 1 exemption
+    expect(ruleMatches).toHaveLength(1)
   })
 })

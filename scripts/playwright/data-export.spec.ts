@@ -12,8 +12,7 @@
  * - Pauli mode shows export buttons
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   gotoMode,
   requireWebGPU,

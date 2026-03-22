@@ -6,6 +6,7 @@
  */
 
 import { expect, type Page } from '@playwright/test'
+import sharp from 'sharp'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -457,85 +458,135 @@ export async function waitForShaderCompilation(page: Page, timeoutMs = 300_000):
 // ─── Pixel Verification ──────────────────────────────────────────────────────
 
 /**
- * Capture the WebGPU canvas via the app's GPU buffer readback, then sample pixels.
- * Returns the number of unique colors found across 9 sample points.
+ * Capture the WebGPU canvas and count how many sampled pixels are NOT dark
+ * background. Samples a 20×20 grid (400 points).
  *
- * This is the only reliable way to read WebGPU canvas pixels — naive drawImage
- * returns zeroes because the front buffer is cleared after present.
+ * The canvas background is near-black (~13,13,13). Any pixel where ANY
+ * channel exceeds 25 is counted as "content" — this catches green spheres,
+ * white spheres, colored orbitals, brighter grays, dark greens, etc.
+ *
+ * Decodes the PNG in Node.js via sharp — no browser round-trip needed.
  */
 export async function captureAndSamplePixels(page: Page): Promise<{
-  uniqueColors: number
-  dataUrlLength: number
+  nonBgPixels: number
 }> {
-  return page.evaluate(async () => {
-    const mod = await import('/src/hooks/useScreenshotCapture.ts')
-    const dataUrl = await mod.captureScreenshotAsync()
+  // Capture the canvas element via compositor screenshot (avoids WebGPU
+  // readback bug in headless Chrome 146+), then crop to center 30% to
+  // safely exclude UI panels overlaid at edges. The left/right panels each
+  // cover ~25-30% of canvas width; top/bottom bars cover ~10-15% of height.
+  const canvas = page.locator('[data-testid="webgpu-canvas"]')
+  const pngBuffer = await canvas.screenshot({ type: 'png' })
+  const meta = await sharp(pngBuffer).metadata()
+  const fullW = meta.width!
+  const fullH = meta.height!
+  const cropW = Math.floor(fullW * 0.3)
+  const cropH = Math.floor(fullH * 0.3)
 
-    const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = reject
-      img.src = dataUrl
+  const { data, info } = await sharp(pngBuffer)
+    .extract({
+      left: Math.floor((fullW - cropW) / 2),
+      top: Math.floor((fullH - cropH) / 2),
+      width: cropW,
+      height: cropH,
     })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
 
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width
-    canvas.height = img.height
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0)
+  const w = info.width
+  const h = info.height
 
-    const w = img.width
-    const h = img.height
+  // Sample 20×20 grid = 400 points
+  // Count pixels where any channel exceeds 25 — anything brighter than
+  // the near-black background (r≤25, g≤25, b≤25) is rendered content.
+  const DARK_THRESHOLD = 25
+  let nonBgPixels = 0
+  for (let row = 1; row <= 20; row++) {
+    for (let col = 1; col <= 20; col++) {
+      const px = Math.floor((col * w) / 21)
+      const py = Math.floor((row * h) / 21)
+      const offset = (py * w + px) * 4
+      const r = data[offset]!
+      const g = data[offset + 1]!
+      const b = data[offset + 2]!
+      if (r > DARK_THRESHOLD || g > DARK_THRESHOLD || b > DARK_THRESHOLD) {
+        nonBgPixels++
+      }
+    }
+  }
 
-    const points = [
-      [w / 2, h / 2],
-      [w / 4, h / 4],
-      [(3 * w) / 4, h / 4],
-      [w / 4, (3 * h) / 4],
-      [(3 * w) / 4, (3 * h) / 4],
-      [w / 2, h / 4],
-      [w / 2, (3 * h) / 4],
-      [w / 4, h / 2],
-      [(3 * w) / 4, h / 2],
-    ]
-
-    const colorSet = new Set(
-      points.map(([x, y]) => {
-        const px = Math.floor(x)
-        const py = Math.floor(y)
-        const pixel = ctx.getImageData(px, py, 1, 1).data
-        return `${pixel[0]},${pixel[1]},${pixel[2]}`
-      })
-    )
-
-    return { uniqueColors: colorSet.size, dataUrlLength: dataUrl.length }
-  })
+  return { nonBgPixels }
 }
 
 /**
  * Assert that the WebGPU canvas has rendered non-blank content.
- * Captures via GPU readback and verifies >1 unique color across sample points.
  *
- * Retries up to 3 times with a frame advance between each attempt.
- * Compute modes (Dirac, BEC, TDSE, FSF) may need several frames
- * after shader swap for the density grid to populate.
+ * Enforces the full wait sequence before sampling:
+ * 1. Renderer in ready state (not error/initializing)
+ * 2. Shader compilation complete (pipeline-gen > 0)
+ * 3. Shader compilation overlay dismissed
+ * 4. 2-second settle for compute modes to populate density grids
+ *
+ * Then takes 3 screenshots spaced 150ms apart and checks if ANY of them
+ * show ≥5 non-background pixels. This handles modes like Free Scalar Field
+ * that have faint fluctuations with phases of near-blackness — a single
+ * snapshot can miss the content during a dark phase.
  */
 export async function expectCanvasNotBlank(page: Page): Promise<void> {
-  const maxAttempts = 3
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const { uniqueColors, dataUrlLength } = await captureAndSamplePixels(page)
-    if (uniqueColors > 1 && dataUrlLength > 500) return // pass
+  // Gate 1: renderer must be in ready state, not error
+  const rendererState = await page
+    .locator('[data-testid="webgpu-container"]')
+    .getAttribute('data-renderer-state')
+  expect(
+    rendererState,
+    'Renderer must be in ready state (not error/initializing) before pixel check'
+  ).toBe('ready')
 
-    if (attempt < maxAttempts - 1) {
-      // Wait for more frames — compute pipeline may still be populating the density grid
-      const current = await getFrameCount(page)
-      await waitForFrameAdvance(page, current + 3)
-    } else {
-      // Final attempt — assert and fail with diagnostics
-      expect(dataUrlLength, 'Captured PNG should be non-trivial size').toBeGreaterThan(500)
-      expect(uniqueColors, 'Canvas must have >1 color — proves scene rendered').toBeGreaterThan(1)
+  // Gate 2: shader must be compiled and swapped in
+  await waitForShaderCompilation(page)
+
+  // Gate 3: shader compilation overlay must be gone (it covers the canvas center)
+  await expect(page.getByTestId('shader-compilation-overlay')).not.toBeVisible({ timeout: 10_000 })
+
+  // Gate 4: wait for sufficient frames to render after shader swap.
+  // Compute modes need many frames for density grids to populate and
+  // for walks/simulations to spread from initial conditions. At 60fps,
+  // 120 frames = ~2 seconds of simulation time.
+  const currentFrame = await getFrameCount(page)
+  await waitForFrameAdvance(page, currentFrame + 120)
+
+  // Gate 5: check for GPU errors
+  const consoleErrors = await page.evaluate(() => {
+    const container = document.querySelector('[data-testid="webgpu-container"]')
+    return container?.getAttribute('data-renderer-error') ?? null
+  })
+  if (consoleErrors) {
+    throw new Error(`Renderer reported error: ${consoleErrors}`)
+  }
+
+  // Gate 6: frames must be advancing (not stuck)
+  const frameCount = await getFrameCount(page)
+  expect(frameCount, 'Frame count must be > 0 before pixel check').toBeGreaterThan(0)
+
+  // Take 3 snapshots 150ms apart — modes with oscillating brightness
+  // (FSF, some TDSE configs) may be dark at any single instant.
+  let bestCount = 0
+  for (let i = 0; i < 3; i++) {
+    const { nonBgPixels } = await captureAndSamplePixels(page)
+    bestCount = Math.max(bestCount, nonBgPixels)
+    if (bestCount >= 5) break
+    if (i < 2) {
+      // Wait for a few frames to render between snapshots so oscillating
+      // modes (FSF, some TDSE configs) show different phases.
+      const fc = await getFrameCount(page)
+      await waitForFrameAdvance(page, fc + 5)
     }
   }
+
+  expect(
+    bestCount,
+    `At least 5 of 400 sampled pixels must differ from the background across 3 snapshots — proves an object rendered (best=${bestCount})`
+  ).toBeGreaterThanOrEqual(5)
 }
 
 // ─── Performance Metrics ─────────────────────────────────────────────────────
@@ -605,41 +656,46 @@ export interface PixelSnapshot {
 /**
  * Capture a pixel snapshot from the WebGPU canvas.
  * Samples 25 points in a 5×5 grid for robust differential comparison.
+ *
+ * Crops to center 30% to exclude UI panels overlaid on the canvas edges.
+ * Decodes PNG in Node.js via sharp — no browser round-trip needed.
  */
 export async function capturePixelSnapshot(page: Page): Promise<PixelSnapshot> {
-  return page.evaluate(async () => {
-    const mod = await import('/src/hooks/useScreenshotCapture.ts')
-    const dataUrl = await mod.captureScreenshotAsync()
+  const canvas = page.locator('[data-testid="webgpu-canvas"]')
+  const pngBuffer = await canvas.screenshot({ type: 'png' })
+  const dataUrlLength = pngBuffer.length
+  const meta = await sharp(pngBuffer).metadata()
+  const fullW = meta.width!
+  const fullH = meta.height!
+  const cropW = Math.floor(fullW * 0.3)
+  const cropH = Math.floor(fullH * 0.3)
 
-    const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = reject
-      img.src = dataUrl
+  const { data, info } = await sharp(pngBuffer)
+    .extract({
+      left: Math.floor((fullW - cropW) / 2),
+      top: Math.floor((fullH - cropH) / 2),
+      width: cropW,
+      height: cropH,
     })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
 
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width
-    canvas.height = img.height
-    const ctx = canvas.getContext('2d')!
-    ctx.drawImage(img, 0, 0)
+  const w = info.width
+  const h = info.height
 
-    const w = img.width
-    const h = img.height
-
-    // 5×5 grid = 25 sample points
-    const samples: Array<{ r: number; g: number; b: number }> = []
-    for (let row = 1; row <= 5; row++) {
-      for (let col = 1; col <= 5; col++) {
-        const x = Math.floor((col * w) / 6)
-        const y = Math.floor((row * h) / 6)
-        const pixel = ctx.getImageData(x, y, 1, 1).data
-        samples.push({ r: pixel[0], g: pixel[1], b: pixel[2] })
-      }
+  // 5×5 grid = 25 sample points
+  const samples: Array<{ r: number; g: number; b: number }> = []
+  for (let row = 1; row <= 5; row++) {
+    for (let col = 1; col <= 5; col++) {
+      const x = Math.floor((col * w) / 6)
+      const y = Math.floor((row * h) / 6)
+      const offset = (y * w + x) * 4
+      samples.push({ r: data[offset]!, g: data[offset + 1]!, b: data[offset + 2]! })
     }
+  }
 
-    return { samples, dataUrlLength: dataUrl.length }
-  })
+  return { samples, dataUrlLength }
 }
 
 /**
@@ -795,18 +851,12 @@ export async function applyPauliPreset(page: Page, presetId: string): Promise<vo
  * Navigate to mode, wait for render, pause animation, verify non-blank.
  * Reusable setup for physics coverage and density oracle tests.
  */
-export async function setupRenderMode(
-  page: Page,
-  mode: string,
-  dim: number,
-  gpuErrors: string[]
-): Promise<void> {
+export async function setupRenderMode(page: Page, mode: string, dim: number): Promise<void> {
   await gotoMode(page, mode, dim)
   await waitForRendererReady(page)
   await waitForShaderCompilation(page)
   await pauseAnimation(page)
   await expectCanvasNotBlank(page)
-  expect(gpuErrors, `${mode} ${dim}D: no fatal GPU errors after setup`).toEqual([])
 }
 
 /**
@@ -819,4 +869,132 @@ export async function setupAndWaitForDensity(page: Page, mode: string, dim: numb
   await waitForShaderCompilation(page)
   await pauseAnimation(page)
   await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+}
+
+// ─── Observables Readback ────────────────────────────────────────────────────
+
+/** Read observables diagnostics from the GPU readback store. */
+export async function readObservablesDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
+    const s = mod.useObservablesDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      activeDims: s.activeDims,
+      positionMean: [...s.positionMean],
+      positionVariance: [...s.positionVariance],
+      momentumMean: [...s.momentumMean],
+      momentumVariance: [...s.momentumVariance],
+      uncertaintyProduct: [...s.uncertaintyProduct],
+      totalEnergy: s.totalEnergy,
+      positionNorm: s.positionNorm,
+      momentumNorm: s.momentumNorm,
+    }
+  })
+}
+
+// ─── Quantum Walk Helpers ────────────────────────────────────────────────────
+
+/** Read quantum walk configuration from the store. */
+export async function getQuantumWalkConfig(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const qw = mod.useExtendedObjectStore.getState().schroedinger.quantumWalk
+    return {
+      coinType: qw.coinType,
+      gridSize: [...qw.gridSize],
+      stepsPerFrame: qw.stepsPerFrame,
+      steps: qw.steps,
+      fieldView: qw.fieldView,
+      needsReset: qw.needsReset,
+    }
+  })
+}
+
+/** Set quantum walk coin type via store injection. */
+export async function setQuantumWalkCoin(page: Page, coinType: string): Promise<void> {
+  await page.evaluate(async (coin: string) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const store = mod.useExtendedObjectStore.getState()
+    store.setSchroedingerConfig({
+      quantumWalk: { ...store.schroedinger.quantumWalk, coinType: coin as never, needsReset: true },
+    })
+  }, coinType)
+}
+
+/** Set quantum walk field view via store injection. */
+export async function setQuantumWalkFieldView(page: Page, fieldView: string): Promise<void> {
+  await page.evaluate(async (view: string) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const store = mod.useExtendedObjectStore.getState()
+    store.setSchroedingerConfig({
+      quantumWalk: { ...store.schroedinger.quantumWalk, fieldView: view as never },
+    })
+  }, fieldView)
+}
+
+// ─── Measurement Helpers ─────────────────────────────────────────────────────
+
+/** Read measurement store state. */
+export async function readMeasurementState(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/measurementStore.ts')
+    const s = mod.useMeasurementStore.getState()
+    return {
+      enabled: s.enabled,
+      totalCount: s.totalCount,
+      measurementCount: s.measurements.length,
+      collapseWidth: s.collapseWidth,
+      measureAxis: s.measureAxis,
+      isCollapsing: s.isCollapsing,
+      positionMean: [...s.positionMean],
+      positionStd: [...s.positionStd],
+    }
+  })
+}
+
+// ─── Classical Overlay Helpers ───────────────────────────────────────────────
+
+/** Enable classical overlay and set hbar value. */
+export async function enableClassicalOverlay(page: Page, hbar = 1.0): Promise<void> {
+  await page.evaluate(async (h: number) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const store = mod.useExtendedObjectStore.getState()
+    store.setSchroedingerClassicalOverlayEnabled(true)
+    store.setSchroedingerClassicalOverlayHbar(h)
+  }, hbar)
+}
+
+// ─── Imaginary Time Helpers ──────────────────────────────────────────────────
+
+/** Enable imaginary-time propagation. */
+export async function enableImaginaryTime(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    mod.useExtendedObjectStore.getState().setTdseImaginaryTimeEnabled(true)
+  })
+}
+
+/** Read simulation state (eigenstate storage, etc). */
+export async function readSimulationState(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/simulationStateStore.ts')
+    const s = mod.useSimulationStateStore.getState()
+    return {
+      storedEigenstateCount: s.storedEigenstateCount,
+      pendingStoreRequest: s.pendingStoreRequest,
+    }
+  })
+}
+
+/** Read TDSE imaginary-time configuration. */
+export async function getImaginaryTimeConfig(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const tdse = mod.useExtendedObjectStore.getState().schroedinger.tdse
+    return {
+      imaginaryTimeEnabled: tdse.imaginaryTimeEnabled,
+      potentialType: tdse.potentialType,
+    }
+  })
 }

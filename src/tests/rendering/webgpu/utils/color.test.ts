@@ -48,6 +48,35 @@ describe('rendering/webgpu/utils/color', () => {
       expect(parseHexColorToSrgbRgb('#zzzzzz')).toBeNull()
       expect(parseHexColorToSrgbRgb('#ff00zz')).toBeNull()
     })
+
+    it('returns null for non-string inputs', () => {
+      expect(parseHexColorToSrgbRgb(null as unknown as string)).toBeNull()
+      expect(parseHexColorToSrgbRgb(undefined as unknown as string)).toBeNull()
+      expect(parseHexColorToSrgbRgb(42 as unknown as string)).toBeNull()
+    })
+
+    it('is case insensitive', () => {
+      const lower = parseHexColorToSrgbRgb('#ff0000')
+      const upper = parseHexColorToSrgbRgb('#FF0000')
+      const mixed = parseHexColorToSrgbRgb('#Ff0000')
+      expect(lower).toEqual(upper)
+      expect(lower).toEqual(mixed)
+    })
+
+    it('handles hex without # prefix', () => {
+      const withHash = parseHexColorToSrgbRgb('#ff0000')
+      const withoutHash = parseHexColorToSrgbRgb('ff0000')
+      expect(withoutHash).toEqual(withHash)
+    })
+
+    it('rejects 4-digit and 5-digit hex', () => {
+      expect(parseHexColorToSrgbRgb('#1234')).toBeNull()
+      expect(parseHexColorToSrgbRgb('#12345')).toBeNull()
+    })
+
+    it('rejects 9+ digit hex', () => {
+      expect(parseHexColorToSrgbRgb('#123456789')).toBeNull()
+    })
   })
 
   describe('parseHexColorToLinearRgb', () => {
@@ -62,6 +91,24 @@ describe('rendering/webgpu/utils/color', () => {
       expect(rgb[0]).toBeCloseTo(expected, 7)
       expect(rgb[1]).toBeCloseTo(expected, 7)
       expect(rgb[2]).toBeCloseTo(expected, 7)
+    })
+
+    it('gamma correction: linear < sRGB for mid-range values', () => {
+      // sRGB encoding has higher values than linear for mid-range colors
+      // because gamma compression brightens darks
+      const rgb = parseHexColorToLinearRgb('#808080', [0, 0, 0])
+      const srgbValue = 0x80 / 0xff // ~0.502
+      expect(rgb[0]).toBeLessThan(srgbValue) // linear ~0.216 < sRGB ~0.502
+    })
+
+    it('pure black and white are identity transforms', () => {
+      const black = parseHexColorToLinearRgb('#000000', [1, 1, 1])
+      expect(black).toEqual([0, 0, 0])
+
+      const white = parseHexColorToLinearRgb('#ffffff', [0, 0, 0])
+      expect(white[0]).toBeCloseTo(1, 7)
+      expect(white[1]).toBeCloseTo(1, 7)
+      expect(white[2]).toBeCloseTo(1, 7)
     })
 
     it('reuses cached linear conversion for repeated hex strings', () => {

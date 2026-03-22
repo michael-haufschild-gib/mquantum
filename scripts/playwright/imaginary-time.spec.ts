@@ -11,10 +11,8 @@
  * - Store eigenstate count desync after grid rebuild
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectFatalGpuErrors,
   gotoMode,
   requireWebGPU,
   waitForFirstFrame,
@@ -32,8 +30,6 @@ test.describe('imaginary-time propagation', () => {
   })
 
   test('renders frames with imaginary-time enabled in TDSE mode', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     // Navigate to TDSE mode with harmonic trap (bound state → IT converges)
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForRendererReady(page)
@@ -54,8 +50,6 @@ test.describe('imaginary-time propagation', () => {
       return parseInt(c?.getAttribute('data-frame-count') ?? '0', 10)
     })
     await waitForFrameAdvance(page, fc + 5)
-
-    expect(gpuErrors, 'no fatal GPU errors with imaginary-time enabled').toEqual([])
   })
 
   test('shows store eigenstate button when imaginary-time is enabled', async ({ page }) => {

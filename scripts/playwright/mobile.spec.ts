@@ -13,8 +13,7 @@
  * - Both mobile and desktop timeline visible simultaneously
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import { waitForAppLoaded } from './helpers/app-helpers'
 import { TopBar } from './pages/TopBar'
 
@@ -34,8 +33,8 @@ test.describe('mobile timeline controls', () => {
 
     // Should be near the bottom of the viewport
     const box = await timeline.boundingBox()
-    expect(box).not.toBeNull()
-    expect(box!.y + box!.height).toBeGreaterThan(MOBILE.height - 100)
+    if (!box) throw new Error('Timeline bounding box is null — element may not be visible')
+    expect(box.y + box.height).toBeGreaterThan(MOBILE.height - 100)
   })
 
   test('hidden on desktop — desktop uses editor-bottom-panel', async ({ page }) => {
@@ -73,12 +72,17 @@ test.describe('mobile timeline controls', () => {
     const timeline = page.getByTestId('mobile-timeline-controls')
     const topBar = new TopBar(page)
 
-    // Close left panel if open (default: open)
-    await topBar.closeLeftPanel()
+    // EditorLayout auto-collapses the left panel on mobile init via useEffect.
+    // Wait for that effect to complete — the mobile timeline appears only when
+    // both side panels are closed (useMobileBottomPanel condition).
     await expect(timeline).toBeVisible({ timeout: 5000 })
+    await expect(topBar.leftPanelToggle).toHaveAttribute('aria-expanded', 'false', {
+      timeout: 3000,
+    })
 
     // Open left panel — timeline should hide
-    await topBar.openLeftPanel()
+    await topBar.toggleLeftPanel()
+    await expect(topBar.leftPanelToggle).toHaveAttribute('aria-expanded', 'true')
     await expect(timeline).not.toBeVisible({ timeout: 5000 })
   })
 })

@@ -136,6 +136,72 @@ describe('computeHydrogenMomentumBoundingRadius', () => {
   })
 })
 
+describe('computeHOBoundingRadius — edge cases', () => {
+  it('clamps near-zero omega to 0.01 (prevents infinite radius)', () => {
+    // omega=0 would cause division by zero: turning point = sqrt(2n+1) / sqrt(omega)
+    // Production code clamps omega to max(omega, 0.01)
+    const R = computeHOBoundingRadius(3, [[0, 0, 0]], [0, 0, 0])
+    expect(Number.isFinite(R)).toBe(true)
+    expect(R).toBeGreaterThanOrEqual(2.0)
+  })
+
+  it('handles negative omega by clamping', () => {
+    const R = computeHOBoundingRadius(3, [[0, 0, 0]], [-1.0, -1.0, -1.0])
+    expect(Number.isFinite(R)).toBe(true)
+    expect(R).toBeGreaterThanOrEqual(2.0)
+  })
+
+  it('handles high quantum numbers (n=7) without overflow', () => {
+    const R = computeHOBoundingRadius(3, [[7, 7, 7]], [1.0, 1.0, 1.0])
+    expect(Number.isFinite(R)).toBe(true)
+    // sqrt(2*7+1) = sqrt(15) ≈ 3.87, + 2.5 margin ≈ 6.37
+    expect(R).toBeGreaterThan(6.0)
+    expect(R).toBeLessThan(10.0)
+  })
+
+  it('handles 11D with high quantum numbers', () => {
+    const qn = [Array(11).fill(5) as number[]]
+    const omegas = Array(11).fill(1.0) as number[]
+    const R = computeHOBoundingRadius(11, qn, omegas)
+    expect(Number.isFinite(R)).toBe(true)
+    expect(R).toBeGreaterThan(3.0)
+  })
+
+  // KNOWN BUG: computeHOBoundingRadius returns NaN for empty quantumNumbers array.
+  // Math.max(...[].map(...)) = -Infinity → sqrt(2*(-Inf)+1) = NaN → Math.max(2, NaN) = NaN.
+  // In practice, quantumNumbers is always non-empty (at least one term with one element),
+  // but the function lacks a guard. Fixing would require a production code change.
+  it.todo('handles empty quantum numbers array gracefully')
+
+  it('handles missing omega entries by defaulting to 1.0', () => {
+    // Omega array shorter than dimension
+    const R = computeHOBoundingRadius(3, [[2, 2, 2]], [1.0])
+    expect(Number.isFinite(R)).toBe(true)
+    expect(R).toBeGreaterThanOrEqual(2.0)
+  })
+})
+
+describe('computeHydrogenBoundingRadius — N-dimensional', () => {
+  it('uses n_eff = n + (D-3)/2 for D > 3', () => {
+    // D=5: n_eff = 2 + 1 = 3, R = 9 * 1.0 * 3.0 = 27
+    const R = computeHydrogenBoundingRadius(2, 1.0, undefined, undefined, 5)
+    expect(R).toBeCloseTo(27.0, 0)
+  })
+
+  it('n_eff equals n for D=3 (standard hydrogen)', () => {
+    // D=3: n_eff = n + 0 = n
+    const R = computeHydrogenBoundingRadius(2, 1.0, undefined, undefined, 3)
+    // R = 4 * 1.0 * 3.0 = 12
+    expect(R).toBeCloseTo(12.0, 0)
+  })
+
+  it('n_eff handles even dimensions (half-integer offset)', () => {
+    // D=4: n_eff = 2 + 0.5 = 2.5
+    const R = computeHydrogenBoundingRadius(2, 1.0, undefined, undefined, 4)
+    expect(R).toBeCloseTo(2.5 * 2.5 * 3.0, 2)
+  })
+})
+
 describe('computeBoundingRadius (dispatch)', () => {
   it('dispatches to HO for harmonicOscillator mode', () => {
     const preset = generateQuantumPreset(42, 3, 1, 3, 0.01)

@@ -13,10 +13,8 @@
  * - Rapid dimension + mode cycling produces invalid shader configuration
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectFatalGpuErrors,
   collectPageErrors,
   filterBenignErrors,
   gotoMode,
@@ -40,7 +38,6 @@ test.describe('concurrent operations', () => {
   })
 
   test('rapid mode + dimension cycling with no crashes', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
     const pageErrors = collectPageErrors(page)
 
     // Rapid sequence of mode and dimension changes
@@ -66,12 +63,9 @@ test.describe('concurrent operations', () => {
     // App should not have crashed
     const realErrors = filterBenignErrors(pageErrors)
     expect(realErrors).toEqual([])
-    expect(gpuErrors).toEqual([])
   })
 
   test('panel toggle during shader compilation does not crash', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     // Start a mode change (triggers shader compilation)
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
@@ -89,7 +83,6 @@ test.describe('concurrent operations', () => {
     await waitForAppLoaded(page)
     await waitForRendererSettled(page)
 
-    expect(gpuErrors).toEqual([])
     await expect(page.getByTestId('top-bar')).toBeVisible()
   })
 
@@ -122,8 +115,6 @@ test.describe('concurrent operations', () => {
   })
 
   test('window resize during rendering does not crash', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     await gotoMode(page, 'harmonicOscillator', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -142,7 +133,6 @@ test.describe('concurrent operations', () => {
 
     // After resizing, renderer should still be functional
     await waitForRendererReady(page)
-    expect(gpuErrors).toEqual([])
     await expect(page.getByTestId('top-bar')).toBeVisible()
   })
 
@@ -195,7 +185,6 @@ test.describe('concurrent operations', () => {
   })
 
   test('recovery after rapid mode cycling: final mode renders correctly', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
     const pageErrors = collectPageErrors(page)
 
     // Stress test: rapidly cycle through every mode twice, then settle on a
@@ -227,7 +216,6 @@ test.describe('concurrent operations', () => {
     // Renderer must have recovered: no crashes, no stale pipeline
     const realErrors = filterBenignErrors(pageErrors)
     expect(realErrors, 'No page errors after stress cycle').toEqual([])
-    expect(gpuErrors, 'No GPU errors after stress cycle').toEqual([])
 
     // Canvas must render the correct mode (not a stale pipeline from a mid-cycle mode)
     await expect(page.getByTestId('top-bar')).toBeVisible()

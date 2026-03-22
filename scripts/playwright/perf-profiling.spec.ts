@@ -11,14 +11,11 @@
  * - Benchmark helper not reading new fields
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectFatalGpuErrors,
   getFrameCount,
   getPerformanceMetrics,
   requireWebGPU,
-  waitForFirstFrame,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -69,8 +66,6 @@ test.describe('performance profiling', () => {
   })
 
   test('pass timing data is published to the store after rendering frames', async ({ page }) => {
-    const gpuErrors = collectFatalGpuErrors(page)
-
     // Open perf monitor in expanded mode so the collector publishes full stats
     await openPassesTab(page)
 
@@ -90,8 +85,6 @@ test.describe('performance profiling', () => {
     // Verify known passes exist
     const passIds = data.passTimings.map((p) => p.passId)
     expect(passIds, 'should include toScreen pass').toContain('toScreen')
-
-    expect(gpuErrors).toEqual([])
   })
 
   test('CPU breakdown reports non-zero values for all three phases', async ({ page }) => {
@@ -128,9 +121,10 @@ test.describe('performance profiling', () => {
     // The helper should include the new fields
     expect(snapshot.passTimings, 'snapshot should have passTimings array').toBeInstanceOf(Array)
     expect(snapshot.passTimings.length, 'snapshot should have entries').toBeGreaterThan(0)
-    expect(typeof snapshot.totalGpuTimeMs, 'snapshot should have totalGpuTimeMs number').toBe(
-      'number'
-    )
+    expect(
+      snapshot.totalGpuTimeMs,
+      'snapshot should have totalGpuTimeMs >= 0'
+    ).toBeGreaterThanOrEqual(0)
   })
 
   test('Passes tab renders with pass data visible', async ({ page }) => {
@@ -217,8 +211,6 @@ test.describe('performance profiling', () => {
 
     // Check if the GPU supports timestamp queries
     const supportsTimestamp = await page.evaluate(async () => {
-      const mod = await import('/src/rendering/webgpu/core/WebGPUDevice.ts')
-      // Read from the device capabilities if available
       const perfMod = await import('/src/stores/performanceStore.ts')
       const state = perfMod.usePerformanceStore.getState()
       // deviceCapabilitiesDetected is set after init; if not detected, can't tell

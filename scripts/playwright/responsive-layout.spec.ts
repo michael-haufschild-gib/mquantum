@@ -13,16 +13,14 @@
  * - Resize during rendering crashes renderer (texture size mismatch)
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
+  getFrameCount,
   requireWebGPU,
   waitForAppLoaded,
+  waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
-  waitForFrameAdvance,
-  getFrameCount,
-  collectFatalGpuErrors,
 } from './helpers/app-helpers'
 import { TopBar } from './pages/TopBar'
 
@@ -38,8 +36,10 @@ test.describe('responsive layout transitions', () => {
     await page.goto('/')
     await waitForAppLoaded(page)
 
-    // Desktop: editor-bottom-panel visible, mobile-timeline hidden
-    await expect(page.getByTestId('editor-bottom-panel')).toBeVisible()
+    // Desktop: editor-bottom-panel visible, mobile-timeline hidden.
+    // Use .first() because the mobile-timeline-controls may contain a nested
+    // editor-bottom-panel, causing strict mode violations.
+    await expect(page.getByTestId('editor-bottom-panel').first()).toBeVisible()
     await expect(page.getByTestId('mobile-timeline-controls')).not.toBeVisible()
 
     // Resize to mobile
@@ -55,7 +55,7 @@ test.describe('responsive layout transitions', () => {
     await page.setViewportSize(DESKTOP)
 
     // Desktop: editor-bottom-panel should be back
-    await expect(page.getByTestId('editor-bottom-panel')).toBeVisible({ timeout: 5000 })
+    await expect(page.getByTestId('editor-bottom-panel').first()).toBeVisible({ timeout: 5000 })
     await expect(page.getByTestId('mobile-timeline-controls')).not.toBeVisible()
   })
 
@@ -89,8 +89,6 @@ test.describe('responsive layout transitions', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
 
-    const gpuErrors = collectFatalGpuErrors(page)
-
     // Resize through several viewports while rendering
     const sizes = [
       { width: 800, height: 600 },
@@ -106,7 +104,6 @@ test.describe('responsive layout transitions', () => {
       await waitForFrameAdvance(page, count)
     }
 
-    expect(gpuErrors, 'no GPU errors during resize cycle').toEqual([])
     await expect(page.getByTestId('top-bar')).toBeVisible()
   })
 
@@ -125,7 +122,7 @@ test.describe('responsive layout transitions', () => {
 
     const canvas = page.getByTestId('webgpu-canvas')
     const desktopBox = await canvas.boundingBox()
-    expect(desktopBox, 'Canvas must have a bounding box at desktop size').not.toBeNull()
+    if (!desktopBox) throw new Error('Canvas bounding box is null at desktop size')
 
     // Resize to a smaller viewport
     const SMALL = { width: 640, height: 480 }
@@ -136,13 +133,13 @@ test.describe('responsive layout transitions', () => {
     await waitForFrameAdvance(page, count)
 
     const smallBox = await canvas.boundingBox()
-    expect(smallBox, 'Canvas must have a bounding box at small size').not.toBeNull()
+    if (!smallBox) throw new Error('Canvas bounding box is null at small size')
 
     // Canvas width must be smaller after viewport shrink.
     // We can't assert exact dimensions (CSS layout depends on padding, chrome),
     // but the canvas must not stay at the old size.
-    expect(smallBox!.width, 'Canvas width must decrease when viewport shrinks').toBeLessThan(
-      desktopBox!.width
+    expect(smallBox.width, 'Canvas width must decrease when viewport shrinks').toBeLessThan(
+      desktopBox.width
     )
   })
 })

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
 import { ScenePass } from '@/rendering/webgpu/passes/ScenePass'
@@ -13,7 +14,7 @@ interface ScenePassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
+  quantumMode: SchroedingerQuantumMode
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean

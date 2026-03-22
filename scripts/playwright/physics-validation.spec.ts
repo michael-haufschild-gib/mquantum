@@ -15,8 +15,7 @@
  * @module scripts/playwright/physics-validation
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   applyBecPreset,
   applyDiracPreset,
@@ -24,12 +23,12 @@ import {
   applyTdsePreset,
   gotoMode,
   gotoPauli,
-  requireWebGPU,
   readBecDiagnostics,
   readDiracDiagnostics,
   readFsfDiagnostics,
   readPauliDiagnostics,
   readTdseDiagnostics,
+  requireWebGPU,
   waitForDiagnostics,
   waitForShaderCompilation,
   waitForSimulationFrames,

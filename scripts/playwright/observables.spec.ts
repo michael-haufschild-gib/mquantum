@@ -14,8 +14,7 @@
  * - Export button appears only when data exists
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
   gotoModeWithParams,
   requireWebGPU,

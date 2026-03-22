@@ -17,12 +17,10 @@
  * Run: npx playwright test scripts/playwright/physics-density-oracle.spec.ts --workers=1
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectGpuWarningsAndErrors,
-  requireWebGPU,
   readDensityDiagnostics,
+  requireWebGPU,
   setHydrogenQuantumNumbers,
   setTermCount,
   setupAndWaitForDensity,
@@ -42,7 +40,6 @@ test.describe('HO density oracle', () => {
   })
 
   test('HO 3D ground state: center density ≈ (1/π)^{3/2}', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
 
     // Force single-term ground state (n=0 in all dimensions)
@@ -64,11 +61,9 @@ test.describe('HO density oracle', () => {
 
     expect(diag.maxDensity).toBeGreaterThan(0)
     expect(Number.isFinite(diag.totalDensityMass)).toBe(true)
-    expect(gpuErrors).toEqual([])
   })
 
   test('HO 3D: mass increases with superposition term count', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
 
     await setTermCount(page, 1)
@@ -83,7 +78,6 @@ test.describe('HO density oracle', () => {
     expect(diag4.hasData).toBe(true)
     // More terms spread density across more voxels
     expect(diag4.activeVoxelCount).toBeGreaterThan(diag1.activeVoxelCount * 0.8)
-    expect(gpuErrors).toEqual([])
   })
 
   test.afterAll(async ({ browser }) => {
@@ -104,7 +98,6 @@ test.describe('hydrogen density oracle', () => {
   })
 
   test('hydrogen 1s: center density > 0 (s-orbital peaks at origin)', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
     await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
@@ -116,11 +109,9 @@ test.describe('hydrogen density oracle', () => {
     // 1s center density should be the max (or near it) — spherically symmetric
     expect(diag.centerDensity).toBeGreaterThan(diag.maxDensity * 0.5)
     expect(Number.isFinite(diag.totalDensityMass)).toBe(true)
-    expect(gpuErrors).toEqual([])
   })
 
   test('hydrogen 2p: center density ≈ 0 (p-orbital node at origin)', async ({ page }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 2, 1, 0)
     await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
@@ -130,13 +121,11 @@ test.describe('hydrogen density oracle', () => {
     expect(diag.maxDensity).toBeGreaterThan(0)
     // p-orbital has a node at the origin: |ψ_210(0)|² = 0
     expect(diag.centerDensity).toBeLessThan(diag.maxDensity * 0.01)
-    expect(gpuErrors).toEqual([])
   })
 
   test('hydrogen 3d vs 1s: different max density (quantum numbers reach shader)', async ({
     page,
   }) => {
-    const gpuErrors = collectGpuWarningsAndErrors(page)
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
 
     await setHydrogenQuantumNumbers(page, 1, 0, 0)
@@ -152,7 +141,6 @@ test.describe('hydrogen density oracle', () => {
     // 1s and 3d have very different peak densities — ratio should be outside [0.9, 1.1]
     const ratio = diag3d.maxDensity / Math.max(diag1s.maxDensity, 1e-20)
     expect(ratio < 0.9 || ratio > 1.1).toBe(true)
-    expect(gpuErrors).toEqual([])
   })
 
   test.afterAll(async ({ browser }) => {
@@ -182,7 +170,6 @@ test.describe('density grid structural invariants', () => {
 
   for (const { mode, dim, label } of modes) {
     test(`${label}: maxDensity > 0 and totalMass finite`, async ({ page }) => {
-      const gpuErrors = collectGpuWarningsAndErrors(page)
       await setupAndWaitForDensity(page, mode, dim)
 
       const diag = await readDensityDiagnostics(page)
@@ -192,7 +179,6 @@ test.describe('density grid structural invariants', () => {
       expect(diag.activeVoxelCount, `${label}: some voxels active`).toBeGreaterThan(0)
       expect(diag.gridSize, `${label}: gridSize > 0`).toBeGreaterThan(0)
       expect(diag.worldBound, `${label}: worldBound > 0`).toBeGreaterThan(0)
-      expect(gpuErrors).toEqual([])
     })
   }
 })
