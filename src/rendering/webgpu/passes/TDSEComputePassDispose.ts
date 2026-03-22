@@ -31,6 +31,11 @@ export function disposeTdseResources(
   slState: SaveLoadState,
   obsState: ObservablesState
 ): void {
+  // Cancel any pending mapAsync before destroying staging buffers
+  if (diagState.diagMappingInFlight && diagState.diagStagingBuffer) {
+    diagState.diagStagingBuffer.unmap()
+    diagState.diagMappingInFlight = false
+  }
   // Diagnostics readback buffers
   diagState.diagResultBuffer?.destroy()
   diagState.diagStagingBuffer?.destroy()

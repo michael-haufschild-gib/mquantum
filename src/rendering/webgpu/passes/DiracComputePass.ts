@@ -253,6 +253,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   private rebuildBuffers(device: GPUDevice, config: DiracConfig): void {
+    // Cancel any pending diagnostic mapAsync before destroying the staging buffer.
+    // unmap() aborts a pending mapAsync (the promise rejects with AbortError).
+    if (this.diagMappingInFlight && this.diagStagingBuffer) {
+      this.diagStagingBuffer.unmap()
+      this.diagMappingInFlight = false
+    }
+
     // Clear cached per-component bind groups
     if (this.bg) {
       this.bg.cachedPackBGs = []
@@ -664,6 +671,11 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    // Cancel any pending diagnostic mapAsync before destroying buffers
+    if (this.diagMappingInFlight && this.diagStagingBuffer) {
+      this.diagStagingBuffer.unmap()
+      this.diagMappingInFlight = false
+    }
     // prettier-ignore
     const gpuBuffers: (GPUBuffer | null | undefined)[] = [
       this.spinorReBuffer, this.spinorImBuffer, this.potentialBuffer, this.gammaBuffer,

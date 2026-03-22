@@ -228,6 +228,12 @@ export class PauliComputePass extends WebGPUBaseComputePass {
 
   /** Allocate GPU buffers for the spinor field, FFT scratch, and output texture */
   private rebuildBuffers(device: GPUDevice, config: PauliConfig): void {
+    // Cancel any pending diagnostic mapAsync before destroying the staging buffer.
+    if (this.diagMappingInFlight && this.buf?.diagStagingBuffer) {
+      this.buf.diagStagingBuffer.unmap()
+      this.diagMappingInFlight = false
+    }
+
     if (!this.densityTexture) this.initializeDensityTexture(device)
 
     const oldBuf = this.buf
@@ -669,6 +675,11 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // ============================================================================
 
   dispose(): void {
+    // Cancel any pending diagnostic mapAsync before destroying buffers
+    if (this.diagMappingInFlight && this.buf?.diagStagingBuffer) {
+      this.buf.diagStagingBuffer.unmap()
+      this.diagMappingInFlight = false
+    }
     if (this.buf) {
       this.buf.spinorReBuffer.destroy()
       this.buf.spinorImBuffer.destroy()

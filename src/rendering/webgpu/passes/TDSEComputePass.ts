@@ -277,6 +277,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   private rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
+    // Cancel any pending diagnostic mapAsync before destroying the staging buffer.
+    if (this._diagState.diagMappingInFlight && this._diagState.diagStagingBuffer) {
+      this._diagState.diagStagingBuffer.unmap()
+      this._diagState.diagMappingInFlight = false
+    }
+
     const old = {
       psiReBuffer: this.psiReBuffer,
       psiImBuffer: this.psiImBuffer,

@@ -77,7 +77,12 @@ export class FsfKSpaceManager {
   destroyBuffers(): void {
     this.kSpaceReadbackEpoch++
     this.pendingKSpaceData = null
-    this.diagMappingInFlight = false
+    // Cancel any pending mapAsync before destroying staging buffers.
+    if (this.diagMappingInFlight) {
+      this.diagPhiReadbackBuffer?.unmap()
+      this.diagPiReadbackBuffer?.unmap()
+      this.diagMappingInFlight = false
+    }
     this.phiReadbackBuffer?.destroy()
     this.piReadbackBuffer?.destroy()
     this.diagPhiReadbackBuffer?.destroy()
