@@ -53,6 +53,23 @@ type DiracActions = Pick<
 /** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
 const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
 
+/**
+ * WebGPU minStorageBufferOffsetAlignment is 256 bytes.
+ * Dirac pack/unpack bind groups view spinor components at offset
+ * `c * totalSites * 4`. To satisfy alignment: totalSites * 4 >= 256,
+ * so totalSites >= 64. This gives the minimum per-dimension grid size.
+ */
+const MIN_ALIGNED_TOTAL_SITES = 64
+
+/**
+ * Minimum per-dimension grid size for Dirac that satisfies WebGPU
+ * buffer offset alignment (256 bytes). Returns a power of 2.
+ */
+export const minDiracGridPerDim = (dim: number): number => {
+  const raw = Math.ceil(Math.pow(MIN_ALIGNED_TOTAL_SITES, 1 / dim))
+  return Math.max(2, 2 ** Math.ceil(Math.log2(raw)))
+}
+
 const defaultDiracGridPerDim = (d: number): number => {
   const raw = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / d))
   let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
@@ -317,18 +334,19 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       setWithVersion((state) => {
         const { latticeDim } = state.schroedinger.dirac
         const gridDefault = defaultDiracGridPerDim(latticeDim)
+        const minGrid = minDiracGridPerDim(latticeDim)
         const snapped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < size.length ? size[i]! : gridDefault
-          const val = Math.max(2, Math.min(128, Math.round(s)))
+          const val = Math.max(minGrid, Math.min(128, Math.round(s)))
           const log2 = Math.round(Math.log2(val))
-          return Math.max(2, Math.min(gridDefault, 2 ** log2))
+          return Math.max(minGrid, Math.min(gridDefault, 2 ** log2))
         })
         while (snapped.reduce((a, b) => a * b, 1) > DIRAC_MAX_TOTAL_SITES) {
           let maxIdx = 0
           for (let i = 1; i < snapped.length; i++) {
             if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
           }
-          if (snapped[maxIdx]! <= 2) break
+          if (snapped[maxIdx]! <= minGrid) break
           snapped[maxIdx] = snapped[maxIdx]! / 2
         }
         return {

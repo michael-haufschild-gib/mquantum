@@ -20,6 +20,7 @@ import type {
   DiracPotentialType,
 } from '@/lib/geometry/extended/types'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
+import { minDiracGridPerDim } from '@/stores/slices/geometry/setters/diracSetters'
 
 import type { DiracControlsProps } from './types'
 
@@ -111,10 +112,14 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
   const latticeDim = dirac.latticeDim ?? dimension
   const activePreset = useMemo(() => detectActiveDiracPreset(dirac), [dirac])
 
-  // Compute max grid size per dimension (power of 2, limited by total sites)
+  // Compute grid size range (power of 2, limited by total sites + alignment)
   const gridSizeOptions = useMemo(() => {
     const maxPerDim = Math.floor(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / latticeDim))
-    return ALL_GRID_SIZE_OPTIONS.filter((opt) => parseInt(opt.value) <= maxPerDim)
+    const minGrid = minDiracGridPerDim(latticeDim)
+    return ALL_GRID_SIZE_OPTIONS.filter((opt) => {
+      const v = parseInt(opt.value)
+      return v >= minGrid && v <= maxPerDim
+    })
   }, [latticeDim])
 
   // Half-extent for position sliders
