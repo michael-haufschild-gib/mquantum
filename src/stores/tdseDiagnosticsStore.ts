@@ -30,6 +30,8 @@ interface TdseDiagnosticsState extends TdseDiagnosticsSnapshot {
   /** Whether any diagnostics data has been received */
   hasData: boolean
 
+  /** Simulation time ring buffer */
+  historySimTime: Float32Array
   /** Norm time-series ring buffer */
   historyNorm: Float32Array
   /** Reflection coefficient time-series ring buffer */
@@ -61,6 +63,7 @@ const INITIAL_SNAPSHOT: TdseDiagnosticsSnapshot = {
 export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   ...INITIAL_SNAPSHOT,
   hasData: false,
+  historySimTime: new Float32Array(HISTORY_LENGTH),
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyR: new Float32Array(HISTORY_LENGTH),
   historyT: new Float32Array(HISTORY_LENGTH),
@@ -70,6 +73,7 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   pushSnapshot: (snapshot) => {
     set((state) => {
       const head = state.historyHead
+      state.historySimTime[head] = snapshot.simTime
       state.historyNorm[head] = snapshot.totalNorm
       state.historyR[head] = snapshot.R
       state.historyT[head] = snapshot.T

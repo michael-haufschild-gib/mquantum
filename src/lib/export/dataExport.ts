@@ -42,7 +42,7 @@ export function readRingBuffer(buffer: Float32Array, head: number, count: number
 /**
  * Export TDSE diagnostics time-series as CSV.
  *
- * @returns CSV string with columns: frame, norm, R, T
+ * @returns CSV string with columns: simTime, frame, norm, R, T
  */
 export function exportTdseDiagnosticsCSV(): string {
   const state = useTdseDiagnosticsStore.getState()
@@ -50,13 +50,14 @@ export function exportTdseDiagnosticsCSV(): string {
 
   if (count === 0) return ''
 
+  const simTime = readRingBuffer(state.historySimTime, head, count)
   const norm = readRingBuffer(state.historyNorm, head, count)
   const R = readRingBuffer(state.historyR, head, count)
   const T = readRingBuffer(state.historyT, head, count)
 
-  const lines = ['frame,norm,R,T']
+  const lines = ['simTime,frame,norm,R,T']
   for (let i = 0; i < count; i++) {
-    lines.push(`${i},${norm[i]},${R[i]},${T[i]}`)
+    lines.push(`${simTime[i]},${i},${norm[i]},${R[i]},${T[i]}`)
   }
   return lines.join('\n')
 }

@@ -45,6 +45,8 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'doubleSlit',
   'periodicLattice',
   'doubleWell',
+  'radialDoubleWell',
+  'custom',
 ]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -96,6 +98,8 @@ export interface ShareableObjectState {
   observablesEnabled?: boolean
   /** TDSE imaginary-time propagation enabled */
   imaginaryTimeEnabled?: boolean
+  /** Custom potential expression V(x,y,z,...) when potentialType === 'custom' */
+  customPotentialExpression?: string
 
   // ── Features ─────────────────────────────────────────────────────────────
   /** Open quantum system enabled */
@@ -247,6 +251,9 @@ export function serializeState(state: ShareableState): string {
   setBoolParam(params, 'diag', state.diagnosticsEnabled)
   setBoolParam(params, 'obs', state.observablesEnabled)
   setBoolParam(params, 'it', state.imaginaryTimeEnabled)
+  if (state.potentialType === 'custom' && state.customPotentialExpression) {
+    setStringParam(params, 'cpx', state.customPotentialExpression)
+  }
 
   // Features
   if (state.openQuantumEnabled) {
@@ -309,6 +316,10 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.diagnosticsEnabled = parseBoolParam(params, 'diag')
   state.observablesEnabled = parseBoolParam(params, 'obs')
   state.imaginaryTimeEnabled = parseBoolParam(params, 'it')
+  if (state.potentialType === 'custom') {
+    const cpx = params.get('cpx')
+    if (cpx && cpx.length <= 200) state.customPotentialExpression = cpx
+  }
 
   // Features — open quantum
   const oq = parseBoolParam(params, 'oq')

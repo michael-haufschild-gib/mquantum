@@ -40,7 +40,7 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (urlState.crossSectionEnabled !== undefined)
       ext.setSchroedingerCrossSectionEnabled(urlState.crossSectionEnabled)
     if (urlState.densityGain !== undefined) ext.setSchroedingerDensityGain(urlState.densityGain)
-    if (urlState.scale !== undefined) geo.setSchroedingerScale(urlState.scale)
+    if (urlState.scale !== undefined) ext.setSchroedingerScale(urlState.scale)
 
     // ── Quantum numbers ──────────────────────────────────────────────────────
     if (urlState.termCount !== undefined) ext.setSchroedingerTermCount(urlState.termCount)
@@ -61,6 +61,8 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       ext.setTdseObservablesEnabled(urlState.observablesEnabled)
     if (urlState.imaginaryTimeEnabled !== undefined)
       ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
+    if (urlState.customPotentialExpression !== undefined)
+      ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
 
     // ── Features ─────────────────────────────────────────────────────────────
     if (urlState.openQuantumEnabled !== undefined) {

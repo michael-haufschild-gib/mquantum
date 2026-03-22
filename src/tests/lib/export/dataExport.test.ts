@@ -105,14 +105,14 @@ describe('exportTdseDiagnosticsCSV', () => {
 
     const csv = exportTdseDiagnosticsCSV()
     const lines = csv.split('\n')
-    expect(lines[0]).toBe('frame,norm,R,T')
+    expect(lines[0]).toBe('simTime,frame,norm,R,T')
     expect(lines).toHaveLength(3) // header + 2 data rows
 
     const row1 = lines[1]!.split(',').map(Number)
-    expect(row1[0]).toBe(0)
-    expect(row1[1]).toBeCloseTo(0.99, 2)
-    expect(row1[2]).toBeCloseTo(0.3, 2)
-    expect(row1[3]).toBeCloseTo(0.6, 2)
+    expect(row1[1]).toBe(0) // frame index
+    expect(row1[2]).toBeCloseTo(0.99, 2) // norm
+    expect(row1[3]).toBeCloseTo(0.3, 2) // R
+    expect(row1[4]).toBeCloseTo(0.6, 2) // T
   })
 
   it('3-row export preserves chronological order (oldest first)', () => {
@@ -154,18 +154,24 @@ describe('exportTdseDiagnosticsCSV', () => {
     const lines = csv.split('\n')
     expect(lines).toHaveLength(4) // header + 3 rows
 
-    // Verify chronological order via distinguishable R values
-    const r0 = Number(lines[1]!.split(',')[2])
-    const r1 = Number(lines[2]!.split(',')[2])
-    const r2 = Number(lines[3]!.split(',')[2])
+    // Verify chronological order via distinguishable R values (column index 3 after simTime addition)
+    const r0 = Number(lines[1]!.split(',')[3])
+    const r1 = Number(lines[2]!.split(',')[3])
+    const r2 = Number(lines[3]!.split(',')[3])
     expect(r0).toBeCloseTo(0.1, 2) // oldest
     expect(r1).toBeCloseTo(0.25, 2) // middle
     expect(r2).toBeCloseTo(0.4, 2) // newest
 
+    // Verify simTime column
+    const t0 = Number(lines[1]!.split(',')[0])
+    const t2 = Number(lines[3]!.split(',')[0])
+    expect(t0).toBeCloseTo(0.1, 2) // oldest simTime
+    expect(t2).toBeCloseTo(0.3, 2) // newest simTime
+
     // Row 2 second snapshot values
     const row2 = lines[2]!.split(',').map(Number)
-    expect(row2[1]).toBeCloseTo(0.99, 2) // norm
-    expect(row2[3]).toBeCloseTo(0.74, 2) // T
+    expect(row2[2]).toBeCloseTo(0.99, 2) // norm
+    expect(row2[4]).toBeCloseTo(0.74, 2) // T
   })
 })
 
@@ -471,9 +477,9 @@ describe('exportDiagnosticsJSON', () => {
     expect(ts.R).toHaveLength(1)
 
     // Verify time-series VALUES, not just lengths
-    expect(ts.norm[0]).toBeCloseTo(0.99, 2)
-    expect(ts.R[0]).toBeCloseTo(0.3, 2)
-    expect(ts.T[0]).toBeCloseTo(0.6, 2)
+    expect(ts.norm![0]).toBeCloseTo(0.99, 2)
+    expect(ts.R![0]).toBeCloseTo(0.3, 2)
+    expect(ts.T![0]).toBeCloseTo(0.6, 2)
   })
 
   it('TDSE JSON time-series preserves chronological order across snapshots', () => {
@@ -502,10 +508,10 @@ describe('exportDiagnosticsJSON', () => {
     const parsed = JSON.parse(json) as Record<string, unknown>
     const ts = (parsed.tdse as Record<string, unknown>).timeSeries as Record<string, number[]>
     expect(ts.R).toHaveLength(2)
-    expect(ts.R[0]).toBeCloseTo(0.1, 2) // oldest
-    expect(ts.R[1]).toBeCloseTo(0.3, 2) // newest
-    expect(ts.norm[0]).toBeCloseTo(1.0, 2)
-    expect(ts.norm[1]).toBeCloseTo(0.98, 2)
+    expect(ts.R![0]).toBeCloseTo(0.1, 2) // oldest
+    expect(ts.R![1]).toBeCloseTo(0.3, 2) // newest
+    expect(ts.norm![0]).toBeCloseTo(1.0, 2)
+    expect(ts.norm![1]).toBeCloseTo(0.98, 2)
   })
 
   it('includes Dirac data for diracEquation mode', () => {
@@ -574,9 +580,9 @@ describe('exportDiagnosticsJSON', () => {
     expect(current.dxdp_y).toBeCloseTo(0.61, 2)
 
     const ts = obs.timeSeries as Record<string, number[]>
-    expect(ts.energy[0]).toBeCloseTo(4.2, 2)
-    expect(ts.dxdp_x[0]).toBeCloseTo(0.52, 2)
-    expect(ts.dxdp_y[0]).toBeCloseTo(0.61, 2)
+    expect(ts.energy![0]).toBeCloseTo(4.2, 2)
+    expect(ts.dxdp_x![0]).toBeCloseTo(0.52, 2)
+    expect(ts.dxdp_y![0]).toBeCloseTo(0.61, 2)
   })
 
   it('JSON open quantum section contains exact metric values', () => {
@@ -598,9 +604,9 @@ describe('exportDiagnosticsJSON', () => {
     expect(current.groundPopulation).toBeCloseTo(0.72, 2)
 
     const ts = oq.timeSeries as Record<string, number[]>
-    expect(ts.purity[0]).toBeCloseTo(0.85, 2)
-    expect(ts.vonNeumannEntropy[0]).toBeCloseTo(0.42, 2)
-    expect(ts.coherence[0]).toBeCloseTo(0.37, 2)
+    expect(ts.purity![0]).toBeCloseTo(0.85, 2)
+    expect(ts.vonNeumannEntropy![0]).toBeCloseTo(0.42, 2)
+    expect(ts.coherence![0]).toBeCloseTo(0.37, 2)
   })
 
   it('does not include unrelated mode data', () => {

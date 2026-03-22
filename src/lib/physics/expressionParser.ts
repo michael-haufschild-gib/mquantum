@@ -219,7 +219,7 @@ class Parser {
 
   // Term: multiplicative level
   private parseTerm(): ASTNode {
-    let left = this.parseExponent()
+    let left = this.parseUnary()
     while (true) {
       const t = this.peek()
       if (
@@ -228,7 +228,7 @@ class Parser {
       ) {
         const op = (t as { op: string }).op as '*' | '/'
         this.advance()
-        const right = this.parseExponent()
+        const right = this.parseUnary()
         left = { type: 'binary', op, left, right }
       } else {
         break
@@ -237,19 +237,7 @@ class Parser {
     return left
   }
 
-  // Exponent: right-associative ^
-  private parseExponent(): ASTNode {
-    const base = this.parseUnary()
-    const t = this.peek()
-    if (t.type === 'op' && (t as { op: string }).op === '^') {
-      this.advance()
-      const exp = this.parseExponent() // right-associative
-      return { type: 'binary', op: '^', left: base, right: exp }
-    }
-    return base
-  }
-
-  // Unary: - prefix
+  // Unary: - prefix (lower precedence than ^, so -x^2 = -(x^2))
   private parseUnary(): ASTNode {
     const t = this.peek()
     if (t.type === 'op' && (t as { op: string }).op === '-') {
@@ -261,7 +249,19 @@ class Parser {
       this.advance()
       return this.parseUnary()
     }
-    return this.parsePrimary()
+    return this.parseExponent()
+  }
+
+  // Exponent: right-associative ^, higher precedence than unary minus
+  private parseExponent(): ASTNode {
+    const base = this.parsePrimary()
+    const t = this.peek()
+    if (t.type === 'op' && (t as { op: string }).op === '^') {
+      this.advance()
+      const exp = this.parseUnary() // right side allows unary minus (2^-3)
+      return { type: 'binary', op: '^', left: base, right: exp }
+    }
+    return base
   }
 
   // Primary: numbers, variables, functions, parenthesized expressions

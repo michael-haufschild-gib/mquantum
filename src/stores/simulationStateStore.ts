@@ -96,10 +96,16 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
 
         // Apply config immediately so mode/grid changes trigger pipeline rebuild
         // before the strategy checks pendingLoadData for wavefunction injection.
+        // Force needsReset on the mode sub-config so the compute pass reinitializes
+        // with the loaded grid parameters.
         const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
+        const loadedConfig = result.config as Record<string, unknown>
+        if ('needsReset' in loadedConfig || result.quantumMode) {
+          loadedConfig.needsReset = true
+        }
         useExtendedObjectStore.getState().setSchroedingerConfig({
           quantumMode: result.quantumMode,
-          ...(result.config as Record<string, unknown>),
+          ...loadedConfig,
         })
 
         set({

@@ -390,7 +390,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         slicePositions: bec.slicePositions ?? [],
         interactionStrength: g,
         customPotentialExpression: '',
-        observablesEnabled: false,
+        observablesEnabled: bec.observablesEnabled ?? false,
         imaginaryTimeEnabled: false,
       },
     }

@@ -127,7 +127,6 @@ export const TRANSIENT_FIELDS = new Set([
   'needsReset',
 
   // Imaginary-time propagation mode — runtime toggle, not scene state
-  'imaginaryTimeEnabled',
 
   // Second quantization educational layer — session-specific interpretive UI, not scene state
   'sqLayerEnabled',

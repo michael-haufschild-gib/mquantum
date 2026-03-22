@@ -346,12 +346,18 @@ describe('parseExpression', () => {
       expect(evalExpr('2 * 3^2', [])).toBe(18) // 2 * 9 = 18
     })
 
-    // KNOWN BUG: The parser gives unary minus higher precedence than exponentiation,
-    // so -3^2 = (-3)^2 = 9 instead of the standard -(3^2) = -9. Most CAS systems
-    // (Mathematica, Wolfram, Python) treat -3^2 as -9. Fix: move unary minus after
-    // exponentiation in the grammar (parseUnary called before parsePrimary).
-    it('unary minus current behavior: -3^2 = (-3)^2 = 9 (non-standard precedence)', () => {
-      expect(evalExpr('-3^2', [])).toBe(9)
+    // Standard math: exponentiation binds tighter than unary minus.
+    // -3^2 = -(3^2) = -9, matching Mathematica, Wolfram, Python.
+    it('unary minus has lower precedence than exponentiation: -3^2 = -9', () => {
+      expect(evalExpr('-3^2', [])).toBe(-9)
+    })
+
+    it('exponent with negative base in parens: (-3)^2 = 9', () => {
+      expect(evalExpr('(-3)^2', [])).toBe(9)
+    })
+
+    it('exponent with negative exponent: 2^-3 = 0.125', () => {
+      expect(evalExpr('2^-3', [])).toBeCloseTo(0.125)
     })
 
     it('handles pi * e correctly', () => {

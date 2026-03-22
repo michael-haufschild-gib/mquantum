@@ -104,6 +104,8 @@ export interface BecConfig {
   // === Diagnostics ===
   diagnosticsEnabled: boolean
   diagnosticsInterval: number
+  /** Enable observable expectation value computation (⟨x⟩, ⟨p⟩, ΔxΔp) */
+  observablesEnabled: boolean
 
   // === Runtime ===
   needsReset: boolean
@@ -135,6 +137,7 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   pmlTargetReflection: 1e-6,
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
+  observablesEnabled: false,
   needsReset: true,
   slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 }
