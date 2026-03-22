@@ -59,8 +59,8 @@ const GPU_ERROR_PATTERNS = [
   /\[SchrodingerRenderer\].*fail|\[WebGPU.*\].*fail|\[WebGPU.*\].*error/i,
   // Device lost / fatal
   /device.*lost|rendergraph.*cycle|unhandled.*gpu/i,
-  // Texture/buffer operation errors from Dawn
-  /While encoding|While finishing|While calling.*Submit/i,
+  // Dawn context lines — any "While ..." prefix indicates a GPU validation problem
+  /While encoding|While finishing|While calling|While initializing/i,
   // Catch-all for any console error (not warning) — console.error in production is a bug
   // This is the last pattern; warnings are filtered by the patterns above.
 ]

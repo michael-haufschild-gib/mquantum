@@ -257,6 +257,11 @@ export function collectGpuWarningsAndErrors(page: Page): string[] {
       issues.push(`[${type}] ${text}`)
       return
     }
+    // Dawn context lines — any "While ..." prefix indicates a GPU validation problem
+    if (/While encoding|While finishing|While calling|While initializing/i.test(text)) {
+      issues.push(`[${type}] ${text}`)
+      return
+    }
     // Device lost / fatal
     if (/device.*lost|rendergraph.*cycle|unhandled.*gpu/i.test(text)) {
       issues.push(`[${type}] ${text}`)
