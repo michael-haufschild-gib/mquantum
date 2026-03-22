@@ -18,26 +18,27 @@ import { gzipSync } from 'node:zlib'
 
 const DIST_DIR = join(import.meta.dirname, '..', 'dist', 'assets')
 
-/** Per-chunk gzip budgets in KB. */
+/** Per-chunk gzip budgets in KB.
+ *  Updated 2026-03-22 for roadmap features (quantum walk, measurement,
+ *  observables, expression parser, Pauli spinor, Dirac equation). */
 const CHUNK_BUDGETS = {
   'react-vendor': 65,
   'motion': 35,
-  'rendering': 90,
+  'rendering': 100,
   'shaders-schroedinger': 110,
   'shaders': 30,
   'components': 80,
-  'components-panels': 55,
+  'components-panels': 65,
   'stores': 45,
   'physics': 20,
   'mediabunny': 50,
   'vendor': 15,
-  'index': 25,
+  'index': 30,
 }
 
 /** Total JS gzip budget in KB (all .js chunks combined).
- *  Bumped 570→580 to accommodate roadmap Phase B/C features
- *  (expression parser, potential evaluator, quantum walk, measurement, observables). */
-const TOTAL_JS_BUDGET_KB = 580
+ *  Updated 2026-03-22: 580→620 to accommodate roadmap Phase B/C/D features. */
+const TOTAL_JS_BUDGET_KB = 620
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

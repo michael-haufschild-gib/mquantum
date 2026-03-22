@@ -11,6 +11,16 @@ export default defineConfig({
   workers: 1,
   reporter: [['line'], ['./scripts/playwright/gpu-enforcement-reporter.ts']],
 
+  // Exclude profiling/benchmark instrumentation from the default test run.
+  // These files contain zero assertions — they measure GPU timing and print
+  // tables, but do not verify correctness. Run them explicitly:
+  //   npx playwright test scripts/playwright/perf-benchmark.spec.ts
+  testIgnore: [
+    '**/perf-benchmark.spec.ts',
+    '**/compute-mode-profiling.spec.ts',
+    '**/shader-ab-profiling.spec.ts',
+  ],
+
   use: {
     baseURL: `http://localhost:${devServerPort}`,
     trace: 'on-first-retry',
@@ -21,10 +31,12 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
     launchOptions: {
       args: [
+        '--headless=new', // new headless mode: better GPU compositing for screenshots
         '--enable-gpu', // required: stop headless from forcing software rendering
         '--enable-unsafe-webgpu', // required: enable WebGPU API
         '--ignore-gpu-blocklist', // required: bypass driver blocklists
-        '--use-angle', // macOS arm64: selects Metal backend in headless
+        '--use-angle=metal', // macOS arm64: Metal backend for WebGPU
+        '--use-gl=angle', // route GL through ANGLE (Metal-backed on macOS)
       ],
     },
   },

@@ -914,6 +914,8 @@ export default [
       // E2E specs run in Node.js (Playwright) but contain browser code inside page.evaluate()
       'jsdoc/require-jsdoc': 'off',
       'no-console': 'off',
+      // Playwright fixture `use()` is not React's `use` hook — disable hooks rule
+      '@eslint-react/rules-of-hooks': 'off',
       // E2E selector discipline
       'project-rules/no-flaky-click-selectors': 'error',
     },
