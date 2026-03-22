@@ -111,4 +111,165 @@ describe('Dirac setters', () => {
     expect(dt).toBeGreaterThan(0)
     expect(dt).toBeLessThan(1000) // should be clamped down
   })
+
+  it('clamps potentialWidth to [0.01, 10]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracPotentialWidth(0)
+    expect(getDirac().potentialWidth).toBe(0.01)
+    s.setDiracPotentialWidth(50)
+    expect(getDirac().potentialWidth).toBe(10)
+  })
+
+  it('clamps potentialCenter to [-10, 10]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracPotentialCenter(-20)
+    expect(getDirac().potentialCenter).toBe(-10)
+    s.setDiracPotentialCenter(20)
+    expect(getDirac().potentialCenter).toBe(10)
+  })
+
+  it('clamps harmonicOmega to [0.01, 10]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracHarmonicOmega(0)
+    expect(getDirac().harmonicOmega).toBe(0.01)
+    s.setDiracHarmonicOmega(500)
+    expect(getDirac().harmonicOmega).toBe(10)
+  })
+
+  it('clamps coulombZ to [1, 137] (rounded)', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracCoulombZ(0)
+    expect(getDirac().coulombZ).toBe(1)
+    s.setDiracCoulombZ(200)
+    expect(getDirac().coulombZ).toBe(137)
+  })
+
+  it('clamps packetWidth to [0.05, 5]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracPacketWidth(0)
+    expect(getDirac().packetWidth).toBe(0.05)
+    s.setDiracPacketWidth(100)
+    expect(getDirac().packetWidth).toBe(5)
+  })
+
+  it('clamps positiveEnergyFraction to [0, 1]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracPositiveEnergyFraction(-1)
+    expect(getDirac().positiveEnergyFraction).toBe(0)
+    s.setDiracPositiveEnergyFraction(2)
+    expect(getDirac().positiveEnergyFraction).toBe(1)
+  })
+
+  it('sets fieldView', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracFieldView('spinDensity')
+    expect(getDirac().fieldView).toBe('spinDensity')
+  })
+
+  it('sets autoScale boolean', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracAutoScale(false)
+    expect(getDirac().autoScale).toBe(false)
+    s.setDiracAutoScale(true)
+    expect(getDirac().autoScale).toBe(true)
+  })
+
+  it('sets showPotential boolean', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracShowPotential(true)
+    expect(getDirac().showPotential).toBe(true)
+  })
+
+  it('sets absorberEnabled boolean', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracAbsorberEnabled(true)
+    expect(getDirac().absorberEnabled).toBe(true)
+  })
+
+  it('clamps absorberWidth to [0.05, 0.5]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracAbsorberWidth(0)
+    expect(getDirac().absorberWidth).toBe(0.05)
+    s.setDiracAbsorberWidth(1)
+    expect(getDirac().absorberWidth).toBe(0.5)
+  })
+
+  it('clamps pmlTargetReflection to [1e-12, 0.999]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracPmlTargetReflection(0)
+    expect(getDirac().pmlTargetReflection).toBe(1e-12)
+    s.setDiracPmlTargetReflection(2)
+    expect(getDirac().pmlTargetReflection).toBe(0.999)
+  })
+
+  it('sets spacing array and triggers needsReset', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.5, 0.5, 0.5])
+    const spacing = getDirac().spacing
+    expect(spacing[0]).toBe(0.5)
+    expect(getDirac().needsReset).toBe(true)
+  })
+
+  it('sets spin direction per axis', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpinDirection(0, 0.5)
+    expect(getDirac().spinDirection[0]).toBe(0.5)
+  })
+
+  it('sets particle and antiparticle colors', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracParticleColor([1, 0, 0])
+    expect(getDirac().particleColor).toEqual([1, 0, 0])
+    s.setDiracAntiparticleColor([0, 1, 0])
+    expect(getDirac().antiparticleColor).toEqual([0, 1, 0])
+  })
+
+  it('sets diagnosticsEnabled and interval', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracDiagnosticsEnabled(true)
+    expect(getDirac().diagnosticsEnabled).toBe(true)
+    s.setDiracDiagnosticsInterval(10)
+    expect(getDirac().diagnosticsInterval).toBe(10)
+  })
+
+  it('clamps diagnosticsInterval to [1, 60]', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracDiagnosticsInterval(0)
+    expect(getDirac().diagnosticsInterval).toBe(1)
+    s.setDiracDiagnosticsInterval(500)
+    expect(getDirac().diagnosticsInterval).toBe(60)
+  })
+
+  it('setDiracNeedsReset and clearDiracNeedsReset toggle the flag', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracNeedsReset()
+    expect(getDirac().needsReset).toBe(true)
+    s.clearDiracNeedsReset()
+    expect(getDirac().needsReset).toBe(false)
+  })
+
+  it('sets slice position per axis', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSlicePosition(1, 0.7)
+    expect(getDirac().slicePositions[1]).toBe(0.7)
+  })
+
+  it('applies a preset and triggers needsReset', () => {
+    const s = useExtendedObjectStore.getState()
+    s.applyDiracPreset('freeParticle')
+    expect(getDirac().needsReset).toBe(true)
+    // Preset should have set a valid mass
+    expect(getDirac().mass).toBeGreaterThan(0)
+  })
+
+  it('rejects NaN for clamped numeric setters', () => {
+    const s = useExtendedObjectStore.getState()
+    const beforeWidth = getDirac().potentialWidth
+    s.setDiracPotentialWidth(NaN)
+    expect(getDirac().potentialWidth).toBe(beforeWidth)
+
+    const beforeOmega = getDirac().harmonicOmega
+    s.setDiracHarmonicOmega(NaN)
+    expect(getDirac().harmonicOmega).toBe(beforeOmega)
+  })
 })

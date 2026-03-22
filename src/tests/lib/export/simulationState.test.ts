@@ -197,6 +197,72 @@ describe('simulationState serialization', () => {
     }
   })
 
+  it('handles misaligned config length (odd-byte JSON forces copy path)', async () => {
+    // Config JSON with odd length forces the wavBytes.byteOffset % 4 !== 0 branch
+    // in deserialize, triggering the alignment copy path.
+    const gridSize = [8]
+    const totalSites = 8
+    const wf = makeWavefunction(totalSites, 1)
+    // Use a config whose JSON encoding has a length NOT divisible by 4
+    const config = { x: 'abc' } // '{"x":"abc"}' = 11 bytes (11 % 4 = 3)
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.config).toEqual(config)
+    expect(result.totalSites).toBe(totalSites)
+    // Verify wavefunction data survived alignment
+    for (let i = 0; i < totalSites; i++) {
+      expect(result.psiRe[i]).toBeCloseTo(wf.re[i]!, 5)
+      expect(result.psiIm[i]).toBeCloseTo(wf.im[i]!, 5)
+    }
+  })
+
+  it('falls back to uncompressed when CompressionStream is unavailable', async () => {
+    // happy-dom may or may not have CompressionStream. Either way, the round-trip
+    // must work — this exercises the `else` branch when compression is unavailable,
+    // or the compression path when it IS available.
+    const gridSize = [4]
+    const totalSites = 4
+    const wf = makeWavefunction(totalSites, 1)
+    const config = { quantumMode: 'tdseDynamics' }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+
+    // Verify the header compression flag matches environment capability
+    const header = new Uint8Array(data)
+    const compressedFlag = header[11]!
+    const hasCompression = typeof globalThis.CompressionStream !== 'undefined'
+    expect(compressedFlag).toBe(hasCompression ? 1 : 0)
+
+    // Round-trip must still work regardless
+    const result = await deserializeSimulationState(data)
+    expect(result.totalSites).toBe(totalSites)
+    for (let i = 0; i < totalSites; i++) {
+      expect(result.psiRe[i]).toBeCloseTo(wf.re[i]!, 5)
+    }
+  })
+
+  it('defaults unknown mode index to tdseDynamics', async () => {
+    // Manually construct a header with an unknown mode index (255)
+    const gridSize = [4]
+    const totalSites = 4
+    const wf = makeWavefunction(totalSites, 1)
+    const config = { quantumMode: 'tdseDynamics' }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    // Patch the mode index to an unknown value
+    const u8 = new Uint8Array(data)
+    u8[8] = 255
+
+    const result = await deserializeSimulationState(data)
+    // Unknown mode index falls back to 'tdseDynamics'
+    expect(result.quantumMode).toBe('tdseDynamics')
+  })
+
   it('handles high-dimensional grid sizes (up to 11D)', async () => {
     const gridSize = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] // 11D
     const totalSites = Math.pow(2, 11) // 2048
