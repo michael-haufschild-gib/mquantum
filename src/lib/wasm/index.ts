@@ -9,7 +9,6 @@ export {
   // Phase 1: Animation functions
   composeRotationsIndexedWasm,
   dotProductWasm,
-  flattenVertices,
   // Data conversion helpers
   float64ToVector,
   // Initialization

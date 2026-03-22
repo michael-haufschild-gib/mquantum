@@ -4,19 +4,12 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { getModifierKey, getModifierSymbols, getPlatformKeyLabel, isMac } from '@/lib/platform'
+import { getModifierSymbols, getPlatformKeyLabel, isMac } from '@/lib/platform'
 
 describe('platform detection', () => {
   // Note: In Node.js test environment, navigator is undefined so isMac = false
   it('should detect non-Mac platform in test environment', () => {
     expect(isMac).toBe(false)
-  })
-})
-
-describe('getModifierKey', () => {
-  it('should return Ctrl for non-Mac platforms', () => {
-    // In test environment (Node.js), navigator is undefined so we get Windows/Linux symbols
-    expect(getModifierKey()).toBe('Ctrl')
   })
 })
 

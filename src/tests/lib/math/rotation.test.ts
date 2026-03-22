@@ -7,15 +7,11 @@ import { describe, expect, it } from 'vitest'
 import {
   composeRotations,
   createIdentityMatrix,
-  createPlaneName,
   createRotationMatrix,
   determinant,
-  getAxisName,
-  getRotationPlaneCount,
   getRotationPlanes,
   multiplyMatrices,
   multiplyMatrixVector,
-  parsePlaneName,
   transposeMatrix,
 } from '@/lib/math'
 
@@ -32,37 +28,6 @@ function matrixAt(matrix: Float32Array, dim: number, row: number, col: number): 
 }
 
 describe('Rotation Operations', () => {
-  describe('getRotationPlaneCount', () => {
-    it('returns correct count for 3D', () => {
-      // 3(2)/2 = 3 planes
-      expect(getRotationPlaneCount(3)).toBe(3)
-    })
-
-    it('returns correct count for 4D', () => {
-      // 4(3)/2 = 6 planes
-      expect(getRotationPlaneCount(4)).toBe(6)
-    })
-
-    it('returns correct count for 5D', () => {
-      // 5(4)/2 = 10 planes
-      expect(getRotationPlaneCount(5)).toBe(10)
-    })
-
-    it('returns correct count for 6D', () => {
-      // 6(5)/2 = 15 planes
-      expect(getRotationPlaneCount(6)).toBe(15)
-    })
-
-    it('throws error for dimension < 2', () => {
-      expect(() => getRotationPlaneCount(1)).toThrow()
-      expect(() => getRotationPlaneCount(0)).toThrow()
-    })
-
-    it('throws error for non-integer dimensions', () => {
-      expect(() => getRotationPlaneCount(2.5)).toThrow('integer')
-    })
-  })
-
   describe('getRotationPlanes', () => {
     it('returns 3 planes for 3D space', () => {
       const planes = getRotationPlanes(3)
@@ -105,22 +70,6 @@ describe('Rotation Operations', () => {
 
     it('throws error for non-integer dimensions', () => {
       expect(() => getRotationPlanes(3.5)).toThrow('integer')
-    })
-  })
-
-  describe('getAxisName', () => {
-    it('returns correct names for standard axes', () => {
-      expect(getAxisName(0)).toBe('X')
-      expect(getAxisName(1)).toBe('Y')
-      expect(getAxisName(2)).toBe('Z')
-      expect(getAxisName(3)).toBe('W')
-      expect(getAxisName(4)).toBe('V')
-      expect(getAxisName(5)).toBe('U')
-    })
-
-    it('returns numeric names for higher dimensions', () => {
-      expect(getAxisName(6)).toBe('A6')
-      expect(getAxisName(7)).toBe('A7')
     })
   })
 
@@ -307,40 +256,6 @@ describe('Rotation Operations', () => {
     })
   })
 
-  describe('parsePlaneName', () => {
-    it('parses standard plane names', () => {
-      expect(parsePlaneName('XY')).toEqual([0, 1])
-      expect(parsePlaneName('XZ')).toEqual([0, 2])
-      expect(parsePlaneName('YZ')).toEqual([1, 2])
-      expect(parsePlaneName('XW')).toEqual([0, 3])
-    })
-
-    it('returns indices in sorted order', () => {
-      expect(parsePlaneName('YX')).toEqual([0, 1])
-      expect(parsePlaneName('ZX')).toEqual([0, 2])
-    })
-
-    it('throws error for invalid plane names', () => {
-      expect(() => parsePlaneName('XX')).toThrow()
-      expect(() => parsePlaneName('ABC')).toThrow()
-      expect(() => parsePlaneName('X')).toThrow()
-    })
-  })
-
-  describe('createPlaneName', () => {
-    it('creates plane names from indices', () => {
-      expect(createPlaneName(0, 1)).toBe('XY')
-      expect(createPlaneName(0, 2)).toBe('XZ')
-      expect(createPlaneName(1, 2)).toBe('YZ')
-      expect(createPlaneName(0, 3)).toBe('XW')
-    })
-
-    it('returns sorted plane name', () => {
-      expect(createPlaneName(1, 0)).toBe('XY')
-      expect(createPlaneName(2, 0)).toBe('XZ')
-    })
-  })
-
   describe('N-dimensional rotation properties', () => {
     it('full 2π rotation returns to identity', () => {
       const R = createRotationMatrix(4, 0, 1, 2 * Math.PI)
@@ -435,16 +350,6 @@ describe('Rotation Operations', () => {
       expect(names).toContain('XA6')
       expect(names).toContain('A6A7')
       expect(names).toContain('A9A10')
-    })
-
-    it('parsePlaneName handles high-dimension plane names', () => {
-      expect(parsePlaneName('XA6')).toEqual([0, 6])
-      expect(parsePlaneName('A6A7')).toEqual([6, 7])
-      expect(parsePlaneName('UA6')).toEqual([5, 6])
-    })
-
-    it('parsePlaneName rejects axes with same index', () => {
-      expect(() => parsePlaneName('XX')).toThrow()
     })
   })
 

@@ -11,14 +11,6 @@ export const isMac =
   typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
 /**
- * Get the primary modifier key symbol for the current platform
- * @returns '⌘' on Mac, 'Ctrl' on Windows/Linux
- */
-export function getModifierKey(): string {
-  return isMac ? '⌘' : 'Ctrl'
-}
-
-/**
  * Get all modifier key symbols for the current platform
  * @returns Object with ctrl, shift, alt symbols
  */

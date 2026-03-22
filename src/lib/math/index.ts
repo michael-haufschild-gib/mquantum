@@ -42,15 +42,7 @@ export {
 } from './matrix'
 
 // Rotation operations
-export {
-  composeRotations,
-  createPlaneName,
-  createRotationMatrix,
-  getAxisName,
-  getRotationPlaneCount,
-  getRotationPlanes,
-  parsePlaneName,
-} from './rotation'
+export { composeRotations, createRotationMatrix, getRotationPlanes } from './rotation'
 
 // Transformation operations
 export { createScaleMatrix } from './transform'

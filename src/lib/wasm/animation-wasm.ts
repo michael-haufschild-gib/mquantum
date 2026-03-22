@@ -16,7 +16,7 @@
  */
 
 import { logger } from '@/lib/logger'
-import type { MatrixND, VectorND } from '@/lib/math/types'
+import type { VectorND } from '@/lib/math/types'
 
 // WASM module types
 interface WasmModule {
@@ -303,50 +303,6 @@ export function subtractVectorsWasm(a: Float64Array, b: Float64Array): Float64Ar
 // Helper Functions for Data Conversion
 // ============================================================================
 
-// OPT-WASM-1: Pool Float64Array instances to avoid per-call allocations
-// Key: size, Value: pooled array (simple single-item pool per size)
-const float64Pool = new Map<number, Float64Array>()
-
-/** Maximum pooled buffer size (64KB of float64s = 8KB) */
-const MAX_POOL_SIZE = 8192
-
-/**
- * Get or create a pooled Float64Array of the requested size.
- * The returned array may contain stale data - caller must fill it.
- * @param size - Requested array size
- * @returns Float64Array of the requested size
- */
-function getPooledFloat64(size: number): Float64Array {
-  if (size > MAX_POOL_SIZE) {
-    return new Float64Array(size)
-  }
-  const pooled = float64Pool.get(size)
-  if (pooled) {
-    return pooled
-  }
-  const fresh = new Float64Array(size)
-  float64Pool.set(size, fresh)
-  return fresh
-}
-
-/**
- * Convert a MatrixND (Float32Array) to Float64Array for WASM input.
- * @param matrix - Input matrix as Float32Array
- * @returns Matrix as Float64Array
- */
-export function matrixToFloat64(matrix: MatrixND): Float64Array {
-  return new Float64Array(matrix)
-}
-
-/**
- * Convert a VectorND (number[]) to Float64Array for WASM input.
- * @param vector - Input vector as number[]
- * @returns Vector as Float64Array
- */
-export function vectorToFloat64(vector: VectorND): Float64Array {
-  return new Float64Array(vector)
-}
-
 /**
  * Convert Float64Array result back to VectorND (number[]).
  * @param vector - Input vector as Float64Array
@@ -354,41 +310,4 @@ export function vectorToFloat64(vector: VectorND): Float64Array {
  */
 export function float64ToVector(vector: Float64Array): VectorND {
   return Array.from(vector)
-}
-
-/**
- * Flatten 2D vertices array to Float64Array.
- * OPT-WASM-1: Uses pooled arrays to avoid per-call allocations.
- * @param vertices - Array of vertex arrays
- * @returns Flat Float64Array (may be pooled - do not store reference long-term)
- */
-export function flattenVertices(vertices: VectorND[]): Float64Array {
-  if (vertices.length === 0) return new Float64Array(0)
-
-  const dimension = vertices[0]!.length
-  if (dimension === 0) {
-    throw new Error('Vertex dimension must be at least 1')
-  }
-
-  const size = vertices.length * dimension
-  const flat = getPooledFloat64(size)
-
-  for (let i = 0; i < vertices.length; i++) {
-    const v = vertices[i]!
-    if (v.length !== dimension) {
-      throw new Error(
-        `Vertex dimension mismatch at index ${i}: expected ${dimension}, got ${v.length}`
-      )
-    }
-
-    const offset = i * dimension
-    for (let j = 0; j < dimension; j++) {
-      const value = v[j]!
-      if (!Number.isFinite(value)) {
-        throw new Error(`Vertex coordinate must be finite at vertex ${i}, axis ${j}`)
-      }
-      flat[offset + j] = value
-    }
-  }
-  return flat
 }
