@@ -133,6 +133,7 @@ describe('extractSchrodingerConfig', () => {
       'tdseDynamics',
       'becDynamics',
       'diracEquation',
+      'quantumWalk',
     ] as const
     for (const mode of computeModes) {
       const extracted = extractSchrodingerConfig(
@@ -187,6 +188,11 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
   it('falls back to phaseDensity for compute modes with unavailable algorithm', () => {
     const result = normalizeColorAlgorithmForQuantumMode('tdseDynamics', 'radialDistance')
     expect(result).toBe('phaseDensity')
+  })
+
+  it('falls back to phaseCyclicUniform for quantumWalk with unavailable algorithm', () => {
+    const result = normalizeColorAlgorithmForQuantumMode('quantumWalk', 'radialDistance')
+    expect(result).toBe('phaseCyclicUniform')
   })
 
   it('falls back to purityMap when openQuantum is enabled', () => {

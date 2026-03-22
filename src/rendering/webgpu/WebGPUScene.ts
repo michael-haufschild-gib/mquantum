@@ -319,6 +319,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         schroedingerCompile.quantumMode === 'tdseDynamics' ||
         schroedingerCompile.quantumMode === 'becDynamics' ||
         schroedingerCompile.quantumMode === 'diracEquation' ||
+        schroedingerCompile.quantumMode === 'quantumWalk' ||
         objectType === 'pauliSpinor' ||
         dimension === 2 ||
         schroedingerCompile.representation === 'wigner'

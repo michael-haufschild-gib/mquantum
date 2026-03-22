@@ -348,12 +348,12 @@ const DataExportButtons: React.FC<{
   observablesHasData?: boolean
 }> = React.memo(({ quantumMode, observablesHasData }) => {
   const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
-  const isDynamic = !isAnalytic && quantumMode !== 'pauliSpinor'
   const hasSaveLoad =
     quantumMode === 'tdseDynamics' ||
     quantumMode === 'becDynamics' ||
     quantumMode === 'freeScalarField' ||
     quantumMode === 'diracEquation' ||
+    quantumMode === 'quantumWalk' ||
     quantumMode === 'pauliSpinor'
 
   // Wavefunction slice availability
@@ -433,7 +433,7 @@ const DataExportButtons: React.FC<{
         )}
 
         {/* Wavefunction slice capture (dynamic modes) */}
-        {isDynamic && !wfSliceHasData && (
+        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && !wfSliceHasData && (
           <Button
             variant="ghost"
             size="sm"
@@ -445,7 +445,7 @@ const DataExportButtons: React.FC<{
             Capture |&psi;|&sup2; Slice
           </Button>
         )}
-        {isDynamic && wfSliceHasData && (
+        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && wfSliceHasData && (
           <Button
             variant="ghost"
             size="sm"

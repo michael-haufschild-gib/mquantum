@@ -38,6 +38,12 @@ export interface QuantumWalkConfig {
   spacing: number[]
   /** Runtime flag to trigger re-initialization */
   needsReset: boolean
+  /** Enable absorbing boundaries (amplitude damping near edges) */
+  absorberEnabled: boolean
+  /** Fraction of grid per side used for absorbing layer (0–0.5) */
+  absorberWidth: number
+  /** Per-step damping target at outer edge (e.g. 1e-6) */
+  pmlTargetReflection: number
 }
 
 /** Default quantum walk configuration. */
@@ -53,6 +59,9 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
   autoScale: true,
   spacing: [0.1, 0.1],
   needsReset: false,
+  absorberEnabled: true,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
 }
 
 /** Maximum total lattice sites for quantum walk (matches MAX_LINEAR_DISPATCH_SITES) */

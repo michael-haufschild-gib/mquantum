@@ -18,7 +18,7 @@ import {
   composeSchroedingerVertexShader2D,
   type SchroedingerWGSLShaderConfig,
 } from '../shaders/schroedinger/compose'
-import { computePipelineCacheKey } from './rendererConfigUtils'
+import { computePipelineCacheKey, isComputeQuantumMode } from './rendererConfigUtils'
 import {
   type SchrodingerRendererConfig,
   SCHROEDINGER_UNIFORM_SIZE,
@@ -196,12 +196,7 @@ async function createSchrodingerPipelineImpl(
   deps: PipelineCreationDeps
 ): Promise<SchrodingerPipelineResources> {
   const dim = rendererConfig.dimension ?? 3
-  const isFreeScalar = rendererConfig.quantumMode === 'freeScalarField'
-  const isTdse =
-    rendererConfig.quantumMode === 'tdseDynamics' || rendererConfig.quantumMode === 'becDynamics'
-  const isDirac = rendererConfig.quantumMode === 'diracEquation'
-  const isPauli = rendererConfig.isPauli === true
-  const isComputeMode = isFreeScalar || isTdse || isDirac || isPauli
+  const isComputeMode = isComputeQuantumMode(rendererConfig)
   const pipelineIs2D = !isComputeMode && (dim === 2 || rendererConfig.representation === 'wigner')
 
   // =====================================================================

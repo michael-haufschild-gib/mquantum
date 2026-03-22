@@ -65,18 +65,23 @@ export function handleDisabledPassthrough(
     const outputTexture = pool.getTexture(outputId)
 
     if (inputTexture && outputTexture) {
-      const dimMatch =
-        inputTexture.width === outputTexture.width && inputTexture.height === outputTexture.height
-      const fmtMatch = inputTexture.format === outputTexture.format
-
-      if (dimMatch && fmtMatch) {
-        encoder.copyTextureToTexture(
-          { texture: inputTexture },
-          { texture: outputTexture },
-          { width: inputTexture.width, height: inputTexture.height }
-        )
+      // Same texture — output already contains input data, nothing to do
+      if (inputTexture === outputTexture) {
+        // no-op
       } else {
-        resourceAliases.set(outputId, inputId)
+        const dimMatch =
+          inputTexture.width === outputTexture.width && inputTexture.height === outputTexture.height
+        const fmtMatch = inputTexture.format === outputTexture.format
+
+        if (dimMatch && fmtMatch) {
+          encoder.copyTextureToTexture(
+            { texture: inputTexture },
+            { texture: outputTexture },
+            { width: inputTexture.width, height: inputTexture.height }
+          )
+        } else {
+          resourceAliases.set(outputId, inputId)
+        }
       }
     }
   }

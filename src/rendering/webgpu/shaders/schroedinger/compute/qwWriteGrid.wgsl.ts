@@ -57,6 +57,7 @@ export const qwWriteGridBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> params: QWWriteGridUniforms;
 @group(0) @binding(1) var<storage, read> coinState: array<f32>;
 @group(0) @binding(2) var outputTex: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(3) var<storage, read_write> maxDensityAtomic: atomic<u32>;
 
 // Convert N-D world position to lattice coordinates with trilinear interpolation.
 fn worldToLatticeInterp(
@@ -217,10 +218,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     blendedPhase /= totalWeight;
   }
 
+  // Track peak probability for next-frame normalization.
+  // IEEE 754 positive floats compare correctly as unsigned integers,
+  // so bitcast to u32 for atomicMax.
+  let rawProb = blendedProb * perpFalloff;
+  atomicMax(&maxDensityAtomic, bitcast<u32>(rawProb));
+
   let maxD = max(params.maxDensity, 1e-20);
-  let normDensity = clamp(blendedProb / maxD * perpFalloff, 0.0, 1.0);
+  let normDensity = clamp(rawProb / maxD, 0.0, 1.0);
   let logDensity = log(normDensity + 1e-10);
 
-  textureStore(outputTex, gid, vec4f(normDensity, logDensity, blendedPhase, 0.0));
+  textureStore(outputTex, gid, vec4f(normDensity, logDensity, blendedPhase, normDensity));
 }
 `

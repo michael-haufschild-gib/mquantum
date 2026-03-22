@@ -83,6 +83,12 @@ function useAbsorber(objectType: string) {
           setWidth: s.setDiracAbsorberWidth,
           setPmlTargetReflection: s.setDiracPmlTargetReflection,
         },
+        quantumWalk: {
+          cfg: cfg.quantumWalk,
+          setEnabled: s.setQwAbsorberEnabled,
+          setWidth: s.setQwAbsorberWidth,
+          setPmlTargetReflection: s.setQwPmlTargetReflection,
+        },
       } as const
 
       const m = modeMap[qm as keyof typeof modeMap]

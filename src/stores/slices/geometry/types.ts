@@ -405,6 +405,9 @@ export interface SchroedingerSliceActions {
 
   // Quantum Walk
   clearQuantumWalkNeedsReset: () => void
+  setQwAbsorberEnabled: (enabled: boolean) => void
+  setQwAbsorberWidth: (width: number) => void
+  setQwPmlTargetReflection: (r: number) => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void

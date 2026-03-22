@@ -158,6 +158,10 @@ export function normalizeColorAlgorithmForQuantumMode(
 
   if (openQuantumEnabled) return 'purityMap'
   if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
+  // Quantum Walk: use phase-only coloring (constant brightness from Oklab L=0.72).
+  // phaseDensity maps log-density to brightness, which produces near-black for
+  // QW's dilute per-site probability after spreading.
+  if (quantumMode === 'quantumWalk') return 'phaseCyclicUniform'
   if (
     quantumMode === 'tdseDynamics' ||
     quantumMode === 'becDynamics' ||
@@ -175,8 +179,9 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
   const isTdse = config.quantumMode === 'tdseDynamics'
   const isBec = config.quantumMode === 'becDynamics'
   const isDirac = config.quantumMode === 'diracEquation'
+  const isQuantumWalk = config.quantumMode === 'quantumWalk'
   const isPauli = config.objectType === 'pauliSpinor'
-  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
+  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isQuantumWalk || isPauli
   const is2D = !isComputeMode && (config.dimension === 2 || config.representation === 'wigner')
 
   const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
@@ -243,7 +248,13 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.objectType !== next.objectType) return true
   if (previous.quantumMode === next.quantumMode) return false
-  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
+  const computeModes = new Set([
+    'freeScalarField',
+    'tdseDynamics',
+    'becDynamics',
+    'diracEquation',
+    'quantumWalk',
+  ])
   return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
 }
 

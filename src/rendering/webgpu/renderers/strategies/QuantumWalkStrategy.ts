@@ -8,6 +8,8 @@
  * @module rendering/webgpu/renderers/strategies/QuantumWalkStrategy
  */
 
+import { useSimulationStateStore } from '@/stores/simulationStateStore'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { QuantumWalkComputePass } from '../../passes/QuantumWalkComputePass'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
@@ -70,7 +72,7 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     }
 
     return {
-      initPromises: [this.qwPass.initialize(ctx)],
+      initPromises: [],
       additionalLayoutEntries,
       getBindGroupEntries: () => {
         if (!densityTextureView || !sampler) return []
@@ -122,6 +124,20 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     // Clear needsReset after processing
     if (qwConfig.needsReset) {
       extended?.clearQuantumWalkNeedsReset?.()
+    }
+
+    // Simulation state save/load
+    const simState = useSimulationStateStore.getState()
+    if (simState.saveRequested) {
+      simState.clearSaveRequest()
+      qwPass.requestStateSave(ctx)
+    }
+    if (simState.pendingLoadData) {
+      const loadData = simState.pendingLoadData
+      if (loadData.quantumMode === 'quantumWalk') {
+        qwPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+        simState.clearLoadData()
+      }
     }
   }
 

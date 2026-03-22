@@ -358,6 +358,34 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setQwAbsorberEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumWalk: { ...state.schroedinger.quantumWalk, absorberEnabled: enabled },
+        },
+      }))
+    },
+    setQwAbsorberWidth: (width) => {
+      if (!isFinite(width)) return
+      const clamped = Math.max(0.05, Math.min(0.5, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumWalk: { ...state.schroedinger.quantumWalk, absorberWidth: clamped },
+        },
+      }))
+    },
+    setQwPmlTargetReflection: (r) => {
+      if (!isFinite(r)) return
+      const clamped = Math.max(1e-12, Math.min(0.999, r))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumWalk: { ...state.schroedinger.quantumWalk, pmlTargetReflection: clamped },
+        },
+      }))
+    },
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {

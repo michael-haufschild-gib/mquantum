@@ -24,6 +24,7 @@ export function isComputeQuantumMode(config: SchrodingerRendererConfig): boolean
     config.quantumMode === 'tdseDynamics' ||
     config.quantumMode === 'becDynamics' ||
     config.quantumMode === 'diracEquation' ||
+    config.quantumMode === 'quantumWalk' ||
     config.isPauli === true
   )
 }
