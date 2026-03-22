@@ -255,7 +255,8 @@ export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
-  objectType: string = 'schroedinger'
+  objectType: string = 'schroedinger',
+  freeScalarInitialCondition?: string
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per
   // field view. Expose the Pauli-specific algorithms (which match the grid layout)
@@ -341,6 +342,11 @@ export function getAvailableColorAlgorithms(
       'energyFlux',
       'kSpaceOccupation',
     ])
+    // Exact vacuum has n_k = 0 for all modes (zero-point subtracted), so the
+    // k-space occupation map is correctly but unhelpfully blank.
+    if (freeScalarInitialCondition === 'vacuumNoise') {
+      computeValidAlgos.delete('kSpaceOccupation')
+    }
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
 

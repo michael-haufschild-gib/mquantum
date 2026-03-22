@@ -328,26 +328,26 @@ test.describe('free scalar field: k-space occupation map', () => {
     await requireWebGPU(page, test.info())
   })
 
-  test('kSpaceOccupation + vacuumNoise 3D: no GPU errors', async ({ page }) => {
-    // Vacuum k-space occupation produces scattered dim dots that fade as PML
-    // absorbs boundary modes. The pixel values are below the screenshot dark
-    // threshold (25 RGB) in headless Chrome, so pixel assertion is skipped.
-    // The real value: the fixture auto-catches any GPU/shader/pipeline errors
-    // from this specific combination of k-space FFT readback + vacuum init.
+  test('kSpaceOccupation unavailable for vacuumNoise (auto-switches away)', async ({ page }) => {
+    // Exact vacuum has n_k = 0 for all modes (zero-point subtracted), so the
+    // k-space occupation map is correctly but unhelpfully blank. The UI gates
+    // this combination — verify the auto-switch works at runtime.
     await gotoMode(page, 'freeScalarField', 3)
     await waitForRendererReady(page)
-    await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
-      const app = await import('/src/stores/appearanceStore.ts')
-      const store = ext.useExtendedObjectStore.getState()
-      store.setFreeScalarAbsorberEnabled(false)
-      store.setFreeScalarInitialCondition('vacuumNoise')
-      app.useAppearanceStore.setState({ colorAlgorithm: 'kSpaceOccupation' })
-    })
     await waitForShaderCompilation(page)
+    // Set kSpaceOccupation first, then switch to vacuumNoise
+    await setColorAlgorithm(page, 'kSpaceOccupation')
+    await setInitialCondition(page, 'vacuumNoise')
+    // The UI auto-effect should switch away from kSpaceOccupation
     const fc = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc + 120)
-    // GPU error detection is automatic via fixtures — no pixel assertion needed
+    await waitForFrameAdvance(page, fc + 30)
+    const algo = await page.evaluate(async () => {
+      const mod = await import('/src/stores/appearanceStore.ts')
+      return mod.useAppearanceStore.getState().colorAlgorithm
+    })
+    expect(algo, 'kSpaceOccupation should auto-switch away for vacuumNoise').not.toBe(
+      'kSpaceOccupation'
+    )
   })
 
   test('kSpaceOccupation + gaussianPacket 3D renders', async ({ page }) => {

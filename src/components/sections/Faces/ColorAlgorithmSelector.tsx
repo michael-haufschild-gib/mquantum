@@ -29,21 +29,29 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       }))
     )
 
-    const { quantumMode, representation, openQuantumEnabled } = useExtendedObjectStore(
-      useShallow((s) => ({
-        quantumMode: s.schroedinger.quantumMode,
-        representation: s.schroedinger.representation,
-        openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
-      }))
-    )
+    const { quantumMode, representation, openQuantumEnabled, freeScalarInitialCondition } =
+      useExtendedObjectStore(
+        useShallow((s) => ({
+          quantumMode: s.schroedinger.quantumMode,
+          representation: s.schroedinger.representation,
+          openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
+          freeScalarInitialCondition: s.schroedinger.freeScalar.initialCondition,
+        }))
+      )
     const effectiveOpenQuantumEnabled =
       openQuantumEnabled &&
       (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
       representation !== 'wigner'
 
     const availableOptions = useMemo(
-      () => getAvailableColorAlgorithms(quantumMode, effectiveOpenQuantumEnabled, objectType),
-      [quantumMode, effectiveOpenQuantumEnabled, objectType]
+      () =>
+        getAvailableColorAlgorithms(
+          quantumMode,
+          effectiveOpenQuantumEnabled,
+          objectType,
+          quantumMode === 'freeScalarField' ? freeScalarInitialCondition : undefined
+        ),
+      [quantumMode, effectiveOpenQuantumEnabled, objectType, freeScalarInitialCondition]
     )
 
     const selectOptions = useMemo(
