@@ -133,6 +133,7 @@ export class WebGPUDevice {
         maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
         maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ,
         maxComputeInvocationsPerWorkgroup: adapter.limits.maxComputeInvocationsPerWorkgroup,
+        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
         maxBindGroups: adapter.limits.maxBindGroups,
         maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
       },

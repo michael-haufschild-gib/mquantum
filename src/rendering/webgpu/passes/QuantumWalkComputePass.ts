@@ -37,6 +37,7 @@ import {
   DENSITY_GRID_SIZE,
   GRID_WG,
 } from './computePassUtils'
+import { packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
 
 const COIN_WG = 64
 
@@ -87,6 +88,8 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   private maxDensityReadbackBuffer: GPUBuffer | null = null
   private gpuMaxDensity = 1.0
   private readbackPending = false
+  /** Monotonic epoch — incremented on dispose to invalidate in-flight async readbacks. */
+  private readbackEpoch = 0
 
   // Save/load state
   private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
@@ -690,16 +693,25 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
     this.readbackPending = true
     const readbackBuf = this.maxDensityReadbackBuffer
+    const epoch = this.readbackEpoch
 
     ctx.device.queue
       .onSubmittedWorkDone()
       .then(() => {
+        if (epoch !== this.readbackEpoch) {
+          this.readbackPending = false
+          return
+        }
         if (!readbackBuf || readbackBuf.mapState !== 'unmapped') {
           this.readbackPending = false
           return
         }
         readbackBuf.mapAsync(GPUMapMode.READ).then(
           () => {
+            if (epoch !== this.readbackEpoch) {
+              this.readbackPending = false
+              return
+            }
             const mapped = readbackBuf.getMappedRange()
             // The shader stores bitcast<u32>(f32) via atomicMax.
             // Reinterpret the u32 bytes as f32 to recover the peak density.
@@ -730,60 +742,16 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     basisZ: Float32Array | undefined,
     boundingRadius: number
   ): void {
-    const buf = new ArrayBuffer(QW_WRITE_GRID_UNIFORMS_SIZE)
-    const u32 = new Uint32Array(buf)
-    const f32 = new Float32Array(buf)
-
-    const numCoinStates = 2 * config.latticeDim
-    const fieldViewMap: Record<string, number> = { probability: 0, phase: 1, coinState: 2 }
-
-    // Scalars (offset 0-15)
-    u32[0] = config.latticeDim
-    u32[1] = this.totalSites
-    u32[2] = numCoinStates
-    u32[3] = fieldViewMap[config.fieldView] ?? 0
-
-    // gridSize (offset 16, 12 u32)
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[4 + d] = config.gridSize[d] ?? 64
-    }
-
-    // strides (offset 64, 12 u32)
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[16 + d] = strides[d] ?? 1
-    }
-
-    // spacing (offset 112, 12 f32)
-    for (let d = 0; d < config.latticeDim; d++) {
-      f32[28 + d] = config.spacing[d] ?? 0.1
-    }
-
-    // Rendering parameters (offset 160)
-    f32[40] = boundingRadius
-    // maxDensity from GPU atomicMax readback (1-frame lag, like TDSE's diagnostics).
-    // The shader also writes the current frame's peak to the atomic buffer.
-    f32[41] = Math.max(this.gpuMaxDensity, 1e-8)
-    u32[42] = 0 // _pad0
-    u32[43] = 0 // _pad1
-
-    // basisX (offset 176, 12 f32)
-    for (let d = 0; d < 12; d++) {
-      f32[44 + d] = basisX?.[d] ?? (d === 0 ? 1 : 0)
-    }
-
-    // basisY (offset 224, 12 f32)
-    for (let d = 0; d < 12; d++) {
-      f32[56 + d] = basisY?.[d] ?? (d === 1 ? 1 : 0)
-    }
-
-    // basisZ (offset 272, 12 f32)
-    for (let d = 0; d < 12; d++) {
-      f32[68 + d] = basisZ?.[d] ?? (d === 2 ? 1 : 0)
-    }
-
-    // slicePositions (offset 320, 12 f32) — all 0 for now
-    // (extra dimensions beyond 3 are sliced at center)
-
+    const buf = packWriteGridUniforms(
+      config,
+      this.totalSites,
+      this.gpuMaxDensity,
+      strides,
+      basisX,
+      basisY,
+      basisZ,
+      boundingRadius
+    )
     device.queue.writeBuffer(this.writeGridUniformBuffer!, 0, buf)
   }
 
@@ -792,6 +760,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    this.readbackEpoch++
     this.coinStateA?.destroy()
     this.coinStateB?.destroy()
     this.coinUniformBuffer?.destroy()
