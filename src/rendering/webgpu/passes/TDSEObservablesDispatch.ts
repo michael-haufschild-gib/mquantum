@@ -177,6 +177,7 @@ export function dispatchObservablesReadback(
   const momStaging = res.momStagingBuffer
   const latticeDim = config.latticeDim
   const hbar = config.hbar
+  const mass = config.mass ?? 1
   const gen = state.diagGeneration
 
   device.queue
@@ -194,7 +195,7 @@ export function dispatchObservablesReadback(
         .then(() => {
           const posData = new Float32Array(posStaging.getMappedRange())
           const momData = new Float32Array(momStaging.getMappedRange())
-          const snapshot = processObservablesReadback(posData, momData, latticeDim, hbar)
+          const snapshot = processObservablesReadback(posData, momData, latticeDim, hbar, mass)
           posStaging.unmap()
           momStaging.unmap()
           if (snapshot) useObservablesDiagnosticsStore.getState().pushSnapshot(snapshot)

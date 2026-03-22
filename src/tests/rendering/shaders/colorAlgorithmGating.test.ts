@@ -119,6 +119,23 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     }
   })
 
+  it('quantumWalk uses grid-compatible algorithms (same as TDSE/BEC)', () => {
+    const algos = getAvailableColorAlgorithms('quantumWalk', false)
+    const values = algos.map((a) => a.value)
+
+    // Grid-compatible algorithms should be present
+    expect(values).toContain('blackbody')
+    expect(values).toContain('phaseDensity')
+    expect(values).toContain('viridis')
+    expect(values).toContain('inferno')
+
+    // Geometric algorithms that read world-space position should be absent
+    expect(values).not.toContain('radialDistance')
+    expect(values).not.toContain('lch')
+    expect(values).not.toContain('radial')
+    expect(values).not.toContain('multiSource')
+  })
+
   it('excludes phase-dependent algorithms for hydrogenND in OQ mode', () => {
     const algos = getAvailableColorAlgorithms('hydrogenND', true)
     const values = algos.map((a) => a.value)

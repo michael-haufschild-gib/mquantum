@@ -289,7 +289,11 @@ export function getAvailableColorAlgorithms(
   // from the grid's R/B channels produce meaningful coloring. Geometric algorithms
   // (lch, radial, multiSource, radialDistance, phase, mixed) color by world-space
   // position and silently fall back to blackbody — remove them from the dropdown.
-  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
+  if (
+    quantumMode === 'tdseDynamics' ||
+    quantumMode === 'becDynamics' ||
+    quantumMode === 'quantumWalk'
+  ) {
     const computeValidAlgos = new Set<string>([
       'blackbody', // R (density) → heat ramp
       'phaseCyclicUniform', // B (phase) → perceptual cyclic hue

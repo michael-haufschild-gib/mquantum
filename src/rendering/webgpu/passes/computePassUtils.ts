@@ -1,7 +1,9 @@
 /**
- * Shared utilities and constants for split-operator compute passes
- * (TDSE, Dirac, Pauli).
+ * Shared utilities and constants for GPU compute passes
+ * (TDSE, Dirac, Pauli, QuantumWalk, FreeScalar).
  */
+
+import { logger } from '@/lib/logger'
 
 /** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
 export const LINEAR_WG = 64
@@ -83,65 +85,71 @@ export function computeStrides(gridSize: number[]): number[] {
 }
 
 /**
+ * Compute row-major strides for a grid, padded to MAX_DIM with zeros.
+ * Used by TDSE/Dirac/Pauli compute passes that pass strides in a fixed-size uniform array.
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions
+ * @returns Stride array of length MAX_DIM
+ */
+export function computeStridesPadded(gridSize: number[], latticeDim: number): number[] {
+  const strides = new Array(MAX_DIM).fill(0) as number[]
+  if (latticeDim > 0) {
+    strides[latticeDim - 1] = 1
+    for (let d = latticeDim - 2; d >= 0; d--) {
+      strides[d] = strides[d + 1]! * gridSize[d + 1]!
+    }
+  }
+  return strides
+}
+
+/**
+ * Sanitize grid sizes: snap to power-of-2, enforce dispatch limits.
+ * @param config - Config containing gridSize and latticeDim
+ * @returns Config with sanitized gridSize (may be the same reference if no change needed)
+ */
+export function sanitizeGridSizes<T extends { gridSize: number[]; latticeDim: number }>(
+  config: T
+): T {
+  const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
+  const activeGrid = pow2Grid.slice(0, config.latticeDim)
+  const fittedActive = reduceGridToFit(activeGrid)
+  const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
+  if (fixed.every((g, i) => g === config.gridSize[i])) return config
+  logger.warn(`[compute] Grid sizes sanitized: ${config.gridSize} -> ${fixed}`)
+  return { ...config, gridSize: fixed }
+}
+
+/**
+ * Compute a hash string for config identity (grid topology).
+ * @param gridSize - Per-axis grid dimensions
+ * @param latticeDim - Number of active lattice dimensions
+ * @returns Hash string
+ */
+export function computeConfigHash(gridSize: number[], latticeDim: number): string {
+  return `${gridSize.join('x')}_d${latticeDim}`
+}
+
+/**
  * Create a 3D density grid texture for volume visualization.
  * @param device - WebGPU device
  * @param label - Texture label prefix
+ * @param extraUsage - Additional GPUTextureUsage flags (e.g. COPY_DST for FreeScalar)
  * @returns GPUTexture with rgba16float format, sized DENSITY_GRID_SIZE^3
  */
-export function createDensityTexture(device: GPUDevice, label: string): GPUTexture {
+export function createDensityTexture(
+  device: GPUDevice,
+  label: string,
+  extraUsage: GPUTextureUsageFlags = 0
+): GPUTexture {
   return device.createTexture({
     label: `${label}-density-grid`,
     size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
     format: 'rgba16float',
     dimension: '3d',
     usage:
-      GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      GPUTextureUsage.STORAGE_BINDING |
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_SRC |
+      extraUsage,
   })
-}
-
-/**
- * Create paired FFT scratch buffers for split-operator methods.
- * @param device - WebGPU device
- * @param totalSites - Total number of lattice sites
- * @param label - Buffer label prefix
- * @returns Tuple of [scratchA, scratchB]
- */
-export function createFFTScratchBuffers(
-  device: GPUDevice,
-  totalSites: number,
-  label: string
-): [GPUBuffer, GPUBuffer] {
-  const size = totalSites * 8 // 2 × f32 per site (complex)
-  const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
-  return [
-    device.createBuffer({ label: `${label}-fft-scratch-a`, size, usage }),
-    device.createBuffer({ label: `${label}-fft-scratch-b`, size, usage }),
-  ]
-}
-
-/**
- * Create diagnostic result + staging buffers for GPU readback.
- * @param device - WebGPU device
- * @param resultCount - Number of f32 values in the result
- * @param label - Buffer label prefix
- * @returns Tuple of [resultBuffer, stagingBuffer]
- */
-export function createDiagnosticBuffers(
-  device: GPUDevice,
-  resultCount: number,
-  label: string
-): [GPUBuffer, GPUBuffer] {
-  const size = resultCount * 4
-  return [
-    device.createBuffer({
-      label: `${label}-diag-result`,
-      size,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    }),
-    device.createBuffer({
-      label: `${label}-diag-staging`,
-      size,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    }),
-  ]
 }

@@ -4,9 +4,13 @@
  * Extracts a 1D line from the 3D density texture and writes it
  * as a single row in the 2D rolling carpet texture.
  *
- * The density texture channels:
- * - .r = |ψ|² (linear density)
- * - .g = log(|ψ|² + ε) (log density)
+ * Always reads raw |ψ|² from the density texture's alpha channel (.a),
+ * which stores the field-view-independent normalized density. This ensures
+ * the quantum carpet always shows probability density regardless of which
+ * field view (density, phase, current, velocity, etc.) is active.
+ *
+ * Alpha dual encoding: .a >= 0 is rawDensity, .a < 0 is -potOverlay.
+ * The carpet takes max(.a, 0) to ignore potential overlay values.
  *
  * @module rendering/webgpu/shaders/schroedinger/compute/carpetSlice
  */
@@ -45,7 +49,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let sample = textureLoad(densityTex, coord, 0);
-  let value = select(sample.r, sample.g, params.useLogScale == 1u);
+  // Read raw |ψ|² from .a (always non-negative density; negative = potOverlay, ignored)
+  let rawDensity = max(sample.a, 0.0);
+  let value = select(rawDensity, log(rawDensity + 1e-10), params.useLogScale == 1u);
 
   textureStore(carpetTex, vec2u(i, params.writeRow), vec4f(value, 0.0, 0.0, 1.0));
 }

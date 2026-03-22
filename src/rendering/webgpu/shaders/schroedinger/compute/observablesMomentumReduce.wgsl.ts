@@ -36,7 +36,7 @@ struct ObsMomReduceUniforms {
 
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> sdata: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
 
 @compute @workgroup_size(256)
 fn main(
@@ -49,7 +49,7 @@ fn main(
   let nc = obsParams.numChannels;
 
   for (var ch: u32 = 0u; ch < nc; ch++) {
-    shared[local * MAX_CHANNELS + ch] = 0.0;
+    sdata[local * MAX_CHANNELS + ch] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
@@ -59,7 +59,7 @@ fn main(
     let density = re * re + im * im;
 
     // Channel 0: k-space norm
-    shared[local * MAX_CHANNELS] = density;
+    sdata[local * MAX_CHANNELS] = density;
 
     // Decompose linear index to N-D coordinates
     let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, obsParams.latticeDim);
@@ -72,8 +72,8 @@ fn main(
       let kVal = obsParams.kGridScale[d] * f32(kIdx);
 
       let chBase = 1u + d * 2u;
-      shared[local * MAX_CHANNELS + chBase] = kVal * density;          // k_d * |φ|²
-      shared[local * MAX_CHANNELS + chBase + 1u] = kVal * kVal * density; // k_d² * |φ|²
+      sdata[local * MAX_CHANNELS + chBase] = kVal * density;          // k_d * |φ|²
+      sdata[local * MAX_CHANNELS + chBase + 1u] = kVal * kVal * density; // k_d² * |φ|²
     }
   }
   workgroupBarrier();
@@ -82,7 +82,7 @@ fn main(
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch++) {
-        shared[local * MAX_CHANNELS + ch] += shared[(local + stride) * MAX_CHANNELS + ch];
+        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
       }
     }
     workgroupBarrier();
@@ -90,7 +90,7 @@ fn main(
 
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      partials[wid.x * nc + ch] = shared[ch];
+      partials[wid.x * nc + ch] = sdata[ch];
     }
   }
 }
@@ -121,7 +121,7 @@ struct ObsMomReduceUniforms {
 
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 6144>;
+var<workgroup> sdata: array<f32, 6144>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -131,13 +131,13 @@ fn main(
   let nc = obsParams.numChannels;
 
   for (var ch: u32 = 0u; ch < nc; ch++) {
-    shared[local * MAX_CHANNELS + ch] = 0.0;
+    sdata[local * MAX_CHANNELS + ch] = 0.0;
   }
 
   var i = local;
   while (i < obsParams.numWorkgroups) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      shared[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
+      sdata[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
     }
     i += WG_SIZE;
   }
@@ -146,7 +146,7 @@ fn main(
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch++) {
-        shared[local * MAX_CHANNELS + ch] += shared[(local + stride) * MAX_CHANNELS + ch];
+        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
       }
     }
     workgroupBarrier();
@@ -154,7 +154,7 @@ fn main(
 
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      result[ch] = shared[ch];
+      result[ch] = sdata[ch];
     }
   }
 }

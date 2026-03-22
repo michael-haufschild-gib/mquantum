@@ -28,13 +28,14 @@ import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
+  computeConfigHash,
+  computeStridesPadded,
+  createDensityTexture,
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
-  MAX_DIM,
-  nearestPow2,
-  reduceGridToFit,
+  sanitizeGridSizes,
 } from './computePassUtils'
 import type { DiagDispatchParams, FFTAxisParams } from './DiracComputePassDispatchers'
 import { dispatchDiagnostics, dispatchFFTAxis } from './DiracComputePassDispatchers'
@@ -141,20 +142,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   /** Create density texture eagerly for renderer bind group creation. */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = device.createTexture({
-      label: 'dirac-density-grid',
-      size: {
-        width: DENSITY_GRID_SIZE,
-        height: DENSITY_GRID_SIZE,
-        depthOrArrayLayers: DENSITY_GRID_SIZE,
-      },
-      format: 'rgba16float',
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })
+    this.densityTexture = createDensityTexture(device, 'dirac')
     this.densityTextureView = this.densityTexture.createView({
       label: 'dirac-density-view',
       dimension: '3d',
@@ -255,30 +243,6 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     return this.densityTexture
   }
 
-  /** Ensure all grid sizes are power-of-2 and total sites fit GPU dispatch limits. */
-  private sanitizeGridSizes(config: DiracConfig): DiracConfig {
-    const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
-    const activeGrid = pow2Grid.slice(0, config.latticeDim)
-    const fittedActive = reduceGridToFit(activeGrid)
-    const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
-    if (fixed.every((g, i) => g === config.gridSize[i])) return config
-    logger.warn(`[Dirac] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
-    return { ...config, gridSize: fixed }
-  }
-
-  private computeConfigHash(config: DiracConfig): string {
-    return `${config.gridSize.join('x')}_d${config.latticeDim}_s${spinorSize(config.latticeDim)}`
-  }
-
-  private computeStrides(config: DiracConfig): number[] {
-    const strides = new Array(MAX_DIM).fill(0)
-    strides[config.latticeDim - 1] = 1
-    for (let d = config.latticeDim - 2; d >= 0; d--) {
-      strides[d] = strides[d + 1]! * config.gridSize[d + 1]!
-    }
-    return strides
-  }
-
   /** Bridge object exposing base-class helpers to the extracted setup functions. */
   private get setupHelpers(): DiracPassHelpers {
     return {
@@ -368,7 +332,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.diagMappingInFlight = false
 
     this.initializeDensityTexture(device)
-    this.lastConfigHash = this.computeConfigHash(config)
+    this.lastConfigHash = `${computeConfigHash(config.gridSize, config.latticeDim)}_s${spinorSize(config.latticeDim)}`
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -495,7 +459,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         currentSpinorSize: this.currentSpinorSize,
         simTime: this.simTime,
         maxDensity: this.maxDensity,
-        strides: this.computeStrides(config),
+        strides: computeStridesPadded(config.gridSize, config.latticeDim),
         basisX,
         basisY,
         basisZ,
@@ -534,9 +498,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     basisZ?: Float32Array,
     boundingRadius?: number
   ): void {
-    const config = this.sanitizeGridSizes(rawConfig)
+    const config = sanitizeGridSizes(rawConfig)
     const { device } = ctx
-    const configHash = this.computeConfigHash(config)
+    const configHash = `${computeConfigHash(config.gridSize, config.latticeDim)}_s${spinorSize(config.latticeDim)}`
 
     if (configHash !== this.lastConfigHash || !this.spinorReBuffer) {
       logger.log(`[Dirac-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)

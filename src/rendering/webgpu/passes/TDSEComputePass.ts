@@ -33,13 +33,14 @@ import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
+  computeConfigHash,
+  computeStridesPadded,
+  createDensityTexture,
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
   GRID_WG,
   LINEAR_WG,
-  MAX_DIM,
-  nearestPow2,
-  reduceGridToFit,
+  sanitizeGridSizes,
 } from './computePassUtils'
 import { rebuildTdseBuffers } from './TDSEComputePassBuffers'
 import { computePotentialHash, uploadCustomPotentialBuffer } from './TDSEComputePassCustomPotential'
@@ -49,7 +50,6 @@ import { writeTdseUniforms } from './TDSEComputePassUniforms'
 import {
   disposeObservables,
   type ObservablesState,
-  shouldDispatchObs,
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
@@ -203,20 +203,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Create density texture eagerly for renderer bind group creation. */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = device.createTexture({
-      label: 'tdse-density-grid',
-      size: {
-        width: DENSITY_GRID_SIZE,
-        height: DENSITY_GRID_SIZE,
-        depthOrArrayLayers: DENSITY_GRID_SIZE,
-      },
-      format: 'rgba16float',
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })
+    this.densityTexture = createDensityTexture(device, 'tdse')
     this.densityTextureView = this.densityTexture.createView({
       label: 'tdse-density-view',
       dimension: '3d',
@@ -235,13 +222,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   getDiagnosticsHistory(): readonly TdseDiagnosticsSnapshot[] {
     return this._diagState.diagHistory.getHistory()
   }
-
-  /** Delegate to extracted save/load module. */
   requestStateSave(ctx: WebGPURenderContext): void {
     slRequestSave(ctx, this._slState)
   }
 
-  /** Delegate slice capture to the save/load module. */
   requestSliceCapture(
     ctx: WebGPURenderContext,
     axis: 'x' | 'y' | 'z',
@@ -251,22 +235,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
   }
 
-  /** Set loaded wavefunction data for injection on next frame. */
   setLoadedWavefunction(re: Float32Array, im: Float32Array): void {
     this._slState.pendingInjection = { re, im }
   }
-
-  /** Copy the current wavefunction into eigenstate storage. */
   storeCurrentEigenstate(device: GPUDevice): number {
     return gsStoreEigenstate(device, this._gsState)
   }
-
-  /** Get the number of stored eigenstates. */
   getStoredEigenstateCount(): number {
     return this._gsState.gsEigenstates.length
   }
 
-  /** Request async readback of the current wavefunction for measurement. */
   requestMeasurementReadback(
     ctx: WebGPURenderContext
   ): Promise<{ re: Float32Array; im: Float32Array } | null> {
@@ -297,29 +275,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._obsState.totalSites = this.totalSites
     this._obsState.pl = this.pl
     this._obsState.diagGeneration = this._diagState.diagGeneration
-  }
-
-  /** Ensure all grid sizes are power-of-2 and total sites fit GPU dispatch limits. */
-  private sanitizeGridSizes(config: TdseConfig): TdseConfig {
-    const pow2Grid = config.gridSize.map((g) => nearestPow2(g))
-    const activeGrid = pow2Grid.slice(0, config.latticeDim)
-    const fittedActive = reduceGridToFit(activeGrid)
-    const fixed = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
-    if (fixed.every((g, i) => g === config.gridSize[i])) return config
-    logger.warn(`[TDSE] Grid sizes sanitized: ${config.gridSize} → ${fixed}`)
-    return { ...config, gridSize: fixed }
-  }
-
-  private computeConfigHash(config: TdseConfig): string {
-    return `${config.gridSize.join('x')}_d${config.latticeDim}`
-  }
-  private computeStrides(config: TdseConfig): number[] {
-    const strides = new Array(MAX_DIM).fill(0)
-    strides[config.latticeDim - 1] = 1
-    for (let d = config.latticeDim - 2; d >= 0; d--) {
-      strides[d] = strides[d + 1]! * config.gridSize[d + 1]!
-    }
-    return strides
   }
 
   private rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
@@ -371,7 +326,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._diagState.diagMappingInFlight = false
 
     this.initializeDensityTexture(device)
-    this.lastConfigHash = this.computeConfigHash(config)
+    this.lastConfigHash = computeConfigHash(config.gridSize, config.latticeDim)
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -415,7 +370,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
   private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
     const { device, encoder } = ctx
-    if (this.initialized && !config.needsReset && !this._diagState.pendingAutoReset) return
+    const needsInit =
+      !this.initialized ||
+      config.needsReset ||
+      this._diagState.pendingAutoReset ||
+      !!this._slState.pendingInjection
+    if (!needsInit) return
 
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     const hasOmegaQuench =
@@ -462,6 +422,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._diagState.pendingAutoReset = false
     this._diagState.diagGeneration++
     this.initialized = true
+
+    // Seed targetNorm so renormalize doesn't skip early imaginary-time frames.
+    // First readback will replace this with the measured value.
+    if (config.imaginaryTimeEnabled && this.bg?.renormalizeUniformBuffer) {
+      device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([1.0]))
+    }
     this._diagState.diagHistory.clear()
     useTdseDiagnosticsStore.getState().reset()
   }
@@ -494,10 +460,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     basisZ?: Float32Array,
     boundingRadius?: number
   ): void {
-    const config = this.sanitizeGridSizes(rawConfig)
+    const config = sanitizeGridSizes(rawConfig)
     const { device } = ctx
     this.syncSharedState()
-    const configHash = this.computeConfigHash(config)
+    const configHash = computeConfigHash(config.gridSize, config.latticeDim)
 
     if (configHash !== this.lastConfigHash || !this.psiReBuffer) {
       logger.log(`[TDSE-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
@@ -530,7 +496,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           totalSites: this.totalSites,
           simTime: this.simTime,
           maxDensity: this._diagState.maxDensity,
-          strides: this.computeStrides(config),
+          strides: computeStridesPadded(config.gridSize, config.latticeDim),
           needsInit: !this.initialized || config.needsReset || this._diagState.pendingAutoReset,
           basisX,
           basisY,
@@ -577,10 +543,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       const stepsThisFrame = Math.floor(this.stepAccumulator)
       this.stepAccumulator -= stepsThisFrame
 
-      // Determine whether this frame captures momentum observables
-      const obsDiagDue = shouldDispatchObs(this._obsState.obsEnabled, this.diagFrameCounter, config)
-      const obsWG = this._obsState.obsResources?.numWorkgroups ?? 0
-
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential
         const vHalf = ctx.beginComputePass({ label: `tdse-V-half-1-${step}` })
@@ -596,28 +558,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         let fftSlot = 0
         for (let d = config.latticeDim - 1; d >= 0; d--) {
           fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
-        }
-
-        // 3b. Momentum observables: piggyback on the last substep's forward FFT.
-        // ψ is now in k-space (fftScratchA). Reduce ⟨k_i⟩ and ⟨k_i²⟩ before
-        // the kinetic phase modifies it.
-        if (
-          obsDiagDue &&
-          step === stepsThisFrame - 1 &&
-          this._obsState.obsMomReduceBG &&
-          this._obsState.obsMomFinalBG
-        ) {
-          const momR = ctx.beginComputePass({ label: 'obs-mom-reduce' })
-          this.dispatchCompute(
-            momR,
-            pl.obsMomReducePipeline,
-            [this._obsState.obsMomReduceBG],
-            obsWG
-          )
-          momR.end()
-          const momF = ctx.beginComputePass({ label: 'obs-mom-final' })
-          this.dispatchCompute(momF, pl.obsMomFinalPipeline, [this._obsState.obsMomFinalBG], 1)
-          momF.end()
         }
 
         // 4. Apply kinetic propagator in k-space
@@ -673,8 +613,19 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
           // Gram-Schmidt: orthogonalize against stored eigenstates (imaginary-time only)
           if (isImaginaryTime && this._gsState.gsEigenstates.length > 0) {
-            gsDispatch(ctx, this._gsState, (pe, pl, bgs, x, y, z) =>
-              this.dispatchCompute(pe, pl, bgs, x, y ?? 1, z ?? 1)
+            gsDispatch(
+              ctx,
+              this._gsState,
+              (pe, ppl, bgs, x, y, z) => this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1),
+              {
+                diagReducePipeline: pl.diagReducePipeline,
+                diagReduceBG: bg.diagReduceBG,
+                diagFinalizePipeline: pl.diagFinalizePipeline,
+                diagFinalizeBG: bg.diagFinalizeBG,
+                renormalizePipeline: pl.renormalizePipeline,
+                renormalizeBG: bg.renormalizeBG,
+                diagNumWorkgroups: this.diagNumWorkgroups,
+              }
             )
           }
         }
@@ -726,9 +677,20 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       totalSites: this.totalSites,
       diagNumWorkgroups: this.diagNumWorkgroups,
       simTime: this.simTime,
-      computeStrides: (c) => this.computeStrides(c),
-      dispatchCompute: (pe, pl, bgs, x, y, z) =>
-        this.dispatchCompute(pe, pl, bgs, x, y ?? 1, z ?? 1),
+      computeStrides: (c) => computeStridesPadded(c.gridSize, c.latticeDim),
+      dispatchCompute: (pe, ppl, bgs, x, y, z) =>
+        this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1),
+      observablesMomentumFFT: (fftCtx) => {
+        // Pack post-step psi into interleaved complex, then forward FFT all axes
+        const wg = Math.ceil(this.totalSites / LINEAR_WG)
+        const packP = fftCtx.beginComputePass({ label: 'obs-fft-pack' })
+        this.dispatchCompute(packP, pl.packPipeline, [bg.packBG], wg)
+        packP.end()
+        let slot = 0
+        for (let d = config.latticeDim - 1; d >= 0; d--) {
+          slot = this.dispatchFFTAxis(fftCtx, config.gridSize[d]!, slot)
+        }
+      },
     }
     extDispatchDiagnostics(ctx, config, recordHistory, p)
   }
@@ -760,15 +722,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
     this.fftScratchA = this.fftScratchB = null
-    this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null
-    this.packUniformBuffer = this.omegaStagingBuffer = null
-    this.densityTexture = null
+    this.uniformBuffer =
+      this.fftUniformBuffer =
+      this.fftStagingBuffer =
+      this.packUniformBuffer =
+        null
+    this.omegaStagingBuffer = this.densityTexture = null
     this.densityTextureView = null
-    this.diagUniformBuffer = this.diagPartialSumsBuffer = null
-    this.diagPartialMaxBuffer = this.diagPartialLeftBuffer = this.diagPartialRightBuffer = null
+    this.diagUniformBuffer = this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
+    this.diagPartialLeftBuffer = this.diagPartialRightBuffer = null
     this._diagState.diagResultBuffer = this._diagState.diagStagingBuffer = null
-    this.pl = null
-    this.bg = null
+    this.pl = this.bg = null
 
     disposeObservables(this._obsState)
     destroyGSBuffers(this._gsState)

@@ -337,8 +337,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let normDensity = clamp(displayScalar * perpFalloff, 0.0, 1.0);
   let logDensity = log(normDensity + 1e-10);
 
-  // Potential overlay
-  var potOverlay: f32 = 0.0;
+  // Alpha channel dual encoding:
+  // .a >= 0 → raw |ψ|² density (used by quantum carpet, always available)
+  // .a <  0 → -potOverlay intensity (used by raymarcher potential overlay)
+  let rawDensityScaled = clamp(normDensityRaw * perpFalloff, 0.0, 1.0);
+  var alphaChannel: f32 = rawDensityScaled;
+
   if (params.showPotential == 1u && params.fieldView != 3u) {
     let potentialScale = getPotentialScale();
     let normPot = abs(potentialVal) / potentialScale;
@@ -347,9 +351,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     if (params.potentialType == 4u || params.potentialType == 8u || params.potentialType == 9u) {
       overlayGain = 0.03;
     }
-    potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain * perpFalloff;
+    let potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain * perpFalloff;
+    if (potOverlay > 0.01) {
+      alphaChannel = -potOverlay;
+    }
   }
 
-  textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, potOverlay));
+  textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, alphaChannel));
 }
 `

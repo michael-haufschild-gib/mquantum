@@ -39,10 +39,10 @@ struct ObsReduceUniforms {
 
 // Max channels: 2 + 2*11 = 24. Shared memory: 256 * 24 = 6144 floats.
 // WGSL requires compile-time constants for arrays, so use a flat block
-// and index as shared[local * MAX_CHANNELS + ch].
+// and index as sdata[local * MAX_CHANNELS + ch].
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
+var<workgroup> sdata: array<f32, 6144>;  // WG_SIZE * MAX_CHANNELS
 
 @compute @workgroup_size(256)
 fn main(
@@ -56,7 +56,7 @@ fn main(
 
   // Initialize shared memory for this thread's channels
   for (var ch: u32 = 0u; ch < nc; ch++) {
-    shared[local * MAX_CHANNELS + ch] = 0.0;
+    sdata[local * MAX_CHANNELS + ch] = 0.0;
   }
 
   if (idx < obsParams.totalSites) {
@@ -72,7 +72,7 @@ fn main(
     let weightedDensity = density * dV;
 
     // Channel 0: norm
-    shared[local * MAX_CHANNELS] = weightedDensity;
+    sdata[local * MAX_CHANNELS] = weightedDensity;
 
     // Decompose linear index to N-D coordinates
     let coords = linearToND(idx, obsParams.strides, obsParams.gridSize, obsParams.latticeDim);
@@ -81,13 +81,13 @@ fn main(
     for (var d: u32 = 0u; d < obsParams.latticeDim; d++) {
       let pos_d = (f32(coords[d]) - f32(obsParams.gridSize[d]) * 0.5 + 0.5) * obsParams.spacing[d];
       let chBase = 1u + d * 2u;
-      shared[local * MAX_CHANNELS + chBase] = pos_d * weightedDensity;          // x_d * |ψ|² dV
-      shared[local * MAX_CHANNELS + chBase + 1u] = pos_d * pos_d * weightedDensity; // x_d² * |ψ|² dV
+      sdata[local * MAX_CHANNELS + chBase] = pos_d * weightedDensity;          // x_d * |ψ|² dV
+      sdata[local * MAX_CHANNELS + chBase + 1u] = pos_d * pos_d * weightedDensity; // x_d² * |ψ|² dV
     }
 
     // Last channel: potential energy ⟨V⟩ = Σ V(x) |ψ|² dV
     let vIdx = 1u + 2u * obsParams.latticeDim;
-    shared[local * MAX_CHANNELS + vIdx] = potentialBuf[idx] * weightedDensity;
+    sdata[local * MAX_CHANNELS + vIdx] = potentialBuf[idx] * weightedDensity;
   }
   workgroupBarrier();
 
@@ -95,7 +95,7 @@ fn main(
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch++) {
-        shared[local * MAX_CHANNELS + ch] += shared[(local + stride) * MAX_CHANNELS + ch];
+        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
       }
     }
     workgroupBarrier();
@@ -104,7 +104,7 @@ fn main(
   // Write workgroup results: partials[wid.x * numChannels + ch]
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      partials[wid.x * nc + ch] = shared[ch];
+      partials[wid.x * nc + ch] = sdata[ch];
     }
   }
 }
@@ -135,7 +135,7 @@ struct ObsReduceUniforms {
 
 const MAX_CHANNELS: u32 = 24u;
 const WG_SIZE: u32 = 256u;
-var<workgroup> shared: array<f32, 6144>;
+var<workgroup> sdata: array<f32, 6144>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -146,13 +146,13 @@ fn main(
 
   // Each thread accumulates multiple workgroup entries
   for (var ch: u32 = 0u; ch < nc; ch++) {
-    shared[local * MAX_CHANNELS + ch] = 0.0;
+    sdata[local * MAX_CHANNELS + ch] = 0.0;
   }
 
   var i = local;
   while (i < obsParams.numWorkgroups) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      shared[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
+      sdata[local * MAX_CHANNELS + ch] += partials[i * nc + ch];
     }
     i += WG_SIZE;
   }
@@ -162,7 +162,7 @@ fn main(
   for (var stride: u32 = 128u; stride > 0u; stride >>= 1u) {
     if (local < stride) {
       for (var ch: u32 = 0u; ch < nc; ch++) {
-        shared[local * MAX_CHANNELS + ch] += shared[(local + stride) * MAX_CHANNELS + ch];
+        sdata[local * MAX_CHANNELS + ch] += sdata[(local + stride) * MAX_CHANNELS + ch];
       }
     }
     workgroupBarrier();
@@ -171,7 +171,7 @@ fn main(
   // Write final result
   if (local == 0u) {
     for (var ch: u32 = 0u; ch < nc; ch++) {
-      result[ch] = shared[ch];
+      result[ch] = sdata[ch];
     }
   }
 }

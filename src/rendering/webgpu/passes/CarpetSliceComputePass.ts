@@ -222,15 +222,17 @@ export class CarpetSliceComputePass {
     // Throttled readback — capture writeHead/totalFrames at submission time
     this.framesSinceReadback++
     if (this.framesSinceReadback >= READBACK_INTERVAL && !this.readbackInFlight) {
-      this.performReadback(historyLength, writeHead, params.totalFrames, onReadback)
+      this.performReadback(encoder, historyLength, writeHead, params.totalFrames, onReadback)
       this.framesSinceReadback = 0
     }
   }
 
   /**
-   * Copy carpet texture to staging buffer and map for CPU read.
+   * Copy carpet texture to staging buffer via the frame encoder and map for CPU read.
+   * Uses onSubmittedWorkDone to ensure the frame encoder's commands complete before mapping.
    */
   private performReadback(
+    encoder: GPUCommandEncoder,
     historyLength: number,
     captureWriteHead: number,
     captureTotalFrames: number,
@@ -239,57 +241,64 @@ export class CarpetSliceComputePass {
     if (!this.device || !this.carpetTexture || !this.stagingBuffer) return
 
     const bytesPerRow = Math.ceil((DENSITY_GRID_SIZE * 4) / 256) * 256
-    const readbackEncoder = this.device.createCommandEncoder({
-      label: 'carpet-readback',
-    })
 
-    readbackEncoder.copyTextureToBuffer(
+    encoder.copyTextureToBuffer(
       { texture: this.carpetTexture },
       { buffer: this.stagingBuffer, bytesPerRow, rowsPerImage: historyLength },
       { width: DENSITY_GRID_SIZE, height: historyLength }
     )
 
-    this.device.queue.submit([readbackEncoder.finish()])
     this.readbackInFlight = true
 
     const staging = this.stagingBuffer
+    const device = this.device
     const gridSize = DENSITY_GRID_SIZE
     const hl = historyLength
 
-    staging.mapAsync(GPUMapMode.READ).then(
-      () => {
-        // Guard: if dispose/releaseTextures ran while readback was in flight,
-        // the staging buffer is destroyed and getMappedRange/unmap would throw.
-        if (this.disposed) {
-          try {
-            staging.unmap()
-          } catch {
-            // Buffer already destroyed — safe to ignore
-          }
+    device.queue
+      .onSubmittedWorkDone()
+      .then(() => {
+        if (this.disposed || staging.mapState !== 'unmapped') {
+          this.readbackInFlight = false
           return
         }
+        staging.mapAsync(GPUMapMode.READ).then(
+          () => {
+            if (this.disposed) {
+              try {
+                staging.unmap()
+              } catch {
+                // Buffer already destroyed — safe to ignore
+              }
+              this.readbackInFlight = false
+              return
+            }
 
-        const mapped = staging.getMappedRange()
-        const result = new Float32Array(gridSize * hl)
-        const src = new Float32Array(mapped)
-        const paddedRowFloats = bytesPerRow / 4
+            const mapped = staging.getMappedRange()
+            const result = new Float32Array(gridSize * hl)
+            const src = new Float32Array(mapped)
+            const paddedRowFloats = bytesPerRow / 4
 
-        for (let row = 0; row < hl; row++) {
-          const srcOffset = row * paddedRowFloats
-          const dstOffset = row * gridSize
-          for (let col = 0; col < gridSize; col++) {
-            result[dstOffset + col] = src[srcOffset + col]!
+            for (let row = 0; row < hl; row++) {
+              const srcOffset = row * paddedRowFloats
+              const dstOffset = row * gridSize
+              for (let col = 0; col < gridSize; col++) {
+                result[dstOffset + col] = src[srcOffset + col]!
+              }
+            }
+
+            staging.unmap()
+            onReadback(result, gridSize, captureWriteHead, captureTotalFrames)
+            this.readbackInFlight = false
+          },
+          () => {
+            this.readbackInFlight = false
           }
-        }
-
-        staging.unmap()
-        onReadback(result, gridSize, captureWriteHead, captureTotalFrames)
+        )
+      })
+      .catch(() => {
         this.readbackInFlight = false
-      },
-      () => {
-        this.readbackInFlight = false
-      }
-    )
+      })
   }
 
   /**

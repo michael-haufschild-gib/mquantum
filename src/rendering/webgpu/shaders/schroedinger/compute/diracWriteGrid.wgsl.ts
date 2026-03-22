@@ -288,10 +288,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let pNorm = select(blendedP / params.densityScale, 0.0, params.densityScale <= 0.0);
     let aNorm = select(blendedA / params.densityScale, 0.0, params.densityScale <= 0.0);
+    let totalNorm = clamp((pNorm + aNorm) * perpFalloff, 0.0, 1.0);
     textureStore(outputTex, gid, vec4f(
       clamp(pNorm * perpFalloff, 0.0, 1.0),
       clamp(aNorm * perpFalloff, 0.0, 1.0),
-      phase, 0.0
+      phase, totalNorm
     ));
     return;
 
@@ -425,8 +426,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let normDisplay = clamp(displayScalar * perpFalloff, 0.0, 1.0);
   let logDensity = log(normDisplay + 1e-10);
 
-  // Potential overlay (nearest-neighbor)
-  var potOverlay: f32 = 0.0;
+  // Alpha dual-encoding: raw density (>= 0) or -potOverlay (< 0)
+  let rawTotalDensity = totalDensityAt(nnSiteIdx, S, T);
+  let rawDensityNorm = clamp(
+    select(rawTotalDensity / params.densityScale, 0.0, params.densityScale <= 0.0) * perpFalloff,
+    0.0, 1.0
+  );
+  var alphaChannel: f32 = rawDensityNorm;
+
   if (params.showPotential == 1u && params.fieldView != 3u) {
     let V = potential[nnSiteIdx];
     let potScale = max(abs(params.potentialStrength), 1.0);
@@ -436,9 +443,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     if (params.potentialType == 4u || params.potentialType == 5u) {
       overlayGain = 0.03;
     }
-    potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain * perpFalloff;
+    let potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain * perpFalloff;
+    if (potOverlay > 0.01) {
+      alphaChannel = -potOverlay;
+    }
   }
 
-  textureStore(outputTex, gid, vec4f(normDisplay, logDensity, phase, potOverlay));
+  textureStore(outputTex, gid, vec4f(normDisplay, logDensity, phase, alphaChannel));
 }
 `

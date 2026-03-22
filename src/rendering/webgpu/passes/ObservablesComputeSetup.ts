@@ -130,7 +130,8 @@ export function processObservablesReadback(
   posData: Float32Array,
   momData: Float32Array,
   latticeDim: number,
-  hbar: number
+  hbar: number,
+  mass = 1
 ): ObservablesSnapshot | null {
   const posNorm = posData[0]!
   const momNorm = momData[0]!
@@ -161,7 +162,7 @@ export function processObservablesReadback(
     momentumVariance[d] = varP
     uncertaintyProduct[d] = Math.sqrt(varX) * Math.sqrt(varP)
 
-    kineticEnergy += (hbar * hbar * meanK2) / 2 // ℏ²⟨k²⟩/(2m), mass=1
+    kineticEnergy += (hbar * hbar * meanK2) / (2 * mass)
   }
 
   // Potential energy: last channel in position data = Σ V(x)|ψ|² dV

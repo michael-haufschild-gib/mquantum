@@ -29,14 +29,14 @@ import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 import type { WebGPURenderContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
+  computeStridesPadded,
+  createDensityTexture,
   DENSITY_GRID_SIZE,
   DIAG_DECIMATION,
   FFT_UNIFORM_SIZE,
   GRID_WG,
   LINEAR_WG,
-  MAX_DIM,
-  nearestPow2,
-  reduceGridToFit,
+  sanitizeGridSizes,
 } from './computePassUtils'
 import type { PauliBufferResult } from './PauliComputePassBuffers'
 import { rebuildPauliBuffers, writePauliUniforms } from './PauliComputePassBuffers'
@@ -211,32 +211,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // Configuration
   // ============================================================================
 
-  /** Compute a hash string for config change detection */
+  /**
+   * Compute a hash string for config change detection.
+   *
+   * Unlike the shared computeConfigHash (grid topology only), the Pauli hash
+   * includes spacing because spacing changes affect FFT k-vectors and require
+   * buffer rebuild. This parallels Dirac's approach of appending spinor size.
+   */
   private computeConfigHash(config: PauliConfig): string {
     return `${config.latticeDim}|${config.gridSize.join(',')}|${config.spacing.join(',')}`
-  }
-
-  /** Sanitize grid sizes to nearest power of 2 and reduce to fit GPU dispatch limits */
-  private sanitizeGridSizes(config: PauliConfig): PauliConfig {
-    const pow2Grid = config.gridSize.map(nearestPow2)
-    const activeGrid = pow2Grid.slice(0, config.latticeDim)
-    const fittedActive = reduceGridToFit(activeGrid)
-    const gridSize = [...fittedActive, ...pow2Grid.slice(config.latticeDim)]
-    if (gridSize.every((g, i) => g === config.gridSize[i])) return config
-    return { ...config, gridSize }
-  }
-
-  /** Compute linear strides from grid dimensions (C-order: last-dim-fastest) */
-  private computeStrides(gridSize: number[]): number[] {
-    const dim = gridSize.length
-    const strides = new Array(MAX_DIM).fill(0)
-    if (dim > 0) {
-      strides[dim - 1] = 1
-      for (let d = dim - 2; d >= 0; d--) {
-        strides[d] = strides[d + 1]! * gridSize[d + 1]!
-      }
-    }
-    return strides
   }
 
   // ============================================================================
@@ -271,16 +254,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /** Create the 3D density texture for spin-resolved rendering */
   initializeDensityTexture(device: GPUDevice): void {
     this.densityTexture?.destroy()
-    this.densityTexture = device.createTexture({
-      label: 'pauli-density-texture',
-      size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
-      format: 'rgba16float',
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })
+    this.densityTexture = createDensityTexture(device, 'pauli')
     this.densityTextureView = this.densityTexture.createView({
       label: 'pauli-density-view',
       dimension: '3d',
@@ -371,7 +345,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         totalSites: this.buf.totalSites,
         simTime: this.simTime,
         maxDensity: this.maxDensity,
-        strides: this.computeStrides(config.gridSize.slice(0, config.latticeDim)),
+        strides: computeStridesPadded(config.gridSize, config.latticeDim),
         basisX,
         basisY,
         basisZ,
@@ -450,7 +424,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     basisZ?: Float32Array,
     boundingRadius?: number
   ): void {
-    const config = this.sanitizeGridSizes(rawConfig)
+    const config = sanitizeGridSizes(rawConfig)
     const { device } = ctx
     const configHash = this.computeConfigHash(config)
 

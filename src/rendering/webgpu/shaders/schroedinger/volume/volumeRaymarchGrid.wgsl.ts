@@ -128,17 +128,17 @@ fn volumeRaymarchGrid(
     }
 
     // Skip near-zero density regions (but not potential overlay regions).
-    // Potential overlay only applies to compute modes (TDSE/BEC/Dirac/FSF) where the
-    // alpha channel encodes |V|/Vmax. For HO/hydrogen modes, alpha is relativePhase.
-    // Pauli spinor: alpha is total density, not potential — skip potential check.
-    let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    // Compute mode alpha dual-encoding: .a >= 0 → raw density, .a < 0 → -potOverlay.
+    // For HO/hydrogen modes, alpha is relativePhase (always >= 0).
+    // Pauli spinor: alpha is total density — skip potential check.
+    let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
-        let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
-        let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+        let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
+        let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
         // For dual-channel modes, include secondary density (G channel) in skip check
         let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
         let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
@@ -164,13 +164,13 @@ fn volumeRaymarchGrid(
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
     // Potential overlay: render V(x) as a solid semi-transparent wall.
-    // Alpha channel encodes normalized |V|/Vmax from the write-grid shader.
-    // Only active for compute modes (IS_FREE_SCALAR) where alpha IS potential.
-    // For HO/hydrogen modes, alpha is relativePhase — must NOT be rendered as potential.
-    // For Pauli spinor mode, alpha encodes total density — must NOT be rendered as potential.
-    if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
+    // Alpha dual-encoding: .a < 0 encodes -potOverlay from the write-grid shader.
+    // For HO/hydrogen modes, alpha is relativePhase (>= 0) — never triggers.
+    // For Pauli spinor mode, alpha encodes total density (>= 0) — never triggers.
+    if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
-      let potOpacity = clamp(gridSample.a * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
+      let potIntensity = abs(gridSample.a);
+      let potOpacity = clamp(potIntensity * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
     }

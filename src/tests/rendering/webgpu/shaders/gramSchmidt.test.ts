@@ -148,8 +148,8 @@ function subtractProjection(
     // = cRe*fRe - cIm*fIm + i(cRe*fIm + cIm*fRe)
     const projRe = coeffRe * phiRe[i]! - coeffIm * phiIm[i]!
     const projIm = coeffRe * phiIm[i]! + coeffIm * phiRe[i]!
-    psiRe[i] -= projRe
-    psiIm[i] -= projIm
+    psiRe[i] = psiRe[i]! - projRe
+    psiIm[i] = psiIm[i]! - projIm
   }
 }
 
@@ -165,8 +165,8 @@ function normalize(re: Float64Array, im: Float64Array): void {
   const n = Math.sqrt(norm2(re, im))
   if (n < 1e-15) return
   for (let i = 0; i < re.length; i++) {
-    re[i] /= n
-    im[i] /= n
+    re[i] = re[i]! / n
+    im[i] = im[i]! / n
   }
 }
 

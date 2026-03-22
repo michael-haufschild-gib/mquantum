@@ -139,7 +139,8 @@ fn main(@builtin(local_invocation_id) lid: vec3u) {
 export const gramSchmidtSubtractBlock = /* wgsl */ `
 struct GSSubtractUniforms {
   totalElements: u32,
-  _pad0: u32,
+  /// ⟨φ|φ⟩ for the current eigenstate (divide inner product by this)
+  normSquared: f32,
   _pad1: u32,
   _pad2: u32,
 }
@@ -156,13 +157,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= params.totalElements) { return; }
 
-  let cRe = innerProduct[0];
-  let cIm = innerProduct[1];
+  let norm2 = max(params.normSquared, 1e-20);
+  let cRe = innerProduct[0] / norm2;
+  let cIm = innerProduct[1] / norm2;
 
   let fRe = phiRe[idx];
   let fIm = phiIm[idx];
 
-  // ⟨φ|ψ⟩ · φ = (cRe + icIm)(fRe + ifIm) = (cRe*fRe - cIm*fIm) + i(cRe*fIm + cIm*fRe)
+  // (⟨φ|ψ⟩/⟨φ|φ⟩) · φ
   let projRe = cRe * fRe - cIm * fIm;
   let projIm = cRe * fIm + cIm * fRe;
 

@@ -265,7 +265,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let logRho = log(normRho + 1e-10);
   let phase = select(0.0, 3.14159265, fieldValue < 0.0);
 
-  textureStore(outputTex, gid, vec4f(normRho, logRho, phase, 0.0));
+  textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
 
   // Analysis texture output (educational color modes)
   if (params.analysisMode == 1u) {

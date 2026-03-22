@@ -23,6 +23,7 @@ import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
+  createDensityTexture,
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
@@ -113,21 +114,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
 
-    this.densityTexture = device.createTexture({
-      label: 'free-scalar-density-grid',
-      size: {
-        width: DENSITY_GRID_SIZE,
-        height: DENSITY_GRID_SIZE,
-        depthOrArrayLayers: DENSITY_GRID_SIZE,
-      },
-      format: 'rgba16float',
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.COPY_DST,
-    })
+    this.densityTexture = createDensityTexture(device, 'free-scalar', GPUTextureUsage.COPY_DST)
 
     this.densityTextureView = this.densityTexture.createView({
       label: 'free-scalar-density-view',

@@ -118,6 +118,12 @@ export interface DiagDispatchParams {
     y?: number,
     z?: number
   ) => void
+  /**
+   * Optional callback that dispatches pack + forward FFT to fill fftScratchA
+   * with k-space data from the current post-step psi. Called by dispatchDiagnostics
+   * when momentum observables need a consistent snapshot with position observables.
+   */
+  readonly observablesMomentumFFT?: (ctx: WebGPURenderContext) => void
 }
 
 /**
@@ -152,10 +158,28 @@ export function dispatchDiagnostics(
   p.dispatchCompute(fP, p.pl.diagFinalizePipeline, [p.bg.diagFinalizeBG], 1)
   fP.end()
 
-  // Position observables reduction
+  // Observable expectation value reductions (position + momentum from consistent post-step state)
   const os = p.obsState
   if (os.obsEnabled && os.obsResources && os.obsPosReduceBG && os.obsPosFinalBG) {
     obsWriteUniforms(device, config, os, strides)
+
+    // Momentum: pack + forward FFT to get k-space data, then reduce ⟨k⟩, ⟨k²⟩
+    if (p.observablesMomentumFFT && os.obsMomReduceBG && os.obsMomFinalBG) {
+      p.observablesMomentumFFT(ctx)
+      const momR = ctx.beginComputePass({ label: 'obs-mom-reduce' })
+      p.dispatchCompute(
+        momR,
+        p.pl.obsMomReducePipeline,
+        [os.obsMomReduceBG],
+        os.obsResources.numWorkgroups
+      )
+      momR.end()
+      const momF = ctx.beginComputePass({ label: 'obs-mom-final' })
+      p.dispatchCompute(momF, p.pl.obsMomFinalPipeline, [os.obsMomFinalBG], 1)
+      momF.end()
+    }
+
+    // Position: reduce ⟨x⟩, ⟨x²⟩, ⟨V⟩ from psi buffers (already post-step)
     const pR = ctx.beginComputePass({ label: 'obs-pos-reduce' })
     p.dispatchCompute(
       pR,

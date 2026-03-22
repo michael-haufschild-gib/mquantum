@@ -27,10 +27,12 @@ export const MAX_STORED_EIGENSTATES = 8
 /** GSReduceUniforms struct size (16 bytes: totalElements, numWorkgroups, pad, pad) */
 const GS_UNIFORM_SIZE = 16
 
-/** Eigenstate GPU buffer pair. */
+/** Eigenstate GPU buffer pair with cached norm. */
 export interface EigenstateBuffers {
   re: GPUBuffer
   im: GPUBuffer
+  /** ⟨φ|φ⟩ at storage time (from renormalization targetNorm) */
+  normSquared: number
 }
 
 /** Mutable state shared between GS functions and the TDSE pass. */
@@ -82,7 +84,11 @@ export function ensureGSBuffers(device: GPUDevice, state: GramSchmidtState): voi
  *
  * @returns New eigenstate count, or -1 if storage is full or buffers unavailable
  */
-export function storeCurrentEigenstate(device: GPUDevice, state: GramSchmidtState): number {
+export function storeCurrentEigenstate(
+  device: GPUDevice,
+  state: GramSchmidtState,
+  targetNorm = 1.0
+): number {
   if (!state.psiReBuffer || !state.psiImBuffer) return -1
   if (state.gsEigenstates.length >= MAX_STORED_EIGENSTATES) return -1
 
@@ -103,7 +109,11 @@ export function storeCurrentEigenstate(device: GPUDevice, state: GramSchmidtStat
   encoder.copyBufferToBuffer(state.psiImBuffer, 0, imBuffer, 0, byteSize)
   device.queue.submit([encoder.finish()])
 
-  state.gsEigenstates.push({ re: reBuffer, im: imBuffer })
+  state.gsEigenstates.push({
+    re: reBuffer,
+    im: imBuffer,
+    normSquared: targetNorm > 0 ? targetNorm : 1.0,
+  })
   return state.gsEigenstates.length
 }
 
@@ -130,14 +140,30 @@ export function destroyGSBuffers(state: GramSchmidtState): void {
 }
 
 /**
+ * Resources for post-GS renormalization dispatch.
+ * Passed to dispatchGramSchmidt to re-normalize ψ after projection subtraction.
+ */
+export interface PostGSRenormResources {
+  diagReducePipeline: GPUComputePipeline
+  diagReduceBG: GPUBindGroup
+  diagFinalizePipeline: GPUComputePipeline
+  diagFinalizeBG: GPUBindGroup
+  renormalizePipeline: GPUComputePipeline
+  renormalizeBG: GPUBindGroup
+  diagNumWorkgroups: number
+}
+
+/**
  * Dispatch Gram-Schmidt orthogonalization against all stored eigenstates.
  *
  * @param dispatch - Function to dispatch a compute pass (from the TDSE pass)
+ * @param postGSRenorm - If provided, re-normalize ψ after projection subtraction
  */
 export function dispatchGramSchmidt(
   ctx: WebGPURenderContext,
   state: GramSchmidtState,
-  dispatch: DispatchComputeFn
+  dispatch: DispatchComputeFn,
+  postGSRenorm?: PostGSRenormResources
 ): void {
   if (
     state.gsEigenstates.length === 0 ||
@@ -152,12 +178,17 @@ export function dispatchGramSchmidt(
     return
 
   const { device } = ctx
-  const unifData = new Uint32Array([state.totalSites, state.gsNumWorkgroups, 0, 0])
-  device.queue.writeBuffer(state.gsUniformBuffer, 0, unifData)
-
   const linearWG = Math.ceil(state.totalSites / LINEAR_WG)
 
+  // Pre-allocate uniform scratch buffers
+  const reduceUnifBuf = new Uint32Array([state.totalSites, state.gsNumWorkgroups, 0, 0])
+  const subtractUnifBuf = new ArrayBuffer(16)
+  const subtractU32 = new Uint32Array(subtractUnifBuf)
+  const subtractF32 = new Float32Array(subtractUnifBuf)
+
   for (const eigenstate of state.gsEigenstates) {
+    // Write reduce uniforms: { totalElements, numWorkgroups, 0, 0 }
+    device.queue.writeBuffer(state.gsUniformBuffer!, 0, reduceUnifBuf)
     const reduceBG = device.createBindGroup({
       layout: state.pl.gsReduceBGL,
       entries: [
@@ -187,6 +218,13 @@ export function dispatchGramSchmidt(
     dispatch(fPass, state.pl.gsFinalizePipeline, [finalizeBG], 1)
     fPass.end()
 
+    // Overwrite uniforms for subtract: { totalElements, normSquared, 0, 0 }
+    subtractU32[0] = state.totalSites
+    subtractF32[1] = eigenstate.normSquared
+    subtractU32[2] = 0
+    subtractU32[3] = 0
+    device.queue.writeBuffer(state.gsUniformBuffer!, 0, subtractUnifBuf)
+
     const subtractBG = device.createBindGroup({
       layout: state.pl.gsSubtractBGL,
       entries: [
@@ -201,5 +239,19 @@ export function dispatchGramSchmidt(
     const sPass = ctx.beginComputePass({ label: 'gs-subtract' })
     dispatch(sPass, state.pl.gsSubtractPipeline, [subtractBG], linearWG)
     sPass.end()
+  }
+
+  // Re-normalize after GS projection subtraction to restore target norm
+  if (postGSRenorm) {
+    const r = postGSRenorm
+    const rReduce = ctx.beginComputePass({ label: 'post-gs-reduce' })
+    dispatch(rReduce, r.diagReducePipeline, [r.diagReduceBG], r.diagNumWorkgroups)
+    rReduce.end()
+    const rFinal = ctx.beginComputePass({ label: 'post-gs-final' })
+    dispatch(rFinal, r.diagFinalizePipeline, [r.diagFinalizeBG], 1)
+    rFinal.end()
+    const rRenorm = ctx.beginComputePass({ label: 'post-gs-renorm' })
+    dispatch(rRenorm, r.renormalizePipeline, [r.renormalizeBG], linearWG)
+    rRenorm.end()
   }
 }
