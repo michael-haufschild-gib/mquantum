@@ -474,6 +474,7 @@ export async function waitForShaderCompilation(page: Page, timeoutMs = 300_000):
  */
 export async function captureAndSamplePixels(page: Page): Promise<{
   nonBgPixels: number
+  totalPixels: number
 }> {
   // Capture the canvas element via compositor screenshot (avoids WebGPU
   // readback bug in headless Chrome 146+), then crop to center 30% to
@@ -498,29 +499,22 @@ export async function captureAndSamplePixels(page: Page): Promise<{
     .raw()
     .toBuffer({ resolveWithObject: true })
 
-  const w = info.width
-  const h = info.height
-
-  // Sample 20×20 grid = 400 points
-  // Count pixels where any channel exceeds 25 — anything brighter than
-  // the near-black background (r≤25, g≤25, b≤25) is rendered content.
+  // Count every pixel where any channel exceeds the background threshold.
+  // At ~384×216 (~83k pixels) this is sub-millisecond — no sampling needed.
   const DARK_THRESHOLD = 25
+  const totalPixels = info.width * info.height
   let nonBgPixels = 0
-  for (let row = 1; row <= 20; row++) {
-    for (let col = 1; col <= 20; col++) {
-      const px = Math.floor((col * w) / 21)
-      const py = Math.floor((row * h) / 21)
-      const offset = (py * w + px) * 4
-      const r = data[offset]!
-      const g = data[offset + 1]!
-      const b = data[offset + 2]!
-      if (r > DARK_THRESHOLD || g > DARK_THRESHOLD || b > DARK_THRESHOLD) {
-        nonBgPixels++
-      }
+  for (let i = 0; i < data.length; i += 4) {
+    if (
+      data[i]! > DARK_THRESHOLD ||
+      data[i + 1]! > DARK_THRESHOLD ||
+      data[i + 2]! > DARK_THRESHOLD
+    ) {
+      nonBgPixels++
     }
   }
 
-  return { nonBgPixels }
+  return { nonBgPixels, totalPixels }
 }
 
 /**
@@ -590,7 +584,7 @@ export async function expectCanvasNotBlank(page: Page): Promise<void> {
 
   expect(
     bestCount,
-    `At least 5 of 400 sampled pixels must differ from the background across 3 snapshots — proves an object rendered (best=${bestCount})`
+    `At least 5 pixels in center crop must differ from background across 3 snapshots — proves an object rendered (best=${bestCount})`
   ).toBeGreaterThanOrEqual(5)
 }
 
