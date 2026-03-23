@@ -114,13 +114,17 @@ export class WebGPUDevice {
     const adapterInfo = adapter.info
     const adapterInfoString = `${adapterInfo.vendor} ${adapterInfo.architecture} ${adapterInfo.device}`
 
-    // Check for timestamp query support
-    const supportsTimestamp = adapter.features.has('timestamp-query')
-
-    // Request device with required features
+    // Request device with optional features (only those the adapter supports)
     const requiredFeatures: GPUFeatureName[] = []
-    if (supportsTimestamp) {
-      requiredFeatures.push('timestamp-query')
+    const optionalFeatures: GPUFeatureName[] = [
+      'timestamp-query',
+      'texture-compression-bc',
+      'texture-compression-astc',
+    ]
+    for (const feature of optionalFeatures) {
+      if (adapter.features.has(feature)) {
+        requiredFeatures.push(feature)
+      }
     }
 
     // Request maximum limits
@@ -172,7 +176,7 @@ export class WebGPUDevice {
       maxComputeWorkgroupSizeZ: device.limits.maxComputeWorkgroupSizeZ,
       maxComputeInvocationsPerWorkgroup: device.limits.maxComputeInvocationsPerWorkgroup,
       maxBindGroups: device.limits.maxBindGroups,
-      timestampQuery: supportsTimestamp,
+      timestampQuery: requiredFeatures.includes('timestamp-query'),
       adapterInfo: adapterInfoString,
     }
 
@@ -186,7 +190,7 @@ export class WebGPUDevice {
     logger.log('[WebGPU] Initialized:', {
       adapter: adapterInfoString,
       format,
-      timestampQuery: supportsTimestamp,
+      timestampQuery: requiredFeatures.includes('timestamp-query'),
     })
 
     return { adapter, device, context, format, capabilities }

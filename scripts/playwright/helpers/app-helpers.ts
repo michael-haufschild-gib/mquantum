@@ -1069,3 +1069,22 @@ export async function waitForModeReady(page: Page, extraFrames = 0): Promise<voi
     await waitForFrameAdvance(page, fc + extraFrames)
   }
 }
+
+/**
+ * Make the quantum object invisible so only the skybox/background is visible.
+ * Sets densityGain to near-zero and scale to minimum via direct setState
+ * (bypasses clamped setters). Use this before pixel-checking skybox rendering.
+ */
+export async function hideQuantumObject(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/stores/geometryStore.ts')
+    mod.useGeometryStore.setState({
+      schroedinger: {
+        ...mod.useGeometryStore.getState().schroedinger,
+        densityGain: 0.001,
+        schroedingerScale: 0.01,
+      },
+    })
+  })
+  await waitForUniformUpdate(page)
+}

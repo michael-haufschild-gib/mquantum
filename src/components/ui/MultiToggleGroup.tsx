@@ -110,7 +110,7 @@ export const MultiToggleGroup = React.memo(
           <label className="block text-xs font-medium text-text-secondary mb-2">
             {tooltip ? (
               <Tooltip content={tooltip} position="top">
-                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+                <span>{label}</span>
               </Tooltip>
             ) : (
               label

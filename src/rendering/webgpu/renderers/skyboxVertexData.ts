@@ -12,86 +12,39 @@ import type { SkyboxMode, SkyboxProceduralSettings } from '@/stores/defaults/vis
 import type { SkyboxMode as ShaderSkyboxMode } from '../shaders/skybox'
 
 /**
- * Load a cubemap texture from the bundled skybox face assets.
+ * Resolved KTX2 cubemap asset URLs (eagerly resolved by Vite).
+ * Files are named: cubemap_{bc7|astc}.ktx2 and cubemap_hq_{bc7|astc}.ktx2
+ */
+const ktx2Assets = import.meta.glob<string>('/src/assets/skyboxes/*/cubemap*.ktx2', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+})
+
+/**
+ * Load a KTX2 cubemap texture for the named skybox.
+ * Selects BC7 (Windows/Linux) or ASTC (macOS/mobile) based on device features.
  *
  * @param device - GPU device for texture creation
  * @param textureName - Skybox texture identifier (e.g. 'space_blue')
- * @param highQuality - Whether to generate mipmaps
- * @param faceAssets - Resolved face URLs from Vite glob
- * @returns The created GPU cubemap texture, or null if face assets are missing
+ * @param highQuality - When true, loads the higher-fidelity variant
+ * @returns The GPU cubemap texture, or null if the asset is missing or unsupported
  */
-export async function loadSkyboxCubeTexture(
+export async function loadSkyboxKTX2Texture(
   device: GPUDevice,
   textureName: string,
-  highQuality: boolean,
-  faceAssets: Record<string, string>
+  highQuality: boolean
 ): Promise<GPUTexture | null> {
-  const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'] as const
+  const { detectCompressedFormatSuffix, loadKTX2CubeTexture } = await import('../utils/ktx2Loader')
+  const suffix = detectCompressedFormatSuffix(device)
+  if (!suffix) return null
 
-  const faceURLs: string[] = []
-  for (const face of faceNames) {
-    const key = `/src/assets/skyboxes/${textureName}/${face}.png`
-    const url = faceAssets[key]
-    if (!url) return null
-    faceURLs.push(url)
-  }
+  const filename = highQuality ? `cubemap_hq_${suffix}` : `cubemap_${suffix}`
+  const key = `/src/assets/skyboxes/${textureName}/${filename}.ktx2`
+  const url = ktx2Assets[key]
+  if (!url) return null
 
-  const bitmaps = await Promise.all(
-    faceURLs.map(async (url) => {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      return createImageBitmap(blob, { colorSpaceConversion: 'none' })
-    })
-  )
-
-  const width = bitmaps[0]!.width
-  const height = bitmaps[0]!.height
-  const mipLevelCount = highQuality ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
-
-  const cubeTexture = device.createTexture({
-    label: `skybox-cube-${textureName}`,
-    size: { width, height, depthOrArrayLayers: 6 },
-    format: 'rgba8unorm',
-    mipLevelCount,
-    usage:
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_DST |
-      GPUTextureUsage.RENDER_ATTACHMENT,
-  })
-
-  for (let i = 0; i < 6; i++) {
-    device.queue.copyExternalImageToTexture(
-      { source: bitmaps[i]! },
-      { texture: cubeTexture, origin: { x: 0, y: 0, z: i } },
-      { width, height }
-    )
-  }
-
-  if (highQuality && mipLevelCount > 1) {
-    for (let face = 0; face < 6; face++) {
-      let mipW = width
-      let mipH = height
-      for (let level = 1; level < mipLevelCount; level++) {
-        mipW = Math.max(1, mipW >> 1)
-        mipH = Math.max(1, mipH >> 1)
-        const mipBitmap = await createImageBitmap(bitmaps[face]!, {
-          resizeWidth: mipW,
-          resizeHeight: mipH,
-          resizeQuality: 'high',
-          colorSpaceConversion: 'none',
-        })
-        device.queue.copyExternalImageToTexture(
-          { source: mipBitmap },
-          { texture: cubeTexture, origin: { x: 0, y: 0, z: face }, mipLevel: level },
-          { width: mipW, height: mipH }
-        )
-        mipBitmap.close()
-      }
-    }
-  }
-
-  for (const bm of bitmaps) bm.close()
-  return cubeTexture
+  return loadKTX2CubeTexture(device, url)
 }
 
 /**

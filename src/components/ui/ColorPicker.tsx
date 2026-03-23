@@ -273,7 +273,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
           <span className="text-xs font-medium text-text-secondary select-none">
             {tooltip ? (
               <Tooltip content={tooltip} position="top">
-                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+                <span>{label}</span>
               </Tooltip>
             ) : (
               label

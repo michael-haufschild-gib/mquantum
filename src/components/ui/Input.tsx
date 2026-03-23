@@ -102,7 +102,7 @@ export const Input = ({
         <label htmlFor={inputId} className="text-xs font-medium text-text-secondary ms-1">
           {tooltip ? (
             <Tooltip content={tooltip} position="top">
-              <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              <span>{label}</span>
             </Tooltip>
           ) : (
             label

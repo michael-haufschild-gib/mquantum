@@ -10,7 +10,6 @@
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { Button } from '@/components/ui/Button'
 import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { type EnvironmentStore, useEnvironmentStore } from '@/stores/environmentStore'
 
@@ -184,13 +183,20 @@ export const SkyboxControls: React.FC = React.memo(() => {
         {ALL_SKYBOX_OPTIONS.map((option) => {
           const isSelected = skyboxSelection === option.id
           return (
-            <Button
+            <a
               key={option.id}
-              variant="ghost"
+              role="button"
+              tabIndex={0}
               data-testid={`skybox-option-${option.id}`}
               onClick={() => handleSkyboxSelect(option.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleSkyboxSelect(option.id)
+                }
+              }}
               className={`
-                !p-0 group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
+                group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
                 transition-[transform,border-color,box-shadow] duration-200 ease-out
                 hover:scale-105 hover:shadow-lg
                 ${
@@ -215,10 +221,10 @@ export const SkyboxControls: React.FC = React.memo(() => {
               )}
 
               {/* Label overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center backdrop-blur-sm">
+              <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center">
                 <span className="text-[10px] font-medium text-white block">{option.name}</span>
               </div>
-            </Button>
+            </a>
           )
         })}
       </div>

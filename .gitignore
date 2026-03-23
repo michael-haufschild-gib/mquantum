@@ -46,7 +46,12 @@ task_*.md
 godmode_*.md
 market_readiness_*.md
 
+# Skybox face PNGs (cubemaps are KTX2; only thumbnails kept)
+src/assets/skyboxes/*/*.png
+!src/assets/skyboxes/*/thumbnail.png
+
 # Screenshots and test artifacts
 screenshots/
 scripts/playwright/videos/
 scripts/playwright/screenshots/
+.vercel

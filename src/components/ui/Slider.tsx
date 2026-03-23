@@ -226,7 +226,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
           >
             {tooltip ? (
               <Tooltip content={tooltip} position="top">
-                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+                <span>{label}</span>
               </Tooltip>
             ) : (
               label

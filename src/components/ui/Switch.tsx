@@ -128,7 +128,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
           <span className="text-xs font-medium text-text-secondary group-hover/switch:text-text-primary transition-colors tracking-wide">
             {tooltip ? (
               <Tooltip content={tooltip} position="top">
-                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+                <span>{label}</span>
               </Tooltip>
             ) : (
               label

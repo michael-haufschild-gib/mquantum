@@ -22,16 +22,7 @@ import {
   SKYBOX_BIND_GROUPS,
   type SkyboxMode as ShaderSkyboxMode,
 } from '../shaders/skybox'
-import { generateSkyboxCubeVertices, loadSkyboxCubeTexture } from './skyboxVertexData'
-
-/**
- * Resolved URLs for skybox face PNG images (eagerly loaded by Vite).
- * Used to load classic cubemap textures for the WebGPU skybox pipeline.
- */
-const skyboxFaceAssets = import.meta.glob<string>(
-  '/src/assets/skyboxes/*/{right,left,top,bottom,front,back}.png',
-  { eager: true, import: 'default', query: '?url' }
-)
+import { generateSkyboxCubeVertices, loadSkyboxKTX2Texture } from './skyboxVertexData'
 
 /**
  * Configuration for the skybox renderer.
@@ -295,25 +286,20 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   }
 
   /**
-   * Load a classic cube texture from PNG face images and bind it.
-   * When highQuality is true, generates mipmaps for smoother filtering.
+   * Load a classic cube texture from a KTX2 cubemap asset.
+   * Transcodes via Basis Universal to the best GPU-native compressed format.
    * @param device - GPU device
    * @param textureName - Skybox texture identifier (e.g. 'space_blue')
-   * @param highQuality - Whether to generate mipmaps for higher quality rendering
+   * @param highQuality - When true, loads the higher-fidelity cubemap_hq.ktx2
    */
   private async loadCubeTexture(
     device: GPUDevice,
     textureName: string,
     highQuality: boolean
   ): Promise<void> {
-    const cubeTexture = await loadSkyboxCubeTexture(
-      device,
-      textureName,
-      highQuality,
-      skyboxFaceAssets
-    )
+    const cubeTexture = await loadSkyboxKTX2Texture(device, textureName, highQuality)
     if (!cubeTexture) {
-      logger.warn(`[WebGPU Skybox] Missing face assets for: ${textureName}`)
+      logger.warn(`[WebGPU Skybox] Missing KTX2 asset for: ${textureName}`)
       return
     }
 

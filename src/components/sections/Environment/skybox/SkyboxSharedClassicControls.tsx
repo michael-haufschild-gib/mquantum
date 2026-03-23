@@ -49,8 +49,8 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         data-testid="skybox-hq-toggle"
         checked={skyboxHighQuality}
         onCheckedChange={setSkyboxHighQuality}
-        label="High Quality (Mipmaps)"
-        tooltip="Enable trilinear mipmap filtering for smoother skybox textures at oblique angles. Slightly higher GPU cost."
+        label="High Quality"
+        tooltip="Load the higher-fidelity cubemap texture. Both versions include full mipmaps; this option uses a less compressed source for sharper detail."
       />
 
       <Select
