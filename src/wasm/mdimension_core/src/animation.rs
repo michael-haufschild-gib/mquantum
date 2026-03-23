@@ -4895,4 +4895,647 @@ mod tests {
         let result = subtract_vectors(&a, &b);
         assert_eq!(result, vec![4.0, 1.0, -2.0]);
     }
+
+    // ========================================================================
+    // fsin / fcos — Fast Trig Approximation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_fsin_exact_points() {
+        // fsin is exact at 0, ±PI/2, ±PI by construction
+        assert!((fsin(0.0)).abs() < 1e-15);
+        assert!((fsin(PI / 2.0) - 1.0).abs() < 1e-15);
+        assert!((fsin(-PI / 2.0) + 1.0).abs() < 1e-15);
+        assert!((fsin(PI)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fcos_exact_points() {
+        assert!((fcos(0.0) - 1.0).abs() < 1e-15);
+        assert!((fcos(PI) + 1.0).abs() < 1e-10);
+        assert!((fcos(PI / 2.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fsin_accuracy_across_full_cycle() {
+        // Parabolic approximation max error is ~0.0561
+        let steps = 3600;
+        let mut max_err: f64 = 0.0;
+        for i in 0..=steps {
+            let angle = (i as f64 / steps as f64) * TAU - PI;
+            let approx = fsin(angle);
+            let exact = angle.sin();
+            let err = (approx - exact).abs();
+            max_err = max_err.max(err);
+            assert!(
+                err < 0.057,
+                "fsin({angle}) = {approx}, expected {exact}, error {err}"
+            );
+        }
+        // Verify the max error is in the expected ballpark
+        assert!(max_err > 0.05, "Suspiciously low max error: {max_err}");
+    }
+
+    #[test]
+    fn test_fcos_accuracy_across_full_cycle() {
+        let steps = 3600;
+        let mut max_err: f64 = 0.0;
+        for i in 0..=steps {
+            let angle = (i as f64 / steps as f64) * TAU - PI;
+            let approx = fcos(angle);
+            let exact = angle.cos();
+            let err = (approx - exact).abs();
+            max_err = max_err.max(err);
+            assert!(
+                err < 0.057,
+                "fcos({angle}) = {approx}, expected {exact}, error {err}"
+            );
+        }
+        assert!(max_err > 0.05, "Suspiciously low max error: {max_err}");
+    }
+
+    #[test]
+    fn test_fsin_is_odd() {
+        for i in 0..1000 {
+            let x = (i as f64 - 500.0) * 0.01;
+            assert!(
+                (fsin(-x) + fsin(x)).abs() < 1e-10,
+                "fsin is not odd at x={x}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fcos_is_even() {
+        for i in 0..1000 {
+            let x = (i as f64 - 500.0) * 0.01;
+            assert!(
+                (fcos(-x) - fcos(x)).abs() < 1e-10,
+                "fcos is not even at x={x}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fsin_fcos_clamped_to_unit_range() {
+        for i in 0..10000 {
+            let x = (i as f64 - 5000.0) * 0.1;
+            let s = fsin(x);
+            let c = fcos(x);
+            assert!(s >= -1.0 && s <= 1.0, "fsin({x}) = {s} out of [-1,1]");
+            assert!(c >= -1.0 && c <= 1.0, "fcos({x}) = {c} out of [-1,1]");
+        }
+    }
+
+    #[test]
+    fn test_fsin_large_input_normalization() {
+        // Large inputs should be normalized to [-PI, PI] without NaN/Inf
+        let x = 100.0 * PI + PI / 2.0;
+        let result = fsin(x);
+        assert!(result.is_finite());
+        assert!((result - x.sin()).abs() < 0.056);
+    }
+
+    // ========================================================================
+    // Unrolled Matrix Multiplication — Specialized vs Generic Path
+    // ========================================================================
+
+    /// Reference implementation: generic triple-loop matrix multiply
+    fn reference_multiply(a: &[f64], b: &[f64], dim: usize) -> Vec<f64> {
+        let mut result = vec![0.0; dim * dim];
+        for i in 0..dim {
+            for j in 0..dim {
+                let mut sum = 0.0;
+                for k in 0..dim {
+                    sum += a[i * dim + k] * b[k * dim + j];
+                }
+                result[i * dim + j] = sum;
+            }
+        }
+        result
+    }
+
+    #[test]
+    fn test_multiply_matrices_specialized_vs_generic_all_dims() {
+        // For each dimension 4-11 (which have unrolled specializations),
+        // verify the specialized path matches the generic reference.
+        for dim in 4..=11 {
+            let n = dim * dim;
+            // Create non-trivial matrices with deterministic values
+            let a: Vec<f64> = (0..n).map(|i| ((i * 7 + 3) % 13) as f64 - 6.0).collect();
+            let b: Vec<f64> = (0..n).map(|i| ((i * 11 + 5) % 17) as f64 - 8.0).collect();
+
+            let expected = reference_multiply(&a, &b, dim);
+            let actual = multiply_matrices(&a, &b, dim);
+
+            for idx in 0..n {
+                assert!(
+                    (actual[idx] - expected[idx]).abs() < 1e-6,
+                    "Mismatch at dim={dim}, index={idx}: actual={}, expected={}",
+                    actual[idx],
+                    expected[idx]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_multiply_matrices_identity_all_dims() {
+        // A * I = A for all dimensions 2-11
+        for dim in 2..=11 {
+            let n = dim * dim;
+            let a: Vec<f64> = (0..n).map(|i| ((i * 7 + 3) % 13) as f64 - 6.0).collect();
+            let mut identity = vec![0.0; n];
+            for i in 0..dim {
+                identity[i * dim + i] = 1.0;
+            }
+
+            let result = multiply_matrices(&a, &identity, dim);
+            for idx in 0..n {
+                assert!(
+                    (result[idx] - a[idx]).abs() < 1e-10,
+                    "A*I != A at dim={dim}, index={idx}"
+                );
+            }
+
+            let result2 = multiply_matrices(&identity, &a, dim);
+            for idx in 0..n {
+                assert!(
+                    (result2[idx] - a[idx]).abs() < 1e-10,
+                    "I*A != A at dim={dim}, index={idx}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_multiply_matrices_associativity() {
+        // (A*B)*C = A*(B*C) for dims that use specialized paths
+        for dim in [4, 5, 6, 7] {
+            let n = dim * dim;
+            let a: Vec<f64> = (0..n).map(|i| ((i * 3 + 1) % 7) as f64 - 3.0).collect();
+            let b: Vec<f64> = (0..n).map(|i| ((i * 5 + 2) % 9) as f64 - 4.0).collect();
+            let c: Vec<f64> = (0..n).map(|i| ((i * 7 + 4) % 11) as f64 - 5.0).collect();
+
+            let ab = multiply_matrices(&a, &b, dim);
+            let ab_c = multiply_matrices(&ab, &c, dim);
+            let bc = multiply_matrices(&b, &c, dim);
+            let a_bc = multiply_matrices(&a, &bc, dim);
+
+            for idx in 0..n {
+                assert!(
+                    (ab_c[idx] - a_bc[idx]).abs() < 1e-4,
+                    "Associativity failed at dim={dim}, index={idx}: {} vs {}",
+                    ab_c[idx],
+                    a_bc[idx]
+                );
+            }
+        }
+    }
+
+    // ========================================================================
+    // multiply_matrix_vector — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_multiply_matrix_vector_known_product() {
+        // [[1,2],[3,4]] * [5,6] = [17, 39]
+        let m = vec![1.0, 2.0, 3.0, 4.0];
+        let v = vec![5.0, 6.0];
+        let result = multiply_matrix_vector(&m, &v, 2);
+        assert!((result[0] - 17.0).abs() < 1e-10);
+        assert!((result[1] - 39.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_multiply_matrix_vector_diagonal() {
+        // Diagonal matrix scales each component
+        for dim in 2..=11 {
+            let mut m = vec![0.0; dim * dim];
+            for i in 0..dim {
+                m[i * dim + i] = (i + 1) as f64;
+            }
+            let v: Vec<f64> = (0..dim).map(|i| (i + 1) as f64).collect();
+            let result = multiply_matrix_vector(&m, &v, dim);
+            for i in 0..dim {
+                let expected = ((i + 1) * (i + 1)) as f64;
+                assert!(
+                    (result[i] - expected).abs() < 1e-10,
+                    "dim={dim}, i={i}: expected {expected}, got {}",
+                    result[i]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_multiply_matrix_vector_invalid_input() {
+        // dimension=0 returns empty
+        let result = multiply_matrix_vector(&[], &[], 0);
+        assert!(result.is_empty());
+
+        // Undersized matrix returns zeros
+        let result = multiply_matrix_vector(&[1.0], &[1.0, 2.0], 2);
+        assert_eq!(result, vec![0.0, 0.0]);
+    }
+
+    // ========================================================================
+    // compose_rotations — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_compose_rotations_near_orthogonal_all_dims() {
+        // compose_rotations uses fsin/fcos (fast parabolic approximation).
+        // Since fsin²+fcos² deviates from 1 by up to 12.5%, the resulting
+        // rotation matrices are only approximately orthogonal.
+        // R^T * R ≈ I within the Pythagorean error bound.
+        for dim in 2..=11 {
+            let plane_names = vec!["XY".to_string()];
+            let angles = vec![0.7];
+            let r = compose_rotations(dim, &plane_names, &angles);
+
+            let mut rt_r = vec![0.0; dim * dim];
+            for i in 0..dim {
+                for j in 0..dim {
+                    let mut sum = 0.0;
+                    for k in 0..dim {
+                        sum += r[k * dim + i] * r[k * dim + j];
+                    }
+                    rt_r[i * dim + j] = sum;
+                }
+            }
+
+            for i in 0..dim {
+                for j in 0..dim {
+                    let expected = if i == j { 1.0 } else { 0.0 };
+                    assert!(
+                        (rt_r[i * dim + j] - expected).abs() < 0.15,
+                        "R^T*R deviation too large at dim={dim}, [{i}][{j}]: got {}",
+                        rt_r[i * dim + j]
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_compose_rotations_multi_plane_structure() {
+        // Multi-plane composition produces a matrix with correct structure:
+        // all entries finite, diagonal entries near ±1, off-diagonal bounded.
+        let plane_names = vec![
+            "XY".to_string(),
+            "XZ".to_string(),
+            "YZ".to_string(),
+        ];
+        let angles = vec![0.3, 0.5, 0.7];
+        let r = compose_rotations(4, &plane_names, &angles);
+
+        assert_eq!(r.len(), 16);
+        for val in &r {
+            assert!(val.is_finite(), "Non-finite value in rotation matrix");
+            assert!(
+                val.abs() < 2.0,
+                "Rotation matrix entry too large: {val}"
+            );
+        }
+
+        // Near-orthogonal check with loose tolerance for fsin/fcos
+        let mut rt_r = vec![0.0; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                let mut sum = 0.0;
+                for k in 0..4 {
+                    sum += r[k * 4 + i] * r[k * 4 + j];
+                }
+                rt_r[i * 4 + j] = sum;
+            }
+        }
+        for i in 0..4 {
+            for j in 0..4 {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!(
+                    (rt_r[i * 4 + j] - expected).abs() < 0.25,
+                    "Multi-plane R^T*R too far from identity at [{i}][{j}]: got {}",
+                    rt_r[i * 4 + j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_compose_rotations_preserves_vector_length_approx() {
+        // With fsin/fcos, length preservation is approximate.
+        // The ~12.5% Pythagorean identity error means length can change by ~6%.
+        let plane_names = vec!["XY".to_string(), "XW".to_string()];
+        let angles = vec![1.0, 0.5];
+        let r = compose_rotations(4, &plane_names, &angles);
+
+        let v = vec![1.0, 2.0, 3.0, 4.0];
+        let rotated = multiply_matrix_vector(&r, &v, 4);
+
+        let orig_mag = magnitude(&v);
+        let rot_mag = magnitude(&rotated);
+        assert!(
+            (orig_mag - rot_mag).abs() / orig_mag < 0.1,
+            "Rotation changed vector length too much: {orig_mag} -> {rot_mag}"
+        );
+    }
+
+    #[test]
+    fn test_compose_rotations_zero_angle_is_identity() {
+        for dim in 2..=7 {
+            let plane_names = vec!["XY".to_string()];
+            let angles = vec![0.0];
+            let r = compose_rotations(dim, &plane_names, &angles);
+            for i in 0..dim {
+                for j in 0..dim {
+                    let expected = if i == j { 1.0 } else { 0.0 };
+                    assert!(
+                        (r[i * dim + j] - expected).abs() < 1e-10,
+                        "Zero-angle not identity at dim={dim}, [{i}][{j}]"
+                    );
+                }
+            }
+        }
+    }
+
+    // ========================================================================
+    // compose_rotations_indexed — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_compose_rotations_indexed_empty() {
+        let result = compose_rotations_indexed(4, &[], &[], 0);
+        assert_eq!(result.len(), 16);
+        assert!((result[0] - 1.0).abs() < 1e-10);
+        assert!((result[5] - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_compose_rotations_indexed_reversed_indices() {
+        // Indices (1, 0) should be normalized to (0, 1)
+        let plane_indices = vec![1_u32, 0_u32];
+        let angles = vec![0.5];
+        let result = compose_rotations_indexed(3, &plane_indices, &angles, 1);
+
+        // Compare with canonical order (0, 1)
+        let canonical_indices = vec![0_u32, 1_u32];
+        let canonical = compose_rotations_indexed(3, &canonical_indices, &angles, 1);
+
+        for i in 0..9 {
+            assert!(
+                (result[i] - canonical[i]).abs() < 1e-10,
+                "Reversed indices differ at index {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_compose_rotations_indexed_same_indices_skipped() {
+        // Same indices (e.g., [0, 0]) should be skipped → identity
+        let plane_indices = vec![0_u32, 0_u32];
+        let angles = vec![0.5];
+        let result = compose_rotations_indexed(3, &plane_indices, &angles, 1);
+        // Should be identity since (0,0) is invalid
+        assert!((result[0] - 1.0).abs() < 1e-10);
+        assert!((result[4] - 1.0).abs() < 1e-10);
+        assert!((result[8] - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_compose_rotations_indexed_overprovisioned_buffers() {
+        // Buffers larger than rotation_count — extra entries ignored
+        let plane_indices = vec![0_u32, 1_u32, 0_u32, 2_u32, 1_u32, 2_u32];
+        let angles = vec![0.5, 0.3, 0.7];
+        // Only use first rotation
+        let result = compose_rotations_indexed(3, &plane_indices, &angles, 1);
+        let single = compose_rotations_indexed(3, &[0_u32, 1_u32], &[0.5], 1);
+        for i in 0..9 {
+            assert!(
+                (result[i] - single[i]).abs() < 1e-10,
+                "Overprovisioned buffer differs at index {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_compose_rotations_indexed_matches_named() {
+        // Indexed and named should produce the same result
+        let plane_names = vec!["XY".to_string(), "XZ".to_string()];
+        let angles_named = vec![0.3, 0.7];
+        let named = compose_rotations(4, &plane_names, &angles_named);
+
+        let plane_indices = vec![0_u32, 1_u32, 0_u32, 2_u32];
+        let angles_indexed = vec![0.3, 0.7];
+        let indexed = compose_rotations_indexed(4, &plane_indices, &angles_indexed, 2);
+
+        for i in 0..16 {
+            assert!(
+                (named[i] - indexed[i]).abs() < 1e-10,
+                "Named vs indexed differ at index {i}: named={}, indexed={}",
+                named[i],
+                indexed[i]
+            );
+        }
+    }
+
+    // ========================================================================
+    // project_vertices — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_project_vertices_empty() {
+        let result = project_vertices_to_positions(&[], 4, 4.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_project_vertices_dim_too_low() {
+        let result = project_vertices_to_positions(&[1.0, 2.0], 2, 4.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_project_vertices_5d() {
+        // 5D: effectiveDepth = (w + v) / sqrt(2)
+        let sqrt2 = std::f64::consts::SQRT_2;
+        let w = 1.0;
+        let v = 1.0;
+        let effective_depth = (w + v) / sqrt2;
+        let proj_dist = 4.0;
+        let expected_scale = 1.0 / (proj_dist - effective_depth);
+
+        let vertices = vec![1.0, 0.0, 0.0, w, v];
+        let result = project_vertices_to_positions(&vertices, 5, proj_dist);
+        assert_eq!(result.len(), 3);
+        assert!(
+            (result[0] as f64 - expected_scale).abs() < 1e-5,
+            "5D projection: expected {expected_scale}, got {}",
+            result[0]
+        );
+    }
+
+    #[test]
+    fn test_project_vertices_nd_generic() {
+        // 6D: higher dims all zero → effectiveDepth = 0 → scale = 1/projDist
+        let vertices = vec![3.0, 6.0, 9.0, 0.0, 0.0, 0.0];
+        let result = project_vertices_to_positions(&vertices, 6, 3.0);
+        assert_eq!(result.len(), 3);
+        assert!((result[0] - 1.0).abs() < 1e-5); // 3/3
+        assert!((result[1] - 2.0).abs() < 1e-5); // 6/3
+        assert!((result[2] - 3.0).abs() < 1e-5); // 9/3
+    }
+
+    #[test]
+    fn test_project_vertices_near_zero_denom() {
+        // w = projDist → denom = 0 → clamped to MIN_SAFE_DISTANCE (0.01)
+        let vertices = vec![1.0, 0.0, 0.0, 4.0];
+        let result = project_vertices_to_positions(&vertices, 4, 4.0);
+        assert_eq!(result.len(), 3);
+        assert!((result[0] - 100.0).abs() < 1.0); // 1.0 / 0.01 = 100
+        assert!(result[0].is_finite());
+    }
+
+    #[test]
+    fn test_project_vertices_multiple() {
+        // Two 4D vertices
+        let vertices = vec![
+            1.0, 0.0, 0.0, 0.0, // vertex 1: scale = 1/4 = 0.25
+            0.0, 2.0, 0.0, 0.0, // vertex 2: scale = 1/4 = 0.25
+        ];
+        let result = project_vertices_to_positions(&vertices, 4, 4.0);
+        assert_eq!(result.len(), 6);
+        assert!((result[0] - 0.25).abs() < 1e-5); // v1.x
+        assert!((result[4] - 0.5).abs() < 1e-5); // v2.y
+    }
+
+    // ========================================================================
+    // normalize_vector — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_normalize_near_zero_returns_zeros() {
+        // Rust returns zeros for near-zero vectors (unlike TS which throws)
+        let v = vec![1e-15, 1e-15];
+        let result = normalize_vector(&v);
+        assert_eq!(result, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_normalize_unit_vector_is_idempotent() {
+        for dim in 2..=11 {
+            let mut v = vec![0.0; dim];
+            v[0] = 1.0;
+            let normalized = normalize_vector(&v);
+            for i in 0..dim {
+                assert!(
+                    (normalized[i] - v[i]).abs() < 1e-10,
+                    "Normalizing unit vector changed it at dim={dim}, i={i}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_normalize_preserves_direction() {
+        let v = vec![3.0, 4.0, 0.0];
+        let n = normalize_vector(&v);
+        assert!((n[0] - 0.6).abs() < 1e-10);
+        assert!((n[1] - 0.8).abs() < 1e-10);
+        assert!((n[2]).abs() < 1e-10);
+    }
+
+    // ========================================================================
+    // dot_product / magnitude — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_dot_product_orthogonal() {
+        assert!((dot_product(&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0])).abs() < 1e-15);
+    }
+
+    #[test]
+    fn test_dot_product_self_equals_magnitude_squared() {
+        for dim in 2..=11 {
+            let v: Vec<f64> = (0..dim).map(|i| (i as f64 + 1.0) * 0.5).collect();
+            let dot = dot_product(&v, &v);
+            let mag = magnitude(&v);
+            assert!(
+                (dot - mag * mag).abs() < 1e-10,
+                "dot(v,v) != ||v||^2 at dim={dim}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_magnitude_unit_basis_vectors() {
+        for dim in 2..=11 {
+            for axis in 0..dim {
+                let mut v = vec![0.0; dim];
+                v[axis] = 1.0;
+                assert!(
+                    (magnitude(&v) - 1.0).abs() < 1e-15,
+                    "Unit basis vector magnitude != 1 at dim={dim}, axis={axis}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_magnitude_scaling() {
+        let v = vec![1.0, 2.0, 3.0];
+        let scaled: Vec<f64> = v.iter().map(|x| x * 5.0).collect();
+        assert!((magnitude(&scaled) - 5.0 * magnitude(&v)).abs() < 1e-10);
+    }
+
+    // ========================================================================
+    // parse_plane_name — Extended Names (dims > 6)
+    // ========================================================================
+
+    #[test]
+    fn test_parse_plane_name_extended_dimensions() {
+        // A6, A7, etc. for dims > 6
+        assert_eq!(parse_plane_name("XA6"), Some((0, 6)));
+        assert_eq!(parse_plane_name("YA7"), Some((1, 7)));
+        assert_eq!(parse_plane_name("ZA8"), Some((2, 8)));
+        assert_eq!(parse_plane_name("UA6"), Some((5, 6)));
+        assert_eq!(parse_plane_name("A6A7"), Some((6, 7)));
+        assert_eq!(parse_plane_name("A8A10"), Some((8, 10)));
+    }
+
+    #[test]
+    fn test_parse_plane_name_invalid() {
+        assert_eq!(parse_plane_name(""), None);
+        assert_eq!(parse_plane_name("X"), None);
+        assert_eq!(parse_plane_name("XX"), None); // same axis
+        assert_eq!(parse_plane_name("123"), None);
+    }
+
+    // ========================================================================
+    // subtract_vectors — Extended Tests
+    // ========================================================================
+
+    #[test]
+    fn test_subtract_vectors_self_is_zero() {
+        for dim in 2..=11 {
+            let v: Vec<f64> = (0..dim).map(|i| (i as f64 + 1.0) * 3.7).collect();
+            let result = subtract_vectors(&v, &v);
+            for (i, val) in result.iter().enumerate() {
+                assert!(
+                    val.abs() < 1e-15,
+                    "v - v != 0 at dim={dim}, i={i}: got {val}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_subtract_vectors_mismatched_lengths() {
+        // Rust truncates to min length
+        let a = vec![5.0, 3.0, 1.0];
+        let b = vec![1.0, 2.0];
+        let result = subtract_vectors(&a, &b);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result, vec![4.0, 1.0]);
+    }
 }
