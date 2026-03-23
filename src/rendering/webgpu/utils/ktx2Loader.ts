@@ -214,7 +214,7 @@ export async function loadKTX2CubeTexture(
       if (offset + faceSz > levelData.byteLength) break
       device.queue.writeTexture(
         { texture, origin: { x: 0, y: 0, z: face }, mipLevel: mip },
-        levelData,
+        levelData as Uint8Array<ArrayBuffer>,
         { offset, bytesPerRow: blocksWide * fmt.blockBytes, rowsPerImage: blocksHigh },
         { width: mipW, height: mipH, depthOrArrayLayers: 1 }
       )
