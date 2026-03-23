@@ -5,12 +5,14 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3000",
-    "build": "npm run wasm:build && tsc -b && vite build && npm run build:check",
-    "build:web": "tsc -b && vite build && npm run build:check",
+    "build": "npm run wasm:build && node scripts/check-untracked-imports.js && tsc -b && vite build && npm run build:check",
+    "build:web": "node scripts/check-untracked-imports.js && tsc -b && vite build && npm run build:check",
     "build:check": "node scripts/check-chunk-cycles.js && node scripts/check-bundle-size.js",
     "wasm:build": "wasm-pack build ./src/wasm/mdimension_core --target web && rm -f ./src/wasm/mdimension_core/pkg/.gitignore",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:rust": "cargo test --manifest-path src/wasm/mdimension_core/Cargo.toml",
+    "test:all": "npm run test && npm run test:rust",
     "test:watch": "vitest",
     "lint": "eslint . --max-warnings 0 --no-warn-ignored",
     "lint:css": "stylelint \"src/**/*.css\" --max-warnings 0",
@@ -66,9 +68,7 @@
     "vite": "^7.3.1",
     "vite-plugin-static-copy": "^3.1.4",
     "vite-plugin-svgr": "^4.5.0",
-    "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.5.0",
-    "vite-plugin-wasm-pack": "^0.1.12",
     "vitest": "^4.0.15"
   },
   "overrides": {
