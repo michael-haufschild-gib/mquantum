@@ -243,6 +243,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
                   <ColorPicker
                     value={classicalOverlayColor}
                     onChange={setClassicalOverlayColor}
+                    tooltip="Color of the classical trajectory trail rendered over the quantum wavefunction."
                     disableAlpha={true}
                     className="w-24"
                   />

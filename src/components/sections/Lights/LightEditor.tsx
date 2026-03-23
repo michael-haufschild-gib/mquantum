@@ -189,6 +189,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <div className="flex items-center justify-between">
           <ColorPicker
             label="Color"
+            tooltip="Tint of the ambient light that illuminates all surfaces equally."
             value={ambientColor}
             onChange={setAmbientColor}
             disableAlpha={true}
@@ -266,6 +267,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       {/* Color picker */}
       <ColorPicker
         label="Color"
+        tooltip="Light emission color. Colored lights tint surfaces they illuminate."
         value={selectedLight.color}
         onChange={handleColorChange}
         disableAlpha={true}

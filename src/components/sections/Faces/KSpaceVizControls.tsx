@@ -85,6 +85,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
         value={kv.displayMode}
         onChange={handleDisplayMode}
         ariaLabel="Display mode"
+        tooltip="Raw 3D shows the full momentum lattice. Radial 3D averages into spherical shells."
         data-testid="kspace-display-mode"
       />
 
@@ -104,6 +105,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
           value={kv.exposureMode}
           onChange={handleExposureMode}
           ariaLabel="Exposure mode"
+          tooltip="Tone mapping for k-space values. Log compresses the dynamic range; Linear shows raw magnitudes."
           data-testid="kspace-exposure-mode"
         />
         <Slider

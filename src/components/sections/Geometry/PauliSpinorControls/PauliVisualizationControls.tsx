@@ -42,6 +42,7 @@ export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProp
           value={fieldView}
           onChange={(v) => onFieldViewChange(v as PauliFieldView)}
           ariaLabel="Field View"
+          tooltip="Which spinor observable to render: spin density (up vs down), total probability, spin expectation value, or off-diagonal coherence."
         />
 
         <Switch

@@ -122,6 +122,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
           <div className="space-y-1">
             <Switch
               label="Nodal Surfaces"
+              tooltip="Highlight regions where the wavefunction passes through zero. These surfaces separate positive and negative lobes."
               checked={config.nodalEnabled ?? false}
               onCheckedChange={(checked) => setNodalEnabled(checked)}
               data-testid="schroedinger-nodal-toggle"
@@ -130,6 +131,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
               <div className="ps-2 border-s border-border-default space-y-2">
                 <Slider
                   label="Strength"
+                  tooltip="Visual intensity of the nodal surface highlight. Higher values make the zero-crossing surfaces more prominent."
                   min={0.0}
                   max={2.0}
                   step={0.1}
@@ -141,6 +143,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
                 <Select
                   label="Rendering Mode"
+                  tooltip="Volumetric Band renders a soft glowing region around the node. Ray-Hit Surface renders a sharp isosurface."
                   options={NODAL_RENDER_MODE_OPTIONS}
                   value={config.nodalRenderMode ?? 'band'}
                   onChange={setNodalRenderMode}
@@ -149,6 +152,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
                 <Select
                   label="Definition"
+                  tooltip="Which zero-crossing to detect: |psi| envelope nodes, Re(psi)=0, Im(psi)=0, or the intersection of Re and Im zeros."
                   options={NODAL_DEFINITION_OPTIONS}
                   value={config.nodalDefinition ?? 'psiAbs'}
                   onChange={setNodalDefinition}
@@ -157,6 +161,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
                 <Slider
                   label="Zero Tolerance ε"
+                  tooltip="Width of the zero-crossing detection band. Smaller values produce thinner, more precise nodal surfaces."
                   min={0.00001}
                   max={0.5}
                   step={0.001}
@@ -169,6 +174,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
                 <Select
                   label="Hydrogen Node Family"
+                  tooltip="Filter nodal surfaces by origin: radial nodes (from the Laguerre polynomial), angular nodes (from spherical harmonics), or both."
                   options={NODAL_FAMILY_OPTIONS}
                   value={config.nodalFamilyFilter ?? 'all'}
                   onChange={setNodalFamilyFilter}
@@ -183,6 +189,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
 
                 <Switch
                   label="Lobe Sign Colors"
+                  tooltip="Color positive and negative wavefunction lobes differently, making the sign structure visible across nodal boundaries."
                   checked={config.nodalLobeColoringEnabled ?? false}
                   onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
                   data-testid="schroedinger-nodal-lobe-toggle"
@@ -201,6 +208,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                           DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
                         }
                         onChange={setNodalColorPositive}
+                        tooltip="Color for regions where the wavefunction is positive."
                         disableAlpha={true}
                         className="w-24"
                       />
@@ -216,6 +224,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                           DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
                         }
                         onChange={setNodalColorNegative}
+                        tooltip="Color for regions where the wavefunction is negative."
                         disableAlpha={true}
                         className="w-24"
                       />
@@ -231,6 +240,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                       <ColorPicker
                         value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
                         onChange={setNodalColor}
+                        tooltip="Color of the nodal surface where |psi| passes through zero."
                         disableAlpha={true}
                         className="w-24"
                       />
@@ -243,6 +253,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                       <ColorPicker
                         value={config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal}
                         onChange={setNodalColorReal}
+                        tooltip="Color of the nodal surface where Re(psi) = 0."
                         disableAlpha={true}
                         className="w-24"
                       />
@@ -255,6 +266,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                       <ColorPicker
                         value={config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag}
                         onChange={setNodalColorImag}
+                        tooltip="Color of the nodal surface where Im(psi) = 0."
                         disableAlpha={true}
                         className="w-24"
                       />
@@ -268,6 +280,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
           <div className="space-y-1 mt-2">
             <Switch
               label="Uncertainty Boundary"
+              tooltip="Render a shell at the boundary enclosing a given fraction of the probability density, visualizing the spatial extent of quantum uncertainty."
               checked={config.uncertaintyBoundaryEnabled ?? false}
               onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
               data-testid="schroedinger-uncertainty-boundary-toggle"
@@ -276,6 +289,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
               <div className="ps-2 border-s border-border-default space-y-2">
                 <Slider
                   label="Strength"
+                  tooltip="Visual intensity of the uncertainty boundary shell."
                   min={0.0}
                   max={1.0}
                   step={0.05}
@@ -286,6 +300,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                 />
                 <Slider
                   label="Confidence Mass"
+                  tooltip="Fraction of the total probability enclosed by the boundary. 0.68 corresponds to one standard deviation for a Gaussian."
                   min={0.5}
                   max={0.99}
                   step={0.01}
@@ -296,6 +311,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                 />
                 <Slider
                   label="Boundary Width"
+                  tooltip="Spatial thickness of the boundary shell transition. Larger values produce a softer, more diffuse boundary."
                   min={0.05}
                   max={1.0}
                   step={0.05}
@@ -311,6 +327,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
           <div className="space-y-1 mt-2">
             <Switch
               label="Phase Materiality"
+              tooltip="Modulate material properties (roughness, metalness) based on the complex phase of the wavefunction, making phase visible through surface appearance."
               checked={config.phaseMaterialityEnabled ?? false}
               onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
               data-testid="schroedinger-phase-materiality-toggle"
@@ -318,6 +335,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
             {config.phaseMaterialityEnabled && (
               <Slider
                 label="Strength"
+                tooltip="How strongly the wavefunction phase modulates the surface material properties."
                 min={0}
                 max={1}
                 step={0.05}

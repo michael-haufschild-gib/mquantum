@@ -177,6 +177,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
               onChange={handleChange}
               disabled={disabled}
               ariaLabel="Select dimension"
+              tooltip="Number of spatial dimensions for the quantum system. Higher dimensions show richer structure but require more computation."
               className="min-w-full w-max flex-nowrap"
               data-testid="dimension-selector"
             />

@@ -105,12 +105,14 @@ export function SecondQuantizationSection({
               value={sqLayerMode}
               onChange={(v) => actions.setMode(v as SecondQuantizationMode)}
               ariaLabel="Second quantization interpretation mode"
+              tooltip="Interpretation basis: Fock (number states |n>), Coherent (classical-like |alpha>), or Squeezed (reduced uncertainty in one quadrature)."
               data-testid="sq-layer-mode-selector"
             />
 
             {/* Mode index selector */}
             <Slider
               label="Mode index (k)"
+              tooltip="Which dimension's harmonic oscillator mode to analyze. Each dimension is an independent quantum harmonic oscillator."
               min={0}
               max={Math.max(dimension - 1, 0)}
               step={1}
@@ -124,6 +126,7 @@ export function SecondQuantizationSection({
             {sqLayerMode === 'fock' && (
               <Slider
                 label="Fock quantum number (n)"
+                tooltip="Occupation number of the Fock state |n>. Energy is E = hbar*omega*(n + 1/2)."
                 min={0}
                 max={10}
                 step={1}
@@ -139,6 +142,7 @@ export function SecondQuantizationSection({
               <div className="space-y-2">
                 <Slider
                   label="Re(α)"
+                  tooltip="Real part of the coherent state amplitude alpha. Determines the mean position quadrature."
                   min={-5}
                   max={5}
                   step={0.1}
@@ -149,6 +153,7 @@ export function SecondQuantizationSection({
                 />
                 <Slider
                   label="Im(α)"
+                  tooltip="Imaginary part of the coherent state amplitude alpha. Determines the mean momentum quadrature."
                   min={-5}
                   max={5}
                   step={0.1}
@@ -165,6 +170,7 @@ export function SecondQuantizationSection({
               <div className="space-y-2">
                 <Slider
                   label="Squeeze r"
+                  tooltip="Squeeze parameter. Larger r compresses one quadrature uncertainty below the vacuum level at the expense of the conjugate."
                   min={0}
                   max={3}
                   step={0.05}
@@ -175,6 +181,7 @@ export function SecondQuantizationSection({
                 />
                 <Slider
                   label="Squeeze θ"
+                  tooltip="Squeeze angle in phase space. Rotates the axis along which uncertainty is reduced."
                   min={0}
                   max={6.28}
                   step={0.05}
@@ -232,12 +239,14 @@ export function SecondQuantizationSection({
                 checked={sqLayerShowOccupation}
                 onCheckedChange={actions.setShowOccupation}
                 label="Occupation"
+                tooltip="Show the Fock-space occupation number, energy, and P(n) distribution for the selected mode."
                 data-testid="sq-show-occupation"
               />
               <Switch
                 checked={sqLayerShowUncertainty}
                 onCheckedChange={actions.setShowUncertainty}
                 label="Uncertainty"
+                tooltip="Show quadrature uncertainties (delta X, delta P) and the Heisenberg product delta X * delta P."
                 data-testid="sq-show-uncertainty"
               />
             </div>

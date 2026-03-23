@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Single option within a {@link MultiToggleGroup}. */
@@ -17,6 +18,8 @@ export interface MultiToggleGroupProps<T extends string = string> {
   className?: string
   disabled?: boolean
   ariaLabel?: string
+  /** Tooltip text shown on hover over the group label. */
+  tooltip?: string
   'data-testid'?: string
 }
 
@@ -84,6 +87,7 @@ export const MultiToggleGroup = React.memo(
     className = '',
     disabled = false,
     ariaLabel,
+    tooltip,
     'data-testid': testId,
   }: MultiToggleGroupProps<T>) => {
     const handleToggle = useCallback(
@@ -103,7 +107,15 @@ export const MultiToggleGroup = React.memo(
     return (
       <div className={className}>
         {label && (
-          <label className="block text-xs font-medium text-text-secondary mb-2">{label}</label>
+          <label className="block text-xs font-medium text-text-secondary mb-2">
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
+          </label>
         )}
         <div
           className="flex flex-wrap gap-1 p-1 bg-[var(--bg-hover)] rounded-lg"

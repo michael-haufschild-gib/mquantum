@@ -85,6 +85,7 @@ export const ExportGeneralTab = () => {
                 const fmt = val as 'mp4' | 'webm'
                 updateSettings({ format: fmt, codec: fmt === 'mp4' ? 'avc' : 'vp9' })
               }}
+              tooltip="MP4 is universally supported. WebM offers better compression but limited platform support."
             />
           </div>
 
@@ -101,6 +102,7 @@ export const ExportGeneralTab = () => {
               ]}
               value={settings.resolution}
               onChange={(val) => updateSettings({ resolution: val as ExportResolution })}
+              tooltip="Output pixel resolution. Higher resolutions produce sharper video but take longer to render."
             />
           </div>
         </div>
@@ -123,6 +125,7 @@ export const ExportGeneralTab = () => {
                   min={128}
                   max={7680}
                   step={2}
+                  tooltip="Output width in pixels. Must be even. Range: 128-7680."
                 />
               </div>
               <div className="space-y-1.5 flex-1">
@@ -135,6 +138,7 @@ export const ExportGeneralTab = () => {
                   min={128}
                   max={7680}
                   step={2}
+                  tooltip="Output height in pixels. Must be even. Range: 128-7680."
                 />
               </div>
             </m.div>
@@ -164,12 +168,14 @@ export const ExportGeneralTab = () => {
               ]}
               value={settings.fps.toString()}
               onChange={(val) => updateSettings({ fps: Number(val) })}
+              tooltip="Frames per second. 24 is cinematic, 30 is standard, 60 is smooth."
             />
           </div>
 
           <div className="space-y-1">
             <Slider
               label="Duration"
+              tooltip="Total length of the exported video in seconds."
               value={settings.duration}
               onChange={(val) => updateSettings({ duration: val })}
               min={1}
@@ -214,6 +220,7 @@ export const ExportGeneralTab = () => {
             <Switch
               checked={settings.crop.enabled}
               onCheckedChange={(c) => updateSettings({ crop: { ...settings.crop, enabled: c } })}
+              tooltip="Restrict the export to a custom rectangular region of the canvas."
             />
           </div>
           <Button

@@ -29,7 +29,11 @@ export const ExportTextTab = () => {
             Add watermarks or titles
           </span>
         </div>
-        <Switch checked={textOverlay.enabled} onCheckedChange={(c) => update({ enabled: c })} />
+        <Switch
+          checked={textOverlay.enabled}
+          onCheckedChange={(c) => update({ enabled: c })}
+          tooltip="Burn a text watermark or title into the exported video frames."
+        />
       </div>
 
       {textOverlay.enabled && (
@@ -56,6 +60,7 @@ export const ExportTextTab = () => {
                 onChange={(val) => update({ fontSize: val })}
                 min={10}
                 max={300}
+                tooltip="Font size of the overlay text in pixels."
               />
             </div>
             <div className="space-y-2">
@@ -72,6 +77,7 @@ export const ExportTextTab = () => {
                   { value: '700', label: 'Bold' },
                   { value: '900', label: 'Black' },
                 ]}
+                tooltip="Font weight of the overlay text."
               />
             </div>
           </div>
@@ -82,6 +88,7 @@ export const ExportTextTab = () => {
             </label>
             <Slider
               label="Opacity"
+              tooltip="Transparency of the text overlay. 0 = invisible, 1 = fully opaque."
               value={textOverlay.opacity}
               onChange={(val) => update({ opacity: val })}
               min={0}
@@ -96,7 +103,11 @@ export const ExportTextTab = () => {
                 <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
                   Text Color
                 </label>
-                <ColorPicker value={textOverlay.color} onChange={(c) => update({ color: c })} />
+                <ColorPicker
+                  value={textOverlay.color}
+                  onChange={(c) => update({ color: c })}
+                  tooltip="Fill color of the overlay text."
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
@@ -105,6 +116,7 @@ export const ExportTextTab = () => {
                 <ColorPicker
                   value={textOverlay.shadowColor}
                   onChange={(c) => update({ shadowColor: c })}
+                  tooltip="Color of the drop shadow behind the overlay text."
                 />
               </div>
             </div>
@@ -129,6 +141,7 @@ export const ExportTextTab = () => {
                   onChange={(val) =>
                     update({ verticalPlacement: val as 'top' | 'center' | 'bottom' })
                   }
+                  tooltip="Vertical anchor position of the text overlay on the frame."
                 />
               </div>
               <div className="space-y-2">
@@ -145,11 +158,13 @@ export const ExportTextTab = () => {
                   onChange={(val) =>
                     update({ horizontalPlacement: val as 'left' | 'center' | 'right' })
                   }
+                  tooltip="Horizontal anchor position of the text overlay on the frame."
                 />
               </div>
             </div>
             <Slider
               label="Padding"
+              tooltip="Distance in pixels between the text and the frame edge."
               value={textOverlay.padding}
               onChange={(val) => update({ padding: val })}
               min={0}

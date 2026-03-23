@@ -69,7 +69,10 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
       </ControlGroup>
 
       {/* Frame Blending */}
-      <ControlGroup title="Frame Blending">
+      <ControlGroup
+        title="Frame Blending"
+        tooltip="Temporal frame blending for smoother volumetric rendering and reduced noise."
+      >
         <Switch
           checked={frameBlendingEnabled}
           onCheckedChange={setFrameBlendingEnabled}

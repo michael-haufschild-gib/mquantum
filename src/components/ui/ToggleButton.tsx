@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Props for the {@link ToggleButton} component. */
@@ -14,6 +15,8 @@ export interface ToggleButtonProps extends Omit<
   children: React.ReactNode
   /** Sound to play on click: 'click' (default) or 'swish' (for opening drawers/panels) */
   sound?: 'click' | 'swish'
+  /** Tooltip text shown on hover over the button. */
+  tooltip?: string
 }
 
 export const ToggleButton = React.memo(
@@ -24,6 +27,7 @@ export const ToggleButton = React.memo(
     className = '',
     children,
     sound = 'click',
+    tooltip,
     ref,
     ...props
   }: ToggleButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
@@ -42,7 +46,7 @@ export const ToggleButton = React.memo(
       soundManager.playHover()
     }
 
-    return (
+    const button = (
       <button
         ref={ref}
         type="button"
@@ -65,6 +69,16 @@ export const ToggleButton = React.memo(
         {children}
       </button>
     )
+
+    if (tooltip) {
+      return (
+        <Tooltip content={tooltip} position="top">
+          {button}
+        </Tooltip>
+      )
+    }
+
+    return button
   }
 )
 

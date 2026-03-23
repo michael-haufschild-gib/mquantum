@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import {
   generatePalette,
   type HSVA,
@@ -25,6 +26,8 @@ interface ColorPickerProps {
   alpha?: number // External alpha control
   onChangeAlpha?: (alpha: number) => void // Handler for alpha changes
   disableAlpha?: boolean // If true, hide alpha controls and force alpha=1
+  /** Tooltip text shown on hover over the label. */
+  tooltip?: string
 }
 
 type ColorMode = 'HEX' | 'RGB' | 'CSS'
@@ -39,6 +42,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     alpha,
     onChangeAlpha,
     disableAlpha = false,
+    tooltip,
   }) => {
     // --- State ---
     const [hsv, setHsv] = useState<HSVA>({ h: 0, s: 0, v: 0, a: 1 })
@@ -266,7 +270,15 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         {label && (
-          <span className="text-xs font-medium text-text-secondary select-none">{label}</span>
+          <span className="text-xs font-medium text-text-secondary select-none">
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
+          </span>
         )}
 
         <Popover

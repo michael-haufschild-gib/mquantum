@@ -1,6 +1,8 @@
 import { m, PanInfo } from 'motion/react'
 import React, { useCallback, useId } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
+
 /** Props for the rotary {@link Knob} control. */
 export interface KnobProps {
   value: number
@@ -12,6 +14,8 @@ export interface KnobProps {
   size?: number
   className?: string
   sensitivity?: number
+  /** Tooltip text shown on hover over the label. */
+  tooltip?: string
 }
 
 export const Knob: React.FC<KnobProps> = React.memo(
@@ -25,6 +29,7 @@ export const Knob: React.FC<KnobProps> = React.memo(
     size = 64,
     className = '',
     sensitivity = 1, // Value change per pixel (approx)
+    tooltip,
   }) => {
     const id = useId()
 
@@ -260,7 +265,13 @@ export const Knob: React.FC<KnobProps> = React.memo(
 
         {label && (
           <span className="text-[10px] font-medium text-text-secondary select-none tracking-wider uppercase opacity-80">
-            {label}
+            {tooltip ? (
+              <Tooltip content={tooltip} position="top">
+                <span className="border-b border-dotted border-text-tertiary">{label}</span>
+              </Tooltip>
+            ) : (
+              label
+            )}
           </span>
         )}
       </div>

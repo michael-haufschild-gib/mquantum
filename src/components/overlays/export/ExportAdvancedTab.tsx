@@ -78,9 +78,10 @@ export const ExportAdvancedTab = () => {
             },
             { value: 'vp9', label: 'VP9', disabled: settings.format !== 'webm' },
             { value: 'av1', label: 'AV1', disabled: !supportedCodecs.av1 },
-          ].filter((opt) => !opt.disabled || opt.value === settings.codec)} // Hide invalid options? Or just disable. Filtering invalid is cleaner for UI.
+          ].filter((opt) => !opt.disabled || opt.value === settings.codec)}
           value={settings.codec}
           onChange={(val) => updateSettings({ codec: val as VideoCodec })}
+          tooltip="Video codec for encoding. H.264 is most compatible; AV1 offers best compression at higher CPU cost."
         />
       </div>
 
@@ -98,6 +99,7 @@ export const ExportAdvancedTab = () => {
           onChange={(val) =>
             updateSettings({ hardwareAcceleration: val as 'prefer-hardware' | 'prefer-software' })
           }
+          tooltip="Software encoding is slower but more consistent. Hardware encoding uses GPU acceleration for faster exports."
         />
       </div>
 
@@ -113,6 +115,7 @@ export const ExportAdvancedTab = () => {
           ]}
           value={settings.bitrateMode}
           onChange={(val) => updateSettings({ bitrateMode: val as 'constant' | 'variable' })}
+          tooltip="CBR maintains a steady bitrate. VBR allocates more bits to complex frames for better quality-to-size ratio."
         />
       </div>
     </div>

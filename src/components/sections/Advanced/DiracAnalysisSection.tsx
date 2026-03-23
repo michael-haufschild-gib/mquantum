@@ -41,6 +41,7 @@ export const DiracAnalysisContent: React.FC = React.memo(() => {
     <>
       <Slider
         label="Diagnostics Interval (frames)"
+        tooltip="How often to compute Dirac observables (spinor fractions, norm, Compton wavelength). Lower values update faster but use more GPU time."
         min={1}
         max={60}
         step={1}

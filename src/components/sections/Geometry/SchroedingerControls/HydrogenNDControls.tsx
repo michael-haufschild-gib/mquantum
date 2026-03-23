@@ -185,6 +185,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
               variant={config.useRealOrbitals ? 'primary' : 'ghost'}
               size="sm"
               onClick={() => setUseRealOrbitals(!config.useRealOrbitals)}
+              tooltip="Toggle between real orbitals (px, py, pz — linear combinations) and complex orbitals (eigenstates of L_z with quantum number m)."
               className={config.useRealOrbitals ? 'bg-accent/20 text-accent' : ''}
               data-testid="hydrogen-nd-real-toggle"
             >

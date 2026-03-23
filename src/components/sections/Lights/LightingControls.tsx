@@ -47,7 +47,11 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
               <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-semibold">
                 Gizmos
               </span>
-              <Switch checked={showLightGizmos} onCheckedChange={setShowLightGizmos} />
+              <Switch
+                checked={showLightGizmos}
+                onCheckedChange={setShowLightGizmos}
+                tooltip="Show light position indicators in the 3D viewport."
+              />
             </div>
           }
         >

@@ -41,6 +41,7 @@ export const PauliAnalysisContent: React.FC = React.memo(() => {
     <>
       <Slider
         label="Diagnostics Interval (frames)"
+        tooltip="How often to compute Pauli observables (spin fractions, coherence, Larmor frequency). Lower values update faster but use more GPU time."
         min={1}
         max={60}
         step={1}

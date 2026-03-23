@@ -344,6 +344,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               <div className="flex items-center gap-2">
                 <NumberInput
                   label="Seed"
+                  tooltip="Random seed for generating vacuum fluctuations. Different seeds produce different quantum noise realizations."
                   value={fs.vacuumSeed}
                   onChange={setVacuumSeed}
                   min={0}

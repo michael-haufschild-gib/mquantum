@@ -69,6 +69,7 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
 
       <Slider
         label="Diagnostics Interval (frames)"
+        tooltip="How often to compute field observables (energy, norm, drift). Lower values give more responsive sparklines but use more GPU time."
         min={1}
         max={120}
         step={1}

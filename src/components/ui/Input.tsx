@@ -1,6 +1,7 @@
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 import { LoadingSpinner } from './LoadingSpinner'
@@ -15,6 +16,8 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   onClear?: () => void
   containerClassName?: string
   label?: string
+  /** Tooltip text shown on hover over the label. */
+  tooltip?: string
 }
 
 export const Input = ({
@@ -27,6 +30,7 @@ export const Input = ({
   className = '',
   containerClassName = '',
   label,
+  tooltip,
   disabled,
   value,
   onChange,
@@ -96,7 +100,13 @@ export const Input = ({
     <div className={`flex flex-col gap-1.5 ${containerClassName}`}>
       {label && (
         <label htmlFor={inputId} className="text-xs font-medium text-text-secondary ms-1">
-          {label}
+          {tooltip ? (
+            <Tooltip content={tooltip} position="top">
+              <span className="border-b border-dotted border-text-tertiary">{label}</span>
+            </Tooltip>
+          ) : (
+            label
+          )}
         </label>
       )}
 

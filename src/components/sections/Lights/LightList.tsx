@@ -139,6 +139,7 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({ cla
         value=""
         onChange={handleAddLight}
         disabled={!canAddLight}
+        tooltip="Add a new light source to the scene. Maximum 4 lights."
       />
     </div>
   )

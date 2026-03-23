@@ -442,6 +442,7 @@ const CustomExpressionInput: React.FC<CustomExpressionInputProps> = React.memo(
       <div className="space-y-2">
         <Input
           label="V(x) ="
+          tooltip="Custom potential expression using variables x, y, z, etc. Supports +, -, *, /, ^, sqrt, sin, cos, exp, pi, and parentheses."
           value={localExpr}
           onChange={handleChange}
           onBlur={handleBlur}

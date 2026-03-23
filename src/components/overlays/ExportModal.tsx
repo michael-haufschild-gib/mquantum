@@ -405,6 +405,7 @@ export const ExportModal = () => {
                   ]}
                   value={exportModeOverride || exportMode}
                   onChange={(val) => setExportModeOverride(val as ExportMode)}
+                  tooltip="Memory holds the video in RAM. Stream writes directly to disk. Segmented downloads in chunks."
                 />
 
                 <p className="text-[11px] text-text-tertiary leading-relaxed">
@@ -454,6 +455,7 @@ export const ExportModal = () => {
                   ]}
                   value={exportModeOverride || exportMode}
                   onChange={(val) => setExportModeOverride(val as ExportMode)}
+                  tooltip="Memory holds the video in RAM. Stream writes directly to disk. Segmented downloads in chunks."
                 />
                 <p className="text-[10px] text-text-tertiary pb-3">{getModeGuidance()}</p>
               </div>

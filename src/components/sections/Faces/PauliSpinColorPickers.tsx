@@ -63,12 +63,14 @@ export const PauliSpinColorPickers: React.FC = React.memo(() => {
     <div className="grid grid-cols-2 gap-3">
       <ColorPicker
         label="Spin Up"
+        tooltip="Color representing the spin-up (+z) component of the Pauli spinor."
         value={tupleToHex(spinUpColor)}
         onChange={handleSpinUpColor}
         disableAlpha
       />
       <ColorPicker
         label="Spin Down"
+        tooltip="Color representing the spin-down (-z) component of the Pauli spinor."
         value={tupleToHex(spinDownColor)}
         onChange={handleSpinDownColor}
         disableAlpha

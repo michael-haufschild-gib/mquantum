@@ -61,11 +61,13 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
         value={divergingPsi.component}
         onChange={handleComponentChange}
         ariaLabel="Signed component mode"
+        tooltip="Which component of the complex wavefunction to visualize with the diverging colormap."
         data-testid="diverging-component-mode"
       />
 
       <ColorPicker
         label="Zero (Neutral)"
+        tooltip="Color shown where the selected component is near zero."
         value={divergingPsi.neutralColor}
         onChange={handleNeutralColor}
         disableAlpha={true}
@@ -73,6 +75,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
 
       <ColorPicker
         label="Positive Wing"
+        tooltip="Color for positive values of the selected wavefunction component."
         value={divergingPsi.positiveColor}
         onChange={handlePositiveColor}
         disableAlpha={true}
@@ -80,6 +83,7 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
 
       <ColorPicker
         label="Negative Wing"
+        tooltip="Color for negative values of the selected wavefunction component."
         value={divergingPsi.negativeColor}
         onChange={handleNegativeColor}
         disableAlpha={true}

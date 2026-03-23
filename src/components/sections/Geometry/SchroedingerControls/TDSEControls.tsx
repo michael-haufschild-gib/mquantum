@@ -345,6 +345,7 @@ const StoreEigenstateButton: React.FC = React.memo(() => {
         size="sm"
         onClick={() => useSimulationStateStore.getState().requestStoreEigenstate()}
         disabled={count >= 8}
+        tooltip="Capture the current converged eigenstate for Gram-Schmidt orthogonalization. Subsequent imaginary-time runs will find the next excited state."
         data-testid="store-eigenstate"
       >
         Store Eigenstate

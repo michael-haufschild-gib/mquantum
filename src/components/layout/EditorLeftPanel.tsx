@@ -92,11 +92,13 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
                   value={isoEnabled ? 'isosurface' : 'volumetric'}
                   onChange={handleSurfaceModeChange}
                   ariaLabel="Select surface rendering mode"
+                  tooltip="Volumetric renders a translucent probability cloud. Isosurface renders a solid shell at a constant probability density."
                   data-testid="surface-mode-selector"
                 />
                 {isoEnabled && (
                   <Slider
                     label="Iso Threshold (log)"
+                    tooltip="Log-scale probability density at which the isosurface is drawn. Lower values reveal more of the wavefunction structure."
                     min={-6}
                     max={0}
                     step={0.1}

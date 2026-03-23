@@ -86,6 +86,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
             <ColorPicker
               value={sssColor}
               onChange={handleSssColorChange}
+              tooltip="Tint color for subsurface scattered light. Warm tones simulate organic materials; cool tones simulate crystalline media."
               disableAlpha={true}
               className="w-24"
             />

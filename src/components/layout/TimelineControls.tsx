@@ -279,6 +279,7 @@ export const TimelineControls: FC = () => {
             pressed={direction === -1}
             onToggle={() => toggleDirection()}
             ariaLabel={direction === 1 ? 'Enable reverse' : 'Disable reverse'}
+            tooltip="Reverse the direction of time evolution."
             className="w-9 h-9 p-0 rounded-lg flex items-center justify-center"
           >
             <Icon name="redo" size={14} />
@@ -289,6 +290,7 @@ export const TimelineControls: FC = () => {
         <div className="w-28 sm:w-44 pt-2.5 pl-3 border-l border-border-subtle shrink-0">
           <Slider
             label="SPEED"
+            tooltip="Animation speed multiplier. Controls how fast the wavefunction evolves in time."
             min={MIN_SPEED}
             max={MAX_SPEED}
             step={0.1}
@@ -327,6 +329,7 @@ export const TimelineControls: FC = () => {
               }}
               sound="swish"
               ariaLabel="Toggle animations drawer"
+              tooltip="Open the quantum animation effects panel (phase, interference, probability flow)."
               className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Effects
@@ -348,6 +351,7 @@ export const TimelineControls: FC = () => {
               }}
               sound="swish"
               ariaLabel="Toggle open quantum drawer"
+              tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
               className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Open Q
@@ -363,6 +367,7 @@ export const TimelineControls: FC = () => {
             }}
             sound="swish"
             ariaLabel="Toggle rotation drawer"
+            tooltip="Select which N-dimensional rotation planes to animate."
             className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
           >
             Rotate

@@ -87,6 +87,7 @@ export const SpinControls: React.FC<SpinControlsProps> = React.memo(
             if (angles) onSpinDirectionChange(angles)
           }}
           ariaLabel="Spin Preset"
+          tooltip="Quick presets for common spin orientations on the Bloch sphere. Sets the polar and azimuthal angles automatically."
         />
 
         <Slider

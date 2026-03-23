@@ -68,12 +68,13 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
     }, [])
 
     return (
-      <Section title="Settings" defaultOpen={defaultOpen}>
+      <Section title="Settings" defaultOpen={defaultOpen} data-testid="section-settings">
         <div className="mt-3 pt-3 border-t border-panel-border">
           <Switch
             checked={showAxisHelper}
             onCheckedChange={setShowAxisHelper}
             label="Show Axis Helper"
+            tooltip="Display an XYZ orientation gizmo in the viewport corner."
           />
         </div>
         <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">
@@ -82,6 +83,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
             size="sm"
             onClick={handleRestoreDismissedHints}
             disabled={dismissedCount === 0}
+            tooltip="Re-show all previously dismissed hint dialogs and info banners."
             data-testid="restore-hints-button"
           >
             Restore Dismissed Hints{dismissedCount > 0 ? ` (${dismissedCount})` : ''}
@@ -90,6 +92,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
             variant="secondary"
             size="sm"
             onClick={handleOpenClearLocalStorageModal}
+            tooltip="Delete all saved preferences, presets, and cached data from the browser."
             data-testid="clear-localstorage-button"
           >
             Clear localStorage

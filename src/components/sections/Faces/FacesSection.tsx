@@ -248,6 +248,7 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
         {USES_BASE_COLOR.has(colorAlgorithm) && (
           <ColorPicker
             label="Base Color"
+            tooltip="Starting hue for HSL-based color algorithms. The wavefunction amplitude shifts around this color."
             value={faceColor}
             onChange={setFaceColor}
             disableAlpha={true}
@@ -394,6 +395,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
             <div className="flex items-center justify-between">
               <ColorPicker
                 label="Specular Color"
+                tooltip="Tint of specular highlights. White is physically neutral; colored tints simulate metallic reflections."
                 value={specularColor}
                 onChange={setSpecularColor}
                 disableAlpha={true}

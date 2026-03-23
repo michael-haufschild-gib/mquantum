@@ -164,6 +164,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
           <div className="space-y-2">
             <Select
               label="Compositing"
+              tooltip="How the slice plane combines with the 3D volume. Overlay blends the slice into the volume; Slice Only shows the plane alone."
               options={CROSS_SECTION_COMPOSITE_OPTIONS}
               value={config.crossSectionCompositeMode ?? 'overlay'}
               onChange={(value) =>
@@ -173,6 +174,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             />
             <Select
               label="Scalar"
+              tooltip="Which quantity to color-map on the slice plane: probability density |psi|^2, real part Re(psi), or imaginary part Im(psi)."
               options={CROSS_SECTION_SCALAR_OPTIONS}
               value={config.crossSectionScalar ?? 'density'}
               onChange={(value) => setCrossSectionScalar(value as SchroedingerCrossSectionScalar)}
@@ -180,6 +182,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             />
             <Select
               label="Plane Mode"
+              tooltip="Axis-Aligned restricts the slice to XY, XZ, or YZ planes. Free Plane allows arbitrary normal direction."
               options={CROSS_SECTION_PLANE_MODE_OPTIONS}
               value={config.crossSectionPlaneMode ?? 'axisAligned'}
               onChange={(value) =>
@@ -191,6 +194,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             {(config.crossSectionPlaneMode ?? 'axisAligned') === 'axisAligned' ? (
               <Select
                 label="Orientation"
+                tooltip="Which plane to slice through: YZ (normal to X), XZ (normal to Y), or XY (normal to Z)."
                 options={CROSS_SECTION_AXIS_OPTIONS}
                 value={config.crossSectionAxis ?? 'z'}
                 onChange={(value) => setCrossSectionAxis(value as SchroedingerCrossSectionAxis)}
@@ -200,6 +204,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
               <>
                 <Slider
                   label="Normal X"
+                  tooltip="X component of the free-plane normal vector."
                   min={-1}
                   max={1}
                   step={0.01}
@@ -216,6 +221,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
                 />
                 <Slider
                   label="Normal Y"
+                  tooltip="Y component of the free-plane normal vector."
                   min={-1}
                   max={1}
                   step={0.01}
@@ -232,6 +238,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
                 />
                 <Slider
                   label="Normal Z"
+                  tooltip="Z component of the free-plane normal vector."
                   min={-1}
                   max={1}
                   step={0.01}
@@ -251,6 +258,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
 
             <Slider
               label="Plane Offset"
+              tooltip="Position of the slice plane along its normal direction. 0 is centered; positive moves forward."
               min={-1}
               max={1}
               step={0.01}
@@ -261,6 +269,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             />
             <Slider
               label="Opacity"
+              tooltip="Transparency of the cross-section plane. 0 = fully transparent, 1 = fully opaque."
               min={0}
               max={1}
               step={0.01}
@@ -271,6 +280,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             />
             <Slider
               label="Thickness"
+              tooltip="Thickness of the slice slab in normalized coordinates. Thicker slabs average more of the wavefunction."
               min={0}
               max={0.2}
               step={0.005}
@@ -282,6 +292,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             <div data-testid="schroedinger-cross-section-plane-color">
               <ColorPicker
                 label="Plane Color"
+                tooltip="Base color of the cross-section plane border and background tint."
                 value={
                   config.crossSectionPlaneColor ??
                   DEFAULT_SCHROEDINGER_CONFIG.crossSectionPlaneColor
@@ -294,6 +305,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
 
             <Switch
               label="Auto Window"
+              tooltip="Automatically compute the color-mapping range from the wavefunction data. Disable for manual min/max control."
               checked={config.crossSectionAutoWindow ?? true}
               onCheckedChange={(checked) => setCrossSectionAutoWindow(checked)}
               data-testid="schroedinger-cross-section-auto-window-toggle"
@@ -303,6 +315,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
               <>
                 <Slider
                   label="Window Min"
+                  tooltip="Lower bound of the color-mapping range for the slice scalar."
                   min={-5}
                   max={5}
                   step={0.01}
@@ -313,6 +326,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
                 />
                 <Slider
                   label="Window Max"
+                  tooltip="Upper bound of the color-mapping range for the slice scalar."
                   min={-5}
                   max={5}
                   step={0.01}
@@ -349,6 +363,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
             <div className="space-y-2">
               <Slider
                 label="Opacity"
+                tooltip="Transparency of the radial probability shell overlay. 0 = invisible, 1 = fully opaque."
                 min={0}
                 max={1}
                 step={0.05}
@@ -368,6 +383,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
                     DEFAULT_SCHROEDINGER_CONFIG.radialProbabilityColor
                   }
                   onChange={setRadialProbabilityColor}
+                  tooltip="Color of the radial probability shell rendered at the most probable radius."
                   disableAlpha={true}
                   className="w-24"
                 />

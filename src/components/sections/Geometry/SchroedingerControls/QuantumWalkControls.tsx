@@ -91,6 +91,7 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
           updateQW({ coinType: v as QuantumWalkCoinType, steps: 0, needsReset: true })
         }
         ariaLabel="Coin operator type"
+        tooltip="Coin operator applied at each step. Grover creates localization, Hadamard gives asymmetric spreading, DFT gives uniform phase distribution."
         data-testid="qw-coin-type"
       />
 
@@ -123,6 +124,7 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         value={qw.fieldView}
         onChange={(v) => updateQW({ fieldView: v as QuantumWalkFieldView })}
         ariaLabel="Field view"
+        tooltip="Displayed quantity: P(x) shows position probability, Phase shows complex phase, Coin shows the internal coin state."
         data-testid="qw-field-view"
       />
 

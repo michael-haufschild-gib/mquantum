@@ -185,6 +185,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <ColorPicker
         label="Front Color"
+        tooltip="Primary paper color for the lighter, front-facing grain."
         value={paperColorFront}
         onChange={setPaperColorFront}
         disableAlpha
@@ -192,6 +193,7 @@ export const PaperControls: React.FC<PaperControlsProps> = React.memo(({ classNa
 
       <ColorPicker
         label="Back Color"
+        tooltip="Secondary paper color for the darker, back-facing grain texture."
         value={paperColorBack}
         onChange={setPaperColorBack}
         disableAlpha

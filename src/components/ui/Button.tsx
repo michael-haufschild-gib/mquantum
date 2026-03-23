@@ -1,6 +1,7 @@
 import { HTMLMotionProps, m } from 'motion/react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 import { LoadingSpinner } from './LoadingSpinner'
@@ -17,6 +18,8 @@ export interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   ariaLabel?: string
   'data-testid'?: string
   glow?: boolean
+  /** Tooltip text shown on hover over the button. */
+  tooltip?: string
 }
 
 const baseStyles =
@@ -51,6 +54,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
     ariaLabel,
     'data-testid': testId,
     glow = false,
+    tooltip,
     ref: externalRef,
     ...props
   }: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
@@ -127,7 +131,7 @@ export const Button: React.FC<ButtonProps> = React.memo(
       [disabled, loading]
     )
 
-    return (
+    const button = (
       <m.button
         ref={setRef}
         type={type}
@@ -177,6 +181,16 @@ export const Button: React.FC<ButtonProps> = React.memo(
         )}
       </m.button>
     )
+
+    if (tooltip) {
+      return (
+        <Tooltip content={tooltip} position="top">
+          {button}
+        </Tooltip>
+      )
+    }
+
+    return button
   }
 )
 
