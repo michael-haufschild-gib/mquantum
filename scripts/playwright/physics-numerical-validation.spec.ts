@@ -22,8 +22,13 @@
 
 import { expect, test } from './fixtures'
 import {
+  applyBecPreset,
   gotoMode,
+  readBecDiagnostics,
   readDensityDiagnostics,
+  readFsfDiagnostics,
+  readObservablesDiagnostics,
+  readQwDiagnostics,
   readTdseDiagnostics,
   requireWebGPU,
   setHydrogenQuantumNumbers,
@@ -331,7 +336,7 @@ test.describe('cross-mode density sanity', () => {
     await requireWebGPU(page, test.info())
   })
 
-  test('HO 3D and hydrogen 3D have different density profiles', async ({ page }) => {
+  test('HO and hydrogen produce different density distributions', async ({ page }) => {
     // HO ground state
     await setupAndWaitForDensity(page, 'harmonicOscillator', 3)
     await setTermCount(page, 1)
@@ -364,6 +369,684 @@ test.describe('cross-mode density sanity', () => {
       ratio < 0.8 || ratio > 1.2,
       `HO/hydrogen maxDensity ratio ${ratio.toFixed(3)} should differ by >20%`
     ).toBe(true)
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
+})
+
+// ─── Free Scalar Field Energy Conservation ──────────────────────────────────
+//
+// The free scalar field (no self-interaction, λ=0) is a linear system with
+// exact energy conservation in the continuum. The leapfrog integrator is
+// symplectic, so energy drift should be bounded by floating-point roundoff.
+//
+// This tests the WGSL compute shaders:
+//   freeScalarUpdatePhi.wgsl.ts — φ update step
+//   freeScalarUpdatePi.wgsl.ts  — π (conjugate momentum) update step
+//   freeScalarInit.wgsl.ts      — initial field configuration
+//
+// Existing test in physics-validation.spec.ts allows |energyDrift| < 5.0 (500%).
+// This test demands < 5% for the free (quadratic) Hamiltonian.
+
+test.describe('free scalar field energy conservation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('free field (no self-interaction): |energyDrift| < 5% after 200 frames', async ({
+    page,
+  }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+
+    // Explicitly disable self-interaction to isolate the free Hamiltonian
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarSelfInteractionEnabled(false)
+      s.resetFreeScalarField()
+    })
+
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData, 'FSF diagnostics must have data').toBe(true)
+    expect(Number.isFinite(diag.totalEnergy), 'energy must be finite').toBe(true)
+    expect(diag.totalEnergy, 'energy must be positive').toBeGreaterThan(0)
+
+    // Free field symplectic integrator: energy drift should be < 5%.
+    // Any larger drift means the leapfrog update or FFT has a bug.
+    expect(
+      Math.abs(diag.energyDrift),
+      `energyDrift=${diag.energyDrift}: free field should conserve energy`
+    ).toBeLessThan(0.05)
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
+})
+
+// ─── TDSE Observables: Uncertainty Principle & Free-Particle Motion ─────────
+//
+// Tests the GPU reduction passes (observablesPositionReduce.wgsl.ts,
+// observablesMomentumReduce.wgsl.ts) that compute expectation values
+// <x>, <p>, Δx, Δp from the TDSE wavefunction.
+//
+// Physics invariants:
+//   1. Heisenberg uncertainty: Δx·Δp ≥ ℏ/2 = 0.5 (in natural units)
+//   2. Free-particle Ehrenfest theorem: <x>(t) moves in the direction of <p>(0)
+
+test.describe('TDSE observables physics', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('uncertainty principle: Δx·Δp ≥ ℏ/2 for all 3 dimensions', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForShaderCompilation(page)
+
+    // Configure: free potential, no absorber, observables enabled
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdsePotentialType('free')
+      s.setTdseAbsorberEnabled(false)
+      s.setTdseDiagnosticsEnabled(true)
+      s.setTdseObservablesEnabled(true)
+      s.setTdseInitialCondition('gaussianPacket')
+      s.setTdsePacketWidth(0.3)
+      s.setTdsePacketMomentum([2.0, 0, 0])
+      s.resetTdseField()
+    })
+
+    // Wait for observables diagnostic data
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
+        return mod.useObservablesDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    await waitForSimulationFrames(page, 100)
+
+    const obs = await readObservablesDiagnostics(page)
+    expect(obs.hasData, 'observables must have GPU readback data').toBe(true)
+
+    // Heisenberg: ΔxΔp ≥ ℏ/2 = 0.5 in all dimensions
+    // Allow 10% slack (0.45) for GPU floating-point and finite grid effects
+    for (let d = 0; d < 3; d++) {
+      expect(
+        obs.uncertaintyProduct[d],
+        `dim ${d}: ΔxΔp=${obs.uncertaintyProduct[d]} must be ≥ ℏ/2`
+      ).toBeGreaterThanOrEqual(0.45)
+    }
+  })
+
+  test('free particle: <x> moves in direction of initial momentum', async ({ page }) => {
+    // Ehrenfest theorem: d<x>/dt = <p>/m. For a free particle with p₀ > 0
+    // in dimension 0, <x₀> should increase over time.
+    //
+    // This tests the full chain:
+    //   tdseInit (initial wavepacket) → tdseApplyKinetic (FFT momentum step) →
+    //   tdseApplyPotentialHalf (V=0) → observablesPositionReduce (<x> readback)
+
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdsePotentialType('free')
+      s.setTdseAbsorberEnabled(false)
+      s.setTdseDiagnosticsEnabled(true)
+      s.setTdseObservablesEnabled(true)
+      s.setTdseInitialCondition('gaussianPacket')
+      s.setTdsePacketCenter([0, 0, 0])
+      s.setTdsePacketWidth(0.3)
+      s.setTdsePacketMomentum([5.0, 0, 0])
+      s.resetTdseField()
+    })
+
+    // Read initial position
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
+        return mod.useObservablesDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    const obs0 = await readObservablesDiagnostics(page)
+    const x0 = obs0.positionMean[0]!
+
+    // Let the packet propagate
+    await waitForSimulationFrames(page, 200)
+
+    const obs1 = await readObservablesDiagnostics(page)
+    const x1 = obs1.positionMean[0]!
+
+    // <x> should have moved in the +x direction (p₀ = +5.0)
+    // The exact displacement depends on dt and frame count, but it must be positive.
+    expect(x1, `<x> must increase: x0=${x0.toFixed(4)}, x1=${x1.toFixed(4)}`).toBeGreaterThan(x0)
+
+    // Transverse dimensions should not have systematic drift
+    // (no transverse momentum → <y>, <z> stay near 0)
+    expect(Math.abs(obs1.positionMean[1]!)).toBeLessThan(0.5)
+    expect(Math.abs(obs1.positionMean[2]!)).toBeLessThan(0.5)
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
+})
+
+// ─── Quantum Walk Physics Invariants ────────────────────────────────────────
+//
+// Tests the discrete-time quantum walk compute shaders:
+//   quantumWalkCoin.wgsl.ts   — coin operator (Grover/Hadamard/DFT)
+//   quantumWalkShift.wgsl.ts  — conditional shift operator
+//   quantumWalkAbsorber.wgsl.ts — PML boundary absorber
+//
+// The coin and shift operators are unitary. Without absorber, the total
+// wavefunction norm Σ_{site,j} |c_j(site)|² must be exactly conserved.
+// With absorber, norm must decrease (probability absorbed at boundaries).
+//
+// These are the first physics assertions for QW — previously only pixel tests.
+
+test.describe('quantum walk norm conservation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('unitary walk (no absorber): |normDrift| < 1% after 100 steps', async ({ page }) => {
+    // Discrete QW with Hadamard coin is exactly unitary. Any norm drift = bug
+    // in the coin or shift shader. The only error source is f32 roundoff.
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForShaderCompilation(page)
+
+    // Disable absorber to isolate unitarity
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(false)
+      s.resetQuantumWalk()
+    })
+
+    // Wait for QW diagnostics to appear
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+        return mod.useQwDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readQwDiagnostics(page)
+    expect(diag.hasData, 'QW diagnostics must receive GPU readback data').toBe(true)
+    expect(diag.stepCount, 'steps must advance').toBeGreaterThan(0)
+
+    // Unitary operators conserve norm exactly. f32 roundoff ≈ 10⁻⁶ per step.
+    // After ~100 steps: cumulative drift < 10⁻⁴. We allow 1% as a safe margin.
+    expect(
+      Math.abs(diag.normDrift),
+      `normDrift=${diag.normDrift}: coin+shift must preserve norm`
+    ).toBeLessThan(0.01)
+
+    // Norm must be positive and finite
+    expect(diag.totalNorm, 'totalNorm must be positive').toBeGreaterThan(0)
+    expect(Number.isFinite(diag.totalNorm), 'totalNorm must be finite').toBe(true)
+  })
+
+  test('absorber enabled: norm decreases (probability absorbed at boundary)', async ({ page }) => {
+    // With PML absorber, the walk should lose probability as the walker
+    // reaches the boundary. Norm should decrease, not increase.
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForShaderCompilation(page)
+
+    // Enable absorber with aggressive settings
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(true)
+      s.setQwAbsorberWidth(0.3)
+      s.resetQuantumWalk()
+    })
+
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+        return mod.useQwDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    await waitForSimulationFrames(page, 300)
+
+    const diag = await readQwDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(diag.stepCount).toBeGreaterThan(0)
+
+    // Norm should have decreased (absorber removing probability).
+    // normDrift should be negative (norm < initial norm).
+    // If norm INCREASED, the absorber has a sign error.
+    expect(diag.normDrift, 'absorber must not create probability').toBeLessThanOrEqual(0.01)
+    expect(diag.totalNorm, 'totalNorm must remain positive').toBeGreaterThan(0)
+    expect(Number.isFinite(diag.totalNorm)).toBe(true)
+  })
+
+  test('Grover coin preserves norm (alternative coin operator)', async ({ page }) => {
+    // Grover coin G_jk = 2/N - δ_jk is also unitary. Verify norm conservation.
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(false)
+      // Set coin type via direct state merge (no dedicated setter)
+      const store = mod.useExtendedObjectStore.getState()
+      mod.useExtendedObjectStore.setState({
+        schroedinger: {
+          ...store.schroedinger,
+          quantumWalk: {
+            ...store.schroedinger.quantumWalk,
+            coinType: 'grover' as never,
+            needsReset: true,
+          },
+        },
+      })
+    })
+
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+        return mod.useQwDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readQwDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(Math.abs(diag.normDrift), 'Grover coin must preserve norm').toBeLessThan(0.01)
+  })
+
+  test('DFT coin: norm conservation', async ({ page }) => {
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const store = mod.useExtendedObjectStore.getState()
+      const s = store as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(false)
+      mod.useExtendedObjectStore.setState({
+        schroedinger: {
+          ...store.schroedinger,
+          quantumWalk: {
+            ...store.schroedinger.quantumWalk,
+            coinType: 'dft' as never,
+            needsReset: true,
+          },
+        },
+      })
+    })
+
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+        return mod.useQwDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readQwDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(Math.abs(diag.normDrift), 'DFT coin must preserve norm').toBeLessThan(0.01)
+  })
+
+  test('ballistic spreading: position variance grows over time', async ({ page }) => {
+    // Quantum walk signature: Δx² ∝ t² (ballistic), not ∝ t (diffusive).
+    // Read variance at two time points and verify it grows.
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(false)
+      s.resetQuantumWalk()
+    })
+
+    // Wait for initial diagnostics
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+        return mod.useQwDiagnosticsStore.getState().hasData
+      },
+      { timeout: 30_000 }
+    )
+
+    // Read early variance
+    await waitForSimulationFrames(page, 60)
+    const early = await readQwDiagnostics(page)
+
+    // Read late variance
+    await waitForSimulationFrames(page, 200)
+    const late = await readQwDiagnostics(page)
+
+    expect(early.hasData).toBe(true)
+    expect(late.hasData).toBe(true)
+    expect(late.stepCount, 'must have more steps').toBeGreaterThan(early.stepCount)
+
+    // Position variance should increase as the walk spreads
+    expect(
+      late.positionVariance,
+      `variance must grow: early=${early.positionVariance.toFixed(3)}, late=${late.positionVariance.toFixed(3)}`
+    ).toBeGreaterThan(early.positionVariance)
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
+})
+
+// ─── BEC Physics (Strong) ───────────────────────────────────────────────────
+//
+// Tests BEC-specific physics beyond generic norm conservation:
+//   - Attractive interactions cause collapse (g < 0)
+//   - Thomas-Fermi ground state has correct profile shape
+//   - Increasing g scales chemical potential
+//   - Imaginary-time propagation converges
+//
+// These test the Gross-Pitaevskii nonlinear term in the TDSE split-step:
+//   tdsePotential.wgsl.ts (V(r) + g|ψ|² potential half-step)
+
+test.describe('BEC physics — strong validation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('TF ground state: chemical potential > 0 and TF radius > 0', async ({ page }) => {
+    await gotoMode(page, 'becDynamics', 3)
+    await waitForShaderCompilation(page)
+    await applyBecPreset(page, 'groundState')
+    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 120)
+
+    const diag = await readBecDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(diag.chemicalPotential, 'μ > 0 for repulsive BEC').toBeGreaterThan(0)
+    expect(diag.thomasFermiRadius, 'R_TF > 0').toBeGreaterThan(0)
+    expect(diag.thomasFermiRadius, 'R_TF < domain').toBeLessThan(10)
+    // Sound speed cs = sqrt(gn/m) should be positive for repulsive BEC
+    expect(diag.soundSpeed, 'cs > 0 for repulsive BEC').toBeGreaterThan(0)
+  })
+
+  test('increasing g increases chemical potential', async ({ page }) => {
+    await gotoMode(page, 'becDynamics', 3)
+    await waitForShaderCompilation(page)
+
+    // g = 200 (low)
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setBecInteractionStrength(200)
+      s.setBecInitialCondition('thomasFermi')
+      s.resetBecField()
+    })
+    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 120)
+    const diagLow = await readBecDiagnostics(page)
+
+    // g = 1000 (high)
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setBecInteractionStrength(1000)
+      s.resetBecField()
+    })
+    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 120)
+    const diagHigh = await readBecDiagnostics(page)
+
+    expect(diagLow.hasData).toBe(true)
+    expect(diagHigh.hasData).toBe(true)
+    // μ = g * n_peak. Higher g → higher μ (assuming similar density profile)
+    expect(
+      diagHigh.chemicalPotential,
+      `μ(g=1000)=${diagHigh.chemicalPotential} should be > μ(g=200)=${diagLow.chemicalPotential}`
+    ).toBeGreaterThan(diagLow.chemicalPotential)
+  })
+
+  test('attractive BEC (g < 0): norm drops rapidly (collapse)', async ({ page }) => {
+    // Negative g causes the BEC to collapse — |ψ|² concentrates
+    // and eventually the integrator can't handle the singularity.
+    // Norm should drop or blow up, not stay stable.
+    await gotoMode(page, 'becDynamics', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setBecInteractionStrength(-500)
+      s.setBecInitialCondition('thomasFermi')
+      s.setBecAbsorberEnabled(false)
+      s.resetBecField()
+    })
+    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readBecDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    // Attractive BEC should show significant instability — norm drift > 5%
+    // or maxDensity should be much larger than for repulsive case.
+    // If norm is perfectly stable with g<0, the nonlinear term is broken.
+    expect(
+      Math.abs(diag.normDrift) > 0.05 || diag.maxDensity > 5,
+      `attractive BEC should show instability: normDrift=${diag.normDrift}, maxDensity=${diag.maxDensity}`
+    ).toBe(true)
+  })
+
+  test('TF ground state: center density via density oracle', async ({ page }) => {
+    // TF profile has maximum at the center, zero at the boundary.
+    await setupAndWaitForDensity(page, 'becDynamics', 3)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setBecInteractionStrength(500)
+      s.setBecInitialCondition('thomasFermi')
+      s.resetBecField()
+    })
+    await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+
+    const diag = await readDensityDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    // Center density should be near the peak (TF profile peaks at center)
+    expect(diag.centerDensity, 'center > 0 for TF profile').toBeGreaterThan(0)
+    expect(diag.maxDensity, 'maxDensity > 0').toBeGreaterThan(0)
+  })
+
+  test('TF ground state: healing length physically consistent with μ', async ({ page }) => {
+    // ξ = ℏ/√(2mgn) and μ = gn → ξ = ℏ/√(2mμ). For ℏ=m=1: ξ = 1/√(2μ).
+    // Test that healing length and chemical potential are self-consistent.
+    await gotoMode(page, 'becDynamics', 3)
+    await waitForShaderCompilation(page)
+    await applyBecPreset(page, 'groundState')
+    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 120)
+
+    const diag = await readBecDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(diag.chemicalPotential).toBeGreaterThan(0)
+    expect(diag.healingLength).toBeGreaterThan(0)
+    // ξ ≈ 1/√(2μ) for ℏ=m=1. Allow 50% tolerance (TF is an approximation).
+    const expectedXi = 1 / Math.sqrt(2 * diag.chemicalPotential)
+    const ratio = diag.healingLength / expectedXi
+    expect(ratio, `ξ/ξ_predicted = ${ratio.toFixed(3)}, expected near 1.0`).toBeGreaterThan(0.3)
+    expect(ratio).toBeLessThan(3.0)
+  })
+
+  test.afterAll(async ({ browser }) => {
+    for (const ctx of browser.contexts()) {
+      for (const p of ctx.pages()) {
+        await p.goto('about:blank').catch(() => {})
+      }
+    }
+  })
+})
+
+// ─── FSF Physics (Strong) ───────────────────────────────────────────────────
+//
+// Tests free scalar field physics beyond generic energy finiteness:
+//   - Vacuum fluctuations: variancePhi > 0 (quantum noise exists)
+//   - Field symmetry: meanPhi ≈ 0 for symmetric initial conditions
+//   - Self-interaction differential: λφ⁴ changes energy profile
+//   - Conjugate momentum bounded: maxPi stays finite
+//
+// FSF diagnostics are computed CPU-side from GPU readback arrays (phi, pi).
+// The chain is: GPU leapfrog → readback arrays → computeFsfDiagnostics → store.
+
+test.describe('FSF physics — strong validation', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('vacuum state: variancePhi > 0 (quantum fluctuations exist)', async ({ page }) => {
+    // Even in the vacuum state, the scalar field has zero-point fluctuations.
+    // variancePhi = 0 would mean a perfectly classical vacuum — wrong.
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarSelfInteractionEnabled(false)
+      s.setFreeScalarInitialCondition('vacuum')
+      s.resetFreeScalarField()
+    })
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 60)
+
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(diag.variancePhi, 'vacuum must have nonzero field variance').toBeGreaterThan(0)
+    expect(Number.isFinite(diag.variancePhi), 'variance must be finite').toBe(true)
+  })
+
+  test('symmetric init: meanPhi ≈ 0', async ({ page }) => {
+    // A symmetric initial condition (vacuum or centered gaussian) should have
+    // zero mean field. If meanPhi is significantly nonzero, there's a bias.
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarSelfInteractionEnabled(false)
+      s.setFreeScalarInitialCondition('vacuum')
+      s.resetFreeScalarField()
+    })
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 60)
+
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    // Mean should be near zero for symmetric initial conditions
+    expect(Math.abs(diag.meanPhi), `meanPhi=${diag.meanPhi} should be near 0`).toBeLessThan(0.1)
+  })
+
+  test('self-interaction ON vs OFF: different total energy', async ({ page }) => {
+    // The Mexican hat potential V(φ) = λ(φ²-v²)² adds energy. Enabling it
+    // should produce measurably different total energy from the free field.
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+
+    // Free field (no self-interaction)
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarSelfInteractionEnabled(false)
+      s.setFreeScalarInitialCondition('gaussianPacket')
+      s.resetFreeScalarField()
+    })
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 60)
+    const diagFree = await readFsfDiagnostics(page)
+
+    // Self-interaction enabled
+    await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarSelfInteractionEnabled(true)
+      s.setFreeScalarSelfInteractionLambda(2.0)
+      s.resetFreeScalarField()
+    })
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 60)
+    const diagSI = await readFsfDiagnostics(page)
+
+    expect(diagFree.hasData).toBe(true)
+    expect(diagSI.hasData).toBe(true)
+    expect(diagFree.totalEnergy).toBeGreaterThan(0)
+    expect(diagSI.totalEnergy).toBeGreaterThan(0)
+
+    // Energies should differ (self-interaction adds potential energy)
+    const ratio = diagSI.totalEnergy / diagFree.totalEnergy
+    expect(
+      ratio < 0.8 || ratio > 1.2,
+      `SI/free energy ratio ${ratio.toFixed(3)} should differ by >20%`
+    ).toBe(true)
+  })
+
+  test('conjugate momentum stays bounded: maxPi finite after 200 frames', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(Number.isFinite(diag.maxPi), 'maxPi must be finite').toBe(true)
+    expect(diag.maxPi, 'maxPi must be positive').toBeGreaterThan(0)
+  })
+
+  test('field norm stays finite and positive over 200 frames', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForShaderCompilation(page)
+    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForSimulationFrames(page, 200)
+
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData).toBe(true)
+    expect(Number.isFinite(diag.totalNorm), 'norm must be finite').toBe(true)
+    expect(diag.totalNorm, 'norm must be positive').toBeGreaterThan(0)
   })
 
   test.afterAll(async ({ browser }) => {

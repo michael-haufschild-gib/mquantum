@@ -367,6 +367,9 @@ export async function readFsfDiagnostics(page: Page) {
       totalNorm: s.totalNorm,
       energyDrift: s.energyDrift,
       maxPhi: s.maxPhi,
+      maxPi: s.maxPi,
+      meanPhi: s.meanPhi,
+      variancePhi: s.variancePhi,
     }
   })
 }
@@ -888,6 +891,22 @@ export async function readObservablesDiagnostics(page: Page) {
       totalEnergy: s.totalEnergy,
       positionNorm: s.positionNorm,
       momentumNorm: s.momentumNorm,
+    }
+  })
+}
+
+/** Read quantum walk diagnostics from the running app (GPU readback values). */
+export async function readQwDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/qwDiagnosticsStore.ts')
+    const s = mod.useQwDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      stepCount: s.stepCount,
+      positionMean: s.positionMean,
+      positionVariance: s.positionVariance,
     }
   })
 }
