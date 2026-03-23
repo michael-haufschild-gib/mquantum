@@ -40,6 +40,7 @@ test-results/
 build
 .cache
 *.tsbuildinfo
+src/wasm/mdimension_core/target/
 
 # Temporary task/session files
 task_*.md
