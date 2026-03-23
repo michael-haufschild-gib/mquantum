@@ -1,14 +1,15 @@
 /**
- * Quantum Walk — Write-Grid Uniform Buffer Packing
+ * Quantum Walk — Uniform Buffer Packing
  *
- * Pure function that packs QW configuration into the uniform buffer layout
- * expected by the qwWriteGrid compute shader.
+ * Pure functions that pack QW configuration into uniform buffer layouts
+ * expected by the compute shaders.
  *
- * Extracted from QuantumWalkComputePass to keep file size under lint limits.
+ * @module rendering/webgpu/passes/QuantumWalkComputePassUniforms
  */
 
 import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 
+import { QW_ABSORBER_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/quantumWalkAbsorber.wgsl'
 import { QW_WRITE_GRID_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
 
 const FIELD_VIEW_MAP: Record<string, number> = { probability: 0, phase: 1, coinState: 2 }
@@ -86,6 +87,40 @@ export function packWriteGridUniforms(
   }
 
   // slicePositions (offset 320, 12 f32) — all 0 for now
+
+  return buf
+}
+
+/**
+ * Pack QW absorber uniforms into an ArrayBuffer matching the WGSL struct layout.
+ *
+ * @param config - Quantum walk configuration
+ * @param totalSites - Total number of lattice sites
+ * @param strides - Row-major strides per dimension
+ * @param sigmaMax - Pre-computed PML sigma max (0 if absorber disabled)
+ * @returns Packed uniform buffer ready for GPU upload
+ */
+export function packAbsorberUniforms(
+  config: QuantumWalkConfig,
+  totalSites: number,
+  strides: number[],
+  sigmaMax: number
+): ArrayBuffer {
+  const buf = new ArrayBuffer(QW_ABSORBER_UNIFORMS_SIZE)
+  const u32 = new Uint32Array(buf)
+  const f32 = new Float32Array(buf)
+
+  u32[0] = totalSites
+  u32[1] = config.latticeDim
+  u32[2] = config.absorberEnabled ? 1 : 0
+  f32[3] = sigmaMax
+  for (let d = 0; d < config.latticeDim; d++) {
+    u32[4 + d] = config.gridSize[d] ?? 64
+  }
+  for (let d = 0; d < config.latticeDim; d++) {
+    u32[16 + d] = strides[d] ?? 1
+  }
+  f32[28] = config.absorberWidth
 
   return buf
 }

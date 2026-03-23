@@ -14,41 +14,22 @@
 import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { logger } from '@/lib/logger'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
-import { useQwDiagnosticsStore } from '@/stores/qwDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
-import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
-import {
-  QW_DIAG_RESULT_COUNT,
-  qwDiagFinalizeBlock,
-  qwDiagReduceBlock,
-} from '../shaders/schroedinger/compute/qwDiagnostics.wgsl'
-import {
-  quantumWalkAbsorberBlock,
-  QW_ABSORBER_UNIFORMS_SIZE,
-  qwAbsorberUniformsBlock,
-} from '../shaders/schroedinger/compute/quantumWalkAbsorber.wgsl'
-import { quantumWalkCoinBlock } from '../shaders/schroedinger/compute/quantumWalkCoin.wgsl'
-import { quantumWalkShiftBlock } from '../shaders/schroedinger/compute/quantumWalkShift.wgsl'
-import {
-  QW_WRITE_GRID_UNIFORMS_SIZE,
-  qwWriteGridBlock,
-  qwWriteGridUniformsBlock,
-} from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
 import {
   computeStrides,
   createDensityTexture,
   DENSITY_GRID_SIZE,
   GRID_WG,
 } from './computePassUtils'
-import { packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
+import { packAbsorberUniforms, packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
+import { QwDiagnostics } from './QuantumWalkDiagnostics'
+import { createQwPipelines } from './QuantumWalkPipelines'
+import type { QwSaveState } from './QuantumWalkStateSave'
+import { requestQwStateSave } from './QuantumWalkStateSave'
 
 const COIN_WG = 64
-const DIAG_WG = 256
-/** Dispatch diagnostics every N steps */
-const DIAG_INTERVAL = 10
 
 /**
  * Compute pass for discrete-time quantum walk simulation.
@@ -104,19 +85,8 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
   private saveMappingInFlight = false
 
-  // Diagnostics — norm + position reduction
-  private diagReducePipeline: GPUComputePipeline | null = null
-  private diagFinalizePipeline: GPUComputePipeline | null = null
-  private diagUniformBuffer: GPUBuffer | null = null
-  private diagPartialNormBuffer: GPUBuffer | null = null
-  private diagPartialPosSumBuffer: GPUBuffer | null = null
-  private diagPartialPosSqSumBuffer: GPUBuffer | null = null
-  private diagResultBuffer: GPUBuffer | null = null
-  private diagStagingBuffer: GPUBuffer | null = null
-  private diagReduceBG: GPUBindGroup | null = null
-  private diagFinalizeBG: GPUBindGroup | null = null
-  private diagMappingInFlight = false
-  private diagStepAccumulator = 0
+  // Diagnostics subsystem (extracted)
+  private readonly diag = new QwDiagnostics()
 
   // State
   private initialized = false
@@ -176,73 +146,18 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
   /**
    * Initiate async save of the current coin state.
-   * Copies coinStateA to staging, de-interleaves re/im, serializes and downloads.
    *
    * @param ctx - Render context with device and command encoder
    */
   requestStateSave(ctx: WebGPURenderContext): void {
-    if (!this.coinStateA || this.saveMappingInFlight || this.totalSites === 0) return
-    const { device, encoder } = ctx
-    const coinStates = 2 * this.latticeDim
-    const totalElements = this.totalSites * coinStates
-    const byteSize = totalElements * 2 * 4 // complex f32 interleaved
-
-    const staging = device.createBuffer({
-      label: 'qw-save-staging',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-    encoder.copyBufferToBuffer(this.coinStateA, 0, staging, 0, byteSize)
-    this.saveMappingInFlight = true
-
-    const totalSites = this.totalSites
-    const latDim = this.latticeDim
-
-    device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (staging.mapState !== 'unmapped') {
-          this.saveMappingInFlight = false
-          return
-        }
-        await staging.mapAsync(GPUMapMode.READ)
-        const interleaved = new Float32Array(staging.getMappedRange())
-
-        // De-interleave: [re0, im0, re1, im1, ...] → separate re/im arrays
-        const re = new Float32Array(totalElements)
-        const im = new Float32Array(totalElements)
-        for (let i = 0; i < totalElements; i++) {
-          re[i] = interleaved[i * 2]!
-          im[i] = interleaved[i * 2 + 1]!
-        }
-        staging.unmap()
-        staging.destroy()
-
-        const { serializeSimulationState } = await import('@/lib/export/simulationState')
-        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
-        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
-
-        const qwConfig = useExtendedObjectStore.getState().schroedinger.quantumWalk
-        const gridSize = qwConfig.gridSize.slice(0, qwConfig.latticeDim)
-        const componentCount = 2 * latDim
-
-        const blob = await serializeSimulationState(
-          { quantumMode: 'quantumWalk', quantumWalk: qwConfig } as Record<string, unknown>,
-          { re, im, totalSites, componentCount },
-          'quantumWalk',
-          gridSize
-        )
-        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
-        useSimulationStateStore.getState().setSaveComplete()
-        this.saveMappingInFlight = false
-      })
-      .catch((err) => {
-        import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
-          useSimulationStateStore.getState().setSaveError(String(err))
-        })
-        this.saveMappingInFlight = false
-      })
+    const state: QwSaveState = {
+      coinStateA: this.coinStateA,
+      saveMappingInFlight: this.saveMappingInFlight,
+      totalSites: this.totalSites,
+      latticeDim: this.latticeDim,
+    }
+    requestQwStateSave(ctx, state)
+    this.saveMappingInFlight = state.saveMappingInFlight
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -257,189 +172,19 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     if (this.pipelinesCreated) return
     logger.log('[QuantumWalk] Setup — creating pipelines and buffers')
 
-    // Create shader modules from raw WGSL strings
-    const coinModule = device.createShaderModule({
-      label: 'qw-coin',
-      code: quantumWalkCoinBlock,
-    })
-    // Shift shader needs ND index helpers prepended
-    const shiftModule = device.createShaderModule({
-      label: 'qw-shift',
-      code: freeScalarNDIndexBlock + '\n' + quantumWalkShiftBlock,
-    })
-    // WriteGrid shader needs ND index helpers + uniforms + main
-    const writeGridModule = device.createShaderModule({
-      label: 'qw-write-grid',
-      code: freeScalarNDIndexBlock + '\n' + qwWriteGridUniformsBlock + '\n' + qwWriteGridBlock,
-    })
-    // Absorber shader needs ND index + PML profile + absorber uniforms + main
-    const absorberModule = device.createShaderModule({
-      label: 'qw-absorber',
-      code:
-        freeScalarNDIndexBlock +
-        '\n' +
-        qwAbsorberUniformsBlock +
-        '\n' +
-        pmlProfileBlock +
-        '\n' +
-        quantumWalkAbsorberBlock,
-    })
+    const p = createQwPipelines(device)
+    this.coinPipeline = p.coinPipeline
+    this.shiftPipeline = p.shiftPipeline
+    this.writeGridPipeline = p.writeGridPipeline
+    this.absorberPipeline = p.absorberPipeline
+    this.coinUniformBuffer = p.coinUniformBuffer
+    this.shiftUniformBuffer = p.shiftUniformBuffer
+    this.writeGridUniformBuffer = p.writeGridUniformBuffer
+    this.absorberUniformBuffer = p.absorberUniformBuffer
+    this.maxDensityAtomicBuffer = p.maxDensityAtomicBuffer
+    this.maxDensityReadbackBuffer = p.maxDensityReadbackBuffer
 
-    const coinBGL = device.createBindGroupLayout({
-      label: 'qw-coin-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    const shiftBGL = device.createBindGroupLayout({
-      label: 'qw-shift-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    const writeGridBGL = device.createBindGroupLayout({
-      label: 'qw-write-grid-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
-        },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    this.coinPipeline = device.createComputePipeline({
-      label: 'qw-coin-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [coinBGL] }),
-      compute: { module: coinModule, entryPoint: 'main' },
-    })
-
-    this.shiftPipeline = device.createComputePipeline({
-      label: 'qw-shift-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [shiftBGL] }),
-      compute: { module: shiftModule, entryPoint: 'main' },
-    })
-
-    this.writeGridPipeline = device.createComputePipeline({
-      label: 'qw-write-grid-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
-      compute: { module: writeGridModule, entryPoint: 'main' },
-    })
-
-    const absorberBGL = device.createBindGroupLayout({
-      label: 'qw-absorber-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-
-    this.absorberPipeline = device.createComputePipeline({
-      label: 'qw-absorber-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [absorberBGL] }),
-      compute: { module: absorberModule, entryPoint: 'main' },
-    })
-
-    // Create uniform buffers
-    this.coinUniformBuffer = device.createBuffer({
-      label: 'qw-coin-uniform',
-      size: 16, // QWCoinUniforms: 4 x u32/f32
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    })
-
-    this.shiftUniformBuffer = device.createBuffer({
-      label: 'qw-shift-uniform',
-      size: 16 + 12 * 4 * 2, // QWShiftUniforms: 4 scalars + 2 arrays of 12
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    })
-
-    this.writeGridUniformBuffer = device.createBuffer({
-      label: 'qw-write-grid-uniform',
-      size: QW_WRITE_GRID_UNIFORMS_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    })
-
-    this.absorberUniformBuffer = device.createBuffer({
-      label: 'qw-absorber-uniform',
-      size: QW_ABSORBER_UNIFORMS_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    })
-
-    // GPU max-density tracking: atomic buffer written by shader, readback for CPU
-    this.maxDensityAtomicBuffer = device.createBuffer({
-      label: 'qw-max-density-atomic',
-      size: 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
-    })
-    this.maxDensityReadbackBuffer = device.createBuffer({
-      label: 'qw-max-density-readback',
-      size: 4,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    // Diagnostics — norm reduction pipelines
-    const diagReduceModule = device.createShaderModule({
-      label: 'qw-diag-reduce',
-      code: qwDiagReduceBlock,
-    })
-    const diagFinalizeModule = device.createShaderModule({
-      label: 'qw-diag-finalize',
-      code: qwDiagFinalizeBlock,
-    })
-    const diagReduceBGL = device.createBindGroupLayout({
-      label: 'qw-diag-reduce-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    const diagFinalizeBGL = device.createBindGroupLayout({
-      label: 'qw-diag-finalize-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.diagReducePipeline = device.createComputePipeline({
-      label: 'qw-diag-reduce-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [diagReduceBGL] }),
-      compute: { module: diagReduceModule, entryPoint: 'main' },
-    })
-    this.diagFinalizePipeline = device.createComputePipeline({
-      label: 'qw-diag-finalize-pipeline',
-      layout: device.createPipelineLayout({ bindGroupLayouts: [diagFinalizeBGL] }),
-      compute: { module: diagFinalizeModule, entryPoint: 'main' },
-    })
-    this.diagUniformBuffer = device.createBuffer({
-      label: 'qw-diag-uniform',
-      size: 16, // QWDiagUniforms: 4 x u32
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    })
-    this.diagResultBuffer = device.createBuffer({
-      label: 'qw-diag-result',
-      size: QW_DIAG_RESULT_COUNT * 4, // [totalNorm, posSum, posSqSum]
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    })
-    this.diagStagingBuffer = device.createBuffer({
-      label: 'qw-diag-staging',
-      size: QW_DIAG_RESULT_COUNT * 4,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
+    this.diag.buildPipelines(device)
 
     this.pipelinesCreated = true
     logger.log('[QuantumWalk] Setup complete')
@@ -496,11 +241,10 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     this.pingPong = 0
     this.stepCount = 0
     this.stepAccumulator = 0
-    this.diagStepAccumulator = 0
     this.lastGridSize0 = config.gridSize[0] ?? 64
     this.gpuMaxDensity = 1.0
     this.initialized = true
-    useQwDiagnosticsStore.getState().reset()
+    this.diag.reset()
   }
 
   private rebuildCoinShiftBindGroups(device: GPUDevice): void {
@@ -576,44 +320,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         { binding: 1, resource: { buffer: this.coinStateA } },
       ],
     })
-  }
-
-  /**
-   * Write absorber uniform buffer with current config values.
-   */
-  private writeAbsorberUniforms(
-    device: GPUDevice,
-    config: QuantumWalkConfig,
-    strides: number[]
-  ): void {
-    const buf = new ArrayBuffer(QW_ABSORBER_UNIFORMS_SIZE)
-    const u32 = new Uint32Array(buf)
-    const f32 = new Float32Array(buf)
-
-    u32[0] = this.totalSites
-    u32[1] = config.latticeDim
-    u32[2] = config.absorberEnabled ? 1 : 0
-    // dt=1 for discrete walks: σ_max calibrated for per-step damping
-    f32[3] = config.absorberEnabled
-      ? computePMLSigmaMaxND(
-          config.pmlTargetReflection,
-          config.absorberWidth,
-          config.gridSize.slice(0, config.latticeDim),
-          1.0, // dt = 1 (discrete step)
-          3,
-          config.latticeDim
-        )
-      : 0
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[4 + d] = config.gridSize[d] ?? 64
-    }
-    for (let d = 0; d < config.latticeDim; d++) {
-      u32[16 + d] = strides[d] ?? 1
-    }
-    f32[28] = config.absorberWidth
-    // _pad0, _pad1, _pad2 already 0
-
-    device.queue.writeBuffer(this.absorberUniformBuffer!, 0, buf)
   }
 
   /**
@@ -693,7 +399,21 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     device.queue.writeBuffer(this.shiftUniformBuffer!, 0, shiftData)
 
     // Update absorber uniforms (needed even if paused for density grid pass)
-    this.writeAbsorberUniforms(device, config, strides)
+    const sigmaMax = config.absorberEnabled
+      ? computePMLSigmaMaxND(
+          config.pmlTargetReflection,
+          config.absorberWidth,
+          config.gridSize.slice(0, config.latticeDim),
+          1.0,
+          3,
+          config.latticeDim
+        )
+      : 0
+    device.queue.writeBuffer(
+      this.absorberUniformBuffer!,
+      0,
+      packAbsorberUniforms(config, this.totalSites, strides, sigmaMax)
+    )
 
     // Dispatch coin+shift+absorber steps, scaled by animation speed.
     // Uses fractional accumulator (matching TDSE pattern) so speed < 1
@@ -728,19 +448,37 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
 
         this.stepCount++
       }
-    }
 
-    // Diagnostics — dispatch norm reduction every DIAG_INTERVAL steps
-    if (isPlaying) {
-      this.diagStepAccumulator += config.stepsPerFrame * speed
-      if (this.diagStepAccumulator >= DIAG_INTERVAL) {
-        this.diagStepAccumulator -= DIAG_INTERVAL
-        this.dispatchDiagnostics(ctx)
+      // Diagnostics — dispatch norm reduction at configured interval
+      if (this.coinStateA) {
+        this.diag.maybeDispatch(
+          ctx,
+          this.coinStateA,
+          this.totalSites,
+          this.latticeDim,
+          this.lastGridSize0,
+          config.stepsPerFrame,
+          speed,
+          this.stepCount
+        )
       }
     }
 
-    // Write density grid
-    this.writeGridUniforms(device, config, strides, basisX, basisY, basisZ, boundingRadius)
+    // Write density grid uniforms and rebuild bind group
+    device.queue.writeBuffer(
+      this.writeGridUniformBuffer!,
+      0,
+      packWriteGridUniforms(
+        config,
+        this.totalSites,
+        this.gpuMaxDensity,
+        strides,
+        basisX,
+        basisY,
+        basisZ,
+        boundingRadius
+      )
+    )
     this.rebuildWriteGridBindGroup(device)
 
     if (this.writeGridPipeline && this.writeGridBG) {
@@ -824,158 +562,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       })
   }
 
-  private writeGridUniforms(
-    device: GPUDevice,
-    config: QuantumWalkConfig,
-    strides: number[],
-    basisX: Float32Array | undefined,
-    basisY: Float32Array | undefined,
-    basisZ: Float32Array | undefined,
-    boundingRadius: number
-  ): void {
-    const buf = packWriteGridUniforms(
-      config,
-      this.totalSites,
-      this.gpuMaxDensity,
-      strides,
-      basisX,
-      basisY,
-      basisZ,
-      boundingRadius
-    )
-    device.queue.writeBuffer(this.writeGridUniformBuffer!, 0, buf)
-  }
-
-  /** Dispatch norm reduction and schedule async readback to qwDiagnosticsStore. */
-  private dispatchDiagnostics(ctx: WebGPURenderContext): void {
-    if (
-      !this.diagReducePipeline ||
-      !this.diagFinalizePipeline ||
-      !this.coinStateA ||
-      !this.diagUniformBuffer ||
-      !this.diagResultBuffer ||
-      !this.diagStagingBuffer
-    )
-      return
-
-    const { device } = ctx
-    const numCoinStates = 2 * this.latticeDim
-    const numWG = Math.ceil(this.totalSites / DIAG_WG)
-    const gridSize0 = (this.latticeDim > 0 ? this.lastGridSize0 : 64)
-
-    // Create or resize partial buffers (3 arrays: norm, posSum, posSqSum)
-    const neededPartials = numWG * 4
-    if (!this.diagPartialNormBuffer || this.diagPartialNormBuffer.size < neededPartials) {
-      this.diagPartialNormBuffer?.destroy()
-      this.diagPartialPosSumBuffer?.destroy()
-      this.diagPartialPosSqSumBuffer?.destroy()
-      this.diagPartialNormBuffer = device.createBuffer({
-        label: 'qw-diag-partial-norm',
-        size: neededPartials,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-      })
-      this.diagPartialPosSumBuffer = device.createBuffer({
-        label: 'qw-diag-partial-pos',
-        size: neededPartials,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-      })
-      this.diagPartialPosSqSumBuffer = device.createBuffer({
-        label: 'qw-diag-partial-pos2',
-        size: neededPartials,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-      })
-    }
-
-    // Write uniforms (now includes gridSize0)
-    device.queue.writeBuffer(
-      this.diagUniformBuffer,
-      0,
-      new Uint32Array([this.totalSites, numCoinStates, numWG, gridSize0])
-    )
-
-    // Rebuild bind groups (coin state pointer may have changed)
-    this.diagReduceBG = device.createBindGroup({
-      label: 'qw-diag-reduce-bg',
-      layout: this.diagReducePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.diagUniformBuffer! } },
-        { binding: 1, resource: { buffer: this.coinStateA! } },
-        { binding: 2, resource: { buffer: this.diagPartialNormBuffer! } },
-        { binding: 3, resource: { buffer: this.diagPartialPosSumBuffer! } },
-        { binding: 4, resource: { buffer: this.diagPartialPosSqSumBuffer! } },
-      ],
-    })
-    this.diagFinalizeBG = device.createBindGroup({
-      label: 'qw-diag-finalize-bg',
-      layout: this.diagFinalizePipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.diagUniformBuffer! } },
-        { binding: 1, resource: { buffer: this.diagPartialNormBuffer! } },
-        { binding: 2, resource: { buffer: this.diagPartialPosSumBuffer! } },
-        { binding: 3, resource: { buffer: this.diagPartialPosSqSumBuffer! } },
-        { binding: 4, resource: { buffer: this.diagResultBuffer! } },
-      ],
-    })
-
-    // Pass 1: reduce coin state → partial sums
-    const p1 = ctx.beginComputePass({ label: 'qw-diag-reduce' })
-    this.dispatchCompute(p1, this.diagReducePipeline, [this.diagReduceBG], numWG)
-    p1.end()
-
-    // Pass 2: finalize partial sums → result
-    const p2 = ctx.beginComputePass({ label: 'qw-diag-finalize' })
-    this.dispatchCompute(p2, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
-    p2.end()
-
-    // Schedule async readback
-    this.scheduleNormReadback(ctx)
-  }
-
-  /** Copy diagnostic result → staging buffer and map asynchronously. */
-  private scheduleNormReadback(ctx: WebGPURenderContext): void {
-    if (this.diagMappingInFlight || !this.diagResultBuffer || !this.diagStagingBuffer) return
-
-    const byteSize = QW_DIAG_RESULT_COUNT * 4
-    ctx.encoder.copyBufferToBuffer(this.diagResultBuffer, 0, this.diagStagingBuffer, 0, byteSize)
-    this.diagMappingInFlight = true
-    const staging = this.diagStagingBuffer
-    const epoch = this.readbackEpoch
-    const steps = this.stepCount
-
-    ctx.device.queue
-      .onSubmittedWorkDone()
-      .then(() => {
-        if (epoch !== this.readbackEpoch || !staging || staging.mapState !== 'unmapped') {
-          this.diagMappingInFlight = false
-          return
-        }
-        staging
-          .mapAsync(GPUMapMode.READ)
-          .then(() => {
-            if (epoch !== this.readbackEpoch) {
-              this.diagMappingInFlight = false
-              return
-            }
-            const data = new Float32Array(staging.getMappedRange().slice(0))
-            const totalNorm = data[0]!
-            const posSum = data[1]!
-            const posSqSum = data[2]!
-            staging.unmap()
-            this.diagMappingInFlight = false
-
-            if (isFinite(totalNorm)) {
-              useQwDiagnosticsStore.getState().pushDiagnostics(totalNorm, steps, posSum, posSqSum)
-            }
-          })
-          .catch(() => {
-            this.diagMappingInFlight = false
-          })
-      })
-      .catch(() => {
-        this.diagMappingInFlight = false
-      })
-  }
-
   execute(_ctx: WebGPURenderContext): void {
     // Use executeQuantumWalk instead
   }
@@ -990,12 +576,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     this.absorberUniformBuffer?.destroy()
     this.maxDensityAtomicBuffer?.destroy()
     this.maxDensityReadbackBuffer?.destroy()
-    this.diagUniformBuffer?.destroy()
-    this.diagPartialNormBuffer?.destroy()
-    this.diagPartialPosSumBuffer?.destroy()
-    this.diagPartialPosSqSumBuffer?.destroy()
-    this.diagResultBuffer?.destroy()
-    this.diagStagingBuffer?.destroy()
+    this.diag.dispose()
     this.densityTexture?.destroy()
     this.coinStateA = null
     this.coinStateB = null
@@ -1005,15 +586,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     this.absorberUniformBuffer = null
     this.maxDensityAtomicBuffer = null
     this.maxDensityReadbackBuffer = null
-    this.diagUniformBuffer = null
-    this.diagPartialNormBuffer = null
-    this.diagPartialPosSumBuffer = null
-    this.diagPartialPosSqSumBuffer = null
-    this.diagResultBuffer = null
-    this.diagStagingBuffer = null
-    this.diagReduceBG = null
-    this.diagFinalizeBG = null
-    this.diagMappingInFlight = false
     this.densityTexture = null
     this.densityTextureView = null
     this.initialized = false
