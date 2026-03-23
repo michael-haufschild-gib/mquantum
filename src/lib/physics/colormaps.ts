@@ -11,7 +11,8 @@
  * @module lib/physics/colormaps
  */
 
-import type { CarpetColormap } from '@/stores/carpetStore'
+/** Available perceptually uniform colormaps. */
+export type CarpetColormap = 'viridis' | 'inferno' | 'magma' | 'plasma'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // COLORMAP DATA — 32 control points each, interpolated to 256 entries

@@ -17,6 +17,77 @@ const faviconFiles = [
   'manifest.webmanifest',
 ]
 
+// ── Manual chunk assignment ────────────────────────────────────────────
+// Explicit chunk boundaries prevent Rollup from auto-assigning orphaned
+// modules into consumer chunks, which causes circular chunk dependencies
+// and TDZ ReferenceErrors in production builds.
+//
+// Chunk DAG (no cycles):
+//   core-utils (leaf) ← physics ← stores → shaders
+//                           ↑                  ↑
+//                    shaders-schroedinger    rendering → stores
+
+/** Vendor package → chunk name. Checked via id.includes(). */
+const VENDOR_CHUNKS: [string, string][] = [
+  ['node_modules/react-dom', 'react-vendor'],
+  ['node_modules/react/', 'react-vendor'],
+  ['node_modules/scheduler', 'react-vendor'],
+  ['node_modules/zustand', 'zustand'],
+  ['node_modules/motion', 'motion'],
+  ['node_modules/detect-gpu', 'detect-gpu'],
+  ['node_modules/mediabunny', 'mediabunny'],
+]
+
+/** Source path fragment → chunk name. Order matters: first match wins. */
+const SOURCE_CHUNKS: [string, string][] = [
+  // Leaf chunk — shared utils imported by both stores and physics.
+  ['/lib/logger', 'core-utils'],
+  ['/constants/', 'core-utils'],
+  ['temporalDepthRegistry', 'core-utils'],
+  // Shaders — non-webgpu rendering modules (palette types, light types)
+  ['/rendering/lights/', 'shaders'],
+  // Schroedinger shaders (must precede generic /webgpu/shaders/ rule)
+  ['/rendering/webgpu/shaders/schroedinger/', 'shaders-schroedinger'],
+  ['/rendering/webgpu/shaders/', 'shaders'],
+  // All remaining webgpu modules
+  ['/rendering/webgpu/', 'rendering'],
+  // Physics — lib modules without store deps
+  ['/lib/physics/', 'physics'],
+  ['/lib/math/', 'physics'],
+  ['/lib/geometry/', 'physics'],
+  ['/lib/wasm/', 'physics'],
+  ['/lib/animation/', 'physics'],
+  ['/lib/colors/', 'physics'],
+  ['/lib/audio/', 'physics'],
+  // Stores
+  ['/stores/', 'stores'],
+  // Components — panels are lazy-loaded after first frame
+  ['/components/layout/EditorLeftPanel', 'components-panels'],
+  ['/components/layout/EditorRightPanel', 'components-panels'],
+  ['/components/layout/EditorBottomPanel', 'components-panels'],
+  ['/components/sections/', 'components-panels'],
+  ['/components/', 'components'],
+]
+
+/** Assign a module to a named chunk, or undefined for Rollup auto-assignment. */
+function assignChunk(id: string): string | undefined {
+  if (id.includes('node_modules/')) {
+    for (const [pattern, chunk] of VENDOR_CHUNKS) {
+      if (id.includes(pattern)) return chunk
+    }
+    return 'vendor'
+  }
+  // Non-webgpu rendering/shaders/ must go to 'shaders' before the
+  // generic /rendering/webgpu/ rule catches it.
+  if (id.includes('/rendering/shaders/') && !id.includes('/webgpu/')) return 'shaders'
+  for (const [pattern, chunk] of SOURCE_CHUNKS) {
+    if (id.includes(pattern)) return chunk
+  }
+  // Remaining src/ files (lib/export, lib/url, hooks, types) are left
+  // for Rollup — they depend on stores and land in the index chunk.
+  return undefined
+}
+
 // https://vite.dev/config/
 export default defineConfig((_env) => ({
   plugins: [
@@ -73,45 +144,7 @@ export default defineConfig((_env) => ({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // React + its internal deps (scheduler) in one chunk
-          if (
-            id.includes('node_modules/react-dom') ||
-            id.includes('node_modules/react/') ||
-            id.includes('node_modules/scheduler')
-          ) {
-            return 'react-vendor'
-          }
-          if (id.includes('node_modules/zustand')) return 'zustand'
-          if (id.includes('node_modules/motion')) return 'motion'
-          // detect-gpu and mediabunny are dynamically imported — let Rollup
-          // split them into async chunks instead of bundling with vendor.
-          if (id.includes('node_modules/detect-gpu')) return 'detect-gpu'
-          if (id.includes('node_modules/mediabunny')) return 'mediabunny'
-          if (id.includes('node_modules/')) return 'vendor'
-          // Split shaders by subdomain
-          if (id.includes('/rendering/webgpu/shaders/schroedinger/')) return 'shaders-schroedinger'
-          if (id.includes('/rendering/webgpu/shaders/')) return 'shaders'
-          // Rendering: passes + core + renderers + graph (tightly coupled via BasePass)
-          if (
-            id.includes('/rendering/webgpu/passes/') ||
-            id.includes('/rendering/webgpu/core/') ||
-            id.includes('/rendering/webgpu/renderers/') ||
-            id.includes('/rendering/webgpu/graph/')
-          ) {
-            return 'rendering'
-          }
-          // Split physics/math
-          if (id.includes('/lib/physics/') || id.includes('/lib/math/')) return 'physics'
-          // Split stores
-          if (id.includes('/stores/')) return 'stores'
-          // Split components: panel content is lazy-loaded after first frame
-          if (id.includes('/components/layout/EditorLeftPanel')) return 'components-panels'
-          if (id.includes('/components/layout/EditorRightPanel')) return 'components-panels'
-          if (id.includes('/components/layout/EditorBottomPanel')) return 'components-panels'
-          if (id.includes('/components/sections/')) return 'components-panels'
-          if (id.includes('/components/')) return 'components'
-        },
+        manualChunks: assignChunk,
       },
     },
   },

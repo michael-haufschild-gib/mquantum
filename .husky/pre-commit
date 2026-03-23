@@ -1,1 +1,7 @@
 npx lint-staged
+
+# Check for circular chunk dependencies when chunk config changes
+if git diff --cached --name-only | grep -q 'vite.config.ts'; then
+  echo "vite.config.ts changed — checking for circular chunk dependencies..."
+  node scripts/check-chunk-cycles.js
+fi
