@@ -91,7 +91,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
                   options={SURFACE_MODE_OPTIONS}
                   value={isoEnabled ? 'isosurface' : 'volumetric'}
                   onChange={handleSurfaceModeChange}
-                  className="w-full"
+                  fullWidth
                   ariaLabel="Select surface rendering mode"
                   tooltip="Volumetric renders a translucent probability cloud. Isosurface renders a solid shell at a constant probability density."
                   data-testid="surface-mode-selector"

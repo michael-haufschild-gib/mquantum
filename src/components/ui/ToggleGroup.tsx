@@ -21,6 +21,8 @@ export interface ToggleGroupProps<T extends string = string> {
   ariaLabel?: string
   /** Tooltip text shown on hover over the group label area. */
   tooltip?: string
+  /** When true, the group stretches to fill its container width. */
+  fullWidth?: boolean
   'data-testid'?: string
 }
 
@@ -94,6 +96,7 @@ export const ToggleGroup = React.memo(
     disabled = false,
     ariaLabel,
     tooltip,
+    fullWidth = false,
     'data-testid': testId,
   }: ToggleGroupProps<T>) => {
     const layoutId = React.useId()
@@ -101,7 +104,7 @@ export const ToggleGroup = React.memo(
     const group = (
       <LayoutGroup id={layoutId}>
         <div
-          className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${className}`}
+          className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${fullWidth ? 'w-full' : ''} ${className}`}
           role="radiogroup"
           aria-label={ariaLabel}
           data-testid={testId}
@@ -127,7 +130,7 @@ export const ToggleGroup = React.memo(
 
     if (tooltip) {
       return (
-        <Tooltip content={tooltip} position="top">
+        <Tooltip content={tooltip} position="top" className={fullWidth ? 'w-full block' : ''}>
           {group}
         </Tooltip>
       )
