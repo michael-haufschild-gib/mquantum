@@ -63,8 +63,7 @@ export class RightPanel {
 
   /** Check that settings section is visible in System tab. */
   async expectSettingsVisible(): Promise<void> {
-    // Settings section doesn't have a testid — look for the "Restore Hints" button
-    await expect(this.page.getByTestId('restore-hints-button')).toBeVisible({
+    await expect(this.page.getByTestId('section-settings')).toBeVisible({
       timeout: UI_SETTLE_TIMEOUT,
     })
   }

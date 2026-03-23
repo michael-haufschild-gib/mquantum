@@ -28,7 +28,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import {
   applyDiracPreset,
-  captureAndSamplePixels,
+  assertNonBlankPixels,
   capturePixelSnapshot,
   expectSnapshotsDiffer,
   getFrameCount,
@@ -38,6 +38,7 @@ import {
   requireWebGPU,
   waitForDiagnostics,
   waitForFrameAdvance,
+  waitForModeReady,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -48,43 +49,8 @@ test.setTimeout(600_000)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Multi-screenshot pixel check for Dirac oscillating density.
- * Takes 3 shots with 30-frame gaps; returns the best non-bg pixel count.
- */
-async function diracPixelCheck(
-  page: Page,
-  minPixels = 5
-): Promise<{ pass: boolean; bestCount: number }> {
-  let bestCount = 0
-  for (let i = 0; i < 3; i++) {
-    const { nonBgPixels } = await captureAndSamplePixels(page)
-    bestCount = Math.max(bestCount, nonBgPixels)
-    if (bestCount >= minPixels) return { pass: true, bestCount }
-    if (i < 2) {
-      const fc = await getFrameCount(page)
-      await waitForFrameAdvance(page, fc + 30)
-    }
-  }
-  return { pass: bestCount >= minPixels, bestCount }
-}
-
-/** Assert pixel check passes with descriptive error. */
-async function assertPixels(page: Page, context: string, minPixels = 5): Promise<void> {
-  const { pass, bestCount } = await diracPixelCheck(page, minPixels)
-  expect(
-    pass,
-    `${context}: expected >= ${minPixels} non-bg pixels across 3 snapshots, best was ${bestCount}`
-  ).toBe(true)
-}
-
-/** Wait for Dirac to initialize, compile shaders, and populate density grid. */
-async function waitForDiracReady(page: Page, extraFrames = 150): Promise<void> {
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-  const fc = await getFrameCount(page)
-  await waitForFrameAdvance(page, fc + extraFrames)
-}
+const assertPixels = assertNonBlankPixels
+const waitForDiracReady = (page: Page, extraFrames = 150) => waitForModeReady(page, extraFrames)
 
 /** Set Dirac field view via store mutation. */
 async function setFieldView(page: Page, view: string): Promise<void> {

@@ -25,18 +25,16 @@ import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures'
 import {
-  captureAndSamplePixels,
+  assertNonBlankPixels,
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  getFrameCount,
   gotoMode,
   pauseAnimation,
   readDensityDiagnostics,
   requireWebGPU,
   setHydrogenQuantumNumbers,
   snapshotDistance,
-  waitForFrameAdvance,
-  waitForRendererReady,
+  waitForModeReady,
   waitForShaderCompilation,
   waitForUniformUpdate,
 } from './helpers/app-helpers'
@@ -45,41 +43,8 @@ test.setTimeout(600_000)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Multi-screenshot pixel check for hydrogen mode.
- * Takes 3 shots with 30-frame gaps; returns the best non-bg pixel count.
- */
-async function hydrogenPixelCheck(
-  page: Page,
-  minPixels = 5
-): Promise<{ pass: boolean; bestCount: number }> {
-  let bestCount = 0
-  for (let i = 0; i < 3; i++) {
-    const { nonBgPixels } = await captureAndSamplePixels(page)
-    bestCount = Math.max(bestCount, nonBgPixels)
-    if (bestCount >= minPixels) return { pass: true, bestCount }
-    if (i < 2) {
-      const fc = await getFrameCount(page)
-      await waitForFrameAdvance(page, fc + 30)
-    }
-  }
-  return { pass: bestCount >= minPixels, bestCount }
-}
-
-/** Assert pixel check passes with descriptive error. */
-async function assertPixels(page: Page, context: string, minPixels = 5): Promise<void> {
-  const { pass, bestCount } = await hydrogenPixelCheck(page, minPixels)
-  expect(
-    pass,
-    `${context}: expected >= ${minPixels} non-bg pixels across 3 snapshots, best was ${bestCount}`
-  ).toBe(true)
-}
-
-/** Wait for hydrogen to initialize and compile shaders. */
-async function waitForHydrogenReady(page: Page): Promise<void> {
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-}
+const assertPixels = assertNonBlankPixels
+const waitForHydrogenReady = (page: Page) => waitForModeReady(page)
 
 /** Enable isosurface mode via store. */
 async function enableIsosurface(page: Page): Promise<void> {

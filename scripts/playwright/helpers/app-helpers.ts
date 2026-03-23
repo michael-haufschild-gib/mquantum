@@ -997,3 +997,75 @@ export async function getImaginaryTimeConfig(page: Page) {
     }
   })
 }
+
+// ─── Shared Pixel Verification ───────────────────────────────────────────────
+
+/**
+ * Is the renderer producing visible content?
+ *
+ * Single screenshot: checks if any pixel in the center 30% crop is brighter
+ * than the dark background (~13,13,13). Returns true if at least `minPixels`
+ * non-background pixels are found.
+ *
+ * For modes that oscillate through dark phases (FSF, QW), use
+ * `isRenderingMultiShot` which takes 3 screenshots with frame gaps.
+ */
+export async function isRendering(page: Page, minPixels = 5): Promise<boolean> {
+  const { nonBgPixels } = await captureAndSamplePixels(page)
+  return nonBgPixels >= minPixels
+}
+
+/**
+ * Is the renderer producing visible content? (multi-shot variant)
+ *
+ * Takes up to 3 screenshots with 30-frame gaps between them. Returns true
+ * if ANY of the 3 shots has at least `minPixels` non-background pixels.
+ *
+ * Use for modes that can have phases of near-total darkness:
+ * - Free Scalar Field: vacuum fluctuations oscillate through zero
+ * - Quantum Walk: interference pattern has dark nodes
+ */
+export async function isRenderingMultiShot(page: Page, minPixels = 5): Promise<boolean> {
+  for (let i = 0; i < 3; i++) {
+    if (await isRendering(page, minPixels)) return true
+    if (i < 2) {
+      const fc = await getFrameCount(page)
+      await waitForFrameAdvance(page, fc + 30)
+    }
+  }
+  return false
+}
+
+/**
+ * Assert the renderer is producing visible content.
+ *
+ * Takes up to 3 screenshots (handles oscillating modes). Fails with a
+ * descriptive message including the context label.
+ */
+export async function assertRendering(page: Page, context: string, minPixels = 5): Promise<void> {
+  const rendering = await isRenderingMultiShot(page, minPixels)
+  expect(
+    rendering,
+    `${context}: expected >= ${minPixels} non-bg pixels across 3 snapshots — nothing rendered`
+  ).toBe(true)
+}
+
+// Backward-compatible aliases
+export const multiShotPixelCheck = async (page: Page, minPixels = 5) => {
+  const pass = await isRenderingMultiShot(page, minPixels)
+  return { pass, bestCount: pass ? minPixels : 0 }
+}
+export const assertNonBlankPixels = assertRendering
+
+/**
+ * Wait for renderer + shader compilation + optional frame advance.
+ * Replaces per-mode `waitForTdseReady`, `waitForBecReady`, etc.
+ */
+export async function waitForModeReady(page: Page, extraFrames = 0): Promise<void> {
+  await waitForRendererReady(page)
+  await waitForShaderCompilation(page)
+  if (extraFrames > 0) {
+    const fc = await getFrameCount(page)
+    await waitForFrameAdvance(page, fc + extraFrames)
+  }
+}

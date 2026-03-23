@@ -23,13 +23,14 @@ import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures'
 import {
-  captureAndSamplePixels,
+  assertNonBlankPixels,
   getFrameCount,
   gotoMode,
   readFsfDiagnostics,
   requireWebGPU,
   waitForDiagnostics,
   waitForFrameAdvance,
+  waitForModeReady,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -115,28 +116,8 @@ function pickColorAlgorithms(label: string, initCond: string): FsfColorAlgorithm
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Take 3 screenshots with frame gaps between them.
- * FSF can have oscillating phases where the field is near-zero.
- * @param minPixels - Minimum non-background pixels required (default 5).
- *   Use lower values for inherently faint modes like exact vacuum.
- */
-async function fsfPixelCheck(
-  page: Page,
-  minPixels = 5
-): Promise<{ pass: boolean; bestCount: number }> {
-  let bestCount = 0
-  for (let i = 0; i < 3; i++) {
-    const { nonBgPixels } = await captureAndSamplePixels(page)
-    bestCount = Math.max(bestCount, nonBgPixels)
-    if (bestCount >= minPixels) return { pass: true, bestCount }
-    if (i < 2) {
-      const fc = await getFrameCount(page)
-      await waitForFrameAdvance(page, fc + 30)
-    }
-  }
-  return { pass: bestCount >= minPixels, bestCount }
-}
+const assertPixels = assertNonBlankPixels
+const waitForFsfReady = (page: Page, extraFrames = 120) => waitForModeReady(page, extraFrames)
 
 /** Set FSF initial condition via store. Enables selfInteraction first if kinkProfile. */
 async function setInitialCondition(page: Page, initCond: string): Promise<void> {
@@ -186,23 +167,6 @@ async function enableDiagnostics(page: Page): Promise<void> {
     const mod = await import('/src/stores/extendedObjectStore.ts')
     mod.useExtendedObjectStore.getState().setFreeScalarDiagnosticsEnabled(true)
   })
-}
-
-/** Wait for FSF to initialize, compile shaders, and render enough frames. */
-async function waitForFsfReady(page: Page, extraFrames = 120): Promise<void> {
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-  const fc = await getFrameCount(page)
-  await waitForFrameAdvance(page, fc + extraFrames)
-}
-
-/** Assert pixel check passes with descriptive error. */
-async function assertPixels(page: Page, context: string, minPixels = 5): Promise<void> {
-  const { pass, bestCount } = await fsfPixelCheck(page, minPixels)
-  expect(
-    pass,
-    `${context}: expected >= ${minPixels} non-bg pixels across 3 snapshots, best was ${bestCount}`
-  ).toBe(true)
 }
 
 // ─── A. Rendering Matrix ─────────────────────────────────────────────────────

@@ -39,6 +39,7 @@ import type { Page } from '@playwright/test'
 
 import { expect, test } from './fixtures'
 import {
+  assertNonBlankPixels,
   captureAndSamplePixels,
   capturePixelSnapshot,
   expectSnapshotsDiffer,
@@ -49,6 +50,7 @@ import {
   setQuantumWalkCoin,
   setQuantumWalkFieldView,
   waitForFrameAdvance,
+  waitForModeReady,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
@@ -57,48 +59,10 @@ test.setTimeout(600_000)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Multi-screenshot pixel check for quantum walk density.
- * QW starts from a delta function and needs many frames to spread.
- * Takes 3 shots with 30-frame gaps; returns the best non-bg pixel count.
- */
-async function qwPixelCheck(
-  page: Page,
-  minPixels = 1
-): Promise<{ pass: boolean; bestCount: number }> {
-  let bestCount = 0
-  for (let i = 0; i < 3; i++) {
-    const { nonBgPixels } = await captureAndSamplePixels(page)
-    bestCount = Math.max(bestCount, nonBgPixels)
-    if (bestCount >= minPixels) return { pass: true, bestCount }
-    if (i < 2) {
-      const fc = await getFrameCount(page)
-      await waitForFrameAdvance(page, fc + 30)
-    }
-  }
-  return { pass: bestCount >= minPixels, bestCount }
-}
-
-/** Assert pixel check passes with descriptive error. */
-async function assertPixels(page: Page, context: string, minPixels = 1): Promise<void> {
-  const { pass, bestCount } = await qwPixelCheck(page, minPixels)
-  expect(
-    pass,
-    `${context}: expected >= ${minPixels} non-bg pixels across 3 snapshots, best was ${bestCount}`
-  ).toBe(true)
-}
-
-/**
- * Wait for QW to initialize, compile shaders, and evolve enough for the
- * interference pattern to be visible. QW starts from a single lattice site
- * (delta function) so needs many frames to spread.
- */
-async function waitForQwReady(page: Page, extraFrames = 120): Promise<void> {
-  await waitForRendererReady(page)
-  await waitForShaderCompilation(page)
-  const fc = await getFrameCount(page)
-  await waitForFrameAdvance(page, fc + extraFrames)
-}
+/** QW default minPixels=1 because walks are inherently sparse. */
+const assertPixels = (page: Page, context: string, minPixels = 1) =>
+  assertNonBlankPixels(page, context, minPixels)
+const waitForQwReady = (page: Page, extraFrames = 120) => waitForModeReady(page, extraFrames)
 
 /** Set quantum walk grid size via store mutation. Triggers needsReset. */
 async function setQwGridSize(page: Page, size: number, dim: number): Promise<void> {
