@@ -128,7 +128,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // ---- DIAGONAL CONTRIBUTION ----
   var Wdiag = 0.0;
 
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // Hydrogen family
     if (dimIdx < 3) {
       // xPhys >= 0 guaranteed by grid range [0, xRange] for hydrogen radial;

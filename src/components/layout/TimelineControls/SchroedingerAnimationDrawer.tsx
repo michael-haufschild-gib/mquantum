@@ -125,7 +125,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     // Check quantum mode for UI visibility
     const objectType = useGeometryStore((state) => state.objectType)
     const isPauliSpinor = objectType === 'pauliSpinor'
-    const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
+    const isHydrogenNDMode =
+      config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdse = config.quantumMode === 'tdseDynamics'
     const isBec = config.quantumMode === 'becDynamics'

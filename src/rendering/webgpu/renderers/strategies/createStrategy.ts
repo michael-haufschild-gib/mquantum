@@ -37,6 +37,7 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
       return new QuantumWalkStrategy()
     case 'harmonicOscillator':
     case 'hydrogenND':
+    case 'hydrogenNDCoupled':
     default:
       return new AnalyticModeStrategy()
   }

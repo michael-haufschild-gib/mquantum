@@ -43,7 +43,7 @@ export interface WignerPassHelpers {
 /** Configuration needed for pipeline compilation. */
 export interface WignerPipelineConfig {
   dimension: number
-  quantumMode?: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode?: 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 }
 

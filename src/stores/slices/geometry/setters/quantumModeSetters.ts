@@ -66,7 +66,8 @@ export function createQuantumModeSetters(
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
-      if (COMPUTE_MODES_3D.has(mode) && useGeometryStore.getState().dimension < 3) {
+      const needsDim3 = COMPUTE_MODES_3D.has(mode) || mode === 'hydrogenNDCoupled'
+      if (needsDim3 && useGeometryStore.getState().dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
       setWithVersion((state) => {
@@ -160,11 +161,19 @@ export function createQuantumModeSetters(
       const currentM = get().schroedinger.magneticQuantumNumber
       const clamped = Math.max(0, Math.min(currentN - 1, Math.floor(l)))
       const newM = Math.max(-clamped, Math.min(clamped, currentM))
+      // Auto-clamp angular chain: each element must be <= l₁, cascade downward
+      const chain = [...get().schroedinger.angularChain]
+      let prevMax = clamped
+      for (let i = 0; i < chain.length; i++) {
+        chain[i] = Math.min(chain[i]!, prevMax)
+        prevMax = chain[i]!
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           azimuthalQuantumNumber: clamped,
           magneticQuantumNumber: newM,
+          angularChain: chain,
           hydrogenNDPreset: 'custom',
         },
       }))
@@ -261,6 +270,28 @@ export function createQuantumModeSetters(
           extraDimQuantumNumbers: clamped,
           hydrogenNDPreset: 'custom',
         },
+      }))
+    },
+
+    /** Set a single angular chain value l_{k+2} for coupled hydrogen ND. */
+    setSchroedingerAngularChainValue: (chainIndex: number, value: number) => {
+      if (!Number.isInteger(chainIndex) || chainIndex < 0 || chainIndex >= 8) return
+      if (!isFinite(value)) {
+        warn('angularChain', value)
+        return
+      }
+      const state = get().schroedinger
+      const chain = [...state.angularChain]
+      // Upper bound: previous element (or l₁ for the first)
+      const upperBound =
+        chainIndex === 0 ? state.azimuthalQuantumNumber : (chain[chainIndex - 1] ?? 0)
+      chain[chainIndex] = Math.max(0, Math.min(upperBound, Math.floor(value)))
+      // Cascade: clamp all subsequent elements to be <= this one
+      for (let i = chainIndex + 1; i < chain.length; i++) {
+        chain[i] = Math.min(chain[i]!, chain[i - 1]!)
+      }
+      setWithVersion((s) => ({
+        schroedinger: { ...s.schroedinger, angularChain: chain },
       }))
     },
 

@@ -115,7 +115,8 @@ export const TimelineControls: FC = () => {
   const supportsOpenQuantumControls =
     isSchroedinger &&
     (schroedingerConfig.quantumMode === 'harmonicOscillator' ||
-      schroedingerConfig.quantumMode === 'hydrogenND') &&
+      schroedingerConfig.quantumMode === 'hydrogenND' ||
+      schroedingerConfig.quantumMode === 'hydrogenNDCoupled') &&
     schroedingerConfig.representation !== 'wigner'
 
   const handleReset = useCallback(() => {

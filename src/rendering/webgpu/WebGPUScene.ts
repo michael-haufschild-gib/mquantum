@@ -92,7 +92,9 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     | 'wigner'
   const openQuantumEnabled = state.schroedinger?.openQuantum?.enabled ?? false
   const openQuantumSupported =
-    (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
+    (quantumMode === 'harmonicOscillator' ||
+      quantumMode === 'hydrogenND' ||
+      quantumMode === 'hydrogenNDCoupled') &&
     representation !== 'wigner'
 
   const diracFieldView =

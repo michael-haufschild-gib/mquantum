@@ -73,7 +73,7 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Wigner Cache`)
 
-  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const includeHydrogen = isHydrogenFamily
 
   defines.push(`const HYDROGEN_MODE_ENABLED: bool = ${includeHydrogen};`)
@@ -83,7 +83,10 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   }
 
   // Quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenND') {
+  if (quantumMode === 'hydrogenNDCoupled') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
+    features.push('Hydrogen ND (Coupled)')
+  } else if (quantumMode === 'hydrogenND') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
     features.push('Hydrogen ND')
   } else {

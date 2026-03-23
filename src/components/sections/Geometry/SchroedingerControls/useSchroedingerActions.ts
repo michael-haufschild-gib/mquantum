@@ -27,6 +27,14 @@ export interface SchroedingerActionsResult {
   setMomentumHbar: ExtendedObjectState['setSchroedingerMomentumHbar']
   harmonicActions: HarmonicOscillatorActions
   hydrogenNDActions: HydrogenNDActions
+  hydrogenNDCoupledActions: {
+    setPrincipalQuantumNumber: ExtendedObjectState['setSchroedingerPrincipalQuantumNumber']
+    setAzimuthalQuantumNumber: ExtendedObjectState['setSchroedingerAzimuthalQuantumNumber']
+    setMagneticQuantumNumber: ExtendedObjectState['setSchroedingerMagneticQuantumNumber']
+    setUseRealOrbitals: ExtendedObjectState['setSchroedingerUseRealOrbitals']
+    setBohrRadiusScale: ExtendedObjectState['setSchroedingerBohrRadiusScale']
+    setAngularChainValue: ExtendedObjectState['setSchroedingerAngularChainValue']
+  }
   wignerActions: WignerActions
   freeScalarActions: FreeScalarFieldActions
   tdseActions: TdseActions
@@ -65,6 +73,8 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setHydrogenNDPreset: state.setSchroedingerHydrogenNDPreset,
     setExtraDimQuantumNumber: state.setSchroedingerExtraDimQuantumNumber,
     setExtraDimFrequencySpread: state.setSchroedingerExtraDimFrequencySpread,
+    // Hydrogen ND Coupled actions
+    setAngularChainValue: state.setSchroedingerAngularChainValue,
     // Wigner actions
     setWignerDimensionIndex: state.setSchroedingerWignerDimensionIndex,
     setWignerAutoRange: state.setSchroedingerWignerAutoRange,
@@ -230,6 +240,15 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setExtraDimFrequencySpread: s.setExtraDimFrequencySpread,
   }
 
+  const hydrogenNDCoupledActions = {
+    setPrincipalQuantumNumber: s.setPrincipalQuantumNumber,
+    setAzimuthalQuantumNumber: s.setAzimuthalQuantumNumber,
+    setMagneticQuantumNumber: s.setMagneticQuantumNumber,
+    setUseRealOrbitals: s.setUseRealOrbitals,
+    setBohrRadiusScale: s.setBohrRadiusScale,
+    setAngularChainValue: s.setAngularChainValue,
+  }
+
   const wignerActions: WignerActions = {
     setDimensionIndex: s.setWignerDimensionIndex,
     setAutoRange: s.setWignerAutoRange,
@@ -374,6 +393,7 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setMomentumHbar: s.setMomentumHbar,
     harmonicActions,
     hydrogenNDActions,
+    hydrogenNDCoupledActions,
     wignerActions,
     freeScalarActions,
     tdseActions,

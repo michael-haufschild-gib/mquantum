@@ -437,7 +437,8 @@ export function computeSchroedingerUpdate(
   if (
     !inputs.isUniformComputeMode &&
     inputs.schroedinger?.representation === 'momentum' &&
-    inputs.quantumModeStr !== 'hydrogenND'
+    inputs.quantumModeStr !== 'hydrogenND' &&
+    inputs.quantumModeStr !== 'hydrogenNDCoupled'
   ) {
     applyHOMomentumTransform(floatView, intView, inputs.dimension, hbar)
   }
@@ -530,7 +531,9 @@ function computeNewBoundingRadius(
   } else if (state.cachedPreset) {
     const oqCfg = schroedinger?.openQuantum
     const effectiveN =
-      config.openQuantumEnabled && oqCfg?.enabled && quantumModeStr === 'hydrogenND'
+      config.openQuantumEnabled &&
+      oqCfg?.enabled &&
+      (quantumModeStr === 'hydrogenND' || quantumModeStr === 'hydrogenNDCoupled')
         ? Math.max(schroedinger?.principalQuantumNumber ?? 2, oqCfg.hydrogenBasisMaxN ?? 2)
         : (schroedinger?.principalQuantumNumber ?? 2)
     const rawBR = computeBoundingRadius(

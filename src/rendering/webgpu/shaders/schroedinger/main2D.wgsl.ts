@@ -52,7 +52,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= schroedinger.hydrogenNDBoost;
   }
 
@@ -199,7 +199,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= schroedinger.hydrogenNDBoost;
   }
 

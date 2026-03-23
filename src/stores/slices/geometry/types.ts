@@ -94,6 +94,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerHydrogenNDPreset: (preset: HydrogenNDPresetName) => void
   setSchroedingerExtraDimQuantumNumber: (dimIndex: number, n: number) => void
   setSchroedingerExtraDimQuantumNumbers: (numbers: number[]) => void
+  setSchroedingerAngularChainValue: (chainIndex: number, value: number) => void
   setSchroedingerExtraDimOmega: (dimIndex: number, omega: number) => void
   setSchroedingerExtraDimOmegaAll: (omegas: number[]) => void
   setSchroedingerExtraDimFrequencySpread: (spread: number) => void

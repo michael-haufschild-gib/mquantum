@@ -297,7 +297,7 @@ fn evaluateNodalScalarField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) 
   let psi = samplePsiWithFlow(pos, t, uniforms);
   let psiAbs = length(psi);
 
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
     let factors = sampleHydrogenNodeFactorsWithFlow(pos, t, uniforms);
     if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
       return NodalScalarSample(factors.x, factors.x, psiAbs, NODAL_DEFINITION_PSI_ABS);
@@ -455,7 +455,7 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   var colorMode = uniforms.nodalDefinition;
 
   // Optional hydrogen node-family filtering.
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
     let h0 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V0 * delta, t, uniforms);
     let h1 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V1 * delta, t, uniforms);
     let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
@@ -552,7 +552,7 @@ fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) 
   );
 
   // Keep physical current magnitude aligned with hydrogen-ND density scaling.
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     j *= uniforms.hydrogenNDBoost;
   }
 

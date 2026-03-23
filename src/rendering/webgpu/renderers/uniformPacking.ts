@@ -230,9 +230,14 @@ function packHydrogenAndExtraDims(
     25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
 
   // extraDimN: 2 vec4i = 8 ints
-  const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
+  // For coupled hydrogen ND, these slots carry the angular chain (l₂, l₃, ...)
+  // instead of HO quantum numbers. The shader's getAngularChainL() reads from here.
+  const isCoupled = p.quantumModeStr === 'hydrogenNDCoupled'
+  const extraDimSource = isCoupled
+    ? (schroedinger?.angularChain as number[] | undefined)
+    : (schroedinger?.extraDimQuantumNumbers as number[] | undefined)
   for (let i = 0; i < MAX_EXTRA_DIM; i++) {
-    intView[I.extraDimN + i] = extraDimQuantumNumbers?.[i] ?? 0
+    intView[I.extraDimN + i] = extraDimSource?.[i] ?? 0
   }
 
   // extraDimOmega: 2 vec4f = 8 floats
@@ -490,7 +495,9 @@ function packRepresentationAndColorOverlays(
 
   // Representation + momentum controls
   const forcePosition =
-    isUniformComputeMode || (isDensityMatrixMode && quantumModeStr === 'hydrogenND')
+    isUniformComputeMode ||
+    (isDensityMatrixMode &&
+      (quantumModeStr === 'hydrogenND' || quantumModeStr === 'hydrogenNDCoupled'))
   intView[I.representationMode] = forcePosition
     ? 0
     : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
@@ -621,7 +628,8 @@ function packWignerAutoRange(
   wignerDimIdx: number
 ): void {
   const { schroedinger } = p
-  const isHydrogenMode = p.rendererQuantumMode === 'hydrogenND'
+  const isHydrogenMode =
+    p.rendererQuantumMode === 'hydrogenND' || p.rendererQuantumMode === 'hydrogenNDCoupled'
 
   if (isHydrogenMode && wignerDimIdx < 3) {
     const n = schroedinger?.principalQuantumNumber ?? 2

@@ -105,6 +105,7 @@ export type SchroedingerRenderStyle = 'rayMarching'
 export type SchroedingerQuantumMode =
   | 'harmonicOscillator'
   | 'hydrogenND'
+  | 'hydrogenNDCoupled'
   | 'freeScalarField'
   | 'tdseDynamics'
   | 'becDynamics'

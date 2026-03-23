@@ -55,7 +55,7 @@ fn sampleCrossSectionScalar(
   let psi = evalPsi(xND, animTime, uniforms);
 
   var rho = rhoFromPsi(psi);
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 

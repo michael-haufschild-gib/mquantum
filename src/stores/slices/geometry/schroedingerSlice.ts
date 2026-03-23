@@ -419,7 +419,7 @@ export const createSchroedingerSlice: StateCreator<
       const hydrogenUpdate: Record<string, number> = {}
       if (dimension === 2) {
         const current = get().schroedinger
-        if (current.quantumMode === 'hydrogenND') {
+        if (current.quantumMode === 'hydrogenND' || current.quantumMode === 'hydrogenNDCoupled') {
           const currentL = current.azimuthalQuantumNumber
           const currentM = current.magneticQuantumNumber
           if (currentM === 0 && currentL > 0) {

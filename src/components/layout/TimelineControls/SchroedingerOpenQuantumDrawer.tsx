@@ -109,9 +109,11 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
       }))
     )
 
-    const isHydrogen = quantumMode === 'hydrogenND'
+    const isHydrogen = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
     const supportsOpenQuantum =
-      (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
+      (quantumMode === 'harmonicOscillator' ||
+        quantumMode === 'hydrogenND' ||
+        quantumMode === 'hydrogenNDCoupled') &&
       representation !== 'wigner'
 
     const onDephasingToggle = useCallback(() => {

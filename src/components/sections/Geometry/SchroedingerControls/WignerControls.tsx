@@ -32,7 +32,8 @@ import type { WignerControlsProps } from './types'
  */
 export const WignerControls: React.FC<WignerControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
-    const isHydrogenMode = config.quantumMode === 'hydrogenND'
+    const isHydrogenMode =
+      config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
 
     // Build dimension options based on current dimension and quantum mode
     const dimensionOptions = useMemo(() => {

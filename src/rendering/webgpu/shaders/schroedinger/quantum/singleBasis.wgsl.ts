@@ -22,10 +22,10 @@
  * @returns WGSL source for the evaluateSingleBasis function
  */
 export function generateSingleBasisBlock(
-  quantumMode: 'harmonicOscillator' | 'hydrogenND',
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled',
   dimension?: number
 ): string {
-  if (quantumMode === 'hydrogenND') {
+  if (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') {
     const dim = Math.min(Math.max(dimension ?? 3, 3), 11)
     const extraDimCount = dim - 3
 

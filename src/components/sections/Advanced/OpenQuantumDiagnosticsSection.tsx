@@ -38,7 +38,11 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     const oq = s.schroedinger.openQuantum?.enabled ?? false
     const mode = s.schroedinger.quantumMode
     const repr = s.schroedinger.representation
-    return oq && (mode === 'harmonicOscillator' || mode === 'hydrogenND') && repr !== 'wigner'
+    return (
+      oq &&
+      (mode === 'harmonicOscillator' || mode === 'hydrogenND' || mode === 'hydrogenNDCoupled') &&
+      repr !== 'wigner'
+    )
   })
 
   const metrics = useOpenQuantumDiagnosticsStore(

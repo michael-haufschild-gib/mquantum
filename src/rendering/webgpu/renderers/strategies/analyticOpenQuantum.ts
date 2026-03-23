@@ -93,7 +93,9 @@ export class AnalyticOpenQuantumExecutor {
       forceUpdate = true
     }
 
-    const isHydrogenOQ = shared.rendererConfig.quantumMode === 'hydrogenND'
+    const isHydrogenOQ =
+      shared.rendererConfig.quantumMode === 'hydrogenND' ||
+      shared.rendererConfig.quantumMode === 'hydrogenNDCoupled'
 
     if (isHydrogenOQ) {
       this.executeHydrogen(

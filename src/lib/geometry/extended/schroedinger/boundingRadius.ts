@@ -244,7 +244,7 @@ export function computeBoundingRadius(
   const activeExtraDimOmega = extraDimOmega?.slice(0, activeExtraDimCount)
 
   if (representation === 'momentum') {
-    if (quantumMode === 'hydrogenND') {
+    if (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') {
       return computeHydrogenMomentumBoundingRadius(
         principalN,
         bohrRadius,
@@ -267,7 +267,7 @@ export function computeBoundingRadius(
   }
 
   // Position space (default)
-  if (quantumMode === 'hydrogenND') {
+  if (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') {
     return computeHydrogenBoundingRadius(
       principalN,
       bohrRadius,

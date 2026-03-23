@@ -92,6 +92,8 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
     if (objectType !== 'schroedinger') {
       return null
     }
+    const isHydrogenMode =
+      config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
     // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
     // Free scalar field uses density-grid raymarching; these shader features are disabled in
     // extractSchrodingerConfig and would have no visual effect.
@@ -178,10 +180,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                   options={NODAL_FAMILY_OPTIONS}
                   value={config.nodalFamilyFilter ?? 'all'}
                   onChange={setNodalFamilyFilter}
-                  disabled={config.quantumMode !== 'hydrogenND'}
+                  disabled={!isHydrogenMode}
                   data-testid="schroedinger-nodal-family-filter"
                 />
-                {config.quantumMode !== 'hydrogenND' && (
+                {!isHydrogenMode && (
                   <p className="text-xs text-text-tertiary">
                     Family filtering is available in Hydrogen ND mode.
                   </p>

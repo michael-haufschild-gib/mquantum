@@ -70,7 +70,7 @@ fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
 // Automatically selects between harmonic oscillator and hydrogen ND modes
 fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   // Check quantum mode and dispatch
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // Hydrogen ND mode - use generated dispatch function
     return hydrogenNDOptimized(xND, t, uniforms);
   }
@@ -90,7 +90,7 @@ fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms)
 // Evaluate spatial-only phase (t=0) for stable coloring
 // This gives position-dependent color without time-flickering
 fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // Hydrogen ND mode - evaluate at t=0 for spatial phase
     let psi = hydrogenNDOptimized(xND, 0.0, uniforms);
     return atan2(psi.y, psi.x);
@@ -116,7 +116,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 // stable spatial phase (for coloring) without redundant calculations.
 // Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, relativePhaseToSpatialRef)
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // OPTIMIZED: Evaluate spatial wavefunction ONCE (at t=0)
     let psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
 
@@ -197,7 +197,7 @@ export const psiBlockDynamic = /* wgsl */ `
 
 // Evaluate wavefunction ψ(x,t) at D-dimensional point xND and time t
 fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     return hydrogenNDOptimized(xND, t, uniforms);
   }
 
@@ -214,7 +214,7 @@ fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms)
 
 // Evaluate spatial-only phase (t=0) for stable coloring
 fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     let psi = hydrogenNDOptimized(xND, 0.0, uniforms);
     return atan2(psi.y, psi.x);
   }
@@ -226,7 +226,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 
 // OPTIMIZED: Evaluate time-dependent ψ AND spatial-only phase in ONE pass
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     let psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
     let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
     var outputPhase = spatialPhase;
@@ -478,6 +478,49 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   } else {
     psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
   }
+  let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
+
+  var outputPhase = spatialPhase;
+  if (uniforms.phaseAnimationEnabled != 0u) {
+    let nf = f32(uniforms.principalN);
+    let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
+    let E = -0.5 / (nEff * nEff);
+    outputPhase = spatialPhase - E * t;
+  }
+
+  let relativePhase = outputPhase - spatialPhase;
+  return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, relativePhase);
+}
+`
+
+/**
+ * Hydrogen ND Coupled psi block.
+ * Uses hydrogenNDCoupledOptimized() from hyperspherical harmonics module.
+ * Position-only for now (momentum-space deferred).
+ */
+export const psiBlockHydrogenNDCoupled = /* wgsl */ `
+// ============================================
+// Wavefunction Evaluation (Hydrogen ND Coupled)
+// True D-dimensional Coulomb with hyperspherical harmonics
+// ============================================
+
+fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  return hydrogenNDCoupledOptimized(xND, t, uniforms);
+}
+
+fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let psi = evalPsi(xND, t, uniforms);
+  let phase = atan2(psi.y, psi.x);
+  return vec3f(psi.x, psi.y, phase);
+}
+
+fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  let psi = hydrogenNDCoupledOptimized(xND, 0.0, uniforms);
+  return atan2(psi.y, psi.x);
+}
+
+fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  let psiSpatial = hydrogenNDCoupledOptimized(xND, 0.0, uniforms);
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
 
   var outputPhase = spatialPhase;

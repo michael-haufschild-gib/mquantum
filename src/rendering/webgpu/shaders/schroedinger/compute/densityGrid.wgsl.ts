@@ -323,7 +323,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Apply uniform visualization boost for hydrogen ND mode.
   // This replaces the per-basis boost that was removed from evaluateSingleBasis,
   // ensuring correct relative scaling between cross-terms and diagonals.
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     totalDensity *= schroedinger.hydrogenNDBoost;
   }
 

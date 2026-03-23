@@ -7,6 +7,8 @@
  * @module rendering/webgpu/renderers/strategies/AnalyticModeStrategy
  */
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { DensityGridComputePass } from '../../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../../passes/EigenfunctionCacheComputePass'
@@ -28,6 +30,11 @@ import type {
   QuantumModeStrategy,
   SchroedingerSnapshot,
 } from './types'
+
+/** Check if a quantum mode is a hydrogen family mode (decoupled or coupled). */
+function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boolean {
+  return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
+}
 
 /** Strategy for analytic quantum modes (harmonic oscillator, hydrogen) evaluated per-fragment in WGSL. */
 export class AnalyticModeStrategy implements QuantumModeStrategy {
@@ -57,7 +64,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     const { device } = ctx
     const dim = config.dimension ?? 3
-    const isHydrogen = config.quantumMode === 'hydrogenND'
+    const isHydrogen = isHydrogenQuantumMode(config.quantumMode)
     const openQuantumEnabled = config.openQuantumEnabled ?? false
     const isWigner = config.representation === 'wigner'
     const pipelineIs2D = dim === 2 || isWigner
@@ -429,7 +436,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     )
 
     const schroedinger = extended?.schroedinger
-    const isHydrogen = shared.rendererConfig.quantumMode === 'hydrogenND'
+    const isHydrogen = isHydrogenQuantumMode(shared.rendererConfig.quantumMode)
     const isHydrogenRadial = isHydrogen && (shared.schroedingerIntView[1456 / 4] ?? 0) < 3
 
     const xRange = shared.schroedingerFloatView[1464 / 4]!

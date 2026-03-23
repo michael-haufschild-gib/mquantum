@@ -167,7 +167,10 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       )
     }
 
-    const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
+    const isAnalytic =
+      quantumMode === 'harmonicOscillator' ||
+      quantumMode === 'hydrogenND' ||
+      quantumMode === 'hydrogenNDCoupled'
 
     // Analytic modes require 3D+ and non-Wigner representation for cross-section
     if (isAnalytic && (dimension <= 2 || representation === 'wigner')) return null
@@ -348,7 +351,10 @@ const DataExportButtons: React.FC<{
   quantumMode: string
   observablesHasData?: boolean
 }> = React.memo(({ quantumMode, observablesHasData }) => {
-  const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
+  const isAnalytic =
+    quantumMode === 'harmonicOscillator' ||
+    quantumMode === 'hydrogenND' ||
+    quantumMode === 'hydrogenNDCoupled'
   const hasSaveLoad =
     quantumMode === 'tdseDynamics' ||
     quantumMode === 'becDynamics' ||

@@ -26,6 +26,7 @@ import { MAX_DIMENSION, MIN_DIMENSION } from '@/stores/geometryStore'
 const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'harmonicOscillator',
   'hydrogenND',
+  'hydrogenNDCoupled',
   'freeScalarField',
   'tdseDynamics',
   'becDynamics',

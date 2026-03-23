@@ -47,7 +47,7 @@ import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { COLOR_ALG_NAMES } from './volume/emission.wgsl'
 
 /** Quantum physics mode for Schrödinger visualization */
-export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND'
+export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
 
 /**
  * Schrödinger shader configuration options.
@@ -212,7 +212,10 @@ function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${flags.useRobustEigenInterpolation};`)
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
 
-  if (flags.quantumMode === 'hydrogenND') {
+  if (flags.quantumMode === 'hydrogenNDCoupled') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
+    features.push('Hydrogen ND (Coupled)')
+  } else if (flags.quantumMode === 'hydrogenND') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
     features.push('Hydrogen ND')
   } else {
@@ -285,7 +288,8 @@ function derivedShaderFlags(config: SchroedingerWGSLShaderConfig) {
     termCount,
   } = config
   const is2D = dimension === 2 || isWigner
-  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
+  const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
   const actualDim =
     isHydrogenFamily || isWigner
       ? Math.min(Math.max(dimension, 3), 11)
@@ -305,6 +309,7 @@ function derivedShaderFlags(config: SchroedingerWGSLShaderConfig) {
   return {
     is2D,
     isHydrogenFamily,
+    isHydrogenCoupled,
     actualDim,
     includeHydrogen,
     includeHydrogenND,
@@ -364,6 +369,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const {
     is2D,
     isHydrogenFamily,
+    isHydrogenCoupled,
     actualDim,
     includeHydrogen,
     includeHydrogenND,
@@ -465,6 +471,7 @@ struct VertexOutput {
       includeHydrogenND,
       hydrogenNDDimension,
       isHydrogenFamily,
+      isHydrogenCoupled,
       useCache,
       useUnrolledHO,
       termCount,

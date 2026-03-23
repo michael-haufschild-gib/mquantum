@@ -47,6 +47,7 @@ export const BAYER_OFFSETS: [number, number][] = [
 export const QUANTUM_MODE_MAP: Record<string, number> = {
   harmonicOscillator: 0,
   hydrogenND: 1,
+  hydrogenNDCoupled: 7,
   freeScalarField: 2,
   tdseDynamics: 3,
   becDynamics: 4,

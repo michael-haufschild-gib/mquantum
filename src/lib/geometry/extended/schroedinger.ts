@@ -229,6 +229,16 @@ export interface SchroedingerConfig {
   /** Energy spread factor for extra dimensions (0-0.5) */
   extraDimFrequencySpread: number
 
+  // === Hydrogen ND Coupled Configuration (when quantumMode === 'hydrogenNDCoupled') ===
+  /**
+   * Angular momentum chain for D-dimensional hyperspherical harmonics.
+   * Length D-2 (indices 0..D-3): l_1 >= l_2 >= ... >= l_{D-2} >= 0.
+   * l_1 maps to azimuthalQuantumNumber, m maps to magneticQuantumNumber.
+   * Intermediate values l_2..l_{D-3} are stored here (indices 1..D-3).
+   * Maximum length 8 (for D=11: 9 angles, chain length 9, but l_1 and |m| stored separately).
+   */
+  angularChain: number[]
+
   // === Volume Rendering Parameters ===
   /** Time evolution speed multiplier (0.1-2.0) */
   timeScale: number
@@ -572,6 +582,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   extraDimQuantumNumbers: [0, 0, 0, 0, 0, 0, 0, 0], // 8 values for dims 4-11
   extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   extraDimFrequencySpread: 0.0,
+
+  // Hydrogen ND Coupled state — angular chain l_2..l_{D-3} (l_1 = azimuthalL, m = magneticM)
+  angularChain: [0, 0, 0, 0, 0, 0, 0, 0],
 
   // Volume rendering
   timeScale: 0.8,

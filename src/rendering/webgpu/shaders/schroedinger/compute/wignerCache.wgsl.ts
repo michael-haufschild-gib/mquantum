@@ -107,7 +107,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let t = schroedinger.time * schroedinger.timeScale;
   var W = 0.0;
 
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // Hydrogen family
     if (dimIdx < 3) {
       // Core radial dimension: numerical Fourier-cosine quadrature

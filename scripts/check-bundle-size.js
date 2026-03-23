@@ -25,7 +25,7 @@ const CHUNK_BUDGETS = {
   'react-vendor': 65,
   'motion': 35,
   'rendering': 120,
-  'shaders-schroedinger': 110,
+  'shaders-schroedinger': 115,
   'shaders': 35,
   'components': 80,
   'components-panels': 65,
@@ -38,7 +38,7 @@ const CHUNK_BUDGETS = {
 
 /** Total JS gzip budget in KB (all .js chunks combined).
  *  Updated 2026-03-22: 580→620 to accommodate roadmap Phase B/C/D features. */
-const TOTAL_JS_BUDGET_KB = 620
+const TOTAL_JS_BUDGET_KB = 625
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

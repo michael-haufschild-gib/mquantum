@@ -73,7 +73,11 @@ import {
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */
-export type ComputeQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
+export type ComputeQuantumMode =
+  | 'harmonicOscillator'
+  | 'hydrogenND'
+  | 'hydrogenNDCoupled'
+  | 'freeScalarField'
 
 /**
  * Configuration for density grid compute shader
@@ -124,7 +128,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Quantum`)
 
-  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily
@@ -148,7 +152,10 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   }
 
   // Quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenND') {
+  if (quantumMode === 'hydrogenNDCoupled') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
+    features.push('Hydrogen ND (Coupled)')
+  } else if (quantumMode === 'hydrogenND') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
     features.push('Hydrogen ND')
   } else {

@@ -62,7 +62,7 @@ export function generateMainBlockWigner2D(useCache = false): string {
   let t = schroedinger.time * schroedinger.timeScale;
   var W = 0.0;
 
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     // Hydrogen family
     if (dimIdx < 3) {
       // Core radial dimension: numerical Fourier-cosine quadrature
@@ -115,7 +115,7 @@ fn classicalEllipseSDF(x: f32, p: f32, omega: f32, energy: f32, lineWidth: f32) 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Detect hydrogen radial mode: one-sided x-axis [0, rMax] since r >= 0
-  let isHydrogenRadial = (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND)
+  let isHydrogenRadial = (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND)
     && (schroedinger.wignerDimensionIndex < 3);
 
   // Map UV to physical (x, p) coordinates with aspect correction
@@ -185,7 +185,7 @@ ${wignerEvalBlock}
     let lineColor = vec3f(1.0, 1.0, 1.0);
     var overlayAlpha = 0.0;
 
-    if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+    if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
       let dimIdx = schroedinger.wignerDimensionIndex;
       if (dimIdx < 3) {
         // Hydrogen radial: classical turning points

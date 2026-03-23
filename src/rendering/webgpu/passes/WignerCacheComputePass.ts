@@ -127,7 +127,9 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
     const termCount = this.passConfig.termCount ?? 1
-    const isHydrogen = this.passConfig.quantumMode === 'hydrogenND'
+    const isHydrogen =
+      this.passConfig.quantumMode === 'hydrogenND' ||
+      this.passConfig.quantumMode === 'hydrogenNDCoupled'
 
     // Build the cross-pair mapping
     const { crossPairs, numCrossLayers } = buildCrossPairMap(termCount)

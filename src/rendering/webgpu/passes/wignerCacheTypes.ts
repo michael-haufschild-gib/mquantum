@@ -23,7 +23,7 @@ export interface WignerCacheComputeConfig {
   /** Number of dimensions (3-11) */
   dimension: number
   /** Quantum mode */
-  quantumMode?: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode?: 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
   /** Number of HO superposition terms (1-8) */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 }

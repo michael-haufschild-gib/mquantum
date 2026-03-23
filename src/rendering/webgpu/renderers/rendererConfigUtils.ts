@@ -137,7 +137,9 @@ export function buildShaderConfig(
   const pipelineIs2D = !computeMode && (dim === 2 || isWigner)
 
   const enableCache = rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
-  const isHydrogen = rendererConfig.quantumMode === 'hydrogenND'
+  const isHydrogen =
+    rendererConfig.quantumMode === 'hydrogenND' ||
+    rendererConfig.quantumMode === 'hydrogenNDCoupled'
   const isosurface = rendererConfig.isosurface ?? false
   const openQuantumEnabled = rendererConfig.openQuantumEnabled ?? false
 

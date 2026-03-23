@@ -153,7 +153,7 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
@@ -175,7 +175,7 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
@@ -244,7 +244,7 @@ fn sampleDensityAtPos(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32
   let psi = evalPsi(xND, t, uniforms);
   var rho = rhoFromPsi(psi);
 
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 

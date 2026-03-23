@@ -144,7 +144,8 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
     <>
       {/* Energy level + wavefunction diagrams */}
       {isHarmonicOscillatorMode && <HOEnergyDiagram />}
-      {config.quantumMode === 'hydrogenND' && <HydrogenEnergyDiagram />}
+      {config.quantumMode === 'hydrogenND' ||
+        (config.quantumMode === 'hydrogenNDCoupled' && <HydrogenEnergyDiagram />)}
 
       {/* Slice Plane */}
       <ControlGroup
@@ -345,53 +346,54 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
       </ControlGroup>
 
       {/* Radial Probability (hydrogen ND only) */}
-      {config.quantumMode === 'hydrogenND' && (
-        <ControlGroup
-          title="Radial Probability P(r)"
-          collapsible
-          defaultOpen={false}
-          data-testid="control-group-radial-probability"
-          rightElement={
-            <Switch
-              checked={config.radialProbabilityEnabled ?? false}
-              onCheckedChange={(checked) => setRadialProbabilityEnabled(checked)}
-              data-testid="schroedinger-radial-probability-toggle"
-            />
-          }
-        >
-          {config.radialProbabilityEnabled && (
-            <div className="space-y-2">
-              <Slider
-                label="Opacity"
-                tooltip="Transparency of the radial probability shell overlay. 0 = invisible, 1 = fully opaque."
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.radialProbabilityOpacity ?? 0.6}
-                onChange={setRadialProbabilityOpacity}
-                showValue
-                data-testid="schroedinger-radial-probability-opacity"
+      {config.quantumMode === 'hydrogenND' ||
+        (config.quantumMode === 'hydrogenNDCoupled' && (
+          <ControlGroup
+            title="Radial Probability P(r)"
+            collapsible
+            defaultOpen={false}
+            data-testid="control-group-radial-probability"
+            rightElement={
+              <Switch
+                checked={config.radialProbabilityEnabled ?? false}
+                onCheckedChange={(checked) => setRadialProbabilityEnabled(checked)}
+                data-testid="schroedinger-radial-probability-toggle"
               />
-              <div
-                className="flex items-center justify-between"
-                data-testid="schroedinger-radial-probability-color"
-              >
-                <label className="text-xs text-text-secondary">Shell Color</label>
-                <ColorPicker
-                  value={
-                    config.radialProbabilityColor ??
-                    DEFAULT_SCHROEDINGER_CONFIG.radialProbabilityColor
-                  }
-                  onChange={setRadialProbabilityColor}
-                  tooltip="Color of the radial probability shell rendered at the most probable radius."
-                  disableAlpha={true}
-                  className="w-24"
+            }
+          >
+            {config.radialProbabilityEnabled && (
+              <div className="space-y-2">
+                <Slider
+                  label="Opacity"
+                  tooltip="Transparency of the radial probability shell overlay. 0 = invisible, 1 = fully opaque."
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={config.radialProbabilityOpacity ?? 0.6}
+                  onChange={setRadialProbabilityOpacity}
+                  showValue
+                  data-testid="schroedinger-radial-probability-opacity"
                 />
+                <div
+                  className="flex items-center justify-between"
+                  data-testid="schroedinger-radial-probability-color"
+                >
+                  <label className="text-xs text-text-secondary">Shell Color</label>
+                  <ColorPicker
+                    value={
+                      config.radialProbabilityColor ??
+                      DEFAULT_SCHROEDINGER_CONFIG.radialProbabilityColor
+                    }
+                    onChange={setRadialProbabilityColor}
+                    tooltip="Color of the radial probability shell rendered at the most probable radius."
+                    disableAlpha={true}
+                    className="w-24"
+                  />
+                </div>
               </div>
-            </div>
-          )}
-        </ControlGroup>
-      )}
+            )}
+          </ControlGroup>
+        ))}
 
       {/* Second Quantization Educational Layer (HO modes only) */}
       {isHarmonicOscillatorMode && (

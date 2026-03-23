@@ -393,7 +393,11 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
   }
 
   // Open quantum diagnostics (analytic modes)
-  if (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') {
+  if (
+    quantumMode === 'harmonicOscillator' ||
+    quantumMode === 'hydrogenND' ||
+    quantumMode === 'hydrogenNDCoupled'
+  ) {
     const s = useOpenQuantumDiagnosticsStore.getState()
     if (s.historyCount > 0) {
       payload.openQuantum = {

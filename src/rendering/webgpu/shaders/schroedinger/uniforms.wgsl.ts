@@ -28,6 +28,7 @@ const MAX_EXTRA_DIM: i32 = 8;
 // Quantum mode constants (used throughout all quantum modules)
 const QUANTUM_MODE_HARMONIC: i32 = 0;
 const QUANTUM_MODE_HYDROGEN_ND: i32 = 1;
+const QUANTUM_MODE_HYDROGEN_ND_COUPLED: i32 = 2;
 
 // Representation-space constants
 const REPRESENTATION_POSITION: i32 = 0;
@@ -345,6 +346,16 @@ fn getExtraDimN(uniforms: SchroedingerUniforms, i: i32) -> i32 {
 // Get extraDimOmega[i] from packed array<vec4f, 2>
 fn getExtraDimOmega(uniforms: SchroedingerUniforms, i: i32) -> f32 {
   return uniforms.extraDimOmega[i / 4][i % 4];
+}
+
+// Get angular chain quantum number for coupled hydrogen ND.
+// k=0: l_1 = azimuthalL (overall angular momentum)
+// k=1..D-3: l_{k+1} = extraDimN[k-1] (intermediate angular momenta)
+// The deepest is |m| = magneticM.
+// Chain constraint: l_1 >= l_2 >= ... >= l_{D-2} >= 0
+fn getAngularChainL(uniforms: SchroedingerUniforms, k: i32) -> i32 {
+  if (k == 0) { return uniforms.azimuthalL; }
+  return getExtraDimN(uniforms, k - 1);
 }
 
 // ============================================

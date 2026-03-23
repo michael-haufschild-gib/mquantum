@@ -40,7 +40,9 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       )
     const effectiveOpenQuantumEnabled =
       openQuantumEnabled &&
-      (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
+      (quantumMode === 'harmonicOscillator' ||
+        quantumMode === 'hydrogenND' ||
+        quantumMode === 'hydrogenNDCoupled') &&
       representation !== 'wigner'
 
     const availableOptions = useMemo(

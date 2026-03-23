@@ -16,6 +16,7 @@ const MODE_FEATURES: Record<
 > = {
   harmonicOscillator: { minDim: 1, category: 'analytic' },
   hydrogenND: { minDim: 3, category: 'analytic' },
+  hydrogenNDCoupled: { minDim: 3, category: 'analytic' },
   freeScalarField: { minDim: 1, category: 'compute' },
   tdseDynamics: { minDim: 3, category: 'compute' },
   becDynamics: { minDim: 3, category: 'compute' },
@@ -37,6 +38,11 @@ const MODE_OPTIONS: {
     value: 'hydrogenND',
     label: 'Hydrogen Orbitals',
     description: 'N-dimensional hydrogen atom in 3D space.',
+  },
+  {
+    value: 'hydrogenNDCoupled',
+    label: 'Hydrogen ND (Coupled)',
+    description: 'True D-dimensional Coulomb problem with hyperspherical harmonics.',
   },
   {
     value: 'freeScalarField',

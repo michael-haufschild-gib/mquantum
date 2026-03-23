@@ -56,9 +56,20 @@ import {
   hydrogenNDGen11dBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
 import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
+import {
+  getHydrogenNDCoupledBlocks,
+  hypersphericalCoordsBlock,
+  hypersphericalNormBlock,
+  LN_GAMMA_HALF_INT_LUT_WGSL,
+} from './quantum/hypersphericalHarmonics.wgsl'
 import { laguerreBlock } from './quantum/laguerre.wgsl'
 import { legendreBlock } from './quantum/legendre.wgsl'
-import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from './quantum/psi.wgsl'
+import {
+  psiBlockDynamicHarmonic,
+  psiBlockHarmonic,
+  psiBlockHydrogenND,
+  psiBlockHydrogenNDCoupled,
+} from './quantum/psi.wgsl'
 import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.wgsl'
 import { wignerHOBlock } from './quantum/wignerHO.wgsl'
 import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
@@ -125,6 +136,22 @@ export function buildBindGroupBlock(opts: {
 }
 
 /** Build quantum math shader blocks (HO basis, hydrogen, Wigner, superposition). */
+/** Build shader blocks for the coupled hydrogen ND mode (hyperspherical harmonics). */
+function buildCoupledHydrogenBlocks(dim: number, isCoupled: boolean): ShaderBlockEntry[] {
+  if (!isCoupled) return []
+  const cb = getHydrogenNDCoupledBlocks(dim)
+  return [
+    { name: 'Gamma Half-Int LUT', content: LN_GAMMA_HALF_INT_LUT_WGSL },
+    { name: 'Hyperspherical Coords', content: hypersphericalCoordsBlock },
+    { name: `Hyperspherical Conversion ${dim}D`, content: cb.conversion },
+    { name: 'Hyperspherical Norm', content: hypersphericalNormBlock },
+    { name: `Hyperspherical Harmonic ${dim}D`, content: cb.harmonic },
+    { name: `Hydrogen ND Coupled ${dim}D`, content: cb.coupled },
+    { name: 'Hydrogen ND Coupled Dispatch', content: cb.dispatch },
+  ]
+}
+
+/** Build the quantum math shader blocks based on mode and dimension. */
 export function buildQuantumMathBlocks(opts: {
   actualDim: number
   includeHarmonic: boolean
@@ -132,6 +159,7 @@ export function buildQuantumMathBlocks(opts: {
   includeHydrogenND: boolean
   hydrogenNDDimension: number
   isHydrogenFamily: boolean
+  isHydrogenCoupled: boolean
   useCache: boolean
   useUnrolledHO: boolean
   termCount: number | undefined
@@ -164,11 +192,19 @@ export function buildQuantumMathBlocks(opts: {
   }
   const hydrogenNDBlock = hydrogenNDBlockMap[opts.hydrogenNDDimension] || ''
 
-  const selectedPsiBlock = opts.isHydrogenFamily
-    ? psiBlockHydrogenND
-    : opts.useUnrolledHO
-      ? psiBlockDynamicHarmonic
-      : psiBlockHarmonic
+  const selectedPsiBlock = opts.isHydrogenCoupled
+    ? psiBlockHydrogenNDCoupled
+    : opts.isHydrogenFamily
+      ? psiBlockHydrogenND
+      : opts.useUnrolledHO
+        ? psiBlockDynamicHarmonic
+        : psiBlockHarmonic
+
+  // Coupled hydrogen ND blocks (hyperspherical harmonics) — extracted for complexity
+  const coupledEntries = buildCoupledHydrogenBlocks(
+    opts.hydrogenNDDimension,
+    opts.isHydrogenCoupled
+  )
 
   const blocks: ShaderBlockEntry[] = [
     { name: 'Complex Math', content: complexMathBlock },
@@ -228,12 +264,16 @@ export function buildQuantumMathBlocks(opts: {
     {
       name: `Hydrogen ND ${opts.hydrogenNDDimension}D`,
       content: hydrogenNDBlock,
-      condition: opts.includeHydrogenND && hydrogenNDBlock.length > 0,
+      condition: opts.includeHydrogenND && !opts.isHydrogenCoupled && hydrogenNDBlock.length > 0,
     },
     {
       name: `Hydrogen ND ${opts.hydrogenNDDimension}D Cached`,
       content: opts.useCache ? generateHydrogenNDCachedBlock(opts.hydrogenNDDimension) : '',
-      condition: opts.includeHydrogenND && opts.useCache && opts.hydrogenNDDimension > 3,
+      condition:
+        opts.includeHydrogenND &&
+        !opts.isHydrogenCoupled &&
+        opts.useCache &&
+        opts.hydrogenNDDimension > 3,
     },
     {
       name: 'Hydrogen ND Dispatch',
@@ -241,8 +281,10 @@ export function buildQuantumMathBlocks(opts: {
         opts.useCache && opts.hydrogenNDDimension > 3
           ? generateHydrogenNDCachedDispatchBlock(opts.hydrogenNDDimension)
           : generateHydrogenNDDispatchBlock(opts.hydrogenNDDimension),
-      condition: opts.includeHydrogenND,
+      condition: opts.includeHydrogenND && !opts.isHydrogenCoupled,
     },
+    // --- Coupled Hydrogen ND blocks (hyperspherical harmonics) ---
+    ...coupledEntries,
   ]
 
   // HO Superposition - unrolled variants when termCount is known

@@ -11,6 +11,7 @@ import React from 'react'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -19,6 +20,7 @@ import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
+import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { QuantumWalkControls } from './QuantumWalkControls'
 import { TDSEControls } from './TDSEControls'
 import { useSchroedingerActions } from './useSchroedingerActions'
@@ -30,6 +32,63 @@ import { WignerControls } from './WignerControls'
 export interface SchroedingerControlsProps {
   /** Optional CSS class name for additional styling. */
   className?: string
+}
+
+/** Extracted to reduce main component complexity. */
+function renderModeControls(p: {
+  config: SchroedingerConfig
+  dimension: number
+  isQuantumWalk: boolean
+  isDiracEquation: boolean
+  isBecDynamics: boolean
+  isTdseDynamics: boolean
+  isFreeScalarField: boolean
+  isHydrogenCoupled: boolean
+  isHydrogenNDMode: boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  diracActions: any
+  becActions: any
+  tdseActions: any
+  freeScalarActions: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  hydrogenNDCoupledActions: any
+  hydrogenNDActions: any
+  harmonicActions: any
+}): React.ReactNode {
+  if (p.isQuantumWalk) return <QuantumWalkControls />
+  if (p.isDiracEquation)
+    return <DiracControls config={p.config} dimension={p.dimension} actions={p.diracActions} />
+  if (p.isBecDynamics)
+    return <BECControls config={p.config} dimension={p.dimension} actions={p.becActions} />
+  if (p.isTdseDynamics)
+    return <TDSEControls config={p.config} dimension={p.dimension} actions={p.tdseActions} />
+  if (p.isFreeScalarField)
+    return (
+      <FreeScalarFieldControls
+        config={p.config}
+        dimension={p.dimension}
+        actions={p.freeScalarActions}
+      />
+    )
+  if (p.isHydrogenCoupled)
+    return (
+      <HydrogenNDCoupledControls
+        config={p.config}
+        dimension={p.dimension}
+        actions={p.hydrogenNDCoupledActions}
+      />
+    )
+  if (p.isHydrogenNDMode)
+    return (
+      <HydrogenNDControls config={p.config} dimension={p.dimension} actions={p.hydrogenNDActions} />
+    )
+  return (
+    <HarmonicOscillatorControls
+      config={p.config}
+      dimension={p.dimension}
+      actions={p.harmonicActions}
+    />
+  )
 }
 
 /**
@@ -49,6 +108,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setMomentumHbar,
       harmonicActions,
       hydrogenNDActions,
+      hydrogenNDCoupledActions,
       wignerActions,
       freeScalarActions,
       tdseActions,
@@ -59,7 +119,9 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const dimension = useGeometryStore((state) => state.dimension)
     const isoEnabled = useExtendedObjectStore((state) => state.schroedinger?.isoEnabled ?? false)
 
-    const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
+    const isHydrogenNDMode =
+      config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
+    const isHydrogenCoupled = config.quantumMode === 'hydrogenNDCoupled'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdseDynamics = config.quantumMode === 'tdseDynamics'
     const isBecDynamics = config.quantumMode === 'becDynamics'
@@ -154,29 +216,24 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           }
           defaultOpen={true}
         >
-          {isQuantumWalk ? (
-            <QuantumWalkControls />
-          ) : isDiracEquation ? (
-            <DiracControls config={config} dimension={dimension} actions={diracActions} />
-          ) : isBecDynamics ? (
-            <BECControls config={config} dimension={dimension} actions={becActions} />
-          ) : isTdseDynamics ? (
-            <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
-          ) : isFreeScalarField ? (
-            <FreeScalarFieldControls
-              config={config}
-              dimension={dimension}
-              actions={freeScalarActions}
-            />
-          ) : isHydrogenNDMode ? (
-            <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
-          ) : (
-            <HarmonicOscillatorControls
-              config={config}
-              dimension={dimension}
-              actions={harmonicActions}
-            />
-          )}
+          {renderModeControls({
+            config,
+            dimension,
+            isQuantumWalk,
+            isDiracEquation,
+            isBecDynamics,
+            isTdseDynamics,
+            isFreeScalarField,
+            isHydrogenCoupled,
+            isHydrogenNDMode,
+            diracActions,
+            becActions,
+            tdseActions,
+            freeScalarActions,
+            hydrogenNDCoupledActions,
+            hydrogenNDActions,
+            harmonicActions,
+          })}
         </Section>
 
         {/* Render Mode Info */}
