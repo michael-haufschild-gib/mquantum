@@ -66,7 +66,7 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
     logger.log('[MeasurementPointCloud] Setup')
 
     const vertModule = device.createShaderModule({
@@ -99,7 +99,7 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
         entryPoint: 'main',
         targets: [
           {
-            format,
+            format: 'rgba16float' as GPUTextureFormat,
             blend: {
               color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
               alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
@@ -109,11 +109,6 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
         ],
       },
       primitive: { topology: 'triangle-list' },
-      depthStencil: {
-        format: 'depth32float',
-        depthWriteEnabled: false,
-        depthCompare: 'less',
-      },
     })
 
     this.uniformBuffer = device.createBuffer({
@@ -183,13 +178,6 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
           storeOp: 'store' as const,
         },
       ],
-      depthStencilAttachment: outputResource.depthView
-        ? {
-            view: outputResource.depthView,
-            depthLoadOp: 'load' as const,
-            depthStoreOp: 'store' as const,
-          }
-        : undefined,
     })
 
     pass.setPipeline(this.renderPipeline)
