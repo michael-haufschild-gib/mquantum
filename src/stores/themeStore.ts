@@ -80,7 +80,7 @@ export const useThemeStore = create<ThemeState>()(
       },
     }),
     {
-      name: 'mdimension-theme-storage',
+      name: 'mquantum-theme-storage',
     }
   )
 )

@@ -14,7 +14,7 @@ vi.mock('@/components/ui/Popover', () => ({
 }))
 
 describe('ColorPicker', () => {
-  const HISTORY_KEY = 'mdimension_color_history'
+  const HISTORY_KEY = 'mquantum_color_history'
 
   beforeEach(() => {
     localStorage.removeItem(HISTORY_KEY)

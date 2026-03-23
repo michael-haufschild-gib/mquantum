@@ -1,5 +1,5 @@
 const MAX_HISTORY = 8
-const HISTORY_KEY = 'mdimension_color_history'
+const HISTORY_KEY = 'mquantum_color_history'
 
 /**
  * Normalize persisted color history into a bounded string list.

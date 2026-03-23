@@ -61,7 +61,7 @@ describe('ExportModal', () => {
         rotation: 0,
         textOverlay: {
           enabled: false,
-          text: 'mdimension',
+          text: 'mquantum',
           fontFamily: 'Inter, sans-serif',
           fontSize: 48,
           fontWeight: 700,

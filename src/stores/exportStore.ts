@@ -612,7 +612,7 @@ export const useExportStore = create<ExportStore>()(
         }),
     }),
     {
-      name: 'mdimension-export-settings',
+      name: 'mquantum-export-settings',
       partialize: (state) => ({ settings: state.settings }), // Only persist settings
       merge: (persistedState, currentState) => {
         const persisted = persistedState as { settings?: Partial<ExportSettings> }

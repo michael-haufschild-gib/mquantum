@@ -84,7 +84,7 @@ export const ScreenshotModal = () => {
       const blob = await generateOutput()
       if (!blob) throw new Error('Failed to process image')
 
-      const filename = `mdimension-${Date.now()}.png`
+      const filename = `mquantum-${Date.now()}.png`
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

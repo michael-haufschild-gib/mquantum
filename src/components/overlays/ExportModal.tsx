@@ -173,7 +173,7 @@ export const ExportModal = () => {
       const link = document.createElement('a')
       link.href = previewUrl
       const ext = settings.format === 'webm' ? 'webm' : 'mp4'
-      link.download = `mdimension-${Date.now()}.${ext}`
+      link.download = `mquantum-${Date.now()}.${ext}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

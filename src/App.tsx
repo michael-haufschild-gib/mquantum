@@ -81,7 +81,7 @@ function AppContent() {
         {!isComplete ? (
           // Detection in progress
           <div className="flex h-full w-full flex-col items-center justify-center gap-4 bg-black/95">
-            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MDimension</h1>
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MQuantum</h1>
             <div className="flex items-center gap-3 text-sm text-text-tertiary">
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle
@@ -123,7 +123,7 @@ function AppContent() {
         ) : (
           // WebGPU not supported
           <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-black/95 text-text-secondary px-6">
-            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MDimension</h1>
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MQuantum</h1>
             <div className="max-w-md text-center space-y-4">
               <p className="text-sm text-text-tertiary">
                 This application requires{' '}

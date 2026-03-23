@@ -273,12 +273,12 @@ describe('exportStore (invariants)', () => {
 
   describe('invariant: rehydration sanitizes corrupted persisted state', () => {
     it('sanitizes invalid persisted export settings on rehydrate', async () => {
-      localStorage.removeItem('mdimension-export-settings')
+      localStorage.removeItem('mquantum-export-settings')
       await useExportStore.persist.rehydrate()
       const defaults = useExportStore.getState().settings
 
       localStorage.setItem(
-        'mdimension-export-settings',
+        'mquantum-export-settings',
         JSON.stringify({
           state: {
             settings: {

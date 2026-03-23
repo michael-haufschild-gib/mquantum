@@ -232,7 +232,7 @@ export const useLayoutStore = create<LayoutStore>()(
       },
     }),
     {
-      name: 'mdimension-layout',
+      name: 'mquantum-layout',
       // Only persist these fields
       partialize: (state) => ({
         sidebarWidth: state.sidebarWidth,

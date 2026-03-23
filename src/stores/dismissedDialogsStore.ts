@@ -54,7 +54,7 @@ export const useDismissedDialogsStore = create<DismissedDialogsState>()(
       getDismissedCount: () => get().dismissedIds.size,
     }),
     {
-      name: 'mdimension-dismissed-dialogs',
+      name: 'mquantum-dismissed-dialogs',
       partialize: (state) => ({
         // Convert Set to Array for JSON serialization
         dismissedIds: [...state.dismissedIds],

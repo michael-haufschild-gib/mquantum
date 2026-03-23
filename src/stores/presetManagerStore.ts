@@ -684,7 +684,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       },
     }),
     {
-      name: 'mdimension-preset-manager',
+      name: 'mquantum-preset-manager',
     }
   )
 )

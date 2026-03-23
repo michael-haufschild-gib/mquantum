@@ -307,7 +307,7 @@ export function useExportRuntime({
           const mimeType = settings.format === 'webm' ? 'video/webm' : 'video/mp4'
 
           streamHandle = await window.showSaveFilePicker({
-            suggestedName: `mdimension-${Date.now()}${extension}`,
+            suggestedName: `mquantum-${Date.now()}${extension}`,
             types: [
               {
                 description,

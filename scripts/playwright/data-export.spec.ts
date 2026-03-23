@@ -107,7 +107,7 @@ test.describe('Data Export', () => {
     const parsed = JSON.parse(content) as Record<string, unknown>
     const meta = parsed._meta as Record<string, string>
     expect(meta.quantumMode).toBe('tdseDynamics')
-    expect(meta.application).toBe('mdimension')
+    expect(meta.application).toBe('mquantum')
   })
 
   test('Dirac mode shows diagnostics export buttons', async ({ page }) => {

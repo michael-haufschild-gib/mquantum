@@ -443,7 +443,7 @@ test.describe('B2: Data Export — content integrity', () => {
     const meta = parsed._meta as Record<string, string>
 
     expect(meta.quantumMode).toBe('diracEquation')
-    expect(meta.application).toBe('mdimension')
+    expect(meta.application).toBe('mquantum')
   })
 })
 

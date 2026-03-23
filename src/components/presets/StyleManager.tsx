@@ -104,7 +104,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
     try {
       const a = document.createElement('a')
       a.href = url
-      a.download = `mdimension-styles-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `mquantum-styles-${new Date().toISOString().slice(0, 10)}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

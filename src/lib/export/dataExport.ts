@@ -262,7 +262,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
       version: 1,
       quantumMode,
       exportedAt: new Date().toISOString(),
-      application: 'mdimension',
+      application: 'mquantum',
     },
   }
 

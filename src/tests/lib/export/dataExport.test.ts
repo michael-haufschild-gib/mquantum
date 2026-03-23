@@ -446,7 +446,7 @@ describe('exportDiagnosticsJSON', () => {
     const meta = parsed._meta as Record<string, unknown>
     expect(meta.version).toBe(1)
     expect(meta.quantumMode).toBe('tdseDynamics')
-    expect(meta.application).toBe('mdimension')
+    expect(meta.application).toBe('mquantum')
     expect(meta.exportedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
 
