@@ -97,7 +97,6 @@ export function generateQuantumPreset(
     // Quantum numbers: distribution biased toward low values
     // This creates smoother, more organic shapes
     const n: number[] = []
-    let _totalN = 0
 
     for (let j = 0; j < dim; j++) {
       const r = rng()
@@ -108,23 +107,24 @@ export function generateQuantumPreset(
       // slice coordinate is 0, Hermite polynomials H_n(0) = 0 for odd n,
       // which would zero out the entire wavefunction term.
       const mustBeEven = j >= 3
+      // Maximum even quantum number that fits within nMax
+      const evenMax = nMax & ~1 // e.g. nMax=3 → 2, nMax=4 → 4, nMax=1 → 0
 
       // Biased distribution: lower numbers more likely
       if (r < 0.4) {
         quantumN = 0
       } else if (r < 0.65) {
-        quantumN = mustBeEven ? 2 : 1
+        quantumN = mustBeEven ? Math.min(2, evenMax) : Math.min(1, nMax)
       } else if (r < 0.82) {
-        quantumN = 2
+        quantumN = Math.min(2, mustBeEven ? evenMax : nMax)
       } else if (r < 0.92) {
-        quantumN = mustBeEven ? Math.min(4, nMax) : Math.min(3, nMax)
+        quantumN = mustBeEven ? Math.min(4, evenMax) : Math.min(3, nMax)
       } else {
         const raw = Math.floor(rng() * (nMax + 1))
-        quantumN = mustBeEven ? Math.min(raw & ~1, nMax) : Math.min(raw, nMax) // mask off lowest bit if must be even
+        quantumN = mustBeEven ? Math.min(raw & ~1, evenMax) : Math.min(raw, nMax)
       }
 
       n.push(quantumN)
-      _totalN += quantumN
     }
 
     quantumNumbers.push(n)

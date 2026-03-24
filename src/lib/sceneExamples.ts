@@ -102,16 +102,16 @@ export function applySceneExample(id: string): boolean {
     }))
   }
 
-  // Load the scene
+  // Load the scene (synchronous — reads from savedScenes then applies state)
   presetManager.loadScene(scene.id)
 
-  // Remove it from savedScenes if we added it temporarily
+  // Remove it from savedScenes immediately after load completes.
+  // loadScene is synchronous, so the scene data has already been read
+  // and applied by the time we reach this line.
   if (!existingScene) {
-    setTimeout(() => {
-      usePresetManagerStore.setState((state) => ({
-        savedScenes: state.savedScenes.filter((s) => s.id !== scene.id),
-      }))
-    }, 100)
+    usePresetManagerStore.setState((state) => ({
+      savedScenes: state.savedScenes.filter((s) => s.id !== scene.id),
+    }))
   }
 
   soundManager.playClick()

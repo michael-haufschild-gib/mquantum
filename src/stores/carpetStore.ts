@@ -49,6 +49,8 @@ export interface CarpetState {
   readbackTotalFrames: number
   /** Grid size of the density texture (spatial resolution). Set by compute pass. */
   gridSize: number
+  /** Set after clear() — render loop skips one advance so totalFrames=0 is visible. */
+  needsReset: boolean
 
   // ── Actions ──
   setEnabled: (v: boolean) => void
@@ -88,6 +90,7 @@ export const useCarpetStore = create<CarpetState>((set, get) => ({
   readbackWriteHead: 0,
   readbackTotalFrames: 0,
   gridSize: 96,
+  needsReset: false,
 
   setEnabled: (v) => set({ enabled: v }),
 
@@ -136,6 +139,7 @@ export const useCarpetStore = create<CarpetState>((set, get) => ({
       carpetData: null,
       readbackWriteHead: 0,
       readbackTotalFrames: 0,
+      needsReset: true,
     }),
 
   advanceHead: (dt) => {

@@ -53,6 +53,7 @@ import type { SavedScene, SavedStyle } from './utils/presetTypes'
  * Used to cancel stale callbacks when rapid scene loads occur.
  */
 let pendingSceneLoadRafId: number | null = null
+let pendingStyleLoadRafId: number | null = null
 
 /**
  * Schedules scene load completion after React settles.
@@ -97,11 +98,23 @@ function restoreAnimationState(animationData: Record<string, unknown>): void {
   useAnimationStore.getState().setDimension(useGeometryStore.getState().dimension)
 }
 
-function scheduleSceneLoadComplete(): void {
-  // Cancel any pending callback to prevent premature completion
+/**
+ * Cancels any pending scene load rAF callback.
+ * Exported for test teardown to prevent stale callbacks firing between tests.
+ */
+export function cancelPendingSceneLoad(): void {
   if (pendingSceneLoadRafId !== null) {
     cancelAnimationFrame(pendingSceneLoadRafId)
+    pendingSceneLoadRafId = null
   }
+  if (pendingStyleLoadRafId !== null) {
+    cancelAnimationFrame(pendingStyleLoadRafId)
+    pendingStyleLoadRafId = null
+  }
+}
+
+function scheduleSceneLoadComplete(): void {
+  cancelPendingSceneLoad()
 
   pendingSceneLoadRafId = requestAnimationFrame(() => {
     pendingSceneLoadRafId = null
@@ -242,7 +255,11 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // This ensures material properties (transparent, depthWrite) match loaded state
         usePerformanceStore.getState().incrementPresetLoadVersion()
 
-        requestAnimationFrame(() => {
+        if (pendingStyleLoadRafId !== null) {
+          cancelAnimationFrame(pendingStyleLoadRafId)
+        }
+        pendingStyleLoadRafId = requestAnimationFrame(() => {
+          pendingStyleLoadRafId = null
           usePerformanceStore.getState().setSceneTransitioning(false)
         })
       },

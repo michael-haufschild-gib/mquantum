@@ -64,22 +64,47 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
     const defaultIsObject =
       defaultVal !== null && typeof defaultVal === 'object' && !Array.isArray(defaultVal)
 
-    if (loadedVal === null && defaultIsObject) {
-      // Null loaded where default is an object: keep the default to prevent
-      // downstream property-access crashes (e.g., cosineParams: null → cosineParams.a fails)
+    const defaultIsArray = Array.isArray(defaultVal)
+
+    if (loadedVal === null && (defaultIsObject || defaultIsArray)) {
+      // Null loaded where default is an object or array: keep the default to prevent
+      // downstream property-access crashes (e.g., cosineParams: null → cosineParams.a fails,
+      // or cosineParams.a: null → cosineParams.a.length fails)
       continue
     }
 
     if (Array.isArray(loadedVal)) {
-      // Arrays are replaced, not merged
-      // (e.g., parameterValues, center, juliaConstant are position-specific)
+      if (defaultIsObject) {
+        // Loaded array where default is a plain object: type mismatch.
+        // Keep the default to preserve expected property structure
+        // (e.g., cosineParams: [] would lose a/b/c/d properties).
+        continue
+      }
+      // Arrays are replaced, not merged — but validate length for fixed-size arrays.
+      // When the default array is non-empty (fixed-size, e.g., cosineParams.a = [0.5, 0.5, 0.5]),
+      // the loaded array must match that length; otherwise downstream code that indexes into it
+      // will read undefined values. Variable-length arrays (default = []) accept any length.
+      const defaultArr = defaultVal as unknown[]
+      if (
+        defaultIsArray &&
+        defaultArr.length > 0 &&
+        (loadedVal as unknown[]).length !== defaultArr.length
+      ) {
+        continue
+      }
       ;(result as Record<string, unknown>)[key] = loadedVal
+    } else if (defaultIsArray) {
+      // Default is an array but loaded is not an array (it's a non-array object or primitive).
+      // Type mismatch: keep the default to preserve array structure
+      // (e.g., cosineParams.a: {} would lose the [0.5, 0.5, 0.5] array).
+      continue
     } else if (loadedVal !== null && typeof loadedVal === 'object' && defaultIsObject) {
       // Recursively merge nested objects (e.g., cosineParams, customPalette)
       ;(result as Record<string, unknown>)[key] = deepMerge(defaultVal as object, loadedVal)
     } else if (!defaultIsObject || typeof loadedVal === typeof defaultVal) {
       // Primitives: loaded value overrides default, but only if types match
-      // (prevents a number replacing an expected object, e.g., cosineParams: 42)
+      // (prevents a number replacing an expected object or array,
+      // e.g., cosineParams: 42, parameterValues: "garbage")
       ;(result as Record<string, unknown>)[key] = loadedVal
     }
   }
@@ -152,6 +177,11 @@ export function mergeExtendedObjectStateForType(
   if (!defaultConfig) {
     logger.warn(`No default config found for key: ${configKey}`)
     return {}
+  }
+
+  // Guard: loaded may be null/undefined/non-object from corrupted or stale presets
+  if (loaded == null || typeof loaded !== 'object') {
+    return { [configKey]: { ...defaultConfig } }
   }
 
   const loadedConfig = loaded[configKey]

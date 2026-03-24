@@ -52,6 +52,9 @@ export function computeHOBoundingRadius(
   quantumNumbers: number[][],
   omegas: number[]
 ): number {
+  if (quantumNumbers.length === 0) {
+    return MIN_BOUND_R
+  }
   let maxR = MIN_BOUND_R
   for (let j = 0; j < dimension; j++) {
     const maxN = Math.max(...quantumNumbers.map((term) => term[j] ?? 0))
@@ -123,6 +126,9 @@ export function computeHOMomentumBoundingRadius(
   omegas: number[],
   momentumScale: number = 1.0
 ): number {
+  if (quantumNumbers.length === 0) {
+    return MIN_BOUND_R
+  }
   const kScale = Math.max(momentumScale, 0.01)
   let maxR = MIN_BOUND_R
   for (let j = 0; j < dimension; j++) {

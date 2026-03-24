@@ -98,16 +98,16 @@ export function applyStyleExample(id: string): boolean {
     }))
   }
 
-  // Load the style
+  // Load the style (synchronous — reads from savedStyles then applies state)
   presetManager.loadStyle(style.id)
 
-  // Remove it from savedStyles if we added it temporarily
+  // Remove it from savedStyles immediately after load completes.
+  // loadStyle is synchronous, so the style data has already been read
+  // and applied by the time we reach this line.
   if (!existingStyle) {
-    setTimeout(() => {
-      usePresetManagerStore.setState((state) => ({
-        savedStyles: state.savedStyles.filter((s) => s.id !== style.id),
-      }))
-    }, 100)
+    usePresetManagerStore.setState((state) => ({
+      savedStyles: state.savedStyles.filter((s) => s.id !== style.id),
+    }))
   }
 
   soundManager.playClick()

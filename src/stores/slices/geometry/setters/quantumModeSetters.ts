@@ -66,7 +66,8 @@ export function createQuantumModeSetters(
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
-      const needsDim3 = COMPUTE_MODES_3D.has(mode) || mode === 'hydrogenNDCoupled'
+      const needsDim3 =
+        COMPUTE_MODES_3D.has(mode) || mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
       if (needsDim3 && useGeometryStore.getState().dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
@@ -140,7 +141,8 @@ export function createQuantumModeSetters(
       const currentL = get().schroedinger.azimuthalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
       const newL = Math.min(currentL, clamped - 1)
-      const newM = Math.max(-newL, Math.min(newL, currentM))
+      // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
+      const newM = Math.max(-newL, Math.min(newL, currentM)) || 0
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -160,7 +162,8 @@ export function createQuantumModeSetters(
       const currentN = get().schroedinger.principalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
       const clamped = Math.max(0, Math.min(currentN - 1, Math.floor(l)))
-      const newM = Math.max(-clamped, Math.min(clamped, currentM))
+      // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
+      const newM = Math.max(-clamped, Math.min(clamped, currentM)) || 0
       // Auto-clamp angular chain: each element must be <= l₁, cascade downward
       const chain = [...get().schroedinger.angularChain]
       let prevMax = clamped
@@ -185,7 +188,8 @@ export function createQuantumModeSetters(
         return
       }
       const currentL = get().schroedinger.azimuthalQuantumNumber
-      const clamped = Math.max(-currentL, Math.min(currentL, Math.floor(m)))
+      // `|| 0` normalizes JS -0 to 0 (Math.max(-0, ...) can produce -0 when bounds are 0)
+      const clamped = Math.max(-currentL, Math.min(currentL, Math.floor(m))) || 0
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

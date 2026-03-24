@@ -27,7 +27,7 @@ export interface AnimationState {
   /** Whether animation is currently playing */
   isPlaying: boolean
 
-  /** Speed multiplier (0.1 to 5.0) */
+  /** Speed multiplier (0.1 to 3.0) */
   speed: number
 
   /** Rotation direction: 1 = clockwise, -1 = counter-clockwise */

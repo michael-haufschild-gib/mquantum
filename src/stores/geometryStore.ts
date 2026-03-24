@@ -42,14 +42,22 @@ function propagateDimensionToStores(dimension: number): void {
 let pendingTransitionRafId: number | null = null
 
 /**
+ * Cancels any pending transition rAF callback.
+ * Called by reset() to prevent stale callbacks firing between tests.
+ */
+function cancelPendingTransition(): void {
+  if (pendingTransitionRafId !== null) {
+    cancelAnimationFrame(pendingTransitionRafId)
+    pendingTransitionRafId = null
+  }
+}
+
+/**
  * Schedules scene transition completion after React settles.
  * Cancels any pending callback to prevent race conditions.
  */
 function scheduleTransitionComplete(): void {
-  // Cancel any pending callback to prevent premature completion
-  if (pendingTransitionRafId !== null) {
-    cancelAnimationFrame(pendingTransitionRafId)
-  }
+  cancelPendingTransition()
 
   pendingTransitionRafId = requestAnimationFrame(() => {
     pendingTransitionRafId = null
@@ -299,6 +307,9 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
   },
 
   reset: () => {
+    // Cancel any pending transition rAF to prevent stale callbacks
+    // firing after reset (e.g. between tests).
+    cancelPendingTransition()
     set({
       dimension: DEFAULT_DIMENSION,
       objectType: DEFAULT_OBJECT_TYPE,

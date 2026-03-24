@@ -417,21 +417,26 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     const carpetState = useCarpetStore.getState()
     if (carpetState.enabled && !carpetState.paused) {
-      const densityView = this.strategy.getDensityTextureView?.()
-      if (densityView && this.device) {
-        if (!this.carpetSlicePass) {
-          this.carpetSlicePass = new CarpetSliceComputePass()
-          this.carpetSlicePass.initialize(this.device)
-        }
-        this.carpetSlicePass.dispatch(
-          ctx.encoder,
-          densityView,
-          carpetState,
-          (data, gridSize, wh, tf) => {
-            useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
+      // After clear(), skip one frame of accumulation so totalFrames=0 is visible
+      if (carpetState.needsReset) {
+        useCarpetStore.setState({ needsReset: false })
+      } else {
+        const densityView = this.strategy.getDensityTextureView?.()
+        if (densityView && this.device) {
+          if (!this.carpetSlicePass) {
+            this.carpetSlicePass = new CarpetSliceComputePass()
+            this.carpetSlicePass.initialize(this.device)
           }
-        )
-        carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
+          this.carpetSlicePass.dispatch(
+            ctx.encoder,
+            densityView,
+            carpetState,
+            (data, gridSize, wh, tf) => {
+              useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
+            }
+          )
+          carpetState.advanceHead(ctx.frame?.delta ?? 0.016)
+        }
       }
     }
 
