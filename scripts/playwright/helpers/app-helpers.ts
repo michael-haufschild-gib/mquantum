@@ -8,6 +8,8 @@
 import { expect, type Page } from '@playwright/test'
 import sharp from 'sharp'
 
+import { BENIGN_GPU_PATTERNS } from './gpu-patterns'
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const RENDERER_READY_TIMEOUT = 15_000
@@ -65,14 +67,18 @@ export async function getFrameCount(page: Page): Promise<number> {
  * Wait for frame count to increase beyond a known value.
  * Replaces `waitForTimeout(1000)` in animation tests.
  */
-export async function waitForFrameAdvance(page: Page, beyondCount: number): Promise<number> {
+export async function waitForFrameAdvance(
+  page: Page,
+  beyondCount: number,
+  timeoutMs = 10_000
+): Promise<number> {
   await page.waitForFunction(
     (minCount: number) => {
       const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
       return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > minCount
     },
     beyondCount,
-    { timeout: 10_000 }
+    { timeout: timeoutMs }
   )
   return getFrameCount(page)
 }
@@ -237,6 +243,8 @@ export function collectGpuWarningsAndErrors(page: Page): string[] {
     const type = msg.type()
     if (type !== 'error' && type !== 'warning') return
     const text = msg.text()
+    // Skip known-benign teardown races (shared pattern list — see gpu-patterns.ts)
+    if (BENIGN_GPU_PATTERNS.some((p) => p.test(text))) return
     // WGSL shader errors (unresolved values, syntax errors, etc.)
     if (/\[WGSL ERROR\]|unresolved value|shader.*error/i.test(text)) {
       issues.push(`[${type}] ${text}`)
@@ -553,9 +561,10 @@ export async function expectCanvasNotBlank(page: Page): Promise<void> {
   // Gate 4: wait for sufficient frames to render after shader swap.
   // Compute modes need many frames for density grids to populate and
   // for walks/simulations to spread from initial conditions. At 60fps,
-  // 120 frames = ~2 seconds of simulation time.
+  // 120 frames = ~2 seconds. Heavy shader variants (open quantum,
+  // decoherence) may run at 10-15fps, so allow 30s for 120 frames.
   const currentFrame = await getFrameCount(page)
-  await waitForFrameAdvance(page, currentFrame + 120)
+  await waitForFrameAdvance(page, currentFrame + 120, 30_000)
 
   // Gate 5: check for GPU errors
   const consoleErrors = await page.evaluate(() => {

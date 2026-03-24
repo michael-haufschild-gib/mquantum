@@ -20,6 +20,8 @@ import {
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
+import { LeftPanel } from './pages/LeftPanel'
+import { TopBar } from './pages/TopBar'
 
 test.setTimeout(120_000)
 
@@ -56,13 +58,18 @@ test.describe('imaginary-time propagation', () => {
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForRendererReady(page)
 
-    // Enable imaginary-time via store
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setTdseImaginaryTimeEnabled(true)
-    })
+    // Ensure the left panel is open so TDSE controls are visible
+    const topBar = new TopBar(page)
+    await topBar.openLeftPanel()
+    const leftPanel = new LeftPanel(page)
+    await leftPanel.waitForVisible()
 
-    // Check that the "Store Eigenstate" button is visible (polls until React re-renders)
+    // Click the imaginary-time toggle via UI (scroll to it if needed)
+    const toggle = page.getByTestId('tdse-imaginary-time')
+    await toggle.scrollIntoViewIfNeeded()
+    await toggle.click({ force: true })
+
+    // The "Store Eigenstate" button should appear below the toggle
     const storeBtn = page.getByTestId('store-eigenstate')
     await expect(storeBtn).toBeVisible({ timeout: 5_000 })
   })

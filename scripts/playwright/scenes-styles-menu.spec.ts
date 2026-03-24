@@ -104,11 +104,15 @@ test.describe('Styles menu', () => {
   })
 
   test('clicking an example style applies it without crash', async ({ appPage: page }) => {
-    // Capture initial visual state for comparison
+    // Capture initial visual state for comparison using real store fields
     const initialStyle = await page.evaluate(async () => {
       const mod = await import('/src/stores/appearanceStore.ts')
       const s = mod.useAppearanceStore.getState()
-      return JSON.stringify({ opacity: s.opacity, wireframe: s.wireframe })
+      return JSON.stringify({
+        colorAlgorithm: s.colorAlgorithm,
+        edgeColor: s.edgeColor,
+        faceColor: s.faceColor,
+      })
     })
 
     const topBar = new TopBar(page)
@@ -127,12 +131,18 @@ test.describe('Styles menu', () => {
     await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 5000 })
 
     // Verify at least one visual store changed (style presets mutate appearance/theme/PBR stores)
-    const newStyle = await page.evaluate(async () => {
-      const mod = await import('/src/stores/appearanceStore.ts')
-      const s = mod.useAppearanceStore.getState()
-      return JSON.stringify({ opacity: s.opacity, wireframe: s.wireframe })
-    })
-    expect(newStyle, 'Style preset must change visual state').not.toBe(initialStyle)
+    await expect(async () => {
+      const newStyle = await page.evaluate(async () => {
+        const mod = await import('/src/stores/appearanceStore.ts')
+        const s = mod.useAppearanceStore.getState()
+        return JSON.stringify({
+          colorAlgorithm: s.colorAlgorithm,
+          edgeColor: s.edgeColor,
+          faceColor: s.faceColor,
+        })
+      })
+      expect(newStyle, 'Style preset must change visual state').not.toBe(initialStyle)
+    }).toPass({ timeout: 3000 })
   })
 
   test('Save Current Scene opens save dialog', async ({ appPage: page }) => {

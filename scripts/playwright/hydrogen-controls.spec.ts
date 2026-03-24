@@ -195,7 +195,7 @@ test.describe('hydrogen ND extra-dimension controls', () => {
 
 test.describe('hydrogen dimension constraints', () => {
   test('hydrogen mode at dimension 2 auto-adjusts to minimum valid dimension', async ({ page }) => {
-    // Load at 2D — hydrogen requires >=3D. The app should handle this gracefully.
+    // Load at 2D — hydrogen requires >=3D. The app should auto-correct.
     await page.goto('/?t=schroedinger&d=2&qm=hydrogenND')
     await new TopBar(page).waitForVisible()
 

@@ -181,6 +181,12 @@ test.describe('Observable Expectation Values', () => {
     await topBar.openRightPanel()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
+    // Expand the Data Export group (collapsed by default)
+    const dataExportHeader = page.getByTestId('data-export-group-header')
+    await dataExportHeader.scrollIntoViewIfNeeded()
+    await dataExportHeader.click({ force: true })
+
+    // Without observables enabled, the export button should not be present
     const exportBtn = page.getByTestId('export-observables-csv')
     await expect(exportBtn).not.toBeVisible({ timeout: 3000 })
 

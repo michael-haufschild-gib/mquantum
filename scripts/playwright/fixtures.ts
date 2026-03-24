@@ -31,6 +31,7 @@ import {
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
+import { BENIGN_GPU_PATTERNS } from './helpers/gpu-patterns'
 
 // ─── GPU Error Patterns ──────────────────────────────────────────────────────
 
@@ -65,6 +66,9 @@ const GPU_ERROR_PATTERNS = [
   // This is the last pattern; warnings are filtered by the patterns above.
 ]
 
+// Benign GPU messages shared with app-helpers.ts — see helpers/gpu-patterns.ts for docs.
+const BENIGN_PATTERNS = BENIGN_GPU_PATTERNS
+
 /** Console error types that should always be captured regardless of content. */
 const ALWAYS_CAPTURE_TYPES = new Set(['error'])
 
@@ -79,6 +83,10 @@ function attachGpuErrorCollection(page: Page): string[] {
   page.on('console', (msg) => {
     const type = msg.type()
     const text = msg.text()
+
+    // Skip known-benign messages (both errors and warnings) that occur
+    // during normal operation like rapid mode switching teardown.
+    if (BENIGN_PATTERNS.some((p) => p.test(text))) return
 
     // All console.error messages are captured unconditionally
     if (ALWAYS_CAPTURE_TYPES.has(type)) {

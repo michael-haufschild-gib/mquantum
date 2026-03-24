@@ -42,19 +42,25 @@ test.describe('open quantum drawer', () => {
     await expect(page.getByTestId('openq-panel-main')).toBeVisible({ timeout: 5000 })
   })
 
-  test('enabling open quantum updates store', async ({ hoPage: page }) => {
-    // Enable open quantum via store to ensure controls are available
+  test('enabling open quantum updates store', async ({ page }) => {
+    // Navigate with open quantum disabled, then enable via store
+    await page.goto('/?t=schroedinger&d=3&qm=harmonicOscillator&tc=4')
+    await waitForAppLoaded(page)
+
+    // Enable open quantum via store
     await page.evaluate(async () => {
       const mod = await import('/src/stores/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().setOpenQuantumEnabled(true)
     })
 
     // Verify store updated — the field is at schroedinger.openQuantum.enabled
-    const enabled = await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      return mod.useExtendedObjectStore.getState().schroedinger.openQuantum.enabled
-    })
-    expect(enabled).toBe(true)
+    await expect(async () => {
+      const enabled = await page.evaluate(async () => {
+        const mod = await import('/src/stores/extendedObjectStore.ts')
+        return mod.useExtendedObjectStore.getState().schroedinger.openQuantum.enabled
+      })
+      expect(enabled).toBe(true)
+    }).toPass({ timeout: 3000 })
   })
 
   test('open quantum shader compiles without errors (HO 3D)', async ({ page }) => {

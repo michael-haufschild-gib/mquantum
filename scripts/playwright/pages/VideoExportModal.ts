@@ -43,19 +43,14 @@ export class VideoExportModal {
   // ─── Quick Stats ─────────────────────────────────────────────────────
 
   async getQuickStatText(label: string): Promise<string> {
-    // The stat container includes label + value as child elements.
-    // Get the full text content from the container.
-    const stat = this.dialog.getByText(label, { exact: true }).first()
-    const parent = stat.locator('..')
-    const fullText = (await parent.textContent()) ?? ''
-    // Strip the label from the full text to get just the value
-    return fullText.replace(label, '').trim()
+    const testId = `quick-stat-${label.toLowerCase()}`
+    return (await this.page.getByTestId(testId).textContent()) ?? ''
   }
 
   async expectQuickStatsVisible(): Promise<void> {
-    await expect(this.dialog.getByText('Res', { exact: true }).first()).toBeVisible()
-    await expect(this.dialog.getByText('FPS', { exact: true }).first()).toBeVisible()
-    await expect(this.dialog.getByText('Dur', { exact: true }).first()).toBeVisible()
+    await expect(this.page.getByTestId('quick-stat-res')).toBeVisible()
+    await expect(this.page.getByTestId('quick-stat-fps')).toBeVisible()
+    await expect(this.page.getByTestId('quick-stat-dur')).toBeVisible()
   }
 
   // ─── Action Button ───────────────────────────────────────────────────

@@ -130,7 +130,8 @@ test.describe('quantum carpet: UI controls', () => {
   })
 
   test('carpet toggle not present at dimension 2', async ({ page }) => {
-    await gotoMode(page, 'tdseDynamics', 2)
+    // Use freeScalarField which supports d=2 (unlike tdseDynamics which auto-corrects to 3)
+    await gotoMode(page, 'freeScalarField', 2)
 
     const topBar = new TopBar(page)
     await topBar.openRightPanel()
@@ -138,10 +139,10 @@ test.describe('quantum carpet: UI controls', () => {
     const rightPanel = new RightPanel(page)
     await rightPanel.waitForVisible()
 
-    // Analysis section should be visible for TDSE
+    // Analysis section should be visible for FSF
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
-    // But carpet toggle should NOT be present (dimension < 3)
+    // Carpet toggle should NOT be present at dimension 2
     await expect(page.getByTestId('carpet-toggle')).not.toBeVisible()
   })
 })
