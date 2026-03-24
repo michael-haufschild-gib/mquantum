@@ -115,7 +115,6 @@ export default defineConfig((_env) => ({
       '@/hooks': path.resolve(import.meta.dirname, './src/hooks'),
       '@/stores': path.resolve(import.meta.dirname, './src/stores'),
       '@/types': path.resolve(import.meta.dirname, './src/types'),
-      '@/utils': path.resolve(import.meta.dirname, './src/utils'),
     },
   },
   server: {
