@@ -167,11 +167,12 @@ describe('computeHOBoundingRadius — edge cases', () => {
     expect(R).toBeGreaterThan(3.0)
   })
 
-  // KNOWN BUG: computeHOBoundingRadius returns NaN for empty quantumNumbers array.
-  // Math.max(...[].map(...)) = -Infinity → sqrt(2*(-Inf)+1) = NaN → Math.max(2, NaN) = NaN.
-  // In practice, quantumNumbers is always non-empty (at least one term with one element),
-  // but the function lacks a guard. Fixing would require a production code change.
-  it.todo('handles empty quantum numbers array gracefully')
+  it('handles empty quantum numbers array gracefully', () => {
+    // Empty quantumNumbers should return MIN_BOUND_R (2.0), not NaN
+    const R = computeHOBoundingRadius(3, [], [1.0, 1.0, 1.0])
+    expect(R).toBe(2.0)
+    expect(Number.isFinite(R)).toBe(true)
+  })
 
   it('handles missing omega entries by defaulting to 1.0', () => {
     // Omega array shorter than dimension

@@ -291,6 +291,161 @@ describe('Hydrogen ND Store Actions', () => {
     })
   })
 
+  describe('quantum number constraint cascading', () => {
+    it('n=1 forces l=0 and m=0 regardless of prior state', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(5)
+      store.setSchroedingerAzimuthalQuantumNumber(4)
+      store.setSchroedingerMagneticQuantumNumber(-3)
+
+      store.setSchroedingerPrincipalQuantumNumber(1)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.principalQuantumNumber).toBe(1)
+      expect(config.azimuthalQuantumNumber).toBe(0) // l < n=1, so l=0
+      // When l=0, m is clamped to 0 (setter normalizes -0 to 0 via `|| 0`)
+      expect(config.magneticQuantumNumber).toBe(0) // |m| <= l=0, so m=0
+    })
+
+    it('setting l directly respects l < n constraint', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(3)
+
+      // Try to set l = n (should clamp to n-1)
+      store.setSchroedingerAzimuthalQuantumNumber(3)
+      expect(useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber).toBe(2)
+
+      // Try to set l > n (should clamp to n-1)
+      store.setSchroedingerAzimuthalQuantumNumber(10)
+      expect(useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber).toBe(2)
+    })
+
+    it('reducing l cascades to clamp m', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(5)
+      store.setSchroedingerAzimuthalQuantumNumber(4)
+      store.setSchroedingerMagneticQuantumNumber(3) // valid: |3| <= 4
+
+      // Reduce l to 2 — m=3 violates |m| <= l=2
+      store.setSchroedingerAzimuthalQuantumNumber(2)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.azimuthalQuantumNumber).toBe(2)
+      expect(config.magneticQuantumNumber).toBe(2) // clamped from 3 to l=2
+    })
+
+    it('negative m is preserved when within bounds', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(4)
+      store.setSchroedingerAzimuthalQuantumNumber(3)
+      store.setSchroedingerMagneticQuantumNumber(-2)
+
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(-2)
+    })
+
+    it('negative m is clamped to -l when l decreases', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(5)
+      store.setSchroedingerAzimuthalQuantumNumber(4)
+      store.setSchroedingerMagneticQuantumNumber(-4) // valid: |-4| <= 4
+
+      // Reduce l to 1 — m=-4 violates |m| <= l=1
+      store.setSchroedingerAzimuthalQuantumNumber(1)
+
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(-1) // clamped to -l
+    })
+
+    it('m boundary values +l and -l are accepted', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(4)
+      store.setSchroedingerAzimuthalQuantumNumber(3)
+
+      store.setSchroedingerMagneticQuantumNumber(3)
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(3)
+
+      store.setSchroedingerMagneticQuantumNumber(-3)
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(-3)
+    })
+
+    it('m beyond +l is clamped to l', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(4)
+      store.setSchroedingerAzimuthalQuantumNumber(2)
+
+      store.setSchroedingerMagneticQuantumNumber(5)
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(2)
+    })
+
+    it('fractional quantum numbers are floored', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(3.7)
+      expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(3)
+
+      store.setSchroedingerAzimuthalQuantumNumber(1.9)
+      expect(useExtendedObjectStore.getState().schroedinger.azimuthalQuantumNumber).toBe(1)
+
+      // floor(-0.5) = -1, clamped to max(-l, min(l, -1)) with l=1 -> -1
+      store.setSchroedingerMagneticQuantumNumber(-0.5)
+      expect(useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber).toBe(-1)
+    })
+
+    it('n=1, l=0: setting m to fractional near zero yields 0 (or -0)', () => {
+      // When l=0, any m is clamped to 0. Setter normalizes -0 to 0 via `|| 0`.
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(1)
+      store.setSchroedingerMagneticQuantumNumber(-0.5)
+      const m = useExtendedObjectStore.getState().schroedinger.magneticQuantumNumber
+      expect(m).toBe(0)
+    })
+
+    it('n is clamped to [1, 7] range', () => {
+      const store = useExtendedObjectStore.getState()
+
+      store.setSchroedingerPrincipalQuantumNumber(0)
+      expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(1)
+
+      store.setSchroedingerPrincipalQuantumNumber(-5)
+      expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(1)
+
+      store.setSchroedingerPrincipalQuantumNumber(100)
+      expect(useExtendedObjectStore.getState().schroedinger.principalQuantumNumber).toBe(7)
+    })
+
+    it('full cascade: n=7 -> l=6 -> m=-6, then n=2 cascades everything', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerPrincipalQuantumNumber(7)
+      store.setSchroedingerAzimuthalQuantumNumber(6)
+      store.setSchroedingerMagneticQuantumNumber(-6)
+
+      // Reduce to n=2
+      store.setSchroedingerPrincipalQuantumNumber(2)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.principalQuantumNumber).toBe(2)
+      expect(config.azimuthalQuantumNumber).toBe(1) // clamped from 6 to n-1=1
+      expect(config.magneticQuantumNumber).toBe(-1) // clamped from -6 to -l=-1
+    })
+
+    it('all quantum number setters switch preset to custom', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+      expect(useExtendedObjectStore.getState().schroedinger.hydrogenNDPreset).toBe('2pz_4d')
+
+      store.setSchroedingerPrincipalQuantumNumber(3)
+      expect(useExtendedObjectStore.getState().schroedinger.hydrogenNDPreset).toBe('custom')
+
+      // Re-apply preset, then change l
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+      store.setSchroedingerAzimuthalQuantumNumber(0)
+      expect(useExtendedObjectStore.getState().schroedinger.hydrogenNDPreset).toBe('custom')
+
+      // Re-apply preset, then change m
+      store.setSchroedingerHydrogenNDPreset('2pz_4d')
+      store.setSchroedingerMagneticQuantumNumber(1)
+      expect(useExtendedObjectStore.getState().schroedinger.hydrogenNDPreset).toBe('custom')
+    })
+  })
+
   describe('setSchroedingerPhaseAnimationEnabled', () => {
     it('should toggle phase animation', () => {
       const store = useExtendedObjectStore.getState()

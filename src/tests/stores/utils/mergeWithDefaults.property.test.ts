@@ -83,13 +83,27 @@ describe('mergeExtendedObjectStateForType — fuzz testing', () => {
     )
   })
 
-  // PRODUCTION BUG: When cosineParams is an array (e.g., []) instead of an object,
-  // deepMerge's "Arrays are replaced, not merged" path replaces the entire default
-  // cosineParams object with the array, losing the a/b/c/d properties. The fix would
-  // be to add a type guard: if loadedVal is an array but defaultVal is a plain object,
-  // skip the replacement and keep the default.
-  // Counterexample found by fast-check: { cosineParams: [] }
-  it.todo('cosineParams always has arrays of length 3 regardless of input')
+  it('cosineParams always has arrays of length 3 regardless of input', () => {
+    fc.assert(
+      fc.property(arbPartialConfig, (partialConfig) => {
+        const result = mergeExtendedObjectStateForType(
+          { schroedinger: partialConfig },
+          'schroedinger'
+        )
+        const sch = result.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+        // cosineParams must always be an object with a/b/c/d arrays
+        expect(sch.cosineParams).toHaveProperty('a')
+        expect(sch.cosineParams).toHaveProperty('b')
+        expect(sch.cosineParams).toHaveProperty('c')
+        expect(sch.cosineParams).toHaveProperty('d')
+        expect(sch.cosineParams.a).toHaveLength(3)
+        expect(sch.cosineParams.b).toHaveLength(3)
+        expect(sch.cosineParams.c).toHaveLength(3)
+        expect(sch.cosineParams.d).toHaveLength(3)
+      }),
+      { numRuns: 500 }
+    )
+  })
 
   it('never throws for null, undefined, or non-object schroedinger config', () => {
     fc.assert(
@@ -114,10 +128,20 @@ describe('mergeExtendedObjectStateForType — fuzz testing', () => {
     )
   })
 
-  // PRODUCTION BUG: When the entire loaded state is null (not an object),
-  // mergeExtendedObjectStateForType tries to access loaded[configKey] which
-  // throws "Cannot read properties of null". The fix would be to add a
-  // guard: if (loaded == null || typeof loaded !== 'object') return defaults.
-  // Counterexample found by fast-check: null
-  it.todo('never throws when entire loaded state is garbage')
+  it('never throws when entire loaded state is garbage', () => {
+    fc.assert(
+      fc.property(arbJsonValue, (garbage) => {
+        // Should never throw, even when the entire loaded object is garbage
+        const result = mergeExtendedObjectStateForType(
+          garbage as Record<string, unknown>,
+          'schroedinger'
+        )
+        expect(result).toHaveProperty('schroedinger')
+        const sch = result.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+        // Should fall back to full defaults
+        expect(sch.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
+      }),
+      { numRuns: 200 }
+    )
+  })
 })

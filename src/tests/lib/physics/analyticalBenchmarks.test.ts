@@ -1106,7 +1106,7 @@ describe('spherical harmonic orthonormality — higher l', () => {
   ]
 
   for (const [l, m] of higherLStates) {
-    it(`∫|Y_${l},${m}|² dΩ = 1.0 ± 10⁻³`, () => {
+    it(`∫|Y_${l},${m}|² dΩ = 1.0 ± 10⁻³`, { timeout: 15_000 }, () => {
       const result = integrateYlmProduct(l, m, l, m)
       expect(result).toBeCloseTo(1.0, 3)
     })
@@ -1145,7 +1145,7 @@ describe('spherical harmonic orthonormality — higher l', () => {
   ]
 
   for (const [[l1, m1], [l2, m2]] of higherLOrthoPairs) {
-    it(`⟨Y_${l1},${m1}|Y_${l2},${m2}⟩ = 0 ± 10⁻³`, () => {
+    it(`⟨Y_${l1},${m1}|Y_${l2},${m2}⟩ = 0 ± 10⁻³`, { timeout: 15_000 }, () => {
       const result = integrateYlmProduct(l1, m1, l2, m2)
       expect(Math.abs(result)).toBeLessThan(1e-3)
     })

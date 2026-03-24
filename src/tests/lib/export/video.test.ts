@@ -32,8 +32,6 @@ vi.mock('mediabunny', () => {
   class MockOutput {
     private started = false
     private canceled = false
-    // @ts-expect-error - Used for internal state tracking in some tests potentially, but linter complains
-    private finalized = false
 
     addVideoTrack = vi.fn()
 
@@ -44,7 +42,6 @@ vi.mock('mediabunny', () => {
     finalize = vi.fn().mockImplementation(async () => {
       if (!this.started) throw new Error('Output not started')
       if (this.canceled) throw new Error('Output already canceled')
-      this.finalized = true
     })
 
     cancel = vi.fn().mockImplementation(async () => {

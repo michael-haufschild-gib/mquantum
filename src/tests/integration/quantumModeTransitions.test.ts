@@ -31,8 +31,6 @@ const COMPUTE_MODES: SchroedingerQuantumMode[] = [
   'diracEquation',
 ]
 
-const ANALYTICAL_MODES: SchroedingerQuantumMode[] = ['harmonicOscillator', 'hydrogenND']
-
 describe('quantum mode state machine transitions', () => {
   beforeEach(() => {
     useGeometryStore.getState().reset()
@@ -55,12 +53,16 @@ describe('quantum mode state machine transitions', () => {
       }
     })
 
-    it('analytical modes allow dimension 2', () => {
-      for (const mode of ANALYTICAL_MODES) {
-        useGeometryStore.getState().setDimension(2)
-        useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
-        expect(useGeometryStore.getState().dimension).toBe(2)
-      }
+    it('harmonicOscillator allows dimension 2', () => {
+      useGeometryStore.getState().setDimension(2)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      expect(useGeometryStore.getState().dimension).toBe(2)
+    })
+
+    it('hydrogenND enforces dimension >= 3', () => {
+      useGeometryStore.getState().setDimension(2)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenND')
+      expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
     })
 
     it('switching from compute to analytical preserves dimension', () => {
@@ -188,6 +190,73 @@ describe('quantum mode state machine transitions', () => {
           ).toBeGreaterThan(0)
         }
       }
+    })
+  })
+
+  describe('TDSE potential type constraint on dimension change', () => {
+    it('doubleSlit potential downgrades to barrier when dimension < 2', () => {
+      // doubleSlit is only meaningful in >= 2D
+      useGeometryStore.getState().setDimension(3)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+
+      // Set doubleSlit potential
+      useExtendedObjectStore.getState().setTdsePotentialType('doubleSlit')
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.potentialType).toBe('doubleSlit')
+
+      // Dimension is already >= 2, so doubleSlit should survive re-entry
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.potentialType).toBe('doubleSlit')
+    })
+  })
+
+  describe('mode-specific state isolation', () => {
+    it('changing TDSE settings does not affect BEC state', () => {
+      useGeometryStore.getState().setDimension(3)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+
+      // Modify TDSE-specific state
+      useExtendedObjectStore.getState().setTdsePotentialType('harmonicTrap')
+
+      // Switch to BEC and verify BEC state is independent
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
+      const becState = useExtendedObjectStore.getState().schroedinger.bec
+
+      // BEC should have its own defaults, not TDSE's harmonicTrap
+      expect(becState.latticeDim).toBe(3)
+      expect(becState.needsReset).toBe(true) // freshly entered
+    })
+
+    it('hydrogen quantum numbers persist through mode roundtrip', () => {
+      useGeometryStore.getState().setDimension(5)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenND')
+      useExtendedObjectStore.getState().setSchroedingerPrincipalQuantumNumber(4)
+      useExtendedObjectStore.getState().setSchroedingerAzimuthalQuantumNumber(3)
+      useExtendedObjectStore.getState().setSchroedingerMagneticQuantumNumber(-2)
+
+      // Switch away and back
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenND')
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.principalQuantumNumber).toBe(4)
+      expect(config.azimuthalQuantumNumber).toBe(3)
+      expect(config.magneticQuantumNumber).toBe(-2)
+    })
+
+    it('HO superposition state persists through mode roundtrip', () => {
+      useGeometryStore.getState().setDimension(4)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      useExtendedObjectStore.getState().setSchroedingerTermCount(5)
+      useExtendedObjectStore.getState().setSchroedingerSeed(42)
+
+      // Switch away and back
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      expect(config.termCount).toBe(5)
+      expect(config.seed).toBe(42)
     })
   })
 

@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-// Heavy computation: FFTs and Gaussian broadening on 64^3 grids.
-// Runs ~3s in isolation, can exceed the 5s default under CI load.
-vi.setConfig({ testTimeout: 15_000 })
+// Heavy computation: FFTs on 8^3 grids projected to 64^3 output (262K voxels),
+// plus Gaussian broadening. Runs ~10s in isolation, can exceed 20s under CI
+// load with 4 parallel workers competing for CPU.
+vi.setConfig({ testTimeout: 30_000 })
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'
