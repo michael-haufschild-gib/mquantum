@@ -23,6 +23,15 @@ import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
 import { QuantumWalkControls } from './QuantumWalkControls'
 import { TDSEControls } from './TDSEControls'
+import type {
+  BecActions,
+  DiracActions,
+  FreeScalarFieldActions,
+  HarmonicOscillatorActions,
+  HydrogenNDActions,
+  HydrogenNDCoupledActions,
+  TdseActions,
+} from './types'
 import { useSchroedingerActions } from './useSchroedingerActions'
 import { WignerControls } from './WignerControls'
 
@@ -45,15 +54,13 @@ function renderModeControls(p: {
   isFreeScalarField: boolean
   isHydrogenCoupled: boolean
   isHydrogenNDMode: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  diracActions: any
-  becActions: any
-  tdseActions: any
-  freeScalarActions: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hydrogenNDCoupledActions: any
-  hydrogenNDActions: any
-  harmonicActions: any
+  diracActions: DiracActions
+  becActions: BecActions
+  tdseActions: TdseActions
+  freeScalarActions: FreeScalarFieldActions
+  hydrogenNDCoupledActions: HydrogenNDCoupledActions
+  hydrogenNDActions: HydrogenNDActions
+  harmonicActions: HarmonicOscillatorActions
 }): React.ReactNode {
   if (p.isQuantumWalk) return <QuantumWalkControls />
   if (p.isDiracEquation)

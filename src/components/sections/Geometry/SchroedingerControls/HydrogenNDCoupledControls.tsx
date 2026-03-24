@@ -17,21 +17,8 @@ import {
   maxAzimuthalForPrincipal,
   orbitalShapeLetter,
 } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
-interface HydrogenNDCoupledControlsProps {
-  config: SchroedingerConfig
-  dimension: number
-  actions: {
-    setPrincipalQuantumNumber: ExtendedObjectState['setSchroedingerPrincipalQuantumNumber']
-    setAzimuthalQuantumNumber: ExtendedObjectState['setSchroedingerAzimuthalQuantumNumber']
-    setMagneticQuantumNumber: ExtendedObjectState['setSchroedingerMagneticQuantumNumber']
-    setUseRealOrbitals: ExtendedObjectState['setSchroedingerUseRealOrbitals']
-    setBohrRadiusScale: ExtendedObjectState['setSchroedingerBohrRadiusScale']
-    setAngularChainValue: ExtendedObjectState['setSchroedingerAngularChainValue']
-  }
-}
+import type { HydrogenNDCoupledControlsProps } from './types'
 
 /**
  * Controls for the true D-dimensional Coulomb problem with hyperspherical harmonics.

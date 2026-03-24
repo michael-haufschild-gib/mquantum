@@ -14,6 +14,7 @@ import type {
   FreeScalarFieldActions,
   HarmonicOscillatorActions,
   HydrogenNDActions,
+  HydrogenNDCoupledActions,
   TdseActions,
   WignerActions,
 } from './types'
@@ -27,14 +28,7 @@ export interface SchroedingerActionsResult {
   setMomentumHbar: ExtendedObjectState['setSchroedingerMomentumHbar']
   harmonicActions: HarmonicOscillatorActions
   hydrogenNDActions: HydrogenNDActions
-  hydrogenNDCoupledActions: {
-    setPrincipalQuantumNumber: ExtendedObjectState['setSchroedingerPrincipalQuantumNumber']
-    setAzimuthalQuantumNumber: ExtendedObjectState['setSchroedingerAzimuthalQuantumNumber']
-    setMagneticQuantumNumber: ExtendedObjectState['setSchroedingerMagneticQuantumNumber']
-    setUseRealOrbitals: ExtendedObjectState['setSchroedingerUseRealOrbitals']
-    setBohrRadiusScale: ExtendedObjectState['setSchroedingerBohrRadiusScale']
-    setAngularChainValue: ExtendedObjectState['setSchroedingerAngularChainValue']
-  }
+  hydrogenNDCoupledActions: HydrogenNDCoupledActions
   wignerActions: WignerActions
   freeScalarActions: FreeScalarFieldActions
   tdseActions: TdseActions
@@ -240,7 +234,7 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setExtraDimFrequencySpread: s.setExtraDimFrequencySpread,
   }
 
-  const hydrogenNDCoupledActions = {
+  const hydrogenNDCoupledActions: HydrogenNDCoupledActions = {
     setPrincipalQuantumNumber: s.setPrincipalQuantumNumber,
     setAzimuthalQuantumNumber: s.setAzimuthalQuantumNumber,
     setMagneticQuantumNumber: s.setMagneticQuantumNumber,

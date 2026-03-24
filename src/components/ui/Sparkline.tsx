@@ -77,7 +77,23 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
     const padding = 2
 
     const { polyline, fillPath, refLineY, lo, hi } = useMemo(() => {
-      if (count < 2) return { polyline: '', fillPath: '', refLineY: null, lo: 0, hi: 1 }
+      if (count < 2) {
+        // No data for polyline/fill, but still render reference line if provided
+        if (referenceLine != null) {
+          let lo = minProp ?? 0
+          let hi = maxProp ?? 1
+          if (referenceLine < lo) lo = referenceLine
+          if (referenceLine > hi) hi = referenceLine
+          if (hi - lo < 1e-10) {
+            lo -= 0.5
+            hi += 0.5
+          }
+          const usableHeight = viewHeight - padding * 2
+          const refY = padding + usableHeight - ((referenceLine - lo) / (hi - lo)) * usableHeight
+          return { polyline: '', fillPath: '', refLineY: refY, lo, hi }
+        }
+        return { polyline: '', fillPath: '', refLineY: null, lo: 0, hi: 1 }
+      }
 
       const len = data.length
       const n = Math.min(count, len)

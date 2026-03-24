@@ -418,17 +418,30 @@ export const ExportModal = () => {
                 <div className="grid grid-cols-3 gap-2 text-center pt-2">
                   <div>
                     <div className="text-[10px] text-text-tertiary uppercase">Res</div>
-                    <div className="font-bold text-sm text-text-primary">
+                    <div
+                      className="font-bold text-sm text-text-primary"
+                      data-testid="quick-stat-res"
+                    >
                       {settings.resolution === 'custom' ? 'Custom' : settings.resolution}
                     </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-text-tertiary uppercase">FPS</div>
-                    <div className="font-bold text-sm text-text-primary">{settings.fps}</div>
+                    <div
+                      className="font-bold text-sm text-text-primary"
+                      data-testid="quick-stat-fps"
+                    >
+                      {settings.fps}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[10px] text-text-tertiary uppercase">Dur</div>
-                    <div className="font-bold text-sm text-text-primary">{settings.duration}s</div>
+                    <div
+                      className="font-bold text-sm text-text-primary"
+                      data-testid="quick-stat-dur"
+                    >
+                      {settings.duration}s
+                    </div>
                   </div>
                 </div>
               </div>

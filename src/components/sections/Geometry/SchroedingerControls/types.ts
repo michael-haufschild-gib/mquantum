@@ -42,6 +42,27 @@ export interface HydrogenNDActions {
 }
 
 /**
+ * Actions for Hydrogen ND Coupled mode (true D-dimensional Coulomb problem)
+ */
+export interface HydrogenNDCoupledActions {
+  setPrincipalQuantumNumber: ExtendedObjectState['setSchroedingerPrincipalQuantumNumber']
+  setAzimuthalQuantumNumber: ExtendedObjectState['setSchroedingerAzimuthalQuantumNumber']
+  setMagneticQuantumNumber: ExtendedObjectState['setSchroedingerMagneticQuantumNumber']
+  setUseRealOrbitals: ExtendedObjectState['setSchroedingerUseRealOrbitals']
+  setBohrRadiusScale: ExtendedObjectState['setSchroedingerBohrRadiusScale']
+  setAngularChainValue: ExtendedObjectState['setSchroedingerAngularChainValue']
+}
+
+/**
+ * Props for Hydrogen ND Coupled Controls
+ */
+export interface HydrogenNDCoupledControlsProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: HydrogenNDCoupledActions
+}
+
+/**
  * Actions for Wigner phase-space controls
  */
 export interface WignerActions {
