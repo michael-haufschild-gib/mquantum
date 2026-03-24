@@ -1,23 +1,26 @@
 /**
- * Structured logger that tree-shakes in production builds.
+ * Structured logger with level-based production behavior.
  *
- * All methods are no-ops when `import.meta.env.DEV` is false,
- * which Vite statically replaces and dead-code-eliminates at build time.
- * This replaces scattered `console.log/warn/error` calls throughout the
- * codebase with a single, controllable logging interface.
+ * Level semantics:
+ * - `log` / `warn`: development-only, tree-shaken in production via
+ *   `import.meta.env.DEV` guard (Vite dead-code-eliminates the branch).
+ * - `error`: always emits to `console.error` in both dev and production.
+ *   Errors represent conditions that need diagnosability (GPU device lost,
+ *   shader compilation failures, initialization errors). Stripping them
+ *   in production makes failures invisible.
  *
  * Do NOT wrap logger calls in `if (import.meta.env.DEV)` — the logger
- * already handles this internally. Redundant guards are dead code.
+ * already handles gating internally. Redundant guards are dead code.
  *
  * Enforced by `no-console` ESLint rule: raw `console.*` calls are banned
- * in source files. Only ErrorBoundary files are exempt (they must log
- * in production for crash reporting).
+ * in source files. Only ErrorBoundary files and this logger are exempt.
  *
  * Usage:
  * ```ts
  * import { logger } from '@/lib/logger'
- * logger.warn('[StoreName]', 'Invalid value:', value)
- * logger.error('[WebGPU]', 'Pipeline creation failed:', err)
+ * logger.log('[Rendering]', 'Frame time:', ms)    // dev only
+ * logger.warn('[StoreName]', 'Invalid value:', v)  // dev only
+ * logger.error('[WebGPU]', 'Device lost:', reason) // always emits
  * ```
  *
  * @module lib/logger
@@ -44,17 +47,22 @@ export function warn(...args: unknown[]): void {
 }
 
 /**
- * Log an error. Stripped in production.
+ * Log an error. Emits in both development and production.
+ *
+ * Unlike `log` and `warn`, error-level messages are never stripped.
+ * GPU device loss, shader compilation failures, and initialization
+ * errors must remain diagnosable in production builds.
+ *
  * @param args - Arguments passed to console.error
  */
 export function error(...args: unknown[]): void {
-  if (import.meta.env.DEV) {
-    console.error(...args)
-  }
+  console.error(...args)
 }
 
 /**
  * Structured logger namespace.
- * All methods are no-ops in production (tree-shaken by Vite).
+ *
+ * - `log`, `warn`: dev-only (tree-shaken in production)
+ * - `error`: always emits (production-safe)
  */
 export const logger = { log, warn, error } as const
