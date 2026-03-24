@@ -41,6 +41,9 @@ jobs:
       - name: Test with coverage
         run: npx vitest run --coverage
 
+      - name: Coverage ratchet
+        run: node scripts/check-coverage-ratchet.js
+
       # build:web skips wasm:build — the separate `wasm` job handles that.
       # WASM has JS fallbacks, so the main build doesn't need it.
       - name: Build

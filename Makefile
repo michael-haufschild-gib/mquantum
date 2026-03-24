@@ -1,4 +1,4 @@
-.PHONY: setup dev build build-web test lint lint-css format format-check type-check ci bundle-check clean
+.PHONY: setup dev build build-web test test-coverage test-e2e lint lint-css format format-check type-check coverage-ratchet ci bundle-check clean
 
 ## Install dependencies
 setup:
@@ -19,6 +19,14 @@ build-web:
 ## Run unit tests
 test:
 	npx vitest run
+
+## Run unit tests with coverage report
+test-coverage:
+	npx vitest run --coverage
+
+## Run Playwright e2e tests (requires running dev server)
+test-e2e:
+	npx playwright test
 
 ## Run linter (matches CI: zero warnings allowed)
 lint:
@@ -44,9 +52,13 @@ type-check:
 bundle-check:
 	node scripts/check-bundle-size.js
 
+## Check coverage ratchet (requires prior test-coverage run)
+coverage-ratchet:
+	node scripts/check-coverage-ratchet.js
+
 ## Run full CI pipeline (mirrors .github/workflows/ci.yml)
-ci: format-check lint lint-css type-check test build-web bundle-check
+ci: format-check lint lint-css type-check test-coverage coverage-ratchet build-web bundle-check
 
 ## Remove build artifacts
 clean:
-	rm -rf dist tsconfig.tsbuildinfo
+	rm -rf dist tsconfig.tsbuildinfo coverage

@@ -18,7 +18,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text-summary', 'lcov'],
+      reporter: ['text-summary', 'lcov', 'json-summary'],
       reportsDirectory: 'coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
@@ -61,6 +61,9 @@ export default defineConfig({
         'src/rendering/webgpu/core/WebGPUUniformBuffer.ts',
         'src/rendering/renderers/base/useRotationUpdates.ts',
       ],
+      // Coverage ratchet: thresholds must be >= current actuals (rounded down
+      // to nearest 0.5%). Raise these when coverage improves; never lower them.
+      // Last measured 2026-03-24: stmts 60.7%, branches 53.47%, funcs 59.23%, lines 61.05%
       thresholds: {
         statements: 60.5,
         branches: 53,
@@ -77,7 +80,6 @@ export default defineConfig({
       '@/hooks': path.resolve(import.meta.dirname, './src/hooks'),
       '@/stores': path.resolve(import.meta.dirname, './src/stores'),
       '@/types': path.resolve(import.meta.dirname, './src/types'),
-      '@/utils': path.resolve(import.meta.dirname, './src/utils'),
       // Mock WASM module for tests (Vite import analysis runs before vitest mocks)
       'mdimension-core': path.resolve(
         import.meta.dirname,
