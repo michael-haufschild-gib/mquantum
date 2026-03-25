@@ -882,6 +882,104 @@ export async function setupAndWaitForDensity(page: Page, mode: string, dim: numb
   await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
 }
 
+// ─── Open Quantum Diagnostics ────────────────────────────────────────────────
+
+/** Snapshot of the open quantum diagnostics store. */
+export interface OQDiagnosticsSnapshot {
+  purity: number
+  linearEntropy: number
+  vonNeumannEntropy: number
+  coherenceMagnitude: number
+  groundPopulation: number
+  trace: number
+  basisCount: number
+  historyCount: number
+  populations: number[]
+}
+
+/** Read the open quantum diagnostics store from the running app. */
+export async function readOQDiagnostics(page: Page): Promise<OQDiagnosticsSnapshot> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
+    const s = mod.useOpenQuantumDiagnosticsStore.getState()
+    return {
+      purity: s.purity,
+      linearEntropy: s.linearEntropy,
+      vonNeumannEntropy: s.vonNeumannEntropy,
+      coherenceMagnitude: s.coherenceMagnitude,
+      groundPopulation: s.groundPopulation,
+      trace: s.trace,
+      basisCount: s.basisCount,
+      historyCount: s.historyCount,
+      populations: Array.from(s.populations.slice(0, s.basisCount)),
+    }
+  })
+}
+
+/**
+ * Wait for the open quantum system to evolve for at least `minUpdates` steps.
+ * Polls the diagnostics store's historyCount. Each count corresponds to one
+ * density matrix propagation step (with frame stride applied).
+ */
+export async function waitForOQEvolution(
+  page: Page,
+  minUpdates = 20,
+  timeout = 60_000
+): Promise<void> {
+  await page.waitForFunction(
+    async (min: number) => {
+      const mod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
+      return mod.useOpenQuantumDiagnosticsStore.getState().historyCount >= min
+    },
+    minUpdates,
+    { timeout }
+  )
+}
+
+/**
+ * Set open quantum configuration via the extended object store.
+ * Merges the provided partial config with the existing OQ config.
+ */
+export async function setOQConfig(page: Page, config: Record<string, unknown>): Promise<void> {
+  await page.evaluate(async (cfg: Record<string, unknown>) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const store = mod.useExtendedObjectStore.getState()
+    // Apply each setting via the individual setters when available
+    if ('enabled' in cfg) store.setOpenQuantumEnabled(cfg.enabled as boolean)
+    if ('dephasingRate' in cfg) store.setOpenQuantumDephasingRate(cfg.dephasingRate as number)
+    if ('relaxationRate' in cfg) store.setOpenQuantumRelaxationRate(cfg.relaxationRate as number)
+    if ('thermalUpRate' in cfg) store.setOpenQuantumThermalUpRate(cfg.thermalUpRate as number)
+    if ('dt' in cfg) store.setOpenQuantumDt(cfg.dt as number)
+    if ('substeps' in cfg) store.setOpenQuantumSubsteps(cfg.substeps as number)
+    if ('bathTemperature' in cfg) store.setOpenQuantumBathTemperature(cfg.bathTemperature as number)
+    if ('couplingScale' in cfg) store.setOpenQuantumCouplingScale(cfg.couplingScale as number)
+    if ('hydrogenBasisMaxN' in cfg)
+      store.setOpenQuantumHydrogenBasisMaxN(cfg.hydrogenBasisMaxN as number)
+    if ('dephasingModel' in cfg)
+      store.setOpenQuantumDephasingModel(cfg.dephasingModel as 'none' | 'uniform')
+    if ('visualizationMode' in cfg)
+      store.setOpenQuantumVisualizationMode(cfg.visualizationMode as string)
+
+    // Channel toggles via generic setter
+    if ('dephasingEnabled' in cfg)
+      store.setOpenQuantumChannelEnabled('dephasingEnabled', cfg.dephasingEnabled as boolean)
+    if ('relaxationEnabled' in cfg)
+      store.setOpenQuantumChannelEnabled('relaxationEnabled', cfg.relaxationEnabled as boolean)
+    if ('thermalEnabled' in cfg)
+      store.setOpenQuantumChannelEnabled('thermalEnabled', cfg.thermalEnabled as boolean)
+  }, config)
+}
+
+/** Reset the open quantum diagnostics store and trigger density matrix re-init. */
+export async function resetOQState(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const diagMod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
+    diagMod.useOpenQuantumDiagnosticsStore.getState().reset()
+    const extMod = await import('/src/stores/extendedObjectStore.ts')
+    extMod.useExtendedObjectStore.getState().requestOpenQuantumStateReset()
+  })
+}
+
 // ─── Observables Readback ────────────────────────────────────────────────────
 
 /** Read observables diagnostics from the GPU readback store. */

@@ -66,17 +66,27 @@ test.describe('A: Coupled hydrogen ND rendering', () => {
     { dim: 3, label: '3D (standard hydrogen reduction)' },
     { dim: 4, label: '4D (one Gegenbauer layer)' },
     { dim: 5, label: '5D (half-integer λ)' },
+    { dim: 6, label: '6D (three Gegenbauer layers)' },
     { dim: 7, label: '7D (four Gegenbauer layers)' },
   ]
 
   for (const { dim, label } of dims) {
     test(`${label}: renders non-blank pixels`, async ({ page }) => {
       await gotoMode(page, 'hydrogenNDCoupled', dim)
-      await waitForShaderCompilation(page)
+      await waitForModeReady(page)
       await pauseAnimation(page)
       await assertPixels(page, `Coupled hydrogen ${dim}D`)
     })
   }
+
+  test('6D n=4, l=2, m=0: renders non-blank (regression)', async ({ page }) => {
+    await gotoMode(page, 'hydrogenNDCoupled', 6)
+    await waitForModeReady(page)
+    await pauseAnimation(page)
+    await setHydrogenQuantumNumbers(page, 4, 2, 0)
+    await waitForUniformUpdate(page)
+    await assertPixels(page, 'Coupled hydrogen 6D n=4 l=2 m=0')
+  })
 })
 
 // ─── Section B: Control response ─────────────────────────────────────────────

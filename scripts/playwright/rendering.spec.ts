@@ -50,6 +50,8 @@ test.describe('quantum mode rendering', () => {
   const modes = [
     { mode: 'harmonicOscillator', dim: 3, label: 'HO 3D' },
     { mode: 'harmonicOscillator', dim: 5, label: 'HO 5D' },
+    { mode: 'hydrogenND', dim: 2, label: 'Hydrogen 2D (true 2D Coulomb)' },
+    { mode: 'hydrogenNDCoupled', dim: 2, label: 'Hydrogen Coupled 2D (falls back to uncoupled)' },
     { mode: 'hydrogenND', dim: 3, label: 'Hydrogen 3D' },
     { mode: 'hydrogenND', dim: 4, label: 'Hydrogen 4D' },
     { mode: 'hydrogenND', dim: 5, label: 'Hydrogen 5D (odd D, half-int λ)' },
