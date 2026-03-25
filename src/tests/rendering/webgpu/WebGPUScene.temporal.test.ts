@@ -31,6 +31,9 @@ interface ScenePassConfig {
   fastEigenInterpolationEnabled: boolean
   representation: 'position' | 'momentum'
   openQuantumEnabled: boolean
+  crossSectionEnabled: boolean
+  classicalOverlayEnabled: boolean
+  probabilityCurrentEnabled: boolean
   colorAlgorithm:
     | 'lch'
     | 'multiSource'
@@ -81,6 +84,9 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     fastEigenInterpolationEnabled: true,
     representation: 'position',
     openQuantumEnabled: false,
+    crossSectionEnabled: false,
+    classicalOverlayEnabled: false,
+    probabilityCurrentEnabled: false,
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
     skyboxMode: 'classic',

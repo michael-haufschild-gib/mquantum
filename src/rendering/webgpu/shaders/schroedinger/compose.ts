@@ -40,6 +40,7 @@ import {
   generateMainBlockIsosurfaceTemporal,
   generateMainBlockTemporal,
   generateMainBlockVolumetric,
+  PHASE_COLOR_ALGS,
   temporalMRTOutputBlock,
 } from './main.wgsl'
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
@@ -95,6 +96,12 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
   useDensityMatrix?: boolean
+  /** Compile-time gate for cross-section slice (default: true). */
+  crossSectionEnabled?: boolean
+  /** Compile-time gate for classical trajectory overlay (default: true). */
+  classicalOverlayEnabled?: boolean
+  /** Compile-time gate for probability current j-field (default: true). */
+  probabilityCurrentEnabled?: boolean
   /**
    * Profiling strip flags — compile out specific hot-path components to measure
    * their actual GPU cost via A/B benchmarking. Each flag replaces the real
@@ -124,7 +131,8 @@ function selectMainBlock(
   enableTemporal: boolean,
   useDensityGrid: boolean,
   useDensityMatrix: boolean,
-  useWignerCache: boolean
+  useWignerCache: boolean,
+  gridOnly: boolean
 ): string {
   if (isWigner) return generateMainBlockWigner2D(useWignerCache)
   if (is2D) return isosurface ? generateMainBlock2DIsolines() : generateMainBlock2D()
@@ -134,8 +142,8 @@ function selectMainBlock(
       : generateMainBlockIsosurface({ useDensityGrid })
   }
   return enableTemporal
-    ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
-    : generateMainBlockVolumetric({ useDensityGrid })
+    ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix, gridOnly })
+    : generateMainBlockVolumetric({ useDensityGrid, gridOnly })
 }
 
 /** Build WGSL compile-time defines and human-readable feature tags. */
@@ -168,6 +176,9 @@ function buildShaderDefinesAndFeatures(flags: {
   isQuantumWalk: boolean
   isPauli: boolean
   useWignerCache: boolean
+  crossSectionEnabled: boolean
+  classicalOverlayEnabled: boolean
+  probabilityCurrentEnabled: boolean
   profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
 }): { defines: string[]; features: string[] } {
   const defines: string[] = []
@@ -211,6 +222,9 @@ function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${flags.useAnalyticalGradient};`)
   defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${flags.useRobustEigenInterpolation};`)
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
+  defines.push(`const FEATURE_CROSS_SECTION: bool = ${flags.crossSectionEnabled};`)
+  defines.push(`const FEATURE_CLASSICAL_OVERLAY: bool = ${flags.classicalOverlayEnabled};`)
+  defines.push(`const FEATURE_PROBABILITY_CURRENT: bool = ${flags.probabilityCurrentEnabled};`)
 
   if (flags.quantumMode === 'hydrogenNDCoupled') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
@@ -361,6 +375,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isPauli = false,
     freeScalarAnalysis = false,
     useDensityMatrix = false,
+    crossSectionEnabled = true,
+    classicalOverlayEnabled = true,
+    probabilityCurrentEnabled = true,
     overrides = [],
   } = config
 
@@ -415,9 +432,33 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isQuantumWalk,
     isPauli,
     useWignerCache,
+    crossSectionEnabled,
+    classicalOverlayEnabled,
+    probabilityCurrentEnabled,
     profilingStrip: config.profilingStrip,
   })
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
+
+  // Determine if we can use grid-only mode (excludes inline raymarch + entire
+  // quantum math / density evaluation chain from the fragment shader).
+  // Conditions: density grid active AND no compile-time feature needs inline sampling.
+  const isPhaseColorAlg = PHASE_COLOR_ALGS.includes(
+    colorAlgorithm as (typeof PHASE_COLOR_ALGS)[number]
+  )
+  const gridOnly =
+    useDensityGrid &&
+    !is2D &&
+    !isosurface &&
+    !isPhaseColorAlg &&
+    !phaseMateriality &&
+    !interference &&
+    !probabilityCurrentEnabled &&
+    !nodal &&
+    !useDensityMatrix
+
+  if (gridOnly) {
+    features.push('Grid-Only (inline raymarch excluded)')
+  }
 
   const selectedMainBlock = selectMainBlock(
     isWigner,
@@ -426,7 +467,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     enableTemporal,
     useDensityGrid,
     useDensityMatrix,
-    useWignerCache
+    useWignerCache,
+    gridOnly
   )
 
   // Build blocks array in dependency order
@@ -463,7 +505,7 @@ struct VertexOutput {
       }),
     },
 
-    // Quantum math modules
+    // Quantum math modules (excluded in grid-only mode — compute shader handles wavefunction evaluation)
     ...buildQuantumMathBlocks({
       actualDim,
       includeHarmonic,
@@ -476,6 +518,7 @@ struct VertexOutput {
       useUnrolledHO,
       termCount,
       isWigner,
+      gridOnly,
     }),
 
     // Color system
@@ -487,7 +530,7 @@ struct VertexOutput {
     { name: 'GGX PBR', content: ggxBlock, condition: isosurface && !is2D },
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface && !is2D },
 
-    // Volume rendering
+    // Volume rendering (inline raymarch excluded in grid-only mode)
     ...buildVolumeBlocks({
       is2D,
       colorAlgorithm,
@@ -499,6 +542,10 @@ struct VertexOutput {
       usePrecomputedNormals,
       freeScalarAnalysis,
       nodal,
+      crossSectionEnabled,
+      classicalOverlayEnabled,
+      probabilityCurrentEnabled,
+      gridOnly,
     }),
 
     // Geometry

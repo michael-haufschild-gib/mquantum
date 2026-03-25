@@ -1,0 +1,119 @@
+/**
+ * Preset import/export helpers
+ *
+ * Generic validation, UUID regeneration, and name deduplication for
+ * importing preset arrays (styles and scenes). Extracted from
+ * presetManagerStore to keep the store thin.
+ *
+ * @module stores/utils/presetImportExport
+ */
+
+import { logger } from '@/lib/logger'
+
+import { isNonEmptyTrimmedString, makeUniqueImportedName } from './presetNormalization'
+
+/** Required data keys for a valid style import. */
+const STYLE_REQUIRED_KEYS = ['appearance', 'lighting', 'postProcessing', 'environment'] as const
+
+/** Required data keys for a valid scene import. */
+const SCENE_REQUIRED_KEYS = [
+  'appearance',
+  'lighting',
+  'postProcessing',
+  'environment',
+  'geometry',
+  'extended',
+  'transform',
+  'rotation',
+  'animation',
+  'camera',
+  'ui',
+] as const
+
+/** Validate that a preset object has all required fields. */
+function hasRequiredFields(
+  item: Record<string, unknown>,
+  requiredDataKeys: readonly string[]
+): boolean {
+  if (!item.id || !isNonEmptyTrimmedString(item.name as string) || !item.timestamp || !item.data) {
+    return false
+  }
+  const data = item.data as Record<string, unknown>
+  return requiredDataKeys.every((key) => Boolean(data[key]))
+}
+
+/**
+ * Result of an import attempt.
+ */
+export type ImportResult =
+  | { success: true; items: Array<Record<string, unknown>> }
+  | { success: false; error: string }
+
+/**
+ * Parse, validate, deduplicate, and sanitize an imported preset array.
+ *
+ * @param jsonData - Raw JSON string
+ * @param existingNames - Set of existing preset names (for deduplication)
+ * @param requiredDataKeys - Keys that must be present in each preset's `data` object
+ * @param sanitize - Function to sanitize a preset's data
+ * @param entityLabel - Human-readable label for error messages ("styles" or "scenes")
+ * @returns Import result with processed items or error message
+ */
+export function parseAndValidateImport<T>(
+  jsonData: string,
+  existingNames: Set<string>,
+  requiredDataKeys: readonly string[],
+  sanitize: (data: T) => T,
+  entityLabel: string
+): ImportResult {
+  let imported: unknown
+  try {
+    imported = JSON.parse(jsonData)
+  } catch (e) {
+    logger.error(`Failed to import ${entityLabel}`, e)
+    return {
+      success: false,
+      error: `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`,
+    }
+  }
+
+  if (!Array.isArray(imported)) {
+    return {
+      success: false,
+      error: `Invalid format: expected an array of ${entityLabel}.`,
+    }
+  }
+
+  const valid = imported.every((i) =>
+    hasRequiredFields(i as Record<string, unknown>, requiredDataKeys)
+  )
+  if (!valid) {
+    return {
+      success: false,
+      error: `The ${entityLabel} data is corrupted or incompatible. ${entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1)} must contain all required data fields.`,
+    }
+  }
+
+  const usedNames = new Set(existingNames)
+  const processed = imported.map((item) => {
+    const newId = crypto.randomUUID()
+    const rawName = (item.name as string).trim()
+    const newName = makeUniqueImportedName(rawName, usedNames)
+    usedNames.add(newName)
+    return {
+      ...item,
+      id: newId,
+      name: newName,
+      timestamp: Date.now(),
+      data: sanitize(item.data as T),
+    } as Record<string, unknown>
+  })
+
+  return { success: true, items: processed }
+}
+
+/** Required keys for style import validation. */
+export const STYLE_IMPORT_KEYS = STYLE_REQUIRED_KEYS
+
+/** Required keys for scene import validation. */
+export const SCENE_IMPORT_KEYS = SCENE_REQUIRED_KEYS

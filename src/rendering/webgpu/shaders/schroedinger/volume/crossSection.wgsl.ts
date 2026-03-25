@@ -10,6 +10,27 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/crossSection.wgsl
  */
 
+/** No-op stub when cross-section is disabled at compile time. Includes struct for symbol resolution. */
+export const crossSectionStubBlock = /* wgsl */ `
+struct CrossSectionSample {
+  color: vec3f,
+  alpha: f32,
+  hitT: f32,
+  _pad0: vec3f,
+}
+
+fn evaluateCrossSectionSample(
+  ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, animTime: f32, uniforms: SchroedingerUniforms
+) -> CrossSectionSample {
+  var result: CrossSectionSample;
+  result.color = vec3f(0.0);
+  result.alpha = 0.0;
+  result.hitT = -1.0;
+  result._pad0 = vec3f(0.0);
+  return result;
+}
+`
+
 export const crossSectionBlock = /* wgsl */ `
 // ============================================
 // Cross-Section Slice

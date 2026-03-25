@@ -23,7 +23,7 @@ import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
 
 // Phase-dependent color algorithms that require direct wavefunction sampling
 // (cannot use pre-computed density grid because they need complex phase information).
-const PHASE_COLOR_ALGS = [
+export const PHASE_COLOR_ALGS = [
   COLOR_ALGORITHM_TO_INT.phase,
   COLOR_ALGORITHM_TO_INT.mixed,
   COLOR_ALGORITHM_TO_INT.phaseCyclicUniform,
@@ -47,6 +47,8 @@ function phaseAlgorithmCondition(uniformName: string): string {
 export interface VolumetricMainBlockConfig {
   /** Use pre-computed density grid for faster raymarching */
   useDensityGrid?: boolean
+  /** When true, the grid-only path is guaranteed — no inline wavefunction fallback needed. */
+  gridOnly?: boolean
 }
 
 /**
@@ -55,17 +57,24 @@ export interface VolumetricMainBlockConfig {
  * @param config
  */
 export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
-  const { useDensityGrid = false } = config
+  const { useDensityGrid = false, gridOnly = false } = config
 
-  // When density grid is enabled, use the grid-based raymarcher
-  // with automatic fallback when features require direct wavefunction sampling.
-  const raymarchCall = useDensityGrid
-    ? `let phaseDependentMode =
+  // When gridOnly=true, the density grid handles ALL rendering — no inline
+  // wavefunction fallback is compiled. This dramatically reduces the fragment
+  // shader size (removes ~1000 lines of quantum math, inline density sampling,
+  // tetrahedral gradient, and both volumeRaymarch/HQ functions), which avoids
+  // a GPU occupancy cliff on Apple Silicon's Metal compiler (Safari WebGPU).
+  let raymarchCall: string
+  if (gridOnly) {
+    raymarchCall = `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
+  } else if (useDensityGrid) {
+    raymarchCall = `let phaseDependentMode =
     ${phaseAlgorithmCondition('schroedinger')} ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
   let probabilityCurrentVolumeMode =
+    FEATURE_PROBABILITY_CURRENT &&
     schroedinger.probabilityCurrentEnabled != 0u &&
     (
       schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_VOLUME ||
@@ -88,11 +97,13 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   } else {
     volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
   }`
-    : `if (fastMode) {
+  } else {
+    raymarchCall = `if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
   }`
+  }
 
   return /* wgsl */ `
 // ============================================
@@ -241,6 +252,8 @@ export interface TemporalMainBlockConfig {
   useDensityGrid?: boolean
   /** Density matrix mode — disable inline wavefunction fallback */
   useDensityMatrix?: boolean
+  /** When true, the grid-only path is guaranteed — no inline wavefunction fallback compiled. */
+  gridOnly?: boolean
 }
 
 /**
@@ -270,7 +283,12 @@ struct TemporalFragmentOutput {
  * @param config
  */
 export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}): string {
-  const { bayerJitter = true, useDensityGrid = false, useDensityMatrix = false } = config
+  const {
+    bayerJitter = true,
+    useDensityGrid = false,
+    useDensityMatrix = false,
+    gridOnly = false,
+  } = config
 
   // Bayer jitter section - applies sub-pixel offset for quarter-res rendering
   // NOTE: Unlike the incorrect previous implementation that DISCARDED pixels,
@@ -320,13 +338,17 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
   // When jitter is applied, use jitteredVPosition for ray direction
   const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
 
-  const raymarchCall = useDensityGrid
-    ? `let phaseDependentMode =
+  let raymarchCall: string
+  if (gridOnly) {
+    raymarchCall = `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
+  } else if (useDensityGrid) {
+    raymarchCall = `let phaseDependentMode =
     ${phaseAlgorithmCondition('schroedinger')} ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
   let probabilityCurrentVolumeMode =
+    FEATURE_PROBABILITY_CURRENT &&
     schroedinger.probabilityCurrentEnabled != 0u &&
     (
       schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_VOLUME ||
@@ -368,11 +390,13 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     }`
     }
   }`
-    : `if (fastMode) {
+  } else {
+    raymarchCall = `if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
   }`
+  }
 
   return /* wgsl */ `
 // ============================================

@@ -402,6 +402,31 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('struct FragmentOutput')
   })
 
+  it('composes grid-only mode for hydrogen ND without unresolved hydrogenRadial', () => {
+    // Regression: grid-only stubs exclude hydrogenRadialBlock, but
+    // radialProbabilityBlock called hydrogenRadial() → unresolved symbol.
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      quantumMode: 'hydrogenND',
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      probabilityCurrentEnabled: false,
+      colorAlgorithm: 11, // radialDistance — non-phase, enables gridOnly
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).toContain('Grid-Only (inline raymarch excluded)')
+    expect(features).toContain('Hydrogen ND')
+    // Radial probability overlay must use stub (no hydrogenRadial in grid-only)
+    expect(wgsl).not.toContain('fn hydrogenRadial(')
+  })
+
   it('uses sphere intersection for non-free-scalar modes', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,

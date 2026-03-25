@@ -62,6 +62,9 @@ export interface PassConfig {
   pauliFieldView?: string
   representation: 'position' | 'momentum' | 'wigner'
   openQuantumEnabled: boolean
+  crossSectionEnabled: boolean
+  classicalOverlayEnabled: boolean
+  probabilityCurrentEnabled: boolean
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
   backgroundColor: string
@@ -85,6 +88,9 @@ export interface SchrodingerPassConfig {
   fastEigenInterpolationEnabled: boolean
   temporalReprojectionEnabled: boolean
   openQuantumEnabled: boolean
+  crossSectionEnabled: boolean
+  classicalOverlayEnabled: boolean
+  probabilityCurrentEnabled: boolean
 }
 
 /** Subset of PassConfig fields that trigger post-processing pass rebuild when changed. */
@@ -173,46 +179,55 @@ export function normalizeColorAlgorithmForQuantumMode(
   return 'radialDistance'
 }
 
+/** Compute/2D modes that are GPU-lattice or low-dim: disable analytical features. */
+const COMPUTE_MODES = new Set([
+  'freeScalarField',
+  'tdseDynamics',
+  'becDynamics',
+  'diracEquation',
+  'quantumWalk',
+])
+
+/** Gate a config flag: return false if any disabling condition is true, otherwise pass through. */
+function gate(value: boolean, ...disablers: boolean[]): boolean {
+  return disablers.some(Boolean) ? false : value
+}
+
 /** @returns Normalized Schroedinger-specific config with compute-mode overrides applied. */
 export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
-  const isFreeScalar = config.quantumMode === 'freeScalarField'
-  const isTdse = config.quantumMode === 'tdseDynamics'
-  const isBec = config.quantumMode === 'becDynamics'
-  const isDirac = config.quantumMode === 'diracEquation'
-  const isQuantumWalk = config.quantumMode === 'quantumWalk'
   const isPauli = config.objectType === 'pauliSpinor'
-  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isQuantumWalk || isPauli
-  const is2D = !isComputeMode && (config.dimension === 2 || config.representation === 'wigner')
-
-  const colorAlgorithm = normalizeColorAlgorithmForQuantumMode(
-    config.quantumMode,
-    config.colorAlgorithm,
-    config.openQuantumEnabled,
-    config.diracFieldView,
-    isPauli ? config.pauliFieldView : undefined,
-    config.objectType
-  )
+  const isCompute = COMPUTE_MODES.has(config.quantumMode) || isPauli
+  const is2D = !isCompute && (config.dimension === 2 || config.representation === 'wigner')
+  const disableAnalytical = isCompute || is2D
+  const disableQuantumEffect = isCompute || config.openQuantumEnabled
 
   return {
     objectType: config.objectType,
-    dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
+    dimension: isCompute ? Math.max(config.dimension, 3) : config.dimension,
     quantumMode: config.quantumMode,
-    termCount: isComputeMode ? 1 : config.termCount,
-    colorAlgorithm,
+    termCount: isCompute ? 1 : config.termCount,
+    colorAlgorithm: normalizeColorAlgorithmForQuantumMode(
+      config.quantumMode,
+      config.colorAlgorithm,
+      config.openQuantumEnabled,
+      config.diracFieldView,
+      isPauli ? config.pauliFieldView : undefined,
+      config.objectType
+    ),
     isosurface: config.isosurface,
-    nodalEnabled: isComputeMode || config.openQuantumEnabled ? false : config.nodalEnabled,
-    phaseMaterialityEnabled:
-      isComputeMode || config.openQuantumEnabled ? false : config.phaseMaterialityEnabled,
-    interferenceEnabled:
-      isComputeMode || config.openQuantumEnabled ? false : config.interferenceEnabled,
-    uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
-    representation: isComputeMode ? 'position' : config.representation,
-    eigenfunctionCacheEnabled: isComputeMode || is2D ? false : config.eigenfunctionCacheEnabled,
-    analyticalGradientEnabled: isComputeMode || is2D ? false : config.analyticalGradientEnabled,
-    fastEigenInterpolationEnabled:
-      isComputeMode || is2D ? false : config.fastEigenInterpolationEnabled,
-    temporalReprojectionEnabled: isComputeMode || is2D ? false : config.temporalReprojectionEnabled,
-    openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
+    representation: isCompute ? 'position' : config.representation,
+    openQuantumEnabled: gate(config.openQuantumEnabled, isCompute),
+    nodalEnabled: gate(config.nodalEnabled, disableQuantumEffect),
+    phaseMaterialityEnabled: gate(config.phaseMaterialityEnabled, disableQuantumEffect),
+    interferenceEnabled: gate(config.interferenceEnabled, disableQuantumEffect),
+    uncertaintyBoundaryEnabled: gate(config.uncertaintyBoundaryEnabled, isCompute),
+    eigenfunctionCacheEnabled: gate(config.eigenfunctionCacheEnabled, disableAnalytical),
+    analyticalGradientEnabled: gate(config.analyticalGradientEnabled, disableAnalytical),
+    fastEigenInterpolationEnabled: gate(config.fastEigenInterpolationEnabled, disableAnalytical),
+    temporalReprojectionEnabled: gate(config.temporalReprojectionEnabled, disableAnalytical),
+    crossSectionEnabled: gate(config.crossSectionEnabled, disableAnalytical),
+    classicalOverlayEnabled: gate(config.classicalOverlayEnabled, disableAnalytical),
+    probabilityCurrentEnabled: gate(config.probabilityCurrentEnabled, disableAnalytical),
   }
 }
 

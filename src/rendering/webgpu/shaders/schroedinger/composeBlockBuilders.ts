@@ -75,8 +75,8 @@ import { wignerHOBlock } from './quantum/wignerHO.wgsl'
 import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
 import { schroedingerUniformsBlock } from './uniforms.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
-import { classicalOverlayWGSL } from './volume/classicalOverlay.wgsl'
-import { crossSectionBlock } from './volume/crossSection.wgsl'
+import { classicalOverlayStubWGSL, classicalOverlayWGSL } from './volume/classicalOverlay.wgsl'
+import { crossSectionBlock, crossSectionStubBlock } from './volume/crossSection.wgsl'
 import {
   analysisTextureSamplingBlock,
   densityGridSamplingBlock,
@@ -91,6 +91,10 @@ import {
 } from './volume/emission.wgsl'
 import {
   generateVolumeRaymarchGridBlock,
+  nodalSurfacesBlock,
+  nodalSurfacesStubBlock,
+  probabilityCurrentBlock,
+  probabilityCurrentStubBlock,
   volumeGradientBlock,
   volumeIntegrationBlock,
   volumeRaymarchBlock,
@@ -164,7 +168,41 @@ export function buildQuantumMathBlocks(opts: {
   useUnrolledHO: boolean
   termCount: number | undefined
   isWigner: boolean
+  /** When true, the density grid handles all wavefunction evaluation in a compute shader.
+   *  The fragment shader only needs stubs for symbols referenced by dead branches. */
+  gridOnly?: boolean
 }): ShaderBlockEntry[] {
+  // In grid-only mode, the fragment shader does NOT evaluate wavefunctions inline.
+  // All quantum math (Hermite, ho1D, hoND, evalPsi, density sampling) lives in the
+  // compute shader's DensityGridComputePass. The fragment shader only needs stubs
+  // for symbols still referenced in dead WGSL branches (e.g. behind const false guards).
+  if (opts.gridOnly) {
+    return [
+      {
+        name: 'Quantum Math Stubs (grid-only)',
+        content: [
+          '// Grid-only mode: quantum math excluded from fragment shader.',
+          '// The DensityGridComputePass evaluates wavefunctions on a 3D grid;',
+          '// the fragment shader raymarches the pre-computed grid texture.',
+          '// Stubs satisfy WGSL symbol resolution for dead branches.',
+          'fn mapPosToND(pos: vec3f, uniforms: SchroedingerUniforms) -> array<f32, 11> { var a: array<f32, 11>; return a; }',
+          'fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f { return vec2f(0.0); }',
+          'fn rhoFromPsi(psi: vec2f) -> f32 { return psi.x * psi.x + psi.y * psi.y; }',
+          'fn sFromRho(rho: f32) -> f32 { return select(-20.0, log(rho), rho > 1e-9); }',
+          'fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
+          'fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+          'fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> { return array<vec3f, 2>(vec3f(0.0), pos); }',
+          'fn sampleDensityAtPos(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
+          'fn densityPair(psi: vec2f) -> vec2f { return vec2f(0.0); }',
+          'fn applyUncertaintyBoundaryEmphasis(rho: f32, logRho: f32, uniforms: SchroedingerUniforms) -> f32 { return rho; }',
+          'fn gradientNoise(p: vec3f) -> f32 { return 0.0; }',
+          'fn hash33(p3: vec3f) -> vec3f { return vec3f(0.0); }',
+          'fn cmul(a: vec2f, b: vec2f) -> vec2f { return vec2f(0.0); }',
+          'fn cexp_i(theta: f32) -> vec2f { return vec2f(cos(theta), sin(theta)); }',
+        ].join('\n'),
+      },
+    ]
+  }
   const hoNDBlockMap: Record<number, string> = {
     2: hoND2dBlock,
     3: hoND3dBlock,
@@ -335,6 +373,11 @@ export function buildVolumeBlocks(opts: {
   usePrecomputedNormals: boolean
   freeScalarAnalysis: boolean
   nodal: boolean
+  crossSectionEnabled: boolean
+  classicalOverlayEnabled: boolean
+  probabilityCurrentEnabled: boolean
+  /** When true, inline raymarch functions are excluded — grid path handles everything. */
+  gridOnly?: boolean
 }): ShaderBlockEntry[] {
   return [
     { name: 'Beer-Lambert Absorption', content: absorptionBlock, condition: !opts.is2D },
@@ -347,27 +390,55 @@ export function buildVolumeBlocks(opts: {
       content: generateComputeBaseColor(opts.colorAlgorithm),
     },
     { name: 'Volume Emission (Post)', content: emissionPostBlock, condition: !opts.is2D },
-    { name: 'Cross-Section Slice', content: crossSectionBlock, condition: !opts.is2D },
-    { name: 'Classical Trajectory Overlay', content: classicalOverlayWGSL, condition: !opts.is2D },
+    {
+      name: 'Cross-Section Slice',
+      content: !opts.is2D && opts.crossSectionEnabled ? crossSectionBlock : crossSectionStubBlock,
+      condition: !opts.is2D,
+    },
+    {
+      name: 'Classical Trajectory Overlay',
+      content:
+        !opts.is2D && opts.classicalOverlayEnabled
+          ? classicalOverlayWGSL
+          : classicalOverlayStubWGSL,
+      condition: !opts.is2D,
+    },
     {
       name: 'Radial Probability Overlay',
       content:
-        opts.includeHydrogen && !opts.is2D ? radialProbabilityBlock : radialProbabilityStubBlock,
+        opts.includeHydrogen && !opts.is2D && !opts.gridOnly
+          ? radialProbabilityBlock
+          : radialProbabilityStubBlock,
       condition: !opts.is2D,
     },
-    { name: 'Volume Gradient', content: volumeGradientBlock, condition: !opts.is2D },
+    {
+      name: 'Volume Gradient',
+      content: opts.gridOnly
+        ? [
+            '// Stubs: tetrahedral gradient excluded in grid-only mode (grid uses fetchGradient).',
+            'struct TetraSample { rho: f32, s: f32, phase: f32, gradient: vec3f }',
+            'const TETRA_V0: vec3f = vec3f(0.5773503, 0.5773503, -0.5773503);',
+            'const TETRA_V1: vec3f = vec3f(0.5773503, -0.5773503, 0.5773503);',
+            'const TETRA_V2: vec3f = vec3f(-0.5773503, 0.5773503, 0.5773503);',
+            'const TETRA_V3: vec3f = vec3f(-0.5773503, -0.5773503, -0.5773503);',
+            'fn sampleWithTetrahedralGradient(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
+            'fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+            'fn computeGradientTetrahedralAtPos(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+          ].join('\n')
+        : volumeGradientBlock,
+      condition: !opts.is2D,
+    },
     {
       name: 'Analytical Gradient',
       condition: !opts.is2D,
-      content: opts.useCache
-        ? generateAnalyticalGradientBlock(opts.actualDim, opts.termCount)
-        : [
-            '// Stubs: analytical gradient unavailable without eigenfunction cache',
-            '// These functions are referenced behind if (USE_ANALYTICAL_GRADIENT) guards',
-            '// but WGSL still requires symbol resolution in dead branches.',
-            'fn sampleDensityWithAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
-            'fn computeAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
-          ].join('\n'),
+      content:
+        opts.gridOnly || !opts.useCache
+          ? [
+              '// Stubs: analytical gradient excluded (grid-only or no eigenfunction cache).',
+              'fn sampleDensityWithAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
+              'fn computeAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+            ].join('\n')
+          : generateAnalyticalGradientBlock(opts.actualDim, opts.termCount),
     },
     {
       name: 'Density Grid Sampling',
@@ -388,7 +459,30 @@ export function buildVolumeBlocks(opts: {
         : '// Stub: analysis texture unavailable\nfn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !opts.is2D },
-    { name: 'Volume Raymarch', content: volumeRaymarchBlock, condition: !opts.is2D },
+    {
+      name: 'Nodal Surfaces',
+      content: opts.nodal ? nodalSurfacesBlock : nodalSurfacesStubBlock,
+      condition: !opts.is2D,
+    },
+    {
+      name: 'Probability Current',
+      content: opts.probabilityCurrentEnabled
+        ? probabilityCurrentBlock
+        : probabilityCurrentStubBlock,
+      condition: !opts.is2D,
+    },
+    {
+      name: 'Volume Raymarch',
+      condition: !opts.is2D,
+      content: opts.gridOnly
+        ? [
+            '// Stubs: inline raymarch excluded in grid-only mode.',
+            '// The grid-based volumeRaymarchGrid handles all rendering.',
+            'fn volumeRaymarch(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',
+            'fn volumeRaymarchHQ(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',
+          ].join('\n')
+        : volumeRaymarchBlock,
+    },
     {
       name: 'Volume Raymarch Grid',
       condition: !opts.is2D,

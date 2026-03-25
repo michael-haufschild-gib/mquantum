@@ -412,6 +412,9 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         fastEigenInterpolationEnabled: config.fastEigenInterpolationEnabled,
         representation: config.representation,
         openQuantumEnabled: config.openQuantumEnabled,
+        crossSectionEnabled: config.crossSectionEnabled,
+        classicalOverlayEnabled: config.classicalOverlayEnabled,
+        probabilityCurrentEnabled: config.probabilityCurrentEnabled,
       })
 
     case 'pauliSpinor':
@@ -432,6 +435,9 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         representation: 'position',
         openQuantumEnabled: false,
         isPauli: true,
+        crossSectionEnabled: false,
+        classicalOverlayEnabled: false,
+        probabilityCurrentEnabled: false,
       })
 
     default:

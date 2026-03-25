@@ -439,7 +439,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     }
   }
 
-  if (schroedinger.probabilityCurrentEnabled != 0u && schroedinger.probabilityCurrentScale > 0.0) {
+  if (FEATURE_PROBABILITY_CURRENT && schroedinger.probabilityCurrentEnabled != 0u && schroedinger.probabilityCurrentScale > 0.0) {
     let currentSample = sampleProbabilityCurrent(p, animTime, schroedinger);
     let currentOverlay = computeProbabilityCurrentOverlay(
       p,

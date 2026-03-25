@@ -840,6 +840,8 @@ export default [
       'src/rendering/webgpu/renderers/**/*.ts',
       'src/rendering/webgpu/graph/WebGPURenderGraph.ts',
       'src/rendering/webgpu/useExportRuntime.ts',
+      'src/rendering/webgpu/shaders/schroedinger/compose.ts',
+      'src/rendering/webgpu/shaders/schroedinger/composeBlockBuilders.ts',
     ],
     rules: {
       complexity: ['error', 40],

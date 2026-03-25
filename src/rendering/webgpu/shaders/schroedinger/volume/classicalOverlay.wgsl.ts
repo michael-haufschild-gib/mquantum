@@ -14,6 +14,25 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/classicalOverlay.wgsl
  */
 
+/** No-op stub when classical overlay is disabled at compile time. Includes struct for symbol resolution. */
+export const classicalOverlayStubWGSL = /* wgsl */ `
+struct ClassicalOverlayResult {
+  color: vec3f,
+  alpha: f32,
+  depth: f32,
+}
+
+fn evaluateClassicalOverlay(
+  ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms, dimension: i32
+) -> ClassicalOverlayResult {
+  var result: ClassicalOverlayResult;
+  result.color = vec3f(0.0);
+  result.alpha = 0.0;
+  result.depth = tFar;
+  return result;
+}
+`
+
 export const classicalOverlayWGSL = /* wgsl */ `
 
 struct ClassicalOverlayResult {

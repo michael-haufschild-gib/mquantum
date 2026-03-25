@@ -84,37 +84,45 @@ const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.
 const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
   state.schroedinger?.isoEnabled ?? false
 
-const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => {
-  const quantumMode = state.schroedinger?.quantumMode ?? 'harmonicOscillator'
-  const representation = (state.schroedinger?.representation ?? 'position') as
-    | 'position'
-    | 'momentum'
-    | 'wigner'
-  const openQuantumEnabled = state.schroedinger?.openQuantum?.enabled ?? false
-  const openQuantumSupported =
+/** Resolves open-quantum support based on quantum mode and representation. */
+function isOpenQuantumSupported(
+  quantumMode: string,
+  representation: string,
+  enabled: boolean
+): boolean {
+  return (
+    enabled &&
     (quantumMode === 'harmonicOscillator' ||
       quantumMode === 'hydrogenND' ||
       quantumMode === 'hydrogenNDCoupled') &&
     representation !== 'wigner'
+  )
+}
 
-  const diracFieldView =
-    quantumMode === 'diracEquation'
-      ? (state.schroedinger?.dirac?.fieldView ?? 'totalDensity')
-      : undefined
-
-  const pauliFieldView = state.pauliSpinor?.fieldView ?? 'spinDensity'
+const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => {
+  const s = state.schroedinger
+  const quantumMode = s?.quantumMode ?? 'harmonicOscillator'
+  const representation = (s?.representation ?? 'position') as 'position' | 'momentum' | 'wigner'
 
   return {
     quantumMode,
-    termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
-    nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
-    phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
-    interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
-    uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
+    termCount: (s?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+    nodalEnabled: s?.nodalEnabled ?? false,
+    phaseMaterialityEnabled: s?.phaseMaterialityEnabled ?? false,
+    interferenceEnabled: s?.interferenceEnabled ?? false,
+    uncertaintyBoundaryEnabled: s?.uncertaintyBoundaryEnabled ?? false,
+    crossSectionEnabled: s?.crossSectionEnabled ?? false,
+    classicalOverlayEnabled: s?.classicalOverlayEnabled ?? false,
+    probabilityCurrentEnabled: s?.probabilityCurrentEnabled ?? false,
     representation,
-    openQuantumEnabled: openQuantumEnabled && openQuantumSupported,
-    diracFieldView,
-    pauliFieldView,
+    openQuantumEnabled: isOpenQuantumSupported(
+      quantumMode,
+      representation,
+      s?.openQuantum?.enabled ?? false
+    ),
+    diracFieldView:
+      quantumMode === 'diracEquation' ? (s?.dirac?.fieldView ?? 'totalDensity') : undefined,
+    pauliFieldView: state.pauliSpinor?.fieldView ?? 'spinDensity',
   }
 }
 
@@ -339,6 +347,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           : schroedingerCompile.pauliFieldView,
       representation: schroedingerCompile.representation,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
+      crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
+      classicalOverlayEnabled: schroedingerCompile.classicalOverlayEnabled,
+      probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
       skyboxEnabled: environment.skyboxEnabled,
       skyboxMode: environment.skyboxMode as SkyboxMode,
       backgroundColor: environment.backgroundColor,
@@ -503,6 +514,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.interferenceEnabled,
     schroedingerCompile.uncertaintyBoundaryEnabled,
     schroedingerCompile.representation,
+    schroedingerCompile.crossSectionEnabled,
+    schroedingerCompile.classicalOverlayEnabled,
+    schroedingerCompile.probabilityCurrentEnabled,
     schroedingerCompile.diracFieldView,
     schroedingerCompile.pauliFieldView,
     performance_.temporalReprojectionEnabled,

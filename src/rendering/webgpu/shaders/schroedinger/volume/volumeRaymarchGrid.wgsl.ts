@@ -205,6 +205,7 @@ fn volumeRaymarchGrid(
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (
+      FEATURE_PROBABILITY_CURRENT &&
       !momentumOverlaySubsample &&
       uniforms.probabilityCurrentEnabled != 0u &&
       uniforms.probabilityCurrentScale > 0.0 &&
