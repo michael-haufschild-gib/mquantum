@@ -18,7 +18,7 @@
  */
 
 // Cosine palette evaluation functions (CPU-side)
-export { applyDistributionTS, calculateCosineColor, getCosinePaletteColorTS } from './cosine.glsl'
+export { applyDistributionTS, calculateCosineColor, getCosinePaletteColorTS } from './cosine'
 
 // Types
 export {
