@@ -1,5 +1,13 @@
 import { AnimatePresence, m } from 'motion/react'
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import React, {
+  cloneElement,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { soundManager } from '@/lib/audio/SoundManager'
@@ -247,14 +255,15 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       <>
         <div
           ref={triggerRef}
+          data-testid={`dropdown-trigger-${dropdownId}`}
           data-dropdown-trigger={dropdownId}
-          onClick={handleToggle}
-          role="button"
           className={`cursor-pointer ${className}`}
-          aria-haspopup="menu"
-          aria-expanded={isOpen}
         >
-          {trigger}
+          {cloneElement(trigger, {
+            onClick: handleToggle,
+            'aria-haspopup': 'menu' as const,
+            'aria-expanded': isOpen,
+          })}
         </div>
 
         <div

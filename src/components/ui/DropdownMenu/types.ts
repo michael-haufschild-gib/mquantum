@@ -13,7 +13,7 @@ export interface DropdownMenuItem {
 
 /** Props for the portal-rendered dropdown menu with submenu support. */
 export interface DropdownMenuProps {
-  trigger: React.ReactNode
+  trigger: React.ReactElement<Record<string, unknown>>
   items: DropdownMenuItem[]
   className?: string
   align?: 'left' | 'right'

@@ -335,6 +335,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
           return (
             <div
               key={tab.id}
+              id={`panel-${tab.id}`}
               className={`w-full h-full ${tab.id === value ? 'block animate-fade-in' : 'hidden'}`}
               role="tabpanel"
               aria-labelledby={`tab-${tab.id}`}

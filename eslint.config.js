@@ -656,6 +656,7 @@ export default [
       '@eslint-react/no-use-context': 'off',          // using useContext directly is fine
       '@eslint-react/no-context-provider': 'off',     // React 19 <Ctx> syntax is opt-in
       '@eslint-react/no-forward-ref': 'off',          // forwardRef is legitimate in this codebase
+      '@eslint-react/no-clone-element': 'off',         // single use in DropdownMenu trigger injection — intentional pattern
 
       // Disable rules that generate noise for legitimate patterns in this codebase
       // set-state-in-effect: 10+ components sync external data (GPU state, subscriptions,

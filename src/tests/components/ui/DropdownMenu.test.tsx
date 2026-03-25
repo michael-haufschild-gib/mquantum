@@ -274,10 +274,12 @@ describe('DropdownMenu (invariants)', () => {
     it('should add data-dropdown-trigger attribute to trigger', async () => {
       render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
-      // The trigger wrapper has proper ARIA attributes for accessibility
-      const buttons = screen.getAllByRole('button', { name: /Open Menu/ })
-      const triggerWrapper = buttons.find((el) => el.getAttribute('aria-haspopup') === 'menu')!
-      expect(triggerWrapper).toHaveAttribute('aria-expanded', 'false')
+      // ARIA attributes are injected directly onto the trigger button (no wrapper role="button")
+      const triggerButton = screen.getByRole('button', { name: /Open Menu/ })
+      expect(triggerButton).toHaveAttribute('aria-haspopup', 'menu')
+      expect(triggerButton).toHaveAttribute('aria-expanded', 'false')
+      // data-dropdown-trigger is on the positioning wrapper, not the button
+      const triggerWrapper = screen.getByTestId('dropdown-trigger-test-menu')
       expect(triggerWrapper).toHaveAttribute('data-dropdown-trigger', 'test-menu')
     })
 
