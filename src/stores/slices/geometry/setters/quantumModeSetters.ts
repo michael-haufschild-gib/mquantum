@@ -66,8 +66,7 @@ export function createQuantumModeSetters(
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
-      const needsDim3 =
-        COMPUTE_MODES_3D.has(mode) || mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
+      const needsDim3 = COMPUTE_MODES_3D.has(mode)
       if (needsDim3 && useGeometryStore.getState().dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
@@ -79,6 +78,13 @@ export function createQuantumModeSetters(
         if (COMPUTE_MODES.has(mode)) {
           if (state.schroedinger.representation !== 'position') updates.representation = 'position'
           if (state.schroedinger.crossSectionEnabled) updates.crossSectionEnabled = false
+        }
+
+        // Force position representation for hydrogen at dim=2
+        // (momentum/Wigner not yet implemented for 2D hydrogen)
+        const isHydrogen2D = dim === 2 && (mode === 'hydrogenND' || mode === 'hydrogenNDCoupled')
+        if (isHydrogen2D && state.schroedinger.representation !== 'position') {
+          updates.representation = 'position'
         }
 
         if (mode === 'freeScalarField') {
@@ -127,6 +133,12 @@ export function createQuantumModeSetters(
 
     setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {
       if (value !== 'position' && COMPUTE_MODES.has(get().schroedinger.quantumMode)) return
+      // Block non-position for hydrogen at dim=2 (not yet implemented)
+      if (value !== 'position') {
+        const qm = get().schroedinger.quantumMode
+        const dim = useGeometryStore.getState().dimension
+        if (dim === 2 && (qm === 'hydrogenND' || qm === 'hydrogenNDCoupled')) return
+      }
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, representation: value },
       }))

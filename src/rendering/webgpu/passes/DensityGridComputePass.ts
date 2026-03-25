@@ -17,6 +17,7 @@ import { logger } from '@/lib/logger'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
 import { DensityDistributionAnalyzer } from './DensityDistributionAnalysis'
 import { createGradientPipeline } from './DensityGridGradientSetup'
@@ -32,7 +33,7 @@ const DEFAULT_GRID_SIZE = 64
 const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
-const WORKGROUP_SIZE = 4
+const WORKGROUP_SIZE = 8
 /**
  * Configuration for the density grid compute pass.
  */
@@ -42,7 +43,7 @@ export interface DensityGridComputeConfig {
   /** Number of dimensions (3-11) */
   dimension: number
   /** Quantum mode */
-  quantumMode?: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode?: 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
   /** Number of HO superposition terms for compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Force rgba16float format (ensures phase data for dim > 3 momentum mode) */
@@ -207,8 +208,11 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     })
 
     // Create uniform buffers
-    // SchroedingerUniforms: 1520 bytes (matches SCHROEDINGER_UNIFORM_SIZE in renderer)
-    this.schroedingerBuffer = this.createUniformBuffer(device, 1520, 'density-schroedinger')
+    this.schroedingerBuffer = this.createUniformBuffer(
+      device,
+      SCHROEDINGER_UNIFORM_SIZE,
+      'density-schroedinger'
+    )
     // BasisVectors: 192 bytes (4 × 3 × vec4f)
     this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
     // GridParams: 48 bytes

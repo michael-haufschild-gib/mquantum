@@ -97,7 +97,10 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
 
       this.densityGridPass = new DensityGridComputePass({
         dimension: dim,
-        quantumMode: config.quantumMode as 'harmonicOscillator' | 'hydrogenND',
+        quantumMode: config.quantumMode as
+          | 'harmonicOscillator'
+          | 'hydrogenND'
+          | 'hydrogenNDCoupled',
         termCount: config.termCount,
         gridSize: densityGridSize,
         forceRgba,

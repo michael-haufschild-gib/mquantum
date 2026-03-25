@@ -416,14 +416,19 @@ export const createSchroedingerSlice: StateCreator<
       const dimensionBoost = dimension > 4 ? 1.0 + (dimension - 4) * 0.4 : 1.0
       const densityGain = Math.min(baseDensityGain * dimensionBoost, 5.0)
 
-      const hydrogenUpdate: Record<string, number> = {}
+      const hydrogenUpdate: Record<string, unknown> = {}
       if (dimension === 2) {
         const current = get().schroedinger
         if (current.quantumMode === 'hydrogenND' || current.quantumMode === 'hydrogenNDCoupled') {
-          const currentL = current.azimuthalQuantumNumber
-          const currentM = current.magneticQuantumNumber
-          if (currentM === 0 && currentL > 0) {
-            hydrogenUpdate.magneticQuantumNumber = 1
+          // In 2D hydrogen, l is not independent — it equals |m|.
+          // The shader uses abs(magneticM) as effective l, but keep the store consistent.
+          const absM = Math.abs(current.magneticQuantumNumber)
+          if (current.azimuthalQuantumNumber !== absM) {
+            hydrogenUpdate.azimuthalQuantumNumber = absM
+          }
+          // Force position representation (momentum/Wigner not implemented for 2D hydrogen)
+          if (current.representation !== 'position') {
+            hydrogenUpdate.representation = 'position'
           }
         }
       }

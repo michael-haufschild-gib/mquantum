@@ -59,10 +59,10 @@ describe('quantum mode state machine transitions', () => {
       expect(useGeometryStore.getState().dimension).toBe(2)
     })
 
-    it('hydrogenND enforces dimension >= 3', () => {
+    it('hydrogenND allows dimension 2 (true 2D hydrogen)', () => {
       useGeometryStore.getState().setDimension(2)
       useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenND')
-      expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+      expect(useGeometryStore.getState().dimension).toBe(2)
     })
 
     it('switching from compute to analytical preserves dimension', () => {

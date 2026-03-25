@@ -128,7 +128,7 @@ export const densityGridComputeBlock = /* wgsl */ `
 // Density Grid Compute Shader Entry Point
 // ============================================
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check - skip threads outside grid
   if (any(gid >= gridParams.gridSize)) {
@@ -184,7 +184,7 @@ export const densityGridWithPhaseComputeBlock = /* wgsl */ `
 // Density Grid with Phase - Compute Shader
 // ============================================
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check
   if (any(gid >= gridParams.gridSize)) {
@@ -223,6 +223,95 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 `
 
 /**
+ * Coupled hydrogen ND compute shader with nodal-plane avoidance.
+ *
+ * The coupled wavefunction's Gegenbauer chain C_{l_k-l_{k+1}}^α(cos θ_k)
+ * evaluates to zero when cos(θ_k)=0 for odd-degree layers. At the default
+ * identity-basis orientation, extra-dim coordinates from mapPosToND are zero,
+ * placing cos(θ₁)=x_D/r_D=0 for all grid points → full-grid zero density.
+ *
+ * Fix: after mapPosToND, mix a small fraction of the z-component into extra
+ * dimensions. This is equivalent to viewing a slightly tilted D-dim slice.
+ * The tilt angle is ~15° (sin≈0.26), physically negligible for visualization
+ * but sufficient to break the exact nodal alignment. When the user rotates
+ * in higher dimensions, the basis vectors already produce nonzero extra-dim
+ * coordinates and the offset has negligible effect (it's additive to already
+ * nonzero values scaled by the same coordinate).
+ *
+ * Output format (rgba16float): same as densityGridWithPhaseComputeBlock.
+ */
+export function generateCoupledDensityGridComputeBlock(dimension: number): string {
+  const D = Math.min(Math.max(dimension, 3), 11)
+  const extraDimCount = D - 3
+
+  // Generate the nodal offset lines: xND[3] += xND[2] * 0.26, xND[4] += xND[1] * 0.26, ...
+  // Each extra dim gets a fraction of a different visible-dim coordinate so they're
+  // not all proportional (which would create a new aligned nodal surface).
+  const offsetLines: string[] = []
+  const sourceCoords = [2, 1, 0, 2, 1, 0, 2, 1] // z, y, x, z, y, x, ...
+  for (let i = 0; i < extraDimCount; i++) {
+    const extraIdx = i + 3
+    const srcIdx = sourceCoords[i % sourceCoords.length]!
+    offsetLines.push(`    xND[${extraIdx}] += xND[${srcIdx}] * 0.26;`)
+  }
+
+  return /* wgsl */ `
+// ============================================
+// Coupled Hydrogen ND Density Grid - Compute Shader
+// Nodal-plane avoidance for ${D}D (${extraDimCount} extra dims)
+// ============================================
+
+@compute @workgroup_size(8, 8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  // Bounds check
+  if (any(gid >= gridParams.gridSize)) {
+    return;
+  }
+
+  // Convert grid coordinate to world-space position
+  let gridSizeF = vec3f(gridParams.gridSize);
+  let uvw = (vec3f(gid) + 0.5) / gridSizeF;
+  let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
+
+  // Skip positions outside bounding sphere (dynamic radius)
+  let dist2 = dot(worldPos, worldPos);
+  let boundR = schroedinger.boundingRadius;
+  if (dist2 > boundR * boundR) {
+    textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
+    return;
+  }
+
+  // Map 3D position to ND coordinates via basis vectors
+  var xND = mapPosToND(worldPos, schroedinger);
+
+  // Nodal-plane avoidance: mix visible-dim coordinates into extra dims.
+  // This tilts the viewing slice ~15° off the Gegenbauer nodal surface
+  // at cos(θ_k)=0 that occurs when extra dims are exactly zero.
+  {
+${offsetLines.join('\n')}
+  }
+
+  // Evaluate coupled wavefunction at the offset coordinates
+  let t = schroedinger.time * schroedinger.timeScale;
+  let psiResult = evalPsiWithSpatialPhase(xND, t, schroedinger);
+  let psi = psiResult.xy;
+
+  var rho = rhoFromPsi(psi);
+
+  // Hydrogen ND density boost
+  rho *= schroedinger.hydrogenNDBoost;
+
+  // Uncertainty boundary emphasis skipped in compute (applied in fragment)
+  let logRho = select(-20.0, log(max(rho, 1e-20)), rho > 1e-10);
+  let spatialPhase = psiResult.z;
+  let relativePhase = psiResult.w;
+
+  textureStore(densityGrid, gid, vec4f(rho, logRho, spatialPhase, relativePhase));
+}
+`
+}
+
+/**
  * Density matrix compute shader entry point.
  *
  * Evaluates n(x) = Tr(ρ|x⟩⟨x|) = Σ_{kl} ρ_{kl} ψ_k(x) ψ_l*(x)
@@ -253,7 +342,7 @@ fn complexConjOQ(a: vec2f) -> vec2f {
   return vec2f(a.x, -a.y);
 }
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check
   if (any(gid >= gridParams.gridSize)) {

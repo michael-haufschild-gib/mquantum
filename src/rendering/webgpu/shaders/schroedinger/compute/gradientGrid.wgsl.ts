@@ -25,7 +25,7 @@ override HAS_LOG_DENSITY: u32 = 1u;
 // 1 = dual-channel (Dirac/Pauli) with R=primary, G=secondary density
 override IS_DUAL_CHANNEL_GRID: u32 = 0u;
 
-@compute @workgroup_size(4, 4, 4)
+@compute @workgroup_size(8, 8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let size = GRID_SIZE;
   if (any(gid >= vec3u(size))) { return; }

@@ -50,10 +50,21 @@ import {
   hydrogenNDGen11dBlock,
 } from '../quantum/hydrogenNDVariants.wgsl'
 import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
+import {
+  getHydrogenNDCoupledBlocks,
+  hypersphericalCoordsBlock,
+  hypersphericalNormBlock,
+  LN_GAMMA_HALF_INT_LUT_WGSL,
+} from '../quantum/hypersphericalHarmonics.wgsl'
 // Hydrogen blocks (shared by hydrogen ND mode)
 import { laguerreBlock } from '../quantum/laguerre.wgsl'
 import { legendreBlock } from '../quantum/legendre.wgsl'
-import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from '../quantum/psi.wgsl'
+import {
+  psiBlockDynamicHarmonic,
+  psiBlockHarmonic,
+  psiBlockHydrogenND,
+  psiBlockHydrogenNDCoupled,
+} from '../quantum/psi.wgsl'
 // Single basis evaluation for density matrix mode
 import { generateSingleBasisBlock } from '../quantum/singleBasis.wgsl'
 import { sphericalHarmonicsBlock } from '../quantum/sphericalHarmonics.wgsl'
@@ -95,6 +106,101 @@ export interface DensityGridComputeConfig {
   useDensityMatrix?: boolean
 }
 
+/** Derived flags and compile-time constants for the density grid compute shader. */
+interface ComputeShaderFlags {
+  defines: string[]
+  features: string[]
+  actualDim: number
+  isHydrogenFamily: boolean
+  isHydrogenCoupled: boolean
+  includeHydrogen: boolean
+  includeHydrogenND: boolean
+  includeHarmonic: boolean
+  hydrogenNDDimension: number
+  useUnrolledHO: boolean
+}
+
+/** Generate WGSL compile-time defines and feature tags for the compute shader. */
+function generateComputeDefines(config: DensityGridComputeConfig): ComputeShaderFlags {
+  const {
+    dimension,
+    quantumMode = 'harmonicOscillator',
+    termCount,
+    storageFormat = 'r16float',
+    useDensityMatrix = false,
+  } = config
+
+  const defines: string[] = []
+  const features: string[] = []
+  const actualDim = Math.min(Math.max(dimension, 3), 11)
+
+  defines.push(`const DIMENSION: i32 = ${dimension};`)
+  defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
+  features.push(`${dimension}D Quantum`)
+
+  const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
+  const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
+  const includeHydrogen = isHydrogenFamily
+  const includeHydrogenND = isHydrogenFamily
+  const includeHarmonic = !isHydrogenFamily
+  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
+
+  defines.push(`const HYDROGEN_MODE_ENABLED: bool = ${includeHydrogen};`)
+  defines.push(`const HYDROGEN_ND_MODE_ENABLED: bool = ${includeHydrogenND};`)
+  if (includeHydrogenND) {
+    defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${hydrogenNDDimension};`)
+  }
+
+  const useUnrolledHO = includeHarmonic && termCount !== undefined
+  if (useUnrolledHO && termCount) {
+    defines.push('const HO_UNROLLED: bool = true;')
+    defines.push(`const HO_TERM_COUNT: i32 = ${termCount};`)
+    features.push(`HO ${termCount}-term unrolled`)
+  } else {
+    defines.push('const HO_UNROLLED: bool = false;')
+  }
+
+  if (quantumMode === 'hydrogenNDCoupled') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
+    features.push('Hydrogen ND Coupled (hyperspherical)')
+  } else if (quantumMode === 'hydrogenND') {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
+    features.push('Hydrogen ND')
+  } else {
+    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
+    features.push('Harmonic Oscillator')
+  }
+
+  defines.push('const TEMPORAL_ENABLED: bool = false;')
+  defines.push('const COLOR_ALGORITHM: i32 = 4;')
+  defines.push('const IS_DUAL_CHANNEL: bool = false;')
+  defines.push('const FEATURE_INTERFERENCE: bool = true;')
+  defines.push('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
+  defines.push('const SKIP_DENSITY_EMPHASIS: bool = true;')
+
+  features.push('Density Grid Compute')
+  features.push(`Grid Format: ${storageFormat}`)
+  if (useDensityMatrix) {
+    features.push('Density Matrix (Open Quantum)')
+    defines.push('const USE_DENSITY_MATRIX: bool = true;')
+  } else {
+    defines.push('const USE_DENSITY_MATRIX: bool = false;')
+  }
+
+  return {
+    defines,
+    features,
+    actualDim,
+    isHydrogenFamily,
+    isHydrogenCoupled,
+    includeHydrogen,
+    includeHydrogenND,
+    includeHarmonic,
+    hydrogenNDDimension,
+    useUnrolledHO,
+  }
+}
+
 /**
  * Compose the density grid compute shader.
  *
@@ -110,83 +216,24 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   features: string[]
 } {
   const {
-    dimension,
     quantumMode = 'harmonicOscillator',
     termCount,
     storageFormat = 'r16float',
     useDensityMatrix = false,
   } = config
 
-  const defines: string[] = []
-  const features: string[] = []
-
-  // Compile-time dimension
-  const actualDim = Math.min(Math.max(dimension, 3), 11)
-
-  // Add dimension defines
-  defines.push(`const DIMENSION: i32 = ${dimension};`)
-  defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
-  features.push(`${dimension}D Quantum`)
-
-  const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
-  const includeHydrogen = isHydrogenFamily
-  const includeHydrogenND = isHydrogenFamily
-  const includeHarmonic = !isHydrogenFamily
-  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
-
-  defines.push(`const HYDROGEN_MODE_ENABLED: bool = ${includeHydrogen};`)
-  defines.push(`const HYDROGEN_ND_MODE_ENABLED: bool = ${includeHydrogenND};`)
-  if (includeHydrogenND) {
-    defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${hydrogenNDDimension};`)
-  }
-
-  // HO unrolled optimization when term count is known at compile time
-  const useUnrolledHO = includeHarmonic && termCount !== undefined
-
-  if (useUnrolledHO && termCount) {
-    defines.push('const HO_UNROLLED: bool = true;')
-    defines.push(`const HO_TERM_COUNT: i32 = ${termCount};`)
-    features.push(`HO ${termCount}-term unrolled`)
-  } else {
-    defines.push('const HO_UNROLLED: bool = false;')
-  }
-
-  // Quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenNDCoupled') {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
-    features.push('Hydrogen ND (Coupled)')
-  } else if (quantumMode === 'hydrogenND') {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
-    features.push('Hydrogen ND')
-  } else {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
-    features.push('Harmonic Oscillator')
-  }
-
-  // Temporal disabled for compute (not needed)
-  defines.push('const TEMPORAL_ENABLED: bool = false;')
-  // Compute shaders include shared density helpers that reference COLOR_ALGORITHM.
-  // Grid baking is algorithm-agnostic, so keep the default mixed mode value.
-  defines.push('const COLOR_ALGORITHM: i32 = 4;')
-  defines.push('const IS_DUAL_CHANNEL: bool = false;')
-  // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
-  // Set to true so runtime uniform toggles still control the effect in compute mode.
-  defines.push('const FEATURE_INTERFERENCE: bool = true;')
-  // Density modules reference FEATURE_UNCERTAINTY_BOUNDARY; keep it defined in compute shaders.
-  // Set to false — compute stores raw density; fragment shader applies emphasis per-pixel.
-  defines.push('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
-  // Skip uncertainty boundary emphasis in compute: store raw density in the grid so
-  // the fragment shader can apply emphasis per-pixel (preserves sharp band at 64³).
-  defines.push('const SKIP_DENSITY_EMPHASIS: bool = true;')
-
-  features.push('Density Grid Compute')
-  features.push(`Grid Format: ${storageFormat}`)
-  if (useDensityMatrix) {
-    features.push('Density Matrix (Open Quantum)')
-    defines.push('const USE_DENSITY_MATRIX: bool = true;')
-  } else {
-    defines.push('const USE_DENSITY_MATRIX: bool = false;')
-  }
+  const {
+    defines,
+    features,
+    actualDim,
+    isHydrogenFamily,
+    isHydrogenCoupled,
+    includeHydrogen,
+    includeHydrogenND,
+    includeHarmonic,
+    hydrogenNDDimension,
+    useUnrolledHO,
+  } = generateComputeDefines(config)
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
@@ -215,11 +262,19 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   }
   const hydrogenNDBlock = hydrogenNDBlockMap[hydrogenNDDimension] || ''
 
-  const selectedPsiBlock = isHydrogenFamily
-    ? psiBlockHydrogenND
-    : useUnrolledHO
-      ? psiBlockDynamicHarmonic
-      : psiBlockHarmonic
+  // Select the psi block based on quantum mode.
+  // Coupled mode uses the full hyperspherical harmonics evaluation.
+  // The basis vectors rotate the 3D viewing slice through D-dimensional space,
+  // so the grid is correctly populated for non-degenerate orientations.
+  // An automatic extra-dimension rotation offset ensures the initial slice
+  // avoids Gegenbauer nodal planes (cos θ_k = 0 for odd-degree layers).
+  const selectedPsiBlock = isHydrogenCoupled
+    ? psiBlockHydrogenNDCoupled
+    : isHydrogenFamily
+      ? psiBlockHydrogenND
+      : useUnrolledHO
+        ? psiBlockDynamicHarmonic
+        : psiBlockHarmonic
 
   // Build blocks array in dependency order
   const blocks = [
@@ -282,18 +337,40 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
 
-    // Hydrogen ND modules
+    // Hydrogen ND modules (uncoupled variant for decoupled mode)
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },
     {
       name: `Hydrogen ND ${hydrogenNDDimension}D`,
       content: hydrogenNDBlock,
-      condition: includeHydrogenND && hydrogenNDBlock.length > 0,
+      condition: includeHydrogenND && !isHydrogenCoupled && hydrogenNDBlock.length > 0,
     },
     {
       name: 'Hydrogen ND Dispatch',
       content: generateHydrogenNDDispatchBlock(hydrogenNDDimension),
-      condition: includeHydrogenND,
+      condition: includeHydrogenND && !isHydrogenCoupled,
     },
+
+    // Coupled hydrogen ND: hyperspherical harmonics + Gegenbauer chain
+    ...(isHydrogenCoupled && hydrogenNDDimension >= 3
+      ? (() => {
+          const coupled = getHydrogenNDCoupledBlocks(hydrogenNDDimension)
+          return [
+            { name: 'Ln Gamma Half-Int LUT', content: LN_GAMMA_HALF_INT_LUT_WGSL },
+            { name: 'Hyperspherical Coords Struct', content: hypersphericalCoordsBlock },
+            { name: 'Hyperspherical Norm', content: hypersphericalNormBlock },
+            {
+              name: `Hyperspherical Conversion ${hydrogenNDDimension}D`,
+              content: coupled.conversion,
+            },
+            {
+              name: `Hyperspherical Harmonic ${hydrogenNDDimension}D`,
+              content: coupled.harmonic,
+            },
+            { name: `Hydrogen ND Coupled ${hydrogenNDDimension}D`, content: coupled.coupled },
+            { name: 'Hydrogen ND Coupled Dispatch', content: coupled.dispatch },
+          ]
+        })()
+      : []),
 
     // HO Superposition - unrolled variants when termCount is known
     ...(useUnrolledHO && termCount
@@ -322,7 +399,12 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
     // Density field blocks
     { name: 'Density Pre-Map', content: densityPreMapBlock },
-    { name: `Density mapPosToND (${actualDim}D)`, content: generateMapPosToND(actualDim) },
+    {
+      name: `Density mapPosToND (${actualDim}D)`,
+      content: generateMapPosToND(actualDim, {
+        coupledNodalOffset: isHydrogenCoupled && actualDim > 3,
+      }),
+    },
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // Single basis function evaluation (density matrix mode only)

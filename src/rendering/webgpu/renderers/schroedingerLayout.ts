@@ -214,7 +214,15 @@ const SCHROEDINGER_FIELDS = [
   { name: '_padPauliUp', type: 'f32' },
   { name: 'pauliSpinDownColor', type: 'vec3f' },
   { name: '_padPauliDown', type: 'f32' },
+
+  // --- Precomputed normalization constants for coupled hydrogen ND (offset 1520) ---
+  // Eliminates redundant log/exp/gamma calls that are constant per quantum state.
+  // [0].x = radial norm, [0].yzw...[2].xyzw = hyperspherical layer norms (up to 8)
+  { name: 'coupledNorms', type: arr('vec4f', 3) },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */
 export const SCHROEDINGER_LAYOUT = computeStructLayout(SCHROEDINGER_FIELDS)
+
+/** Total byte size of the SchroedingerUniforms GPU buffer (derived from layout). */
+export const SCHROEDINGER_UNIFORM_SIZE = SCHROEDINGER_LAYOUT.totalSize

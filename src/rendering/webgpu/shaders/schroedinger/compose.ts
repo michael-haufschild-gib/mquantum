@@ -304,10 +304,9 @@ function derivedShaderFlags(config: SchroedingerWGSLShaderConfig) {
   const is2D = dimension === 2 || isWigner
   const isHydrogenFamily = quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled'
   const isHydrogenCoupled = quantumMode === 'hydrogenNDCoupled'
-  const actualDim =
-    isHydrogenFamily || isWigner
-      ? Math.min(Math.max(dimension, 3), 11)
-      : Math.min(Math.max(dimension, 2), 11)
+  const actualDim = isWigner
+    ? Math.min(Math.max(dimension, 3), 11)
+    : Math.min(Math.max(dimension, 2), 11)
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily

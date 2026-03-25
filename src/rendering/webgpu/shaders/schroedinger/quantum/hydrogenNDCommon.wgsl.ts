@@ -190,4 +190,43 @@ fn hydrogenNDTimeEvolutionND(psi0: vec2f, n: i32, extraEnergy: f32, t: f32, dim:
   let s = sin(phase);
   return vec2f(psi0.x * c - psi0.y * s, psi0.x * s + psi0.y * c);
 }
+
+// ============================================
+// 2D Circular Harmonics Φ_m(φ)
+// ============================================
+// In 2D, the angular part is e^{imφ}/√(2π) (complex) or
+// cos(mφ)·√(2/2π), sin(|m|φ)·√(2/2π) (real).
+// Replaces 3D spherical harmonics Y_lm for D=2 hydrogen.
+
+/**
+ * Evaluate 2D circular harmonic as vec2f(re, im).
+ *
+ * Complex: Φ_m(φ) = e^{imφ} / √(2π)
+ * Real: m=0 → 1/√(2π),  m>0 → cos(mφ)/√π,  m<0 → sin(|m|φ)/√π
+ *
+ * @param m - Angular momentum quantum number
+ * @param phi - Azimuthal angle atan2(y, x)
+ * @param useReal - Use real circular harmonics
+ * @return vec2f(re, im) of angular factor
+ */
+fn evalCircularHarmonic(m: i32, phi: f32, useReal: bool) -> vec2f {
+  let mf = f32(m);
+  if (useReal) {
+    // Real circular harmonics
+    if (m == 0) {
+      // 1/√(2π) ≈ 0.39894228
+      return vec2f(0.39894228, 0.0);
+    } else if (m > 0) {
+      // cos(mφ)/√π ≈ cos(mφ) × 0.56418958
+      return vec2f(0.56418958 * cos(mf * phi), 0.0);
+    } else {
+      // sin(|m|φ)/√π ≈ sin(|m|φ) × 0.56418958
+      return vec2f(0.56418958 * sin(-mf * phi), 0.0);
+    }
+  } else {
+    // Complex: e^{imφ} / √(2π)
+    let norm = 0.39894228; // 1/√(2π)
+    return vec2f(norm * cos(mf * phi), norm * sin(mf * phi));
+  }
+}
 `

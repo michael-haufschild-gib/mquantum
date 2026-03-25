@@ -249,7 +249,51 @@ function packHydrogenAndExtraDims(
     floatView[I.extraDimOmega + i] = baseOmega * spread
   }
 
+  // Precompute normalization constants for coupled hydrogen ND
+  if (isCoupled && dimension >= 3) {
+    packCoupledNorms(floatView, validN, validL, bohrRadius, dimension, extraDimSource)
+  }
+
   return { validN, validL, bohrRadius }
+}
+
+// ---------------------------------------------------------------------------
+// Coupled hydrogen ND — precomputed normalization constants
+// ---------------------------------------------------------------------------
+
+import {
+  computeHydrogenRadialNormND,
+  computeHypersphericalLayerNorm,
+} from './uniformPackingHydrogenMath'
+
+/**
+ * Pack precomputed normalization constants for coupled hydrogen ND.
+ * Layout: coupledNorms[0].x = radial norm, [0].yzw...[2].xyzw = layer norms
+ */
+function packCoupledNorms(
+  floatView: Float32Array,
+  n: number,
+  l: number,
+  a0: number,
+  D: number,
+  angularChain: number[] | undefined
+): void {
+  const lambda = l + (D - 3) / 2
+  const nr = n - l - 1
+  const nEff = nr + lambda + 1
+
+  // Slot 0: radial normalization constant
+  floatView[I.coupledNorms] = computeHydrogenRadialNormND(nr, lambda, nEff, a0)
+
+  // Slots 1..numLayers: hyperspherical layer norms
+  const numTheta = D - 2
+  const numLayers = numTheta - 1
+
+  for (let k = 0; k < numLayers && k < 11; k++) {
+    const lk = k === 0 ? l : (angularChain?.[k - 1] ?? 0)
+    const lkp1 = angularChain?.[k] ?? 0
+    floatView[I.coupledNorms + k + 1] = computeHypersphericalLayerNorm(lk, lkp1, D, k)
+  }
 }
 
 /** Pack visual/appearance fields (active fields only — reserved fields zeroed by caller). */

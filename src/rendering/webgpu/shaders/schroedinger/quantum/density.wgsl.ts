@@ -56,8 +56,13 @@ fn gradientNoise(p: vec3f) -> f32 {
  * @param dimension - The dimension (3-11)
  * @returns WGSL mapPosToND function for the specified dimension
  */
-export function generateMapPosToND(dimension: number): string {
+export function generateMapPosToND(
+  dimension: number,
+  options?: { coupledNodalOffset?: boolean }
+): string {
   const dim = Math.min(Math.max(dimension, 2), 11)
+  const coupled = options?.coupledNodalOffset ?? false
+  const extraDimCount = dim - 3
 
   // Generate unrolled coordinate assignments using getBasisComponent helper
   // The basis uniform is globally available from the bind group
@@ -79,10 +84,28 @@ export function generateMapPosToND(dimension: number): string {
   for (var j = ${dim}; j < 11; j++) { xND[j] = 0.0; }`
       : ''
 
+  // Coupled hydrogen nodal-plane avoidance: mix visible-dim coordinates
+  // into extra dims so cos(θ_k) is not exactly zero at default orientation.
+  // Each extra dim uses a different source coordinate (z, y, x cycling) to
+  // avoid creating a new co-aligned nodal surface.
+  let nodalOffset = ''
+  if (coupled && extraDimCount > 0) {
+    const sourceCoords = [2, 1, 0]
+    const lines = []
+    for (let i = 0; i < extraDimCount; i++) {
+      const extraIdx = i + 3
+      const srcIdx = sourceCoords[i % sourceCoords.length]!
+      lines.push(`  xND[${extraIdx}] += xND[${srcIdx}] * 0.26;`)
+    }
+    nodalOffset = `
+  // Tilt slice ~15° off Gegenbauer nodal plane (coupled hydrogen ND)
+${lines.join('\n')}`
+  }
+
   return `
 // ============================================
 // Dimension-Specific Coordinate Mapping (Unrolled)
-// Dimension: ${dim}
+// Dimension: ${dim}${coupled ? ' — Coupled nodal offset' : ''}
 // ============================================
 
 // Maps 3D position to ND coordinates using rotated basis vectors.
@@ -90,7 +113,7 @@ export function generateMapPosToND(dimension: number): string {
 // Unrolled for dimension ${dim} - no runtime branching.
 fn mapPosToND(pos: vec3f, uniforms: SchroedingerUniforms) -> array<f32, 11> {
   var xND: array<f32, 11>;
-${assignments.join('\n')}${zeroLoop}
+${assignments.join('\n')}${zeroLoop}${nodalOffset}
   return xND;
 }
 `

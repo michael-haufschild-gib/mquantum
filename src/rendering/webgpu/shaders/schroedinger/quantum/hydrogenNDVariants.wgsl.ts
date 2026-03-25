@@ -212,7 +212,7 @@ ${extraDimEnergy}
  * @returns WGSL dispatch block code
  */
 export function generateHydrogenNDDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   return `
 // ============================================
 // Hydrogen ND - Compile-time Dispatch
@@ -339,9 +339,9 @@ ${extraDimEnergy}
  * @returns WGSL dispatch block code
  */
 export function generateHydrogenNDCachedDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   if (dim <= 3) {
-    // 3D hydrogen has no extra dimensions to cache, fall back to non-cached
+    // 2D/3D hydrogen has no extra dimensions to cache, fall back to non-cached
     return generateHydrogenNDDispatchBlock(dim)
   }
   return `
@@ -358,7 +358,70 @@ fn hydrogenNDOptimized(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUnifor
 `
 }
 
+// ============================================
+// 2D Hydrogen (True 2D Coulomb Problem)
+// ============================================
+
+/**
+ * Generate the 2D hydrogen wavefunction evaluator.
+ *
+ * In 2D, the angular part is circular harmonics e^{imφ}/√(2π)
+ * instead of 3D spherical harmonics. The effective angular momentum
+ * for the radial function is |m| (not an independent l).
+ * Energy: E_n = -0.5 / (n - 0.5)² via n_eff = n + (D-3)/2 = n - 0.5.
+ *
+ * The shader uses abs(uniforms.magneticM) as the effective l parameter
+ * for the radial wavefunction, making the store's azimuthalL irrelevant in 2D.
+ */
+function generateHydrogenND2DBlock(): string {
+  return `
+// ============================================
+// Hydrogen ND - 2D (True 2D Coulomb Problem)
+// Uses circular harmonics Φ_m(φ) = e^{imφ}/√(2π)
+// Effective angular momentum: l_eff = |m|
+// N-D radial correction: λ = |m| - 0.5, n_eff = n - 0.5
+// ============================================
+
+fn evalHydrogenNDPsi2D(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  // Extract 2D coordinates
+  let x0 = xND[0];
+  let x1 = xND[1];
+
+  // 2D radius
+  let r2D = sqrt(x0 * x0 + x1 * x1);
+
+  // In 2D hydrogen, effective l = |m| (l is not independent)
+  let effectiveL = abs(uniforms.magneticM);
+
+  // EARLY EXIT: Check hydrogen radial threshold (2D n_eff)
+  if (hydrogenRadialEarlyExitND(r2D, uniforms.principalN, effectiveL, uniforms.bohrRadius, 2)) {
+    return vec2f(0.0, 0.0);
+  }
+
+  // Azimuthal angle φ = atan2(y, x)
+  let phi = atan2(x1, x0);
+
+  // Radial part: R_{n,|m|}^(2D)(r) with D=2 dimensional correction
+  // λ = |m| + (2-3)/2 = |m| - 0.5
+  let R = hydrogenRadialND(uniforms.principalN, effectiveL, r2D, uniforms.bohrRadius, 2);
+
+  // Angular part: circular harmonic Φ_m(φ)
+  let Y = evalCircularHarmonic(uniforms.magneticM, phi, uniforms.useRealOrbitals != 0u);
+
+  // Combine: psi0 = R × Φ_m (complex)
+  let psi0 = vec2f(R * Y.x, R * Y.y);
+
+  // No extra dimensions in 2D
+  let extraEnergy: f32 = 0.0;
+
+  // Time evolution with 2D energy: E = -0.5/n_eff² where n_eff = n - 0.5
+  return hydrogenNDTimeEvolutionND(psi0, uniforms.principalN, extraEnergy, t, 2);
+}
+`
+}
+
 // Pre-generate all dimension-specific blocks
+export const hydrogenNDGen2dBlock = generateHydrogenND2DBlock()
 export const hydrogenNDGen3dBlock = generateHydrogenNDBlock(3)
 export const hydrogenNDGen4dBlock = generateHydrogenNDBlock(4)
 export const hydrogenNDGen5dBlock = generateHydrogenNDBlock(5)
@@ -372,12 +435,14 @@ export const hydrogenNDGen11dBlock = generateHydrogenNDBlock(11)
 /**
  * Get the generated block for a specific dimension.
  *
- * @param dimension - The dimension (3-11)
+ * @param dimension - The dimension (2-11)
  * @returns WGSL code for the hydrogen ND function
  */
 export function getHydrogenNDBlockForDimension(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   switch (dim) {
+    case 2:
+      return hydrogenNDGen2dBlock
     case 3:
       return hydrogenNDGen3dBlock
     case 4:

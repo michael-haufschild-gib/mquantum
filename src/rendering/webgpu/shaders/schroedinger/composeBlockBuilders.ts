@@ -45,6 +45,7 @@ import {
   generateHydrogenNDCachedBlock,
   generateHydrogenNDCachedDispatchBlock,
   generateHydrogenNDDispatchBlock,
+  hydrogenNDGen2dBlock,
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
   hydrogenNDGen5dBlock,
@@ -143,6 +144,10 @@ export function buildBindGroupBlock(opts: {
 /** Build shader blocks for the coupled hydrogen ND mode (hyperspherical harmonics). */
 function buildCoupledHydrogenBlocks(dim: number, isCoupled: boolean): ShaderBlockEntry[] {
   if (!isCoupled) return []
+  // In 2D, hyperspherical harmonics don't exist (only one angular coordinate).
+  // The coupled mode reduces to the uncoupled mode — blocks provided by the
+  // standard hydrogen ND path, so return empty here.
+  if (dim <= 2) return []
   const cb = getHydrogenNDCoupledBlocks(dim)
   return [
     { name: 'Gamma Half-Int LUT', content: LN_GAMMA_HALF_INT_LUT_WGSL },
@@ -218,6 +223,7 @@ export function buildQuantumMathBlocks(opts: {
   const hoNDBlock = hoNDBlockMap[opts.actualDim] || hoND3dBlock
 
   const hydrogenNDBlockMap: Record<number, string> = {
+    2: hydrogenNDGen2dBlock,
     3: hydrogenNDGen3dBlock,
     4: hydrogenNDGen4dBlock,
     5: hydrogenNDGen5dBlock,
@@ -230,13 +236,15 @@ export function buildQuantumMathBlocks(opts: {
   }
   const hydrogenNDBlock = hydrogenNDBlockMap[opts.hydrogenNDDimension] || ''
 
-  const selectedPsiBlock = opts.isHydrogenCoupled
-    ? psiBlockHydrogenNDCoupled
-    : opts.isHydrogenFamily
-      ? psiBlockHydrogenND
-      : opts.useUnrolledHO
-        ? psiBlockDynamicHarmonic
-        : psiBlockHarmonic
+  // In 2D, coupled hydrogen reduces to uncoupled (no hyperspherical harmonics)
+  const selectedPsiBlock =
+    opts.isHydrogenCoupled && opts.hydrogenNDDimension > 2
+      ? psiBlockHydrogenNDCoupled
+      : opts.isHydrogenFamily
+        ? psiBlockHydrogenND
+        : opts.useUnrolledHO
+          ? psiBlockDynamicHarmonic
+          : psiBlockHarmonic
 
   // Coupled hydrogen ND blocks (hyperspherical harmonics) — extracted for complexity
   const coupledEntries = buildCoupledHydrogenBlocks(
@@ -302,14 +310,18 @@ export function buildQuantumMathBlocks(opts: {
     {
       name: `Hydrogen ND ${opts.hydrogenNDDimension}D`,
       content: hydrogenNDBlock,
-      condition: opts.includeHydrogenND && !opts.isHydrogenCoupled && hydrogenNDBlock.length > 0,
+      // Include uncoupled block when: not coupled, OR coupled at dim=2 (where coupled=uncoupled)
+      condition:
+        opts.includeHydrogenND &&
+        (!opts.isHydrogenCoupled || opts.hydrogenNDDimension <= 2) &&
+        hydrogenNDBlock.length > 0,
     },
     {
       name: `Hydrogen ND ${opts.hydrogenNDDimension}D Cached`,
       content: opts.useCache ? generateHydrogenNDCachedBlock(opts.hydrogenNDDimension) : '',
       condition:
         opts.includeHydrogenND &&
-        !opts.isHydrogenCoupled &&
+        (!opts.isHydrogenCoupled || opts.hydrogenNDDimension <= 2) &&
         opts.useCache &&
         opts.hydrogenNDDimension > 3,
     },
@@ -319,7 +331,9 @@ export function buildQuantumMathBlocks(opts: {
         opts.useCache && opts.hydrogenNDDimension > 3
           ? generateHydrogenNDCachedDispatchBlock(opts.hydrogenNDDimension)
           : generateHydrogenNDDispatchBlock(opts.hydrogenNDDimension),
-      condition: opts.includeHydrogenND && !opts.isHydrogenCoupled,
+      // Include dispatch when: not coupled, OR coupled at dim=2
+      condition:
+        opts.includeHydrogenND && (!opts.isHydrogenCoupled || opts.hydrogenNDDimension <= 2),
     },
     // --- Coupled Hydrogen ND blocks (hyperspherical harmonics) ---
     ...coupledEntries,
@@ -353,7 +367,9 @@ export function buildQuantumMathBlocks(opts: {
     { name: 'Density Pre-Map', content: densityPreMapBlock },
     {
       name: `Density mapPosToND (${opts.actualDim}D)`,
-      content: generateMapPosToND(opts.actualDim),
+      content: generateMapPosToND(opts.actualDim, {
+        coupledNodalOffset: opts.isHydrogenCoupled && opts.actualDim > 3,
+      }),
     },
     { name: 'Density Post-Map', content: densityPostMapBlock }
   )

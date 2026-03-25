@@ -276,6 +276,37 @@ fn hydrogenRadialND(n: i32, l: i32, r: f32, a0: f32, dim: i32) -> f32 {
 }
 
 /**
+ * PERF: Evaluate R_nl^(D)(r) with a precomputed normalization constant.
+ * Identical to hydrogenRadialND except the caller supplies the norm,
+ * eliminating per-sample log/exp/gamma calls (~60 GPU cycles saved).
+ */
+fn hydrogenRadialNDWithNorm(n: i32, l: i32, r: f32, a0: f32, dim: i32, norm: f32) -> f32 {
+  if (n < 1 || l < 0 || l >= n) { return 0.0; }
+
+  let a0Safe = max(a0, 0.001);
+  let lambda = f32(l) + f32(dim - 3) * 0.5;
+  let nr = n - l - 1;
+  let nEff = f32(nr) + lambda + 1.0;
+  let rho = 2.0 * r / (nEff * a0Safe);
+
+  var rhoLambda: f32;
+  let lambdaInt = i32(lambda);
+  if (abs(lambda - f32(lambdaInt)) < 1e-6) {
+    rhoLambda = 1.0;
+    for (var il = 0; il < lambdaInt; il++) {
+      rhoLambda *= rho;
+    }
+  } else {
+    rhoLambda = pow(max(rho, 1e-20), lambda);
+  }
+
+  let alpha = 2.0 * lambda + 1.0;
+  let L = laguerre(nr, alpha, rho);
+  let expPart = exp(-rho * 0.5);
+  return norm * rhoLambda * L * expPart;
+}
+
+/**
  * Evaluate Gegenbauer polynomial C_n^alpha(x) using recurrence.
  */
 fn gegenbauer(n: i32, alpha: f32, x: f32) -> f32 {

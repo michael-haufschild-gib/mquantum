@@ -121,6 +121,35 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('return evalHarmonicOscillatorPsi(xND, t, uniforms);')
   })
 
+  it('compiles true 2D hydrogen with circular harmonics', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      sss: false,
+      quantumMode: 'hydrogenND',
+    })
+
+    verifyWgsl(wgsl, true)
+    // 2D evaluator uses circular harmonics, not spherical
+    expect(wgsl).toContain('evalHydrogenNDPsi2D')
+    expect(wgsl).toContain('evalCircularHarmonic')
+    expect(wgsl).toContain('ACTUAL_DIM: i32 = 2')
+  })
+
+  it('compiles hydrogenNDCoupled at dim=2 using uncoupled evaluator', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      sss: false,
+      quantumMode: 'hydrogenNDCoupled',
+    })
+
+    verifyWgsl(wgsl, true)
+    // At dim=2, coupled mode falls back to uncoupled (no hyperspherical harmonics)
+    expect(wgsl).toContain('evalHydrogenNDPsi2D')
+    expect(wgsl).not.toContain('cartesianToHyperspherical')
+  })
+
   it('routes hydrogen-ND psi through momentum evaluator when enabled', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 6,

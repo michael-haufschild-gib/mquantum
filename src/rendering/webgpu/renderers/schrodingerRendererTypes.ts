@@ -24,8 +24,8 @@ import type { packLightingUniforms } from '../utils/lighting'
 // Uniform buffer size
 // ---------------------------------------------------------------------------
 
-/** Total byte size of the SchroedingerUniforms GPU buffer */
-export const SCHROEDINGER_UNIFORM_SIZE = 1520
+/** Total byte size of the SchroedingerUniforms GPU buffer (derived from layout) */
+export { SCHROEDINGER_UNIFORM_SIZE } from './schroedingerLayout'
 
 // ---------------------------------------------------------------------------
 // Temporal jitter pattern

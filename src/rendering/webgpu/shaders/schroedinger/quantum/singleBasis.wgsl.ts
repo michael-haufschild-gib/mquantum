@@ -26,7 +26,48 @@ export function generateSingleBasisBlock(
   dimension?: number
 ): string {
   if (quantumMode === 'hydrogenND' || quantumMode === 'hydrogenNDCoupled') {
-    const dim = Math.min(Math.max(dimension ?? 3, 3), 11)
+    const dim = Math.min(Math.max(dimension ?? 3, 2), 11)
+
+    // 2D hydrogen: circular harmonics, |m| as effective l, 2D radius
+    if (dim === 2) {
+      return /* wgsl */ `
+// ============================================
+// Single Basis Function Evaluation (Hydrogen 2D - Per-Basis)
+// Uses circular harmonics and |m| as effective angular momentum
+// ============================================
+
+fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
+  let n_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 0);
+  let l_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 1);
+  let m_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 2);
+
+  if (n_k <= 0) { return vec2f(0.0, 0.0); }
+
+  let xND = mapPosToND(pos, uniforms);
+
+  // 2D radius
+  let r2D = sqrt(xND[0]*xND[0] + xND[1]*xND[1]);
+
+  // In 2D, effective l = |m|
+  let effectiveL = abs(m_k);
+
+  // Radial threshold
+  let nEff_k = f32(n_k) + f32(2 - 3) * 0.5;
+  let threshold = 25.0 * nEff_k * uniforms.bohrRadius * (1.0 + 0.1 * f32(effectiveL));
+  if (r2D > threshold) { return vec2f(0.0, 0.0); }
+
+  // Radial part with D=2
+  let R = hydrogenRadialND(n_k, effectiveL, r2D, uniforms.bohrRadius, 2);
+
+  // Angular part: circular harmonic
+  let phi = atan2(xND[1], xND[0]);
+  let Y_complex = evalCircularHarmonic(m_k, phi, uniforms.useRealOrbitals != 0u);
+
+  return vec2f(R * Y_complex.x, R * Y_complex.y);
+}
+`
+    }
+
     const extraDimCount = dim - 3
 
     // Generate extra-dimension HO product using per-basis quantum numbers

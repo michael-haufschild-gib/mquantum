@@ -7,8 +7,8 @@
 /** Workgroup size for 2D compute dispatches. Must match @workgroup_size(16, 16) in shaders. */
 export const WIGNER_WORKGROUP_SIZE = 16
 
-/** Byte size of the Schrödinger uniform buffer. Must match renderer constant. */
-export const SCHROEDINGER_UNIFORM_SIZE = 1520
+/** Byte size of the Schrödinger uniform buffer (derived from layout). */
+export { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 
 /** BasisVectors uniform size: 4 vec3f padded to vec4f = 4 × 48 = 192 bytes. */
 export const BASIS_UNIFORM_SIZE = 192
