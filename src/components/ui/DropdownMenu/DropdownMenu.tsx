@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState
 import { useShallow } from 'zustand/react/shallow'
 
 import { soundManager } from '@/lib/audio/SoundManager'
+import { supportsPopover } from '@/lib/dom/popoverSupport'
 import { useDropdownStore } from '@/stores/dropdownStore'
 
 import { MenuItems } from './MenuItems'
@@ -56,7 +57,10 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
     }, [isOpen, onClose])
 
     // Sync popover visibility with store state
+    // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
+    // On older browsers, matches(':popover-open') throws SyntaxError.
     useEffect(() => {
+      if (!supportsPopover) return
       const popover = popoverRef.current
       if (!popover) return
 
@@ -69,6 +73,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
 
     // Handle toggle event to sync store when popover closes via light-dismiss
     useEffect(() => {
+      if (!supportsPopover) return
       const popover = popoverRef.current
       if (!popover) return
 
@@ -84,6 +89,28 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       popover.addEventListener('toggle', handleToggle)
       return () => popover.removeEventListener('toggle', handleToggle)
     }, [dropdownId, closeDropdown, openDropdown])
+
+    // Fallback light-dismiss: click-outside and Escape when Popover API unavailable
+    useEffect(() => {
+      if (supportsPopover || !isOpen) return
+
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node
+        if (popoverRef.current?.contains(target) || triggerRef.current?.contains(target)) return
+        closeDropdown(dropdownId)
+      }
+
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') closeDropdown(dropdownId)
+      }
+
+      window.addEventListener('pointerdown', handleClickOutside, true)
+      window.addEventListener('keydown', handleEscape)
+      return () => {
+        window.removeEventListener('pointerdown', handleClickOutside, true)
+        window.removeEventListener('keydown', handleEscape)
+      }
+    }, [isOpen, dropdownId, closeDropdown])
 
     useLayoutEffect(() => {
       if (!isOpen) return
@@ -232,7 +259,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
 
         <div
           ref={popoverRef}
-          popover="auto"
+          {...(supportsPopover ? { popover: 'auto' } : {})}
           id={dropdownId}
           data-dropdown-content="true"
           data-dropdown-id={dropdownId}

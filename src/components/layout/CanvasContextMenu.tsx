@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { supportsPopover } from '@/lib/dom/popoverSupport'
 import { getModifierSymbols } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useDropdownStore } from '@/stores/dropdownStore'
@@ -39,7 +40,9 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
   const resetCamera = useCameraStore((state) => state.reset)
 
   // Sync popover visibility with store state
+  // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
   useEffect(() => {
+    if (!supportsPopover) return
     const popover = popoverRef.current
     if (!popover) return
 
@@ -130,7 +133,7 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
   return (
     <div
       ref={popoverRef}
-      popover="manual"
+      {...(supportsPopover ? { popover: 'manual' } : {})}
       id={DROPDOWN_ID}
       data-testid="canvas-context-menu"
       className="fixed z-50 min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1 m-0 p-0 border-none bg-transparent"

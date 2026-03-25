@@ -2,6 +2,7 @@ import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 
 import { soundManager } from '@/lib/audio/SoundManager'
+import { supportsPopover } from '@/lib/dom/popoverSupport'
 
 /** Props for the Popover component */
 export interface PopoverProps {
@@ -87,7 +88,9 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     }, [handleOpenChange, isOpen])
 
     // Sync popover visibility with React state
+    // Guarded: Popover API requires Safari 17+, Chrome 114+, Firefox 125+.
     useEffect(() => {
+      if (!supportsPopover) return
       const popover = popoverRef.current
       if (!popover) return
 
@@ -100,6 +103,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
 
     // Handle toggle event to sync state when popover closes via light-dismiss
     useEffect(() => {
+      if (!supportsPopover) return
       const popover = popoverRef.current
       if (!popover) return
 
@@ -111,6 +115,28 @@ export const Popover: React.FC<PopoverProps> = React.memo(
       popover.addEventListener('toggle', handleToggle)
       return () => popover.removeEventListener('toggle', handleToggle)
     }, [handleOpenChange])
+
+    // Fallback light-dismiss: click-outside and Escape when Popover API unavailable
+    useEffect(() => {
+      if (supportsPopover || !isOpen) return
+
+      const handleClickOutside = (e: MouseEvent) => {
+        const target = e.target as Node
+        if (popoverRef.current?.contains(target) || triggerRef.current?.contains(target)) return
+        handleOpenChange(false)
+      }
+
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') handleOpenChange(false)
+      }
+
+      window.addEventListener('pointerdown', handleClickOutside, true)
+      window.addEventListener('keydown', handleEscape)
+      return () => {
+        window.removeEventListener('pointerdown', handleClickOutside, true)
+        window.removeEventListener('keydown', handleEscape)
+      }
+    }, [isOpen, handleOpenChange])
 
     useLayoutEffect(() => {
       const updatePosition = () => {
@@ -223,7 +249,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
 
         <div
           ref={popoverRef}
-          popover="auto"
+          {...(supportsPopover ? { popover: 'auto' } : {})}
           id={popoverId}
           className="m-0 p-0 border-none bg-transparent"
           style={{

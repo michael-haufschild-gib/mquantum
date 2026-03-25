@@ -27,6 +27,8 @@ export const Modal: React.FC<ModalProps> = React.memo(
   ({ isOpen, onClose, title, children, width = 'max-w-md', 'data-testid': dataTestId }) => {
     const dialogRef = useRef<HTMLDialogElement>(null)
     const previousActiveElement = useRef<HTMLElement | null>(null)
+    /** Tracks programmatic closes so the native 'close' event doesn't re-fire onClose. */
+    const closingProgrammatically = useRef(false)
     const titleId = useId()
 
     // Sync dialog open state with isOpen prop
@@ -38,6 +40,8 @@ export const Modal: React.FC<ModalProps> = React.memo(
         previousActiveElement.current = document.activeElement as HTMLElement
         dialog.showModal()
       } else if (!isOpen && dialog.open) {
+        // Mark this close as programmatic so the 'close' event handler skips onClose
+        closingProgrammatically.current = true
         dialog.close()
       }
     }, [isOpen])
@@ -48,9 +52,16 @@ export const Modal: React.FC<ModalProps> = React.memo(
       if (!dialog) return
 
       const handleClose = () => {
-        onClose()
         // Restore focus to previous element
         previousActiveElement.current?.focus()
+
+        // Only fire onClose for user-initiated closes (Escape key, form submission).
+        // Programmatic closes (parent set isOpen=false) already handled state upstream.
+        if (closingProgrammatically.current) {
+          closingProgrammatically.current = false
+          return
+        }
+        onClose()
       }
 
       dialog.addEventListener('close', handleClose)
