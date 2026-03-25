@@ -26,8 +26,11 @@ import { useTransformStore } from './transformStore'
 import { useUIStore } from './uiStore'
 import { mergeExtendedObjectStateForType } from './utils/mergeWithDefaults'
 import {
-  isNonEmptyTrimmedString,
-  makeUniqueImportedName,
+  parseAndValidateImport,
+  SCENE_IMPORT_KEYS,
+  STYLE_IMPORT_KEYS,
+} from './utils/presetImportExport'
+import {
   normalizeAnimationLoadData,
   normalizeAppearanceLoadData,
   normalizeEnvironmentLoadData,
@@ -282,68 +285,28 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       },
 
       importStyles: (jsonData) => {
-        try {
-          const imported = JSON.parse(jsonData)
-          if (!Array.isArray(imported)) {
-            useMsgBoxStore
-              .getState()
-              .showMsgBox('Import Failed', 'Invalid format: expected an array of styles.', 'error')
-            return false
-          }
-          // Comprehensive validation: Check all required SavedStyle fields
-          const valid = imported.every(
-            (i) =>
-              i.id &&
-              isNonEmptyTrimmedString(i.name) &&
-              i.timestamp &&
-              i.data &&
-              i.data.appearance &&
-              i.data.lighting &&
-              i.data.postProcessing &&
-              i.data.environment
-          )
-          if (!valid) {
-            useMsgBoxStore
-              .getState()
-              .showMsgBox(
-                'Import Failed',
-                'The style data is corrupted or incompatible. Styles must contain appearance, lighting, postProcessing, and environment data.',
-                'error'
-              )
-            return false
-          }
-
-          // Regenerate IDs to prevent duplicates and sanitize data
-          const usedNames = new Set(get().savedStyles.map((s) => s.name))
-          const processedStyles = imported.map((style) => {
-            // Always generate a new ID to ensure uniqueness
-            const newId = crypto.randomUUID()
-            const rawName = style.name.trim()
-            const newName = makeUniqueImportedName(rawName, usedNames)
-            usedNames.add(newName)
-            return {
-              ...style,
-              id: newId,
-              name: newName,
-              timestamp: Date.now(), // Update timestamp to import time
-              // Sanitize data to remove any transient fields (version counters, etc.)
-              data: sanitizeStyleData(style.data),
-            }
-          })
-
-          set((state) => ({ savedStyles: [...state.savedStyles, ...processedStyles] }))
-          return true
-        } catch (e) {
-          logger.error('Failed to import styles', e)
+        const existingNames = new Set(get().savedStyles.map((s) => s.name))
+        const result = parseAndValidateImport(
+          jsonData,
+          existingNames,
+          STYLE_IMPORT_KEYS,
+          sanitizeStyleData,
+          'styles'
+        )
+        if (!result.success) {
           useMsgBoxStore
             .getState()
             .showMsgBox(
-              'Import Error',
-              `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`,
+              result.error.startsWith('Failed') ? 'Import Error' : 'Import Failed',
+              result.error,
               'error'
             )
           return false
         }
+        set((state) => ({
+          savedStyles: [...state.savedStyles, ...(result.items as unknown as SavedStyle[])],
+        }))
+        return true
       },
 
       exportStyles: () => {
@@ -623,77 +586,28 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       },
 
       importScenes: (jsonData) => {
-        try {
-          const imported = JSON.parse(jsonData)
-          if (!Array.isArray(imported)) {
-            useMsgBoxStore
-              .getState()
-              .showMsgBox('Import Failed', 'Invalid format: expected an array of scenes.', 'error')
-            return false
-          }
-          // Comprehensive validation: Check all required SavedScene fields
-          const valid = imported.every(
-            (i) =>
-              i.id &&
-              isNonEmptyTrimmedString(i.name) &&
-              i.timestamp &&
-              i.data &&
-              // Style components
-              i.data.appearance &&
-              i.data.lighting &&
-              i.data.postProcessing &&
-              i.data.environment &&
-              // Scene components
-              i.data.geometry &&
-              i.data.extended &&
-              i.data.transform &&
-              i.data.rotation &&
-              i.data.animation &&
-              i.data.camera &&
-              i.data.ui
-          )
-          if (!valid) {
-            useMsgBoxStore
-              .getState()
-              .showMsgBox(
-                'Import Failed',
-                'The scene data is corrupted or incompatible. Scenes must contain all required data fields (geometry, appearance, lighting, etc.).',
-                'error'
-              )
-            return false
-          }
-
-          // Regenerate IDs to prevent duplicates and sanitize data
-          const usedNames = new Set(get().savedScenes.map((s) => s.name))
-          const processedScenes = imported.map((scene) => {
-            // Always generate a new ID to ensure uniqueness
-            const newId = crypto.randomUUID()
-            const rawName = scene.name.trim()
-            const newName = makeUniqueImportedName(rawName, usedNames)
-            usedNames.add(newName)
-            return {
-              ...scene,
-              id: newId,
-              name: newName,
-              timestamp: Date.now(), // Update timestamp to import time
-              // Sanitize data to remove any transient fields (version counters, etc.)
-              data: sanitizeSceneData(scene.data),
-            }
-          })
-
-          set((state) => ({ savedScenes: [...state.savedScenes, ...processedScenes] }))
-          return true
-        } catch (e) {
-          logger.error('Failed to import scenes', e)
+        const existingNames = new Set(get().savedScenes.map((s) => s.name))
+        const result = parseAndValidateImport(
+          jsonData,
+          existingNames,
+          SCENE_IMPORT_KEYS,
+          sanitizeSceneData,
+          'scenes'
+        )
+        if (!result.success) {
           useMsgBoxStore
             .getState()
             .showMsgBox(
-              'Import Error',
-              `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`,
+              result.error.startsWith('Failed') ? 'Import Error' : 'Import Failed',
+              result.error,
               'error'
             )
           return false
         }
+        set((state) => ({
+          savedScenes: [...state.savedScenes, ...(result.items as unknown as SavedScene[])],
+        }))
+        return true
       },
 
       exportScenes: () => {
