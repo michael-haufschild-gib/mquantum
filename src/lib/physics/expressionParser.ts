@@ -163,12 +163,32 @@ function tokenize(input: string): Token[] {
 // Parser (Precedence Climbing)
 // ---------------------------------------------------------------------------
 
+/** Maximum recursion depth for nested parentheses/function calls. */
+const MAX_PARSE_DEPTH = 50
+
+/** Maximum expression length (characters). */
+const MAX_EXPRESSION_LENGTH = 1000
+
 class Parser {
   private tokens: Token[]
   private pos = 0
+  private depth = 0
 
   constructor(tokens: Token[]) {
     this.tokens = tokens
+  }
+
+  /** Enter a recursive parse context; throws if depth exceeded. */
+  private enterDepth(pos: number): void {
+    this.depth++
+    if (this.depth > MAX_PARSE_DEPTH) {
+      throw new ParseError(`Expression nesting depth exceeds maximum of ${MAX_PARSE_DEPTH}`, pos)
+    }
+  }
+
+  /** Exit a recursive parse context. */
+  private exitDepth(): void {
+    this.depth--
   }
 
   private peek(): Token {
@@ -276,9 +296,11 @@ class Parser {
 
     // Parenthesized expression
     if (t.type === 'lparen') {
+      this.enterDepth(t.pos)
       this.advance()
       const inner = this.parseExpression()
       this.expect('rparen')
+      this.exitDepth()
       return inner
     }
 
@@ -478,6 +500,13 @@ function compileAST(node: ASTNode): (coords: number[]) => number {
  * ```
  */
 export function parseExpression(expression: string): ParseResult {
+  if (expression.length > MAX_EXPRESSION_LENGTH) {
+    return {
+      success: false,
+      error: `Expression exceeds maximum length of ${MAX_EXPRESSION_LENGTH} characters`,
+      position: 0,
+    }
+  }
   try {
     const tokens = tokenize(expression)
     const parser = new Parser(tokens)

@@ -170,7 +170,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
             </div>
           )}
 
-          <div ref={scrollContainerRef} className="overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div ref={scrollContainerRef} className="overflow-x-auto scrollbar-none">
             <ToggleGroup
               options={DIMENSION_OPTIONS}
               value={String(dimension)}
