@@ -51,6 +51,9 @@ market_readiness_*.md
 src/assets/skyboxes/*/*.png
 !src/assets/skyboxes/*/thumbnail.png
 
+# Standalone test/reproduction cases
+safari-test/
+
 # Screenshots and test artifacts
 screenshots/
 scripts/playwright/videos/

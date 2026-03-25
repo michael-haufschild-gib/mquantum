@@ -6,7 +6,7 @@
  */
 
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
 import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
@@ -15,7 +15,9 @@ import { EditorLayout } from '@/components/layout/EditorLayout'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
+import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { Modal } from '@/components/ui/Modal'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon'
@@ -28,6 +30,18 @@ import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
+
+/** Detect Safari — includes Safari on iOS (Chrome/Firefox on iOS also use WebKit). */
+function isSafari(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent
+  // All iOS browsers use WebKit and share Safari's WebGPU backend.
+  // Desktop Chrome/Edge/Firefox include "Safari" in UA but also "Chrome"/"Edg"/"Firefox".
+  return /Safari/.test(ua) && !/Chrome|Chromium|Firefox|Edg/.test(ua)
+}
+
+/** Safari rendering gate — 'pending' shows modal, 'stop' blocks rendering, 'continue' is non-Safari default. */
+type SafariChoice = 'pending' | 'stop' | 'continue'
 
 /** Stable error handler for WebGPU initialization failures. */
 function handleWebGPUErrorStable(error: Error) {
@@ -54,6 +68,15 @@ function AppContent() {
   // Detect WebGPU support
   const { isSupported, isComplete } = useWebGPUSupport()
 
+  // Safari WebGPU gate — rendering is always blocked; modal is informational only
+  const [safariChoice, setSafariChoice] = useState<SafariChoice>(() =>
+    isSafari() ? 'pending' : 'continue'
+  )
+  const handleSafariAcknowledge = useCallback(() => setSafariChoice('stop'), [])
+
+  // Show Safari warning modal when WebGPU is supported but browser is Safari
+  const showSafariWarning = safariChoice === 'pending' && isComplete && isSupported
+
   // Get current geometry for WebGPU scene
   const objectType = useGeometryStore((state) => state.objectType)
   const dimension = useGeometryStore((state) => state.dimension)
@@ -77,6 +100,36 @@ function AppContent() {
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
         {/* Performance indicators */}
         <RefinementIndicator position="bottom-right" />
+
+        {/* Safari WebGPU Warning Modal */}
+        <Modal
+          isOpen={showSafariWarning}
+          onClose={handleSafariAcknowledge}
+          title="Safari Not Supported"
+          width="max-w-md"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              Safari&apos;s WebGPU shader compiler cannot handle the complex quantum wavefunction
+              shaders used by this application.{' '}
+              <span className="text-text-primary font-semibold">
+                Rendering will freeze your system
+              </span>{' '}
+              — even on the latest hardware.
+            </p>
+            <p className="text-sm text-text-secondary">
+              This is a WebKit limitation. Please use{' '}
+              <span className="text-text-primary font-medium">Chrome</span>,{' '}
+              <span className="text-text-primary font-medium">Edge</span>, or{' '}
+              <span className="text-text-primary font-medium">Firefox</span> instead.
+            </p>
+            <div className="flex justify-end pt-2">
+              <Button variant="primary" onClick={handleSafariAcknowledge} size="sm">
+                Understood
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         {!isComplete ? (
           // Detection in progress
@@ -102,8 +155,23 @@ function AppContent() {
               Initializing WebGPU renderer...
             </div>
           </div>
-        ) : isSupported ? (
-          // WebGPU Renderer
+        ) : isSupported && safariChoice === 'stop' ? (
+          // Safari user chose to stop — rendering deactivated
+          <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-black/95 text-text-secondary px-6">
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">MQuantum</h1>
+            <div className="max-w-md text-center space-y-4">
+              <p className="text-lg font-semibold text-text-primary">Rendering deactivated</p>
+              <p className="text-sm text-text-tertiary">
+                Safari&apos;s WebGPU performance is not viable for real-time quantum wavefunction
+                rendering. Please open this page in{' '}
+                <span className="text-text-primary font-medium">Chrome</span>,{' '}
+                <span className="text-text-primary font-medium">Edge</span>, or{' '}
+                <span className="text-text-primary font-medium">Firefox</span> for full performance.
+              </p>
+            </div>
+          </div>
+        ) : isSupported && safariChoice === 'continue' ? (
+          // WebGPU Renderer (normal path, or Safari user chose to continue)
           <ErrorBoundary
             fallback={
               <div className="flex h-full w-full items-center justify-center text-red-400 bg-black/90">
@@ -120,6 +188,9 @@ function AppContent() {
               <WebGPUScene objectType={objectType} dimension={dimension} />
             </WebGPUCanvas>
           </ErrorBoundary>
+        ) : isSupported ? (
+          // Safari user hasn't chosen yet — show blank while modal is open
+          <div className="flex h-full w-full items-center justify-center bg-black/95" />
         ) : (
           // WebGPU not supported
           <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-black/95 text-text-secondary px-6">
@@ -135,7 +206,6 @@ function AppContent() {
                 <ul className="text-xs text-text-tertiary space-y-1">
                   <li>Chrome 113+ (desktop &amp; Android)</li>
                   <li>Edge 113+</li>
-                  <li>Safari 18+ (macOS Sequoia / iOS 18)</li>
                   <li>
                     Firefox — enable via <code className="text-text-secondary">about:config</code>{' '}
                     &rarr; <code className="text-text-secondary">dom.webgpu.enabled</code>
