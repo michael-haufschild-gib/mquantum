@@ -193,11 +193,11 @@ const ALGO_BRANCH: Record<number, string> = {
     // Quantum walk: density grid is already normalized by peak — use linear rho
     // directly (log mapping crushes QW's sparse per-site probabilities to black).
     // Continuous modes: s = log(|psi|^2), log mapping preserves tail detail.
+    let logModulus = select(s, s * 0.5, modulusMode);
     var modulusValue: f32;
     if (IS_QUANTUM_WALK) {
       modulusValue = clamp(select(rho, sqrt(rho), modulusMode), 0.0, 1.0);
     } else {
-      let logModulus = select(s, s * 0.5, modulusMode);
       modulusValue = clamp((logModulus + 8.0) / 8.0, 0.0, 1.0);
     }
     let baseLightness = clamp(0.08 + 0.82 * modulusValue, 0.0, 1.0);

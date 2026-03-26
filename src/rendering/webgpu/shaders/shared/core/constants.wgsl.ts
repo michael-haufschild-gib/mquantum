@@ -51,6 +51,9 @@ const EPS_SURFACE: f32 = 1e-4;
 const EPSILON: f32 = 1e-6;
 const EPS: f32 = 1e-6; // Alias for EPSILON, used by Julia shaders
 
+// Density epsilon — prevents log(0) in density/cross-section shaders
+const DENSITY_EPS: f32 = 1e-8;
+
 // ============================================
 // Rendering Limits
 // ============================================

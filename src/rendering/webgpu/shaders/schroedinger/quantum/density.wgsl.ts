@@ -127,8 +127,7 @@ export const densityPostMapBlock = /* wgsl */ `
 // Density Field Calculations
 // ============================================
 
-// Small epsilon to prevent log(0)
-const DENSITY_EPS: f32 = 1e-8;
+// DENSITY_EPS is now in shared/core/constants.wgsl.ts
 
 // Compute probability density ρ = |ψ|²
 fn rhoFromPsi(psi: vec2f) -> f32 {
