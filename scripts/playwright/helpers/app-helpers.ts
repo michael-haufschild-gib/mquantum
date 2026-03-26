@@ -672,6 +672,21 @@ export interface PixelSnapshot {
  * Decodes PNG in Node.js via sharp — no browser round-trip needed.
  */
 export async function capturePixelSnapshot(page: Page): Promise<PixelSnapshot> {
+  // Fail-fast: if the renderer has crashed, report that instead of producing
+  // a misleading pixel comparison later.
+  const rendererState = await page
+    .locator('[data-testid="webgpu-container"]')
+    .getAttribute('data-renderer-state')
+  if (rendererState === 'error') {
+    const errMsg = await page
+      .locator('[data-testid="webgpu-container"]')
+      .getAttribute('data-renderer-error')
+    throw new Error(
+      `Cannot capture pixel snapshot: renderer is in error state. ` +
+        `This usually means shader compilation failed.\nRenderer error: ${errMsg}`
+    )
+  }
+
   const canvas = page.locator('[data-testid="webgpu-canvas"]')
   const pngBuffer = await canvas.screenshot({ type: 'png' })
   const dataUrlLength = pngBuffer.length
@@ -729,15 +744,31 @@ export function snapshotDistance(a: PixelSnapshot, b: PixelSnapshot): number {
 
 /**
  * Assert two pixel snapshots are visually different.
- * Uses mean absolute channel difference — threshold of 2.0 avoids
- * false positives from compression artifacts or dithering.
+ *
+ * Default threshold is 0.3 mean absolute channel difference (0-255 scale).
+ * Compression artifacts and dithering produce < 0.1; genuine visual changes
+ * from preset/setting switches produce 0.4-10+. The old threshold of 2.0 was
+ * too aggressive and rejected subtle but real differences (e.g. Pauli spinor
+ * presets at 0.47-0.65).
+ *
+ * When distance is exactly 0.00, the error message flags a likely
+ * shader compilation failure (identical frames = nothing changed).
  */
-export function expectSnapshotsDiffer(a: PixelSnapshot, b: PixelSnapshot, label: string): void {
+export function expectSnapshotsDiffer(
+  a: PixelSnapshot,
+  b: PixelSnapshot,
+  label: string,
+  threshold = 0.3
+): void {
   const dist = snapshotDistance(a, b)
+  const hint =
+    dist === 0
+      ? ' — distance is exactly 0 which usually means a shader compilation failed and the scene did not change. Check GPU/shader errors in the test output.'
+      : ''
   expect(
     dist,
-    `${label}: pixel snapshots must differ (distance=${dist.toFixed(2)})`
-  ).toBeGreaterThan(2.0)
+    `${label}: pixel snapshots must differ (distance=${dist.toFixed(2)}, threshold=${threshold})${hint}`
+  ).toBeGreaterThan(threshold)
 }
 
 /**

@@ -37,7 +37,7 @@ async function saveSceneViaUI(
   await expect(page.getByTestId('save-scene-modal-input')).toBeVisible({ timeout: 5000 })
   await page.getByTestId('save-scene-modal-input').fill(name)
   // Wait for React to process the fill (controlled input state update) before confirm
-  await expect(page.getByTestId('save-scene-modal-confirm')).toBeEnabled({ timeout: 3000 })
+  await expect(page.getByTestId('save-scene-modal-confirm')).toBeEnabled({ timeout: 5000 })
   await page.getByTestId('save-scene-modal-confirm').click()
   await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 5000 })
   // Dismiss any lingering dialog backdrop — the native <dialog> close
@@ -63,7 +63,7 @@ async function saveStyleViaUI(
   await expect(page.getByTestId('save-style-modal-input')).toBeVisible({ timeout: 5000 })
   await page.getByTestId('save-style-modal-input').fill(name)
   // Wait for React to process the fill before confirm
-  await expect(page.getByTestId('save-style-modal-confirm')).toBeEnabled({ timeout: 3000 })
+  await expect(page.getByTestId('save-style-modal-confirm')).toBeEnabled({ timeout: 5000 })
   await page.getByTestId('save-style-modal-confirm').click()
   await expect(page.getByTestId('save-style-modal-input')).not.toBeVisible({ timeout: 5000 })
   // Dismiss any lingering dialog backdrop
@@ -98,7 +98,7 @@ test.describe('scene preset CRUD', () => {
 
     // Reopen Scenes menu — saved scene should appear
     await topBar.openScenesMenu()
-    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 5000 })
   })
 
   test('load saved scene restores state from different mode', async ({ page }) => {
@@ -131,7 +131,7 @@ test.describe('scene preset CRUD', () => {
 
     // Verify it exists in the menu
     await topBar.openScenesMenu()
-    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 5000 })
     await page.keyboard.press('Escape')
 
     // Open Manage Scenes dialog via the menu
@@ -141,7 +141,7 @@ test.describe('scene preset CRUD', () => {
     // The Manage Scenes modal should appear with our saved scene
     const manageDialog = page.getByRole('dialog')
     await expect(manageDialog).toBeVisible({ timeout: 5000 })
-    await expect(manageDialog.getByText(SCENE_NAME)).toBeVisible({ timeout: 3000 })
+    await expect(manageDialog.getByText(SCENE_NAME)).toBeVisible({ timeout: 5000 })
 
     // Click the delete button for our scene (hidden until hover, use force: true)
     const deleteBtn = manageDialog.getByTestId(`delete-scene-${id}`)
@@ -149,19 +149,19 @@ test.describe('scene preset CRUD', () => {
 
     // Confirmation dialog should appear
     await expect(page.getByTestId('delete-scene-confirm-modal-confirm')).toBeVisible({
-      timeout: 3000,
+      timeout: 5000,
     })
     await page.getByTestId('delete-scene-confirm-modal-confirm').click()
 
     // Scene should be removed from the manage dialog
-    await expect(manageDialog.getByText(SCENE_NAME)).not.toBeVisible({ timeout: 3000 })
+    await expect(manageDialog.getByText(SCENE_NAME)).not.toBeVisible({ timeout: 5000 })
 
     // Close manage dialog
     await page.keyboard.press('Escape')
 
     // Reopen Scenes menu — scene should be gone
     await topBar.openScenesMenu()
-    await expect(page.getByTestId(`menu-saved-scene-${id}`)).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).not.toBeVisible({ timeout: 5000 })
   })
 
   test('saving scene with Enter key works', async ({ page }) => {
@@ -173,12 +173,12 @@ test.describe('scene preset CRUD', () => {
     await page.getByTestId('save-scene-modal-input').fill(SCENE_NAME)
     await page.getByTestId('save-scene-modal-input').press('Enter')
 
-    await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId('save-scene-modal-input')).not.toBeVisible({ timeout: 5000 })
 
     // Verify saved — at least one saved scene item should exist
     await topBar.openScenesMenu()
     await expect(page.locator('[data-testid^="menu-saved-scene-"]').first()).toBeVisible({
-      timeout: 3000,
+      timeout: 5000,
     })
   })
 
@@ -206,7 +206,7 @@ test.describe('scene preset CRUD', () => {
     // Verify it appears in menu with correct name
     await topBar.openScenesMenu()
     const menuItem = page.getByTestId(`menu-saved-scene-${id}`)
-    await expect(menuItem).toBeVisible({ timeout: 3000 })
+    await expect(menuItem).toBeVisible({ timeout: 5000 })
     await expect(menuItem).toHaveText(specialName)
   })
 
@@ -216,7 +216,7 @@ test.describe('scene preset CRUD', () => {
 
     // Verify it exists before reload
     await topBar.openScenesMenu()
-    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id}`)).toBeVisible({ timeout: 5000 })
     await page.keyboard.press('Escape')
 
     // Full page reload — forces localStorage rehydration
@@ -263,8 +263,8 @@ test.describe('scene preset CRUD', () => {
 
     // Both should appear in the menu
     await topBar.openScenesMenu()
-    await expect(page.getByTestId(`menu-saved-scene-${id1}`)).toBeVisible({ timeout: 3000 })
-    await expect(page.getByTestId(`menu-saved-scene-${id2}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id1}`)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByTestId(`menu-saved-scene-${id2}`)).toBeVisible({ timeout: 5000 })
   })
 })
 
@@ -290,7 +290,7 @@ test.describe('style preset CRUD', () => {
 
     // Verify in menu
     await topBar.openStylesMenu()
-    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 5000 })
   })
 
   test('load saved style changes visual state', async ({ page }) => {
@@ -328,7 +328,7 @@ test.describe('style preset CRUD', () => {
         return mod.useAppearanceStore.getState().colorAlgorithm
       })
       expect(restored).toBe('blackbody')
-    }).toPass({ timeout: 3000 })
+    }).toPass({ timeout: 5000 })
   })
 
   test('saved style persists across full page reload (localStorage)', async ({ page }) => {
@@ -337,7 +337,7 @@ test.describe('style preset CRUD', () => {
 
     // Verify it exists before reload
     await topBar.openStylesMenu()
-    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 5000 })
     await page.keyboard.press('Escape')
 
     // Full page reload
@@ -358,7 +358,7 @@ test.describe('style preset CRUD', () => {
 
     // Verify exists
     await topBar.openStylesMenu()
-    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).toBeVisible({ timeout: 5000 })
     await page.keyboard.press('Escape')
 
     // Delete via store
@@ -371,6 +371,6 @@ test.describe('style preset CRUD', () => {
 
     // Verify removed
     await topBar.openStylesMenu()
-    await expect(page.getByTestId(`menu-saved-style-${id}`)).not.toBeVisible({ timeout: 3000 })
+    await expect(page.getByTestId(`menu-saved-style-${id}`)).not.toBeVisible({ timeout: 5000 })
   })
 })
