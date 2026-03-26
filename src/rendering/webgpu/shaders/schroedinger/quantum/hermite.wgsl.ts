@@ -4,9 +4,9 @@
  * Hermite polynomials H_n(u) are used in quantum harmonic oscillator eigenfunctions.
  * Port of GLSL quantum/hermite.glsl to WGSL.
  *
- * OPTIMIZATION: Instead of using the recurrence relation which requires
- * multiple loop iterations, we use precomputed polynomial coefficients
- * evaluated with Horner's method. This reduces GPU ALU operations by ~30%.
+ * Uses a precomputed coefficient LUT + Horner's method instead of the three-term
+ * recurrence relation. The loop has a constant upper bound (MAX_QUANTUM_N = 6),
+ * which Dawn/Tint unrolls automatically during WGSL compilation.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hermite.wgsl
  */
@@ -39,53 +39,19 @@ const HERMITE_COEFFS: array<f32, 49> = array<f32, 49>(
   -120.0, 0.0, 720.0, 0.0, -480.0, 0.0, 64.0
 );
 
-// Evaluate Hermite polynomial H_n(u) using precomputed coefficients
-// Uses Horner's method for numerical stability and efficiency
-// ~30% faster than recurrence-based evaluation
+// Evaluate Hermite polynomial H_n(u) using precomputed coefficients.
+// Horner's method from highest to lowest power: H_n(u) = c[n]*u^n + ... + c[0].
+// The loop bound is constant (≤ MAX_QUANTUM_N), so Dawn/Tint unrolls it.
 fn hermite(n: i32, u: f32) -> f32 {
-  // Clamp to valid range
   if (n < 0 || n > MAX_QUANTUM_N) { return 0.0; }
-
-  // Fast paths for common low-order cases
   if (n == 0) { return 1.0; }
   if (n == 1) { return 2.0 * u; }
 
-  // Coefficient offset for polynomial n
   let offset = n * 7;
-
-  // Horner's method: evaluate from highest to lowest power
-  // H_n(u) = c[n] + u*(c[n-1] + u*(c[n-2] + ...))
   var result = HERMITE_COEFFS[offset + n];
-
-  // Unrolled for common cases to avoid dynamic loop overhead
-  if (n == 2) {
-    result = result * u + HERMITE_COEFFS[offset + 1];
-    result = result * u + HERMITE_COEFFS[offset];
-  } else if (n == 3) {
-    result = result * u + HERMITE_COEFFS[offset + 2];
-    result = result * u + HERMITE_COEFFS[offset + 1];
-    result = result * u + HERMITE_COEFFS[offset];
-  } else if (n == 4) {
-    result = result * u + HERMITE_COEFFS[offset + 3];
-    result = result * u + HERMITE_COEFFS[offset + 2];
-    result = result * u + HERMITE_COEFFS[offset + 1];
-    result = result * u + HERMITE_COEFFS[offset];
-  } else if (n == 5) {
-    result = result * u + HERMITE_COEFFS[offset + 4];
-    result = result * u + HERMITE_COEFFS[offset + 3];
-    result = result * u + HERMITE_COEFFS[offset + 2];
-    result = result * u + HERMITE_COEFFS[offset + 1];
-    result = result * u + HERMITE_COEFFS[offset];
-  } else {
-    // n == 6 (fully unrolled)
-    result = result * u + HERMITE_COEFFS[offset + 5];
-    result = result * u + HERMITE_COEFFS[offset + 4];
-    result = result * u + HERMITE_COEFFS[offset + 3];
-    result = result * u + HERMITE_COEFFS[offset + 2];
-    result = result * u + HERMITE_COEFFS[offset + 1];
-    result = result * u + HERMITE_COEFFS[offset];
+  for (var k = n - 1; k >= 0; k--) {
+    result = result * u + HERMITE_COEFFS[offset + k];
   }
-
   return result;
 }
 `
