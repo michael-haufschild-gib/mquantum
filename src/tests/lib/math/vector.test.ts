@@ -59,6 +59,15 @@ describe('Vector Operations', () => {
       expect(result).toEqual([6, 6, 6, 6, 6])
     })
 
+    it('writes into out parameter when provided', () => {
+      const a = [1, 2, 3]
+      const b = [4, 5, 6]
+      const out = [0, 0, 0]
+      const result = addVectors(a, b, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([5, 7, 9])
+    })
+
     it('throws error for mismatched dimensions', () => {
       const a = [1, 2, 3]
       const b = [1, 2]
@@ -79,6 +88,15 @@ describe('Vector Operations', () => {
       const b = [-4, 5, -6]
       const result = subtractVectors(a, b)
       expect(result).toEqual([5, -7, 9])
+    })
+
+    it('writes into out parameter when provided', () => {
+      const a = [10, 20, 30]
+      const b = [1, 2, 3]
+      const out = [0, 0, 0]
+      const result = subtractVectors(a, b, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([9, 18, 27])
     })
 
     it('throws error for mismatched dimensions', () => {
@@ -112,6 +130,14 @@ describe('Vector Operations', () => {
       const result = scaleVector(v, 0)
       expect(result).toEqual([0, 0, 0])
     })
+
+    it('writes into out parameter when provided', () => {
+      const v = [2, 4, 6]
+      const out = [0, 0, 0]
+      const result = scaleVector(v, 3, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([6, 12, 18])
+    })
   })
 
   describe('dotProduct', () => {
@@ -139,6 +165,20 @@ describe('Vector Operations', () => {
       const b = [5, 6, 7, 8]
       // 1*5 + 2*6 + 3*7 + 4*8 = 5 + 12 + 21 + 32 = 70
       expect(dotProduct(a, b)).toBe(70)
+    })
+
+    it('dot product of orthogonal 11D vectors is zero', () => {
+      const a = new Array(11).fill(0)
+      const b = new Array(11).fill(0)
+      a[0] = 1
+      b[1] = 1
+      expect(dotProduct(a, b)).toBe(0)
+    })
+
+    it('dot product with self equals magnitude squared', () => {
+      const v = [1, 2, 3, 4, 5]
+      const magSq = dotProduct(v, v)
+      expect(magSq).toBeCloseTo(magnitude(v) ** 2, 10)
     })
 
     it('throws error for mismatched dimensions', () => {
@@ -176,6 +216,13 @@ describe('Vector Operations', () => {
       // √(4 + 9 + 36) = √49 = 7
       expect(magnitude(v)).toBe(7)
     })
+
+    it('computes magnitude of 11D unit-like vector', () => {
+      // All components = 1/√11 → magnitude should be 1
+      const val = 1 / Math.sqrt(11)
+      const v = new Array(11).fill(val)
+      expect(magnitude(v)).toBeCloseTo(1, 10)
+    })
   })
 
   describe('normalize', () => {
@@ -209,6 +256,24 @@ describe('Vector Operations', () => {
       expect(normalized[3]).toBeCloseTo(expected, 10)
       expect(magnitude(normalized)).toBeCloseTo(1, 10)
     })
+
+    it('writes into out parameter when provided', () => {
+      const v = [0, 3, 4]
+      const out = [0, 0, 0]
+      const result = normalize(v, out)
+      expect(result).toBe(out)
+      expect(magnitude(out)).toBeCloseTo(1, 10)
+      expect(out[0]).toBeCloseTo(0, 10)
+      expect(out[1]).toBeCloseTo(0.6, 10)
+      expect(out[2]).toBeCloseTo(0.8, 10)
+    })
+
+    it('normalizes 11D vector to unit length', () => {
+      const v = Array.from({ length: 11 }, (_, i) => i + 1)
+      const normalized = normalize(v)
+      expect(magnitude(normalized)).toBeCloseTo(1, 10)
+      expect(normalized).toHaveLength(11)
+    })
   })
 
   describe('vectorsEqual', () => {
@@ -238,6 +303,13 @@ describe('Vector Operations', () => {
       const c = [1.0 + EPSILON * 2, 2.0, 3.0]
       expect(vectorsEqual(a, c)).toBe(false)
     })
+
+    it('uses custom epsilon when provided', () => {
+      const a = [1.0, 2.0]
+      const b = [1.05, 2.0]
+      expect(vectorsEqual(a, b, 0.1)).toBe(true)
+      expect(vectorsEqual(a, b, 0.01)).toBe(false)
+    })
   })
 
   describe('copyVector', () => {
@@ -250,6 +322,14 @@ describe('Vector Operations', () => {
 
       copy[0] = 999
       expect(original[0]).toBe(1)
+    })
+
+    it('writes into out parameter when provided', () => {
+      const original = [7, 8, 9]
+      const out = [0, 0, 0]
+      const result = copyVector(original, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([7, 8, 9])
     })
   })
 

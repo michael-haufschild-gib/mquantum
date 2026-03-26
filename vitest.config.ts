@@ -63,11 +63,11 @@ export default defineConfig({
       ],
       // Coverage ratchet: thresholds must be >= current actuals (rounded down
       // to nearest 0.5%). Raise these when coverage improves; never lower them.
-      // Last measured 2026-03-24: stmts 60.7%, branches 53.47%, funcs 59.23%, lines 61.05%
+      // Last measured 2026-03-26: stmts 60.99%, branches 53.84%, funcs 59.79%, lines 61.35%
       thresholds: {
         statements: 60.5,
-        branches: 53,
-        functions: 59,
+        branches: 53.5,
+        functions: 59.5,
         lines: 61,
       },
     },

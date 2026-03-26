@@ -26,6 +26,7 @@ import {
   // Registry data
   OBJECT_TYPE_REGISTRY,
 } from '@/lib/geometry/registry'
+import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/registry/components'
 
 describe('Object Type Registry', () => {
   describe('Registry Structure', () => {
@@ -121,6 +122,35 @@ describe('Object Type Registry', () => {
 
     it('hasTimelineControls returns true for schroedinger', () => {
       expect(hasTimelineControls('schroedinger')).toBe(true)
+    })
+  })
+
+  describe('Component Loader', () => {
+    it('hasControlsComponent returns true for registered keys', () => {
+      expect(hasControlsComponent('SchroedingerControls')).toBe(true)
+      expect(hasControlsComponent('PauliSpinorControls')).toBe(true)
+    })
+
+    it('hasControlsComponent returns false for unknown keys', () => {
+      expect(hasControlsComponent('NonexistentControls')).toBe(false)
+      expect(hasControlsComponent('')).toBe(false)
+    })
+
+    it('getControlsComponent returns a lazy component for registered keys', () => {
+      const component = getControlsComponent('SchroedingerControls')
+      // React.lazy components have $$typeof set to the lazy symbol
+      expect(component).toHaveProperty('$$typeof')
+    })
+
+    it('getControlsComponent returns null for unknown keys', () => {
+      const component = getControlsComponent('UnknownControls')
+      expect(component).toBe(null)
+    })
+
+    it('getControlsComponent caches results (second call returns same ref)', () => {
+      const first = getControlsComponent('SchroedingerControls')
+      const second = getControlsComponent('SchroedingerControls')
+      expect(first).toBe(second)
     })
   })
 

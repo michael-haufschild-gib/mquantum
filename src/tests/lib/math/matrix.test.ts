@@ -413,6 +413,74 @@ describe('Matrix Operations', () => {
     })
   })
 
+  describe('multiplyMatrices (5x5)', () => {
+    it('multiplies two 5x5 identity matrices', () => {
+      const I5 = createIdentityMatrix(5)
+      const result = multiplyMatrices(I5, I5)
+      expect(matricesEqual(result, I5)).toBe(true)
+    })
+
+    it('multiplies 5x5 matrix by identity returns same matrix', () => {
+      const I5 = createIdentityMatrix(5)
+      const M = new Float32Array(25)
+      for (let i = 0; i < 25; i++) M[i] = i + 1
+      const result = multiplyMatrices(I5, M)
+      expect(matricesEqual(result, M)).toBe(true)
+    })
+
+    it('writes into out parameter when provided', () => {
+      const a = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const b = mat([
+        [5, 6],
+        [7, 8],
+      ])
+      const out = new Float32Array(4)
+      const result = multiplyMatrices(a, b, out)
+      expect(result).toBe(out)
+      expect(result[0]).toBeCloseTo(19, 5)
+      expect(result[1]).toBeCloseTo(22, 5)
+      expect(result[2]).toBeCloseTo(43, 5)
+      expect(result[3]).toBeCloseTo(50, 5)
+    })
+  })
+
+  describe('multiplyMatricesInto (5x5 generic path)', () => {
+    it('multiplies 5x5 matrices via generic loop (not 4x4 unrolled)', () => {
+      const I5 = createIdentityMatrix(5)
+      const M = new Float32Array(25)
+      for (let i = 0; i < 25; i++) M[i] = (i % 5) + 1
+      const out = new Float32Array(25)
+      multiplyMatricesInto(out, I5, M)
+      expect(matricesEqual(out, M)).toBe(true)
+    })
+
+    it('handles aliasing for 5x5 (out === a)', () => {
+      const a = createIdentityMatrix(5)
+      const b = new Float32Array(25)
+      for (let i = 0; i < 25; i++) b[i] = i
+      multiplyMatricesInto(a, a, b)
+      // I * b = b
+      expect(matricesEqual(a, b)).toBe(true)
+    })
+  })
+
+  describe('multiplyMatrixVector with out parameter', () => {
+    it('writes into pre-allocated out array', () => {
+      const M = mat([
+        [1, 0],
+        [0, 2],
+      ])
+      const v = [3, 4]
+      const out = [0, 0]
+      const result = multiplyMatrixVector(M, v, out)
+      expect(result).toBe(out)
+      expect(out).toEqual([3, 8])
+    })
+  })
+
   describe('getMatrixDimensions', () => {
     it('returns dimensions of a matrix', () => {
       const M = mat([

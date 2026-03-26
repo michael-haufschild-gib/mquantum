@@ -11,6 +11,7 @@ import {
   getPresetsForDimension,
   HYDROGEN_ND_PRESETS,
   type HydrogenNDPreset,
+  hydrogenNDToLabel,
 } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 
 describe('Hydrogen ND Presets', () => {
@@ -209,6 +210,56 @@ describe('Hydrogen ND Presets', () => {
       const presets = getPresetsForDimension(11)
 
       expect(presets.every((p) => p.name !== 'Custom')).toBe(true)
+    })
+  })
+
+  describe('hydrogenNDToLabel', () => {
+    it('generates s-orbital label for l=0', () => {
+      expect(hydrogenNDToLabel(1, 0, 0, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('1s')
+    })
+
+    it('generates pz label for l=1, m=0', () => {
+      expect(hydrogenNDToLabel(2, 1, 0, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('2pz')
+    })
+
+    it('generates px label for l=1, m=1', () => {
+      expect(hydrogenNDToLabel(2, 1, 1, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('2px')
+    })
+
+    it('generates py label for l=1, m=-1', () => {
+      expect(hydrogenNDToLabel(2, 1, -1, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('2py')
+    })
+
+    it('generates dz² label for l=2, m=0', () => {
+      expect(hydrogenNDToLabel(3, 2, 0, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('3dz²')
+    })
+
+    it('generates d label for l=2, m≠0', () => {
+      expect(hydrogenNDToLabel(3, 2, 1, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('3d')
+    })
+
+    it('generates generic f-orbital label for l=3', () => {
+      expect(hydrogenNDToLabel(4, 3, 0, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('4f')
+    })
+
+    it('generates fallback label for high l', () => {
+      // l=7 → no letter in lookup table
+      expect(hydrogenNDToLabel(8, 7, 0, 3, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('8l=7')
+    })
+
+    it('appends dimension for 4D+ with ground states', () => {
+      expect(hydrogenNDToLabel(2, 1, 0, 4, [0, 0, 0, 0, 0, 0, 0, 0])).toBe('2pz + 4D')
+    })
+
+    it('shows extra dim quantum numbers when excited', () => {
+      const label = hydrogenNDToLabel(2, 1, 0, 5, [1, 2, 0, 0, 0, 0, 0, 0])
+      expect(label).toBe('2pz + 5D (n4=1, n5=2)')
+    })
+
+    it('shows only used extra dims for the dimension', () => {
+      // 4D has 1 extra dim, so only extraDimN[0] is shown
+      const label = hydrogenNDToLabel(2, 1, 0, 4, [3, 0, 0, 0, 0, 0, 0, 0])
+      expect(label).toBe('2pz + 4D (n4=3)')
     })
   })
 

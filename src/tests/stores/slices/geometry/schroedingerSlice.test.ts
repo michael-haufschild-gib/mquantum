@@ -225,3 +225,88 @@ describe('schroedingerSlice — clamped setters', () => {
     expect(v2).toBeGreaterThan(v1)
   })
 })
+
+describe('schroedingerSlice — quantum mode transitions', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().reset()
+  })
+
+  function getSchroedinger() {
+    return useExtendedObjectStore.getState().schroedinger
+  }
+
+  const ALL_MODES = [
+    'harmonicOscillator',
+    'hydrogenND',
+    'tdseDynamics',
+    'becDynamics',
+    'diracEquation',
+    'quantumWalk',
+    'freeScalarField',
+  ] as const
+
+  it('can switch to every quantum mode without error', () => {
+    for (const mode of ALL_MODES) {
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
+      expect(getSchroedinger().quantumMode).toBe(mode)
+    }
+  })
+
+  it('switching to becDynamics has valid bec config', () => {
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
+    const bec = getSchroedinger().bec
+    expect(bec.interactionStrength).toBeGreaterThanOrEqual(0)
+    expect(bec.trapOmega).toBeGreaterThan(0)
+  })
+
+  it('switching to diracEquation has valid dirac config', () => {
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('diracEquation')
+    const dirac = getSchroedinger().dirac
+    expect(dirac.mass).toBeGreaterThan(0)
+  })
+
+  it('switching to quantumWalk sets quantumMode correctly', () => {
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('quantumWalk')
+    expect(getSchroedinger().quantumMode).toBe('quantumWalk')
+  })
+
+  it('switching to hydrogenND sets quantumMode correctly', () => {
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('hydrogenND')
+    expect(getSchroedinger().quantumMode).toBe('hydrogenND')
+  })
+
+  it('round-trip: HO → TDSE → HO preserves harmonic oscillator state', () => {
+    useExtendedObjectStore.getState().setSchroedingerTermCount(4)
+    const originalTermCount = getSchroedinger().termCount
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+    expect(getSchroedinger().termCount).toBe(originalTermCount)
+  })
+
+  it('switching to freeScalarField forces position representation', () => {
+    useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+    expect(getSchroedinger().representation).toBe('position')
+  })
+
+  it('setSchroedingerDensityGain clamps and rejects NaN', () => {
+    useExtendedObjectStore.getState().setSchroedingerDensityGain(5.0)
+    expect(getSchroedinger().densityGain).toBe(5.0)
+
+    useExtendedObjectStore.getState().setSchroedingerDensityGain(Number.NaN)
+    expect(getSchroedinger().densityGain).toBe(5.0)
+  })
+
+  it('setSchroedingerIsoThreshold clamps to valid range', () => {
+    useExtendedObjectStore.getState().setSchroedingerIsoThreshold(-3)
+    expect(getSchroedinger().isoThreshold).toBe(-3)
+
+    // Should clamp to [-6, 0] range
+    useExtendedObjectStore.getState().setSchroedingerIsoThreshold(-10)
+    expect(getSchroedinger().isoThreshold).toBe(-6)
+
+    useExtendedObjectStore.getState().setSchroedingerIsoThreshold(5)
+    expect(getSchroedinger().isoThreshold).toBe(0)
+  })
+})

@@ -342,6 +342,19 @@ describe('Rotation Operations', () => {
       expect(out[0]).not.toBeCloseTo(1, 3)
     })
 
+    it('empty rotation map resets out parameter to identity', () => {
+      const dim = 5
+      const out = createIdentityMatrix(dim)
+      out[0] = 42 // dirty the buffer
+      const result = composeRotations(dim, new Map(), out)
+      expect(result).toBe(out)
+      // Should be reset to identity
+      const I = createIdentityMatrix(dim)
+      for (let i = 0; i < dim * dim; i++) {
+        expect(result[i]).toBeCloseTo(I[i]!, 5)
+      }
+    })
+
     it('produces correct planes for 11D (maximum dimension)', () => {
       const planes = getRotationPlanes(11)
       expect(planes).toHaveLength((11 * 10) / 2) // 55
