@@ -13,6 +13,7 @@ import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/co
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
   type AnimationState,
+  type AppearanceStoreState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
@@ -108,7 +109,19 @@ export class DiracStrategy implements QuantumModeStrategy {
     if (!diracConfig) return
 
     const schroedinger = extended?.schroedinger
-    const diracWithSharedPml = applySharedPml(diracConfig, schroedinger) as DiracConfig
+
+    // Derive fieldView from the color algorithm so the density grid encoding
+    // matches the fragment shader's IS_DUAL_CHANNEL expectation.
+    // Mirrors PauliStrategy's fieldView derivation pattern.
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+    const algo = appearance?.colorAlgorithm ?? 'totalDensity'
+    const diracFieldView =
+      algo === 'particleAntiparticle' ? 'particleAntiparticleSplit' : diracConfig.fieldView
+
+    const diracWithSharedPml = {
+      ...applySharedPml(diracConfig, schroedinger),
+      fieldView: diracFieldView,
+    } as DiracConfig
 
     diracPass.executeDirac(
       ctx,

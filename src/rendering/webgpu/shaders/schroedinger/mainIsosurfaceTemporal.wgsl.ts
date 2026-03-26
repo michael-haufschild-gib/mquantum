@@ -54,8 +54,9 @@ export function generateMainBlockIsosurfaceTemporal(
   // Density grid sampling helpers (same as non-temporal isosurface)
   const densitySample = useDensityGrid
     ? `if (USE_DENSITY_GRID) {
-      rho = sampleDensityFromGrid(pos, schroedinger).r;
-      if (FEATURE_UNCERTAINTY_BOUNDARY) { rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger); }
+      let gridVal = sampleDensityFromGrid(pos, schroedinger);
+      rho = select(gridVal.r, gridVal.r + gridVal.g, IS_DUAL_CHANNEL);
+      if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger); }
       rho *= isoGain;
     } else {
       rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
@@ -65,8 +66,9 @@ export function generateMainBlockIsosurfaceTemporal(
   const seedSample = useDensityGrid
     ? `var seedRho: f32;
   if (USE_DENSITY_GRID) {
-    seedRho = sampleDensityFromGrid(ro + rd * tNear, schroedinger).r;
-    if (FEATURE_UNCERTAINTY_BOUNDARY) { seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger); }
+    let seedGrid = sampleDensityFromGrid(ro + rd * tNear, schroedinger);
+    seedRho = select(seedGrid.r, seedGrid.r + seedGrid.g, IS_DUAL_CHANNEL);
+    if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger); }
     seedRho *= isoGain;
   } else {
     seedRho = sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain;
@@ -77,8 +79,9 @@ export function generateMainBlockIsosurfaceTemporal(
   const binarySearchSample = useDensityGrid
     ? `var midRho: f32;
         if (USE_DENSITY_GRID) {
-          midRho = sampleDensityFromGrid(midPos, schroedinger).r;
-          if (FEATURE_UNCERTAINTY_BOUNDARY) { midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger); }
+          let midGrid = sampleDensityFromGrid(midPos, schroedinger);
+          midRho = select(midGrid.r, midGrid.r + midGrid.g, IS_DUAL_CHANNEL);
+          if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger); }
           midRho *= isoGain;
         } else {
           midRho = sampleDensity(midPos, animTime, schroedinger) * isoGain;
@@ -102,10 +105,14 @@ export function generateMainBlockIsosurfaceTemporal(
 
   const colorSample = useDensityGrid
     ? `var rhoSurface: f32;
+  var dualSecondary: f32 = 0.0;
   var phase: f32;
   if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
     let gridColor = sampleDensityFromGrid(p, schroedinger);
     rhoSurface = gridColor.r * isoGain;
+    if (IS_DUAL_CHANNEL) {
+      dualSecondary = gridColor.g;
+    }
     phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
   } else {
     let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
@@ -114,7 +121,8 @@ export function generateMainBlockIsosurfaceTemporal(
   }`
     : `let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
   let rhoSurface = densityInfo.x * isoGain;
-  let phase = densityInfo.z;`
+  let phase = densityInfo.z;
+  let dualSecondary: f32 = 0.0;`
 
   return /* wgsl */ `
 // ============================================
@@ -294,7 +302,8 @@ ${bayerJitterSection}
   // Sample for color
   ${colorSample}
 
-  let sSurface = sFromRho(rhoSurface);
+  // For dual-channel modes: s = secondary density from grid (not log-density).
+  let sSurface = select(sFromRho(rhoSurface), dualSecondary, IS_DUAL_CHANNEL);
   var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
 
   // Phase materiality
