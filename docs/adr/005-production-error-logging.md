@@ -28,7 +28,7 @@ This is the minimum viable change for production diagnosability. Errors represen
 ## Alternatives Considered
 
 1. **Keep all logging DEV-only**: Simple but makes production failures undiagnosable. Rejected.
-2. **External error reporting service (Sentry, etc.)**: Appropriate for a SaaS product but over-engineering for an open-source physics simulator. The project has no backend.
+2. **External error reporting service (Sentry, LogRocket, etc.)**: Permanently rejected. This is a fully client-side app deployed on Vercel with zero backend infrastructure. Integrating an error reporting service would introduce: (a) GDPR obligations for processing user telemetry data, (b) recurring server/SaaS costs with no revenue to offset them, (c) a third-party dependency that requires ongoing maintenance. The project will not send any data anywhere. Console.error provides sufficient diagnostics for users who report issues — they can share DevTools output.
 3. **User-visible error UI only**: The app already shows error states in the UI (via ErrorBoundary, renderer state), but the console provides the technical detail needed to diagnose the cause. Both are needed.
 4. **Make all levels production-safe**: Would eliminate the tree-shaking benefit for debug/info logging. The bundle size impact is ~0 for error-only, but would be measurable for all levels.
 

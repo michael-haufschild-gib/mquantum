@@ -31,7 +31,26 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 
-/** Detect Safari — includes Safari on iOS (Chrome/Firefox on iOS also use WebKit). */
+/**
+ * Detect Safari — includes Safari on iOS (Chrome/Firefox on iOS also use WebKit).
+ *
+ * WHY Safari is hard-blocked (not degraded):
+ * WebKit's WGSL shader compiler (as of Safari 18.x / WebKit r292839) cannot handle
+ * the complex quantum wavefunction shaders this app uses. The shaders contain deep
+ * nested loops, large constant arrays (Hermite coefficients, Laguerre recurrences),
+ * and per-dimension branching that exceeds WebKit's compiler time/memory budget.
+ * The result is not a graceful fallback — the shader compiler hangs indefinitely,
+ * freezing the entire browser process (not just the tab). This happens on all hardware
+ * including M3 Max with 128GB RAM.
+ *
+ * A reduced-quality mode is not feasible because the fundamental issue is shader
+ * compilation, not runtime performance. Even the simplest quantum mode (HO 1D)
+ * uses Hermite polynomial evaluation that triggers the hang. Stripping the physics
+ * to avoid the compiler bug would produce a non-functional app.
+ *
+ * This decision should be revisited when WebKit ships an updated WGSL compiler
+ * (tracked: WebKit bug 263444). Chrome and Firefox compile the same shaders in <50ms.
+ */
 function isSafari(): boolean {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent
@@ -40,7 +59,12 @@ function isSafari(): boolean {
   return /Safari/.test(ua) && !/Chrome|Chromium|Firefox|Edg/.test(ua)
 }
 
-/** Safari rendering gate — 'pending' shows modal, 'stop' blocks rendering, 'continue' is non-Safari default. */
+/**
+ * Safari rendering gate.
+ * - 'pending': modal shown, awaiting user acknowledgement
+ * - 'stop': user acknowledged, rendering permanently disabled for session
+ * - 'continue': non-Safari browser, rendering proceeds normally
+ */
 type SafariChoice = 'pending' | 'stop' | 'continue'
 
 /** Stable error handler for WebGPU initialization failures. */

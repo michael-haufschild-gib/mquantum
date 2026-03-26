@@ -16,6 +16,13 @@ export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
 /**
  * Fields that should never be serialized to presets.
  * These are transient runtime states that don't represent user configuration.
+ *
+ * WHY blacklist (not whitelist):
+ * New store fields should serialize by default — user settings must persist
+ * in presets without requiring explicit opt-in. A whitelist would cause silent
+ * regressions: new features wouldn't save to presets until someone remembered
+ * to add them. The blacklist only grows when we add runtime-only state (rare)
+ * or need to strip legacy fields from imported presets (backward compat).
  */
 export const TRANSIENT_FIELDS = new Set([
   // Skybox - runtime texture object and loading state

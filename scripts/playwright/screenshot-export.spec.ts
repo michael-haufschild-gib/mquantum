@@ -3,8 +3,18 @@
  *
  * The export flow: File > Export Image → captureScreenshotAsync() → openModal(dataUrl)
  *
- * In headless Chromium, WebGPU canvas readback may fail, causing the capture
- * to throw. The app handles this by showing a MsgBox error.
+ * In headless Chromium, WebGPU canvas readback (copyTextureToBuffer from the
+ * swapchain) may fail depending on GPU driver and headless mode. This is a
+ * Chrome/driver limitation, not an app bug — the same readback works in headed
+ * mode and on real hardware. The app handles failure by showing a MsgBox error.
+ *
+ * WHY conditional skips (not removal or mocking):
+ * These tests verify REAL screenshot capture, not mocked paths. Removing the
+ * GPU-dependent tests would leave the export pipeline untested. Mocking the
+ * readback would test the mock, not the pipeline. The conditional skip ensures
+ * tests execute when GPU readback works (local dev, GPU-enabled CI) and degrade
+ * gracefully when it doesn't. The gpu-enforcement-reporter limits total skips
+ * across the suite to 5, preventing silent mass-skip.
  *
  * Tests are split into two deterministic groups:
  * 1. Tests that work regardless of capture success (menu wiring, modal/error appearance)

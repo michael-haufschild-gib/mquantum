@@ -42,6 +42,10 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </pre>
             )}
+            {/* Raw <button> is intentional: ErrorBoundary is a crash-recovery component.
+                It cannot depend on UI primitives (Button, etc.) because those components
+                may be the source of the crash. Self-contained HTML ensures the reload
+                button always renders regardless of what failed. */}
             <button
               type="button"
               className="rounded bg-danger-solid px-4 py-2 text-sm font-semibold text-text-inverse hover:brightness-110 transition-colors"

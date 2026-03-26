@@ -34,7 +34,20 @@ function isWebGPUSupported(): boolean {
  * WebGPU device manager singleton.
  *
  * Handles device initialization, loss recovery, and capability queries.
- * Uses a singleton pattern to ensure consistent device access.
+ *
+ * WHY singleton:
+ * A browser page has exactly one GPU adapter and one `GPUDevice`. Creating
+ * multiple devices wastes VRAM, risks hitting adapter limits, and complicates
+ * device-loss recovery (all passes must reference the same device). The singleton
+ * enforces this 1:1 relationship. `resetForTesting()` provides test isolation
+ * without the complexity of a factory or DI container.
+ *
+ * This was evaluated against alternatives:
+ * - React Context: would couple the GPU layer to React, but render passes
+ *   (non-React classes) also need device access.
+ * - Factory function: callers would need to pass the device through every
+ *   constructor, increasing coupling for no benefit since the instance is
+ *   inherently global.
  */
 export class WebGPUDevice {
   private static instance: WebGPUDevice | null = null
