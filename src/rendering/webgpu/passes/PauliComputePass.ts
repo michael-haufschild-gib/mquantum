@@ -627,7 +627,17 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               const sigmaX = data[3]!
               const sigmaY = data[4]!
               const sigmaZ = data[5]!
-              this.maxDensity = Math.max(0.001, data[6]!)
+              const rawMaxDensity = Math.max(0.001, data[6]!)
+              // Asymmetric maxDensity smoothing (matches TDSE/Dirac pattern):
+              // snap up instantly (new features visible immediately),
+              // EMA down with α=0.4 (fading features blend smoothly).
+              if (rawMaxDensity > 0) {
+                if (this.maxDensity <= 0.001 || rawMaxDensity >= this.maxDensity) {
+                  this.maxDensity = rawMaxDensity
+                } else {
+                  this.maxDensity += 0.4 * (rawMaxDensity - this.maxDensity)
+                }
+              }
 
               const safeTotalNorm = totalNorm > 0 ? totalNorm : 1
               const spinUpFraction = normUp / safeTotalNorm

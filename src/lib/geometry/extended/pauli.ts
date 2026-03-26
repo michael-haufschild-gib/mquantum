@@ -157,7 +157,9 @@ export interface PauliConfig {
 
 /**
  * Default configuration for Pauli spinor simulation.
- * 3D Gaussian wavepacket in a uniform magnetic field.
+ * 3D Gaussian wavepacket in a gradient magnetic field (Stern-Gerlach setup):
+ * the field gradient along z splits spin-up and spin-down components spatially,
+ * producing visible two-lobe structure from the initial equal superposition.
  */
 export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   latticeDim: 3,
@@ -168,10 +170,10 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   hbar: 1.0,
   mass: 1.0,
 
-  fieldType: 'uniform',
+  fieldType: 'gradient',
   fieldStrength: 2.0,
   fieldDirection: [0, 0],
-  gradientStrength: 1.0,
+  gradientStrength: 3.0,
   rotatingFrequency: 1.0,
 
   initialSpinDirection: [Math.PI / 2, 0],
@@ -181,7 +183,7 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   packetWidth: 0.8,
   packetMomentum: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 
-  potentialType: 'harmonicTrap',
+  potentialType: 'none',
   harmonicOmega: 1.0,
   wellDepth: 5.0,
   wellWidth: 1.0,

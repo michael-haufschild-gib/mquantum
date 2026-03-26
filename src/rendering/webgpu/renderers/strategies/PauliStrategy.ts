@@ -17,6 +17,7 @@ import {
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
+import { applySharedPml } from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -118,13 +119,10 @@ export class PauliStrategy implements QuantumModeStrategy {
             ? 'coherence'
             : 'totalDensity'
 
-    const effectiveConfig = {
-      ...pauliConfig,
-      fieldView: pauliFieldView,
-      absorberEnabled: schroedinger?.absorberEnabled ?? pauliConfig.absorberEnabled,
-      absorberWidth: schroedinger?.absorberWidth ?? pauliConfig.absorberWidth,
-      pmlTargetReflection: schroedinger?.pmlTargetReflection ?? pauliConfig.pmlTargetReflection,
-    } as PauliConfig
+    const effectiveConfig = applySharedPml(
+      { ...pauliConfig, fieldView: pauliFieldView },
+      schroedinger
+    ) as PauliConfig
 
     pauliPass.executePauli(
       ctx,

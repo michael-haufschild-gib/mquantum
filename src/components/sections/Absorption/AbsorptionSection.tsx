@@ -23,10 +23,11 @@ import { useGeometryStore } from '@/stores/geometryStore'
 const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND'])
 
 /**
- * Selects the absorber state and setters for the active quantum mode.
+ * Selects the shared absorber state and setters.
  *
- * Returns a flat object (no nesting) so useShallow comparison works
- * correctly. Returns `disabled: true` for static analytical modes.
+ * PML settings are universal — one set of controls applied to all modes
+ * via `applySharedPml` in each strategy. The top-level schroedinger
+ * absorber fields are the single source of truth.
  */
 function useAbsorber(objectType: string) {
   return useExtendedObjectStore(
@@ -34,74 +35,16 @@ function useAbsorber(objectType: string) {
       const cfg = s.schroedinger
       const qm = cfg.quantumMode
 
-      if (objectType === 'pauliSpinor') {
-        return {
-          disabled: false,
-          enabled: s.pauliSpinor.absorberEnabled,
-          width: s.pauliSpinor.absorberWidth,
-          pmlTargetReflection: s.pauliSpinor.pmlTargetReflection,
-          setEnabled: s.setPauliAbsorberEnabled,
-          setWidth: s.setPauliAbsorberWidth,
-          setPmlTargetReflection: s.setPauliPmlTargetReflection,
-        }
-      }
-
-      if (STATIC_MODES.has(qm)) {
-        return {
-          disabled: true,
-          enabled: false,
-          width: 0.2,
-          pmlTargetReflection: 1e-6,
-          setEnabled: s.setSchroedingerAbsorberEnabled,
-          setWidth: s.setSchroedingerAbsorberWidth,
-          setPmlTargetReflection: s.setSchroedingerPmlTargetReflection,
-        }
-      }
-
-      const modeMap = {
-        tdseDynamics: {
-          cfg: cfg.tdse,
-          setEnabled: s.setTdseAbsorberEnabled,
-          setWidth: s.setTdseAbsorberWidth,
-          setPmlTargetReflection: s.setTdsePmlTargetReflection,
-        },
-        freeScalarField: {
-          cfg: cfg.freeScalar,
-          setEnabled: s.setFreeScalarAbsorberEnabled,
-          setWidth: s.setFreeScalarAbsorberWidth,
-          setPmlTargetReflection: s.setFreeScalarPmlTargetReflection,
-        },
-        becDynamics: {
-          cfg: cfg.bec,
-          setEnabled: s.setBecAbsorberEnabled,
-          setWidth: s.setBecAbsorberWidth,
-          setPmlTargetReflection: s.setBecPmlTargetReflection,
-        },
-        diracEquation: {
-          cfg: cfg.dirac,
-          setEnabled: s.setDiracAbsorberEnabled,
-          setWidth: s.setDiracAbsorberWidth,
-          setPmlTargetReflection: s.setDiracPmlTargetReflection,
-        },
-        quantumWalk: {
-          cfg: cfg.quantumWalk,
-          setEnabled: s.setQwAbsorberEnabled,
-          setWidth: s.setQwAbsorberWidth,
-          setPmlTargetReflection: s.setQwPmlTargetReflection,
-        },
-      } as const
-
-      const m = modeMap[qm as keyof typeof modeMap]
-      const source = m?.cfg ?? cfg
+      const isStatic = objectType !== 'pauliSpinor' && STATIC_MODES.has(qm)
 
       return {
-        disabled: false,
-        enabled: source.absorberEnabled,
-        width: source.absorberWidth,
-        pmlTargetReflection: source.pmlTargetReflection,
-        setEnabled: m?.setEnabled ?? s.setSchroedingerAbsorberEnabled,
-        setWidth: m?.setWidth ?? s.setSchroedingerAbsorberWidth,
-        setPmlTargetReflection: m?.setPmlTargetReflection ?? s.setSchroedingerPmlTargetReflection,
+        disabled: isStatic,
+        enabled: cfg.absorberEnabled,
+        width: cfg.absorberWidth,
+        pmlTargetReflection: cfg.pmlTargetReflection,
+        setEnabled: s.setSchroedingerAbsorberEnabled,
+        setWidth: s.setSchroedingerAbsorberWidth,
+        setPmlTargetReflection: s.setSchroedingerPmlTargetReflection,
       }
     })
   )
