@@ -314,3 +314,61 @@ export function estimateVacuumMaxPhi(config: FreeScalarConfig): number {
   const variancePerSite = varianceSum / totalSites
   return 3 * Math.sqrt(variancePerSite)
 }
+
+/**
+ * Estimates the maximum conjugate momentum (pi) for auto-scale normalization.
+ *
+ * Computes a 3-sigma estimate: `3 * sqrt(variance_per_site)` where
+ * `variance_per_site = (1/N) * sum_k omega_k / 2`.
+ *
+ * Uses the actual k-space mode spectrum instead of the conservative omega_max
+ * bound, which over-estimates by ~50% in high dimensions.
+ *
+ * @param config - Free scalar field configuration
+ * @returns Estimated maximum pi value (positive)
+ */
+export function estimateVacuumMaxPi(config: FreeScalarConfig): number {
+  const { gridSize, spacing, mass, latticeDim } = config
+  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
+  const dims = gridSize.slice(0, latticeDim)
+  const totalSites = dims.reduce((a, b) => a * b, 1)
+
+  let varianceSum = 0
+  for (let idx = 0; idx < totalSites; idx++) {
+    const coords = linearToNDCoords(idx, dims)
+    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    varianceSum += omega / 2
+  }
+
+  const variancePerSite = varianceSum / totalSites
+  return 3 * Math.sqrt(variancePerSite)
+}
+
+/**
+ * Estimates the maximum local energy density for auto-scale normalization.
+ *
+ * For a free Gaussian field, the local energy density is:
+ * `E(x) = 0.5 * pi^2 + 0.5 * m^2 * phi^2 + 0.5 * sum_d (grad_d phi)^2`
+ *
+ * Since `omega_k^2 = m^2 + sum_d k_d^2`, the total variance simplifies to:
+ * `var(E) ~ (1/N) * sum_k omega_k` and the 3-sigma peak is `4.5 * <omega>`.
+ *
+ * @param config - Free scalar field configuration
+ * @returns Estimated maximum energy density (positive)
+ */
+export function estimateVacuumMaxEnergy(config: FreeScalarConfig): number {
+  const { gridSize, spacing, mass, latticeDim } = config
+  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
+  const dims = gridSize.slice(0, latticeDim)
+  const totalSites = dims.reduce((a, b) => a * b, 1)
+
+  let omegaSum = 0
+  for (let idx = 0; idx < totalSites; idx++) {
+    const coords = linearToNDCoords(idx, dims)
+    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    omegaSum += omega
+  }
+
+  const meanOmega = omegaSum / totalSites
+  return 4.5 * meanOmega
+}

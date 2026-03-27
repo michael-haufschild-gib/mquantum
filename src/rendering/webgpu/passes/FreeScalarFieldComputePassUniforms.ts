@@ -7,7 +7,11 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
-import { estimateVacuumMaxPhi } from '@/lib/physics/freeScalar/vacuumSpectrum'
+import {
+  estimateVacuumMaxEnergy,
+  estimateVacuumMaxPhi,
+  estimateVacuumMaxPi,
+} from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/fsfDiagnosticsStore'
 
@@ -264,28 +268,34 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return 1.0
   }
 
-  // Compute omega from lattice dispersion relation.
-  // For vacuum noise all modes are excited, so omega_max (Nyquist) is correct.
-  // For singleMode / gaussianPacket, use the actual mode wavevector to avoid
-  // overestimating by 10-100x (which makes pi/energy views appear too dim).
-  let omegaSq = config.mass * config.mass
+  // For vacuum noise, use exact k-space sums instead of the conservative omega_max
+  // bound. omega_max over-estimates by ~50% in high dimensions because it treats all
+  // modes as if they oscillate at the Nyquist frequency, while most modes have
+  // omega << omega_max. The exact sums give tight 3-sigma bounds.
   if (config.initialCondition === 'vacuumNoise') {
-    // omega_max^2 = m^2 + sum_d (2/a_d)^2 -- conservative upper bound
-    for (let d = 0; d < config.latticeDim; d++) {
-      const a = config.spacing[d]!
-      omegaSq += (2 / a) * (2 / a)
+    if (config.fieldView === 'pi') {
+      return estimateVacuumMaxPi(config)
     }
-  } else {
-    // Lattice dispersion for the actual mode: sk = (2/a) sin(k_phys * a / 2)
-    for (let d = 0; d < config.latticeDim; d++) {
-      const N = config.gridSize[d]!
-      const a = config.spacing[d]!
-      if (N <= 1 || a <= 0) continue
-      const latticeL = N * a
-      const kPhys = (2 * Math.PI * (config.modeK[d] ?? 0)) / latticeL
-      const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
-      omegaSq += sk * sk
+    // energyDensity: exact k-space sum + optional self-interaction potential
+    let energy = estimateVacuumMaxEnergy(config)
+    if (config.selfInteractionEnabled) {
+      const v = config.selfInteractionVev
+      energy += config.selfInteractionLambda * v * v * v * v
     }
+    return energy
+  }
+
+  // Non-vacuum modes (singleMode, gaussianPacket, kinkProfile):
+  // Use the actual mode wavevector for accurate per-mode omega estimation.
+  let omegaSq = config.mass * config.mass
+  for (let d = 0; d < config.latticeDim; d++) {
+    const N = config.gridSize[d]!
+    const a = config.spacing[d]!
+    if (N <= 1 || a <= 0) continue
+    const latticeL = N * a
+    const kPhys = (2 * Math.PI * (config.modeK[d] ?? 0)) / latticeL
+    const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
+    omegaSq += sk * sk
   }
   const omega = Math.sqrt(omegaSq)
 
@@ -296,7 +306,6 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
   // energyDensity: E ~ 0.5 * (pi^2 + (grad phi)^2 + m^2 phi^2) + V(phi)
   let energy = phi0 * phi0 * omegaSq * 0.5
   if (config.selfInteractionEnabled) {
-    // Max potential energy at phi=0: V(0) = lambda * v^4
     const v = config.selfInteractionVev
     energy += config.selfInteractionLambda * v * v * v * v
   }
