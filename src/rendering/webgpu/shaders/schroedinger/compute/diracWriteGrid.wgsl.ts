@@ -441,8 +441,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let potScale = max(abs(params.potentialStrength), 1.0);
     let normPot = abs(V) / potScale;
     let fadeout = 1.0 - smoothstep(1.5, 3.0, normPot);
+    // Per-type overlay gain: localized potentials (barrier) use full gain,
+    // spatially extended potentials need lower gain to avoid opaque walls.
     var overlayGain: f32 = 1.0;
-    if (params.potentialType == 4u || params.potentialType == 5u) {
+    if (params.potentialType == 1u || params.potentialType == 3u) {
+      // Step and well fill half the volume — reduce to translucent tint
+      overlayGain = 0.06;
+    } else if (params.potentialType == 4u || params.potentialType == 5u) {
+      // Harmonic and coulomb fill entire volume
       overlayGain = 0.03;
     }
     let potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain * perpFalloff;

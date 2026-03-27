@@ -266,7 +266,7 @@ ${bayerJitterSection}
       if (potSample.a < -0.01) {
         let potColor = vec3f(0.35, 0.45, 0.55);
         let potIntensity = abs(potSample.a);
-        let potOpacity = clamp(potIntensity * 0.5, 0.0, 0.7);
+        let potOpacity = clamp(potIntensity * 0.04, 0.0, 0.15);
         potAccColor += potTransmittance * potOpacity * potColor;
         potTransmittance *= (1.0 - potOpacity);
       }

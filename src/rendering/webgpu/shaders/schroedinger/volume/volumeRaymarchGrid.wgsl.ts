@@ -170,7 +170,7 @@ fn volumeRaymarchGrid(
     if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potIntensity = abs(gridSample.a);
-      let potOpacity = clamp(potIntensity * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
+      let potOpacity = clamp(potIntensity * 0.04 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.15);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
     }
