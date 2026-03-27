@@ -87,8 +87,9 @@ const defaultDiracGridPerDim = (d: number): number => {
 export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<DiracConfig> => {
   const gridDefault = defaultDiracGridPerDim(newDim)
   const gridSize = Array.from({ length: newDim }, () => gridDefault)
+  const dim0Spacing = prev.spacing.length > 0 ? prev.spacing[0]! : 0.15
   const spacing = Array.from({ length: newDim }, (_, i) =>
-    i < prev.spacing.length ? prev.spacing[i]! : 0.15
+    i < prev.spacing.length ? prev.spacing[i]! : dim0Spacing
   )
   const halfExtent = (d: number) => gridSize[d]! * spacing[d]! * 0.5
   const packetCenter = Array.from({ length: newDim }, (_, i) => {
@@ -486,7 +487,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       })
     },
     applyDiracPreset: (presetId) => {
-      import('@/lib/physics/dirac/presets').then(({ DIRAC_SCENARIO_PRESETS }) => {
+      void import('@/lib/physics/dirac/presets').then(({ DIRAC_SCENARIO_PRESETS }) => {
         const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
         if (!preset) return
         setWithVersion((state) => {

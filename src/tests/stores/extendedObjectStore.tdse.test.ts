@@ -260,11 +260,16 @@ describe('TDSE store slice', () => {
     // Default slicePositions is [] (latticeDim=3 → 0 extra dims). Expand to 4D first.
     store.setTdseLatticeDim(4)
     // Now slicePositions has length 1 (max(0, 4-3)=1)
+    // 4D resize: grid=16, spacing=0.4 (inherited from dim 0), half-extent = 16*0.4*0.5 = 3.2
     store.setTdseSlicePosition(0, 1.5)
     const sp = useExtendedObjectStore.getState().schroedinger.tdse.slicePositions
     expect(sp).toHaveLength(1)
-    // Value is clamped to half-extent of the 4th grid dimension (default: 16 * 0.1 * 0.5 = 0.8)
-    expect(sp[0]).toBe(0.8)
+    expect(sp[0]).toBe(1.5)
+
+    // Verify clamping at the actual half-extent boundary
+    store.setTdseSlicePosition(0, 5.0)
+    const sp2 = useExtendedObjectStore.getState().schroedinger.tdse.slicePositions
+    expect(sp2[0]).toBe(3.2)
   })
 
   it('setTdseBarrierHeight clamps to [0, 100]', () => {

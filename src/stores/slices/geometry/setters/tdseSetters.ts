@@ -84,12 +84,19 @@ type TdseActions = Pick<
 export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<TdseConfig> => {
   const gridDefault = defaultTdseGridPerDim(newDim)
   const gridSize = Array.from({ length: newDim }, () => gridDefault)
+  // Compute spacing for preserved dimensions first, then use dim-0 spacing as
+  // default for new dimensions. The old hardcoded 0.1 created severe asymmetries
+  // (up to 10:1 extent ratio) that made higher-dim TDSE look broken.
+  const dim0Spacing =
+    prev.gridSize.length > 0 && prev.spacing.length > 0
+      ? Math.max(0.01, Math.min(1.0, (prev.gridSize[0]! * prev.spacing[0]!) / gridDefault))
+      : 0.1
   const spacing = Array.from({ length: newDim }, (_, i) => {
     if (i < prev.spacing.length && i < prev.gridSize.length) {
       const oldExtent = prev.gridSize[i]! * prev.spacing[i]!
       return Math.max(0.01, Math.min(1.0, oldExtent / gridDefault))
     }
-    return 0.1
+    return dim0Spacing
   })
   const packetCenter = Array.from({ length: newDim }, (_, i) =>
     i < prev.packetCenter.length ? prev.packetCenter[i]! : 0

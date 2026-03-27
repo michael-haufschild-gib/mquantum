@@ -66,8 +66,9 @@ export const resizeFreeScalarArrays = (
 ): Partial<FreeScalarConfig> => {
   const gridDefault = defaultGridPerDim(newDim)
   const gridSize = Array.from({ length: newDim }, () => gridDefault)
+  const dim0Spacing = prev.spacing.length > 0 ? prev.spacing[0]! : 0.1
   const spacing = Array.from({ length: newDim }, (_, i) =>
-    i < prev.spacing.length ? prev.spacing[i]! : 0.1
+    i < prev.spacing.length ? prev.spacing[i]! : dim0Spacing
   )
   const packetCenter = Array.from({ length: newDim }, (_, i) =>
     i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
