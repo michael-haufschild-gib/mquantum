@@ -8,7 +8,7 @@
  * @module components/sections/Geometry/SchroedingerControls/DiracControls
  */
 
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -133,6 +133,15 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
   }, [dirac.gridSize, dirac.spacing, latticeDim])
 
   const potentialType = dirac.potentialType ?? 'none'
+  const overlayInapplicable =
+    potentialType === 'none' || dirac.fieldView === 'particleAntiparticleSplit'
+
+  useEffect(() => {
+    if (overlayInapplicable && dirac.showPotential) {
+      actions.setShowPotential(false)
+    }
+  }, [overlayInapplicable, dirac.showPotential, actions])
+
   const showPotentialParams = potentialType !== 'none'
   const showBarrierWidth = potentialType === 'barrier' || potentialType === 'well'
   const showHarmonicOmega = potentialType === 'harmonicTrap'
@@ -176,7 +185,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         tooltip="Overlay the electromagnetic potential on the spinor density visualization. Disabled when potential is 'none' or field view is upper/lower split."
         checked={dirac.showPotential}
         onCheckedChange={actions.setShowPotential}
-        disabled={potentialType === 'none' || dirac.fieldView === 'particleAntiparticleSplit'}
+        disabled={overlayInapplicable}
       />
 
       {/* Potential */}
