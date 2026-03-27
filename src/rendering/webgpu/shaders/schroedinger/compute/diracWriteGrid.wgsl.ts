@@ -374,7 +374,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         spinMag2 += dotIm * dotIm;
       }
     }
-    displayScalar = sqrt(spinMag2) * densityGate;
+    let rawSpin = sqrt(spinMag2);
+    displayScalar = select(rawSpin / params.densityScale, 0.0, params.densityScale <= 0.0) * densityGate;
 
   } else if (params.fieldView == 5u) {
     // currentDensity: nearest-neighbor (expensive gamma matrix work)
@@ -406,7 +407,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       currentMag2 += expectRe * expectRe;
     }
     let cFactor = params.speedOfLight;
-    displayScalar = cFactor * sqrt(currentMag2) * densityGate;
+    let rawCurrent = cFactor * sqrt(currentMag2);
+    displayScalar = select(rawCurrent / params.densityScale, 0.0, params.densityScale <= 0.0) * densityGate;
 
   } else if (params.fieldView == 6u) {
     // phase: trilinear-interpolated density for gating, NN for phase value
