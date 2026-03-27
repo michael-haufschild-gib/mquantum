@@ -107,11 +107,18 @@ export class WebGPURenderGraph {
   }> = []
   private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
     new Map()
-  // PERF: Pre-allocated hook context to avoid per-frame allocation
-  private _reusableHookContext: WebGPUBeforeSubmitHookContext = {
-    device: null as unknown as GPUDevice,
-    encoder: null as unknown as GPUCommandEncoder,
-    canvasTexture: null as unknown as GPUTexture,
+  // PERF: Pre-allocated hook context to avoid per-frame allocation.
+  // Nullable fields are populated by execute() before any hook reads them.
+  private _reusableHookContext: {
+    device: GPUDevice | null
+    encoder: GPUCommandEncoder | null
+    canvasTexture: GPUTexture | null
+    frame: WebGPUFrameContext | null
+    size: { width: number; height: number }
+  } = {
+    device: null,
+    encoder: null,
+    canvasTexture: null,
     frame: null,
     size: { width: 0, height: 0 },
   }
@@ -490,13 +497,17 @@ export class WebGPURenderGraph {
     }
 
     if (this.beforeSubmitHooks.size > 0) {
-      const hookContext = this._reusableHookContext
-      hookContext.device = device
-      hookContext.encoder = encoder
-      hookContext.canvasTexture = canvasTexture
-      hookContext.frame = this.frameContext
-      hookContext.size.width = this.width
-      hookContext.size.height = this.height
+      // Populate reusable context — all fields are non-null here because
+      // execute() has already obtained device, encoder, and canvasTexture.
+      const ctx = this._reusableHookContext
+      ctx.device = device
+      ctx.encoder = encoder
+      ctx.canvasTexture = canvasTexture
+      ctx.frame = this.frameContext
+      ctx.size.width = this.width
+      ctx.size.height = this.height
+      // Safe cast: all fields were just assigned non-null above.
+      const hookContext = ctx as WebGPUBeforeSubmitHookContext
 
       for (const [hookId, hook] of this.beforeSubmitHooks) {
         try {

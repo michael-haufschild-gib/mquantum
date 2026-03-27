@@ -103,7 +103,7 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
         })
     }
 
-    runDetection()
+    void runDetection()
   }, [])
 
   return { webgl2Supported }

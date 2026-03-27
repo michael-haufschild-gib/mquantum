@@ -1,3 +1,13 @@
+/**
+ * Message box store.
+ *
+ * Global modal dialog state for info, success, warning, and error messages.
+ * Supports configurable actions, optional "don't show again" persistence,
+ * and auto-dismiss via the dismissed dialogs store.
+ *
+ * @module stores/msgBoxStore
+ */
+
 import { create } from 'zustand'
 
 /** Message box severity level. */

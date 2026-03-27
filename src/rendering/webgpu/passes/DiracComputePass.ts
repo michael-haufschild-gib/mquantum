@@ -233,7 +233,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       })
       .catch((err) => {
-        import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+        void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
           useSimulationStateStore.getState().setSaveError(String(err))
         })
         this.saveMappingInFlight = false

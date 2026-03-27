@@ -1,3 +1,13 @@
+/**
+ * Panel collision avoidance hook.
+ *
+ * Computes spring-animated position offsets for floating UI elements
+ * (e.g. PerformanceMonitor) to avoid overlap with sidebars, top bar,
+ * and bottom bar as panels open/close.
+ *
+ * @module hooks/usePanelCollision
+ */
+
 import { MotionValue, useSpring } from 'motion/react'
 import { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'

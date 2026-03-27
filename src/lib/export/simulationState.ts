@@ -196,8 +196,8 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
 async function compressGzip(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const cs = new CompressionStream('gzip')
   const writer = cs.writable.getWriter()
-  writer.write(input)
-  writer.close()
+  void writer.write(input)
+  void writer.close()
 
   const chunks: Uint8Array<ArrayBuffer>[] = []
   const reader = cs.readable.getReader()
@@ -221,8 +221,8 @@ async function compressGzip(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<
 async function decompressGzip(input: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const ds = new DecompressionStream('gzip')
   const writer = ds.writable.getWriter()
-  writer.write(input)
-  writer.close()
+  void writer.write(input)
+  void writer.close()
 
   const chunks: Uint8Array<ArrayBuffer>[] = []
   const reader = ds.readable.getReader()

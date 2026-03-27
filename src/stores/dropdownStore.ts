@@ -1,3 +1,12 @@
+/**
+ * Global dropdown state store.
+ *
+ * Ensures only one dropdown menu is open at a time across the application.
+ * Components call openDropdown/closeDropdown to coordinate visibility.
+ *
+ * @module stores/dropdownStore
+ */
+
 import { create } from 'zustand'
 
 // ============================================================================

@@ -157,7 +157,7 @@ export class WebGPUDevice {
     })
 
     // Handle device loss
-    device.lost.then((info) => {
+    void device.lost.then((info) => {
       logger.error('WebGPU device lost:', info.message, 'reason:', info.reason)
       this.handleDeviceLost(info.reason)
     })

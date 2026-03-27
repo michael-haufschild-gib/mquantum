@@ -95,7 +95,7 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
       state.saveMappingInFlight = false
     })
     .catch((err) => {
-      import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+      void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
         useSimulationStateStore.getState().setSaveError(String(err))
       })
       state.saveMappingInFlight = false

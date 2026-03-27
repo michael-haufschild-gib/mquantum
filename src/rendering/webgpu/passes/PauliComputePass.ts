@@ -200,7 +200,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         this.saveMappingInFlight = false
       })
       .catch((err) => {
-        import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
+        void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
           useSimulationStateStore.getState().setSaveError(String(err))
         })
         this.saveMappingInFlight = false
@@ -612,7 +612,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       )
       this.diagMappingInFlight = true
 
-      device.queue.onSubmittedWorkDone().then(() => {
+      void device.queue.onSubmittedWorkDone().then(() => {
         const staging = this.buf?.diagStagingBuffer
         if (!staging) return
         staging

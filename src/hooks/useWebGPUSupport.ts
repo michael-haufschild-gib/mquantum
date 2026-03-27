@@ -222,7 +222,7 @@ export function useWebGPUSupport(): UseWebGPUSupportResult {
       completeDetection(caps)
     }
 
-    runDetection()
+    void runDetection()
   }, [detectionComplete, setWebGPUStatus, completeDetection])
 
   return {

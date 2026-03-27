@@ -9,7 +9,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { initAnimationWasm } from '@/lib/wasm'
 
 import App from './App.tsx'
-initAnimationWasm()
+void initAnimationWasm()
 
 // Expose stores on window for benchmark/profiling specs and console debugging.
 //

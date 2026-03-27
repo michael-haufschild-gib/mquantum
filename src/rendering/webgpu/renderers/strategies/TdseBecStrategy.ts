@@ -223,7 +223,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // Request async readback
     const readbackPromise = tdsePass.requestMeasurementReadback(ctx)
 
-    readbackPromise.then(async (data) => {
+    void readbackPromise.then(async (data) => {
       if (!data) {
         useMeasurementStore.getState().completeMeasurement([], 0, null)
         return

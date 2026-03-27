@@ -84,9 +84,17 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
 
   // PERF: Pre-allocated per-frame objects to avoid GC pressure
   const frameSizeRef = useRef({ width: 0, height: 0 })
-  const frameMetricsArgsRef = useRef<FrameMetricsArgs>({
-    graph: null as unknown as WebGPURenderGraph,
-    collector: null as unknown as WebGPUStatsCollector,
+  // Pre-allocated ref populated before use in the frame callback.
+  // graph/collector are null until the first frame populates them.
+  const frameMetricsArgsRef = useRef<{
+    graph: WebGPURenderGraph | null
+    collector: WebGPUStatsCollector | null
+    deltaTime: number
+    size: { width: number; height: number }
+    dpr: number
+  }>({
+    graph: null,
+    collector: null,
     deltaTime: 0,
     size: { width: 0, height: 0 },
     dpr: 1,
@@ -189,7 +197,8 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
       args.deltaTime = deltaTime
       args.size = frameSize
       args.dpr = effectiveDpr
-      executeFrameAndCollectMetrics(args)
+      // Safe cast: graph and collector were just assigned non-null above.
+      executeFrameAndCollectMetrics(args as FrameMetricsArgs)
 
       // Update frame counter attribute for e2e test automation.
       // Written sparsely (first 10 frames + every 60th) to avoid DOM thrashing.

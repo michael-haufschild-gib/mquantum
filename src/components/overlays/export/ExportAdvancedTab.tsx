@@ -30,7 +30,7 @@ export const ExportAdvancedTab = () => {
         return false
       }
     }
-    Promise.all([
+    void Promise.all([
       check('avc1.42001E'),
       check('hvc1.1.6.L120.B0'),
       check('vp09.00.10.08'),

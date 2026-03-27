@@ -1,3 +1,13 @@
+/**
+ * Performance metrics store.
+ *
+ * Holds per-frame GPU timing, draw call counts, memory stats, and
+ * historical frame time data for the performance monitor overlay.
+ * Updated by the render graph's stats collector after each frame.
+ *
+ * @module stores/performanceMetricsStore
+ */
+
 import { create } from 'zustand'
 
 /** GPU timing metrics collected per frame. */

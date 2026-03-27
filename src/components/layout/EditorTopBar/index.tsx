@@ -146,7 +146,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
       soundManager.playSuccess()
       await new Promise((resolve) => setTimeout(resolve, 50))
       const filename = generateTimestampFilename('ndimensional')
-      exportSceneToPNG({ filename })
+      void exportSceneToPNG({ filename })
     }
 
     const { setExportModalOpen, setPreviewImage, updateExportSettings } = useExportStore(

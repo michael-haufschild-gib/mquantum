@@ -161,7 +161,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       if (isCtrlOrMeta && lowerKey === 's') {
         event.preventDefault()
         const filename = generateTimestampFilename('ndimensional')
-        exportSceneToPNG({ filename })
+        void exportSceneToPNG({ filename })
         return
       }
 

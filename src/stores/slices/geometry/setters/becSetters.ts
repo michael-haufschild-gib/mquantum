@@ -360,7 +360,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     applyBecPreset: (presetId) => {
-      import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
+      void import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
         const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === presetId)
         if (!preset) return
         setWithVersion((state) => {

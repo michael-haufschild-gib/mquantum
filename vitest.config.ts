@@ -54,21 +54,23 @@ export default defineConfig({
         'src/rendering/webgpu/passes/DepthPass.ts',
         'src/rendering/webgpu/passes/NormalPass.ts',
         'src/rendering/webgpu/passes/MainObjectMRTPass.ts',
-        'src/rendering/webgpu/passes/gizmoGround.ts',
+        // gizmoGround.ts — removed: pure geometry math, no GPU calls, testable
         'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer.ts',
-        'src/rendering/webgpu/renderers/skyboxVertexData.ts',
+        // skyboxVertexData.ts — removed: mostly pure functions, testable
         'src/rendering/webgpu/renderers/strategies/TdseBecStrategy.ts',
         'src/rendering/webgpu/core/WebGPUUniformBuffer.ts',
-        'src/rendering/renderers/base/useRotationUpdates.ts',
+        // useRotationUpdates.ts — removed: React hook with zero GPU calls, testable
       ],
       // Coverage ratchet: thresholds must be >= current actuals (rounded down
       // to nearest 0.5%). Raise these when coverage improves; never lower them.
-      // Last measured 2026-03-26: stmts 60.99%, branches 53.84%, funcs 59.79%, lines 61.35%
+      // Last measured 2026-03-27: stmts 62.53%, branches 54.66%, funcs 62.10%, lines 62.92%
+      // (Adjusted after removing 3 testable files from exclusion list: gizmoGround,
+      // skyboxVertexData, useRotationUpdates — these contain pure logic, not GPU calls.)
       thresholds: {
-        statements: 60.5,
-        branches: 53.5,
-        functions: 59.5,
-        lines: 61,
+        statements: 62,
+        branches: 54.5,
+        functions: 62,
+        lines: 62.5,
       },
     },
   },

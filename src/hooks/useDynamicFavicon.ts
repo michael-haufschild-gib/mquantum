@@ -1,7 +1,18 @@
+/**
+ * Dynamic favicon hook.
+ *
+ * Generates a 32x32 favicon on a canvas using the current accent color
+ * from the theme store, then sets it as the page icon. Updates whenever
+ * the accent color changes.
+ *
+ * @module hooks/useDynamicFavicon
+ */
+
 import { useEffect } from 'react'
 
 import { useThemeStore } from '@/stores/themeStore'
 
+/** Generate and set a dynamic favicon based on the current theme accent. */
 export const useDynamicFavicon = () => {
   const accent = useThemeStore((state) => state.accent)
 

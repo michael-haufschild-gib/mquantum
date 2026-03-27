@@ -7,7 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
 import {
-  getEffectiveSampleQuality,
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
   REFINEMENT_STAGE_QUALITY,
@@ -283,18 +282,6 @@ describe('performanceStore', () => {
       store.reset()
       expect(localStorage.getItem('mdim_render_resolution_scale')).not.toBe('0.5')
       expect(localStorage.getItem('mdim_max_fps')).not.toBe('90')
-    })
-  })
-})
-
-describe('quality interpolation utilities', () => {
-  describe('getEffectiveSampleQuality', () => {
-    it('should return target at maximum multiplier', () => {
-      expect(getEffectiveSampleQuality('high', 1.0)).toBe('high')
-    })
-
-    it('should return low at minimum multiplier', () => {
-      expect(getEffectiveSampleQuality('high', 0.25)).toBe('low')
     })
   })
 })

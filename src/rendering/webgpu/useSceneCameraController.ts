@@ -11,12 +11,9 @@ import type { RefObject } from 'react'
 import { useCallback, useEffect, useRef } from 'react'
 
 import { useCameraStore } from '@/stores/cameraStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores/performanceStore'
 
 import { WebGPUCamera } from './core/WebGPUCamera'
-
-/** Delay before restoring full quality after interaction stops (ms). */
-const INTERACTION_RESTORE_DELAY = 150
 
 /** Dependencies injected from the parent scene component. */
 export interface SceneCameraControllerDeps {

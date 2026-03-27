@@ -17,7 +17,7 @@ import {
   normalizeCosineVector,
   POST_PROCESSING_LOAD_KEYS,
   SHADER_TYPE_SET,
-} from './presetNormalization'
+} from './presetNormalizationShared'
 
 // ---------------------------------------------------------------------------
 // Shared helpers

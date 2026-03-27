@@ -132,7 +132,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-    this.readbackAndComputeKSpace(device, config) // fire-and-forget async
+    void this.readbackAndComputeKSpace(device, config) // fire-and-forget async
   }
 
   /**
@@ -162,7 +162,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.diagPhiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.diagPiReadbackBuffer, 0, bufferSize)
-    this.readbackDiagnostics(device, config)
+    void this.readbackDiagnostics(device, config)
   }
 
   /** Get or create the k-space Web Worker. */
@@ -275,7 +275,10 @@ export class FsfKSpaceManager {
 
       useFsfDiagnosticsStore.getState().pushSnapshot(snapshot)
       this.diagMappingInFlight = false
-    } catch {
+    } catch (e) {
+      // Buffer may be destroyed mid-readback during mode transitions.
+      // Log in dev to surface unexpected failures.
+      logger.warn('[FSF KSpace] Diagnostics readback failed:', e)
       this.diagMappingInFlight = false
     }
   }

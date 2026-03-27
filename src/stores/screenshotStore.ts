@@ -1,3 +1,12 @@
+/**
+ * Screenshot preview modal store.
+ *
+ * Manages the open/close state and image source for the screenshot
+ * preview modal. Clears the capture store on close.
+ *
+ * @module stores/screenshotStore
+ */
+
 import { create } from 'zustand'
 
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'

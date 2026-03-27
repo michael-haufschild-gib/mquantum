@@ -170,7 +170,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       }
     }
 
-    initialize()
+    void initialize()
 
     return () => {
       cancelled = true
