@@ -107,9 +107,15 @@ export function writeTdseUniforms(
   // spacing (128, indices 32-43)
   for (let d = 0; d < config.latticeDim; d++) f32[32 + d] = config.spacing[d]!
   // packetCenter (176, indices 44-55)
-  for (let d = 0; d < config.latticeDim; d++) f32[44 + d] = config.packetCenter[d] ?? 0
+  // Write full array length: BEC encodes non-spatial params beyond latticeDim
+  const centerLen = Math.min(config.packetCenter.length, MAX_DIM)
+  for (let d = 0; d < centerLen; d++) f32[44 + d] = config.packetCenter[d] ?? 0
   // packetMomentum (224, indices 56-67)
-  for (let d = 0; d < config.latticeDim; d++) f32[56 + d] = config.packetMomentum[d] ?? 0
+  // Write full array length: BEC encodes vortex/soliton params beyond latticeDim
+  // [0]=vortexCharge, [1]=solitonDepth, [2]=solitonVelocity,
+  // [3]=vortexLatticeCount, [4]=vortexAlternateCharge
+  const momLen = Math.min(config.packetMomentum.length, MAX_DIM)
+  for (let d = 0; d < momLen; d++) f32[56 + d] = config.packetMomentum[d] ?? 0
 
   // Packet scalars (272-287, indices 68-71)
   f32[68] = config.packetWidth
