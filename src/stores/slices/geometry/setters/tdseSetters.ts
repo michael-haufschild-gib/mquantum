@@ -8,7 +8,6 @@
  */
 
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
-import { getTdsePreset } from '@/lib/physics/tdse/presets'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -483,28 +482,30 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       })
     },
     applyTdsePreset: (presetId) => {
-      const preset = getTdsePreset(presetId)
-      if (!preset) return
-      setWithVersion((state) => {
-        const globalDim = useGeometryStore.getState().dimension
-        const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
-        const base = {
-          ...DEFAULT_TDSE_CONFIG,
-          ...safeOverrides,
-          slicePositions: state.schroedinger.tdse.slicePositions,
-          needsReset: true,
-        }
-        const resized = resizeTdseArrays(base, globalDim)
-        const potentialType =
-          globalDim < 2 && base.potentialType === 'doubleSlit'
-            ? ('barrier' as const)
-            : base.potentialType
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...base, ...resized, potentialType, needsReset: true },
-          },
-        }
+      void import('@/lib/physics/tdse/presets').then(({ getTdsePreset }) => {
+        const preset = getTdsePreset(presetId)
+        if (!preset) return
+        setWithVersion((state) => {
+          const globalDim = useGeometryStore.getState().dimension
+          const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
+          const base = {
+            ...DEFAULT_TDSE_CONFIG,
+            ...safeOverrides,
+            slicePositions: state.schroedinger.tdse.slicePositions,
+            needsReset: true,
+          }
+          const resized = resizeTdseArrays(base, globalDim)
+          const potentialType =
+            globalDim < 2 && base.potentialType === 'doubleSlit'
+              ? ('barrier' as const)
+              : base.potentialType
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              tdse: { ...base, ...resized, potentialType, needsReset: true },
+            },
+          }
+        })
       })
     },
     resetTdseField: () => {

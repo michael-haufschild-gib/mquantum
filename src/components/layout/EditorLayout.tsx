@@ -2,11 +2,22 @@ import { AnimatePresence, m } from 'motion/react'
 import React, { Suspense, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { CanvasContextMenu } from '@/components/layout/CanvasContextMenu'
-import { CommandPalette } from '@/components/layout/CommandPalette'
-import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay'
-import { CropEditor } from '@/components/overlays/CropEditor'
-import { ExportModal } from '@/components/overlays/ExportModal'
+// Lazy-load overlays — only fetched when user opens them
+const CanvasContextMenu = React.lazy(() =>
+  import('@/components/layout/CanvasContextMenu').then((m) => ({ default: m.CanvasContextMenu }))
+)
+const CommandPalette = React.lazy(() =>
+  import('@/components/layout/CommandPalette').then((m) => ({ default: m.CommandPalette }))
+)
+const ShortcutsOverlay = React.lazy(() =>
+  import('@/components/layout/ShortcutsOverlay').then((m) => ({ default: m.ShortcutsOverlay }))
+)
+const CropEditor = React.lazy(() =>
+  import('@/components/overlays/CropEditor').then((m) => ({ default: m.CropEditor }))
+)
+const ExportModal = React.lazy(() =>
+  import('@/components/overlays/ExportModal').then((m) => ({ default: m.ExportModal }))
+)
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
@@ -161,8 +172,10 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
         className="relative z-10 flex flex-col h-full w-full pointer-events-none"
       >
         <GlobalProgress />
-        <ExportModal />
-        <CropEditor />
+        <Suspense>
+          <ExportModal />
+          <CropEditor />
+        </Suspense>
 
         {!isCinematicMode && (
           <div className="pointer-events-auto shrink-0 z-50">
@@ -328,9 +341,11 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
         )}
       </AnimatePresence>
 
-      <CommandPalette />
-      <CanvasContextMenu />
-      {!isCinematicMode && <ShortcutsOverlay />}
+      <Suspense>
+        <CommandPalette />
+        <CanvasContextMenu />
+        {!isCinematicMode && <ShortcutsOverlay />}
+      </Suspense>
     </div>
   )
 })

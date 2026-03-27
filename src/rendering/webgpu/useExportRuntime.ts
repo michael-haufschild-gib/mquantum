@@ -9,7 +9,6 @@
 
 import { useCallback } from 'react'
 
-import { VideoRecorder } from '@/lib/export/video'
 import {
   computeRenderDimensions,
   computeSegmentDurationFrames,
@@ -421,7 +420,7 @@ export function useExportRuntime({
       if (mode !== 'stream') {
         const firstRecorderDuration =
           mode === 'segmented' ? segmentDurationFrames / settings.fps : settings.duration
-        const recorder = createExportRecorder(
+        const recorder = await createExportRecorder(
           canvas,
           settings,
           runtime.exportWidth,
@@ -494,7 +493,7 @@ export function useExportRuntime({
             loop.frameId = 0
             loop.totalFrames = Math.max(1, Math.ceil(previewDuration * settings.fps))
 
-            const previewRecorder = createExportRecorder(
+            const previewRecorder = await createExportRecorder(
               canvas,
               settings,
               runtime.exportWidth,
@@ -547,6 +546,7 @@ export function useExportRuntime({
             useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
           }
 
+          const { VideoRecorder } = await import('@/lib/export/video')
           const mainRecorder = new VideoRecorder(canvas, {
             width: runtime.exportWidth,
             height: runtime.exportHeight,
@@ -606,7 +606,7 @@ export function useExportRuntime({
           const remainingFrames = loop.totalFrames - loop.frameId
           const nextSegmentFrames = Math.min(loop.segmentDurationFrames, remainingFrames)
 
-          const nextRecorder = createExportRecorder(
+          const nextRecorder = await createExportRecorder(
             canvas,
             settings,
             runtime.exportWidth,

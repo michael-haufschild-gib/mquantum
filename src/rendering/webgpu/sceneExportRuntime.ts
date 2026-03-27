@@ -6,7 +6,6 @@
 
 import type React from 'react'
 
-import { VideoRecorder } from '@/lib/export/video'
 import type { ExportMode, ExportSettings } from '@/stores/exportStore'
 import { useExportStore } from '@/stores/exportStore'
 
@@ -42,6 +41,15 @@ export interface ExportPerformanceSnapshot {
   renderResolutionScale: number
 }
 
+/** Minimal recorder interface — avoids static import of VideoRecorder (and mediabunny). */
+export interface ExportRecorder {
+  initialize(): Promise<void>
+  captureFrame(videoTime: number, frameDuration: number, globalVideoTime?: number): Promise<void>
+  finalize(): Promise<Blob | null>
+  cancel(): Promise<void>
+  dispose(): void
+}
+
 /** Full mutable state for the video export runtime. */
 export interface ExportRuntimeState {
   starting: boolean
@@ -52,7 +60,7 @@ export interface ExportRuntimeState {
   abortRequested: boolean
   mode: RuntimeExportMode | null
   settings: ExportSettings | null
-  recorder: VideoRecorder | null
+  recorder: ExportRecorder | null
   rotationSnapshot: Map<string, number> | null
   originalCanvasWidth: number
   originalCanvasHeight: number
@@ -197,14 +205,16 @@ export interface UseExportRuntimeReturn {
 
 /**
  * Create a VideoRecorder with standard config derived from export settings.
+ * Dynamically imports video.ts to keep mediabunny out of the initial bundle.
  */
-export function createExportRecorder(
+export async function createExportRecorder(
   canvas: HTMLCanvasElement,
   settings: ExportSettings,
   width: number,
   height: number,
   duration: number
-): VideoRecorder {
+): Promise<ExportRecorder> {
+  const { VideoRecorder } = await import('@/lib/export/video')
   return new VideoRecorder(canvas, {
     width,
     height,
