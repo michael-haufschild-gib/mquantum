@@ -263,9 +263,10 @@ ${bayerJitterSection}
       if (potT > potEndT || potTransmittance < 0.05) { break; }
       let potPos = ro + rd * potT;
       let potSample = sampleDensityFromGrid(potPos, schroedinger);
-      if (potSample.a > 0.01) {
+      if (potSample.a < -0.01) {
         let potColor = vec3f(0.35, 0.45, 0.55);
-        let potOpacity = clamp(potSample.a * 0.5, 0.0, 0.7);
+        let potIntensity = abs(potSample.a);
+        let potOpacity = clamp(potIntensity * 0.5, 0.0, 0.7);
         potAccColor += potTransmittance * potOpacity * potColor;
         potTransmittance *= (1.0 - potOpacity);
       }

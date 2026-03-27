@@ -173,9 +173,10 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
 
       <Switch
         label="Show Potential Overlay"
-        tooltip="Overlay the electromagnetic potential on the spinor density visualization."
+        tooltip="Overlay the electromagnetic potential on the spinor density visualization. Disabled when potential is 'none' or field view is upper/lower split."
         checked={dirac.showPotential}
         onCheckedChange={actions.setShowPotential}
+        disabled={potentialType === 'none' || dirac.fieldView === 'particleAntiparticleSplit'}
       />
 
       {/* Potential */}
