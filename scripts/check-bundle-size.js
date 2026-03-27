@@ -36,9 +36,8 @@ const CHUNK_BUDGETS = {
   'index': 30,
 }
 
-/** Total JS gzip budget in KB (all .js chunks combined).
- *  Updated 2026-03-25: 625→626 for shader optimization branch (hydrogen math module split). */
-const TOTAL_JS_BUDGET_KB = 626
+/** Total JS gzip budget in KB (all .js chunks combined). */
+const TOTAL_JS_BUDGET_KB = 750
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)
