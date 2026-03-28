@@ -35,6 +35,9 @@ claude-mcp.sh
 # Testing
 coverage
 test-results/
+reports/mutation/
+.stryker-tmp/
+stryker-incremental.json
 
 # Build artifacts
 build

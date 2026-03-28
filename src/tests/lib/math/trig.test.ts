@@ -40,13 +40,18 @@ describe('fsin', () => {
     expect(Math.abs(fsin(x) - Math.sin(x))).toBeLessThan(0.06)
   })
 
-  it('output is clamped to [-1, 1]', () => {
+  it('output is bounded to [-1, 1] (inherent to parabolic formula)', () => {
     for (let i = 0; i < 1000; i++) {
       const x = (i - 500) * 0.1
       const result = fsin(x)
       expect(result).toBeGreaterThanOrEqual(-1)
       expect(result).toBeLessThanOrEqual(1)
     }
+  })
+
+  it('peaks at exactly 1.0 at x = PI/2 (IEEE 754 exact)', () => {
+    expect(fsin(Math.PI / 2)).toBe(1)
+    expect(fsin(-Math.PI / 2)).toBe(-1)
   })
 
   it('is periodic with period 2*PI', () => {

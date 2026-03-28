@@ -41,10 +41,9 @@ export function fsin(x: number): number {
   x = (((x % TAU) + TAU + PI) % TAU) - PI
 
   // Parabolic approximation: y = x * (PI - |x|) * 4/PI²
-  const y = x * (PI - Math.abs(x)) * PI_SQ_INV_4
-
-  // Clamp to [-1, 1] to prevent floating point overshoot
-  return y < -1 ? -1 : y > 1 ? 1 : y
+  // Peak at x=±PI/2 is exactly 1.0 in IEEE 754 (PI/2 * PI/2 * 4/PI² = 1),
+  // so the output is inherently bounded to [-1, 1] — no clamp needed.
+  return x * (PI - Math.abs(x)) * PI_SQ_INV_4
 }
 
 /**
