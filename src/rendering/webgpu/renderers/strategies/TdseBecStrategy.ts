@@ -13,6 +13,8 @@ import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
+import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -182,16 +184,26 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       }
     }
 
-    // B3: Eigenstate storage for Gram-Schmidt
+    // B3: Eigenstate storage for Gram-Schmidt + scar analysis
     if (simState.storeEigenstateRequested) {
-      const newCount = tdsePass.storeCurrentEigenstate(ctx.device)
+      const energy = TdseBecStrategy.getCurrentEigenstateEnergy()
+      const newCount = tdsePass.storeCurrentEigenstate(ctx.device, energy, tdseConfig)
       simState.clearStoreEigenstateRequest(
         newCount >= 0 ? newCount : tdsePass.getStoredEigenstateCount()
       )
+      if (newCount >= 0) {
+        useEigenstateDiagnosticsStore.getState().pushEigenstate(energy, NaN)
+      }
     }
 
     // C3: Born rule measurement
     TdseBecStrategy.handleMeasurement(ctx, tdsePass, tdseConfig)
+  }
+
+  /** Read the current eigenstate energy from the observables store if available. */
+  private static getCurrentEigenstateEnergy(): number {
+    const obs = useObservablesDiagnosticsStore.getState()
+    return obs.hasData ? obs.totalEnergy : NaN
   }
 
   /**
@@ -387,7 +399,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         radialWellOuter: 1.8,
         radialWellDepth: 50,
         radialWellTilt: 0.5,
-        disorderStrength: 5.0,
+        anharmonicLambda: 0,
+        disorderStrength: 0,
         disorderSeed: 42,
         disorderDistribution: 'uniform' as const,
         driveEnabled: false,

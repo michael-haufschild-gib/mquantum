@@ -46,6 +46,7 @@ export const ALL_POTENTIAL_TYPE_OPTIONS: { value: string; label: string; minDims
   { value: 'doubleWell', label: 'Double Well' },
   { value: 'radialDoubleWell', label: 'Radial Double Well' },
   { value: 'andersonDisorder', label: 'Anderson Disorder' },
+  { value: 'coupledAnharmonic', label: 'Coupled Anharmonic' },
   { value: 'custom', label: 'Custom Expression' },
 ]
 

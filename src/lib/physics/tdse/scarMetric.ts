@@ -1,0 +1,237 @@
+/**
+ * Eigenstate–Orbit Correlation Metric
+ *
+ * Computes the overlap between eigenstate probability density and classical
+ * trajectories at the same energy. This is a heuristic for detecting quantum
+ * scarring (concentration along unstable periodic orbits), but does NOT perform
+ * a true periodic-orbit search. The classical trajectories are random
+ * energy-shell samples — not guaranteed periodic or unstable.
+ *
+ * The weight function W_orbit(x) is a Gaussian tube around the trajectory:
+ *   W(x) = Σ_t exp(-|x - x_orbit(t)|² / (2ε²))
+ *
+ * The normalized correlation is:
+ *   C = ∫|ψ|² · W dx / (∫|ψ|² dx · ⟨W⟩)
+ *
+ * where ⟨W⟩ = ∫W dx / Volume is the mean weight over the domain.
+ * C > 1 indicates excess density along the trajectory (possible scarring).
+ * C ≈ 1 indicates a uniformly spread eigenstate (Berry conjecture).
+ *
+ * When disorder is active, orbits are computed on the clean (disorder-free)
+ * Hamiltonian. Comparing clean-system orbits against disordered eigenstates
+ * detects which scars survive the Anderson perturbation — this is the correct
+ * approach for studying scar–localization competition (cf. arXiv:2512.xxxxx).
+ *
+ * Reference: Heller (1984), Phys. Rev. Lett. 53, 1515 — original scar paper
+ *
+ * @module lib/physics/tdse/scarMetric
+ */
+
+import type { ClassicalTrajectory } from './classicalOrbit'
+
+/** Result of scar correlation analysis for one eigenstate. */
+export interface ScarResult {
+  /** Per-orbit scar correlations (C values) */
+  orbitCorrelations: number[]
+  /** Maximum scar correlation across all orbits */
+  maxCorrelation: number
+  /** Mean correlation (baseline — should be ~1 for non-scarred states) */
+  meanCorrelation: number
+  /** Orbit correlation strength: max / mean — values >> 1 suggest scarring */
+  orbitCorrelation: number
+  /** Index of the orbit with strongest scarring */
+  strongestOrbitIndex: number
+}
+
+/**
+ * Compute scar correlation between an eigenstate density and classical orbits.
+ *
+ * Algorithm:
+ * 1. For each orbit, build a sparse weight function W on the lattice grid
+ *    by discretizing orbit points with a Gaussian kernel
+ * 2. Compute C = (Σ_i ρ_i · W_i) / (Σ_i ρ_i · ⟨W⟩) where ⟨W⟩ = Σ_i W_i / N
+ * 3. Return per-orbit correlations and summary statistics
+ *
+ * @param densityRe - Eigenstate ψ_re values on the lattice (Float32Array)
+ * @param densityIm - Eigenstate ψ_im values on the lattice (Float32Array)
+ * @param orbits - Classical trajectories at the eigenstate energy
+ * @param gridSize - Per-dimension grid sizes
+ * @param spacing - Per-dimension lattice spacings
+ * @param tubeWidth - Gaussian tube width ε (spatial units)
+ * @returns Scar correlation results
+ */
+export function computeScarCorrelation(
+  densityRe: Float32Array,
+  densityIm: Float32Array,
+  orbits: ClassicalTrajectory[],
+  gridSize: number[],
+  spacing: number[],
+  tubeWidth: number
+): ScarResult {
+  const dim = gridSize.length
+  let totalSites = 1
+  for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
+
+  // Precompute probability density |ψ|²
+  const density = new Float64Array(totalSites)
+  let totalDensity = 0
+  for (let i = 0; i < totalSites; i++) {
+    const re = densityRe[i]!
+    const im = densityIm[i]!
+    const rho = re * re + im * im
+    density[i] = rho
+    totalDensity += rho
+  }
+
+  if (totalDensity <= 0) {
+    return {
+      orbitCorrelations: orbits.map(() => 0),
+      maxCorrelation: 0,
+      meanCorrelation: 0,
+      orbitCorrelation: 0,
+      strongestOrbitIndex: 0,
+    }
+  }
+
+  // Precompute grid coordinate helpers
+  const halfGrid = new Float64Array(dim)
+  for (let d = 0; d < dim; d++) halfGrid[d] = gridSize[d]! * 0.5 - 0.5
+
+  // Compute strides for N-D → linear index (C-order, last-axis-fastest)
+  const strides = new Int32Array(dim)
+  strides[dim - 1] = 1
+  for (let d = dim - 2; d >= 0; d--) strides[d] = strides[d + 1]! * gridSize[d + 1]!
+
+  const invTwoEpsSq = 1.0 / (2.0 * tubeWidth * tubeWidth)
+  // Kernel radius in grid cells per dimension
+  const kernelRadius = Math.max(1, Math.ceil(3 * tubeWidth / Math.min(...spacing)))
+
+  const orbitCorrelations: number[] = []
+
+  for (const orbit of orbits) {
+    // Build sparse weight function W on the grid
+    const weight = new Float64Array(totalSites)
+
+    for (const pt of orbit.points) {
+      // Convert orbit position to grid coordinates
+      const centerGrid = new Float64Array(dim)
+      for (let d = 0; d < dim; d++) {
+        centerGrid[d] = pt.x[d]! / spacing[d]! + halfGrid[d]!
+      }
+
+      // Enumerate nearby grid cells within the kernel
+      addGaussianKernel(
+        weight,
+        centerGrid,
+        gridSize,
+        strides,
+        spacing,
+        halfGrid,
+        pt.x,
+        kernelRadius,
+        invTwoEpsSq,
+        dim
+      )
+    }
+
+    // Compute scar correlation
+    // C = (Σ ρ·W) / (totalDensity · meanW)  where meanW = ΣW / N
+    let dotProduct = 0
+    let totalWeight = 0
+    for (let i = 0; i < totalSites; i++) {
+      dotProduct += density[i]! * weight[i]!
+      totalWeight += weight[i]!
+    }
+
+    const meanWeight = totalWeight / totalSites
+    const denominator = totalDensity * meanWeight
+
+    const C = denominator > 0 ? dotProduct / denominator : 0
+    orbitCorrelations.push(C)
+  }
+
+  // Summary statistics
+  let maxCorrelation = 0
+  let strongestOrbitIndex = 0
+  let sumCorrelation = 0
+
+  for (let i = 0; i < orbitCorrelations.length; i++) {
+    const c = orbitCorrelations[i]!
+    sumCorrelation += c
+    if (c > maxCorrelation) {
+      maxCorrelation = c
+      strongestOrbitIndex = i
+    }
+  }
+
+  const meanCorrelation = orbitCorrelations.length > 0 ? sumCorrelation / orbitCorrelations.length : 0
+  const orbitCorrelation = meanCorrelation > 0 ? maxCorrelation / meanCorrelation : 0
+
+  return {
+    orbitCorrelations,
+    maxCorrelation,
+    meanCorrelation,
+    orbitCorrelation,
+    strongestOrbitIndex,
+  }
+}
+
+/**
+ * Add a Gaussian kernel centered at a point to the weight grid.
+ *
+ * Iterates over nearby grid cells within `radius` and adds
+ * exp(-|x_grid - x_orbit|² / (2ε²)) to each cell.
+ *
+ * Uses recursive iteration over dimensions to handle arbitrary N-D.
+ */
+function addGaussianKernel(
+  weight: Float64Array,
+  centerGrid: Float64Array,
+  gridSize: number[],
+  strides: Int32Array,
+  spacing: number[],
+  halfGrid: Float64Array,
+  orbitPos: Float64Array,
+  radius: number,
+  invTwoEpsSq: number,
+  dim: number
+): void {
+  // Iterative N-D kernel enumeration using a coordinate stack
+  const coords = new Int32Array(dim)
+  const lo = new Int32Array(dim)
+  const hi = new Int32Array(dim)
+
+  for (let d = 0; d < dim; d++) {
+    const center = Math.round(centerGrid[d]!)
+    lo[d] = Math.max(0, center - radius)
+    hi[d] = Math.min(gridSize[d]! - 1, center + radius)
+    coords[d] = lo[d]!
+  }
+
+  // Iterate through all cells in the N-D box [lo, hi]
+  outer: while (true) {
+    // Compute distance² from this grid cell to the orbit point
+    let dist2 = 0
+    let linearIdx = 0
+    for (let d = 0; d < dim; d++) {
+      const posGrid = (coords[d]! - halfGrid[d]!) * spacing[d]!
+      const dx = posGrid - orbitPos[d]!
+      dist2 += dx * dx
+      linearIdx += coords[d]! * strides[d]!
+    }
+
+    // Add Gaussian contribution
+    const w = Math.exp(-dist2 * invTwoEpsSq)
+    if (w > 1e-10) {
+      weight[linearIdx] = weight[linearIdx]! + w
+    }
+
+    // Increment N-D counter (last dimension fastest)
+    for (let d = dim - 1; d >= 0; d--) {
+      coords[d]!++
+      if (coords[d]! <= hi[d]!) break
+      if (d === 0) break outer
+      coords[d] = lo[d]!
+    }
+  }
+}

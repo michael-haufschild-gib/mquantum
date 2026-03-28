@@ -65,8 +65,13 @@ import {
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
-/** TDSEUniforms struct size in bytes (732 = 708 + 24 vortex reconnection fields) */
-const UNIFORM_SIZE = 732
+/** TDSEUniforms struct size in bytes (736 = 732 + 4 anharmonicLambda) */
+const UNIFORM_SIZE = 736
+
+import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
+import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+
+import { tdseAddDisorderBlock } from '../shaders/schroedinger/compute/tdseAddDisorder.wgsl'
 
 import type { DiagDispatchParams, FFTAxisParams } from './TDSEComputePassDispatchers'
 import {
@@ -197,6 +202,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Max |V| from the last custom potential upload, for display normalization */
   private customPotentialScale = 1.0
 
+  // Disorder overlay state
+  private disorderBuffer: GPUBuffer | null = null
+  private disorderUniformBuffer: GPUBuffer | null = null
+  private disorderPipeline: GPUComputePipeline | null = null
+  private disorderBGL: GPUBindGroupLayout | null = null
+  private disorderBG: GPUBindGroup | null = null
+  private lastDisorderHash = ''
+
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
@@ -254,11 +267,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   setLoadedWavefunction(re: Float32Array, im: Float32Array, isMeasurementCollapse?: boolean): void {
     this._slState.pendingInjection = { re, im, isMeasurementCollapse }
   }
-  storeCurrentEigenstate(device: GPUDevice): number {
-    return gsStoreEigenstate(device, this._gsState)
+  storeCurrentEigenstate(device: GPUDevice, energy = NaN, tdseConfig?: import('@/lib/geometry/extended/tdse').TdseConfig): number {
+    return gsStoreEigenstate(device, this._gsState, 1.0, energy, tdseConfig)
   }
   getStoredEigenstateCount(): number {
     return this._gsState.gsEigenstates.length
+  }
+  /** Get per-eigenstate diagnostics (energy, IPR) for UI display and statistics. */
+  getEigenstateDiagnostics(): { energy: number; ipr: number }[] {
+    return this._gsState.gsEigenstates.map((es) => ({ energy: es.energy, ipr: es.ipr }))
   }
 
   requestMeasurementReadback(
@@ -338,6 +355,26 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       createComputePipeline: (d, sm, bgls, label) => this.createComputePipeline(d, sm, bgls, label),
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
+    this.buildDisorderPipeline(device)
+  }
+
+  /** Build disorder overlay pipeline (uniform + potential + disorderBuffer). */
+  private buildDisorderPipeline(device: GPUDevice): void {
+    this.disorderBGL = device.createBindGroupLayout({
+      label: 'tdse-disorder-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      ],
+    })
+    const sm = this.createShaderModule(device, tdseAddDisorderBlock, 'tdse-add-disorder')
+    this.disorderPipeline = this.createComputePipeline(
+      device,
+      sm,
+      [this.disorderBGL],
+      'tdse-add-disorder'
+    )
   }
   private rebuildBindGroups(device: GPUDevice): void {
     if (!this.pl || !this.densityTextureView) return
@@ -422,6 +459,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.dispatchCompute(pass, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
         pass.end()
       }
+      // Disorder overlay on init
+      this.maybeDispatchDisorder(device, ctx, config, linearWG)
     }
 
     this._diagState.maxDensity = estimateInitialDensity(config)
@@ -485,6 +524,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._obsState.obsEnabled = false // force rebuild on next check
       gsClearEigenstates(this._gsState) // eigenstates are grid-size-specific
       useSimulationStateStore.getState().clearStoredEigenstates()
+      useEigenstateDiagnosticsStore.getState().clear()
     }
 
     // Create/destroy observables resources when toggle changes or after rebuild
@@ -543,6 +583,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
           p.end()
         }
+        // Disorder overlay: add random noise to the potential buffer
+        this.maybeDispatchDisorder(device, ctx, config, linearWG)
       }
     }
 
@@ -705,6 +747,60 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     runVortexDetection(ctx, this._vdState, config, this.totalSites, this._diagState.maxDensity)
   }
 
+  /**
+   * Generate and dispatch disorder overlay if disorderStrength > 0.
+   * Regenerates the noise buffer when the seed or grid size changes.
+   */
+  private maybeDispatchDisorder(
+    device: GPUDevice,
+    ctx: WebGPURenderContext,
+    config: TdseConfig,
+    linearWG: number
+  ): void {
+    if (config.disorderStrength <= 0 || !this.potentialBuffer || !this.disorderPipeline) return
+
+    const disorderHash = `${config.disorderSeed}|${this.totalSites}`
+    if (disorderHash !== this.lastDisorderHash) {
+      this.disorderBuffer?.destroy()
+      this.disorderUniformBuffer?.destroy()
+
+      const noise = generateDisorderNoise(this.totalSites, config.disorderSeed)
+      this.disorderBuffer = device.createBuffer({
+        label: 'tdse-disorder',
+        size: this.totalSites * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      })
+      device.queue.writeBuffer(this.disorderBuffer, 0, noise.buffer)
+
+      this.disorderUniformBuffer = device.createBuffer({
+        label: 'tdse-disorder-uniform',
+        size: 8,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      this.lastDisorderHash = disorderHash
+    }
+
+    if (!this.disorderBuffer || !this.disorderUniformBuffer || !this.disorderBGL) return
+
+    // Write disorder uniforms: { totalSites: u32, strength: f32 }
+    const buf = new ArrayBuffer(8)
+    new Uint32Array(buf, 0, 1)[0] = this.totalSites
+    new Float32Array(buf, 4, 1)[0] = config.disorderStrength
+    device.queue.writeBuffer(this.disorderUniformBuffer, 0, buf)
+
+    this.disorderBG = device.createBindGroup({
+      layout: this.disorderBGL,
+      entries: [
+        { binding: 0, resource: { buffer: this.disorderUniformBuffer } },
+        { binding: 1, resource: { buffer: this.potentialBuffer } },
+        { binding: 2, resource: { buffer: this.disorderBuffer } },
+      ],
+    })
+    const pass = ctx.beginComputePass({ label: 'tdse-add-disorder' })
+    this.dispatchCompute(pass, this.disorderPipeline, [this.disorderBG], linearWG)
+    pass.end()
+  }
+
   execute(_ctx: WebGPURenderContext): void {
     // Use executeTDSE instead
   }
@@ -730,8 +826,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.diagPartialRightBuffer,
       this.diagPartialIprBuffer,
       this.bg?.renormalizeUniformBuffer,
+      this.disorderBuffer,
+      this.disorderUniformBuffer,
     ]
     for (const b of bufs) b?.destroy()
+    this.disorderBuffer = this.disorderUniformBuffer = null
+    this.disorderBG = null
+    this.lastDisorderHash = ''
     this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
     this.fftScratchA = this.fftScratchB = this.omegaStagingBuffer = null
     this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null

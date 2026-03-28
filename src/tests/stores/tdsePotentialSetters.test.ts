@@ -71,12 +71,12 @@ describe('TDSE potential setters', () => {
     s.setTdseDriveWaveform('sine' as unknown as number)
     expect(getTdse().driveWaveform).toBe('sine')
     // @ts-expect-error intentional invalid input
-    s.setTdseDriveWaveform('square' as unknown as number)
-    expect(getTdse().driveWaveform).toBe('square')
+    s.setTdseDriveWaveform('pulse' as unknown as number)
+    expect(getTdse().driveWaveform).toBe('pulse')
     // Invalid waveform should not change state
     // @ts-expect-error intentional invalid input
     s.setTdseDriveWaveform('invalid' as unknown as number)
-    expect(getTdse().driveWaveform).toBe('square')
+    expect(getTdse().driveWaveform).toBe('pulse')
   })
 
   it('clamps double well parameters', () => {

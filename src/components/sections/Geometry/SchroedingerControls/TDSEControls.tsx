@@ -13,6 +13,7 @@ import React, { useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 import { Switch } from '@/components/ui/Switch'
 import type { TdseFieldView, TdseInitialCondition } from '@/lib/geometry/extended/types'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
@@ -343,20 +344,44 @@ TDSEControls.displayName = 'TDSEControls'
 
 const StoreEigenstateButton: React.FC = React.memo(() => {
   const count = useSimulationStateStore((s) => s.storedEigenstateCount)
+  const eigenstates = useEigenstateDiagnosticsStore((s) => s.eigenstates)
+  const levelSpacing = useEigenstateDiagnosticsStore((s) => s.levelSpacing)
 
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => useSimulationStateStore.getState().requestStoreEigenstate()}
-        disabled={count >= 8}
-        tooltip="Capture the current converged eigenstate for Gram-Schmidt orthogonalization. Subsequent imaginary-time runs will find the next excited state."
-        data-testid="store-eigenstate"
-      >
-        Store Eigenstate
-      </Button>
-      {count > 0 && <span className="text-[10px] text-text-tertiary">{count} stored</span>}
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => useSimulationStateStore.getState().requestStoreEigenstate()}
+          disabled={count >= 32}
+          tooltip="Capture the current converged eigenstate for Gram-Schmidt orthogonalization. Subsequent imaginary-time runs will find the next excited state."
+          data-testid="store-eigenstate"
+        >
+          Store Eigenstate
+        </Button>
+        {count > 0 && <span className="text-[10px] text-text-tertiary">{count} stored</span>}
+      </div>
+      {eigenstates.length > 0 && (
+        <div className="space-y-1 text-[10px] text-text-tertiary" data-testid="eigenstate-diagnostics">
+          {eigenstates.map((es) => (
+            <div key={es.index} className="flex gap-2">
+              <span>|{es.index}\u27E9</span>
+              <span>E={Number.isFinite(es.energy) ? es.energy.toFixed(3) : '?'}</span>
+              <span>IPR={Number.isFinite(es.ipr) ? es.ipr.toExponential(2) : '...'}</span>
+              {Number.isFinite(es.orbitCorrelation) && (
+                <span>Orb={es.orbitCorrelation.toFixed(2)}</span>
+              )}
+            </div>
+          ))}
+          {levelSpacing && (
+            <div className="border-t border-border-subtle pt-1 mt-1" data-testid="level-spacing-stats">
+              <div>\u03B2={levelSpacing.brodyBeta.toFixed(2)} ({levelSpacing.classification})</div>
+              <div>\u27E8s\u27E9={levelSpacing.meanSpacing.toFixed(3)}</div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 })

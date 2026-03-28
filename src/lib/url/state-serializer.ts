@@ -49,6 +49,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'radialDoubleWell',
   'custom',
   'andersonDisorder',
+  'coupledAnharmonic',
 ]
 
 // ─── Types ───────────────────────────────────────────────────────────────────

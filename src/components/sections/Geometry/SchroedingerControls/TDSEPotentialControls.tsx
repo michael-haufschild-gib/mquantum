@@ -59,6 +59,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
     const showDoubleWellControls = td.potentialType === 'doubleWell'
     const showRadialDoubleWellControls = td.potentialType === 'radialDoubleWell'
     const showDisorderControls = td.potentialType === 'andersonDisorder'
+    const showCoupledAnharmonicControls = td.potentialType === 'coupledAnharmonic'
 
     return (
       <>
@@ -388,6 +389,63 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
               >
                 Randomize Seed
               </Button>
+            </>
+          )}
+
+          {showCoupledAnharmonicControls && (
+            <>
+              <Slider
+                label="Omega"
+                tooltip="Harmonic oscillator frequency for the confining quadratic part of the potential."
+                min={0.01}
+                max={10}
+                step={0.01}
+                value={td.harmonicOmega}
+                onChange={actions.setHarmonicOmega}
+                showValue
+                data-testid="tdse-anharmonic-omega"
+              />
+              <Slider
+                label="Coupling (\u03BB)"
+                tooltip="Cross-dimensional coupling strength in V = \u00BDΣ\u03C9\u00B2x\u00B2 + \u03BBΣx_i\u00B2x_j\u00B2. Higher values increase classical chaos."
+                min={0}
+                max={100}
+                step={0.1}
+                value={td.anharmonicLambda}
+                onChange={actions.setAnharmonicLambda}
+                showValue
+                data-testid="tdse-anharmonic-lambda"
+              />
+            </>
+          )}
+
+          {/* Disorder overlay (available for any potential except andersonDisorder which has its own) */}
+          {!showDisorderControls && (
+            <>
+              <Slider
+                label="Disorder (W)"
+                tooltip="Uniform random on-site disorder strength. Adds V_noise \u2208 [-W/2, +W/2] to the potential at each lattice site. Non-zero values enable Anderson localization physics."
+                min={0}
+                max={100}
+                step={0.1}
+                value={td.disorderStrength}
+                onChange={actions.setDisorderStrength}
+                showValue
+                data-testid="tdse-disorder-strength"
+              />
+              {td.disorderStrength > 0 && (
+                <Slider
+                  label="Disorder Seed"
+                  tooltip="Random seed for reproducible disorder realization. Different seeds give different disorder patterns."
+                  min={0}
+                  max={999999}
+                  step={1}
+                  value={td.disorderSeed}
+                  onChange={actions.setDisorderSeed}
+                  showValue
+                  data-testid="tdse-disorder-seed"
+                />
+              )}
             </>
           )}
         </div>

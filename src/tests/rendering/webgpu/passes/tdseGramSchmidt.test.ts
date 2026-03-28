@@ -124,9 +124,10 @@ describe('storeCurrentEigenstate', () => {
 
     expect(count).toBe(1)
     expect(state.gsEigenstates).toHaveLength(1)
-    // 2 buffers created for the eigenstate copy (re + im)
-    expect(device.createBuffer).toHaveBeenCalledTimes(2)
-    expect(device.queue.submit).toHaveBeenCalledTimes(1)
+    // 2 buffers for eigenstate copy (re + im) + 2 staging buffers for async IPR readback
+    expect(device.createBuffer).toHaveBeenCalledTimes(4)
+    // 2 submits: one for eigenstate copy, one for IPR readback
+    expect(device.queue.submit).toHaveBeenCalledTimes(2)
   })
 
   it('stores multiple eigenstates up to MAX_STORED_EIGENSTATES', () => {
@@ -170,8 +171,8 @@ describe('clearEigenstates', () => {
     const buf2Im = createMockBuffer('es-1-im')
     const state = createGSState()
     state.gsEigenstates = [
-      { re: buf1Re, im: buf1Im, normSquared: 1.0 },
-      { re: buf2Re, im: buf2Im, normSquared: 1.0 },
+      { re: buf1Re, im: buf1Im, normSquared: 1.0, energy: NaN, ipr: NaN },
+      { re: buf2Re, im: buf2Im, normSquared: 1.0, energy: NaN, ipr: NaN },
     ]
 
     clearEigenstates(state)
@@ -211,7 +212,7 @@ describe('destroyGSBuffers', () => {
 })
 
 describe('MAX_STORED_EIGENSTATES', () => {
-  it('is 8 (matches UI button disable threshold)', () => {
-    expect(MAX_STORED_EIGENSTATES).toBe(8)
+  it('is 32 (matches UI button disable threshold)', () => {
+    expect(MAX_STORED_EIGENSTATES).toBe(32)
   })
 })

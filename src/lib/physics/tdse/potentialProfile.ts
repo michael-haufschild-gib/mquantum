@@ -60,6 +60,20 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       return lam * x2a2 * x2a2 - eps * x
     }
 
+    case 'radialDoubleWell': {
+      // 1D slice: r = |x|
+      const r = Math.abs(x)
+      const dr1 = r - config.radialWellInner
+      const dr2 = r - config.radialWellOuter
+      return config.radialWellDepth * dr1 * dr1 * dr2 * dr2 - config.radialWellTilt * r
+    }
+
+    case 'coupledAnharmonic':
+      // On the 1D axis slice (y=z=...=0), the cross-coupling λΣ x_i²x_j²
+      // vanishes because all other coordinates are zero. The 1D profile
+      // is indistinguishable from a pure harmonic trap.
+      return 0.5 * config.mass * config.harmonicOmega * config.harmonicOmega * x * x
+
     case 'custom': {
       const result = parseExpression(config.customPotentialExpression ?? '0')
       if (!result.success) return 0
@@ -204,6 +218,18 @@ export function getPotentialPlotScale(config: TdseConfig): number {
     case 'doubleWell': {
       const a2 = config.doubleWellSeparation ** 2
       return Math.max(config.doubleWellLambda * a2 * a2, 1)
+    }
+    case 'radialDoubleWell': {
+      // Scale from barrier height between inner and outer wells
+      const rMid = (config.radialWellInner + config.radialWellOuter) / 2
+      const dr1 = rMid - config.radialWellInner
+      const dr2 = rMid - config.radialWellOuter
+      return Math.max(config.radialWellDepth * dr1 * dr1 * dr2 * dr2, 1)
+    }
+    case 'coupledAnharmonic': {
+      // 1D slice is harmonic; use harmonic scale at quarter-domain
+      const r = (config.gridSize[0] ?? 64) * (config.spacing[0] ?? 0.1) * 0.25
+      return Math.max(0.5 * config.mass * config.harmonicOmega ** 2 * r ** 2, 1)
     }
     case 'custom': {
       // Sample the custom expression along axis 0 to find max|V|

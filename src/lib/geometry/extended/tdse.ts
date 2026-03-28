@@ -69,6 +69,7 @@ export type TdsePotentialType =
   | 'radialDoubleWell'
   | 'custom'
   | 'andersonDisorder'
+  | 'coupledAnharmonic'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -172,8 +173,12 @@ export interface TdseConfig {
   /** Asymmetry tilt ε (>0 = outer well deeper, drives bubble nucleation) */
   radialWellTilt: number
 
-  // === Anderson Disorder Configuration (when potentialType === 'andersonDisorder') ===
-  /** Disorder strength W: V(r) ∈ [-W/2, W/2] (uniform) or σ = W (gaussian) */
+  // === Coupled Anharmonic Configuration (when potentialType === 'coupledAnharmonic') ===
+  /** Coupling strength λ in V = ½Σω²x² + λΣ_{i<j} x_i²x_j² */
+  anharmonicLambda: number
+
+  // === Disorder Configuration (andersonDisorder type + generic overlay) ===
+  /** Disorder strength W: V_disorder ∈ [-W/2, +W/2] (uniform) or σ = W (gaussian) */
   disorderStrength: number
   /** Deterministic PRNG seed for disorder realization reproducibility */
   disorderSeed: number
@@ -297,7 +302,9 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   radialWellDepth: 50.0,
   radialWellTilt: 0.5,
 
-  disorderStrength: 5.0,
+  anharmonicLambda: 1.0,
+
+  disorderStrength: 0,
   disorderSeed: 42,
   disorderDistribution: 'uniform',
 

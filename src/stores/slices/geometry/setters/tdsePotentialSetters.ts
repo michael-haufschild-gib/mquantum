@@ -40,6 +40,9 @@ const TDSE_PARAMS: Record<string, TdseParamDef> = {
   setTdseRadialWellOuter: { field: 'radialWellOuter', min: 0.1, max: 10 },
   setTdseRadialWellDepth: { field: 'radialWellDepth', min: 0, max: 200 },
   setTdseRadialWellTilt: { field: 'radialWellTilt', min: -2, max: 2 },
+  setTdseAnharmonicLambda: { field: 'anharmonicLambda', min: 0, max: 100 },
+  setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
+  setTdseDisorderSeed: { field: 'disorderSeed', min: 0, max: 999999 },
   setTdseDriveFrequency: { field: 'driveFrequency', min: 0, max: 50 },
   setTdseDriveAmplitude: { field: 'driveAmplitude', min: 0, max: 100 },
   setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
@@ -85,10 +88,8 @@ export function createTdsePotentialSetters(
 
   result.setTdseDriveWaveform = (waveform: unknown) => {
     const w = waveform as string
-    if (w !== 'sine' && w !== 'square' && w !== 'sawtooth') return
-    // Type assertion needed: w is narrowed to 'sine'|'square'|'sawtooth' by the guard above,
-    // but TypeScript doesn't propagate this through the Zustand setState callback type.
-    type DriveWaveform = 'sine' | 'square' | 'sawtooth'
+    if (w !== 'sine' && w !== 'pulse' && w !== 'chirp') return
+    type DriveWaveform = 'sine' | 'pulse' | 'chirp'
     setWithVersion(
       (state) =>
         ({

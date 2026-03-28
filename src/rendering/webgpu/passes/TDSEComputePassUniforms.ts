@@ -52,6 +52,7 @@ const POT_MAP: Record<string, number> = {
   radialDoubleWell: 10,
   custom: 11, // GPU potential shader skipped; buffer filled from JS
   andersonDisorder: 12, // GPU potential shader skipped; buffer filled from JS with random disorder
+  coupledAnharmonic: 13,
 }
 
 /** Enum maps for TDSE field view modes. */
@@ -230,6 +231,9 @@ export function writeTdseUniforms(
   u32[180] = vp2[1]
   f32[181] = config.vortexSeparation ?? 0.0
   u32[182] = config.vortexPairCount ?? 2
+
+  // Coupled anharmonic coupling (offset 732, index 183)
+  f32[183] = config.anharmonicLambda ?? 1.0
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

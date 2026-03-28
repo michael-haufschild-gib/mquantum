@@ -16,6 +16,7 @@
  *   8 = doubleWell (radial quartic V(r) = λ(r² − a²)² − εr — bubble nucleation)
  *   9 = becTrap (anisotropic harmonic trap for BEC — radial)
  *  10 = radialDoubleWell (V(r) = λ(r−r₁)²(r−r₂)² − ε·r — bubble nucleation)
+ *  13 = coupledAnharmonic (V = ½Σω²x² + λΣ_{i<j} x_i²x_j² — chaotic for most λ)
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -145,6 +146,27 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let dr1 = rrdw - r1;
     let dr2 = rrdw - r2;
     V = lam * dr1 * dr1 * dr2 * dr2 - eps * rrdw;
+  } else if (params.potentialType == 13u) {
+    // Coupled anharmonic: V = ½Σω²x_d² + λΣ_{i<j} x_i²x_j²
+    // Harmonic part (isotropic, uses harmonicOmega)
+    let omega2ca = params.harmonicOmega * params.harmonicOmega;
+    var harmonic: f32 = 0.0;
+    // Store per-dimension positions for cross-coupling
+    var posCA: array<f32, 12>;
+    for (var dca: u32 = 0u; dca < params.latticeDim; dca++) {
+      let p = (f32(coords[dca]) - f32(params.gridSize[dca]) * 0.5 + 0.5) * params.spacing[dca];
+      posCA[dca] = p;
+      harmonic += p * p;
+    }
+    harmonic = 0.5 * params.mass * omega2ca * harmonic;
+    // Cross-coupling: λΣ_{i<j} x_i²x_j²
+    var coupling: f32 = 0.0;
+    for (var ica: u32 = 0u; ica < params.latticeDim; ica++) {
+      for (var jca: u32 = ica + 1u; jca < params.latticeDim; jca++) {
+        coupling += posCA[ica] * posCA[ica] * posCA[jca] * posCA[jca];
+      }
+    }
+    V = harmonic + params.anharmonicLambda * coupling;
   }
 
   potential[idx] = V;

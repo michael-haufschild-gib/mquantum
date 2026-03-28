@@ -11,8 +11,8 @@ import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
-/** TDSEUniforms struct size in bytes (732 = 708 + 24 vortex reconnection fields) */
-const UNIFORM_SIZE = 732
+/** TDSEUniforms struct size in bytes (736 = 732 + 4 anharmonicLambda) */
+const UNIFORM_SIZE = 736
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */

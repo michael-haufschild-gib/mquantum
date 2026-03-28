@@ -49,8 +49,11 @@ export function computePotentialHash(config: TdseConfig, simTime: number): strin
         config.radialWellOuter,
         config.radialWellDepth,
         config.radialWellTilt,
+        config.anharmonicLambda,
         (config.trapAnisotropy ?? []).join(','),
         config.spacing.join(','),
+        config.disorderStrength,
+        config.disorderSeed,
       ].join('|')
   const custom = config.potentialType === 'custom' ? config.customPotentialExpression : ''
   const anderson =
