@@ -51,6 +51,7 @@ const POT_MAP: Record<string, number> = {
   becTrap: 9,
   radialDoubleWell: 10,
   custom: 11, // GPU potential shader skipped; buffer filled from JS
+  andersonDisorder: 12, // GPU potential shader skipped; buffer filled from JS with random disorder
 }
 
 /** Enum maps for TDSE field view modes. */

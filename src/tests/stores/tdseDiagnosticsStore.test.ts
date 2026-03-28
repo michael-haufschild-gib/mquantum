@@ -28,6 +28,7 @@ function makeSnapshot(overrides: Record<string, number> = {}) {
     normRight: 0.5,
     R: 0,
     T: 0,
+    ipr: 0,
     ...overrides,
   }
 }

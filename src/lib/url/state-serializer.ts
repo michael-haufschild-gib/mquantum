@@ -48,6 +48,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'doubleWell',
   'radialDoubleWell',
   'custom',
+  'andersonDisorder',
 ]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -101,6 +102,12 @@ export interface ShareableObjectState {
   imaginaryTimeEnabled?: boolean
   /** Custom potential expression V(x,y,z,...) when potentialType === 'custom' */
   customPotentialExpression?: string
+  /** Anderson disorder strength W (when potentialType === 'andersonDisorder') */
+  disorderStrength?: number
+  /** Anderson disorder PRNG seed */
+  disorderSeed?: number
+  /** Anderson disorder distribution ('uniform' | 'gaussian') */
+  disorderDistribution?: string
 
   // ── Features ─────────────────────────────────────────────────────────────
   /** Open quantum system enabled */
@@ -255,6 +262,11 @@ export function serializeState(state: ShareableState): string {
   if (state.potentialType === 'custom' && state.customPotentialExpression) {
     setStringParam(params, 'cpx', state.customPotentialExpression)
   }
+  if (state.potentialType === 'andersonDisorder') {
+    setFloatParam(params, 'dis_w', state.disorderStrength, true)
+    setIntParam(params, 'dis_s', state.disorderSeed)
+    setStringParam(params, 'dis_d', state.disorderDistribution)
+  }
 
   // Features
   if (state.openQuantumEnabled) {
@@ -320,6 +332,12 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   if (state.potentialType === 'custom') {
     const cpx = params.get('cpx')
     if (cpx && cpx.length <= 200) state.customPotentialExpression = cpx
+  }
+  if (state.potentialType === 'andersonDisorder') {
+    state.disorderStrength = parseFloatParam(params, 'dis_w', 0, 100)
+    state.disorderSeed = parseIntParam(params, 'dis_s', 0, 999999)
+    const dd = params.get('dis_d')
+    if (dd === 'uniform' || dd === 'gaussian') state.disorderDistribution = dd
   }
 
   // Features — open quantum

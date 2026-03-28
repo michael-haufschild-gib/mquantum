@@ -22,6 +22,7 @@ import {
   SchroedingerQuantumMode,
   SchroedingerRenderStyle,
   SecondQuantizationMode,
+  type TdseDisorderDistribution,
   type TdseDriveWaveform,
   type TdseFieldView,
   type TdseInitialCondition,
@@ -325,6 +326,9 @@ export interface SchroedingerSliceActions {
   setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
   setTdseDriveFrequency: (frequency: number) => void
   setTdseDriveAmplitude: (amplitude: number) => void
+  setTdseDisorderStrength: (strength: number) => void
+  setTdseDisorderSeed: (seed: number) => void
+  setTdseDisorderDistribution: (distribution: TdseDisorderDistribution) => void
   setTdseAbsorberEnabled: (enabled: boolean) => void
   setTdseAbsorberWidth: (width: number) => void
   setTdsePmlTargetReflection: (r: number) => void

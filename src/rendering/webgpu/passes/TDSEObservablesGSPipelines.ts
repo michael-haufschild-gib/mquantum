@@ -14,6 +14,10 @@ import {
   gramSchmidtSubtractBlock,
 } from '../shaders/schroedinger/compute/gramSchmidt.wgsl'
 import {
+  energySpectralDensityBlock,
+  energySpectralDensityUniformsBlock,
+} from '../shaders/schroedinger/compute/energySpectralDensity.wgsl'
+import {
   observablesMomentumFinalizeBlock,
   observablesMomentumReduceBlock,
 } from '../shaders/schroedinger/compute/observablesMomentumReduce.wgsl'
@@ -39,6 +43,8 @@ export interface ObsGSPipelineResult {
   gsFinalizeBGL: GPUBindGroupLayout
   gsSubtractPipeline: GPUComputePipeline
   gsSubtractBGL: GPUBindGroupLayout
+  energySpectrumPipeline: GPUComputePipeline
+  energySpectrumBGL: GPUBindGroupLayout
 }
 
 /**
@@ -187,6 +193,30 @@ export function buildObsGSPipelines(
     'gs-subtract'
   )
 
+  // ── Energy Spectral Density ──
+  const energySpectrumBGL = device.createBindGroupLayout({
+    label: 'energy-spectrum-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ],
+  })
+
+  // NDIndex block provides linearToND (not used by this shader but the uniform struct references
+  // array types that need the block prepended for WGSL parsing context). Actually, this shader
+  // does its own index decomposition, so only needs its own uniform block.
+  const energySpectrumPipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(
+      device,
+      energySpectralDensityUniformsBlock + energySpectralDensityBlock,
+      'energy-spectrum'
+    ),
+    [energySpectrumBGL],
+    'energy-spectrum'
+  )
+
   return {
     obsPosReducePipeline,
     obsPosReduceBGL,
@@ -202,5 +232,7 @@ export function buildObsGSPipelines(
     gsFinalizeBGL,
     gsSubtractPipeline,
     gsSubtractBGL,
+    energySpectrumPipeline,
+    energySpectrumBGL,
   }
 }

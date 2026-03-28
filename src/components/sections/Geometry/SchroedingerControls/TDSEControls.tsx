@@ -23,7 +23,7 @@ import {
   detectActivePreset,
   FIELD_VIEW_OPTIONS,
   INITIAL_CONDITION_OPTIONS,
-  SCENARIO_PRESET_OPTIONS,
+  getScenarioPresetOptions,
   TDSE_MAX_TOTAL_SITES,
 } from './tdseControlsConstants'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
@@ -98,6 +98,12 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
       [actions]
     )
 
+    // Filter presets to those compatible with the current dimension
+    const scenarioPresetOptions = useMemo(
+      () => getScenarioPresetOptions(dimension),
+      [dimension]
+    )
+
     return (
       <div className="space-y-4" data-testid="tdse-controls">
         {/* Scenario Presets */}
@@ -105,7 +111,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <Select
             label="Scenario"
             tooltip="Preconfigured physics scenarios with tuned parameters for tunneling, scattering, interference, and other quantum phenomena."
-            options={SCENARIO_PRESET_OPTIONS}
+            options={scenarioPresetOptions}
             value={activePreset}
             onChange={handlePresetChange}
             data-testid="tdse-scenario-preset"

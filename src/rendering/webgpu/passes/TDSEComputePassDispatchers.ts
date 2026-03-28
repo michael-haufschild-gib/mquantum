@@ -177,6 +177,20 @@ export function dispatchDiagnostics(
       const momF = ctx.beginComputePass({ label: 'obs-mom-final' })
       p.dispatchCompute(momF, p.pl.obsMomFinalPipeline, [os.obsMomFinalBG], 1)
       momF.end()
+
+      // Energy spectral density: bin |φ(k)|² by E(k) (k-space data already in fftScratchA)
+      if (os.esSpectrumBG && os.obsResources.esBinsBuffer) {
+        // Clear bins buffer to zero before atomic accumulation
+        encoder.clearBuffer(os.obsResources.esBinsBuffer)
+        const esP = ctx.beginComputePass({ label: 'energy-spectrum' })
+        p.dispatchCompute(
+          esP,
+          p.pl.energySpectrumPipeline,
+          [os.esSpectrumBG],
+          Math.ceil(p.totalSites / LINEAR_WG)
+        )
+        esP.end()
+      }
     }
 
     // Position: reduce ⟨x⟩, ⟨x²⟩, ⟨V⟩ from psi buffers (already post-step)

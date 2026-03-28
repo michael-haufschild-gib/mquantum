@@ -26,6 +26,8 @@ export interface TdseDiagnosticsSnapshot {
   R: number
   /** Transmission coefficient T = normRight / (normLeft + normRight) */
   T: number
+  /** Inverse Participation Ratio: IPR = Σ|ψ|⁴ / (Σ|ψ|²)². Ranges from 1/N (extended) to 1 (localized). */
+  ipr: number
 }
 
 /**

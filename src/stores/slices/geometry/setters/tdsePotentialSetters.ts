@@ -42,6 +42,7 @@ const TDSE_PARAMS: Record<string, TdseParamDef> = {
   setTdseRadialWellTilt: { field: 'radialWellTilt', min: -2, max: 2 },
   setTdseDriveFrequency: { field: 'driveFrequency', min: 0, max: 50 },
   setTdseDriveAmplitude: { field: 'driveAmplitude', min: 0, max: 100 },
+  setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
 }
 
 /**

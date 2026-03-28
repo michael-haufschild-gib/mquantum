@@ -24,6 +24,7 @@ interface TdseDiagnosticsSnapshot {
   normRight: number
   R: number
   T: number
+  ipr: number
 }
 
 interface TdseDiagnosticsState extends TdseDiagnosticsSnapshot {
@@ -38,6 +39,8 @@ interface TdseDiagnosticsState extends TdseDiagnosticsSnapshot {
   historyR: Float32Array
   /** Transmission coefficient time-series ring buffer */
   historyT: Float32Array
+  /** IPR time-series ring buffer (inverse participation ratio) */
+  historyIpr: Float32Array
   /** Current write head in ring buffer */
   historyHead: number
   /** Number of valid entries (up to HISTORY_LENGTH) */
@@ -57,6 +60,7 @@ const INITIAL_SNAPSHOT: TdseDiagnosticsSnapshot = {
   normRight: 0,
   R: 0,
   T: 0,
+  ipr: 0,
   simTime: 0,
 }
 
@@ -67,6 +71,7 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyR: new Float32Array(HISTORY_LENGTH),
   historyT: new Float32Array(HISTORY_LENGTH),
+  historyIpr: new Float32Array(HISTORY_LENGTH),
   historyHead: 0,
   historyCount: 0,
 
@@ -77,6 +82,7 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
       state.historyNorm[head] = snapshot.totalNorm
       state.historyR[head] = snapshot.R
       state.historyT[head] = snapshot.T
+      state.historyIpr[head] = snapshot.ipr
 
       return {
         ...snapshot,
@@ -94,6 +100,7 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
       historyNorm: new Float32Array(HISTORY_LENGTH),
       historyR: new Float32Array(HISTORY_LENGTH),
       historyT: new Float32Array(HISTORY_LENGTH),
+      historyIpr: new Float32Array(HISTORY_LENGTH),
       historyHead: 0,
       historyCount: 0,
     })

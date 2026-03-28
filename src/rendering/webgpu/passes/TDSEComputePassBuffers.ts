@@ -17,8 +17,8 @@ const UNIFORM_SIZE = 732
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */
 const DIAG_UNIFORM_SIZE = 32
-/** Number of f32 values in diagnostic result buffer */
-const DIAG_RESULT_COUNT = 4
+/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
+const DIAG_RESULT_COUNT = 5
 
 /** Old buffers to destroy before rebuilding. Any field may be null. */
 export interface TdseDestroyableBuffers {
@@ -37,6 +37,7 @@ export interface TdseDestroyableBuffers {
   diagPartialMaxBuffer: GPUBuffer | null
   diagPartialLeftBuffer: GPUBuffer | null
   diagPartialRightBuffer: GPUBuffer | null
+  diagPartialIprBuffer: GPUBuffer | null
   diagResultBuffer: GPUBuffer | null
   diagStagingBuffer: GPUBuffer | null
 }
@@ -61,6 +62,7 @@ export interface TdseBufferResult {
   diagPartialMaxBuffer: GPUBuffer
   diagPartialLeftBuffer: GPUBuffer
   diagPartialRightBuffer: GPUBuffer
+  diagPartialIprBuffer: GPUBuffer
   diagResultBuffer: GPUBuffer
   diagStagingBuffer: GPUBuffer
   totalSites: number
@@ -107,6 +109,7 @@ export function rebuildTdseBuffers(
   old.diagPartialMaxBuffer?.destroy()
   old.diagPartialLeftBuffer?.destroy()
   old.diagPartialRightBuffer?.destroy()
+  old.diagPartialIprBuffer?.destroy()
   old.diagResultBuffer?.destroy()
   old.diagStagingBuffer?.destroy()
 
@@ -212,6 +215,11 @@ export function rebuildTdseBuffers(
     size: diagNumWorkgroups * 4,
     usage: GPUBufferUsage.STORAGE,
   })
+  const diagPartialIprBuffer = device.createBuffer({
+    label: 'tdse-diag-partial-ipr',
+    size: diagNumWorkgroups * 4,
+    usage: GPUBufferUsage.STORAGE,
+  })
   const diagResultBuffer = device.createBuffer({
     label: 'tdse-diag-result',
     size: DIAG_RESULT_COUNT * 4,
@@ -240,10 +248,60 @@ export function rebuildTdseBuffers(
     diagPartialMaxBuffer,
     diagPartialLeftBuffer,
     diagPartialRightBuffer,
+    diagPartialIprBuffer,
     diagResultBuffer,
     diagStagingBuffer,
     totalSites,
     fwdStageCount,
     diagNumWorkgroups,
   }
+}
+
+/** Mutable buffer fields on TDSEComputePass that mirror TdseBufferResult + TdseDestroyableBuffers. */
+export interface TdsePassBufferFields {
+  psiReBuffer: GPUBuffer | null
+  psiImBuffer: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
+  fftScratchA: GPUBuffer | null
+  fftScratchB: GPUBuffer | null
+  uniformBuffer: GPUBuffer | null
+  fftUniformBuffer: GPUBuffer | null
+  fftStagingBuffer: GPUBuffer | null
+  packUniformBuffer: GPUBuffer | null
+  omegaStagingBuffer: GPUBuffer | null
+  diagUniformBuffer: GPUBuffer | null
+  diagPartialSumsBuffer: GPUBuffer | null
+  diagPartialMaxBuffer: GPUBuffer | null
+  diagPartialLeftBuffer: GPUBuffer | null
+  diagPartialRightBuffer: GPUBuffer | null
+  diagPartialIprBuffer: GPUBuffer | null
+}
+
+/** Collect old buffer references from the pass for destroy-and-rebuild. */
+export function collectOldBuffers(
+  fields: TdsePassBufferFields,
+  diagResultBuffer: GPUBuffer | null,
+  diagStagingBuffer: GPUBuffer | null
+): TdseDestroyableBuffers {
+  return { ...fields, diagResultBuffer, diagStagingBuffer }
+}
+
+/** Apply rebuild result to the pass's mutable buffer fields. */
+export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferResult): void {
+  fields.psiReBuffer = r.psiReBuffer
+  fields.psiImBuffer = r.psiImBuffer
+  fields.potentialBuffer = r.potentialBuffer
+  fields.fftScratchA = r.fftScratchA
+  fields.fftScratchB = r.fftScratchB
+  fields.uniformBuffer = r.uniformBuffer
+  fields.fftUniformBuffer = r.fftUniformBuffer
+  fields.fftStagingBuffer = r.fftStagingBuffer
+  fields.packUniformBuffer = r.packUniformBuffer
+  fields.omegaStagingBuffer = r.omegaStagingBuffer
+  fields.diagUniformBuffer = r.diagUniformBuffer
+  fields.diagPartialSumsBuffer = r.diagPartialSumsBuffer
+  fields.diagPartialMaxBuffer = r.diagPartialMaxBuffer
+  fields.diagPartialLeftBuffer = r.diagPartialLeftBuffer
+  fields.diagPartialRightBuffer = r.diagPartialRightBuffer
+  fields.diagPartialIprBuffer = r.diagPartialIprBuffer
 }

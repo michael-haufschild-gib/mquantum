@@ -109,6 +109,7 @@ export interface TdseBindGroupInputs {
   diagPartialMaxBuffer: GPUBuffer
   diagPartialLeftBuffer: GPUBuffer
   diagPartialRightBuffer: GPUBuffer
+  diagPartialIprBuffer: GPUBuffer
   diagResultBuffer: GPUBuffer
   totalSites: number
 }
@@ -340,6 +341,7 @@ struct PackUniforms {
       { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 7, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
     ],
   })
   const diagReducePipeline = helpers.createComputePipeline(
@@ -359,6 +361,7 @@ struct PackUniforms {
       { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
       { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
     ],
   })
   const diagFinalizePipeline = helpers.createComputePipeline(
@@ -433,6 +436,7 @@ export function rebuildTdseBindGroups(
     diagPartialMaxBuffer,
     diagPartialLeftBuffer,
     diagPartialRightBuffer,
+    diagPartialIprBuffer,
     diagResultBuffer,
     totalSites,
   } = inputs
@@ -542,6 +546,7 @@ export function rebuildTdseBindGroups(
       { binding: 4, resource: { buffer: diagPartialMaxBuffer } },
       { binding: 5, resource: { buffer: diagPartialLeftBuffer } },
       { binding: 6, resource: { buffer: diagPartialRightBuffer } },
+      { binding: 7, resource: { buffer: diagPartialIprBuffer } },
     ],
   })
 
@@ -555,6 +560,7 @@ export function rebuildTdseBindGroups(
       { binding: 3, resource: { buffer: diagResultBuffer } },
       { binding: 4, resource: { buffer: diagPartialLeftBuffer } },
       { binding: 5, resource: { buffer: diagPartialRightBuffer } },
+      { binding: 6, resource: { buffer: diagPartialIprBuffer } },
     ],
   })
 

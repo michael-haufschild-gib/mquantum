@@ -45,7 +45,14 @@ export const ALL_POTENTIAL_TYPE_OPTIONS: { value: string; label: string; minDims
   { value: 'periodicLattice', label: 'Periodic Lattice' },
   { value: 'doubleWell', label: 'Double Well' },
   { value: 'radialDoubleWell', label: 'Radial Double Well' },
+  { value: 'andersonDisorder', label: 'Anderson Disorder' },
   { value: 'custom', label: 'Custom Expression' },
+]
+
+/** Anderson disorder distribution options. */
+export const DISORDER_DISTRIBUTION_OPTIONS = [
+  { value: 'uniform', label: 'Uniform [-W/2, W/2]' },
+  { value: 'gaussian', label: 'Gaussian (0, W)' },
 ]
 
 /** Drive waveform options. */
@@ -63,11 +70,32 @@ export const FIELD_VIEW_OPTIONS = [
   { value: 'potential', label: 'Potential V(x)' },
 ]
 
-/** Scenario preset dropdown options. */
+/** All scenario preset dropdown options (unfiltered). */
 export const SCENARIO_PRESET_OPTIONS = [
   { value: '', label: 'Custom' },
   ...TDSE_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
 ]
+
+/**
+ * Filter scenario presets to those compatible with the current dimension.
+ * A preset is compatible if its latticeDim matches the user's dimension,
+ * or if it defines latticeDim ≤ the user's dimension (can scale up).
+ *
+ * @param dim - Current user-selected dimension
+ * @returns Filtered preset options for the dropdown
+ */
+export function getScenarioPresetOptions(dim: number): { value: string; label: string }[] {
+  return [
+    { value: '', label: 'Custom' },
+    ...TDSE_SCENARIO_PRESETS.filter((p) => {
+      const presetDim = p.overrides.latticeDim
+      // No latticeDim in overrides → compatible with any dimension
+      if (presetDim === undefined) return true
+      // Preset designed for this dimension or lower (TDSE can scale arrays up)
+      return presetDim <= dim
+    }).map((p) => ({ value: p.id, label: p.name })),
+  ]
+}
 
 /**
  * Compare current config against all presets to find a match.

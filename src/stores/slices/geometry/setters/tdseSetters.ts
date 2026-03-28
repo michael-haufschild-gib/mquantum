@@ -58,6 +58,9 @@ type TdseActions = Pick<
   | 'setTdseDriveWaveform'
   | 'setTdseDriveFrequency'
   | 'setTdseDriveAmplitude'
+  | 'setTdseDisorderStrength'
+  | 'setTdseDisorderSeed'
+  | 'setTdseDisorderDistribution'
   | 'setTdseAbsorberEnabled'
   | 'setTdseAbsorberWidth'
   | 'setTdsePmlTargetReflection'
@@ -348,7 +351,24 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       | 'setTdseDriveWaveform'
       | 'setTdseDriveFrequency'
       | 'setTdseDriveAmplitude'
+      | 'setTdseDisorderStrength'
     >),
+    setTdseDisorderSeed: (seed) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, disorderSeed: Math.floor(Math.max(0, seed)) },
+        },
+      }))
+    },
+    setTdseDisorderDistribution: (distribution) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, disorderDistribution: distribution },
+        },
+      }))
+    },
     setTdseAbsorberEnabled: (enabled) => {
       setWithVersion((state) => ({
         schroedinger: {

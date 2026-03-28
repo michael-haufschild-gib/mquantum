@@ -57,8 +57,13 @@ interface ObservablesDiagnosticsState extends ObservablesSnapshot {
   /** Number of valid entries (up to HISTORY_LENGTH) */
   historyCount: number
 
+  /** Energy spectral density histogram ρ(E) — NUM_ENERGY_BINS bins of |φ(k)|² by kinetic energy */
+  energySpectrum: Float32Array
+
   /** Push a new observables snapshot from GPU readback */
   pushSnapshot: (snapshot: ObservablesSnapshot) => void
+  /** Update energy spectrum histogram from GPU readback */
+  setEnergySpectrum: (spectrum: Float32Array) => void
   /** Reset to initial state */
   reset: () => void
 }
@@ -71,7 +76,9 @@ function createEmptyPositionMeanHistory(): Float64Array[] {
   return Array.from({ length: MAX_DIM }, () => new Float64Array(HISTORY_LENGTH))
 }
 
-const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'reset'> = {
+const NUM_ENERGY_BINS = 32
+
+const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'setEnergySpectrum' | 'reset'> = {
   hasData: false,
   activeDims: 0,
   positionMean: new Float64Array(MAX_DIM),
@@ -87,6 +94,7 @@ const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'reset'>
   historyPositionMean: createEmptyPositionMeanHistory(),
   historyHead: 0,
   historyCount: 0,
+  energySpectrum: new Float32Array(NUM_ENERGY_BINS),
 }
 
 /**
@@ -120,6 +128,8 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
     })
   },
 
+  setEnergySpectrum: (spectrum) => set({ energySpectrum: spectrum }),
+
   reset: () =>
     set({
       ...INITIAL_STATE,
@@ -131,5 +141,6 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
       historyUncertainty: createEmptyHistoryArrays(),
       historyEnergy: new Float32Array(HISTORY_LENGTH),
       historyPositionMean: createEmptyPositionMeanHistory(),
+      energySpectrum: new Float32Array(NUM_ENERGY_BINS),
     }),
 }))

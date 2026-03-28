@@ -63,6 +63,13 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
     if (urlState.customPotentialExpression !== undefined)
       ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
+    if (urlState.disorderStrength !== undefined)
+      ext.setTdseDisorderStrength(urlState.disorderStrength)
+    if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
+    if (urlState.disorderDistribution !== undefined)
+      ext.setTdseDisorderDistribution(
+        urlState.disorderDistribution as 'uniform' | 'gaussian'
+      )
 
     // ── Features ─────────────────────────────────────────────────────────────
     if (urlState.openQuantumEnabled !== undefined) {

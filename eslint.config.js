@@ -515,6 +515,49 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- no-silent-gpu-skip ----
+    // E2E tests must use requireWebGPU(page, test.info()) — never hasWebGPU() or test.skip with GPU conditions.
+    // Silent skips let AI agents claim "all tests passed" when WebGPU was never tested.
+    'no-silent-gpu-skip': {
+      meta: {
+        type: 'problem',
+        docs: { description: 'E2E tests must hard-fail on missing WebGPU, not silently skip' },
+        messages: {
+          noGpuSkip:
+            'Do not use test.skip() to skip when GPU is ABSENT. Use requireWebGPU(page, test.info()) which hard-fails unless ALLOW_GPU_SKIP=1 is set.',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('.spec.')) return {}
+
+        return {
+          CallExpression(node) {
+            // Ban: test.skip(!hasGPU, ...) or test.skip(!await hasWebGPU(...), ...)
+            // These silently skip GPU tests when WebGPU is unavailable.
+            // Allow: test.skip(await hasWebGPU(...), ...) — legitimate reverse check
+            // for testing the fallback path when GPU IS available.
+            if (
+              node.callee.type !== 'MemberExpression' ||
+              node.callee.object.type !== 'Identifier' ||
+              node.callee.object.name !== 'test' ||
+              node.callee.property.type !== 'Identifier' ||
+              node.callee.property.name !== 'skip' ||
+              node.arguments.length === 0
+            ) return
+
+            const arg = node.arguments[0]
+            const src = context.sourceCode.getText(arg)
+            // Only flag negated GPU checks: !hasGPU, !hasWebGPU, !(await hasWebGPU(...))
+            if (/^!.*(?:gpu|webgpu)/i.test(src)) {
+              context.report({ node, messageId: 'noGpuSkip' })
+            }
+          },
+        }
+      },
+    },
+
     // ---- no-raw-html-controls ----
     'no-raw-html-controls': {
       meta: {
@@ -935,6 +978,8 @@ export default [
       '@eslint-react/rules-of-hooks': 'off',
       // E2E selector discipline
       'project-rules/no-flaky-click-selectors': 'error',
+      // E2E GPU discipline — prevent silent GPU test skips
+      'project-rules/no-silent-gpu-skip': 'error',
     },
   },
 ]

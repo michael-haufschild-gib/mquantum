@@ -5,7 +5,7 @@
  * spatially-partitioned norms (left/right of barrierCenter) for
  * reflection/transmission coefficient estimation.
  *
- * Output: [totalNorm, maxDensity, normLeft, normRight]
+ * Output: [totalNorm, maxDensity, normLeft, normRight, sumPsi4]
  *
  * Pass 1 (`tdseDiagNormReduceBlock`):
  *   Each workgroup reduces a chunk of psi data into partial sums for
@@ -40,11 +40,13 @@ struct DiagReduceUniforms {
 @group(0) @binding(4) var<storage, read_write> partialMax: array<f32>;
 @group(0) @binding(5) var<storage, read_write> partialLeft: array<f32>;
 @group(0) @binding(6) var<storage, read_write> partialRight: array<f32>;
+@group(0) @binding(7) var<storage, read_write> partialIpr: array<f32>;
 
 var<workgroup> shared_norm: array<f32, 256>;
 var<workgroup> shared_max: array<f32, 256>;
 var<workgroup> shared_left: array<f32, 256>;
 var<workgroup> shared_right: array<f32, 256>;
+var<workgroup> shared_ipr: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -75,6 +77,7 @@ fn main(
   shared_max[local] = val;
   shared_left[local] = select(0.0, val, isLeft);
   shared_right[local] = select(val, 0.0, isLeft);
+  shared_ipr[local] = val * val;  // |ψ|⁴ for inverse participation ratio
   workgroupBarrier();
 
   // Tree reduction within workgroup
@@ -84,6 +87,7 @@ fn main(
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
       shared_left[local] += shared_left[local + stride];
       shared_right[local] += shared_right[local + stride];
+      shared_ipr[local] += shared_ipr[local + stride];
     }
     workgroupBarrier();
   }
@@ -94,6 +98,7 @@ fn main(
     partialMax[wid.x] = shared_max[0];
     partialLeft[wid.x] = shared_left[0];
     partialRight[wid.x] = shared_right[0];
+    partialIpr[wid.x] = shared_ipr[0];
   }
 }
 `
@@ -117,11 +122,13 @@ struct DiagReduceUniforms {
 @group(0) @binding(3) var<storage, read_write> result: array<f32>;
 @group(0) @binding(4) var<storage, read> partialLeft: array<f32>;
 @group(0) @binding(5) var<storage, read> partialRight: array<f32>;
+@group(0) @binding(6) var<storage, read> partialIpr: array<f32>;
 
 var<workgroup> shared_norm: array<f32, 256>;
 var<workgroup> shared_max: array<f32, 256>;
 var<workgroup> shared_left: array<f32, 256>;
 var<workgroup> shared_right: array<f32, 256>;
+var<workgroup> shared_ipr: array<f32, 256>;
 
 @compute @workgroup_size(256)
 fn main(
@@ -135,18 +142,21 @@ fn main(
   var max_val: f32 = 0.0;
   var left_val: f32 = 0.0;
   var right_val: f32 = 0.0;
+  var ipr_val: f32 = 0.0;
   var i = local;
   while (i < diagParams.numWorkgroups) {
     norm_val += partialSums[i];
     max_val = max(max_val, partialMax[i]);
     left_val += partialLeft[i];
     right_val += partialRight[i];
+    ipr_val += partialIpr[i];
     i += 256u;
   }
   shared_norm[local] = norm_val;
   shared_max[local] = max_val;
   shared_left[local] = left_val;
   shared_right[local] = right_val;
+  shared_ipr[local] = ipr_val;
   workgroupBarrier();
 
   // Tree reduction
@@ -156,16 +166,18 @@ fn main(
       shared_max[local] = max(shared_max[local], shared_max[local + stride]);
       shared_left[local] += shared_left[local + stride];
       shared_right[local] += shared_right[local + stride];
+      shared_ipr[local] += shared_ipr[local + stride];
     }
     workgroupBarrier();
   }
 
-  // Write final result: [0] = totalNorm, [1] = maxDensity, [2] = normLeft, [3] = normRight
+  // Write final result: [0]=totalNorm, [1]=maxDensity, [2]=normLeft, [3]=normRight, [4]=sumPsi4
   if (local == 0u) {
     result[0] = shared_norm[0];
     result[1] = shared_max[0];
     result[2] = shared_left[0];
     result[3] = shared_right[0];
+    result[4] = shared_ipr[0];
   }
 }
 `

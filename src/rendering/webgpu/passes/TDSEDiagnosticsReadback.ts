@@ -7,8 +7,8 @@ import {
 } from '@/lib/physics/tdse/diagnostics'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
-/** Number of f32 values in diagnostic result buffer */
-const DIAG_RESULT_COUNT = 4
+/** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
+const DIAG_RESULT_COUNT = 5
 
 /** Mutable state shared with the TDSE pass for diagnostics readback. */
 export interface DiagReadbackState {
@@ -63,7 +63,12 @@ export function scheduleNormReadback(
           const maxDens = data[1]!
           const normLeft = data[2]!
           const normRight = data[3]!
+          const sumPsi4 = data[4]!
           staging.unmap()
+
+          // Inverse Participation Ratio: IPR = Σ|ψ|⁴ / (Σ|ψ|²)²
+          // IPR → 1/N for extended states, IPR → 1 for fully localized
+          const ipr = totalNorm > 0 ? sumPsi4 / (totalNorm * totalNorm) : 0
 
           // Asymmetric maxDensity smoothing
           if (maxDens > 0) {
@@ -97,6 +102,7 @@ export function scheduleNormReadback(
               normRight,
               R,
               T,
+              ipr,
             }
             s.diagHistory.push(snapshot)
             useTdseDiagnosticsStore.getState().pushSnapshot(snapshot)

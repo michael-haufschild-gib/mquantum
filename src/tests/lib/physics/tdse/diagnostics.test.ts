@@ -23,6 +23,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.5,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
     ]
     expect(normDriftFromHistory(history)).toBe(0)
@@ -39,6 +40,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.5,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
       {
         simTime: 1,
@@ -49,6 +51,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.55,
         R: 0.476,
         T: 0.524,
+        ipr: 0,
       },
     ]
     expect(normDriftFromHistory(history)).toBeCloseTo(0.05)
@@ -65,6 +68,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.5,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
       {
         simTime: 0.5,
@@ -75,6 +79,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.49,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
       {
         simTime: 1,
@@ -85,6 +90,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.475,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
     ]
     expect(normDriftFromHistory(history)).toBeCloseTo(-0.05)
@@ -101,6 +107,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0,
         R: 0,
         T: 0,
+        ipr: 0,
       },
       {
         simTime: 1,
@@ -111,6 +118,7 @@ describe('normDriftFromHistory', () => {
         normRight: 0.25,
         R: 0.5,
         T: 0.5,
+        ipr: 0,
       },
     ]
     expect(normDriftFromHistory(history)).toBe(0)
@@ -170,6 +178,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.5,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.push({
       simTime: 0.1,
@@ -180,6 +189,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.495,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
 
     expect(h.length).toBe(2)
@@ -198,6 +208,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.5,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.push({
       simTime: 1,
@@ -208,6 +219,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.495,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.push({
       simTime: 2,
@@ -218,6 +230,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.49,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.push({
       simTime: 3,
@@ -228,6 +241,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.485,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
 
     expect(h.length).toBe(3)
@@ -246,6 +260,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.5,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
 
     expect(h.length).toBe(0)
@@ -264,6 +279,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.5,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.push({
       simTime: 1,
@@ -274,6 +290,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.51,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     expect(h.getNormDrift()).toBeCloseTo(0.02)
   })
@@ -289,6 +306,7 @@ describe('TdseDiagnosticsHistory', () => {
       normRight: 0.5,
       R: 0.5,
       T: 0.5,
+      ipr: 0,
     })
     h.clear()
     expect(h.length).toBe(0)

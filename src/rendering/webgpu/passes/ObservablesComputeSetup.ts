@@ -9,6 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import type { ObservablesSnapshot } from '@/stores/observablesDiagnosticsStore'
 
 /**
@@ -33,6 +34,12 @@ export interface ObservablesResources {
   posNumChannels: number
   /** Momentum channels: 1 + 2 * latticeDim */
   momNumChannels: number
+  /** Energy spectrum uniform buffer */
+  esUniformBuffer: GPUBuffer
+  /** Energy spectrum histogram bins (atomic<u32> × NUM_ENERGY_BINS) */
+  esBinsBuffer: GPUBuffer
+  /** Energy spectrum staging buffer for readback */
+  esStagingBuffer: GPUBuffer
 }
 
 /**
@@ -96,6 +103,22 @@ export function createObservablesBuffers(
     numWorkgroups: wgCount,
     posNumChannels,
     momNumChannels,
+    // Energy spectrum buffers
+    esUniformBuffer: makeBuffer(
+      'energy-spectrum-uniform',
+      176, // EnergySpectrumUniforms: 8 scalars + 3 arrays of 12 = 44 u32s = 176 bytes
+      GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    ),
+    esBinsBuffer: makeBuffer(
+      'energy-spectrum-bins',
+      NUM_ENERGY_BINS * 4,
+      GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
+    ),
+    esStagingBuffer: makeBuffer(
+      'energy-spectrum-staging',
+      NUM_ENERGY_BINS * 4,
+      GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST
+    ),
   }
 }
 
@@ -112,6 +135,9 @@ export function destroyObservablesBuffers(resources: ObservablesResources | null
   resources.momPartialBuffer.destroy()
   resources.momResultBuffer.destroy()
   resources.momStagingBuffer.destroy()
+  resources.esUniformBuffer.destroy()
+  resources.esBinsBuffer.destroy()
+  resources.esStagingBuffer.destroy()
 }
 
 /**

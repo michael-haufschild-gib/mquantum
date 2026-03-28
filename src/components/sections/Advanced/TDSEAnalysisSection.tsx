@@ -14,6 +14,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { AndersonSweepSection } from '@/components/sections/Advanced/AndersonSweepSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'
@@ -78,6 +79,12 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
         onEnabledChange={setObservablesEnabled}
         hbar={tdse.hbar}
       />
+
+      {/* Energy spectral density (when observables enabled) */}
+      {tdse.observablesEnabled && <EnergySpectrumDisplay />}
+
+      {/* Anderson disorder sweep (only for andersonDisorder potential) */}
+      {tdse.potentialType === 'andersonDisorder' && <AndersonSweepSection />}
     </>
   )
 })
@@ -97,15 +104,23 @@ const SCATTERING_POTENTIALS = new Set(['barrier', 'step', 'driven'])
 
 const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ tdse }) => {
   const isScattering = SCATTERING_POTENTIALS.has(tdse.potentialType)
-  const { R, T, totalNorm, normDrift, hasData } = useTdseDiagnosticsStore(
-    useShallow((s) => ({
-      R: s.R,
-      T: s.T,
-      totalNorm: s.totalNorm,
-      normDrift: s.normDrift,
-      hasData: s.hasData,
-    }))
-  )
+  const isAnderson = tdse.potentialType === 'andersonDisorder'
+  const { R, T, totalNorm, normDrift, ipr, hasData, historyIpr, historyCount, historyHead } =
+    useTdseDiagnosticsStore(
+      useShallow((s) => ({
+        R: s.R,
+        T: s.T,
+        totalNorm: s.totalNorm,
+        normDrift: s.normDrift,
+        ipr: s.ipr,
+        hasData: s.hasData,
+        historyIpr: s.historyIpr,
+        historyCount: s.historyCount,
+        historyHead: s.historyHead,
+      }))
+    )
+
+  void isAnderson // used for conditional rendering below
 
   const profile = useMemo(() => samplePotentialProfile(tdse, 200), [tdse])
   const kineticEnergy = useMemo(() => computePacketKineticEnergy(tdse), [tdse])
@@ -272,11 +287,15 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
         <div className="px-2 pb-1.5 flex gap-3 text-[9px] font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
-              <span>
-                {isScattering
-                  ? `R=${R.toFixed(3)} T=${T.toFixed(3)}`
-                  : `P(L)=${R.toFixed(3)} P(R)=${T.toFixed(3)}`}
-              </span>
+              {isAnderson ? (
+                <span>IPR={ipr.toExponential(2)}</span>
+              ) : (
+                <span>
+                  {isScattering
+                    ? `R=${R.toFixed(3)} T=${T.toFixed(3)}`
+                    : `P(L)=${R.toFixed(3)} P(R)=${T.toFixed(3)}`}
+                </span>
+              )}
               <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
               <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
                 Δ={normDrift >= 0 ? '+' : ''}
@@ -288,6 +307,21 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
           )}
         </div>
       </div>
+
+      {/* IPR sparkline for Anderson disorder */}
+      {isAnderson && historyCount > 1 && (
+        <div className="mt-1.5">
+          <p className="text-[10px] text-text-secondary mb-0.5">
+            IPR (Inverse Participation Ratio)
+          </p>
+          <Sparkline
+            data={historyIpr}
+            head={historyHead}
+            count={historyCount}
+            height={40}
+          />
+        </div>
+      )}
     </div>
   )
 })
@@ -469,3 +503,74 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
 )
 
 ObservablesDisplay.displayName = 'ObservablesDisplay'
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Energy Spectral Density Display                              */
+/* ────────────────────────────────────────────────────────────── */
+
+const ES_W = 260
+const ES_H = 60
+const ES_PAD = { left: 4, right: 4, top: 4, bottom: 14 }
+const ES_PLOT_W = ES_W - ES_PAD.left - ES_PAD.right
+const ES_PLOT_H = ES_H - ES_PAD.top - ES_PAD.bottom
+
+/**
+ * Energy spectral density histogram ρ(E).
+ * Shows the wavefunction's kinetic energy distribution from GPU readback.
+ */
+export const EnergySpectrumDisplay: React.FC = React.memo(() => {
+  const spectrum = useObservablesDiagnosticsStore((s) => s.energySpectrum)
+
+  const maxVal = useMemo(() => {
+    let m = 0
+    for (let i = 0; i < spectrum.length; i++) {
+      if (spectrum[i]! > m) m = spectrum[i]!
+    }
+    return m
+  }, [spectrum])
+
+  if (maxVal <= 0) return null
+
+  const numBins = spectrum.length
+  const barW = ES_PLOT_W / numBins
+
+  return (
+    <div className="mt-2" data-testid="energy-spectrum-display">
+      <p className="text-[10px] text-text-secondary mb-0.5">
+        Energy Spectrum ρ(E)
+      </p>
+      <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
+        <svg width="100%" viewBox={`0 0 ${ES_W} ${ES_H}`} className="block">
+          {Array.from({ length: numBins }, (_, i) => {
+            const h = (spectrum[i]! / maxVal) * ES_PLOT_H
+            return (
+              <rect
+                key={i}
+                x={ES_PAD.left + i * barW}
+                y={ES_PAD.top + ES_PLOT_H - h}
+                width={Math.max(barW - 0.5, 0.5)}
+                height={h}
+                fill="var(--theme-accent)"
+                fillOpacity={0.7}
+              />
+            )
+          })}
+          {/* X axis */}
+          <line
+            x1={ES_PAD.left} y1={ES_PAD.top + ES_PLOT_H}
+            x2={ES_PAD.left + ES_PLOT_W} y2={ES_PAD.top + ES_PLOT_H}
+            stroke="var(--text-secondary)" strokeWidth={0.5}
+          />
+          <text
+            x={ES_PAD.left + ES_PLOT_W / 2} y={ES_H - 2}
+            textAnchor="middle" fill="var(--text-tertiary)" fontSize={7} fontFamily="monospace"
+          >
+            E (kinetic)
+          </text>
+        </svg>
+      </div>
+    </div>
+  )
+})
+
+EnergySpectrumDisplay.displayName = 'EnergySpectrumDisplay'

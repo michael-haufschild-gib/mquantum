@@ -53,6 +53,7 @@ export type TdseInitialCondition =
  * - doubleWell: Quartic double-well V(x) = λ(x²−a²)² − εx
  * - becTrap: BEC anisotropic harmonic trap (per-dimension ω ratios via trapAnisotropy)
  * - radialDoubleWell: Radial double well V(r) = λ(r−r₁)²(r−r₂)² − εr (bubble nucleation)
+ * - andersonDisorder: Random on-site disorder V(r) ∈ [-W/2, W/2] for Anderson localization studies
  */
 export type TdsePotentialType =
   | 'free'
@@ -67,6 +68,7 @@ export type TdsePotentialType =
   | 'becTrap'
   | 'radialDoubleWell'
   | 'custom'
+  | 'andersonDisorder'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -75,6 +77,13 @@ export type TdsePotentialType =
  * - chirp: Linearly chirped sinusoidal drive
  */
 export type TdseDriveWaveform = 'sine' | 'pulse' | 'chirp'
+
+/**
+ * Distribution type for Anderson disorder potential
+ * - uniform: V(r) ∈ [-W/2, W/2] uniform distribution
+ * - gaussian: V(r) ~ N(0, W) Gaussian distribution
+ */
+export type TdseDisorderDistribution = 'uniform' | 'gaussian'
 
 // ============================================================================
 // TDSE Config
@@ -162,6 +171,14 @@ export interface TdseConfig {
   radialWellDepth: number
   /** Asymmetry tilt ε (>0 = outer well deeper, drives bubble nucleation) */
   radialWellTilt: number
+
+  // === Anderson Disorder Configuration (when potentialType === 'andersonDisorder') ===
+  /** Disorder strength W: V(r) ∈ [-W/2, W/2] (uniform) or σ = W (gaussian) */
+  disorderStrength: number
+  /** Deterministic PRNG seed for disorder realization reproducibility */
+  disorderSeed: number
+  /** Statistical distribution of on-site disorder energies */
+  disorderDistribution: TdseDisorderDistribution
 
   // === Custom Potential Expression (when potentialType === 'custom') ===
   /** Mathematical expression for V(x,y,z,...) evaluated on the JS side */
@@ -279,6 +296,10 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   radialWellOuter: 1.8,
   radialWellDepth: 50.0,
   radialWellTilt: 0.5,
+
+  disorderStrength: 5.0,
+  disorderSeed: 42,
+  disorderDistribution: 'uniform',
 
   customPotentialExpression: '0.5 * (x^2 + y^2)',
 

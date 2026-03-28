@@ -305,6 +305,7 @@ export async function readTdseDiagnostics(page: Page) {
       normDrift: s.normDrift,
       R: s.R,
       T: s.T,
+      ipr: s.ipr,
       maxDensity: s.maxDensity,
       simTime: s.simTime,
     }

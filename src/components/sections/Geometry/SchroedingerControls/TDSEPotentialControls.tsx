@@ -15,12 +15,17 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import type {
   TdseConfig,
+  TdseDisorderDistribution,
   TdseDriveWaveform,
   TdsePotentialType,
 } from '@/lib/geometry/extended/types'
 import { parseExpression } from '@/lib/physics/expressionParser'
 
-import { ALL_POTENTIAL_TYPE_OPTIONS, DRIVE_WAVEFORM_OPTIONS } from './tdseControlsConstants'
+import {
+  ALL_POTENTIAL_TYPE_OPTIONS,
+  DISORDER_DISTRIBUTION_OPTIONS,
+  DRIVE_WAVEFORM_OPTIONS,
+} from './tdseControlsConstants'
 import type { TdseActions } from './types'
 
 /** Props for TDSEPotentialControls. */
@@ -53,6 +58,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
     const showLatticeControls = td.potentialType === 'periodicLattice'
     const showDoubleWellControls = td.potentialType === 'doubleWell'
     const showRadialDoubleWellControls = td.potentialType === 'radialDoubleWell'
+    const showDisorderControls = td.potentialType === 'andersonDisorder'
 
     return (
       <>
@@ -339,6 +345,49 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 showValue
                 data-testid="tdse-radial-well-tilt"
               />
+            </>
+          )}
+
+          {showDisorderControls && (
+            <>
+              <Slider
+                label="Disorder Strength (W)"
+                tooltip="Width of the random potential distribution. V(r) drawn from [-W/2, W/2] (uniform) or N(0, W) (Gaussian). Higher W = stronger Anderson localization."
+                min={0}
+                max={100}
+                step={0.1}
+                value={td.disorderStrength}
+                onChange={actions.setDisorderStrength}
+                showValue
+                data-testid="tdse-disorder-strength"
+              />
+              <Select
+                label="Distribution"
+                tooltip="Statistical distribution of on-site disorder energies."
+                options={DISORDER_DISTRIBUTION_OPTIONS}
+                value={td.disorderDistribution}
+                onChange={(v) => actions.setDisorderDistribution(v as TdseDisorderDistribution)}
+                data-testid="tdse-disorder-distribution"
+              />
+              <Slider
+                label="Seed"
+                tooltip="PRNG seed for disorder realization. Same seed = same random potential for reproducibility."
+                min={0}
+                max={999999}
+                step={1}
+                value={td.disorderSeed}
+                onChange={actions.setDisorderSeed}
+                showValue
+                data-testid="tdse-disorder-seed"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => actions.setDisorderSeed(Math.floor(Math.random() * 999999))}
+                data-testid="tdse-randomize-seed"
+              >
+                Randomize Seed
+              </Button>
             </>
           )}
         </div>

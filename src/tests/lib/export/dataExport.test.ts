@@ -91,6 +91,7 @@ describe('exportTdseDiagnosticsCSV', () => {
       normRight: 0.5,
       R: 0.3,
       T: 0.6,
+    ipr: 0,
     })
     useTdseDiagnosticsStore.getState().pushSnapshot({
       simTime: 0.2,
@@ -101,6 +102,7 @@ describe('exportTdseDiagnosticsCSV', () => {
       normRight: 0.55,
       R: 0.35,
       T: 0.55,
+    ipr: 0,
     })
 
     const csv = exportTdseDiagnosticsCSV()
@@ -126,6 +128,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.5,
         R: 0.1,
         T: 0.9,
+      ipr: 0,
       },
       {
         simTime: 0.2,
@@ -136,6 +139,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.6,
         R: 0.25,
         T: 0.74,
+      ipr: 0,
       },
       {
         simTime: 0.3,
@@ -146,6 +150,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         normRight: 0.7,
         R: 0.4,
         T: 0.58,
+      ipr: 0,
       },
     ]
     for (const s of snapshots) useTdseDiagnosticsStore.getState().pushSnapshot(s)
@@ -460,6 +465,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.5,
       R: 0.3,
       T: 0.6,
+    ipr: 0,
     })
 
     const json = exportDiagnosticsJSON('tdseDynamics')
@@ -492,6 +498,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.5,
       R: 0.1,
       T: 0.9,
+    ipr: 0,
     })
     useTdseDiagnosticsStore.getState().pushSnapshot({
       simTime: 0.2,
@@ -502,6 +509,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.6,
       R: 0.3,
       T: 0.68,
+    ipr: 0,
     })
 
     const json = exportDiagnosticsJSON('tdseDynamics')
@@ -620,6 +628,7 @@ describe('exportDiagnosticsJSON', () => {
       normRight: 0.5,
       R: 0.3,
       T: 0.6,
+    ipr: 0,
     })
     const json = exportDiagnosticsJSON('becDynamics')
     const parsed = JSON.parse(json) as Record<string, unknown>

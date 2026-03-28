@@ -42,9 +42,22 @@ import {
   LINEAR_WG,
   sanitizeGridSizes,
 } from './computePassUtils'
-import { rebuildTdseBuffers } from './TDSEComputePassBuffers'
-import { computePotentialHash, uploadCustomPotentialBuffer } from './TDSEComputePassCustomPotential'
-import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
+import {
+  applyBufferResult,
+  collectOldBuffers,
+  rebuildTdseBuffers,
+  type TdsePassBufferFields,
+} from './TDSEComputePassBuffers'
+import {
+  computePotentialHash,
+  uploadAndersonDisorderBuffer,
+  uploadCustomPotentialBuffer,
+} from './TDSEComputePassCustomPotential'
+import type {
+  TdseBindGroupInputs,
+  TdseBindGroupResult,
+  TdsePipelineResult,
+} from './TDSEComputePassSetup'
 import { buildTdsePipelines, rebuildTdseBindGroups } from './TDSEComputePassSetup'
 import { writeTdseUniforms } from './TDSEComputePassUniforms'
 import {
@@ -108,6 +121,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private diagPartialMaxBuffer: GPUBuffer | null = null
   private diagPartialLeftBuffer: GPUBuffer | null = null
   private diagPartialRightBuffer: GPUBuffer | null = null
+  private diagPartialIprBuffer: GPUBuffer | null = null
   private diagNumWorkgroups = 0
   private diagFrameCounter = 0
   private readonly _diagState: DiagReadbackState = {
@@ -155,6 +169,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     obsPosFinalBG: null,
     obsMomReduceBG: null,
     obsMomFinalBG: null,
+    esSpectrumBG: null,
+    esMappingInFlight: false,
     obsMappingInFlight: false,
     obsEnabled: false,
     psiReBuffer: null,
@@ -281,44 +297,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._diagState.diagMappingInFlight = false
     }
 
-    const old = {
-      psiReBuffer: this.psiReBuffer,
-      psiImBuffer: this.psiImBuffer,
-      potentialBuffer: this.potentialBuffer,
-      fftScratchA: this.fftScratchA,
-      fftScratchB: this.fftScratchB,
-      uniformBuffer: this.uniformBuffer,
-      fftUniformBuffer: this.fftUniformBuffer,
-      fftStagingBuffer: this.fftStagingBuffer,
-      packUniformBuffer: this.packUniformBuffer,
-      omegaStagingBuffer: this.omegaStagingBuffer,
-      diagUniformBuffer: this.diagUniformBuffer,
-      diagPartialSumsBuffer: this.diagPartialSumsBuffer,
-      diagPartialMaxBuffer: this.diagPartialMaxBuffer,
-      diagPartialLeftBuffer: this.diagPartialLeftBuffer,
-      diagPartialRightBuffer: this.diagPartialRightBuffer,
-      diagResultBuffer: this._diagState.diagResultBuffer,
-      diagStagingBuffer: this._diagState.diagStagingBuffer,
-    }
+    const self = this as unknown as TdsePassBufferFields
+    const old = collectOldBuffers(
+      self,
+      this._diagState.diagResultBuffer,
+      this._diagState.diagStagingBuffer
+    )
     const r = rebuildTdseBuffers(device, config, old, {
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
-
-    this.psiReBuffer = r.psiReBuffer
-    this.psiImBuffer = r.psiImBuffer
-    this.potentialBuffer = r.potentialBuffer
-    this.fftScratchA = r.fftScratchA
-    this.fftScratchB = r.fftScratchB
-    this.uniformBuffer = r.uniformBuffer
-    this.fftUniformBuffer = r.fftUniformBuffer
-    this.fftStagingBuffer = r.fftStagingBuffer
-    this.packUniformBuffer = r.packUniformBuffer
-    this.omegaStagingBuffer = r.omegaStagingBuffer
-    this.diagUniformBuffer = r.diagUniformBuffer
-    this.diagPartialSumsBuffer = r.diagPartialSumsBuffer
-    this.diagPartialMaxBuffer = r.diagPartialMaxBuffer
-    this.diagPartialLeftBuffer = r.diagPartialLeftBuffer
-    this.diagPartialRightBuffer = r.diagPartialRightBuffer
+    applyBufferResult(self, r)
     this._diagState.diagResultBuffer = r.diagResultBuffer
     this._diagState.diagStagingBuffer = r.diagStagingBuffer
     this.totalSites = r.totalSites
@@ -353,27 +341,19 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
   private rebuildBindGroups(device: GPUDevice): void {
     if (!this.pl || !this.densityTextureView) return
+    const bgSelf = this as unknown as TdsePassBufferFields
     this.bg = rebuildTdseBindGroups(
       device,
       this.pl,
       {
-        uniformBuffer: this.uniformBuffer!,
-        psiReBuffer: this.psiReBuffer!,
-        psiImBuffer: this.psiImBuffer!,
-        potentialBuffer: this.potentialBuffer!,
-        fftScratchA: this.fftScratchA!,
-        fftScratchB: this.fftScratchB!,
-        fftUniformBuffer: this.fftUniformBuffer!,
-        packUniformBuffer: this.packUniformBuffer!,
+        ...collectOldBuffers(
+          bgSelf,
+          this._diagState.diagResultBuffer,
+          this._diagState.diagStagingBuffer
+        ),
         densityTextureView: this.densityTextureView,
-        diagUniformBuffer: this.diagUniformBuffer!,
-        diagPartialSumsBuffer: this.diagPartialSumsBuffer!,
-        diagPartialMaxBuffer: this.diagPartialMaxBuffer!,
-        diagPartialLeftBuffer: this.diagPartialLeftBuffer!,
-        diagPartialRightBuffer: this.diagPartialRightBuffer!,
-        diagResultBuffer: this._diagState.diagResultBuffer!,
         totalSites: this.totalSites,
-      },
+      } as TdseBindGroupInputs,
       this.bg?.renormalizeUniformBuffer ?? null
     )
   }
@@ -427,6 +407,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     if (this.pl && this.bg) {
       if (config.potentialType === 'custom') {
         this.customPotentialScale = uploadCustomPotentialBuffer(
+          device,
+          this.potentialBuffer,
+          config
+        )
+      } else if (config.potentialType === 'andersonDisorder') {
+        this.customPotentialScale = uploadAndersonDisorderBuffer(
           device,
           this.potentialBuffer,
           config
@@ -542,6 +528,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       if (this.pl && this.bg) {
         if (config.potentialType === 'custom') {
           this.customPotentialScale = uploadCustomPotentialBuffer(
+            device,
+            this.potentialBuffer,
+            config
+          )
+        } else if (config.potentialType === 'andersonDisorder') {
+          this.customPotentialScale = uploadAndersonDisorderBuffer(
             device,
             this.potentialBuffer,
             config
@@ -736,6 +728,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.diagPartialMaxBuffer,
       this.diagPartialLeftBuffer,
       this.diagPartialRightBuffer,
+      this.diagPartialIprBuffer,
       this.bg?.renormalizeUniformBuffer,
     ]
     for (const b of bufs) b?.destroy()
@@ -744,7 +737,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null
     this.packUniformBuffer = this.diagUniformBuffer = null
     this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
-    this.diagPartialLeftBuffer = this.diagPartialRightBuffer = null
+    this.diagPartialLeftBuffer = this.diagPartialRightBuffer = this.diagPartialIprBuffer = null
     this.densityTexture = this.densityTextureView = null
     this.pl = this.bg = null
     disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)

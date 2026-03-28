@@ -1,6 +1,7 @@
 /** TDSE Observables — Resource Management, Dispatch & Readback */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 
 import { DIAG_DECIMATION } from './computePassUtils'
@@ -20,6 +21,8 @@ export interface ObservablesState {
   obsPosFinalBG: GPUBindGroup | null
   obsMomReduceBG: GPUBindGroup | null
   obsMomFinalBG: GPUBindGroup | null
+  esSpectrumBG: GPUBindGroup | null
+  esMappingInFlight: boolean
   obsMappingInFlight: boolean
   obsEnabled: boolean
   // References to pass state
@@ -102,6 +105,15 @@ export function updateObservablesResources(
       { binding: 2, resource: { buffer: res.momResultBuffer } },
     ],
   })
+  state.esSpectrumBG = device.createBindGroup({
+    label: 'energy-spectrum-bg',
+    layout: state.pl.energySpectrumBGL,
+    entries: [
+      { binding: 0, resource: { buffer: res.esUniformBuffer } },
+      { binding: 1, resource: { buffer: state.fftScratchA } },
+      { binding: 2, resource: { buffer: res.esBinsBuffer } },
+    ],
+  })
   state.obsEnabled = true
 }
 
@@ -143,6 +155,35 @@ export function writeObservablesUniforms(
     momF32[28 + d] = (2 * Math.PI) / (Nd * ad)
   }
   device.queue.writeBuffer(res.momUniformBuffer, 0, momBuf)
+
+  // Energy spectrum uniforms
+  // EnergySpectrumUniforms: 8 scalars + 3 arrays of 12 = 44 u32s = 176 bytes
+  const esBuf = new ArrayBuffer(176)
+  const esU32 = new Uint32Array(esBuf)
+  const esF32 = new Float32Array(esBuf)
+  esU32[0] = state.totalSites
+  esU32[1] = NUM_ENERGY_BINS
+  // Auto-compute energy range from lattice: E_max = ℏ²/(2m) * (π/a_min)² * D
+  const aMin = Math.min(...config.spacing.slice(0, config.latticeDim))
+  const kMax = Math.PI / aMin
+  const eMaxAuto = (config.hbar * config.hbar * kMax * kMax * config.latticeDim) / (2 * config.mass)
+  esF32[2] = 0 // eMin
+  esF32[3] = eMaxAuto // eMax
+  esF32[4] = config.hbar
+  esF32[5] = config.mass
+  esU32[6] = config.latticeDim
+  esU32[7] = 0 // pad
+  // gridSize at offset 32 (index 8)
+  for (let d = 0; d < config.latticeDim; d++) esU32[8 + d] = config.gridSize[d] ?? 64
+  // strides at offset 80 (index 20)
+  for (let d = 0; d < config.latticeDim; d++) esU32[20 + d] = strides[d] ?? 1
+  // kGridScale at offset 128 (index 32)
+  for (let d = 0; d < config.latticeDim; d++) {
+    const Nd = config.gridSize[d] ?? 64
+    const ad = config.spacing[d] ?? 0.1
+    esF32[32 + d] = (2 * Math.PI) / (Nd * ad)
+  }
+  device.queue.writeBuffer(res.esUniformBuffer, 0, esBuf)
 }
 
 /** Check whether observables should be dispatched this frame. */
@@ -172,9 +213,14 @@ export function dispatchObservablesReadback(
   encoder.copyBufferToBuffer(res.posResultBuffer, 0, res.posStagingBuffer, 0, resultBytes)
   encoder.copyBufferToBuffer(res.momResultBuffer, 0, res.momStagingBuffer, 0, resultBytes)
 
+  // Energy spectrum: copy bins → staging for readback
+  const esBinBytes = NUM_ENERGY_BINS * 4
+  encoder.copyBufferToBuffer(res.esBinsBuffer, 0, res.esStagingBuffer, 0, esBinBytes)
+
   state.obsMappingInFlight = true
   const posStaging = res.posStagingBuffer
   const momStaging = res.momStagingBuffer
+  const esStaging = res.esStagingBuffer
   const latticeDim = config.latticeDim
   const hbar = config.hbar
   const mass = config.mass ?? 1
@@ -187,18 +233,37 @@ export function dispatchObservablesReadback(
         state.obsMappingInFlight = false
         return
       }
-      if (posStaging.mapState !== 'unmapped' || momStaging.mapState !== 'unmapped') {
+      if (
+        posStaging.mapState !== 'unmapped' ||
+        momStaging.mapState !== 'unmapped' ||
+        esStaging.mapState !== 'unmapped'
+      ) {
         state.obsMappingInFlight = false
         return
       }
-      Promise.all([posStaging.mapAsync(GPUMapMode.READ), momStaging.mapAsync(GPUMapMode.READ)])
+      Promise.all([
+        posStaging.mapAsync(GPUMapMode.READ),
+        momStaging.mapAsync(GPUMapMode.READ),
+        esStaging.mapAsync(GPUMapMode.READ),
+      ])
         .then(() => {
           const posData = new Float32Array(posStaging.getMappedRange())
           const momData = new Float32Array(momStaging.getMappedRange())
           const snapshot = processObservablesReadback(posData, momData, latticeDim, hbar, mass)
           posStaging.unmap()
           momStaging.unmap()
-          if (snapshot) useObservablesDiagnosticsStore.getState().pushSnapshot(snapshot)
+
+          // Decode energy spectrum from fixed-point u32 → float
+          const esRaw = new Uint32Array(esStaging.getMappedRange())
+          const spectrum = new Float32Array(NUM_ENERGY_BINS)
+          for (let i = 0; i < NUM_ENERGY_BINS; i++) {
+            spectrum[i] = (esRaw[i] ?? 0) / 1048576.0
+          }
+          esStaging.unmap()
+
+          const store = useObservablesDiagnosticsStore.getState()
+          if (snapshot) store.pushSnapshot(snapshot)
+          store.setEnergySpectrum(spectrum)
           state.obsMappingInFlight = false
         })
         .catch(() => {
