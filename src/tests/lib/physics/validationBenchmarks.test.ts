@@ -519,60 +519,56 @@ describe('exact tunneling formula self-consistency', () => {
 })
 
 describe('CPU split-step tunneling vs exact formula', () => {
-  it(
-    'transmission coefficient matches exact formula within 10% for E > V₀',
-    { timeout: 30_000 },
-    () => {
-      // Use E >> V₀ where T ≈ 1. A wide packet (narrow Δk) approaches the
-      // monochromatic plane-wave limit, so the measured T matches the
-      // analytical formula for a single energy.
-      const N = 2048
-      const dx = 0.05
-      const dt = 0.005
-      const mass = 1.0
-      const hbar = 1.0
+  it('transmission coefficient matches exact formula within 10% for E > V₀', () => {
+    // Use E >> V₀ where T ≈ 1. A wide packet (narrow Δk) approaches the
+    // monochromatic plane-wave limit, so the measured T matches the
+    // analytical formula for a single energy.
+    const N = 2048
+    const dx = 0.05
+    const dt = 0.005
+    const mass = 1.0
+    const hbar = 1.0
 
-      // Barrier: thin and moderate height
-      const V0 = 3.0
-      const barrierWidth = 0.5
-      const barrierCenter = 0.0
+    // Barrier: thin and moderate height
+    const V0 = 3.0
+    const barrierWidth = 0.5
+    const barrierCenter = 0.0
 
-      // E = 20 >> V₀ = 3 → T very close to 1
-      const E = 20.0
-      const k0 = Math.sqrt((2 * mass * E) / (hbar * hbar))
+    // E = 20 >> V₀ = 3 → T very close to 1
+    const E = 20.0
+    const k0 = Math.sqrt((2 * mass * E) / (hbar * hbar))
 
-      // Wide packet (σ₀ = 5) for narrow momentum spread. Start at x = -15.
-      const x0 = -15.0
-      const sigma0 = 5.0
-      const psi = initGaussianPacket(N, dx, x0, sigma0, k0)
+    // Wide packet (σ₀ = 5) for narrow momentum spread. Start at x = -15.
+    const x0 = -15.0
+    const sigma0 = 5.0
+    const psi = initGaussianPacket(N, dx, x0, sigma0, k0)
 
-      // Rectangular barrier
-      const V = new Float64Array(N)
-      const halfL = (N * dx) / 2
-      for (let i = 0; i < N; i++) {
-        const x = -halfL + i * dx
-        V[i] = Math.abs(x - barrierCenter) < barrierWidth / 2 ? V0 : 0
-      }
-
-      // velocity v = ℏk₀/m ≈ 6.32, distance = 15, time ≈ 2.4 + settling
-      const T_evolve = 5.0
-      const nSteps = Math.round(T_evolve / dt)
-      for (let step = 0; step < nSteps; step++) {
-        splitStepEvolve(psi, N, dx, dt, mass, hbar, V)
-      }
-
-      // Fraction of norm to the right of barrier
-      const barrierIdx = Math.round((barrierCenter + halfL) / dx)
-      const { normLeft, normRight } = computeLeftRightNorm(psi, N, dx, barrierIdx)
-      const totalNorm = normLeft + normRight
-      const measuredT = normRight / totalNorm
-
-      const exactT = exactTransmissionAbove(E, V0, barrierWidth, mass, hbar)
-
-      const relError = Math.abs(measuredT - exactT) / exactT
-      expect(relError).toBeLessThan(0.1)
+    // Rectangular barrier
+    const V = new Float64Array(N)
+    const halfL = (N * dx) / 2
+    for (let i = 0; i < N; i++) {
+      const x = -halfL + i * dx
+      V[i] = Math.abs(x - barrierCenter) < barrierWidth / 2 ? V0 : 0
     }
-  )
+
+    // velocity v = ℏk₀/m ≈ 6.32, distance = 15, time ≈ 2.4 + settling
+    const T_evolve = 5.0
+    const nSteps = Math.round(T_evolve / dt)
+    for (let step = 0; step < nSteps; step++) {
+      splitStepEvolve(psi, N, dx, dt, mass, hbar, V)
+    }
+
+    // Fraction of norm to the right of barrier
+    const barrierIdx = Math.round((barrierCenter + halfL) / dx)
+    const { normLeft, normRight } = computeLeftRightNorm(psi, N, dx, barrierIdx)
+    const totalNorm = normLeft + normRight
+    const measuredT = normRight / totalNorm
+
+    const exactT = exactTransmissionAbove(E, V0, barrierWidth, mass, hbar)
+
+    const relError = Math.abs(measuredT - exactT) / exactT
+    expect(relError).toBeLessThan(0.1)
+  })
 })
 
 // ============================================================================
