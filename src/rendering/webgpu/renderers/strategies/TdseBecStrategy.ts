@@ -9,6 +9,7 @@
 
 import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/tdse'
+import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
@@ -223,38 +224,44 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // Request async readback
     const readbackPromise = tdsePass.requestMeasurementReadback(ctx)
 
-    void readbackPromise.then(async (data) => {
-      if (!data) {
-        useMeasurementStore.getState().completeMeasurement([], 0, null)
-        return
-      }
+    void readbackPromise
+      .then(async (data) => {
+        if (!data) {
+          useMeasurementStore.getState().completeMeasurement([], 0, null)
+          return
+        }
 
-      const { executeFullMeasurement, executePartialMeasurement } =
-        await import('@/lib/physics/measurementOrchestrator')
+        const { executeFullMeasurement, executePartialMeasurement } =
+          await import('@/lib/physics/measurementOrchestrator')
 
-      const config = { latticeDim: gridSize.length, gridSize, spacing }
+        const config = { latticeDim: gridSize.length, gridSize, spacing }
 
-      const inject = (re: Float32Array, im: Float32Array) => {
-        tdsePass.setLoadedWavefunction(re, im)
-      }
-      const record = (pos: number[], density: number, axis: number | null) => {
-        useMeasurementStore.getState().completeMeasurement(pos, density, axis)
-      }
+        const inject = (re: Float32Array, im: Float32Array) => {
+          tdsePass.setLoadedWavefunction(re, im, true)
+        }
+        const record = (pos: number[], density: number, axis: number | null) => {
+          useMeasurementStore.getState().completeMeasurement(pos, density, axis)
+        }
 
-      if (measureAxis !== null && measureAxis < gridSize.length) {
-        executePartialMeasurement(
-          data.re,
-          data.im,
-          config,
-          measureAxis,
-          collapseWidth,
-          inject,
-          record
-        )
-      } else {
-        executeFullMeasurement(data.re, data.im, config, collapseWidth, inject, record)
-      }
-    })
+        if (measureAxis !== null && measureAxis < gridSize.length) {
+          executePartialMeasurement(
+            data.re,
+            data.im,
+            config,
+            measureAxis,
+            collapseWidth,
+            inject,
+            record
+          )
+        } else {
+          executeFullMeasurement(data.re, data.im, config, collapseWidth, inject, record)
+        }
+      })
+      .catch((err) => {
+        logger.error('[Measurement] Collapse failed:', err)
+        const s = useMeasurementStore.getState()
+        if (s.isCollapsing) s.completeMeasurement([], 0, null)
+      })
   }
 
   // ═══════════════════════════════════════════════════════════════════════

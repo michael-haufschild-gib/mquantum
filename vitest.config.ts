@@ -15,6 +15,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       '**/scripts/playwright/**', // Playwright tests run separately
+      '**/.claude/worktrees/**', // Isolated agent worktrees
     ],
     coverage: {
       provider: 'v8',

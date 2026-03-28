@@ -19,7 +19,7 @@ export interface SaveLoadState {
   saveStagingRe: GPUBuffer | null
   saveStagingIm: GPUBuffer | null
   saveMappingInFlight: boolean
-  pendingInjection: { re: Float32Array; im: Float32Array } | null
+  pendingInjection: { re: Float32Array; im: Float32Array; isMeasurementCollapse?: boolean } | null
 }
 
 /**

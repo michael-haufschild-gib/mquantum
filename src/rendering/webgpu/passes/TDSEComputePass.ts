@@ -83,30 +83,19 @@ import {
  * Manages psi buffers, FFT scratch, potential buffer, and density grid output.
  */
 export class TDSEComputePass extends WebGPUBaseComputePass {
-  // Wavefunction storage
   private psiReBuffer: GPUBuffer | null = null
   private psiImBuffer: GPUBuffer | null = null
-  // Potential storage
   private potentialBuffer: GPUBuffer | null = null
-  // FFT scratch (interleaved complex, 2x site count)
   private fftScratchA: GPUBuffer | null = null
   private fftScratchB: GPUBuffer | null = null
-  // Uniform buffers
   private uniformBuffer: GPUBuffer | null = null
   private fftUniformBuffer: GPUBuffer | null = null
   private fftStagingBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
-  // Output texture
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
-
-  // Pipelines + bind group layouts (created together by buildTdsePipelines)
   private pl: TdsePipelineResult | null = null
-
-  // Bind groups + renormalize uniform buffer (created by rebuildTdseBindGroups)
   private bg: TdseBindGroupResult | null = null
-
-  // Diagnostics: GPU norm reduction
   private diagUniformBuffer: GPUBuffer | null = null
   private diagPartialSumsBuffer: GPUBuffer | null = null
   private diagPartialMaxBuffer: GPUBuffer | null = null
@@ -114,7 +103,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private diagPartialRightBuffer: GPUBuffer | null = null
   private diagNumWorkgroups = 0
   private diagFrameCounter = 0
-  // Shared state for extracted readback module
   private readonly _diagState: DiagReadbackState = {
     diagResultBuffer: null,
     diagStagingBuffer: null,
@@ -234,8 +222,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     slRequestSlice(ctx, this._slState, axis, gridSize, worldBound)
   }
 
-  setLoadedWavefunction(re: Float32Array, im: Float32Array): void {
-    this._slState.pendingInjection = { re, im }
+  setLoadedWavefunction(re: Float32Array, im: Float32Array, isMeasurementCollapse?: boolean): void {
+    this._slState.pendingInjection = { re, im, isMeasurementCollapse }
   }
   storeCurrentEigenstate(device: GPUDevice): number {
     return gsStoreEigenstate(device, this._gsState)
@@ -375,12 +363,24 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
   private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
     const { device, encoder } = ctx
+    const isMeasurementCollapse = !!this._slState.pendingInjection?.isMeasurementCollapse
     const needsInit =
       !this.initialized ||
       config.needsReset ||
       this._diagState.pendingAutoReset ||
       !!this._slState.pendingInjection
     if (!needsInit) return
+
+    // Measurement collapse: inject wavefunction without full reinit.
+    // Preserves simTime, diagnostics history, and uses peak=1.0 for maxDensity
+    // so the collapsed Gaussian is immediately visible.
+    if (isMeasurementCollapse) {
+      injectLoadedWavefunction(device, this._slState, this.totalSites)
+      this._slState.pendingInjection = null
+      this._diagState.maxDensity = 1.0
+      this._diagState.diagGeneration++
+      return
+    }
 
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     const hasOmegaQuench =
@@ -705,39 +705,34 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
-    // Destroy all GPU buffers and textures
-    this.psiReBuffer?.destroy()
-    this.psiImBuffer?.destroy()
-    this.potentialBuffer?.destroy()
-    this.fftScratchA?.destroy()
-    this.fftScratchB?.destroy()
-    this.uniformBuffer?.destroy()
-    this.fftUniformBuffer?.destroy()
-    this.fftStagingBuffer?.destroy()
-    this.packUniformBuffer?.destroy()
-    this.omegaStagingBuffer?.destroy()
-    this.densityTexture?.destroy()
-    this.diagUniformBuffer?.destroy()
-    this.diagPartialSumsBuffer?.destroy()
-    this.diagPartialMaxBuffer?.destroy()
-    this.diagPartialLeftBuffer?.destroy()
-    this.diagPartialRightBuffer?.destroy()
-    this.bg?.renormalizeUniformBuffer?.destroy()
-
+    const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
+      this.psiReBuffer,
+      this.psiImBuffer,
+      this.potentialBuffer,
+      this.fftScratchA,
+      this.fftScratchB,
+      this.uniformBuffer,
+      this.fftUniformBuffer,
+      this.fftStagingBuffer,
+      this.packUniformBuffer,
+      this.omegaStagingBuffer,
+      this.densityTexture,
+      this.diagUniformBuffer,
+      this.diagPartialSumsBuffer,
+      this.diagPartialMaxBuffer,
+      this.diagPartialLeftBuffer,
+      this.diagPartialRightBuffer,
+      this.bg?.renormalizeUniformBuffer,
+    ]
+    for (const b of bufs) b?.destroy()
     this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
-    this.fftScratchA = this.fftScratchB = null
-    this.uniformBuffer =
-      this.fftUniformBuffer =
-      this.fftStagingBuffer =
-      this.packUniformBuffer =
-        null
-    this.omegaStagingBuffer = this.densityTexture = null
-    this.densityTextureView = null
-    this.diagUniformBuffer = this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
+    this.fftScratchA = this.fftScratchB = this.omegaStagingBuffer = null
+    this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null
+    this.packUniformBuffer = this.diagUniformBuffer = null
+    this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
     this.diagPartialLeftBuffer = this.diagPartialRightBuffer = null
+    this.densityTexture = this.densityTextureView = null
     this.pl = this.bg = null
-
-    // Dispose extracted module state
     disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)
     this.initialized = false
     this.lastConfigHash = ''

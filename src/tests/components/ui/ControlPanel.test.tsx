@@ -7,13 +7,15 @@ import { ControlPanel } from '@/components/sections/ControlPanel'
 import { useLayoutStore } from '../../../stores/layoutStore'
 
 describe('ControlPanel', () => {
-  // Reset store before each test
+  // Reset store before each test — must clear persisted storage first
+  // to prevent async rehydration from overriding the test's state.
   beforeEach(() => {
-    useLayoutStore.getState().setCollapsed(false)
+    useLayoutStore.persist.clearStorage()
+    useLayoutStore.setState({ isCollapsed: false })
   })
 
   it('reflects collapsed state from the layout store', () => {
-    useLayoutStore.getState().setCollapsed(true)
+    useLayoutStore.setState({ isCollapsed: true })
 
     render(
       <ControlPanel>
