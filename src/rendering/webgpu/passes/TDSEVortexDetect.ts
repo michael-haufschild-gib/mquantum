@@ -78,8 +78,8 @@ export function initVortexDetect(
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
 
-  // Partial buffers
-  const partialSize = state.numWorkgroups * 4
+  // Partial buffers (minimum 4 bytes to avoid zero-size bind group validation errors)
+  const partialSize = Math.max(state.numWorkgroups * 4, 4)
   state.partialCountsBuffer = device.createBuffer({
     label: 'vortex-detect-partial-counts',
     size: partialSize,
@@ -310,7 +310,7 @@ export function rebuildVortexDetect(
   psiImBuffer: GPUBuffer | null
 ): void {
   disposeVortexDetect(state)
-  if (uniformBuffer && psiReBuffer && psiImBuffer) {
+  if (uniformBuffer && psiReBuffer && psiImBuffer && totalSites > 0) {
     initVortexDetect(device, state, totalSites, uniformBuffer, psiReBuffer, psiImBuffer)
   }
 }

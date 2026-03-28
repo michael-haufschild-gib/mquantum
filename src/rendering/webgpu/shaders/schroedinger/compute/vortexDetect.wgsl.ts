@@ -13,8 +13,8 @@
  *   Pass 1: Each workgroup counts vortex plaquettes in its chunk → partial sums
  *   Pass 2: Single workgroup reduces partials → [totalVortexCount, totalPositiveCharge, totalNegativeCharge]
  *
- * For D≥4, only checks plaquettes in the 3D slice (dimensions 0,1,2).
- * Full N-D plaquette detection across all C(D,2) planes deferred to future work.
+ * Checks plaquettes across all C(D,2) dimension pairs:
+ * D=3: 3 planes, D=4: 6 planes, D=5: 10 planes.
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -79,11 +79,14 @@ fn main(
 
     // Only check if density is below threshold (vortex core region)
     if (density < threshold && density > 0.0) {
-      // Check plaquettes in visible dimension pairs: (0,1), (0,2), (1,2)
-      let visibleDims = min(tParams.latticeDim, 3u);
+      // Check plaquettes in all C(D,2) dimension pairs for N-D vortex detection.
+      // For D=3: planes (0,1), (0,2), (1,2) — standard 3D vortex lines.
+      // For D=4: adds (0,3), (1,3), (2,3) — detects vortex surfaces in all planes.
+      // For D=5+: all pairs — detects vortex volumes across all codimension-2 planes.
+      let totalDims = tParams.latticeDim;
 
-      for (var da: u32 = 0u; da < visibleDims; da++) {
-        for (var db: u32 = da + 1u; db < visibleDims; db++) {
+      for (var da: u32 = 0u; da < totalDims; da++) {
+        for (var db: u32 = da + 1u; db < totalDims; db++) {
           // Skip if at boundary (can't form plaquette)
           if (coords[da] >= tParams.gridSize[da] - 1u || coords[db] >= tParams.gridSize[db] - 1u) {
             continue;
