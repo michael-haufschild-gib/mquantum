@@ -350,6 +350,10 @@ export interface SchroedingerSliceActions {
   setBecFieldView: (view: BecFieldView) => void
   setBecVortexCharge: (charge: number) => void
   setBecVortexLatticeCount: (count: number) => void
+  setBecVortexPlane1: (plane: [number, number]) => void
+  setBecVortexPlane2: (plane: [number, number]) => void
+  setBecVortexSeparation: (sep: number) => void
+  setBecVortexPairCount: (count: number) => void
   setBecSolitonDepth: (depth: number) => void
   setBecSolitonVelocity: (velocity: number) => void
   setBecAutoScale: (autoScale: boolean) => void

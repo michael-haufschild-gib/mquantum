@@ -16,6 +16,8 @@ export interface BecScenarioPreset {
   id: string
   name: string
   description: string
+  /** Minimum spatial dimension required for this preset (default: 2) */
+  minDim?: number
   overrides: Partial<BecConfig>
 }
 
@@ -110,6 +112,85 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       trapOmega: 1.0,
       initialCondition: 'thomasFermi',
       fieldView: 'density',
+    },
+  },
+  // === Higher-Dimensional Vortex Topology (D ≥ 4) ===
+  {
+    id: 'vortex4DReconnection',
+    name: '4D Vortex Reconnection',
+    description:
+      'Two vortex surfaces in orthogonal planes (x₀x₁ and x₂x₃) — first interactive 4D reconnection',
+    minDim: 4,
+    overrides: {
+      interactionStrength: 500,
+      trapOmega: 0.5,
+      initialCondition: 'vortexReconnection',
+      vortexCharge: 1,
+      vortexPlane1: [0, 1],
+      vortexPlane2: [2, 3],
+      vortexSeparation: 0.5,
+      vortexPairCount: 2,
+      fieldView: 'phase',
+      dt: 0.001,
+      stepsPerFrame: 4,
+    },
+  },
+  {
+    id: 'vortex4DParallel',
+    name: '4D Parallel Vortices',
+    description:
+      'Two vortex surfaces in the same plane (both x₀x₁) — no reconnection control case',
+    minDim: 4,
+    overrides: {
+      interactionStrength: 500,
+      trapOmega: 0.5,
+      initialCondition: 'vortexReconnection',
+      vortexCharge: 1,
+      vortexPlane1: [0, 1],
+      vortexPlane2: [0, 1],
+      vortexSeparation: 1.0,
+      vortexPairCount: 2,
+      fieldView: 'phase',
+      dt: 0.001,
+      stepsPerFrame: 4,
+    },
+  },
+  {
+    id: 'vortex5DReconnection',
+    name: '5D Vortex Reconnection',
+    description:
+      'Two vortex 3-volumes in orthogonal planes — first-ever D=5 GPE vortex simulation',
+    minDim: 5,
+    overrides: {
+      interactionStrength: 500,
+      trapOmega: 0.5,
+      initialCondition: 'vortexReconnection',
+      vortexCharge: 1,
+      vortexPlane1: [0, 1],
+      vortexPlane2: [2, 3],
+      vortexSeparation: 0.5,
+      vortexPairCount: 2,
+      fieldView: 'density',
+      dt: 0.0005,
+      stepsPerFrame: 8,
+    },
+  },
+  {
+    id: 'vortex4DSingle',
+    name: '4D Single Vortex Surface',
+    description:
+      'One vortex surface in the x₂x₃ plane — rotate through 4D to see the 2-surface cross-sections',
+    minDim: 4,
+    overrides: {
+      interactionStrength: 500,
+      trapOmega: 0.8,
+      initialCondition: 'vortexReconnection',
+      vortexCharge: 1,
+      vortexPlane1: [2, 3],
+      vortexPlane2: [0, 1],
+      vortexSeparation: 0.0,
+      vortexPairCount: 1,
+      fieldView: 'phase',
     },
   },
 ]

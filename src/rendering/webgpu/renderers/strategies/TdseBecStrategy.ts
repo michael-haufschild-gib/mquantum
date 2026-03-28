@@ -284,13 +284,18 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       (initCond === 'thomasFermi' ||
         initCond === 'vortexImprint' ||
         initCond === 'vortexLattice' ||
-        initCond === 'darkSoliton')
+        initCond === 'darkSoliton' ||
+        initCond === 'vortexReconnection')
     ) {
       initCond = 'gaussianPacket'
     }
 
-    // Map vortexLattice to vortexImprint (same shader, different count)
-    const mappedInit = initCond === 'vortexLattice' ? 'vortexImprint' : initCond
+    // Map BEC init conditions to TDSE shader init condition strings:
+    // vortexLattice → vortexImprint (same shader, different count)
+    // vortexReconnection → ndVortexPair (new shader branch for configurable-plane vortices)
+    let mappedInit: string = initCond
+    if (initCond === 'vortexLattice') mappedInit = 'vortexImprint'
+    else if (initCond === 'vortexReconnection') mappedInit = 'ndVortexPair'
 
     // Build momentum vector — encode BEC-specific params
     const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
@@ -300,6 +305,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         mom[3] = bec.vortexLatticeCount ?? 4
         mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
       }
+    }
+    if (initCond === 'vortexReconnection') {
+      mom[0] = bec.vortexCharge ?? 1
     }
     if (initCond === 'darkSoliton') {
       mom[1] = bec.solitonDepth ?? 1.0
@@ -399,6 +407,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         customPotentialExpression: '',
         observablesEnabled: bec.observablesEnabled ?? false,
         imaginaryTimeEnabled: false,
+        // N-D vortex reconnection plane configuration
+        vortexPlane1: bec.vortexPlane1 ?? [0, 1],
+        vortexPlane2: bec.vortexPlane2 ?? [2, 3],
+        vortexSeparation: bec.vortexSeparation ?? 0.0,
+        vortexPairCount: bec.vortexPairCount ?? 2,
       },
     }
   }
@@ -437,6 +450,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const rtfDenom = mass * omegaEff * omegaEff
     const rtf = rtfDenom > 0 && mu > 0 ? Math.sqrt((2 * mu) / rtfDenom) : 0
 
+    // Vortex count from plaquette-based phase singularity detection
+    const [vortexPlaquettes, posCharge, negCharge] = tdsePass.getVortexCounts()
+    const estimatedVortexCount = Math.max(posCharge, negCharge)
+
     useBecDiagnosticsStore.getState().update({
       totalNorm: diag.totalNorm,
       maxDensity: peakN,
@@ -445,6 +462,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       healingLength: xi,
       soundSpeed: cs,
       thomasFermiRadius: rtf,
+      vortexCount: estimatedVortexCount,
+      vortexPlaquettes,
+      vortexPositiveCharge: posCharge,
+      vortexNegativeCharge: negCharge,
     })
   }
 

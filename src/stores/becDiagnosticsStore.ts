@@ -34,8 +34,14 @@ interface BecDiagnosticsState {
   soundSpeed: number
   /** Thomas-Fermi radius */
   thomasFermiRadius: number
-  /** Estimated vortex count (future: phase winding analysis) */
+  /** Estimated vortex count from plaquette phase-winding detection */
   vortexCount: number
+  /** Total vortex plaquettes detected (raw count before deduplication) */
+  vortexPlaquettes: number
+  /** Positive-charge vortex plaquettes */
+  vortexPositiveCharge: number
+  /** Negative-charge vortex plaquettes */
+  vortexNegativeCharge: number
 
   /** Norm time-series ring buffer */
   historyNorm: Float32Array
@@ -64,6 +70,9 @@ const INITIAL_STATE = {
   soundSpeed: 0,
   thomasFermiRadius: 0,
   vortexCount: 0,
+  vortexPlaquettes: 0,
+  vortexPositiveCharge: 0,
+  vortexNegativeCharge: 0,
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyChemPot: new Float32Array(HISTORY_LENGTH),
   historyHealingLen: new Float32Array(HISTORY_LENGTH),

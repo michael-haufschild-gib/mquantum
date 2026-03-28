@@ -52,8 +52,8 @@ import {
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
-/** TDSEUniforms struct size in bytes (708 = 636 + 48 trapAnisotropy + 16 radialWell + 4 imagTime + 4 customScale) */
-const UNIFORM_SIZE = 708
+/** TDSEUniforms struct size in bytes (732 = 708 + 24 vortex reconnection fields) */
+const UNIFORM_SIZE = 732
 
 import type { DiagDispatchParams, FFTAxisParams } from './TDSEComputePassDispatchers'
 import {
@@ -77,6 +77,13 @@ import {
   requestStateSave as slRequestSave,
   type SaveLoadState,
 } from './TDSEStateSaveLoad'
+import {
+  createVortexDetectState,
+  disposeVortexDetect,
+  rebuildVortexDetect,
+  runVortexDetection,
+  type VortexDetectState,
+} from './TDSEVortexDetect'
 
 /**
  * Compute pass for TDSE split-operator dynamics.
@@ -159,6 +166,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     diagGeneration: 0,
   }
 
+  // Vortex detection state
+  private readonly _vdState: VortexDetectState = createVortexDetectState()
+
   // State
   private initialized = false
   private lastConfigHash = ''
@@ -206,6 +216,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   getDiagnostics(): TdseDiagnosticsSnapshot | null {
     return this._diagState.diagHistory.getLatest()
   }
+  getVortexCounts(): [number, number, number] {
+    return this._vdState.lastResult
+  }
   getDiagnosticsHistory(): readonly TdseDiagnosticsSnapshot[] {
     return this._diagState.diagHistory.getHistory()
   }
@@ -244,22 +257,19 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Sync shared state objects with current buffer references. */
   private syncSharedState(): void {
-    this._gsState.psiReBuffer = this.psiReBuffer
-    this._gsState.psiImBuffer = this.psiImBuffer
-    this._gsState.totalSites = this.totalSites
-    this._gsState.pl = this.pl
-    this._slState.psiReBuffer = this.psiReBuffer
-    this._slState.psiImBuffer = this.psiImBuffer
-    this._slState.totalSites = this.totalSites
-    this.syncObsState()
-  }
-
-  private syncObsState(): void {
-    this._obsState.psiReBuffer = this.psiReBuffer
-    this._obsState.psiImBuffer = this.psiImBuffer
-    this._obsState.potentialBuffer = this.potentialBuffer
-    this._obsState.fftScratchA = this.fftScratchA
-    this._obsState.totalSites = this.totalSites
+    const { psiReBuffer, psiImBuffer, totalSites, pl, potentialBuffer, fftScratchA } = this
+    this._gsState.psiReBuffer = psiReBuffer
+    this._gsState.psiImBuffer = psiImBuffer
+    this._gsState.totalSites = totalSites
+    this._gsState.pl = pl
+    this._slState.psiReBuffer = psiReBuffer
+    this._slState.psiImBuffer = psiImBuffer
+    this._slState.totalSites = totalSites
+    this._obsState.psiReBuffer = psiReBuffer
+    this._obsState.psiImBuffer = psiImBuffer
+    this._obsState.potentialBuffer = potentialBuffer
+    this._obsState.fftScratchA = fftScratchA
+    this._obsState.totalSites = totalSites
     this._obsState.pl = this.pl
     this._obsState.diagGeneration = this._diagState.diagGeneration
   }
@@ -320,6 +330,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     this.initializeDensityTexture(device)
     this.lastConfigHash = computeConfigHash(config.gridSize, config.latticeDim)
+    rebuildVortexDetect(
+      device,
+      this._vdState,
+      this.totalSites,
+      this.uniformBuffer,
+      this.psiReBuffer,
+      this.psiImBuffer
+    )
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -484,7 +502,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     }
 
     // Create/destroy observables resources when toggle changes or after rebuild
-    this.syncObsState()
+    this.syncSharedState()
     obsUpdate(device, config, this._obsState)
     // Ensure GS uniform buffer exists when needed
     gsEnsureBuffers(device, this._gsState)
@@ -663,22 +681,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     config: TdseConfig,
     recordHistory: boolean
   ): void {
-    const { pl, bg } = this
-    if (
-      !pl ||
-      !bg ||
-      !this._diagState.diagResultBuffer ||
-      !this._diagState.diagStagingBuffer ||
-      !this.diagUniformBuffer
-    )
-      return
+    const { pl, bg, diagUniformBuffer } = this
+    const { diagResultBuffer, diagStagingBuffer } = this._diagState
+    if (!pl || !bg || !diagResultBuffer || !diagStagingBuffer || !diagUniformBuffer) return
 
     const p: DiagDispatchParams = {
       pl,
       bg,
       diagState: this._diagState,
       obsState: this._obsState,
-      diagUniformBuffer: this.diagUniformBuffer,
+      diagUniformBuffer,
       totalSites: this.totalSites,
       diagNumWorkgroups: this.diagNumWorkgroups,
       simTime: this.simTime,
@@ -698,6 +710,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       },
     }
     extDispatchDiagnostics(ctx, config, recordHistory, p)
+    runVortexDetection(ctx, this._vdState, config, this.totalSites, this._diagState.maxDensity)
   }
 
   execute(_ctx: WebGPURenderContext): void {
@@ -705,6 +718,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
+    disposeVortexDetect(this._vdState)
     const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
       this.psiReBuffer,
       this.psiImBuffer,

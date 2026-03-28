@@ -15,6 +15,7 @@
  * - vortexImprint: Thomas-Fermi with a phase-imprinted vortex at center
  * - vortexLattice: Thomas-Fermi with an array of imprinted vortices
  * - darkSoliton: Thomas-Fermi with a density dip (phase step) along axis 0
+ * - vortexReconnection: Two vortices in configurable N-D planes for reconnection studies (D≥4)
  */
 export type BecInitialCondition =
   | 'thomasFermi'
@@ -22,6 +23,7 @@ export type BecInitialCondition =
   | 'vortexImprint'
   | 'vortexLattice'
   | 'darkSoliton'
+  | 'vortexReconnection'
 
 /**
  * BEC field view type.
@@ -90,6 +92,16 @@ export interface BecConfig {
   /** Soliton velocity for darkSoliton (fraction of sound speed) */
   solitonVelocity: number
 
+  // === N-D Vortex Reconnection (when initialCondition === 'vortexReconnection') ===
+  /** First vortex winding plane axes [axisA, axisB] (0-indexed, must be < latticeDim) */
+  vortexPlane1: [number, number]
+  /** Second vortex winding plane axes [axisA, axisB] (0-indexed, must be < latticeDim) */
+  vortexPlane2: [number, number]
+  /** Spatial separation between vortex cores (lattice units, 0 = coincident) */
+  vortexSeparation: number
+  /** Number of vortices: 1 = single configurable-plane vortex, 2 = reconnection pair */
+  vortexPairCount: number
+
   // === Display ===
   fieldView: BecFieldView
   /** Auto-scale density normalization */
@@ -130,6 +142,10 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   vortexAlternateCharge: false,
   solitonDepth: 1.0,
   solitonVelocity: 0.0,
+  vortexPlane1: [0, 1],
+  vortexPlane2: [2, 3],
+  vortexSeparation: 0.5,
+  vortexPairCount: 2,
   fieldView: 'density',
   autoScale: true,
   absorberEnabled: false,

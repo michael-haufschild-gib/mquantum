@@ -5,8 +5,9 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 708 bytes.
+ * Total size: 732 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
+ * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  *
  * @module
  */
@@ -22,7 +23,7 @@ struct TDSEUniforms {
   // Physics scalars (16 bytes)
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
-  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton)
+  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton, 6=ndVortexPair)
   potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap, 10=radialDoubleWell, 11=custom)
 
   // Per-dimension arrays (48 bytes each)
@@ -99,5 +100,13 @@ struct TDSEUniforms {
 
   imaginaryTime: u32,        // offset 700 (0 = real-time, 1 = imaginary-time/Wick rotation)
   customPotentialScale: f32, // offset 704 (max|V| for custom potential display normalization)
+
+  // N-D vortex reconnection parameters (24 bytes)
+  vortexPlane1Axis0: u32,    // offset 708 — first vortex winding plane, axis A
+  vortexPlane1Axis1: u32,    // offset 712 — first vortex winding plane, axis B
+  vortexPlane2Axis0: u32,    // offset 716 — second vortex winding plane, axis A
+  vortexPlane2Axis1: u32,    // offset 720 — second vortex winding plane, axis B
+  vortexSeparation: f32,     // offset 724 — displacement between vortex cores
+  vortexCount: u32,          // offset 728 — number of vortices to seed (1 or 2)
 }
 `

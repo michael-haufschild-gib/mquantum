@@ -34,6 +34,7 @@ const INIT_MAP: Record<string, number> = {
   thomasFermi: 3,
   vortexImprint: 4,
   darkSoliton: 5,
+  ndVortexPair: 6,
 }
 
 /** Enum maps for TDSE potential types. */
@@ -218,6 +219,16 @@ export function writeTdseUniforms(
 
   // Custom potential display scale (offset 704, index 176)
   f32[176] = params.customPotentialScale ?? 1.0
+
+  // N-D vortex reconnection parameters (offset 708-731, indices 177-182)
+  const vp1 = config.vortexPlane1 ?? [0, 1]
+  const vp2 = config.vortexPlane2 ?? [2, 3]
+  u32[177] = vp1[0]
+  u32[178] = vp1[1]
+  u32[179] = vp2[0]
+  u32[180] = vp2[1]
+  f32[181] = config.vortexSeparation ?? 0.0
+  u32[182] = config.vortexPairCount ?? 2
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

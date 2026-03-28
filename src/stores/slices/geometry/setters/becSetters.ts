@@ -30,6 +30,10 @@ type BecActions = Pick<
   | 'setBecFieldView'
   | 'setBecVortexCharge'
   | 'setBecVortexLatticeCount'
+  | 'setBecVortexPlane1'
+  | 'setBecVortexPlane2'
+  | 'setBecVortexSeparation'
+  | 'setBecVortexPairCount'
   | 'setBecSolitonDepth'
   | 'setBecSolitonVelocity'
   | 'setBecAutoScale'
@@ -163,6 +167,57 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         schroedinger: {
           ...state.schroedinger,
           bec: { ...state.schroedinger.bec, vortexLatticeCount: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecVortexPlane1: (plane) => {
+      const latDim = useGeometryStore.getState().dimension
+      const a = Math.max(0, Math.min(latDim - 1, Math.round(plane[0])))
+      const b = Math.max(0, Math.min(latDim - 1, Math.round(plane[1])))
+      if (a === b) return // axes must differ
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: {
+            ...state.schroedinger.bec,
+            vortexPlane1: [a, b] as [number, number],
+            needsReset: true,
+          },
+        },
+      }))
+    },
+    setBecVortexPlane2: (plane) => {
+      const latDim = useGeometryStore.getState().dimension
+      const a = Math.max(0, Math.min(latDim - 1, Math.round(plane[0])))
+      const b = Math.max(0, Math.min(latDim - 1, Math.round(plane[1])))
+      if (a === b) return
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: {
+            ...state.schroedinger.bec,
+            vortexPlane2: [a, b] as [number, number],
+            needsReset: true,
+          },
+        },
+      }))
+    },
+    setBecVortexSeparation: (sep) => {
+      if (!isFinite(sep)) return
+      const clamped = Math.max(0, Math.min(5.0, sep))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, vortexSeparation: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecVortexPairCount: (count) => {
+      const clamped = Math.max(1, Math.min(2, Math.round(count)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, vortexPairCount: clamped, needsReset: true },
         },
       }))
     },

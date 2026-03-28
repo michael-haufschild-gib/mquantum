@@ -39,6 +39,7 @@ const INITIAL_CONDITION_OPTIONS = [
   { value: 'vortexImprint', label: 'Vortex Imprint' },
   { value: 'vortexLattice', label: 'Vortex Lattice' },
   { value: 'darkSoliton', label: 'Dark Soliton' },
+  { value: 'vortexReconnection', label: 'Vortex Reconnection (D≥4)' },
 ]
 
 const FIELD_VIEW_OPTIONS = [
@@ -50,10 +51,15 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'healingLength', label: 'Healing Length' },
 ]
 
-const SCENARIO_PRESET_OPTIONS = [
-  { value: '', label: '— Select Preset —' },
-  ...BEC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
+/** Filter BEC presets by dimension — presets with minDim > current dim are hidden. */
+function getPresetOptions(dim: number) {
+  return [
+    { value: '', label: '— Select Preset —' },
+    ...BEC_SCENARIO_PRESETS
+      .filter((p) => (p.minDim ?? 2) <= dim)
+      .map((p) => ({ value: p.id, label: p.name })),
+  ]
+}
 
 /**
  * BEC (Gross-Pitaevskii) control panel.
@@ -98,10 +104,26 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
       () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
       [maxGridPerDim]
     )
+    const presetOptions = useMemo(() => getPresetOptions(dimension), [dimension])
 
     const showVortexControls =
       bec.initialCondition === 'vortexImprint' || bec.initialCondition === 'vortexLattice'
     const showSolitonControls = bec.initialCondition === 'darkSoliton'
+    const showReconnectionControls = bec.initialCondition === 'vortexReconnection'
+
+    // Build axis pair options for vortex plane selectors
+    const axisPairOptions = useMemo(() => {
+      const opts: { value: string; label: string }[] = []
+      for (let a = 0; a < activeDims; a++) {
+        for (let b = a + 1; b < activeDims; b++) {
+          opts.push({
+            value: `${a},${b}`,
+            label: `${AXIS_LABELS[a]}${AXIS_LABELS[b]}`,
+          })
+        }
+      }
+      return opts
+    }, [activeDims])
 
     return (
       <div className="space-y-4">
@@ -111,7 +133,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           tooltip="Pre-configured BEC scenarios with tuned interaction strength, trap, and initial state."
           value={activePreset}
           onChange={(v) => v && actions.applyPreset(v)}
-          options={SCENARIO_PRESET_OPTIONS}
+          options={presetOptions}
         />
 
         {/* Initial Condition */}
@@ -169,6 +191,60 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
               min={-1}
               max={1}
               step={0.05}
+            />
+          </>
+        )}
+
+        {/* Conditional: Vortex reconnection controls (D≥4) */}
+        {showReconnectionControls && (
+          <>
+            <Slider
+              label="Vortex Charge"
+              tooltip="Topological winding number for both vortices in the reconnection pair."
+              value={bec.vortexCharge}
+              onChange={actions.setVortexCharge}
+              min={-4}
+              max={4}
+              step={1}
+            />
+            <Select
+              label="Vortex 1 Plane"
+              tooltip="2D plane for the first vortex's phase winding. In D=4, a vortex in plane xy is a 2-surface spanning zw."
+              value={`${bec.vortexPlane1[0]},${bec.vortexPlane1[1]}`}
+              onChange={(v) => {
+                const [a, b] = v.split(',').map(Number) as [number, number]
+                actions.setVortexPlane1([a, b])
+              }}
+              options={axisPairOptions}
+            />
+            <Select
+              label="Vortex 2 Plane"
+              tooltip="2D plane for the second vortex. Orthogonal planes (e.g. xy+zw) produce reconnection; same plane produces parallel vortices."
+              value={`${bec.vortexPlane2[0]},${bec.vortexPlane2[1]}`}
+              onChange={(v) => {
+                const [a, b] = v.split(',').map(Number) as [number, number]
+                actions.setVortexPlane2([a, b])
+              }}
+              options={axisPairOptions}
+            />
+            <Slider
+              label="Separation"
+              tooltip="Distance between vortex cores. Zero = coincident cores, larger values delay reconnection onset."
+              value={bec.vortexSeparation}
+              onChange={actions.setVortexSeparation}
+              min={0}
+              max={5}
+              step={0.1}
+            />
+            <Select
+              label="Vortex Count"
+              tooltip="1 = single configurable-plane vortex, 2 = reconnection pair."
+              value={String(bec.vortexPairCount)}
+              onChange={(v) => actions.setVortexPairCount(parseInt(v, 10))}
+              options={[
+                { value: '1', label: '1 (single vortex)' },
+                { value: '2', label: '2 (reconnection pair)' },
+              ]}
             />
           </>
         )}

@@ -25,7 +25,7 @@ const CHUNK_BUDGETS = {
   'react-vendor': 65,
   'motion': 35,
   'rendering': 120,
-  'shaders-schroedinger': 115,
+  'shaders-schroedinger': 120,
   'shaders': 35,
   'components': 80,
   'components-panels': 65,

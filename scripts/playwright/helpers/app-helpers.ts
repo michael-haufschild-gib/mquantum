@@ -344,6 +344,10 @@ export async function readBecDiagnostics(page: Page) {
       soundSpeed: s.soundSpeed,
       thomasFermiRadius: s.thomasFermiRadius,
       maxDensity: s.maxDensity,
+      vortexCount: s.vortexCount,
+      vortexPlaquettes: s.vortexPlaquettes,
+      vortexPositiveCharge: s.vortexPositiveCharge,
+      vortexNegativeCharge: s.vortexNegativeCharge,
     }
   })
 }

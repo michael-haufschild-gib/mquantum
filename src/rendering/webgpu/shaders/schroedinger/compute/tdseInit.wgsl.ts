@@ -181,6 +181,87 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let solitonIm = vFrac;
     reVal = sqrt(n0) * solitonRe;
     imVal = sqrt(n0) * solitonIm;
+  } else if (params.initCondition == 6u) {
+    // N-D vortex reconnection pair: product of phase windings in configurable planes.
+    //
+    // Each vortex is a codimension-2 defect defined by a 2D winding plane (axisA, axisB).
+    // In D=3 this is a vortex line; in D=4 a vortex surface; in D=5 a vortex volume.
+    // The product ansatz ψ = ρ_TF × Π_i [f(r_i) × exp(i·m·θ_i)] seeds 1 or 2 vortices
+    // in specified planes for reconnection studies.
+    //
+    // Uniform fields:
+    //   vortexPlane1Axis0/1: plane axes for vortex 1
+    //   vortexPlane2Axis0/1: plane axes for vortex 2
+    //   vortexSeparation: displacement of vortex cores from origin
+    //   vortexCount: 1 or 2 vortices
+    //   packetMomentum[0]: vortex charge (winding number)
+    //   packetAmplitude: chemical potential μ
+    //   interactionStrength: coupling g
+
+    let mu6 = params.packetAmplitude;
+    let g6 = params.interactionStrength;
+    let charge6 = params.packetMomentum[0];
+    let sep = params.vortexSeparation;
+    let nVortex = params.vortexCount;
+
+    // Compute physical positions for all dimensions
+    var worldPos: array<f32, 12>;
+    var V6: f32 = 0.0;
+    for (var d6: u32 = 0u; d6 < params.latticeDim; d6++) {
+      let p6 = (f32(coords[d6]) - f32(params.gridSize[d6]) * 0.5 + 0.5) * params.spacing[d6];
+      worldPos[d6] = p6;
+      let omega6 = params.harmonicOmega * params.trapAnisotropy[d6];
+      V6 += 0.5 * params.mass * omega6 * omega6 * p6 * p6;
+    }
+
+    // Thomas-Fermi background density
+    let n6 = max(0.0, (mu6 - V6) / max(abs(g6), 1e-10));
+    let rho6 = sqrt(n6);
+    let xi6 = params.hbar / sqrt(2.0 * params.mass * max(abs(g6) * max(n6, 1e-10), 1e-10));
+
+    // Start with TF background (real, no phase)
+    var vRe: f32 = rho6;
+    var vIm: f32 = 0.0;
+
+    // Vortex 1: winding in plane (vortexPlane1Axis0, vortexPlane1Axis1)
+    let a1a = params.vortexPlane1Axis0;
+    let a1b = params.vortexPlane1Axis1;
+    // Offset vortex 1 core along axis a1a by +sep/2
+    let x1a = worldPos[a1a] - sep * 0.5;
+    let x1b = worldPos[a1b];
+    let r1 = sqrt(x1a * x1a + x1b * x1b);
+    let theta1 = atan2(x1b, x1a);
+    let core1 = r1 / sqrt(r1 * r1 + xi6 * xi6);
+    let phase1 = charge6 * theta1;
+    // Multiply: (vRe + i·vIm) × core1 × exp(i·phase1)
+    let c1cos = core1 * cos(phase1);
+    let c1sin = core1 * sin(phase1);
+    let nextRe1 = vRe * c1cos - vIm * c1sin;
+    let nextIm1 = vRe * c1sin + vIm * c1cos;
+    vRe = nextRe1;
+    vIm = nextIm1;
+
+    // Vortex 2 (if vortexCount >= 2): winding in plane (vortexPlane2Axis0, vortexPlane2Axis1)
+    if (nVortex >= 2u) {
+      let a2a = params.vortexPlane2Axis0;
+      let a2b = params.vortexPlane2Axis1;
+      // Offset vortex 2 core along axis a2a by -sep/2
+      let x2a = worldPos[a2a] + sep * 0.5;
+      let x2b = worldPos[a2b];
+      let r2v = sqrt(x2a * x2a + x2b * x2b);
+      let theta2 = atan2(x2b, x2a);
+      let core2 = r2v / sqrt(r2v * r2v + xi6 * xi6);
+      let phase2v = charge6 * theta2;
+      let c2cos = core2 * cos(phase2v);
+      let c2sin = core2 * sin(phase2v);
+      let nextRe2 = vRe * c2cos - vIm * c2sin;
+      let nextIm2 = vRe * c2sin + vIm * c2cos;
+      vRe = nextRe2;
+      vIm = nextIm2;
+    }
+
+    reVal = vRe;
+    imVal = vIm;
   }
 
   psiRe[idx] = reVal;

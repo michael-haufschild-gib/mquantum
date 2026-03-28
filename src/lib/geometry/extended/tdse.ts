@@ -38,6 +38,7 @@ export type TdseInitialCondition =
   | 'vortexImprint'
   | 'vortexLattice'
   | 'darkSoliton'
+  | 'ndVortexPair'
 
 /**
  * External potential type for the TDSE
@@ -222,6 +223,16 @@ export interface TdseConfig {
    *  for this omega, then the potential is filled with harmonicOmega for evolution.
    *  This enables breathing-mode excitations via trap-frequency quench. */
   harmonicOmegaInit?: number
+
+  // === N-D Vortex Reconnection (when initialCondition === 'ndVortexPair') ===
+  /** First vortex winding plane axis indices [axisA, axisB] (0-indexed) */
+  vortexPlane1?: [number, number]
+  /** Second vortex winding plane axis indices [axisA, axisB] (0-indexed) */
+  vortexPlane2?: [number, number]
+  /** Spatial separation between vortex cores (in lattice units) */
+  vortexSeparation?: number
+  /** Number of vortices to seed (1 = single configurable-plane vortex, 2 = reconnection pair) */
+  vortexPairCount?: number
 }
 
 /**
