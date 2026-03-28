@@ -576,7 +576,260 @@ describe('CPU split-step tunneling vs exact formula', () => {
 })
 
 // ============================================================================
-// 5. Dirac Equation Scales Validation
+// 5. GPE (Gross-Pitaevskii) Validation: Exact Bright Soliton Benchmark
+//
+// Reference: Wikipedia "Gross-Pitaevskii equation"
+// (https://en.wikipedia.org/wiki/Gross%E2%80%93Pitaevskii_equation)
+//
+// The 1D GPE with attractive interactions (g < 0, V = 0) has an exact
+// stationary bright soliton solution:
+//
+//   ψ(x,t) = A · sech(κx) · exp(-iμt/ℏ)
+//
+// where κ = √(m|g|A²) / ℏ  and  μ = gA²/2 (< 0 for g < 0).
+//
+// The density |ψ(x,t)|² = A² sech²(κx) is time-independent.
+// A split-step GPE solver initialized with this exact soliton must preserve
+// the density profile. Any deviation is solver error.
+//
+// This validates the nonlinear GPE solver against an exact analytical
+// solution — not just self-consistency (scaling laws), but convergence
+// to a known solution.
+// ============================================================================
+
+/**
+ * 1D split-step Fourier evolution with nonlinear GPE term (Strang splitting).
+ *
+ * Identical to splitStepEvolve but the potential half-step includes g|ψ|²:
+ *   V_eff(x) = V(x) + g·|ψ(x)|²
+ *
+ * Reference: Same Strang splitting as TDSE, with nonlinear term proven to
+ * maintain O(dt²) convergence for GPE.
+ * (Gao et al., J. Sci. Comput. 104, 95, 2025)
+ */
+function splitStepEvolveGPE(
+  psi: Float64Array,
+  N: number,
+  dx: number,
+  dt: number,
+  mass: number,
+  hbar: number,
+  V: Float64Array,
+  g: number
+): void {
+  // Half-step potential + nonlinear: ψ → exp(-i(V + g|ψ|²)·dt/(2ℏ)) ψ
+  for (let i = 0; i < N; i++) {
+    const re = psi[2 * i]!
+    const im = psi[2 * i + 1]!
+    const density = re * re + im * im
+    const angle = (-(V[i]! + g * density) * dt) / (2 * hbar)
+    const cosA = Math.cos(angle)
+    const sinA = Math.sin(angle)
+    psi[2 * i] = re * cosA - im * sinA
+    psi[2 * i + 1] = re * sinA + im * cosA
+  }
+
+  // Forward FFT
+  fft(psi, N)
+
+  // Full-step kinetic: ψ_k → exp(-iℏk²dt/(2m)) ψ_k
+  const dk = (2 * Math.PI) / (N * dx)
+  for (let i = 0; i < N; i++) {
+    const ki = i <= N / 2 ? i : i - N
+    const k = ki * dk
+    const angle = (-hbar * k * k * dt) / (2 * mass)
+    const cosA = Math.cos(angle)
+    const sinA = Math.sin(angle)
+    const re = psi[2 * i]!
+    const im = psi[2 * i + 1]!
+    psi[2 * i] = re * cosA - im * sinA
+    psi[2 * i + 1] = re * sinA + im * cosA
+  }
+
+  // Inverse FFT
+  ifft(psi, N)
+
+  // Half-step potential + nonlinear
+  for (let i = 0; i < N; i++) {
+    const re = psi[2 * i]!
+    const im = psi[2 * i + 1]!
+    const density = re * re + im * im
+    const angle = (-(V[i]! + g * density) * dt) / (2 * hbar)
+    const cosA = Math.cos(angle)
+    const sinA = Math.sin(angle)
+    psi[2 * i] = re * cosA - im * sinA
+    psi[2 * i + 1] = re * sinA + im * cosA
+  }
+}
+
+/**
+ * Initialize exact GPE bright soliton on a grid.
+ *
+ * ψ(x) = A · sech(κx)   where κ = A√(m|g|)/ℏ
+ *
+ * The soliton is normalized by its analytical norm: ∫|ψ|²dx = 2A²/κ = 2A·ℏ/√(m|g|).
+ * No numerical normalization is applied — the exact analytical state is used directly.
+ *
+ * @param N - Grid points
+ * @param dx - Grid spacing
+ * @param A - Peak amplitude
+ * @param g - Interaction strength (must be < 0 for bright soliton)
+ * @param mass - Particle mass
+ * @param hbar - Reduced Planck constant
+ * @returns Interleaved complex array (purely real initial state)
+ */
+function initBrightSoliton(
+  N: number,
+  dx: number,
+  A: number,
+  g: number,
+  mass: number,
+  hbar: number
+): Float64Array {
+  const absG = Math.abs(g)
+  const kappa = (A * Math.sqrt(mass * absG)) / hbar
+  const psi = new Float64Array(2 * N)
+  const halfL = (N * dx) / 2
+
+  for (let i = 0; i < N; i++) {
+    const x = -halfL + i * dx
+    psi[2 * i] = A / Math.cosh(kappa * x)
+    psi[2 * i + 1] = 0
+  }
+  return psi
+}
+
+describe('GPE norm conservation with nonlinear term (g ≠ 0)', () => {
+  it('norm is preserved to machine precision for attractive GPE (g < 0)', () => {
+    const N = 256
+    const dx = 0.1
+    const dt = 0.01
+    const mass = 1.0
+    const hbar = 1.0
+    const g = -1.0
+    const V = new Float64Array(N) // free
+
+    const psi = initGaussianPacket(N, dx, 0, 1.5, 0)
+    const norm0 = computeNorm(psi, N, dx)
+
+    for (let step = 0; step < 100; step++) {
+      splitStepEvolveGPE(psi, N, dx, dt, mass, hbar, V, g)
+    }
+
+    const normFinal = computeNorm(psi, N, dx)
+    // Each half-step is a phase rotation (|e^{iθ}| = 1), so norm is exactly preserved
+    expect(Math.abs(normFinal - norm0) / norm0).toBeLessThan(1e-12)
+  })
+
+  it('norm is preserved for repulsive GPE (g > 0)', () => {
+    const N = 256
+    const dx = 0.1
+    const dt = 0.01
+    const mass = 1.0
+    const hbar = 1.0
+    const g = 2.0
+    const V = new Float64Array(N)
+
+    const psi = initGaussianPacket(N, dx, 0, 1.5, 0)
+    const norm0 = computeNorm(psi, N, dx)
+
+    for (let step = 0; step < 100; step++) {
+      splitStepEvolveGPE(psi, N, dx, dt, mass, hbar, V, g)
+    }
+
+    const normFinal = computeNorm(psi, N, dx)
+    expect(Math.abs(normFinal - norm0) / norm0).toBeLessThan(1e-12)
+  })
+})
+
+describe('GPE bright soliton: exact stationary solution (Wikipedia: Gross-Pitaevskii equation)', () => {
+  it('density profile |ψ|² remains stationary under GPE evolution', () => {
+    // Parameters in natural units (ℏ = m = 1)
+    const N = 512
+    const dx = 0.05
+    const dt = 0.005
+    const mass = 1.0
+    const hbar = 1.0
+    const g = -1.0
+    const A = 1.0 // peak amplitude
+    const V = new Float64Array(N) // no external potential
+
+    const psi = initBrightSoliton(N, dx, A, g, mass, hbar)
+
+    // Record initial density
+    const density0 = new Float64Array(N)
+    for (let i = 0; i < N; i++) {
+      density0[i] = psi[2 * i]! * psi[2 * i]! + psi[2 * i + 1]! * psi[2 * i + 1]!
+    }
+
+    // Evolve for T = 2.0
+    const T = 2.0
+    const nSteps = Math.round(T / dt)
+    for (let step = 0; step < nSteps; step++) {
+      splitStepEvolveGPE(psi, N, dx, dt, mass, hbar, V, g)
+    }
+
+    // Compare final density to initial
+    let l2Error = 0
+    let l2Ref = 0
+    for (let i = 0; i < N; i++) {
+      const re = psi[2 * i]!
+      const im = psi[2 * i + 1]!
+      const densityFinal = re * re + im * im
+      const diff = densityFinal - density0[i]!
+      l2Error += diff * diff * dx
+      l2Ref += density0[i]! * density0[i]! * dx
+    }
+    const relL2 = Math.sqrt(l2Error / l2Ref)
+
+    // The soliton is an exact stationary state — density should not change.
+    // Tolerance accounts for O(dt²) Strang splitting error over T/dt = 400 steps.
+    expect(relL2).toBeLessThan(0.01) // 1% relative L2 error
+  })
+
+  it('density error decreases as O(dt²) when halving dt (Strang convergence)', () => {
+    const N = 512
+    const dx = 0.05
+    const mass = 1.0
+    const hbar = 1.0
+    const g = -1.0
+    const A = 1.0
+    const V = new Float64Array(N)
+    const T = 1.0
+
+    // Record initial density once
+    const psiRef = initBrightSoliton(N, dx, A, g, mass, hbar)
+    const density0 = new Float64Array(N)
+    for (let i = 0; i < N; i++) {
+      density0[i] = psiRef[2 * i]! * psiRef[2 * i]! + psiRef[2 * i + 1]! * psiRef[2 * i + 1]!
+    }
+
+    function measureError(dt: number): number {
+      const psi = initBrightSoliton(N, dx, A, g, mass, hbar)
+      const nSteps = Math.round(T / dt)
+      for (let step = 0; step < nSteps; step++) {
+        splitStepEvolveGPE(psi, N, dx, dt, mass, hbar, V, g)
+      }
+      let l2Err = 0
+      for (let i = 0; i < N; i++) {
+        const d = psi[2 * i]! * psi[2 * i]! + psi[2 * i + 1]! * psi[2 * i + 1]! - density0[i]!
+        l2Err += d * d * dx
+      }
+      return Math.sqrt(l2Err)
+    }
+
+    const err1 = measureError(0.02) // coarse
+    const err2 = measureError(0.01) // fine
+
+    // O(dt²) convergence: err1/err2 ≈ (0.02/0.01)² = 4
+    const ratio = err1 / err2
+    expect(ratio).toBeGreaterThan(2.5)
+    expect(ratio).toBeLessThan(6.0)
+  })
+})
+
+// ============================================================================
+// 6. Dirac Equation Scales Validation
 //
 // References:
 //   - Energy-momentum: Wikipedia "Energy-momentum relation"
