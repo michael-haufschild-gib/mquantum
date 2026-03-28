@@ -13,9 +13,9 @@ import React, { useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 import { Switch } from '@/components/ui/Switch'
 import type { TdseFieldView, TdseInitialCondition } from '@/lib/geometry/extended/types'
+import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import {
@@ -23,8 +23,8 @@ import {
   AXIS_LABELS,
   detectActivePreset,
   FIELD_VIEW_OPTIONS,
-  INITIAL_CONDITION_OPTIONS,
   getScenarioPresetOptions,
+  INITIAL_CONDITION_OPTIONS,
   TDSE_MAX_TOTAL_SITES,
 } from './tdseControlsConstants'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
@@ -100,10 +100,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
     )
 
     // Filter presets to those compatible with the current dimension
-    const scenarioPresetOptions = useMemo(
-      () => getScenarioPresetOptions(dimension),
-      [dimension]
-    )
+    const scenarioPresetOptions = useMemo(() => getScenarioPresetOptions(dimension), [dimension])
 
     return (
       <div className="space-y-4" data-testid="tdse-controls">
@@ -363,7 +360,10 @@ const StoreEigenstateButton: React.FC = React.memo(() => {
         {count > 0 && <span className="text-[10px] text-text-tertiary">{count} stored</span>}
       </div>
       {eigenstates.length > 0 && (
-        <div className="space-y-1 text-[10px] text-text-tertiary" data-testid="eigenstate-diagnostics">
+        <div
+          className="space-y-1 text-[10px] text-text-tertiary"
+          data-testid="eigenstate-diagnostics"
+        >
           {eigenstates.map((es) => (
             <div key={es.index} className="flex gap-2">
               <span>|{es.index}\u27E9</span>
@@ -375,8 +375,13 @@ const StoreEigenstateButton: React.FC = React.memo(() => {
             </div>
           ))}
           {levelSpacing && (
-            <div className="border-t border-border-subtle pt-1 mt-1" data-testid="level-spacing-stats">
-              <div>\u03B2={levelSpacing.brodyBeta.toFixed(2)} ({levelSpacing.classification})</div>
+            <div
+              className="border-t border-border-subtle pt-1 mt-1"
+              data-testid="level-spacing-stats"
+            >
+              <div>
+                \u03B2={levelSpacing.brodyBeta.toFixed(2)} ({levelSpacing.classification})
+              </div>
               <div>\u27E8s\u27E9={levelSpacing.meanSpacing.toFixed(3)}</div>
             </div>
           )}

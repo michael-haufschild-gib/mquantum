@@ -7,16 +7,16 @@
  * @module rendering/webgpu/passes/TDSEObservablesGSPipelines
  */
 
+import {
+  energySpectralDensityBlock,
+  energySpectralDensityUniformsBlock,
+} from '../shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import {
   gramSchmidtInnerProductFinalizeBlock,
   gramSchmidtInnerProductReduceBlock,
   gramSchmidtSubtractBlock,
 } from '../shaders/schroedinger/compute/gramSchmidt.wgsl'
-import {
-  energySpectralDensityBlock,
-  energySpectralDensityUniformsBlock,
-} from '../shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import {
   observablesMomentumFinalizeBlock,
   observablesMomentumReduceBlock,

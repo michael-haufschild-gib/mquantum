@@ -1,0 +1,137 @@
+/**
+ * TDSE Compute Pass — Initialization Logic
+ *
+ * Extracted from TDSEComputePass to keep the main file under the 600-line limit.
+ * Handles wavefunction initialization, potential filling, and quench setup.
+ *
+ * @module rendering/webgpu/passes/TDSEComputePassInit
+ */
+
+import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+
+import type { WebGPURenderContext } from '../core/types'
+import { LINEAR_WG } from './computePassUtils'
+import {
+  uploadAndersonDisorderBuffer,
+  uploadCustomPotentialBuffer,
+} from './TDSEComputePassCustomPotential'
+import type { DisorderState } from './TDSEComputePassDisorder'
+import { maybeDispatchDisorder } from './TDSEComputePassDisorder'
+import { estimateInitialDensity } from './TDSEComputePassDispatchers'
+import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
+import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
+import { injectLoadedWavefunction, type SaveLoadState } from './TDSEStateSaveLoad'
+
+/** State references needed by the init logic. */
+export interface InitContext {
+  pl: TdsePipelineResult | null
+  bg: TdseBindGroupResult | null
+  initialized: boolean
+  totalSites: number
+  simTime: number
+  stepAccumulator: number
+  uniformBuffer: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
+  omegaStagingBuffer: GPUBuffer | null
+  customPotentialScale: number
+  diagState: DiagReadbackState
+  slState: SaveLoadState
+  disorderState: DisorderState
+  dispatchCompute: (
+    pass: GPUComputePassEncoder,
+    pipeline: GPUComputePipeline,
+    bindGroups: GPUBindGroup[],
+    x: number,
+    y?: number,
+    z?: number
+  ) => void
+}
+
+/**
+ * Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop.
+ *
+ * @returns Updated scalar state (initialized, simTime, stepAccumulator, customPotentialScale)
+ */
+export function maybeInitialize(
+  ctx: WebGPURenderContext,
+  config: TdseConfig,
+  ic: InitContext
+): void {
+  const { device, encoder } = ctx
+  const isMeasurementCollapse = !!ic.slState.pendingInjection?.isMeasurementCollapse
+  const needsInit =
+    !ic.initialized ||
+    config.needsReset ||
+    ic.diagState.pendingAutoReset ||
+    !!ic.slState.pendingInjection
+  if (!needsInit) return
+
+  // Measurement collapse: inject wavefunction without full reinit
+  if (isMeasurementCollapse) {
+    injectLoadedWavefunction(device, ic.slState, ic.totalSites)
+    ic.slState.pendingInjection = null
+    ic.diagState.maxDensity = 1.0
+    ic.diagState.diagGeneration++
+    return
+  }
+
+  const linearWG = Math.ceil(ic.totalSites / LINEAR_WG)
+  const hasOmegaQuench =
+    config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
+
+  // Inject loaded wavefunction or dispatch GPU init shader
+  if (injectLoadedWavefunction(device, ic.slState, ic.totalSites)) {
+    ic.slState.pendingInjection = null
+  } else if (ic.pl && ic.bg) {
+    const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
+    ic.dispatchCompute(pass, ic.pl.initPipeline, [ic.bg.initBG], linearWG)
+    pass.end()
+  }
+
+  // For trap-frequency quench: restore evolution omega before filling the potential
+  if (hasOmegaQuench && ic.uniformBuffer && ic.omegaStagingBuffer) {
+    const buf = new Float32Array(1)
+    buf[0] = config.harmonicOmega
+    device.queue.writeBuffer(ic.omegaStagingBuffer, 0, buf)
+    encoder.copyBufferToBuffer(ic.omegaStagingBuffer, 0, ic.uniformBuffer, 308, 4)
+  }
+
+  // Fill potential buffer
+  if (ic.pl && ic.bg) {
+    if (config.potentialType === 'custom') {
+      ic.customPotentialScale = uploadCustomPotentialBuffer(device, ic.potentialBuffer, config)
+    } else if (config.potentialType === 'andersonDisorder') {
+      ic.customPotentialScale = uploadAndersonDisorderBuffer(device, ic.potentialBuffer, config)
+    } else {
+      const pass = ctx.beginComputePass({ label: 'tdse-potential-fill' })
+      ic.dispatchCompute(pass, ic.pl.potentialPipeline, [ic.bg.potentialBG], linearWG)
+      pass.end()
+    }
+    maybeDispatchDisorder(
+      device,
+      ctx,
+      config,
+      ic.disorderState,
+      ic.potentialBuffer,
+      ic.totalSites,
+      linearWG,
+      ic.dispatchCompute.bind(null) as typeof ic.dispatchCompute
+    )
+  }
+
+  ic.diagState.maxDensity = estimateInitialDensity(config)
+  ic.diagState.initialNorm = -1.0
+  ic.simTime = 0
+  ic.stepAccumulator = 0
+  ic.diagState.pendingAutoReset = false
+  ic.diagState.diagGeneration++
+  ic.initialized = true
+
+  // Seed targetNorm for imaginary-time renormalization
+  if (config.imaginaryTimeEnabled && ic.bg?.renormalizeUniformBuffer) {
+    device.queue.writeBuffer(ic.bg.renormalizeUniformBuffer, 4, new Float32Array([1.0]))
+  }
+  ic.diagState.diagHistory.clear()
+  useTdseDiagnosticsStore.getState().reset()
+}

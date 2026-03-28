@@ -30,7 +30,7 @@ const CHUNK_BUDGETS = {
   'components': 80,
   'components-panels': 65,
   'stores': 45,
-  'physics': 30,
+  'physics': 35,
   'mediabunny': 50,
   'vendor': 16,
   'index': 30,

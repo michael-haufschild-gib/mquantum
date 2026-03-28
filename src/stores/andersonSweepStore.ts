@@ -175,4 +175,4 @@ export const useAndersonSweepStore = create<AndersonSweepState>((set, get) => ({
   },
 }))
 
-export { wForStep, seedForStep }
+export { seedForStep, wForStep }
