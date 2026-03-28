@@ -49,7 +49,7 @@ const config = {
 
   // Allow slow physics benchmarks (split-step FFT evolution) to complete
   // during the initial dry run. Default 5min is too short for some tests.
-  dryRunTimeoutMinutes: 10,
+  dryRunTimeoutMinutes: 30,
 
   // Concurrency: 2 keeps the machine usable during runs.
   // Each worker runs a full vitest process, so 2 already saturates ~4 cores.
