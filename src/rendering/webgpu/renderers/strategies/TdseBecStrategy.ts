@@ -11,9 +11,10 @@ import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
+import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
-import { useMeasurementStore } from '@/stores/measurementStore'
 import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+import { useMeasurementStore } from '@/stores/measurementStore'
 import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
@@ -35,11 +36,18 @@ import type {
   SchroedingerSnapshot,
 } from './types'
 
+/** Interval (in diagnostic cycles) between spectrum computations. */
+const SPECTRUM_INTERVAL = 4
+
 /** Strategy for TDSE and BEC dynamics modes using split-operator compute dispatch. */
 export class TdseBecStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
 
   private tdsePass: TDSEComputePass | null = null
+  /** Counter for throttling spectrum computation (every SPECTRUM_INTERVAL diag cycles). */
+  private spectrumCounter = 0
+  /** Guard to prevent overlapping spectrum readbacks. */
+  private spectrumInFlight = false
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute mode overrides applied by renderer constructor
@@ -155,6 +163,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // BEC diagnostics
     if (isBecMode) {
       this.updateBecDiagnostics(tdsePass, extended)
+      this.maybeComputeSpectrum(ctx, tdsePass, extended)
     }
 
     // B1: Simulation state save/load
@@ -483,6 +492,60 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       vortexPositiveCharge: posCharge,
       vortexNegativeCharge: negCharge,
     })
+  }
+
+  /**
+   * Trigger async incompressible E(k) spectrum computation at throttled intervals.
+   * Reads back psi from GPU, computes velocity field + Helmholtz decomposition on CPU.
+   */
+  private maybeComputeSpectrum(
+    ctx: WebGPURenderContext,
+    tdsePass: TDSEComputePass,
+    extended: ExtendedStoreSnapshot | undefined
+  ): void {
+    const bec = extended?.schroedinger?.bec
+    const g = bec?.interactionStrength ?? 0
+    if (g <= 0 || !bec || this.spectrumInFlight) return
+
+    this.spectrumCounter++
+    if (this.spectrumCounter < SPECTRUM_INTERVAL) return
+    this.spectrumCounter = 0
+    this.spectrumInFlight = true
+
+    const gridSize = bec.gridSize.slice(0, bec.latticeDim)
+    const spacingArr = bec.spacing.slice(0, bec.latticeDim)
+    const hbar = bec.hbar ?? 1.0
+    const mass = bec.mass ?? 1.0
+
+    void tdsePass.requestMeasurementReadback(ctx).then(
+      (result) => {
+        this.spectrumInFlight = false
+        if (!result) return
+        try {
+          const spec = computeIncompressibleSpectrum(
+            result.re,
+            result.im,
+            gridSize,
+            spacingArr,
+            hbar,
+            mass
+          )
+          useBecDiagnosticsStore
+            .getState()
+            .setIncompressibleSpectrum(
+              spec.spectrum,
+              spec.kValues,
+              spec.totalIncompressible,
+              spec.totalCompressible
+            )
+        } catch {
+          logger.warn('[BEC] Incompressible spectrum computation failed')
+        }
+      },
+      () => {
+        this.spectrumInFlight = false
+      }
+    )
   }
 
   getDensityTextureView(): GPUTextureView | null {

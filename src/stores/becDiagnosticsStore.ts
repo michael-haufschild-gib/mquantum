@@ -11,6 +11,8 @@
 
 import { create } from 'zustand'
 
+import { NUM_SPECTRUM_BINS } from '@/lib/physics/bec/incompressibleSpectrum'
+
 /** Ring buffer length — ~2s at 60fps */
 const HISTORY_LENGTH = 120
 
@@ -43,6 +45,15 @@ interface BecDiagnosticsState {
   /** Negative-charge vortex plaquettes */
   vortexNegativeCharge: number
 
+  /** Incompressible kinetic energy spectrum E_incomp(k) — log-binned by |k| */
+  incompressibleSpectrum: Float32Array
+  /** Bin-center k values for the incompressible spectrum (log-spaced) */
+  spectrumKValues: Float32Array
+  /** Total incompressible kinetic energy (integral of spectrum) */
+  totalIncompressibleEnergy: number
+  /** Total compressible kinetic energy */
+  totalCompressibleEnergy: number
+
   /** Norm time-series ring buffer */
   historyNorm: Float32Array
   /** Chemical potential time-series ring buffer */
@@ -56,6 +67,13 @@ interface BecDiagnosticsState {
 
   /** Push new diagnostic snapshot */
   update: (snapshot: Partial<BecDiagnosticsState>) => void
+  /** Update the incompressible kinetic energy spectrum */
+  setIncompressibleSpectrum: (
+    spectrum: Float32Array,
+    kValues: Float32Array,
+    totalIncomp: number,
+    totalComp: number
+  ) => void
   /** Reset all diagnostics to defaults */
   reset: () => void
 }
@@ -73,6 +91,10 @@ const INITIAL_STATE = {
   vortexPlaquettes: 0,
   vortexPositiveCharge: 0,
   vortexNegativeCharge: 0,
+  incompressibleSpectrum: new Float32Array(NUM_SPECTRUM_BINS),
+  spectrumKValues: new Float32Array(NUM_SPECTRUM_BINS),
+  totalIncompressibleEnergy: 0,
+  totalCompressibleEnergy: 0,
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyChemPot: new Float32Array(HISTORY_LENGTH),
   historyHealingLen: new Float32Array(HISTORY_LENGTH),
@@ -111,9 +133,19 @@ export const useBecDiagnosticsStore = create<BecDiagnosticsState>((set) => ({
     })
   },
 
+  setIncompressibleSpectrum: (spectrum, kValues, totalIncomp, totalComp) =>
+    set({
+      incompressibleSpectrum: spectrum,
+      spectrumKValues: kValues,
+      totalIncompressibleEnergy: totalIncomp,
+      totalCompressibleEnergy: totalComp,
+    }),
+
   reset: () =>
     set({
       ...INITIAL_STATE,
+      incompressibleSpectrum: new Float32Array(NUM_SPECTRUM_BINS),
+      spectrumKValues: new Float32Array(NUM_SPECTRUM_BINS),
       historyNorm: new Float32Array(HISTORY_LENGTH),
       historyChemPot: new Float32Array(HISTORY_LENGTH),
       historyHealingLen: new Float32Array(HISTORY_LENGTH),

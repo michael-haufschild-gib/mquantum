@@ -349,6 +349,9 @@ export async function readBecDiagnostics(page: Page) {
       vortexPlaquettes: s.vortexPlaquettes,
       vortexPositiveCharge: s.vortexPositiveCharge,
       vortexNegativeCharge: s.vortexNegativeCharge,
+      incompressibleSpectrum: Array.from(s.incompressibleSpectrum),
+      totalIncompressibleEnergy: s.totalIncompressibleEnergy,
+      totalCompressibleEnergy: s.totalCompressibleEnergy,
     }
   })
 }
