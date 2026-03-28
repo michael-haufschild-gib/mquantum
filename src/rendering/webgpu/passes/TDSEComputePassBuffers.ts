@@ -275,6 +275,9 @@ export interface TdsePassBufferFields {
   diagPartialLeftBuffer: GPUBuffer | null
   diagPartialRightBuffer: GPUBuffer | null
   diagPartialIprBuffer: GPUBuffer | null
+  totalSites: number
+  fwdStageCount: number
+  diagNumWorkgroups: number
 }
 
 /** Collect old buffer references from the pass for destroy-and-rebuild. */
@@ -286,7 +289,7 @@ export function collectOldBuffers(
   return { ...fields, diagResultBuffer, diagStagingBuffer }
 }
 
-/** Apply rebuild result to the pass's mutable buffer fields. */
+/** Apply rebuild result to the pass's mutable buffer fields and derived scalars. */
 export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferResult): void {
   fields.psiReBuffer = r.psiReBuffer
   fields.psiImBuffer = r.psiImBuffer
@@ -304,4 +307,7 @@ export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferRes
   fields.diagPartialLeftBuffer = r.diagPartialLeftBuffer
   fields.diagPartialRightBuffer = r.diagPartialRightBuffer
   fields.diagPartialIprBuffer = r.diagPartialIprBuffer
+  fields.totalSites = r.totalSites
+  fields.fwdStageCount = r.fwdStageCount
+  fields.diagNumWorkgroups = r.diagNumWorkgroups
 }

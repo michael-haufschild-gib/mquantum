@@ -28,7 +28,6 @@ import {
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -81,9 +80,9 @@ import type { FFTAxisParams } from './TDSEComputePassDispatchers'
 import {
   dispatchDiagnostics as extDispatchDiagnostics,
   dispatchFFTAxis as extDispatchFFTAxis,
-  estimateInitialDensity,
 } from './TDSEComputePassDispatchers'
 import { disposeTdseResources } from './TDSEComputePassDispose'
+import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
   clearEigenstates as gsClearEigenstates,
@@ -94,7 +93,6 @@ import {
 } from './TDSEGramSchmidt'
 import { requestMeasurementReadback as extRequestMeasurementReadback } from './TDSEMeasurementReadback'
 import {
-  injectLoadedWavefunction,
   requestSliceCapture as slRequestSlice,
   requestStateSave as slRequestSave,
   type SaveLoadState,
@@ -212,7 +210,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
-  private readonly omegaUploadBuf = new Float32Array(1)
 
   constructor() {
     super({
@@ -387,96 +384,35 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
   private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
-    const { device, encoder } = ctx
-    const isMeasurementCollapse = !!this._slState.pendingInjection?.isMeasurementCollapse
-    const needsInit =
-      !this.initialized ||
-      config.needsReset ||
-      this._diagState.pendingAutoReset ||
-      !!this._slState.pendingInjection
-    if (!needsInit) return
-
-    // Measurement collapse: inject wavefunction without full reinit.
-    // Preserves simTime, diagnostics history, and uses peak=1.0 for maxDensity
-    // so the collapsed Gaussian is immediately visible.
-    if (isMeasurementCollapse) {
-      injectLoadedWavefunction(device, this._slState, this.totalSites)
-      this._slState.pendingInjection = null
-      this._diagState.maxDensity = 1.0
-      this._diagState.diagGeneration++
-      return
+    const dc = (
+      pe: GPUComputePassEncoder,
+      p: GPUComputePipeline,
+      b: GPUBindGroup[],
+      x: number,
+      y?: number,
+      z?: number
+    ) => this.dispatchCompute(pe, p, b, x, y ?? 1, z ?? 1)
+    const ic = {
+      pl: this.pl,
+      bg: this.bg,
+      initialized: this.initialized,
+      totalSites: this.totalSites,
+      simTime: this.simTime,
+      stepAccumulator: this.stepAccumulator,
+      uniformBuffer: this.uniformBuffer,
+      potentialBuffer: this.potentialBuffer,
+      omegaStagingBuffer: this.omegaStagingBuffer,
+      customPotentialScale: this.customPotentialScale,
+      diagState: this._diagState,
+      slState: this._slState,
+      disorderState: this._disorderState,
+      dispatchCompute: dc,
     }
-
-    const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
-    const hasOmegaQuench =
-      config.harmonicOmegaInit !== undefined && config.harmonicOmegaInit !== config.harmonicOmega
-
-    // Check for pending loaded wavefunction data — skip init shader and inject directly
-    if (injectLoadedWavefunction(device, this._slState, this.totalSites)) {
-      this._slState.pendingInjection = null
-    } else {
-      // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
-      if (this.pl && this.bg) {
-        const pass = ctx.beginComputePass({ label: 'tdse-init-pass' })
-        this.dispatchCompute(pass, this.pl.initPipeline, [this.bg.initBG], linearWG)
-        pass.end()
-      }
-    }
-
-    // For trap-frequency quench: restore evolution omega before filling the potential.
-    if (hasOmegaQuench && this.uniformBuffer && this.omegaStagingBuffer) {
-      this.omegaUploadBuf[0] = config.harmonicOmega
-      device.queue.writeBuffer(this.omegaStagingBuffer, 0, this.omegaUploadBuf)
-      encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
-    }
-
-    // Fill potential buffer
-    if (this.pl && this.bg) {
-      if (config.potentialType === 'custom') {
-        this.customPotentialScale = uploadCustomPotentialBuffer(
-          device,
-          this.potentialBuffer,
-          config
-        )
-      } else if (config.potentialType === 'andersonDisorder') {
-        this.customPotentialScale = uploadAndersonDisorderBuffer(
-          device,
-          this.potentialBuffer,
-          config
-        )
-      } else {
-        const pass = ctx.beginComputePass({ label: 'tdse-potential-fill' })
-        this.dispatchCompute(pass, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
-        pass.end()
-      }
-      // Disorder overlay on init
-      maybeDispatchDisorder(
-        device,
-        ctx,
-        config,
-        this._disorderState,
-        this.potentialBuffer,
-        this.totalSites,
-        linearWG,
-        this.dispatchCompute.bind(this)
-      )
-    }
-
-    this._diagState.maxDensity = estimateInitialDensity(config)
-    this._diagState.initialNorm = -1.0
-    this.simTime = 0
-    this.stepAccumulator = 0
-    this._diagState.pendingAutoReset = false
-    this._diagState.diagGeneration++
-    this.initialized = true
-
-    // Seed targetNorm so renormalize doesn't skip early imaginary-time frames.
-    // First readback will replace this with the measured value.
-    if (config.imaginaryTimeEnabled && this.bg?.renormalizeUniformBuffer) {
-      device.queue.writeBuffer(this.bg.renormalizeUniformBuffer, 4, new Float32Array([1.0]))
-    }
-    this._diagState.diagHistory.clear()
-    useTdseDiagnosticsStore.getState().reset()
+    extMaybeInitialize(ctx, config, ic)
+    this.initialized = ic.initialized
+    this.simTime = ic.simTime
+    this.stepAccumulator = ic.stepAccumulator
+    this.customPotentialScale = ic.customPotentialScale
   }
 
   /** Dispatch FFT for one axis. Delegates to extracted module. */
