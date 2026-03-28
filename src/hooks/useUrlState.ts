@@ -18,6 +18,30 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
+/** Apply TDSE-specific URL state params. */
+function applyTdseParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.potentialType !== undefined) ext.setTdsePotentialType(urlState.potentialType)
+  if (urlState.absorberEnabled !== undefined) ext.setTdseAbsorberEnabled(urlState.absorberEnabled)
+  if (urlState.diagnosticsEnabled !== undefined)
+    ext.setTdseDiagnosticsEnabled(urlState.diagnosticsEnabled)
+  if (urlState.observablesEnabled !== undefined)
+    ext.setTdseObservablesEnabled(urlState.observablesEnabled)
+  if (urlState.imaginaryTimeEnabled !== undefined)
+    ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
+  if (urlState.customPotentialExpression !== undefined)
+    ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
+  if (urlState.anharmonicLambda !== undefined)
+    ext.setTdseAnharmonicLambda(urlState.anharmonicLambda)
+  if (urlState.disorderStrength !== undefined)
+    ext.setTdseDisorderStrength(urlState.disorderStrength)
+  if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
+  if (urlState.disorderDistribution !== undefined)
+    ext.setTdseDisorderDistribution(urlState.disorderDistribution as 'uniform' | 'gaussian')
+}
+
 /**
  * Apply individual URL state parameters to stores.
  * @param urlState - Parsed URL state to apply
@@ -53,23 +77,7 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
 
     // ── TDSE config ──────────────────────────────────────────────────────────
-    if (urlState.potentialType !== undefined) ext.setTdsePotentialType(urlState.potentialType)
-    if (urlState.absorberEnabled !== undefined) ext.setTdseAbsorberEnabled(urlState.absorberEnabled)
-    if (urlState.diagnosticsEnabled !== undefined)
-      ext.setTdseDiagnosticsEnabled(urlState.diagnosticsEnabled)
-    if (urlState.observablesEnabled !== undefined)
-      ext.setTdseObservablesEnabled(urlState.observablesEnabled)
-    if (urlState.imaginaryTimeEnabled !== undefined)
-      ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
-    if (urlState.customPotentialExpression !== undefined)
-      ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
-    if (urlState.disorderStrength !== undefined)
-      ext.setTdseDisorderStrength(urlState.disorderStrength)
-    if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
-    if (urlState.disorderDistribution !== undefined)
-      ext.setTdseDisorderDistribution(
-        urlState.disorderDistribution as 'uniform' | 'gaussian'
-      )
+    applyTdseParams(urlState, ext)
 
     // ── Features ─────────────────────────────────────────────────────────────
     if (urlState.openQuantumEnabled !== undefined) {

@@ -103,6 +103,8 @@ export interface ShareableObjectState {
   imaginaryTimeEnabled?: boolean
   /** Custom potential expression V(x,y,z,...) when potentialType === 'custom' */
   customPotentialExpression?: string
+  /** Coupled anharmonic coupling λ (when potentialType === 'coupledAnharmonic') */
+  anharmonicLambda?: number
   /** Anderson disorder strength W (when potentialType === 'andersonDisorder') */
   disorderStrength?: number
   /** Anderson disorder PRNG seed */
@@ -263,6 +265,9 @@ export function serializeState(state: ShareableState): string {
   if (state.potentialType === 'custom' && state.customPotentialExpression) {
     setStringParam(params, 'cpx', state.customPotentialExpression)
   }
+  if (state.potentialType === 'coupledAnharmonic') {
+    setFloatParam(params, 'anh_l', state.anharmonicLambda, true)
+  }
   if (state.potentialType === 'andersonDisorder') {
     setFloatParam(params, 'dis_w', state.disorderStrength, true)
     setIntParam(params, 'dis_s', state.disorderSeed)
@@ -333,6 +338,9 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   if (state.potentialType === 'custom') {
     const cpx = params.get('cpx')
     if (cpx && cpx.length <= 200) state.customPotentialExpression = cpx
+  }
+  if (state.potentialType === 'coupledAnharmonic') {
+    state.anharmonicLambda = parseFloatParam(params, 'anh_l', 0, 100)
   }
   if (state.potentialType === 'andersonDisorder') {
     state.disorderStrength = parseFloatParam(params, 'dis_w', 0, 100)

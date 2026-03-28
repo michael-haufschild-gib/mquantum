@@ -345,6 +345,46 @@ describe('state-serializer', () => {
       expect(d.observablesEnabled).toBe(true)
       expect(d.imaginaryTimeEnabled).toBe(false)
     })
+
+    it('roundtrips coupledAnharmonic with anharmonicLambda', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        potentialType: 'coupledAnharmonic',
+        anharmonicLambda: 5.5,
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.potentialType).toBe('coupledAnharmonic')
+      expect(d.anharmonicLambda).toBeCloseTo(5.5, 1)
+    })
+
+    it('omits anharmonicLambda for non-coupledAnharmonic potentials', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        potentialType: 'harmonicTrap',
+      }
+      const s = serializeState(state)
+      expect(s).not.toContain('anh_l')
+    })
+
+    it('roundtrips andersonDisorder with disorder params', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        potentialType: 'andersonDisorder',
+        disorderStrength: 8.0,
+        disorderSeed: 42,
+        disorderDistribution: 'gaussian',
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.potentialType).toBe('andersonDisorder')
+      expect(d.disorderStrength).toBeCloseTo(8.0, 1)
+      expect(d.disorderSeed).toBe(42)
+      expect(d.disorderDistribution).toBe('gaussian')
+    })
   })
 
   describe('generateShareUrl', () => {
