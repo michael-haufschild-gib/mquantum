@@ -135,15 +135,22 @@ export function storeCurrentEigenstate(
 
   // Async readback: compute IPR and orbit correlation from eigenstate wavefunction on CPU
   const eigIdx = state.gsEigenstates.length - 1
-  computeEigenstateDiagnosticsAsync(
-    device, reBuffer, imBuffer, state.totalSites, energy, tdseConfig
+  void computeEigenstateDiagnosticsAsync(
+    device,
+    reBuffer,
+    imBuffer,
+    state.totalSites,
+    energy,
+    tdseConfig
   ).then((diag) => {
     eigenstateEntry.ipr = diag.ipr
     // Push orbit correlation back to the diagnostics store
-    import('@/stores/eigenstateDiagnosticsStore').then((m) => {
+    void import('@/stores/eigenstateDiagnosticsStore').then((m) => {
       m.useEigenstateDiagnosticsStore.getState().updateIPR(eigIdx, diag.ipr)
       if (Number.isFinite(diag.orbitCorrelation)) {
-        m.useEigenstateDiagnosticsStore.getState().updateOrbitCorrelation(eigIdx, diag.orbitCorrelation)
+        m.useEigenstateDiagnosticsStore
+          .getState()
+          .updateOrbitCorrelation(eigIdx, diag.orbitCorrelation)
       }
     })
   })
@@ -223,7 +230,14 @@ async function computeEigenstateDiagnosticsAsync(
         }
         const orbits = generateOrbitsAtEnergy(energy, tdseConfig, orbitCfg)
         if (orbits.length > 0) {
-          const result = computeScarCorrelation(re, im, orbits, gridSize, spacing, orbitCfg.tubeWidth)
+          const result = computeScarCorrelation(
+            re,
+            im,
+            orbits,
+            gridSize,
+            spacing,
+            orbitCfg.tubeWidth
+          )
           orbitCorrelation = result.orbitCorrelation
         }
       } catch {

@@ -68,12 +68,16 @@ import {
 /** TDSEUniforms struct size in bytes (736 = 732 + 4 anharmonicLambda) */
 const UNIFORM_SIZE = 736
 
-import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
 import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 
-import { tdseAddDisorderBlock } from '../shaders/schroedinger/compute/tdseAddDisorder.wgsl'
-
-import type { DiagDispatchParams, FFTAxisParams } from './TDSEComputePassDispatchers'
+import {
+  buildDisorderPipeline,
+  createDisorderState,
+  type DisorderState,
+  disposeDisorder,
+  maybeDispatchDisorder,
+} from './TDSEComputePassDisorder'
+import type { FFTAxisParams } from './TDSEComputePassDispatchers'
 import {
   dispatchDiagnostics as extDispatchDiagnostics,
   dispatchFFTAxis as extDispatchFFTAxis,
@@ -202,13 +206,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Max |V| from the last custom potential upload, for display normalization */
   private customPotentialScale = 1.0
 
-  // Disorder overlay state
-  private disorderBuffer: GPUBuffer | null = null
-  private disorderUniformBuffer: GPUBuffer | null = null
-  private disorderPipeline: GPUComputePipeline | null = null
-  private disorderBGL: GPUBindGroupLayout | null = null
-  private disorderBG: GPUBindGroup | null = null
-  private lastDisorderHash = ''
+  private readonly _disorderState: DisorderState = createDisorderState()
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -267,7 +265,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   setLoadedWavefunction(re: Float32Array, im: Float32Array, isMeasurementCollapse?: boolean): void {
     this._slState.pendingInjection = { re, im, isMeasurementCollapse }
   }
-  storeCurrentEigenstate(device: GPUDevice, energy = NaN, tdseConfig?: import('@/lib/geometry/extended/tdse').TdseConfig): number {
+  storeCurrentEigenstate(
+    device: GPUDevice,
+    energy = NaN,
+    tdseConfig?: import('@/lib/geometry/extended/tdse').TdseConfig
+  ): number {
     return gsStoreEigenstate(device, this._gsState, 1.0, energy, tdseConfig)
   }
   getStoredEigenstateCount(): number {
@@ -290,21 +292,25 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Sync shared state objects with current buffer references. */
   private syncSharedState(): void {
-    const { psiReBuffer, psiImBuffer, totalSites, pl, potentialBuffer, fftScratchA } = this
-    this._gsState.psiReBuffer = psiReBuffer
-    this._gsState.psiImBuffer = psiImBuffer
-    this._gsState.totalSites = totalSites
-    this._gsState.pl = pl
-    this._slState.psiReBuffer = psiReBuffer
-    this._slState.psiImBuffer = psiImBuffer
-    this._slState.totalSites = totalSites
-    this._obsState.psiReBuffer = psiReBuffer
-    this._obsState.psiImBuffer = psiImBuffer
-    this._obsState.potentialBuffer = potentialBuffer
-    this._obsState.fftScratchA = fftScratchA
-    this._obsState.totalSites = totalSites
-    this._obsState.pl = this.pl
-    this._obsState.diagGeneration = this._diagState.diagGeneration
+    const {
+      psiReBuffer: re,
+      psiImBuffer: im,
+      totalSites: n,
+      pl,
+      potentialBuffer,
+      fftScratchA,
+    } = this
+    Object.assign(this._gsState, { psiReBuffer: re, psiImBuffer: im, totalSites: n, pl })
+    Object.assign(this._slState, { psiReBuffer: re, psiImBuffer: im, totalSites: n })
+    Object.assign(this._obsState, {
+      psiReBuffer: re,
+      psiImBuffer: im,
+      potentialBuffer,
+      fftScratchA,
+      totalSites: n,
+      pl,
+      diagGeneration: this._diagState.diagGeneration,
+    })
   }
 
   private rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
@@ -326,9 +332,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     applyBufferResult(self, r)
     this._diagState.diagResultBuffer = r.diagResultBuffer
     this._diagState.diagStagingBuffer = r.diagStagingBuffer
-    this.totalSites = r.totalSites
-    this.fwdStageCount = r.fwdStageCount
-    this.diagNumWorkgroups = r.diagNumWorkgroups
     this._diagState.diagHistory.clear()
     this.diagFrameCounter = 0
     this._diagState.diagMappingInFlight = false
@@ -355,27 +358,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       createComputePipeline: (d, sm, bgls, label) => this.createComputePipeline(d, sm, bgls, label),
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
-    this.buildDisorderPipeline(device)
-  }
-
-  /** Build disorder overlay pipeline (uniform + potential + disorderBuffer). */
-  private buildDisorderPipeline(device: GPUDevice): void {
-    this.disorderBGL = device.createBindGroupLayout({
-      label: 'tdse-disorder-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      ],
-    })
-    const sm = this.createShaderModule(device, tdseAddDisorderBlock, 'tdse-add-disorder')
-    this.disorderPipeline = this.createComputePipeline(
+    buildDisorderPipeline(
       device,
-      sm,
-      [this.disorderBGL],
-      'tdse-add-disorder'
+      this._disorderState,
+      this.createShaderModule.bind(this),
+      this.createComputePipeline.bind(this)
     )
   }
+
   private rebuildBindGroups(device: GPUDevice): void {
     if (!this.pl || !this.densityTextureView) return
     const bgSelf = this as unknown as TdsePassBufferFields
@@ -460,7 +450,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         pass.end()
       }
       // Disorder overlay on init
-      this.maybeDispatchDisorder(device, ctx, config, linearWG)
+      maybeDispatchDisorder(
+        device,
+        ctx,
+        config,
+        this._disorderState,
+        this.potentialBuffer,
+        this.totalSites,
+        linearWG,
+        this.dispatchCompute.bind(this)
+      )
     }
 
     this._diagState.maxDensity = estimateInitialDensity(config)
@@ -584,7 +583,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           p.end()
         }
         // Disorder overlay: add random noise to the potential buffer
-        this.maybeDispatchDisorder(device, ctx, config, linearWG)
+        maybeDispatchDisorder(
+          device,
+          ctx,
+          config,
+          this._disorderState,
+          this.potentialBuffer,
+          this.totalSites,
+          linearWG,
+          this.dispatchCompute.bind(this)
+        )
       }
     }
 
@@ -705,100 +713,42 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
-      this.dispatchDiagnostics(ctx, config, config.diagnosticsEnabled)
+      const { pl, bg, diagUniformBuffer } = this
+      const { diagResultBuffer, diagStagingBuffer } = this._diagState
+      if (pl && bg && diagResultBuffer && diagStagingBuffer && diagUniformBuffer) {
+        const dc = (
+          pe: GPUComputePassEncoder,
+          ppl: GPUComputePipeline,
+          bgs: GPUBindGroup[],
+          x: number,
+          y?: number,
+          z?: number
+        ) => this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1)
+        extDispatchDiagnostics(ctx, config, config.diagnosticsEnabled, {
+          pl,
+          bg,
+          diagState: this._diagState,
+          obsState: this._obsState,
+          diagUniformBuffer,
+          totalSites: this.totalSites,
+          diagNumWorkgroups: this.diagNumWorkgroups,
+          simTime: this.simTime,
+          computeStrides: (c) => computeStridesPadded(c.gridSize, c.latticeDim),
+          dispatchCompute: dc,
+          observablesMomentumFFT: (fftCtx) => {
+            const wg = Math.ceil(this.totalSites / LINEAR_WG)
+            const packP = fftCtx.beginComputePass({ label: 'obs-fft-pack' })
+            dc(packP, pl.packPipeline, [bg.packBG], wg)
+            packP.end()
+            let slot = 0
+            for (let d = config.latticeDim - 1; d >= 0; d--) {
+              slot = this.dispatchFFTAxis(fftCtx, config.gridSize[d]!, slot)
+            }
+          },
+        })
+        runVortexDetection(ctx, this._vdState, config, this.totalSites, this._diagState.maxDensity)
+      }
     }
-  }
-
-  /** Dispatch GPU norm reduction and schedule async readback. Delegates to extracted module. */
-  private dispatchDiagnostics(
-    ctx: WebGPURenderContext,
-    config: TdseConfig,
-    recordHistory: boolean
-  ): void {
-    const { pl, bg, diagUniformBuffer } = this
-    const { diagResultBuffer, diagStagingBuffer } = this._diagState
-    if (!pl || !bg || !diagResultBuffer || !diagStagingBuffer || !diagUniformBuffer) return
-
-    const p: DiagDispatchParams = {
-      pl,
-      bg,
-      diagState: this._diagState,
-      obsState: this._obsState,
-      diagUniformBuffer,
-      totalSites: this.totalSites,
-      diagNumWorkgroups: this.diagNumWorkgroups,
-      simTime: this.simTime,
-      computeStrides: (c) => computeStridesPadded(c.gridSize, c.latticeDim),
-      dispatchCompute: (pe, ppl, bgs, x, y, z) =>
-        this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1),
-      observablesMomentumFFT: (fftCtx) => {
-        // Pack post-step psi into interleaved complex, then forward FFT all axes
-        const wg = Math.ceil(this.totalSites / LINEAR_WG)
-        const packP = fftCtx.beginComputePass({ label: 'obs-fft-pack' })
-        this.dispatchCompute(packP, pl.packPipeline, [bg.packBG], wg)
-        packP.end()
-        let slot = 0
-        for (let d = config.latticeDim - 1; d >= 0; d--) {
-          slot = this.dispatchFFTAxis(fftCtx, config.gridSize[d]!, slot)
-        }
-      },
-    }
-    extDispatchDiagnostics(ctx, config, recordHistory, p)
-    runVortexDetection(ctx, this._vdState, config, this.totalSites, this._diagState.maxDensity)
-  }
-
-  /**
-   * Generate and dispatch disorder overlay if disorderStrength > 0.
-   * Regenerates the noise buffer when the seed or grid size changes.
-   */
-  private maybeDispatchDisorder(
-    device: GPUDevice,
-    ctx: WebGPURenderContext,
-    config: TdseConfig,
-    linearWG: number
-  ): void {
-    if (config.disorderStrength <= 0 || !this.potentialBuffer || !this.disorderPipeline) return
-
-    const disorderHash = `${config.disorderSeed}|${this.totalSites}`
-    if (disorderHash !== this.lastDisorderHash) {
-      this.disorderBuffer?.destroy()
-      this.disorderUniformBuffer?.destroy()
-
-      const noise = generateDisorderNoise(this.totalSites, config.disorderSeed)
-      this.disorderBuffer = device.createBuffer({
-        label: 'tdse-disorder',
-        size: this.totalSites * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      })
-      device.queue.writeBuffer(this.disorderBuffer, 0, noise.buffer)
-
-      this.disorderUniformBuffer = device.createBuffer({
-        label: 'tdse-disorder-uniform',
-        size: 8,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      })
-      this.lastDisorderHash = disorderHash
-    }
-
-    if (!this.disorderBuffer || !this.disorderUniformBuffer || !this.disorderBGL) return
-
-    // Write disorder uniforms: { totalSites: u32, strength: f32 }
-    const buf = new ArrayBuffer(8)
-    new Uint32Array(buf, 0, 1)[0] = this.totalSites
-    new Float32Array(buf, 4, 1)[0] = config.disorderStrength
-    device.queue.writeBuffer(this.disorderUniformBuffer, 0, buf)
-
-    this.disorderBG = device.createBindGroup({
-      layout: this.disorderBGL,
-      entries: [
-        { binding: 0, resource: { buffer: this.disorderUniformBuffer } },
-        { binding: 1, resource: { buffer: this.potentialBuffer } },
-        { binding: 2, resource: { buffer: this.disorderBuffer } },
-      ],
-    })
-    const pass = ctx.beginComputePass({ label: 'tdse-add-disorder' })
-    this.dispatchCompute(pass, this.disorderPipeline, [this.disorderBG], linearWG)
-    pass.end()
   }
 
   execute(_ctx: WebGPURenderContext): void {
@@ -826,13 +776,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.diagPartialRightBuffer,
       this.diagPartialIprBuffer,
       this.bg?.renormalizeUniformBuffer,
-      this.disorderBuffer,
-      this.disorderUniformBuffer,
     ]
     for (const b of bufs) b?.destroy()
-    this.disorderBuffer = this.disorderUniformBuffer = null
-    this.disorderBG = null
-    this.lastDisorderHash = ''
+    disposeDisorder(this._disorderState)
     this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
     this.fftScratchA = this.fftScratchB = this.omegaStagingBuffer = null
     this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null

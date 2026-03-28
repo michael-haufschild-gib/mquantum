@@ -13,8 +13,6 @@ import { expect, test } from './fixtures'
 import {
   expectCanvasNotBlank,
   gotoModeWithParams,
-  hasWebGPU,
-  pauseAnimation,
   requireWebGPU,
   waitForFirstFrame,
   waitForFrameAdvance,
@@ -244,9 +242,8 @@ test.describe('quantum scarring features', () => {
 
   test('classical orbit integrator produces valid trajectories in browser', async ({ page }) => {
     const result = await page.evaluate(async () => {
-      const { evaluatePotential, integrateOrbit, DEFAULT_ORBIT_CONFIG } = await import(
-        '/src/lib/physics/tdse/classicalOrbit.ts'
-      )
+      const { evaluatePotential, integrateOrbit, DEFAULT_ORBIT_CONFIG } =
+        await import('/src/lib/physics/tdse/classicalOrbit.ts')
       const { DEFAULT_TDSE_CONFIG } = await import('/src/lib/geometry/extended/tdse.ts')
       const config = {
         ...DEFAULT_TDSE_CONFIG,
@@ -285,9 +282,8 @@ test.describe('quantum scarring features', () => {
   test('scar metric computation runs without errors in browser', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const { computeScarCorrelation } = await import('/src/lib/physics/tdse/scarMetric.ts')
-      const { generateOrbitsAtEnergy, DEFAULT_ORBIT_CONFIG } = await import(
-        '/src/lib/physics/tdse/classicalOrbit.ts'
-      )
+      const { generateOrbitsAtEnergy, DEFAULT_ORBIT_CONFIG } =
+        await import('/src/lib/physics/tdse/classicalOrbit.ts')
       const { DEFAULT_TDSE_CONFIG } = await import('/src/lib/geometry/extended/tdse.ts')
 
       const config = {

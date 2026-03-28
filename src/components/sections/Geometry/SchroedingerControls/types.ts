@@ -206,8 +206,6 @@ export interface TdseActions {
   setDriveWaveform: ExtendedObjectState['setTdseDriveWaveform']
   setDriveFrequency: ExtendedObjectState['setTdseDriveFrequency']
   setDriveAmplitude: ExtendedObjectState['setTdseDriveAmplitude']
-  setDisorderStrength: ExtendedObjectState['setTdseDisorderStrength']
-  setDisorderSeed: ExtendedObjectState['setTdseDisorderSeed']
   setDisorderDistribution: ExtendedObjectState['setTdseDisorderDistribution']
   setFieldView: ExtendedObjectState['setTdseFieldView']
   setAutoScale: ExtendedObjectState['setTdseAutoScale']

@@ -45,7 +45,6 @@ const TDSE_PARAMS: Record<string, TdseParamDef> = {
   setTdseDisorderSeed: { field: 'disorderSeed', min: 0, max: 999999 },
   setTdseDriveFrequency: { field: 'driveFrequency', min: 0, max: 50 },
   setTdseDriveAmplitude: { field: 'driveAmplitude', min: 0, max: 100 },
-  setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
 }
 
 /**
