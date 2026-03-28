@@ -18,15 +18,15 @@ All reference formulas cited below were verified from online sources. The specif
 | Category | Test Files | Tests | Status |
 |-|-|-|-|
 | Analytical benchmarks | `analyticalBenchmarks.test.ts` | 208 | All passing |
-| Validation benchmarks | `validationBenchmarks.test.ts` | 32 | All passing |
+| Validation benchmarks | `validationBenchmarks.test.ts` | 36 | All passing |
 | Clifford algebra (dim 1-11) | `cliffordAlgebraFallback.test.ts` | 52 | All passing |
 | Property-based (fast-check) | 19 files | ~350 | All passing |
 | BEC chemical potential | `chemicalPotential.test.ts` | 22 | All passing |
-| Quantum walk physics | `quantumWalk.test.ts` | ~25 | All passing |
+| Quantum walk physics | `quantumWalk.test.ts` | 14 | All passing |
 | Free scalar k-space | `kSpaceOccupation.test.ts` | ~10 | All passing |
 | Open quantum / Lindblad | 6 files | ~100 | All passing |
 | Other physics + math | 30+ files | ~220 | All passing |
-| **Total** | **48 physics files** | **1020** | **All passing** |
+| **Total** | **48 physics files** | **~1030** | **All passing** |
 
 ---
 
@@ -258,9 +258,9 @@ The vacuum state sampler (`sampleVacuumSpectrum`) draws phi_k from Gaussians wit
 
 ## BEC (Gross-Pitaevskii) Validation
 
-**Test file:** `chemicalPotential.test.ts`
+### Thomas-Fermi Formulas
 
-The Thomas-Fermi approximation formulas are tested for internal consistency and scaling laws. External numerical comparison was not performed (published reference tables could not be retrieved in machine-readable form).
+**Test file:** `chemicalPotential.test.ts`
 
 | Benchmark | Method | Tolerance |
 |-|-|-|
@@ -274,13 +274,37 @@ The Thomas-Fermi approximation formulas are tested for internal consistency and 
 | Sound speed: c_s = sqrt(g n / m) | Direct formula | 10^-6 |
 | All dimensions 2-11 produce finite positive mu | Range check | exact |
 
+### GPE Solver: Exact Bright Soliton Benchmark
+
+**Test file:** `validationBenchmarks.test.ts`
+
+**Reference:** [Wikipedia: Gross-Pitaevskii equation](https://en.wikipedia.org/wiki/Gross%E2%80%93Pitaevskii_equation)
+
+The 1D GPE with attractive interactions (g < 0, V = 0) has an exact stationary bright soliton solution:
+
+```
+ψ(x,t) = A · sech(κx) · exp(-iμt/ℏ)
+where κ = √(m|g|A²)/ℏ   and   μ = gA²/2
+```
+
+The density `|ψ|²` is time-independent. A CPU split-step GPE solver (Strang splitting with the nonlinear term g|ψ|² added to the potential half-step) initialized with this exact soliton must preserve the density profile. This validates the nonlinear solver against an exact analytical solution — not just self-consistency.
+
+| Benchmark | Method | Tolerance |
+|-|-|-|
+| GPE norm conservation (g < 0) | Evolve Gaussian 100 steps, check norm preserved | 10^-12 |
+| GPE norm conservation (g > 0) | Same with repulsive interactions | 10^-12 |
+| Soliton stationarity | Init exact soliton, evolve T=2.0, compare density L2 | 1% |
+| Strang convergence for GPE | Soliton at dt=0.02 and dt=0.01, error ratio ≈ 4 | ratio in [2.5, 6.0] |
+
+**Convergence order reference:** Gao et al., "Order of Convergence of Splitting Schemes for Deterministic/Stochastic Gross-Pitaevskii Equations." J. Sci. Comput. 104, 95 (2025). [Springer](https://link.springer.com/article/10.1007/s10915-025-03010-z)
+
 ---
 
 ## Quantum Walk Validation
 
-**Test file:** `quantumWalk.test.ts`
+### Unitarity and Spreading
 
-**Reference:** [Wikipedia: Quantum walk](https://en.wikipedia.org/wiki/Quantum_walk) (ballistic spreading: sigma proportional to t)
+**Test file:** `quantumWalk.test.ts`
 
 | Benchmark | Method | Tolerance |
 |-|-|-|
@@ -291,6 +315,35 @@ The Thomas-Fermi approximation formulas are tested for internal consistency and 
 | Full step (coin+shift) preserves probability | Same | 10^-6 |
 | 1D Hadamard walk: ballistic spreading | Spread >= 15 after 20 steps (vs sqrt(20) ~ 4.5 for classical) | Qualitative |
 | 3D DFT walk preserves probability | Total prob = 1.0 after 5 steps | 10^-6 |
+
+### Konno Limit Distribution (Exact Analytical Benchmark)
+
+**Test file:** `quantumWalk.test.ts`
+
+**Reference:** Konno, N. "A new type of limit theorems for the one-dimensional quantum random walk." J. Math. Soc. Japan 57(4), 1179-1195 (2005). [Project Euclid](https://projecteuclid.org/euclid.jmsj/1150287309)
+
+For a 1D discrete-time quantum walk with Hadamard coin and symmetric initial state `|ψ₀⟩ = (1/√2)(|L⟩ − i|R⟩) ⊗ |center⟩`, the scaled position `X_t/t` converges weakly to the Konno distribution:
+
+```
+f_K(x) = 1 / (π(1 - x²)√(1 - 2x²))   for x ∈ (-1/√2, 1/√2)
+```
+
+This is the general Konno density `f_K(v;r) = √(1-r²) / (π(1-v²)√(r²-v²))` with `r = 1/√2` for the Hadamard coin (confirmed by [arXiv:2408.09578](https://arxiv.org/abs/2408.09578)).
+
+The second moment of the Konno density is:
+
+```
+E[V²] = ∫ v² f_K(v) dv = 1 − 1/√2 ≈ 0.29289
+```
+
+Therefore `Var(X_t) ~ (1 − 1/√2) · t²` as `t → ∞`.
+
+| Benchmark | Method | Tolerance |
+|-|-|-|
+| Konno density second moment self-check | Numerical integration vs 1 − 1/√2 | 10^-8 |
+| E[X²/t²] matches Konno second moment | 1000-step Hadamard walk, symmetric initial state | 5% |
+| Convergence improves with more steps | Error monotonically decreasing at t = 200, 500, 1000 | Monotonic |
+| Symmetric initial state: E[X_t] = 0 | First moment check (no drift) | 10^-2 |
 
 ---
 
@@ -339,8 +392,7 @@ The GPU compute shaders (WGSL) cannot be tested in vitest because WebGPU require
 | No external code comparison | No comparison against QuTiP, GPUE, or other reference implementations. This is by design: analytical solutions are a stronger validation target. |
 | Grid resolution | Browser GPU memory limits constrain grid sizes below what dedicated CUDA solvers achieve. All benchmarks use grids within the application's operating range. |
 | GPU solver coverage | The CPU reference solver tests the algorithm; the GPU implementation is validated by runtime diagnostics and e2e tests, not by unit-testing the WGSL shaders directly. |
-| BEC and Free Scalar | Validated against self-consistency (scaling laws, conservation, statistical properties) rather than published numerical tables. The Thomas-Fermi formula and vacuum spectrum formula are well-established, but specific published reference tables were not retrievable in machine-readable form. |
-| Quantum Walk constant | The ballistic spreading rate sigma proportional to t is verified qualitatively. The exact proportionality constant for the Hadamard walk is not tested (the constant depends on coin operator details not published in accessible online sources). |
+| Free Scalar | Validated against self-consistency (statistical properties, energy conservation) rather than published numerical tables. The vacuum spectrum formula is well-established, but specific published reference tables were not retrievable in machine-readable form. |
 
 ## References
 
@@ -353,3 +405,7 @@ All reference formulas were verified from the following online sources:
 5. [Wikipedia: Zitterbewegung](https://en.wikipedia.org/wiki/Zitterbewegung) — ZBW frequency omega = 2mc^2/hbar
 6. [Wikipedia: Quantum walk](https://en.wikipedia.org/wiki/Quantum_walk) — Ballistic spreading sigma proportional to t
 7. [NIST DLMF Section 3.5](https://dlmf.nist.gov/3.5) — Gauss-Laguerre and Gauss-Hermite quadrature nodes and weights
+8. [Wikipedia: Gross-Pitaevskii equation](https://en.wikipedia.org/wiki/Gross%E2%80%93Pitaevskii_equation) — Exact bright soliton solution ψ = A·sech(κx)·exp(-iμt/ℏ)
+9. [Konno, N. J. Math. Soc. Japan 57(4), 1179-1195 (2005)](https://projecteuclid.org/euclid.jmsj/1150287309) — Konno limit distribution for 1D quantum walks
+10. [arXiv:2408.09578](https://arxiv.org/abs/2408.09578) — General Konno density parameterization f_K(v;r)
+11. [Gao et al., J. Sci. Comput. 104, 95 (2025)](https://link.springer.com/article/10.1007/s10915-025-03010-z) — O(dt²) convergence proof for Strang splitting of GPE
