@@ -408,3 +408,195 @@ describe('Quantum walk in 3D', () => {
     expect(prob).toBeCloseTo(1.0, 6)
   })
 })
+
+// ============================================================================
+// Konno Limit Distribution Benchmark
+//
+// For a 1D discrete-time quantum walk with Hadamard coin and symmetric initial
+// state |ψ₀⟩ = (1/√2)(|L⟩ − i|R⟩) ⊗ |center⟩, the scaled position X_t/t
+// converges weakly to the Konno distribution as t → ∞.
+//
+// Konno density (Konno 2005, J. Math. Soc. Japan 57(4), 1179-1195):
+//   f_K(x) = 1 / (π(1-x²)√(1-2x²))   for x ∈ (-1/√2, 1/√2)
+//
+// This is a special case of the general Konno density f_K(v;r) with r = 1/√2
+// for the Hadamard coin (confirmed by arXiv:2408.09578, Eq. for v_max = a).
+//
+// The second moment E[V²] = ∫ v² f_K(v) dv = 1 − 1/√2 ≈ 0.2929
+// (computed via substitution v = sin(θ)/√2, reducing to ∫sin²θ/(1+cos²θ)dθ).
+//
+// Therefore Var(X_t) ~ (1 − 1/√2)·t² as t → ∞.
+//
+// References:
+//   - Konno, N. "A new type of limit theorems for the one-dimensional quantum
+//     random walk." J. Math. Soc. Japan 57(4), 1179-1195 (2005).
+//     https://projecteuclid.org/euclid.jmsj/1150287309
+//   - arXiv:2408.09578 — confirms general Konno density parameterization.
+// ============================================================================
+
+/**
+ * Create symmetric initial state for 1D Hadamard walk (Konno's convention).
+ *
+ * |ψ₀⟩ = (1/√2)(|L⟩ − i|R⟩) ⊗ |center⟩
+ *
+ * This gives a symmetric probability distribution, so E[X_t] = 0 and the
+ * unweighted Konno density applies.
+ */
+function createSymmetricInitialState1D(gridSize: number): Float32Array {
+  const numCoinStates = 2
+  const state = new Float32Array(gridSize * numCoinStates * 2)
+  const center = Math.floor(gridSize / 2)
+  const amp = 1 / Math.sqrt(2)
+
+  // Coin state |L⟩ = index 0: amplitude 1/√2 (real)
+  state[(center * numCoinStates + 0) * 2] = amp // Re
+  state[(center * numCoinStates + 0) * 2 + 1] = 0 // Im
+
+  // Coin state |R⟩ = index 1: amplitude -i/√2
+  state[(center * numCoinStates + 1) * 2] = 0 // Re
+  state[(center * numCoinStates + 1) * 2 + 1] = -amp // Im
+
+  return state
+}
+
+/**
+ * Compute E[X²] for a quantum walk state (1D only).
+ *
+ * Position of site i is (i − center).
+ */
+function computePositionSecondMoment1D(state: Float32Array, gridSize: number): number {
+  const numCoinStates = 2
+  const center = Math.floor(gridSize / 2)
+  let moment2 = 0
+
+  for (let site = 0; site < gridSize; site++) {
+    const pos = site - center
+    let siteProb = 0
+    const baseIdx = site * numCoinStates * 2
+    for (let j = 0; j < numCoinStates; j++) {
+      const re = state[baseIdx + j * 2]!
+      const im = state[baseIdx + j * 2 + 1]!
+      siteProb += re * re + im * im
+    }
+    moment2 += pos * pos * siteProb
+  }
+  return moment2
+}
+
+/**
+ * Numerically integrate the second moment of the Konno density via substitution.
+ *
+ * f_K(v; r) = √(1-r²) / (π(1-v²)√(r²-v²))  on (-r, r)
+ *
+ * Substitution v = r·sin(θ) removes the square-root singularity:
+ *   E[V²] = (r²√(1-r²)/π) ∫₀^π sin²(θ) / (1 - r²sin²(θ)) dθ
+ *
+ * Computed with composite Simpson's rule (nPts must be even).
+ */
+function konnoSecondMomentNumerical(r: number, nPts: number = 10000): number {
+  const r2 = r * r
+  const prefactor = (r2 * Math.sqrt(1 - r2)) / Math.PI
+  const h = Math.PI / nPts
+
+  function integrand(theta: number): number {
+    const s = Math.sin(theta)
+    return (s * s) / (1 - r2 * s * s)
+  }
+
+  // Simpson's 1/3 rule
+  let sum = integrand(0) + integrand(Math.PI)
+  for (let i = 1; i < nPts; i++) {
+    const weight = i % 2 === 0 ? 2 : 4
+    sum += weight * integrand(i * h)
+  }
+  return prefactor * (h / 3) * sum
+}
+
+describe('1D Hadamard walk: Konno limit distribution (Konno 2005)', () => {
+  it('numerical integration of Konno density second moment equals 1 − 1/√2', () => {
+    // Cross-validate: the analytical result E[V²] = 1 - 1/√2 must match
+    // the numerical integral of the Konno density.
+    const r = 1 / Math.sqrt(2)
+    const numerical = konnoSecondMomentNumerical(r, 100000)
+    const analytical = 1 - 1 / Math.sqrt(2) // ≈ 0.29289...
+
+    expect(Math.abs(numerical - analytical) / analytical).toBeLessThan(1e-8)
+  })
+
+  it('E[X²/t²] converges to Konno second moment (1 − 1/√2) for large t', () => {
+    const gridSize = 2048
+    const latticeDim = 1
+    const numSteps = 1000
+
+    const bufA = createSymmetricInitialState1D(gridSize)
+    const bufB = new Float32Array(bufA.length)
+
+    // Run 1000 Hadamard walk steps
+    runSteps(applyHadamardCoin, bufA, bufB, gridSize, latticeDim, [gridSize], numSteps)
+
+    const secondMoment = computePositionSecondMoment1D(bufA, gridSize)
+    const scaledSecondMoment = secondMoment / (numSteps * numSteps)
+
+    // Konno: E[V²] = 1 - 1/√2 ≈ 0.2929
+    const konnoExpected = 1 - 1 / Math.sqrt(2)
+
+    // At t=1000, finite-time corrections are small.
+    // Tolerance 5% accounts for O(1/t) corrections to the weak limit.
+    const relError = Math.abs(scaledSecondMoment - konnoExpected) / konnoExpected
+    expect(relError).toBeLessThan(0.05)
+  })
+
+  it('E[X²/t²] convergence improves with more steps', () => {
+    const gridSize = 2048
+    const latticeDim = 1
+    const konnoExpected = 1 - 1 / Math.sqrt(2)
+
+    const errors: number[] = []
+
+    for (const numSteps of [200, 500, 1000]) {
+      const bufA = createSymmetricInitialState1D(gridSize)
+      const bufB = new Float32Array(bufA.length)
+
+      runSteps(applyHadamardCoin, bufA, bufB, gridSize, latticeDim, [gridSize], numSteps)
+
+      const scaledMoment = computePositionSecondMoment1D(bufA, gridSize) / (numSteps * numSteps)
+      errors.push(Math.abs(scaledMoment - konnoExpected) / konnoExpected)
+    }
+
+    // Error should decrease monotonically as t increases
+    expect(errors[0]).toBeGreaterThan(errors[1]!)
+    expect(errors[1]).toBeGreaterThan(errors[2]!)
+
+    // At t=1000 the error should be well below 5%
+    expect(errors[2]).toBeLessThan(0.05)
+  })
+
+  it('symmetric initial state produces zero first moment (no drift)', () => {
+    const gridSize = 2048
+    const latticeDim = 1
+    const numSteps = 500
+
+    const bufA = createSymmetricInitialState1D(gridSize)
+    const bufB = new Float32Array(bufA.length)
+
+    runSteps(applyHadamardCoin, bufA, bufB, gridSize, latticeDim, [gridSize], numSteps)
+
+    const center = Math.floor(gridSize / 2)
+    const numCoinStates = 2
+    let firstMoment = 0
+    for (let site = 0; site < gridSize; site++) {
+      const pos = site - center
+      let siteProb = 0
+      const baseIdx = site * numCoinStates * 2
+      for (let j = 0; j < numCoinStates; j++) {
+        const re = bufA[baseIdx + j * 2]!
+        const im = bufA[baseIdx + j * 2 + 1]!
+        siteProb += re * re + im * im
+      }
+      firstMoment += pos * siteProb
+    }
+
+    // Symmetric state ⟹ E[X] = 0 (within numerical precision of f32)
+    expect(Math.abs(firstMoment / numSteps)).toBeLessThan(0.01)
+  })
+})
