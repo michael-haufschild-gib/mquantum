@@ -41,8 +41,10 @@ const config = {
     break: null,
   },
 
-  // Timeout: mutations that cause infinite loops get killed after 10s.
-  timeoutMS: 10_000,
+  // Timeout: mutations that cause infinite loops get killed.
+  // 60s base + 1.5x factor gives plenty of room for physics benchmarks
+  // under instrumentation while still catching actual infinite loops.
+  timeoutMS: 60_000,
   timeoutFactor: 1.5,
 
   // Allow slow physics benchmarks (split-step FFT evolution) to complete

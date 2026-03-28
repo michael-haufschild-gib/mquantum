@@ -291,7 +291,7 @@ describe('CPU split-step reference: norm conservation', () => {
 // ============================================================================
 
 describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
-  it('σ(t) matches exact analytical formula within 1%', { timeout: 30_000 }, () => {
+  it('σ(t) matches exact analytical formula within 1%', { timeout: 10_000 }, () => {
     const N = 1024
     const dx = 0.05
     const dt = 0.005
@@ -322,7 +322,7 @@ describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
     expect(relError).toBeLessThan(0.01) // 1% tolerance
   })
 
-  it('σ(t) matches at multiple time points', () => {
+  it('σ(t) matches at multiple time points', { timeout: 30_000 }, () => {
     const N = 1024
     const dx = 0.05
     const dt = 0.005
@@ -364,7 +364,7 @@ describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
 // ============================================================================
 
 describe('Strang splitting convergence order (Wikipedia: Split-step method)', () => {
-  it('global error decreases as O(Δt²) when halving dt', () => {
+  it('global error decreases as O(Δt²) when halving dt', { timeout: 30_000 }, () => {
     const N = 512
     const dx = 0.05
     const mass = 1.0
