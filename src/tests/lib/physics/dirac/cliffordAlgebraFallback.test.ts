@@ -102,7 +102,7 @@ describe('generateDiracMatricesFallback', () => {
   })
 
   // Clifford algebra: {αᵢ, αⱼ} = 2δᵢⱼ I  and  β² = I  and  {αᵢ, β} = 0
-  for (const dim of [1, 2, 3, 4, 5]) {
+  for (const dim of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     describe(`N=${dim}`, () => {
       const { gammaData, spinorSize: s } = generateDiracMatricesFallback(dim)
       const matSize = s * s * 2
