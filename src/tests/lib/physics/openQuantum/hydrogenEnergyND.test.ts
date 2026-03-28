@@ -5,7 +5,7 @@
  *   E_n(D) = -0.5 / n_eff²  where  n_eff = n + (D-3)/2
  *   R_nl^(D)(r) uses effective angular momentum λ = l + (D-3)/2
  *
- * Reference: Dong, S.-H. "Wave Equations in Higher Dimensions" (2011), Ch. 6.
+ * Reference: Dong, S.-H. "Wave Equations in Higher Dimensions" (2011), Ch. 7.
  */
 import { describe, expect, it } from 'vitest'
 

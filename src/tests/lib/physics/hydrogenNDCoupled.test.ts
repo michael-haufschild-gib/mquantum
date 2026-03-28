@@ -13,7 +13,7 @@
  * 6. Full wavefunction normalization via numerical quadrature (D=3,4,5)
  * 7. Gamma half-integer LUT accuracy
  *
- * Reference: Dong, S.-H. "Wave Equations in Higher Dimensions" (2011), Ch. 5-6
+ * Reference: Dong, S.-H. "Wave Equations in Higher Dimensions" (2011), Part I + Ch. 7
  */
 import { describe, expect, it } from 'vitest'
 

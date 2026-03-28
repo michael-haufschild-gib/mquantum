@@ -14,8 +14,9 @@
  * where r_D = |x| is the FULL D-dimensional radius (not r_3D).
  *
  * References:
- * - Dong, S.-H. "Wave Equations in Higher Dimensions" (Springer, 2011), Ch. 5-6
- * - Avery, J. "Hyperspherical Harmonics" (Kluwer, 2000)
+ * - Dong, S.-H. "Wave Equations in Higher Dimensions" (Springer, 2011), Part I + Ch. 7
+ * - Avery, J. "Hyperspherical Harmonics: Applications in Quantum Theory" (Kluwer, 1989)
+ * - docs/physics/hydrogen-nd-extension.md — derivation, normalization convention, error analysis
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hypersphericalHarmonics.wgsl
  */
@@ -223,7 +224,7 @@ fn lnHypersphericalLayerNorm(lk: i32, lkp1: i32, D: i32, k: i32) -> f32 {
   // For the normalization integral of C_n^alpha(cos theta) * sin^{2*alpha}(theta):
   // ∫_0^pi |C_n^alpha(cos t)|^2 sin^{2alpha}(t) dt = pi * 2^{1-2alpha} * Gamma(n+2alpha) / (n! * (n+alpha) * Gamma(alpha)^2)
   //
-  // Simplified normalization (Dong 2011, eq 5.1.17):
+  // Simplified normalization (Dong 2011, Part I; Avery 1989):
   // N_k^2 = (2*lk + D - k - 1) * nk! * Gamma(lkp1 + (D-k-1)/2) / (2 * Gamma(lk + (D-k+1)/2))
   //
   // Using half-integer gamma LUT:

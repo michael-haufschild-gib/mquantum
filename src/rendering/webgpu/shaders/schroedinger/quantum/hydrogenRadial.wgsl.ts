@@ -10,6 +10,9 @@
  * where n_eff = n + (D-3)/2, ρ = 2r/(n_eff × a₀), and energies shift to
  * E_n(D) = -0.5/n_eff². At D=3, λ=l and all formulas reduce to standard hydrogen.
  *
+ * NOTE: Normalization uses 3D volume element (r² dr) for all D. See
+ * docs/physics/hydrogen-nd-extension.md §1.4 for the convention rationale.
+ *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hydrogenRadial.wgsl
  */
 
