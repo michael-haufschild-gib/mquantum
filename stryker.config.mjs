@@ -6,7 +6,7 @@ const config = {
 
   testRunner: 'vitest',
   vitest: {
-    configFile: 'vitest.config.ts',
+    configFile: 'vitest.config.stryker.ts',
   },
 
   // Target: pure logic and state management — highest mutation testing ROI.

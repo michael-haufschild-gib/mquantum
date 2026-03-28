@@ -291,7 +291,7 @@ describe('CPU split-step reference: norm conservation', () => {
 // ============================================================================
 
 describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
-  it('σ(t) matches exact analytical formula within 1%', { timeout: 120_000 }, () => {
+  it('σ(t) matches exact analytical formula within 1%', () => {
     const N = 1024
     const dx = 0.05
     const dt = 0.005
@@ -322,7 +322,7 @@ describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
     expect(relError).toBeLessThan(0.01) // 1% tolerance
   })
 
-  it('σ(t) matches at multiple time points', { timeout: 120_000 }, () => {
+  it('σ(t) matches at multiple time points', () => {
     const N = 1024
     const dx = 0.05
     const dt = 0.005
@@ -364,7 +364,7 @@ describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
 // ============================================================================
 
 describe('Strang splitting convergence order (Wikipedia: Split-step method)', () => {
-  it('global error decreases as O(Δt²) when halving dt', { timeout: 120_000 }, () => {
+  it('global error decreases as O(Δt²) when halving dt', () => {
     const N = 512
     const dx = 0.05
     const mass = 1.0
@@ -521,7 +521,7 @@ describe('exact tunneling formula self-consistency', () => {
 describe('CPU split-step tunneling vs exact formula', () => {
   it(
     'transmission coefficient matches exact formula within 10% for E > V₀',
-    { timeout: 120_000 },
+    { timeout: 30_000 },
     () => {
       // Use E >> V₀ where T ≈ 1. A wide packet (narrow Δk) approaches the
       // monochromatic plane-wave limit, so the measured T matches the
