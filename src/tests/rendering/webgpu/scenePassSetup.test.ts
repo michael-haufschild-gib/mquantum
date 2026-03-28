@@ -198,6 +198,16 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
     expect(result).toBe('phaseCyclicUniform')
   })
 
+  it('falls back to phaseCyclicUniform for quantumWalk with domainColoringPsi', () => {
+    const result = normalizeColorAlgorithmForQuantumMode('quantumWalk', 'domainColoringPsi')
+    expect(result).toBe('phaseCyclicUniform')
+  })
+
+  it('falls back to phaseCyclicUniform for quantumWalk with phaseDensity', () => {
+    const result = normalizeColorAlgorithmForQuantumMode('quantumWalk', 'phaseDensity')
+    expect(result).toBe('phaseCyclicUniform')
+  })
+
   it('falls back to purityMap when openQuantum is enabled', () => {
     const result = normalizeColorAlgorithmForQuantumMode(
       'harmonicOscillator',

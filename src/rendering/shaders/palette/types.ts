@@ -290,11 +290,23 @@ export function getAvailableColorAlgorithms(
   // from the grid's R/B channels produce meaningful coloring. Geometric algorithms
   // (lch, radial, multiSource, radialDistance, phase, mixed) color by world-space
   // position and silently fall back to blackbody — remove them from the dropdown.
-  if (
-    quantumMode === 'tdseDynamics' ||
-    quantumMode === 'becDynamics' ||
-    quantumMode === 'quantumWalk'
-  ) {
+  // Quantum walk: domainColoringPsi and phaseDensity produce black output
+  // due to hsl2rgb rendering incorrectly in the QW grid-only pipeline.
+  // Other HSL-free algorithms work correctly.
+  if (quantumMode === 'quantumWalk') {
+    const qwValidAlgos = new Set<string>([
+      'blackbody', // R (density) → heat ramp
+      'phaseCyclicUniform', // B (phase) → perceptual cyclic hue
+      'phaseDiverging', // B (phase) → signed diverging
+      'diverging', // B (phase) → zero-centered Re/Im
+      'viridis', // R (density) → perceptually uniform scientific ramp
+      'inferno', // R (density) → high-contrast scientific ramp
+      'densityContours', // R (density) → viridis + isodensity contour lines
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => qwValidAlgos.has(opt.value))
+  }
+
+  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
     const computeValidAlgos = new Set<string>([
       'blackbody', // R (density) → heat ramp
       'phaseCyclicUniform', // B (phase) → perceptual cyclic hue

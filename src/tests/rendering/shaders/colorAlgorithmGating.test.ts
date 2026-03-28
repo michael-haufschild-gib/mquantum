@@ -154,21 +154,37 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     }
   })
 
-  it('quantumWalk uses grid-compatible algorithms (same as TDSE/BEC)', () => {
+  it('quantumWalk excludes hsl2rgb-based phase algorithms (black output on QW pipeline)', () => {
     const algos = getAvailableColorAlgorithms('quantumWalk', false)
     const values = algos.map((a) => a.value)
 
-    // Grid-compatible algorithms should be present
+    // Working algorithms should be present
     expect(values).toContain('blackbody')
-    expect(values).toContain('phaseDensity')
+    expect(values).toContain('phaseCyclicUniform')
     expect(values).toContain('viridis')
     expect(values).toContain('inferno')
+    expect(values).toContain('densityContours')
+    expect(values).toContain('phaseDiverging')
+    expect(values).toContain('diverging')
+
+    // hsl2rgb-based phase algorithms produce black in QW pipeline
+    expect(values).not.toContain('domainColoringPsi')
+    expect(values).not.toContain('phaseDensity')
 
     // Geometric algorithms that read world-space position should be absent
     expect(values).not.toContain('radialDistance')
     expect(values).not.toContain('lch')
     expect(values).not.toContain('radial')
     expect(values).not.toContain('multiSource')
+  })
+
+  it('TDSE/BEC retain domainColoringPsi and phaseDensity', () => {
+    for (const mode of ['tdseDynamics', 'becDynamics'] as const) {
+      const algos = getAvailableColorAlgorithms(mode, false)
+      const values = algos.map((a) => a.value)
+      expect(values, `${mode} should include domainColoringPsi`).toContain('domainColoringPsi')
+      expect(values, `${mode} should include phaseDensity`).toContain('phaseDensity')
+    }
   })
 
   it('excludes phase-dependent algorithms for hydrogenND in OQ mode', () => {

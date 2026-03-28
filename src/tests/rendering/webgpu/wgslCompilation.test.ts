@@ -731,6 +731,58 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(wgsl).not.toContain('fwidth(')
   })
 
+  it('quantumWalk + domainColoringPsi uses log-based lightness, not linear rho', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      useDensityGrid: true,
+      densityGridHasPhase: true,
+      densityGridSize: 96,
+      isFreeScalar: true,
+      isQuantumWalk: true,
+      colorAlgorithm: 8,
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      crossSectionEnabled: false,
+      classicalOverlayEnabled: false,
+      probabilityCurrentEnabled: false,
+    })
+
+    expect(wgsl).toContain('const IS_QUANTUM_WALK: bool = true')
+    expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 8')
+    // Log-based modulusValue: (logModulus + 8) / 8 provides good dynamic range
+    expect(wgsl).toContain('clamp((logModulus + 8.0) / 8.0, 0.0, 1.0)')
+    // Must NOT contain linear rho branch for QW (causes black output)
+    expect(wgsl).not.toContain('select(rho, sqrt(rho), modulusMode)')
+  })
+
+  it('quantumWalk + phaseDensity uses log-compressed normalized, not linear rho', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      useDensityGrid: true,
+      densityGridHasPhase: true,
+      densityGridSize: 96,
+      isFreeScalar: true,
+      isQuantumWalk: true,
+      colorAlgorithm: 22,
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      crossSectionEnabled: false,
+      classicalOverlayEnabled: false,
+      probabilityCurrentEnabled: false,
+    })
+
+    expect(wgsl).toContain('const IS_QUANTUM_WALK: bool = true')
+    expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 22')
+    // Uses log-compressed 'normalized' for brightness (not linear rho)
+    expect(wgsl).toContain('let brightness = clamp(normalized, 0.0, 1.0)')
+    // Must NOT contain IS_QUANTUM_WALK-gated linear rho select
+    expect(wgsl).not.toContain('select(normalized, rho, IS_QUANTUM_WALK)')
+  })
+
   it('always adds color feature tag (compile-time specialization)', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
