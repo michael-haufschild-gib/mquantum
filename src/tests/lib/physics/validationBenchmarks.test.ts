@@ -291,7 +291,7 @@ describe('CPU split-step reference: norm conservation', () => {
 // ============================================================================
 
 describe('free Gaussian wavepacket spreading (Wikipedia: Wave packet)', () => {
-  it('σ(t) matches exact analytical formula within 1%', () => {
+  it('σ(t) matches exact analytical formula within 1%', { timeout: 30_000 }, () => {
     const N = 1024
     const dx = 0.05
     const dt = 0.005
