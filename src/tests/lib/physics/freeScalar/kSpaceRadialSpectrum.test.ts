@@ -243,9 +243,7 @@ describe('buildRadialDisplayGrid', () => {
     expect(grid.nk[0]).toBe(0)
     // Center region should have values
     const G = OUTPUT_GRID_SIZE
-    const center = Math.floor(G / 2)
     const offset = Math.floor((G - 4) / 2)
-    const centerIdx = ((offset) * G + (offset)) * G + (offset)
     // At least some voxels near the offset should be non-zero
     let hasNonZero = false
     for (let i = offset; i < offset + 4; i++) {

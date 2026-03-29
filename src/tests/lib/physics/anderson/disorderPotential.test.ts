@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  generateDisorderPotential,
-  mulberry32,
-} from '@/lib/physics/anderson/disorderPotential'
+import { generateDisorderPotential, mulberry32 } from '@/lib/physics/anderson/disorderPotential'
 
 describe('mulberry32', () => {
   it('produces deterministic sequence from seed', () => {
@@ -40,7 +37,7 @@ describe('mulberry32', () => {
     const N = 10000
     for (let i = 0; i < N; i++) {
       const bin = Math.min(9, Math.floor(rng() * 10))
-      bins[bin]++
+      bins[bin]!++
     }
     // chi-squared: sum of (observed - expected)^2 / expected
     const expected = N / 10
@@ -78,7 +75,10 @@ describe('generateDisorderPotential', () => {
     const pot2 = generateDisorderPotential([32], 1, 1.0, 2, 'uniform')
     let allSame = true
     for (let i = 0; i < pot1.length; i++) {
-      if (pot1[i] !== pot2[i]) { allSame = false; break }
+      if (pot1[i] !== pot2[i]) {
+        allSame = false
+        break
+      }
     }
     expect(allSame).toBe(false)
   })
@@ -114,7 +114,7 @@ describe('generateDisorderPotential', () => {
       const mean = sum / pot.length
       const variance = sum2 / pot.length - mean * mean
       // Expected variance = W^2/12 = 16/12 ≈ 1.333
-      expect(variance).toBeCloseTo(W * W / 12, 0)
+      expect(variance).toBeCloseTo((W * W) / 12, 0)
     })
   })
 
@@ -149,7 +149,10 @@ describe('generateDisorderPotential', () => {
       // With ~260K samples from N(0,1), some should exceed ±0.5
       let hasLargeValue = false
       for (let i = 0; i < pot.length; i++) {
-        if (Math.abs(pot[i]!) > W / 2) { hasLargeValue = true; break }
+        if (Math.abs(pot[i]!) > W / 2) {
+          hasLargeValue = true
+          break
+        }
       }
       expect(hasLargeValue).toBe(true)
     })

@@ -270,8 +270,8 @@ describe('computeGradient', () => {
     const grad = new Float64Array(3)
     computeGradient(x, config, grad)
     // Gradient should have same sign as position
-    expect(Math.sign(grad[0])).toBe(Math.sign(x[0]!))
-    expect(Math.sign(grad[1])).toBe(Math.sign(x[1]!))
+    expect(Math.sign(grad[0]!)).toBe(Math.sign(x[0]!))
+    expect(Math.sign(grad[1]!)).toBe(Math.sign(x[1]!))
   })
 
   it('does not mutate position vector', () => {
