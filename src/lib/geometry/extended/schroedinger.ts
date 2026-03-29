@@ -117,6 +117,12 @@ export type SchroedingerProbabilityCurrentColorMode = 'magnitude' | 'direction' 
  * Format: {orbital}_{dimension}d (e.g., '2pz_4d' = 2pz orbital in 4D)
  */
 export type HydrogenNDPresetName =
+  | '1s_3d'
+  | '2s_3d'
+  | '2pz_3d'
+  | '3dz2_3d'
+  | '3dxy_3d'
+  | '4fz3_3d'
   | '2pz_4d'
   | '3dz2_4d'
   | '2pz_5d'
@@ -578,7 +584,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   bohrRadiusScale: 1.0,
 
   // Hydrogen ND state
-  hydrogenNDPreset: '2pz_4d',
+  hydrogenNDPreset: '2pz_3d',
   extraDimQuantumNumbers: [0, 0, 0, 0, 0, 0, 0, 0], // 8 values for dims 4-11
   extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   extraDimFrequencySpread: 0.0,

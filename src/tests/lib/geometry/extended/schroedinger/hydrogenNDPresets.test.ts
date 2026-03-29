@@ -17,6 +17,14 @@ import {
 describe('Hydrogen ND Presets', () => {
   describe('HYDROGEN_ND_PRESETS', () => {
     it('should have all expected ND presets', () => {
+      // 3D presets
+      expect(HYDROGEN_ND_PRESETS['1s_3d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['2s_3d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['2pz_3d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['3dz2_3d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['3dxy_3d']).toHaveProperty('n')
+      expect(HYDROGEN_ND_PRESETS['4fz3_3d']).toHaveProperty('n')
+
       // 4D presets
       expect(HYDROGEN_ND_PRESETS['2pz_4d']).toHaveProperty('n')
       expect(HYDROGEN_ND_PRESETS['3dz2_4d']).toHaveProperty('n')
@@ -77,6 +85,14 @@ describe('Hydrogen ND Presets', () => {
     })
 
     it('should have correct dimension for named presets', () => {
+      // 3D presets
+      expect(HYDROGEN_ND_PRESETS['1s_3d'].dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS['2s_3d'].dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS['2pz_3d'].dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS['3dz2_3d'].dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS['3dxy_3d'].dimension).toBe(3)
+      expect(HYDROGEN_ND_PRESETS['4fz3_3d'].dimension).toBe(3)
+
       // 4D presets
       expect(HYDROGEN_ND_PRESETS['2pz_4d'].dimension).toBe(4)
       expect(HYDROGEN_ND_PRESETS['3dz2_4d'].dimension).toBe(4)
@@ -120,12 +136,16 @@ describe('Hydrogen ND Presets', () => {
     it('should group presets by dimension', () => {
       const groups = getHydrogenNDPresetsGroupedByDimension()
 
-      // Should have groups for 4D, 5D, 6D (based on current presets)
+      // Should have groups for 3D, 4D, 5D, 6D (based on current presets)
+      expect(groups[3]?.length).toBeGreaterThan(0)
       expect(groups[4]?.length).toBeGreaterThan(0)
       expect(groups[5]?.length).toBeGreaterThan(0)
       expect(groups[6]?.length).toBeGreaterThan(0)
 
       // Each group should have correct dimension presets
+      for (const preset of groups[3]!) {
+        expect(preset.dimension).toBe(3)
+      }
       for (const preset of groups[4]!) {
         expect(preset.dimension).toBe(4)
       }
@@ -152,12 +172,17 @@ describe('Hydrogen ND Presets', () => {
     it('should return presets with their keys grouped by dimension', () => {
       const groups = getHydrogenNDPresetsWithKeysByDimension()
 
-      // Should have groups for 4D, 5D, 6D
+      // Should have groups for 3D, 4D, 5D, 6D
+      expect(groups[3]?.length).toBeGreaterThan(0)
       expect(groups[4]?.length).toBeGreaterThan(0)
       expect(groups[5]?.length).toBeGreaterThan(0)
       expect(groups[6]?.length).toBeGreaterThan(0)
 
       // Each entry should be a tuple [key, preset]
+      for (const [key, preset] of groups[3]!) {
+        expect(preset.dimension).toBe(3)
+        expect(HYDROGEN_ND_PRESETS[key]).toBe(preset)
+      }
       for (const [key, preset] of groups[4]!) {
         expect(preset.dimension).toBe(4)
         expect(HYDROGEN_ND_PRESETS[key]).toBe(preset)
@@ -199,11 +224,11 @@ describe('Hydrogen ND Presets', () => {
       expect(presets4d.every((p) => p.dimension <= 4)).toBe(true)
     })
 
-    it('should return empty for dimension 3', () => {
+    it('should return 3D presets for dimension 3', () => {
       const presets3d = getPresetsForDimension(3)
 
-      // No ND presets for 3D (that's just regular hydrogen)
-      expect(presets3d.length).toBe(0)
+      expect(presets3d.length).toBeGreaterThan(0)
+      expect(presets3d.every((p) => p.dimension === 3)).toBe(true)
     })
 
     it('should not include custom preset', () => {

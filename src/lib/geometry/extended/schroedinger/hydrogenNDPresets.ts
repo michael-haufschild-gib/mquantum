@@ -58,6 +58,82 @@ export interface HydrogenNDPreset {
  */
 export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset> = {
   // ============================================
+  // 3D Presets (standard hydrogen orbitals)
+  // ============================================
+  '1s_3d': {
+    name: '1s (Ground State)',
+    description: 'Spherically symmetric ground state — the simplest hydrogen orbital',
+    n: 1,
+    l: 0,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.0,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '2s_3d': {
+    name: '2s',
+    description: 'Spherical with one radial node — second energy level',
+    n: 2,
+    l: 0,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.5,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '2pz_3d': {
+    name: '2pz',
+    description: 'Classic dumbbell orbital along z-axis',
+    n: 2,
+    l: 1,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.5,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '3dz2_3d': {
+    name: '3dz²',
+    description: 'Donut-shaped orbital with lobes along z-axis',
+    n: 3,
+    l: 2,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 2.0,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '3dxy_3d': {
+    name: '3dxy',
+    description: 'Clover-shaped orbital in the xy-plane',
+    n: 3,
+    l: 2,
+    m: 2,
+    useReal: true,
+    bohrRadiusScale: 2.0,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '4fz3_3d': {
+    name: '4fz³',
+    description: 'Triple-lobed f orbital along z-axis',
+    n: 4,
+    l: 3,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 2.5,
+    dimension: 3,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+
+  // ============================================
   // 4D Presets (1 extra dimension)
   // ============================================
   '2pz_4d': {
