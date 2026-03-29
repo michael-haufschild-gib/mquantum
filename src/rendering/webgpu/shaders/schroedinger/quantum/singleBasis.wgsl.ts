@@ -7,6 +7,10 @@
  *
  * Generated per quantum mode to avoid referencing undefined shader symbols.
  *
+ * The function accepts pre-computed ND coordinates (from mapPosToND) to
+ * avoid redundant basis transforms when evaluating multiple basis states
+ * at the same grid point.
+ *
  * For hydrogen modes, reads per-basis quantum numbers (n, l, m) from
  * the HydrogenBasisUniforms buffer so each basis state k evaluates
  * a distinct orbital.
@@ -15,7 +19,7 @@
  */
 
 /**
- * Generates WGSL block providing evaluateSingleBasis(pos, t, k, uniforms) -> vec2f.
+ * Generates WGSL block providing evaluateSingleBasis(xND, t, k, uniforms) -> vec2f.
  *
  * @param quantumMode - Current quantum mode, determines which basis evaluation to emit
  * @param dimension - Spatial dimension (3-11), used for hydrogen extra-dim unrolling
@@ -36,14 +40,12 @@ export function generateSingleBasisBlock(
 // Uses circular harmonics and |m| as effective angular momentum
 // ============================================
 
-fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
+fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
   let n_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 0);
   let l_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 1);
   let m_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 2);
 
   if (n_k <= 0) { return vec2f(0.0, 0.0); }
-
-  let xND = mapPosToND(pos, uniforms);
 
   // 2D radius
   let r2D = sqrt(xND[0]*xND[0] + xND[1]*xND[1]);
@@ -99,7 +101,7 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
 // Dimension: ${dim}, Extra dims: ${extraDimCount}
 // ============================================
 
-fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
+fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
   // Read per-basis quantum numbers from HydrogenBasisUniforms
   let n_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 0);
   let l_k = getHydrogenBasisQN(hydrogenBasis, i32(k), 1);
@@ -107,8 +109,6 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
 
   // Guard: skip invalid/unused basis states
   if (n_k <= 0) { return vec2f(0.0, 0.0); }
-
-  let xND = mapPosToND(pos, uniforms);
 
   // 3D radius
   let r3D = sqrt(xND[0]*xND[0] + xND[1]*xND[1] + xND[2]*xND[2]);
@@ -150,8 +150,7 @@ ${extraDimCode}
 // Single Basis Function Evaluation (Harmonic Oscillator)
 // ============================================
 
-fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
-  let xND = mapPosToND(pos, uniforms);
+fn evaluateSingleBasis(xND: array<f32, 11>, t: f32, k: u32, uniforms: SchroedingerUniforms) -> vec2f {
   let phi = hoNDOptimized(xND, i32(k), uniforms);
   return vec2f(phi, 0.0);
 }

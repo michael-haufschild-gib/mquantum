@@ -608,9 +608,12 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // Time-dependent density for multi-term superpositions:
     // |ψ(x,t)|² has cross-term interference fringes that evolve in time.
     // Single eigenstates (termCount=1) are stationary — skip time check.
-    // Use a time bucket at ~60 Hz to avoid recomputing every frame.
+    // Density matrix mode: time evolution lives in the CPU-evolved density matrix,
+    // not in per-pixel phase factors. evaluateSingleBasis returns time-independent
+    // basis functions, so the grid output only changes when updateOpenQuantumUniforms
+    // sets needsRecompute. Skip the time-bucket trigger to avoid identical recomputation.
     const termCount = this.passConfig.termCount ?? 1
-    if (termCount > 1) {
+    if (termCount > 1 && !this.passConfig.useDensityMatrix) {
       const bucket = Math.floor(time * 60.0)
       if (bucket !== this.lastTimeBucket) return true
     }

@@ -354,14 +354,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let uvw = (vec3f(gid) + 0.5) / gridSizeF;
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // No sphere clip for density matrix mode: the cube grid [-R, R] already bounds
-  // the computation. Sphere clipping creates a hard zero boundary inside the cube
-  // that produces a visible ring artifact when the raymarcher's inline fallback
-  // evaluates a different (single-wavefunction) path for cube corners outside the
-  // inscribed sphere. Basis functions naturally decay to near-zero at the boundary.
+  // Sphere clipping: skip cube corners outside the bounding sphere.
+  // Basis functions (HO: Gaussian decay, hydrogen: exponential decay) are
+  // negligible beyond the bounding radius. The density-grid raymarcher
+  // samples only from the texture — no inline fallback exists — so zero
+  // values in corners are handled correctly via empty-skip acceleration.
+  let dist2 = dot(worldPos, worldPos);
+  let boundR = schroedinger.boundingRadius;
+  if (dist2 > boundR * boundR) {
+    textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
+    return;
+  }
 
   // Compute animation time
   let t = schroedinger.time * schroedinger.timeScale;
+
+  // Map 3D position to ND coordinates ONCE, shared across all basis evaluations.
+  // Previously each evaluateSingleBasis call redundantly recomputed this transform.
+  let xND = mapPosToND(worldPos, schroedinger);
 
   // Active basis size: use oq.maxK for density matrix mode (supports up to 14)
   let basisK = min(u32(oq.maxK), 14u);
@@ -370,7 +380,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Store as complex values (re, im)
   var basisValues: array<vec2f, 14>;
   for (var k = 0u; k < basisK; k = k + 1u) {
-    basisValues[k] = evaluateSingleBasis(worldPos, t, k, schroedinger);
+    basisValues[k] = evaluateSingleBasis(xND, t, k, schroedinger);
   }
 
   // Compute n(x) = Σ_{kl} ρ_{kl} · ψ_k(x) · ψ_l*(x)

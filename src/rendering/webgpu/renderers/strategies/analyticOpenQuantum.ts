@@ -364,7 +364,11 @@ export class AnalyticOpenQuantumExecutor {
   }
 
   static computeGridSize(baseSize: number, basisK: number): number {
-    if (basisK <= 6) return baseSize
+    // Density matrix mode recomputes the full grid every evolution step.
+    // Smaller grids dramatically reduce per-frame GPU cost: 64³ vs 96³ = 3.4× fewer voxels.
+    // For small basis (K≤4), decoherence smooths density — 64³ suffices (>10 samples/node for n≤8).
+    if (basisK <= 4) return Math.min(baseSize, 64)
+    if (basisK <= 6) return Math.min(baseSize, 64)
     if (basisK <= 10) return Math.min(baseSize, 48)
     return Math.min(baseSize, 32)
   }
