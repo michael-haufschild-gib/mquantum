@@ -329,6 +329,154 @@ describe('integrateOrbit', () => {
     // Initial point + 100/10 = 10 sampled points = 11 total
     expect(trajectory.points.length).toBe(11)
   })
+
+  // Energy conservation for additional potential types.
+  // The symplectic Störmer-Verlet integrator should conserve energy to O(dt²)
+  // for all smooth potentials. These tests catch gradient errors or potential
+  // evaluation bugs that would break the integrator.
+
+  it('conserves energy for double well', () => {
+    const config = makeConfig({
+      potentialType: 'doubleWell',
+      doubleWellLambda: 1,
+      doubleWellSeparation: 1,
+      doubleWellAsymmetry: 0,
+      mass: 1,
+    })
+    // Start in the right well (x=1) with small momentum
+    const x0 = new Float64Array([0.8, 0, 0])
+    const p0 = new Float64Array([0.3, 0, 0])
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 5000, dt: 0.001, sampleInterval: 100 }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    expect(trajectory.energyDrift).toBeLessThan(1e-4)
+  })
+
+  it('conserves energy for radial double well', () => {
+    const config = makeConfig({
+      potentialType: 'radialDoubleWell',
+      radialWellInner: 1.0,
+      radialWellOuter: 3.0,
+      radialWellDepth: 1.0,
+      radialWellTilt: 0,
+      mass: 1,
+      harmonicOmega: 1,
+    })
+    // Start between the wells
+    const x0 = new Float64Array([2, 0, 0])
+    const p0 = new Float64Array([0, 0.5, 0])
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 5000, dt: 0.001, sampleInterval: 100 }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    expect(trajectory.energyDrift).toBeLessThan(1e-3)
+  })
+
+  it('conserves energy for periodic lattice', () => {
+    const config = makeConfig({
+      potentialType: 'periodicLattice',
+      latticePeriod: 2.0,
+      latticeDepth: 5.0,
+      mass: 1,
+    })
+    // Particle bouncing in a lattice cell
+    const x0 = new Float64Array([0.5, 0, 0])
+    const p0 = new Float64Array([1.0, 0, 0])
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 5000, dt: 0.001, sampleInterval: 100 }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    expect(trajectory.energyDrift).toBeLessThan(1e-4)
+  })
+
+  it('conserves energy for free particle outside barrier', () => {
+    const config = makeConfig({
+      potentialType: 'barrier',
+      barrierCenter: 10,
+      barrierWidth: 2.0,
+      barrierHeight: 100,
+      mass: 1,
+    })
+    // Particle far from the barrier — experiences zero potential
+    const x0 = new Float64Array([0, 0, 0])
+    const p0 = new Float64Array([0.5, 0.3, 0])
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 1000, dt: 0.001, sampleInterval: 100 }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    // Free particle: zero drift exactly (no forces)
+    expect(trajectory.energyDrift).toBeLessThan(1e-10)
+  })
+
+  it('conserves energy for anisotropic BEC trap', () => {
+    const config = makeConfig({
+      potentialType: 'becTrap',
+      mass: 1.0,
+      harmonicOmega: 1.0,
+      trapAnisotropy: [1, 2, 3],
+    })
+    const x0 = new Float64Array([0.5, 0.3, 0.2])
+    const p0 = new Float64Array([0.1, 0.2, 0.3])
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 5000, dt: 0.001, sampleInterval: 100 }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    expect(trajectory.energyDrift).toBeLessThan(1e-5)
+  })
+
+  it('harmonic oscillator returns to initial position after one period T = 2π/ω', () => {
+    const omega = 2.0
+    const config = makeConfig({ potentialType: 'harmonicTrap', mass: 1, harmonicOmega: omega })
+    const x0 = new Float64Array([1, 0, 0])
+    const p0 = new Float64Array([0, 0, 0])
+    const T = (2 * Math.PI) / omega
+    const dt = 0.001
+    const steps = Math.round(T / dt)
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps, dt, sampleInterval: steps }
+
+    const trajectory = integrateOrbit(x0, p0, config, orbitCfg)
+    const finalPoint = trajectory.points[trajectory.points.length - 1]!
+
+    // After exactly one period, x should return to x0
+    expect(finalPoint.x[0]).toBeCloseTo(x0[0]!, 2)
+    expect(finalPoint.x[1]).toBeCloseTo(x0[1]!, 2)
+  })
+
+  it('preserves phase-space area (Liouville theorem) for coupled anharmonic', () => {
+    // Launch 4 orbits from corners of a small phase-space parallelogram.
+    // The symplectic integrator should preserve the enclosed area.
+    const config = makeConfig({
+      potentialType: 'coupledAnharmonic',
+      mass: 1,
+      harmonicOmega: 1,
+      anharmonicLambda: 0.3,
+      latticeDim: 2,
+    })
+    const eps = 0.01
+    const orbitCfg = { ...DEFAULT_ORBIT_CONFIG, steps: 2000, dt: 0.001, sampleInterval: 2000 }
+
+    // 4 corners in (x0, p0) space (2D projection: axis 0 only)
+    const corners = [
+      { x: [1, 0], p: [0, 0] },
+      { x: [1 + eps, 0], p: [0, 0] },
+      { x: [1, 0], p: [eps, 0] },
+      { x: [1 + eps, 0], p: [eps, 0] },
+    ]
+
+    const final = corners.map((c) => {
+      const t = integrateOrbit(new Float64Array(c.x), new Float64Array(c.p), config, orbitCfg)
+      const last = t.points[t.points.length - 1]!
+      return { x: last.x[0]!, p: last.p[0]! }
+    })
+
+    // Initial area = eps × eps = eps²
+    // Final area via cross product of the two edge vectors
+    const dx1 = final[1]!.x - final[0]!.x
+    const dp1 = final[1]!.p - final[0]!.p
+    const dx2 = final[2]!.x - final[0]!.x
+    const dp2 = final[2]!.p - final[0]!.p
+    const finalArea = Math.abs(dx1 * dp2 - dx2 * dp1)
+    const initialArea = eps * eps
+
+    // Symplectic integrator preserves phase-space area to O(dt²)
+    expect(finalArea / initialArea).toBeCloseTo(1.0, 1)
+  })
 })
 
 describe('generateOrbitsAtEnergy', () => {

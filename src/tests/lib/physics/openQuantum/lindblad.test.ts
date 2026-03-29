@@ -141,3 +141,154 @@ describe('computeDissipator', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// Multi-channel edge cases
+// ---------------------------------------------------------------------------
+
+describe('multi-channel Lindblad trace preservation', () => {
+  it('preserves trace with channels sharing the same target row', () => {
+    // Two channels both decay INTO state |0⟩ from different sources.
+    // Tests that the (0,0) population accumulation from multiple channels
+    // is balanced by the anticommutator depletion of the source states.
+    const K = 4
+    const rho = zeroDM(K)
+    // Spread population: ρ = 0.25|0⟩⟨0| + 0.3|1⟩⟨1| + 0.2|2⟩⟨2| + 0.25|3⟩⟨3|
+    rho.elements[2 * (0 * K + 0)] = 0.25
+    rho.elements[2 * (1 * K + 1)] = 0.3
+    rho.elements[2 * (2 * K + 2)] = 0.2
+    rho.elements[2 * (3 * K + 3)] = 0.25
+    // Add off-diagonal coherences
+    rho.elements[2 * (0 * K + 1)] = 0.1
+    rho.elements[2 * (1 * K + 0)] = 0.1
+    rho.elements[2 * (0 * K + 1) + 1] = 0.05
+    rho.elements[2 * (1 * K + 0) + 1] = -0.05
+
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      decayChannel(0, 1, 1.0), // |1⟩ → |0⟩
+      decayChannel(0, 2, 0.5), // |2⟩ → |0⟩
+      decayChannel(0, 3, 0.3), // |3⟩ → |0⟩
+    ]
+
+    computeDissipator(channels, rho, dRho)
+    expect(trace(dRho)).toBeCloseTo(0, 10)
+  })
+
+  it('preserves trace with channels sharing the same source col', () => {
+    // Multiple channels deplete the SAME state |2⟩ into different targets.
+    const K = 4
+    const rho = pureState(K, 2)
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      decayChannel(0, 2, 0.8), // |2⟩ → |0⟩
+      decayChannel(1, 2, 0.6), // |2⟩ → |1⟩
+      decayChannel(3, 2, 0.4), // |2⟩ → |3⟩
+    ]
+
+    computeDissipator(channels, rho, dRho)
+    expect(trace(dRho)).toBeCloseTo(0, 10)
+  })
+
+  it('preserves trace with bidirectional channels (detailed balance)', () => {
+    // Channels modeling thermal equilibrium: both up and down transitions.
+    const K = 3
+    const rho = mixedState(K)
+    // Add coherences to make it more realistic
+    rho.elements[2 * (0 * K + 1)] = 0.1
+    rho.elements[2 * (1 * K + 0)] = 0.1
+    rho.elements[2 * (1 * K + 2)] = 0.05
+    rho.elements[2 * (2 * K + 1)] = 0.05
+
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      decayChannel(0, 1, 1.0), // |1⟩ → |0⟩ (emission)
+      decayChannel(1, 0, 0.3), // |0⟩ → |1⟩ (absorption)
+      decayChannel(1, 2, 0.8), // |2⟩ → |1⟩ (emission)
+      decayChannel(2, 1, 0.2), // |1⟩ → |2⟩ (absorption)
+      decayChannel(0, 2, 0.5), // |2⟩ → |0⟩ (emission)
+      decayChannel(2, 0, 0.1), // |0⟩ → |2⟩ (absorption)
+    ]
+
+    computeDissipator(channels, rho, dRho)
+    expect(trace(dRho)).toBeCloseTo(0, 10)
+  })
+
+  it('preserves trace with complex amplitudes', () => {
+    // The dissipator only depends on |amplitude|², but complex amplitudes
+    // could introduce bugs if conjugation is incorrect.
+    const K = 3
+    const rho = mixedState(K)
+    rho.elements[2 * (0 * K + 1)] = 0.15
+    rho.elements[2 * (1 * K + 0)] = 0.15
+    rho.elements[2 * (0 * K + 1) + 1] = 0.08
+    rho.elements[2 * (1 * K + 0) + 1] = -0.08
+
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.7, amplitudeIm: 0.3 },
+      { row: 1, col: 2, amplitudeRe: 0.4, amplitudeIm: -0.5 },
+    ]
+
+    computeDissipator(channels, rho, dRho)
+    expect(trace(dRho)).toBeCloseTo(0, 10)
+  })
+
+  it('preserves Hermiticity of dRho', () => {
+    // D[L](ρ) must be Hermitian if ρ is Hermitian.
+    const K = 3
+    const rho = mixedState(K)
+    rho.elements[2 * (0 * K + 1)] = 0.1
+    rho.elements[2 * (1 * K + 0)] = 0.1
+    rho.elements[2 * (0 * K + 1) + 1] = 0.05
+    rho.elements[2 * (1 * K + 0) + 1] = -0.05
+
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      decayChannel(0, 1, 1.0),
+      decayChannel(1, 2, 0.5),
+      { row: 0, col: 2, amplitudeRe: 0.3, amplitudeIm: 0.4 },
+    ]
+
+    computeDissipator(channels, rho, dRho)
+
+    // Check dRho_{kl} = conj(dRho_{lk})
+    for (let k = 0; k < K; k++) {
+      for (let l = k + 1; l < K; l++) {
+        const reKL = dRho.elements[2 * (k * K + l)]!
+        const imKL = dRho.elements[2 * (k * K + l) + 1]!
+        const reLK = dRho.elements[2 * (l * K + k)]!
+        const imLK = dRho.elements[2 * (l * K + k) + 1]!
+        expect(reKL).toBeCloseTo(reLK, 10) // Re(ρ_{kl}) = Re(ρ_{lk})
+        expect(imKL).toBeCloseTo(-imLK, 10) // Im(ρ_{kl}) = -Im(ρ_{lk})
+      }
+    }
+  })
+
+  it('steady-state population matches detailed-balance prediction', () => {
+    // For a two-level system with γ_down and γ_up, the steady-state
+    // populations are p₀ = γ_down/(γ_down + γ_up), p₁ = γ_up/(γ_down + γ_up).
+    // At steady state D[L](ρ_ss) should have negligible diagonal elements.
+    const K = 2
+    const gammaDown = 1.0
+    const gammaUp = 0.3
+    const p0 = gammaDown / (gammaDown + gammaUp)
+    const p1 = gammaUp / (gammaDown + gammaUp)
+
+    const rho = zeroDM(K)
+    rho.elements[2 * (0 * K + 0)] = p0
+    rho.elements[2 * (1 * K + 1)] = p1
+
+    const dRho = zeroDM(K)
+    const channels: LindbladChannel[] = [
+      decayChannel(0, 1, gammaDown), // |1⟩ → |0⟩
+      decayChannel(1, 0, gammaUp), // |0⟩ → |1⟩
+    ]
+
+    computeDissipator(channels, rho, dRho)
+
+    // At thermal equilibrium, diagonal dissipator should be ~0
+    expect(dRho.elements[2 * (0 * K + 0)]!).toBeCloseTo(0, 10)
+    expect(dRho.elements[2 * (1 * K + 1)]!).toBeCloseTo(0, 10)
+  })
+})

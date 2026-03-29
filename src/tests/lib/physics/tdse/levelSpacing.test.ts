@@ -119,3 +119,78 @@ describe('classifyLocalization', () => {
     expect(classifyLocalization(0.1, 0)).toBe('critical')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Large-N statistical validation of Brody β fitting
+// ---------------------------------------------------------------------------
+
+describe('Brody β fitting accuracy (large N)', () => {
+  /** Seeded LCG for reproducible tests */
+  function lcg(seed: number): () => number {
+    let state = seed
+    return () => {
+      state = (state * 1103515245 + 12345) & 0x7fffffff
+      return state / 0x7fffffff
+    }
+  }
+
+  it('β < 0.15 for N=200 exact Poisson spacings', () => {
+    // Poisson: P(s) = exp(-s), CDF = 1 - exp(-s), inverse: s = -ln(1-u)
+    // With large N, the Brody fit should accurately identify β ≈ 0
+    const rng = lcg(12345)
+    const N = 200
+    const energies: number[] = [0]
+    for (let i = 1; i < N; i++) {
+      const s = -Math.log(1 - rng() * 0.999)
+      energies.push(energies[i - 1]! + s)
+    }
+    const result = computeLevelSpacing(energies)
+    expect(result.brodyBeta).toBeLessThan(0.15)
+    expect(result.classification).toBe('poisson')
+  })
+
+  it('β > 0.80 for N=200 exact Wigner-Dyson spacings', () => {
+    // Wigner surmise: P(s) = (π/2)s·exp(-πs²/4)
+    // CDF: F(s) = 1 - exp(-πs²/4), inverse: s = sqrt(-4·ln(1-u)/π)
+    const rng = lcg(54321)
+    const N = 200
+    const energies: number[] = [0]
+    for (let i = 1; i < N; i++) {
+      const u = rng() * 0.999
+      const s = Math.sqrt((-4 * Math.log(1 - u)) / Math.PI)
+      energies.push(energies[i - 1]! + s)
+    }
+    const result = computeLevelSpacing(energies)
+    expect(result.brodyBeta).toBeGreaterThan(0.8)
+    expect(result.classification).toBe('wigner-dyson')
+  })
+
+  it('β ≈ 0.5 for mixed Poisson/Wigner spacings', () => {
+    // Alternate between Poisson and Wigner spacings to produce intermediate β
+    const rng = lcg(99999)
+    const N = 200
+    const energies: number[] = [0]
+    for (let i = 1; i < N; i++) {
+      const u = rng() * 0.999
+      const s =
+        i % 2 === 0
+          ? -Math.log(1 - u) // Poisson
+          : Math.sqrt((-4 * Math.log(1 - u)) / Math.PI) // Wigner
+      energies.push(energies[i - 1]! + s)
+    }
+    const result = computeLevelSpacing(energies)
+    // Should be intermediate
+    expect(result.brodyBeta).toBeGreaterThan(0.2)
+    expect(result.brodyBeta).toBeLessThan(0.8)
+    expect(result.classification).toBe('intermediate')
+  })
+
+  it('equally-spaced harmonic oscillator spectrum gives high β (level repulsion)', () => {
+    // E_n = (n + 0.5)ω — perfectly rigid, zero fluctuation.
+    // This is maximal level repulsion (more rigid than Wigner-Dyson).
+    const N = 100
+    const energies = Array.from({ length: N }, (_, n) => (n + 0.5) * 1.0)
+    const result = computeLevelSpacing(energies)
+    expect(result.brodyBeta).toBeGreaterThan(0.8)
+  })
+})

@@ -5,7 +5,7 @@
  * profile sampling/plotting utilities.
  */
 
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import {
@@ -512,5 +512,76 @@ describe('computePacketKineticEnergy', () => {
     expect(computePacketKineticEnergy(cfg1)).toBeCloseTo(2, 10)
     expect(computePacketKineticEnergy(cfg2)).toBeCloseTo(8, 10)
     expect(computePacketKineticEnergy(cfg2) / computePacketKineticEnergy(cfg1)).toBeCloseTo(4, 10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// CPU potential consistency: evaluatePotential1D vs classicalOrbit.evaluatePotential
+// ---------------------------------------------------------------------------
+
+describe('evaluatePotential1D ↔ classicalOrbit.evaluatePotential consistency', () => {
+  // The 1D HUD profile (potentialProfile.ts) and the N-D orbit integrator
+  // (classicalOrbit.ts) both implement the same potentials. If they diverge,
+  // the energy diagram would show the wrong potential shape.
+
+  let evaluatePotentialND: typeof import('@/lib/physics/tdse/classicalOrbit').evaluatePotential
+
+  // Dynamic import to avoid circular dependency issues in test setup
+
+  beforeAll(async () => {
+    const mod = await import('@/lib/physics/tdse/classicalOrbit')
+    evaluatePotentialND = mod.evaluatePotential
+  })
+
+  const testPoints = [-2.5, -1.0, -0.3, 0, 0.3, 1.0, 2.5]
+
+  function check(potentialType: TdseConfig['potentialType'], overrides: Partial<TdseConfig> = {}) {
+    const cfg = createConfig({ potentialType, latticeDim: 3, ...overrides })
+    for (const x of testPoints) {
+      const v1D = evaluatePotential1D(x, cfg)
+      const vND = evaluatePotentialND(new Float64Array([x, 0, 0]), cfg)
+      expect(v1D).toBeCloseTo(vND, 8)
+    }
+  }
+
+  it('harmonicTrap: 1D matches N-D at y=z=0', () => {
+    check('harmonicTrap', { mass: 1.5, harmonicOmega: 2.0 })
+  })
+
+  it('barrier: 1D matches N-D at y=z=0', () => {
+    check('barrier', { barrierCenter: 0.5, barrierWidth: 1.5, barrierHeight: 8 })
+  })
+
+  it('finiteWell: 1D matches N-D at y=z=0', () => {
+    check('finiteWell', { wellWidth: 3.0, wellDepth: 7 })
+  })
+
+  it('periodicLattice: 1D matches N-D at y=z=0', () => {
+    check('periodicLattice', { latticePeriod: 1.5, latticeDepth: 4 })
+  })
+
+  it('doubleWell: 1D matches N-D at y=z=0', () => {
+    check('doubleWell', {
+      doubleWellLambda: 2,
+      doubleWellSeparation: 1.2,
+      doubleWellAsymmetry: 0.3,
+    })
+  })
+
+  it('radialDoubleWell: 1D matches N-D at y=z=0', () => {
+    // radialDoubleWell uses r=|x| in 1D profile and r=sqrt(x²+y²+z²) in N-D.
+    // At y=z=0, r=|x| so they should match.
+    check('radialDoubleWell', {
+      radialWellInner: 0.8,
+      radialWellOuter: 2.5,
+      radialWellDepth: 10,
+      radialWellTilt: 0.3,
+    })
+  })
+
+  it('coupledAnharmonic: 1D slice matches N-D at y=z=0 (cross-coupling vanishes)', () => {
+    // On the 1D axis slice (y=z=0), the coupling term λΣx_i²x_j² vanishes
+    // because all other coordinates are zero. Both should give pure harmonic.
+    check('coupledAnharmonic', { mass: 1, harmonicOmega: 1.5, anharmonicLambda: 5 })
   })
 })

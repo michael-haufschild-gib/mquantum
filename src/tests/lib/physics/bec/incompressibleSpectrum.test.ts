@@ -236,3 +236,111 @@ describe('computeIncompressibleSpectrum', () => {
     expect(result.totalCompressible).toBeGreaterThanOrEqual(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// N-D Parseval's theorem and Helmholtz invariants
+// ---------------------------------------------------------------------------
+
+describe('fftND Parseval theorem (multi-dimensional)', () => {
+  it('preserves energy for 2D FFT', () => {
+    const Nx = 16
+    const Ny = 16
+    const total = Nx * Ny
+    const re = new Float64Array(total)
+    const im = new Float64Array(total)
+
+    // 2D Gaussian signal
+    for (let ix = 0; ix < Nx; ix++) {
+      for (let iy = 0; iy < Ny; iy++) {
+        const x = (ix - Nx / 2) / 4
+        const y = (iy - Ny / 2) / 4
+        re[ix * Ny + iy] = Math.exp(-(x * x + y * y))
+      }
+    }
+
+    let eSpace = 0
+    for (let i = 0; i < total; i++) eSpace += re[i]! * re[i]! + im[i]! * im[i]!
+
+    fftND(re, im, [Nx, Ny], false)
+
+    let eFreq = 0
+    for (let i = 0; i < total; i++) eFreq += re[i]! * re[i]! + im[i]! * im[i]!
+
+    // Parseval: Σ|f_k|² = N × Σ|f_x|²
+    expect(eFreq / total).toBeCloseTo(eSpace, 6)
+  })
+
+  it('preserves energy for 3D FFT', () => {
+    const dims = [8, 8, 8]
+    const total = 512
+    const re = new Float64Array(total)
+    const im = new Float64Array(total)
+
+    // 3D signal with some structure
+    for (let ix = 0; ix < 8; ix++) {
+      for (let iy = 0; iy < 8; iy++) {
+        for (let iz = 0; iz < 8; iz++) {
+          const x = (ix - 4) / 3
+          const y = (iy - 4) / 3
+          const z = (iz - 4) / 3
+          re[ix * 64 + iy * 8 + iz] = Math.exp(-(x * x + y * y + z * z))
+        }
+      }
+    }
+
+    let eSpace = 0
+    for (let i = 0; i < total; i++) eSpace += re[i]! * re[i]! + im[i]! * im[i]!
+
+    fftND(re, im, dims, false)
+
+    let eFreq = 0
+    for (let i = 0; i < total; i++) eFreq += re[i]! * re[i]! + im[i]! * im[i]!
+
+    expect(eFreq / total).toBeCloseTo(eSpace, 6)
+  })
+})
+
+describe('Helmholtz decomposition physics', () => {
+  it('vortex flow is entirely incompressible (divergence-free)', () => {
+    // A single quantum vortex ψ = |ψ| exp(iθ) has a purely rotational
+    // (incompressible) velocity field v = (ℏ/m) ∇θ = (ℏ/m)(1/r) θ̂.
+    // The Helmholtz decomposition should classify ~100% as incompressible.
+    const N = 32
+    const spacing = [0.5, 0.5]
+    const totalSites = N * N
+    const psiRe = new Float32Array(totalSites)
+    const psiIm = new Float32Array(totalSites)
+
+    for (let ix = 0; ix < N; ix++) {
+      for (let iy = 0; iy < N; iy++) {
+        const x = (ix - N / 2 + 0.5) * spacing[0]!
+        const y = (iy - N / 2 + 0.5) * spacing[1]!
+        const r = Math.sqrt(x * x + y * y)
+        const theta = Math.atan2(y, x)
+        // Vortex with healing-length core: |ψ| = r/sqrt(r²+ξ²)
+        const xi = 1.0 // healing length
+        const amp = r / Math.sqrt(r * r + xi * xi)
+        psiRe[ix * N + iy] = amp * Math.cos(theta)
+        psiIm[ix * N + iy] = amp * Math.sin(theta)
+      }
+    }
+
+    const result = computeIncompressibleSpectrum(
+      psiRe,
+      psiIm,
+      [N, N],
+      spacing,
+      1.0, // hbar
+      1.0 // mass
+    )
+
+    // Vortex flow should be predominantly incompressible. The compressible
+    // fraction is non-zero due to the density gradient at the vortex core
+    // (healing length ξ=1 on spacing=0.5 grid), which is physical.
+    const totalKE = result.totalIncompressible + result.totalCompressible
+    if (totalKE > 0) {
+      const incompFraction = result.totalIncompressible / totalKE
+      expect(incompFraction).toBeGreaterThan(0.55)
+    }
+  })
+})

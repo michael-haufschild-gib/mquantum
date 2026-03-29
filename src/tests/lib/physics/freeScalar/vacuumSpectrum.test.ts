@@ -261,6 +261,100 @@ describe('sampleVacuumSpectrum', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Quantum vacuum two-point correlation function (ensemble-averaged)
+// ---------------------------------------------------------------------------
+
+describe('vacuum two-point correlations', () => {
+  it('ensemble-averaged ⟨|φ_k|²⟩ ≈ N/(2ωₖ) for each mode', () => {
+    // The vacuum state satisfies ⟨|φ_k|²⟩ = N/(2ωₖ) where N is the total
+    // number of sites. After IFFT, the real-space variance per site is
+    // (1/N) Σₖ 1/(2ωₖ). We check this in real space with an ensemble of seeds.
+    const config = makeConfig({
+      latticeDim: 2,
+      gridSize: [16, 16],
+      spacing: [0.2, 0.2],
+      mass: 1.0,
+    })
+    const total = 16 * 16
+    const numSeeds = 50
+
+    // Ensemble average of ⟨φ²⟩ per site
+    let phiSqSum = 0
+    let piSqSum = 0
+    for (let seed = 1; seed <= numSeeds; seed++) {
+      const { phi, pi } = sampleVacuumSpectrum(config, seed)
+      for (let i = 0; i < total; i++) {
+        phiSqSum += phi[i]! * phi[i]!
+        piSqSum += pi[i]! * pi[i]!
+      }
+    }
+    const measuredPhiVar = phiSqSum / (numSeeds * total)
+    const measuredPiVar = piSqSum / (numSeeds * total)
+
+    // Expected: <φ²> = (1/N) Σₖ 1/(2ωₖ), <π²> = (1/N) Σₖ ωₖ/2
+    let expectedPhiVar = 0
+    let expectedPiVar = 0
+    const dims = [16, 16]
+    for (let idx = 0; idx < total; idx++) {
+      const coords: number[] = [Math.floor(idx / 16), idx % 16]
+      const omega = computeOmegaK(coords, dims, [0.2, 0.2], 1.0, 2)
+      expectedPhiVar += 1 / (2 * omega)
+      expectedPiVar += omega / 2
+    }
+    expectedPhiVar /= total
+    expectedPiVar /= total
+
+    // With 50 seeds, the ensemble average should be within ~20% of the exact value
+    expect(measuredPhiVar / expectedPhiVar).toBeGreaterThan(0.75)
+    expect(measuredPhiVar / expectedPhiVar).toBeLessThan(1.25)
+    expect(measuredPiVar / expectedPiVar).toBeGreaterThan(0.75)
+    expect(measuredPiVar / expectedPiVar).toBeLessThan(1.25)
+  })
+
+  it('total vacuum energy equals zero-point energy Σ ωₖ/2', () => {
+    // The free-field Hamiltonian H = Σₖ ωₖ(a†ₖaₖ + ½). In the vacuum state,
+    // ⟨H⟩ = Σₖ ωₖ/2. The kinetic+potential energy per realization fluctuates,
+    // but the ensemble average should match.
+    const config = makeConfig({
+      latticeDim: 1,
+      gridSize: [32],
+      spacing: [0.15],
+      mass: 0.5,
+    })
+    const N = 32
+    const numSeeds = 80
+
+    let totalEnergySum = 0
+    for (let seed = 1; seed <= numSeeds; seed++) {
+      const { phi, pi } = sampleVacuumSpectrum(config, seed)
+      // E = Σᵢ [½ π² + ½ m² φ² + ½ (∂φ/∂x)²]
+      let E = 0
+      for (let i = 0; i < N; i++) {
+        const piVal = pi[i]!
+        const phiVal = phi[i]!
+        // Lattice gradient (periodic boundary)
+        const phiNext = phi[(i + 1) % N]!
+        const dPhi = (phiNext - phiVal) / 0.15
+        E += 0.5 * piVal * piVal + 0.5 * 0.5 * 0.5 * phiVal * phiVal + 0.5 * dPhi * dPhi
+      }
+      totalEnergySum += E
+    }
+    const measuredMeanE = totalEnergySum / numSeeds
+
+    // Expected: Σₖ ωₖ/2
+    let zeroPointE = 0
+    for (let k = 0; k < N; k++) {
+      const omega = computeOmegaK([k], [N], [0.15], 0.5, 1)
+      zeroPointE += omega / 2
+    }
+
+    // Allow 30% tolerance for ensemble fluctuations with 80 seeds
+    expect(measuredMeanE / zeroPointE).toBeGreaterThan(0.7)
+    expect(measuredMeanE / zeroPointE).toBeLessThan(1.3)
+  })
+})
+
 describe('estimateVacuumMaxPhi', () => {
   it('returns a finite positive value', () => {
     const config = makeConfig()

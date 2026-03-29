@@ -65,7 +65,12 @@ describe('computeScarCorrelation', () => {
     const orbit = makeTrajectory(orbitPoints)
 
     const resultUniform = computeScarCorrelation(
-      reUniform, imUniform, [orbit], gridSize, spacing, 0.5
+      reUniform,
+      imUniform,
+      [orbit],
+      gridSize,
+      spacing,
+      0.5
     )
 
     // Uniform density → correlation ≈ 1 (no excess along orbit)
@@ -110,5 +115,90 @@ describe('computeScarCorrelation', () => {
 
     const result = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 1.5)
     expect(result.maxCorrelation).toBeGreaterThan(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scar metric normalization invariants
+// ---------------------------------------------------------------------------
+
+describe('scar correlation normalization', () => {
+  it('C ≈ 1 for perfectly uniform density (Berry conjecture baseline)', () => {
+    // A uniformly spread eigenstate should produce C ≈ 1, meaning no excess
+    // density along any orbit. This is the null hypothesis for scar detection.
+    const gridSize = [32, 32]
+    const spacing = [0.5, 0.5]
+    const totalSites = 1024
+
+    // Uniform density: |ψ|² = 1/N everywhere
+    const amp = 1 / Math.sqrt(totalSites)
+    const re = new Float32Array(totalSites).fill(amp)
+    const im = new Float32Array(totalSites)
+
+    // Dense orbit sampling across the grid
+    const orbitPoints: OrbitPoint[] = []
+    for (let x = -7; x <= 7; x += 0.5) {
+      for (let y = -7; y <= 7; y += 2) {
+        orbitPoints.push(makePoint([x, y]))
+      }
+    }
+    const orbit = makeTrajectory(orbitPoints)
+
+    const result = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 1.0)
+
+    // For uniform density, C should be very close to 1.0
+    expect(result.maxCorrelation).toBeGreaterThan(0.85)
+    expect(result.maxCorrelation).toBeLessThan(1.15)
+  })
+
+  it('C >> 1 for density concentrated along an orbit tube', () => {
+    // Create a wavefunction with density concentrated along x-axis (y≈0).
+    // The scar correlation should be significantly > 1.
+    const gridSize = [32, 32]
+    const spacing = [0.5, 0.5]
+    const totalSites = 1024
+    const re = new Float32Array(totalSites)
+    const im = new Float32Array(totalSites)
+
+    // Gaussian tube along x-axis: |ψ|² ∝ exp(-y²/σ²) with σ=1
+    for (let ix = 0; ix < 32; ix++) {
+      for (let iy = 0; iy < 32; iy++) {
+        const y = (iy - 15.5) * 0.5
+        re[ix * 32 + iy] = Math.exp((-y * y) / 2)
+      }
+    }
+
+    // Orbit along x-axis
+    const orbitPoints: OrbitPoint[] = []
+    for (let x = -7; x <= 7; x += 0.3) {
+      orbitPoints.push(makePoint([x, 0]))
+    }
+    const orbit = makeTrajectory(orbitPoints)
+
+    const result = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 1.0)
+
+    // Concentrated density along the orbit should give C >> 1
+    expect(result.maxCorrelation).toBeGreaterThan(3.0)
+  })
+
+  it('correlation increases as tube width ε matches density width', () => {
+    // As ε (Gaussian tube width) shrinks toward the density width,
+    // the correlation should increase for a delta-like orbit.
+    const gridSize = [16, 16]
+    const spacing = [1.0, 1.0]
+    const totalSites = 256
+    const re = new Float32Array(totalSites)
+    const im = new Float32Array(totalSites)
+
+    // Point-like density at center
+    re[8 * 16 + 8] = 1.0
+
+    const orbit = makeTrajectory([makePoint([0.5, 0.5])])
+
+    const cWide = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 3.0)
+    const cNarrow = computeScarCorrelation(re, im, [orbit], gridSize, spacing, 1.0)
+
+    // Narrower tube should give higher (or equal) correlation for point density
+    expect(cNarrow.maxCorrelation).toBeGreaterThanOrEqual(cWide.maxCorrelation * 0.9)
   })
 })

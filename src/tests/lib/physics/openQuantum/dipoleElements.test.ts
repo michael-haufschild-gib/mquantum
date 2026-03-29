@@ -43,6 +43,60 @@ describe('radialDipoleIntegral', () => {
     const reverse = radialDipoleIntegral(3, 2, 2, 1)
     expect(forward).toBeCloseTo(reverse, 10)
   })
+
+  // Higher-n transitions verified against high-precision Simpson's rule integration
+  // (200k points). These catch quadrature accuracy degradation at higher quantum numbers
+  // where the Laguerre polynomials oscillate more.
+
+  it('produces the known 1s→3p radial integral ≈ 0.5167', () => {
+    expect(radialDipoleIntegral(1, 0, 3, 1)).toBeCloseTo(0.5167, 2)
+  })
+
+  it('produces the known 2s→3p radial integral ≈ 3.06', () => {
+    // 0.2% quadrature tolerance — the 2s WF has a radial node that slightly
+    // degrades GL accuracy relative to nodeless states
+    expect(radialDipoleIntegral(2, 0, 3, 1)).toBeCloseTo(3.06, 1)
+  })
+
+  it('produces the known 2p→3d radial integral ≈ 4.748', () => {
+    expect(radialDipoleIntegral(2, 1, 3, 2)).toBeCloseTo(4.748, 2)
+  })
+
+  it('produces the known 2p→3s radial integral ≈ 0.938', () => {
+    expect(radialDipoleIntegral(2, 1, 3, 0)).toBeCloseTo(0.9384, 2)
+  })
+
+  it('produces the known 3d→4f radial integral ≈ 10.23', () => {
+    expect(radialDipoleIntegral(3, 2, 4, 3)).toBeCloseTo(10.2303, 1)
+  })
+
+  it('produces the known 3p→4d radial integral ≈ 7.565', () => {
+    expect(radialDipoleIntegral(3, 1, 4, 2)).toBeCloseTo(7.5654, 1)
+  })
+
+  it('produces the known 4f→5g radial integral ≈ 17.72', () => {
+    expect(radialDipoleIntegral(4, 3, 5, 4)).toBeCloseTo(17.7206, 1)
+  })
+
+  it('produces the known 5g→6h radial integral ≈ 27.21', () => {
+    expect(radialDipoleIntegral(5, 4, 6, 5)).toBeCloseTo(27.2145, 1)
+  })
+
+  it('produces the known 6h→7i radial integral ≈ 38.71', () => {
+    // Highest quantum numbers supported (n=7). Tests quadrature at the accuracy limit.
+    expect(radialDipoleIntegral(6, 5, 7, 6)).toBeCloseTo(38.7103, 0)
+  })
+
+  it('produces the known 1s→7p radial integral ≈ 0.1214', () => {
+    // Large Δn transition — tests quadrature with very different radial scales
+    expect(radialDipoleIntegral(1, 0, 7, 1)).toBeCloseTo(0.1214, 2)
+  })
+
+  it('is symmetric for high-n transitions', () => {
+    const forward = radialDipoleIntegral(4, 3, 5, 4)
+    const reverse = radialDipoleIntegral(5, 4, 4, 3)
+    expect(forward).toBeCloseTo(reverse, 6)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -154,6 +208,57 @@ describe('dipoleMatrixElementSquared', () => {
     const reverse = dipoleMatrixElementSquared(s2, s1)
     // Bug caught: asymmetric cache key or angular factor argument ordering
     expect(forward).toBeCloseTo(reverse, 10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// clearDipoleCache
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Thomas-Reiche-Kuhn f-sum rule (integration test)
+// ---------------------------------------------------------------------------
+
+describe('Thomas-Reiche-Kuhn f-sum rule', () => {
+  it('discrete 1s→np oscillator strengths (n=2..7) sum to ≈0.551', () => {
+    // The TRK sum rule: Σ_f f_{i→f} = Z (number of electrons = 1 for hydrogen).
+    // The discrete sum over bound states converges to ~0.565; the rest is
+    // in the continuum. Summing n=2..7 should give ≈0.551.
+    //
+    // f_{1s→np} = (2/3) × |E_n - E_1| × |⟨np|r|1s⟩|²
+    // where the factor accounts for summing over all m' of the np subshell.
+    //
+    // Bug caught: systematic error in radial integrals, angular factors, or
+    // energy computation that would make the sum deviate from the known value.
+    clearDipoleCache()
+    let fSum = 0
+    for (let n = 2; n <= 7; n++) {
+      const omega = Math.abs(-0.5 / (n * n) - -0.5)
+      const rad = radialDipoleIntegral(1, 0, n, 1)
+      fSum += (2 / 3) * omega * rad * rad
+    }
+    // Known value from high-precision computation: 0.5508
+    expect(fSum).toBeCloseTo(0.5508, 2)
+  })
+
+  it('f-sum is strictly less than 1 (continuum contribution missing)', () => {
+    clearDipoleCache()
+    let fSum = 0
+    for (let n = 2; n <= 7; n++) {
+      const omega = Math.abs(-0.5 / (n * n) - -0.5)
+      const rad = radialDipoleIntegral(1, 0, n, 1)
+      fSum += (2 / 3) * omega * rad * rad
+    }
+    expect(fSum).toBeLessThan(1)
+    expect(fSum).toBeGreaterThan(0.5)
+  })
+
+  it('Lyman-alpha (1s→2p) dominates the sum with f ≈ 0.416', () => {
+    const omega = 0.375 // E_2 - E_1 in Hartree
+    const rad = radialDipoleIntegral(1, 0, 2, 1)
+    const f = (2 / 3) * omega * rad * rad
+    // Known: f_{1s→2p} = 0.4162 (NIST Wiese & Fuhr 2009)
+    expect(f).toBeCloseTo(0.4162, 2)
   })
 })
 

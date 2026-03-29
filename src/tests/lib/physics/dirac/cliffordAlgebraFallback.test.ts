@@ -145,6 +145,52 @@ describe('generateDiracMatricesFallback', () => {
           expect(isScaledIdentity(anticomm, s, 0, 1e-6)).toBe(true)
         }
       })
+
+      it('tr(αᵢ) = 0 for all alpha matrices (traceless generators)', () => {
+        for (let i = 0; i < dim; i++) {
+          let trRe = 0
+          let trIm = 0
+          for (let k = 0; k < s; k++) {
+            const [re, im] = getEntry(alphas[i]!, s, k, k)
+            trRe += re
+            trIm += im
+          }
+          expect(Math.abs(trRe)).toBeLessThan(1e-6)
+          expect(Math.abs(trIm)).toBeLessThan(1e-6)
+        }
+      })
+
+      it('tr(β) = 0 (traceless)', () => {
+        let trRe = 0
+        let trIm = 0
+        for (let k = 0; k < s; k++) {
+          const [re, im] = getEntry(beta, s, k, k)
+          trRe += re
+          trIm += im
+        }
+        expect(Math.abs(trRe)).toBeLessThan(1e-6)
+        expect(Math.abs(trIm)).toBeLessThan(1e-6)
+      })
+
+      it('β = diag(I_{S/2}, −I_{S/2}) in standard Dirac form', () => {
+        const halfS = s / 2
+        for (let i = 0; i < s; i++) {
+          for (let j = 0; j < s; j++) {
+            const [re, im] = getEntry(beta, s, i, j)
+            if (i === j && i < halfS) {
+              // Upper-left block: +1
+              expect(re).toBeCloseTo(1, 5)
+            } else if (i === j && i >= halfS) {
+              // Lower-right block: -1
+              expect(re).toBeCloseTo(-1, 5)
+            } else {
+              // Off-diagonal: 0
+              expect(Math.abs(re)).toBeLessThan(1e-6)
+            }
+            expect(Math.abs(im)).toBeLessThan(1e-6)
+          }
+        }
+      })
     })
   }
 })
