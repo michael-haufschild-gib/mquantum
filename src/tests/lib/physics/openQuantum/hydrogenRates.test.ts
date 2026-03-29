@@ -177,3 +177,60 @@ describe('buildTransitionRates', () => {
     }
   })
 })
+
+describe('buildTransitionRates — ND', () => {
+  const temperature = 5000
+
+  it('D=3 explicit matches default (backward compatibility)', () => {
+    clearDipoleCache()
+    const basis3 = buildHydrogenBasis(2, 3)
+    const ratesDefault = buildTransitionRates(basis3, temperature)
+    clearDipoleCache()
+    const ratesExplicit = buildTransitionRates(basis3, temperature, 1.0, 3)
+    expect(ratesExplicit.length).toBe(ratesDefault.length)
+    for (let i = 0; i < ratesDefault.length; i++) {
+      expect(ratesExplicit[i]!.gammaDown).toBeCloseTo(ratesDefault[i]!.gammaDown, 10)
+    }
+  })
+
+  it('D=5 produces rates with ND energies and ND dipole elements', () => {
+    clearDipoleCache()
+    const basis5 = buildHydrogenBasis(2, 5)
+    const rates5 = buildTransitionRates(basis5, temperature, 1.0, 5)
+    // Should still produce allowed 1s↔2p transitions
+    expect(rates5.length).toBeGreaterThanOrEqual(3)
+    for (const rate of rates5) {
+      expect(rate.gammaDown).toBeGreaterThan(0)
+      expect(rate.omega).toBeGreaterThan(0)
+      expect(rate.dipoleSq).toBeGreaterThan(0)
+    }
+  })
+
+  it('D=5 rates differ from D=3 rates (self-consistency with ND model)', () => {
+    clearDipoleCache()
+    const basis3 = buildHydrogenBasis(2, 3)
+    const rates3 = buildTransitionRates(basis3, temperature, 1.0, 3)
+    clearDipoleCache()
+    const basis5 = buildHydrogenBasis(2, 5)
+    const rates5 = buildTransitionRates(basis5, temperature, 1.0, 5)
+    // Both should have the same number of allowed transitions (same quantum number structure)
+    expect(rates5.length).toBe(rates3.length)
+    // But the actual rates must differ due to ND energy shifts and radial overlaps
+    // Use relative comparison since absolute values are tiny (~1e-9)
+    const relDiff =
+      Math.abs(rates5[0]!.gammaDown - rates3[0]!.gammaDown) /
+      Math.max(rates5[0]!.gammaDown, rates3[0]!.gammaDown)
+    expect(relDiff).toBeGreaterThan(0.1)
+  })
+
+  it('D=5 detailed balance holds with ND energies', () => {
+    clearDipoleCache()
+    const basis5 = buildHydrogenBasis(2, 5)
+    const rates5 = buildTransitionRates(basis5, temperature, 1.0, 5)
+    for (const rate of rates5) {
+      const ratio = rate.gammaUp / rate.gammaDown
+      const boltzmann = Math.exp(-rate.omega / (KB_ATOMIC * temperature))
+      expect(ratio).toBeCloseTo(boltzmann, 6)
+    }
+  })
+})

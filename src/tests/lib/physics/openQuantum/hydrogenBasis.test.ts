@@ -223,6 +223,25 @@ describe('buildHydrogenBasis', () => {
       expect(basis[0]!.extraDimN).toHaveLength(4)
       expect(basis[0]!.extraDimN).toEqual([0, 0, 0, 0])
     })
+
+    it('D=2 uses ND energy formula: E = -0.5/n_eff² with n_eff = n - 0.5', () => {
+      // Regression test: previously D=2 fell through to 3D hydrogenEnergy(n) = -0.5/n²
+      const basis = buildHydrogenBasis(1, 2)
+      // D=2, n=1: n_eff = 1 + (2-3)/2 = 0.5, E = -0.5/0.25 = -2.0
+      expect(basis[0]!.energy).toBeCloseTo(-2.0, 10)
+    })
+
+    it('D=2 n=2 energy differs from D=3 n=2', () => {
+      const basis2D = buildHydrogenBasis(2, 2)
+      const basis3D = buildHydrogenBasis(2, 3)
+      // D=2 n=2: n_eff = 1.5, E = -0.5/2.25 ≈ -0.2222
+      // D=3 n=2: E = -0.5/4 = -0.125
+      const e2D_n2 = basis2D.find((s) => s.n === 2)!.energy
+      const e3D_n2 = basis3D.find((s) => s.n === 2)!.energy
+      expect(e2D_n2).toBeCloseTo(-0.5 / (1.5 * 1.5), 10)
+      expect(e3D_n2).toBe(-0.125)
+      expect(e2D_n2).not.toBeCloseTo(e3D_n2, 2)
+    })
   })
 })
 

@@ -73,12 +73,11 @@ function laguerreAssoc(p: number, alpha: number, x: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Evaluate the hydrogen radial wavefunction R_nl(r).
+ * Evaluate the 3D hydrogen radial wavefunction R_nl(r).
  *
  * R_nl(r) = N_nl · (2r/(n·a₀))^l · exp(-r/(n·a₀)) · L_{n-l-1}^{2l+1}(2r/(n·a₀))
  *
- * where N_nl = sqrt((2/(n·a₀))³ · (n-l-1)! / (2n·((n+l)!)³))
- *            = (2/(n·a₀))^(3/2) · sqrt((n-l-1)! / (2n·(n+l)!))
+ * where N_nl = (2/(n·a₀))^(3/2) · sqrt((n-l-1)! / (2n·(n+l)!))
  *
  * In atomic units (a₀ = 1).
  *
@@ -95,6 +94,52 @@ function hydrogenRadialWavefunction(n: number, l: number, r: number): number {
   const L = laguerreAssoc(polyDegree, polyAlpha, rho)
 
   return norm * Math.pow(rho, l) * Math.exp(-rho / 2) * L
+}
+
+/** Log-factorial: ln(k!) */
+function lnFactorial(k: number): number {
+  let sum = 0
+  for (let i = 2; i <= k; i++) sum += Math.log(i)
+  return sum
+}
+
+/**
+ * Evaluate the D-dimensional hydrogen radial wavefunction R_nl^(D)(r).
+ *
+ * Uses effective angular momentum λ = l + (D-3)/2 and effective principal
+ * quantum number n_eff = n_r + λ + 1 where n_r = n - l - 1.
+ *
+ * At D=3, reduces exactly to hydrogenRadialWavefunction.
+ * In atomic units (a₀ = 1).
+ *
+ * @param n - Principal quantum number (≥ 1)
+ * @param l - Azimuthal quantum number (0 to n-1)
+ * @param r - Radial coordinate (≥ 0)
+ * @param dim - Spatial dimension D
+ * @returns R_nl^(D)(r)
+ */
+function hydrogenRadialWavefunctionND(n: number, l: number, r: number, dim: number): number {
+  if (n < 1 || l < 0 || l >= n) return 0
+
+  const lambda = l + (dim - 3) / 2
+  const nr = n - l - 1
+  const nEff = nr + lambda + 1
+
+  const rho = (2 * r) / nEff
+
+  // Normalization via log-factorial to avoid overflow at high quantum numbers
+  const twoOverNEff = 2 / nEff
+  const front = twoOverNEff * Math.sqrt(twoOverNEff)
+  const denomFactArg = Math.round(nr + 2 * lambda + 1)
+  const lnNum = lnFactorial(nr)
+  const lnDen = Math.log(2 * nEff) + lnFactorial(denomFactArg)
+  const norm = front * Math.sqrt(Math.exp(lnNum - lnDen))
+
+  const rhoLambda = Math.pow(Math.max(rho, 1e-20), lambda)
+  const L = laguerreAssoc(nr, 2 * lambda + 1, rho)
+  const expPart = Math.exp(-rho / 2)
+
+  return norm * rhoLambda * L * expPart
 }
 
 // ---------------------------------------------------------------------------
@@ -131,21 +176,36 @@ const GL_WEIGHTS_32 = [
  * Uses Gauss-Laguerre quadrature with substitution r = x · s / 2 where
  * s = max(n1, n2) to handle the exponential decay scale.
  *
+ * When dimension ≠ 3, uses the D-dimensional radial wavefunction with
+ * effective quantum numbers n_eff = n + (D-3)/2.
+ *
  * @param n1 - Principal quantum number of state 1
  * @param l1 - Azimuthal quantum number of state 1
  * @param n2 - Principal quantum number of state 2
  * @param l2 - Azimuthal quantum number of state 2
+ * @param dimension - Spatial dimension D (default 3)
  * @returns Radial dipole integral in atomic units (a₀)
  */
-export function radialDipoleIntegral(n1: number, l1: number, n2: number, l2: number): number {
+export function radialDipoleIntegral(
+  n1: number,
+  l1: number,
+  n2: number,
+  l2: number,
+  dimension: number = 3
+): number {
+  // For D≠3, use effective principal quantum numbers for the scale estimate
+  const dimShift = (dimension - 3) / 2
+  const nEff1 = n1 + dimShift
+  const nEff2 = n2 + dimShift
+
   // Scale factor: map Gauss-Laguerre range to hydrogen radial scale.
-  // The integrand R1(r)·r·R2(r)·r² peaks at r ≈ (l1+l2+3)·n1·n2/(n1+n2)
-  // due to the r^(l1+l2+2) prefactor and exponential decay exp(-r(1/n1+1/n2)).
-  // Dividing by the mean GL node (~2.5) yields the optimal scale for centering
-  // the quadrature on the peak. The max(n1,n2) floor handles large-Δn transitions
-  // where the overlap region spans multiple radial scales.
-  const peakScale = ((l1 + l2 + 3) * n1 * n2) / ((n1 + n2) * 2.5)
-  const scale = Math.max(peakScale, Math.max(n1, n2))
+  // Use effective quantum numbers for ND to center quadrature correctly.
+  const lambda1 = l1 + dimShift
+  const lambda2 = l2 + dimShift
+  const peakScale = ((lambda1 + lambda2 + 3) * nEff1 * nEff2) / ((nEff1 + nEff2) * 2.5)
+  const scale = Math.max(peakScale, Math.max(nEff1, nEff2))
+
+  const useND = dimension !== 3
 
   let integral = 0
   for (let i = 0; i < 32; i++) {
@@ -155,11 +215,14 @@ export function radialDipoleIntegral(n1: number, l1: number, n2: number, l2: num
     // r = x * scale, dr = scale * dx
     // The quadrature integrates f(x) * exp(-x) dx
     // We need ∫ R1(r) * r * R2(r) * r² dr
-    // = ∫ R1(x*s) * (x*s) * R2(x*s) * (x*s)² * s * exp(-x) * exp(+x) dx
     // = s⁴ ∫ R1(x*s) * R2(x*s) * x³ * exp(+x) * [exp(-x) dx]
     const r = x * scale
-    const R1 = hydrogenRadialWavefunction(n1, l1, r)
-    const R2 = hydrogenRadialWavefunction(n2, l2, r)
+    const R1 = useND
+      ? hydrogenRadialWavefunctionND(n1, l1, r, dimension)
+      : hydrogenRadialWavefunction(n1, l1, r)
+    const R2 = useND
+      ? hydrogenRadialWavefunctionND(n2, l2, r, dimension)
+      : hydrogenRadialWavefunction(n2, l2, r)
 
     // exp(+x) compensates for the Gauss-Laguerre weight function exp(-x)
     integral += w * R1 * r * R2 * r * r * Math.exp(x) * scale
@@ -287,17 +350,22 @@ const dipoleCache = new Map<string, number>()
  * where the radial part is ∫ R_{n_j,l_j}(r) · r · R_{n_i,l_i}(r) · r² dr
  * and the angular part is the Gaunt coefficient.
  *
+ * When dimension ≠ 3, the radial integral uses D-dimensional wavefunctions
+ * for self-consistency with ND energy levels.
+ *
  * @param stateI - Initial hydrogen basis state
  * @param stateJ - Final hydrogen basis state
+ * @param dimension - Spatial dimension D (default 3)
  * @returns |⟨j|r|i⟩|² in atomic units (a₀²)
  */
 export function dipoleMatrixElementSquared(
   stateI: HydrogenBasisState,
-  stateJ: HydrogenBasisState
+  stateJ: HydrogenBasisState,
+  dimension: number = 3
 ): number {
-  // Cache key (symmetric: |⟨j|r|i⟩|² = |⟨i|r|j⟩|²)
+  // Cache key (symmetric: |⟨j|r|i⟩|² = |⟨i|r|j⟩|²), includes dimension
   const [a, b] = stateI.index < stateJ.index ? [stateI, stateJ] : [stateJ, stateI]
-  const key = `${a.n},${a.l},${a.m}-${b.n},${b.l},${b.m}`
+  const key = `${dimension}:${a.n},${a.l},${a.m}-${b.n},${b.l},${b.m}`
 
   const cached = dipoleCache.get(key)
   if (cached !== undefined) return cached
@@ -308,8 +376,8 @@ export function dipoleMatrixElementSquared(
     return 0
   }
 
-  // Radial integral
-  const radial = radialDipoleIntegral(stateI.n, stateI.l, stateJ.n, stateJ.l)
+  // Radial integral (dimension-aware)
+  const radial = radialDipoleIntegral(stateI.n, stateI.l, stateJ.n, stateJ.l, dimension)
 
   // Sum over spherical components q = -1, 0, +1
   let sumSq = 0

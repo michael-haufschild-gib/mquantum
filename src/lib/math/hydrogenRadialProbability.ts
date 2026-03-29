@@ -102,7 +102,7 @@ function hydrogenRadialND(n: number, l: number, r: number, a0: number, dim: numb
  * P(r) = 4πr² |R_nl(r)|²
  *
  * Scans a grid of r values to find the peak, returns the inverse for GPU normalization.
- * When dimension > 3, uses the D-dimensional radial wavefunction.
+ * When dimension ≠ 3, uses the D-dimensional radial wavefunction.
  *
  * @param n - Principal quantum number
  * @param l - Azimuthal quantum number
@@ -130,7 +130,7 @@ export function computeRadialProbabilityNorm(
   for (let i = 1; i <= steps; i++) {
     const r = i * dr
     const R =
-      dimension > 3
+      dimension !== 3
         ? hydrogenRadialND(validN, validL, r, validA0, dimension)
         : hydrogenRadial(validN, validL, r, validA0)
     const P = 4.0 * Math.PI * r * r * R * R

@@ -212,4 +212,42 @@ describe('computeRadialProbabilityNorm', () => {
       expect(norm).toBeCloseTo(normN1, 10)
     })
   })
+
+  describe('2D hydrogen (D = 2)', () => {
+    it('all D=2 orbitals up to n=5 produce finite positive norms', () => {
+      for (let n = 1; n <= 5; n++) {
+        for (let l = 0; l < n; l++) {
+          const norm = computeRadialProbabilityNorm(n, l, 1.0, 2)
+          expect(norm, `D=2, n=${n}, l=${l}`).toBeGreaterThan(0)
+          expect(Number.isFinite(norm), `D=2, n=${n}, l=${l} not finite`).toBe(true)
+        }
+      }
+    })
+
+    it('D=2 norm differs from D=3 (nEff shift changes peak)', () => {
+      // D=2: nEff = n - 0.5, D=3: nEff = n
+      // These must produce different normalization values
+      const norm2D = computeRadialProbabilityNorm(2, 1, 1.0, 2)
+      const norm3D = computeRadialProbabilityNorm(2, 1, 1.0, 3)
+      expect(norm2D).not.toBeCloseTo(norm3D, 2)
+    })
+
+    it('D=2 wavefunction is more compact than D=3 (lower nEff → higher peak → lower norm)', () => {
+      // D=2: nEff = n - 0.5 < n (D=3). More compact wavefunction → higher peak → lower norm.
+      const norm2D = computeRadialProbabilityNorm(2, 0, 1.0, 2)
+      const norm3D = computeRadialProbabilityNorm(2, 0, 1.0, 3)
+      expect(norm2D).toBeLessThan(norm3D)
+    })
+
+    it('D=2 routes through hydrogenRadialND, not the 3D function', () => {
+      // Regression test: previously D=2 used the 3D branch due to `dimension > 3` check.
+      // The 3D function at n=1 l=0 has peak P(r) at r=a0.
+      // The 2D function at n=1 l=0 has nEff=0.5, lambda=-0.5, a very different shape.
+      // If the 3D function were used, the norm would equal the standard 3D 1s norm.
+      const norm2D = computeRadialProbabilityNorm(1, 0, 1.0, 2)
+      const norm3D = computeRadialProbabilityNorm(1, 0, 1.0, 3)
+      // These must NOT be equal — they use fundamentally different radial functions
+      expect(Math.abs(norm2D - norm3D) / norm3D).toBeGreaterThan(0.1)
+    })
+  })
 })

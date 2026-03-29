@@ -282,3 +282,81 @@ describe('clearDipoleCache', () => {
     expect(after).toBeCloseTo(before, 10)
   })
 })
+
+// ---------------------------------------------------------------------------
+// N-dimensional dipole elements
+// ---------------------------------------------------------------------------
+
+describe('radialDipoleIntegral — ND', () => {
+  it('D=3 explicit matches default (backward compatibility)', () => {
+    const default3D = radialDipoleIntegral(1, 0, 2, 1)
+    const explicit3D = radialDipoleIntegral(1, 0, 2, 1, 3)
+    expect(explicit3D).toBeCloseTo(default3D, 12)
+  })
+
+  it('D=4 produces finite positive result for 1s→2p', () => {
+    const result = radialDipoleIntegral(1, 0, 2, 1, 4)
+    expect(Number.isFinite(result)).toBe(true)
+    expect(result).toBeGreaterThan(0)
+  })
+
+  it('D=4 differs from D=3 (effective quantum numbers shift)', () => {
+    const d3 = radialDipoleIntegral(1, 0, 2, 1, 3)
+    const d4 = radialDipoleIntegral(1, 0, 2, 1, 4)
+    // n_eff shifts by 0.5 at D=4, changing the radial overlap
+    expect(Math.abs(d4 - d3) / d3).toBeGreaterThan(0.05)
+  })
+
+  it('is symmetric for ND: ∫R₁·r·R₂·r²dr = ∫R₂·r·R₁·r²dr', () => {
+    const forward = radialDipoleIntegral(1, 0, 2, 1, 5)
+    const reverse = radialDipoleIntegral(2, 1, 1, 0, 5)
+    expect(forward).toBeCloseTo(reverse, 6)
+  })
+
+  it('D=7 high-n transitions produce finite results', () => {
+    const result = radialDipoleIntegral(3, 2, 4, 3, 7)
+    expect(Number.isFinite(result)).toBe(true)
+    expect(result).toBeGreaterThan(0)
+  })
+})
+
+describe('dipoleMatrixElementSquared — ND', () => {
+  it('D=3 explicit matches default', () => {
+    clearDipoleCache()
+    const s1 = makeState(0, 1, 0, 0)
+    const s2 = makeState(1, 2, 1, 0)
+    const default3D = dipoleMatrixElementSquared(s1, s2)
+    clearDipoleCache()
+    const explicit3D = dipoleMatrixElementSquared(s1, s2, 3)
+    expect(explicit3D).toBeCloseTo(default3D, 12)
+  })
+
+  it('D=4 produces different value than D=3 for same quantum numbers', () => {
+    clearDipoleCache()
+    const s1 = makeState(0, 1, 0, 0)
+    const s2 = makeState(1, 2, 1, 0)
+    const d3 = dipoleMatrixElementSquared(s1, s2, 3)
+    clearDipoleCache()
+    const d4 = dipoleMatrixElementSquared(s1, s2, 4)
+    expect(d4).toBeGreaterThan(0)
+    expect(Math.abs(d4 - d3) / d3).toBeGreaterThan(0.05)
+  })
+
+  it('cache distinguishes dimensions (same quantum numbers, different D)', () => {
+    clearDipoleCache()
+    const s1 = makeState(0, 1, 0, 0)
+    const s2 = makeState(1, 2, 1, 0)
+    const d3 = dipoleMatrixElementSquared(s1, s2, 3)
+    // Without clearing cache, D=5 should return a different value
+    const d5 = dipoleMatrixElementSquared(s1, s2, 5)
+    expect(d3).not.toBeCloseTo(d5, 2)
+  })
+
+  it('selection rules still enforced at D≠3', () => {
+    clearDipoleCache()
+    // Δl = 0 is forbidden regardless of dimension
+    const s1 = makeState(0, 1, 0, 0)
+    const s2 = makeState(1, 2, 0, 0)
+    expect(dipoleMatrixElementSquared(s1, s2, 5)).toBe(0)
+  })
+})

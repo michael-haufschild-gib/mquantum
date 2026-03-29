@@ -90,15 +90,20 @@ export function thermalOccupation(omega: number, temperature: number): number {
  *   - γ_up = A_ij · n̄ = thermal absorption
  *   - Detailed balance: γ_up / γ_down = n̄ / (1 + n̄) = exp(-ω/kT)
  *
+ * When dimension ≠ 3, dipole matrix elements use D-dimensional radial
+ * wavefunctions for self-consistency with ND energy levels.
+ *
  * @param basis - Hydrogen basis states (sorted by energy)
  * @param temperature - Bath temperature in Kelvin
  * @param couplingScale - Overall coupling multiplier (default 1.0)
+ * @param dimension - Spatial dimension D (default 3)
  * @returns Array of transition rates for all allowed pairs
  */
 export function buildTransitionRates(
   basis: readonly HydrogenBasisState[],
   temperature: number,
-  couplingScale: number = 1.0
+  couplingScale: number = 1.0,
+  dimension: number = 3
 ): TransitionRate[] {
   const rates: TransitionRate[] = []
   const K = basis.length
@@ -115,7 +120,7 @@ export function buildTransitionRates(
       const omega = Math.abs(stateJ.energy - stateI.energy)
       if (omega < 1e-15) continue // degenerate — no transition
 
-      const dipoleSq = dipoleMatrixElementSquared(stateI, stateJ)
+      const dipoleSq = dipoleMatrixElementSquared(stateI, stateJ, dimension)
       if (dipoleSq < 1e-30) continue
 
       const A = einsteinA(omega, dipoleSq)

@@ -131,7 +131,7 @@ export function buildHydrogenBasis(
   for (let n = 1; n <= maxN; n++) {
     for (let l = 0; l < n; l++) {
       for (let m = -l; m <= l; m++) {
-        const e3D = dimension > 3 ? hydrogenEnergyND(n, l, dimension) : hydrogenEnergy(n)
+        const e3D = dimension !== 3 ? hydrogenEnergyND(n, l, dimension) : hydrogenEnergy(n)
         const eExtra = numExtra > 0 ? extraDimEnergy(extraN, extraDimOmega) : 0
         states.push({
           index: 0, // assigned after sorting

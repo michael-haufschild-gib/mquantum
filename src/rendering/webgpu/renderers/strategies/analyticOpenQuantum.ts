@@ -151,7 +151,8 @@ export class AnalyticOpenQuantumExecutor {
       this.hydrogenRates = buildTransitionRates(
         this.hydrogenBasis,
         oqConfig.bathTemperature ?? 300,
-        oqConfig.couplingScale ?? 1.0
+        oqConfig.couplingScale ?? 1.0,
+        dim
       )
       this.hydrogenChannels = buildHydrogenChannels(
         this.hydrogenBasis,
