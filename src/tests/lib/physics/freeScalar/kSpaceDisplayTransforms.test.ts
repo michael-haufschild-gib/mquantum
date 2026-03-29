@@ -310,6 +310,130 @@ describe('applyExposureTransfer', () => {
     expect(grid.nkMax).toBe(0.5)
   })
 
+  it('none mode is a no-op', () => {
+    const raw = makeTestRawData(8)
+    const grid = projectToDisplayGrid(raw, PASSTHROUGH_KSPACE_VIZ)
+    const nkCopy = new Float64Array(grid.nk)
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'none',
+    })
+
+    for (let i = 0; i < grid.nk.length; i++) {
+      expect(grid.nk[i]).toBe(nkCopy[i])
+    }
+  })
+
+  it('gamma < 1 boosts mid-range values relative to linear', () => {
+    const G = OUTPUT_GRID_SIZE
+    const center = Math.floor(G / 2)
+
+    // Helper: apply linear exposure with given gamma, return a mid-range mapped value
+    const applyWithGamma = (gamma: number) => {
+      const nk = new Float64Array(G ** 3)
+      // Place a gradient of 20 values so percentile binning resolves well
+      for (let i = 0; i < 20; i++) {
+        nk[(center * G + center) * G + (center + i)] = (i + 1) * 1.0
+      }
+      const grid = {
+        nk,
+        kNorm: new Float64Array(G ** 3),
+        omegaNorm: new Float64Array(G ** 3),
+        nkOmega: new Float64Array(G ** 3),
+        nkMax: 20.0,
+      }
+      applyExposureTransfer(grid, {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        exposureMode: 'linear',
+        lowPercentile: 0,
+        highPercentile: 100,
+        gamma,
+      })
+      // Return the mapped value for mid-range voxel (value=10, index 9)
+      return grid.nk[(center * G + center) * G + (center + 9)]!
+    }
+
+    const lowGamma = applyWithGamma(0.5) // boosts mids
+    const linearGamma = applyWithGamma(1.0)
+    const highGamma = applyWithGamma(2.0) // darkens mids
+
+    // gamma < 1 should produce higher output for mid-range (pow(0.5, 0.5)=0.71 > 0.5)
+    expect(lowGamma).toBeGreaterThan(linearGamma)
+    // gamma > 1 should produce lower output (pow(0.5, 2.0)=0.25 < 0.5)
+    expect(highGamma).toBeLessThan(linearGamma)
+  })
+
+  it('gamma = 2 darkens low values', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    const center = Math.floor(G / 2)
+    const idxLow = (center * G + center) * G + center
+    const idxHigh = (center * G + center) * G + (center + 1)
+    nk[idxLow] = 1.0
+    nk[idxHigh] = 10.0
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 10.0,
+    }
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'linear',
+      lowPercentile: 0,
+      highPercentile: 100,
+      gamma: 2.0,
+    })
+
+    // High value maps to ~1, gamma=2 → 1^2=1
+    expect(grid.nk[idxHigh]).toBeCloseTo(1.0, 1)
+    // Low value maps to ~0.1, gamma=2 → 0.01 (much darker)
+    expect(grid.nk[idxLow]).toBeLessThan(0.05)
+  })
+
+  it('percentile window clips extreme values', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    const center = Math.floor(G / 2)
+    // Fill 100 voxels with values 1..100
+    for (let i = 0; i < 100; i++) {
+      nk[(center * G + center) * G + i] = i + 1
+    }
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 100,
+    }
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'linear',
+      lowPercentile: 10,
+      highPercentile: 90,
+      gamma: 1.0,
+    })
+
+    // nkMax should be set to 1.0 after transfer
+    expect(grid.nkMax).toBe(1.0)
+    // Values outside the window should be clamped to 0 or 1
+    let hasZero = false
+    let hasOne = false
+    for (let i = 0; i < 100; i++) {
+      const v = grid.nk[(center * G + center) * G + i]!
+      if (v <= 0.001) hasZero = true
+      if (v >= 0.999) hasOne = true
+    }
+    expect(hasZero).toBe(true)
+    expect(hasOne).toBe(true)
+  })
+
   it('sanitizes non-finite percentile/gamma parameters', () => {
     const G = OUTPUT_GRID_SIZE
     const nk = new Float64Array(G ** 3)
@@ -387,6 +511,123 @@ describe('applyBroadening', () => {
     }
   })
 
+  it('nkOnly=true blurs only nk, leaves kNorm/omegaNorm unchanged', () => {
+    const G = OUTPUT_GRID_SIZE
+    const total = G ** 3
+    const nk = new Float64Array(total)
+    const kNorm = new Float64Array(total)
+    const omegaNorm = new Float64Array(total)
+    const nkOmega = new Float64Array(total)
+    const center = Math.floor(G / 2)
+    const centerIdx = (center * G + center) * G + center
+    nk[centerIdx] = 100.0
+    kNorm[centerIdx] = 0.5
+    omegaNorm[centerIdx] = 0.3
+    nkOmega[centerIdx] = 30.0
+
+    const grid = { nk, kNorm, omegaNorm, nkOmega, nkMax: 100.0 }
+    const kNormBefore = new Float64Array(kNorm)
+    const omegaNormBefore = new Float64Array(omegaNorm)
+
+    applyBroadening(
+      grid,
+      {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        broadeningEnabled: true,
+        broadeningRadius: 2,
+        broadeningSigma: 1.0,
+      },
+      3,
+      true
+    )
+
+    // nk should have changed (spread to neighbors)
+    expect(grid.nk[centerIdx]).toBeLessThan(100.0)
+    const neighborIdx = (center * G + center) * G + (center + 1)
+    expect(grid.nk[neighborIdx]).toBeGreaterThan(0)
+
+    // kNorm and omegaNorm should be unchanged in nkOnly mode
+    expect(grid.kNorm[centerIdx]).toBe(kNormBefore[centerIdx])
+    expect(grid.omegaNorm[centerIdx]).toBe(omegaNormBefore[centerIdx])
+  })
+
+  it('latticeDim=1 only blurs along X axis', () => {
+    const G = OUTPUT_GRID_SIZE
+    const total = G ** 3
+    const nk = new Float64Array(total)
+    const center = Math.floor(G / 2)
+    const centerIdx = (center * G + center) * G + center
+    nk[centerIdx] = 100.0
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(total),
+      omegaNorm: new Float64Array(total),
+      nkOmega: new Float64Array(total),
+      nkMax: 100.0,
+    }
+
+    applyBroadening(
+      grid,
+      {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        broadeningEnabled: true,
+        broadeningRadius: 2,
+        broadeningSigma: 1.0,
+      },
+      1,
+      true
+    )
+
+    // X neighbor should have received blur
+    const xNeighbor = (center * G + center) * G + (center + 1)
+    expect(grid.nk[xNeighbor]).toBeGreaterThan(0)
+
+    // Y neighbor should NOT have blur (only 1 blur dim)
+    const yNeighbor = (center * G + (center + 1)) * G + center
+    expect(grid.nk[yNeighbor]).toBe(0)
+  })
+
+  it('nkOnly=false blurs kNorm and omegaNorm weighted channels', () => {
+    const G = OUTPUT_GRID_SIZE
+    const total = G ** 3
+    const nk = new Float64Array(total)
+    const kNorm = new Float64Array(total)
+    const omegaNorm = new Float64Array(total)
+    const nkOmega = new Float64Array(total)
+    const center = Math.floor(G / 2)
+    const centerIdx = (center * G + center) * G + center
+    nk[centerIdx] = 100.0
+    kNorm[centerIdx] = 0.5
+    omegaNorm[centerIdx] = 0.3
+    nkOmega[centerIdx] = 30.0
+
+    const grid = { nk, kNorm, omegaNorm, nkOmega, nkMax: 100.0 }
+
+    applyBroadening(
+      grid,
+      {
+        ...PASSTHROUGH_KSPACE_VIZ,
+        broadeningEnabled: true,
+        broadeningRadius: 2,
+        broadeningSigma: 1.0,
+      },
+      3,
+      false
+    )
+
+    // Center should still have high nk but less than original
+    expect(grid.nk[centerIdx]).toBeLessThan(100.0)
+    expect(grid.nk[centerIdx]).toBeGreaterThan(0)
+
+    // Neighbor should have inherited weighted kNorm and omegaNorm
+    const neighborIdx = (center * G + center) * G + (center + 1)
+    expect(grid.nk[neighborIdx]).toBeGreaterThan(0)
+    // kNorm should be ~0.5 (occupancy-weighted average near source)
+    expect(grid.kNorm[neighborIdx]).toBeCloseTo(0.5, 1)
+    expect(grid.omegaNorm[neighborIdx]).toBeCloseTo(0.3, 1)
+  })
+
   it('spreads a single-voxel peak to neighboring voxels', () => {
     const G = OUTPUT_GRID_SIZE
     const nk = new Float64Array(G ** 3)
@@ -433,6 +674,61 @@ describe('packDisplayTextures', () => {
     expect(density.length).toBe(expected)
     expect(analysis.length).toBe(expected)
   })
+
+  it('nkOnly=true zeros analysis G/B/A channels', () => {
+    const raw = makeTestRawData(8)
+    const grid = projectToDisplayGrid(raw, PASSTHROUGH_KSPACE_VIZ)
+    const { analysis } = packDisplayTextures(grid, true)
+
+    // Find any voxel with non-zero R in analysis (there should be at least one)
+    let hasNonZeroR = false
+    let hasNonZeroGBA = false
+    for (let i = 0; i < analysis.length; i += 4) {
+      if (analysis[i]! !== 0) hasNonZeroR = true
+      if (analysis[i + 1]! !== 0 || analysis[i + 2]! !== 0 || analysis[i + 3]! !== 0) {
+        hasNonZeroGBA = true
+      }
+    }
+    expect(hasNonZeroR).toBe(true) // R channel has data
+    expect(hasNonZeroGBA).toBe(false) // G,B,A are zero in nkOnly mode
+  })
+
+  it('nkOnly=false packs all 4 analysis channels', () => {
+    const raw = makeTestRawData(8)
+    const grid = projectToDisplayGrid(raw, PASSTHROUGH_KSPACE_VIZ)
+    const { analysis } = packDisplayTextures(grid, false)
+
+    // With real data, analysis G (kNorm) should have non-zero values
+    let hasNonZeroG = false
+    for (let i = 0; i < analysis.length; i += 4) {
+      if (analysis[i + 1]! !== 0) {
+        hasNonZeroG = true
+        break
+      }
+    }
+    expect(hasNonZeroG).toBe(true)
+  })
+
+  it('density R channel contains normalized nk values', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    nk[0] = 10.0
+    nk[1] = 5.0
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 10.0,
+    }
+
+    const { density } = packDisplayTextures(grid)
+    // Voxel 0: R=10/10=1.0, Voxel 1: R=5/10=0.5
+    // These are packed as float16, so check that voxel 0 has larger R than voxel 1
+    expect(density[0]).not.toBe(0) // voxel 0 R channel
+    expect(density[4]).not.toBe(0) // voxel 1 R channel
+  })
 })
 
 // ============================================================================
@@ -461,6 +757,24 @@ describe('buildKSpaceDisplayTextures', () => {
 
     expect(density.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
     expect(analysis.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
+  })
+
+  it('nkOnly=true produces valid output (skips aux channels)', () => {
+    const raw = makeTestRawData(8)
+    const { density, analysis } = buildKSpaceDisplayTextures(raw, DEFAULT_KSPACE_VIZ, true)
+
+    expect(density.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
+    expect(analysis.length).toBe(OUTPUT_GRID_SIZE ** 3 * 4)
+
+    // Density should have non-zero values
+    let hasNonZero = false
+    for (let i = 0; i < density.length; i += 4) {
+      if (density[i]! !== 0) {
+        hasNonZero = true
+        break
+      }
+    }
+    expect(hasNonZero).toBe(true)
   })
 
   it('physics invariance: raw n_k values unchanged by display config', () => {

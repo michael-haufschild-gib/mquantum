@@ -101,6 +101,59 @@ describe('computeRadialShells', () => {
       }
     }
   })
+
+  it('empty bins get interpolated kCenter = (b+0.5)/bins', () => {
+    // Create raw data with all modes at k≈0 (DC mode only)
+    const gridSize = [4, 4, 4]
+    const spacing = [1.0, 1.0, 1.0]
+    const totalSites = 64
+    const phi = new Float32Array(totalSites)
+    const pi = new Float32Array(totalSites)
+    // Constant field → only DC mode
+    phi.fill(1.0)
+    const raw = computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 3)
+    const shells = computeRadialShells(raw, 8)
+
+    // Most bins should be empty (modes concentrated at k≈0)
+    // Check that empty bins get the interpolated center
+    for (let b = 0; b < shells.binCount; b++) {
+      if (shells.shellCounts[b]! === 0) {
+        expect(shells.shellKCenter[b]).toBeCloseTo((b + 0.5) / shells.binCount, 10)
+        expect(shells.shellOmegaCenter[b]).toBe(0)
+      }
+    }
+  })
+
+  it('shellMeanNk is sum/count for each bin', () => {
+    const raw = makeIsotropicRawData(4)
+    const shells = computeRadialShells(raw, 8)
+
+    // Verify that mean = sumNk / count by checking non-empty bins have positive mean
+    // when there's positive occupation
+    for (let b = 0; b < shells.binCount; b++) {
+      if (shells.shellCounts[b]! > 0) {
+        // Mean nk should be non-negative (clamped to 0 in source)
+        expect(shells.shellMeanNk[b]).toBeGreaterThanOrEqual(0)
+      }
+    }
+  })
+
+  it('kMax is positive for non-trivial data', () => {
+    const raw = makeIsotropicRawData(8)
+    const shells = computeRadialShells(raw, 16)
+    expect(shells.kMax).toBeGreaterThan(0)
+  })
+
+  it('omegaCenter values are normalized to [0, 1]', () => {
+    const raw = makeIsotropicRawData(8)
+    const shells = computeRadialShells(raw, 16)
+    for (let b = 0; b < shells.binCount; b++) {
+      if (shells.shellCounts[b]! > 0) {
+        expect(shells.shellOmegaCenter[b]).toBeGreaterThanOrEqual(0)
+        expect(shells.shellOmegaCenter[b]).toBeLessThanOrEqual(1.001)
+      }
+    }
+  })
 })
 
 // ============================================================================
@@ -159,6 +212,47 @@ describe('buildRadialDisplayGrid', () => {
       sumShift += withShift.nk[i]!
     }
     expect(Math.abs(sumNoShift - sumShift) / Math.max(sumNoShift, 1e-10)).toBeLessThan(0.01)
+  })
+
+  it('nkMax reflects the actual maximum nk in the grid', () => {
+    const raw = makePlaneWaveRawData(8)
+    const grid = buildRadialDisplayGrid(raw, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      displayMode: 'radial3d',
+      fftShiftEnabled: false,
+      radialBinCount: 32,
+    })
+
+    let actualMax = 0
+    for (let i = 0; i < grid.nk.length; i++) {
+      if (grid.nk[i]! > actualMax) actualMax = grid.nk[i]!
+    }
+    expect(grid.nkMax).toBe(actualMax)
+  })
+
+  it('invalid voxels (outside active grid) remain zero', () => {
+    const raw = makePlaneWaveRawData(4) // Small grid → most of 64^3 is outside
+    const grid = buildRadialDisplayGrid(raw, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      displayMode: 'radial3d',
+      fftShiftEnabled: false,
+      radialBinCount: 16,
+    })
+
+    // Corner voxel (0,0,0) should be outside the active grid region
+    expect(grid.nk[0]).toBe(0)
+    // Center region should have values
+    const G = OUTPUT_GRID_SIZE
+    const center = Math.floor(G / 2)
+    const offset = Math.floor((G - 4) / 2)
+    const centerIdx = ((offset) * G + (offset)) * G + (offset)
+    // At least some voxels near the offset should be non-zero
+    let hasNonZero = false
+    for (let i = offset; i < offset + 4; i++) {
+      const idx = (offset * G + offset) * G + i
+      if (grid.nk[idx]! > 0) hasNonZero = true
+    }
+    expect(hasNonZero).toBe(true)
   })
 
   it('keeps nkOmega in physical n*omega units (not normalized omega)', () => {

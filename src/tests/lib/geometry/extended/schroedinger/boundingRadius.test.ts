@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import type { DiracConfig } from '@/lib/geometry/extended/dirac'
+import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
 import {
   computeBoundingRadius,
+  computeDiracBoundingRadius,
   computeHOBoundingRadius,
   computeHOMomentumBoundingRadius,
   computeHydrogenBoundingRadius,
@@ -265,5 +268,152 @@ describe('computeBoundingRadius (dispatch)', () => {
     // Active physics is n=2, D=4 hydrogen core + one extra dim in ground state.
     // n_eff = 2 + (4-3)/2 = 2.5, radius = 2.5^2 * 1.0 * 3.0 = 18.75.
     expect(R).toBeCloseTo(18.75, 6)
+  })
+
+  it('dispatches to Dirac for diracEquation mode', () => {
+    const diracConfig: DiracConfig = {
+      ...DEFAULT_DIRAC_CONFIG,
+      gridSize: [32, 32, 32],
+      spacing: [0.2, 0.2, 0.2],
+    }
+    const R = computeBoundingRadius(
+      'diracEquation',
+      null,
+      3,
+      2,
+      1.0,
+      undefined,
+      undefined,
+      'position',
+      1.0,
+      diracConfig
+    )
+    // maxExtent = 32 * 0.2 * 0.5 = 3.2, R = 3.2 * 1.1 = 3.52
+    expect(R).toBeCloseTo(3.52, 2)
+  })
+
+  it('dispatches hydrogenNDCoupled same as hydrogenND for position space', () => {
+    const R_nd = computeBoundingRadius('hydrogenND', null, 3, 3, 1.0)
+    const R_coupled = computeBoundingRadius('hydrogenNDCoupled', null, 3, 3, 1.0)
+    expect(R_coupled).toBe(R_nd)
+  })
+
+  it('dispatches hydrogenNDCoupled same as hydrogenND for momentum space', () => {
+    const R_nd = computeBoundingRadius(
+      'hydrogenND',
+      null,
+      3,
+      3,
+      1.0,
+      undefined,
+      undefined,
+      'momentum'
+    )
+    const R_coupled = computeBoundingRadius(
+      'hydrogenNDCoupled',
+      null,
+      3,
+      3,
+      1.0,
+      undefined,
+      undefined,
+      'momentum'
+    )
+    expect(R_coupled).toBe(R_nd)
+  })
+
+  it('returns MIN_BOUND_R for momentum HO with no preset', () => {
+    const R = computeBoundingRadius(
+      'harmonicOscillator',
+      null,
+      3,
+      2,
+      1.0,
+      undefined,
+      undefined,
+      'momentum'
+    )
+    expect(R).toBe(2.0)
+  })
+})
+
+describe('computeDiracBoundingRadius', () => {
+  it('computes radius from lattice extent with 1.1 margin', () => {
+    const config: DiracConfig = {
+      ...DEFAULT_DIRAC_CONFIG,
+      gridSize: [64, 64, 64],
+      spacing: [0.15, 0.15, 0.15],
+    }
+    // maxExtent = 64 * 0.15 * 0.5 = 4.8, R = 4.8 * 1.1 = 5.28
+    const R = computeDiracBoundingRadius(3, config)
+    expect(R).toBeCloseTo(5.28, 2)
+  })
+
+  it('returns at least MIN_BOUND_R for small grids', () => {
+    const config: DiracConfig = {
+      ...DEFAULT_DIRAC_CONFIG,
+      gridSize: [4, 4, 4],
+      spacing: [0.01, 0.01, 0.01],
+    }
+    // maxExtent = 4 * 0.01 * 0.5 = 0.02, 0.02*1.1 = 0.022 < 2.0
+    const R = computeDiracBoundingRadius(3, config)
+    expect(R).toBe(2.0)
+  })
+
+  it('uses only min(dimension, 3) axes', () => {
+    const config: DiracConfig = {
+      ...DEFAULT_DIRAC_CONFIG,
+      gridSize: [64, 64, 64, 128, 128],
+      spacing: [0.1, 0.1, 0.1, 0.5, 0.5],
+    }
+    // Only first 3 dims: maxExtent = 64*0.1*0.5 = 3.2
+    // The 4th/5th dims (128*0.5*0.5=32) are excluded for dim=3
+    const R3 = computeDiracBoundingRadius(3, config)
+    expect(R3).toBeCloseTo(3.2 * 1.1, 2)
+  })
+
+  it('handles anisotropic spacing (picks largest extent)', () => {
+    const config: DiracConfig = {
+      ...DEFAULT_DIRAC_CONFIG,
+      gridSize: [32, 64, 16],
+      spacing: [0.1, 0.2, 0.5],
+    }
+    // Extents: 32*0.1*0.5=1.6, 64*0.2*0.5=6.4, 16*0.5*0.5=4.0
+    // max = 6.4, R = 6.4 * 1.1 = 7.04
+    const R = computeDiracBoundingRadius(3, config)
+    expect(R).toBeCloseTo(7.04, 2)
+  })
+})
+
+describe('computeHydrogenBoundingRadius — extra dimensions formula', () => {
+  it('extra dim HO formula: R_j = (sqrt(2n+1) + margin) / alpha', () => {
+    // n=4, omega=1.0 → alpha=1.0, turning = sqrt(9) = 3, R = (3 + 2.5)/1 = 5.5
+    const R = computeHydrogenBoundingRadius(1, 0.001, [4], [1.0], 4)
+    // Hydrogen core: nEff = 1 + 0.5 = 1.5, hydrogenR = 1.5^2 * 0.001 * 3 = 0.00675
+    // Extra dim: R = (sqrt(9) + 2.5) / 1 = 5.5 → dominates
+    expect(R).toBeCloseTo(5.5, 1)
+  })
+
+  it('extra dim with low omega gives large radius', () => {
+    // n=0, omega=0.25 → alpha=0.5, turning = sqrt(1)/0.5 = 2, margin = 2.5/0.5 = 5, R = 7
+    const R = computeHydrogenBoundingRadius(1, 0.001, [0], [0.25], 4)
+    expect(R).toBeCloseTo(7.0, 1)
+  })
+})
+
+describe('computeHydrogenMomentumBoundingRadius — extra dimensions', () => {
+  it('extra dim momentum formula: R_j = (sqrt(2n+1) + margin) * alpha / kScale', () => {
+    // n=2, omega=4.0 → alpha=2.0, k_extent = (sqrt(5)+2.5)*2 = (2.236+2.5)*2 = 9.472
+    // Use large a0 so hydrogen term (6/(nEff*a0*kScale)) is small
+    // nEff = 1 + (4-3)/2 = 1.5, hydrogenK/kScale = 6/(1.5*10) = 0.4
+    const R = computeHydrogenMomentumBoundingRadius(1, 10.0, 1.0, [2], [4.0], 4)
+    const expected = (Math.sqrt(5) + 2.5) * 2.0
+    expect(R).toBeCloseTo(expected, 1)
+  })
+
+  it('small momentumScale is clamped to 0.01', () => {
+    const R_small = computeHydrogenMomentumBoundingRadius(1, 1.0, 0)
+    expect(Number.isFinite(R_small)).toBe(true)
+    expect(R_small).toBeGreaterThan(2.0)
   })
 })

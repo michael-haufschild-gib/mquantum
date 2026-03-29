@@ -139,4 +139,77 @@ describe('computeRadialProbabilityNorm', () => {
       expect(a).toBe(b) // exact equality — deterministic
     })
   })
+
+  describe('N-dimensional hydrogen (D > 3)', () => {
+    it('all D=5 orbitals up to n=5 produce finite positive norms', () => {
+      for (let n = 1; n <= 5; n++) {
+        for (let l = 0; l < n; l++) {
+          const norm = computeRadialProbabilityNorm(n, l, 1.0, 5)
+          expect(norm, `D=5, n=${n}, l=${l}`).toBeGreaterThan(0)
+          expect(Number.isFinite(norm), `D=5, n=${n}, l=${l} not finite`).toBe(true)
+        }
+      }
+    })
+
+    it('D=3 and D>3 agree at 1s orbital (nEff is the same when D=3)', () => {
+      const norm3D = computeRadialProbabilityNorm(1, 0, 1.0, 3)
+      // For D=3, n_eff = n + 0 = 1, same as standard hydrogen
+      // This verifies the D>3 branch handles D=3 correctly
+      const norm3D_explicit = computeRadialProbabilityNorm(1, 0, 1.0)
+      expect(norm3D).toBeCloseTo(norm3D_explicit, 10)
+    })
+
+    it('D=4 norm is different from D=3 (nEff shift changes peak)', () => {
+      const norm3D = computeRadialProbabilityNorm(2, 1, 1.0, 3)
+      const norm4D = computeRadialProbabilityNorm(2, 1, 1.0, 4)
+      expect(norm4D).not.toBeCloseTo(norm3D, 2)
+    })
+
+    it('higher D spreads the wavefunction (increases norm = lower peak)', () => {
+      // Increasing dimension with fixed n,l should spread the wavefunction
+      // nEff = n + (D-3)/2 grows with D
+      const norm3D = computeRadialProbabilityNorm(2, 0, 1.0, 3)
+      const norm5D = computeRadialProbabilityNorm(2, 0, 1.0, 5)
+      const norm7D = computeRadialProbabilityNorm(2, 0, 1.0, 7)
+      // Higher D → larger nEff → more spread → lower peak → higher norm
+      expect(norm5D).toBeGreaterThan(norm3D)
+      expect(norm7D).toBeGreaterThan(norm5D)
+    })
+
+    it('n_eff = n + (D-3)/2: D=5 n=2 matches D=3 n=3 effective behavior', () => {
+      // D=5, n=2: nEff = 2 + 1 = 3
+      // D=3, n=3: nEff = 3 + 0 = 3
+      // Same nEff doesn't mean identical norms (the radial functions differ
+      // because lambda = l + (D-3)/2 also changes), but for l=0 (s-orbital):
+      // D=5 n=2 l=0: lambda=1, nr=1, nEff=3
+      // D=3 n=3 l=0: uses standard formula with l=0, n=3
+      // These use different code paths, so just verify D=5 n=2 produces a reasonable value
+      const norm = computeRadialProbabilityNorm(2, 0, 1.0, 5)
+      expect(norm).toBeGreaterThan(0)
+      expect(norm).toBeLessThan(100) // sanity bound
+    })
+
+    it('Bohr radius scaling works in N-dimensional case', () => {
+      const normSmall = computeRadialProbabilityNorm(2, 0, 0.5, 5)
+      const normLarge = computeRadialProbabilityNorm(2, 0, 2.0, 5)
+      // Larger a0 → more spread → lower peak → higher norm
+      expect(normLarge).toBeGreaterThan(normSmall)
+    })
+
+    it('D=11 high quantum numbers do not overflow', () => {
+      for (let n = 1; n <= 5; n++) {
+        for (const l of [0, Math.min(n - 1, 3)]) {
+          const norm = computeRadialProbabilityNorm(n, l, 1.0, 11)
+          expect(Number.isFinite(norm), `D=11, n=${n}, l=${l}`).toBe(true)
+          expect(norm, `D=11, n=${n}, l=${l}`).toBeGreaterThan(0)
+        }
+      }
+    })
+
+    it('clamps n to valid range even for D>3', () => {
+      const norm = computeRadialProbabilityNorm(0, 0, 1.0, 5)
+      const normN1 = computeRadialProbabilityNorm(1, 0, 1.0, 5)
+      expect(norm).toBeCloseTo(normN1, 10)
+    })
+  })
 })

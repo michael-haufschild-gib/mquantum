@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { computePMLSigmaMax, computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import {
+  computePMLSigmaMax,
+  computePMLSigmaMaxND,
+  PML_GRADING_EXPONENT,
+} from '@/lib/physics/pml/profile'
 
 describe('computePMLSigmaMax (legacy per-step formula)', () => {
   it('outer-edge damping per full step equals R_target', () => {
@@ -59,6 +63,81 @@ describe('computePMLSigmaMaxND (traversal formula)', () => {
     expect(computePMLSigmaMaxND(1e-6, 0, [64], 0.005)).toBe(0)
     expect(computePMLSigmaMaxND(1e-6, 0.5, [64], 0.005)).toBe(0)
     expect(computePMLSigmaMaxND(1e-6, 0.2, [], 0.005)).toBe(0)
+  })
+})
+
+describe('computePMLSigmaMax — edge cases', () => {
+  it('returns 0 for Infinity dt', () => {
+    expect(computePMLSigmaMax(1e-6, Infinity)).toBe(0)
+  })
+
+  it('returns 0 for Infinity targetReflection', () => {
+    expect(computePMLSigmaMax(Infinity, 0.005)).toBe(0)
+  })
+
+  it('σ_max increases with smaller R_target (stronger damping)', () => {
+    const s1 = computePMLSigmaMax(1e-3, 0.005)
+    const s2 = computePMLSigmaMax(1e-6, 0.005)
+    const s3 = computePMLSigmaMax(1e-10, 0.005)
+    expect(s2).toBeGreaterThan(s1)
+    expect(s3).toBeGreaterThan(s2)
+  })
+
+  it('σ_max is inversely proportional to dt', () => {
+    const s1 = computePMLSigmaMax(1e-6, 0.01)
+    const s2 = computePMLSigmaMax(1e-6, 0.005)
+    // s2 should be ~2x s1
+    expect(s2 / s1).toBeCloseTo(2.0, 5)
+  })
+
+  it('specific value: R=1e-6, dt=0.005 gives σ_max = -ln(1e-6)/0.005', () => {
+    const expected = -Math.log(1e-6) / 0.005
+    expect(computePMLSigmaMax(1e-6, 0.005)).toBeCloseTo(expected, 5)
+  })
+})
+
+describe('computePMLSigmaMaxND — edge cases', () => {
+  it('defaults latticeDim to gridSizes.length when omitted', () => {
+    const dt = 0.005
+    const gridSizes = [64, 64]
+    const withDim = computePMLSigmaMaxND(1e-6, 0.2, gridSizes, dt, 3, 2)
+    const withoutDim = computePMLSigmaMaxND(1e-6, 0.2, gridSizes, dt, 3)
+    expect(withoutDim).toBe(withDim)
+  })
+
+  it('returns 0 for zero-size grid dimension', () => {
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64, 0], 0.005, 3, 2)).toBe(0)
+  })
+
+  it('returns 0 for dims=0', () => {
+    expect(computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, 3, 0)).toBe(0)
+  })
+
+  it('returns 0 for R_target >= 1', () => {
+    expect(computePMLSigmaMaxND(1.0, 0.2, [64], 0.005, 3, 1)).toBe(0)
+    expect(computePMLSigmaMaxND(1.5, 0.2, [64], 0.005, 3, 1)).toBe(0)
+  })
+
+  it('order is clamped to minimum 1', () => {
+    const s = computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, 0, 1)
+    const sOrder1 = computePMLSigmaMaxND(1e-6, 0.2, [64], 0.005, 1, 1)
+    expect(s).toBe(sOrder1)
+  })
+
+  it('higher order → larger σ_max (steeper grading concentrates absorption)', () => {
+    const dt = 0.005
+    const gs = [64, 64, 64]
+    const s1 = computePMLSigmaMaxND(1e-6, 0.2, gs, dt, 1, 3)
+    const s3 = computePMLSigmaMaxND(1e-6, 0.2, gs, dt, 3, 3)
+    const s5 = computePMLSigmaMaxND(1e-6, 0.2, gs, dt, 5, 3)
+    expect(s3).toBeGreaterThan(s1)
+    expect(s5).toBeGreaterThan(s3)
+  })
+})
+
+describe('PML_GRADING_EXPONENT', () => {
+  it('is 3 (cubic polynomial)', () => {
+    expect(PML_GRADING_EXPONENT).toBe(3)
   })
 })
 

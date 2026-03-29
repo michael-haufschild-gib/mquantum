@@ -47,6 +47,11 @@ function createConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
     doubleWellSeparation: 1.0,
     doubleWellLambda: 1.0,
     doubleWellAsymmetry: 0,
+    radialWellInner: 0.6,
+    radialWellOuter: 1.8,
+    radialWellDepth: 50.0,
+    radialWellTilt: 0.5,
+    anharmonicLambda: 1.0,
     driveAmplitude: 1,
     driveFrequency: 1,
     driveWaveform: 'sine',
@@ -181,6 +186,50 @@ describe('evaluatePotential1D', () => {
     expect(evaluatePotential1D(0.3, cfg)).toBe(20)
     // Outside wall
     expect(evaluatePotential1D(2.0, cfg)).toBe(0)
+  })
+
+  it('radialDoubleWell V = D*(|x|-r1)²*(|x|-r2)² - tilt*|x|', () => {
+    const cfg = createConfig({
+      potentialType: 'radialDoubleWell',
+      radialWellInner: 1.0,
+      radialWellOuter: 3.0,
+      radialWellDepth: 1.0,
+      radialWellTilt: 0,
+    } as Partial<TdseConfig>)
+    // At x=1 (inner well): dr1=0, V=0
+    expect(evaluatePotential1D(1, cfg)).toBeCloseTo(0, 10)
+    // At x=-1: r=|x|=1, same result
+    expect(evaluatePotential1D(-1, cfg)).toBeCloseTo(0, 10)
+    // At x=3 (outer well): dr2=0, V=0
+    expect(evaluatePotential1D(3, cfg)).toBeCloseTo(0, 10)
+    // At x=2 (midpoint): dr1=1, dr2=-1, V=1*1*1=1
+    expect(evaluatePotential1D(2, cfg)).toBeCloseTo(1.0, 10)
+  })
+
+  it('radialDoubleWell tilt breaks symmetry between inner and outer wells', () => {
+    const cfg = createConfig({
+      potentialType: 'radialDoubleWell',
+      radialWellInner: 1.0,
+      radialWellOuter: 3.0,
+      radialWellDepth: 1.0,
+      radialWellTilt: 0.5,
+    } as Partial<TdseConfig>)
+    // At r=1: V = 0 - 0.5*1 = -0.5
+    expect(evaluatePotential1D(1, cfg)).toBeCloseTo(-0.5, 10)
+    // At r=3: V = 0 - 0.5*3 = -1.5
+    expect(evaluatePotential1D(3, cfg)).toBeCloseTo(-1.5, 10)
+  })
+
+  it('coupledAnharmonic 1D slice equals pure harmonic (cross terms vanish)', () => {
+    const cfg = createConfig({
+      potentialType: 'coupledAnharmonic',
+      mass: 1.0,
+      harmonicOmega: 2.0,
+    } as Partial<TdseConfig>)
+    // On the 1D axis, coupling vanishes → V = 0.5*m*ω²*x²
+    // V(3) = 0.5 * 1 * 4 * 9 = 18
+    expect(evaluatePotential1D(3, cfg)).toBeCloseTo(18, 10)
+    expect(evaluatePotential1D(0, cfg)).toBeCloseTo(0, 10)
   })
 
   it('unknown potential type returns 0', () => {
@@ -330,16 +379,88 @@ describe('getPotentialPlotScale', () => {
       'doubleSlit',
       'periodicLattice',
       'doubleWell',
+      'radialDoubleWell',
+      'coupledAnharmonic',
     ] as const
     for (const pt of types) {
-      const cfg = createConfig({ potentialType: pt })
-      expect(getPotentialPlotScale(cfg)).toBeGreaterThanOrEqual(1)
+      const cfg = createConfig({ potentialType: pt } as Partial<TdseConfig>)
+      expect(getPotentialPlotScale(cfg), `${pt}`).toBeGreaterThanOrEqual(1)
     }
   })
 
   it('returns barrierHeight for barrier type', () => {
     const cfg = createConfig({ potentialType: 'barrier', barrierHeight: 15 })
     expect(getPotentialPlotScale(cfg)).toBe(15)
+  })
+
+  it('returns stepHeight for step type', () => {
+    const cfg = createConfig({ potentialType: 'step', stepHeight: 12 })
+    expect(getPotentialPlotScale(cfg)).toBe(12)
+  })
+
+  it('returns wellDepth for finiteWell type', () => {
+    const cfg = createConfig({ potentialType: 'finiteWell', wellDepth: 7 })
+    expect(getPotentialPlotScale(cfg)).toBe(7)
+  })
+
+  it('returns wallHeight for doubleSlit type', () => {
+    const cfg = createConfig({ potentialType: 'doubleSlit', wallHeight: 25 })
+    expect(getPotentialPlotScale(cfg)).toBe(25)
+  })
+
+  it('returns latticeDepth for periodicLattice type', () => {
+    const cfg = createConfig({ potentialType: 'periodicLattice', latticeDepth: 9 })
+    expect(getPotentialPlotScale(cfg)).toBe(9)
+  })
+
+  it('returns barrierHeight for driven type', () => {
+    const cfg = createConfig({ potentialType: 'driven', barrierHeight: 11 } as Partial<TdseConfig>)
+    expect(getPotentialPlotScale(cfg)).toBe(11)
+  })
+
+  it('returns λ*a⁴ for doubleWell type', () => {
+    const cfg = createConfig({
+      potentialType: 'doubleWell',
+      doubleWellLambda: 2,
+      doubleWellSeparation: 3,
+    })
+    // scale = λ * a⁴ = 2 * 81 = 162
+    expect(getPotentialPlotScale(cfg)).toBe(162)
+  })
+
+  it('returns barrier height between wells for radialDoubleWell', () => {
+    const cfg = createConfig({
+      potentialType: 'radialDoubleWell',
+      radialWellInner: 1.0,
+      radialWellOuter: 3.0,
+      radialWellDepth: 1.0,
+    } as Partial<TdseConfig>)
+    // rMid = 2, dr1 = 1, dr2 = -1, scale = 1 * 1 * 1 = 1
+    expect(getPotentialPlotScale(cfg)).toBe(1)
+  })
+
+  it('returns harmonic scale at quarter-domain for coupledAnharmonic', () => {
+    const cfg = createConfig({
+      potentialType: 'coupledAnharmonic',
+      mass: 1.0,
+      harmonicOmega: 2.0,
+      gridSize: [64],
+      spacing: [0.1],
+    } as Partial<TdseConfig>)
+    // r = 64*0.1*0.25 = 1.6, scale = 0.5*1*4*2.56 = 5.12
+    expect(getPotentialPlotScale(cfg)).toBeCloseTo(5.12, 10)
+  })
+
+  it('returns harmonicTrap scale based on quarter-domain', () => {
+    const cfg = createConfig({
+      potentialType: 'harmonicTrap',
+      mass: 1.0,
+      harmonicOmega: 2.0,
+      gridSize: [64],
+      spacing: [0.1],
+    })
+    // r = 64*0.1*0.25 = 1.6, scale = 0.5*1*4*2.56 = 5.12
+    expect(getPotentialPlotScale(cfg)).toBeCloseTo(5.12, 10)
   })
 
   it('returns max|V| for custom expression', () => {
@@ -382,5 +503,14 @@ describe('computePacketKineticEnergy', () => {
   it('returns 0 for zero momentum', () => {
     const cfg = createConfig({ packetMomentum: [0, 0, 0] })
     expect(computePacketKineticEnergy(cfg)).toBe(0)
+  })
+
+  it('scales with hbar²', () => {
+    const cfg1 = createConfig({ hbar: 1, mass: 1, packetMomentum: [2] })
+    const cfg2 = createConfig({ hbar: 2, mass: 1, packetMomentum: [2] })
+    // E1 = 1*4/2 = 2, E2 = 4*4/2 = 8
+    expect(computePacketKineticEnergy(cfg1)).toBeCloseTo(2, 10)
+    expect(computePacketKineticEnergy(cfg2)).toBeCloseTo(8, 10)
+    expect(computePacketKineticEnergy(cfg2) / computePacketKineticEnergy(cfg1)).toBeCloseTo(4, 10)
   })
 })
