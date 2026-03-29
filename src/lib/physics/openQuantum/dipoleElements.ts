@@ -138,8 +138,14 @@ const GL_WEIGHTS_32 = [
  * @returns Radial dipole integral in atomic units (a₀)
  */
 export function radialDipoleIntegral(n1: number, l1: number, n2: number, l2: number): number {
-  // Scale factor: map Gauss-Laguerre range to hydrogen radial scale
-  const scale = Math.max(n1, n2) * 0.5
+  // Scale factor: map Gauss-Laguerre range to hydrogen radial scale.
+  // The integrand R1(r)·r·R2(r)·r² peaks at r ≈ (l1+l2+3)·n1·n2/(n1+n2)
+  // due to the r^(l1+l2+2) prefactor and exponential decay exp(-r(1/n1+1/n2)).
+  // Dividing by the mean GL node (~2.5) yields the optimal scale for centering
+  // the quadrature on the peak. The max(n1,n2) floor handles large-Δn transitions
+  // where the overlap region spans multiple radial scales.
+  const peakScale = ((l1 + l2 + 3) * n1 * n2) / ((n1 + n2) * 2.5)
+  const scale = Math.max(peakScale, Math.max(n1, n2))
 
   let integral = 0
   for (let i = 0; i < 32; i++) {
