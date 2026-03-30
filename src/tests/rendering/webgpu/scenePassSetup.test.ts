@@ -123,11 +123,28 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.temporalReprojectionEnabled).toBe(false)
   })
 
-  it('forces dimension >= 3 for compute modes with lower dimension', () => {
-    const extracted = extractSchrodingerConfig(
+  it('forces dimension >= 3 for BEC and Dirac at lower dimension', () => {
+    const bec = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'becDynamics', dimension: 2 })
+    )
+    expect(bec.dimension).toBe(3)
+
+    const dirac = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'diracEquation', dimension: 2 })
+    )
+    expect(dirac.dimension).toBe(3)
+  })
+
+  it('allows dimension 2 for TDSE and freeScalarField', () => {
+    const tdse = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'tdseDynamics', dimension: 2 })
+    )
+    expect(tdse.dimension).toBe(2)
+
+    const fs = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'freeScalarField', dimension: 2 })
     )
-    expect(extracted.dimension).toBe(3)
+    expect(fs.dimension).toBe(2)
   })
 
   it('all compute modes force identical analytic feature overrides', () => {

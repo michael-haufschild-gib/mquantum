@@ -62,7 +62,7 @@ describe('useUrlState', () => {
     const parsedState: Partial<ShareableState> = {
       objectType: 'schroedinger',
       dimension: 2,
-      quantumMode: 'tdseDynamics',
+      quantumMode: 'becDynamics',
     }
 
     mockedParseCurrentUrl.mockReturnValue(parsedState)
@@ -71,6 +71,23 @@ describe('useUrlState', () => {
 
     await waitFor(() => {
       expect(useGeometryStore.getState().dimension).toBe(3)
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('becDynamics')
+    })
+  })
+
+  it('TDSE at dimension 2 preserves dimension', async () => {
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 2,
+      quantumMode: 'tdseDynamics',
+    }
+
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useGeometryStore.getState().dimension).toBe(2)
       expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
     })
   })

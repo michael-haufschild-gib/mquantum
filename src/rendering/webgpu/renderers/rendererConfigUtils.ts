@@ -90,7 +90,13 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
 
   if (isComputeQuantumMode(result)) {
     result.temporal = false
-    if ((result.dimension ?? 3) < 3) {
+    // Only BEC and Dirac require 3D+. TDSE, freeScalar, and quantumWalk
+    // support 2D natively (shaders handle latticeDim < 3 via perpFalloff).
+    const needs3D =
+      result.quantumMode === 'becDynamics' ||
+      result.quantumMode === 'diracEquation' ||
+      result.isPauli === true
+    if (needs3D && (result.dimension ?? 3) < 3) {
       result.dimension = 3
     }
   }

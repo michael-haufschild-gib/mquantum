@@ -202,7 +202,11 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
 
   return {
     objectType: config.objectType,
-    dimension: isCompute ? Math.max(config.dimension, 3) : config.dimension,
+    dimension:
+      isCompute &&
+      (config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation' || isPauli)
+        ? Math.max(config.dimension, 3)
+        : config.dimension,
     quantumMode: config.quantumMode,
     termCount: isCompute ? 1 : config.termCount,
     colorAlgorithm: normalizeColorAlgorithmForQuantumMode(

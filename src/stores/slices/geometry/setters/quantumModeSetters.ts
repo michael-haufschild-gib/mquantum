@@ -15,13 +15,10 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
 
-/** Quantum modes that require 3D+ dimensions. */
-const COMPUTE_MODES_3D = new Set([
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-])
+/** Quantum modes that require 3D+ dimensions.
+ *  TDSE and freeScalarField support 2D natively (shaders handle latticeDim < 3
+ *  via perpendicular falloff; FFT dispatches per-axis). */
+const COMPUTE_MODES_3D = new Set(['becDynamics', 'diracEquation'])
 
 /** Quantum modes that use compute pipelines (no inline wavefunction). */
 const COMPUTE_MODES = new Set([

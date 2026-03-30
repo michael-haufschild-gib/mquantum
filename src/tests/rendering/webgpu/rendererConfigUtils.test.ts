@@ -103,13 +103,36 @@ describe('applyModeOverrides', () => {
     expect(result.temporal).toBe(false)
   })
 
-  it('forces dimension >= 3 for compute modes', () => {
-    const result = applyModeOverrides({
+  it('forces dimension >= 3 for BEC and Dirac', () => {
+    const becResult = applyModeOverrides({
+      ...BASE_CONFIG,
+      quantumMode: 'becDynamics',
+      dimension: 2,
+    })
+    expect(becResult.dimension).toBe(3)
+
+    const diracResult = applyModeOverrides({
+      ...BASE_CONFIG,
+      quantumMode: 'diracEquation',
+      dimension: 2,
+    })
+    expect(diracResult.dimension).toBe(3)
+  })
+
+  it('allows dimension 2 for TDSE and freeScalarField', () => {
+    const tdseResult = applyModeOverrides({
+      ...BASE_CONFIG,
+      quantumMode: 'tdseDynamics',
+      dimension: 2,
+    })
+    expect(tdseResult.dimension).toBe(2)
+
+    const fsResult = applyModeOverrides({
       ...BASE_CONFIG,
       quantumMode: 'freeScalarField',
       dimension: 2,
     })
-    expect(result.dimension).toBe(3)
+    expect(fsResult.dimension).toBe(2)
   })
 
   it('preserves config for standard 3D analytic mode', () => {

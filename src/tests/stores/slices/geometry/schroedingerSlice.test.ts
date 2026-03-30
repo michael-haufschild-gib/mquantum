@@ -137,11 +137,19 @@ describe('schroedingerSlice — mode switching', () => {
     useGeometryStore.getState().reset()
   })
 
-  it('switching to compute mode forces dimension >= 3', () => {
-    useGeometryStore.getState().setDimension(3)
+  it('switching to BEC forces dimension >= 3', () => {
+    useGeometryStore.getState().setDimension(2)
+
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
+    expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('becDynamics')
+  })
+
+  it('TDSE allows dimension 2', () => {
+    useGeometryStore.getState().setDimension(2)
 
     useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
-    expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+    expect(useGeometryStore.getState().dimension).toBe(2)
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 

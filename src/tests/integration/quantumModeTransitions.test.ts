@@ -39,17 +39,22 @@ describe('quantum mode state machine transitions', () => {
   })
 
   describe('dimension constraints', () => {
-    it('compute modes enforce minimum 3D dimension', () => {
-      useGeometryStore.getState().setDimension(2)
-      expect(useGeometryStore.getState().dimension).toBe(2)
-
-      for (const mode of COMPUTE_MODES) {
+    it('BEC and Dirac enforce minimum 3D dimension', () => {
+      for (const mode of ['becDynamics', 'diracEquation'] as SchroedingerQuantumMode[]) {
         useGeometryStore.getState().setDimension(2)
         useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
         expect(
           useGeometryStore.getState().dimension,
           `${mode} should enforce dim >= 3`
         ).toBeGreaterThanOrEqual(3)
+      }
+    })
+
+    it('TDSE and freeScalarField allow dimension 2', () => {
+      for (const mode of ['tdseDynamics', 'freeScalarField'] as SchroedingerQuantumMode[]) {
+        useGeometryStore.getState().setDimension(2)
+        useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
+        expect(useGeometryStore.getState().dimension, `${mode} should allow dim 2`).toBe(2)
       }
     })
 

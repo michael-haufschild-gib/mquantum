@@ -338,18 +338,25 @@ describe('mode switch + dimension constraint chain', () => {
     resetAllStores()
   })
 
-  it('compute mode at 2D triggers dimension bump, which propagates to all dependent stores', () => {
+  it('BEC at 2D triggers dimension bump, which propagates to all dependent stores', () => {
     useGeometryStore.getState().setDimension(2)
     expect(useGeometryStore.getState().dimension).toBe(2)
     expect(useRotationStore.getState().dimension).toBe(2)
 
-    // Switch to TDSE — should force dim >= 3
-    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+    // Switch to BEC — should force dim >= 3
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
 
     const dim = useGeometryStore.getState().dimension
     expect(dim).toBeGreaterThanOrEqual(3)
     expect(useRotationStore.getState().dimension).toBe(dim)
     expect(useTransformStore.getState().dimension).toBe(dim)
+  })
+
+  it('TDSE at 2D preserves dimension 2', () => {
+    useGeometryStore.getState().setDimension(2)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+    expect(useGeometryStore.getState().dimension).toBe(2)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.latticeDim).toBe(2)
   })
 
   it('chain: set momentum repr → switch to compute → repr forced to position → switch back → repr stays position', () => {

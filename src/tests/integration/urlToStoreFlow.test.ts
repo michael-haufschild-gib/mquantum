@@ -121,15 +121,12 @@ describe('URL params -> store state integration', () => {
     expect(useGeometryStore.getState().dimension).toBe(dimBefore)
   })
 
-  it('application order matters: compute mode after dimension prevents dimension downgrade', () => {
-    // If we set quantumMode to tdseDynamics BEFORE setting dimension to 3,
-    // the mode setter would see dimension as default (possibly > 3 from previous test)
-    // and not enforce the minimum. Setting dimension first, then mode, is the correct order.
+  it('URL dimension param overrides current dimension for compute mode', () => {
     useGeometryStore.getState().setDimension(2) // Start at 2D
     applyUrlStateToStores('d=3&t=schroedinger&qm=tdseDynamics')
 
-    // tdseDynamics requires dimension >= 3 — should be 3, not 2
-    expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+    // URL explicitly sets d=3 — should be 3
+    expect(useGeometryStore.getState().dimension).toBe(3)
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 

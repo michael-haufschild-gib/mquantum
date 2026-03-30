@@ -131,11 +131,19 @@ describe('Quantum mode → dimension → extended store chain', () => {
     useExtendedObjectStore.getState().reset()
   })
 
-  it('switching to compute mode forces minimum 3D dimension', () => {
-    useGeometryStore.getState().setDimension(3)
-    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+  it('switching to BEC forces minimum 3D dimension', () => {
+    useGeometryStore.getState().setDimension(2)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('becDynamics')
 
     expect(useGeometryStore.getState().dimension).toBeGreaterThanOrEqual(3)
+    expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('becDynamics')
+  })
+
+  it('switching to TDSE at 2D preserves dimension', () => {
+    useGeometryStore.getState().setDimension(2)
+    useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
+
+    expect(useGeometryStore.getState().dimension).toBe(2)
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 
