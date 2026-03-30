@@ -76,6 +76,9 @@ describe('animationStore', () => {
     })
 
     it('should remove plane from animating set', () => {
+      // First add XY, then toggle again to remove
+      useAnimationStore.getState().togglePlane('XY')
+      expect(useAnimationStore.getState().animatingPlanes.has('XY')).toBe(true)
       useAnimationStore.getState().togglePlane('XY')
       expect(useAnimationStore.getState().animatingPlanes.has('XY')).toBe(false)
     })

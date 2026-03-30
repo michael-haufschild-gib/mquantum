@@ -72,16 +72,18 @@ export function applyPropagator(propagator: ComplexMatrix, rho: DensityMatrix): 
   }
 
   // Matrix-vector multiply: P · vec(ρ)
+  // Row-major traversal: P is stored row-major, so P[i*N..i*N+N-1] is contiguous.
+  // vec is small enough to fit in L1 cache (~1.5KB for N=196).
   const Pr = propagator.real
   const Pi = propagator.imag
 
   for (let i = 0; i < N; i++) {
     let sumRe = 0
     let sumIm = 0
-    const iN = i * N
+    const base = i * N
     for (let j = 0; j < N; j++) {
-      const pRe = Pr[iN + j]!
-      const pIm = Pi[iN + j]!
+      const pRe = Pr[base + j]!
+      const pIm = Pi[base + j]!
       const vRe = vecReScratch[j]!
       const vIm = vecImScratch[j]!
       sumRe += pRe * vRe - pIm * vIm

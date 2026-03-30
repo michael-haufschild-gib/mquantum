@@ -30,19 +30,14 @@ describe('pmlProfile WGSL block', () => {
 })
 
 describe('linearToND WGSL correctness', () => {
-  it('uses modular decomposition by gridSize (not strides)', () => {
-    // linearToND must decompose via repeated mod/div by gridSize:
-    //   coords[d] = remaining % gridSize[d]
-    //   remaining = remaining / gridSize[d]
-    // Using strides instead of gridSize is WRONG for the descending loop
-    // and produces garbage coordinates for dim >= 2.
-    expect(freeScalarNDIndexBlock).toContain('remaining % gridSize[ud]')
-    expect(freeScalarNDIndexBlock).toContain('remaining / gridSize[ud]')
-  })
-
-  it('does NOT use strides for decomposition', () => {
-    // Strides must NOT appear in the division/modulo operations.
-    // The strides parameter is kept for call-site compatibility but unused.
-    expect(freeScalarNDIndexBlock).not.toMatch(/remaining [/%] strides/)
+  it('uses stride-based forward decomposition', () => {
+    // linearToND decomposes idx using precomputed strides:
+    //   coords[d] = remaining / strides[d]
+    //   remaining = remaining % strides[d]
+    // This is equivalent to repeated mod/div by gridSize (backward iteration)
+    // but uses strides for forward iteration, which the GPU compiler can optimize
+    // for power-of-2 grid sizes.
+    expect(freeScalarNDIndexBlock).toContain('remaining / s')
+    expect(freeScalarNDIndexBlock).toContain('remaining % s')
   })
 })
