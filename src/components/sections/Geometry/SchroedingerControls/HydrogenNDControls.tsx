@@ -5,20 +5,14 @@
  * Extends 3D hydrogen orbitals with extra dimension quantum numbers.
  */
 
-import React, { useMemo } from 'react'
+import React from 'react'
 
 import { Button } from '@/components/ui/Button'
-import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import {
-  getHydrogenNDPresetsWithKeysByDimension,
-  HYDROGEN_ND_PRESETS,
-} from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import {
   maxAzimuthalForPrincipal,
   orbitalShapeLetter,
 } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
-import type { HydrogenNDPresetName } from '@/lib/geometry/extended/types'
 
 import type { HydrogenNDControlsProps } from './types'
 
@@ -35,7 +29,6 @@ import type { HydrogenNDControlsProps } from './types'
 export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
     const {
-      setHydrogenNDPreset,
       setPrincipalQuantumNumber,
       setAzimuthalQuantumNumber,
       setMagneticQuantumNumber,
@@ -49,43 +42,8 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
     const maxL = maxAzimuthalForPrincipal(config.principalQuantumNumber)
     const maxM = config.azimuthalQuantumNumber
 
-    // Build preset options filtered to current dimension and below
-    const presetOptions = useMemo(() => {
-      const groups = getHydrogenNDPresetsWithKeysByDimension()
-      return [
-        ...Object.entries(groups)
-          .filter(([dim]) => Number(dim) <= dimension)
-          .map(([dim, presets]) => ({
-            label: `${dim}D Orbitals`,
-            options: presets.map(([key, preset]) => ({ value: key, label: preset.name })),
-          })),
-        { label: 'Custom', options: [{ value: 'custom', label: 'Custom Configuration' }] },
-      ]
-    }, [dimension])
-
-    // Flatten for Select component
-    const flatOptions = useMemo(
-      () => presetOptions.flatMap((group) => group.options),
-      [presetOptions]
-    )
-
     return (
       <>
-        {/* Hydrogen ND Preset Selection */}
-        <div className="space-y-2">
-          <Select
-            label="ND Orbital Preset"
-            tooltip="Preconfigured hydrogen orbital states for different dimensions, with curated quantum numbers for visually interesting patterns."
-            options={flatOptions}
-            value={config.hydrogenNDPreset}
-            onChange={(v) => setHydrogenNDPreset(v as HydrogenNDPresetName)}
-            data-testid="hydrogen-nd-preset-select"
-          />
-          <p className="text-xs text-text-tertiary pt-1">
-            {HYDROGEN_ND_PRESETS[config.hydrogenNDPreset as HydrogenNDPresetName]?.description}
-          </p>
-        </div>
-
         {/* 3D Quantum Numbers (n, l, m) */}
         <div className="space-y-2 pt-2 border-t border-border-subtle">
           <div className="flex items-center justify-between mb-1">

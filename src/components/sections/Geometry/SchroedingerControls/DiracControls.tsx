@@ -13,13 +13,11 @@ import React, { useEffect, useMemo } from 'react'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import type { DiracConfig } from '@/lib/geometry/extended/types'
 import type {
   DiracFieldView,
   DiracInitialCondition,
   DiracPotentialType,
 } from '@/lib/geometry/extended/types'
-import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { minDiracGridPerDim } from '@/stores/slices/geometry/setters/diracSetters'
 
 import type { DiracControlsProps } from './types'
@@ -56,38 +54,6 @@ const FIELD_VIEW_OPTIONS: { value: DiracFieldView; label: string }[] = [
   { value: 'phase', label: 'Phase arg(ψ₀)' },
 ]
 
-const PRESET_OPTIONS = [
-  { value: '', label: '— Select Preset —' },
-  ...DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
-
-/** Compare current Dirac config against presets to find a match. */
-function detectActiveDiracPreset(config: DiracConfig): string {
-  for (const preset of DIRAC_SCENARIO_PRESETS) {
-    let matches = true
-    for (const [key, expected] of Object.entries(preset.overrides)) {
-      if (key === 'latticeDim' || key === 'gridSize') continue
-      const actual = config[key as keyof DiracConfig]
-      if (Array.isArray(expected)) {
-        if (!Array.isArray(actual)) {
-          matches = false
-          break
-        }
-        const len = Math.min(expected.length, (actual as number[]).length)
-        if (expected.slice(0, len).some((v, i) => v !== (actual as number[])[i])) {
-          matches = false
-          break
-        }
-      } else if (actual !== expected) {
-        matches = false
-        break
-      }
-    }
-    if (matches) return preset.id
-  }
-  return ''
-}
-
 const POTENTIAL_TYPE_OPTIONS: { value: DiracPotentialType; label: string }[] = [
   { value: 'none', label: 'Free Particle' },
   { value: 'step', label: 'Step (Klein Paradox)' },
@@ -110,7 +76,6 @@ const POTENTIAL_TYPE_OPTIONS: { value: DiracPotentialType; label: string }[] = [
 export const DiracControls = React.memo(({ config, dimension, actions }: DiracControlsProps) => {
   const dirac = config.dirac
   const latticeDim = dirac.latticeDim ?? dimension
-  const activePreset = useMemo(() => detectActiveDiracPreset(dirac), [dirac])
 
   // Compute grid size range (power of 2, limited by total sites + alignment)
   const gridSizeOptions = useMemo(() => {
@@ -151,17 +116,6 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
 
   return (
     <div className="space-y-3">
-      {/* Scenario Preset */}
-      <Select
-        label="Scenario"
-        tooltip="Pre-configured Dirac equation setups demonstrating key relativistic phenomena."
-        value={activePreset}
-        options={PRESET_OPTIONS}
-        onChange={(v) => {
-          if (v) actions.applyPreset(v)
-        }}
-      />
-
       {/* Initial Condition */}
       <Select
         label="Initial Condition"

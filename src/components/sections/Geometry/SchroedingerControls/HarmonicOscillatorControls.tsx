@@ -9,23 +9,9 @@ import React from 'react'
 
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
-import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import type { SchroedingerPresetName } from '@/lib/geometry/extended/types'
 
 import type { HarmonicOscillatorControlsProps } from './types'
-
-/**
- * Preset options for Select component
- */
-const presetOptions = [
-  ...Object.entries(SCHROEDINGER_NAMED_PRESETS).map(([key, preset]) => ({
-    value: key,
-    label: preset.name,
-  })),
-  { value: 'custom', label: 'Custom Configuration' },
-]
 
 /**
  * HarmonicOscillatorControls component
@@ -40,7 +26,6 @@ const presetOptions = [
 export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
     const {
-      setPresetName,
       setSeed,
       randomizeSeed,
       setTermCount,
@@ -52,21 +37,6 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
 
     return (
       <>
-        {/* Quantum State Controls */}
-        <div className="space-y-2">
-          <Select
-            label="Quantum Preset"
-            tooltip="Predefined superposition states with curated quantum numbers, frequencies, and amplitudes for interesting visual patterns."
-            options={presetOptions}
-            value={config.presetName}
-            onChange={(v) => setPresetName(v as SchroedingerPresetName)}
-            data-testid="schroedinger-preset-select"
-          />
-          <p className="text-xs text-text-tertiary pt-1">
-            {SCHROEDINGER_NAMED_PRESETS[config.presetName]?.description}
-          </p>
-        </div>
-
         {/* Seed Control */}
         <div className="space-y-2 pt-2 border-t border-border-subtle">
           <div className="flex items-center justify-between">

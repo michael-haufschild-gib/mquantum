@@ -414,7 +414,11 @@ export interface SchroedingerSliceActions {
   setDiracSlicePosition: (dimIndex: number, value: number) => void
   applyDiracPreset: (presetId: string) => void
 
+  // Free Scalar Field Presets
+  applyFreeScalarPreset: (presetId: string) => void
+
   // Quantum Walk
+  applyQuantumWalkPreset: (presetId: string) => void
   resetQuantumWalk: () => void
   clearQuantumWalkNeedsReset: () => void
   setQwAbsorberEnabled: (enabled: boolean) => void

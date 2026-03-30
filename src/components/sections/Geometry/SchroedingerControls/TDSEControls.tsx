@@ -21,9 +21,7 @@ import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import {
   ALL_GRID_SIZE_OPTIONS,
   AXIS_LABELS,
-  detectActivePreset,
   FIELD_VIEW_OPTIONS,
-  getScenarioPresetOptions,
   INITIAL_CONDITION_OPTIONS,
   TDSE_MAX_TOTAL_SITES,
 } from './tdseControlsConstants'
@@ -42,7 +40,6 @@ import type { TdseControlsProps } from './types'
 export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
     const td = config.tdse
-    const activePreset = useMemo(() => detectActivePreset(td), [td])
 
     const handleGridSizeChange = useCallback(
       (dimIdx: number, value: number) => {
@@ -92,30 +89,8 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
       [maxGridPerDim]
     )
 
-    const handlePresetChange = useCallback(
-      (value: string) => {
-        if (value) actions.applyPreset(value)
-      },
-      [actions]
-    )
-
-    // Filter presets to those compatible with the current dimension
-    const scenarioPresetOptions = useMemo(() => getScenarioPresetOptions(dimension), [dimension])
-
     return (
       <div className="space-y-4" data-testid="tdse-controls">
-        {/* Scenario Presets */}
-        <div className="space-y-3">
-          <Select
-            label="Scenario"
-            tooltip="Preconfigured physics scenarios with tuned parameters for tunneling, scattering, interference, and other quantum phenomena."
-            options={scenarioPresetOptions}
-            value={activePreset}
-            onChange={handlePresetChange}
-            data-testid="tdse-scenario-preset"
-          />
-        </div>
-
         {/* Initial Condition */}
         <div className="space-y-3">
           <Select

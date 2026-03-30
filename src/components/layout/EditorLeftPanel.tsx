@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelector'
 import { ObjectSettingsSection } from '@/components/sections/Geometry/ObjectSettingsSection'
+import { ScenarioSelector } from '@/components/sections/Geometry/ScenarioSelector'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
@@ -114,6 +115,9 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
               </div>
             </div>
           )}
+          <div className="px-4 pb-2">
+            <ScenarioSelector />
+          </div>
         </div>
 
         {/* Tabs Section */}

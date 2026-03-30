@@ -73,7 +73,7 @@ export const FIELD_VIEW_OPTIONS = [
 
 /** All scenario preset dropdown options (unfiltered). */
 export const SCENARIO_PRESET_OPTIONS = [
-  { value: '', label: 'Custom' },
+  { value: '', label: '\u2014 Select Preset \u2014' },
   ...TDSE_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
 ]
 
@@ -87,7 +87,7 @@ export const SCENARIO_PRESET_OPTIONS = [
  */
 export function getScenarioPresetOptions(dim: number): { value: string; label: string }[] {
   return [
-    { value: '', label: 'Custom' },
+    { value: '', label: '\u2014 Select Preset \u2014' },
     ...TDSE_SCENARIO_PRESETS.filter((p) => {
       const presetDim = p.overrides.latticeDim
       // No latticeDim in overrides → compatible with any dimension

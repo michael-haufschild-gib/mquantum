@@ -7,7 +7,9 @@
  * @module stores/slices/geometry/setters/freeScalarSetters
  */
 
+import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
@@ -54,6 +56,7 @@ type FreeScalarActions = Pick<
   | 'setFreeScalarKSpaceBroadeningRadius'
   | 'setFreeScalarKSpaceBroadeningSigma'
   | 'setFreeScalarKSpaceRadialBinCount'
+  | 'applyFreeScalarPreset'
 >
 
 /**
@@ -573,6 +576,29 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           },
         },
       }))
+    },
+    applyFreeScalarPreset: (presetId) => {
+      void import('@/lib/physics/freeScalar/presets').then(({ FREE_SCALAR_PRESETS }) => {
+        const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
+        if (!preset) return
+        setWithVersion((state) => {
+          const globalDim = useGeometryStore.getState().dimension
+          const base: FreeScalarConfig = {
+            ...DEFAULT_FREE_SCALAR_CONFIG,
+            ...preset.overrides,
+            kSpaceViz: state.schroedinger.freeScalar.kSpaceViz,
+            slicePositions: state.schroedinger.freeScalar.slicePositions,
+            needsReset: true,
+          }
+          const resized = resizeFreeScalarArrays(base, globalDim)
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              freeScalar: { ...base, ...resized, needsReset: true },
+            },
+          }
+        })
+      })
     },
   }
 }

@@ -1,6 +1,9 @@
 import { StateCreator } from 'zustand'
 
-import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
+import {
+  DEFAULT_QUANTUM_WALK_CONFIG,
+  resizeQuantumWalkArrays,
+} from '@/lib/geometry/extended/quantumWalk'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
@@ -15,6 +18,7 @@ import {
   type TdseConfig,
 } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
@@ -350,6 +354,28 @@ export const createSchroedingerSlice: StateCreator<
     ...createOpenQuantumSetters(ctx),
 
     // === Quantum Walk ===
+    applyQuantumWalkPreset: (presetId) => {
+      void import('@/lib/physics/quantumWalk/presets').then(({ QUANTUM_WALK_PRESETS }) => {
+        const preset = QUANTUM_WALK_PRESETS.find((p) => p.id === presetId)
+        if (!preset) return
+        setWithVersion((state) => {
+          const globalDim = useGeometryStore.getState().dimension
+          const base = {
+            ...DEFAULT_QUANTUM_WALK_CONFIG,
+            ...preset.overrides,
+            steps: 0,
+            needsReset: true,
+          }
+          const resized = resizeQuantumWalkArrays(base, globalDim)
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              quantumWalk: { ...base, ...resized, needsReset: true },
+            },
+          }
+        })
+      })
+    },
     resetQuantumWalk: () => {
       set((state) => {
         const qw = state.schroedinger.quantumWalk

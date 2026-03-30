@@ -8,12 +8,11 @@
  * @module components/sections/Geometry/SchroedingerControls/BECControls
  */
 
-import React, { useCallback, useMemo } from 'react'
+import React, { useMemo } from 'react'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
-import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 
 import type { BecControlsProps } from './types'
 
@@ -50,17 +49,6 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'healingLength', label: 'Healing Length' },
 ]
 
-/** Filter BEC presets by dimension — presets with minDim > current dim are hidden. */
-function getPresetOptions(dim: number) {
-  return [
-    { value: '', label: '— Select Preset —' },
-    ...BEC_SCENARIO_PRESETS.filter((p) => (p.minDim ?? 2) <= dim).map((p) => ({
-      value: p.id,
-      label: p.name,
-    })),
-  ]
-}
-
 /**
  * BEC (Gross-Pitaevskii) control panel.
  *
@@ -77,24 +65,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
     const bec = config.bec
     const activeDims = Math.min(bec.latticeDim, dimension)
 
-    // Scenario preset detection
-    const detectActivePreset = useCallback((cfg: typeof bec): string => {
-      for (const preset of BEC_SCENARIO_PRESETS) {
-        const o = preset.overrides
-        if (
-          (o.interactionStrength === undefined ||
-            o.interactionStrength === cfg.interactionStrength) &&
-          (o.trapOmega === undefined || o.trapOmega === cfg.trapOmega) &&
-          (o.initialCondition === undefined || o.initialCondition === cfg.initialCondition)
-        ) {
-          return preset.id
-        }
-      }
-      return ''
-    }, [])
-
-    const activePreset = useMemo(() => detectActivePreset(bec), [detectActivePreset, bec])
-
     // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
     const maxGridPerDim = useMemo(
       () => Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
@@ -104,7 +74,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
       () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
       [maxGridPerDim]
     )
-    const presetOptions = useMemo(() => getPresetOptions(dimension), [dimension])
 
     const showVortexControls =
       bec.initialCondition === 'vortexImprint' || bec.initialCondition === 'vortexLattice'
@@ -127,15 +96,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
 
     return (
       <div className="space-y-4">
-        {/* Scenario Preset */}
-        <Select
-          label="Scenario"
-          tooltip="Pre-configured BEC scenarios with tuned interaction strength, trap, and initial state."
-          value={activePreset}
-          onChange={(v) => v && actions.applyPreset(v)}
-          options={presetOptions}
-        />
-
         {/* Initial Condition */}
         <Select
           label="Initial Condition"

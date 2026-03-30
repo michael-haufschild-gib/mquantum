@@ -12,10 +12,8 @@ import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
-import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import type { PauliFieldView } from '@/lib/geometry/extended/types'
-import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -33,11 +31,6 @@ import { PauliGridControls } from './PauliGridControls'
 import { PauliPotentialControls } from './PauliPotentialControls'
 import { PauliVisualizationControls } from './PauliVisualizationControls'
 import { SpinControls } from './SpinControls'
-
-const PRESET_OPTIONS = [
-  { value: '', label: '\u2014 Select Preset \u2014' },
-  ...PAULI_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
 
 /**
  * Pauli spinor equation configuration panel.
@@ -87,24 +80,6 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
     }))
   )
 
-  const handlePresetChange = useCallback(
-    (value: string) => {
-      if (!value) return
-      const preset = PAULI_SCENARIO_PRESETS.find((p) => p.id === value)
-      if (preset) {
-        actions.setPauliConfig({ ...preset.overrides, needsReset: true })
-        // Sync color algorithm to match the preset's fieldView
-        if (preset.overrides.fieldView) {
-          const algo = FIELD_VIEW_TO_COLOR_ALGO[preset.overrides.fieldView]
-          if (algo) {
-            useAppearanceStore.getState().setColorAlgorithm(algo)
-          }
-        }
-      }
-    },
-    [actions]
-  )
-
   /** Sync fieldView toggle with color algorithm so the renderer encodes matching channels. */
   const handleFieldViewChange = useCallback(
     (view: PauliFieldView) => {
@@ -121,17 +96,6 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-1" data-testid="pauli-spinor-controls">
-      {/* Scenario Preset */}
-      <div className="px-4 py-2">
-        <Select
-          label="Scenario Preset"
-          tooltip="Load a preconfigured scenario demonstrating spin dynamics, Stern-Gerlach splitting, Larmor precession, or other spinor phenomena."
-          options={PRESET_OPTIONS}
-          value=""
-          onChange={handlePresetChange}
-        />
-      </div>
-
       {/* Visualization Mode */}
       <Section title="Visualization" defaultOpen={true}>
         <PauliVisualizationControls
