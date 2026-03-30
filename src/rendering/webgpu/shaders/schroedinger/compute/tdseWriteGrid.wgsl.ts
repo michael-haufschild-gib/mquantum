@@ -279,7 +279,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let jd = hbarOverM * (re * dIm - im * dRe);
       currentMagSq += jd * jd;
     }
-    displayScalar = (1.0 - exp(-sqrt(currentMagSq))) * densityGate;
+    // Normalize current by maxDensity (same pattern as Dirac currentDensity).
+    // j = ρ·v, so j/ρ_max ≈ v where density is significant. This maps
+    // the current to a velocity-like scale where vortex flow is O(1) and
+    // stationary states are ~0. The exp mapping provides soft saturation.
+    let jMag = sqrt(currentMagSq);
+    let jNorm = jMag / max(params.maxDensity, 1e-20);
+    displayScalar = (1.0 - exp(-jNorm)) * densityGate;
   } else if (params.fieldView == 4u) {
     // superfluid velocity magnitude (NN) with PML-aware boundaries
     let hbarOverM = params.hbar / max(params.mass, 1e-6);
