@@ -70,21 +70,21 @@ ${uCalcs}
  * @param dimension
  */
 function generateRadiusCalculation(dimension: number): string {
-  // First compute sum3D for reuse
   const sum3D = 'x0*x0 + x1*x1 + x2*x2'
 
   if (dimension === 3) {
     return `
   // 3D radius
-  let r3D = sqrt(${sum3D});
+  let sum3D = ${sum3D};
+  let r3D = sqrt(sum3D);
 `
   }
 
   return `
-  // PERF: Compute sum3D once, reuse for angular/radial hydrogen core terms.
+  // PERF: Compute sum3D once, reuse for early exit (squared comparison) and angular/radial terms.
   let sum3D = ${sum3D};
 
-  // 3D hydrogen-core radius (reusing sum3D)
+  // 3D hydrogen-core radius (deferred sqrt until after squared early exit)
   let r3D = sqrt(sum3D);
 `
 }
@@ -103,29 +103,64 @@ function generateExtraDimProduct(dimension: number): string {
 `
   }
 
-  // Generate inlined ho1D calls for each extra dimension
-  const hoCallsWithEarlyExit = Array.from({ length: extraDimCount }, (_, i) => {
+  // PERF: Precompute alphaNorm per extra dimension (reuse alpha_ed from early exit).
+  const alphaNormDecls = Array.from(
+    { length: extraDimCount },
+    (_, i) => `  let alphaNorm_ed${i} = sqrt(alpha_ed${i} * sqrt(INV_PI));`
+  ).join('\n')
+
+  // Generate extra dim product computation with fused-Gaussian fast path.
+  // When ALL extra dims are in ground state (n_j=0), fuse individual exp() calls
+  // into a single exp(-0.5 * Σ omega_j * x_j²). This replaces D-3 exp() calls
+  // with 1 exp() + D-3 multiply-adds, saving (D-4) × ~8 GPU cycles.
+  const allGroundCheck = Array.from(
+    { length: extraDimCount },
+    (_, i) => `getExtraDimN(uniforms, ${i}) == 0`
+  ).join(' && ')
+
+  // Fused Gaussian: product of alphaNorms × exp(-0.5 * sum(omega_j * x_j²))
+  // omega_j = alpha_ed_j² (since alpha = sqrt(omega))
+  const fusedSumTerms = Array.from(
+    { length: extraDimCount },
+    (_, i) => `alpha_ed${i} * alpha_ed${i} * x${i + 3} * x${i + 3}`
+  ).join(' + ')
+  const fusedNormProduct = Array.from({ length: extraDimCount }, (_, i) => `alphaNorm_ed${i}`).join(
+    ' * '
+  )
+
+  // Per-dim evaluation for non-ground states
+  function genExtraDimEval(i: number): string {
     const efVar = `ef${i}`
     const coordVar = `x${i + 3}`
-    if (i === 0) {
-      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));
-  if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
-    } else if (i === extraDimCount - 1) {
-      // Last one - no early exit check needed
-      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));`
-    } else {
-      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));
-  if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
-    }
-  }).join('\n')
+    const fullCall = `ho1DFast(getExtraDimN(uniforms, ${i}), ${coordVar}, alpha_ed${i}, alphaNorm_ed${i})`
+    return `let ${efVar} = ${fullCall};`
+  }
 
-  // Generate product calculation
-  const productTerms = Array.from({ length: extraDimCount }, (_, i) => `ef${i}`).join(' * ')
+  const perDimCalls = Array.from({ length: extraDimCount }, (_, i) => {
+    const efVar = `ef${i}`
+    const eval_ = genExtraDimEval(i)
+    if (i < extraDimCount - 1) {
+      return `    ${eval_}
+    if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
+    }
+    return `    ${eval_}`
+  }).join('\n')
+  const perDimProduct = Array.from({ length: extraDimCount }, (_, i) => `ef${i}`).join(' * ')
 
   return `
-  // Extra dimension factors (unrolled, inlined ho1D calls)
-${hoCallsWithEarlyExit}
-  let extraProduct = ${productTerms};
+  // Extra dimension factors (fused-Gaussian fast path for all-ground-state)
+${alphaNormDecls}
+  var extraProduct: f32;
+  if (${allGroundCheck}) {
+    // PERF: Fuse ${extraDimCount} individual exp() into single exp(-0.5 * Σ omega_j * x_j²)
+    let fusedExponent = 0.5 * (${fusedSumTerms});
+    if (fusedExponent > 20.0) { return vec2f(0.0, 0.0); } // Early exit: below f32 precision
+    extraProduct = ${fusedNormProduct} * exp(-fusedExponent);
+  } else {
+    // Per-dimension evaluation for excited extra dims
+${perDimCalls}
+    extraProduct = ${perDimProduct};
+  }
 `
 }
 
@@ -177,8 +212,10 @@ fn evalHydrogenNDPsi${dimension}D(xND: array<f32, 11>, t: f32, uniforms: Schroed
   // Extract coordinates (unrolled)
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
-  // EARLY EXIT 2: Check hydrogen radial threshold (D-dimensional n_eff)
-  if (hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, ${dimension})) {
+  // PERF: Squared comparison avoids redundant threshold computation per-sample.
+  // Uses precomputed hydrogenRadialThreshold from CPU uniform.
+  let _thresh = uniforms.hydrogenRadialThreshold;
+  if (sum3D > _thresh * _thresh) {
     return vec2f(0.0, 0.0);
   }
 
@@ -189,7 +226,8 @@ ${extraDimEarlyExit}${radiusCalc}
   let nz = x2 * invR;
 
   // Radial part: R_nl^(D)(r_3D) with D-dimensional effective potential
-  let R = hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension});
+  // PERF: Uses precomputed normalization from uniform (eliminates per-sample log/exp/sqrt)
+  let R = hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension}, uniforms.hydrogenRadialNorm);
 
   // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
@@ -304,8 +342,9 @@ fn evalHydrogenNDPsi${dimension}DCached(xND: array<f32, 11>, t: f32, uniforms: S
   // Extract coordinates (unrolled)
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
-  // EARLY EXIT 2: Check hydrogen radial threshold (D-dimensional n_eff)
-  if (hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, ${dimension})) {
+  // PERF: Squared comparison using precomputed threshold from CPU uniform
+  let _thresh = uniforms.hydrogenRadialThreshold;
+  if (sum3D > _thresh * _thresh) {
     return vec2f(0.0, 0.0);
   }
 
@@ -316,7 +355,8 @@ ${extraDimEarlyExit}${radiusCalc}
   let nz = x2 * invR;
 
   // Radial part: R_nl^(D)(r_3D) with D-dimensional effective potential
-  let R = hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension});
+  // PERF: Uses precomputed normalization from uniform (eliminates per-sample log/exp/sqrt)
+  let R = hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension}, uniforms.hydrogenRadialNorm);
 
   // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);

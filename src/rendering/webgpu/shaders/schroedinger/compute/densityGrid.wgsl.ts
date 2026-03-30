@@ -404,7 +404,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let pk = basisValues[k];
     for (var l = k + 1u; l < basisK; l = l + 1u) {
       let pl = basisValues[l];
+      // PERF: skip negligible basis-state amplitude (avoids getRho uniform fetch)
+      if (dot(pl, pl) < 1e-20) { continue; }
       let rho_kl = getRho(oq, k, l);
+      // PERF: skip negligible coherence (common after decoherence)
+      if (dot(rho_kl, rho_kl) < 1e-20) { continue; }
       // Re(ψ_k · ψ_l*) = dot(ψ_k, ψ_l), Im(ψ_k · ψ_l*) = ψk.y·ψl.x - ψk.x·ψl.y
       totalDensity += 2.0 * (rho_kl.x * dot(pk, pl) - rho_kl.y * (pk.y * pl.x - pk.x * pl.y));
     }

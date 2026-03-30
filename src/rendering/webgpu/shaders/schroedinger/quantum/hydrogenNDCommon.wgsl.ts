@@ -57,7 +57,7 @@ fn sphericalAngles3D(x: f32, y: f32, z: f32, r3d: f32) -> vec2f {
  */
 fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) -> vec2f {
   if (useReal) {
-    if (l <= 2) {
+    if (l <= 3) {
       return vec2f(fastRealSphericalHarmonic(l, m, theta, phi), 0.0);
     } else {
       return vec2f(realSphericalHarmonic(l, m, theta, phi, true), 0.0);
@@ -83,7 +83,7 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
  */
 fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi: f32, useReal: bool) -> vec2f {
   if (useReal) {
-    if (l <= 2) {
+    if (l <= 3) {
       return vec2f(fastRealSphericalHarmonicDirect(l, m, cosTheta, sinTheta, phi), 0.0);
     } else {
       let theta = acos(clamp(cosTheta, -1.0, 1.0));
@@ -106,7 +106,7 @@ fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi
  */
 fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, useReal: bool) -> vec2f {
   if (useReal) {
-    if (l <= 2) {
+    if (l <= 3) {
       return vec2f(fastRealSphericalHarmonicCartesian(l, m, nx, ny, nz), 0.0);
     } else {
       let rxy2 = nx * nx + ny * ny;

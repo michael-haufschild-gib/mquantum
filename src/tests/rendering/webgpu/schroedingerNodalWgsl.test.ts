@@ -66,12 +66,10 @@ describe('Schroedinger nodal WGSL composition', () => {
       isosurface: false,
     })
 
-    // Should use ND radial functions with baked-in dimension
+    // Should use precomputed radial threshold (squared comparison) and precomputed norm
+    expect(wgsl).toContain('sum3D > _thresh * _thresh')
     expect(wgsl).toContain(
-      'hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, 7)'
-    )
-    expect(wgsl).toContain(
-      'hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, 7)'
+      'hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, 7, uniforms.hydrogenRadialNorm)'
     )
     // Should NOT use old 3D-only radial
     expect(wgsl).not.toContain('if (hydrogenRadialEarlyExit(r3D, uniforms))')

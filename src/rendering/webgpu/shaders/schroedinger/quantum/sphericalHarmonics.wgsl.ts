@@ -194,7 +194,33 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
     }
   }
 
-  // Fall back to general computation for l > 2 (needs theta for Legendre)
+  // f orbitals (l=3) — using ct/st to avoid acos round-trip
+  if (l == 3) {
+    let ct2 = ct * ct;
+    let st2 = st * st;
+    if (m == 0) {
+      return 0.3731763326 * ct * (5.0 * ct2 - 3.0);
+    }
+    if (m == 1) {
+      return 0.4570457995 * st * cos(phi) * (5.0 * ct2 - 1.0);
+    }
+    if (m == -1) {
+      return 0.4570457995 * st * sin(phi) * (5.0 * ct2 - 1.0);
+    }
+    if (m == 2) {
+      return 1.4453057213 * st2 * cos(2.0 * phi) * ct;
+    }
+    if (m == -2) {
+      return 1.4453057213 * st2 * sin(2.0 * phi) * ct;
+    }
+    if (m == 3) {
+      return 0.5900435899 * st * st2 * cos(3.0 * phi);
+    }
+    // m == -3
+    return 0.5900435899 * st * st2 * sin(3.0 * phi);
+  }
+
+  // Fall back to general computation for l > 3 (needs theta for Legendre)
   let theta = acos(clamp(ct, -1.0, 1.0));
   return realSphericalHarmonic(l, m, theta, phi, true);
 }
@@ -245,7 +271,40 @@ fn fastRealSphericalHarmonicCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32)
     return 0.54627422 * 2.0 * nx * ny;
   }
 
-  // Should not reach here for l <= 2
+  // f orbitals (l=3) — Cartesian real spherical harmonics
+  // Eliminates Legendre recurrence + atan2 for f-orbital visualization.
+  // Coefficients from standard real solid harmonics (Wikipedia convention, CS-phase undone).
+  if (l == 3) {
+    let nz2 = nz * nz;
+    if (m == 0) {
+      // f_z³ ∝ nz(5nz²-3)
+      return 0.3731763326 * nz * (5.0 * nz2 - 3.0);
+    }
+    if (m == 1) {
+      // f_xz² ∝ nx(5nz²-1)
+      return 0.4570457995 * nx * (5.0 * nz2 - 1.0);
+    }
+    if (m == -1) {
+      // f_yz² ∝ ny(5nz²-1)
+      return 0.4570457995 * ny * (5.0 * nz2 - 1.0);
+    }
+    if (m == 2) {
+      // f_z(x²-y²) ∝ (nx²-ny²)nz
+      return 1.4453057213 * (nx * nx - ny * ny) * nz;
+    }
+    if (m == -2) {
+      // f_xyz ∝ nx·ny·nz
+      return 2.8906114426 * nx * ny * nz;
+    }
+    if (m == 3) {
+      // f_x(x²-3y²) ∝ nx(nx²-3ny²)
+      return 0.5900435899 * nx * (nx * nx - 3.0 * ny * ny);
+    }
+    // m == -3: f_y(3x²-y²) ∝ ny(3nx²-ny²)
+    return 0.5900435899 * ny * (3.0 * nx * nx - ny * ny);
+  }
+
+  // Should not reach here for l <= 3
   return 0.0;
 }
 `

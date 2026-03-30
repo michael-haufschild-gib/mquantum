@@ -32,13 +32,35 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let coord = vec3i(gid);
 
-  // Central differences with clamped boundary access
-  let xp = textureLoad(densityGrid, clamp(coord + vec3i(1, 0, 0), vec3i(0), vec3i(i32(size) - 1)), 0);
-  let xn = textureLoad(densityGrid, clamp(coord - vec3i(1, 0, 0), vec3i(0), vec3i(i32(size) - 1)), 0);
-  let yp = textureLoad(densityGrid, clamp(coord + vec3i(0, 1, 0), vec3i(0), vec3i(i32(size) - 1)), 0);
-  let yn = textureLoad(densityGrid, clamp(coord - vec3i(0, 1, 0), vec3i(0), vec3i(i32(size) - 1)), 0);
-  let zp = textureLoad(densityGrid, clamp(coord + vec3i(0, 0, 1), vec3i(0), vec3i(i32(size) - 1)), 0);
-  let zn = textureLoad(densityGrid, clamp(coord - vec3i(0, 0, 1), vec3i(0), vec3i(i32(size) - 1)), 0);
+  // PERF: Interior voxels (97.8% of grid) skip per-axis clamp operations.
+  // Only boundary voxels (within 1 of any face) need clamped access.
+  let isInterior = all(gid > vec3u(0u)) && all(gid < vec3u(size - 1u));
+
+  var xp: vec4f;
+  var xn: vec4f;
+  var yp: vec4f;
+  var yn: vec4f;
+  var zp: vec4f;
+  var zn: vec4f;
+
+  if (isInterior) {
+    // Fast path: no boundary checks needed
+    xp = textureLoad(densityGrid, coord + vec3i(1, 0, 0), 0);
+    xn = textureLoad(densityGrid, coord - vec3i(1, 0, 0), 0);
+    yp = textureLoad(densityGrid, coord + vec3i(0, 1, 0), 0);
+    yn = textureLoad(densityGrid, coord - vec3i(0, 1, 0), 0);
+    zp = textureLoad(densityGrid, coord + vec3i(0, 0, 1), 0);
+    zn = textureLoad(densityGrid, coord - vec3i(0, 0, 1), 0);
+  } else {
+    // Boundary path: clamp to grid bounds
+    let maxC = vec3i(i32(size) - 1);
+    xp = textureLoad(densityGrid, clamp(coord + vec3i(1, 0, 0), vec3i(0), maxC), 0);
+    xn = textureLoad(densityGrid, clamp(coord - vec3i(1, 0, 0), vec3i(0), maxC), 0);
+    yp = textureLoad(densityGrid, clamp(coord + vec3i(0, 1, 0), vec3i(0), maxC), 0);
+    yn = textureLoad(densityGrid, clamp(coord - vec3i(0, 1, 0), vec3i(0), maxC), 0);
+    zp = textureLoad(densityGrid, clamp(coord + vec3i(0, 0, 1), vec3i(0), maxC), 0);
+    zn = textureLoad(densityGrid, clamp(coord - vec3i(0, 0, 1), vec3i(0), maxC), 0);
+  }
 
   var grad: vec3f;
 

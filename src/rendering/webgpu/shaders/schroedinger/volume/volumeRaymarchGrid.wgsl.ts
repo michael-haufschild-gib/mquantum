@@ -74,8 +74,7 @@ fn volumeRaymarchGrid(
     if (transmittance < MIN_TRANSMITTANCE) { break; }
     let remainingDistance = max(tFar - t, 0.0);
     let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
-    let remainingContributionBound = transmittance * maxRemainingOpacity;
-    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
+    if (transmittance * maxRemainingOpacity < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
 

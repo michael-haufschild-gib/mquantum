@@ -174,9 +174,9 @@ struct SchroedingerUniforms {
   // Sample count (LOD)
   sampleCount: i32,              // Sample count for loop control
 
-  // Reserved padding (formerly phase shift, removed)
+  // Precomputed constants
   _reserved924: u32,
-  _reserved928: f32,
+  hydrogenRadialNorm: f32,         // Precomputed R_nl^(D) normalization (eliminates per-sample log/exp/sqrt)
   _reserved932: f32,
   _reserved936: f32,
 

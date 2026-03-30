@@ -172,44 +172,53 @@ fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
  * @return Gradient vector (ds/dx, ds/dy, ds/dz) where s = log(ρ + ε)
  */
 fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  // Step size: 2 texels in world space for smoother gradient
-  // Grid covers [-bound, +bound] with DENSITY_GRID_SIZE texels
+  // PERF: Compute base UVW once, then offset in UVW space directly.
+  // This avoids 6 redundant worldToDensityGridUVW calls (each does div + add).
   let bound = uniforms.boundingRadius;
+  let invDiameter = uniforms.invBoundingRadius * 0.5; // = 1 / (2 * bound)
+
+  // Step size in UVW space: 2 texels / gridSize
+  let uvwStep = 2.0 / DENSITY_GRID_SIZE;
+  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+
+  // Sample 6 neighbors in UVW space with zero-outside-grid semantics.
+  // Matches sampleDensityFromGrid: positions outside [0,1] return zero,
+  // preventing clamp-to-edge from creating spurious gradients at the boundary.
+  let uxp = baseUVW + vec3f(uvwStep, 0.0, 0.0);
+  let uxn = baseUVW - vec3f(uvwStep, 0.0, 0.0);
+  let uyp = baseUVW + vec3f(0.0, uvwStep, 0.0);
+  let uyn = baseUVW - vec3f(0.0, uvwStep, 0.0);
+  let uzp = baseUVW + vec3f(0.0, 0.0, uvwStep);
+  let uzn = baseUVW - vec3f(0.0, 0.0, uvwStep);
+  let sxp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxp, 0.0), all(uxp >= vec3f(0.0)) && all(uxp <= vec3f(1.0)));
+  let sxn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxn, 0.0), all(uxn >= vec3f(0.0)) && all(uxn <= vec3f(1.0)));
+  let syp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyp, 0.0), all(uyp >= vec3f(0.0)) && all(uyp <= vec3f(1.0)));
+  let syn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyn, 0.0), all(uyn >= vec3f(0.0)) && all(uyn <= vec3f(1.0)));
+  let szp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzp, 0.0), all(uzp >= vec3f(0.0)) && all(uzp <= vec3f(1.0)));
+  let szn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzn, 0.0), all(uzn >= vec3f(0.0)) && all(uzn <= vec3f(1.0)));
+
+  // World-space step for gradient normalization
   let eps = bound * (2.0 / DENSITY_GRID_SIZE);
 
-  let dx = vec3f(eps, 0.0, 0.0);
-  let dy = vec3f(0.0, eps, 0.0);
-  let dz = vec3f(0.0, 0.0, eps);
-
   if (IS_DUAL_CHANNEL) {
-    // Dual-channel (Dirac/Pauli): .r = primary, .g = secondary density
-    // Compute gradient of total density (R + G) then convert to ∇s = ∇ρ/(ρ+ε)
-    let sxp = sampleDensityFromGrid(pos + dx, uniforms);
-    let sxn = sampleDensityFromGrid(pos - dx, uniforms);
-    let syp = sampleDensityFromGrid(pos + dy, uniforms);
-    let syn = sampleDensityFromGrid(pos - dy, uniforms);
-    let szp = sampleDensityFromGrid(pos + dz, uniforms);
-    let szn = sampleDensityFromGrid(pos - dz, uniforms);
     let gradX = (sxp.r + sxp.g) - (sxn.r + sxn.g);
     let gradY = (syp.r + syp.g) - (syn.r + syn.g);
     let gradZ = (szp.r + szp.g) - (szn.r + szn.g);
     let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
-    let rhoCenter = sampleDensityFromGrid(pos, uniforms);
+    let rhoCenter = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
     let rhoTotal = rhoCenter.r + rhoCenter.g;
     return gradRho / max(rhoTotal + 1e-8, 1e-8);
   } else if (DENSITY_GRID_HAS_PHASE) {
-    // rgba16float grid: logRho stored in .g channel — central-difference directly on s
-    let gradX = sampleDensityFromGrid(pos + dx, uniforms).g - sampleDensityFromGrid(pos - dx, uniforms).g;
-    let gradY = sampleDensityFromGrid(pos + dy, uniforms).g - sampleDensityFromGrid(pos - dy, uniforms).g;
-    let gradZ = sampleDensityFromGrid(pos + dz, uniforms).g - sampleDensityFromGrid(pos - dz, uniforms).g;
+    let gradX = sxp.g - sxn.g;
+    let gradY = syp.g - syn.g;
+    let gradZ = szp.g - szn.g;
     return vec3f(gradX, gradY, gradZ) / (2.0 * eps);
   } else {
-    // r16float fallback: only rho available, compute ∇ρ then convert to ∇s = ∇ρ/(ρ+ε)
-    let gradX = sampleDensityFromGrid(pos + dx, uniforms).r - sampleDensityFromGrid(pos - dx, uniforms).r;
-    let gradY = sampleDensityFromGrid(pos + dy, uniforms).r - sampleDensityFromGrid(pos - dy, uniforms).r;
-    let gradZ = sampleDensityFromGrid(pos + dz, uniforms).r - sampleDensityFromGrid(pos - dz, uniforms).r;
+    let gradX = sxp.r - sxn.r;
+    let gradY = syp.r - syn.r;
+    let gradZ = szp.r - szn.r;
     let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
-    let rho = sampleDensityFromGrid(pos, uniforms).r;
+    let rho = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0).r;
     return gradRho / max(rho + 1e-8, 1e-8);
   }
 }

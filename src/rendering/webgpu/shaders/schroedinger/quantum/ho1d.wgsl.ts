@@ -61,6 +61,29 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   return alphaNorm * norm * H * gauss;
 }
 
+// PERF: Fast 1D HO eigenfunction with precomputed alpha and normalization.
+// Eliminates 2× sqrt() per call when alpha = sqrt(omega) and alphaNorm = (omega/pi)^{1/4}
+// are invariant across superposition terms for the same dimension.
+fn ho1DFast(n: i32, x: f32, alpha: f32, alphaNorm: f32) -> f32 {
+  if (n < 0 || n > 6) { return 0.0; }
+
+  let u = alpha * x;
+  let u2 = min(u * u, 40.0);
+  let gauss = exp(-0.5 * u2);
+  let H = hermite(n, u);
+  let norm = HO_NORM[n];
+
+  return alphaNorm * norm * H * gauss;
+}
+
+// PERF: Ground-state HO eigenfunction (n=0). Eliminates Hermite evaluation
+// and norm lookup: φ_0(x, ω) = (ω/π)^{1/4} * exp(-½ωx²).
+// Used by hydrogen ND extra dimensions when quantum numbers are 0 (common default).
+fn ho1DGroundState(x: f32, alpha: f32, alphaNorm: f32) -> f32 {
+  let u2 = min(alpha * alpha * x * x, 40.0);
+  return alphaNorm * exp(-0.5 * u2);
+}
+
 // Evaluate product of 1D HO eigenfunctions for D dimensions
 // This is the separable D-dimensional eigenfunction:
 //   Φ_n(x) = Π_{j=0}^{D-1} φ_{n_j}(x_j, ω_j)

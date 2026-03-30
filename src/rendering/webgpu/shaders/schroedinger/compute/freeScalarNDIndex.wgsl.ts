@@ -17,16 +17,17 @@ fn ndToLinear(coords: array<u32, 12>, strides: array<u32, 12>, dim: u32) -> u32 
 }
 
 // Convert linear buffer index to N-D lattice coordinates.
-// Decomposes via repeated mod/div by gridSize (C-order, last-axis-fastest).
-// The strides parameter is accepted for call-site compatibility but unused;
-// only gridSize is needed for the modular decomposition.
+// PERF: Uses strides directly with forward iteration. This avoids the
+// backward iteration and accumulating quotient+remainder, replacing it
+// with (idx / stride) % gridSize which the compiler can optimize for
+// power-of-2 gridSizes (common for FFT grids).
 fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: u32) -> array<u32, 12> {
   var coords: array<u32, 12>;
   var remaining = idx;
-  for (var d: i32 = i32(dim) - 1; d >= 0; d--) {
-    let ud = u32(d);
-    coords[ud] = remaining % gridSize[ud];
-    remaining = remaining / gridSize[ud];
+  for (var d: u32 = 0u; d < dim; d++) {
+    let s = strides[d];
+    coords[d] = remaining / s;
+    remaining = remaining % s;
   }
   return coords;
 }

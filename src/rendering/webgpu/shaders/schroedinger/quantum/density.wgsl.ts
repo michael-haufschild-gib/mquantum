@@ -77,12 +77,9 @@ export function generateMapPosToND(
     )
   }
 
-  // Zero out remaining dimensions if not at MAX_DIM (11)
-  const zeroLoop =
-    dim < 11
-      ? `
-  for (var j = ${dim}; j < 11; j++) { xND[j] = 0.0; }`
-      : ''
+  // WGSL 'var' declarations are zero-initialized, so remaining dimensions
+  // beyond dim are already 0.0. No explicit zeroing loop needed.
+  const zeroLoop = ''
 
   // Coupled hydrogen nodal-plane avoidance: mix visible-dim coordinates
   // into extra dims so cos(θ_k) is not exactly zero at default orientation.
