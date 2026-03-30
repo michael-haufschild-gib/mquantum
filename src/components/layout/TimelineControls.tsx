@@ -36,11 +36,9 @@ export const TimelineControls: FC = () => {
   const animationSelector = useShallow((state: AnimationState) => ({
     isPlaying: state.isPlaying,
     speed: state.speed,
-    direction: state.direction,
     animatingPlanes: state.animatingPlanes,
     toggle: state.toggle,
     setSpeed: state.setSpeed,
-    toggleDirection: state.toggleDirection,
     togglePlane: state.togglePlane,
     animateAll: state.animateAll,
     randomizePlanes: state.randomizePlanes,
@@ -50,11 +48,9 @@ export const TimelineControls: FC = () => {
   const {
     isPlaying,
     speed,
-    direction,
     animatingPlanes,
     toggle,
     setSpeed,
-    toggleDirection,
     togglePlane,
     animateAll,
     randomizePlanes,
@@ -256,6 +252,7 @@ export const TimelineControls: FC = () => {
             size="icon"
             onClick={handleReset}
             ariaLabel="Reset wavefunction"
+            tooltip="Reset the wavefunction to its initial state and re-initialize all mode parameters."
             className="w-9 h-9 rounded-full"
           >
             <Icon name="reset" size={14} />
@@ -266,6 +263,9 @@ export const TimelineControls: FC = () => {
             size="icon"
             onClick={toggle}
             ariaLabel={isPlaying ? 'Pause' : 'Play'}
+            tooltip={
+              isPlaying ? 'Pause the time evolution.' : 'Start the time evolution animation.'
+            }
             glow={isPlaying}
             className={`w-9 h-9 rounded-full ${isPlaying ? 'bg-accent text-text-inverse' : ''}`}
           >
@@ -275,16 +275,6 @@ export const TimelineControls: FC = () => {
               <Icon name="play" size={11} className="ml-0.5" />
             )}
           </Button>
-
-          <ToggleButton
-            pressed={direction === -1}
-            onToggle={() => toggleDirection()}
-            ariaLabel={direction === 1 ? 'Enable reverse' : 'Disable reverse'}
-            tooltip="Reverse the direction of time evolution."
-            className="w-9 h-9 p-0 rounded-lg flex items-center justify-center"
-          >
-            <Icon name="redo" size={14} />
-          </ToggleButton>
         </div>
 
         {/* Speed Slider */}

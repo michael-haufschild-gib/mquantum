@@ -12,7 +12,6 @@ import React, { useCallback, useMemo } from 'react'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 
@@ -55,9 +54,10 @@ const FIELD_VIEW_OPTIONS = [
 function getPresetOptions(dim: number) {
   return [
     { value: '', label: '— Select Preset —' },
-    ...BEC_SCENARIO_PRESETS
-      .filter((p) => (p.minDim ?? 2) <= dim)
-      .map((p) => ({ value: p.id, label: p.name })),
+    ...BEC_SCENARIO_PRESETS.filter((p) => (p.minDim ?? 2) <= dim).map((p) => ({
+      value: p.id,
+      label: p.name,
+    })),
   ]
 }
 
@@ -291,12 +291,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           value={bec.fieldView}
           onChange={(v) => actions.setFieldView(v as BecFieldView)}
           options={FIELD_VIEW_OPTIONS}
-        />
-        <Switch
-          label="Auto-Scale"
-          tooltip="Automatically rescale the color map range to the current density extrema each frame."
-          checked={bec.autoScale}
-          onCheckedChange={actions.setAutoScale}
         />
 
         {/* Numerics: Grid */}

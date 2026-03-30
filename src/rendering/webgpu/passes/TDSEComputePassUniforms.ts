@@ -16,6 +16,10 @@ export interface TdseUniformParams {
   totalSites: number
   simTime: number
   maxDensity: number
+  /** Initial peak density from first diagnostics readback, for gain cap */
+  initialMaxDensity: number
+  /** Maximum autoScale amplification factor (from store) */
+  autoScaleMaxGain: number
   strides: number[]
   needsInit: boolean
   basisX?: Float32Array
@@ -86,7 +90,17 @@ export function writeTdseUniforms(
   uniformF32: Float32Array,
   params: TdseUniformParams
 ): void {
-  const { config, totalSites, simTime, maxDensity, strides, needsInit, boundingRadius } = params
+  const {
+    config,
+    totalSites,
+    simTime,
+    maxDensity,
+    initialMaxDensity,
+    autoScaleMaxGain,
+    strides,
+    needsInit,
+    boundingRadius,
+  } = params
   const u32 = uniformU32
   const f32 = uniformF32
   u32.fill(0)
@@ -158,7 +172,10 @@ export function writeTdseUniforms(
   f32[84] = config.driveFrequency
   f32[85] = config.driveAmplitude
   f32[86] = simTime
-  f32[87] = config.autoScale ? maxDensity : 1.0
+  // AutoScale gain cap: never amplify beyond autoScaleMaxGain × initial peak density.
+  // Without this, a 0.001-density residual gets amplified 1000× and looks like a full wavepacket.
+  const densityFloor = initialMaxDensity / Math.max(autoScaleMaxGain, 1)
+  f32[87] = config.autoScale ? Math.max(maxDensity, densityFloor) : 1.0
 
   // slicePositions (352, indices 88-99)
   for (let i = 0; i < config.slicePositions.length; i++) f32[88 + 3 + i] = config.slicePositions[i]!

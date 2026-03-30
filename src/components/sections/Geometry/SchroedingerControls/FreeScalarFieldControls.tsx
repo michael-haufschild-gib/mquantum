@@ -69,7 +69,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setPacketWidth,
       setPacketAmplitude,
       setModeK,
-      setAutoScale,
       setVacuumSeed,
       setSlicePosition,
       setSelfInteractionEnabled,
@@ -447,13 +446,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Field view"
             tooltip="Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density)."
             data-testid="field-view-selector"
-          />
-          <Switch
-            label="Auto-Scale"
-            tooltip="Automatically normalize the color map range to the current field extrema each frame."
-            checked={fs.autoScale}
-            onCheckedChange={setAutoScale}
-            data-testid="auto-scale-switch"
           />
         </div>
       </div>

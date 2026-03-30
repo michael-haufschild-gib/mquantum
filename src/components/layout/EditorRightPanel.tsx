@@ -7,6 +7,7 @@ import { AnalysisSection } from '@/components/sections/Advanced/AnalysisSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/OpenQuantumDiagnosticsSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
+import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
 import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
@@ -20,6 +21,7 @@ const ObjectTabContent: React.FC = React.memo(() => {
   return (
     <div>
       <FacesSection defaultOpen={true} />
+      <ExposureSection defaultOpen={true} />
       <AbsorptionSection defaultOpen={true} />
       <AnalysisSection defaultOpen={true} />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
@@ -37,6 +39,8 @@ export const EditorRightPanel: React.FC = React.memo(() => {
   const tabs: Tab[] = [
     {
       id: 'object',
+      tooltip:
+        'Appearance, exposure, absorption, analysis, and rendering for the active quantum object.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="sphere" size={14} />
@@ -47,6 +51,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     },
     {
       id: 'scene',
+      tooltip: 'Environment, lighting, and post-processing effects.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="home" size={14} />
@@ -64,6 +69,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     },
     {
       id: 'system',
+      tooltip: 'Application settings and performance tuning.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="cog" size={14} />

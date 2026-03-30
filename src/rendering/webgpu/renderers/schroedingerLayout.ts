@@ -90,9 +90,9 @@ const SCHROEDINGER_FIELDS = [
   { name: 'isoThreshold', type: 'f32' },
   { name: 'sampleCount', type: 'i32' },
 
-  // --- Reserved: formerly phase shift (offset 924) ---
+  // --- Precomputed constants (offset 924) ---
   { name: '_reserved924', type: 'u32' },
-  { name: '_reserved928', type: 'f32' },
+  { name: 'hydrogenRadialNorm', type: 'f32' },
   { name: '_reserved932', type: 'f32' },
   { name: '_reserved936', type: 'f32' },
 

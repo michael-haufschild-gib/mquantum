@@ -15,6 +15,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { FFT_UNIFORM_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
 import {
   buildTdseFFTStagingData,
+  type TdseUniformParams,
   writeTdseUniforms,
 } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
 
@@ -76,8 +77,24 @@ function createTdseConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
     imaginaryTimeEnabled: false,
     observablesEnabled: false,
     needsReset: false,
+    autoScaleMaxGain: 20,
     ...overrides,
   } as TdseConfig
+}
+
+/** Build TdseUniformParams with sensible defaults for testing. */
+function uniformParams(overrides: Partial<TdseUniformParams> = {}): TdseUniformParams {
+  return {
+    config: createTdseConfig(),
+    totalSites: 262144,
+    simTime: 0,
+    maxDensity: 1,
+    initialMaxDensity: 1,
+    autoScaleMaxGain: 20,
+    strides: [4096, 64, 1],
+    needsInit: false,
+    ...overrides,
+  }
 }
 
 describe('writeTdseUniforms', () => {
@@ -91,14 +108,14 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config,
-      totalSites,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config, totalSites })
+    )
 
     expect(u32[0]).toBe(3) // latticeDim
     expect(u32[1]).toBe(262144) // totalSites = 64^3
@@ -112,36 +129,36 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ potentialType: 'barrier' }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ potentialType: 'barrier' }) })
+    )
     expect(u32[7]).toBe(1) // barrier → 1
 
     u32.fill(0)
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ potentialType: 'doubleSlit' }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ potentialType: 'doubleSlit' }) })
+    )
     expect(u32[7]).toBe(6) // doubleSlit → 6
 
     u32.fill(0)
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ potentialType: 'custom' }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ potentialType: 'custom' }) })
+    )
     expect(u32[7]).toBe(11) // custom → 11
   })
 
@@ -151,15 +168,17 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ potentialType: 'custom' }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-      customPotentialScale: 42.5,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ potentialType: 'custom' }),
+        customPotentialScale: 42.5,
+      })
+    )
     expect(f32[176]).toBeCloseTo(42.5)
   })
 
@@ -169,14 +188,18 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ gridSize: [32, 64, 128], latticeDim: 3 }),
-      totalSites: 32 * 64 * 128,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [8192, 128, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ gridSize: [32, 64, 128], latticeDim: 3 }),
+        totalSites: 32 * 64 * 128,
+        strides: [8192, 128, 1],
+      })
+    )
 
     expect(u32[8]).toBe(32)
     expect(u32[9]).toBe(64)
@@ -189,14 +212,16 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ gridSize: [64, 64, 64], spacing: [0.1, 0.1, 0.1] }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({ gridSize: [64, 64, 64], spacing: [0.1, 0.1, 0.1] }),
+      })
+    )
 
     // kGridScale = 2π / (64 * 0.1) = 2π / 6.4 ≈ 0.9817
     const expected = (2 * Math.PI) / (64 * 0.1)
@@ -211,14 +236,14 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ absorberEnabled: true, absorberWidth: 0.2 }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ absorberEnabled: true, absorberWidth: 0.2 }) })
+    )
 
     expect(u32[79]).toBe(1) // absorberEnabled
     expect(f32[81]).toBeGreaterThan(0) // sigma_max > 0
@@ -232,14 +257,7 @@ describe('writeTdseUniforms', () => {
     const mockDevice = { queue: { writeBuffer } } as unknown as GPUDevice
     const mockBuffer = {} as GPUBuffer
 
-    writeTdseUniforms(mockDevice, mockBuffer, uniformData, u32, f32, {
-      config: createTdseConfig(),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(mockDevice, mockBuffer, uniformData, u32, f32, uniformParams())
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
   })
@@ -250,14 +268,14 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ imaginaryTimeEnabled: true }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ imaginaryTimeEnabled: true }) })
+    )
 
     // Offset 700 / 4 = index 175
     expect(u32[175]).toBe(1)
@@ -269,14 +287,14 @@ describe('writeTdseUniforms', () => {
     const f32 = new Float32Array(uniformData)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
-    writeTdseUniforms(mockDevice, {} as GPUBuffer, uniformData, u32, f32, {
-      config: createTdseConfig({ imaginaryTimeEnabled: false }),
-      totalSites: 262144,
-      simTime: 0,
-      maxDensity: 1,
-      strides: [4096, 64, 1],
-      needsInit: false,
-    })
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ imaginaryTimeEnabled: false }) })
+    )
 
     expect(u32[175]).toBe(0)
   })

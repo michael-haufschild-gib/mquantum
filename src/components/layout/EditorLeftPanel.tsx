@@ -40,6 +40,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const tabs: Tab[] = [
     {
       id: 'type',
+      tooltip: 'Browse and select quantum object types and modes.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="sparkles" size={14} />
@@ -54,6 +55,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
     },
     {
       id: 'geometry',
+      tooltip: 'Configure quantum numbers, dimensions, and mode-specific parameters.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="layers" size={14} />

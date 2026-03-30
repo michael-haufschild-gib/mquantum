@@ -142,6 +142,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     pendingAutoReset: false,
     simTime: 0,
     diagHistory: new TdseDiagnosticsHistory(),
+    prevNorm: 0,
+    stagnationCount: 0,
+    initialMaxDensity: 1.0,
   }
 
   // Gram-Schmidt state (shared mutable object for extracted module)
@@ -210,6 +213,18 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
+
+  /** Adapter: wraps base dispatchCompute with optional y/z defaulting to 1. */
+  private readonly dc = (
+    pe: GPUComputePassEncoder,
+    p: GPUComputePipeline,
+    b: GPUBindGroup[],
+    x: number,
+    y?: number,
+    z?: number
+  ): void => {
+    this.dispatchCompute(pe, p, b, x, y ?? 1, z ?? 1)
+  }
 
   constructor() {
     super({
@@ -384,14 +399,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
   private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
-    const dc = (
-      pe: GPUComputePassEncoder,
-      p: GPUComputePipeline,
-      b: GPUBindGroup[],
-      x: number,
-      y?: number,
-      z?: number
-    ) => this.dispatchCompute(pe, p, b, x, y ?? 1, z ?? 1)
     const ic = {
       pl: this.pl,
       bg: this.bg,
@@ -406,7 +413,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       diagState: this._diagState,
       slState: this._slState,
       disorderState: this._disorderState,
-      dispatchCompute: dc,
+      dispatchCompute: this.dc,
     }
     extMaybeInitialize(ctx, config, ic)
     this.initialized = ic.initialized
@@ -426,8 +433,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       fftScratchA: this.fftScratchA!,
       fftScratchB: this.fftScratchB!,
       totalSites: this.totalSites,
-      dispatchCompute: (pe, pl, bgs, x, y, z) =>
-        this.dispatchCompute(pe, pl, bgs, x, y ?? 1, z ?? 1),
+      dispatchCompute: this.dc,
     }
     return extDispatchFFTAxis(ctx, axisDim, slotOffset, p)
   }
@@ -480,6 +486,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           totalSites: this.totalSites,
           simTime: this.simTime,
           maxDensity: this._diagState.maxDensity,
+          initialMaxDensity: this._diagState.initialMaxDensity,
+          autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
           strides: computeStridesPadded(config.gridSize, config.latticeDim),
           needsInit: !this.initialized || config.needsReset || this._diagState.pendingAutoReset,
           basisX,
@@ -545,15 +553,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       for (let step = 0; step < stepsThisFrame; step++) {
-        // 1. Half-step potential
-        const vHalf = ctx.beginComputePass({ label: `tdse-V-half-1-${step}` })
-        this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
-        vHalf.end()
-
-        // 2. Pack psiRe+psiIm into interleaved complex
-        const packPass = ctx.beginComputePass({ label: `tdse-pack-${step}` })
-        this.dispatchCompute(packPass, pl.packPipeline, [bg.packBG], linearWG)
-        packPass.end()
+        // 1+2. PERF: Fused half-step potential + pack (saves 1 dispatch + 2MB memory)
+        const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
+        this.dispatchCompute(
+          fusedVPack,
+          pl.fusedPotentialPackPipeline,
+          [bg.fusedPotentialPackBG],
+          linearWG
+        )
+        fusedVPack.end()
 
         // 3. Forward FFT (for each spatial axis)
         let fftSlot = 0
@@ -572,15 +580,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
         }
 
-        // 6. Unpack with 1/N normalization
-        const unpackPass = ctx.beginComputePass({ label: `tdse-unpack-${step}` })
-        this.dispatchCompute(unpackPass, pl.unpackPipeline, [bg.unpackBG], linearWG)
-        unpackPass.end()
-
-        // 7. Second half-step potential
-        const vHalf2 = ctx.beginComputePass({ label: `tdse-V-half-2-${step}` })
-        this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG], linearWG)
-        vHalf2.end()
+        // 6+7. PERF: Fused unpack (1/N norm) + second half-step potential (saves 1 dispatch + 2MB memory)
+        const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
+        this.dispatchCompute(
+          fusedUnpackV,
+          pl.fusedUnpackPotentialPipeline,
+          [bg.fusedUnpackPotentialBG],
+          linearWG
+        )
+        fusedUnpackV.end()
 
         // 8. Absorber (separate pass AFTER the Strang step)
         // Applied once per step, after the FFT kinetic step has completed.
@@ -614,20 +622,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
           // Gram-Schmidt: orthogonalize against stored eigenstates (imaginary-time only)
           if (isImaginaryTime && this._gsState.gsEigenstates.length > 0) {
-            gsDispatch(
-              ctx,
-              this._gsState,
-              (pe, ppl, bgs, x, y, z) => this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1),
-              {
-                diagReducePipeline: pl.diagReducePipeline,
-                diagReduceBG: bg.diagReduceBG,
-                diagFinalizePipeline: pl.diagFinalizePipeline,
-                diagFinalizeBG: bg.diagFinalizeBG,
-                renormalizePipeline: pl.renormalizePipeline,
-                renormalizeBG: bg.renormalizeBG,
-                diagNumWorkgroups: this.diagNumWorkgroups,
-              }
-            )
+            gsDispatch(ctx, this._gsState, this.dc, {
+              diagReducePipeline: pl.diagReducePipeline,
+              diagReduceBG: bg.diagReduceBG,
+              diagFinalizePipeline: pl.diagFinalizePipeline,
+              diagFinalizeBG: bg.diagFinalizeBG,
+              renormalizePipeline: pl.renormalizePipeline,
+              renormalizeBG: bg.renormalizeBG,
+              diagNumWorkgroups: this.diagNumWorkgroups,
+            })
           }
         }
       }
@@ -652,14 +655,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       const { pl, bg, diagUniformBuffer } = this
       const { diagResultBuffer, diagStagingBuffer } = this._diagState
       if (pl && bg && diagResultBuffer && diagStagingBuffer && diagUniformBuffer) {
-        const dc = (
-          pe: GPUComputePassEncoder,
-          ppl: GPUComputePipeline,
-          bgs: GPUBindGroup[],
-          x: number,
-          y?: number,
-          z?: number
-        ) => this.dispatchCompute(pe, ppl, bgs, x, y ?? 1, z ?? 1)
         extDispatchDiagnostics(ctx, config, config.diagnosticsEnabled, {
           pl,
           bg,
@@ -670,11 +665,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           diagNumWorkgroups: this.diagNumWorkgroups,
           simTime: this.simTime,
           computeStrides: (c) => computeStridesPadded(c.gridSize, c.latticeDim),
-          dispatchCompute: dc,
+          dispatchCompute: this.dc,
           observablesMomentumFFT: (fftCtx) => {
             const wg = Math.ceil(this.totalSites / LINEAR_WG)
             const packP = fftCtx.beginComputePass({ label: 'obs-fft-pack' })
-            dc(packP, pl.packPipeline, [bg.packBG], wg)
+            this.dc(packP, pl.packPipeline, [bg.packBG], wg)
             packP.end()
             let slot = 0
             for (let d = config.latticeDim - 1; d >= 0; d--) {

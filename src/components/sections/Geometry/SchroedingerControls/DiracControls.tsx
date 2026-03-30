@@ -378,14 +378,6 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         max={16}
         step={1}
       />
-
-      {/* Auto Scale */}
-      <Switch
-        label="Auto Scale"
-        tooltip="Automatically normalize the visualization to the current peak density."
-        checked={dirac.autoScale}
-        onCheckedChange={actions.setAutoScale}
-      />
     </div>
   )
 })

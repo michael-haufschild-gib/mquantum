@@ -105,6 +105,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerFieldScale: (scale: number) => void
   setSchroedingerDensityGain: (gain: number) => void
   setSchroedingerDensityContrast: (contrast: number) => void
+  setSchroedingerAutoScaleMaxGain: (gain: number) => void
   setSchroedingerPowderScale: (scale: number) => void
   setSchroedingerSampleCount: (count: number) => void
 

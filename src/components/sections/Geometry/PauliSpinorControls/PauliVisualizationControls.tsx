@@ -1,15 +1,14 @@
 /**
  * PauliVisualizationControls Component
  *
- * Controls for selecting which field quantity to render
- * and toggling auto-scale density.
+ * Controls for selecting which field quantity to render.
+ * Auto-scale toggle has been moved to the centralized Exposure section.
  *
  * @module components/sections/Geometry/PauliSpinorControls/PauliVisualizationControls
  */
 
 import React from 'react'
 
-import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { PauliFieldView } from '@/lib/geometry/extended/types'
 
@@ -22,19 +21,17 @@ const FIELD_VIEW_OPTIONS: { value: PauliFieldView; label: string }[] = [
 
 interface PauliVisualizationControlsProps {
   fieldView: PauliFieldView
-  autoScale: boolean
   onFieldViewChange: (view: PauliFieldView) => void
-  onAutoScaleChange: (autoScale: boolean) => void
 }
 
 /**
- * Field view and auto-scale controls for Pauli spinor.
+ * Field view controls for Pauli spinor.
  *
  * @param props - Visualization parameters and change handlers
  * @returns Visualization controls panel
  */
 export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProps> = React.memo(
-  ({ fieldView, autoScale, onFieldViewChange, onAutoScaleChange }) => {
+  ({ fieldView, onFieldViewChange }) => {
     return (
       <div className="space-y-3">
         <ToggleGroup
@@ -43,13 +40,6 @@ export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProp
           onChange={(v) => onFieldViewChange(v as PauliFieldView)}
           ariaLabel="Field View"
           tooltip="Which spinor observable to render: spin density (up vs down), total probability, spin expectation value, or off-diagonal coherence."
-        />
-
-        <Switch
-          label="Auto-Scale Density"
-          tooltip="Automatically normalize the color range to the current peak density. Prevents saturation as the wavepacket evolves."
-          checked={autoScale}
-          onCheckedChange={onAutoScaleChange}
         />
       </div>
     )

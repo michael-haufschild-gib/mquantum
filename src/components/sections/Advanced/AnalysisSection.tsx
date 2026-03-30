@@ -202,6 +202,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
               <Switch
                 checked={classicalOverlayEnabled}
                 onCheckedChange={setClassicalOverlayEnabled}
+                tooltip="Show a classical particle trajectory overlaid on the quantum wavefunction."
                 data-testid="classical-overlay-toggle"
               />
             }
@@ -262,6 +263,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
               <Switch
                 checked={carpetEnabled}
                 onCheckedChange={setCarpetEnabled}
+                tooltip="Toggle the quantum carpet — a space-time density plot of the evolution history."
                 data-testid="carpet-toggle"
               />
             }

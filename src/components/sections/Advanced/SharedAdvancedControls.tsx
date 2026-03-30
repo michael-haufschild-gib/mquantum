@@ -66,6 +66,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
             <Switch
               checked={sssEnabled}
               onCheckedChange={setSssEnabled}
+              tooltip="Simulate translucent subsurface light scattering within the volume."
               data-testid="global-sss-toggle"
             />
           }

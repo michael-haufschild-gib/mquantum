@@ -122,6 +122,9 @@ export function maybeInitialize(
 
   ic.diagState.maxDensity = estimateInitialDensity(config)
   ic.diagState.initialNorm = -1.0
+  ic.diagState.initialMaxDensity = 1.0
+  ic.diagState.prevNorm = 0
+  ic.diagState.stagnationCount = 0
   ic.simTime = 0
   ic.stepAccumulator = 0
   ic.diagState.pendingAutoReset = false

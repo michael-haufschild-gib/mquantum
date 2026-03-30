@@ -209,6 +209,8 @@ export interface TdseConfig {
   fieldView: TdseFieldView
   /** Auto-scale density normalization from wavefunction maximum */
   autoScale: boolean
+  /** Maximum auto-scale amplification factor (1-100). Prevents negligible residuals from being amplified to full brightness. */
+  autoScaleMaxGain: number
   /** Show potential V(x) as a faint overlay in the 3D volume */
   showPotential: boolean
 
@@ -321,6 +323,7 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   fieldView: 'density',
   autoScale: true,
+  autoScaleMaxGain: 20,
   showPotential: true,
   autoLoop: false,
 

@@ -314,12 +314,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
           <p className="text-[10px] text-text-secondary mb-0.5">
             IPR (Inverse Participation Ratio)
           </p>
-          <Sparkline
-            data={historyIpr}
-            head={historyHead}
-            count={historyCount}
-            height={40}
-          />
+          <Sparkline data={historyIpr} head={historyHead} count={historyCount} height={40} />
         </div>
       )}
     </div>
@@ -411,6 +406,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
           <Switch
             checked={enabled}
             onCheckedChange={onEnabledChange}
+            tooltip="Enable GPU readback of position, momentum, and energy expectation values."
             data-testid="observables-toggle"
           />
         }
@@ -536,9 +532,7 @@ export const EnergySpectrumDisplay: React.FC = React.memo(() => {
 
   return (
     <div className="mt-2" data-testid="energy-spectrum-display">
-      <p className="text-[10px] text-text-secondary mb-0.5">
-        Energy Spectrum ρ(E)
-      </p>
+      <p className="text-[10px] text-text-secondary mb-0.5">Energy Spectrum ρ(E)</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${ES_W} ${ES_H}`} className="block">
           {Array.from({ length: numBins }, (_, i) => {
@@ -557,13 +551,20 @@ export const EnergySpectrumDisplay: React.FC = React.memo(() => {
           })}
           {/* X axis */}
           <line
-            x1={ES_PAD.left} y1={ES_PAD.top + ES_PLOT_H}
-            x2={ES_PAD.left + ES_PLOT_W} y2={ES_PAD.top + ES_PLOT_H}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={ES_PAD.left}
+            y1={ES_PAD.top + ES_PLOT_H}
+            x2={ES_PAD.left + ES_PLOT_W}
+            y2={ES_PAD.top + ES_PLOT_H}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
           <text
-            x={ES_PAD.left + ES_PLOT_W / 2} y={ES_H - 2}
-            textAnchor="middle" fill="var(--text-tertiary)" fontSize={7} fontFamily="monospace"
+            x={ES_PAD.left + ES_PLOT_W / 2}
+            y={ES_H - 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={7}
+            fontFamily="monospace"
           >
             E (kinetic)
           </text>

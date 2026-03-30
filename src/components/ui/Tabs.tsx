@@ -20,6 +20,7 @@ import React, {
 
 import ChevronLeftIcon from '@/assets/icons/chevron-left2.svg?react'
 import ChevronRightIcon from '@/assets/icons/chevron-right2.svg?react'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { soundManager } from '@/lib/audio/SoundManager'
 
 /** Definition for a single tab within a {@link Tabs} component. */
@@ -32,6 +33,8 @@ export interface Tab {
   content: React.ReactNode
   /** Disabled tabs remain visible but cannot be selected */
   disabled?: boolean
+  /** Optional tooltip shown on hover */
+  tooltip?: string
 }
 
 /** Props for the {@link Tabs} component. Supports keep-alive and mount-on-demand strategies. */
@@ -144,7 +147,13 @@ const TabButton = React.memo(
         {isActive && variant !== 'pills' && (
           <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent pointer-events-none" />
         )}
-        <span className="relative z-10">{tab.label}</span>
+        {tab.tooltip ? (
+          <Tooltip content={tab.tooltip} position="bottom">
+            <span className="relative z-10">{tab.label}</span>
+          </Tooltip>
+        ) : (
+          <span className="relative z-10">{tab.label}</span>
+        )}
       </button>
     )
   }

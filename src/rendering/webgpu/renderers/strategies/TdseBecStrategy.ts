@@ -347,6 +347,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
           absorberEnabled?: boolean
           absorberWidth?: number
           pmlTargetReflection?: number
+          autoScaleMaxGain?: number
         }
       | undefined
   ): { config: TdseConfig } {
@@ -422,6 +423,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         pmlTargetReflection: schroedinger?.pmlTargetReflection ?? 1e-6,
         fieldView: bec.fieldView ?? 'density',
         autoScale: bec.autoScale ?? true,
+        autoScaleMaxGain: schroedinger?.autoScaleMaxGain ?? 20,
         showPotential: false,
         autoLoop: false,
         diagnosticsEnabled: bec.diagnosticsEnabled ?? true,

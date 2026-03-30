@@ -22,6 +22,12 @@ export interface DiagReadbackState {
   pendingAutoReset: boolean
   simTime: number
   diagHistory: TdseDiagnosticsHistory
+  /** Previous norm reading for stagnation detection */
+  prevNorm: number
+  /** Count of consecutive readings where norm barely changed */
+  stagnationCount: number
+  /** Peak maxDensity from the first diagnostics readback, used to cap autoScale gain */
+  initialMaxDensity: number
 }
 
 /**
@@ -76,17 +82,37 @@ export function scheduleNormReadback(
             else s.maxDensity += 0.4 * (maxDens - s.maxDensity)
           }
 
-          // Auto-loop: capture initial norm, check decay/divergence
+          // Auto-loop: capture initial norm, check decay/divergence/stagnation
           if (s.initialNorm < 0) {
             s.initialNorm = totalNorm
+            s.initialMaxDensity = maxDens
+            s.prevNorm = totalNorm
+            s.stagnationCount = 0
             if (renormBuf) device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
           } else if (s.initialNorm > 0) {
             if (!isFinite(totalNorm)) s.pendingAutoReset = true
-            else if (
-              s.currentAutoLoop &&
-              (totalNorm < s.initialNorm * 0.001 || totalNorm > s.initialNorm * 5.0)
-            )
-              s.pendingAutoReset = true
+            else if (s.currentAutoLoop) {
+              // Reset if norm dropped below 1% or diverged above 5×
+              if (totalNorm < s.initialNorm * 0.01 || totalNorm > s.initialNorm * 5.0) {
+                s.pendingAutoReset = true
+              }
+              // Stagnation detection: if norm has decayed significantly (below 10%)
+              // but stopped changing (< 0.1% relative change between readings),
+              // the remaining probability is a trapped residual that will never
+              // reach the absorber (e.g., near-zero-momentum density next to a
+              // high barrier). Reset to avoid visually misleading late-time states.
+              else if (totalNorm < s.initialNorm * 0.1 && s.prevNorm > 0) {
+                const relChange = Math.abs(totalNorm - s.prevNorm) / s.prevNorm
+                if (relChange < 0.001) {
+                  s.stagnationCount++
+                  // 3 consecutive stagnant readings ≈ 15 frames at interval=5
+                  if (s.stagnationCount >= 3) s.pendingAutoReset = true
+                } else {
+                  s.stagnationCount = 0
+                }
+              }
+            }
+            s.prevNorm = totalNorm
           }
 
           if (recordHistory) {

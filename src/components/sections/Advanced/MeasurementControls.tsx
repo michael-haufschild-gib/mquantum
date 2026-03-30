@@ -109,7 +109,12 @@ export const MeasurementControls: React.FC = React.memo(() => {
       defaultOpen={false}
       data-testid="control-group-measurement"
       rightElement={
-        <Switch checked={enabled} onCheckedChange={handleToggle} data-testid="measurement-toggle" />
+        <Switch
+          checked={enabled}
+          onCheckedChange={handleToggle}
+          tooltip="Enable Born-rule measurement: click the volume to sample from |ψ|² and collapse the wavefunction."
+          data-testid="measurement-toggle"
+        />
       }
     >
       {enabled && (

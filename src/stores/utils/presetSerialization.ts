@@ -59,6 +59,9 @@ export const TRANSIENT_FIELDS = new Set([
   'schroedingerVersion',
   'pauliSpinorVersion',
 
+  // Exposure - runtime display preference, not part of scene/style presets
+  'autoScaleMaxGain',
+
   // Legacy version counters from removed object types - strip from imported presets
   'gravityVersion',
   'polytopeVersion',

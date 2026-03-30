@@ -229,6 +229,12 @@ function packHydrogenAndExtraDims(
   floatView[I.hydrogenRadialThreshold] =
     25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
 
+  // PERF: Precompute hydrogen radial normalization — eliminates per-sample log/exp/sqrt on GPU.
+  // hydrogenRadialNormND(nr, lambda, nEff, a0) depends only on uniform-constant (n, l, dim, a0).
+  const nr = validN - validL - 1
+  const lambda = validL + (dimension - 3) / 2
+  floatView[I.hydrogenRadialNorm] = computeHydrogenRadialNormND(nr, lambda, nEff, bohrRadius)
+
   // extraDimN: 2 vec4i = 8 ints
   // For coupled hydrogen ND, these slots carry the angular chain (l₂, l₃, ...)
   // instead of HO quantum numbers. The shader's getAngularChainL() reads from here.

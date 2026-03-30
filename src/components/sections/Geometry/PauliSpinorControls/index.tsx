@@ -136,9 +136,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       <Section title="Visualization" defaultOpen={true}>
         <PauliVisualizationControls
           fieldView={pauli.fieldView}
-          autoScale={pauli.autoScale}
           onFieldViewChange={handleFieldViewChange}
-          onAutoScaleChange={actions.setPauliAutoScale}
         />
       </Section>
 

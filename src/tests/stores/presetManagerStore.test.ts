@@ -795,9 +795,12 @@ describe('presetManagerStore (invariants)', () => {
 
   describe('invariant: scene save/load round-trips with cross-store coordination', () => {
     it('should save and load a scene with animation', () => {
-      // Setup animation state
+      // Setup animation state: speed + specific planes
       const animStore = useAnimationStore.getState()
       animStore.setSpeed(2.0)
+      animStore.togglePlane('XY')
+      animStore.togglePlane('YZ')
+      animStore.togglePlane('XZ')
 
       // Save scene
       usePresetManagerStore.getState().saveScene('Fast Scene')

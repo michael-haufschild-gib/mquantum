@@ -193,13 +193,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             data-testid="tdse-field-view"
           />
           <Switch
-            label="Auto Scale"
-            tooltip="Automatically normalize the color range to the current maximum probability density. Prevents saturation as the wavepacket spreads."
-            checked={td.autoScale}
-            onCheckedChange={actions.setAutoScale}
-            data-testid="tdse-auto-scale"
-          />
-          <Switch
             label="Show Potential"
             tooltip="Overlay the external potential V(x) on the wavefunction visualization."
             checked={td.showPotential}

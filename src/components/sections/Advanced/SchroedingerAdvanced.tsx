@@ -15,12 +15,10 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const isPauli = objectType === 'pauliSpinor'
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
-    setDensityGain: state.setSchroedingerDensityGain,
-    setDensityContrast: state.setSchroedingerDensityContrast,
     setPowderScale: state.setSchroedingerPowderScale,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
   }))
-  const { config, setDensityGain, setDensityContrast, setPowderScale, setScatteringAnisotropy } =
+  const { config, setPowderScale, setScatteringAnisotropy } =
     useExtendedObjectStore(extendedObjectSelector)
 
   // Emission settings from appearance store
@@ -85,26 +83,14 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
         />
       </ControlGroup>
 
-      {/* Volume Rendering (includes Volume Effects) */}
-      <ControlGroup
-        title="Volume Rendering"
-        collapsible
-        defaultOpen
-        data-testid="control-group-volume-rendering"
-      >
-        <Slider
-          label="Density Gain"
-          tooltip="Multiplier for the volumetric density. Increase to make faint regions visible; decrease to reveal inner structure."
-          min={0.1}
-          max={5.0}
-          step={0.1}
-          value={config.densityGain}
-          onChange={setDensityGain}
-          showValue
-          data-testid="schroedinger-density-gain"
-        />
-        {(isPauli ||
-          (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
+      {/* Volume Rendering — density gain/contrast moved to Exposure section */}
+      {(isPauli || (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
+        <ControlGroup
+          title="Volume Effects"
+          collapsible
+          defaultOpen
+          data-testid="control-group-volume-rendering"
+        >
           <Slider
             label="Powder Effect"
             tooltip="Simulates light scattering in dense media. Creates a soft, diffuse appearance similar to powder or fog within the volume."
@@ -116,9 +102,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             showValue
             data-testid="schroedinger-powder-scale"
           />
-        )}
-        {(isPauli ||
-          (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
           <Slider
             label="Anisotropy (Phase)"
             tooltip="Henyey-Greenstein scattering parameter. Positive = forward scattering (backlit glow), negative = backscattering (edge highlights)."
@@ -130,19 +113,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             showValue
             data-testid="schroedinger-anisotropy"
           />
-        )}
-        <Slider
-          label="Density Contrast"
-          tooltip="Power curve applied to density values. Higher contrast suppresses dim regions and emphasizes bright peaks."
-          min={1.0}
-          max={4.0}
-          step={0.1}
-          value={config.densityContrast ?? 1.8}
-          onChange={setDensityContrast}
-          showValue
-          data-testid="schroedinger-density-contrast"
-        />
-      </ControlGroup>
+        </ControlGroup>
+      )}
     </div>
   )
 })
