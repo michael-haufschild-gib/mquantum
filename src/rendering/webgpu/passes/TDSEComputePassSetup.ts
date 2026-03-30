@@ -13,6 +13,10 @@ import {
   tdseDiagNormFinalizeBlock,
   tdseDiagNormReduceBlock,
 } from '../shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import {
+  tdseFusedPotentialPackBlock,
+  tdseFusedUnpackPotentialBlock,
+} from '../shaders/schroedinger/compute/tdseFusedKernels.wgsl'
 import { tdseInitBlock } from '../shaders/schroedinger/compute/tdseInit.wgsl'
 import { tdsePotentialBlock } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
 import {
@@ -62,6 +66,12 @@ export interface TdsePipelineResult extends ObsGSPipelineResult {
   packBGL: GPUBindGroupLayout
   unpackPipeline: GPUComputePipeline
   unpackBGL: GPUBindGroupLayout
+  /** PERF: Fused potentialHalf + pack kernel (saves 1 dispatch per substep) */
+  fusedPotentialPackPipeline: GPUComputePipeline
+  fusedPotentialPackBGL: GPUBindGroupLayout
+  /** PERF: Fused unpack + potentialHalf kernel (saves 1 dispatch per substep) */
+  fusedUnpackPotentialPipeline: GPUComputePipeline
+  fusedUnpackPotentialBGL: GPUBindGroupLayout
   fftStagePipeline: GPUComputePipeline
   fftStageBGL: GPUBindGroupLayout
   kineticPipeline: GPUComputePipeline
@@ -81,6 +91,8 @@ export interface TdseBindGroupResult {
   initBG: GPUBindGroup
   potentialBG: GPUBindGroup
   potentialHalfBG: GPUBindGroup
+  fusedPotentialPackBG: GPUBindGroup
+  fusedUnpackPotentialBG: GPUBindGroup
   packBG: GPUBindGroup
   unpackBG: GPUBindGroup
   fftStageABBG: GPUBindGroup
@@ -182,6 +194,52 @@ export function buildTdsePipelines(
     ),
     [potentialHalfBGL],
     'tdse-potential-half'
+  )
+
+  // PERF: Fused potentialHalf + pack kernel
+  // Bindings: uniform, psiRe(rw), psiIm(rw), potential(r), complexBuf(rw)
+  const fusedPotentialPackBGL = device.createBindGroupLayout({
+    label: 'tdse-fused-potential-pack-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ],
+  })
+  const fusedPotentialPackPipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(
+      device,
+      unifAndIndex + tdseFusedPotentialPackBlock,
+      'tdse-fused-potential-pack'
+    ),
+    [fusedPotentialPackBGL],
+    'tdse-fused-potential-pack'
+  )
+
+  // PERF: Fused unpack + potentialHalf kernel
+  // Bindings: uniform, complexBuf(r), psiRe(rw), psiIm(rw), potential(r)
+  const fusedUnpackPotentialBGL = device.createBindGroupLayout({
+    label: 'tdse-fused-unpack-potential-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+    ],
+  })
+  const fusedUnpackPotentialPipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(
+      device,
+      unifAndIndex + tdseFusedUnpackPotentialBlock,
+      'tdse-fused-unpack-potential'
+    ),
+    [fusedUnpackPotentialBGL],
+    'tdse-fused-unpack-potential'
   )
 
   // Absorber (separate pass after Strang step — NOT merged into potential half-step).
@@ -381,6 +439,10 @@ struct PackUniforms {
     potentialBGL,
     potentialHalfPipeline,
     potentialHalfBGL,
+    fusedPotentialPackPipeline,
+    fusedPotentialPackBGL,
+    fusedUnpackPotentialPipeline,
+    fusedUnpackPotentialBGL,
     absorberPipeline,
     renormalizePipeline,
     renormalizeBGL,
@@ -468,6 +530,35 @@ export function rebuildTdseBindGroups(
       { binding: 1, resource: { buffer: psiReBuffer } },
       { binding: 2, resource: { buffer: psiImBuffer } },
       { binding: 3, resource: { buffer: potentialBuffer } },
+    ],
+  })
+
+  // PERF: Fused potentialHalf + pack bind group
+  const fusedPotentialPackBG = device.createBindGroup({
+    label: 'tdse-fused-potential-pack-bg',
+    layout: pipelines.fusedPotentialPackBGL,
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: psiReBuffer } },
+      { binding: 2, resource: { buffer: psiImBuffer } },
+      { binding: 3, resource: { buffer: potentialBuffer } },
+      { binding: 4, resource: { buffer: fftScratchA } },
+    ],
+  })
+
+  // PERF: Fused unpack + potentialHalf bind group
+  // Note: complexBuf result is in fftScratchA (even stages) or fftScratchB (odd stages).
+  // For odd-stage count, final result is in B and gets copied to A before unpack.
+  // So the fused unpack always reads from fftScratchA.
+  const fusedUnpackPotentialBG = device.createBindGroup({
+    label: 'tdse-fused-unpack-potential-bg',
+    layout: pipelines.fusedUnpackPotentialBGL,
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: fftScratchA } },
+      { binding: 2, resource: { buffer: psiReBuffer } },
+      { binding: 3, resource: { buffer: psiImBuffer } },
+      { binding: 4, resource: { buffer: potentialBuffer } },
     ],
   })
 
@@ -592,6 +683,8 @@ export function rebuildTdseBindGroups(
     initBG,
     potentialBG,
     potentialHalfBG,
+    fusedPotentialPackBG,
+    fusedUnpackPotentialBG,
     packBG,
     unpackBG,
     fftStageABBG,

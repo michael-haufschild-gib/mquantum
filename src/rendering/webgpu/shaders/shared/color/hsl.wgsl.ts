@@ -20,28 +20,19 @@ export const hslBlock = /* wgsl */ `
  * @return RGB color (0-1)
  */
 fn hsl2rgb(h: f32, s: f32, l: f32) -> vec3f {
-  let hue = fract(h) * 6.0;
+  // PERF: Branchless HSL→RGB using the triangle-wave identity.
+  // Each RGB channel is a triangle wave offset by 120° in hue space.
+  // This eliminates the 6-branch if-else chain that causes GPU warp divergence.
   let c = (1.0 - abs(2.0 * l - 1.0)) * s;
-  let x = c * (1.0 - abs(fract(hue / 2.0) * 2.0 - 1.0));
   let m = l - c * 0.5;
+  let hue6 = fract(h) * 6.0;
 
-  var rgb: vec3f;
+  // Triangle wave: T(x) = clamp(|x - 3| - 1, 0, 1) maps hue sector to channel intensity
+  let r = clamp(abs(hue6 - 3.0) - 1.0, 0.0, 1.0);
+  let g = clamp(2.0 - abs(hue6 - 2.0), 0.0, 1.0);
+  let b = clamp(2.0 - abs(hue6 - 4.0), 0.0, 1.0);
 
-  if (hue < 1.0) {
-    rgb = vec3f(c, x, 0.0);
-  } else if (hue < 2.0) {
-    rgb = vec3f(x, c, 0.0);
-  } else if (hue < 3.0) {
-    rgb = vec3f(0.0, c, x);
-  } else if (hue < 4.0) {
-    rgb = vec3f(0.0, x, c);
-  } else if (hue < 5.0) {
-    rgb = vec3f(x, 0.0, c);
-  } else {
-    rgb = vec3f(c, 0.0, x);
-  }
-
-  return rgb + m;
+  return vec3f(r, g, b) * c + m;
 }
 
 /**
