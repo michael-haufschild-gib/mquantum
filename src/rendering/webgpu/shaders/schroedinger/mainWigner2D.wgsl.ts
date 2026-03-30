@@ -94,24 +94,6 @@ export function generateMainBlockWigner2D(useCache = false): string {
 // Main Fragment Shader - Wigner Phase-Space Mode
 // ============================================
 
-/**
- * Compute the signed distance to the classical HO energy ellipse.
- * Ellipse: omega*x^2 + p^2/omega = E_cl, where E_cl = 2n + 1.
- * Returns smooth anti-aliased line opacity.
- */
-fn classicalEllipseSDF(x: f32, p: f32, omega: f32, energy: f32, lineWidth: f32) -> f32 {
-  // Implicit function: f(x,p) = omega*x^2 + p^2/omega - energy
-  let f = omega * x * x + p * p / omega - energy;
-  // Gradient magnitude for distance normalization
-  let gx = 2.0 * omega * x;
-  let gp = 2.0 * p / omega;
-  let gradMag = sqrt(gx * gx + gp * gp);
-  // Signed distance
-  let dist = abs(f) / max(gradMag, 1e-8);
-  // Anti-aliased line
-  return 1.0 - smoothstep(0.0, lineWidth, dist);
-}
-
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Detect hydrogen radial mode: one-sided x-axis [0, rMax] since r >= 0
@@ -173,75 +155,6 @@ ${wignerEvalBlock}
 
   // Alpha from Wigner magnitude (adaptive scaling for visibility)
   var alpha = clamp(absW * 8.0, 0.0, 1.0);
-
-  // Classical trajectory overlay
-  if (schroedinger.wignerClassicalOverlay != 0u) {
-    // Compute pixel size in phase-space units for line width scaling
-    // Both modes use symmetric mapping: x covers [-xRange*aspect, +xRange*aspect]
-    let xExtent = schroedinger.wignerXRange * aspect * 2.0;
-    let pixelX = xExtent / camera.resolution.x;
-    let pixelP = schroedinger.wignerPRange * 2.0 / camera.resolution.y;
-    let lineWidth = max(pixelX, pixelP) * 1.5;
-    let lineColor = vec3f(1.0, 1.0, 1.0);
-    var overlayAlpha = 0.0;
-
-    if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-      let dimIdx = schroedinger.wignerDimensionIndex;
-      if (dimIdx < 3) {
-        // Hydrogen radial: classical turning points
-        let nf = f32(schroedinger.principalN);
-        let lf = f32(schroedinger.azimuthalL);
-        let a0 = schroedinger.bohrRadius;
-        let E = -1.0 / (2.0 * nf * nf);
-        let ll1 = lf * (lf + 1.0);
-        if (ll1 > 0.0) {
-          let disc = 1.0 + 2.0 * E * ll1;
-          if (disc >= 0.0) {
-            let sqrtDisc = sqrt(disc);
-            let invR1 = (1.0 + sqrtDisc) / (ll1 * a0);
-            let invR2 = (1.0 - sqrtDisc) / (ll1 * a0);
-            let rMin = select(0.0, 1.0 / invR1, invR1 > 0.0);
-            let rMax = select(100.0 * a0, 1.0 / invR2, invR2 > 0.0);
-            let distMin = abs(xPhys - rMin);
-            let distMax = abs(xPhys - rMax);
-            let lineMin = 1.0 - smoothstep(0.0, lineWidth, distMin);
-            let lineMax = 1.0 - smoothstep(0.0, lineWidth, distMax);
-            overlayAlpha = max(lineMin, lineMax);
-          }
-        } else {
-          let rMax = 2.0 * nf * nf * a0;
-          let distMax = abs(xPhys - rMax);
-          overlayAlpha = 1.0 - smoothstep(0.0, lineWidth, distMax);
-        }
-      } else {
-        // Extra HO dimension: same as HO ellipse
-        let extraIdx = dimIdx - 3;
-        let n = getExtraDimN(schroedinger, extraIdx);
-        let omega = getExtraDimOmega(schroedinger, extraIdx);
-        let energy = 2.0 * f32(n) + 1.0;
-        overlayAlpha = classicalEllipseSDF(xPhys, pPhys, omega, energy, lineWidth);
-      }
-    } else {
-      // HO: draw energy ellipse for each term (weighted by |c_k|^2)
-      let dimIdx = schroedinger.wignerDimensionIndex;
-      let omega = getOmega(schroedinger, dimIdx);
-      let tc = schroedinger.termCount;
-      for (var k = 0; k < tc; k++) {
-        let c = getCoeff(schroedinger, k);
-        let weight = c.x * c.x + c.y * c.y;
-        if (weight < 0.01) { continue; }
-        let n = getQuantumNumber(schroedinger, k, dimIdx);
-        let energy = 2.0 * f32(n) + 1.0;
-        let ellipse = classicalEllipseSDF(xPhys, pPhys, omega, energy, lineWidth);
-        overlayAlpha = max(overlayAlpha, ellipse * weight);
-      }
-    }
-
-    // Blend overlay line onto the color
-    let overlayStrength = clamp(overlayAlpha, 0.0, 1.0) * 0.8;
-    col = mix(col, lineColor, overlayStrength);
-    alpha = max(alpha, overlayStrength);
-  }
 
   if (alpha < 0.005) {
     discard;

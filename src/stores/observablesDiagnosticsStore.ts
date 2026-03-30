@@ -5,8 +5,7 @@
  * Heisenberg uncertainty product per spatial dimension. Updated by
  * TDSEComputePass GPU readback when observables are enabled.
  *
- * Ring buffer history enables sparkline time-series display and
- * classical trajectory overlay (A2: Ehrenfest trail from ⟨x⟩(t)).
+ * Ring buffer history enables sparkline time-series display.
  *
  * @module stores/observablesDiagnosticsStore
  */

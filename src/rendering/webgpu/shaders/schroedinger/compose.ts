@@ -83,7 +83,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     freeScalarAnalysis = false,
     useDensityMatrix = false,
     crossSectionEnabled = true,
-    classicalOverlayEnabled = true,
     probabilityCurrentEnabled = true,
     overrides = [],
   } = config
@@ -140,7 +139,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isPauli,
     useWignerCache,
     crossSectionEnabled,
-    classicalOverlayEnabled,
     probabilityCurrentEnabled,
     profilingStrip: config.profilingStrip,
   })
@@ -236,7 +234,6 @@ struct VertexOutput {
       freeScalarAnalysis,
       nodal,
       crossSectionEnabled,
-      classicalOverlayEnabled,
       probabilityCurrentEnabled,
       gridOnly,
     }),

@@ -121,8 +121,6 @@ export interface ShareableObjectState {
   openQuantumRelaxationRate?: number
   /** Open quantum thermal excitation rate */
   openQuantumThermalUpRate?: number
-  /** Classical-quantum correspondence overlay enabled */
-  classicalOverlayEnabled?: boolean
 }
 
 /**
@@ -281,8 +279,6 @@ export function serializeState(state: ShareableState): string {
     setFloatParam(params, 'oq_rx', state.openQuantumRelaxationRate, true)
     setFloatParam(params, 'oq_th', state.openQuantumThermalUpRate, true)
   }
-  setBoolParam(params, 'co', state.classicalOverlayEnabled)
-
   return params.toString()
 }
 
@@ -357,8 +353,6 @@ export function deserializeState(searchParams: string): ParsedShareableState {
     state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
     state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
   }
-  state.classicalOverlayEnabled = parseBoolParam(params, 'co')
-
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {
     if (state[key] === undefined) delete state[key]

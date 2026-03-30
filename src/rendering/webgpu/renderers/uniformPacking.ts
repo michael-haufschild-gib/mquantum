@@ -18,9 +18,6 @@ import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { zeroReservedFields } from '../utils/structLayout'
-import { packClassicalOverlay } from './uniformPackingClassical'
-
-export { projectNDToModelSpace } from './uniformPackingClassical'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
   CROSS_SECTION_SCALAR_MAP,
@@ -57,18 +54,6 @@ export interface FlattenedPreset {
   quantum: Int32Array
   coeff: Float32Array
   energy: Float32Array
-}
-
-/** Observables position history for TDSE/BEC Ehrenfest trail. */
-export interface ObservablesTrailData {
-  /** Per-dimension ⟨x_i⟩(t) ring buffer */
-  historyPositionMean: Float64Array[]
-  /** Current write head */
-  historyHead: number
-  /** Number of valid entries */
-  historyCount: number
-  /** Number of active dimensions */
-  activeDims: number
 }
 
 /** All values needed to pack the Schroedinger uniform buffer. */
@@ -108,8 +93,6 @@ export interface SchroedingerPackParams {
   rendererQuantumMode: string
   rendererTermCount: number | undefined
 
-  // A3 observables position history for TDSE/BEC Ehrenfest trail
-  observablesTrailData: ObservablesTrailData | null
 }
 
 /**
@@ -322,9 +305,6 @@ function packVisualFields(
   floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
   floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
   floatView[I.roughness] = pbr?.face?.roughness ?? 0.3
-
-  // Classical-quantum correspondence overlay (delegated to extracted module)
-  packClassicalOverlay(floatView, intView, p, parseColor)
 }
 
 /** Pack nodal fields, color algorithm, and cosine palette. */
@@ -657,7 +637,6 @@ function packWignerAndPauliFields(
     floatView[I.wignerPRange] = schroedinger?.wignerPRange ?? 6.0
   }
   intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
-  intView[I.wignerClassicalOverlay] = schroedinger?.wignerClassicalOverlay ? 1 : 0
 
   // Pauli spinor colors
   const spinUp = pauliSpinor?.spinUpColor ?? [0.0, 0.898, 1.0]

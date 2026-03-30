@@ -745,7 +745,6 @@ describe('WGSL Color Algorithm Specialization', () => {
       interference: false,
       uncertaintyBoundary: false,
       crossSectionEnabled: false,
-      classicalOverlayEnabled: false,
       probabilityCurrentEnabled: false,
     })
 
@@ -771,7 +770,6 @@ describe('WGSL Color Algorithm Specialization', () => {
       interference: false,
       uncertaintyBoundary: false,
       crossSectionEnabled: false,
-      classicalOverlayEnabled: false,
       probabilityCurrentEnabled: false,
     })
 

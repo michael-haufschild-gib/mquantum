@@ -444,21 +444,8 @@ export interface SchroedingerConfig {
   wignerCrossTermsEnabled: boolean
   /** Number of quadrature points for hydrogen numerical Wigner transform */
   wignerQuadPoints: number
-  /** Show classical trajectory ellipse overlay */
-  wignerClassicalOverlay: boolean
   /** Resolution of the pre-computed Wigner cache texture (128-1024) */
   wignerCacheResolution: number
-
-  // === Classical-Quantum Correspondence Overlay ===
-  /** Enable classical energy-shell Lissajous trajectory overlay in 3D volume */
-  classicalOverlayEnabled: boolean
-  /** Fraction of the Lissajous period to display as trail (0.05-0.5) */
-  classicalOverlayTrailFraction: number
-  /** Trail glow color (hex string) */
-  classicalOverlayColor: string
-  /** Effective ℏ for wavepacket width scaling (0.01-2.0, default 1.0). HO only.
-   *  At hbar=1.0, physical quantum cloud. At hbar→0, cloud narrows to classical trail. */
-  classicalOverlayHbar: number
 
   // === Second Quantization Educational Layer ===
   /** Master toggle for second-quantization interpretation overlay */
@@ -707,14 +694,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   wignerPRange: 6.0,
   wignerCrossTermsEnabled: true,
   wignerQuadPoints: 32,
-  wignerClassicalOverlay: false,
   wignerCacheResolution: 256,
-
-  // Classical-Quantum Correspondence Overlay
-  classicalOverlayEnabled: false,
-  classicalOverlayTrailFraction: 0.15,
-  classicalOverlayColor: '#fff2cc',
-  classicalOverlayHbar: 1.0,
 
   // Second Quantization Educational Layer
   sqLayerEnabled: false,

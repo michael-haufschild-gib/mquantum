@@ -8,7 +8,6 @@
  */
 
 export { absorptionBlock } from './absorption.wgsl'
-export { classicalOverlayWGSL } from './classicalOverlay.wgsl'
 export {
   COLOR_ALG_NAMES,
   emissionPostBlock,

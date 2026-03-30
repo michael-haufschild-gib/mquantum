@@ -26,7 +26,6 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `it` | 0/1 | Imaginary-time propagation |
 | `oq` | 0/1 | Open quantum |
 | `oq_dp`, `oq_rx`, `oq_th` | float | Open quantum rates |
-| `co` | 0/1 | Classical overlay |
 
 ## Rules
 

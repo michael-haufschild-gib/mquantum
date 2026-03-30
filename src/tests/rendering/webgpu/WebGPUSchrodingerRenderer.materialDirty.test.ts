@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
 import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
 
 interface MockRenderContext {
@@ -169,7 +170,7 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(9)
+    expect((renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]).toBe(9)
   })
 
   it('keeps compile-time k-space algorithm in free scalar uniforms even if appearance is relative phase', () => {
@@ -190,7 +191,7 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(15)
+    expect((renderer['schroedingerIntView'] as Int32Array)[SCHROEDINGER_LAYOUT.index.colorAlgorithm]).toBe(15)
   })
 })
 

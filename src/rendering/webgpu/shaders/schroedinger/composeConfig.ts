@@ -74,8 +74,6 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useDensityMatrix?: boolean
   /** Compile-time gate for cross-section slice (default: true). */
   crossSectionEnabled?: boolean
-  /** Compile-time gate for classical trajectory overlay (default: true). */
-  classicalOverlayEnabled?: boolean
   /** Compile-time gate for probability current j-field (default: true). */
   probabilityCurrentEnabled?: boolean
   /**
@@ -205,7 +203,6 @@ export function buildShaderDefinesAndFeatures(flags: {
   isPauli: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean
-  classicalOverlayEnabled: boolean
   probabilityCurrentEnabled: boolean
   profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
 }): { defines: string[]; features: string[] } {
@@ -251,7 +248,6 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${flags.useRobustEigenInterpolation};`)
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${flags.includeHydrogen};`)
   defines.push(`const FEATURE_CROSS_SECTION: bool = ${flags.crossSectionEnabled};`)
-  defines.push(`const FEATURE_CLASSICAL_OVERLAY: bool = ${flags.classicalOverlayEnabled};`)
   defines.push(`const FEATURE_PROBABILITY_CURRENT: bool = ${flags.probabilityCurrentEnabled};`)
 
   if (flags.quantumMode === 'hydrogenNDCoupled') {

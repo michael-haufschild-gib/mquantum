@@ -63,7 +63,6 @@ export interface PassConfig {
   representation: 'position' | 'momentum' | 'wigner'
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
-  classicalOverlayEnabled: boolean
   probabilityCurrentEnabled: boolean
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
@@ -89,7 +88,6 @@ export interface SchrodingerPassConfig {
   temporalReprojectionEnabled: boolean
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
-  classicalOverlayEnabled: boolean
   probabilityCurrentEnabled: boolean
 }
 
@@ -229,7 +227,6 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     fastEigenInterpolationEnabled: gate(config.fastEigenInterpolationEnabled, disableAnalytical),
     temporalReprojectionEnabled: gate(config.temporalReprojectionEnabled, disableAnalytical),
     crossSectionEnabled: gate(config.crossSectionEnabled, disableAnalytical),
-    classicalOverlayEnabled: gate(config.classicalOverlayEnabled, disableAnalytical),
     probabilityCurrentEnabled: gate(config.probabilityCurrentEnabled, disableAnalytical),
   }
 }

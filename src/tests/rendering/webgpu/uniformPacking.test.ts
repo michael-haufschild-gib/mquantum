@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { SCHROEDINGER_LAYOUT } from '@/rendering/webgpu/renderers/schroedingerLayout'
 import type { SchroedingerPackParams } from '@/rendering/webgpu/renderers/uniformPacking'
 import {
   applyHOMomentumTransform,
@@ -292,11 +293,11 @@ describe('applyHOMomentumTransform', () => {
 
     intView[1] = 1
     floatView[4] = 1.0
-    intView[1328 / 4] = 1 // momentum mode
+    intView[SCHROEDINGER_LAYOUT.index.representationMode] = 1 // momentum mode
 
     applyHOMomentumTransform(floatView, intView, 1, 1.0)
 
-    expect(intView[1328 / 4]).toBe(0)
+    expect(intView[SCHROEDINGER_LAYOUT.index.representationMode]).toBe(0)
   })
 })
 
@@ -421,7 +422,6 @@ function makeBaseParams(overrides: Partial<SchroedingerPackParams> = {}): Schroe
     rendererOpenQuantumEnabled: false,
     rendererQuantumMode: 'harmonicOscillator',
     rendererTermCount: 1,
-    observablesTrailData: null,
     ...overrides,
   }
 }

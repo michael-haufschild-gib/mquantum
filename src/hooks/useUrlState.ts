@@ -89,8 +89,6 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       if (urlState.openQuantumThermalUpRate !== undefined)
         ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
     }
-    if (urlState.classicalOverlayEnabled !== undefined)
-      ext.setSchroedingerClassicalOverlayEnabled(urlState.classicalOverlayEnabled)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   }

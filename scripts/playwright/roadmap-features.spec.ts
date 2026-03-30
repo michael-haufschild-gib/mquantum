@@ -3,7 +3,6 @@
  *
  * Tests every feature from docs/roadmap.md:
  *   A1: Quantum Carpet (spacetime diagram)
- *   A2: Classical-Quantum Correspondence Overlay
  *   A3: Observable Expectation Values (GPU reduction)
  *   B2: Data Export (CSV/JSON)
  *   B3: Imaginary-Time Propagation (Wick rotation)
@@ -164,107 +163,6 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
 
     expect(framesAxis0, 'axis 0 accumulated frames').toBeGreaterThan(0)
     expect(framesAxis1, 'axis 1 accumulated frames').toBeGreaterThan(0)
-  })
-})
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  A2: Classical-Quantum Correspondence Overlay
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-test.describe('A2: Classical Overlay — shader + physics', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/')
-    await requireWebGPU(page, test.info())
-  })
-
-  test('HO 3D + overlay: shader compiles, renders non-blank', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 3)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-
-    // Enable overlay — this is a uniform change, not a shader recompile
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayHbar(1.0)
-    })
-
-    // Wait for several frames with overlay active
-    await waitForUniformUpdate(page)
-    await expectCanvasNotBlank(page)
-  })
-
-  test('HO 7D + overlay: N-D Lissajous shader compiles', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 7)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayHbar(0.5)
-    })
-
-    await waitForUniformUpdate(page)
-    await expectCanvasNotBlank(page)
-  })
-
-  test('different hbar values produce visual difference', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 3)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-    await pauseAnimation(page)
-
-    // Enable overlay with small hbar
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayHbar(0.1)
-    })
-    await waitForUniformUpdate(page)
-    const snapSmall = await capturePixelSnapshot(page)
-
-    // Large hbar
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayHbar(5.0)
-    })
-    await waitForUniformUpdate(page)
-    const snapLarge = await capturePixelSnapshot(page)
-
-    expectSnapshotsDiffer(snapSmall, snapLarge, 'hbar 0.1 vs 5.0 must differ')
-  })
-
-  test('TDSE + overlay + observables: shader compiles together', async ({ page }) => {
-    await gotoMode(page, 'tdseDynamics', 3)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-    await waitForFirstFrame(page)
-
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
-      mod.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
-    })
-
-    await waitForSimulationFrames(page, 60)
-  })
-
-  test('overlay + bloom + cross-section: combined shader compiles', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 3)
-    await waitForRendererReady(page)
-    await waitForShaderCompilation(page)
-
-    await page.evaluate(async () => {
-      const ext = await import('/src/stores/extendedObjectStore.ts')
-      ext.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
-      ext.useExtendedObjectStore.getState().setSchroedingerCrossSectionEnabled(true)
-
-      const pp = await import('/src/stores/postProcessingStore.ts')
-      pp.usePostProcessingStore.getState().setBloomEnabled(true)
-    })
-    await waitForShaderCompilation(page)
-    await expectCanvasNotBlank(page)
   })
 })
 
@@ -762,7 +660,7 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
     await requireWebGPU(page, test.info())
   })
 
-  test('TDSE + carpet + observables + measurement + overlay: all compile', async ({ page }) => {
+  test('TDSE + carpet + observables + measurement: all compile', async ({ page }) => {
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
@@ -776,7 +674,6 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
       const ext = await import('/src/stores/extendedObjectStore.ts')
       ext.useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
       ext.useExtendedObjectStore.getState().setTdseDiagnosticsEnabled(true)
-      ext.useExtendedObjectStore.getState().setSchroedingerClassicalOverlayEnabled(true)
 
       const meas = await import('/src/stores/measurementStore.ts')
       meas.useMeasurementStore.getState().setEnabled(true)

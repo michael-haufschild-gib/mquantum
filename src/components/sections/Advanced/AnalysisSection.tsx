@@ -23,9 +23,7 @@ import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/Schr
 import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
-import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import {
   downloadFile,
@@ -84,14 +82,6 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const {
       quantumMode,
       representation,
-      classicalOverlayEnabled,
-      classicalOverlayTrailFraction,
-      classicalOverlayColor,
-      classicalOverlayHbar,
-      setClassicalOverlayEnabled,
-      setClassicalOverlayTrailFraction,
-      setClassicalOverlayColor,
-      setClassicalOverlayHbar,
       setFsfDiagnosticsEnabled,
       setTdseDiagnosticsEnabled,
       setBecDiagnosticsEnabled,
@@ -101,14 +91,6 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       useShallow((s) => ({
         quantumMode: s.schroedinger.quantumMode,
         representation: s.schroedinger.representation,
-        classicalOverlayEnabled: s.schroedinger.classicalOverlayEnabled,
-        classicalOverlayTrailFraction: s.schroedinger.classicalOverlayTrailFraction,
-        classicalOverlayColor: s.schroedinger.classicalOverlayColor,
-        classicalOverlayHbar: s.schroedinger.classicalOverlayHbar,
-        setClassicalOverlayEnabled: s.setSchroedingerClassicalOverlayEnabled,
-        setClassicalOverlayTrailFraction: s.setSchroedingerClassicalOverlayTrailFraction,
-        setClassicalOverlayColor: s.setSchroedingerClassicalOverlayColor,
-        setClassicalOverlayHbar: s.setSchroedingerClassicalOverlayHbar,
         setFsfDiagnosticsEnabled: s.setFreeScalarDiagnosticsEnabled,
         setTdseDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
         setBecDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
@@ -190,72 +172,6 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {quantumMode === 'tdseDynamics' && <TDSEAnalysisContent />}
         {quantumMode === 'becDynamics' && <BECAnalysisContent />}
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
-        {((quantumMode === 'harmonicOscillator' && dimension >= 3) ||
-          quantumMode === 'tdseDynamics' ||
-          quantumMode === 'becDynamics') && (
-          <ControlGroup
-            title="Classical Trajectory"
-            collapsible
-            defaultOpen={false}
-            data-testid="control-group-classical-trajectory"
-            rightElement={
-              <Switch
-                checked={classicalOverlayEnabled}
-                onCheckedChange={setClassicalOverlayEnabled}
-                tooltip="Show a classical particle trajectory overlaid on the quantum wavefunction."
-                data-testid="classical-overlay-toggle"
-              />
-            }
-          >
-            {classicalOverlayEnabled && (
-              <div className="space-y-2">
-                <Slider
-                  label="Trail Length"
-                  tooltip="Fraction of the oscillation period shown as a trailing path behind the classical particle."
-                  min={0.05}
-                  max={0.5}
-                  step={0.01}
-                  value={classicalOverlayTrailFraction}
-                  onChange={setClassicalOverlayTrailFraction}
-                  showValue
-                  data-testid="classical-overlay-trail"
-                />
-                {quantumMode === 'harmonicOscillator' && (
-                  <Slider
-                    label="Effective \u210F"
-                    tooltip="Scales the quantum wavepacket width. At small values the cloud narrows onto the classical trajectory; at 1.0 the cloud is physical."
-                    min={0.01}
-                    max={2.0}
-                    step={0.01}
-                    value={classicalOverlayHbar}
-                    onChange={setClassicalOverlayHbar}
-                    showValue
-                    data-testid="classical-overlay-hbar"
-                  />
-                )}
-                {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') &&
-                  !observablesHasData && (
-                    <p className="text-xs text-text-tertiary">
-                      Enable Observables to see the Ehrenfest trajectory.
-                    </p>
-                  )}
-                <div
-                  className="flex items-center justify-between"
-                  data-testid="classical-overlay-color"
-                >
-                  <label className="text-xs text-text-secondary">Trail Color</label>
-                  <ColorPicker
-                    value={classicalOverlayColor}
-                    onChange={setClassicalOverlayColor}
-                    tooltip="Color of the classical trajectory trail rendered over the quantum wavefunction."
-                    disableAlpha={true}
-                    className="w-24"
-                  />
-                </div>
-              </div>
-            )}
-          </ControlGroup>
-        )}
         {dimension >= 3 && (
           <ControlGroup
             title="Quantum Carpet"

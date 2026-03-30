@@ -76,7 +76,6 @@ import { wignerHOBlock } from './quantum/wignerHO.wgsl'
 import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
 import { schroedingerUniformsBlock } from './uniforms.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
-import { classicalOverlayStubWGSL, classicalOverlayWGSL } from './volume/classicalOverlay.wgsl'
 import { crossSectionBlock, crossSectionStubBlock } from './volume/crossSection.wgsl'
 import {
   analysisTextureSamplingBlock,
@@ -390,7 +389,6 @@ export function buildVolumeBlocks(opts: {
   freeScalarAnalysis: boolean
   nodal: boolean
   crossSectionEnabled: boolean
-  classicalOverlayEnabled: boolean
   probabilityCurrentEnabled: boolean
   /** When true, inline raymarch functions are excluded — grid path handles everything. */
   gridOnly?: boolean
@@ -409,14 +407,6 @@ export function buildVolumeBlocks(opts: {
     {
       name: 'Cross-Section Slice',
       content: !opts.is2D && opts.crossSectionEnabled ? crossSectionBlock : crossSectionStubBlock,
-      condition: !opts.is2D,
-    },
-    {
-      name: 'Classical Trajectory Overlay',
-      content:
-        !opts.is2D && opts.classicalOverlayEnabled
-          ? classicalOverlayWGSL
-          : classicalOverlayStubWGSL,
       condition: !opts.is2D,
     },
     {

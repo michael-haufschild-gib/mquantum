@@ -58,7 +58,6 @@ const arbObjectState: fc.Arbitrary<ShareableState> = fc.record(
     diagnosticsEnabled: fc.boolean(),
     observablesEnabled: fc.boolean(),
     imaginaryTimeEnabled: fc.boolean(),
-    classicalOverlayEnabled: fc.boolean(),
   },
   { requiredKeys: ['dimension', 'objectType'] }
 )
@@ -124,9 +123,6 @@ describe('state-serializer property-based tests', () => {
         }
         if (state.imaginaryTimeEnabled !== undefined) {
           expect(deserialized.imaginaryTimeEnabled).toBe(state.imaginaryTimeEnabled)
-        }
-        if (state.classicalOverlayEnabled !== undefined) {
-          expect(deserialized.classicalOverlayEnabled).toBe(state.classicalOverlayEnabled)
         }
       }),
       { numRuns: 200 }

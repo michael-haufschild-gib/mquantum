@@ -285,7 +285,6 @@ export function createVisualEffectSetters(
         },
       }))
     },
-    setSchroedingerWignerClassicalOverlay: valueSetter('wignerClassicalOverlay'),
     setSchroedingerWignerCacheResolution: (resolution: number) => {
       if (!isFinite(resolution)) {
         warnNonFinite('wignerCacheResolution', resolution)
@@ -296,23 +295,6 @@ export function createVisualEffectSetters(
         schroedinger: { ...state.schroedinger, wignerCacheResolution: clamped },
       }))
     },
-
-    // Classical-quantum correspondence overlay
-    setSchroedingerClassicalOverlayEnabled: valueSetter('classicalOverlayEnabled'),
-    setSchroedingerClassicalOverlayTrailFraction: (fraction: number) => {
-      if (!isFinite(fraction)) {
-        warnNonFinite('classicalOverlayTrailFraction', fraction)
-        return
-      }
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          classicalOverlayTrailFraction: Math.max(0.1, Math.min(1.0, fraction)),
-        },
-      }))
-    },
-    setSchroedingerClassicalOverlayColor: valueSetter('classicalOverlayColor'),
-    setSchroedingerClassicalOverlayHbar: clampedSetter('classicalOverlayHbar', 0.01, 2.0),
 
     // Second-quantization layer
     setSchroedingerSqLayerEnabled: valueSetter('sqLayerEnabled'),

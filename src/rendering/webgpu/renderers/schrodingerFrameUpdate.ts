@@ -16,7 +16,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
+
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -52,11 +52,13 @@ import {
   packSchroedingerUniforms,
 } from './uniformPacking'
 
+import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+
 /** Byte offset of the time field in the SchroedingerUniforms buffer. */
-export const TIME_FIELD_OFFSET = 908
+export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
 
 /** Byte offset of the uncertainty log-rho threshold in SchroedingerUniforms. */
-export const UNCERTAINTY_THRESHOLD_OFFSET = 1180
+export const UNCERTAINTY_THRESHOLD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.uncertaintyLogRhoThreshold
 
 const BOUND_RADIUS_QUANT_STEP = 0.05
 const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
@@ -276,24 +278,6 @@ function readFrameInputs(
   }
 }
 
-/**
- * Read position mean history from the observables diagnostics store for TDSE/BEC modes.
- * Returns null for modes that don't use observables-derived trajectories.
- */
-function readObservablesTrailData(
-  quantumModeStr: string
-): import('./uniformPacking').ObservablesTrailData | null {
-  if (quantumModeStr !== 'tdseDynamics' && quantumModeStr !== 'becDynamics') return null
-  const obs = useObservablesDiagnosticsStore.getState()
-  if (!obs.hasData || obs.historyCount < 2) return null
-  return {
-    historyPositionMean: obs.historyPositionMean,
-    historyHead: obs.historyHead,
-    historyCount: obs.historyCount,
-    activeDims: obs.activeDims,
-  }
-}
-
 /** Build the packing parameters object from frame inputs and state. */
 function buildPackParams(
   inputs: ReturnType<typeof readFrameInputs>,
@@ -330,7 +314,6 @@ function buildPackParams(
     rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
     rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
     rendererTermCount: config.termCount,
-    observablesTrailData: readObservablesTrailData(inputs.quantumModeStr),
   }
 }
 

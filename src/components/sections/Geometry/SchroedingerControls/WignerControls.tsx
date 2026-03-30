@@ -131,15 +131,6 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
           />
         )}
 
-        {/* Classical trajectory overlay */}
-        <Switch
-          label="Classical Overlay"
-          tooltip="Show the classical phase-space trajectory (ellipse for HO, Kepler orbit for hydrogen) for comparison with the quantum Wigner function."
-          checked={config.wignerClassicalOverlay}
-          onCheckedChange={actions.setClassicalOverlay}
-          data-testid="wigner-classical-overlay"
-        />
-
         {/* Cache resolution */}
         <Select
           label="Cache Resolution"

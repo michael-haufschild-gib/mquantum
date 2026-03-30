@@ -413,7 +413,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         representation: config.representation,
         openQuantumEnabled: config.openQuantumEnabled,
         crossSectionEnabled: config.crossSectionEnabled,
-        classicalOverlayEnabled: config.classicalOverlayEnabled,
         probabilityCurrentEnabled: config.probabilityCurrentEnabled,
       })
 
@@ -436,7 +435,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         openQuantumEnabled: false,
         isPauli: true,
         crossSectionEnabled: false,
-        classicalOverlayEnabled: false,
         probabilityCurrentEnabled: false,
       })
 

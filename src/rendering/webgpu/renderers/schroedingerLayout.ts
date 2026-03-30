@@ -60,21 +60,7 @@ const SCHROEDINGER_FIELDS = [
   { name: 'scatteringAnisotropy', type: 'f32' },
   { name: 'roughness', type: 'f32' },
 
-  // --- Classical-quantum correspondence overlay (offset 720) ---
-  { name: 'classicalOverlayEnabled', type: 'u32' },
-  { name: 'classicalOverlayTrailFraction', type: 'f32' },
-  { name: 'classicalOverlayColor', type: 'vec3f' },
-  { name: '_padClassical0', type: 'f32' },
-  { name: 'classicalOverlayHbar', type: 'f32' },
-  { name: '_reservedClassical0', type: 'f32' },
-
-  // --- Classical overlay: CPU-precomputed trail (offset 760) ---
-  { name: 'classicalTrailCount', type: 'i32' },
-  { name: '_padTrail0', type: 'i32' },
-  // 768 is 16-byte aligned: 6 × vec4f = 96 bytes → ends at 864
-  { name: 'classicalTrail', type: arr('vec4f', 6) },
-
-  // --- Nodal surfaces (offset 864) ---
+  // --- Nodal surfaces ---
   { name: 'nodalEnabled', type: 'u32' },
   { name: 'nodalColor', type: 'vec3f' },
   { name: 'nodalStrength', type: 'f32' },
@@ -205,7 +191,6 @@ const SCHROEDINGER_FIELDS = [
   { name: 'wignerXRange', type: 'f32' },
   { name: 'wignerPRange', type: 'f32' },
   { name: 'wignerQuadPoints', type: 'i32' },
-  { name: 'wignerClassicalOverlay', type: 'u32' },
   { name: '_padWigner0', type: 'f32' },
   { name: '_padWigner1', type: 'f32' },
 

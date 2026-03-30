@@ -248,26 +248,7 @@ describe('SchroedingerUniforms WGSL validation', () => {
     expect(wgslLayout.totalSize).toBe(tsLayout.totalSize)
   })
 
-  // Spot-check offsets from WGSL comments that explicitly state byte positions
-  it.each([
-    ['radialProbabilityEnabled', 1344],
-    ['radialProbabilityOpacity', 1348],
-    ['radialProbabilityNorm', 1352],
-    ['radialProbabilityColor', 1360],
-    ['wignerDimensionIndex', 1456],
-    ['wignerCrossTermsEnabled', 1460],
-    ['wignerXRange', 1464],
-    ['wignerPRange', 1468],
-    ['wignerQuadPoints', 1472],
-    ['wignerClassicalOverlay', 1476],
-    ['pauliSpinUpColor', 1488],
-    ['pauliSpinDownColor', 1504],
-  ])('offset of %s is %d (from WGSL comment)', (name, expectedOffset) => {
-    const field = tsLayout.fields.find((f) => f.name === name)
-    expect(field?.offset, `Field "${name}" not found or offset mismatch`).toBe(expectedOffset)
-  })
-
-  // Spot-check offsets used by the packing code (original magic numbers)
+  // Spot-check offsets used by packing code and runtime magic-number consumers
   it.each([
     ['quantumMode', 0],
     ['termCount', 4],
@@ -282,20 +263,15 @@ describe('SchroedingerUniforms WGSL validation', () => {
     ['phaseAnimationEnabled', 672],
     ['densityGain', 684],
     ['roughness', 716],
-    ['nodalEnabled', 864],
-    ['nodalColor', 880],
-    ['colorAlgorithm', 940],
-    ['cosineA', 960],
-    ['boundingRadius', 1040],
-    ['nodalDefinition', 1072],
-    ['nodalColorReal', 1088],
-    ['probabilityFlowEnabled', 1152],
-    ['multiSourceWeights', 1184],
-    ['nodalRenderMode', 1200],
-    ['crossSectionEnabled', 1216],
-    ['probabilityCurrentEnabled', 1280],
-    ['representationMode', 1328],
-    ['divergingNeutralParams', 1408],
+    ['nodalEnabled', 720],
+    ['colorAlgorithm', 796],
+    ['boundingRadius', 896],
+    ['crossSectionEnabled', 1072],
+    ['probabilityCurrentEnabled', 1136],
+    ['representationMode', 1184],
+    ['wignerDimensionIndex', 1312],
+    ['wignerXRange', 1320],
+    ['wignerPRange', 1324],
   ])('offset of %s matches magic number %d', (name, expectedOffset) => {
     expect(tsLayout.byteOffset[name as keyof typeof tsLayout.byteOffset]).toBe(expectedOffset)
   })

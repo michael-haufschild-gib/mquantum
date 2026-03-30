@@ -253,7 +253,6 @@ describe('state-serializer', () => {
         diagnosticsEnabled: true,
         absorberEnabled: false,
         imaginaryTimeEnabled: true,
-        classicalOverlayEnabled: true,
       }
       const d = deserializeState(serializeState(state))
       expect(d.isoEnabled).toBe(true)
@@ -262,7 +261,6 @@ describe('state-serializer', () => {
       expect(d.diagnosticsEnabled).toBe(true)
       expect(d.absorberEnabled).toBe(false)
       expect(d.imaginaryTimeEnabled).toBe(true)
-      expect(d.classicalOverlayEnabled).toBe(true)
     })
 
     it('roundtrips numeric params with clamping', () => {

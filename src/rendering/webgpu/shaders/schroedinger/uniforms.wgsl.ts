@@ -139,20 +139,6 @@ struct SchroedingerUniforms {
   // Material properties
   roughness: f32,                // GGX roughness (0.0-1.0)
 
-  // Classical-quantum correspondence overlay
-  classicalOverlayEnabled: u32,       // offset 720: enable energy-shell Lissajous trajectory
-  classicalOverlayTrailFraction: f32, // offset 724: fraction of period to show (0.1-1.0)
-  classicalOverlayColor: vec3f,       // offset 736 (16-byte aligned): trail glow color
-  _padClassical0: f32,                // offset 748
-  classicalOverlayHbar: f32,          // offset 752: effective ℏ for wavepacket width (HO only)
-  _reservedClassical0: f32,           // offset 756: reserved
-
-  // Classical overlay: CPU-precomputed trail points (offset 760)
-  // xyz = model-space position, w = fade (1.0=head, 0.0=tail)
-  classicalTrailCount: i32,          // offset 760: number of active trail points
-  _padTrail0: i32,                   // offset 764
-  classicalTrail: array<vec4f, 6>,   // offset 768: 6 trail points (96 bytes, ends at 864)
-
   // Nodal surfaces
   nodalEnabled: u32,             // Enable nodal surface highlighting
   nodalColor: vec3f,             // Nodal surface color
@@ -297,8 +283,7 @@ struct SchroedingerUniforms {
   wignerXRange: f32,                // offset 1464: x-axis half-range (position)
   wignerPRange: f32,                // offset 1468: p-axis half-range (momentum)
   wignerQuadPoints: i32,            // offset 1472: quadrature points for hydrogen
-  wignerClassicalOverlay: u32,      // offset 1476: show classical trajectory
-  _padWigner0: f32,                 // offset 1480: padding
+  _padWigner0: f32,                 // padding
   _padWigner1: f32,                 // offset 1484: padding
 
   // Pauli spinor colors (used by spin-resolved color algorithms 24/25)

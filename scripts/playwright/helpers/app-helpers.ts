@@ -1117,18 +1117,6 @@ export async function readMeasurementState(page: Page) {
   })
 }
 
-// ─── Classical Overlay Helpers ───────────────────────────────────────────────
-
-/** Enable classical overlay and set hbar value. */
-export async function enableClassicalOverlay(page: Page, hbar = 1.0): Promise<void> {
-  await page.evaluate(async (h: number) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    const store = mod.useExtendedObjectStore.getState()
-    store.setSchroedingerClassicalOverlayEnabled(true)
-    store.setSchroedingerClassicalOverlayHbar(h)
-  }, hbar)
-}
-
 // ─── Imaginary Time Helpers ──────────────────────────────────────────────────
 
 /** Enable imaginary-time propagation. */

@@ -76,7 +76,6 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setWignerPRange: state.setSchroedingerWignerPRange,
     setWignerCrossTermsEnabled: state.setSchroedingerWignerCrossTermsEnabled,
     setWignerQuadPoints: state.setSchroedingerWignerQuadPoints,
-    setWignerClassicalOverlay: state.setSchroedingerWignerClassicalOverlay,
     setWignerCacheResolution: state.setSchroedingerWignerCacheResolution,
     // Free scalar field actions
     setFreeScalarLatticeDim: state.setFreeScalarLatticeDim,
@@ -258,7 +257,6 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setPRange: s.setWignerPRange,
     setCrossTermsEnabled: s.setWignerCrossTermsEnabled,
     setQuadPoints: s.setWignerQuadPoints,
-    setClassicalOverlay: s.setWignerClassicalOverlay,
     setCacheResolution: s.setWignerCacheResolution,
   }
 

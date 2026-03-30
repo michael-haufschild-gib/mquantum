@@ -39,7 +39,6 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     representation: 'position',
     openQuantumEnabled: false,
     crossSectionEnabled: false,
-    classicalOverlayEnabled: false,
     probabilityCurrentEnabled: false,
     skyboxEnabled: false,
     skyboxMode: 'classic',

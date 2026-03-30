@@ -263,22 +263,6 @@ describe('visualEffectSetters — compound logic', () => {
     })
   })
 
-  describe('classicalOverlayTrailFraction', () => {
-    it('clamps to [0.1, 1.0]', () => {
-      useExtendedObjectStore.getState().setSchroedingerClassicalOverlayTrailFraction(0.05)
-      expect(getSchroedinger().classicalOverlayTrailFraction).toBe(0.1)
-
-      useExtendedObjectStore.getState().setSchroedingerClassicalOverlayTrailFraction(2.0)
-      expect(getSchroedinger().classicalOverlayTrailFraction).toBe(1.0)
-    })
-
-    it('rejects NaN', () => {
-      const before = getSchroedinger().classicalOverlayTrailFraction
-      useExtendedObjectStore.getState().setSchroedingerClassicalOverlayTrailFraction(NaN)
-      expect(getSchroedinger().classicalOverlayTrailFraction).toBe(before)
-    })
-  })
-
   describe('version bumps on compound setters', () => {
     it('raymarchQuality change bumps version', () => {
       const v1 = useExtendedObjectStore.getState().schroedingerVersion

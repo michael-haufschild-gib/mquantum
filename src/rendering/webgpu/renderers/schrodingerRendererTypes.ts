@@ -245,8 +245,6 @@ export interface SchrodingerRendererConfig {
   isPauli?: boolean
   /** Compile-time gate for cross-section slice. */
   crossSectionEnabled?: boolean
-  /** Compile-time gate for classical trajectory overlay. */
-  classicalOverlayEnabled?: boolean
   /** Compile-time gate for probability current j-field. */
   probabilityCurrentEnabled?: boolean
 }

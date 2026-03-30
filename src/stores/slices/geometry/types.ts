@@ -219,14 +219,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerWignerPRange: (range: number) => void
   setSchroedingerWignerCrossTermsEnabled: (enabled: boolean) => void
   setSchroedingerWignerQuadPoints: (points: number) => void
-  setSchroedingerWignerClassicalOverlay: (enabled: boolean) => void
   setSchroedingerWignerCacheResolution: (resolution: number) => void
-
-  // Classical-Quantum Correspondence Overlay
-  setSchroedingerClassicalOverlayEnabled: (enabled: boolean) => void
-  setSchroedingerClassicalOverlayTrailFraction: (fraction: number) => void
-  setSchroedingerClassicalOverlayColor: (color: string) => void
-  setSchroedingerClassicalOverlayHbar: (hbar: number) => void
 
   // Second Quantization Educational Layer
   setSchroedingerSqLayerEnabled: (enabled: boolean) => void

@@ -208,17 +208,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
-  // Classical trajectory overlay (energy-shell Lissajous for HO)
-  let classicalResult = evaluateClassicalOverlay(
-    ro, rd, tNear, tFar, schroedinger, DIMENSION
-  );
-  if (classicalResult.alpha > 0.0) {
-    // Depth-aware compositing: blend based on whether trail is in front of or behind volume
-    let trailAlpha = classicalResult.alpha;
-    finalColor = mix(finalColor, classicalResult.color, trailAlpha);
-    finalAlpha = max(finalAlpha, trailAlpha);
-  }
-
   // Discard fully transparent pixels
   if (finalAlpha < 0.01) {
     discard;
@@ -510,19 +499,6 @@ ${bayerJitterSection}
     schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY
   ) {
     discard;
-  }
-
-  // Classical trajectory overlay (energy-shell Lissajous for HO)
-  let classicalResult = evaluateClassicalOverlay(
-    ro, rd, tNear, tFar, schroedinger, DIMENSION
-  );
-  if (classicalResult.alpha > 0.0) {
-    let trailAlpha = classicalResult.alpha;
-    finalColor = mix(finalColor, classicalResult.color, trailAlpha);
-    finalAlpha = max(finalAlpha, trailAlpha);
-    if (hitT < 0.0) {
-      hitT = classicalResult.depth;
-    }
   }
 
   // Discard fully transparent pixels

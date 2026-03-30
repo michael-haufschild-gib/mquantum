@@ -13,8 +13,9 @@ export { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 /** BasisVectors uniform size: 4 vec3f padded to vec4f = 4 × 48 = 192 bytes. */
 export const BASIS_UNIFORM_SIZE = 192
 
-/** Offset of the `time` field in SchroedingerUniforms (f32 at offset 908). */
-export const TIME_FIELD_OFFSET = 908
+/** Byte offset of the `time` field in SchroedingerUniforms (derived from layout). */
+import { SCHROEDINGER_LAYOUT as _LAYOUT } from '../renderers/schroedingerLayout'
+export const TIME_FIELD_OFFSET = _LAYOUT.byteOffset.time
 
 /** Configuration for the Wigner cache compute pass. */
 export interface WignerCacheComputeConfig {

@@ -200,7 +200,6 @@ export function buildShaderConfig(
       rendererConfig.colorAlgorithm <= 15,
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
-    classicalOverlayEnabled: rendererConfig.classicalOverlayEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,
     // Profiling strip flags: read from window global (set by A/B benchmark tests)
     profilingStrip:
@@ -285,7 +284,6 @@ export function computePipelineCacheKey(
     config.freeScalarAnalysis ? 1 : 0,
     config.useDensityMatrix ? 1 : 0,
     config.crossSectionEnabled ? 1 : 0,
-    config.classicalOverlayEnabled ? 1 : 0,
     config.probabilityCurrentEnabled ? 1 : 0,
   ].join(':')
 }

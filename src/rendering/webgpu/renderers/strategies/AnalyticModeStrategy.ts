@@ -10,6 +10,9 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
+import { SCHROEDINGER_LAYOUT } from '../schroedingerLayout'
+
+const I = SCHROEDINGER_LAYOUT.index
 import { DensityGridComputePass } from '../../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../../passes/EigenfunctionCacheComputePass'
 import { WignerCacheComputePass } from '../../passes/WignerCacheComputePass'
@@ -440,10 +443,11 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
 
     const schroedinger = extended?.schroedinger
     const isHydrogen = isHydrogenQuantumMode(shared.rendererConfig.quantumMode)
-    const isHydrogenRadial = isHydrogen && (shared.schroedingerIntView[1456 / 4] ?? 0) < 3
+    const isHydrogenRadial =
+      isHydrogen && (shared.schroedingerIntView[I.wignerDimensionIndex] ?? 0) < 3
 
-    const xRange = shared.schroedingerFloatView[1464 / 4]!
-    const pRange = shared.schroedingerFloatView[1468 / 4]!
+    const xRange = shared.schroedingerFloatView[I.wignerXRange]!
+    const pRange = shared.schroedingerFloatView[I.wignerPRange]!
     const { xMin, xMax } = this.computeWignerGridRange(
       xRange,
       ctx.size.width / ctx.size.height,

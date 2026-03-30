@@ -57,9 +57,6 @@ function applyParsedState(urlState: ParsedShareableState): void {
   if (urlState.hydrogenL !== undefined)
     ext.setSchroedingerAzimuthalQuantumNumber(urlState.hydrogenL)
   if (urlState.hydrogenM !== undefined) ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
-
-  if (urlState.classicalOverlayEnabled !== undefined)
-    ext.setSchroedingerClassicalOverlayEnabled(urlState.classicalOverlayEnabled)
 }
 
 describe('URL params -> store state integration', () => {
