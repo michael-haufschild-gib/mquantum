@@ -182,20 +182,24 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
       distribution: 'uniform',
     }
 
-    // Set initial W value and enable diagnostics
-    const ext = useExtendedObjectStore.getState()
+    // Single atomic setState to avoid stale-snapshot overwrites.
+    // Previous pattern called setters then spread a pre-mutation snapshot,
+    // which reverted diagnosticsEnabled and potentialType.
     const firstW = wForStep(sweepConfig, 0)
-    ext.setTdseDisorderStrength(firstW)
-    ext.setTdseDisorderSeed(seedForStep(0))
-    ext.setTdseDiagnosticsEnabled(true)
-    ext.setTdsePotentialType('andersonDisorder')
-
-    // Force reset to start fresh
-    const tdse = ext.schroedinger.tdse
+    const firstSeed = seedForStep(0)
+    const { schroedinger } = useExtendedObjectStore.getState()
     useExtendedObjectStore.setState({
       schroedinger: {
-        ...ext.schroedinger,
-        tdse: { ...tdse, needsReset: true, disorderStrength: firstW, disorderSeed: seedForStep(0) },
+        ...schroedinger,
+        tdse: {
+          ...schroedinger.tdse,
+          needsReset: true,
+          disorderStrength: firstW,
+          disorderSeed: firstSeed,
+          diagnosticsEnabled: true,
+          potentialType: 'andersonDisorder',
+          absorberEnabled: false,
+        },
       },
     })
 
@@ -228,19 +232,14 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
       const nextW = useAndersonSweepStore.getState().tick(diag.simTime, diag.ipr, diag.normDrift)
 
       if (nextW !== null) {
-        // Advance to next W value
-        const sweep = useAndersonSweepStore.getState()
-        const ext = useExtendedObjectStore.getState()
-        const seed = seedForStep(sweep.currentStep)
-        ext.setTdseDisorderStrength(nextW)
-        ext.setTdseDisorderSeed(seed)
-
-        // Trigger wavefunction reset for new realization
+        // Advance to next W value — single atomic setState to avoid stale spread
+        const seed = seedForStep(useAndersonSweepStore.getState().currentStep)
+        const { schroedinger } = useExtendedObjectStore.getState()
         useExtendedObjectStore.setState({
           schroedinger: {
-            ...ext.schroedinger,
+            ...schroedinger,
             tdse: {
-              ...ext.schroedinger.tdse,
+              ...schroedinger.tdse,
               needsReset: true,
               disorderStrength: nextW,
               disorderSeed: seed,

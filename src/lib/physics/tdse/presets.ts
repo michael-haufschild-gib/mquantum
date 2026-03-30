@@ -274,7 +274,8 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   {
     id: 'andersonLocalized3D',
     name: 'Anderson: Localized (3D)',
-    description: 'Strong disorder W=25 in 3D — well above the critical value Wc≈16.5. Wavepacket remains localized.',
+    description:
+      'Strong disorder W=25 in 3D — well above the critical value Wc≈16.5. Wavepacket remains localized.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -317,9 +318,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       disorderStrength: 5.0,
       disorderSeed: 42,
       disorderDistribution: 'uniform',
-      absorberEnabled: true,
-      absorberWidth: 0.15,
-      pmlTargetReflection: 1e-6,
+      absorberEnabled: false,
       diagnosticsEnabled: true,
       diagnosticsInterval: 5,
       observablesEnabled: true,
@@ -330,7 +329,8 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   {
     id: 'andersonTransition4D',
     name: 'Anderson: 4D Transition',
-    description: 'Moderate disorder in 4D (32⁴ lattice). Transport properties at the Anderson transition in higher dimensions.',
+    description:
+      'Moderate disorder in 4D (32⁴ lattice). Transport properties at the Anderson transition in higher dimensions.',
     overrides: {
       latticeDim: 4,
       gridSize: [32, 32, 32, 32],
@@ -357,7 +357,8 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   {
     id: 'andersonTransition5D',
     name: 'Anderson: 5D Transport',
-    description: 'Disorder in 5D (16⁵ lattice). Probes localization in dimensions where exact diagonalization is infeasible.',
+    description:
+      'Disorder in 5D (16⁵ lattice). Probes localization in dimensions where exact diagonalization is infeasible.',
     overrides: {
       latticeDim: 5,
       gridSize: [16, 16, 16, 16, 16],

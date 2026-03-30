@@ -70,8 +70,9 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
         data-testid="tdse-diagnostics-interval"
       />
 
-      {/* Inline energy diagram */}
-      <EnergyDiagramInline tdse={tdse} />
+      {/* Inline energy diagram — hidden for Anderson disorder since the
+          stochastic potential has no meaningful 1D analytical profile */}
+      {tdse.potentialType !== 'andersonDisorder' && <EnergyDiagramInline tdse={tdse} />}
 
       {/* Observable expectation values */}
       <ObservablesDisplay
