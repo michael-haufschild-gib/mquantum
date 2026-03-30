@@ -4,8 +4,7 @@
  * @module e2e/wigner-rendering
  */
 
-import { expect, test } from './fixtures'
-
+import { test } from './fixtures'
 import {
   expectCanvasNotBlank,
   gotoMode,
