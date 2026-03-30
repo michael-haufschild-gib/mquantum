@@ -17,13 +17,11 @@ import {
   assertNonBlankPixels,
   capturePixelSnapshot,
   expectSnapshotsDiffer,
-  getFrameCount,
   gotoMode,
   readBecDiagnostics,
   readTdseDiagnostics,
   requireWebGPU,
   waitForDiagnostics,
-  waitForFrameAdvance,
   waitForModeReady,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -358,9 +356,6 @@ test.describe('KK compactification: toggle round-trip', () => {
     await waitForShaderCompilation(page)
     await waitForModeReady(page, 60)
 
-    // Capture baseline (all extended)
-    const snapBefore = await capturePixelSnapshot(page)
-
     // Enable compact z
     await setTdseCompactDim(page, 2, true)
     await waitForUniformUpdate(page)
@@ -373,9 +368,14 @@ test.describe('KK compactification: toggle round-trip', () => {
     await waitForUniformUpdate(page)
     await waitForSimulationFrames(page, 30)
 
+    const snapAfter = await capturePixelSnapshot(page)
+
     // Verify store is back to all-extended
     const dims = await readTdseCompactDims(page)
     expect(dims[2]).toBe(false)
+
+    // Compact and post-toggle snapshots should differ (simulation evolved differently)
+    expectSnapshotsDiffer(snapCompact, snapAfter, 'compact vs re-extended')
 
     // Must still render after toggle round-trip (no GPU errors)
     await assertNonBlankPixels(page, 'TDSE after compact toggle round-trip')
