@@ -35,9 +35,6 @@ import {
   computeConfigHash,
   computeStridesPadded,
   createDensityTexture,
-  DENSITY_GRID_SIZE,
-  DIAG_DECIMATION,
-  GRID_WG,
   LINEAR_WG,
   sanitizeGridSizes,
 } from './computePassUtils'
@@ -52,6 +49,12 @@ import {
   uploadAndersonDisorderBuffer,
   uploadCustomPotentialBuffer,
 } from './TDSEComputePassCustomPotential'
+import {
+  type DiagFrameState,
+  type EvolutionFrameState,
+  runPostStepDispatches,
+  runStrangEvolution,
+} from './TDSEComputePassEvolution'
 import type {
   TdseBindGroupInputs,
   TdseBindGroupResult,
@@ -77,16 +80,16 @@ import {
   maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
 import type { FFTAxisParams } from './TDSEComputePassDispatchers'
+import { dispatchFFTAxis as extDispatchFFTAxis } from './TDSEComputePassDispatchers'
 import {
-  dispatchDiagnostics as extDispatchDiagnostics,
-  dispatchFFTAxis as extDispatchFFTAxis,
-} from './TDSEComputePassDispatchers'
-import { disposeTdseResources } from './TDSEComputePassDispose'
+  destroyPassBuffers,
+  disposeTdseResources,
+  type TdseGpuFields,
+} from './TDSEComputePassDispose'
 import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
   clearEigenstates as gsClearEigenstates,
-  dispatchGramSchmidt as gsDispatch,
   ensureGSBuffers as gsEnsureBuffers,
   type GramSchmidtState,
   storeCurrentEigenstate as gsStoreEigenstate,
@@ -101,7 +104,6 @@ import {
   createVortexDetectState,
   disposeVortexDetect,
   rebuildVortexDetect,
-  runVortexDetection,
   type VortexDetectState,
 } from './TDSEVortexDetect'
 
@@ -130,7 +132,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private diagPartialRightBuffer: GPUBuffer | null = null
   private diagPartialIprBuffer: GPUBuffer | null = null
   private diagNumWorkgroups = 0
-  private diagFrameCounter = 0
+  private readonly _diagFrameState: DiagFrameState = { diagFrameCounter: 0 }
   private readonly _diagState: DiagReadbackState = {
     diagResultBuffer: null,
     diagStagingBuffer: null,
@@ -345,7 +347,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this._diagState.diagResultBuffer = r.diagResultBuffer
     this._diagState.diagStagingBuffer = r.diagStagingBuffer
     this._diagState.diagHistory.clear()
-    this.diagFrameCounter = 0
+    this._diagFrameState.diagFrameCounter = 0
     this._diagState.diagMappingInFlight = false
 
     this.initializeDensityTexture(device)
@@ -544,142 +546,38 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     if (!pl || !bg) return
 
     if (isPlaying) {
-      // Compute speed-scaled step count using fractional accumulator.
-      // This preserves dt (critical for numerical stability) while allowing
-      // the user to control evolution rate via the timeline speed slider.
-      const scaledSteps = config.stepsPerFrame * speed
-      this.stepAccumulator += scaledSteps
-      const stepsThisFrame = Math.floor(this.stepAccumulator)
-      this.stepAccumulator -= stepsThisFrame
-
-      for (let step = 0; step < stepsThisFrame; step++) {
-        // 1+2. PERF: Fused half-step potential + pack (saves 1 dispatch + 2MB memory)
-        const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
-        this.dispatchCompute(
-          fusedVPack,
-          pl.fusedPotentialPackPipeline,
-          [bg.fusedPotentialPackBG],
-          linearWG
-        )
-        fusedVPack.end()
-
-        // 3. Forward FFT (for each spatial axis)
-        let fftSlot = 0
-        for (let d = config.latticeDim - 1; d >= 0; d--) {
-          fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
-        }
-
-        // 4. Apply kinetic propagator in k-space
-        const kinPass = ctx.beginComputePass({ label: `tdse-kinetic-${step}` })
-        this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
-        kinPass.end()
-
-        // 5. Inverse FFT
-        fftSlot = this.fwdStageCount
-        for (let d = config.latticeDim - 1; d >= 0; d--) {
-          fftSlot = this.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
-        }
-
-        // 6+7. PERF: Fused unpack (1/N norm) + second half-step potential (saves 1 dispatch + 2MB memory)
-        const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
-        this.dispatchCompute(
-          fusedUnpackV,
-          pl.fusedUnpackPotentialPipeline,
-          [bg.fusedUnpackPotentialBG],
-          linearWG
-        )
-        fusedUnpackV.end()
-
-        // 8. Absorber (separate pass AFTER the Strang step)
-        // Applied once per step, after the FFT kinetic step has completed.
-        // This prevents the FFT from seeing the absorber's spatial modulation
-        // and scattering it across k-space (which creates spurious emission artifacts).
-        const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
-        this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
-        absPass.end()
-
-        this.simTime += config.dt
-
-        // 9. Renormalization: once per frame for real-time (f32 drift correction),
-        // every step for imaginary-time (decay must be renormalized to prevent ψ→0).
-        const isImaginaryTime = config.imaginaryTimeEnabled
-        if (isImaginaryTime || step === stepsThisFrame - 1) {
-          const rPass = ctx.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
-          this.dispatchCompute(
-            rPass,
-            pl.diagReducePipeline,
-            [bg.diagReduceBG],
-            this.diagNumWorkgroups
-          )
-          rPass.end()
-          const fPass = ctx.beginComputePass({ label: `tdse-renorm-finalize-${step}` })
-          this.dispatchCompute(fPass, pl.diagFinalizePipeline, [bg.diagFinalizeBG], 1)
-          fPass.end()
-          const sPass = ctx.beginComputePass({ label: `tdse-renorm-scale-${step}` })
-          const renormWG = Math.ceil(this.totalSites / LINEAR_WG)
-          this.dispatchCompute(sPass, pl.renormalizePipeline, [bg.renormalizeBG], renormWG)
-          sPass.end()
-
-          // Gram-Schmidt: orthogonalize against stored eigenstates (imaginary-time only)
-          if (isImaginaryTime && this._gsState.gsEigenstates.length > 0) {
-            gsDispatch(ctx, this._gsState, this.dc, {
-              diagReducePipeline: pl.diagReducePipeline,
-              diagReduceBG: bg.diagReduceBG,
-              diagFinalizePipeline: pl.diagFinalizePipeline,
-              diagFinalizeBG: bg.diagFinalizeBG,
-              renormalizePipeline: pl.renormalizePipeline,
-              renormalizeBG: bg.renormalizeBG,
-              diagNumWorkgroups: this.diagNumWorkgroups,
-            })
-          }
-        }
+      const evoState: EvolutionFrameState = {
+        simTime: this.simTime,
+        stepAccumulator: this.stepAccumulator,
       }
+      runStrangEvolution(ctx, config, speed, evoState, {
+        pl,
+        bg,
+        totalSites: this.totalSites,
+        diagNumWorkgroups: this.diagNumWorkgroups,
+        fwdStageCount: this.fwdStageCount,
+        gsState: this._gsState,
+        dc: this.dc,
+        dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
+      })
+      this.simTime = evoState.simTime
+      this.stepAccumulator = evoState.stepAccumulator
     }
 
-    // Write density grid
-    const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
-    const wgPass = ctx.beginComputePass({ label: 'tdse-write-grid-pass' })
-    this.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG], gridWG, gridWG, gridWG)
-    wgPass.end()
-
-    // Always run decimated norm reduction to keep maxDensity updated for
-    // display normalization. Without this, a spreading wavepacket fades to
-    // invisible because maxDensity stays at the initial peak value.
-    this._diagState.currentAutoLoop = config.autoLoop
-    this.diagFrameCounter++
-    const interval = config.diagnosticsEnabled
-      ? config.diagnosticsInterval || DIAG_DECIMATION
-      : DIAG_DECIMATION
-    if (this.diagFrameCounter >= interval) {
-      this.diagFrameCounter = 0
-      const { pl, bg, diagUniformBuffer } = this
-      const { diagResultBuffer, diagStagingBuffer } = this._diagState
-      if (pl && bg && diagResultBuffer && diagStagingBuffer && diagUniformBuffer) {
-        extDispatchDiagnostics(ctx, config, config.diagnosticsEnabled, {
-          pl,
-          bg,
-          diagState: this._diagState,
-          obsState: this._obsState,
-          diagUniformBuffer,
-          totalSites: this.totalSites,
-          diagNumWorkgroups: this.diagNumWorkgroups,
-          simTime: this.simTime,
-          computeStrides: (c) => computeStridesPadded(c.gridSize, c.latticeDim),
-          dispatchCompute: this.dc,
-          observablesMomentumFFT: (fftCtx) => {
-            const wg = Math.ceil(this.totalSites / LINEAR_WG)
-            const packP = fftCtx.beginComputePass({ label: 'obs-fft-pack' })
-            this.dc(packP, pl.packPipeline, [bg.packBG], wg)
-            packP.end()
-            let slot = 0
-            for (let d = config.latticeDim - 1; d >= 0; d--) {
-              slot = this.dispatchFFTAxis(fftCtx, config.gridSize[d]!, slot)
-            }
-          },
-        })
-        runVortexDetection(ctx, this._vdState, config, this.totalSites, this._diagState.maxDensity)
-      }
-    }
+    runPostStepDispatches(ctx, config, this._diagFrameState, {
+      pl,
+      bg,
+      totalSites: this.totalSites,
+      diagNumWorkgroups: this.diagNumWorkgroups,
+      simTime: this.simTime,
+      diagUniformBuffer: this.diagUniformBuffer,
+      diagState: this._diagState,
+      obsState: this._obsState,
+      vdState: this._vdState,
+      dc: this.dc,
+      dispatchCompute: this.dc,
+      dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
+    })
   }
 
   execute(_ctx: WebGPURenderContext): void {
@@ -688,39 +586,34 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   dispose(): void {
     disposeVortexDetect(this._vdState)
-    const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
-      this.psiReBuffer,
-      this.psiImBuffer,
-      this.potentialBuffer,
-      this.fftScratchA,
-      this.fftScratchB,
-      this.uniformBuffer,
-      this.fftUniformBuffer,
-      this.fftStagingBuffer,
-      this.packUniformBuffer,
-      this.omegaStagingBuffer,
-      this.densityTexture,
-      this.diagUniformBuffer,
-      this.diagPartialSumsBuffer,
-      this.diagPartialMaxBuffer,
-      this.diagPartialLeftBuffer,
-      this.diagPartialRightBuffer,
-      this.diagPartialIprBuffer,
-      this.bg?.renormalizeUniformBuffer,
-    ]
-    for (const b of bufs) b?.destroy()
     disposeDisorder(this._disorderState)
-    this.psiReBuffer = this.psiImBuffer = this.potentialBuffer = null
-    this.fftScratchA = this.fftScratchB = this.omegaStagingBuffer = null
-    this.uniformBuffer = this.fftUniformBuffer = this.fftStagingBuffer = null
-    this.packUniformBuffer = this.diagUniformBuffer = null
-    this.diagPartialSumsBuffer = this.diagPartialMaxBuffer = null
-    this.diagPartialLeftBuffer = this.diagPartialRightBuffer = this.diagPartialIprBuffer = null
-    this.densityTexture = this.densityTextureView = null
-    this.pl = this.bg = null
+    const gpu: TdseGpuFields = {
+      psiReBuffer: this.psiReBuffer,
+      psiImBuffer: this.psiImBuffer,
+      potentialBuffer: this.potentialBuffer,
+      fftScratchA: this.fftScratchA,
+      fftScratchB: this.fftScratchB,
+      uniformBuffer: this.uniformBuffer,
+      fftUniformBuffer: this.fftUniformBuffer,
+      fftStagingBuffer: this.fftStagingBuffer,
+      packUniformBuffer: this.packUniformBuffer,
+      omegaStagingBuffer: this.omegaStagingBuffer,
+      densityTexture: this.densityTexture,
+      densityTextureView: this.densityTextureView,
+      diagUniformBuffer: this.diagUniformBuffer,
+      diagPartialSumsBuffer: this.diagPartialSumsBuffer,
+      diagPartialMaxBuffer: this.diagPartialMaxBuffer,
+      diagPartialLeftBuffer: this.diagPartialLeftBuffer,
+      diagPartialRightBuffer: this.diagPartialRightBuffer,
+      diagPartialIprBuffer: this.diagPartialIprBuffer,
+      pl: this.pl,
+      bg: this.bg,
+      initialized: this.initialized,
+      lastConfigHash: this.lastConfigHash,
+    }
+    destroyPassBuffers(gpu)
+    Object.assign(this, gpu)
     disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)
-    this.initialized = false
-    this.lastConfigHash = ''
     super.dispose()
   }
 }

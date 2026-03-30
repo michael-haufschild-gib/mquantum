@@ -11,6 +11,7 @@
 
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
+import type { TdseBindGroupResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { destroyGSBuffers, type GramSchmidtState } from './TDSEGramSchmidt'
 import { disposeObservables, type ObservablesState } from './TDSEObservablesDispatch'
@@ -54,4 +55,68 @@ export function disposeTdseResources(
 
   // Observables compute resources
   disposeObservables(obsState)
+}
+
+/** GPU buffer fields that must be destroyed and nulled on dispose. */
+export interface TdseGpuFields {
+  psiReBuffer: GPUBuffer | null
+  psiImBuffer: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
+  fftScratchA: GPUBuffer | null
+  fftScratchB: GPUBuffer | null
+  uniformBuffer: GPUBuffer | null
+  fftUniformBuffer: GPUBuffer | null
+  fftStagingBuffer: GPUBuffer | null
+  packUniformBuffer: GPUBuffer | null
+  omegaStagingBuffer: GPUBuffer | null
+  densityTexture: GPUTexture | null
+  densityTextureView: GPUTextureView | null
+  diagUniformBuffer: GPUBuffer | null
+  diagPartialSumsBuffer: GPUBuffer | null
+  diagPartialMaxBuffer: GPUBuffer | null
+  diagPartialLeftBuffer: GPUBuffer | null
+  diagPartialRightBuffer: GPUBuffer | null
+  diagPartialIprBuffer: GPUBuffer | null
+  pl: { renormalizePipeline?: unknown } | null
+  bg: TdseBindGroupResult | null
+  initialized: boolean
+  lastConfigHash: string
+}
+
+/**
+ * Destroy all GPU buffers and textures, null all references.
+ * @param fields - Mutable pass fields to destroy and null
+ */
+export function destroyPassBuffers(fields: TdseGpuFields): void {
+  const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
+    fields.psiReBuffer,
+    fields.psiImBuffer,
+    fields.potentialBuffer,
+    fields.fftScratchA,
+    fields.fftScratchB,
+    fields.uniformBuffer,
+    fields.fftUniformBuffer,
+    fields.fftStagingBuffer,
+    fields.packUniformBuffer,
+    fields.omegaStagingBuffer,
+    fields.densityTexture,
+    fields.diagUniformBuffer,
+    fields.diagPartialSumsBuffer,
+    fields.diagPartialMaxBuffer,
+    fields.diagPartialLeftBuffer,
+    fields.diagPartialRightBuffer,
+    fields.diagPartialIprBuffer,
+    fields.bg?.renormalizeUniformBuffer,
+  ]
+  for (const b of bufs) b?.destroy()
+  fields.psiReBuffer = fields.psiImBuffer = fields.potentialBuffer = null
+  fields.fftScratchA = fields.fftScratchB = fields.omegaStagingBuffer = null
+  fields.uniformBuffer = fields.fftUniformBuffer = fields.fftStagingBuffer = null
+  fields.packUniformBuffer = fields.diagUniformBuffer = null
+  fields.diagPartialSumsBuffer = fields.diagPartialMaxBuffer = null
+  fields.diagPartialLeftBuffer = fields.diagPartialRightBuffer = fields.diagPartialIprBuffer = null
+  fields.densityTexture = fields.densityTextureView = null
+  fields.pl = fields.bg = null
+  fields.initialized = false
+  fields.lastConfigHash = ''
 }
