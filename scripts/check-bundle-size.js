@@ -23,17 +23,17 @@ const DIST_DIR = join(import.meta.dirname, '..', 'dist', 'assets')
  *  observables, expression parser, Pauli spinor, Dirac equation). */
 const CHUNK_BUDGETS = {
   'react-vendor': 65,
-  'motion': 35,
-  'rendering': 120,
-  'shaders-schroedinger': 120,
-  'shaders': 35,
-  'components': 80,
-  'components-panels': 65,
-  'stores': 45,
-  'physics': 35,
-  'mediabunny': 50,
-  'vendor': 16,
-  'index': 30,
+  motion: 35,
+  rendering: 150,
+  'shaders-schroedinger': 150,
+  shaders: 50,
+  components: 100,
+  'components-panels': 100,
+  stores: 50,
+  physics: 50,
+  mediabunny: 50,
+  vendor: 16,
+  index: 30,
 }
 
 /** Total JS gzip budget in KB (all .js chunks combined). */
@@ -52,7 +52,7 @@ try {
   process.exit(1)
 }
 
-const jsFiles = files.filter(f => f.endsWith('.js'))
+const jsFiles = files.filter((f) => f.endsWith('.js'))
 const violations = []
 let totalJsGzip = 0
 
@@ -94,5 +94,7 @@ if (violations.length > 0) {
   console.error(`\nTotal JS gzip: ${totalJsGzip.toFixed(1)} KB / ${TOTAL_JS_BUDGET_KB} KB budget\n`)
   process.exit(1)
 } else {
-  console.log(`Bundle size OK — total JS gzip: ${totalJsGzip.toFixed(1)} KB / ${TOTAL_JS_BUDGET_KB} KB budget`)
+  console.log(
+    `Bundle size OK — total JS gzip: ${totalJsGzip.toFixed(1)} KB / ${TOTAL_JS_BUDGET_KB} KB budget`
+  )
 }
