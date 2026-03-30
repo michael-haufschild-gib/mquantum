@@ -248,6 +248,12 @@ export interface TdseConfig {
    *  This enables breathing-mode excitations via trap-frequency quench. */
   harmonicOmegaInit?: number
 
+  // === Kaluza-Klein Compactification ===
+  /** Per-dimension flag: true = compact (periodic with radius R), false = extended */
+  compactDims: boolean[]
+  /** Per-dimension compactification radius R (L = 2πR). Only used when compactDims[d] = true */
+  compactRadii: number[]
+
   // === N-D Vortex Reconnection (when initialCondition === 'ndVortexPair') ===
   /** First vortex winding plane axis indices [axisA, axisB] (0-indexed) */
   vortexPlane1?: [number, number]
@@ -331,6 +337,9 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   diagnosticsInterval: 5,
   observablesEnabled: false,
   imaginaryTimeEnabled: false,
+
+  compactDims: [false, false, false],
+  compactRadii: [0.15, 0.15, 0.15],
 
   needsReset: false,
   slicePositions: [],

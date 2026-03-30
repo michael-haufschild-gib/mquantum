@@ -5,7 +5,7 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 736 bytes.
+ * Total size: 740 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  *
@@ -109,5 +109,6 @@ struct TDSEUniforms {
   vortexSeparation: f32,     // offset 724 — displacement between vortex cores
   vortexCount: u32,          // offset 728 — number of vortices to seed (1 or 2)
   anharmonicLambda: f32,     // offset 732 — coupling λ for coupled anharmonic potential
+  compactDimsMask: u32,      // offset 736 — bitmask: bit d = 1 means dimension d is compact (periodic KK)
 }
 `

@@ -10,6 +10,7 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { generateDisorderPotential } from '@/lib/physics/anderson/disorderPotential'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { parseExpression } from '@/lib/physics/expressionParser'
 import { evaluatePotentialGrid } from '@/lib/physics/potentialGridEvaluator'
 
@@ -52,6 +53,8 @@ export function computePotentialHash(config: TdseConfig, simTime: number): strin
         config.anharmonicLambda,
         (config.trapAnisotropy ?? []).join(','),
         config.spacing.join(','),
+        (config.compactDims ?? []).map(Number).join(','),
+        (config.compactRadii ?? []).join(','),
         config.disorderStrength,
         config.disorderSeed,
       ].join('|')
@@ -90,7 +93,13 @@ export function uploadCustomPotentialBuffer(
   }
 
   const gridSize = config.gridSize.slice(0, config.latticeDim)
-  const spacing = config.spacing.slice(0, config.latticeDim)
+  const spacing = computeEffectiveSpacing(
+    config.gridSize,
+    config.spacing,
+    config.compactDims,
+    config.compactRadii,
+    config.latticeDim
+  )
   const potential = evaluatePotentialGrid(result.evaluate, gridSize, spacing)
 
   device.queue.writeBuffer(potentialBuffer, 0, potential)

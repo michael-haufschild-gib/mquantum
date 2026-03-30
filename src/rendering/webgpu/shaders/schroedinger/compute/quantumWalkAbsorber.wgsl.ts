@@ -49,7 +49,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
   let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
-                              params.absorberWidth, params.absorberStrength);
+                              params.absorberWidth, params.absorberStrength, 0u);
 
   if (sigma > 0.0) {
     // Per-step damping (no dt for discrete walk)

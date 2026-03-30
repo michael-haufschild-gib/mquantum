@@ -344,6 +344,8 @@ export interface SchroedingerSliceActions {
   setTdseImaginaryTimeEnabled: (enabled: boolean) => void
   setTdseCustomPotentialExpression: (expression: string) => void
   setTdseSlicePosition: (dimIndex: number, value: number) => void
+  setTdseCompactDim: (dimIndex: number, compact: boolean) => void
+  setTdseCompactRadius: (dimIndex: number, radius: number) => void
   applyTdsePreset: (presetId: string) => void
   resetTdseField: () => void
   clearTdseNeedsReset: () => void
@@ -375,6 +377,8 @@ export interface SchroedingerSliceActions {
   setBecGridSize: (size: number[]) => void
   setBecSpacing: (spacing: number[]) => void
   setBecSlicePosition: (dimIndex: number, value: number) => void
+  setBecCompactDim: (dimIndex: number, compact: boolean) => void
+  setBecCompactRadius: (dimIndex: number, radius: number) => void
   applyBecPreset: (presetId: string) => void
   resetBecField: () => void
   clearBecNeedsReset: () => void

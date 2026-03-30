@@ -12,6 +12,7 @@ import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/t
 import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
@@ -108,11 +109,15 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const latticeConfig =
       config.quantumMode === 'becDynamics' ? schroedinger.bec : schroedinger.tdse
     if (!latticeConfig) return null
-    return computeLatticeBoundingRadius(
-      latticeConfig.latticeDim ?? 3,
+    const latDim = latticeConfig.latticeDim ?? 3
+    const effSpacing = computeEffectiveSpacing(
       latticeConfig.gridSize ?? [32],
-      latticeConfig.spacing ?? [0.1]
+      latticeConfig.spacing ?? [0.1],
+      latticeConfig.compactDims as boolean[] | undefined,
+      latticeConfig.compactRadii as number[] | undefined,
+      latDim
     )
+    return computeLatticeBoundingRadius(latDim, latticeConfig.gridSize ?? [32], effSpacing)
   }
 
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
@@ -236,7 +241,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     if (!mState.pendingMeasurement || mState.isCollapsing) return
 
     const gridSize = tdseConfig.gridSize.slice(0, tdseConfig.latticeDim)
-    const spacing = tdseConfig.spacing.slice(0, tdseConfig.latticeDim)
+    const spacing = computeEffectiveSpacing(
+      tdseConfig.gridSize, tdseConfig.spacing,
+      tdseConfig.compactDims, tdseConfig.compactRadii, tdseConfig.latticeDim
+    )
     const measureAxis = mState.measureAxis
     const collapseWidth = mState.collapseWidth
 
@@ -255,7 +263,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         const { executeFullMeasurement, executePartialMeasurement } =
           await import('@/lib/physics/measurementOrchestrator')
 
-        const config = { latticeDim: gridSize.length, gridSize, spacing }
+        const config = {
+          latticeDim: gridSize.length,
+          gridSize,
+          spacing,
+          compactDims: tdseConfig.compactDims as boolean[] | undefined,
+        }
 
         const inject = (re: Float32Array, im: Float32Array) => {
           tdsePass.setLoadedWavefunction(re, im, true)
@@ -439,6 +452,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         vortexPlane2: bec.vortexPlane2 ?? [2, 3],
         vortexSeparation: bec.vortexSeparation ?? 0.0,
         vortexPairCount: bec.vortexPairCount ?? 2,
+        // Kaluza-Klein compactification (pass through from BEC config)
+        compactDims: bec.compactDims ?? new Array(latDim).fill(false) as boolean[],
+        compactRadii: bec.compactRadii ?? new Array(latDim).fill(1.0) as number[],
       },
     }
   }
@@ -515,7 +531,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.spectrumInFlight = true
 
     const gridSize = bec.gridSize.slice(0, bec.latticeDim)
-    const spacingArr = bec.spacing.slice(0, bec.latticeDim)
+    const spacingArr = computeEffectiveSpacing(
+      bec.gridSize as number[], bec.spacing as number[],
+      bec.compactDims as boolean[] | undefined,
+      bec.compactRadii as number[] | undefined,
+      bec.latticeDim as number
+    )
     const hbar = bec.hbar ?? 1.0
     const mass = bec.mass ?? 1.0
 

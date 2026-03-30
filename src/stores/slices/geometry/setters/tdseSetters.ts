@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
+import { clampKKState } from '@/lib/physics/compactification'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -77,6 +78,8 @@ type TdseActions = Pick<
   | 'setTdseImaginaryTimeEnabled'
   | 'setTdseCustomPotentialExpression'
   | 'setTdseSlicePosition'
+  | 'setTdseCompactDim'
+  | 'setTdseCompactRadius'
   | 'applyTdsePreset'
   | 'resetTdseField'
   | 'clearTdseNeedsReset'
@@ -120,7 +123,14 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
   const packetWidth = Math.max(prev.packetWidth, minFeature0)
   const slitSeparation = Math.max(prev.slitSeparation, slitWidth + minFeature1)
 
-  const newDt = clampDtWithCfl(prev.dt, spacing, newDim, prev.mass)
+  const compactDims = Array.from({ length: newDim }, (_, i) =>
+    i < (prev.compactDims?.length ?? 0) ? (prev.compactDims[i] ?? false) : false
+  )
+  const rawRadii = Array.from({ length: newDim }, (_, i) =>
+    i < (prev.compactRadii?.length ?? 0) ? (prev.compactRadii[i] ?? 0.15) : 0.15
+  )
+
+  const kk = clampKKState(prev.dt, gridSize, spacing, compactDims, rawRadii, newDim, prev.mass, clampDtWithCfl)
   return {
     latticeDim: newDim,
     gridSize,
@@ -128,7 +138,9 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
     packetCenter,
     packetMomentum,
     slicePositions,
-    dt: newDt,
+    compactDims,
+    compactRadii: kk.compactRadii,
+    dt: kk.dt,
     wallThickness,
     barrierWidth,
     slitWidth,
@@ -191,10 +203,12 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           return result
         }
         const clamped = reduceToFit(snapped)
+        const td = state.schroedinger.tdse
+        const kk = clampKKState(td.dt, clamped, td.spacing, td.compactDims, td.compactRadii, latticeDim, td.mass, clampDtWithCfl)
         return {
           schroedinger: {
             ...state.schroedinger,
-            tdse: { ...state.schroedinger.tdse, gridSize: clamped, needsReset: true },
+            tdse: { ...td, gridSize: clamped, ...kk, needsReset: true },
           },
         }
       })
@@ -209,10 +223,11 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         const clamped = Array.from({ length: td.latticeDim }, (_, i) =>
           Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
         )
+        const kk = clampKKState(td.dt, td.gridSize, clamped, td.compactDims, td.compactRadii, td.latticeDim, td.mass, clampDtWithCfl)
         return {
           schroedinger: {
             ...state.schroedinger,
-            tdse: { ...td, spacing: clamped, needsReset: true },
+            tdse: { ...td, spacing: clamped, ...kk, needsReset: true },
           },
         }
       })
@@ -223,12 +238,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         return
       }
       const clamped = Math.max(0.01, Math.min(100.0, mass))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, mass: clamped },
-        },
-      }))
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        const kk = clampKKState(td.dt, td.gridSize, td.spacing, td.compactDims, td.compactRadii, td.latticeDim, clamped, clampDtWithCfl)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, mass: clamped, ...kk },
+          },
+        }
+      })
     },
     setTdseHbar: (hbar) => {
       if (!isFinite(hbar)) {
@@ -503,6 +522,44 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           schroedinger: {
             ...state.schroedinger,
             tdse: { ...td, slicePositions },
+          },
+        }
+      })
+    },
+    setTdseCompactDim: (dimIndex, compact) => {
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        const compactDims = [...(td.compactDims ?? [])]
+        if (dimIndex >= 0 && dimIndex < td.latticeDim) {
+          while (compactDims.length < td.latticeDim) compactDims.push(false)
+          compactDims[dimIndex] = compact
+        }
+        const kk = clampKKState(td.dt, td.gridSize, td.spacing, compactDims, td.compactRadii, td.latticeDim, td.mass, clampDtWithCfl)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, compactDims, ...kk, needsReset: true },
+          },
+        }
+      })
+    },
+    setTdseCompactRadius: (dimIndex, radius) => {
+      if (!isFinite(radius)) {
+        warnNonFinite('tdse.compactRadii', radius)
+        return
+      }
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        const rawRadii = [...(td.compactRadii ?? [])]
+        if (dimIndex >= 0 && dimIndex < td.latticeDim) {
+          while (rawRadii.length < td.latticeDim) rawRadii.push(0.15)
+          rawRadii[dimIndex] = radius
+        }
+        const kk = clampKKState(td.dt, td.gridSize, td.spacing, td.compactDims, rawRadii, td.latticeDim, td.mass, clampDtWithCfl)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, ...kk, needsReset: true },
           },
         }
       })

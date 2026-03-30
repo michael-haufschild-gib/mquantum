@@ -28,11 +28,12 @@ export const pmlProfileBlock = /* wgsl */ `
  * Uses cubic polynomial grading: σ_d = σ_max · ((W - distFromEdge) / W)³
  * Sums contributions from all dimensions (additive PML).
  *
- * @param coords     - N-D lattice coordinates of the site
- * @param gridSize   - Number of grid points per dimension
- * @param latticeDim - Number of active spatial dimensions
- * @param pmlWidth   - PML region width as fraction of grid per side (0-0.5)
- * @param sigmaMax   - Peak absorption coefficient (pre-computed on CPU)
+ * @param coords          - N-D lattice coordinates of the site
+ * @param gridSize        - Number of grid points per dimension
+ * @param latticeDim      - Number of active spatial dimensions
+ * @param pmlWidth        - PML region width as fraction of grid per side (0-0.5)
+ * @param sigmaMax        - Peak absorption coefficient (pre-computed on CPU)
+ * @param compactDimsMask - Bitmask: bit d = 1 skips PML on dimension d (Kaluza-Klein periodic)
  * @returns Total σ at this site (0 in physical domain, >0 in PML)
  */
 fn computePMLSigma(
@@ -40,10 +41,15 @@ fn computePMLSigma(
   gridSize: array<u32, 12>,
   latticeDim: u32,
   pmlWidth: f32,
-  sigmaMax: f32
+  sigmaMax: f32,
+  compactDimsMask: u32
 ) -> f32 {
   var sigma: f32 = 0.0;
   for (var d: u32 = 0u; d < latticeDim; d++) {
+    // Skip compact (periodic) dimensions — PML would break KK periodicity
+    if ((compactDimsMask & (1u << d)) != 0u) {
+      continue;
+    }
     let N = f32(gridSize[d]);
     let W = pmlWidth * N;  // PML width in grid points
     let pos = f32(coords[d]);

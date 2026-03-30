@@ -33,7 +33,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
   let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
-                              params.absorberWidth, params.absorberStrength);
+                              params.absorberWidth, params.absorberStrength,
+                              params.compactDimsMask);
 
   if (sigma > 0.0) {
     let dampFactor = exp(-sigma * params.dt);

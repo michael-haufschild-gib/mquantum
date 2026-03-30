@@ -64,8 +64,8 @@ import {
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
-/** TDSEUniforms struct size in bytes (736 = 732 + 4 anharmonicLambda) */
-const UNIFORM_SIZE = 736
+/** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
+const UNIFORM_SIZE = 740
 
 import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
 

@@ -26,8 +26,10 @@ export interface MeasurementGridConfig {
   latticeDim: number
   /** Grid points per dimension */
   gridSize: number[]
-  /** Grid spacing per dimension */
+  /** Grid spacing per dimension (effective, already KK-adjusted) */
   spacing: number[]
+  /** Per-dimension compact flag for periodic distance wrapping */
+  compactDims?: boolean[]
 }
 
 /** Callback to inject the collapsed wavefunction back into the compute pass. */
@@ -59,7 +61,7 @@ export function executeFullMeasurement(
   inject: InjectWavefunctionFn,
   record: RecordMeasurementFn
 ): void {
-  const { gridSize, spacing } = config
+  const { gridSize, spacing, compactDims } = config
   const result = sampleFromDensity(psiRe, psiIm, gridSize, spacing)
 
   logger.log(
@@ -71,7 +73,8 @@ export function executeFullMeasurement(
     gridSize,
     spacing,
     result.position,
-    collapseWidth
+    collapseWidth,
+    compactDims
   )
 
   inject(collapsedRe, collapsedIm)
@@ -99,7 +102,7 @@ export function executePartialMeasurement(
   inject: InjectWavefunctionFn,
   record: RecordMeasurementFn
 ): void {
-  const { gridSize, spacing, latticeDim } = config
+  const { gridSize, spacing, latticeDim, compactDims } = config
   const result = sampleFromMarginalDensity(psiRe, psiIm, gridSize, spacing, axis)
 
   // Build full N-D position with the measured axis filled in, others set to 0
@@ -117,7 +120,8 @@ export function executePartialMeasurement(
     spacing,
     axis,
     result.axisPosition,
-    collapseWidth
+    collapseWidth,
+    compactDims?.[axis]
   )
 
   inject(collapsedRe, collapsedIm)

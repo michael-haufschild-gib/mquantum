@@ -9,6 +9,7 @@
 
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
+import { clampKKState } from '@/lib/physics/compactification'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -49,6 +50,8 @@ type BecActions = Pick<
   | 'setBecGridSize'
   | 'setBecSpacing'
   | 'setBecSlicePosition'
+  | 'setBecCompactDim'
+  | 'setBecCompactRadius'
   | 'applyBecPreset'
   | 'resetBecField'
   | 'clearBecNeedsReset'
@@ -79,8 +82,23 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
   const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
     i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
   )
-  const newDt = clampDtWithCfl(prev.dt, spacing, newDim, mass)
-  return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions, dt: newDt }
+  const compactDims = Array.from({ length: newDim }, (_, i) =>
+    i < (prev.compactDims?.length ?? 0) ? (prev.compactDims[i] ?? false) : false
+  )
+  const rawRadii = Array.from({ length: newDim }, (_, i) =>
+    i < (prev.compactRadii?.length ?? 0) ? (prev.compactRadii[i] ?? 0.15) : 0.15
+  )
+  const kk = clampKKState(prev.dt, gridSize, spacing, compactDims, rawRadii, newDim, mass, clampDtWithCfl)
+  return {
+    latticeDim: newDim,
+    gridSize,
+    spacing,
+    trapAnisotropy,
+    slicePositions,
+    compactDims,
+    compactRadii: kk.compactRadii,
+    dt: kk.dt,
+  }
 }
 
 /**
@@ -328,12 +346,12 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       if (!isFinite(mass)) return
       const clamped = Math.max(0.1, Math.min(10, mass))
       setWithVersion((state) => {
-        const { spacing, latticeDim, dt } = state.schroedinger.bec
-        const newDt = clampDtWithCfl(dt, spacing, latticeDim, clamped)
+        const bec = state.schroedinger.bec
+        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, bec.compactDims, bec.compactRadii, bec.latticeDim, clamped, clampDtWithCfl)
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, mass: clamped, dt: newDt },
+            bec: { ...bec, mass: clamped, ...kk },
           },
         }
       })
@@ -371,10 +389,12 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           if (snapped[maxIdx]! <= 2) break
           snapped[maxIdx] = snapped[maxIdx]! / 2
         }
+        const bec = state.schroedinger.bec
+        const kk = clampKKState(bec.dt, snapped, bec.spacing, bec.compactDims, bec.compactRadii, latticeDim, bec.mass, clampDtWithCfl)
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, gridSize: snapped, needsReset: true },
+            bec: { ...bec, gridSize: snapped, ...kk, needsReset: true },
           },
         }
       })
@@ -385,16 +405,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         return
       }
       setWithVersion((state) => {
-        const { latticeDim, mass, dt } = state.schroedinger.bec
-        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+        const bec = state.schroedinger.bec
+        const clamped = Array.from({ length: bec.latticeDim }, (_, i) => {
           const s = i < spacing.length ? spacing[i]! : 0.15
           return Math.max(0.01, Math.min(1.0, s))
         })
-        const newDt = clampDtWithCfl(dt, clamped, latticeDim, mass)
+        const kk = clampKKState(bec.dt, bec.gridSize, clamped, bec.compactDims, bec.compactRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, spacing: clamped, dt: newDt, needsReset: true },
+            bec: { ...bec, spacing: clamped, ...kk, needsReset: true },
           },
         }
       })
@@ -410,6 +430,44 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           schroedinger: {
             ...state.schroedinger,
             bec: { ...state.schroedinger.bec, slicePositions: arr },
+          },
+        }
+      })
+    },
+    setBecCompactDim: (dimIndex, compact) => {
+      setWithVersion((state) => {
+        const bec = state.schroedinger.bec
+        const compactDims = [...(bec.compactDims ?? [])]
+        if (dimIndex >= 0 && dimIndex < bec.latticeDim) {
+          while (compactDims.length < bec.latticeDim) compactDims.push(false)
+          compactDims[dimIndex] = compact
+        }
+        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, compactDims, bec.compactRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...bec, compactDims, ...kk, needsReset: true },
+          },
+        }
+      })
+    },
+    setBecCompactRadius: (dimIndex, radius) => {
+      if (!isFinite(radius)) {
+        warnNonFinite('bec.compactRadii', radius)
+        return
+      }
+      setWithVersion((state) => {
+        const bec = state.schroedinger.bec
+        const rawRadii = [...(bec.compactRadii ?? [])]
+        if (dimIndex >= 0 && dimIndex < bec.latticeDim) {
+          while (rawRadii.length < bec.latticeDim) rawRadii.push(0.15)
+          rawRadii[dimIndex] = radius
+        }
+        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, bec.compactDims, rawRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...bec, ...kk, needsReset: true },
           },
         }
       })

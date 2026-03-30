@@ -1,6 +1,7 @@
 /** TDSE Observables — Resource Management, Dispatch & Readback */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 
@@ -127,6 +128,11 @@ export function writeObservablesUniforms(
   const res = state.obsResources
   if (!res) return
 
+  // Effective spacing accounts for KK compactification
+  const effSpacing = computeEffectiveSpacing(
+    config.gridSize, config.spacing, config.compactDims, config.compactRadii, config.latticeDim
+  )
+
   const uniformSize = 16 + 12 * 4 * 3
   const obsBuf = new ArrayBuffer(uniformSize)
   const obsU32 = new Uint32Array(obsBuf)
@@ -137,7 +143,7 @@ export function writeObservablesUniforms(
   obsU32[3] = res.posNumChannels
   for (let d = 0; d < config.latticeDim; d++) obsU32[4 + d] = config.gridSize[d] ?? 64
   for (let d = 0; d < config.latticeDim; d++) obsU32[16 + d] = strides[d] ?? 1
-  for (let d = 0; d < config.latticeDim; d++) obsF32[28 + d] = config.spacing[d] ?? 0.1
+  for (let d = 0; d < config.latticeDim; d++) obsF32[28 + d] = effSpacing[d] ?? 0.1
   device.queue.writeBuffer(res.posUniformBuffer, 0, obsBuf)
 
   const momBuf = new ArrayBuffer(uniformSize)
@@ -151,7 +157,7 @@ export function writeObservablesUniforms(
   for (let d = 0; d < config.latticeDim; d++) momU32[16 + d] = strides[d] ?? 1
   for (let d = 0; d < config.latticeDim; d++) {
     const Nd = config.gridSize[d] ?? 64
-    const ad = config.spacing[d] ?? 0.1
+    const ad = effSpacing[d] ?? 0.1
     momF32[28 + d] = (2 * Math.PI) / (Nd * ad)
   }
   device.queue.writeBuffer(res.momUniformBuffer, 0, momBuf)
@@ -164,7 +170,7 @@ export function writeObservablesUniforms(
   esU32[0] = state.totalSites
   esU32[1] = NUM_ENERGY_BINS
   // Auto-compute energy range from lattice: E_max = ℏ²/(2m) * (π/a_min)² * D
-  const aMin = Math.min(...config.spacing.slice(0, config.latticeDim))
+  const aMin = Math.min(...effSpacing.slice(0, config.latticeDim))
   const kMax = Math.PI / aMin
   const eMaxAuto = (config.hbar * config.hbar * kMax * kMax * config.latticeDim) / (2 * config.mass)
   esF32[2] = 0 // eMin
@@ -180,7 +186,7 @@ export function writeObservablesUniforms(
   // kGridScale at offset 128 (index 32)
   for (let d = 0; d < config.latticeDim; d++) {
     const Nd = config.gridSize[d] ?? 64
-    const ad = config.spacing[d] ?? 0.1
+    const ad = effSpacing[d] ?? 0.1
     esF32[32 + d] = (2 * Math.PI) / (Nd * ad)
   }
   device.queue.writeBuffer(res.esUniformBuffer, 0, esBuf)

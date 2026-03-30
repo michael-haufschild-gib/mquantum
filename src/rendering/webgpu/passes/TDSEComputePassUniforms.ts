@@ -6,6 +6,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 
 import { FFT_UNIFORM_SIZE, MAX_DIM } from './computePassUtils'
@@ -105,6 +106,15 @@ export function writeTdseUniforms(
   const f32 = uniformF32
   u32.fill(0)
 
+  // Pre-compute effective spacing (overrides compact dims with spacing from R)
+  const effSpacing = computeEffectiveSpacing(
+    config.gridSize,
+    config.spacing,
+    config.compactDims,
+    config.compactRadii,
+    config.latticeDim
+  )
+
   // Lattice params (0-15)
   u32[0] = config.latticeDim
   u32[1] = totalSites
@@ -121,8 +131,8 @@ export function writeTdseUniforms(
   for (let d = 0; d < config.latticeDim; d++) u32[8 + d] = config.gridSize[d]!
   // strides (80, indices 20-31)
   for (let d = 0; d < config.latticeDim; d++) u32[20 + d] = strides[d]!
-  // spacing (128, indices 32-43)
-  for (let d = 0; d < config.latticeDim; d++) f32[32 + d] = config.spacing[d]!
+  // spacing (128, indices 32-43) — uses effective spacing (compact dims overridden)
+  for (let d = 0; d < config.latticeDim; d++) f32[32 + d] = effSpacing[d]!
   // packetCenter (176, indices 44-55)
   // Write full array length: BEC encodes non-spatial params beyond latticeDim
   const centerLen = Math.min(config.packetCenter.length, MAX_DIM)
@@ -193,10 +203,10 @@ export function writeTdseUniforms(
   writeBasis(124, params.basisZ)
   if (!params.basisZ) f32[126] = 1.0
 
-  // kGridScale (544, indices 136-147): 2*pi / (N * a)
+  // kGridScale (544, indices 136-147): 2*pi / (N * a_eff)
   for (let d = 0; d < config.latticeDim; d++) {
     const N = config.gridSize[d]!
-    const a = config.spacing[d]!
+    const a = effSpacing[d]!
     f32[136 + d] = (2 * Math.PI) / (N * a)
   }
 
@@ -251,6 +261,9 @@ export function writeTdseUniforms(
 
   // Coupled anharmonic coupling (offset 732, index 183)
   f32[183] = config.anharmonicLambda ?? 1.0
+
+  // KK compactification bitmask (offset 736, index 184)
+  u32[184] = buildCompactDimsMask(config.compactDims, config.latticeDim)
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

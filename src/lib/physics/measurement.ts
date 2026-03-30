@@ -186,7 +186,8 @@ export function computeFullCollapse(
   gridSize: number[],
   spacing: number[],
   center: number[],
-  sigma: number
+  sigma: number,
+  compactDims?: boolean[]
 ): [Float32Array, Float32Array] {
   const latticeDim = gridSize.length
   const psiRe = new Float32Array(totalSites)
@@ -201,7 +202,12 @@ export function computeFullCollapse(
       const coordInt = remaining % size
       remaining = (remaining - coordInt) / size
       const pos = (coordInt - size * 0.5 + 0.5) * spacing[d]!
-      const delta = pos - center[d]!
+      let delta = pos - center[d]!
+      // Wrap to shortest-path distance on compact (periodic) dimensions
+      if (compactDims?.[d]) {
+        const L = size * spacing[d]!
+        delta = delta - L * Math.round(delta / L)
+      }
       dist2 += delta * delta
     }
     psiRe[i] = Math.exp(-dist2 / (2 * sigma2))
@@ -235,19 +241,22 @@ export function computePartialCollapse(
   spacing: number[],
   axis: number,
   axisPosition: number,
-  sigma: number
+  sigma: number,
+  axisCompact?: boolean
 ): [Float32Array, Float32Array] {
   const latticeDim = gridSize.length
   const totalSites = psiRe.length
   const axisSize = gridSize[axis]!
   const axisSpacing = spacing[axis]!
   const sigma2 = Math.max(sigma * sigma, 1e-8)
+  const axisL = axisSize * axisSpacing
 
   // Pre-compute 1D Gaussian envelope for the measured axis
   const envelope = new Float32Array(axisSize)
   for (let k = 0; k < axisSize; k++) {
     const pos = (k - axisSize * 0.5 + 0.5) * axisSpacing
-    const delta = pos - axisPosition
+    let delta = pos - axisPosition
+    if (axisCompact) delta = delta - axisL * Math.round(delta / axisL)
     envelope[k] = Math.exp(-(delta * delta) / (2 * sigma2))
   }
 

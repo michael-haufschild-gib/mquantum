@@ -102,6 +102,12 @@ export interface BecConfig {
   /** Number of vortices: 1 = single configurable-plane vortex, 2 = reconnection pair */
   vortexPairCount: number
 
+  // === Kaluza-Klein Compactification ===
+  /** Per-dimension flag: true = compact (periodic with radius R), false = extended */
+  compactDims: boolean[]
+  /** Per-dimension compactification radius R (L = 2πR). Only used when compactDims[d] = true */
+  compactRadii: number[]
+
   // === Display ===
   fieldView: BecFieldView
   /** Auto-scale density normalization */
@@ -146,6 +152,8 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   vortexPlane2: [2, 3],
   vortexSeparation: 0.5,
   vortexPairCount: 2,
+  compactDims: [false, false, false],
+  compactRadii: [0.15, 0.15, 0.15],
   fieldView: 'density',
   autoScale: true,
   absorberEnabled: false,
