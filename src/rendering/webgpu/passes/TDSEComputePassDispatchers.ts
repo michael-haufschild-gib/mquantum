@@ -99,6 +99,47 @@ export function dispatchFFTAxis(
   return slotOffset + stages
 }
 
+/** Parameters for shared-memory FFT axis dispatch (one dispatch per axis). */
+export interface FFTAxisSharedMemParams {
+  readonly pl: TdsePipelineResult
+  readonly bg: TdseBindGroupResult
+  readonly fftAxisUniformBuffer: GPUBuffer
+  readonly fftAxisStagingBuffer: GPUBuffer
+  readonly totalSites: number
+  readonly dispatchCompute: FFTAxisParams['dispatchCompute']
+}
+
+/**
+ * Dispatch shared-memory FFT for one axis: single dispatch completes all stages.
+ * Each workgroup loads one 1D pencil into shared memory, runs all butterfly
+ * stages with workgroupBarrier(), then writes back.
+ *
+ * @returns The next slot offset for subsequent axis dispatches.
+ */
+export function dispatchFFTAxisSharedMem(
+  ctx: WebGPURenderContext,
+  axisDim: number,
+  slotOffset: number,
+  p: FFTAxisSharedMemParams
+): number {
+  // Copy per-axis uniforms from staging to the active uniform buffer
+  ctx.encoder.copyBufferToBuffer(
+    p.fftAxisStagingBuffer,
+    slotOffset * FFT_UNIFORM_SIZE,
+    p.fftAxisUniformBuffer,
+    0,
+    FFT_UNIFORM_SIZE
+  )
+
+  // One dispatch: totalSites/axisDim pencils, one workgroup per pencil
+  const pencilCount = p.totalSites / axisDim
+  const pass = ctx.beginComputePass({ label: `tdse-fft-shared-mem-axis-${slotOffset}` })
+  p.dispatchCompute(pass, p.pl.fftSharedMemPipeline, [p.bg.fftSharedMemBG], pencilCount)
+  pass.end()
+
+  return slotOffset + 1
+}
+
 /** Parameters required for diagnostics dispatch. */
 export interface DiagDispatchParams {
   readonly pl: TdsePipelineResult

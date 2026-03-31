@@ -62,8 +62,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
 
     return (
       <>
-        {/* Potential */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
+        <div className="space-y-3">
           <Select
             label="Potential"
             tooltip="External potential V(x) applied to the wavefunction during time evolution."

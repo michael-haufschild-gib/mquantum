@@ -185,6 +185,14 @@ struct NodalSurfaceHit {
   _pad: f32,
 }
 
+// Combined nodal + gradient result (performance: shares tetrahedral samples)
+struct NodalWithGradient {
+  nodal: NodalSample,
+  gradient: vec3f, // Density gradient from same tetrahedral psi samples
+  rho: f32,        // Average density
+  s: f32,          // Average log-density
+}
+
 // Sample complex wavefunction ψ at world position.
 fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   let xND = mapPosToND(pos, uniforms);

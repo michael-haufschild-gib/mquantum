@@ -67,6 +67,8 @@ export interface TdseGpuFields {
   uniformBuffer: GPUBuffer | null
   fftUniformBuffer: GPUBuffer | null
   fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffer: GPUBuffer | null
+  fftAxisStagingBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   densityTexture: GPUTexture | null
@@ -97,6 +99,8 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
     fields.uniformBuffer,
     fields.fftUniformBuffer,
     fields.fftStagingBuffer,
+    fields.fftAxisUniformBuffer,
+    fields.fftAxisStagingBuffer,
     fields.packUniformBuffer,
     fields.omegaStagingBuffer,
     fields.densityTexture,
@@ -112,6 +116,7 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
   fields.psiReBuffer = fields.psiImBuffer = fields.potentialBuffer = null
   fields.fftScratchA = fields.fftScratchB = fields.omegaStagingBuffer = null
   fields.uniformBuffer = fields.fftUniformBuffer = fields.fftStagingBuffer = null
+  fields.fftAxisUniformBuffer = fields.fftAxisStagingBuffer = null
   fields.packUniformBuffer = fields.diagUniformBuffer = null
   fields.diagPartialSumsBuffer = fields.diagPartialMaxBuffer = null
   fields.diagPartialLeftBuffer = fields.diagPartialRightBuffer = fields.diagPartialIprBuffer = null

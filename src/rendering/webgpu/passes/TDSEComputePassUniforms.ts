@@ -320,3 +320,44 @@ export function buildTdseFFTStagingData(config: TdseConfig, totalSites: number):
 
   return data
 }
+
+/**
+ * Pre-compute per-axis FFT uniforms for the shared-memory FFT kernel.
+ * One slot per axis per direction (forward then inverse), laid out in
+ * execution order: latticeDim-1 down to 0 for forward, same for inverse.
+ *
+ * Each slot is 32 bytes (FFTAxisUniforms), matching FFT_UNIFORM_SIZE.
+ *
+ * @param config - Current TDSE configuration
+ * @param totalSites - Total number of lattice sites
+ * @returns Pre-computed axis staging data as an ArrayBuffer
+ */
+export function buildTdseFFTAxisStagingData(config: TdseConfig, totalSites: number): ArrayBuffer {
+  const slotCount = config.latticeDim * 2 // forward + inverse
+  const data = new ArrayBuffer(slotCount * FFT_UNIFORM_SIZE)
+  let slotIdx = 0
+
+  for (const direction of [1.0, -1.0]) {
+    let axisStride = 1
+    for (let d = config.latticeDim - 1; d >= 0; d--) {
+      const axisDim = config.gridSize[d]!
+      const log2N = Math.round(Math.log2(axisDim))
+
+      const offset = slotIdx * FFT_UNIFORM_SIZE
+      const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
+      view.setUint32(0, axisDim, true) // axisDim
+      view.setFloat32(4, direction, true) // direction
+      view.setUint32(8, totalSites, true) // totalElements
+      view.setUint32(12, axisStride, true) // axisStride
+      view.setUint32(16, log2N, true) // log2N
+      view.setUint32(20, 0, true) // _pad0
+      view.setUint32(24, 0, true) // _pad1
+      view.setUint32(28, 0, true) // _pad2
+      slotIdx++
+
+      axisStride *= axisDim
+    }
+  }
+
+  return data
+}

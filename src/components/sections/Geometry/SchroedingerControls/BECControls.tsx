@@ -10,6 +10,7 @@
 
 import React, { useMemo } from 'react'
 
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
@@ -95,241 +96,250 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
     }, [activeDims])
 
     return (
-      <div className="space-y-4">
-        {/* Initial Condition */}
-        <Select
-          label="Initial Condition"
-          tooltip="Starting wavefunction shape: Thomas-Fermi ground state, Gaussian, vortex, or soliton."
-          value={bec.initialCondition}
-          onChange={(v) => actions.setInitialCondition(v as BecInitialCondition)}
-          options={INITIAL_CONDITION_OPTIONS}
-        />
+      <div className="space-y-1">
+        <ControlGroup
+          title="Initial Condition"
+          collapsible
+          defaultOpen
+          data-testid="control-group-bec-initial"
+        >
+          <Select
+            label="Initial Condition"
+            tooltip="Starting wavefunction shape: Thomas-Fermi ground state, Gaussian, vortex, or soliton."
+            value={bec.initialCondition}
+            onChange={(v) => actions.setInitialCondition(v as BecInitialCondition)}
+            options={INITIAL_CONDITION_OPTIONS}
+          />
 
-        {/* Conditional: Vortex controls */}
-        {showVortexControls && (
-          <>
-            <Slider
-              label="Vortex Charge"
-              tooltip="Topological charge (winding number) of the vortex. Higher magnitude = more angular momentum. Sign determines rotation direction."
-              value={bec.vortexCharge}
-              onChange={actions.setVortexCharge}
-              min={-4}
-              max={4}
-              step={1}
-            />
-            {bec.initialCondition === 'vortexLattice' && (
+          {showVortexControls && (
+            <>
               <Slider
-                label="Vortex Count"
-                tooltip="Number of quantized vortices in the Abrikosov-like lattice arrangement."
-                value={bec.vortexLatticeCount}
-                onChange={actions.setVortexLatticeCount}
-                min={1}
-                max={16}
+                label="Vortex Charge"
+                tooltip="Topological charge (winding number) of the vortex. Higher magnitude = more angular momentum. Sign determines rotation direction."
+                value={bec.vortexCharge}
+                onChange={actions.setVortexCharge}
+                min={-4}
+                max={4}
                 step={1}
               />
-            )}
-          </>
-        )}
+              {bec.initialCondition === 'vortexLattice' && (
+                <Slider
+                  label="Vortex Count"
+                  tooltip="Number of quantized vortices in the Abrikosov-like lattice arrangement."
+                  value={bec.vortexLatticeCount}
+                  onChange={actions.setVortexLatticeCount}
+                  min={1}
+                  max={16}
+                  step={1}
+                />
+              )}
+            </>
+          )}
 
-        {/* Conditional: Soliton controls */}
-        {showSolitonControls && (
-          <>
-            <Slider
-              label="Soliton Depth"
-              tooltip="Density notch depth of the dark soliton. 1.0 = fully dark (stationary), lower = grey soliton."
-              value={bec.solitonDepth}
-              onChange={actions.setSolitonDepth}
-              min={0}
-              max={1}
-              step={0.05}
-            />
-            <Slider
-              label="Soliton Velocity"
-              tooltip="Initial velocity of the dark soliton in units of the speed of sound. Sign sets propagation direction."
-              value={bec.solitonVelocity}
-              onChange={actions.setSolitonVelocity}
-              min={-1}
-              max={1}
-              step={0.05}
-            />
-          </>
-        )}
+          {showSolitonControls && (
+            <>
+              <Slider
+                label="Soliton Depth"
+                tooltip="Density notch depth of the dark soliton. 1.0 = fully dark (stationary), lower = grey soliton."
+                value={bec.solitonDepth}
+                onChange={actions.setSolitonDepth}
+                min={0}
+                max={1}
+                step={0.05}
+              />
+              <Slider
+                label="Soliton Velocity"
+                tooltip="Initial velocity of the dark soliton in units of the speed of sound. Sign sets propagation direction."
+                value={bec.solitonVelocity}
+                onChange={actions.setSolitonVelocity}
+                min={-1}
+                max={1}
+                step={0.05}
+              />
+            </>
+          )}
 
-        {/* Conditional: Vortex reconnection controls (D≥4) */}
-        {showReconnectionControls && (
-          <>
-            <Slider
-              label="Vortex Charge"
-              tooltip="Topological winding number for both vortices in the reconnection pair."
-              value={bec.vortexCharge}
-              onChange={actions.setVortexCharge}
-              min={-4}
-              max={4}
-              step={1}
-            />
-            <Select
-              label="Vortex 1 Plane"
-              tooltip="2D plane for the first vortex's phase winding. In D=4, a vortex in plane xy is a 2-surface spanning zw."
-              value={`${bec.vortexPlane1[0]},${bec.vortexPlane1[1]}`}
-              onChange={(v) => {
-                const [a, b] = v.split(',').map(Number) as [number, number]
-                actions.setVortexPlane1([a, b])
-              }}
-              options={axisPairOptions}
-            />
-            <Select
-              label="Vortex 2 Plane"
-              tooltip="2D plane for the second vortex. Orthogonal planes (e.g. xy+zw) produce reconnection; same plane produces parallel vortices."
-              value={`${bec.vortexPlane2[0]},${bec.vortexPlane2[1]}`}
-              onChange={(v) => {
-                const [a, b] = v.split(',').map(Number) as [number, number]
-                actions.setVortexPlane2([a, b])
-              }}
-              options={axisPairOptions}
-            />
-            <Slider
-              label="Separation"
-              tooltip="Distance between vortex cores. Zero = coincident cores, larger values delay reconnection onset."
-              value={bec.vortexSeparation}
-              onChange={actions.setVortexSeparation}
-              min={0}
-              max={5}
-              step={0.1}
-            />
-            <Select
-              label="Vortex Count"
-              tooltip="1 = single configurable-plane vortex, 2 = reconnection pair."
-              value={String(bec.vortexPairCount)}
-              onChange={(v) => actions.setVortexPairCount(parseInt(v, 10))}
-              options={[
-                { value: '1', label: '1 (single vortex)' },
-                { value: '2', label: '2 (reconnection pair)' },
-              ]}
-            />
-          </>
-        )}
+          {showReconnectionControls && (
+            <>
+              <Slider
+                label="Vortex Charge"
+                tooltip="Topological winding number for both vortices in the reconnection pair."
+                value={bec.vortexCharge}
+                onChange={actions.setVortexCharge}
+                min={-4}
+                max={4}
+                step={1}
+              />
+              <Select
+                label="Vortex 1 Plane"
+                tooltip="2D plane for the first vortex's phase winding. In D=4, a vortex in plane xy is a 2-surface spanning zw."
+                value={`${bec.vortexPlane1[0]},${bec.vortexPlane1[1]}`}
+                onChange={(v) => {
+                  const [a, b] = v.split(',').map(Number) as [number, number]
+                  actions.setVortexPlane1([a, b])
+                }}
+                options={axisPairOptions}
+              />
+              <Select
+                label="Vortex 2 Plane"
+                tooltip="2D plane for the second vortex. Orthogonal planes (e.g. xy+zw) produce reconnection; same plane produces parallel vortices."
+                value={`${bec.vortexPlane2[0]},${bec.vortexPlane2[1]}`}
+                onChange={(v) => {
+                  const [a, b] = v.split(',').map(Number) as [number, number]
+                  actions.setVortexPlane2([a, b])
+                }}
+                options={axisPairOptions}
+              />
+              <Slider
+                label="Separation"
+                tooltip="Distance between vortex cores. Zero = coincident cores, larger values delay reconnection onset."
+                value={bec.vortexSeparation}
+                onChange={actions.setVortexSeparation}
+                min={0}
+                max={5}
+                step={0.1}
+              />
+              <Select
+                label="Vortex Count"
+                tooltip="1 = single configurable-plane vortex, 2 = reconnection pair."
+                value={String(bec.vortexPairCount)}
+                onChange={(v) => actions.setVortexPairCount(parseInt(v, 10))}
+                options={[
+                  { value: '1', label: '1 (single vortex)' },
+                  { value: '2', label: '2 (reconnection pair)' },
+                ]}
+              />
+            </>
+          )}
+        </ControlGroup>
 
-        {/* Physics */}
-        <Slider
-          label="Interaction g̃"
-          tooltip="Dimensionless contact interaction strength. Positive = repulsive (stable BEC), negative = attractive (collapse). Controls nonlinearity in the Gross-Pitaevskii equation."
-          value={bec.interactionStrength}
-          onChange={actions.setInteractionStrength}
-          min={-1000}
-          max={10000}
-          step={10}
-        />
-        <Slider
-          label="Trap ω"
-          tooltip="Harmonic trap frequency. Higher values confine the condensate more tightly, increasing the density and interaction energy."
-          value={bec.trapOmega}
-          onChange={actions.setTrapOmega}
-          min={0.01}
-          max={10}
-          step={0.01}
-        />
-
-        {/* Per-dimension trap anisotropy ratios (ω_d = ratio * ω) */}
-        {activeDims > 1 &&
-          Array.from({ length: activeDims }, (_, i) => (
-            <Slider
-              key={`aniso-${i}`}
-              label={`ω ratio ${AXIS_LABELS[i]}`}
-              tooltip="Trap anisotropy ratio for this axis. Multiplies the base trap frequency to create elongated or pancake traps."
-              value={bec.trapAnisotropy?.[i] ?? 1.0}
-              onChange={(v) => actions.setTrapAnisotropy(i, v)}
-              min={0.1}
-              max={5.0}
-              step={0.05}
-            />
-          ))}
-
-        {/* Display */}
-        <Select
-          label="Field View"
-          tooltip="Which physical observable to visualize: condensate density, phase, probability current, or potential."
-          value={bec.fieldView}
-          onChange={(v) => actions.setFieldView(v as BecFieldView)}
-          options={FIELD_VIEW_OPTIONS}
-        />
-
-        {/* Numerics: Grid */}
-        {Array.from({ length: activeDims }, (_, i) => (
-          <Select
-            key={`grid-${i}`}
-            label={`Grid ${AXIS_LABELS[i]}`}
-            tooltip="Number of lattice points along this axis. Higher values increase spatial resolution but cost O(N^D) memory."
-            value={String(bec.gridSize[i] ?? 64)}
-            onChange={(v) => {
-              const arr = [...bec.gridSize]
-              arr[i] = parseInt(v, 10)
-              actions.setGridSize(arr)
-            }}
-            options={gridSizeOptions}
-          />
-        ))}
-
-        {/* Numerics: Spacing */}
-        {Array.from({ length: activeDims }, (_, i) => (
+        <ControlGroup
+          title="Physics"
+          collapsible
+          defaultOpen
+          data-testid="control-group-bec-physics"
+        >
           <Slider
-            key={`spacing-${i}`}
-            label={`Spacing ${AXIS_LABELS[i]}`}
-            tooltip="Distance between adjacent grid points (dx). Smaller spacing resolves finer features but requires more points."
-            value={bec.spacing[i] ?? 0.15}
-            onChange={(v) => {
-              const arr = [...bec.spacing]
-              arr[i] = v
-              actions.setSpacing(arr)
-            }}
+            label="Interaction g̃"
+            tooltip="Dimensionless contact interaction strength. Positive = repulsive (stable BEC), negative = attractive (collapse). Controls nonlinearity in the Gross-Pitaevskii equation."
+            value={bec.interactionStrength}
+            onChange={actions.setInteractionStrength}
+            min={-1000}
+            max={10000}
+            step={10}
+          />
+          <Slider
+            label="Trap ω"
+            tooltip="Harmonic trap frequency. Higher values confine the condensate more tightly, increasing the density and interaction energy."
+            value={bec.trapOmega}
+            onChange={actions.setTrapOmega}
             min={0.01}
-            max={1.0}
+            max={10}
             step={0.01}
           />
-        ))}
+          {activeDims > 1 &&
+            Array.from({ length: activeDims }, (_, i) => (
+              <Slider
+                key={`aniso-${i}`}
+                label={`ω ratio ${AXIS_LABELS[i]}`}
+                tooltip="Trap anisotropy ratio for this axis. Multiplies the base trap frequency to create elongated or pancake traps."
+                value={bec.trapAnisotropy?.[i] ?? 1.0}
+                onChange={(v) => actions.setTrapAnisotropy(i, v)}
+                min={0.1}
+                max={5.0}
+                step={0.05}
+              />
+            ))}
+          <Select
+            label="Field View"
+            tooltip="Which physical observable to visualize: condensate density, phase, probability current, or potential."
+            value={bec.fieldView}
+            onChange={(v) => actions.setFieldView(v as BecFieldView)}
+            options={FIELD_VIEW_OPTIONS}
+          />
+        </ControlGroup>
 
-        {/* Numerics: Particle */}
-        <Slider
-          label="Mass"
-          tooltip="Particle mass in the GP equation. Affects kinetic energy scale and healing length of the condensate."
-          value={bec.mass}
-          onChange={actions.setMass}
-          min={0.1}
-          max={10}
-          step={0.1}
-        />
-        <Slider
-          label="ℏ"
-          tooltip="Reduced Planck constant. Scales the kinetic term and sets the quantum pressure in the Gross-Pitaevskii equation."
-          value={bec.hbar}
-          onChange={actions.setHbar}
-          min={0.1}
-          max={10}
-          step={0.1}
-        />
+        <ControlGroup
+          title="Grid & Numerics"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-bec-numerics"
+        >
+          {Array.from({ length: activeDims }, (_, i) => (
+            <Select
+              key={`grid-${i}`}
+              label={`Grid ${AXIS_LABELS[i]}`}
+              tooltip="Number of lattice points along this axis. Higher values increase spatial resolution but cost O(N^D) memory."
+              value={String(bec.gridSize[i] ?? 64)}
+              onChange={(v) => {
+                const arr = [...bec.gridSize]
+                arr[i] = parseInt(v, 10)
+                actions.setGridSize(arr)
+              }}
+              options={gridSizeOptions}
+            />
+          ))}
+          {Array.from({ length: activeDims }, (_, i) => (
+            <Slider
+              key={`spacing-${i}`}
+              label={`Spacing ${AXIS_LABELS[i]}`}
+              tooltip="Distance between adjacent grid points (dx). Smaller spacing resolves finer features but requires more points."
+              value={bec.spacing[i] ?? 0.15}
+              onChange={(v) => {
+                const arr = [...bec.spacing]
+                arr[i] = v
+                actions.setSpacing(arr)
+              }}
+              min={0.01}
+              max={1.0}
+              step={0.01}
+            />
+          ))}
+          <Slider
+            label="Mass"
+            tooltip="Particle mass in the GP equation. Affects kinetic energy scale and healing length of the condensate."
+            value={bec.mass}
+            onChange={actions.setMass}
+            min={0.1}
+            max={10}
+            step={0.1}
+          />
+          <Slider
+            label="ℏ"
+            tooltip="Reduced Planck constant. Scales the kinetic term and sets the quantum pressure in the Gross-Pitaevskii equation."
+            value={bec.hbar}
+            onChange={actions.setHbar}
+            min={0.1}
+            max={10}
+            step={0.1}
+          />
+          <Slider
+            label="dt"
+            tooltip="Time step for split-step Fourier integration. Too large causes numerical instability; too small slows evolution."
+            value={bec.dt}
+            onChange={actions.setDt}
+            min={0.0001}
+            max={0.02}
+            step={0.0001}
+          />
+          <Slider
+            label="Steps/Frame"
+            tooltip="Number of GP integration steps per rendered frame. More steps = faster physical time per frame."
+            value={bec.stepsPerFrame}
+            onChange={actions.setStepsPerFrame}
+            min={1}
+            max={16}
+            step={1}
+          />
+        </ControlGroup>
 
-        {/* Numerics: Time */}
-        <Slider
-          label="dt"
-          tooltip="Time step for split-step Fourier integration. Too large causes numerical instability; too small slows evolution."
-          value={bec.dt}
-          onChange={actions.setDt}
-          min={0.0001}
-          max={0.02}
-          step={0.0001}
-        />
-        <Slider
-          label="Steps/Frame"
-          tooltip="Number of GP integration steps per rendered frame. More steps = faster physical time per frame."
-          value={bec.stepsPerFrame}
-          onChange={actions.setStepsPerFrame}
-          min={1}
-          max={16}
-          step={1}
-        />
-
-        {/* Slice positions for dims > 3 */}
         {activeDims > 3 && bec.slicePositions.length > 0 && (
-          <>
+          <ControlGroup
+            title="Slice Positions"
+            collapsible
+            defaultOpen={false}
+            data-testid="control-group-bec-slices"
+          >
             {Array.from({ length: Math.min(activeDims - 3, bec.slicePositions.length) }, (_, i) => {
               const dimIdx = i + 3
               const halfExtent =
@@ -347,7 +357,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                 />
               )
             })}
-          </>
+          </ControlGroup>
         )}
       </div>
     )

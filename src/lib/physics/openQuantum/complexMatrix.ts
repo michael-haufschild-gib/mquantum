@@ -61,6 +61,10 @@ export function complexMatIdentity(N: number): ComplexMatrix {
  * Complex matrix multiply: C = A × B for N×N matrices.
  * Output must not alias A or B.
  *
+ * Uses i-k-j loop order for optimal row-major cache access. The inner j-loop
+ * accesses B[k,:] and out[i,:] sequentially (~3KB working set for N=196),
+ * fitting comfortably in L1 cache.
+ *
  * @param A - Left matrix
  * @param B - Right matrix
  * @param out - Output matrix
@@ -182,6 +186,17 @@ export function complexMatNorm1(A: ComplexMatrix, N: number): number {
 // Linear system solver
 // ---------------------------------------------------------------------------
 
+/** Maximum N for pre-allocated scratch pools. Covers K=14 → N=196. */
+const MAX_PADE_N = 196
+
+// Pre-allocated scratch buffers for solveLinearSystem (N ≤ MAX_PADE_N)
+const solveScratch = {
+  Ar: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  Ai: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  Br: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  Bi: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+}
+
 /**
  * Solve Q · X = P via Gaussian elimination with partial pivoting.
  * Solves for the full N×N right-hand side simultaneously.
@@ -193,11 +208,27 @@ export function complexMatNorm1(A: ComplexMatrix, N: number): number {
  */
 export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number): ComplexMatrix {
   // Augmented matrix: [A | B] where A = Q, B = P
-  // Work on copies
-  const Ar = new Float64Array(Q.real)
-  const Ai = new Float64Array(Q.imag)
-  const Br = new Float64Array(P.real)
-  const Bi = new Float64Array(P.imag)
+  // Work on copies (use pre-allocated buffers for N ≤ MAX_PADE_N)
+  const size = N * N
+  let Ar: Float64Array
+  let Ai: Float64Array
+  let Br: Float64Array
+  let Bi: Float64Array
+  if (N <= MAX_PADE_N) {
+    Ar = solveScratch.Ar
+    Ai = solveScratch.Ai
+    Br = solveScratch.Br
+    Bi = solveScratch.Bi
+    Ar.set(Q.real.subarray(0, size))
+    Ai.set(Q.imag.subarray(0, size))
+    Br.set(P.real.subarray(0, size))
+    Bi.set(P.imag.subarray(0, size))
+  } else {
+    Ar = new Float64Array(Q.real)
+    Ai = new Float64Array(Q.imag)
+    Br = new Float64Array(P.real)
+    Bi = new Float64Array(P.imag)
+  }
 
   // Row permutation (physical row swaps instead of virtual pivoting)
   for (let col = 0; col < N; col++) {
@@ -305,11 +336,61 @@ const PADE_COEFFS_13 = [
   10559470521600, 670442572800, 33522128640, 1323241920, 40840800, 960960, 16380, 182, 1,
 ]
 
+// ---------------------------------------------------------------------------
+// Padé scratch pool — reusable buffers sized for MAX_PADE_N
+// ---------------------------------------------------------------------------
+
+/** Scratch matrices for matrixExponentialPade (avoids 12+ allocations per call) */
+const padeScratch = {
+  As: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  A2: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  A4: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  A6: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  // temp1/temp2 are reused across multiple intermediate steps
+  temp1: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  temp2: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  U: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+  V: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
+}
+
+/** Zero the first N*N elements of a scratch matrix. */
+function zeroScratch(m: ComplexMatrix, N: number): void {
+  const size = N * N
+  m.real.fill(0, 0, size)
+  m.imag.fill(0, 0, size)
+}
+
 /**
  * Matrix exponential via scaling-and-squaring with Padé(13,13) approximation.
  *
  * Computes exp(A) for an N×N complex matrix. Standard algorithm from
  * Al-Mohy & Higham (2009), same as MATLAB's expm / scipy's expm.
+ *
+ * Uses pre-allocated scratch pool for N ≤ 196 to eliminate GC pressure.
  *
  * @param A - Input matrix (not modified)
  * @param N - Matrix dimension
@@ -325,101 +406,105 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   const theta13 = 5.371920351148152
   const s = Math.max(0, Math.ceil(Math.log2(norm / theta13)))
 
+  const useScratch = N <= MAX_PADE_N
+  const size = N * N
+
+  // Allocate or reuse scratch matrices
+  const As = useScratch ? (zeroScratch(padeScratch.As, N), padeScratch.As) : complexMatZero(N)
+  const A2 = useScratch ? (zeroScratch(padeScratch.A2, N), padeScratch.A2) : complexMatZero(N)
+  const A4 = useScratch ? (zeroScratch(padeScratch.A4, N), padeScratch.A4) : complexMatZero(N)
+  const A6 = useScratch ? (zeroScratch(padeScratch.A6, N), padeScratch.A6) : complexMatZero(N)
+  const temp1 = useScratch
+    ? (zeroScratch(padeScratch.temp1, N), padeScratch.temp1)
+    : complexMatZero(N)
+  const temp2 = useScratch
+    ? (zeroScratch(padeScratch.temp2, N), padeScratch.temp2)
+    : complexMatZero(N)
+  const U = useScratch ? (zeroScratch(padeScratch.U, N), padeScratch.U) : complexMatZero(N)
+  const V = useScratch ? (zeroScratch(padeScratch.V, N), padeScratch.V) : complexMatZero(N)
+
   // Scale: A_s = A / 2^s
   const scaleFactor = Math.pow(2, -s)
-  const As = complexMatZero(N)
   complexMatScale(A, scaleFactor, 0, As, N)
 
   // Matrix powers: A², A⁴, A⁶
-  const A2 = complexMatZero(N)
-  const A4 = complexMatZero(N)
-  const A6 = complexMatZero(N)
   complexMatMul(As, As, A2, N)
   complexMatMul(A2, A2, A4, N)
   complexMatMul(A2, A4, A6, N)
 
   const b = PADE_COEFFS_13
-  const size = N * N
-  const I = complexMatIdentity(N)
 
-  // Compute U and V for Padé(13,13):
-  // U = A_s · (A6·(b13·A6 + b11·A4 + b9·A2) + b7·A6 + b5·A4 + b3·A2 + b1·I)
-  // V = A6·(b12·A6 + b10·A4 + b8·A2) + b6·A6 + b4·A4 + b2·A2 + b0·I
-
-  // W_u = b13·A6 + b11·A4 + b9·A2
-  const Wu = complexMatZero(N)
+  // Compute U and V for Padé(13,13), reusing temp1/temp2:
+  // Wu = b13·A6 + b11·A4 + b9·A2  (stored in temp1)
   for (let i = 0; i < size; i++) {
-    Wu.real[i] = b[13]! * A6.real[i]! + b[11]! * A4.real[i]! + b[9]! * A2.real[i]!
-    Wu.imag[i] = b[13]! * A6.imag[i]! + b[11]! * A4.imag[i]! + b[9]! * A2.imag[i]!
+    temp1.real[i] = b[13]! * A6.real[i]! + b[11]! * A4.real[i]! + b[9]! * A2.real[i]!
+    temp1.imag[i] = b[13]! * A6.imag[i]! + b[11]! * A4.imag[i]! + b[9]! * A2.imag[i]!
   }
 
-  const A6Wu = complexMatZero(N)
-  complexMatMul(A6, Wu, A6Wu, N)
+  // A6Wu = A6 · Wu  (stored in temp2)
+  complexMatMul(A6, temp1, temp2, N)
 
-  // Uinner = A6Wu + b7·A6 + b5·A4 + b3·A2 + b1·I
-  const Uinner = complexMatZero(N)
+  // Uinner = A6Wu + b7·A6 + b5·A4 + b3·A2 + b1·I  (stored in temp1, reusing it)
   for (let i = 0; i < size; i++) {
-    Uinner.real[i] =
-      A6Wu.real[i]! +
-      b[7]! * A6.real[i]! +
-      b[5]! * A4.real[i]! +
-      b[3]! * A2.real[i]! +
-      b[1]! * I.real[i]!
-    Uinner.imag[i] =
-      A6Wu.imag[i]! +
-      b[7]! * A6.imag[i]! +
-      b[5]! * A4.imag[i]! +
-      b[3]! * A2.imag[i]! +
-      b[1]! * I.imag[i]!
+    temp1.real[i] = temp2.real[i]! + b[7]! * A6.real[i]! + b[5]! * A4.real[i]! + b[3]! * A2.real[i]!
+    temp1.imag[i] = temp2.imag[i]! + b[7]! * A6.imag[i]! + b[5]! * A4.imag[i]! + b[3]! * A2.imag[i]!
+  }
+  // Add b1·I (only diagonal)
+  for (let i = 0; i < N; i++) {
+    temp1.real[i * N + i] = temp1.real[i * N + i]! + b[1]!
   }
 
-  const U = complexMatZero(N)
-  complexMatMul(As, Uinner, U, N)
+  // U = As · Uinner
+  complexMatMul(As, temp1, U, N)
 
-  // W_v = b12·A6 + b10·A4 + b8·A2
-  const Wv = complexMatZero(N)
+  // Wv = b12·A6 + b10·A4 + b8·A2  (stored in temp1, reusing it)
   for (let i = 0; i < size; i++) {
-    Wv.real[i] = b[12]! * A6.real[i]! + b[10]! * A4.real[i]! + b[8]! * A2.real[i]!
-    Wv.imag[i] = b[12]! * A6.imag[i]! + b[10]! * A4.imag[i]! + b[8]! * A2.imag[i]!
+    temp1.real[i] = b[12]! * A6.real[i]! + b[10]! * A4.real[i]! + b[8]! * A2.real[i]!
+    temp1.imag[i] = b[12]! * A6.imag[i]! + b[10]! * A4.imag[i]! + b[8]! * A2.imag[i]!
   }
 
-  const A6Wv = complexMatZero(N)
-  complexMatMul(A6, Wv, A6Wv, N)
+  // A6Wv = A6 · Wv  (stored in temp2, reusing it)
+  complexMatMul(A6, temp1, temp2, N)
 
   // V = A6Wv + b6·A6 + b4·A4 + b2·A2 + b0·I
-  const V = complexMatZero(N)
   for (let i = 0; i < size; i++) {
-    V.real[i] =
-      A6Wv.real[i]! +
-      b[6]! * A6.real[i]! +
-      b[4]! * A4.real[i]! +
-      b[2]! * A2.real[i]! +
-      b[0]! * I.real[i]!
-    V.imag[i] =
-      A6Wv.imag[i]! +
-      b[6]! * A6.imag[i]! +
-      b[4]! * A4.imag[i]! +
-      b[2]! * A2.imag[i]! +
-      b[0]! * I.imag[i]!
+    V.real[i] = temp2.real[i]! + b[6]! * A6.real[i]! + b[4]! * A4.real[i]! + b[2]! * A2.real[i]!
+    V.imag[i] = temp2.imag[i]! + b[6]! * A6.imag[i]! + b[4]! * A4.imag[i]! + b[2]! * A2.imag[i]!
+  }
+  // Add b0·I (only diagonal)
+  for (let i = 0; i < N; i++) {
+    V.real[i * N + i] = V.real[i * N + i]! + b[0]!
   }
 
-  // Solve (V - U) · X = (V + U)
-  const Pmat = complexMatZero(N)
-  const Qmat = complexMatZero(N)
+  // Solve (V - U) · X = (V + U), reusing temp1 for P and temp2 for Q
   for (let i = 0; i < size; i++) {
-    Pmat.real[i] = V.real[i]! + U.real[i]!
-    Pmat.imag[i] = V.imag[i]! + U.imag[i]!
-    Qmat.real[i] = V.real[i]! - U.real[i]!
-    Qmat.imag[i] = V.imag[i]! - U.imag[i]!
+    temp1.real[i] = V.real[i]! + U.real[i]! // P = V + U
+    temp1.imag[i] = V.imag[i]! + U.imag[i]!
+    temp2.real[i] = V.real[i]! - U.real[i]! // Q = V - U
+    temp2.imag[i] = V.imag[i]! - U.imag[i]!
   }
 
-  let X = solveLinearSystem(Qmat, Pmat, N)
+  let X = solveLinearSystem(temp2, temp1, N)
 
   // Squaring phase: exp(A) = X^{2^s}
-  for (let i = 0; i < s; i++) {
-    const next = complexMatZero(N)
-    complexMatMul(X, X, next, N)
-    X = next
+  // Alternate between X and a scratch buffer to avoid allocation per squaring step
+  if (s > 0) {
+    const sqScratch = complexMatZero(N) // Only one allocation for all squaring steps
+    for (let i = 0; i < s; i++) {
+      if (i % 2 === 0) {
+        complexMatMul(X, X, sqScratch, N)
+      } else {
+        complexMatMul(sqScratch, sqScratch, X, N)
+      }
+    }
+    // Ensure the result is in the correct buffer
+    if (s % 2 === 1) {
+      // Result is in sqScratch, copy to a new matrix (need to return owned buffer)
+      const result = complexMatZero(N)
+      result.real.set(sqScratch.real.subarray(0, size))
+      result.imag.set(sqScratch.imag.subarray(0, size))
+      return result
+    }
   }
 
   return X

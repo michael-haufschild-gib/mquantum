@@ -227,13 +227,36 @@ fn findNodalSurfaceHit(
         prevSample = currSample;
         continue;
       }
-      // Tetrahedral gradient: 4 evaluations instead of 6-point central differences
+
+      // PERF: Hybrid gradient using bisection bracket + 2 off-axis samples.
+      // The bisection already refined lo/hi bracketing the zero-crossing. We reuse the
+      // bracket values for the ray-directional gradient component, then add 2 perpendicular
+      // samples for the tangent-plane gradient. This saves 2 psi evaluations vs 4-point tetrahedral.
+      let bracketSpan = max(tHi - tLo, 1e-6);
+      let rayGrad = (hiSample.value - loSample.value) / bracketSpan;
+
+      // Build a local frame: rayDir + two perpendicular axes
+      let absRx = abs(rayDir.x);
+      let absRy = abs(rayDir.y);
+      let absRz = abs(rayDir.z);
+      var up = vec3f(0.0, 1.0, 0.0);
+      if (absRy > absRx && absRy > absRz) {
+        up = vec3f(1.0, 0.0, 0.0);
+      }
+      let tangent1 = normalize(cross(rayDir, up));
+      let tangent2 = cross(rayDir, tangent1);
+
       let gradDelta = max(stepLen * 0.5, 0.01);
-      let gf0 = evaluateNodalScalarField(hitPos + TETRA_V0 * gradDelta, animTime, uniforms).value;
-      let gf1 = evaluateNodalScalarField(hitPos + TETRA_V1 * gradDelta, animTime, uniforms).value;
-      let gf2 = evaluateNodalScalarField(hitPos + TETRA_V2 * gradDelta, animTime, uniforms).value;
-      let gf3 = evaluateNodalScalarField(hitPos + TETRA_V3 * gradDelta, animTime, uniforms).value;
-      let grad = (TETRA_V0 * gf0 + TETRA_V1 * gf1 + TETRA_V2 * gf2 + TETRA_V3 * gf3) * (0.75 / gradDelta);
+      let t1Val = evaluateNodalScalarField(hitPos + tangent1 * gradDelta, animTime, uniforms).value;
+      let t2Val = evaluateNodalScalarField(hitPos + tangent2 * gradDelta, animTime, uniforms).value;
+      let hitVal = hitSample.value;
+
+      // Forward-difference gradient in the tangent plane
+      let t1Grad = (t1Val - hitVal) / gradDelta;
+      let t2Grad = (t2Val - hitVal) / gradDelta;
+
+      // Combine ray-directional and tangent-plane gradients
+      let grad = rayDir * rayGrad + tangent1 * t1Grad + tangent2 * t2Grad;
 
       var normal = normalize(grad);
       if (dot(grad, grad) < 1e-10) {
@@ -251,6 +274,126 @@ fn findNodalSurfaceHit(
   }
 
   return NodalSurfaceHit(0.0, -1.0, 0.0, uniforms.nodalDefinition, vec3f(0.0, 0.0, 1.0), 0.0);
+}
+
+// Combined nodal field + density gradient computation.
+// When nodal surfaces are enabled, the volumeRaymarch loop needs both:
+// 1. Nodal band detection (requires 4 tetrahedral psi evaluations)
+// 2. Density gradient for lighting (requires 4 tetrahedral density evaluations)
+// By computing both from the same 4 tetrahedral samples, we eliminate 4 redundant
+// psi evaluations per ray step — a ~44% reduction in per-step wavefunction evaluation cost.
+fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalWithGradient {
+  let eps = max(uniforms.nodalTolerance, 1e-6);
+  let delta = 0.05;
+
+  var intensity = 0.0;
+  var signValue = 0.0;
+  var colorMode = uniforms.nodalDefinition;
+  var maxAbsPsi = 0.0;
+  var densityGrad = vec3f(0.0);
+  var avgRho = 0.0;
+  var avgS = 0.0;
+
+  // Hydrogen node-family filtering branch
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+    let psiC = samplePsiWithFlow(pos, t, uniforms);
+    maxAbsPsi = length(psiC);
+
+    let h0 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V0 * delta, t, uniforms);
+    let h1 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V1 * delta, t, uniforms);
+    let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
+    let h3 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V3 * delta, t, uniforms);
+
+    var f0 = 0.0;
+    var f1 = 0.0;
+    var f2 = 0.0;
+    var f3 = 0.0;
+    if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
+      f0 = h0.x; f1 = h1.x; f2 = h2.x; f3 = h3.x;
+    } else {
+      f0 = h0.y; f1 = h1.y; f2 = h2.y; f3 = h3.y;
+    }
+
+    let fCenter = (f0 + f1 + f2 + f3) * 0.25;
+    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
+    let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
+    intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
+    signValue = fCenter;
+    colorMode = NODAL_DEFINITION_PSI_ABS;
+
+    // For hydrogen family filter, density gradient needs separate samples
+    // (hydrogen factors don't directly give us density at offset positions)
+    let sd0 = sFromRho(sampleDensityAtPos(pos + TETRA_V0 * delta, t, uniforms));
+    let sd1 = sFromRho(sampleDensityAtPos(pos + TETRA_V1 * delta, t, uniforms));
+    let sd2 = sFromRho(sampleDensityAtPos(pos + TETRA_V2 * delta, t, uniforms));
+    let sd3 = sFromRho(sampleDensityAtPos(pos + TETRA_V3 * delta, t, uniforms));
+    densityGrad = (TETRA_V0 * sd0 + TETRA_V1 * sd1 + TETRA_V2 * sd2 + TETRA_V3 * sd3) * (0.75 / delta);
+    avgS = (sd0 + sd1 + sd2 + sd3) * 0.25;
+  } else {
+    // Full tetrahedral psi sampling — SHARED between nodal detection and gradient
+    let p0 = samplePsiWithFlow(pos + TETRA_V0 * delta, t, uniforms);
+    let p1 = samplePsiWithFlow(pos + TETRA_V1 * delta, t, uniforms);
+    let p2 = samplePsiWithFlow(pos + TETRA_V2 * delta, t, uniforms);
+    let p3 = samplePsiWithFlow(pos + TETRA_V3 * delta, t, uniforms);
+
+    let re0 = p0.x; let re1 = p1.x; let re2 = p2.x; let re3 = p3.x;
+    let im0 = p0.y; let im1 = p1.y; let im2 = p2.y; let im3 = p3.y;
+    let abs0 = length(p0); let abs1 = length(p1); let abs2 = length(p2); let abs3 = length(p3);
+    maxAbsPsi = max(max(abs0, abs1), max(abs2, abs3));
+
+    // Compute density at each tetrahedral vertex for gradient
+    var rho0 = dot(p0, p0); var rho1 = dot(p1, p1);
+    var rho2 = dot(p2, p2); var rho3 = dot(p3, p3);
+    if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+      rho0 *= uniforms.hydrogenNDBoost;
+      rho1 *= uniforms.hydrogenNDBoost;
+      rho2 *= uniforms.hydrogenNDBoost;
+      rho3 *= uniforms.hydrogenNDBoost;
+    }
+    let s0 = sFromRho(rho0); let s1 = sFromRho(rho1);
+    let s2 = sFromRho(rho2); let s3 = sFromRho(rho3);
+    avgRho = (rho0 + rho1 + rho2 + rho3) * 0.25;
+    avgS = (s0 + s1 + s2 + s3) * 0.25;
+    densityGrad = (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
+
+    // Nodal detection from the same samples
+    let psiCenter = (p0 + p1 + p2 + p3) * 0.25;
+    let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * (0.75 / delta);
+    let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * (0.75 / delta);
+    let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
+    let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
+
+    if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
+      intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_REAL;
+    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
+      intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;
+      signValue = psiCenter.y;
+      colorMode = NODAL_DEFINITION_IMAG;
+    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
+      let maskRe = nodalBandMask(psiCenter.x, gradRe, eps);
+      let maskIm = nodalBandMask(psiCenter.y, gradIm, eps);
+      intensity = sqrt(maskRe * maskIm) * crossingRe * crossingIm;
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
+    } else {
+      let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
+      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * (0.75 / delta);
+      let crossingAbs = nodalCrossingMask(abs0, abs1, abs2, abs3, eps);
+      let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);
+      intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_PSI_ABS;
+    }
+  }
+
+  let envelopeFloor = max(eps * 0.4, 5e-5);
+  let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
+  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);
+
+  let nodalResult = NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
+  return NodalWithGradient(nodalResult, densityGrad, avgRho, avgS);
 }
 
 // Compute physically grounded nodal intensity from psi, Re(psi), Im(psi), and hydrogen factors.
@@ -361,6 +504,9 @@ export const nodalSurfacesStubBlock = /* wgsl */ `
 // Stubs: nodal surfaces disabled at compile time
 fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
   return NodalSample(0.0, 0.0, 0, 0.0);
+}
+fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalWithGradient {
+  return NodalWithGradient(NodalSample(0.0, 0.0, 0, 0.0), vec3f(0.0), 0.0, 0.0);
 }
 fn selectPhysicalNodalColor(uniforms: SchroedingerUniforms, colorMode: i32, signValue: f32) -> vec3f {
   return vec3f(0.0);

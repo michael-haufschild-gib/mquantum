@@ -79,8 +79,8 @@ import {
   disposeDisorder,
   maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
-import type { FFTAxisParams } from './TDSEComputePassDispatchers'
-import { dispatchFFTAxis as extDispatchFFTAxis } from './TDSEComputePassDispatchers'
+import type { FFTAxisSharedMemParams } from './TDSEComputePassDispatchers'
+import { dispatchFFTAxisSharedMem as extDispatchFFTAxisSharedMem } from './TDSEComputePassDispatchers'
 import {
   destroyPassBuffers,
   disposeTdseResources,
@@ -120,6 +120,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private uniformBuffer: GPUBuffer | null = null
   private fftUniformBuffer: GPUBuffer | null = null
   private fftStagingBuffer: GPUBuffer | null = null
+  private fftAxisUniformBuffer: GPUBuffer | null = null
+  private fftAxisStagingBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
@@ -203,7 +205,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private lastPotentialHash = ''
   private totalSites = 0
   private simTime = 0
-  private fwdStageCount = 0
+  private fwdAxisCount = 0
   private stepAccumulator = 0
   private omegaStagingBuffer: GPUBuffer | null = null
   /** Max |V| from the last custom potential upload, for display normalization */
@@ -424,20 +426,20 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.customPotentialScale = ic.customPotentialScale
   }
 
-  /** Dispatch FFT for one axis. Delegates to extracted module. */
+  /** Dispatch FFT for one axis using shared-memory kernel. */
   private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
-    if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
-    const p: FFTAxisParams = {
+    if (!this.pl || !this.bg || !this.fftAxisUniformBuffer || !this.fftAxisStagingBuffer) {
+      return slotOffset
+    }
+    const p: FFTAxisSharedMemParams = {
       pl: this.pl,
       bg: this.bg,
-      fftUniformBuffer: this.fftUniformBuffer,
-      fftStagingBuffer: this.fftStagingBuffer,
-      fftScratchA: this.fftScratchA!,
-      fftScratchB: this.fftScratchB!,
+      fftAxisUniformBuffer: this.fftAxisUniformBuffer,
+      fftAxisStagingBuffer: this.fftAxisStagingBuffer,
       totalSites: this.totalSites,
       dispatchCompute: this.dc,
     }
-    return extDispatchFFTAxis(ctx, axisDim, slotOffset, p)
+    return extDispatchFFTAxisSharedMem(ctx, axisDim, slotOffset, p)
   }
 
   /** Execute the full TDSE compute pipeline. */
@@ -559,7 +561,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         bg,
         totalSites: this.totalSites,
         diagNumWorkgroups: this.diagNumWorkgroups,
-        fwdStageCount: this.fwdStageCount,
+        fwdStageCount: this.fwdAxisCount,
         gsState: this._gsState,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
@@ -600,6 +602,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       uniformBuffer: this.uniformBuffer,
       fftUniformBuffer: this.fftUniformBuffer,
       fftStagingBuffer: this.fftStagingBuffer,
+      fftAxisUniformBuffer: this.fftAxisUniformBuffer,
+      fftAxisStagingBuffer: this.fftAxisStagingBuffer,
       packUniformBuffer: this.packUniformBuffer,
       omegaStagingBuffer: this.omegaStagingBuffer,
       densityTexture: this.densityTexture,

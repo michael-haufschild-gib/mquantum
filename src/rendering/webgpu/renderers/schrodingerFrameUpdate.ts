@@ -17,7 +17,6 @@ import {
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 
-
 import type { WebGPURenderContext } from '../core/types'
 import {
   type AnimationState,
@@ -35,6 +34,7 @@ import {
   type SchrodingerRendererConfig,
   type TransformSnapshot,
 } from './schrodingerRendererTypes'
+import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
 import {
   isBasisDirty,
   isSchroedingerDirty,
@@ -52,13 +52,12 @@ import {
   packSchroedingerUniforms,
 } from './uniformPacking'
 
-import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
-
 /** Byte offset of the time field in the SchroedingerUniforms buffer. */
 export const TIME_FIELD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.time
 
 /** Byte offset of the uncertainty log-rho threshold in SchroedingerUniforms. */
-export const UNCERTAINTY_THRESHOLD_OFFSET = SCHROEDINGER_LAYOUT.byteOffset.uncertaintyLogRhoThreshold
+export const UNCERTAINTY_THRESHOLD_OFFSET =
+  SCHROEDINGER_LAYOUT.byteOffset.uncertaintyLogRhoThreshold
 
 const BOUND_RADIUS_QUANT_STEP = 0.05
 const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05

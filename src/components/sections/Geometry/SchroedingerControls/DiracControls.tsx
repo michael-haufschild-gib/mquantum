@@ -10,6 +10,7 @@
 
 import React, { useEffect, useMemo } from 'react'
 
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
@@ -115,223 +116,244 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
     potentialType === 'step' || potentialType === 'barrier' || potentialType === 'well'
 
   return (
-    <div className="space-y-3">
-      {/* Initial Condition */}
-      <Select
-        label="Initial Condition"
-        tooltip="Shape of the initial four-component Dirac spinor wavepacket at t=0."
-        value={dirac.initialCondition}
-        options={INITIAL_CONDITION_OPTIONS}
-        onChange={(v) => actions.setInitialCondition(v as DiracInitialCondition)}
-      />
-
-      {/* Field View */}
-      <Select
-        label="Field View"
-        tooltip="Which spinor observable to visualize: total density, individual components, spin, or current."
-        value={dirac.fieldView}
-        options={FIELD_VIEW_OPTIONS}
-        onChange={(v) => actions.setFieldView(v as DiracFieldView)}
-      />
-
-      <Switch
-        label="Show Potential Overlay"
-        tooltip="Overlay the electromagnetic potential on the spinor density visualization. Disabled when potential is 'none' or field view is upper/lower split."
-        checked={dirac.showPotential}
-        onCheckedChange={actions.setShowPotential}
-        disabled={overlayInapplicable}
-      />
-
-      {/* Potential */}
-      <Select
-        label="Potential"
-        tooltip="External electromagnetic potential acting on the Dirac spinor field."
-        value={potentialType}
-        options={POTENTIAL_TYPE_OPTIONS}
-        onChange={(v) => actions.setPotentialType(v as DiracPotentialType)}
-      />
-
-      {showPotentialParams && (
-        <>
-          <Slider
-            label="Potential Strength V₀"
-            tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
-            value={dirac.potentialStrength}
-            onChange={actions.setPotentialStrength}
-            min={0}
-            max={10}
-            step={0.1}
-          />
-          {showBarrierWidth && (
-            <Slider
-              label="Potential Width"
-              tooltip="Spatial extent of the barrier or well region in lattice units."
-              value={dirac.potentialWidth}
-              onChange={actions.setPotentialWidth}
-              min={0.1}
-              max={5}
-              step={0.1}
-            />
-          )}
-          {showPotentialCenter && (
-            <Slider
-              label="Potential Center"
-              tooltip="Position of the potential along the primary axis relative to the lattice center."
-              value={dirac.potentialCenter}
-              onChange={actions.setPotentialCenter}
-              min={-halfExtent}
-              max={halfExtent}
-              step={0.1}
-            />
-          )}
-          {showHarmonicOmega && (
-            <Slider
-              label="Trap Frequency ω"
-              tooltip="Angular frequency of the harmonic confining potential. Higher values produce tighter confinement."
-              value={dirac.harmonicOmega}
-              onChange={actions.setHarmonicOmega}
-              min={0.01}
-              max={10}
-              step={0.01}
-            />
-          )}
-          {showCoulombZ && (
-            <Slider
-              label="Charge Z"
-              tooltip="Nuclear charge for the Coulomb potential V = -Z/r. Above Z ≈ 137 the Dirac equation becomes supercritical."
-              value={dirac.coulombZ}
-              onChange={actions.setCoulombZ}
-              min={0.1}
-              max={10}
-              step={0.1}
-            />
-          )}
-        </>
-      )}
-
-      {/* Physics Parameters */}
-      <Slider
-        label="Mass m"
-        tooltip="Rest mass of the Dirac particle. Determines the gap between positive and negative energy solutions (mc²)."
-        value={dirac.mass}
-        onChange={actions.setMass}
-        min={0.01}
-        max={10}
-        step={0.01}
-      />
-      <Slider
-        label="Speed of Light c"
-        tooltip="Speed of light in natural units. Controls the relationship between energy and momentum in the dispersion relation E² = (pc)² + (mc²)²."
-        value={dirac.speedOfLight}
-        onChange={actions.setSpeedOfLight}
-        min={0.1}
-        max={5}
-        step={0.1}
-      />
-      <Slider
-        label="Packet Width σ"
-        tooltip="Spatial width of the initial wavepacket. Narrow packets spread quickly due to dispersion."
-        value={dirac.packetWidth}
-        onChange={actions.setPacketWidth}
-        min={0.1}
-        max={5}
-        step={0.1}
-      />
-      <Slider
-        label="Positive Energy Fraction"
-        tooltip="Fraction of positive-energy (particle) components vs negative-energy (antiparticle). At 0.5, equal mix produces Zitterbewegung."
-        value={dirac.positiveEnergyFraction}
-        onChange={actions.setPositiveEnergyFraction}
-        min={0}
-        max={1}
-        step={0.01}
-      />
-
-      {/* Packet Momentum (one per dimension) */}
-      {Array.from({ length: Math.min(latticeDim, 3) }, (_, d) => (
-        <Slider
-          key={`mom-${d}`}
-          label={`Momentum k${AXIS_LABELS[d]}`}
-          tooltip="Initial crystal momentum of the wavepacket along this axis in units of 1/a."
-          value={dirac.packetMomentum[d] ?? 0}
-          onChange={(v) => actions.setPacketMomentum(d, v)}
-          min={-20}
-          max={20}
-          step={0.5}
-        />
-      ))}
-
-      {/* Grid Settings */}
-      {Array.from({ length: latticeDim }, (_, d) => (
+    <div className="space-y-1">
+      <ControlGroup
+        title="Initial Condition"
+        collapsible
+        defaultOpen
+        data-testid="control-group-dirac-initial"
+      >
         <Select
-          key={`grid-${d}`}
-          label={`Grid ${AXIS_LABELS[d]}`}
-          tooltip="Number of lattice sites along this axis. Total sites across all axes is capped at 262144."
-          value={String(dirac.gridSize[d] ?? 32)}
-          options={gridSizeOptions}
-          onChange={(v) => {
-            const newGrid = [...dirac.gridSize]
-            newGrid[d] = parseInt(v)
-            actions.setGridSize(newGrid)
-          }}
+          label="Initial Condition"
+          tooltip="Shape of the initial four-component Dirac spinor wavepacket at t=0."
+          value={dirac.initialCondition}
+          options={INITIAL_CONDITION_OPTIONS}
+          onChange={(v) => actions.setInitialCondition(v as DiracInitialCondition)}
         />
-      ))}
+      </ControlGroup>
 
-      {Array.from({ length: latticeDim }, (_, d) => (
+      <ControlGroup
+        title="Display"
+        collapsible
+        defaultOpen
+        data-testid="control-group-dirac-display"
+      >
+        <Select
+          label="Field View"
+          tooltip="Which spinor observable to visualize: total density, individual components, spin, or current."
+          value={dirac.fieldView}
+          options={FIELD_VIEW_OPTIONS}
+          onChange={(v) => actions.setFieldView(v as DiracFieldView)}
+        />
+        <Switch
+          label="Show Potential Overlay"
+          tooltip="Overlay the electromagnetic potential on the spinor density visualization. Disabled when potential is 'none' or field view is upper/lower split."
+          checked={dirac.showPotential}
+          onCheckedChange={actions.setShowPotential}
+          disabled={overlayInapplicable}
+        />
+      </ControlGroup>
+
+      <ControlGroup
+        title="Potential"
+        collapsible
+        defaultOpen
+        data-testid="control-group-dirac-potential"
+      >
+        <Select
+          label="Potential"
+          tooltip="External electromagnetic potential acting on the Dirac spinor field."
+          value={potentialType}
+          options={POTENTIAL_TYPE_OPTIONS}
+          onChange={(v) => actions.setPotentialType(v as DiracPotentialType)}
+        />
+        {showPotentialParams && (
+          <>
+            <Slider
+              label="Potential Strength V₀"
+              tooltip="Height of the potential in units of mc². Above 2mc² the Klein paradox regime begins."
+              value={dirac.potentialStrength}
+              onChange={actions.setPotentialStrength}
+              min={0}
+              max={10}
+              step={0.1}
+            />
+            {showBarrierWidth && (
+              <Slider
+                label="Potential Width"
+                tooltip="Spatial extent of the barrier or well region in lattice units."
+                value={dirac.potentialWidth}
+                onChange={actions.setPotentialWidth}
+                min={0.1}
+                max={5}
+                step={0.1}
+              />
+            )}
+            {showPotentialCenter && (
+              <Slider
+                label="Potential Center"
+                tooltip="Position of the potential along the primary axis relative to the lattice center."
+                value={dirac.potentialCenter}
+                onChange={actions.setPotentialCenter}
+                min={-halfExtent}
+                max={halfExtent}
+                step={0.1}
+              />
+            )}
+            {showHarmonicOmega && (
+              <Slider
+                label="Trap Frequency ω"
+                tooltip="Angular frequency of the harmonic confining potential. Higher values produce tighter confinement."
+                value={dirac.harmonicOmega}
+                onChange={actions.setHarmonicOmega}
+                min={0.01}
+                max={10}
+                step={0.01}
+              />
+            )}
+            {showCoulombZ && (
+              <Slider
+                label="Charge Z"
+                tooltip="Nuclear charge for the Coulomb potential V = -Z/r. Above Z ≈ 137 the Dirac equation becomes supercritical."
+                value={dirac.coulombZ}
+                onChange={actions.setCoulombZ}
+                min={0.1}
+                max={10}
+                step={0.1}
+              />
+            )}
+          </>
+        )}
+      </ControlGroup>
+
+      <ControlGroup
+        title="Physics"
+        collapsible
+        defaultOpen={false}
+        data-testid="control-group-dirac-physics"
+      >
         <Slider
-          key={`spacing-${d}`}
-          label={`Spacing Δ${AXIS_LABELS[d]}`}
-          tooltip="Lattice spacing along this axis. Smaller values increase resolution but reduce the physical domain size."
-          value={dirac.spacing[d] ?? 0.15}
-          onChange={(v) => {
-            const newSpacing = [...dirac.spacing]
-            newSpacing[d] = v
-            actions.setSpacing(newSpacing)
-          }}
+          label="Mass m"
+          tooltip="Rest mass of the Dirac particle. Determines the gap between positive and negative energy solutions (mc²)."
+          value={dirac.mass}
+          onChange={actions.setMass}
           min={0.01}
+          max={10}
+          step={0.01}
+        />
+        <Slider
+          label="Speed of Light c"
+          tooltip="Speed of light in natural units. Controls the relationship between energy and momentum in the dispersion relation E² = (pc)² + (mc²)²."
+          value={dirac.speedOfLight}
+          onChange={actions.setSpeedOfLight}
+          min={0.1}
+          max={5}
+          step={0.1}
+        />
+        <Slider
+          label="Packet Width σ"
+          tooltip="Spatial width of the initial wavepacket. Narrow packets spread quickly due to dispersion."
+          value={dirac.packetWidth}
+          onChange={actions.setPacketWidth}
+          min={0.1}
+          max={5}
+          step={0.1}
+        />
+        <Slider
+          label="Positive Energy Fraction"
+          tooltip="Fraction of positive-energy (particle) components vs negative-energy (antiparticle). At 0.5, equal mix produces Zitterbewegung."
+          value={dirac.positiveEnergyFraction}
+          onChange={actions.setPositiveEnergyFraction}
+          min={0}
           max={1}
           step={0.01}
         />
-      ))}
+        {Array.from({ length: Math.min(latticeDim, 3) }, (_, d) => (
+          <Slider
+            key={`mom-${d}`}
+            label={`Momentum k${AXIS_LABELS[d]}`}
+            tooltip="Initial crystal momentum of the wavepacket along this axis in units of 1/a."
+            value={dirac.packetMomentum[d] ?? 0}
+            onChange={(v) => actions.setPacketMomentum(d, v)}
+            min={-20}
+            max={20}
+            step={0.5}
+          />
+        ))}
+      </ControlGroup>
 
-      {/* Slice positions for dimensions > 3 */}
-      {latticeDim > 3 &&
-        Array.from({ length: latticeDim - 3 }, (_, i) => {
-          const d = i + 3
-          const halfExt = (dirac.gridSize[d] ?? 32) * (dirac.spacing[d] ?? 0.15) * 0.5
-          return (
-            <Slider
-              key={`slice-${d}`}
-              label={`Slice ${AXIS_LABELS[d]}`}
-              tooltip="Position of the 3D cross-section through this higher dimension."
-              value={dirac.slicePositions[i] ?? 0}
-              onChange={(v) => actions.setSlicePosition(i, v)}
-              min={-halfExt}
-              max={halfExt}
-              step={0.05}
-            />
-          )
-        })}
-
-      {/* Numerical Settings */}
-      <Slider
-        label="Time Step dt"
-        tooltip="Integration time step for the split-operator method. Smaller values improve accuracy but slow evolution."
-        value={dirac.dt}
-        onChange={actions.setDt}
-        min={0.0001}
-        max={0.05}
-        step={0.0001}
-      />
-      <Slider
-        label="Steps per Frame"
-        tooltip="Number of time-integration steps computed per rendered frame. More steps speed up evolution."
-        value={dirac.stepsPerFrame}
-        onChange={actions.setStepsPerFrame}
-        min={1}
-        max={16}
-        step={1}
-      />
+      <ControlGroup
+        title="Grid & Numerics"
+        collapsible
+        defaultOpen={false}
+        data-testid="control-group-dirac-numerics"
+      >
+        {Array.from({ length: latticeDim }, (_, d) => (
+          <Select
+            key={`grid-${d}`}
+            label={`Grid ${AXIS_LABELS[d]}`}
+            tooltip="Number of lattice sites along this axis. Total sites across all axes is capped at 262144."
+            value={String(dirac.gridSize[d] ?? 32)}
+            options={gridSizeOptions}
+            onChange={(v) => {
+              const newGrid = [...dirac.gridSize]
+              newGrid[d] = parseInt(v)
+              actions.setGridSize(newGrid)
+            }}
+          />
+        ))}
+        {Array.from({ length: latticeDim }, (_, d) => (
+          <Slider
+            key={`spacing-${d}`}
+            label={`Spacing Δ${AXIS_LABELS[d]}`}
+            tooltip="Lattice spacing along this axis. Smaller values increase resolution but reduce the physical domain size."
+            value={dirac.spacing[d] ?? 0.15}
+            onChange={(v) => {
+              const newSpacing = [...dirac.spacing]
+              newSpacing[d] = v
+              actions.setSpacing(newSpacing)
+            }}
+            min={0.01}
+            max={1}
+            step={0.01}
+          />
+        ))}
+        <Slider
+          label="Time Step dt"
+          tooltip="Integration time step for the split-operator method. Smaller values improve accuracy but slow evolution."
+          value={dirac.dt}
+          onChange={actions.setDt}
+          min={0.0001}
+          max={0.05}
+          step={0.0001}
+        />
+        <Slider
+          label="Steps per Frame"
+          tooltip="Number of time-integration steps computed per rendered frame. More steps speed up evolution."
+          value={dirac.stepsPerFrame}
+          onChange={actions.setStepsPerFrame}
+          min={1}
+          max={16}
+          step={1}
+        />
+        {latticeDim > 3 &&
+          Array.from({ length: latticeDim - 3 }, (_, i) => {
+            const d = i + 3
+            const halfExt = (dirac.gridSize[d] ?? 32) * (dirac.spacing[d] ?? 0.15) * 0.5
+            return (
+              <Slider
+                key={`slice-${d}`}
+                label={`Slice ${AXIS_LABELS[d]}`}
+                tooltip="Position of the 3D cross-section through this higher dimension."
+                value={dirac.slicePositions[i] ?? 0}
+                onChange={(v) => actions.setSlicePosition(i, v)}
+                min={-halfExt}
+                max={halfExt}
+                step={0.05}
+              />
+            )
+          })}
+      </ControlGroup>
     </div>
   )
 })

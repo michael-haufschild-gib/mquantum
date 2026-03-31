@@ -7,8 +7,8 @@
 
 import React from 'react'
 
-import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 
 import type { HarmonicOscillatorControlsProps } from './types'
@@ -37,8 +37,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
 
     return (
       <>
-        {/* Seed Control */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
+        <ControlGroup title="Seed" collapsible defaultOpen data-testid="control-group-ho-seed">
           <div className="flex items-center justify-between">
             <label className="text-xs text-[var(--text-secondary)]">Seed: {config.seed}</label>
             <Button
@@ -61,10 +60,14 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
             showValue={false}
             data-testid="schroedinger-seed-slider"
           />
-        </div>
+        </ControlGroup>
 
-        {/* Quantum Parameters */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
+        <ControlGroup
+          title="Quantum Parameters"
+          collapsible
+          defaultOpen
+          data-testid="control-group-ho-quantum-params"
+        >
           <Slider
             label="Superposition Terms"
             tooltip="Number of energy eigenstates combined in the superposition. More terms create richer interference patterns."
@@ -100,10 +103,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
             showValue
             data-testid="schroedinger-freq-spread"
           />
-        </div>
 
-        {/* Geometric Parameters */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
           <Slider
             label="Field Scale"
             tooltip="Scales the spatial extent of the wavefunction visualization. Increase to see further from the origin."
@@ -115,13 +115,15 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
             showValue
             data-testid="schroedinger-field-scale"
           />
-        </div>
+        </ControlGroup>
 
         {/* Slice Parameters - shown for 4D+ */}
         {dimension >= 4 && (
-          <Section
+          <ControlGroup
             title={`Cross Section (${dimension - 3} dim${dimension > 4 ? 's' : ''})`}
-            defaultOpen={true}
+            collapsible
+            defaultOpen
+            data-testid="control-group-ho-cross-section"
           >
             {Array.from({ length: dimension - 3 }, (_, i) => (
               <Slider
@@ -140,7 +142,7 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
             <p className="text-xs text-text-tertiary">
               Explore different {dimension}D cross-sections
             </p>
-          </Section>
+          </ControlGroup>
         )}
       </>
     )

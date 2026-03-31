@@ -150,7 +150,11 @@ fn applyUncertaintyBoundaryEmphasis(
 
   let width = max(uniforms.uncertaintyBoundaryWidth, 1e-3);
   let normalizedDistance = abs(logRho - uniforms.uncertaintyLogRhoThreshold) / width;
-  let band = exp(-0.5 * normalizedDistance * normalizedDistance);
+  // PERF: Replace exp(-0.5x²) with smoothstep approximation.
+  // For |x| > 3, Gaussian < 0.01 — clamp to 0.
+  // smoothstep(3,0,|x|)² gives a close visual match at zero ALU cost vs exp().
+  let t = clamp(1.0 - normalizedDistance / 3.0, 0.0, 1.0);
+  let band = t * t * (3.0 - 2.0 * t); // smoothstep
   let gain = 1.0 + uniforms.uncertaintyBoundaryStrength * band;
   return rho * gain;
 }

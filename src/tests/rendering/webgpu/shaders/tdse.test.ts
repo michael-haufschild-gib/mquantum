@@ -14,6 +14,10 @@ import {
 import { tdseInitBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseInit.wgsl'
 import { tdsePotentialBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdsePotential.wgsl'
 import {
+  fftAxisUniformsBlock,
+  tdseSharedMemFFTBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
+import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
@@ -56,7 +60,7 @@ describe('TDSE init shader', () => {
     expect(tdseInitBlock).toContain('fn main')
   })
 
-  it('writes psiRe and psiIm buffers', () => {
+  it('includes psiRe and psiIm buffer access', () => {
     expect(tdseInitBlock).toContain('psiRe[idx]')
     expect(tdseInitBlock).toContain('psiIm[idx]')
   })
@@ -74,11 +78,11 @@ describe('TDSE apply potential half-step', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('fn main')
   })
 
-  it('reads potential buffer', () => {
+  it('includes potential buffer access', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('potential')
   })
 
-  it('applies complex rotation', () => {
+  it('contains complex rotation (cos/sin)', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('cos')
     expect(tdseApplyPotentialHalfBlock).toContain('sin')
   })
@@ -89,11 +93,11 @@ describe('TDSE apply kinetic (k-space)', () => {
     expect(tdseApplyKineticBlock).toContain('@compute @workgroup_size(64)')
   })
 
-  it('operates on interleaved complex buffer', () => {
+  it('includes interleaved complex buffer reference', () => {
     expect(tdseApplyKineticBlock).toContain('complexBuf')
   })
 
-  it('uses k-space frequency calculation', () => {
+  it('includes k-space frequency calculation', () => {
     expect(tdseApplyKineticBlock).toContain('kGridScale')
     expect(tdseApplyKineticBlock).toContain('k2')
   })
@@ -120,7 +124,7 @@ describe('TDSE potential half-step (V-only)', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('@compute @workgroup_size(64)')
   })
 
-  it('applies potential phase rotation without absorber', () => {
+  it('contains potential phase rotation without absorber', () => {
     // Absorber is a separate pass — NOT merged into the potential half-step.
     // This prevents the FFT kinetic step from scattering the absorber's
     // spatial modulation across k-space.
@@ -132,11 +136,11 @@ describe('TDSE potential half-step (V-only)', () => {
 })
 
 describe('TDSE write grid shader', () => {
-  it('uses 3D workgroup size', () => {
+  it('declares 3D workgroup size', () => {
     expect(tdseWriteGridBlock).toContain('@workgroup_size(4, 4, 4)')
   })
 
-  it('writes rgba16float texture output', () => {
+  it('includes rgba16float texture output', () => {
     expect(tdseWriteGridBlock).toContain('textureStore(outputTex')
   })
 
@@ -157,7 +161,7 @@ describe('TDSE write grid shader', () => {
     expect(tdseWriteGridBlock).toContain('params.fieldView == 2u')
   })
 
-  it('uses basis vectors for N-D projection', () => {
+  it('includes basis vectors for N-D projection', () => {
     expect(tdseWriteGridBlock).toContain('basisX')
     expect(tdseWriteGridBlock).toContain('basisY')
     expect(tdseWriteGridBlock).toContain('basisZ')
@@ -176,7 +180,7 @@ describe('TDSE complex pack/unpack shaders', () => {
     expect(tdseComplexPackBlock).toContain('complexBuf')
   })
 
-  it('unpack shader applies 1/N normalization', () => {
+  it('unpack shader includes 1/N normalization', () => {
     expect(tdseComplexUnpackBlock).toContain('invN')
     expect(tdseComplexUnpackBlock).toContain('complexBuf')
   })
@@ -194,9 +198,50 @@ describe('TDSE Stockham FFT shaders', () => {
     expect(tdseStockhamFFTBlock).toContain('@compute @workgroup_size(64)')
   })
 
-  it('uses twiddle factors for butterfly operation', () => {
+  it('includes twiddle factors for butterfly operation', () => {
     expect(tdseStockhamFFTBlock).toContain('cos')
     expect(tdseStockhamFFTBlock).toContain('sin')
+  })
+})
+
+describe('TDSE shared-memory FFT shader', () => {
+  it('defines FFTAxisUniforms struct with per-axis fields', () => {
+    expect(fftAxisUniformsBlock).toContain('struct FFTAxisUniforms')
+    expect(fftAxisUniformsBlock).toContain('axisDim')
+    expect(fftAxisUniformsBlock).toContain('direction')
+    expect(fftAxisUniformsBlock).toContain('axisStride')
+    expect(fftAxisUniformsBlock).toContain('log2N')
+  })
+
+  it('declares workgroup shared memory for ping-pong', () => {
+    expect(tdseSharedMemFFTBlock).toContain('var<workgroup> smemA')
+    expect(tdseSharedMemFFTBlock).toContain('var<workgroup> smemB')
+  })
+
+  it('includes workgroupBarrier for synchronization', () => {
+    expect(tdseSharedMemFFTBlock).toContain('workgroupBarrier()')
+  })
+
+  it('has @workgroup_size(64) entry point', () => {
+    expect(tdseSharedMemFFTBlock).toContain('@compute @workgroup_size(64)')
+    expect(tdseSharedMemFFTBlock).toContain('fn main')
+  })
+
+  it('performs Stockham butterfly with twiddle factors', () => {
+    expect(tdseSharedMemFFTBlock).toContain('twiddle_sm')
+    expect(tdseSharedMemFFTBlock).toContain('cmul_sm')
+    expect(tdseSharedMemFFTBlock).toContain('cos(angle)')
+    expect(tdseSharedMemFFTBlock).toContain('sin(angle)')
+  })
+
+  it('declares read_write complexBuf binding (in-place per pencil)', () => {
+    expect(tdseSharedMemFFTBlock).toContain(
+      '@group(0) @binding(1) var<storage, read_write> complexBuf'
+    )
+  })
+
+  it('handles even and odd log2N for final result buffer selection', () => {
+    expect(tdseSharedMemFFTBlock).toContain('log2N % 2u == 0u')
   })
 })
 
@@ -205,12 +250,12 @@ describe('TDSE diagnostics shaders', () => {
     expect(tdseDiagNormReduceBlock).toContain('@workgroup_size(256)')
   })
 
-  it('reduce pass uses shared memory for tree reduction', () => {
+  it('reduce pass includes shared memory for tree reduction', () => {
     expect(tdseDiagNormReduceBlock).toContain('var<workgroup>')
     expect(tdseDiagNormReduceBlock).toContain('workgroupBarrier')
   })
 
-  it('finalize pass computes final norm and maxDensity', () => {
+  it('finalize pass contains norm and maxDensity output', () => {
     expect(tdseDiagNormFinalizeBlock).toContain('result[0]')
     expect(tdseDiagNormFinalizeBlock).toContain('result[1]')
   })
@@ -238,16 +283,16 @@ describe('imaginary-time: potential half-step', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('params.imaginaryTime')
   })
 
-  it('applies real exponential decay in imaginary-time mode', () => {
+  it('contains real exponential decay for imaginary-time mode', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('exp(-arg)')
   })
 
-  it('applies unitary phase rotation in real-time mode', () => {
+  it('contains unitary phase rotation for real-time mode', () => {
     expect(tdseApplyPotentialHalfBlock).toContain('cos(phase)')
     expect(tdseApplyPotentialHalfBlock).toContain('sin(phase)')
   })
 
-  it('uses V*dt/(2*hbar) as the argument for both branches', () => {
+  it('includes V*dt/(2*hbar) as the argument for both branches', () => {
     // Both branches compute arg from potential and dt, differing only in exp(-arg) vs exp(-i*arg)
     expect(tdseApplyPotentialHalfBlock).toContain('effectiveV * params.dt / (2.0')
   })
@@ -263,16 +308,16 @@ describe('imaginary-time: kinetic step', () => {
     expect(tdseApplyKineticBlock).toContain('params.imaginaryTime')
   })
 
-  it('applies real exponential decay in imaginary-time mode', () => {
+  it('contains real exponential decay for imaginary-time mode', () => {
     expect(tdseApplyKineticBlock).toContain('exp(-arg)')
   })
 
-  it('applies unitary phase rotation in real-time mode', () => {
+  it('contains unitary phase rotation for real-time mode', () => {
     expect(tdseApplyKineticBlock).toContain('cosP')
     expect(tdseApplyKineticBlock).toContain('sinP')
   })
 
-  it('uses hbar*k2*dt/(2*mass) as the argument for both branches', () => {
+  it('includes hbar*k2*dt/(2*mass) as the argument for both branches', () => {
     expect(tdseApplyKineticBlock).toContain('params.hbar * k2 * params.dt / (2.0')
   })
 })
@@ -284,11 +329,11 @@ describe('renormalization shader', () => {
     expect(renormalizeBlock).toContain('targetNorm: f32')
   })
 
-  it('reads currentNorm from diagResult[0]', () => {
+  it('includes currentNorm from diagResult[0]', () => {
     expect(renormalizeBlock).toContain('diagResult[0]')
   })
 
-  it('computes sqrt(target/current) scale factor', () => {
+  it('contains sqrt(target/current) scale factor', () => {
     expect(renormalizeBlock).toContain('sqrt(targetNorm / currentNorm)')
   })
 

@@ -110,16 +110,23 @@ fn volumeRaymarch(
     }
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
+    // PERF: When nodal band mode is active, use the combined function that also computes
+    // the density gradient from the same tetrahedral samples. This eliminates 4 redundant
+    // psi evaluations when the gradient would otherwise be computed separately.
+    var nodalGradient = vec3f(0.0);
+    var hasNodalGradient = false;
     if (
       FEATURE_NODAL &&
       uniforms.nodalEnabled != 0u &&
       uniforms.nodalStrength > 0.0 &&
       uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
     ) {
-      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
-      let fadedIntensity = nodal.intensity * nodal.envelopeWeight;
+      let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
+      nodalGradient = combined.gradient;
+      hasNodalGradient = true;
+      let fadedIntensity = combined.nodal.intensity * combined.nodal.envelopeWeight;
       if (fadedIntensity > 1e-4) {
-        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
         let nodalOpticalStep = min(adaptiveStep, stepLen * 1.5);
         let nodalAlpha = clamp(
           1.0 - exp(-max(fadedIntensity * uniforms.nodalStrength, 0.0) * nodalOpticalStep),
@@ -200,11 +207,13 @@ fn volumeRaymarch(
         primaryHitT = t;
       }
 
-      // Compute gradient for emission lighting
-      // When eigenfunction cache is available, use analytical gradient (no extra evaluations).
-      // Otherwise, fall back to tetrahedral finite differences (4 samples).
+      // Compute gradient for emission lighting.
+      // When nodal band already computed the gradient (shared tetrahedral samples), reuse it.
+      // Otherwise: analytical gradient (cached eigenfunctions) or tetrahedral finite differences.
       var gradient: vec3f;
-      if (USE_ANALYTICAL_GRADIENT) {
+      if (hasNodalGradient) {
+        gradient = nodalGradient;
+      } else if (USE_ANALYTICAL_GRADIENT) {
         gradient = computeAnalyticalGradient(pos, animTime, uniforms);
       } else {
         gradient = computeGradientTetrahedralAtPos(flowedPos, animTime, 0.05, uniforms);
@@ -317,11 +326,53 @@ fn volumeRaymarchHQ(
     var phase: f32;
     var gradient: vec3f;
 
+    // PERF: When nodal band mode is active and gradient is needed, use the combined
+    // nodalFieldWithGradient function that computes BOTH from the same 4 tetrahedral
+    // psi samples — eliminating 4 redundant psi evaluations per ray step.
+    let nodalBandActive = FEATURE_NODAL &&
+      uniforms.nodalEnabled != 0u &&
+      uniforms.nodalStrength > 0.0 &&
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND;
+
+    var nodalHandled = false;
+
     if (skipGradient) {
       rho = quickRho;
       sCenter = quickS;
       phase = quickCheck.z;
       gradient = vec3f(0.0);
+    } else if (nodalBandActive && !USE_ANALYTICAL_GRADIENT) {
+      // Combined path: nodal detection + density gradient from shared tetrahedral samples.
+      // Saves 4 psi evaluations per step compared to separate computePhysicalNodalField + gradient.
+      let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
+      gradient = combined.gradient;
+      // Use center density from the quick check (more accurate single-point value for compositing)
+      rho = quickRho;
+      sCenter = quickS;
+      phase = quickCheck.z;
+      // Process nodal contribution inline (avoid duplicate call)
+      let fadedIntensityHQ = combined.nodal.intensity * combined.nodal.envelopeWeight;
+      if (fadedIntensityHQ > 1e-4) {
+        // Adaptive step needed before nodal compositing
+        var stepMultiplierN = 1.0;
+        if (quickS < -12.0) { stepMultiplierN = 4.0; }
+        else if (quickS < -8.0) { stepMultiplierN = 2.0; }
+        let adaptiveStepN = min(stepLen * stepMultiplierN, tFar - t);
+
+        let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
+        let nodalOpticalStepHQ = min(adaptiveStepN, stepLen * 1.5);
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensityHQ * uniforms.nodalStrength, 0.0) * nodalOpticalStepHQ),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= (1.0 - nodalAlpha * 0.6);
+        }
+      }
+      nodalHandled = true;
     } else if (USE_ANALYTICAL_GRADIENT) {
       // Analytical gradient from cached eigenfunctions (1 eval vs 4 tetrahedral samples)
       let cached = sampleDensityWithAnalyticalGradient(pos, animTime, uniforms);
@@ -348,12 +399,8 @@ fn volumeRaymarchHQ(
     }
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
-    if (
-      FEATURE_NODAL &&
-      uniforms.nodalEnabled != 0u &&
-      uniforms.nodalStrength > 0.0 &&
-      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
-    ) {
+    // Nodal band processing (only if not already handled by the combined path above)
+    if (!nodalHandled && nodalBandActive) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
       let fadedIntensityHQ = nodal.intensity * nodal.envelopeWeight;
       if (fadedIntensityHQ > 1e-4) {

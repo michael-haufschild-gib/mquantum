@@ -20,6 +20,10 @@ import {
 import { tdseInitBlock } from '../shaders/schroedinger/compute/tdseInit.wgsl'
 import { tdsePotentialBlock } from '../shaders/schroedinger/compute/tdsePotential.wgsl'
 import {
+  fftAxisUniformsBlock,
+  tdseSharedMemFFTBlock,
+} from '../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
+import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
@@ -74,6 +78,9 @@ export interface TdsePipelineResult extends ObsGSPipelineResult {
   fusedUnpackPotentialBGL: GPUBindGroupLayout
   fftStagePipeline: GPUComputePipeline
   fftStageBGL: GPUBindGroupLayout
+  /** Shared-memory FFT: one dispatch per axis (replaces per-stage Stockham for TDSE) */
+  fftSharedMemPipeline: GPUComputePipeline
+  fftSharedMemBGL: GPUBindGroupLayout
   kineticPipeline: GPUComputePipeline
   kineticBGL: GPUBindGroupLayout
   writeGridPipeline: GPUComputePipeline
@@ -97,6 +104,8 @@ export interface TdseBindGroupResult {
   unpackBG: GPUBindGroup
   fftStageABBG: GPUBindGroup
   fftStageBABG: GPUBindGroup
+  /** Shared-memory FFT bind group: axis uniforms + complexBuf(rw) */
+  fftSharedMemBG: GPUBindGroup
   kineticBG: GPUBindGroup
   writeGridBG: GPUBindGroup
   diagReduceBG: GPUBindGroup
@@ -114,6 +123,8 @@ export interface TdseBindGroupInputs {
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
   fftUniformBuffer: GPUBuffer
+  /** Per-axis uniform buffer for shared-memory FFT */
+  fftAxisUniformBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   densityTextureView: GPUTextureView
   diagUniformBuffer: GPUBuffer
@@ -347,6 +358,25 @@ struct PackUniforms {
     'tdse-fft-stage'
   )
 
+  // Shared-memory FFT: one dispatch per axis (all stages in workgroup shared memory)
+  const fftSharedMemBGL = device.createBindGroupLayout({
+    label: 'tdse-fft-shared-mem-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ],
+  })
+  const fftSharedMemPipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(
+      device,
+      fftAxisUniformsBlock + tdseSharedMemFFTBlock,
+      'tdse-fft-shared-mem'
+    ),
+    [fftSharedMemBGL],
+    'tdse-fft-shared-mem'
+  )
+
   // Kinetic (operates on interleaved complex buffer)
   const kineticBGL = device.createBindGroupLayout({
     label: 'tdse-kinetic-bgl',
@@ -452,6 +482,8 @@ struct PackUniforms {
     unpackBGL,
     fftStagePipeline,
     fftStageBGL,
+    fftSharedMemPipeline,
+    fftSharedMemBGL,
     kineticPipeline,
     kineticBGL,
     writeGridPipeline,
@@ -464,236 +496,5 @@ struct PackUniforms {
   }
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// rebuildTdseBindGroups
-// ───────────────────────────────────────────────────────────────────────────
-
-/**
- * Create all bind groups for the TDSE compute pass from pipelines and buffers.
- *
- * @param device - WebGPU device
- * @param pipelines - Pipeline layouts from {@link buildTdsePipelines}
- * @param inputs - GPU buffers and resources
- * @param oldRenormUniformBuffer - Previous renormalize uniform buffer to destroy (may be null)
- * @returns All bind groups and the renormalize uniform buffer
- */
-export function rebuildTdseBindGroups(
-  device: GPUDevice,
-  pipelines: TdsePipelineResult,
-  inputs: TdseBindGroupInputs,
-  oldRenormUniformBuffer: GPUBuffer | null
-): TdseBindGroupResult {
-  const {
-    uniformBuffer,
-    psiReBuffer,
-    psiImBuffer,
-    potentialBuffer,
-    fftScratchA,
-    fftScratchB,
-    fftUniformBuffer,
-    packUniformBuffer,
-    densityTextureView,
-    diagUniformBuffer,
-    diagPartialSumsBuffer,
-    diagPartialMaxBuffer,
-    diagPartialLeftBuffer,
-    diagPartialRightBuffer,
-    diagPartialIprBuffer,
-    diagResultBuffer,
-    totalSites,
-  } = inputs
-
-  const initBG = device.createBindGroup({
-    label: 'tdse-init-bg',
-    layout: pipelines.initBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-    ],
-  })
-
-  const potentialBG = device.createBindGroup({
-    label: 'tdse-potential-bg',
-    layout: pipelines.potentialBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: potentialBuffer } },
-    ],
-  })
-
-  const potentialHalfBG = device.createBindGroup({
-    label: 'tdse-potential-half-bg',
-    layout: pipelines.potentialHalfBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-    ],
-  })
-
-  // PERF: Fused potentialHalf + pack bind group
-  const fusedPotentialPackBG = device.createBindGroup({
-    label: 'tdse-fused-potential-pack-bg',
-    layout: pipelines.fusedPotentialPackBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-      { binding: 4, resource: { buffer: fftScratchA } },
-    ],
-  })
-
-  // PERF: Fused unpack + potentialHalf bind group
-  // Note: complexBuf result is in fftScratchA (even stages) or fftScratchB (odd stages).
-  // For odd-stage count, final result is in B and gets copied to A before unpack.
-  // So the fused unpack always reads from fftScratchA.
-  const fusedUnpackPotentialBG = device.createBindGroup({
-    label: 'tdse-fused-unpack-potential-bg',
-    layout: pipelines.fusedUnpackPotentialBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
-      { binding: 4, resource: { buffer: potentialBuffer } },
-    ],
-  })
-
-  const packBG = device.createBindGroup({
-    label: 'tdse-pack-bg',
-    layout: pipelines.packBGL,
-    entries: [
-      { binding: 0, resource: { buffer: packUniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: fftScratchA } },
-    ],
-  })
-
-  const unpackBG = device.createBindGroup({
-    label: 'tdse-unpack-bg',
-    layout: pipelines.unpackBGL,
-    entries: [
-      { binding: 0, resource: { buffer: packUniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
-    ],
-  })
-
-  // FFT bind groups for A->B and B->A ping-pong
-  const fftStageABBG = device.createBindGroup({
-    label: 'tdse-fft-ab-bg',
-    layout: pipelines.fftStageBGL,
-    entries: [
-      { binding: 0, resource: { buffer: fftUniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchA } },
-      { binding: 2, resource: { buffer: fftScratchB } },
-    ],
-  })
-  const fftStageBABG = device.createBindGroup({
-    label: 'tdse-fft-ba-bg',
-    layout: pipelines.fftStageBGL,
-    entries: [
-      { binding: 0, resource: { buffer: fftUniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchB } },
-      { binding: 2, resource: { buffer: fftScratchA } },
-    ],
-  })
-
-  const kineticBG = device.createBindGroup({
-    label: 'tdse-kinetic-bg',
-    layout: pipelines.kineticBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: fftScratchA } },
-    ],
-  })
-
-  const writeGridBG = device.createBindGroup({
-    label: 'tdse-write-grid-bg',
-    layout: pipelines.writeGridBGL,
-    entries: [
-      { binding: 0, resource: { buffer: uniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: potentialBuffer } },
-      { binding: 4, resource: densityTextureView },
-    ],
-  })
-
-  // Diagnostics bind groups
-  const diagReduceBG = device.createBindGroup({
-    label: 'tdse-diag-reduce-bg',
-    layout: pipelines.diagReduceBGL,
-    entries: [
-      { binding: 0, resource: { buffer: diagUniformBuffer } },
-      { binding: 1, resource: { buffer: psiReBuffer } },
-      { binding: 2, resource: { buffer: psiImBuffer } },
-      { binding: 3, resource: { buffer: diagPartialSumsBuffer } },
-      { binding: 4, resource: { buffer: diagPartialMaxBuffer } },
-      { binding: 5, resource: { buffer: diagPartialLeftBuffer } },
-      { binding: 6, resource: { buffer: diagPartialRightBuffer } },
-      { binding: 7, resource: { buffer: diagPartialIprBuffer } },
-    ],
-  })
-
-  const diagFinalizeBG = device.createBindGroup({
-    label: 'tdse-diag-finalize-bg',
-    layout: pipelines.diagFinalizeBGL,
-    entries: [
-      { binding: 0, resource: { buffer: diagUniformBuffer } },
-      { binding: 1, resource: { buffer: diagPartialSumsBuffer } },
-      { binding: 2, resource: { buffer: diagPartialMaxBuffer } },
-      { binding: 3, resource: { buffer: diagResultBuffer } },
-      { binding: 4, resource: { buffer: diagPartialLeftBuffer } },
-      { binding: 5, resource: { buffer: diagPartialRightBuffer } },
-      { binding: 6, resource: { buffer: diagPartialIprBuffer } },
-    ],
-  })
-
-  // Renormalization bind group
-  oldRenormUniformBuffer?.destroy()
-  const renormalizeUniformBuffer = device.createBuffer({
-    label: 'tdse-renormalize-uniforms',
-    size: 16,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  })
-  // TDSE has 1 component; BEC also has 1 component (shared pass)
-  // targetNorm (f32 at offset 4) starts at 0; updated when initialNorm is captured
-  const renormBuf = new ArrayBuffer(16)
-  new Uint32Array(renormBuf)[0] = totalSites
-  new Float32Array(renormBuf)[1] = 0 // targetNorm = 0 → shader skips until set
-  device.queue.writeBuffer(renormalizeUniformBuffer, 0, renormBuf)
-  const renormalizeBG = device.createBindGroup({
-    label: 'tdse-renormalize-bg',
-    layout: pipelines.renormalizeBGL,
-    entries: [
-      { binding: 0, resource: { buffer: renormalizeUniformBuffer } },
-      { binding: 1, resource: { buffer: diagResultBuffer } },
-      { binding: 2, resource: { buffer: psiReBuffer } },
-      { binding: 3, resource: { buffer: psiImBuffer } },
-    ],
-  })
-
-  return {
-    initBG,
-    potentialBG,
-    potentialHalfBG,
-    fusedPotentialPackBG,
-    fusedUnpackPotentialBG,
-    packBG,
-    unpackBG,
-    fftStageABBG,
-    fftStageBABG,
-    kineticBG,
-    writeGridBG,
-    diagReduceBG,
-    diagFinalizeBG,
-    renormalizeBG,
-    renormalizeUniformBuffer,
-  }
-}
+// Bind group creation extracted to TDSEComputePassBindGroups.ts
+export { rebuildTdseBindGroups } from './TDSEComputePassBindGroups'

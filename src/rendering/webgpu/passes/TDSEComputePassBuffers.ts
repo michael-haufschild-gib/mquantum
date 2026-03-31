@@ -9,7 +9,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
-import { buildTdseFFTStagingData } from './TDSEComputePassUniforms'
+import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
 /** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
 const UNIFORM_SIZE = 740
@@ -30,6 +30,8 @@ export interface TdseDestroyableBuffers {
   uniformBuffer: GPUBuffer | null
   fftUniformBuffer: GPUBuffer | null
   fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffer: GPUBuffer | null
+  fftAxisStagingBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -55,6 +57,8 @@ export interface TdseBufferResult {
   uniformBuffer: GPUBuffer
   fftUniformBuffer: GPUBuffer
   fftStagingBuffer: GPUBuffer
+  fftAxisUniformBuffer: GPUBuffer
+  fftAxisStagingBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   omegaStagingBuffer: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -67,6 +71,8 @@ export interface TdseBufferResult {
   diagStagingBuffer: GPUBuffer
   totalSites: number
   fwdStageCount: number
+  /** Forward axis count for shared-mem FFT (= latticeDim; inverse starts at this offset) */
+  fwdAxisCount: number
   diagNumWorkgroups: number
 }
 
@@ -102,6 +108,8 @@ export function rebuildTdseBuffers(
   old.uniformBuffer?.destroy()
   old.fftUniformBuffer?.destroy()
   old.fftStagingBuffer?.destroy()
+  old.fftAxisUniformBuffer?.destroy()
+  old.fftAxisStagingBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.omegaStagingBuffer?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -172,6 +180,21 @@ export function rebuildTdseBuffers(
   const fftStagingData = buildTdseFFTStagingData(config, totalSites)
   device.queue.writeBuffer(fftStagingBuffer, 0, fftStagingData)
 
+  // Shared-memory FFT: per-axis uniform buffer + staging buffer
+  const fftAxisUniformBuffer = helpers.createUniformBuffer(
+    device,
+    FFT_UNIFORM_SIZE,
+    'tdse-fft-axis-uniforms'
+  )
+  const axisSlotCount = config.latticeDim * 2 // forward + inverse
+  const fftAxisStagingBuffer = device.createBuffer({
+    label: 'tdse-fft-axis-staging',
+    size: Math.max(FFT_UNIFORM_SIZE, axisSlotCount * FFT_UNIFORM_SIZE),
+    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  })
+  const fftAxisStagingData = buildTdseFFTAxisStagingData(config, totalSites)
+  device.queue.writeBuffer(fftAxisStagingBuffer, 0, fftAxisStagingData)
+
   // Pack uniforms: totalSites and invN don't change between frames
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
   const pu32 = new Uint32Array(packData)
@@ -241,6 +264,8 @@ export function rebuildTdseBuffers(
     uniformBuffer,
     fftUniformBuffer,
     fftStagingBuffer,
+    fftAxisUniformBuffer,
+    fftAxisStagingBuffer,
     packUniformBuffer,
     omegaStagingBuffer,
     diagUniformBuffer,
@@ -253,6 +278,7 @@ export function rebuildTdseBuffers(
     diagStagingBuffer,
     totalSites,
     fwdStageCount,
+    fwdAxisCount: config.latticeDim,
     diagNumWorkgroups,
   }
 }
@@ -267,6 +293,8 @@ export interface TdsePassBufferFields {
   uniformBuffer: GPUBuffer | null
   fftUniformBuffer: GPUBuffer | null
   fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffer: GPUBuffer | null
+  fftAxisStagingBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -276,7 +304,7 @@ export interface TdsePassBufferFields {
   diagPartialRightBuffer: GPUBuffer | null
   diagPartialIprBuffer: GPUBuffer | null
   totalSites: number
-  fwdStageCount: number
+  fwdAxisCount: number
   diagNumWorkgroups: number
 }
 
@@ -299,6 +327,8 @@ export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferRes
   fields.uniformBuffer = r.uniformBuffer
   fields.fftUniformBuffer = r.fftUniformBuffer
   fields.fftStagingBuffer = r.fftStagingBuffer
+  fields.fftAxisUniformBuffer = r.fftAxisUniformBuffer
+  fields.fftAxisStagingBuffer = r.fftAxisStagingBuffer
   fields.packUniformBuffer = r.packUniformBuffer
   fields.omegaStagingBuffer = r.omegaStagingBuffer
   fields.diagUniformBuffer = r.diagUniformBuffer
@@ -308,6 +338,6 @@ export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferRes
   fields.diagPartialRightBuffer = r.diagPartialRightBuffer
   fields.diagPartialIprBuffer = r.diagPartialIprBuffer
   fields.totalSites = r.totalSites
-  fields.fwdStageCount = r.fwdStageCount
+  fields.fwdAxisCount = r.fwdAxisCount
   fields.diagNumWorkgroups = r.diagNumWorkgroups
 }

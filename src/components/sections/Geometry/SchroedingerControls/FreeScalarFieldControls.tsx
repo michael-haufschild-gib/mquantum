@@ -10,6 +10,7 @@
 import React, { useCallback, useMemo } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -191,9 +192,13 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     )
 
     return (
-      <div className="space-y-4">
-        {/* Lattice Info */}
-        <div className="space-y-3">
+      <div className="space-y-1">
+        <ControlGroup
+          title="Lattice"
+          collapsible
+          defaultOpen
+          data-testid="control-group-fsf-lattice"
+        >
           <div className="text-xs text-text-secondary">
             Lattice: {latticeDim}D (set via dimension selector)
           </div>
@@ -207,7 +212,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               2D field rendered as glowing sheet with Gaussian falloff
             </div>
           )}
-
           <Select
             label="Grid Size"
             tooltip="Number of lattice sites per dimension. Total sites = N^d; larger grids resolve shorter wavelengths but cost more memory."
@@ -260,17 +264,18 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             showValue
             data-testid="steps-per-frame-slider"
           />
-
-          {/* Memory budget display */}
           <div className="text-xs text-text-tertiary">
             {totalSites.toLocaleString()} sites ({maxGridPerDim}^{latticeDim} max) · {memoryKB} KB
           </div>
-        </div>
+        </ControlGroup>
 
-        {/* Slice Positions for extra dimensions (d > 3) */}
         {latticeDim > 3 && (
-          <div className="space-y-2 border-t border-border-subtle pt-3">
-            <div className="text-xs text-text-secondary font-medium">Extra-Dimension Slice</div>
+          <ControlGroup
+            title="Slice Positions"
+            collapsible
+            defaultOpen={false}
+            data-testid="control-group-fsf-slices"
+          >
             {Array.from({ length: latticeDim - 3 }, (_, i) => {
               const dimIdx = i + 3
               const halfExtent =
@@ -289,17 +294,21 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 />
               )
             })}
-          </div>
+          </ControlGroup>
         )}
 
-        {/* Self-Interaction Potential */}
-        <div className="space-y-3 border-t border-border-subtle pt-3">
-          <Switch
-            label="Self-Interaction V(φ)"
-            tooltip="Enable quartic self-interaction potential V(φ) = λ(φ² − v²)². Creates domain walls (kinks) between degenerate vacua."
-            checked={fs.selfInteractionEnabled}
-            onCheckedChange={setSelfInteractionEnabled}
-          />
+        <ControlGroup
+          title="Self-Interaction"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-fsf-self-interaction"
+          rightElement={
+            <Switch
+              checked={fs.selfInteractionEnabled}
+              onCheckedChange={setSelfInteractionEnabled}
+            />
+          }
+        >
           {fs.selfInteractionEnabled && (
             <>
               <Slider
@@ -325,10 +334,14 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               <div className="text-xs text-text-tertiary">V(φ) = λ(φ² − v²)², minima at φ = ±v</div>
             </>
           )}
-        </div>
+        </ControlGroup>
 
-        {/* Initial Condition */}
-        <div className="space-y-3 border-t border-border-subtle pt-3">
+        <ControlGroup
+          title="Initial Condition"
+          collapsible
+          defaultOpen
+          data-testid="control-group-fsf-initial"
+        >
           <Select
             label="Initial Condition"
             tooltip="Starting field configuration: vacuum fluctuations, a plane-wave mode, or a localized Gaussian wave packet."
@@ -435,10 +448,14 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               ))}
             </div>
           )}
-        </div>
+        </ControlGroup>
 
-        {/* Field View */}
-        <div className="space-y-3 border-t border-border-subtle pt-3">
+        <ControlGroup
+          title="Field View"
+          collapsible
+          defaultOpen
+          data-testid="control-group-fsf-field-view"
+        >
           <ToggleGroup
             options={fieldViewOptions}
             value={fs.fieldView}
@@ -447,7 +464,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             tooltip="Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density)."
             data-testid="field-view-selector"
           />
-        </div>
+        </ControlGroup>
       </div>
     )
   }

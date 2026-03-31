@@ -8,6 +8,7 @@
 import React from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import {
   maxAzimuthalForPrincipal,
@@ -44,17 +45,19 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
 
     return (
       <>
-        {/* 3D Quantum Numbers (n, l, m) */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs text-text-secondary">3D Quantum Numbers</label>
+        <ControlGroup
+          title="Quantum Numbers"
+          collapsible
+          defaultOpen
+          data-testid="control-group-hydrogen-quantum-numbers"
+          rightElement={
             <span className="text-xs text-text-tertiary">
               {config.principalQuantumNumber}
               {orbitalShapeLetter(config.azimuthalQuantumNumber)}
               {config.azimuthalQuantumNumber > 0 ? ` (m=${config.magneticQuantumNumber})` : ''}
             </span>
-          </div>
-
+          }
+        >
           <Slider
             label="n (Principal)"
             tooltip="Principal quantum number — determines the energy level and orbital size. Higher n = larger, more energetic orbitals."
@@ -92,12 +95,16 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
               data-testid="hydrogen-nd-m-slider"
             />
           )}
-        </div>
+        </ControlGroup>
 
-        {/* Extra Dimension Quantum Numbers */}
+        {/* Extra Dimension Quantum Numbers + Frequency Spread */}
         {dimension >= 4 && (
-          <div className="space-y-2 pt-2 border-t border-border-subtle">
-            <label className="text-xs text-text-secondary">Extra Dimension Quantum Numbers</label>
+          <ControlGroup
+            title="Extra Dimensions"
+            collapsible
+            defaultOpen
+            data-testid="control-group-hydrogen-extra-dims"
+          >
             {Array.from({ length: Math.min(dimension - 3, 8) }, (_, i) => (
               <Slider
                 key={`extra-dim-n-${i}`}
@@ -112,15 +119,6 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
                 data-testid={`hydrogen-nd-extra-n-${i}`}
               />
             ))}
-            <p className="text-xs text-text-tertiary">
-              Harmonic oscillator quantum numbers for dimensions 4+
-            </p>
-          </div>
-        )}
-
-        {/* Extra Dim Frequency Spread */}
-        {dimension >= 4 && (
-          <div className="space-y-2 pt-2 border-t border-border-subtle">
             <Slider
               label="Extra Dim Frequency Spread"
               tooltip="Variation in oscillation frequency across extra dimensions. Creates anisotropic confinement in dimensions 4+."
@@ -132,11 +130,18 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
               showValue
               data-testid="hydrogen-nd-freq-spread"
             />
-          </div>
+            <p className="text-xs text-text-tertiary">
+              Harmonic oscillator quantum numbers for dimensions 4+
+            </p>
+          </ControlGroup>
         )}
 
-        {/* Real vs Complex toggle */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
+        <ControlGroup
+          title="Display"
+          collapsible
+          defaultOpen
+          data-testid="control-group-hydrogen-display"
+        >
           <div className="flex items-center justify-between">
             <label className="text-xs text-[var(--text-secondary)]">Orbital Representation</label>
             <Button
@@ -150,10 +155,6 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
               {config.useRealOrbitals ? 'Real (px, py, pz)' : 'Complex (m)'}
             </Button>
           </div>
-        </div>
-
-        {/* Bohr Radius Scale */}
-        <div className="space-y-2 pt-2 border-t border-border-subtle">
           <Slider
             label="Bohr Radius Scale"
             tooltip="Scales the Bohr radius (a₀ ≈ 0.529 Å), controlling how spread out the orbital appears. Larger values reveal outer orbital structure."
@@ -165,7 +166,7 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
             showValue
             data-testid="hydrogen-nd-bohr-scale"
           />
-        </div>
+        </ControlGroup>
       </>
     )
   }

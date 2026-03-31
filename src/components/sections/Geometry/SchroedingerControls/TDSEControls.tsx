@@ -11,6 +11,7 @@
 import React, { useCallback, useMemo } from 'react'
 
 import { Button } from '@/components/ui/Button'
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
@@ -90,9 +91,13 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
     )
 
     return (
-      <div className="space-y-4" data-testid="tdse-controls">
-        {/* Initial Condition */}
-        <div className="space-y-3">
+      <div className="space-y-1" data-testid="tdse-controls">
+        <ControlGroup
+          title="Wavepacket"
+          collapsible
+          defaultOpen
+          data-testid="control-group-tdse-wavepacket"
+        >
           <Select
             label="Initial State"
             tooltip="Shape of the initial wavefunction. Gaussian wavepacket is most common; coherent state matches a classical oscillator."
@@ -123,7 +128,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             showValue
             data-testid="tdse-packet-amplitude"
           />
-          {/* Per-axis packet center */}
           {Array.from({ length: activeDims }, (_, d) => (
             <Slider
               key={`center-${d}`}
@@ -138,7 +142,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
               data-testid={`tdse-center-${d}`}
             />
           ))}
-          {/* Per-axis momentum */}
           {Array.from({ length: activeDims }, (_, d) => (
             <Slider
               key={`momentum-${d}`}
@@ -153,12 +156,23 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
               data-testid={`tdse-momentum-${d}`}
             />
           ))}
-        </div>
+        </ControlGroup>
 
-        <TDSEPotentialControls td={td} activeDims={activeDims} actions={actions} />
+        <ControlGroup
+          title="Potential"
+          collapsible
+          defaultOpen
+          data-testid="control-group-tdse-potential"
+        >
+          <TDSEPotentialControls td={td} activeDims={activeDims} actions={actions} />
+        </ControlGroup>
 
-        {/* Display */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
+        <ControlGroup
+          title="Display"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-tdse-display"
+        >
           <Select
             label="Field View"
             tooltip="Which quantity to visualize: probability density |ψ|², real/imaginary parts, phase, or momentum-space distribution."
@@ -174,10 +188,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             onCheckedChange={actions.setShowPotential}
             data-testid="tdse-show-potential"
           />
-        </div>
-
-        {/* Imaginary-Time Propagation */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
           <Switch
             label="Imaginary Time (Ground State)"
             tooltip="Propagate in imaginary time to find the ground state eigenfunction. The wavefunction decays to the lowest-energy eigenstate and is renormalized each step."
@@ -186,10 +196,14 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             data-testid="tdse-imaginary-time"
           />
           {td.imaginaryTimeEnabled && <StoreEigenstateButton />}
-        </div>
+        </ControlGroup>
 
-        {/* Numerics */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
+        <ControlGroup
+          title="Numerics"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-tdse-numerics"
+        >
           <Slider
             label="Lattice Dim"
             tooltip="Number of spatial dimensions for the TDSE simulation. Higher dimensions require exponentially more memory."
@@ -270,11 +284,16 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             showValue
             data-testid="tdse-steps-per-frame"
           />
-        </div>
+        </ControlGroup>
 
         {/* Slice positions for dims > 3 */}
         {activeDims > 3 && (
-          <div className="border-t border-border-subtle pt-3 space-y-3">
+          <ControlGroup
+            title="Slice Positions"
+            collapsible
+            defaultOpen={false}
+            data-testid="control-group-tdse-slices"
+          >
             {Array.from({ length: activeDims - 3 }, (_, i) => {
               const dimIdx = i + 3
               const halfExtent =
@@ -294,7 +313,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
                 />
               )
             })}
-          </div>
+          </ControlGroup>
         )}
       </div>
     )
