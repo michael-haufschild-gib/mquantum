@@ -558,6 +558,113 @@ const projectRulesPlugin = {
       },
     },
 
+    // ---- no-behavioral-string-test ----
+    // Shader tests that use behavioral language in `it()` descriptions
+    // (applies, computes, evaluates, uses, reads, writes) must verify behavior
+    // with numerical assertions, not string containment on WGSL source.
+    // String containment (toContain) is valid for composition/structural tests
+    // (declares, includes, contains, has, defines, exports, binds).
+    'no-behavioral-string-test': {
+      meta: {
+        type: 'problem',
+        docs: {
+          description:
+            'Shader tests with behavioral descriptions must use numerical assertions, not string containment',
+        },
+        messages: {
+          noBehavioralStringTest:
+            'Test "{{ description }}" uses behavioral language but only checks string containment. ' +
+            'Behavioral tests must verify computed values (toBeCloseTo, toEqual, toBeGreaterThan). ' +
+            'If this is a structural/composition test, rename to use declarative language (declares, includes, contains, defines).',
+        },
+        schema: [],
+      },
+      create(context) {
+        const fp = normalizePath(context.filename)
+        if (!fp.includes('.test.')) return {}
+        // Only apply to shader-related test files
+        if (!fp.includes('/shaders/') && !fp.includes('Wgsl')) return {}
+
+        // Behavioral verbs that imply the test checks computation, not structure
+        const BEHAVIORAL_RE = /\b(applies|computes|calculates|evaluates|produces|uses|operates|reads|writes)\b/i
+
+        // Track: for each it() call, record its description and all matchers used
+        const testStack = []
+
+        return {
+          CallExpression(node) {
+            // Detect it(...) or test(...) calls
+            if (
+              node.callee.type === 'Identifier' &&
+              (node.callee.name === 'it' || node.callee.name === 'test') &&
+              node.arguments.length >= 2
+            ) {
+              const descArg = node.arguments[0]
+              if (descArg.type === 'Literal' && typeof descArg.value === 'string') {
+                testStack.push({
+                  description: descArg.value,
+                  node: descArg,
+                  isBehavioral: BEHAVIORAL_RE.test(descArg.value),
+                  hasNumericalAssertion: false,
+                  hasToContain: false,
+                })
+              }
+            }
+
+            // Detect .toContain() calls
+            if (
+              node.callee.type === 'MemberExpression' &&
+              node.callee.property.type === 'Identifier' &&
+              node.callee.property.name === 'toContain' &&
+              testStack.length > 0
+            ) {
+              testStack[testStack.length - 1].hasToContain = true
+            }
+
+            // Detect numerical assertion matchers
+            if (
+              node.callee.type === 'MemberExpression' &&
+              node.callee.property.type === 'Identifier'
+            ) {
+              const name = node.callee.property.name
+              if (
+                name === 'toBeCloseTo' ||
+                name === 'toEqual' ||
+                name === 'toBe' ||
+                name === 'toBeGreaterThan' ||
+                name === 'toBeLessThan' ||
+                name === 'toBeGreaterThanOrEqual' ||
+                name === 'toBeLessThanOrEqual' ||
+                name === 'toMatchObject'
+              ) {
+                if (testStack.length > 0) {
+                  testStack[testStack.length - 1].hasNumericalAssertion = true
+                }
+              }
+            }
+          },
+          'CallExpression:exit'(node) {
+            if (
+              node.callee.type === 'Identifier' &&
+              (node.callee.name === 'it' || node.callee.name === 'test') &&
+              node.arguments.length >= 2 &&
+              testStack.length > 0
+            ) {
+              const test = testStack.pop()
+              // Report: behavioral description + only toContain + no numerical assertions
+              if (test.isBehavioral && test.hasToContain && !test.hasNumericalAssertion) {
+                context.report({
+                  node: test.node,
+                  messageId: 'noBehavioralStringTest',
+                  data: { description: test.description },
+                })
+              }
+            }
+          },
+        }
+      },
+    },
+
     // ---- no-raw-html-controls ----
     'no-raw-html-controls': {
       meta: {
@@ -641,7 +748,7 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
 
       // Import sorting
       'simple-import-sort/imports': 'error',
@@ -703,10 +810,10 @@ export default [
       '@eslint-react/no-clone-element': 'off',         // single use in DropdownMenu trigger injection — intentional pattern
 
       // Disable rules that generate noise for legitimate patterns in this codebase
-      // set-state-in-effect: 10+ components sync external data (GPU state, subscriptions,
-      // browser APIs) into React state via effects — all conditionally guarded.
-      // With --max-warnings 0 in lint-staged, scoping to individual files would add
-      // noise without preventing real bugs; the pattern is pervasive and correct here.
+      // set-state-in-effect: 40 components sync external data (GPU state, subscriptions,
+      // browser APIs, Zustand store snapshots) into React state via effects — all
+      // conditionally guarded. Scoping to 40 individual file overrides would add config
+      // noise without catching bugs; the pattern is architecturally pervasive here.
       '@eslint-react/set-state-in-effect': 'off',
       '@eslint-react/naming-convention/ref-name': 'off',  // cosmetic; large existing ref surface
       '@eslint-react/use-state': 'off',                   // setter naming convention is cosmetic
@@ -747,6 +854,7 @@ export default [
       'project-rules/no-raw-html-controls': 'error',
       'project-rules/no-shallow-matchers': 'error',
       'project-rules/no-dom-node-access': 'error',
+      'project-rules/no-behavioral-string-test': 'error',
     },
   },
 

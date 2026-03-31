@@ -1,12 +1,15 @@
 /**
- * Diagnostic test: HO1D normalization change impact analysis.
+ * HO1D Normalization Parity Tests
  *
- * The ho1d.wgsl.ts normalization was changed from "visual damping" to "canonical".
- * This test computes peak densities with both approaches to determine if
- * the change could cause the volume rendering to produce invisible output.
+ * Validates that the canonical normalization in ho1d.wgsl.ts produces
+ * correct, visible volume rendering output by comparing against:
+ * - Analytical peak density for the quantum harmonic oscillator ground state
+ * - Beer-Lambert alpha accumulation through a center ray
+ * - Auto-compensation factor that restores visual parity
  *
- * Context: The Schroedinger renderer shows "3 thin horizontal black lines"
- * instead of a volumetric Gaussian blob.
+ * These tests replaced a diagnostic-only file that used console.log for
+ * output instead of assertions. Every test now verifies a concrete physical
+ * or rendering property.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -17,7 +20,7 @@ import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/pres
 // Reproduce WGSL math in TypeScript
 // ============================================================================
 
-/** Hermite polynomial H_n(u) - matches hermite.wgsl.ts */
+/** Hermite polynomial H_n(u) — matches hermite.wgsl.ts coefficient LUT. */
 function hermite(n: number, u: number): number {
   switch (n) {
     case 0:
@@ -51,7 +54,7 @@ const HO_NORM = [
   0.00465847495312,
 ]
 
-/** Canonical normalization: (α²/π)^{1/4} = (ω/π)^{1/4}, matches ho1d.wgsl.ts */
+/** Canonical normalization: (alpha^2/pi)^{1/4}, matches ho1d.wgsl.ts */
 function ho1D_canonical(n: number, x: number, omega: number): number {
   if (n < 0 || n > 6) return 0
   const alpha = Math.sqrt(Math.max(omega, 0.01))
@@ -63,7 +66,7 @@ function ho1D_canonical(n: number, x: number, omega: number): number {
   return alphaNorm * norm * H * gauss
 }
 
-/** OLD visual damping normalization (remote/working code) */
+/** Old visual damping normalization (replaced by canonical). */
 function ho1D_visual(n: number, x: number, omega: number): number {
   const alpha = Math.sqrt(Math.max(omega, 0.01))
   const u = alpha * x
@@ -79,7 +82,12 @@ function computeDensity3D(
   y: number,
   z: number,
   t: number,
-  preset: ReturnType<typeof generateQuantumPreset>,
+  preset: {
+    termCount: number
+    quantumNumbers: number[][]
+    coefficients: [number, number][]
+    energies: number[]
+  },
   omega: number[],
   ho1DFunc: (n: number, x: number, omega: number) => number
 ): number {
@@ -91,17 +99,14 @@ function computeDensity3D(
     const [cRe, cIm] = preset.coefficients[k]!
     const E = preset.energies[k]!
 
-    // Product of 1D eigenfunctions
     const phi =
       ho1DFunc(qn[0]!, x, omega[0]!) *
       ho1DFunc(qn[1]!, y, omega[1]!) *
       ho1DFunc(qn[2]!, z, omega[2]!)
 
-    // Time factor: e^{-iEt}
     const cosEt = Math.cos(E * t)
     const sinEt = Math.sin(E * t)
 
-    // c_k * phi * exp(-iEt) = (cRe + i*cIm) * phi * (cosEt - i*sinEt)
     const termRe = phi * (cRe * cosEt + cIm * sinEt)
     const termIm = phi * (cIm * cosEt - cRe * sinEt)
 
@@ -121,8 +126,7 @@ function computeAlpha(rho: number, stepLen: number, densityGain: number): number
 // Tests
 // ============================================================================
 
-describe('HO1D Normalization Diagnostic', () => {
-  // Default config values
+describe('HO1D canonical normalization', () => {
   const SEED = 42
   const DIM = 3
   const TERM_COUNT = 1
@@ -134,27 +138,25 @@ describe('HO1D Normalization Diagnostic', () => {
 
   const preset = generateQuantumPreset(SEED, DIM, TERM_COUNT, MAX_N, SPREAD)
 
-  it('should log the default quantum state from seed=42', () => {
-    console.log('=== DEFAULT QUANTUM STATE (seed=42) ===')
-    console.log('termCount:', preset.termCount)
-    console.log('omega:', preset.omega)
-    console.log('quantumNumbers:', preset.quantumNumbers)
-    console.log('coefficients:', preset.coefficients)
-    console.log('energies:', preset.energies)
-
+  it('generates a valid single-term 3D quantum preset from seed 42', () => {
     expect(preset.termCount).toBe(1)
-    expect(preset.quantumNumbers.length).toBe(1)
-    expect(preset.quantumNumbers[0]!.length).toBe(3)
+    expect(preset.quantumNumbers).toHaveLength(1)
+    expect(preset.quantumNumbers[0]).toHaveLength(3)
+    expect(preset.coefficients).toHaveLength(1)
+    expect(preset.energies).toHaveLength(1)
+    // Omega array should have 3 entries for 3D
+    expect(preset.omega).toHaveLength(3)
+    for (const w of preset.omega) {
+      expect(w).toBeGreaterThan(0)
+    }
   })
 
-  it('should compare peak density: canonical vs visual normalization', () => {
+  it('produces non-zero peak density for both normalization schemes', () => {
     const omega = preset.omega
-
-    // Scan over a grid to find peak density
     const GRID = 40
+
     let peakCanonical = 0
     let peakVisual = 0
-    let peakPos = [0, 0, 0]
 
     for (let ix = 0; ix < GRID; ix++) {
       for (let iy = 0; iy < GRID; iy++) {
@@ -166,38 +168,25 @@ describe('HO1D Normalization Diagnostic', () => {
           const rhoC = computeDensity3D(x, y, z, 0, preset, omega, ho1D_canonical)
           const rhoV = computeDensity3D(x, y, z, 0, preset, omega, ho1D_visual)
 
-          if (rhoC > peakCanonical) {
-            peakCanonical = rhoC
-            peakPos = [x, y, z]
-          }
+          if (rhoC > peakCanonical) peakCanonical = rhoC
           if (rhoV > peakVisual) peakVisual = rhoV
         }
       }
     }
 
-    console.log('=== PEAK DENSITY COMPARISON ===')
-    console.log('Peak density (canonical/NEW):', peakCanonical.toExponential(4))
-    console.log('Peak density (visual/OLD):   ', peakVisual.toExponential(4))
-    console.log('Ratio (new/old):             ', (peakCanonical / peakVisual).toFixed(4))
-    console.log(
-      'Peak position:               ',
-      peakPos.map((v) => v.toFixed(2))
-    )
-
-    // Both should produce non-zero density
-    expect(peakCanonical).toBeGreaterThan(0)
-    expect(peakVisual).toBeGreaterThan(0)
+    expect(peakCanonical).toBeGreaterThan(1e-10)
+    expect(peakVisual).toBeGreaterThan(1e-10)
+    // Canonical and visual peaks should be within a few orders of magnitude
+    expect(Math.log10(peakCanonical / peakVisual)).toBeGreaterThan(-3)
+    expect(Math.log10(peakCanonical / peakVisual)).toBeLessThan(3)
   })
 
-  it('should simulate volume raymarching alpha accumulation along center ray', () => {
+  it('canonical normalization produces visible alpha (above discard threshold)', () => {
     const omega = preset.omega
     const stepLen = (2 * BOUND_R) / SAMPLE_COUNT
 
-    // March a ray through the center (x=0, y=0, z varies from -BOUND_R to +BOUND_R)
     let transmittanceCanonical = 1.0
     let transmittanceVisual = 1.0
-    let accColorCanonical = 0
-    let accColorVisual = 0
 
     for (let i = 0; i < SAMPLE_COUNT; i++) {
       const z = -BOUND_R + (i + 0.5) * stepLen
@@ -208,9 +197,6 @@ describe('HO1D Normalization Diagnostic', () => {
       const alphaC = computeAlpha(rhoC, stepLen, DENSITY_GAIN)
       const alphaV = computeAlpha(rhoV, stepLen, DENSITY_GAIN)
 
-      accColorCanonical += transmittanceCanonical * alphaC
-      accColorVisual += transmittanceVisual * alphaV
-
       transmittanceCanonical *= 1 - alphaC
       transmittanceVisual *= 1 - alphaV
     }
@@ -218,34 +204,14 @@ describe('HO1D Normalization Diagnostic', () => {
     const totalAlphaCanonical = 1 - transmittanceCanonical
     const totalAlphaVisual = 1 - transmittanceVisual
 
-    console.log('=== VOLUME RAYMARCHING THROUGH CENTER ===')
-    console.log('Total alpha (canonical/NEW):', totalAlphaCanonical.toFixed(6))
-    console.log('Total alpha (visual/OLD):   ', totalAlphaVisual.toFixed(6))
-    console.log('Acc color (canonical/NEW):  ', accColorCanonical.toFixed(6))
-    console.log('Acc color (visual/OLD):     ', accColorVisual.toFixed(6))
-    console.log('')
-
-    // Discard threshold in shader is alpha < 0.01
-    console.log(
-      'Would be DISCARDED (canonical)?',
-      totalAlphaCanonical < 0.01 ? 'YES - INVISIBLE!' : 'no - visible'
-    )
-    console.log(
-      'Would be DISCARDED (visual)?   ',
-      totalAlphaVisual < 0.01 ? 'YES - INVISIBLE!' : 'no - visible'
-    )
-
-    // Canonical normalization must produce visible output (alpha > discard threshold)
+    // Canonical normalization must exceed the shader's 0.01 discard threshold
     expect(totalAlphaCanonical).toBeGreaterThan(0.01)
+    // Visual normalization should also be visible
+    expect(totalAlphaVisual).toBeGreaterThan(0.01)
   })
 
-  it('should compare ho1D peak values per quantum number', () => {
-    console.log('=== ho1D PEAK VALUE COMPARISON (omega=1.0) ===')
-    console.log('n | canonical peak | visual peak | ratio')
-    console.log('--|----------------|-------------|------')
-
+  it('ho1D peak values are finite and non-zero for all quantum numbers n=0..6', () => {
     for (let n = 0; n <= 6; n++) {
-      // Scan x to find peak of |phi_n(x)|
       let peakC = 0
       let peakV = 0
       for (let ix = 0; ix < 1000; ix++) {
@@ -253,125 +219,41 @@ describe('HO1D Normalization Diagnostic', () => {
         peakC = Math.max(peakC, Math.abs(ho1D_canonical(n, x, 1.0)))
         peakV = Math.max(peakV, Math.abs(ho1D_visual(n, x, 1.0)))
       }
-      const ratio = peakC / peakV
-      console.log(
-        `${n} | ${peakC.toExponential(4).padStart(14)} | ${peakV.toExponential(4).padStart(11)} | ${ratio.toFixed(4)}`
-      )
+
+      expect(peakC).toBeGreaterThan(0)
+      expect(peakV).toBeGreaterThan(0)
+      expect(Number.isFinite(peakC)).toBe(true)
+      expect(Number.isFinite(peakV)).toBe(true)
     }
   })
 
-  it('should simulate with ADAPTIVE stepping (matching actual shader)', () => {
-    const omega = preset.omega
-    const baseStepLen = (2 * BOUND_R) / SAMPLE_COUNT
-
-    // March rays at different offsets from center
-    const offsets = [
-      { label: 'center (0,0)', x: 0, y: 0 },
-      { label: 'slight off (0.3, 0)', x: 0.3, y: 0 },
-      { label: 'moderate off (0.7, 0)', x: 0.7, y: 0 },
-      { label: 'edge (1.2, 0)', x: 1.2, y: 0 },
-      { label: 'far (1.8, 0)', x: 1.8, y: 0 },
-    ]
-
-    console.log('=== ADAPTIVE STEPPING RAYMARCHING ===')
-    console.log('offset           | alpha(NEW) | alpha(OLD) | NEW visible?')
-    console.log('-----------------|------------|------------|-------------')
-
-    for (const { label, x, y } of offsets) {
-      let transC = 1.0,
-        transV = 1.0
-      let t = -BOUND_R
-
-      // Simulate sphere intersection
-      const r2 = x * x + y * y
-      if (r2 >= BOUND_R * BOUND_R) {
-        console.log(`${label.padEnd(17)}| no sphere intersection`)
-        continue
-      }
-      const tHalf = Math.sqrt(BOUND_R * BOUND_R - r2)
-      const tNear = -tHalf
-      const tFar = tHalf
-      t = tNear
-
-      let steps = 0
-      while (t < tFar && steps < SAMPLE_COUNT) {
-        const z = t
-        const rhoC = computeDensity3D(x, y, z, 0, preset, omega, ho1D_canonical)
-        const rhoV = computeDensity3D(x, y, z, 0, preset, omega, ho1D_visual)
-
-        // sCenter = log(rho) for adaptive stepping
-        const sC = rhoC > 1e-20 ? Math.log(rhoC) : -46
-        const sV = rhoV > 1e-20 ? Math.log(rhoV) : -46
-
-        // Adaptive step multiplier (matching shader)
-        let multC = 1.0
-        if (sC < -12) multC = 4.0
-        else if (sC < -8) multC = 2.0
-
-        let multV = 1.0
-        if (sV < -12) multV = 4.0
-        else if (sV < -8) multV = 2.0
-
-        const adaptStepC = Math.min(baseStepLen * multC, tFar - t)
-        const adaptStepV = Math.min(baseStepLen * multV, tFar - t)
-
-        // Use the CANONICAL adaptive step for BOTH to simulate the actual shader
-        // (shader doesn't know about "old" normalization)
-        const alphaC = computeAlpha(rhoC, adaptStepC, DENSITY_GAIN)
-        const alphaV = computeAlpha(rhoV, adaptStepV, DENSITY_GAIN)
-
-        transC *= 1 - alphaC
-        transV *= 1 - alphaV
-
-        // Use canonical adaptive step for stepping (shader uses one path)
-        t += adaptStepC
-        steps++
-      }
-
-      const totalC = 1 - transC
-      const totalV = 1 - transV
-      const visC = totalC < 0.01 ? 'DISCARDED' : `visible (${totalC.toFixed(3)})`
-      console.log(
-        `${label.padEnd(17)}| ${totalC.toFixed(6).padStart(10)} | ${totalV.toFixed(6).padStart(10)} | ${visC}`
-      )
-    }
-  })
-
-  it('should verify the 3D density product for all-zeros quantum state', () => {
-    // n=(0,0,0) is the ground state - should be a simple Gaussian
+  it('ground state (0,0,0) center density matches analytical value (omega/pi)^{3/2}', () => {
     const omega = [1.0, 1.0, 1.0]
     const groundPreset = {
       termCount: 1,
       omega,
       quantumNumbers: [[0, 0, 0]],
       coefficients: [[1.0, 0.0]] as [number, number][],
-      energies: [1.5], // E = sum(omega * (n+0.5)) = 3 * 0.5 = 1.5
+      energies: [1.5],
     }
 
     const rhoCenterC = computeDensity3D(0, 0, 0, 0, groundPreset, omega, ho1D_canonical)
-    const rhoCenterV = computeDensity3D(0, 0, 0, 0, groundPreset, omega, ho1D_visual)
 
-    console.log('=== GROUND STATE (0,0,0) CENTER DENSITY ===')
-    console.log('Canonical (new):', rhoCenterC.toExponential(6))
-    console.log('Visual (old):   ', rhoCenterV.toExponential(6))
-    console.log('Ratio:          ', (rhoCenterC / rhoCenterV).toFixed(4))
-
-    // Theoretical canonical peak for ground state (0,0,0) with ω=1:
-    // |ψ_0(0)|^2 = [(ω/π)^{1/4}]^6 = (1/π)^{3/2} ≈ 0.1795 (3D product, each dim contributes (ω/π)^{1/4})
-    console.log('Theoretical canonical:', Math.pow(1 / Math.PI, 1.5).toExponential(6))
+    // Theoretical: |psi_0(0)|^2 in 3D = (omega/pi)^{3/2} for omega=1
+    const theoretical = Math.pow(1 / Math.PI, 1.5)
+    expect(rhoCenterC).toBeCloseTo(theoretical, 4)
   })
 
-  it('should verify auto-compensation restores visual density', () => {
+  it('auto-compensation restores visual parity within 20%', () => {
     const omega = preset.omega
 
-    // === Reproduce the renderer's computeCanonicalCompensation() ===
+    // Reproduce the renderer's computeCanonicalCompensation()
     function computeCanonicalCompensation(
       p: ReturnType<typeof generateQuantumPreset>,
       dim: number
     ): number {
       if (p.termCount === 0) return 1.0
 
-      // Find dominant term
       let dominantIdx = 0
       let maxMag = 0
       for (let k = 0; k < p.termCount; k++) {
@@ -399,15 +281,11 @@ describe('HO1D Normalization Diagnostic', () => {
     }
 
     const compensation = computeCanonicalCompensation(preset, DIM)
-    const userDensityGain = DENSITY_GAIN // 2.0
-    const effectiveDensityGain = userDensityGain * compensation
+    const effectiveDensityGain = DENSITY_GAIN * compensation
 
-    console.log('=== AUTO-COMPENSATION VERIFICATION ===')
-    console.log('Compensation factor:', compensation.toFixed(4))
-    console.log('User densityGain:   ', userDensityGain)
-    console.log('Effective densityGain:', effectiveDensityGain.toFixed(4))
+    expect(compensation).toBeGreaterThan(0)
+    expect(Number.isFinite(compensation)).toBe(true)
 
-    // Now raycast center with the effective gain
     const stepLen = (2 * BOUND_R) / SAMPLE_COUNT
     let transCompensated = 1.0
     let transOld = 1.0
@@ -418,7 +296,7 @@ describe('HO1D Normalization Diagnostic', () => {
       const rhoV = computeDensity3D(0, 0, z, 0, preset, omega, ho1D_visual)
 
       const alphaCompensated = computeAlpha(rhoC, stepLen, effectiveDensityGain)
-      const alphaOld = computeAlpha(rhoV, stepLen, userDensityGain)
+      const alphaOld = computeAlpha(rhoV, stepLen, DENSITY_GAIN)
 
       transCompensated *= 1 - alphaCompensated
       transOld *= 1 - alphaOld
@@ -427,14 +305,10 @@ describe('HO1D Normalization Diagnostic', () => {
     const totalCompensated = 1 - transCompensated
     const totalOld = 1 - transOld
 
-    console.log('Total alpha (compensated canonical):', totalCompensated.toFixed(6))
-    console.log('Total alpha (old visual):           ', totalOld.toFixed(6))
-    console.log('Match ratio:                        ', (totalCompensated / totalOld).toFixed(4))
-
-    // The compensated canonical should produce similar visual output to the old visual
-    // Allow some tolerance since compensation uses dominant-term approximation
-    expect(totalCompensated).toBeGreaterThan(0.5) // Was 0.106 without compensation
-    expect(totalCompensated / totalOld).toBeGreaterThan(0.8) // Within 20%
+    // Compensated canonical should produce visible output
+    expect(totalCompensated).toBeGreaterThan(0.5)
+    // Should match old visual output within 20%
+    expect(totalCompensated / totalOld).toBeGreaterThan(0.8)
     expect(totalCompensated / totalOld).toBeLessThan(1.2)
   })
 })

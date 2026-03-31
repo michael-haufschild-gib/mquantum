@@ -10,11 +10,11 @@ describe('k-Space Occupation emission shader (algorithm 15)', () => {
     expect(ALGO_BRANCH[15]).toContain('sampleAnalysisFromGrid')
   })
 
-  it('ALGO_BRANCH[15] uses hsl2rgb for viridis-like colormap', () => {
+  it('ALGO_BRANCH[15] includes hsl2rgb for viridis-like colormap', () => {
     expect(ALGO_BRANCH[15]).toContain('hsl2rgb')
   })
 
-  it('ALGO_BRANCH[15] reads occupation number from analysis.r', () => {
+  it('ALGO_BRANCH[15] includes occupation number access from analysis.r', () => {
     expect(ALGO_BRANCH[15]).toContain('analysis.r')
   })
 

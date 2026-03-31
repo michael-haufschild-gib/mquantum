@@ -59,7 +59,7 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).not.toContain('fn nodalSliceMask(')
   })
 
-  it('uses D-dimensional hydrogen radial in hydrogen-ND wavefunction evaluation', () => {
+  it('includes D-dimensional hydrogen radial in hydrogen-ND wavefunction evaluation', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 7,
       quantumMode: 'hydrogenND',

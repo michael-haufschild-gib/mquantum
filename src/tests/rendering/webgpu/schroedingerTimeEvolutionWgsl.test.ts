@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 
 describe('Schroedinger time evolution WGSL composition', () => {
-  it('does not apply timeScale to interference or probability-flow local speeds', () => {
+  it('excludes timeScale from interference and probability-flow local speeds', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
       quantumMode: 'harmonicOscillator',
@@ -17,7 +17,7 @@ describe('Schroedinger time evolution WGSL composition', () => {
     expect(wgsl).not.toContain('uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed')
   })
 
-  it('applies timeScale to the main wavefunction evolution time', () => {
+  it('includes timeScale in the main wavefunction evolution time', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       quantumMode: 'harmonicOscillator',

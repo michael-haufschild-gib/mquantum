@@ -29,29 +29,29 @@ describe('Gram-Schmidt inner product reduction', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('numWorkgroups: u32')
   })
 
-  it('uses workgroup size 256 for reduction', () => {
+  it('declares workgroup size 256 for reduction', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('@compute @workgroup_size(256)')
   })
 
-  it('uses shared memory for tree reduction', () => {
+  it('declares shared memory for tree reduction', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('var<workgroup> shared_re')
     expect(gramSchmidtInnerProductReduceBlock).toContain('var<workgroup> shared_im')
     expect(gramSchmidtInnerProductReduceBlock).toContain('workgroupBarrier')
   })
 
-  it('computes complex inner product ⟨φ|ψ⟩ = conj(φ)·ψ', () => {
+  it('contains complex inner product ⟨φ|ψ⟩ = conj(φ)·ψ formula', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('pRe * wRe + pIm * wIm')
     expect(gramSchmidtInnerProductReduceBlock).toContain('pRe * wIm - pIm * wRe')
   })
 
-  it('reads both eigenstate and current wavefunction buffers', () => {
+  it('includes both eigenstate and current wavefunction buffer bindings', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('phiRe')
     expect(gramSchmidtInnerProductReduceBlock).toContain('phiIm')
     expect(gramSchmidtInnerProductReduceBlock).toContain('psiRe')
     expect(gramSchmidtInnerProductReduceBlock).toContain('psiIm')
   })
 
-  it('writes partial sums for reduce-then-finalize pattern', () => {
+  it('includes partial sum output for reduce-then-finalize pattern', () => {
     expect(gramSchmidtInnerProductReduceBlock).toContain('partialRe[wid.x]')
     expect(gramSchmidtInnerProductReduceBlock).toContain('partialIm[wid.x]')
   })
@@ -62,7 +62,7 @@ describe('Gram-Schmidt inner product finalize', () => {
     expect(gramSchmidtInnerProductFinalizeBlock).toContain('struct GSReduceUniforms')
   })
 
-  it('uses workgroup size 256', () => {
+  it('declares workgroup size 256', () => {
     expect(gramSchmidtInnerProductFinalizeBlock).toContain('@compute @workgroup_size(256)')
   })
 
@@ -71,7 +71,7 @@ describe('Gram-Schmidt inner product finalize', () => {
     expect(gramSchmidtInnerProductFinalizeBlock).toContain('i += 256u')
   })
 
-  it('writes final [re, im] result', () => {
+  it('includes final [re, im] result output', () => {
     expect(gramSchmidtInnerProductFinalizeBlock).toContain('result[0]')
     expect(gramSchmidtInnerProductFinalizeBlock).toContain('result[1]')
   })
@@ -83,16 +83,16 @@ describe('Gram-Schmidt subtraction', () => {
     expect(gramSchmidtSubtractBlock).toContain('totalElements: u32')
   })
 
-  it('uses workgroup size 64', () => {
+  it('declares workgroup size 64', () => {
     expect(gramSchmidtSubtractBlock).toContain('@compute @workgroup_size(64)')
   })
 
-  it('reads inner product from result buffer', () => {
+  it('includes inner product from result buffer', () => {
     expect(gramSchmidtSubtractBlock).toContain('innerProduct[0]')
     expect(gramSchmidtSubtractBlock).toContain('innerProduct[1]')
   })
 
-  it('computes complex projection ⟨φ|ψ⟩ · φ', () => {
+  it('contains complex projection ⟨φ|ψ⟩ · φ formula', () => {
     expect(gramSchmidtSubtractBlock).toContain('cRe * fRe - cIm * fIm')
     expect(gramSchmidtSubtractBlock).toContain('cRe * fIm + cIm * fRe')
   })

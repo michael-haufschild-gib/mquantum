@@ -40,12 +40,12 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarInitBlock).toContain('vacuumNoise')
     })
 
-    it('writes to both phi and pi buffers', () => {
+    it('includes phi and pi buffer access', () => {
       expect(freeScalarInitBlock).toContain('phi[idx]')
       expect(freeScalarInitBlock).toContain('pi[idx]')
     })
 
-    it('computes distance using N-D loop over active dimensions', () => {
+    it('contains N-D distance computation loop over active dimensions', () => {
       // N-D refactor: distance is computed via loop, not per-component select()
       expect(freeScalarInitBlock).toContain('worldPos[d] - params.packetCenter[d]')
     })
@@ -68,11 +68,11 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarUpdatePiBlock).not.toContain('struct FreeScalarUniforms')
     })
 
-    it('computes discrete Laplacian', () => {
+    it('contains discrete Laplacian computation', () => {
       expect(freeScalarUpdatePiBlock).toContain('laplacian')
     })
 
-    it('uses periodic boundary conditions via stride wrapping', () => {
+    it('includes periodic boundary conditions via stride wrapping', () => {
       // Stride-based periodic BCs: select wraps at boundary coords 0 and gridSize-1
       expect(freeScalarUpdatePiBlock).toContain('params.gridSize[d] - 1u')
       expect(freeScalarUpdatePiBlock).toContain('coord == 0u')
@@ -149,7 +149,7 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarWriteGridBlock).not.toContain('struct FreeScalarUniforms')
     })
 
-    it('writes to 3D storage texture', () => {
+    it('includes 3D storage texture output', () => {
       expect(freeScalarWriteGridBlock).toContain('textureStore(outputTex')
     })
 
@@ -165,13 +165,13 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarWriteGridBlock).toContain('fieldValue < 0.0')
     })
 
-    it('computes logRho from normalized density, not raw field value', () => {
+    it('contains logRho from normalized density, not raw field value', () => {
       // logRho must use normRho (not rho) for consistency with raymarcher color mapping
       expect(freeScalarWriteGridBlock).toContain('log(normRho + 1e-10)')
       expect(freeScalarWriteGridBlock).not.toContain('log(rho + 1e-10)')
     })
 
-    it('computes energy density with forward-difference gradient matching lattice Hamiltonian', () => {
+    it('contains energy density with forward-difference gradient matching lattice Hamiltonian', () => {
       expect(freeScalarWriteGridBlock).toContain('gradEnergy')
       expect(freeScalarWriteGridBlock).toContain('params.mass * params.mass')
       // Forward difference: (phi[n+1] - phiVal), not central (phi[n+1] - phi[n-1])/(2a)

@@ -5,6 +5,9 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["@webgpu/types"],
     "module": "ESNext",
+    /* skipLibCheck: required — @testing-library/jest-dom references Jest types,
+       @types/dom-webcodecs conflicts with lib.dom.d.ts (duplicate declarations),
+       and fileSystem.d.ts modifier mismatches. All upstream; verified 2026-03-31. */
     "skipLibCheck": true,
 
     /* Bundler mode */

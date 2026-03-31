@@ -72,7 +72,7 @@ describe('composeWignerSpatialComputeShader', () => {
 })
 
 describe('composeWignerReconstructComputeShader', () => {
-  it('produces a valid compute shader with workgroup_size', () => {
+  it('generates a valid compute shader with workgroup_size', () => {
     const { wgsl, modules, features } = composeWignerReconstructComputeShader()
 
     expect(wgsl).toContain('@workgroup_size')

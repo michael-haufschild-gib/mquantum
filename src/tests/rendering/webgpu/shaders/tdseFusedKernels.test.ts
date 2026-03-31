@@ -411,7 +411,7 @@ describe('fused kernel multi-step norm conservation', () => {
 })
 
 describe('fused kernel WGSL structure', () => {
-  it('fusedPotentialPack reads psiRe, psiIm, potential and writes complexBuf', () => {
+  it('fusedPotentialPack includes psiRe, psiIm, potential, and complexBuf access', () => {
     expect(tdseFusedPotentialPackBlock).toContain('psiRe[idx]')
     expect(tdseFusedPotentialPackBlock).toContain('psiIm[idx]')
     expect(tdseFusedPotentialPackBlock).toContain('potential[idx]')
@@ -419,12 +419,12 @@ describe('fused kernel WGSL structure', () => {
     expect(tdseFusedPotentialPackBlock).toContain('complexBuf[idx * 2u + 1u]')
   })
 
-  it('fusedPotentialPack applies phase rotation (cos/sin) in real-time path', () => {
+  it('fusedPotentialPack contains phase rotation (cos/sin) in real-time path', () => {
     expect(tdseFusedPotentialPackBlock).toContain('cos(phase)')
     expect(tdseFusedPotentialPackBlock).toContain('sin(phase)')
   })
 
-  it('fusedPotentialPack applies exponential decay in imaginary-time path', () => {
+  it('fusedPotentialPack contains exponential decay in imaginary-time path', () => {
     expect(tdseFusedPotentialPackBlock).toContain('exp(-arg)')
     expect(tdseFusedPotentialPackBlock).toContain('params.imaginaryTime')
   })
@@ -433,11 +433,11 @@ describe('fused kernel WGSL structure', () => {
     expect(tdseFusedPotentialPackBlock).toContain('params.interactionStrength * density')
   })
 
-  it('fusedUnpackPotential applies 1/N normalization from inverse FFT', () => {
+  it('fusedUnpackPotential includes 1/N normalization from inverse FFT', () => {
     expect(tdseFusedUnpackPotentialBlock).toContain('1.0 / f32(params.totalSites)')
   })
 
-  it('fusedUnpackPotential reads complexBuf and writes psiRe, psiIm', () => {
+  it('fusedUnpackPotential includes complexBuf input and psiRe, psiIm output', () => {
     expect(tdseFusedUnpackPotentialBlock).toContain('complexBuf[idx * 2u]')
     expect(tdseFusedUnpackPotentialBlock).toContain('psiRe[idx]')
     expect(tdseFusedUnpackPotentialBlock).toContain('psiIm[idx]')

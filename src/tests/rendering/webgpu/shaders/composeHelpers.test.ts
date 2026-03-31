@@ -43,7 +43,7 @@ describe('processFeatureFlags', () => {
 })
 
 describe('generateStandardBindGroups', () => {
-  it('produces WGSL with 4 bind groups (0-3)', () => {
+  it('generates WGSL with 4 bind groups (0-3)', () => {
     const wgsl = generateStandardBindGroups()
     expect(wgsl).toContain('@group(0) @binding(0)')
     expect(wgsl).toContain('@group(1) @binding(0)')
@@ -135,7 +135,7 @@ describe('assembleShaderBlocks', () => {
     expect(result.wgsl).toContain('const Y: f32 = 99.0;')
   })
 
-  it('applies overrides by target name', async () => {
+  it('includes override content when target matches', async () => {
     const assembleShaderBlocks = await getAssemble()
     const result = assembleShaderBlocks(
       [
