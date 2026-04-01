@@ -396,6 +396,14 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setQwAutoScale: (autoScale) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          quantumWalk: { ...state.schroedinger.quantumWalk, autoScale },
+        },
+      }))
+    },
     setQwAbsorberEnabled: (enabled) => {
       setWithVersion((state) => ({
         schroedinger: {

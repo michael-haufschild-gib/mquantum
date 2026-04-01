@@ -418,6 +418,7 @@ export interface SchroedingerSliceActions {
   applyQuantumWalkPreset: (presetId: string) => void
   resetQuantumWalk: () => void
   clearQuantumWalkNeedsReset: () => void
+  setQwAutoScale: (autoScale: boolean) => void
   setQwAbsorberEnabled: (enabled: boolean) => void
   setQwAbsorberWidth: (width: number) => void
   setQwPmlTargetReflection: (r: number) => void
