@@ -93,7 +93,7 @@ describe('fcos', () => {
 describe('fsin/fcos — trigonometric identities', () => {
   it('sin²(x) + cos²(x) ≈ 1 across full range', () => {
     // The parabolic approximation deviates from true sin/cos, so sin²+cos²
-    // won't be exactly 1. However, it should be close (~3% max deviation).
+    // won't be exactly 1. Empirically this identity can deviate by about 12.5%.
     const testAngles = [
       0,
       0.1,
@@ -112,7 +112,7 @@ describe('fsin/fcos — trigonometric identities', () => {
       const s = fsin(x)
       const c = fcos(x)
       const sum = s * s + c * c
-      // The parabolic approximation's sin²+cos² can deviate ~11% at worst-case angles
+      // The parabolic approximation's sin²+cos² can deviate ~12.5% at worst-case angles
       // because fsin/fcos each have ~1.2% peak abs error, and the Pythagorean
       // identity amplifies these errors quadratically at angles near ±0.7
       expect(Math.abs(sum - 1.0)).toBeLessThan(0.13)

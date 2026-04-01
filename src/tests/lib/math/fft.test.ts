@@ -455,6 +455,12 @@ describe('fft — known DFT pairs', () => {
     expect(magK).toBeCloseTo(n / 2, 8)
     expect(magNK).toBeCloseTo(n / 2, 8)
 
+    // Verify sign/phase: bin k has imag = -N/2, bin N-k has imag = +N/2
+    expect(data[k * 2]).toBeCloseTo(0, 8)
+    expect(data[(n - k) * 2]).toBeCloseTo(0, 8)
+    expect(data[k * 2 + 1]).toBeCloseTo(-n / 2, 8)
+    expect(data[(n - k) * 2 + 1]).toBeCloseTo(n / 2, 8)
+
     // Other bins should be zero
     for (let i = 0; i < n; i++) {
       if (i !== k && i !== n - k) {

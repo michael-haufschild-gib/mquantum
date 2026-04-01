@@ -554,16 +554,19 @@ describe('Matrix Operations', () => {
       }
     })
 
-    it('4x4 unrolled path and 5x5 generic path produce consistent results', () => {
-      // Verify that multiplyMatricesInto gives same result for 4x4 (unrolled) and 5x5 (generic)
-      // by testing identity multiplication on both paths
+    it('4x4 unrolled path and 5x5 generic path match multiplyMatrices on dense inputs', () => {
       for (const dim of [4, 5]) {
-        const I = createIdentityMatrix(dim)
-        const M = new Float32Array(dim * dim)
-        for (let i = 0; i < dim * dim; i++) M[i] = (i % 7) - 3
+        const A = new Float32Array(dim * dim)
+        const B = new Float32Array(dim * dim)
+        for (let i = 0; i < dim * dim; i++) {
+          A[i] = (i % 7) - 3
+          B[i] = ((i * 3) % 11) - 5
+        }
+
+        const expected = multiplyMatrices(A, B)
         const out = new Float32Array(dim * dim)
-        multiplyMatricesInto(out, I, M)
-        expect(matricesEqual(out, M)).toBe(true)
+        multiplyMatricesInto(out, A, B)
+        expect(matricesEqual(out, expected)).toBe(true)
       }
     })
   })

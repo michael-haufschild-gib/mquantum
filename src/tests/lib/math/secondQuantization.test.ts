@@ -344,7 +344,7 @@ describe('computeSecondQuantMetrics', () => {
     expect(m.fockDistribution[2]).toBeGreaterThan(0)
   })
 
-  it('coherent state normalization holds for large |α| = 5', () => {
+  it('coherent state with large |α| = 5 remains finite under truncation', () => {
     const m = computeSecondQuantMetrics('coherent', {
       n: 0,
       alphaRe: 5,

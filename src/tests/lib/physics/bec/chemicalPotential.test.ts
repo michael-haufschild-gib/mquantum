@@ -131,7 +131,7 @@ describe('thomasFermiMuND', () => {
     expect(0.5 * mass * omega * omega * R * R).toBeCloseTo(mu, 6)
   })
 
-  it('healing length × sound speed = ℏ/m at constant density', () => {
+  it('healing length × sound speed = ℏ/(m√2) at constant density', () => {
     // ξ = ℏ/√(2mgn), c = √(gn/m)
     // ξ·c = ℏ/√(2mgn) · √(gn/m) = ℏ/√(2m²) = ℏ/(m√2)
     const hbar = 1.0

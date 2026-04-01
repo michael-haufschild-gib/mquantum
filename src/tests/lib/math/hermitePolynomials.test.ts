@@ -253,8 +253,11 @@ describe('HO wavefunction properties', () => {
     const nodes2_high = findNodes(2, 4.0)
     expect(nodes2_low).toHaveLength(2)
     expect(nodes2_high).toHaveLength(2)
-    // Higher ω → nodes closer to origin
-    expect(Math.abs(nodes2_high[0]!)).toBeLessThan(Math.abs(nodes2_low[0]!))
+    // Higher ω → both nodes closer to origin
+    const absLow = nodes2_low.map((x) => Math.abs(x)).sort((a, b) => a - b)
+    const absHigh = nodes2_high.map((x) => Math.abs(x)).sort((a, b) => a - b)
+    expect(absHigh[0]!).toBeLessThan(absLow[0]!)
+    expect(absHigh[1]!).toBeLessThan(absLow[1]!)
   })
 
   it('different HO eigenstates are orthogonal: integral(psi_n * psi_m) approx 0 for n != m', () => {
