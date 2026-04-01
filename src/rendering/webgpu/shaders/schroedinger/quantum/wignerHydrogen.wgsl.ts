@@ -65,11 +65,12 @@ fn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> 
   // Auto-scale quadrature for Nyquist satisfaction:
   // cos(2*pr*s) oscillates with period pi/|pr|.
   // Need ds < pi/(4*|pr|) ⟹ nPts > 4*|pr|*sMax/pi.
-  // Cap at 256: covers n≤7,|pr|≤3 (Nyquist: 4×3×122.5/π ≈ 469 > 256 for n=7,
-  // but n=5,|pr|≤3 needs ~191 which fits). Higher n+pr combos are aliased but
-  // visually acceptable in the low-density tails of phase space.
+  // Cap at 256 samples: resolves up to about n≈5 for |pr|≤3
+  // (e.g. n=5,|pr|=3 needs ~191 points). For n=7,|pr|=3 Nyquist
+  // requires ~469, so higher n+pr combos are under-resolved and
+  // exhibit aliasing, mainly in low-density tails of phase space.
   let nyquistPts = i32(ceil(4.0 * abs(pr) * sMax / PI));
-  let effectiveNPts = min(max(nPts, nyquistPts), 256);
+  let effectiveNPts = max(1, min(max(nPts, nyquistPts), 256));
 
   // Midpoint quadrature
   let ds = sMax / f32(effectiveNPts);

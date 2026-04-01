@@ -366,9 +366,10 @@ fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
   // Normalization: sqrt((n-l-1)!/(n+l)!) × 2^l × l! × sqrt(2n/π)
   // Derived from Gegenbauer orthogonality: ∫|R̃|²k²dk = π/(2^{2l+1}·n·(l!)²)
   // without the 2^l·l!·sqrt(2n/π) factor, so we include it here.
-  let factNum = FACTORIAL_LUT[max(order, 0)];
-  let factDen = max(FACTORIAL_LUT[min(n + l, 12)], 1e-6);
-  let norm = sqrt(max(factNum / factDen, 1e-8));
+  // Uses lnFactorial (LUT covers 0..22) instead of FACTORIAL_LUT (0..12)
+  // because n+l can reach 13 (n=7,l=6).
+  let lnRatio = lnFactorial(max(order, 0)) - lnFactorial(n + l);
+  let norm = sqrt(exp(lnRatio));
   let lFact = FACTORIAL_LUT[min(l, 12)];
   let fockNorm = exp2(f32(l)) * lFact * sqrt(2.0 * nf / PI);
 
