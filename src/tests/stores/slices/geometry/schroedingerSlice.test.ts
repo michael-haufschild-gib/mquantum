@@ -145,11 +145,11 @@ describe('schroedingerSlice — mode switching', () => {
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('becDynamics')
   })
 
-  it('TDSE allows dimension 2', () => {
+  it('TDSE forces dimension 3 minimum (no 2D grid rendering path)', () => {
     useGeometryStore.getState().setDimension(2)
 
     useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
-    expect(useGeometryStore.getState().dimension).toBe(2)
+    expect(useGeometryStore.getState().dimension).toBe(3)
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 

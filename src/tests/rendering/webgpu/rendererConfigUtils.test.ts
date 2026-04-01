@@ -119,20 +119,20 @@ describe('applyModeOverrides', () => {
     expect(diracResult.dimension).toBe(3)
   })
 
-  it('allows dimension 2 for TDSE and freeScalarField', () => {
+  it('clamps dimension to 3 for TDSE and freeScalarField', () => {
     const tdseResult = applyModeOverrides({
       ...BASE_CONFIG,
       quantumMode: 'tdseDynamics',
       dimension: 2,
     })
-    expect(tdseResult.dimension).toBe(2)
+    expect(tdseResult.dimension).toBe(3)
 
     const fsResult = applyModeOverrides({
       ...BASE_CONFIG,
       quantumMode: 'freeScalarField',
       dimension: 2,
     })
-    expect(fsResult.dimension).toBe(2)
+    expect(fsResult.dimension).toBe(3)
   })
 
   it('preserves config for standard 3D analytic mode', () => {

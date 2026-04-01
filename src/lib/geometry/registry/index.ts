@@ -1,19 +1,30 @@
 /**
- * Object Type Registry - Barrel Export
+ * Object Type Registry — Barrel Export
  *
- * Central registry for the 'schroedinger' object type metadata,
- * capabilities, and configurations.
+ * Provides both the legacy ObjectType registry (for internal plumbing)
+ * and the flat QuantumType registry (for user-facing type selection).
  *
  * @example
  * ```typescript
  * import {
- *   getAvailableTypesForDimension,
+ *   getAvailableQuantumTypes,
+ *   getQuantumTypeEntry,
  *   getControlsComponent,
  * } from '@/lib/geometry/registry';
  * ```
  */
 
-// Types
+// Types — flat model
+export type {
+  AvailableQuantumTypeInfo,
+  QuantumTypeCategory,
+  QuantumTypeEntry,
+  QuantumTypeInternal,
+  QuantumTypeKey,
+  QuantumTypeRegistry,
+} from './types'
+
+// Types — legacy model (still used by internal plumbing)
 export type {
   AnimationCapabilities,
   AnimationSystemDef,
@@ -23,27 +34,33 @@ export type {
   RenderingCapabilities,
 } from './types'
 
-// Registry
+// Registries
+export { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
 export { OBJECT_TYPE_REGISTRY } from './registry'
 
-// Helper functions
+// Helper functions — flat model
+export {
+  getAvailableQuantumTypes,
+  getQuantumTypeEntry,
+  getQuantumTypeName,
+  getQuantumTypesRequiringDimensionAbove,
+  isComputeQuantumType,
+  isValidQuantumTypeKey,
+  resolveQuantumTypeKey,
+} from './helpers'
+
+// Helper functions — legacy model (still used by stores, URL serializer, etc.)
 export {
   getAvailableTypesForDimension,
-  // Store config helpers
   getConfigStoreKey,
-  // UI helpers
   getControlsComponentKey,
-  // Dimension constraint helpers
   getDimensionConstraints,
-  // Core lookups
   getObjectTypeEntry,
   getRecommendedDimension,
   getUnavailabilityReason,
   hasTimelineControls,
   isAvailableForDimension,
-  // Rendering capability helpers
   isRaymarchingType,
-  // Validation helpers
   isValidObjectType,
 } from './helpers'
 

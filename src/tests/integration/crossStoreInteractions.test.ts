@@ -139,11 +139,11 @@ describe('Quantum mode → dimension → extended store chain', () => {
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('becDynamics')
   })
 
-  it('switching to TDSE at 2D preserves dimension', () => {
+  it('switching to TDSE at 2D clamps dimension to 3', () => {
     useGeometryStore.getState().setDimension(2)
     useExtendedObjectStore.getState().setSchroedingerQuantumMode('tdseDynamics')
 
-    expect(useGeometryStore.getState().dimension).toBe(2)
+    expect(useGeometryStore.getState().dimension).toBe(3)
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 

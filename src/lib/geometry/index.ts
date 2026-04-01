@@ -9,7 +9,24 @@
 export type { ObjectType } from './types'
 export { isExtendedObjectType } from './types'
 
-// Registry exports (single source of truth for object type capabilities)
+// Registry exports — flat quantum type model (user-facing)
+export type {
+  AvailableQuantumTypeInfo,
+  QuantumTypeCategory,
+  QuantumTypeEntry,
+  QuantumTypeKey,
+} from './registry'
+export {
+  getAvailableQuantumTypes,
+  getQuantumTypeEntry,
+  getQuantumTypeName,
+  isComputeQuantumType,
+  isValidQuantumTypeKey,
+  QUANTUM_TYPE_REGISTRY,
+  resolveQuantumTypeKey,
+} from './registry'
+
+// Registry exports — legacy object type model (internal plumbing)
 export type {
   AnimationCapabilities,
   AnimationSystemDef,
@@ -22,19 +39,13 @@ export {
   getAvailableTypesForDimension,
   getConfigStoreKey,
   getControlsComponent,
-  // UI
   getControlsComponentKey,
-  // Dimension constraints
   getDimensionConstraints,
-  // Core lookups
   getObjectTypeEntry,
   hasTimelineControls,
   isAvailableForDimension,
-  // Rendering capabilities
   isRaymarchingType,
-  // Validation
   isValidObjectType,
-  // Registry data
   OBJECT_TYPE_REGISTRY,
 } from './registry'
 

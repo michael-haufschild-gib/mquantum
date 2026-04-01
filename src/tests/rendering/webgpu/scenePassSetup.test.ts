@@ -134,16 +134,16 @@ describe('extractSchrodingerConfig', () => {
     expect(dirac.dimension).toBe(3)
   })
 
-  it('allows dimension 2 for TDSE and freeScalarField', () => {
+  it('clamps dimension to 3 for TDSE and freeScalarField', () => {
     const tdse = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'tdseDynamics', dimension: 2 })
     )
-    expect(tdse.dimension).toBe(2)
+    expect(tdse.dimension).toBe(3)
 
     const fs = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'freeScalarField', dimension: 2 })
     )
-    expect(fs.dimension).toBe(2)
+    expect(fs.dimension).toBe(3)
   })
 
   it('all compute modes force identical analytic feature overrides', () => {

@@ -7,9 +7,19 @@
  * @see src/lib/geometry/registry/registry.ts for the registry data
  */
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+
 import type { ObjectType } from '../types'
+import { QUANTUM_TYPE_REGISTRY } from './quantumTypes'
 import { OBJECT_TYPE_REGISTRY } from './registry'
-import type { AvailableTypeInfo, DimensionConstraints, ObjectTypeEntry } from './types'
+import type {
+  AvailableQuantumTypeInfo,
+  AvailableTypeInfo,
+  DimensionConstraints,
+  ObjectTypeEntry,
+  QuantumTypeEntry,
+  QuantumTypeKey,
+} from './types'
 
 // ============================================================================
 // Core Lookups
@@ -171,4 +181,113 @@ export function isValidObjectType(type: string): type is ObjectType {
  */
 export function getConfigStoreKey(type: ObjectType): string | undefined {
   return getObjectTypeEntry(type)?.configStoreKey
+}
+
+// ============================================================================
+// Quantum Type Registry — Flat Model Helpers
+// ============================================================================
+
+/**
+ * Gets a quantum type entry by key.
+ *
+ * @param key - The quantum type key (any mode or 'pauliSpinor')
+ * @returns The registry entry, or undefined if not found
+ */
+export function getQuantumTypeEntry(key: QuantumTypeKey): QuantumTypeEntry | undefined {
+  return QUANTUM_TYPE_REGISTRY.get(key)
+}
+
+/**
+ * Resolves the flat QuantumTypeKey from the runtime ObjectType + quantumMode pair.
+ *
+ * @param objectType - Runtime object type
+ * @param quantumMode - Quantum mode (only used when objectType is 'schroedinger')
+ * @returns The flat key, or undefined if no match
+ */
+export function resolveQuantumTypeKey(
+  objectType: ObjectType,
+  quantumMode?: SchroedingerQuantumMode
+): QuantumTypeKey | undefined {
+  if (objectType === 'pauliSpinor') return 'pauliSpinor'
+  if (objectType === 'schroedinger' && quantumMode) return quantumMode
+  return undefined
+}
+
+/**
+ * Gets all quantum types available for a given dimension.
+ *
+ * @param dimension - The current dimension
+ * @returns Array of type info with availability status, sorted by category
+ */
+export function getAvailableQuantumTypes(dimension: number): AvailableQuantumTypeInfo[] {
+  const result: AvailableQuantumTypeInfo[] = []
+
+  for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+    const available = dimension >= entry.dimensions.min && dimension <= entry.dimensions.max
+    const disabledReason = !available
+      ? dimension < entry.dimensions.min
+        ? `Requires ${entry.dimensions.min}D+`
+        : `Max ${entry.dimensions.max}D`
+      : undefined
+
+    result.push({
+      key: entry.key,
+      name: entry.name,
+      description: entry.description,
+      category: entry.category,
+      available,
+      disabledReason,
+    })
+  }
+
+  return result
+}
+
+/**
+ * Checks if a quantum type key is a compute mode (GPU lattice simulation).
+ *
+ * @param key - The quantum type key
+ * @returns true if the type uses a compute pipeline
+ */
+export function isComputeQuantumType(key: QuantumTypeKey): boolean {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.category === 'compute'
+}
+
+/**
+ * Gets the display name for a quantum type.
+ *
+ * @param key - The quantum type key
+ * @returns Display name, or the key itself as fallback
+ */
+export function getQuantumTypeName(key: QuantumTypeKey): string {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.name ?? key
+}
+
+/**
+ * Validates a string as a QuantumTypeKey.
+ *
+ * @param key - String to validate
+ * @returns true if the string is a valid QuantumTypeKey
+ */
+export function isValidQuantumTypeKey(key: string): key is QuantumTypeKey {
+  return QUANTUM_TYPE_REGISTRY.has(key as QuantumTypeKey)
+}
+
+/**
+ * Gets all QuantumTypeKeys whose minimum dimension is > the given threshold.
+ * Useful for deriving sets like QUANTUM_MODES_3D_ONLY.
+ *
+ * @param minDimThreshold - Dimension threshold (exclusive)
+ * @returns Set of keys requiring dimension > threshold
+ */
+export function getQuantumTypesRequiringDimensionAbove(
+  minDimThreshold: number
+): Set<QuantumTypeKey> {
+  const result = new Set<QuantumTypeKey>()
+  for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+    if (entry.dimensions.min > minDimThreshold) {
+      result.add(key)
+    }
+  }
+  return result
 }

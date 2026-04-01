@@ -1,75 +1,18 @@
 import { m } from 'motion/react'
-import React, { useCallback } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
-import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import {
+  type AvailableQuantumTypeInfo,
+  getAvailableQuantumTypes,
+  getQuantumTypeEntry,
+  resolveQuantumTypeKey,
+} from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
-
-/** Per-mode metadata */
-const MODE_FEATURES: Record<
-  SchroedingerQuantumMode,
-  { minDim: number; category: 'analytic' | 'compute' }
-> = {
-  harmonicOscillator: { minDim: 1, category: 'analytic' },
-  hydrogenND: { minDim: 3, category: 'analytic' },
-  hydrogenNDCoupled: { minDim: 3, category: 'analytic' },
-  freeScalarField: { minDim: 1, category: 'compute' },
-  tdseDynamics: { minDim: 3, category: 'compute' },
-  becDynamics: { minDim: 3, category: 'compute' },
-  diracEquation: { minDim: 3, category: 'compute' },
-  quantumWalk: { minDim: 1, category: 'compute' },
-}
-
-const MODE_OPTIONS: {
-  value: SchroedingerQuantumMode
-  label: string
-  description: string
-}[] = [
-  {
-    value: 'harmonicOscillator',
-    label: 'Harmonic Oscillator',
-    description: 'N-dimensional quantum superposition states.',
-  },
-  {
-    value: 'hydrogenND',
-    label: 'Hydrogen Orbitals',
-    description: 'N-dimensional hydrogen atom in 3D space.',
-  },
-  {
-    value: 'hydrogenNDCoupled',
-    label: 'Hydrogen ND (Coupled)',
-    description: 'True D-dimensional Coulomb problem with hyperspherical harmonics.',
-  },
-  {
-    value: 'freeScalarField',
-    label: 'Free Scalar Field',
-    description: 'Klein-Gordon field on a lattice with real-time evolution.',
-  },
-  {
-    value: 'tdseDynamics',
-    label: 'TDSE Dynamics',
-    description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
-  },
-  {
-    value: 'becDynamics',
-    label: 'Bose-Einstein Condensate',
-    description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
-  },
-  {
-    value: 'diracEquation',
-    label: 'Dirac',
-    description: 'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
-  },
-  {
-    value: 'quantumWalk',
-    label: 'Quantum Walk',
-    description: 'Discrete-time quantum walk on N-D lattice: Grover search, interference topology.',
-  },
-]
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(
@@ -87,47 +30,51 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     }))
   )
 
-  // Handle object type initialization (rendering config, quantum mode setup)
   useObjectTypeInitialization(objectType, dimension)
 
   const { addToast } = useToast()
 
-  const handleSelectMode = useCallback(
-    (value: SchroedingerQuantumMode) => {
+  // Derive the currently-selected flat key from the runtime two-field model
+  const selectedKey = resolveQuantumTypeKey(objectType, quantumMode)
+
+  // All types from the flat registry, with availability for current dimension
+  const allTypes = useMemo(() => getAvailableQuantumTypes(dimension), [dimension])
+  const analyticTypes = useMemo(() => allTypes.filter((t) => t.category === 'analytic'), [allTypes])
+  const computeTypes = useMemo(() => allTypes.filter((t) => t.category === 'compute'), [allTypes])
+
+  const handleSelect = useCallback(
+    (entry: AvailableQuantumTypeInfo) => {
       soundManager.playClick()
-      const features = MODE_FEATURES[value]
       const prevDim = useGeometryStore.getState().dimension
-      // If switching from pauliSpinor, change objectType back to schroedinger
-      if (useGeometryStore.getState().objectType !== 'schroedinger') {
-        setObjectType('schroedinger')
+
+      if (entry.key === 'pauliSpinor') {
+        // Pauli uses a different ObjectType
+        setObjectType('pauliSpinor')
+      } else {
+        // All other modes use the schroedinger ObjectType
+        if (useGeometryStore.getState().objectType !== 'schroedinger') {
+          setObjectType('schroedinger')
+        }
+        setQuantumMode(entry.key)
       }
-      setQuantumMode(value)
-      // Show feedback toast for mode switch side effects
+
+      // Feedback toast
       const newDim = useGeometryStore.getState().dimension
       const changes: string[] = []
       if (newDim !== prevDim) changes.push(`Dimension → ${newDim}D`)
-      if (features.category === 'compute') changes.push('Representation → Position')
-      const modeLabel = MODE_OPTIONS.find((m) => m.value === value)?.label ?? value
+      if (entry.category === 'compute') changes.push('Representation → Position')
       if (changes.length > 0) {
-        addToast(`${modeLabel}: ${changes.join(', ')}`, 'info')
+        addToast(`${entry.name}: ${changes.join(', ')}`, 'info')
       }
     },
     [setObjectType, setQuantumMode, addToast]
   )
 
-  const handleSelectPauli = useCallback(() => {
-    soundManager.playClick()
-    setObjectType('pauliSpinor')
-    addToast('Pauli Spinor: 2-component spinor with magnetic field', 'info')
-  }, [setObjectType, addToast])
-
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.05,
-      },
+      transition: { staggerChildren: 0.05 },
     },
   }
 
@@ -136,20 +83,14 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     show: { opacity: 1, x: 0 },
   }
 
-  const isPauliSelected = objectType === 'pauliSpinor'
-
-  const analyticModes = MODE_OPTIONS.filter((m) => MODE_FEATURES[m.value].category === 'analytic')
-  const computeModes = MODE_OPTIONS.filter((m) => MODE_FEATURES[m.value].category === 'compute')
-
-  const renderCard = (mode: (typeof MODE_OPTIONS)[number]) => {
-    const isSelected = !isPauliSelected && quantumMode === mode.value
-    const features = MODE_FEATURES[mode.value]
+  const renderCard = (entry: AvailableQuantumTypeInfo) => {
+    const isSelected = selectedKey === entry.key
 
     return (
       <m.button
-        key={mode.value}
+        key={entry.key}
         variants={itemVariants}
-        onClick={() => handleSelectMode(mode.value)}
+        onClick={() => handleSelect(entry)}
         onMouseEnter={() => soundManager.playHover()}
         className={`
           relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
@@ -162,13 +103,15 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         `}
         whileHover={{ scale: 1.01, x: 2 }}
         whileTap={{ scale: 0.98 }}
-        data-testid={`object-type-${mode.value}`}
+        data-testid={`object-type-${entry.key}`}
         data-selected={isSelected}
       >
         <div className="flex items-center justify-between w-full mb-1">
-          <span className="font-medium text-sm">{mode.label}</span>
+          <span className="font-medium text-sm">{entry.name}</span>
           <div className="flex items-center gap-2">
-            <span className="text-[9px] text-text-tertiary font-mono">{features.minDim}D+</span>
+            <span className="text-[9px] text-text-tertiary font-mono">
+              {getQuantumTypeEntry(entry.key)?.dimensions.min ?? 1}D+
+            </span>
             {isSelected && (
               <div className="relative w-2 h-2">
                 <div className="absolute inset-0 rounded-full bg-accent led-glow" />
@@ -178,7 +121,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
           </div>
         </div>
         <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
-          {mode.description}
+          {entry.description}
         </span>
       </m.button>
     )
@@ -194,47 +137,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1">
         Analytic
       </div>
-      {analyticModes.map(renderCard)}
+      {analyticTypes.map(renderCard)}
       <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">
         Compute (GPU)
       </div>
-      {computeModes.map(renderCard)}
-
-      {/* Pauli Spinor — separate object type */}
-      <m.button
-        variants={itemVariants}
-        onClick={handleSelectPauli}
-        onMouseEnter={() => soundManager.playHover()}
-        className={`
-          relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
-          ${
-            isPauliSelected
-              ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
-              : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
-          }
-          cursor-pointer
-        `}
-        whileHover={{ scale: 1.01, x: 2 }}
-        whileTap={{ scale: 0.98 }}
-        data-testid="object-type-pauliSpinor"
-        data-selected={isPauliSelected}
-      >
-        <div className="flex items-center justify-between w-full mb-1">
-          <span className="font-medium text-sm">Pauli Spinor</span>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-text-tertiary font-mono">2D+</span>
-            {isPauliSelected && (
-              <div className="relative w-2 h-2">
-                <div className="absolute inset-0 rounded-full bg-accent led-glow" />
-                <div className="absolute inset-0 rounded-full bg-accent" />
-              </div>
-            )}
-          </div>
-        </div>
-        <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
-          Two-component spinor in a magnetic field: spin precession, Stern-Gerlach splitting.
-        </span>
-      </m.button>
+      {computeTypes.map(renderCard)}
     </m.div>
   )
 })

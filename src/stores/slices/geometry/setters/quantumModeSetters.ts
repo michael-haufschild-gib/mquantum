@@ -7,27 +7,15 @@
  * @module stores/slices/geometry/setters/quantumModeSetters
  */
 
+import { QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
-
-/** Quantum modes that require 3D+ dimensions.
- *  TDSE and freeScalarField support 2D natively (shaders handle latticeDim < 3
- *  via perpendicular falloff; FFT dispatches per-axis). */
-const COMPUTE_MODES_3D = new Set(['becDynamics', 'diracEquation'])
-
-/** Quantum modes that use compute pipelines (no inline wavefunction). */
-const COMPUTE_MODES = new Set([
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-  'quantumWalk',
-])
 
 /**
  * Create quantum mode, representation, and quantum number setters.
@@ -63,7 +51,7 @@ export function createQuantumModeSetters(
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
-      const needsDim3 = COMPUTE_MODES_3D.has(mode)
+      const needsDim3 = QUANTUM_MODES_3D_ONLY.has(mode)
       if (needsDim3 && useGeometryStore.getState().dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
@@ -72,7 +60,7 @@ export function createQuantumModeSetters(
         const dim = useGeometryStore.getState().dimension
 
         // Force position representation and disable cross-section for compute modes
-        if (COMPUTE_MODES.has(mode)) {
+        if (isComputeQuantumType(mode)) {
           if (state.schroedinger.representation !== 'position') updates.representation = 'position'
           if (state.schroedinger.crossSectionEnabled) updates.crossSectionEnabled = false
         }
@@ -129,7 +117,7 @@ export function createQuantumModeSetters(
     },
 
     setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {
-      if (value !== 'position' && COMPUTE_MODES.has(get().schroedinger.quantumMode)) return
+      if (value !== 'position' && isComputeQuantumType(get().schroedinger.quantumMode)) return
       // Block non-position for hydrogen at dim=2 (not yet implemented)
       if (value !== 'position') {
         const qm = get().schroedinger.quantumMode

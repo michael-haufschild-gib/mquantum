@@ -8,11 +8,34 @@
  * @see src/lib/geometry/registry/registry.ts for the actual registry data
  */
 
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+
 import type { ObjectType } from '../types'
+
+// ============================================================================
+// Quantum Type Key — Flat Identifier for All Modes
+// ============================================================================
+
+/**
+ * Unified key for every user-visible quantum type.
+ *
+ * From the user's perspective, "Hydrogen Orbitals" and "Pauli Spinor" are
+ * peers — both are types you pick from the same list. This union captures
+ * that flat model. The two-level ObjectType + SchroedingerQuantumMode split
+ * is an internal implementation detail bridged via {@link QuantumTypeInternal}.
+ */
+export type QuantumTypeKey = SchroedingerQuantumMode | 'pauliSpinor'
 
 // ============================================================================
 // Core Enums and Literal Types
 // ============================================================================
+
+/**
+ * Category classification for quantum types
+ * - analytic: Closed-form wavefunction evaluated inline in the shader
+ * - compute: GPU lattice simulation with a dedicated compute pass
+ */
+export type QuantumTypeCategory = 'analytic' | 'compute'
 
 /**
  * Category classification for object types
@@ -257,6 +280,75 @@ export interface AvailableTypeInfo {
   type: ObjectType
   name: string
   description: string
+  available: boolean
+  disabledReason?: string
+}
+
+// ============================================================================
+// Quantum Type Registry — Flat, User-Facing Model
+// ============================================================================
+
+/**
+ * Bridge to internal runtime plumbing.
+ *
+ * The renderer and stores still operate on ObjectType + SchroedingerQuantumMode.
+ * This mapping lets registry consumers translate a flat QuantumTypeKey to the
+ * two-field model the internals expect.
+ */
+export interface QuantumTypeInternal {
+  /** Runtime ObjectType used by geometryStore and the rendering pipeline */
+  objectType: ObjectType
+  /** Quantum mode within the schroedinger pipeline (undefined for pauliSpinor) */
+  quantumMode?: SchroedingerQuantumMode
+  /** Top-level key in extendedObjectStore (e.g. 'schroedinger', 'pauliSpinor') */
+  configStoreKey: string
+  /** Sub-key within SchrodingerConfig for mode-specific state (e.g. 'tdse', 'bec') */
+  configSubKey?: string
+}
+
+/**
+ * A single entry in the flat quantum type registry.
+ *
+ * Every user-visible type — Harmonic Oscillator, Hydrogen, TDSE, BEC,
+ * Dirac, Pauli Spinor, etc. — gets one entry with identical schema.
+ */
+export interface QuantumTypeEntry {
+  /** Flat identifier (matches QuantumTypeKey union) */
+  key: QuantumTypeKey
+  /** Display name for UI */
+  name: string
+  /** User-facing description */
+  description: string
+  /** Analytic (closed-form) or compute (GPU lattice) */
+  category: QuantumTypeCategory
+  /** Dimension constraints */
+  dimensions: DimensionConstraints
+  /** Rendering capabilities */
+  rendering: RenderingCapabilities
+  /** Animation capabilities */
+  animation: AnimationCapabilities
+  /** URL serialization config */
+  urlSerialization: UrlSerializationConfig
+  /** UI component mapping */
+  ui: UiComponentMapping
+  /** Bridge to internal ObjectType + QuantumMode plumbing */
+  internal: QuantumTypeInternal
+}
+
+/**
+ * The flat Quantum Type Registry.
+ * A readonly Map from QuantumTypeKey to QuantumTypeEntry.
+ */
+export type QuantumTypeRegistry = ReadonlyMap<QuantumTypeKey, QuantumTypeEntry>
+
+/**
+ * Result type for getAvailableQuantumTypes helper
+ */
+export interface AvailableQuantumTypeInfo {
+  key: QuantumTypeKey
+  name: string
+  description: string
+  category: QuantumTypeCategory
   available: boolean
   disabledReason?: string
 }

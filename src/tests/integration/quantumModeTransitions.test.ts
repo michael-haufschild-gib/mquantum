@@ -50,11 +50,11 @@ describe('quantum mode state machine transitions', () => {
       }
     })
 
-    it('TDSE and freeScalarField allow dimension 2', () => {
+    it('TDSE and freeScalarField force dimension 3 minimum', () => {
       for (const mode of ['tdseDynamics', 'freeScalarField'] as SchroedingerQuantumMode[]) {
         useGeometryStore.getState().setDimension(2)
         useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
-        expect(useGeometryStore.getState().dimension, `${mode} should allow dim 2`).toBe(2)
+        expect(useGeometryStore.getState().dimension, `${mode} should clamp to 3`).toBe(3)
       }
     })
 

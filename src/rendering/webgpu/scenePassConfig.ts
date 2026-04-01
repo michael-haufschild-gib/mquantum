@@ -8,6 +8,7 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import {
   COLOR_ALGORITHM_TO_INT,
@@ -177,13 +178,11 @@ export function normalizeColorAlgorithmForQuantumMode(
 }
 
 /** Compute/2D modes that are GPU-lattice or low-dim: disable analytical features. */
-const COMPUTE_MODES = new Set([
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-  'quantumWalk',
-])
+const COMPUTE_MODES = new Set(
+  Array.from(QUANTUM_TYPE_REGISTRY.entries())
+    .filter(([, e]) => e.category === 'compute' && e.internal.objectType === 'schroedinger')
+    .map(([key]) => key)
+)
 
 /** Gate a config flag: return false if any disabling condition is true, otherwise pass through. */
 function gate(value: boolean, ...disablers: boolean[]): boolean {
@@ -198,13 +197,16 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
   const disableAnalytical = isCompute || is2D
   const disableQuantumEffect = isCompute || config.openQuantumEnabled
 
+  // Clamp dimension to the mode's minimum from the quantum type registry.
+  // All compute modes require 3D+ (no 2D density grid rendering path exists).
+  const modeMinDim = isPauli
+    ? (QUANTUM_TYPE_REGISTRY.get('pauliSpinor')?.dimensions.min ?? 3)
+    : (QUANTUM_TYPE_REGISTRY.get(config.quantumMode)?.dimensions.min ?? 2)
+  const effectiveDimension = isCompute ? Math.max(config.dimension, modeMinDim) : config.dimension
+
   return {
     objectType: config.objectType,
-    dimension:
-      isCompute &&
-      (config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation' || isPauli)
-        ? Math.max(config.dimension, 3)
-        : config.dimension,
+    dimension: effectiveDimension,
     quantumMode: config.quantumMode,
     termCount: isCompute ? 1 : config.termCount,
     colorAlgorithm: normalizeColorAlgorithmForQuantumMode(
@@ -263,14 +265,7 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.objectType !== next.objectType) return true
   if (previous.quantumMode === next.quantumMode) return false
-  const computeModes = new Set([
-    'freeScalarField',
-    'tdseDynamics',
-    'becDynamics',
-    'diracEquation',
-    'quantumWalk',
-  ])
-  return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
+  return COMPUTE_MODES.has(previous.quantumMode) || COMPUTE_MODES.has(next.quantumMode)
 }
 
 // ============================================================================

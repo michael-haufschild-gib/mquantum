@@ -21,7 +21,7 @@ import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
-import { OBJECT_TYPE_REGISTRY } from '@/lib/geometry/registry/registry'
+import { getQuantumTypeName, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 import { useExportStore } from '@/stores/exportStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -166,22 +166,9 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
         logger.error('Failed to capture preview for video export:', e)
       }
 
-      let defaultText = ''
-      if (objectType === 'schroedinger') {
-        const modeNames: Record<string, string> = {
-          freeScalarField: 'Free Scalar Field',
-          tdseDynamics: 'TDSE Dynamics',
-          hydrogenND: 'Hydrogen ND',
-          becDynamics: 'BEC Dynamics',
-          diracEquation: 'Dirac Equation',
-        }
-        const modeName = modeNames[quantumMode] ?? 'Harmonic Oscillator'
-        defaultText = `${dimension}D ${modeName}`
-      } else {
-        const entry = OBJECT_TYPE_REGISTRY.get(objectType)
-        const typeName = entry?.name ?? objectType
-        defaultText = `${dimension}D ${typeName}`
-      }
+      const typeKey = resolveQuantumTypeKey(objectType, quantumMode)
+      const typeName = typeKey ? getQuantumTypeName(typeKey) : objectType
+      const defaultText = `${dimension}D ${typeName}`
 
       updateExportSettings((prev) => ({
         textOverlay: { ...prev.textOverlay, text: defaultText },

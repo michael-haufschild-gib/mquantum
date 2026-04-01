@@ -7,7 +7,7 @@
 
 import { create } from 'zustand'
 
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { MAX_DIMENSION, MIN_DIMENSION, QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
 import {
   getRecommendedDimension,
   getUnavailabilityReason,
@@ -19,6 +19,7 @@ import { logger } from '@/lib/logger'
 import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/utils/temporalDepthRegistry'
 
 import { useAnimationStore } from './animationStore'
+import { useExtendedObjectStore } from './extendedObjectStore'
 import { usePerformanceStore } from './performanceStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
@@ -172,12 +173,18 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
   setDimension: (dimension: number) => {
     const currentDimension = get().dimension
-    const clampedDimension = clampDimension(dimension, currentDimension)
+    let clampedDimension = clampDimension(dimension, currentDimension)
     const currentType = get().objectType
 
     if (!Number.isFinite(dimension)) {
       logger.warn(`[geometryStore] Ignoring non-finite dimension: ${dimension}`)
       return
+    }
+
+    // Enforce minimum dim=3 for quantum modes that lack a 2D rendering path
+    const quantumMode = useExtendedObjectStore.getState().schroedinger?.quantumMode
+    if (quantumMode && QUANTUM_MODES_3D_ONLY.has(quantumMode) && clampedDimension < 3) {
+      clampedDimension = 3
     }
 
     // Skip if same dimension (no change needed)

@@ -7,6 +7,8 @@
  * @module rendering/webgpu/renderers/rendererConfigUtils
  */
 
+import { getQuantumTypeEntry, isComputeQuantumType } from '@/lib/geometry/registry'
+
 import type {
   QuantumModeForShader,
   SchroedingerWGSLShaderConfig,
@@ -20,11 +22,7 @@ import type { SchrodingerRendererConfig } from './schrodingerRendererTypes'
 /** Whether the quantum mode uses a compute-pass density grid instead of analytic evaluation. */
 export function isComputeQuantumMode(config: SchrodingerRendererConfig): boolean {
   return (
-    config.quantumMode === 'freeScalarField' ||
-    config.quantumMode === 'tdseDynamics' ||
-    config.quantumMode === 'becDynamics' ||
-    config.quantumMode === 'diracEquation' ||
-    config.quantumMode === 'quantumWalk' ||
+    (config.quantumMode != null && isComputeQuantumType(config.quantumMode)) ||
     config.isPauli === true
   )
 }
@@ -90,14 +88,12 @@ export function applyModeOverrides(config?: SchrodingerRendererConfig): Schrodin
 
   if (isComputeQuantumMode(result)) {
     result.temporal = false
-    // Only BEC and Dirac require 3D+. TDSE, freeScalar, and quantumWalk
-    // support 2D natively (shaders handle latticeDim < 3 via perpFalloff).
-    const needs3D =
-      result.quantumMode === 'becDynamics' ||
-      result.quantumMode === 'diracEquation' ||
-      result.isPauli === true
-    if (needs3D && (result.dimension ?? 3) < 3) {
-      result.dimension = 3
+    // Clamp to the mode's minimum dimension from the quantum type registry.
+    // All compute modes currently require 3D+ (no 2D grid rendering path).
+    const modeKey = result.isPauli ? 'pauliSpinor' : result.quantumMode
+    const minDim = modeKey ? (getQuantumTypeEntry(modeKey)?.dimensions.min ?? 3) : 3
+    if ((result.dimension ?? 3) < minDim) {
+      result.dimension = minDim
     }
   }
 
