@@ -118,9 +118,12 @@ export function runStrangEvolution(
     // Applied once per step, after the FFT kinetic step has completed.
     // This prevents the FFT from seeing the absorber's spatial modulation
     // and scattering it across k-space (which creates spurious emission artifacts).
-    const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
-    dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
-    absPass.end()
+    // PERF: Skip dispatch entirely when absorber is disabled — saves ~5µs per step.
+    if (config.absorberEnabled) {
+      const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
+      dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
+      absPass.end()
+    }
 
     state.simTime += config.dt
 
