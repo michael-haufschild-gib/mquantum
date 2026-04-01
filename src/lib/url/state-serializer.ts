@@ -46,6 +46,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'doubleSlit',
   'periodicLattice',
   'doubleWell',
+  'becTrap',
   'radialDoubleWell',
   'custom',
   'andersonDisorder',

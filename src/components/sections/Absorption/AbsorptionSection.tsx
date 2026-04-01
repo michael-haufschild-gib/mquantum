@@ -20,7 +20,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 /** Analytical modes have no time evolution — PML is irrelevant. */
-const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND'])
+const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
 
 /**
  * Selects the shared absorber state and setters.

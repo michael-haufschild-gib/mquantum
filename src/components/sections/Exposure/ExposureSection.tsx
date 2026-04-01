@@ -22,7 +22,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** Analytical modes have no time evolution — auto-scale gain cap is irrelevant. */
-const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND'])
+const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
 
 const noop = () => {}
 
@@ -42,6 +42,8 @@ function useAutoScaleValue(objectType: string): boolean {
         return cfg.freeScalar?.autoScale ?? true
       case 'diracEquation':
         return cfg.dirac?.autoScale ?? true
+      case 'quantumWalk':
+        return cfg.quantumWalk?.autoScale ?? true
       default:
         return false
     }
@@ -54,21 +56,32 @@ function useAutoScaleValue(objectType: string): boolean {
  */
 function useAutoScaleSetter(objectType: string): (v: boolean) => void {
   const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
-  return useExtendedObjectStore((s) => {
-    if (objectType === 'pauliSpinor') return s.setPauliAutoScale
-    switch (quantumMode) {
-      case 'tdseDynamics':
-        return s.setTdseAutoScale
-      case 'becDynamics':
-        return s.setBecAutoScale
-      case 'freeScalarField':
-        return s.setFreeScalarAutoScale
-      case 'diracEquation':
-        return s.setDiracAutoScale
-      default:
-        return noop
-    }
-  })
+  const setConfig = useExtendedObjectStore((s) => s.setSchroedingerConfig)
+  return useExtendedObjectStore(
+    useCallback(
+      (s) => {
+        if (objectType === 'pauliSpinor') return s.setPauliAutoScale
+        switch (quantumMode) {
+          case 'tdseDynamics':
+            return s.setTdseAutoScale
+          case 'becDynamics':
+            return s.setBecAutoScale
+          case 'freeScalarField':
+            return s.setFreeScalarAutoScale
+          case 'diracEquation':
+            return s.setDiracAutoScale
+          case 'quantumWalk':
+            return (v: boolean) =>
+              setConfig({
+                quantumWalk: { ...s.schroedinger.quantumWalk, autoScale: v },
+              })
+          default:
+            return noop
+        }
+      },
+      [objectType, quantumMode, setConfig]
+    )
+  )
 }
 
 /**

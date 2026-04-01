@@ -29,6 +29,10 @@ struct QWDiagUniforms {
   numCoinStates: u32,   // = 2 * latticeDim
   numWorkgroups: u32,
   gridSize0: u32,       // grid size along dimension 0 (for position computation)
+  stride0: u32,         // stride for dimension 0 = gridSize[1]*gridSize[2]*...
+  _pad0: u32,
+  _pad1: u32,
+  _pad2: u32,
 }
 
 @group(0) @binding(0) var<uniform> diagParams: QWDiagUniforms;
@@ -63,8 +67,10 @@ fn main(
       prob += re * re + im * im;
     }
 
-    // Site position along dimension 0: centered so x ∈ [-G/2, G/2)
-    let coord0 = f32(site % diagParams.gridSize0);
+    // Site position along dimension 0: use stride-based decomposition
+    // (C-order: dim 0 has largest stride = gridSize[1]*gridSize[2]*...)
+    // centered so x ∈ [-G/2, G/2)
+    let coord0 = f32(site / diagParams.stride0);
     let x = coord0 - f32(diagParams.gridSize0) * 0.5 + 0.5;
     xProb = x * prob;
     x2Prob = x * x * prob;
@@ -101,6 +107,10 @@ struct QWDiagUniforms {
   numCoinStates: u32,
   numWorkgroups: u32,
   gridSize0: u32,
+  stride0: u32,
+  _pad0: u32,
+  _pad1: u32,
+  _pad2: u32,
 }
 
 @group(0) @binding(0) var<uniform> diagParams: QWDiagUniforms;

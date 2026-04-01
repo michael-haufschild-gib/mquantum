@@ -83,15 +83,16 @@ export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelS
 
 /**
  * Fit the Brody parameter β to an array of unfolded spacings
- * by minimizing the Kolmogorov-Smirnov statistic via bisection.
+ * by minimizing the Kolmogorov-Smirnov statistic via golden section search.
  *
  * The Brody distribution is:
  *   P(s) = (β+1) · b · s^β · exp(-b · s^(β+1))
  * where b = Γ((β+2)/(β+1))^(β+1)
  *
- * Bisection on β ∈ [0, 1] exploits the unimodality of the KS statistic
- * across the one-parameter Brody family (monotonic interpolation between
- * Poisson and Wigner-Dyson). Converges to ~1e-6 precision in ~20 iterations.
+ * Golden section search on β ∈ [0, 1] exploits the unimodality of the
+ * KS statistic across the one-parameter Brody family. Two interior probe
+ * points narrow the interval by the golden ratio each iteration, converging
+ * to ~1e-6 precision in ~50 iterations.
  *
  * @param spacings - Unfolded spacings (mean ~ 1)
  * @returns Brody parameter β ∈ [0, 1]
@@ -103,25 +104,35 @@ function fitBrodyParameter(spacings: number[]): number {
   const sorted = [...spacings].sort((a, b) => a - b)
   const n = sorted.length
 
-  // Bisection on β to minimize Kolmogorov-Smirnov statistic vs Brody CDF
-  let lo = 0
-  let hi = 1
+  // Golden section search on β to minimize KS statistic vs Brody CDF
+  const phi = (Math.sqrt(5) - 1) / 2 // ≈ 0.618
+  let a = 0
+  let b = 1
+  let c = b - phi * (b - a) // interior left probe
+  let d = a + phi * (b - a) // interior right probe
+  let ksC = ksStatistic(sorted, n, c)
+  let ksD = ksStatistic(sorted, n, d)
+
   for (let iter = 0; iter < 50; iter++) {
-    const mid = (lo + hi) / 2
-    const ksLo = ksStatistic(sorted, n, lo)
-    const ksMid = ksStatistic(sorted, n, mid)
-    if (ksLo < ksMid) {
-      hi = mid
+    if (b - a < 1e-6) break
+    if (ksC < ksD) {
+      // Minimum is in [a, d]
+      b = d
+      d = c
+      ksD = ksC
+      c = b - phi * (b - a)
+      ksC = ksStatistic(sorted, n, c)
     } else {
-      lo = mid
+      // Minimum is in [c, b]
+      a = c
+      c = d
+      ksC = ksD
+      d = a + phi * (b - a)
+      ksD = ksStatistic(sorted, n, d)
     }
-    if (hi - lo < 1e-6) break
   }
 
-  // Final: evaluate both endpoints and pick the better one
-  const ksLo = ksStatistic(sorted, n, lo)
-  const ksHi = ksStatistic(sorted, n, hi)
-  return ksLo < ksHi ? lo : hi
+  return (a + b) / 2
 }
 
 /**

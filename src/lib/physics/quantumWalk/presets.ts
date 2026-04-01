@@ -79,9 +79,10 @@ export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
   {
     id: 'biasedCoin',
     name: 'Biased Coin',
-    description: 'Grover coin with strong bias — transition from quantum to classical walk',
+    description:
+      'Hadamard coin with strong bias (θ ≈ 0.9 × π/2) — asymmetric spreading favoring one direction',
     overrides: {
-      coinType: 'grover',
+      coinType: 'hadamard',
       coinBias: 0.9,
       stepsPerFrame: 1,
       fieldView: 'probability',
