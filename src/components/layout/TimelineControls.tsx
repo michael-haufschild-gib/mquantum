@@ -123,6 +123,7 @@ export const TimelineControls: FC = () => {
     switch (schroedingerConfig.quantumMode) {
       case 'harmonicOscillator':
       case 'hydrogenND':
+      case 'hydrogenNDCoupled':
         resetActions.resetSchroedingerParameters()
         break
       case 'freeScalarField':
