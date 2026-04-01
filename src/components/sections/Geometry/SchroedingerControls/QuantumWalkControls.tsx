@@ -12,7 +12,6 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { QuantumWalkCoinType, QuantumWalkFieldView } from '@/lib/geometry/extended/quantumWalk'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -141,15 +140,6 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         ariaLabel="Field view"
         tooltip="Displayed quantity: P(x) shows position probability, Phase shows complex phase, Coin shows the internal coin state."
         data-testid="qw-field-view"
-      />
-
-      {/* Auto Scale */}
-      <Switch
-        label="Auto Scale"
-        tooltip="Automatically normalize visualization to the current peak probability."
-        checked={qw.autoScale}
-        onCheckedChange={(v) => updateQW({ autoScale: v })}
-        data-testid="qw-auto-scale"
       />
 
       {/* Info */}

@@ -13,6 +13,7 @@ import type {
   SchroedingerNodalRenderMode,
 } from '@/lib/geometry/extended/types'
 import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -100,10 +101,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
     if (
       dimension <= 2 ||
       config.representation === 'wigner' ||
-      config.quantumMode === 'freeScalarField' ||
-      config.quantumMode === 'tdseDynamics' ||
-      config.quantumMode === 'becDynamics' ||
-      config.quantumMode === 'diracEquation'
+      isComputeQuantumType(config.quantumMode)
     ) {
       const reason =
         dimension <= 2

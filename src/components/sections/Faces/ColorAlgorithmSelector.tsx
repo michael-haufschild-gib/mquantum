@@ -70,7 +70,8 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       quantumMode === 'tdseDynamics' ||
       quantumMode === 'freeScalarField' ||
       quantumMode === 'becDynamics' ||
-      quantumMode === 'diracEquation'
+      quantumMode === 'diracEquation' ||
+      quantumMode === 'quantumWalk'
 
     // Auto-switch away from unavailable algorithm when mode changes
     useEffect(() => {

@@ -22,6 +22,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -127,14 +128,11 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     const isPauliSpinor = objectType === 'pauliSpinor'
     const isHydrogenNDMode =
       config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled'
-    const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdse = config.quantumMode === 'tdseDynamics'
-    const isBec = config.quantumMode === 'becDynamics'
-    const isDirac = config.quantumMode === 'diracEquation'
-    // Compute modes (FSF/TDSE/BEC/Dirac/Pauli) use GPU density grids, not inline evalPsi().
+    // Compute modes (FSF/TDSE/BEC/Dirac/QW/Pauli) use GPU density grids, not inline evalPsi().
     // Shader features that depend on inline wavefunction evaluation (interference,
     // probability flow, probability current) are forcibly disabled in extractSchrodingerConfig.
-    const isComputeMode = isPauliSpinor || isFreeScalarField || isTdse || isBec || isDirac
+    const isComputeMode = isPauliSpinor || isComputeQuantumType(config.quantumMode)
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
@@ -150,8 +148,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             </p>
           </div>
         )}
-        {/* Time Evolution — not applicable for free scalar field or TDSE (uses its own dt/stepsPerFrame) */}
-        {!isFreeScalarField && !isTdse && !isBec && !isDirac && (
+        {/* Time Evolution — not applicable for compute modes (each uses its own dt/stepsPerFrame) */}
+        {!isComputeMode && (
           <div className="space-y-4" data-testid="animation-panel-timeEvolution">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
