@@ -176,7 +176,7 @@ export class WebGPUCamera {
       up: [0, 1, 0],
       fov: 60, // Match WebGL camera fov
       near: 0.1,
-      far: 1000,
+      far: 10000,
       aspect: 1,
       ...initialState,
     }

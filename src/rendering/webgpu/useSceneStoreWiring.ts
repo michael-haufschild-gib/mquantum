@@ -63,7 +63,7 @@ export function useSceneStoreWiring(deps: SceneStoreWiringDeps): void {
     position: { x: 0, y: 0, z: 0 },
     target: { x: 0, y: 0, z: 0 },
     near: 0.1,
-    far: 1000,
+    far: 10000,
     fov: 60,
   })
 

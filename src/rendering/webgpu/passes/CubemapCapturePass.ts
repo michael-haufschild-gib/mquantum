@@ -470,7 +470,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
   private computeProjectionMatrix(): Float32Array {
     const fov = Math.PI / 2 // 90 degrees
     const near = 0.1
-    const far = 1000
+    const far = 10000
     const f = 1 / Math.tan(fov / 2)
     const nf = 1 / (near - far)
 

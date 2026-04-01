@@ -138,7 +138,7 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
 
     this.passConfig = config
     this.cameraNear = config.cameraNear ?? 0.1
-    this.cameraFar = config.cameraFar ?? 1000.0
+    this.cameraFar = config.cameraFar ?? 10000.0
   }
 
   /**

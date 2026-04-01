@@ -202,7 +202,7 @@ export function packCameraUniforms(
     data[114] = camera.position.z
   }
   data[115] = camera.near || 0.1
-  data[116] = camera.far || 1000
+  data[116] = camera.far || 10000
   data[117] = ((camera.fov || 50) * Math.PI) / 180 // radians
   data[118] = size.width
   data[119] = size.height

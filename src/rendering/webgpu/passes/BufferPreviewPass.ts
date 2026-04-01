@@ -234,7 +234,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     this.bufferType = typeMap[config.bufferType ?? 'copy']
     this.depthMode = depthModeMap[config.depthMode ?? 'raw']
     this.nearClip = config.nearClip ?? 0.1
-    this.farClip = config.farClip ?? 1000.0
+    this.farClip = config.farClip ?? 10000.0
     this.focus = config.focus ?? 10.0
     this.focusRange = config.focusRange ?? 5.0
   }

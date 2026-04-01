@@ -60,7 +60,7 @@ export function useSceneCameraController(deps: SceneCameraControllerDeps): Scene
       target: [0, 0, 0],
       fov: 60,
       near: 0.1,
-      far: 1000,
+      far: 10000,
       aspect: size.width / size.height || 1,
     })
   }
