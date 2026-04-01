@@ -13,7 +13,7 @@
  *   R: displayScalar          (field-view-dependent: probability, phase, or chirality)
  *   G: log(R + ε)             (log-density for Beer-Lambert)
  *   B: arg(Σ_j c_j)           (phase of summed coin amplitude) [0, 2π]
- *   A: raw |ψ|²/max * falloff (density for opacity, independent of field view)
+ *   A: raw |ψ|²/max * falloff (always density — used by quantum carpet readback)
  *
  * Requires freeScalarNDIndexBlock to be prepended.
  *
@@ -125,16 +125,19 @@ fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   return w;
 }
 
-// Sum probability, complex amplitude, and chirality over all coin states at a site.
-// Returns vec4f(probability, phase, chirality, 0).
-// Chirality = net forward-minus-backward bias across all axes, normalized to [-1,1].
+// Per-site coin state data — raw (unnormalized) for correct trilinear blending.
+struct CoinSiteData {
+  prob: f32,      // total probability Σ_j |c_j|²
+  sumRe: f32,     // Σ_j Re(c_j) — for phase via atan2 after blending
+  sumIm: f32,     // Σ_j Im(c_j) — for phase via atan2 after blending
+  chirality: f32, // Σ_d (|c_{+d}|² - |c_{-d}|²) — raw, normalize by prob after blending
+}
+
+// Sum raw coin state quantities at a single lattice site.
 // Coin state layout: j=2d → +axis_d, j=2d+1 → -axis_d.
-fn sumCoinStates(site: u32) -> vec4f {
+fn sumCoinStates(site: u32) -> CoinSiteData {
   let baseIdx = site * params.numCoinStates * 2u;
-  var prob: f32 = 0.0;
-  var sumRe: f32 = 0.0;
-  var sumIm: f32 = 0.0;
-  var chirality: f32 = 0.0;
+  var data: CoinSiteData;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let jPlus = d * 2u;
     let jMinus = d * 2u + 1u;
@@ -144,15 +147,12 @@ fn sumCoinStates(site: u32) -> vec4f {
     let imMinus = coinState[baseIdx + jMinus * 2u + 1u];
     let pPlus = rePlus * rePlus + imPlus * imPlus;
     let pMinus = reMinus * reMinus + imMinus * imMinus;
-    prob += pPlus + pMinus;
-    sumRe += rePlus + reMinus;
-    sumIm += imPlus + imMinus;
-    chirality += pPlus - pMinus;
+    data.prob += pPlus + pMinus;
+    data.sumRe += rePlus + reMinus;
+    data.sumIm += imPlus + imMinus;
+    data.chirality += pPlus - pMinus;
   }
-  let phase = atan2(sumIm, sumRe) + 3.14159265;
-  // Normalize chirality by total probability at this site
-  let chiralityNorm = select(chirality / max(prob, 1e-20), 0.0, prob < 1e-30);
-  return vec4f(prob, phase, chiralityNorm, 0.0);
+  return data;
 }
 
 @compute @workgroup_size(4, 4, 4)
@@ -211,28 +211,30 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let numCorners = 1u << min(params.latticeDim, 3u);
 
-  // Trilinear interpolation of coin state quantities
+  // Trilinear interpolation of raw coin state quantities.
+  // Blend raw Re/Im (not atan2 angles) to avoid wrapping artifacts near 0/2π.
+  // Blend raw chirality (not normalized) so high-density corners dominate correctly.
   var blendedProb: f32 = 0.0;
-  var blendedPhase: f32 = 0.0;
+  var blendedRe: f32 = 0.0;
+  var blendedIm: f32 = 0.0;
   var blendedChirality: f32 = 0.0;
-  var totalWeight: f32 = 0.0;
 
   for (var corner: u32 = 0u; corner < numCorners; corner++) {
     let w = cornerWeight(&fracs, corner);
     if (w > 0.0) {
       let sIdx = siteIndexForCorner(&coordsLo, &coordsHi, corner);
       let coinData = sumCoinStates(sIdx);
-      blendedProb += w * coinData.x;
-      blendedPhase += w * coinData.y;
-      blendedChirality += w * coinData.z;
-      totalWeight += w;
+      blendedProb += w * coinData.prob;
+      blendedRe += w * coinData.sumRe;
+      blendedIm += w * coinData.sumIm;
+      blendedChirality += w * coinData.chirality;
     }
   }
 
-  if (totalWeight > 0.0) {
-    blendedPhase /= totalWeight;
-    blendedChirality /= totalWeight;
-  }
+  // Compute phase from blended complex amplitude (correct across 0/2π boundary)
+  let phase = atan2(blendedIm, blendedRe) + 3.14159265;
+  // Normalize chirality by blended probability (correct density-weighted average)
+  let chirality = select(blendedChirality / max(blendedProb, 1e-20), 0.0, blendedProb < 1e-30);
 
   // Track peak probability for next-frame normalization.
   // IEEE 754 positive floats compare correctly as unsigned integers,
@@ -251,15 +253,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = normDensityRaw;
   } else if (params.fieldView == 1u) {
     // Phase: complex phase of summed coin amplitude, gated by density
-    displayScalar = blendedPhase / (2.0 * 3.14159265) * densityGate;
+    displayScalar = phase / (2.0 * 3.14159265) * densityGate;
   } else if (params.fieldView == 2u) {
     // Coin state: chirality (net forward-backward bias), mapped to [0,1]
-    displayScalar = (0.5 + 0.5 * blendedChirality) * densityGate;
+    displayScalar = (0.5 + 0.5 * chirality) * densityGate;
   }
 
   let normDensity = displayScalar * perpFalloff;
   let logDensity = log(normDensity + 1e-10);
 
-  textureStore(outputTex, gid, vec4f(normDensity, logDensity, blendedPhase, normDensityRaw * perpFalloff));
+  textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, normDensityRaw * perpFalloff));
 }
 `

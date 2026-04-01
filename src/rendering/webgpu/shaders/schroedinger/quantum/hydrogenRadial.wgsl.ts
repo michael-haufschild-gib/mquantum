@@ -216,7 +216,7 @@ fn hydrogenRadialNormND(nr: i32, lambda: f32, nEff: f32, a0: f32) -> f32 {
   let lnDen = log(2.0 * nEff) + lnFactorial(denomFactIdx);
   let lnRatio = lnNum - lnDen;
 
-  return front * sqrt(exp(lnRatio));
+  return front * exp(lnRatio * 0.5);
 }
 
 /**
@@ -366,10 +366,11 @@ fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
   // Normalization: sqrt((n-l-1)!/(n+l)!) × 2^l × l! × sqrt(2n/π)
   // Derived from Gegenbauer orthogonality: ∫|R̃|²k²dk = π/(2^{2l+1}·n·(l!)²)
   // without the 2^l·l!·sqrt(2n/π) factor, so we include it here.
-  // Uses lnFactorial (LUT covers 0..22) instead of FACTORIAL_LUT (0..12)
-  // because n+l can reach 13 (n=7,l=6).
-  let lnRatio = lnFactorial(max(order, 0)) - lnFactorial(n + l);
-  let norm = sqrt(exp(lnRatio));
+  // Use lnFactorial (supports up to 22!) since n+l can reach 13 at n=7,l=6.
+  // Compute sqrt in log-space: exp(ln(a)/2) avoids the intermediate exp(ln(a))
+  // underflowing past the 1e-8 safety floor (e.g. 0!/13! = 1.6e-10).
+  let lnRatio3d = lnFactorial(order) - lnFactorial(n + l);
+  let norm = exp(lnRatio3d * 0.5);
   let lFact = FACTORIAL_LUT[min(l, 12)];
   let fockNorm = exp2(f32(l)) * lFact * sqrt(2.0 * nf / PI);
 
@@ -445,8 +446,9 @@ fn hydrogenRadialMomentumND(n: i32, l: i32, k: f32, a0: f32, dim: i32) -> f32 {
   // Normalization via log-factorial ratio: sqrt(nr! / (nr + 2λ + 1)!)
   // Both arguments are always integers. denomFactIdx = n+l+D-3 ≤ 21 (see LUT comment).
   let denomFactIdx = nr + i32(2.0 * lambda + 1.0 + 0.5);
+  // Compute sqrt in log-space to avoid exp() underflow at the 1e-8 floor.
   let lnRatio = lnFactorial(nr) - lnFactorial(denomFactIdx);
-  let norm = sqrt(max(exp(lnRatio), 1e-8));
+  let norm = exp(lnRatio * 0.5);
 
   // Fock normalization correction: 2^λ × Γ(λ+1) × √(2·n_eff/π)
   // Derived from Gegenbauer orthogonality on the Fock sphere.

@@ -7,7 +7,7 @@
  *
  * Supported coins:
  *   0 = Grover: G_jk = 1/D - δ_jk (mean minus self, no explicit matrix)
- *   1 = Hadamard: biased H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]] per axis (tensor product for D>1)
+ *   1 = Hadamard: biased H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]] applied independently per ±axis pair
  *   2 = DFT: F_jk = exp(2πi·jk/(2D)) / √(2D)
  *
  * Buffer layout: coinState[site * 2D * 2 + j * 2 + {0=re,1=im}]
@@ -56,8 +56,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else if (params.coinType == 1u) {
     // Biased Hadamard: H(θ) = [[cos θ, sin θ], [sin θ, -cos θ]] per axis pair
     // coinBias ∈ [0,1] maps to θ ∈ [0, π/2]. Standard Hadamard at coinBias=0.5 (θ=π/4).
-    // For D dimensions: tensor product of D biased gates on pairs (2d, 2d+1).
-    let theta = params.coinBias * 1.57079632679; // π/2
+    // For D dimensions: applied independently to each (2d, 2d+1) pair.
+    let theta = clamp(params.coinBias, 0.0, 1.0) * 1.57079632679; // π/2
     let c = cos(theta);
     let s = sin(theta);
     for (var d: u32 = 0u; d < params.latticeDim; d++) {

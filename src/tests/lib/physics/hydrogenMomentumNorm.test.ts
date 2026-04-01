@@ -72,9 +72,10 @@ function hydrogenRadialMomentumFixed(n: number, l: number, k: number, a0: number
   let qPow = 1.0
   for (let il = 0; il < l; il++) qPow *= q
 
-  // Use lnFactorial (covers 0..22) to avoid FACTORIAL_LUT overflow at n+l=13
-  const lnRatio = lnFactorial(Math.max(order, 0)) - lnFactorial(n + l)
-  const norm = Math.sqrt(Math.exp(lnRatio))
+  // Use lnFactorial (matches WGSL fix) — FACTORIAL LUT only goes to 12!
+  // Compute sqrt in log-space: exp(ln(a)/2) avoids intermediate underflow.
+  const lnRatio = lnFactorial(order) - lnFactorial(n + l)
+  const norm = Math.exp(lnRatio * 0.5)
 
   // Fock normalization correction: 2^l × l! × √(2n/π)
   const lFact = factorial(l)
@@ -112,7 +113,7 @@ describe('hydrogen momentum-space normalization (Fock-corrected)', () => {
     [6, 0],
     [7, 0],
     [7, 5],
-    [7, 6],
+    [7, 6], // n+l=13 exceeds FACTORIAL_LUT — exercises lnFactorial path
   ]
 
   for (const [n, l] of states) {
