@@ -504,6 +504,61 @@ describe('computePartialCollapse', () => {
     }
   })
 
+  it('compact dimension wraps to shortest distance', () => {
+    // 1D grid, 8 sites, spacing=1, center at edge (3.5), sigma=1
+    // Without wrapping: site 0 (pos=-3.5) is 7 units from center
+    // With wrapping: grid extent L=8, wrapped distance = |(-3.5-3.5) - 8*round(-7/8)| = |-7+8| = 1
+    const gridSize = [8]
+    const spacing = [1.0]
+    const center = [3.5]
+    const sigma = 1.0
+
+    const [reNoWrap] = computeFullCollapse(8, gridSize, spacing, center, sigma)
+    const [reWrap] = computeFullCollapse(8, gridSize, spacing, center, sigma, [true])
+
+    // Site 0: pos = (0 - 4 + 0.5)*1 = -3.5
+    // Without wrap: delta = -3.5 - 3.5 = -7, dist² = 49 → very small Gaussian
+    // With wrap: delta = -7, L = 8, wrapped = -7 - 8*round(-7/8) = -7 + 8 = 1, dist² = 1
+    expect(reWrap[0]).toBeGreaterThan(reNoWrap[0]! * 10)
+
+    // Center site (7): pos = (7 - 4 + 0.5)*1 = 3.5 → delta = 0 (exact center)
+    // Both should give exp(0) = 1
+    expect(reNoWrap[7]).toBeCloseTo(1.0, 5)
+    expect(reWrap[7]).toBeCloseTo(1.0, 5)
+  })
+
+  it('compact dimension wrapping preserves Gaussian shape across boundary', () => {
+    // 2D grid 8x8, spacing [1,1], center near boundary, compact dims [true, false]
+    // Compact dim 0 should wrap; dim 1 should not
+    const gridSize = [8, 8]
+    const spacing = [1.0, 1.0]
+    const center = [3.5, 0.0] // near right edge of dim 0
+    const sigma = 1.5
+
+    const [reWrap] = computeFullCollapse(64, gridSize, spacing, center, sigma, [true, false])
+    const [reNoWrap] = computeFullCollapse(64, gridSize, spacing, center, sigma, [false, false])
+
+    // Site at (0, 4) = index 0*8+4: dim0 pos=-3.5, dim1 pos=0.5
+    // Without wrap in dim0: delta0=-7, delta1=0.5, dist²=49.25 → tiny
+    // With wrap in dim0: delta0=1, delta1=0.5, dist²=1.25 → significant
+    const idxLeftEdge = 0 * 8 + 4
+    expect(reWrap[idxLeftEdge]).toBeGreaterThan(reNoWrap[idxLeftEdge]! * 5)
+  })
+
+  it('non-compact dims are unaffected by compactDims=[false]', () => {
+    const gridSize = [8]
+    const spacing = [1.0]
+    const center = [0.0]
+    const sigma = 1.0
+
+    const [reDefault] = computeFullCollapse(8, gridSize, spacing, center, sigma)
+    const [reExplicitFalse] = computeFullCollapse(8, gridSize, spacing, center, sigma, [false])
+
+    for (let i = 0; i < 8; i++) {
+      expect(reExplicitFalse[i]).toBeCloseTo(reDefault[i]!, 10)
+    }
+  })
+
   it('collapse along axis 1 of a 3D grid applies envelope to correct dimension', () => {
     // 2x3x2 grid (12 sites), collapse axis 1 at pos=0
     // axis=1, size=3, spacing=1: positions = -1, 0, 1
@@ -527,5 +582,37 @@ describe('computePartialCollapse', () => {
     expect(outRe[0]).toBeCloseTo(envEdge, 5)
     // Site (1,2,1) = index 11: axis1 coordinate = 2
     expect(outRe[11]).toBeCloseTo(envEdge, 5)
+  })
+
+  it('compact axis wrapping in partial collapse uses shortest distance', () => {
+    // 8-site 1D grid, collapse at position near left edge (-3.5),
+    // with compact axis. Site at right edge (+3.5) should be close via wrapping.
+    const gridSize = [8]
+    const spacing = [1.0]
+    const psiRe = new Float32Array(8).fill(1)
+    const psiIm = new Float32Array(8).fill(0)
+    const axisPos = -3.5 // position of site 0
+    const sigma = 1.0
+
+    // Without compact: site 7 (pos=3.5) is 7 units from -3.5
+    const [outNoWrap] = computePartialCollapse(psiRe, psiIm, gridSize, spacing, 0, axisPos, sigma)
+
+    // With compact: site 7 wrapped distance = |3.5-(-3.5)| wrapped on L=8 → |7 - 8| = 1
+    const [outWrap] = computePartialCollapse(
+      psiRe,
+      psiIm,
+      gridSize,
+      spacing,
+      0,
+      axisPos,
+      sigma,
+      true
+    )
+
+    // Site 7 should be much higher with wrapping
+    expect(outWrap[7]).toBeGreaterThan(outNoWrap[7]! * 5)
+
+    // Site 0 (at collapse position): same value regardless of wrapping
+    expect(outWrap[0]).toBeCloseTo(outNoWrap[0]!, 5)
   })
 })

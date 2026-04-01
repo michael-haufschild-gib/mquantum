@@ -356,6 +356,234 @@ describe('fftNd non-uniform grid sizes', () => {
   })
 })
 
+describe('fft — Float32Array support', () => {
+  it('roundtrips a Float32Array signal (lower precision)', () => {
+    const n = 8
+    const original = new Float32Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      original[i * 2] = Math.cos((2 * Math.PI * i) / n)
+    }
+
+    const data = new Float32Array(original)
+    fft(data, n)
+    ifft(data, n)
+
+    // Float32 has ~7 decimal digits precision, so tolerance is looser
+    for (let i = 0; i < 2 * n; i++) {
+      expect(Math.abs(data[i]! - original[i]!)).toBeLessThan(1e-5)
+    }
+  })
+
+  it('Parseval theorem holds for Float32Array', () => {
+    const n = 16
+    const data = new Float32Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      data[i * 2] = Math.sin((2 * Math.PI * 3 * i) / n)
+    }
+
+    let timeEnergy = 0
+    for (let i = 0; i < n; i++) {
+      timeEnergy += data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2
+    }
+
+    fft(data, n)
+
+    let freqEnergy = 0
+    for (let i = 0; i < n; i++) {
+      freqEnergy += data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2
+    }
+    freqEnergy /= n
+
+    // Float32 introduces more rounding → looser tolerance
+    expect(Math.abs(timeEnergy - freqEnergy)).toBeLessThan(1e-4)
+  })
+
+  it('fftNd/ifftNd roundtrips Float32Array', () => {
+    const dims = [4, 4]
+    const total = 16
+    const original = new Float32Array(2 * total)
+    for (let i = 0; i < total; i++) {
+      original[i * 2] = Math.sin((2 * Math.PI * i) / total)
+    }
+
+    const data = new Float32Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    for (let i = 0; i < 2 * total; i++) {
+      expect(Math.abs(data[i]! - original[i]!)).toBeLessThan(1e-4)
+    }
+  })
+})
+
+describe('fft — known DFT pairs', () => {
+  it('pure cosine at frequency k produces peaks at bins k and N-k', () => {
+    const n = 16
+    const k = 3
+    const data = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      data[i * 2] = Math.cos((2 * Math.PI * k * i) / n)
+    }
+
+    fft(data, n)
+
+    // FFT of cos(2πkn/N) = (N/2)[δ(f-k) + δ(f+k)] = (N/2) at bins k and N-k
+    for (let i = 0; i < n; i++) {
+      const mag = Math.sqrt(data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2)
+      if (i === k || i === n - k) {
+        expect(mag).toBeCloseTo(n / 2, 8)
+      } else {
+        expect(mag).toBeLessThan(1e-8)
+      }
+    }
+  })
+
+  it('pure sine at frequency k produces imaginary peaks at bins k and N-k', () => {
+    const n = 16
+    const k = 5
+    const data = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      data[i * 2] = Math.sin((2 * Math.PI * k * i) / n)
+    }
+
+    fft(data, n)
+
+    // FFT of sin(2πkn/N) = (N/2i)[δ(f-k) - δ(f+k)]
+    // At bin k: imaginary part = -N/2, at bin N-k: imaginary part = N/2
+    const magK = Math.sqrt(data[k * 2]! ** 2 + data[k * 2 + 1]! ** 2)
+    const magNK = Math.sqrt(data[(n - k) * 2]! ** 2 + data[(n - k) * 2 + 1]! ** 2)
+    expect(magK).toBeCloseTo(n / 2, 8)
+    expect(magNK).toBeCloseTo(n / 2, 8)
+
+    // Verify sign/phase: bin k has imag = -N/2, bin N-k has imag = +N/2
+    expect(data[k * 2]).toBeCloseTo(0, 8)
+    expect(data[(n - k) * 2]).toBeCloseTo(0, 8)
+    expect(data[k * 2 + 1]).toBeCloseTo(-n / 2, 8)
+    expect(data[(n - k) * 2 + 1]).toBeCloseTo(n / 2, 8)
+
+    // Other bins should be zero
+    for (let i = 0; i < n; i++) {
+      if (i !== k && i !== n - k) {
+        const mag = Math.sqrt(data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2)
+        expect(mag).toBeLessThan(1e-8)
+      }
+    }
+  })
+
+  it('time shift property: delay by m samples → multiply by exp(-i2πkm/N)', () => {
+    const n = 8
+    const m = 2 // shift by 2 samples
+    const signal = new Float64Array(2 * n)
+    const shifted = new Float64Array(2 * n)
+
+    // Create a test signal and its shifted version
+    for (let i = 0; i < n; i++) {
+      signal[i * 2] = Math.cos((2 * Math.PI * i) / n) + 0.5 * Math.sin((4 * Math.PI * i) / n)
+      shifted[((i + m) % n) * 2] = signal[i * 2]!
+    }
+
+    fft(signal, n)
+    fft(shifted, n)
+
+    // For each bin k, shifted[k] should be signal[k] * exp(-i2πkm/N)
+    for (let k = 0; k < n; k++) {
+      const phase = (-2 * Math.PI * k * m) / n
+      const twiddleRe = Math.cos(phase)
+      const twiddleIm = Math.sin(phase)
+
+      // expected = signal[k] * twiddle
+      const sRe = signal[k * 2]!
+      const sIm = signal[k * 2 + 1]!
+      const expectedRe = sRe * twiddleRe - sIm * twiddleIm
+      const expectedIm = sRe * twiddleIm + sIm * twiddleRe
+
+      expect(shifted[k * 2]).toBeCloseTo(expectedRe, 8)
+      expect(shifted[k * 2 + 1]).toBeCloseTo(expectedIm, 8)
+    }
+  })
+
+  it('convolution theorem: FFT(a ⊛ b) = FFT(a) · FFT(b)', () => {
+    const n = 8
+    const a = new Float64Array(2 * n)
+    const b = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      a[i * 2] = i < 3 ? 1 : 0 // rectangular pulse
+      b[i * 2] = Math.exp(-i * 0.5) // exponential decay
+    }
+
+    // Compute circular convolution manually
+    const conv = new Float64Array(2 * n)
+    for (let k = 0; k < n; k++) {
+      let sumRe = 0
+      for (let j = 0; j < n; j++) {
+        const idx = ((k - j + n) % n) * 2
+        sumRe += a[j * 2]! * b[idx]!
+      }
+      conv[k * 2] = sumRe
+    }
+
+    // Compute via FFT multiplication
+    const aFreq = new Float64Array(a)
+    const bFreq = new Float64Array(b)
+    fft(aFreq, n)
+    fft(bFreq, n)
+
+    const product = new Float64Array(2 * n)
+    for (let k = 0; k < n; k++) {
+      const ar = aFreq[k * 2]!,
+        ai = aFreq[k * 2 + 1]!
+      const br = bFreq[k * 2]!,
+        bi = bFreq[k * 2 + 1]!
+      product[k * 2] = ar * br - ai * bi
+      product[k * 2 + 1] = ar * bi + ai * br
+    }
+    ifft(product, n)
+
+    for (let i = 0; i < n; i++) {
+      expect(product[i * 2]).toBeCloseTo(conv[i * 2]!, 8)
+    }
+  })
+})
+
+describe('fft — minimal N=2 edge case', () => {
+  it('transforms two-point signal correctly', () => {
+    // DFT of [a, b] = [a+b, a-b]
+    const data = new Float64Array([3, 0, 7, 0])
+    fft(data, 2)
+    expect(data[0]).toBeCloseTo(10, 10) // 3+7
+    expect(data[2]).toBeCloseTo(-4, 10) // 3-7
+  })
+
+  it('roundtrips N=2 signal', () => {
+    const original = new Float64Array([2.5, 1.3, -0.7, 0.4])
+    const data = new Float64Array(original)
+    fft(data, 2)
+    ifft(data, 2)
+    for (let i = 0; i < 4; i++) {
+      expect(data[i]).toBeCloseTo(original[i]!, 10)
+    }
+  })
+})
+
+describe('fft — large N accuracy', () => {
+  it('roundtrips a 1024-point signal with < 1e-10 error', () => {
+    const n = 1024
+    const original = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      original[i * 2] =
+        Math.sin((2 * Math.PI * 7 * i) / n) + 0.5 * Math.cos((2 * Math.PI * 31 * i) / n)
+    }
+
+    const data = new Float64Array(original)
+    fft(data, n)
+    ifft(data, n)
+
+    for (let i = 0; i < 2 * n; i++) {
+      expect(Math.abs(data[i]! - original[i]!)).toBeLessThan(1e-10)
+    }
+  })
+})
+
 /**
  * Helper: forward 3D FFT via row decomposition (used only for testing roundtrip).
  */
