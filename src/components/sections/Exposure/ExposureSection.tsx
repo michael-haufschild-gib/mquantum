@@ -73,6 +73,7 @@ function useAutoScaleSetter(objectType: string): (v: boolean) => void {
           case 'quantumWalk':
             return (v: boolean) => {
               const current = useExtendedObjectStore.getState().schroedinger.quantumWalk
+              if (!current) return
               setConfig({ quantumWalk: { ...current, autoScale: v } })
             }
           default:
