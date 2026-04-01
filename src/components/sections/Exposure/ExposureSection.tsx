@@ -71,10 +71,10 @@ function useAutoScaleSetter(objectType: string): (v: boolean) => void {
           case 'diracEquation':
             return s.setDiracAutoScale
           case 'quantumWalk':
-            return (v: boolean) =>
-              setConfig({
-                quantumWalk: { ...s.schroedinger.quantumWalk, autoScale: v },
-              })
+            return (v: boolean) => {
+              const current = useExtendedObjectStore.getState().schroedinger.quantumWalk
+              setConfig({ quantumWalk: { ...current, autoScale: v } })
+            }
           default:
             return noop
         }
