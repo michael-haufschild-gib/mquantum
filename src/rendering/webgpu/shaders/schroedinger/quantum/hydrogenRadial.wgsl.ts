@@ -335,9 +335,13 @@ fn gegenbauer(n: i32, alpha: f32, x: f32) -> f32 {
 /**
  * Momentum-space hydrogen radial amplitude R̃_nl(k).
  *
- * Visualization-oriented Fock-style form:
- * R̃_nl(k) ∝ (na0·k)^l / (1 + (na0·k)^2)^(l+2) · C_{n-l-1}^{l+1}(x)
+ * Fock-style representation using the stereographic projection:
+ *   R̃_nl(k) = N_nl × (na0·k)^l / (1 + (na0·k)^2)^(l+2) × C_{n-l-1}^{l+1}(x)
  * with x = ((na0·k)^2 - 1) / ((na0·k)^2 + 1)
+ *
+ * Normalization satisfies ∫₀^∞ |R̃_nl(k)|² k² dk = 1, derived from
+ * Gegenbauer orthogonality on the Fock sphere. The prefactor is:
+ *   N_nl = 2^l × l! × √(2n/π) × 2^{l+2} × √((n-l-1)!/(n+l)!) × (na₀)^{3/2}
  */
 fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
   if (n < 1 || l < 0 || l >= n) { return 0.0; }
@@ -359,23 +363,58 @@ fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
     qPow *= q;
   }
 
-  // Lightweight normalization using factorial ratio (n <= 7 in UI).
-  let factNum = FACTORIAL_LUT[max(order, 0)];
-  let factDen = max(FACTORIAL_LUT[min(n + l, 12)], 1e-6);
-  let norm = sqrt(max(factNum / factDen, 1e-8));
+  // Normalization: sqrt((n-l-1)!/(n+l)!) × 2^l × l! × sqrt(2n/π)
+  // Derived from Gegenbauer orthogonality: ∫|R̃|²k²dk = π/(2^{2l+1}·n·(l!)²)
+  // without the 2^l·l!·sqrt(2n/π) factor, so we include it here.
+  // Uses lnFactorial (LUT covers 0..22) instead of FACTORIAL_LUT (0..12)
+  // because n+l can reach 13 (n=7,l=6).
+  let lnRatio = lnFactorial(max(order, 0)) - lnFactorial(n + l);
+  let norm = sqrt(exp(lnRatio));
+  let lFact = FACTORIAL_LUT[min(l, 12)];
+  let fockNorm = exp2(f32(l)) * lFact * sqrt(2.0 * nf / PI);
 
-  // Dimensional normalization for q = (n a0) k substitution:
-  // k-space radial amplitudes scale with (n a0)^(3/2) to preserve ∫|R̃|² k² dk.
+  // Dimensional normalization: (na₀)^{3/2} for the q = na₀k substitution.
   let naNorm = na * sqrt(na);
-  return naNorm * exp2(f32(l) + 2.0) * norm * qPow * gegen / max(denom, 1e-8);
+  return naNorm * exp2(f32(l) + 2.0) * norm * fockNorm * qPow * gegen / max(denom, 1e-8);
+}
+
+/**
+ * Gamma function Γ(λ+1) for integer or half-integer λ.
+ *
+ * For integer λ: Γ(λ+1) = λ! (via FACTORIAL_LUT).
+ * For half-integer λ: Γ(n+0.5+1) = √π × ∏_{k=0}^{n} (k + 0.5).
+ *
+ * Used by the Fock normalization in momentum-space hydrogen wavefunctions.
+ * Maximum λ = l + (D-3)/2 ≤ 6 + 4 = 10, so the loop is bounded.
+ */
+fn gammaLambdaPlus1(lambda: f32) -> f32 {
+  let lambdaInt = i32(lambda);
+  let isHalfInt = abs(lambda - f32(lambdaInt)) > 0.25;
+
+  if (!isHalfInt) {
+    // Integer λ: Γ(λ+1) = λ!
+    return FACTORIAL_LUT[clamp(lambdaInt, 0, 12)];
+  }
+
+  // Half-integer λ = lambdaInt + 0.5:
+  // Γ(lambdaInt + 1.5) = √π × ∏_{k=0}^{lambdaInt} (k + 0.5)
+  var result = sqrt(PI);
+  for (var k = 0; k <= lambdaInt; k++) {
+    result *= (f32(k) + 0.5);
+  }
+  return result;
 }
 
 /**
  * N-dimensional momentum-space hydrogen radial amplitude R̃_nl^(D)(k).
  *
  * Uses effective parameters: λ = l + (D-3)/2, n_eff = n + (D-3)/2.
- * Modified Fock-style form:
- *   R̃ ∝ (n_eff·a0·k)^λ / (1 + (n_eff·a0·k)²)^(λ+2) · C_{n_r}^{λ+1}(x)
+ * Fock-style representation:
+ *   R̃ = N × (n_eff·a0·k)^λ / (1 + (n_eff·a0·k)²)^(λ+2) × C_{n_r}^{λ+1}(x)
+ *
+ * Normalization satisfies ∫₀^∞ |R̃|² k² dk = 1, derived from Gegenbauer
+ * orthogonality. Without the Fock correction factor 2^λ·Γ(λ+1)·√(2n_eff/π),
+ * the integral would be π/(2^{2λ+1}·n_eff·Γ(λ+1)²).
  *
  * At D=3 this reduces to hydrogenRadialMomentum().
  *
@@ -409,8 +448,13 @@ fn hydrogenRadialMomentumND(n: i32, l: i32, k: f32, a0: f32, dim: i32) -> f32 {
   let lnRatio = lnFactorial(nr) - lnFactorial(denomFactIdx);
   let norm = sqrt(max(exp(lnRatio), 1e-8));
 
+  // Fock normalization correction: 2^λ × Γ(λ+1) × √(2·n_eff/π)
+  // Derived from Gegenbauer orthogonality on the Fock sphere.
+  let gammaLP1 = gammaLambdaPlus1(lambda);
+  let fockNorm = exp2(lambda) * gammaLP1 * sqrt(2.0 * nEff / PI);
+
   let naNorm = na * sqrt(na);
-  return naNorm * exp2(lambda + 2.0) * norm * qPow * gegen / max(denom, 1e-8);
+  return naNorm * exp2(lambda + 2.0) * norm * fockNorm * qPow * gegen / max(denom, 1e-8);
 }
 
 `

@@ -99,7 +99,7 @@ function wignerHydrogenRadial(
 
   // Auto-scale quadrature for Nyquist satisfaction
   const nyquistPts = Math.ceil((4 * Math.abs(pr) * sMax) / Math.PI)
-  const effectiveNPts = Math.min(Math.max(nPts, nyquistPts), 128)
+  const effectiveNPts = Math.max(1, Math.min(Math.max(nPts, nyquistPts), 256))
 
   const ds = sMax / effectiveNPts
   // (-1)^{l+1}: for l=0 → -1, l=1 → +1, l=2 → -1, ...
