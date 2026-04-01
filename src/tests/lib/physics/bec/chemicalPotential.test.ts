@@ -91,6 +91,57 @@ describe('thomasFermiMuND', () => {
       expect(mu).toBeGreaterThan(0)
     }
   })
+
+  it('μ scales as g^(2/(D+2)) for each dimension D=2..6', () => {
+    // The general TF formula gives μ ∝ g^(2/(D+2)) at fixed ω.
+    // Verify by computing mu at g and 2g, checking the ratio equals 2^(2/(D+2)).
+    const omega = 1.0
+    const g1 = 100
+    const g2 = 200
+
+    for (let D = 2; D <= 6; D++) {
+      const mu1 = thomasFermiMuND(D, g1, omega)
+      const mu2 = thomasFermiMuND(D, g2, omega)
+      const expectedRatio = Math.pow(2, 2 / (D + 2))
+      expect(mu2 / mu1).toBeCloseTo(expectedRatio, 6)
+    }
+  })
+
+  it('μ scales as ω^(2D/(D+2)) for each dimension D=2..6', () => {
+    // μ ∝ ω^(2D/(D+2)) at fixed g.
+    const g = 500
+    const omega1 = 1.0
+    const omega2 = 2.0
+
+    for (let D = 2; D <= 6; D++) {
+      const mu1 = thomasFermiMuND(D, g, omega1)
+      const mu2 = thomasFermiMuND(D, g, omega2)
+      const expectedRatio = Math.pow(2, (2 * D) / (D + 2))
+      expect(mu2 / mu1).toBeCloseTo(expectedRatio, 6)
+    }
+  })
+
+  it('Thomas-Fermi radius R_TF is consistent with μ for 3D', () => {
+    // R_TF = sqrt(2μ/(mω²)) — so R_TF² × mω²/2 = μ
+    const g = 500
+    const omega = 1.0
+    const mass = 1.0
+    const mu = thomasFermiMu3D(g, omega)
+    const R = thomasFermiRadius(mu, mass, omega)
+    expect(0.5 * mass * omega * omega * R * R).toBeCloseTo(mu, 6)
+  })
+
+  it('healing length × sound speed = ℏ/m at constant density', () => {
+    // ξ = ℏ/√(2mgn), c = √(gn/m)
+    // ξ·c = ℏ/√(2mgn) · √(gn/m) = ℏ/√(2m²) = ℏ/(m√2)
+    const hbar = 1.0
+    const mass = 1.0
+    const g = 500
+    const density = 0.1
+    const xi = healingLength(hbar, mass, g, density)
+    const cs = soundSpeed(g, density, mass)
+    expect(xi * cs).toBeCloseTo(hbar / (mass * Math.sqrt(2)), 6)
+  })
 })
 
 describe('thomasFermiRadius', () => {

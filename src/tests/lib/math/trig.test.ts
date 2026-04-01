@@ -89,3 +89,69 @@ describe('fcos', () => {
     }
   })
 })
+
+describe('fsin/fcos — trigonometric identities', () => {
+  it('sin²(x) + cos²(x) ≈ 1 across full range', () => {
+    // The parabolic approximation deviates from true sin/cos, so sin²+cos²
+    // won't be exactly 1. However, it should be close (~3% max deviation).
+    const testAngles = [
+      0,
+      0.1,
+      0.5,
+      1.0,
+      Math.PI / 4,
+      Math.PI / 3,
+      Math.PI / 2,
+      Math.PI,
+      1.5 * Math.PI,
+      2 * Math.PI,
+      -1.0,
+      -Math.PI / 3,
+    ]
+    for (const x of testAngles) {
+      const s = fsin(x)
+      const c = fcos(x)
+      const sum = s * s + c * c
+      // The parabolic approximation's sin²+cos² can deviate ~11% at worst-case angles
+      // because fsin/fcos each have ~1.2% peak abs error, and the Pythagorean
+      // identity amplifies these errors quadratically at angles near ±0.7
+      expect(Math.abs(sum - 1.0)).toBeLessThan(0.13)
+    }
+  })
+
+  it('sin(-x) = -sin(x) (odd symmetry)', () => {
+    const testAngles = [0.1, 0.5, 1.0, Math.PI / 4, Math.PI / 2, Math.PI, 2.5]
+    for (const x of testAngles) {
+      expect(fsin(-x)).toBeCloseTo(-fsin(x), 10)
+    }
+  })
+
+  it('cos(-x) = cos(x) (even symmetry)', () => {
+    const testAngles = [0.1, 0.5, 1.0, Math.PI / 4, Math.PI / 2, Math.PI, 2.5]
+    for (const x of testAngles) {
+      expect(fcos(-x)).toBeCloseTo(fcos(x), 10)
+    }
+  })
+
+  it('fsin is monotonically non-decreasing on [-π/2, π/2]', () => {
+    const steps = 500
+    let prev = fsin(-Math.PI / 2)
+    for (let i = 1; i <= steps; i++) {
+      const x = -Math.PI / 2 + (Math.PI * i) / steps
+      const curr = fsin(x)
+      expect(curr).toBeGreaterThanOrEqual(prev - 1e-10)
+      prev = curr
+    }
+  })
+
+  it('fcos is monotonically non-increasing on [0, π]', () => {
+    const steps = 500
+    let prev = fcos(0)
+    for (let i = 1; i <= steps; i++) {
+      const x = (Math.PI * i) / steps
+      const curr = fcos(x)
+      expect(curr).toBeLessThanOrEqual(prev + 1e-10)
+      prev = curr
+    }
+  })
+})

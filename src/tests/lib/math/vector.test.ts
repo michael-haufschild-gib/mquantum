@@ -181,10 +181,70 @@ describe('Vector Operations', () => {
       expect(magSq).toBeCloseTo(magnitude(v) ** 2, 10)
     })
 
+    it('Cauchy-Schwarz inequality: |a·b| ≤ |a|·|b|', () => {
+      const testCases = [
+        { a: [1, 2, 3], b: [4, 5, 6] },
+        { a: [1, 0, 0], b: [0, 1, 0] },
+        { a: [3, -2, 7, 1], b: [-1, 4, 2, -3] },
+        { a: [1, 1, 1, 1, 1], b: [2, 2, 2, 2, 2] },
+      ]
+      for (const { a, b } of testCases) {
+        expect(Math.abs(dotProduct(a, b))).toBeLessThanOrEqual(magnitude(a) * magnitude(b) + 1e-10)
+      }
+    })
+
+    it('is commutative: a·b = b·a', () => {
+      const a = [1.5, -2.3, 4.7]
+      const b = [3.1, 0.8, -1.2]
+      expect(dotProduct(a, b)).toBeCloseTo(dotProduct(b, a), 10)
+    })
+
+    it('is distributive: a·(b+c) = a·b + a·c', () => {
+      const a = [1, 2, 3]
+      const b = [4, 5, 6]
+      const c = [7, -1, 2]
+      const bPlusC = addVectors(b, c)
+      expect(dotProduct(a, bPlusC)).toBeCloseTo(dotProduct(a, b) + dotProduct(a, c), 8)
+    })
+
     it('throws error for mismatched dimensions', () => {
       const a = [1, 2, 3]
       const b = [1, 2]
       expect(() => dotProduct(a, b)).toThrow()
+    })
+  })
+
+  describe('algebraic identities', () => {
+    it('triangle inequality: |a+b| ≤ |a| + |b|', () => {
+      const testCases = [
+        { a: [1, 2, 3], b: [4, 5, 6] },
+        { a: [1, 0, 0], b: [-1, 0, 0] },
+        { a: [3, -2, 7, 1], b: [-1, 4, 2, -3] },
+      ]
+      for (const { a, b } of testCases) {
+        const sum = addVectors(a, b)
+        expect(magnitude(sum)).toBeLessThanOrEqual(magnitude(a) + magnitude(b) + 1e-10)
+      }
+    })
+
+    it('scaling preserves direction: normalize(k*v) = ±normalize(v) for k≠0', () => {
+      const v = [3, -1, 4, 2]
+      const n1 = normalize(v)
+      const n2 = normalize(scaleVector(v, 7.5))
+      const n3 = normalize(scaleVector(v, -3))
+      for (let i = 0; i < 4; i++) {
+        expect(n2[i]).toBeCloseTo(n1[i]!, 10)
+        expect(n3[i]).toBeCloseTo(-n1[i]!, 10)
+      }
+    })
+
+    it('|a - b|² = |a|² + |b|² - 2(a·b) (polarization identity)', () => {
+      const a = [2, 3, -1, 5]
+      const b = [1, -2, 4, 0]
+      const diff = subtractVectors(a, b)
+      const lhs = dotProduct(diff, diff)
+      const rhs = dotProduct(a, a) + dotProduct(b, b) - 2 * dotProduct(a, b)
+      expect(lhs).toBeCloseTo(rhs, 8)
     })
   })
 
@@ -380,6 +440,17 @@ describe('Vector Operations', () => {
       const b = [0, 1, 0]
       const result = crossProduct3D(a, b)
       expect(magnitude(result)).toBeCloseTo(1, 10)
+    })
+
+    it('|a × b|² = |a|²|b|² - (a·b)² (Lagrange identity)', () => {
+      const a = [1, 2, 3]
+      const b = [4, -1, 2]
+      const cross = crossProduct3D(a, b)
+      const crossMagSq = dotProduct(cross, cross)
+      const aMagSq = dotProduct(a, a)
+      const bMagSq = dotProduct(b, b)
+      const ab = dotProduct(a, b)
+      expect(crossMagSq).toBeCloseTo(aMagSq * bMagSq - ab * ab, 8)
     })
 
     it('throws error for non-3D vectors in DEV mode', () => {

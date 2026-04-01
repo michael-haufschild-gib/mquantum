@@ -481,6 +481,93 @@ describe('Matrix Operations', () => {
     })
   })
 
+  describe('algebraic identities', () => {
+    it('det(A*B) = det(A) * det(B) for 2x2 matrices', () => {
+      const A = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const B = mat([
+        [5, 6],
+        [7, 8],
+      ])
+      const AB = multiplyMatrices(A, B)
+      expect(determinant(AB)).toBeCloseTo(determinant(A) * determinant(B), 2)
+    })
+
+    it('det(A*B) = det(A) * det(B) for 3x3 matrices', () => {
+      const A = mat([
+        [1, 2, 3],
+        [0, 4, 5],
+        [1, 0, 6],
+      ])
+      const B = mat([
+        [2, 0, 1],
+        [1, 3, 0],
+        [0, 1, 2],
+      ])
+      const AB = multiplyMatrices(A, B)
+      expect(determinant(AB)).toBeCloseTo(determinant(A) * determinant(B), 1)
+    })
+
+    it('transpose(A*B) = transpose(B) * transpose(A)', () => {
+      const A = mat([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9],
+      ])
+      const B = mat([
+        [9, 8, 7],
+        [6, 5, 4],
+        [3, 2, 1],
+      ])
+      const AB = multiplyMatrices(A, B)
+      const lhs = transposeMatrix(AB)
+      const rhs = multiplyMatrices(transposeMatrix(B), transposeMatrix(A))
+      for (let i = 0; i < 9; i++) {
+        expect(lhs[i]).toBeCloseTo(rhs[i]!, 3)
+      }
+    })
+
+    it('(A*B)*v = A*(B*v) for matrix-vector multiplication', () => {
+      const A = mat([
+        [1, 2],
+        [3, 4],
+      ])
+      const B = mat([
+        [5, 6],
+        [7, 8],
+      ])
+      const v = [1, 2]
+      const AB = multiplyMatrices(A, B)
+      const lhs = multiplyMatrixVector(AB, v)
+      const Bv = multiplyMatrixVector(B, v)
+      const rhs = multiplyMatrixVector(A, Bv)
+      expect(lhs[0]).toBeCloseTo(rhs[0]!, 3)
+      expect(lhs[1]).toBeCloseTo(rhs[1]!, 3)
+    })
+
+    it('det(I) = 1 for dimensions 2 through 6', () => {
+      for (let dim = 2; dim <= 6; dim++) {
+        const I = createIdentityMatrix(dim)
+        expect(determinant(I)).toBeCloseTo(1, 10)
+      }
+    })
+
+    it('4x4 unrolled path and 5x5 generic path produce consistent results', () => {
+      // Verify that multiplyMatricesInto gives same result for 4x4 (unrolled) and 5x5 (generic)
+      // by testing identity multiplication on both paths
+      for (const dim of [4, 5]) {
+        const I = createIdentityMatrix(dim)
+        const M = new Float32Array(dim * dim)
+        for (let i = 0; i < dim * dim; i++) M[i] = (i % 7) - 3
+        const out = new Float32Array(dim * dim)
+        multiplyMatricesInto(out, I, M)
+        expect(matricesEqual(out, M)).toBe(true)
+      }
+    })
+  })
+
   describe('getMatrixDimensions', () => {
     it('returns dimensions of a matrix', () => {
       const M = mat([

@@ -189,6 +189,74 @@ describe('HO wavefunction properties', () => {
     }
   })
 
+  it('excited states are normalized at non-unit omega (ω=0.5, 2, 5)', () => {
+    const dx = 0.005
+    const xMin = -15
+    const xMax = 15
+    const omegas = [0.5, 2.0, 5.0]
+    const maxN = 4
+
+    for (const omega of omegas) {
+      for (let n = 0; n <= maxN; n++) {
+        let integral = 0
+        for (let x = xMin; x <= xMax; x += dx) {
+          const psi = ho1D(n, x, omega)
+          integral += psi * psi * dx
+        }
+        expect(integral).toBeCloseTo(1.0, 1)
+      }
+    }
+  })
+
+  it('excited states are orthogonal at non-unit omega (ω=3)', () => {
+    const dx = 0.005
+    const xMin = -10
+    const xMax = 10
+    const omega = 3.0
+
+    const pairs: [number, number][] = [
+      [0, 1],
+      [0, 2],
+      [1, 2],
+      [1, 3],
+      [2, 4],
+    ]
+
+    for (const [n, m] of pairs) {
+      let integral = 0
+      for (let x = xMin; x <= xMax; x += dx) {
+        integral += ho1D(n, x, omega) * ho1D(m, x, omega) * dx
+      }
+      expect(Math.abs(integral)).toBeLessThan(0.01)
+    }
+  })
+
+  it('node positions shift with omega: nodes move inward as ω increases', () => {
+    // For n=1, the single node is at x=0 regardless of omega.
+    // For n=2, the two nodes are at x = ±1/√ω.
+    // Test that nodes move inward as ω increases.
+    function findNodes(n: number, omega: number): number[] {
+      const nodes: number[] = []
+      let prevSign = Math.sign(ho1D(n, -10, omega))
+      for (let x = -9.99; x <= 10; x += 0.01) {
+        const curSign = Math.sign(ho1D(n, x, omega))
+        if (curSign !== 0 && prevSign !== 0 && curSign !== prevSign) {
+          nodes.push(x)
+        }
+        if (curSign !== 0) prevSign = curSign
+      }
+      return nodes
+    }
+
+    // n=2 has 2 nodes at ±1/√ω
+    const nodes2_low = findNodes(2, 0.5)
+    const nodes2_high = findNodes(2, 4.0)
+    expect(nodes2_low).toHaveLength(2)
+    expect(nodes2_high).toHaveLength(2)
+    // Higher ω → nodes closer to origin
+    expect(Math.abs(nodes2_high[0]!)).toBeLessThan(Math.abs(nodes2_low[0]!))
+  })
+
   it('different HO eigenstates are orthogonal: integral(psi_n * psi_m) approx 0 for n != m', () => {
     const dx = 0.005
     const xMin = -10

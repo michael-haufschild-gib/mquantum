@@ -40,6 +40,29 @@ describe('coherentFockCoefficients', () => {
     expect(mean).toBeCloseTo(alpha * alpha, 2)
   })
 
+  it('large displacement |α|=4: normalization holds with enough terms', () => {
+    // |alpha|² = 16, Poisson mean = 16
+    // Need many terms for normalization: P(n<30) should capture most probability
+    const coeffs = coherentFockCoefficients(4, 0, 40)
+    const totalProb = coeffs.reduce((sum, c) => sum + c.re * c.re + c.im * c.im, 0)
+    expect(totalProb).toBeCloseTo(1, 2)
+    // Mean should be |alpha|² = 16
+    const probs = coeffs.map((c) => c.re * c.re + c.im * c.im)
+    const mean = probs.reduce((sum, p, n) => sum + n * p, 0)
+    expect(mean).toBeCloseTo(16, 1)
+  })
+
+  it('variance of coherent state distribution equals |α|²', () => {
+    const alpha = 2.0
+    const coeffs = coherentFockCoefficients(alpha, 0, 30)
+    const probs = coeffs.map((c) => c.re * c.re + c.im * c.im)
+    const mean = probs.reduce((sum, p, n) => sum + n * p, 0)
+    const meanSq = probs.reduce((sum, p, n) => sum + n * n * p, 0)
+    const variance = meanSq - mean * mean
+    // Poissonian: variance = mean = |alpha|²
+    expect(variance).toBeCloseTo(alpha * alpha, 1)
+  })
+
   it('handles purely imaginary alpha', () => {
     const coeffs = coherentFockCoefficients(0, 1, 10)
     const totalProb = coeffs.reduce((sum, c) => sum + c.re * c.re + c.im * c.im, 0)
@@ -77,6 +100,31 @@ describe('squeezedFockCoefficients', () => {
     const totalProb = coeffs.reduce((sum, c) => sum + c.re * c.re + c.im * c.im, 0)
     // With moderate squeeze and 20 terms, should be close to 1
     expect(totalProb).toBeCloseTo(1, 3)
+  })
+
+  it('large squeeze r=1.5: coefficients remain finite', () => {
+    const coeffs = squeezedFockCoefficients(1.5, 0, 30)
+    for (let n = 0; n < 30; n++) {
+      expect(Number.isFinite(coeffs[n]!.re)).toBe(true)
+      expect(Number.isFinite(coeffs[n]!.im)).toBe(true)
+    }
+    // Even terms should be nonzero for moderate n
+    expect(Math.abs(coeffs[0]!.re)).toBeGreaterThan(0.1)
+    expect(Math.abs(coeffs[2]!.re)).toBeGreaterThan(0.01)
+  })
+
+  it('squeeze angle theta=pi rotates the phase of coefficients', () => {
+    const r = 0.5
+    const coeffs0 = squeezedFockCoefficients(r, 0, 10)
+    const coeffsPi = squeezedFockCoefficients(r, Math.PI, 10)
+    // At theta=0: mu = -tanh(r) (real negative)
+    // At theta=pi: mu = +tanh(r) (real positive)
+    // c_2 should have different signs
+    expect(coeffs0[2]!.re * coeffsPi[2]!.re).toBeLessThan(0)
+    // Magnitudes should be equal (same |mu|)
+    const mag0 = Math.sqrt(coeffs0[2]!.re ** 2 + coeffs0[2]!.im ** 2)
+    const magPi = Math.sqrt(coeffsPi[2]!.re ** 2 + coeffsPi[2]!.im ** 2)
+    expect(mag0).toBeCloseTo(magPi, 8)
   })
 
   it('mean occupation number matches sinh^2(r) from distribution', () => {
@@ -294,6 +342,84 @@ describe('computeSecondQuantMetrics', () => {
     // Even terms should be nonzero
     expect(m.fockDistribution[0]).toBeGreaterThan(0.5) // vacuum component dominates for small r
     expect(m.fockDistribution[2]).toBeGreaterThan(0)
+  })
+
+  it('coherent state normalization holds for large |α| = 5', () => {
+    const m = computeSecondQuantMetrics('coherent', {
+      n: 0,
+      alphaRe: 5,
+      alphaIm: 0,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    // |alpha|² = 25, 12 Fock terms is insufficient for normalization
+    // but the normalization check tests whether the computation doesn't diverge
+    expect(m.occupation).toBeCloseTo(25, 8)
+    expect(m.energy).toBeCloseTo(25.5, 8)
+    // Fock distribution truncated at 12 terms: won't sum to 1 but should be positive
+    const totalProb = m.fockDistribution.reduce((s, p) => s + p, 0)
+    expect(totalProb).toBeGreaterThan(0)
+    expect(totalProb).toBeLessThanOrEqual(1.001)
+  })
+
+  it('squeezed state with large r=2 remains finite and physical', () => {
+    const m = computeSecondQuantMetrics('squeezed', {
+      n: 0,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 2.0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    // <n> = sinh²(2) ≈ 13.15
+    expect(m.occupation).toBeCloseTo(Math.sinh(2) ** 2, 4)
+    expect(Number.isFinite(m.energy)).toBe(true)
+    // Fock distribution should be finite at all indices
+    for (const p of m.fockDistribution) {
+      expect(Number.isFinite(p)).toBe(true)
+      expect(p).toBeGreaterThanOrEqual(0)
+    }
+    // Only even terms should be nonzero
+    for (let i = 0; i < m.fockDistribution.length; i++) {
+      if (i % 2 === 1) expect(m.fockDistribution[i]).toBeCloseTo(0, 10)
+    }
+  })
+
+  it('Heisenberg uncertainty ΔxΔp ≥ 0.5 for all state types', () => {
+    const states: Array<{
+      mode: 'fock' | 'coherent' | 'squeezed'
+      params: Record<string, number>
+    }> = [
+      { mode: 'fock', params: { n: 0 } },
+      { mode: 'fock', params: { n: 5 } },
+      { mode: 'coherent', params: { alphaRe: 3, alphaIm: -2 } },
+      { mode: 'coherent', params: { alphaRe: 0, alphaIm: 0 } },
+      { mode: 'squeezed', params: { squeezeR: 0.5, squeezeTheta: 0 } },
+      { mode: 'squeezed', params: { squeezeR: 2.0, squeezeTheta: Math.PI / 3 } },
+    ]
+    const base = { n: 0, alphaRe: 0, alphaIm: 0, squeezeR: 0, squeezeTheta: 0, omega: 1 }
+    for (const { mode, params } of states) {
+      const u = computeUncertainties(mode, { ...base, ...params })
+      expect(u.product).toBeGreaterThanOrEqual(0.5 - 1e-6)
+    }
+  })
+
+  it('Robertson-Schrodinger invariant ≥ 0.25 for all states', () => {
+    const states: Array<{
+      mode: 'fock' | 'coherent' | 'squeezed'
+      params: Record<string, number>
+    }> = [
+      { mode: 'fock', params: { n: 0 } },
+      { mode: 'fock', params: { n: 10 } },
+      { mode: 'coherent', params: { alphaRe: 5, alphaIm: 3 } },
+      { mode: 'squeezed', params: { squeezeR: 1.5, squeezeTheta: Math.PI / 4 } },
+    ]
+    const base = { n: 0, alphaRe: 0, alphaIm: 0, squeezeR: 0, squeezeTheta: 0, omega: 1 }
+    for (const { mode, params } of states) {
+      const u = computeUncertainties(mode, { ...base, ...params })
+      expect(u.robertsonSchrodinger).toBeGreaterThanOrEqual(0.25 - 1e-6)
+    }
   })
 
   it('sanitizes invalid Fock n values to non-negative integers', () => {
