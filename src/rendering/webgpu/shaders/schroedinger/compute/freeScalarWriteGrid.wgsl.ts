@@ -261,7 +261,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let rho = abs(fieldValue);
-  let normRho = select(rho / params.maxFieldValue, rho, params.maxFieldValue <= 0.0) * perpFalloff;
+  let normRho = select(rho / params.maxFieldValue, 0.0, params.maxFieldValue <= 0.0) * perpFalloff;
   let logRho = log(normRho + 1e-10);
   let phase = select(0.0, 3.14159265, fieldValue < 0.0);
 

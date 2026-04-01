@@ -19,7 +19,7 @@ import {
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
-import { computeLatticeBoundingRadius } from './computeGridUtils'
+import { applySharedPml, computeLatticeBoundingRadius } from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -110,9 +110,12 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
 
     if (!qwConfig) return
 
+    const schroedinger = extended?.schroedinger
+    const qwWithSharedPml = applySharedPml(qwConfig, schroedinger)
+
     qwPass.executeQuantumWalk(
       ctx,
-      qwConfig,
+      qwWithSharedPml,
       isPlaying,
       speed,
       extended?.schroedinger?.basisX as Float32Array | undefined,

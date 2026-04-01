@@ -54,9 +54,14 @@ fn getPotentialScale() -> f32 {
     let halfDr = (params.radialWellOuter - params.radialWellInner) * 0.5;
     let h4 = halfDr * halfDr * halfDr * halfDr;
     return max(params.radialWellDepth * h4, 1.0);
-  } else if (params.potentialType == 11u) {
-    // Custom expression: max|V| computed JS-side and passed via uniform
+  } else if (params.potentialType == 11u || params.potentialType == 12u) {
+    // Custom expression or Anderson disorder: max|V| computed JS-side and passed via uniform
     return max(params.customPotentialScale, 1.0);
+  } else if (params.potentialType == 13u) {
+    // Coupled anharmonic: V = ½Σω²x² + λΣ_{i<j} x_i²x_j²
+    // Scale by harmonic contribution at half-bounding-radius (same as becTrap)
+    let r = params.boundingRadius * 0.5;
+    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
   }
   return 1.0;
 }

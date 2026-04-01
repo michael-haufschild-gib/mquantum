@@ -100,7 +100,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     quantumMode === 'freeScalarField' ||
     quantumMode === 'tdseDynamics' ||
     quantumMode === 'becDynamics' ||
-    quantumMode === 'diracEquation'
+    quantumMode === 'diracEquation' ||
+    quantumMode === 'quantumWalk'
 
   // Local State
   const [isFullscreen, setIsFullscreen] = React.useState(false)

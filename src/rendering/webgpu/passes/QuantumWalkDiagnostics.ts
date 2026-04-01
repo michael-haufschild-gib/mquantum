@@ -84,7 +84,7 @@ export class QwDiagnostics {
     })
     this.uniformBuffer = device.createBuffer({
       label: 'qw-diag-uniform',
-      size: 16,
+      size: 32,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
     this.resultBuffer = device.createBuffer({
@@ -178,10 +178,13 @@ export class QwDiagnostics {
       })
     }
 
+    // stride0 = totalSites / gridSize0 = product of all other dim sizes
+    // For 1D: stride0 = 1. For 2D [64,64]: stride0 = 64.
+    const stride0 = gridSize0 > 0 ? Math.floor(totalSites / gridSize0) : 1
     device.queue.writeBuffer(
       this.uniformBuffer,
       0,
-      new Uint32Array([totalSites, numCoinStates, numWG, gridSize0])
+      new Uint32Array([totalSites, numCoinStates, numWG, gridSize0, stride0, 0, 0, 0])
     )
 
     this.reduceBG = device.createBindGroup({
