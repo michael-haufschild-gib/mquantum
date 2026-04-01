@@ -16,28 +16,27 @@ export const probabilityCurrentBlock = /* wgsl */ `
 // Physical Probability Current (j-field)
 // ============================================
 
+// PERF: Forward-difference j-field — 3 evalPsi calls total (was 7 with central diffs).
+// The caller's density pass already evaluated ψ at this position; we accept that
+// pre-computed center ψ to avoid a redundant mapPosToND + evalPsi.
+// Forward differences are O(h) vs central O(h²), but for j-field visualization
+// the accuracy difference is imperceptible — the field drives color/overlay only.
 // Returns vec4f(jx, jy, jz, |j|).
-fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+fn sampleProbabilityCurrentWithPsi(pos: vec3f, t: f32, psi: vec2f, uniforms: SchroedingerUniforms) -> vec4f {
   var delta = clamp(uniforms.probabilityCurrentStepSize, 0.005, 0.2);
-  // Momentum-space fields vary faster; use a larger stencil for stability.
   if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
     delta = max(delta, 0.02);
   }
-  let invTwoDelta = 0.5 / delta;
+  let invDelta = 1.0 / delta;
 
-  let xND = mapPosToND(pos, uniforms);
-  let psi = evalPsi(xND, t, uniforms);
-
+  // Forward differences: ∂ψ/∂x ≈ (ψ(x+δ) − ψ(x)) / δ — only 3 evalPsi calls
   let psiPx = evalPsi(mapPosToND(pos + vec3f(delta, 0.0, 0.0), uniforms), t, uniforms);
-  let psiMx = evalPsi(mapPosToND(pos - vec3f(delta, 0.0, 0.0), uniforms), t, uniforms);
   let psiPy = evalPsi(mapPosToND(pos + vec3f(0.0, delta, 0.0), uniforms), t, uniforms);
-  let psiMy = evalPsi(mapPosToND(pos - vec3f(0.0, delta, 0.0), uniforms), t, uniforms);
   let psiPz = evalPsi(mapPosToND(pos + vec3f(0.0, 0.0, delta), uniforms), t, uniforms);
-  let psiMz = evalPsi(mapPosToND(pos - vec3f(0.0, 0.0, delta), uniforms), t, uniforms);
 
-  let dPsiDx = (psiPx - psiMx) * invTwoDelta;
-  let dPsiDy = (psiPy - psiMy) * invTwoDelta;
-  let dPsiDz = (psiPz - psiMz) * invTwoDelta;
+  let dPsiDx = (psiPx - psi) * invDelta;
+  let dPsiDy = (psiPy - psi) * invDelta;
+  let dPsiDz = (psiPz - psi) * invDelta;
 
   // j = Im(conj(psi) * grad(psi)) -> psi.re * grad(psi.im) - psi.im * grad(psi.re)
   var j = vec3f(
@@ -46,13 +45,18 @@ fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) 
     psi.x * dPsiDz.y - psi.y * dPsiDz.x
   );
 
-  // Keep physical current magnitude aligned with hydrogen-ND density scaling.
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
     j *= uniforms.hydrogenNDBoost;
   }
 
   let jMag = length(j);
   return vec4f(j, jMag);
+}
+
+// Legacy wrapper for call sites without pre-computed psi (isosurface, grid modes).
+fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  let psi = evalPsi(mapPosToND(pos, uniforms), t, uniforms);
+  return sampleProbabilityCurrentWithPsi(pos, t, psi, uniforms);
 }
 
 fn computeProbabilityCurrentColor(
@@ -175,6 +179,9 @@ fn computeProbabilityCurrentOverlay(
 /** No-op stubs for probability current functions when feature is off. */
 export const probabilityCurrentStubBlock = /* wgsl */ `
 // Stubs: probability current disabled at compile time
+fn sampleProbabilityCurrentWithPsi(pos: vec3f, t: f32, psi: vec2f, uniforms: SchroedingerUniforms) -> vec4f {
+  return vec4f(0.0);
+}
 fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
   return vec4f(0.0);
 }

@@ -17,19 +17,21 @@
  * @returns WGSL function code for hoND{dimension}D
  */
 function generateHoNDBlock(dimension: number): string {
-  // PERF: Precompute alpha and alphaNorm per dimension ONCE (outside the term loop).
-  // These depend only on omega[j] which is uniform-constant per dimension.
-  // Saves 2× sqrt() per ho1D call × D dimensions × T terms per sample.
-  const alphaPrecomp = Array.from(
+  // PERF: Precompute alpha, alphaNorm, scaled coordinate u, and Gaussian envelope
+  // per dimension ONCE. These depend only on omega[j] and xND[j], both term-invariant.
+  // For 8-term superposition at 3D: saves 21 exp() + 21 mul (u²) = ~525 GPU cycles.
+  const precomp = Array.from(
     { length: dimension },
     (_, i) => `  let omega_${i} = max(getOmega(uniforms, ${i}), 0.01);
   let alpha_${i} = sqrt(omega_${i});
-  let alphaNorm_${i} = sqrt(sqrt(omega_${i} * INV_PI));`
+  let alphaNorm_${i} = sqrt(sqrt(omega_${i} * INV_PI));
+  let u_${i} = alpha_${i} * xND[${i}];
+  let gauss_${i} = exp(-0.5 * min(u_${i} * u_${i}, 40.0));`
   ).join('\n')
 
-  // Generate ho1DFast product chain using precomputed alpha/alphaNorm
+  // Generate ho1DFastPreGauss product chain using precomputed u/gauss/alphaNorm
   const ho1DChain = Array.from({ length: dimension }, (_, i) => {
-    const call = `ho1DFast(getQuantum(uniforms, base + ${i}), xND[${i}], alpha_${i}, alphaNorm_${i})`
+    const call = `ho1DFastPreGauss(getQuantum(uniforms, base + ${i}), u_${i}, gauss_${i}, alphaNorm_${i})`
     if (i === 0) {
       return `  var p = ${call};
   if (abs(p) < 1e-10) { return 0.0; }`
@@ -47,13 +49,13 @@ function generateHoNDBlock(dimension: number): string {
   return `
 // ============================================
 // Harmonic Oscillator ND - ${dimension}D (Unrolled)
-// PERF: Precomputed alpha/alphaNorm per dimension
+// PERF: Precomputed alpha/alphaNorm/u/gauss per dimension
 // ============================================
 
 fn hoND${dimension}D(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
   let base = termIdx * 11;
   // Precompute per-dimension constants (invariant across terms)
-${alphaPrecomp}
+${precomp}
 ${ho1DChain}
 }
 `

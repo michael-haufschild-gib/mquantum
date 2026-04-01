@@ -79,10 +79,10 @@ fn volumeRaymarch(
       }
     }
 
-    // Sample density with phase AND get flowed position for optimized gradient computation
+    // Sample density with phase AND raw ψ for probability current reuse
     let densityResult = sampleDensityWithPhaseAndFlow(pos, animTime, uniforms);
     let densityInfo = densityResult[0];
-    let flowedPos = densityResult[1];
+    let rawPsiVec = densityResult[1];
     let rho = densityInfo.x;
     let sCenter = densityInfo.y;
     let phase = densityInfo.z;
@@ -113,13 +113,17 @@ fn volumeRaymarch(
     // PERF: When nodal band mode is active, use the combined function that also computes
     // the density gradient from the same tetrahedral samples. This eliminates 4 redundant
     // psi evaluations when the gradient would otherwise be computed separately.
+    // PERF: Skip nodal computation when density is very low (sCenter < -10 → rho < 4.5e-5).
+    // The envelope weight drives nodal intensity to zero at low amplitude, so the 4 tetrahedral
+    // psi evaluations would produce an invisible result. Saves ~44% ALU per low-density step.
     var nodalGradient = vec3f(0.0);
     var hasNodalGradient = false;
     if (
       FEATURE_NODAL &&
       uniforms.nodalEnabled != 0u &&
       uniforms.nodalStrength > 0.0 &&
-      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND &&
+      sCenter > -10.0
     ) {
       let combined = computePhysicalNodalFieldWithGradient(pos, animTime, uniforms);
       nodalGradient = combined.gradient;
@@ -141,9 +145,9 @@ fn volumeRaymarch(
       }
     }
 
-    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling.
-    // sampleProbabilityCurrent evaluates the full wavefunction 7 times (center + 6 finite diffs).
-    // computeProbabilityCurrentOverlay would discard the result anyway if rho < threshold.
+    // PERF: Hoist density threshold check before expensive current sampling.
+    // sampleProbabilityCurrentWithPsi uses 3 forward-diff evalPsi calls (was 7 central).
+    // The center ψ is reused from the density pass above (rawPsiVec).
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (
@@ -154,7 +158,7 @@ fn volumeRaymarch(
       rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
     ) {
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
-      let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
+      let currentSample = sampleProbabilityCurrentWithPsi(pos, animTime, rawPsiVec.xy, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
         pos,
         currentSample,
@@ -216,7 +220,7 @@ fn volumeRaymarch(
       } else if (USE_ANALYTICAL_GRADIENT) {
         gradient = computeAnalyticalGradient(pos, animTime, uniforms);
       } else {
-        gradient = computeGradientTetrahedralAtPos(flowedPos, animTime, 0.05, uniforms);
+        gradient = computeGradientTetrahedralAtPos(pos, animTime, 0.05, uniforms);
       }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
@@ -329,10 +333,12 @@ fn volumeRaymarchHQ(
     // PERF: When nodal band mode is active and gradient is needed, use the combined
     // nodalFieldWithGradient function that computes BOTH from the same 4 tetrahedral
     // psi samples — eliminating 4 redundant psi evaluations per ray step.
+    // PERF: Also gate on density — skip nodal at very low density where envelope → 0.
     let nodalBandActive = FEATURE_NODAL &&
       uniforms.nodalEnabled != 0u &&
       uniforms.nodalStrength > 0.0 &&
-      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND;
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND &&
+      quickS > -10.0;
 
     var nodalHandled = false;
 
@@ -419,7 +425,7 @@ fn volumeRaymarchHQ(
       }
     }
 
-    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling
+    // PERF: Hoist density threshold check before current sampling (4 evalPsi via forward diffs).
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (

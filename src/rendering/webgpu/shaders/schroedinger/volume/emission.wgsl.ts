@@ -614,12 +614,33 @@ fn computeEmissionLit(
     n = gradient / gradLen;
   }
 
+  // PERF: Hoist light-independent computations out of the per-light loop.
+  // Powder effect depends only on rho/uniforms — same for all lights.
+  var powder = 1.0;
+  if (uniforms.powderScale > 0.0) {
+    powder = 1.0 - exp(-rho * uniforms.densityGain * uniforms.powderScale * 4.0);
+    powder = 0.5 + 1.5 * powder;
+  }
+
+  // SSS noise is position-dependent only — compute once for all lights.
+  var sssJitteredDistortion = 0.5;
+  var sssTransmission = 0.0;
+  let sssActive = material.sssEnabled != 0u && material.sssIntensity > 0.0;
+  if (sssActive) {
+    let fragCoord = vec2f(p.x * 100.0, p.y * 100.0);
+    let sssNoise = fract(sin(dot(fragCoord * 0.1, vec2f(127.1, 311.7))) * 43758.5453) * 2.0 - 1.0;
+    sssJitteredDistortion = 0.5 * (1.0 + sssNoise * material.sssJitter);
+    sssTransmission = exp(-rho * material.sssThickness);
+  }
+
+  // Pre-compute diffuse color factor (light-independent)
+  let diffuseBase = surfaceColor / PI;
+
   // Loop through lights using shared lighting system
   for (var i = 0; i < 8; i++) {
     if (i >= lighting.lightCount) { break; }
 
     let light = lighting.lights[i];
-    // Enabled flag packed in params.w (0 or 1)
     if (light.params.w < 0.5) { continue; }
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
@@ -640,13 +661,6 @@ fn computeEmissionLit(
 
     if (attenuation < 0.001) { continue; }
 
-    // Powder effect for volumetric multiple scattering
-    var powder = 1.0;
-    if (uniforms.powderScale > 0.0) {
-      powder = 1.0 - exp(-rho * uniforms.densityGain * uniforms.powderScale * 4.0);
-      powder = 0.5 + 1.5 * powder;
-    }
-
     // Anisotropic scattering
     var phaseFactor = 1.0;
     if (abs(uniforms.scatteringAnisotropy) > 0.01) {
@@ -655,25 +669,14 @@ fn computeEmissionLit(
       phaseFactor *= 4.0 * PI;
     }
 
-    // Lambertian diffuse (no PBR specular for volumetric — it has negligible effect on clouds)
     let NdotL = max(dot(n, l), 0.0);
+    col += diffuseBase * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
 
-    // Diffuse
-    col += surfaceColor / PI * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
-
-    // Subsurface Scattering (SSS)
-    if (material.sssEnabled != 0u && material.sssIntensity > 0.0) {
-      // Screen-space noise for jitter (uses fragment position)
-      let fragCoord = vec2f(p.x * 100.0, p.y * 100.0); // Approximate fragment coord from world pos
-      let sssNoise = fract(sin(dot(fragCoord * 0.1, vec2f(127.1, 311.7))) * 43758.5453) * 2.0 - 1.0;
-      let jitteredDistortion = 0.5 * (1.0 + sssNoise * material.sssJitter);
-
-      let halfVec = normalize(l + n * jitteredDistortion);
+    // Subsurface Scattering (SSS) — noise/transmission pre-computed above
+    if (sssActive) {
+      let halfVec = normalize(l + n * sssJitteredDistortion);
       let trans = pow(clamp(dot(viewDir, -halfVec), 0.0, 1.0), material.sssThickness * 4.0);
-
-      let transmission = trans * exp(-rho * material.sssThickness);
-
-      col += material.sssColor * light.color.rgb * transmission * material.sssIntensity * attenuation;
+      col += material.sssColor * light.color.rgb * (trans * sssTransmission) * material.sssIntensity * attenuation;
     }
   }
 

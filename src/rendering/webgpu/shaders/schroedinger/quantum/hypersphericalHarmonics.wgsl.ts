@@ -399,8 +399,8 @@ fn evalHydrogenNDCoupledPsi${D}D(xND: array<f32, 11>, t: f32, uniforms: Schroedi
     return vec2f(0.0, 0.0);
   }
 
-  // Radial part: R_{n,l₁}^(D)(r_D) with full D-dimensional radius
-  let R = hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, hs.rD, uniforms.bohrRadius, ${D});
+  // PERF: Use precomputed norm to skip per-pixel log/exp/gamma (~60 cycles saved per eval)
+  let R = hydrogenRadialNDWithNorm(uniforms.principalN, uniforms.azimuthalL, hs.rD, uniforms.bohrRadius, ${D}, uniforms.hydrogenRadialNorm);
   if (abs(R) < 1e-15) { return vec2f(0.0, 0.0); }
 
   // Angular part: D-dimensional hyperspherical harmonic

@@ -253,12 +253,52 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   return vec3f(densityInfo.x, densityInfo.y, phaseForColor);
 }
 
-// Sample density with phase, also returning the position for gradient reuse
-// Returns tuple: (vec3f density info, vec3f position)
+// Sample density with phase, also returning the raw ψ for downstream reuse.
+// Returns tuple: (vec3f(rho, logRho, phase), vec3f(psi.re, psi.im, 0))
+// PERF: Inlines the density processing from sampleDensityWithPhaseComponents to
+// capture the raw psi from evalPsiWithSpatialPhase without a redundant evalPsi call.
+// This saves 1 full wavefunction evaluation per step when probability current is active.
+// The logic must stay in sync with sampleDensityWithPhaseComponents — both live in this
+// file and share the same compile-time feature flags.
 fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> {
-  let densityInfo = sampleDensityWithPhaseComponents(pos, t, uniforms);
-  let phaseForColor = select(densityInfo.z, densityInfo.w, COLOR_ALGORITHM == 10);
-  return array<vec3f, 2>(vec3f(densityInfo.x, densityInfo.y, phaseForColor), pos);
+  let xND = mapPosToND(pos, uniforms);
+  let psiResult = evalPsiWithSpatialPhase(xND, t, uniforms);
+  let psi = psiResult.xy;
+  let spatialPhase = psiResult.z;
+  let relativePhase = psiResult.w;
+
+  var rho = rhoFromPsi(psi);
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+    rho *= uniforms.hydrogenNDBoost;
+  }
+  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
+    let boundaryLogRho = sFromRho(rho);
+    rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
+  }
+  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+    let iTime = uniforms.time * uniforms.interferenceSpeed;
+    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
+    rho *= fringe;
+    rho = max(rho, 0.0);
+  }
+  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
+    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
+    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
+    let pcfOffset = pcfTime * pcfSpeedMod;
+    let psiLen = max(length(psi), 1e-8);
+    let pcfCosP = psi.x / psiLen;
+    let pcfSinP = psi.y / psiLen;
+    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
+        pcfOffset + pcfCosP * 0.5,
+        pcfSinP * 0.5,
+        pcfOffset * 0.7 + pcfCosP * 0.3
+    ));
+    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
+    rho = max(rho, 0.0);
+  }
+  let s = sFromRho(rho);
+  let phaseForColor = select(spatialPhase, relativePhase, COLOR_ALGORITHM == 10);
+  return array<vec3f, 2>(vec3f(rho, s, phaseForColor), vec3f(psi.x, psi.y, 0.0));
 }
 
 // Sample density at a given position (lightweight path for tetrahedral gradient).

@@ -76,6 +76,17 @@ fn ho1DFast(n: i32, x: f32, alpha: f32, alphaNorm: f32) -> f32 {
   return alphaNorm * norm * H * gauss;
 }
 
+// PERF: Variant with precomputed Gaussian and scaled coordinate.
+// For multi-term superposition at the same point, u = alpha*x and gauss = exp(-0.5*u²)
+// are identical across all terms (they depend on dimension, not term index).
+// Eliminates redundant exp() calls: 1 per dimension instead of 1 per term×dimension.
+fn ho1DFastPreGauss(n: i32, u: f32, gauss: f32, alphaNorm: f32) -> f32 {
+  if (n < 0 || n > 6) { return 0.0; }
+  let H = hermite(n, u);
+  let norm = HO_NORM[n];
+  return alphaNorm * norm * H * gauss;
+}
+
 // PERF: Ground-state HO eigenfunction (n=0). Eliminates Hermite evaluation
 // and norm lookup: φ_0(x, ω) = (ω/π)^{1/4} * exp(-½ωx²).
 // Used by hydrogen ND extra dimensions when quantum numbers are 0 (common default).
