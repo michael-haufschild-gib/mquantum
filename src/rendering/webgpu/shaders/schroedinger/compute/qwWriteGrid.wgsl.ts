@@ -10,10 +10,10 @@
  * and perpendicular Gaussian falloff for 1D/2D lattices.
  *
  * Output encoding (rgba16float):
- *   R: P(site) / maxDensity  (normalized probability)
- *   G: log(R + ε)            (log-density for Beer-Lambert)
- *   B: arg(Σ_j c_j)          (phase of summed coin amplitude) [0, 2π]
- *   A: 0.0                   (reserved)
+ *   R: displayScalar          (field-view-dependent: probability, phase, or chirality)
+ *   G: log(R + ε)             (log-density for Beer-Lambert)
+ *   B: arg(Σ_j c_j)           (phase of summed coin amplitude) [0, 2π]
+ *   A: raw |ψ|²/max * falloff (density for opacity, independent of field view)
  *
  * Requires freeScalarNDIndexBlock to be prepended.
  *
@@ -125,21 +125,34 @@ fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   return w;
 }
 
-// Sum probability and complex amplitude over all coin states at a given site.
-fn sumCoinStates(site: u32) -> vec3f {
+// Sum probability, complex amplitude, and chirality over all coin states at a site.
+// Returns vec4f(probability, phase, chirality, 0).
+// Chirality = net forward-minus-backward bias across all axes, normalized to [-1,1].
+// Coin state layout: j=2d → +axis_d, j=2d+1 → -axis_d.
+fn sumCoinStates(site: u32) -> vec4f {
   let baseIdx = site * params.numCoinStates * 2u;
   var prob: f32 = 0.0;
   var sumRe: f32 = 0.0;
   var sumIm: f32 = 0.0;
-  for (var j: u32 = 0u; j < params.numCoinStates; j++) {
-    let re = coinState[baseIdx + j * 2u];
-    let im = coinState[baseIdx + j * 2u + 1u];
-    prob += re * re + im * im;
-    sumRe += re;
-    sumIm += im;
+  var chirality: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let jPlus = d * 2u;
+    let jMinus = d * 2u + 1u;
+    let rePlus = coinState[baseIdx + jPlus * 2u];
+    let imPlus = coinState[baseIdx + jPlus * 2u + 1u];
+    let reMinus = coinState[baseIdx + jMinus * 2u];
+    let imMinus = coinState[baseIdx + jMinus * 2u + 1u];
+    let pPlus = rePlus * rePlus + imPlus * imPlus;
+    let pMinus = reMinus * reMinus + imMinus * imMinus;
+    prob += pPlus + pMinus;
+    sumRe += rePlus + reMinus;
+    sumIm += imPlus + imMinus;
+    chirality += pPlus - pMinus;
   }
   let phase = atan2(sumIm, sumRe) + 3.14159265;
-  return vec3f(prob, phase, 0.0);
+  // Normalize chirality by total probability at this site
+  let chiralityNorm = select(chirality / max(prob, 1e-20), 0.0, prob < 1e-30);
+  return vec4f(prob, phase, chiralityNorm, 0.0);
 }
 
 @compute @workgroup_size(4, 4, 4)
@@ -198,9 +211,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let numCorners = 1u << min(params.latticeDim, 3u);
 
-  // Trilinear interpolation of probability density and phase
+  // Trilinear interpolation of coin state quantities
   var blendedProb: f32 = 0.0;
   var blendedPhase: f32 = 0.0;
+  var blendedChirality: f32 = 0.0;
   var totalWeight: f32 = 0.0;
 
   for (var corner: u32 = 0u; corner < numCorners; corner++) {
@@ -210,12 +224,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let coinData = sumCoinStates(sIdx);
       blendedProb += w * coinData.x;
       blendedPhase += w * coinData.y;
+      blendedChirality += w * coinData.z;
       totalWeight += w;
     }
   }
 
   if (totalWeight > 0.0) {
     blendedPhase /= totalWeight;
+    blendedChirality /= totalWeight;
   }
 
   // Track peak probability for next-frame normalization.
@@ -225,9 +241,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   atomicMax(&maxDensityAtomic, bitcast<u32>(rawProb));
 
   let maxD = max(params.maxDensity, 1e-20);
-  let normDensity = clamp(rawProb / maxD, 0.0, 1.0);
+  let normDensityRaw = clamp(rawProb / maxD, 0.0, 1.0);
+  let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
+
+  // Field view branching — select displayScalar per visualization mode
+  var displayScalar: f32 = 0.0;
+  if (params.fieldView == 0u) {
+    // Probability: normalized |ψ|²
+    displayScalar = normDensityRaw;
+  } else if (params.fieldView == 1u) {
+    // Phase: complex phase of summed coin amplitude, gated by density
+    displayScalar = blendedPhase / (2.0 * 3.14159265) * densityGate;
+  } else if (params.fieldView == 2u) {
+    // Coin state: chirality (net forward-backward bias), mapped to [0,1]
+    displayScalar = (0.5 + 0.5 * blendedChirality) * densityGate;
+  }
+
+  let normDensity = displayScalar * perpFalloff;
   let logDensity = log(normDensity + 1e-10);
 
-  textureStore(outputTex, gid, vec4f(normDensity, logDensity, blendedPhase, normDensity));
+  textureStore(outputTex, gid, vec4f(normDensity, logDensity, blendedPhase, normDensityRaw * perpFalloff));
 }
 `

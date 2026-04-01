@@ -7,7 +7,7 @@
  *
  * Supported coins:
  *   0 = Grover: G_jk = 1/D - δ_jk (mean minus self, no explicit matrix)
- *   1 = Hadamard: 2x2 Hadamard (1D only, extended via tensor product for D>1)
+ *   1 = Hadamard: biased H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]] per axis (tensor product for D>1)
  *   2 = DFT: F_jk = exp(2πi·jk/(2D)) / √(2D)
  *
  * Buffer layout: coinState[site * 2D * 2 + j * 2 + {0=re,1=im}]
@@ -22,7 +22,7 @@ struct QWCoinUniforms {
   totalSites: u32,
   latticeDim: u32,
   coinType: u32,       // 0=grover, 1=hadamard, 2=dft
-  coinBias: f32,       // bias parameter (unused for grover, controls hadamard angle)
+  coinBias: f32,       // bias angle for hadamard: θ = coinBias * π/2, standard H at coinBias=0.5
 }
 
 @group(0) @binding(0) var<uniform> params: QWCoinUniforms;
@@ -54,18 +54,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       coinOut[baseIdx + j * 2u + 1u] = invN * sumIm - imIn;
     }
   } else if (params.coinType == 1u) {
-    // Hadamard: apply H = (1/√2)[[1,1],[1,-1]] per axis pair
-    // For D dimensions: tensor product of D Hadamard gates on pairs (2d, 2d+1)
-    let invSqrt2 = 0.70710678118;
+    // Biased Hadamard: H(θ) = [[cos θ, sin θ], [sin θ, -cos θ]] per axis pair
+    // coinBias ∈ [0,1] maps to θ ∈ [0, π/2]. Standard Hadamard at coinBias=0.5 (θ=π/4).
+    // For D dimensions: tensor product of D biased gates on pairs (2d, 2d+1).
+    let theta = params.coinBias * 1.57079632679; // π/2
+    let c = cos(theta);
+    let s = sin(theta);
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let i0 = baseIdx + (d * 2u) * 2u;
       let i1 = baseIdx + (d * 2u + 1u) * 2u;
       let aRe = coinIn[i0]; let aIm = coinIn[i0 + 1u];
       let bRe = coinIn[i1]; let bIm = coinIn[i1 + 1u];
-      coinOut[i0] = invSqrt2 * (aRe + bRe);
-      coinOut[i0 + 1u] = invSqrt2 * (aIm + bIm);
-      coinOut[i1] = invSqrt2 * (aRe - bRe);
-      coinOut[i1 + 1u] = invSqrt2 * (aIm - bIm);
+      coinOut[i0] = c * aRe + s * bRe;
+      coinOut[i0 + 1u] = c * aIm + s * bIm;
+      coinOut[i1] = s * aRe - c * bRe;
+      coinOut[i1 + 1u] = s * aIm - c * bIm;
     }
   } else {
     // DFT coin: F_jk = exp(2πi·jk/N) / √N where N = 2D

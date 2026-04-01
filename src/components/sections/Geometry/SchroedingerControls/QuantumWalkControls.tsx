@@ -95,6 +95,21 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         data-testid="qw-coin-type"
       />
 
+      {/* Coin Bias — only for Hadamard */}
+      {qw.coinType === 'hadamard' && (
+        <Slider
+          label="Coin Bias"
+          tooltip="Bias angle θ for H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]]. 0.5 = standard Hadamard. Lower values bias leftward, higher rightward."
+          min={0.01}
+          max={0.99}
+          step={0.01}
+          value={qw.coinBias}
+          onChange={(v) => updateQW({ coinBias: v, steps: 0, needsReset: true })}
+          showValue
+          data-testid="qw-coin-bias"
+        />
+      )}
+
       {/* Grid Size */}
       <Select
         label="Grid Size"

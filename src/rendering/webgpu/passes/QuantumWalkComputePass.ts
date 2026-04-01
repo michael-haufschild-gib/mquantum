@@ -349,7 +349,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     if (!this.pipelinesCreated) return
 
     // Check for config changes requiring reinitialization
-    const hash = `${config.latticeDim}|${config.gridSize.join(',')}|${config.coinType}`
+    const hash = `${config.latticeDim}|${config.gridSize.join(',')}|${config.coinType}|${config.coinBias}`
     if (hash !== this.lastConfigHash || !this.initialized || config.needsReset) {
       this.lastConfigHash = hash
       this.initializeState(device, config)
