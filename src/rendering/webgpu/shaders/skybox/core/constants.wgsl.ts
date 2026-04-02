@@ -1,6 +1,5 @@
 /**
  * Skybox constants for WGSL
- * Port of: src/rendering/shaders/skybox/core/constants.glsl.ts
  */
 export const constantsBlock = `
 // --- Constants ---

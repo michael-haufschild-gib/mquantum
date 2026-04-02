@@ -6,7 +6,6 @@
  * - Runtime loop with dynamic break condition
  * - Loop overhead and branch misprediction
  *
- * Port of GLSL quantum/hoSuperpositionVariants.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl
  */

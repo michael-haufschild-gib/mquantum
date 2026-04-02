@@ -4,7 +4,6 @@
  * Spherical harmonics form the angular part of hydrogen atom wavefunctions.
  * They describe how electron probability density varies with direction.
  *
- * Port of GLSL quantum/sphericalHarmonics.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/sphericalHarmonics.wgsl
  */

@@ -2,7 +2,6 @@
  * WGSL Constants Block
  *
  * Mathematical and rendering constants shared across all shaders.
- * Port of GLSL constants.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/core/constants.wgsl
  */

@@ -3,7 +3,6 @@
  *
  * Helper functions for multi-light rendering with point, directional,
  * and spot lights.
- * Port of GLSL multi-light.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/lighting/multi-light.wgsl
  */

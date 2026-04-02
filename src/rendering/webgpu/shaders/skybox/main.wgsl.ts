@@ -1,6 +1,5 @@
 /**
  * Skybox main entry point for WGSL
- * Port of: src/rendering/shaders/skybox/main.glsl.ts
  */
 import { SkyboxEffects, SkyboxMode } from './types'
 

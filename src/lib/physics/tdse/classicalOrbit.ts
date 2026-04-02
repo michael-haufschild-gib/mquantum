@@ -12,6 +12,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ export function evaluatePotential(x: Float64Array, config: TdseConfig): number {
   }
 
   if (pot === 'periodicLattice') {
-    const phase = Math.PI * x[0]! / Math.max(config.latticePeriod, 1e-6)
+    const phase = (Math.PI * x[0]!) / Math.max(config.latticePeriod, 1e-6)
     const c = Math.cos(phase)
     return config.latticeDepth * c * c
   }
@@ -255,7 +256,8 @@ export function integrateOrbit(
   for (let d = 0; d < dim; d++) keFinal += p[d]! * p[d]!
   keFinal *= 0.5 * invMass
   const finalEnergy = keFinal + evaluatePotential(x, config)
-  const energyDrift = initialEnergy !== 0 ? Math.abs(finalEnergy - initialEnergy) / Math.abs(initialEnergy) : 0
+  const energyDrift =
+    initialEnergy !== 0 ? Math.abs(finalEnergy - initialEnergy) / Math.abs(initialEnergy) : 0
 
   return { points, energy: initialEnergy, energyDrift, dim }
 }
@@ -283,7 +285,7 @@ export function generateOrbitsAtEnergy(
 ): ClassicalTrajectory[] {
   const dim = config.latticeDim
   const orbits: ClassicalTrajectory[] = []
-  let rng = orbitCfg.seed | 0
+  const rng = mulberry32(orbitCfg.seed)
 
   for (let orbitIdx = 0; orbitIdx < orbitCfg.numOrbits; orbitIdx++) {
     // Generate random position in classically allowed region
@@ -295,21 +297,14 @@ export function generateOrbitsAtEnergy(
     for (let attempt = 0; attempt < 100; attempt++) {
       // Random direction on S^{N-1} via normalized Gaussian vector
       let norm2 = 0
-      for (let d = 0; d < dim; d++) {
-        // Box-Muller from mulberry32 PRNG
-        rng = (rng + 0x6d2b79f5) | 0
-        let t1 = Math.imul(rng ^ (rng >>> 15), 1 | rng)
-        t1 = (t1 + Math.imul(t1 ^ (t1 >>> 7), 61 | t1)) ^ t1
-        const u1 = ((t1 ^ (t1 >>> 14)) >>> 0) / 4294967296
-
-        rng = (rng + 0x6d2b79f5) | 0
-        let t2 = Math.imul(rng ^ (rng >>> 15), 1 | rng)
-        t2 = (t2 + Math.imul(t2 ^ (t2 >>> 7), 61 | t2)) ^ t2
-        const u2 = ((t2 ^ (t2 >>> 14)) >>> 0) / 4294967296
-
-        const g = Math.sqrt(-2 * Math.log(Math.max(u1, 1e-10))) * Math.cos(2 * Math.PI * u2)
-        x0[d] = g
-        norm2 += g * g
+      for (let d = 0; d < dim; d += 2) {
+        const [g1, g2] = gaussianPair(rng)
+        x0[d] = g1
+        norm2 += g1 * g1
+        if (d + 1 < dim) {
+          x0[d + 1] = g2
+          norm2 += g2 * g2
+        }
       }
       const normInv = 1.0 / Math.sqrt(Math.max(norm2, 1e-20))
       for (let d = 0; d < dim; d++) x0[d] = x0[d]! * normInv
@@ -317,14 +312,12 @@ export function generateOrbitsAtEnergy(
       // Random radius: sample uniformly in [0, r_max] where r_max is the classical turning point
       // For harmonic-like potentials, r_max ~ sqrt(2E / (mω²))
       const omega = Math.max(config.harmonicOmega, 0.1)
-      const rMax = Math.sqrt(Math.max(2 * Math.abs(targetEnergy) / (config.mass * omega * omega), 0.1))
+      const rMax = Math.sqrt(
+        Math.max((2 * Math.abs(targetEnergy)) / (config.mass * omega * omega), 0.1)
+      )
 
-      rng = (rng + 0x6d2b79f5) | 0
-      let t3 = Math.imul(rng ^ (rng >>> 15), 1 | rng)
-      t3 = (t3 + Math.imul(t3 ^ (t3 >>> 7), 61 | t3)) ^ t3
-      const u3 = ((t3 ^ (t3 >>> 14)) >>> 0) / 4294967296
       // Uniform in r^D for uniform volume sampling
-      const r = rMax * Math.pow(u3, 1.0 / dim)
+      const r = rMax * Math.pow(rng(), 1.0 / dim)
 
       for (let d = 0; d < dim; d++) x0[d] = x0[d]! * r
 
@@ -333,22 +326,16 @@ export function generateOrbitsAtEnergy(
         // Assign momentum to conserve energy
         const keNeeded = targetEnergy - V
         if (keNeeded > 0) {
-          // Random momentum direction
+          // Random momentum direction via Gaussian vector
           let pNorm2 = 0
-          for (let d = 0; d < dim; d++) {
-            rng = (rng + 0x6d2b79f5) | 0
-            let tp = Math.imul(rng ^ (rng >>> 15), 1 | rng)
-            tp = (tp + Math.imul(tp ^ (tp >>> 7), 61 | tp)) ^ tp
-            const up1 = ((tp ^ (tp >>> 14)) >>> 0) / 4294967296
-
-            rng = (rng + 0x6d2b79f5) | 0
-            let tp2 = Math.imul(rng ^ (rng >>> 15), 1 | rng)
-            tp2 = (tp2 + Math.imul(tp2 ^ (tp2 >>> 7), 61 | tp2)) ^ tp2
-            const up2 = ((tp2 ^ (tp2 >>> 14)) >>> 0) / 4294967296
-
-            const gp = Math.sqrt(-2 * Math.log(Math.max(up1, 1e-10))) * Math.cos(2 * Math.PI * up2)
-            p0[d] = gp
-            pNorm2 += gp * gp
+          for (let d = 0; d < dim; d += 2) {
+            const [g1, g2] = gaussianPair(rng)
+            p0[d] = g1
+            pNorm2 += g1 * g1
+            if (d + 1 < dim) {
+              p0[d + 1] = g2
+              pNorm2 += g2 * g2
+            }
           }
           const pMag = Math.sqrt(2 * config.mass * keNeeded)
           const pScale = pMag / Math.sqrt(Math.max(pNorm2, 1e-20))

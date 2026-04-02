@@ -11,11 +11,8 @@ export type {
   AccessMode,
   CachedComputePipeline,
   CachedRenderPipeline,
-  ManagedUniformBuffer,
   ResourceSize,
   ResourceSizeMode,
-  UniformBufferDescriptor,
-  UniformEntry,
   WebGPUCapabilities,
   WebGPUFrameContext,
   WebGPUFrameStats,
@@ -44,10 +41,3 @@ export { WebGPUCamera, type WebGPUCameraMatrices, type WebGPUCameraState } from 
 
 // Base Pass
 export { FULLSCREEN_VERTEX_SHADER, WebGPUBaseComputePass, WebGPUBasePass } from './WebGPUBasePass'
-
-// Uniform Buffer
-export {
-  createManagedUniformBuffer,
-  UniformBufferBuilder,
-  UniformBufferWriter,
-} from './WebGPUUniformBuffer'

@@ -1,6 +1,5 @@
 /**
  * Skybox uniforms for WGSL
- * Port of: src/rendering/shaders/skybox/core/uniforms.glsl.ts
  *
  * In WGSL, uniforms are organized into bind groups.
  * Texture and sampler are separate resources.

@@ -14,7 +14,6 @@
  *    The radial part R_nl^(D) uses the D-dimensional Coulomb solution
  *    with effective angular momentum λ = l + (D-3)/2 and n_eff = n + (D-3)/2.
  *
- * Port of GLSL quantum/psi.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl
  */

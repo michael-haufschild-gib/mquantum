@@ -9,7 +9,6 @@
  * - Adaptive step size based on density
  * - Gaussian bounds allow aggressive culling
  *
- * Port of GLSL schroedinger/volume/integration.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/integration.wgsl
  */

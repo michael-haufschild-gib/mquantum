@@ -1,6 +1,5 @@
 /**
  * Skybox sun effect for WGSL
- * Port of: src/rendering/shaders/skybox/effects/sun.glsl.ts
  */
 export const sunBlock = `
 // --- Sun Glow Effect ---

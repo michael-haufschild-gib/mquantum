@@ -7,7 +7,7 @@
  * @module components/sections/Faces/colorPreviewGradient
  */
 
-import { rgbToHex } from '@/lib/colors/colorUtils'
+import { hexToSrgbTuple, rgbToHex } from '@/lib/colors/colorUtils'
 import { applyDistributionTS, getCosinePaletteColorTS } from '@/rendering/shaders/palette'
 
 // ---------------------------------------------------------------------------
@@ -15,11 +15,7 @@ import { applyDistributionTS, getCosinePaletteColorTS } from '@/rendering/shader
 // ---------------------------------------------------------------------------
 
 function hexToHsl(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!result) return [0, 0, 0.5]
-  const r = parseInt(result[1]!, 16) / 255
-  const g = parseInt(result[2]!, 16) / 255
-  const b = parseInt(result[3]!, 16) / 255
+  const [r, g, b] = hexToSrgbTuple(hex)
   const max = Math.max(r, g, b),
     min = Math.min(r, g, b)
   const l = (max + min) / 2
@@ -31,15 +27,7 @@ function hexToHsl(hex: string): [number, number, number] {
   return [((r - g) / d + 4) / 6, s, l]
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!result) return [0.85, 0.85, 0.85]
-  return [
-    parseInt(result[1]!, 16) / 255,
-    parseInt(result[2]!, 16) / 255,
-    parseInt(result[3]!, 16) / 255,
-  ]
-}
+const hexToRgb = hexToSrgbTuple
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const c = (1 - Math.abs(2 * l - 1)) * s

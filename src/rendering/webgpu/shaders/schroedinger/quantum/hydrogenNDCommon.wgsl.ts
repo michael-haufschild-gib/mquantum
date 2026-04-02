@@ -6,7 +6,6 @@
  * - Angular factor evaluation (Y_lm)
  * - Time evolution
  *
- * Port of GLSL quantum/hydrogenND/hydrogenNDCommon.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDCommon.wgsl
  */

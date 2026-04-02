@@ -5,7 +5,6 @@
  * of hydrogen atom wavefunctions:
  *   R_nl(r) ∝ ρ^l · L^{2l+1}_{n-l-1}(ρ) · e^{-ρ/2}
  *
- * Port of GLSL quantum/laguerre.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/laguerre.wgsl
  */

@@ -13,34 +13,10 @@
  */
 
 import type { TdseDisorderDistribution } from '@/lib/geometry/extended/types'
+import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
-/**
- * Mulberry32 — fast 32-bit seeded PRNG with good statistical properties.
- * Returns a function that produces uniform values in [0, 1) on each call.
- *
- * @param seed - Integer seed value
- * @returns A deterministic random number generator
- */
-export function mulberry32(seed: number): () => number {
-  let state = seed | 0
-  return () => {
-    state = (state + 0x6d2b79f5) | 0
-    let t = Math.imul(state ^ (state >>> 15), 1 | state)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-/**
- * Box-Muller transform: convert two uniform [0,1) samples to a standard normal.
- *
- * @param u1 - First uniform sample (must be > 0)
- * @param u2 - Second uniform sample
- * @returns A sample from N(0, 1)
- */
-function boxMuller(u1: number, u2: number): number {
-  return Math.sqrt(-2 * Math.log(Math.max(u1, 1e-30))) * Math.cos(2 * Math.PI * u2)
-}
+// Re-export for backward compatibility with tests that import from this module
+export { mulberry32 } from '@/lib/math/rng'
 
 /**
  * Generate a random disorder potential on an N-D lattice.
@@ -69,8 +45,13 @@ export function generateDisorderPotential(
   const halfW = disorderStrength * 0.5
 
   if (distribution === 'gaussian') {
-    for (let i = 0; i < totalSites; i++) {
-      potential[i] = disorderStrength * boxMuller(rng(), rng())
+    // gaussianPair produces two N(0,1) samples per call
+    for (let i = 0; i < totalSites; i += 2) {
+      const [g1, g2] = gaussianPair(rng)
+      potential[i] = disorderStrength * g1
+      if (i + 1 < totalSites) {
+        potential[i + 1] = disorderStrength * g2
+      }
     }
   } else {
     // Uniform: V ∈ [-W/2, W/2]

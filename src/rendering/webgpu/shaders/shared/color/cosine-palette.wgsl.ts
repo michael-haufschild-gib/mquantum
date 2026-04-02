@@ -3,7 +3,6 @@
  *
  * Procedural color palettes using cosine functions.
  * Based on Inigo Quilez's technique.
- * Port of GLSL cosine-palette.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/color/cosine-palette.wgsl
  */

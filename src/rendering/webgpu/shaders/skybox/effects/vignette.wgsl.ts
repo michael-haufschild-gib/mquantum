@@ -1,6 +1,5 @@
 /**
  * Skybox vignette effect for WGSL
- * Port of: src/rendering/shaders/skybox/effects/vignette.glsl.ts
  */
 export const vignetteBlock = `
 // --- Vignette Effect ---

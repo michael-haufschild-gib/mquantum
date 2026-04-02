@@ -6,7 +6,6 @@
  *
  * With α = √ω (ℏ=m=1), the argument is αx and the prefactor is (α²/π)^{1/4}.
  *
- * Port of GLSL quantum/ho1d.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl
  */

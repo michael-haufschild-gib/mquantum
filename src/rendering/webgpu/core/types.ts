@@ -323,40 +323,6 @@ export interface WebGPURenderContext {
 }
 
 // =============================================================================
-// Uniform Types
-// =============================================================================
-
-/**
- * Uniform buffer layout entry.
- */
-export interface UniformEntry {
-  name: string
-  type: 'f32' | 'i32' | 'u32' | 'vec2f' | 'vec3f' | 'vec4f' | 'mat3x3f' | 'mat4x4f'
-  offset: number
-  size: number
-  arrayLength?: number
-}
-
-/**
- * Uniform buffer descriptor.
- */
-export interface UniformBufferDescriptor {
-  entries: UniformEntry[]
-  totalSize: number
-}
-
-/**
- * Managed uniform buffer.
- */
-export interface ManagedUniformBuffer {
-  buffer: GPUBuffer
-  data: ArrayBuffer
-  view: DataView
-  descriptor: UniformBufferDescriptor
-  dirty: boolean
-}
-
-// =============================================================================
 // Pipeline Types
 // =============================================================================
 

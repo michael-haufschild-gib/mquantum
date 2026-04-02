@@ -2,7 +2,6 @@
  * WGSL Shared Uniforms Block
  *
  * Common uniform structures used across all shaders.
- * Port of GLSL uniforms.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/core/uniforms.wgsl
  */

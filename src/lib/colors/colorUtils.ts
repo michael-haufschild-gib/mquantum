@@ -290,6 +290,24 @@ const hsvToRgbStruct = (h: number, s: number, v: number): { r: number; g: number
 }
 
 /**
+ * Convert a hex color string to an sRGB [0,1] tuple.
+ * Supports 3-char (#F00) and 6-char (#FF0000) hex, with or without '#'.
+ * Falls back to [0.85, 0.85, 0.85] for invalid input.
+ *
+ * @param hex - Color hex string (e.g., '#FF0000', '#f00', 'FF0000')
+ * @returns [r, g, b] in [0, 1] sRGB space
+ */
+export function hexToSrgbTuple(hex: string): [number, number, number] {
+  let h = hex.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{3}$/.test(h)) {
+    h = h[0]! + h[0]! + h[1]! + h[1]! + h[2]! + h[2]!
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return [0.85, 0.85, 0.85]
+  const n = parseInt(h, 16)
+  return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255]
+}
+
+/**
  * Validates Hex (6 or 8).
  * @param hex - The hex string.
  * @returns True if valid.
