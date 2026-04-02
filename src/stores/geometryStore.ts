@@ -232,13 +232,14 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
         constraints &&
         (currentDimension < constraints.min || currentDimension > constraints.max)
       ) {
-        const targetDim = recommended ?? Math.min(currentDimension, constraints.max)
+        const targetDim =
+          recommended ?? Math.max(constraints.min, Math.min(currentDimension, constraints.max))
         logger.log(
           `[geometryStore] Auto-adjusting dimension ${currentDimension} → ${targetDim} for ${type} (range ${constraints.min}-${constraints.max})`
         )
+        invalidateAllTemporalDepthWebGPU()
         propagateDimensionToStores(targetDim)
         set({ dimension: targetDim, objectType: type })
-        invalidateAllTemporalDepthWebGPU()
         usePerformanceStore.getState().setSceneTransitioning(true)
         usePerformanceStore.getState().setCameraTeleported(true)
         scheduleTransitionComplete()
