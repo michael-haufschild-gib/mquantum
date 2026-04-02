@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import {
+  type QuantumWalkCoinInitial,
   type QuantumWalkCoinType,
   type QuantumWalkFieldView,
   QW_MAX_TOTAL_SITES,
@@ -27,6 +28,11 @@ const COIN_TYPE_OPTIONS = [
   { value: 'dft', label: 'DFT' },
 ]
 
+const COIN_INITIAL_OPTIONS = [
+  { value: 'real', label: 'Asymmetric' },
+  { value: 'symmetric', label: 'Symmetric' },
+]
+
 const FIELD_VIEW_OPTIONS = [
   { value: 'probability', label: 'P(x)' },
   { value: 'phase', label: 'Phase' },
@@ -34,6 +40,7 @@ const FIELD_VIEW_OPTIONS = [
 ]
 
 const GRID_SIZE_OPTIONS = [
+  { value: '8', label: '8' },
   { value: '16', label: '16' },
   { value: '32', label: '32' },
   { value: '64', label: '64' },
@@ -97,19 +104,31 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         data-testid="qw-coin-type"
       />
 
-      {/* Coin Bias — only for Hadamard */}
+      {/* Hadamard-specific controls */}
       {qw.coinType === 'hadamard' && (
-        <Slider
-          label="Coin Bias"
-          tooltip="Bias angle θ for H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]]. 0.5 = standard Hadamard. Lower values bias leftward, higher rightward."
-          min={0.01}
-          max={0.99}
-          step={0.01}
-          value={qw.coinBias}
-          onChange={(v) => updateQW({ coinBias: v, steps: 0, needsReset: true })}
-          showValue
-          data-testid="qw-coin-bias"
-        />
+        <>
+          <ToggleGroup
+            options={COIN_INITIAL_OPTIONS}
+            value={qw.coinInitial}
+            onChange={(v) =>
+              updateQW({ coinInitial: v as QuantumWalkCoinInitial, steps: 0, needsReset: true })
+            }
+            ariaLabel="Initial coin state"
+            tooltip="Asymmetric: real superposition (1/√2)(|+⟩+|−⟩) — biased spreading. Symmetric: complex superposition (1/√2)(|+⟩+i|−⟩) — balanced spreading."
+            data-testid="qw-coin-initial"
+          />
+          <Slider
+            label="Coin Bias"
+            tooltip="Bias angle θ for H(θ) = [[cos θ, sin θ],[sin θ, -cos θ]]. 0.5 = standard Hadamard. Lower values bias leftward, higher rightward."
+            min={0.01}
+            max={0.99}
+            step={0.01}
+            value={qw.coinBias}
+            onChange={(v) => updateQW({ coinBias: v, steps: 0, needsReset: true })}
+            showValue
+            data-testid="qw-coin-bias"
+          />
+        </>
       )}
 
       {/* Grid Size */}

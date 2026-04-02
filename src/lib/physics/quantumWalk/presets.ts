@@ -44,6 +44,22 @@ export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
     overrides: {
       coinType: 'hadamard',
       coinBias: 0.5,
+      coinInitial: 'real',
+      stepsPerFrame: 1,
+      fieldView: 'probability',
+      autoScale: true,
+      absorberEnabled: false,
+    },
+  },
+  {
+    id: 'symmetricHadamard',
+    name: 'Symmetric Hadamard',
+    description:
+      'Hadamard coin with balanced initial state (1/√2)(|+⟩+i|−⟩) — symmetric ballistic spreading',
+    overrides: {
+      coinType: 'hadamard',
+      coinBias: 0.5,
+      coinInitial: 'symmetric',
       stepsPerFrame: 1,
       fieldView: 'probability',
       autoScale: true,
@@ -84,6 +100,7 @@ export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
     overrides: {
       coinType: 'hadamard',
       coinBias: 0.9,
+      coinInitial: 'real',
       stepsPerFrame: 1,
       fieldView: 'probability',
       autoScale: true,

@@ -338,8 +338,8 @@ test.describe('Pauli spinor in higher dimensions', () => {
     expect(Math.abs(diag.normDrift)).toBeLessThan(0.1)
   })
 
-  test('7D Pauli: spinor completeness', async ({ page }) => {
-    await gotoPauli(page, 7)
+  test('6D Pauli: spinor completeness', async ({ page }) => {
+    await gotoPauli(page, 6)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'larmorPrecession')
     await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')

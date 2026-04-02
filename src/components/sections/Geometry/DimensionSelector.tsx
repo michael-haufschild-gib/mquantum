@@ -3,12 +3,14 @@
  * Allows users to select the number of dimensions (3D, 4D, 5D, 6D)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { getQuantumTypeEntry, resolveQuantumTypeKey } from '@/lib/geometry/registry'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   type GeometryState,
   MAX_DIMENSION,
@@ -22,19 +24,11 @@ export interface DimensionSelectorProps {
   disabled?: boolean
 }
 
-/**
- * Pre-computed dimension options (MIN_DIMENSION to MAX_DIMENSION are constants)
- * Created once at module load - no need to regenerate on every render
- */
-const DIMENSION_OPTIONS = (() => {
-  const options = []
-  for (let d = MIN_DIMENSION; d <= MAX_DIMENSION; d++) {
-    options.push({
-      value: String(d),
-      label: `${d}D`,
-    })
-  }
-  return options
+/** Base dimension values (MIN_DIMENSION to MAX_DIMENSION). */
+const DIMENSION_VALUES: number[] = (() => {
+  const vals = []
+  for (let d = MIN_DIMENSION; d <= MAX_DIMENSION; d++) vals.push(d)
+  return vals
 })()
 
 export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
@@ -42,9 +36,25 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
     // Consolidate store subscriptions with useShallow to reduce re-renders
     const geometrySelector = useShallow((state: GeometryState) => ({
       dimension: state.dimension,
+      objectType: state.objectType,
       setDimension: state.setDimension,
     }))
-    const { dimension, setDimension } = useGeometryStore(geometrySelector)
+    const { dimension, objectType, setDimension } = useGeometryStore(geometrySelector)
+    const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+
+    // Compute per-option disabled state from the active quantum type's dimension range
+    const dimensionOptions = useMemo(() => {
+      const qtKey = resolveQuantumTypeKey(objectType, quantumMode)
+      const entry = qtKey ? getQuantumTypeEntry(qtKey) : undefined
+      const minDim = entry?.dimensions.min ?? MIN_DIMENSION
+      const maxDim = entry?.dimensions.max ?? MAX_DIMENSION
+      return DIMENSION_VALUES.map((d) => ({
+        value: String(d),
+        label: `${d}D`,
+        disabled: d < minDim || d > maxDim,
+      }))
+    }, [objectType, quantumMode])
+
     const scrollContainerRef = useRef<HTMLDivElement>(null)
     const [canScrollLeft, setCanScrollLeft] = useState(false)
     const [canScrollRight, setCanScrollRight] = useState(false)
@@ -172,7 +182,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
 
           <div ref={scrollContainerRef} className="overflow-x-auto scrollbar-none">
             <ToggleGroup
-              options={DIMENSION_OPTIONS}
+              options={dimensionOptions}
               value={String(dimension)}
               onChange={handleChange}
               disabled={disabled}

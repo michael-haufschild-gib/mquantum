@@ -1,17 +1,17 @@
 /**
  * Pauli Spinor comprehensive e2e test suite.
  *
- * Verifies ALL 6 Pauli presets render at 3D, 5D, and 7D, control changes
+ * Verifies ALL 6 Pauli presets render at 3D, 5D, and 6D, control changes
  * produce visual differences, per-preset physics are correct, and feature
  * toggles work without GPU errors.
  *
  * Coverage NOT duplicated from other specs:
  * - rendering.spec.ts: Pauli 3D and 5D basic render — not repeated
  * - physics-validation.spec.ts: norm conservation, spinor completeness,
- *   Larmor oscillation, Stern-Gerlach splitting, 5D norm, 7D completeness — not repeated
+ *   Larmor oscillation, Stern-Gerlach splitting, 5D norm, 6D completeness — not repeated
  *
  * This spec adds:
- * - Section A: per-PRESET rendering at 3D, 5D, and 7D (6 presets x 3 dims)
+ * - Section A: per-PRESET rendering at 3D, 5D, and 6D (6 presets x 3 dims)
  * - Section B: per-CONTROL differential pixel response (field view, color algo, presets, field type)
  * - Section C: per-PRESET physics validation (directional responses, not invariants)
  * - Section D: feature toggles and edge cases
@@ -116,7 +116,7 @@ const presets = [
   { id: 'freeSpinUp', label: 'Free Spin-Up' },
 ] as const
 
-const dimensions = [3, 5, 7] as const
+const dimensions = [3, 5, 6] as const
 
 test.describe('Pauli spinor: preset rendering matrix', () => {
   test.beforeEach(async ({ page }) => {
@@ -417,14 +417,14 @@ test.describe('Pauli spinor: feature toggles', () => {
     await assertPixels(page, 'autoScale disabled')
   })
 
-  test('dimension switch 3D to 7D: renderer recovers', async ({ page }) => {
+  test('dimension switch 3D to 6D: renderer recovers', async ({ page }) => {
     await gotoPauli(page, 3)
     await waitForPauliReady(page)
     await assertPixels(page, 'Pauli 3D before switch')
 
-    await gotoPauli(page, 7)
+    await gotoPauli(page, 6)
     await waitForPauliReady(page)
-    await assertPixels(page, 'Pauli 7D after switch', 1)
+    await assertPixels(page, 'Pauli 6D after switch', 1)
   })
 
   test('animation: frames advance and density stays nonzero', async ({ page }) => {

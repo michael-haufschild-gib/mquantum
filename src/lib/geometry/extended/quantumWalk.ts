@@ -9,6 +9,9 @@
 /** Coin operator type for the quantum walk. */
 export type QuantumWalkCoinType = 'grover' | 'hadamard' | 'dft'
 
+/** Initial coin state type for the quantum walk. */
+export type QuantumWalkCoinInitial = 'real' | 'symmetric'
+
 /** Field view modes for quantum walk visualization. */
 export type QuantumWalkFieldView = 'probability' | 'phase' | 'coinState'
 
@@ -24,6 +27,8 @@ export interface QuantumWalkConfig {
   coinType: QuantumWalkCoinType
   /** Bias parameter for generalized coins */
   coinBias: number
+  /** Initial coin state: 'real' = (1/√2)(|+⟩+|−⟩) asymmetric, 'symmetric' = (1/√2)(|+⟩+i|−⟩) balanced */
+  coinInitial: QuantumWalkCoinInitial
   /** Number of walk steps completed (runtime, not persisted) */
   steps: number
   /** Steps to advance per frame */
@@ -52,6 +57,7 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
   gridSize: [64, 64],
   coinType: 'grover',
   coinBias: 0.5,
+  coinInitial: 'real',
   steps: 0,
   stepsPerFrame: 1,
   initialPosition: [32, 32],

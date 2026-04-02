@@ -9,6 +9,7 @@ import { create } from 'zustand'
 
 import { MAX_DIMENSION, MIN_DIMENSION, QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
 import {
+  getDimensionConstraints,
   getRecommendedDimension,
   getUnavailabilityReason,
   isAvailableForDimension,
@@ -224,7 +225,26 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const validation = validateObjectTypeForDimension(type, currentDimension)
 
     if (!validation.valid) {
-      // Don't allow setting invalid type - keep current
+      // Dimension out of range for the target type — auto-adjust to recommended
+      const constraints = getDimensionConstraints(type)
+      const recommended = getRecommendedDimension(type)
+      if (
+        constraints &&
+        (currentDimension < constraints.min || currentDimension > constraints.max)
+      ) {
+        const targetDim =
+          recommended ?? Math.max(constraints.min, Math.min(currentDimension, constraints.max))
+        logger.log(
+          `[geometryStore] Auto-adjusting dimension ${currentDimension} → ${targetDim} for ${type} (range ${constraints.min}-${constraints.max})`
+        )
+        invalidateAllTemporalDepthWebGPU()
+        propagateDimensionToStores(targetDim)
+        set({ dimension: targetDim, objectType: type })
+        usePerformanceStore.getState().setSceneTransitioning(true)
+        usePerformanceStore.getState().setCameraTeleported(true)
+        scheduleTransitionComplete()
+        return
+      }
       logger.warn(
         `Object type ${type} is not valid for dimension ${currentDimension}: ${validation.message}`
       )

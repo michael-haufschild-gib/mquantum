@@ -31,6 +31,10 @@ describe('DEFAULT_QUANTUM_WALK_CONFIG', () => {
       expect(cfg.initialPosition[d]).toBe(Math.floor(cfg.gridSize[d]! / 2))
     }
   })
+
+  it('defaults to real (asymmetric) initial coin state', () => {
+    expect(DEFAULT_QUANTUM_WALK_CONFIG.coinInitial).toBe('real')
+  })
 })
 
 describe('resizeQuantumWalkArrays', () => {

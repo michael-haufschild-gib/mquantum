@@ -231,7 +231,16 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     // Uniform superposition of all coin states at initial site
     const amp = 1 / Math.sqrt(coinStates)
     for (let j = 0; j < coinStates; j++) {
-      initData[(initSite * coinStates + j) * 2] = amp // re
+      if (config.coinInitial === 'symmetric') {
+        // Per-pair (1/√2)(|+⟩ + i|−⟩): even indices real, odd indices imaginary
+        if (j % 2 === 0) {
+          initData[(initSite * coinStates + j) * 2] = amp // re
+        } else {
+          initData[(initSite * coinStates + j) * 2 + 1] = amp // im
+        }
+      } else {
+        initData[(initSite * coinStates + j) * 2] = amp // re
+      }
     }
     device.queue.writeBuffer(this.coinStateA, 0, initData)
 
@@ -349,7 +358,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     if (!this.pipelinesCreated) return
 
     // Check for config changes requiring reinitialization
-    const hash = `${config.latticeDim}|${config.gridSize.join(',')}|${config.coinType}|${config.coinBias}`
+    const hash = `${config.latticeDim}|${config.gridSize.join(',')}|${config.coinType}|${config.coinBias}|${config.coinInitial}`
     if (hash !== this.lastConfigHash || !this.initialized || config.needsReset) {
       this.lastConfigHash = hash
       this.initializeState(device, config)
