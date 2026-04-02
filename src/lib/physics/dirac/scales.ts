@@ -71,13 +71,6 @@ export function maxStableDt(spacing: number[], c: number): number {
   return minSpacing / (c * Math.sqrt(n))
 }
 
-/**
- * Compute spinor dimension for N spatial dimensions.
- * S = 2^(⌊(N+1)/2⌋), minimum 2.
- *
- * @param spatialDim - Number of spatial dimensions (1-11)
- * @returns Number of spinor components
- */
-export function spinorSize(spatialDim: number): number {
-  return Math.max(2, 1 << Math.floor((spatialDim + 1) / 2))
-}
+// Re-export spinorSize from the canonical location for consumers
+// that import from this module.
+export { spinorSize } from './cliffordAlgebraFallback'

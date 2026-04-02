@@ -15,7 +15,6 @@
  * And transmittance accumulates as:
  *   T_{n+1} = T_n * (1 - alpha)
  *
- * Port of GLSL schroedinger/volume/absorption.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/volume/absorption.wgsl
  */

@@ -1,6 +1,5 @@
 /**
  * Skybox rotation utilities for WGSL
- * Port of: src/rendering/shaders/skybox/utils/rotation.glsl.ts
  */
 export const rotationBlock = `
 // --- Rotation Utilities ---

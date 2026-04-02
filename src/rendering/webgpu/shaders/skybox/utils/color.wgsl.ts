@@ -1,6 +1,5 @@
 /**
  * Skybox color utilities for WGSL
- * Port of: src/rendering/shaders/skybox/utils/color.glsl.ts
  */
 export const colorBlock = `
 // --- Color Conversion Utilities ---

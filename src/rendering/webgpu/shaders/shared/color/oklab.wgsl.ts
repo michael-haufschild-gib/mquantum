@@ -2,7 +2,6 @@
  * WGSL Oklab Color Block
  *
  * Oklab perceptually uniform color space conversions.
- * Port of GLSL oklab.glsl to WGSL.
  *
  * Oklab is a perceptually uniform color space designed by Björn Ottosson.
  * It provides more accurate color mixing and manipulation than HSL or Lab.

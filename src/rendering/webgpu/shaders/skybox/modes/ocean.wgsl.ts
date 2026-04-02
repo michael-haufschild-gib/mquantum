@@ -1,6 +1,5 @@
 /**
  * Ocean skybox mode for WGSL - Underwater atmosphere
- * Port of: src/rendering/shaders/skybox/modes/ocean.glsl.ts
  */
 export const oceanBlock = `
 // --- Ocean Mode: Deep Ocean Underwater Atmosphere ---

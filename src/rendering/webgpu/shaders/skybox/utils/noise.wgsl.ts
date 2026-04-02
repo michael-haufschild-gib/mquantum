@@ -1,6 +1,5 @@
 /**
  * Skybox noise utilities for WGSL
- * Port of: src/rendering/shaders/skybox/utils/noise.glsl.ts
  */
 export const noiseBlock = `
 // --- Noise Utilities ---

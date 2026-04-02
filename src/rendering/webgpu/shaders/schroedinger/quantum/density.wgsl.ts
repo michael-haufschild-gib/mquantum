@@ -8,7 +8,6 @@
  * log-density:
  *   s(x,t) = log(ρ + ε)
  *
- * Port of GLSL quantum/density.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/density.wgsl
  */

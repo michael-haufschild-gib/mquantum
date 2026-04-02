@@ -1,6 +1,5 @@
 /**
  * Skybox varyings for WGSL
- * Port of: src/rendering/shaders/skybox/core/varyings.glsl.ts
  *
  * In WGSL, varyings are passed through struct outputs from vertex shader
  * and struct inputs to fragment shader.

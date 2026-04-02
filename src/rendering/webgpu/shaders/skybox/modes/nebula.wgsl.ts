@@ -1,6 +1,5 @@
 /**
  * Nebula skybox mode for WGSL - Volumetric clouds
- * Port of: src/rendering/shaders/skybox/modes/nebula.glsl.ts
  */
 export const nebulaBlock = `
 // --- Nebula Mode: Volumetric Clouds ---

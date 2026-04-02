@@ -2,7 +2,6 @@
  * WGSL HSL Color Block
  *
  * HSL (Hue, Saturation, Lightness) color conversion functions.
- * Port of GLSL hsl.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/color/hsl.wgsl
  */

@@ -5,7 +5,6 @@
  * GPU cannot effectively branch-predict early exit in loops, so we
  * provide compile-time specialized versions that eliminate the overhead.
  *
- * Port of GLSL quantum/hoNDVariants.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl
  */

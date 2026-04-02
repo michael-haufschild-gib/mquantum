@@ -3,7 +3,6 @@
  *
  * Temporal reprojection and accumulation for smooth rendering.
  * Used for noise reduction and temporal anti-aliasing.
- * Port of GLSL temporal.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/features/temporal.wgsl
  */

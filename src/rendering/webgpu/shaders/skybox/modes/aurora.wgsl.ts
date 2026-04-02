@@ -1,6 +1,5 @@
 /**
  * Aurora skybox mode for WGSL - Flowing vertical curtains
- * Port of: src/rendering/shaders/skybox/modes/aurora.glsl.ts
  */
 export const auroraBlock = `
 // --- Aurora Mode: Flowing Vertical Curtains ---

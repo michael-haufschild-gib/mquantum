@@ -1,6 +1,5 @@
 /**
  * Twilight skybox mode for WGSL - Sunset/sunrise gradient
- * Port of: src/rendering/shaders/skybox/modes/twilight.glsl.ts
  */
 export const twilightBlock = `
 // --- Twilight Mode: Sunset/Sunrise Gradient ---

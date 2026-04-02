@@ -1,6 +1,5 @@
 /**
  * Horizon skybox mode for WGSL - Clean studio environment
- * Port of: src/rendering/shaders/skybox/modes/horizon.glsl.ts
  */
 export const horizonBlock = `
 // --- Horizon Mode: Clean Studio Environment ---

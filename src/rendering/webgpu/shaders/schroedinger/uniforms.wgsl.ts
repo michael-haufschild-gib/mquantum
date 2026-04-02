@@ -1,7 +1,6 @@
 /**
  * WGSL Schrödinger Uniforms
  *
- * Port of GLSL schroedinger/uniforms.glsl to WGSL.
  * Defines uniform structures for quantum wavefunction visualization.
  *
  * NOTE: All arrays use vec4f/vec4i packing for WebGPU 16-byte alignment requirement.

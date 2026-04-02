@@ -80,33 +80,36 @@ export const clampDtWithCfl = (
 /** Maximum total TDSE/BEC lattice sites — FFT needs power-of-2 per axis */
 export const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
 
-/**
- * Compute default per-dimension grid size for a given TDSE/BEC dimensionality.
- * TDSE requires power-of-2 per axis for FFT. Ensures total sites within budget.
- */
-export const defaultTdseGridPerDim = (d: number): number => {
-  const raw = Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
-  let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-  pow2 = Math.max(2, Math.min(128, pow2))
-  while (pow2 > 2 && Math.pow(pow2, d) > TDSE_MAX_TOTAL_SITES) {
-    pow2 = pow2 / 2
-  }
-  return pow2
-}
-
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers) */
 export const MAX_TOTAL_SITES = 1048576
 
 /**
- * Compute default per-dimension grid size for a given free scalar dimensionality.
- * Ensures total sites stays within MAX_TOTAL_SITES budget.
+ * Compute the largest power-of-2 grid size per dimension that keeps total
+ * sites within a given budget. All lattice modes need power-of-2 per axis for FFT.
+ *
+ * @param d - Number of spatial dimensions
+ * @param maxTotalSites - Maximum total lattice sites budget
+ * @returns Power-of-2 grid size per dimension, clamped to [2, 128]
  */
-export const defaultGridPerDim = (d: number): number => {
-  const raw = Math.round(Math.pow(MAX_TOTAL_SITES, 1 / d))
+export const computeDefaultGridPerDim = (d: number, maxTotalSites: number): number => {
+  const raw = Math.round(Math.pow(maxTotalSites, 1 / d))
   let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
   pow2 = Math.max(2, Math.min(128, pow2))
-  while (pow2 > 2 && Math.pow(pow2, d) > MAX_TOTAL_SITES) {
+  while (pow2 > 2 && Math.pow(pow2, d) > maxTotalSites) {
     pow2 = pow2 / 2
   }
   return pow2
 }
+
+/**
+ * Compute default per-dimension grid size for TDSE/BEC modes.
+ * @param d - Number of spatial dimensions
+ */
+export const defaultTdseGridPerDim = (d: number): number =>
+  computeDefaultGridPerDim(d, TDSE_MAX_TOTAL_SITES)
+
+/**
+ * Compute default per-dimension grid size for free scalar field mode.
+ * @param d - Number of spatial dimensions
+ */
+export const defaultGridPerDim = (d: number): number => computeDefaultGridPerDim(d, MAX_TOTAL_SITES)

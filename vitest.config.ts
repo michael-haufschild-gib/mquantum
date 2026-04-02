@@ -59,7 +59,6 @@ export default defineConfig({
         'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer.ts',
         // skyboxVertexData.ts — removed: mostly pure functions, testable
         'src/rendering/webgpu/renderers/strategies/TdseBecStrategy.ts',
-        'src/rendering/webgpu/core/WebGPUUniformBuffer.ts',
         // useRotationUpdates.ts — removed: React hook with zero GPU calls, testable
       ],
       // Coverage ratchet: thresholds must be >= current actuals (rounded down

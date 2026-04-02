@@ -4,7 +4,6 @@
  * Provides ray-sphere intersection test used for bounding sphere
  * optimization in raymarching algorithms.
  *
- * Port of GLSL shared/raymarch/sphere-intersect.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/raymarch/sphere-intersect.wgsl
  */

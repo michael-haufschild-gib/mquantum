@@ -3,7 +3,6 @@
  *
  * Cook-Torrance BRDF with GGX (Trowbridge-Reitz) distribution
  * for physically-based specular reflections.
- * Port of GLSL ggx.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/lighting/ggx.wgsl
  */

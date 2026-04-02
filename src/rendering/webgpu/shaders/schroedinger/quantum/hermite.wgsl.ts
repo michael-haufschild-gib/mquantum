@@ -2,7 +2,6 @@
  * WGSL Hermite polynomial evaluation using precomputed coefficients
  *
  * Hermite polynomials H_n(u) are used in quantum harmonic oscillator eigenfunctions.
- * Port of GLSL quantum/hermite.glsl to WGSL.
  *
  * Uses a precomputed coefficient LUT + Horner's method instead of the three-term
  * recurrence relation. The loop has a constant upper bound (MAX_QUANTUM_N = 6),

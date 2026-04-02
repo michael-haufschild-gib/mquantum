@@ -12,27 +12,33 @@ export interface CosineGradient {
 }
 
 /**
- * Palette definitions for Schrödinger visualization
+ * Palette definitions for Schrödinger visualization.
+ *
+ * Each palette uses the Inigo Quilez cosine gradient formula:
+ *   color(t) = a + b * cos(2π(c·t + d))
+ *
+ * Every entry must produce a visually distinct result.
+ * Reference: https://iquilezles.org/articles/palettes/
  */
 export const SCHROEDINGER_PALETTE_DEFINITIONS: Record<SchroedingerPalette, CosineGradient> = {
-  // Standard Hue Shifters (Mapped to simple cosine)
+  // Standard Hue Shifters — vary only in phase offset d
   monochrome: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.33, 0.67],
+    d: [0.0, 0.0, 0.0],
   },
   complement: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.1, 0.2],
+    d: [0.0, 0.5, 0.5],
   },
   triadic: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 1.0, 1.0],
-    d: [0.3, 0.2, 0.2],
+    d: [0.0, 0.33, 0.67],
   },
   analogous: {
     a: [0.5, 0.5, 0.5],
@@ -47,24 +53,24 @@ export const SCHROEDINGER_PALETTE_DEFINITIONS: Record<SchroedingerPalette, Cosin
     d: [0.5, 0.5, 0.5],
   },
 
-  // Artistic Presets (Inigo Quilez style)
+  // Artistic Presets — each uses unique a/b/c/d combinations
   nebula: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
-    c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.33, 0.67],
+    c: [1.0, 1.0, 0.5],
+    d: [0.8, 0.9, 0.3],
   },
   sunset: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
-    c: [1.0, 1.0, 1.0],
-    d: [0.3, 0.2, 0.2],
+    c: [1.0, 0.7, 0.4],
+    d: [0.0, 0.15, 0.2],
   },
   aurora: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 0.7, 0.4],
-    d: [0.0, 0.15, 0.2],
+    d: [0.3, 0.2, 0.0],
   },
   ocean: {
     a: [0.5, 0.5, 0.5],
@@ -75,25 +81,25 @@ export const SCHROEDINGER_PALETTE_DEFINITIONS: Record<SchroedingerPalette, Cosin
   fire: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
-    c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.1, 0.2], // Needs tuning
+    c: [1.0, 0.7, 0.4],
+    d: [0.0, 0.05, 0.15],
   },
   ice: {
     a: [0.8, 0.9, 1.0],
     b: [0.2, 0.2, 0.2],
     c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.33, 0.67],
+    d: [0.3, 0.4, 0.5],
   },
   forest: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
-    c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.1, 0.2],
+    c: [1.0, 2.0, 1.0],
+    d: [0.0, 0.25, 0.0],
   },
   plasma: {
     a: [0.5, 0.5, 0.5],
     b: [0.5, 0.5, 0.5],
     c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.33, 0.67],
+    d: [0.3, 0.2, 0.2],
   },
 }

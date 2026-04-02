@@ -246,9 +246,11 @@ export function computeRawKSpaceData(
   let omegaMax = 0
 
   const strides = computeStrides(activeDims)
+  // Pre-allocate coords array to avoid per-site allocation
+  const coords = new Array<number>(latticeDim).fill(0)
 
   for (let i = 0; i < totalSites; i++) {
-    const coords = linearToNDCoords(i, activeDims)
+    linearToNDCoordsInto(i, activeDims, coords)
     const omega = computeOmegaK(coords, activeDims, spacing, mass, latticeDim)
 
     // |phi_k|^2 and |pi_k|^2

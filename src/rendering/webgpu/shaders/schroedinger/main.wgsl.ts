@@ -1,7 +1,6 @@
 /**
  * WGSL Schrödinger Main Shader
  *
- * Port of GLSL schroedinger/main.glsl to WGSL.
  * Main volume raymarching loop for quantum wavefunction visualization.
  *
  * Supports two modes:

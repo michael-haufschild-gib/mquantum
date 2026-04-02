@@ -2,7 +2,6 @@
  * WGSL Complex number utilities for Schrödinger wavefunction computation
  *
  * Used for representing ψ(x,t) as complex (re, im) pairs.
- * Port of GLSL quantum/complex.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/complex.wgsl
  */

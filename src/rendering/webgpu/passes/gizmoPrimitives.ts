@@ -7,6 +7,8 @@
  * @module rendering/webgpu/passes/gizmoPrimitives
  */
 
+import { hexToSrgbTuple } from '@/lib/colors/colorUtils'
+
 /** Floats per vertex: x, y, z, r, g, b, a */
 export const STRIDE = 7
 
@@ -21,14 +23,7 @@ export const MIN_HEIGHT = 0.1
  * @param hex - Color string like '#FF0000' or '#f00'
  * @returns RGB tuple in 0-1 range
  */
-export function hexToRgb(hex: string): [number, number, number] {
-  let h = hex.replace('#', '')
-  if (h.length === 3) {
-    h = h[0]! + h[0]! + h[1]! + h[1]! + h[2]! + h[2]!
-  }
-  const n = parseInt(h, 16)
-  return [(n >> 16) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255]
-}
+export const hexToRgb = hexToSrgbTuple
 
 /**
  * Push a line segment (2 vertices) into the output array.

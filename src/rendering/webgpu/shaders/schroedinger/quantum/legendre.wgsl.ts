@@ -5,7 +5,6 @@
  * of spherical harmonics:
  *   Y_lm(θ, φ) ∝ P^{|m|}_l(cos θ) · e^{imφ}
  *
- * Port of GLSL quantum/legendre.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/legendre.wgsl
  */

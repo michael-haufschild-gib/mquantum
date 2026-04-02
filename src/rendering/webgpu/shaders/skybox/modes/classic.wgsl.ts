@@ -1,6 +1,5 @@
 /**
  * Classic skybox mode for WGSL - KTX2 cube texture sampling
- * Port of: src/rendering/shaders/skybox/modes/classic.glsl.ts
  */
 export const classicBlock = `
 // --- Classic Mode: Texture-based skybox ---

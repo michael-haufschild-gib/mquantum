@@ -1,6 +1,5 @@
 /**
  * Crystalline skybox mode for WGSL - Geometric Voronoi patterns
- * Port of: src/rendering/shaders/skybox/modes/crystalline.glsl.ts
  */
 export const crystallineBlock = `
 // --- Crystalline Mode: Geometric Voronoi Patterns ---
