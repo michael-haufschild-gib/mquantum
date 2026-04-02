@@ -154,15 +154,8 @@ export function buildDiracPipelines(
     },
   })
 
-  // Pack/Unpack (reuse TDSE shaders — they operate on totalSites elements)
-  const packUnifBlock = /* wgsl */ `
-struct PackUniforms {
-  totalElements: u32,
-  invN: f32,
-  _pad0: u32,
-  _pad1: u32,
-}
-`
+  // Pack/Unpack (reuse TDSE shaders directly — they operate on totalSites elements
+  // and include their own PackUniforms struct definition)
   const packBGL = device.createBindGroupLayout({
     label: 'dirac-pack-bgl',
     entries: [
@@ -174,11 +167,7 @@ struct PackUniforms {
   })
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      packUnifBlock + tdseComplexPackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
-      'dirac-pack'
-    ),
+    helpers.createShaderModule(device, tdseComplexPackBlock, 'dirac-pack'),
     [packBGL],
     'dirac-pack'
   )
@@ -194,11 +183,7 @@ struct PackUniforms {
   })
   const unpackPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      packUnifBlock + tdseComplexUnpackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
-      'dirac-unpack'
-    ),
+    helpers.createShaderModule(device, tdseComplexUnpackBlock, 'dirac-unpack'),
     [unpackBGL],
     'dirac-unpack'
   )

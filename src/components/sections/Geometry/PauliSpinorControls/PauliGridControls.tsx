@@ -64,7 +64,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
     onMassChange,
   }) => {
     const gridSizeOptions = useMemo(() => {
-      const maxPerDim = Math.floor(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim))
+      const maxPerDim = Math.round(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim))
       return ALL_GRID_SIZE_OPTIONS.filter((opt) => parseInt(opt.value) <= maxPerDim)
     }, [latticeDim])
 

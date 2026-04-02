@@ -480,7 +480,10 @@ export function downloadFile(
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  // Delay revocation — the browser needs time to initiate the download
+  // before the blob URL is invalidated. Immediate revocation races with
+  // the download in headless Chrome.
+  setTimeout(() => URL.revokeObjectURL(url), 5_000)
 }
 
 /**

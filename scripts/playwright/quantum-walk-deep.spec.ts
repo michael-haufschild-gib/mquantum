@@ -214,13 +214,11 @@ test.describe('Quantum Walk: control response', () => {
     await requireWebGPU(page, test.info())
   })
 
-  test('color algorithm: blackbody vs phaseDensity produces different image at 2D', async ({
-    page,
-  }) => {
-    // Navigate once, evolve walk, then switch color in place (no re-navigation
-    // to avoid the qw-max-density-readback buffer teardown race).
-    await gotoMode(page, 'quantumWalk', 2)
-    await waitForQwReady(page)
+  test('color algorithm: blackbody vs viridis produces different image at 3D', async ({ page }) => {
+    // Use 3D instead of 2D — walks at 2D are too sparse for reliable pixel comparison.
+    // Both blackbody and viridis are valid QW algorithms (no fallback normalization).
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForQwReady(page, 150)
     await pauseAnimation(page)
 
     // Blackbody — heat ramp coloring
@@ -229,28 +227,34 @@ test.describe('Quantum Walk: control response', () => {
       mod.useAppearanceStore.setState({ colorAlgorithm: 'blackbody' })
     })
     await waitForShaderCompilation(page)
+    await expect(page.getByTestId('shader-compilation-overlay')).not.toBeVisible({
+      timeout: 30_000,
+    })
     await resumeAnimation(page)
     const fc1 = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc1 + 10)
+    await waitForFrameAdvance(page, fc1 + 60, 30_000)
     await pauseAnimation(page)
     const snapBlackbody = await capturePixelSnapshot(page)
 
-    // phaseDensity — switch color in place, same walk state
+    // Viridis — perceptually uniform scientific ramp (different hue palette)
     await page.evaluate(async () => {
       const mod = await import('/src/stores/appearanceStore.ts')
-      mod.useAppearanceStore.setState({ colorAlgorithm: 'phaseDensity' })
+      mod.useAppearanceStore.setState({ colorAlgorithm: 'viridis' })
     })
     await waitForShaderCompilation(page)
+    await expect(page.getByTestId('shader-compilation-overlay')).not.toBeVisible({
+      timeout: 30_000,
+    })
     await resumeAnimation(page)
     const fc2 = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc2 + 10)
+    await waitForFrameAdvance(page, fc2 + 60, 30_000)
     await pauseAnimation(page)
-    const snapPhaseDensity = await capturePixelSnapshot(page)
+    const snapViridis = await capturePixelSnapshot(page)
 
     expectSnapshotsDiffer(
       snapBlackbody,
-      snapPhaseDensity,
-      'blackbody vs phaseDensity must produce different colors'
+      snapViridis,
+      'blackbody vs viridis must produce different colors'
     )
   })
 

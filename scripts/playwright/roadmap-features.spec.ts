@@ -40,6 +40,7 @@ import {
   waitForDiagnostics,
   waitForFirstFrame,
   waitForFrameAdvance,
+  waitForFreshReadback,
   waitForRendererReady,
   waitForShaderCompilation,
   waitForSimulationFrames,
@@ -70,17 +71,13 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
-    // Wait for carpet to accumulate frames (carpet dispatch runs on render loop)
-    await waitForSimulationFrames(page, 120)
-
-    const carpetState = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
-      const s = mod.useCarpetStore.getState()
-      return { enabled: s.enabled, totalFrames: s.totalFrames, writeHead: s.writeHead }
-    })
-
-    expect(carpetState.enabled, 'carpet should be enabled').toBe(true)
-    expect(carpetState.totalFrames, 'carpet should have accumulated frames').toBeGreaterThan(0)
+    // Wait for carpet panel to mount and accumulate frames (DOM attribute)
+    const panel = page.getByTestId('quantum-carpet-panel')
+    await expect(panel).toBeVisible({ timeout: 10_000 })
+    await expect(async () => {
+      const frames = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
+      expect(frames).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
   })
 
   test('BEC + carpet: shader compiles, frames render', async ({ page }) => {
@@ -94,14 +91,12 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
-    await waitForSimulationFrames(page, 60)
-
-    const totalFrames = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
-      return mod.useCarpetStore.getState().totalFrames
-    })
-
-    expect(totalFrames, 'BEC carpet accumulated frames').toBeGreaterThan(0)
+    const panel = page.getByTestId('quantum-carpet-panel')
+    await expect(panel).toBeVisible({ timeout: 10_000 })
+    await expect(async () => {
+      const frames = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
+      expect(frames).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
   })
 
   test('Dirac + carpet: shader compiles, frames render', async ({ page }) => {
@@ -115,14 +110,12 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
       mod.useCarpetStore.getState().setEnabled(true)
     })
 
-    await waitForSimulationFrames(page, 60)
-
-    const totalFrames = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
-      return mod.useCarpetStore.getState().totalFrames
-    })
-
-    expect(totalFrames, 'Dirac carpet accumulated frames').toBeGreaterThan(0)
+    const panel = page.getByTestId('quantum-carpet-panel')
+    await expect(panel).toBeVisible({ timeout: 10_000 })
+    await expect(async () => {
+      const frames = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
+      expect(frames).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
   })
 
   test('carpet axis change: both axes accumulate independently', async ({ page }) => {
@@ -130,6 +123,8 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
+
+    const panel = page.getByTestId('quantum-carpet-panel')
 
     // Axis 0
     await page.evaluate(async () => {
@@ -139,12 +134,15 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
       store.setSliceAxis(0)
     })
 
-    await waitForSimulationFrames(page, 60)
+    await expect(panel).toBeVisible({ timeout: 10_000 })
 
-    const framesAxis0 = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
-      return mod.useCarpetStore.getState().totalFrames
-    })
+    // Wait for carpet to accumulate frames on axis 0 via DOM attribute
+    await expect(async () => {
+      const frames = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
+      expect(frames).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
+
+    const framesAxis0 = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
 
     // Clear and switch to axis 1
     await page.evaluate(async () => {
@@ -154,12 +152,15 @@ test.describe('A1: Quantum Carpet — shader + physics', () => {
       store.setSliceAxis(1)
     })
 
-    await waitForSimulationFrames(page, 60)
+    // Wait for carpet to accumulate frames on axis 1 via DOM attribute.
+    // After clear + setSliceAxis, totalFrames resets to 0. The render loop
+    // skips one frame (needsReset) then resumes accumulation.
+    await expect(async () => {
+      const frames = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
+      expect(frames).toBeGreaterThan(0)
+    }).toPass({ timeout: 15_000 })
 
-    const framesAxis1 = await page.evaluate(async () => {
-      const mod = await import('/src/stores/carpetStore.ts')
-      return mod.useCarpetStore.getState().totalFrames
-    })
+    const framesAxis1 = parseInt((await panel.getAttribute('data-carpet-frames')) ?? '0', 10)
 
     expect(framesAxis0, 'axis 0 accumulated frames').toBeGreaterThan(0)
     expect(framesAxis1, 'axis 1 accumulated frames').toBeGreaterThan(0)
@@ -246,15 +247,14 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
       s.resetTdseField()
     })
 
-    await waitForSimulationFrames(page, 120)
-
-    await page.waitForFunction(
-      async () => {
-        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-        return mod.useObservablesDiagnosticsStore.getState().hasData
-      },
-      { timeout: 30_000 }
-    )
+    // Reset observables store and wait for a guaranteed-fresh readback.
+    // The readbackGeneration drain+snapshot pattern ensures we never read
+    // stale data from the previous Classic Tunneling configuration.
+    await page.evaluate(async () => {
+      const obsMod = await import('/src/stores/observablesDiagnosticsStore.ts')
+      obsMod.useObservablesDiagnosticsStore.getState().reset()
+    })
+    await waitForFreshReadback(page, '/src/stores/observablesDiagnosticsStore.ts', 60_000)
 
     const obs = await readObservablesDiagnostics(page)
     expect(obs.hasData).toBe(true)
@@ -281,20 +281,26 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
+    // Wait for enough simulation to populate diagnostics history for export.
+    await waitForSimulationFrames(page, 120)
     await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
 
     // Open analysis section
     await page.getByTestId('toggle-right-panel').click()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
-    // Expand data export group
+    // Expand data export group and wait for expand animation
     const header = page.getByTestId('data-export-group-header')
     await expect(header).toBeVisible({ timeout: 5000 })
     await header.click({ force: true })
 
+    // Wait for the export button to become visible after expand animation
+    const csvBtn = page.getByTestId('export-diagnostics-csv')
+    await expect(csvBtn).toBeVisible({ timeout: 5000 })
+
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 10_000 }),
-      page.getByTestId('export-diagnostics-csv').click(),
+      page.waitForEvent('download', { timeout: 15_000 }),
+      csvBtn.click({ force: true }),
     ])
 
     const stream = await download.createReadStream()
@@ -320,18 +326,24 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
+    await waitForSimulationFrames(page, 120)
     await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
 
     await page.getByTestId('toggle-right-panel').click()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
+    // Expand data export group and wait for expand animation
     const header = page.getByTestId('data-export-group-header')
     await expect(header).toBeVisible({ timeout: 5000 })
     await header.click({ force: true })
 
+    // Wait for the export button to become visible after expand animation
+    const jsonBtn = page.getByTestId('export-diagnostics-json')
+    await expect(jsonBtn).toBeVisible({ timeout: 5000 })
+
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 10_000 }),
-      page.getByTestId('export-diagnostics-json').click(),
+      page.waitForEvent('download', { timeout: 15_000 }),
+      jsonBtn.click({ force: true }),
     ])
 
     const stream = await download.createReadStream()
@@ -434,9 +446,11 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
       mod.useSimulationStateStore.getState().requestStoreEigenstate()
     })
 
-    // Wait for render loop to process
+    // Wait for render loop to process.
+    // data-frame-count is sparse (every 60th after frame 10), so use small
+    // increment and generous timeout to account for IT mode's slower frames.
     const fc = await getFrameCount(page)
-    await waitForFrameAdvance(page, fc + 20)
+    await waitForFrameAdvance(page, fc + 2, 30_000)
 
     const simState = await readSimulationState(page)
     expect(simState.storedEigenstateCount, 'eigenstate stored').toBeGreaterThanOrEqual(1)

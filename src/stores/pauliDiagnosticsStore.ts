@@ -17,6 +17,8 @@ const HISTORY_LENGTH = 120
 interface PauliDiagnosticsState {
   /** Whether any diagnostic data has been received */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
   /** Total probability norm ||ψ||² (should stay ≈ 1) */
   totalNorm: number
   /** Norm drift from initial value (percentage) */
@@ -53,6 +55,7 @@ interface PauliDiagnosticsState {
 
 const INITIAL_STATE = {
   hasData: false,
+  readbackGeneration: 0,
   totalNorm: 0,
   normDrift: 0,
   maxDensity: 0,
@@ -82,6 +85,7 @@ export const usePauliDiagnosticsStore = create<PauliDiagnosticsState>((set) => (
       return {
         ...snapshot,
         hasData: true,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -89,11 +93,12 @@ export const usePauliDiagnosticsStore = create<PauliDiagnosticsState>((set) => (
   },
 
   reset: () =>
-    set({
+    set((state) => ({
       ...INITIAL_STATE,
+      readbackGeneration: state.readbackGeneration,
       historyNorm: new Float32Array(HISTORY_LENGTH),
       historySpinUpFrac: new Float32Array(HISTORY_LENGTH),
       historySpinExpZ: new Float32Array(HISTORY_LENGTH),
       meanPosition: [0, 0, 0],
-    }),
+    })),
 }))

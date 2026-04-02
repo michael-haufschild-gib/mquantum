@@ -13,7 +13,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import type { QuantumWalkCoinType, QuantumWalkFieldView } from '@/lib/geometry/extended/quantumWalk'
+import {
+  type QuantumWalkCoinType,
+  type QuantumWalkFieldView,
+  QW_MAX_TOTAL_SITES,
+} from '@/lib/geometry/extended/quantumWalk'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -70,8 +74,7 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
   const activeGridSize = qw.gridSize[0] ?? 64
 
   const maxGridPerDim = useMemo(() => {
-    const maxTotal = 262144
-    const raw = Math.floor(Math.pow(maxTotal, 1 / dimension))
+    const raw = Math.round(Math.pow(QW_MAX_TOTAL_SITES, 1 / dimension))
     return Math.min(128, 2 ** Math.floor(Math.log2(Math.max(2, raw))))
   }, [dimension])
 

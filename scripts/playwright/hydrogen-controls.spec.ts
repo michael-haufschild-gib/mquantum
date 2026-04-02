@@ -194,31 +194,26 @@ test.describe('hydrogen ND extra-dimension controls', () => {
 })
 
 test.describe('hydrogen dimension constraints', () => {
-  test('hydrogen mode at dimension 2 auto-adjusts to minimum valid dimension', async ({ page }) => {
-    // Load at 2D — hydrogen requires >=3D. The app should auto-correct.
+  test('hydrogen mode at dimension 2 stays at 2D (registry min=2)', async ({ page }) => {
+    // hydrogenND supports dim>=2 per the quantum type registry.
+    // Load at 2D and verify the app keeps dim=2 without crashing.
     await page.goto('/?t=schroedinger&d=2&qm=hydrogenND')
     await new TopBar(page).waitForVisible()
 
-    // The app should either:
-    // 1. Clamp dimension to 3 (hydrogen minimum)
-    // 2. Fall back to a mode that supports 2D
     const dim = await page.evaluate(async () => {
       const mod = await import('/src/stores/geometryStore.ts')
       return mod.useGeometryStore.getState().dimension
     })
 
-    // Dimension should be at least 3 for hydrogen
-    // (if the app auto-corrects) or 2 with a different mode
     const mode = await page.evaluate(async () => {
       const mod = await import('/src/stores/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
       return (s.schroedinger as Record<string, unknown>)?.quantumMode
     })
 
-    if (mode === 'hydrogenND') {
-      expect(dim, 'hydrogen in hydrogenND mode requires dim >= 3').toBeGreaterThanOrEqual(3)
-    }
-    // Either way, the app must not crash
+    expect(mode, 'quantum mode should be hydrogenND').toBe('hydrogenND')
+    expect(dim, 'hydrogenND supports dim=2 per registry').toBe(2)
+    // App must not crash
     await expect(page.getByTestId('top-bar')).toBeVisible()
   })
 })

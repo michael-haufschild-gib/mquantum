@@ -15,8 +15,8 @@
 export interface VersionTracker {
   // Schroedinger uniform buffer versions
   lastSchroedingerVersion: number
-  lastSchrodingerAppearanceVersion: number
-  lastSchrodingerPbrVersion: number
+  lastSchroedingerAppearanceVersion: number
+  lastSchroedingerPbrVersion: number
   lastPauliSpinorVersion: number
 
   // Lighting uniform buffer
@@ -40,8 +40,8 @@ export interface VersionTracker {
 export function createVersionTracker(): VersionTracker {
   return {
     lastSchroedingerVersion: -1,
-    lastSchrodingerAppearanceVersion: -1,
-    lastSchrodingerPbrVersion: -1,
+    lastSchroedingerAppearanceVersion: -1,
+    lastSchroedingerPbrVersion: -1,
     lastPauliSpinorVersion: -1,
     lastLightingVersion: -1,
     lastAppearanceVersion: -1,
@@ -78,8 +78,8 @@ export interface SchroedingerVersions {
 export function isSchroedingerDirty(tracker: VersionTracker, v: SchroedingerVersions): boolean {
   return (
     v.schroedingerVersion !== tracker.lastSchroedingerVersion ||
-    v.appearanceVersion !== tracker.lastSchrodingerAppearanceVersion ||
-    v.pbrVersion !== tracker.lastSchrodingerPbrVersion ||
+    v.appearanceVersion !== tracker.lastSchroedingerAppearanceVersion ||
+    v.pbrVersion !== tracker.lastSchroedingerPbrVersion ||
     v.pauliSpinorVersion !== tracker.lastPauliSpinorVersion ||
     tracker.lastSchroedingerVersion === -1
   )
@@ -88,8 +88,8 @@ export function isSchroedingerDirty(tracker: VersionTracker, v: SchroedingerVers
 /** Stamp the tracker after a full Schroedinger buffer write. */
 export function updateSchroedingerVersions(tracker: VersionTracker, v: SchroedingerVersions): void {
   tracker.lastSchroedingerVersion = v.schroedingerVersion
-  tracker.lastSchrodingerAppearanceVersion = v.appearanceVersion
-  tracker.lastSchrodingerPbrVersion = v.pbrVersion
+  tracker.lastSchroedingerAppearanceVersion = v.appearanceVersion
+  tracker.lastSchroedingerPbrVersion = v.pbrVersion
   tracker.lastPauliSpinorVersion = v.pauliSpinorVersion
 }
 

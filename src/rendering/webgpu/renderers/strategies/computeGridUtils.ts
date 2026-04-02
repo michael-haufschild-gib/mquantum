@@ -27,6 +27,7 @@ export function computeLatticeBoundingRadius(
     const Ld = (gridSize[d] ?? 32) * (spacing[d] ?? 0.1)
     if (Ld > maxExtent) maxExtent = Ld
   }
+  // Fallback: 32 grid points × 0.1 default spacing = 3.2 (matches DEFAULT_FREE_SCALAR_CONFIG)
   if (maxExtent <= 0) maxExtent = 3.2
   // 1.15x margin so the field doesn't fill the entire cube edge-to-edge
   return (maxExtent / 2) * 1.15

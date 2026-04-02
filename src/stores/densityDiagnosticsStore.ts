@@ -46,6 +46,8 @@ export interface WavefunctionSliceData {
 interface DensityDiagnosticsState extends DensityDiagnosticsSnapshot, WavefunctionSliceData {
   /** Whether any diagnostics data has been received from GPU */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
 
   /** Push a new diagnostics snapshot from GPU readback */
   pushSnapshot: (snapshot: DensityDiagnosticsSnapshot) => void
@@ -57,6 +59,7 @@ interface DensityDiagnosticsState extends DensityDiagnosticsSnapshot, Wavefuncti
 
 export const useDensityDiagnosticsStore = create<DensityDiagnosticsState>((set) => ({
   hasData: false,
+  readbackGeneration: 0,
   maxDensity: 0,
   totalDensityMass: 0,
   activeVoxelCount: 0,
@@ -70,7 +73,11 @@ export const useDensityDiagnosticsStore = create<DensityDiagnosticsState>((set) 
   sliceWorldBound: 0,
 
   pushSnapshot: (snapshot) => {
-    set({ ...snapshot, hasData: true })
+    set((state) => ({
+      ...snapshot,
+      hasData: true,
+      readbackGeneration: state.readbackGeneration + 1,
+    }))
   },
 
   pushSlices: (slices) => {
@@ -78,8 +85,9 @@ export const useDensityDiagnosticsStore = create<DensityDiagnosticsState>((set) 
   },
 
   reset: () => {
-    set({
+    set((state) => ({
       hasData: false,
+      readbackGeneration: state.readbackGeneration,
       maxDensity: 0,
       totalDensityMass: 0,
       activeVoxelCount: 0,
@@ -91,6 +99,6 @@ export const useDensityDiagnosticsStore = create<DensityDiagnosticsState>((set) 
       sliceZ: null,
       sliceGridSize: 0,
       sliceWorldBound: 0,
-    })
+    }))
   },
 }))

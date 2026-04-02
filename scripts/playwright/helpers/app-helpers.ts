@@ -429,6 +429,65 @@ export async function waitForDiagnostics(
 }
 
 /**
+ * Wait for a fresh GPU readback after a parameter change.
+ *
+ * Two-phase approach to avoid reading stale in-flight mapAsync data:
+ * 1. Drain: wait a few frames so any in-flight readbacks from the OLD config
+ *    complete and write to the store.
+ * 2. Snapshot the current `readbackGeneration`, then wait for it to advance.
+ *    The next readback is guaranteed to be from the NEW config.
+ *
+ * Use this instead of bare `waitForDiagnostics` after changing quantum
+ * numbers, potential type, OQ config, or any parameter that changes what
+ * the GPU computes.
+ */
+export async function waitForFreshReadback(
+  page: Page,
+  storeModule: string,
+  timeout = 30_000
+): Promise<void> {
+  // Phase 1: drain stale in-flight readbacks (typically ≤1 in flight)
+  const fc = await getFrameCount(page)
+  await waitForFrameAdvance(page, fc + 3, timeout)
+
+  // Phase 2: snapshot generation and wait for a post-drain readback
+  const gen = await page.evaluate(async (mod: string) => {
+    const m = await import(/* @vite-ignore */ mod)
+    const store = (
+      Object.values(m) as Array<{ getState?: () => { readbackGeneration: number } }>
+    ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+    return store?.getState?.().readbackGeneration ?? 0
+  }, storeModule)
+
+  await page.waitForFunction(
+    async ([mod, prevGen]: [string, number]) => {
+      const m = await import(/* @vite-ignore */ mod)
+      const store = (
+        Object.values(m) as Array<{ getState?: () => { readbackGeneration: number } }>
+      ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+      return (store?.getState?.().readbackGeneration ?? 0) > prevGen
+    },
+    [storeModule, gen] as [string, number],
+    { timeout }
+  )
+}
+
+/**
+ * Reset a density diagnostics store and wait for fresh post-reset data.
+ * Use after changing quantum numbers to avoid reading stale snapshots.
+ */
+export async function resetAndWaitForDensityDiagnostics(
+  page: Page,
+  timeout = 30_000
+): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/stores/densityDiagnosticsStore.ts')
+    mod.useDensityDiagnosticsStore.getState().reset()
+  })
+  await waitForFreshReadback(page, '/src/stores/densityDiagnosticsStore.ts', timeout)
+}
+
+/**
  * Wait for the simulation to render at least `minFrames` frames.
  * For compute modes, simulation steps = frames × stepsPerFrame.
  */
@@ -999,17 +1058,22 @@ export async function setOQConfig(page: Page, config: Record<string, unknown>): 
     if ('visualizationMode' in cfg)
       store.setOpenQuantumVisualizationMode(cfg.visualizationMode as string)
 
-    // Channel toggles via generic setter
+    // Channel toggles via generic setter.
+    // The setter expects short channel names ('dephasing', 'relaxation', 'thermal'),
+    // NOT the full store key names ('dephasingEnabled', etc).
     if ('dephasingEnabled' in cfg)
-      store.setOpenQuantumChannelEnabled('dephasingEnabled', cfg.dephasingEnabled as boolean)
+      store.setOpenQuantumChannelEnabled('dephasing', cfg.dephasingEnabled as boolean)
     if ('relaxationEnabled' in cfg)
-      store.setOpenQuantumChannelEnabled('relaxationEnabled', cfg.relaxationEnabled as boolean)
+      store.setOpenQuantumChannelEnabled('relaxation', cfg.relaxationEnabled as boolean)
     if ('thermalEnabled' in cfg)
-      store.setOpenQuantumChannelEnabled('thermalEnabled', cfg.thermalEnabled as boolean)
+      store.setOpenQuantumChannelEnabled('thermal', cfg.thermalEnabled as boolean)
   }, config)
 }
 
-/** Reset the open quantum diagnostics store and trigger density matrix re-init. */
+/**
+ * Reset the open quantum diagnostics store and trigger density matrix re-init.
+ * Uses readbackGeneration to guarantee the returned data is post-reset.
+ */
 export async function resetOQState(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const diagMod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
@@ -1017,6 +1081,7 @@ export async function resetOQState(page: Page): Promise<void> {
     const extMod = await import('/src/stores/extendedObjectStore.ts')
     extMod.useExtendedObjectStore.getState().requestOpenQuantumStateReset()
   })
+  await waitForFreshReadback(page, '/src/stores/openQuantumDiagnosticsStore.ts')
 }
 
 // ─── Observables Readback ────────────────────────────────────────────────────
