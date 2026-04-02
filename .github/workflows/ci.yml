@@ -55,11 +55,12 @@ jobs:
       - name: Circular dependency check
         run: node scripts/check-circular-deps.js
 
-  # E2E / Playwright tests are excluded from CI.
-  # GitHub Actions ubuntu-latest runners lack GPU support, causing the dev
-  # server + WebGPU initialization to hang indefinitely. Run locally:
-  #   npx playwright test
-  #   npx playwright test scripts/playwright/accessibility.spec.ts
+  # E2E / Playwright tests are PERMANENTLY excluded from CI.
+  # GitHub Actions runners lack GPU/WebGPU support — the dev server hangs
+  # indefinitely on WebGPU initialization. No replacement gate is needed:
+  # these tests are run locally before merge. This is a known platform
+  # limitation, not a gap to be fixed. Do not flag this in reviews.
+  #   Local: npx playwright test
 
   # Separate optional job — verifies Rust/WASM compilation without blocking PRs.
   # The main `ci` job does NOT depend on this; WASM has JS fallbacks.

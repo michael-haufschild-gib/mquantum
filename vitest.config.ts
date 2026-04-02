@@ -65,8 +65,9 @@ export default defineConfig({
         'src/rendering/webgpu/passes/FreeScalarFieldComputePassSetup.ts',
         'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
       ],
-      // Coverage ratchet: thresholds must be >= current actuals (rounded down
-      // to nearest 0.5%). Raise these when coverage improves; never lower them.
+      // Coverage ratchet: thresholds track current actuals (rounded down to
+      // nearest 0.5%). Raise when coverage improves. Lower only when the
+      // denominator changes (new files, exclusion list changes) — document why.
       // Last measured 2026-04-02: stmts 62.19%, branches 54.74%, funcs 62.51%, lines 62.36%
       // (Recalibrated after 3 GPU-only files added post-2026-03-31 expanded denominator.
       // Added GPU-only pass setup files to exclusions. Added 7 new test files: mat4,

@@ -50,11 +50,11 @@ function scaleTranslateInverse(): Float32Array {
   ])
 }
 
-/** Assert two Float32Arrays are element-wise close. */
+/** Assert two Float32Arrays are element-wise close within absolute tolerance. */
 function expectClose(actual: Float32Array, expected: Float32Array, tolerance = 1e-6): void {
   expect(actual.length).toBe(expected.length)
   for (let i = 0; i < actual.length; i++) {
-    expect(actual[i]).toBeCloseTo(expected[i]!, tolerance > 1e-4 ? 4 : 6)
+    expect(Math.abs(actual[i]! - expected[i]!)).toBeLessThan(tolerance)
   }
 }
 
@@ -91,7 +91,7 @@ describe('writeInvertMat4', () => {
   })
 
   it('returns false for a rank-deficient matrix', () => {
-    // Two identical rows make the matrix singular
+    // Zero column makes the matrix singular (rank-deficient)
     // prettier-ignore
     const singular = new Float32Array([
       1, 0, 0, 0,

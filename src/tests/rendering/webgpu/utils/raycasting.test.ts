@@ -38,13 +38,12 @@ describe('raycastCanvas', () => {
     const br = 2.0
     const result = raycastCanvas(50, 50, 100, 100, identityMat(), identityMat(), br)
 
-    if (result.hit) {
-      // World position should be within the bounding radius
-      const [x, y, z] = result.worldPosition
-      expect(Math.abs(x)).toBeLessThanOrEqual(br + 0.01)
-      expect(Math.abs(y)).toBeLessThanOrEqual(br + 0.01)
-      expect(Math.abs(z)).toBeLessThanOrEqual(br + 0.01)
-    }
+    expect(result.hit).toBe(true)
+    // World position should be within the bounding radius
+    const [x, y, z] = result.worldPosition
+    expect(Math.abs(x)).toBeLessThanOrEqual(br + 0.01)
+    expect(Math.abs(y)).toBeLessThanOrEqual(br + 0.01)
+    expect(Math.abs(z)).toBeLessThanOrEqual(br + 0.01)
   })
 
   it('returns a normalized ray direction', () => {
@@ -78,22 +77,11 @@ describe('raycastCanvas', () => {
   })
 
   it('different bounding radii affect whether a corner click hits', () => {
-    // With a tiny bounding radius, a corner click should miss
+    // With a tiny bounding radius, a corner click from NDC (-1, +1) must miss
     const small = raycastCanvas(0, 0, 100, 100, identityMat(), identityMat(), 0.01)
     const large = raycastCanvas(0, 0, 100, 100, identityMat(), identityMat(), 10.0)
 
-    // The large radius should hit; the small one likely misses (ray from NDC corner)
     expect(large.hit).toBe(true)
-    // Small may or may not hit depending on ray direction, but at least they should differ
-    // in worldPosition if both hit
-    if (small.hit && large.hit) {
-      // The world positions should differ due to different bounding radii
-      const dist = Math.sqrt(
-        (small.worldPosition[0] - large.worldPosition[0]) ** 2 +
-          (small.worldPosition[1] - large.worldPosition[1]) ** 2 +
-          (small.worldPosition[2] - large.worldPosition[2]) ** 2
-      )
-      expect(dist).toBeGreaterThan(0)
-    }
+    expect(small.hit).toBe(false)
   })
 })

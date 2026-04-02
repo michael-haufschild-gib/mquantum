@@ -104,6 +104,7 @@ export function computeScarCorrelation(
 
   const invTwoEpsSq = 1.0 / (2.0 * tubeWidth * tubeWidth)
   // Kernel radius in grid cells per dimension
+  // 3σ captures ~99.7% of the Gaussian kernel weight
   const kernelRadius = Math.max(1, Math.ceil((3 * tubeWidth) / Math.min(...spacing)))
 
   const orbitCorrelations: number[] = []

@@ -86,6 +86,14 @@ describe('andersonSweepStore', () => {
       expect(state.results).toHaveLength(testConfig.steps)
     })
 
+    it('returns null when simTime is 0 on first tick (simulation not yet started)', () => {
+      useAndersonSweepStore.getState().startSweep(testConfig)
+      const result = useAndersonSweepStore.getState().tick(0, 0.01, 0.0001)
+      expect(result).toBeNull()
+      // stepStartTime should NOT be captured (still 0)
+      expect(useAndersonSweepStore.getState().stepStartTime).toBe(0)
+    })
+
     it('returns null when not running', () => {
       const result = useAndersonSweepStore.getState().tick(1.0, 0.01, 0.0001)
       expect(result).toBeNull()

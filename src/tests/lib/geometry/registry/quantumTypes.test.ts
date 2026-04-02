@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry/quantumTypes'
 
 describe('QUANTUM_TYPE_REGISTRY', () => {
-  it('contains all expected quantum type keys', () => {
+  it('contains exactly the expected quantum type keys', () => {
     const expectedKeys = [
       'harmonicOscillator',
       'hydrogenND',
@@ -15,6 +15,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'quantumWalk',
       'pauliSpinor',
     ]
+    expect(QUANTUM_TYPE_REGISTRY.size).toBe(expectedKeys.length)
     for (const key of expectedKeys) {
       expect(QUANTUM_TYPE_REGISTRY.has(key as never), `missing key: ${key}`).toBe(true)
     }

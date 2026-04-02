@@ -287,7 +287,7 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
               {/* Norm and density */}
               <div className="flex gap-3">
                 <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={normDrift > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
+                <span className={Math.abs(normDrift) > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
                   Δ={normDrift >= 0 ? '+' : ''}
                   {(normDrift * 100).toFixed(2)}%
                 </span>

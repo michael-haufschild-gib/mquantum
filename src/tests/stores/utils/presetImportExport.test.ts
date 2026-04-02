@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
   parseAndValidateImport,
@@ -6,10 +6,15 @@ import {
   STYLE_IMPORT_KEYS,
 } from '@/stores/utils/presetImportExport'
 
+let nextId = 1
+beforeEach(() => {
+  nextId = 1
+})
+
 /** Minimal valid style preset. */
 function makeValidStyle(name: string) {
   return {
-    id: crypto.randomUUID(),
+    id: `test-style-${nextId++}`,
     name,
     timestamp: Date.now(),
     data: {
@@ -25,7 +30,7 @@ function makeValidStyle(name: string) {
 /** Minimal valid scene preset. */
 function makeValidScene(name: string) {
   return {
-    id: crypto.randomUUID(),
+    id: `test-scene-${nextId++}`,
     name,
     timestamp: Date.now(),
     data: {
@@ -168,7 +173,7 @@ describe('parseAndValidateImport', () => {
 
     it('rejects items missing required data keys', () => {
       const incomplete = {
-        id: crypto.randomUUID(),
+        id: 'test-incomplete-1',
         name: 'Bad',
         timestamp: Date.now(),
         data: { appearance: { color: 'red' } }, // missing lighting, postProcessing, environment
