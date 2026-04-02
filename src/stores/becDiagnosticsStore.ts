@@ -22,6 +22,8 @@ const HISTORY_LENGTH = 120
 interface BecDiagnosticsState {
   /** Whether diagnostics data has been received at least once */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
   /** Total wavefunction norm ||ψ||² */
   totalNorm: number
   /** Peak density max(|ψ|²) */
@@ -80,6 +82,7 @@ interface BecDiagnosticsState {
 
 const INITIAL_STATE = {
   hasData: false,
+  readbackGeneration: 0,
   totalNorm: 1.0,
   maxDensity: 0,
   normDrift: 0,
@@ -127,6 +130,7 @@ export const useBecDiagnosticsStore = create<BecDiagnosticsState>((set) => ({
       return {
         ...snapshot,
         hasData: true,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -142,12 +146,13 @@ export const useBecDiagnosticsStore = create<BecDiagnosticsState>((set) => ({
     }),
 
   reset: () =>
-    set({
+    set((state) => ({
       ...INITIAL_STATE,
+      readbackGeneration: state.readbackGeneration,
       incompressibleSpectrum: new Float32Array(NUM_SPECTRUM_BINS),
       spectrumKValues: new Float32Array(NUM_SPECTRUM_BINS),
       historyNorm: new Float32Array(HISTORY_LENGTH),
       historyChemPot: new Float32Array(HISTORY_LENGTH),
       historyHealingLen: new Float32Array(HISTORY_LENGTH),
-    }),
+    })),
 }))

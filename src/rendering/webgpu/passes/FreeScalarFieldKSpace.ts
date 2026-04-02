@@ -73,6 +73,15 @@ export class FsfKSpaceManager {
     })
   }
 
+  /**
+   * Invalidate all in-flight async readback jobs without destroying buffers.
+   * Called on field reinitialization to prevent stale readbacks from corrupting
+   * the diagnostics store's initialEnergy baseline.
+   */
+  invalidateReadbacks(): void {
+    this.kSpaceReadbackEpoch++
+  }
+
   /** Destroy staging buffers and invalidate in-flight jobs. */
   destroyBuffers(): void {
     this.kSpaceReadbackEpoch++

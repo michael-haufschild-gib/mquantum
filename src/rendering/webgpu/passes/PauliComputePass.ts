@@ -71,6 +71,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   // Diagnostics state (not stored in buf — mutable per-frame)
   private diagFrameCounter = 0
   private diagMappingInFlight = false
+  /** Monotonic generation counter — incremented on field init to invalidate stale readbacks. */
+  private diagGeneration = 0
 
   // State
   private initialized = false
@@ -327,6 +329,8 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     this.stepAccumulator = 0
     this.initialNorm = 0
     this.initialized = true
+    // Invalidate in-flight readbacks before resetting diagnostics store
+    this.diagGeneration++
     usePauliDiagnosticsStore.getState().reset()
   }
 
@@ -611,8 +615,14 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         DIAG_RESULT_COUNT * Float32Array.BYTES_PER_ELEMENT
       )
       this.diagMappingInFlight = true
+      const capturedGen = this.diagGeneration
 
       void device.queue.onSubmittedWorkDone().then(() => {
+        // Discard stale readback if field was reinitialized since dispatch
+        if (capturedGen !== this.diagGeneration) {
+          this.diagMappingInFlight = false
+          return
+        }
         const staging = this.buf?.diagStagingBuffer
         if (!staging) return
         staging

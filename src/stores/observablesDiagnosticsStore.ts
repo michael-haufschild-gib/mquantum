@@ -44,6 +44,8 @@ export interface ObservablesSnapshot {
 interface ObservablesDiagnosticsState extends ObservablesSnapshot {
   /** Whether any data has been received from GPU */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
 
   /** Uncertainty product history per dimension (ring buffer for sparklines) */
   historyUncertainty: Float32Array[]
@@ -77,8 +79,12 @@ function createEmptyPositionMeanHistory(): Float64Array[] {
 
 const NUM_ENERGY_BINS = 32
 
-const INITIAL_STATE: Omit<ObservablesDiagnosticsState, 'pushSnapshot' | 'setEnergySpectrum' | 'reset'> = {
+const INITIAL_STATE: Omit<
+  ObservablesDiagnosticsState,
+  'pushSnapshot' | 'setEnergySpectrum' | 'reset'
+> = {
   hasData: false,
+  readbackGeneration: 0,
   activeDims: 0,
   positionMean: new Float64Array(MAX_DIM),
   positionVariance: new Float64Array(MAX_DIM),
@@ -121,6 +127,7 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
       return {
         ...snapshot,
         hasData: true,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -130,8 +137,9 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
   setEnergySpectrum: (spectrum) => set({ energySpectrum: spectrum }),
 
   reset: () =>
-    set({
+    set((state) => ({
       ...INITIAL_STATE,
+      readbackGeneration: state.readbackGeneration,
       positionMean: new Float64Array(MAX_DIM),
       positionVariance: new Float64Array(MAX_DIM),
       momentumMean: new Float64Array(MAX_DIM),
@@ -141,5 +149,5 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
       historyEnergy: new Float32Array(HISTORY_LENGTH),
       historyPositionMean: createEmptyPositionMeanHistory(),
       energySpectrum: new Float32Array(NUM_ENERGY_BINS),
-    }),
+    })),
 }))

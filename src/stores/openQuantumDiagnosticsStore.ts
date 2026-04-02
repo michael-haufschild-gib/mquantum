@@ -47,6 +47,9 @@ interface OpenQuantumDiagnosticsState {
   /** Number of active basis states */
   basisCount: number
 
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
+
   // --- Ring buffer for sparkline charts ---
   /** Purity history */
   historyPurity: Float32Array
@@ -86,6 +89,8 @@ export const useOpenQuantumDiagnosticsStore = create<OpenQuantumDiagnosticsState
   basisLabels: [],
   basisCount: 0,
 
+  readbackGeneration: 0,
+
   historyPurity: new Float32Array(HISTORY_LENGTH),
   historyEntropy: new Float32Array(HISTORY_LENGTH),
   historyCoherence: new Float32Array(HISTORY_LENGTH),
@@ -106,6 +111,7 @@ export const useOpenQuantumDiagnosticsStore = create<OpenQuantumDiagnosticsState
         coherenceMagnitude: metrics.coherenceMagnitude,
         groundPopulation: metrics.groundPopulation,
         trace: metrics.trace,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -121,7 +127,7 @@ export const useOpenQuantumDiagnosticsStore = create<OpenQuantumDiagnosticsState
   },
 
   reset: () => {
-    set({
+    set((state) => ({
       purity: 1,
       linearEntropy: 0,
       vonNeumannEntropy: 0,
@@ -131,11 +137,12 @@ export const useOpenQuantumDiagnosticsStore = create<OpenQuantumDiagnosticsState
       populations: new Float32Array(MAX_POPULATIONS),
       basisLabels: [],
       basisCount: 0,
+      readbackGeneration: state.readbackGeneration,
       historyPurity: new Float32Array(HISTORY_LENGTH),
       historyEntropy: new Float32Array(HISTORY_LENGTH),
       historyCoherence: new Float32Array(HISTORY_LENGTH),
       historyHead: 0,
       historyCount: 0,
-    })
+    }))
   },
 }))

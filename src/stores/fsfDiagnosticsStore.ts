@@ -36,6 +36,8 @@ export interface FsfDiagnosticsSnapshot {
 interface FsfDiagnosticsState extends FsfDiagnosticsSnapshot {
   /** Whether any diagnostics data has been received */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
   /** Initial energy for drift tracking */
   initialEnergy: number
 
@@ -56,6 +58,7 @@ interface FsfDiagnosticsState extends FsfDiagnosticsSnapshot {
 
 const INITIAL_STATE: Omit<FsfDiagnosticsState, 'pushSnapshot' | 'reset'> = {
   hasData: false,
+  readbackGeneration: 0,
   totalEnergy: 0,
   totalNorm: 0,
   maxPhi: 0,
@@ -96,6 +99,7 @@ export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set) => ({
         energyDrift,
         initialEnergy,
         hasData: true,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -103,9 +107,10 @@ export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set) => ({
   },
 
   reset: () =>
-    set({
+    set((state) => ({
       ...INITIAL_STATE,
+      readbackGeneration: state.readbackGeneration,
       historyEnergy: new Float32Array(HISTORY_LENGTH),
       historyNorm: new Float32Array(HISTORY_LENGTH),
-    }),
+    })),
 }))

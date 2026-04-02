@@ -30,6 +30,8 @@ interface TdseDiagnosticsSnapshot {
 interface TdseDiagnosticsState extends TdseDiagnosticsSnapshot {
   /** Whether any diagnostics data has been received */
   hasData: boolean
+  /** Monotonically increasing counter — incremented on each GPU readback. Never reset. */
+  readbackGeneration: number
 
   /** Simulation time ring buffer */
   historySimTime: Float32Array
@@ -67,6 +69,7 @@ const INITIAL_SNAPSHOT: TdseDiagnosticsSnapshot = {
 export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   ...INITIAL_SNAPSHOT,
   hasData: false,
+  readbackGeneration: 0,
   historySimTime: new Float32Array(HISTORY_LENGTH),
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyR: new Float32Array(HISTORY_LENGTH),
@@ -87,6 +90,7 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
       return {
         ...snapshot,
         hasData: true,
+        readbackGeneration: state.readbackGeneration + 1,
         historyHead: (head + 1) % HISTORY_LENGTH,
         historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
       }
@@ -94,15 +98,16 @@ export const useTdseDiagnosticsStore = create<TdseDiagnosticsState>((set) => ({
   },
 
   reset: () => {
-    set({
+    set((state) => ({
       ...INITIAL_SNAPSHOT,
       hasData: false,
+      readbackGeneration: state.readbackGeneration,
       historyNorm: new Float32Array(HISTORY_LENGTH),
       historyR: new Float32Array(HISTORY_LENGTH),
       historyT: new Float32Array(HISTORY_LENGTH),
       historyIpr: new Float32Array(HISTORY_LENGTH),
       historyHead: 0,
       historyCount: 0,
-    })
+    }))
   },
 }))

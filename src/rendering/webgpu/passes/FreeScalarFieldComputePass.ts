@@ -438,6 +438,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     this.initialized = true
     this.stepAccumulator = 0
+    // Invalidate in-flight async readbacks BEFORE resetting the diagnostics store.
+    // Without this, a stale readback from the old field can resolve between frames,
+    // pass the epoch check, and set initialEnergy from old data — corrupting energyDrift.
+    this.kSpace.invalidateReadbacks()
     useFsfDiagnosticsStore.getState().reset()
   }
 

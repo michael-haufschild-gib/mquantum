@@ -104,6 +104,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private diagNumWorkgroups = 0
   private diagFrameCounter = 0
   private diagMappingInFlight = false
+  /** Monotonic generation counter — incremented on field init to invalidate stale readbacks. */
+  private diagGeneration = 0
 
   // State
   private initialized = false
@@ -442,6 +444,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.simTime = 0
     this.stepAccumulator = 0
     this.initialized = true
+    // Invalidate in-flight readbacks before resetting diagnostics store
+    this.diagGeneration++
     useDiracDiagnosticsStore.getState().reset()
   }
 
@@ -660,6 +664,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       initialNorm: this.initialNorm,
       maxDensity: this.maxDensity,
       diagMappingInFlight: this.diagMappingInFlight,
+      diagGeneration: this.diagGeneration,
       dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
     }
     dispatchDiagnostics(ctx, config, params, (result) => {
