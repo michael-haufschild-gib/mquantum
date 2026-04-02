@@ -92,7 +92,6 @@ export interface SchroedingerPackParams {
   rendererOpenQuantumEnabled: boolean
   rendererQuantumMode: string
   rendererTermCount: number | undefined
-
 }
 
 /**
@@ -300,7 +299,9 @@ function packVisualFields(
   floatView[I.powderScale] = schroedinger?.powderScale ?? 1.0
   floatView[I.emissionIntensity] = appearance?.faceEmission ?? 0.0
   floatView[I.emissionThreshold] = appearance?.faceEmissionThreshold ?? 0.0
-  floatView[I.emissionColorShift] = appearance?.faceEmissionColorShift ?? 0.0
+  // Emission color shift is meaningless in Wigner phase-space mode — force to zero
+  const isWigner = schroedinger?.representation === 'wigner'
+  floatView[I.emissionColorShift] = isWigner ? 0.0 : (appearance?.faceEmissionColorShift ?? 0.0)
   floatView[I.peakDensity] = cachedPeakDensity
   floatView[I.densityContrast] = schroedinger?.densityContrast ?? 1.8
   floatView[I.scatteringAnisotropy] = schroedinger?.scatteringAnisotropy ?? 0.0
