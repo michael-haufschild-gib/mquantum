@@ -202,9 +202,8 @@ test.describe('quantum mode switching via UI', () => {
       expect(await getQuantumMode(page)).toBe('tdseDynamics')
     }).toPass({ timeout: 5000 })
 
-    // Open Geometry tab to access TDSE controls
-    await leftPanel.switchTab('Geometry')
-    const presetSelect = page.getByTestId('tdse-scenario-preset')
+    // Scenario selector is in the left panel header (not on Geometry tab)
+    const presetSelect = page.getByTestId('scenario-selector')
     await expect(presetSelect).toBeVisible({ timeout: 5000 })
 
     // Select a specific preset from the dropdown

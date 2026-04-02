@@ -133,12 +133,25 @@ async function setInitialCondition(page: Page, initCond: string): Promise<void> 
   }, initCond)
 }
 
-/** Set color algorithm via appearance store. */
+/** Set color algorithm via appearance store. Retries on context-destroyed (shader rebuild). */
 async function setColorAlgorithm(page: Page, algo: string): Promise<void> {
-  await page.evaluate(async (a) => {
-    const mod = await import('/src/stores/appearanceStore.ts')
-    mod.useAppearanceStore.setState({ colorAlgorithm: a })
-  }, algo)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await page.evaluate(async (a) => {
+        const mod = await import('/src/stores/appearanceStore.ts')
+        mod.useAppearanceStore.setState({ colorAlgorithm: a })
+      }, algo)
+      return
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('Execution context was destroyed') && attempt < 2) {
+        // Pipeline rebuild triggered a navigation — wait and retry
+        await page.waitForTimeout(2000)
+        continue
+      }
+      throw e
+    }
+  }
 }
 
 /** Set field view via store. Enables selfInteraction first if wallDensity. */

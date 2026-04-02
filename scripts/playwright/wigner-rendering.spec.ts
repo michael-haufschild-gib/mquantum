@@ -60,10 +60,23 @@ test.describe('Wigner phase-space rendering', () => {
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
 
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
-      mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
-    })
+    // Retry on context-destroyed — switching representation can trigger pipeline rebuild
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await page.evaluate(async () => {
+          const mod = await import('/src/stores/extendedObjectStore.ts')
+          mod.useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
+        })
+        break
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('Execution context was destroyed') && attempt < 2) {
+          await page.waitForTimeout(2000)
+          continue
+        }
+        throw e
+      }
+    }
 
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)

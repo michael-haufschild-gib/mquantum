@@ -233,19 +233,23 @@ test.describe('Hydrogen 2D: feature toggles', () => {
   })
 
   test('density gain change produces different image', async ({ page }) => {
-    await gotoMode(page, 'hydrogenND', 2)
+    // Use n=3 for a larger orbital that fills more of the sampling region.
+    // The default 1s orbital at 2D is compact and most sample points hit
+    // background — density gain changes are invisible outside the orbital.
+    await gotoModeWithParams(page, 'hydrogenND', 2, { hyd_n: '3', hyd_l: '0', hyd_m: '0' })
     await waitForHydrogen2DReady(page)
+    await waitForShaderCompilation(page)
     await pauseAnimation(page)
 
-    await setDensityGain(page, 1.0)
+    await setDensityGain(page, 0.5)
     await waitForUniformUpdate(page)
     const snapLow = await capturePixelSnapshot(page)
 
-    await setDensityGain(page, 5.0)
+    await setDensityGain(page, 10.0)
     await waitForUniformUpdate(page)
     const snapHigh = await capturePixelSnapshot(page)
 
-    expectSnapshotsDiffer(snapLow, snapHigh, '2D: density gain 1.0 vs 5.0 must differ')
+    expectSnapshotsDiffer(snapLow, snapHigh, '2D: density gain 0.5 vs 10.0 must differ')
   })
 
   test('bohr radius change produces different image', async ({ page }) => {

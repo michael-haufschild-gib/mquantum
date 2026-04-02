@@ -58,15 +58,21 @@ test.describe('imaginary-time propagation', () => {
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForRendererReady(page)
 
-    // Ensure the left panel is open so TDSE controls are visible
+    // Ensure the left panel is open and switch to Geometry tab for TDSE controls
     const topBar = new TopBar(page)
     await topBar.openLeftPanel()
     const leftPanel = new LeftPanel(page)
     await leftPanel.waitForVisible()
+    await leftPanel.switchTab('Geometry')
+
+    // Expand the "Display" control group (collapsed by default) to reveal the toggle
+    const displayHeader = page.getByTestId('control-group-tdse-display-header')
+    await expect(displayHeader).toBeVisible({ timeout: 5000 })
+    await displayHeader.click({ force: true })
 
     // Click the imaginary-time toggle via UI (scroll to it if needed)
     const toggle = page.getByTestId('tdse-imaginary-time')
-    await toggle.scrollIntoViewIfNeeded()
+    await expect(toggle).toBeVisible({ timeout: 5000 })
     await toggle.click({ force: true })
 
     // The "Store Eigenstate" button should appear below the toggle

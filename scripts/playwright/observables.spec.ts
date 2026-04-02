@@ -166,9 +166,11 @@ test.describe('Observable Expectation Values', () => {
     const sparkline0 = page.getByTestId('uncertainty-sparkline-0')
     await expect(sparkline0).toBeVisible({ timeout: 15_000 })
 
-    // The ℏ/2 reference line inside the sparkline SVG
+    // The ℏ/2 reference line inside the sparkline SVG.
+    // SVG <line> elements have zero bounding-box height, so Playwright's
+    // toBeVisible() reports "hidden". Use toHaveCount(1) to verify existence.
     const refLine = sparkline0.locator('[data-testid="sparkline-reference"]')
-    await expect(refLine).toBeVisible({ timeout: 5_000 })
+    await expect(refLine).toHaveCount(1, { timeout: 5_000 })
   })
 
   test('export observables button appears only with data', async ({ page }) => {
