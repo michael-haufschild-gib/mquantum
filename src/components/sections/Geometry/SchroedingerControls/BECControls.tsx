@@ -68,7 +68,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
 
     // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
     const maxGridPerDim = useMemo(
-      () => Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
+      () => Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
       [activeDims]
     )
     const gridSizeOptions = useMemo(

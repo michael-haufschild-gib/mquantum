@@ -80,7 +80,7 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
 
   // Compute grid size range (power of 2, limited by total sites + alignment)
   const gridSizeOptions = useMemo(() => {
-    const maxPerDim = Math.floor(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / latticeDim))
+    const maxPerDim = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / latticeDim))
     const minGrid = minDiracGridPerDim(latticeDim)
     return ALL_GRID_SIZE_OPTIONS.filter((opt) => {
       const v = parseInt(opt.value)

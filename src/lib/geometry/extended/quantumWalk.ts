@@ -65,7 +65,7 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
 }
 
 /** Maximum total lattice sites for quantum walk (matches MAX_LINEAR_DISPATCH_SITES) */
-const QW_MAX_TOTAL_SITES = 65535 * 64
+export const QW_MAX_TOTAL_SITES = 65535 * 64
 
 /**
  * Compute the default per-dimension grid size for quantum walk, capped
