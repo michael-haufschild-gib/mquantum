@@ -298,14 +298,13 @@ const hsvToRgbStruct = (h: number, s: number, v: number): { r: number; g: number
  * @returns [r, g, b] in [0, 1] sRGB space
  */
 export function hexToSrgbTuple(hex: string): [number, number, number] {
-  let h = hex.replace('#', '')
-  if (h.length === 3) {
+  let h = hex.trim().replace(/^#/, '')
+  if (/^[0-9a-fA-F]{3}$/.test(h)) {
     h = h[0]! + h[0]! + h[1]! + h[1]! + h[2]! + h[2]!
   }
-  if (h.length !== 6) return [0.85, 0.85, 0.85]
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return [0.85, 0.85, 0.85]
   const n = parseInt(h, 16)
-  if (Number.isNaN(n)) return [0.85, 0.85, 0.85]
-  return [(n >> 16) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255]
+  return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255]
 }
 
 /**

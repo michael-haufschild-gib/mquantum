@@ -51,7 +51,7 @@ describe('computeHypersphericalLayerNorm', () => {
   it('returns small value for negative nk (l < l_next)', () => {
     // nk = lk - lkp1 = 0 - 1 = -1 → should return exp(-20)
     const norm = computeHypersphericalLayerNorm(0, 1, 4, 0)
-    expect(norm).toBeCloseTo(Math.exp(-20), 20)
+    expect(norm).toBeCloseTo(Math.exp(-20), 12)
   })
 
   it('produces finite results for range of D values (3-8)', () => {

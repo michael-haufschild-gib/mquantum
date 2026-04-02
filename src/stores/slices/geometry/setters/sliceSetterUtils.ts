@@ -92,7 +92,9 @@ export const MAX_TOTAL_SITES = 1048576
  * @returns Power-of-2 grid size per dimension, clamped to [2, 128]
  */
 export const computeDefaultGridPerDim = (d: number, maxTotalSites: number): number => {
-  const raw = Math.round(Math.pow(maxTotalSites, 1 / d))
+  const safeD = Number.isFinite(d) && d >= 1 ? Math.floor(d) : 1
+  const safeBudget = Number.isFinite(maxTotalSites) && maxTotalSites >= 1 ? maxTotalSites : 1
+  const raw = Math.round(Math.pow(safeBudget, 1 / safeD))
   let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
   pow2 = Math.max(2, Math.min(128, pow2))
   while (pow2 > 2 && Math.pow(pow2, d) > maxTotalSites) {
