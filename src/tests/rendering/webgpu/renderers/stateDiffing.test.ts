@@ -13,8 +13,8 @@ describe('createVersionTracker', () => {
   it('initializes all versions to -1 (forces full update on first frame)', () => {
     const tracker = createVersionTracker()
     expect(tracker.lastSchroedingerVersion).toBe(-1)
-    expect(tracker.lastSchrodingerAppearanceVersion).toBe(-1)
-    expect(tracker.lastSchrodingerPbrVersion).toBe(-1)
+    expect(tracker.lastSchroedingerAppearanceVersion).toBe(-1)
+    expect(tracker.lastSchroedingerPbrVersion).toBe(-1)
     expect(tracker.lastPauliSpinorVersion).toBe(-1)
     expect(tracker.lastLightingVersion).toBe(-1)
     expect(tracker.lastAppearanceVersion).toBe(-1)

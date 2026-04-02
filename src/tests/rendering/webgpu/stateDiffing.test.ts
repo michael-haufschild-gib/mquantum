@@ -13,8 +13,8 @@ describe('createVersionTracker', () => {
   it('initializes all numeric versions to -1 (forces first-frame update)', () => {
     const t = createVersionTracker()
     expect(t.lastSchroedingerVersion).toBe(-1)
-    expect(t.lastSchrodingerAppearanceVersion).toBe(-1)
-    expect(t.lastSchrodingerPbrVersion).toBe(-1)
+    expect(t.lastSchroedingerAppearanceVersion).toBe(-1)
+    expect(t.lastSchroedingerPbrVersion).toBe(-1)
     expect(t.lastPauliSpinorVersion).toBe(-1)
     expect(t.lastLightingVersion).toBe(-1)
     expect(t.lastAppearanceVersion).toBe(-1)
@@ -97,8 +97,8 @@ describe('updateSchroedingerVersions', () => {
     })
 
     expect(t.lastSchroedingerVersion).toBe(10)
-    expect(t.lastSchrodingerAppearanceVersion).toBe(5)
-    expect(t.lastSchrodingerPbrVersion).toBe(3)
+    expect(t.lastSchroedingerAppearanceVersion).toBe(5)
+    expect(t.lastSchroedingerPbrVersion).toBe(3)
     expect(t.lastPauliSpinorVersion).toBe(1)
   })
 })

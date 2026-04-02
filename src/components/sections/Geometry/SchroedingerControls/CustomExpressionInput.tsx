@@ -73,9 +73,9 @@ export const CustomExpressionInput: React.FC<CustomExpressionInputProps> = React
         />
         <div className="flex items-center gap-2 text-[10px]">
           {parseResult.success ? (
-            <span className="text-green-400">Valid</span>
+            <span className="text-success">Valid</span>
           ) : (
-            <span className="text-red-400">{parseResult.error}</span>
+            <span className="text-danger">{parseResult.error}</span>
           )}
         </div>
         <div className="text-[10px] text-text-tertiary">Variables: {vars}</div>

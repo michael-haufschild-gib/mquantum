@@ -31,7 +31,12 @@ function pushLine(
 }
 
 /**
+ * Generate translate gizmo: 3 axis arrows (R=X, G=Y, B=Z) with arrowheads.
+ * Centered at origin, extending along each positive axis.
  *
+ * @param alpha - Opacity for all line segments
+ * @param shaftLength - Length of each axis shaft
+ * @returns Float32Array of line-list vertices (7 floats per vertex: x,y,z,r,g,b,a)
  */
 export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32Array {
   const out: number[] = []

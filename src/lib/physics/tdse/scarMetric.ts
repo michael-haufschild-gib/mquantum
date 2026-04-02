@@ -20,7 +20,7 @@
  * When disorder is active, orbits are computed on the clean (disorder-free)
  * Hamiltonian. Comparing clean-system orbits against disordered eigenstates
  * detects which scars survive the Anderson perturbation — this is the correct
- * approach for studying scar–localization competition (cf. arXiv:2512.xxxxx).
+ * approach for studying scar-localization competition.
  *
  * Reference: Heller (1984), Phys. Rev. Lett. 53, 1515 — original scar paper
  *
@@ -104,7 +104,7 @@ export function computeScarCorrelation(
 
   const invTwoEpsSq = 1.0 / (2.0 * tubeWidth * tubeWidth)
   // Kernel radius in grid cells per dimension
-  const kernelRadius = Math.max(1, Math.ceil(3 * tubeWidth / Math.min(...spacing)))
+  const kernelRadius = Math.max(1, Math.ceil((3 * tubeWidth) / Math.min(...spacing)))
 
   const orbitCorrelations: number[] = []
 
@@ -164,7 +164,8 @@ export function computeScarCorrelation(
     }
   }
 
-  const meanCorrelation = orbitCorrelations.length > 0 ? sumCorrelation / orbitCorrelations.length : 0
+  const meanCorrelation =
+    orbitCorrelations.length > 0 ? sumCorrelation / orbitCorrelations.length : 0
   const orbitCorrelation = meanCorrelation > 0 ? maxCorrelation / meanCorrelation : 0
 
   return {

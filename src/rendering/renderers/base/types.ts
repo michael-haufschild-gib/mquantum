@@ -1,8 +1,8 @@
 /**
  * Shared types and utilities for raymarched renderers.
  *
- * These constants and types are shared across MandelbulbMesh, SchroedingerMesh,
- * QuaternionJuliaMesh, and other N-dimensional renderers to eliminate duplication.
+ * Constants and types used by the Schroedinger renderer and its N-dimensional
+ * rotation/basis-vector computations.
  *
  * @module rendering/renderers/base/types
  */

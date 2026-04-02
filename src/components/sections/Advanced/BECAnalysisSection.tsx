@@ -258,7 +258,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
               </div>
               <div className="flex gap-3">
                 <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
+                <span className={normDrift > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
                   Δ={normDrift >= 0 ? '+' : ''}
                   {(normDrift * 100).toFixed(2)}%
                 </span>

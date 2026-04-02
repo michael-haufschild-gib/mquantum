@@ -298,7 +298,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
                 </span>
               )}
               <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-              <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
+              <span className={normDrift > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
                 Δ={normDrift >= 0 ? '+' : ''}
                 {(normDrift * 100).toFixed(2)}%
               </span>
@@ -437,7 +437,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
                     <span className="w-16 text-right">{obs.momentumMean[d]!.toFixed(3)}</span>
                     <span className="w-12 text-right">{dp.toFixed(3)}</span>
                     <span
-                      className={`w-14 text-right ${isViolation ? 'text-red-400' : ''}`}
+                      className={`w-14 text-right ${isViolation ? 'text-danger' : ''}`}
                       data-testid={`uncertainty-product-${d}`}
                     >
                       {product.toFixed(4)}
