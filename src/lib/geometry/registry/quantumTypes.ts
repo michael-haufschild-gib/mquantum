@@ -176,7 +176,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 6,
           recommended: 3,
           recommendedReason: '3D lattice for full spatial dynamics',
         },
@@ -212,7 +212,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 6,
           recommended: 3,
           recommendedReason: '3D for full spatial scattering dynamics',
         },
@@ -248,7 +248,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 6,
           recommended: 3,
           recommendedReason: '3D for vortex dynamics and superfluid behavior',
         },
@@ -285,7 +285,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 6,
           recommended: 3,
           recommendedReason: '3D for relativistic dynamics in physical space',
         },
@@ -322,7 +322,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 7,
           recommended: 3,
           recommendedReason: '3D lattice for spatial walk dynamics',
         },
@@ -361,7 +361,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         category: 'compute',
         dimensions: {
           min: 3,
-          max: 11,
+          max: 6,
           recommended: 3,
           recommendedReason:
             '3D provides intuitive spin dynamics with magnetic field in physical space',

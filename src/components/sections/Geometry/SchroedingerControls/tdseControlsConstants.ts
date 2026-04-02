@@ -17,8 +17,6 @@ export const TDSE_MAX_TOTAL_SITES = 262144
 
 /** Power-of-2 grid sizes required by Stockham FFT. */
 export const ALL_GRID_SIZE_OPTIONS = [
-  { value: '2', label: '2' },
-  { value: '4', label: '4' },
   { value: '8', label: '8' },
   { value: '16', label: '16' },
   { value: '32', label: '32' },

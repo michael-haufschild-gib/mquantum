@@ -98,7 +98,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
 
       dimensions: {
         min: 2,
-        max: 11,
+        max: 6,
         recommended: 3,
         recommendedReason:
           '3D provides intuitive spin dynamics with magnetic field in physical space',

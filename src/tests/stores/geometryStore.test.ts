@@ -115,11 +115,11 @@ describe('geometryStore', () => {
     })
 
     it('preserves objectType when it remains valid for new dimension', () => {
-      // pauliSpinor is valid at dim=2..11, so changing dimension should preserve it
+      // pauliSpinor is valid at dim=2..6, so changing dimension within range should preserve it
       useGeometryStore.getState().setObjectType('pauliSpinor')
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
 
-      useGeometryStore.getState().setDimension(7)
+      useGeometryStore.getState().setDimension(5)
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
     })
   })
@@ -145,12 +145,13 @@ describe('geometryStore', () => {
     })
 
     it('auto-switches to recommended dimension when changing type', () => {
-      // pauliSpinor recommends dim=3
+      // pauliSpinor recommends dim=3, max dim=6
+      // Start at dim=8 which is outside pauliSpinor's range
       useGeometryStore.getState().setDimension(8)
       expect(useGeometryStore.getState().dimension).toBe(8)
 
       useGeometryStore.getState().setObjectType('pauliSpinor')
-      // Should auto-switch to recommended dimension
+      // Should auto-switch to recommended dimension since 8 > max(6)
       expect(useGeometryStore.getState().dimension).toBe(3)
       expect(useRotationStore.getState().dimension).toBe(3)
     })
@@ -239,15 +240,18 @@ describe('geometryStore', () => {
       }
     })
 
-    it('returns valid for pauliSpinor across its dimension range (2-11)', () => {
-      for (let d = 2; d <= 11; d++) {
+    it('returns valid for pauliSpinor across its dimension range (2-6)', () => {
+      for (let d = 2; d <= 6; d++) {
         const result = validateObjectTypeForDimension('pauliSpinor', d)
         expect(result.valid, `pauliSpinor should be valid at dim=${d}`).toBe(true)
       }
+      // dim=7+ should be invalid
+      const result7 = validateObjectTypeForDimension('pauliSpinor', 7)
+      expect(result7.valid, 'pauliSpinor should be invalid at dim=7').toBe(false)
     })
 
     it('returns invalid with fallback for dimension outside supported range', () => {
-      // Both types support dim 2-11, so test at dimension 1 and 12
+      // schroedinger supports dim 2-11, so test at dimension 1
       const resultLow = validateObjectTypeForDimension('schroedinger', 1)
       expect(resultLow.valid).toBe(false)
       expect(resultLow.fallbackType).toBe('schroedinger')
