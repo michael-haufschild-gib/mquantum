@@ -11,7 +11,8 @@ import { QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { isComputeQuantumType } from '@/lib/geometry/registry'
+import { getQuantumTypeEntry, isComputeQuantumType } from '@/lib/geometry/registry'
+import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SetterContext } from './sliceSetterUtils'
@@ -51,9 +52,17 @@ export function createQuantumModeSetters(
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
+      const geo = useGeometryStore.getState()
+      const currentDim = geo.dimension
+
+      // Enforce dimension constraints from the quantum type registry
       const needsDim3 = QUANTUM_MODES_3D_ONLY.has(mode)
-      if (needsDim3 && useGeometryStore.getState().dimension < 3) {
-        useGeometryStore.getState().setDimension(3)
+      if (needsDim3 && currentDim < 3) {
+        geo.setDimension(3)
+      }
+      const entry = getQuantumTypeEntry(mode as QuantumTypeKey)
+      if (entry && currentDim > entry.dimensions.max) {
+        geo.setDimension(entry.dimensions.recommended ?? entry.dimensions.max)
       }
       setWithVersion((state) => {
         const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
