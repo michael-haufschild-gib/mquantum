@@ -261,7 +261,20 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     if (normalizedRho > schroedinger.emissionThreshold) {
       var emissionFactor = (normalizedRho - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
       emissionFactor = emissionFactor * emissionFactor;
-      col += baseColor * schroedinger.emissionIntensity * emissionFactor;
+
+      var emissionColor = baseColor;
+      if (abs(schroedinger.emissionColorShift) > 0.01) {
+        var hsl = rgb2hsl(emissionColor);
+        if (schroedinger.emissionColorShift > 0.0) {
+          hsl.x = mix(hsl.x, 0.08, schroedinger.emissionColorShift * 0.5);
+          hsl.y = mix(hsl.y, 1.0, schroedinger.emissionColorShift * 0.3);
+        } else {
+          hsl.x = mix(hsl.x, 0.6, -schroedinger.emissionColorShift * 0.5);
+          hsl.z = mix(hsl.z, 0.9, -schroedinger.emissionColorShift * 0.3);
+        }
+        emissionColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
+      }
+      col += emissionColor * schroedinger.emissionIntensity * emissionFactor;
     }
   }
 

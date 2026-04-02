@@ -15,10 +15,11 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const isPauli = objectType === 'pauliSpinor'
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
+    representation: state.schroedinger?.representation ?? 'position',
     setPowderScale: state.setSchroedingerPowderScale,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
   }))
-  const { config, setPowderScale, setScatteringAnisotropy } =
+  const { config, representation, setPowderScale, setScatteringAnisotropy } =
     useExtendedObjectStore(extendedObjectSelector)
 
   // Emission settings from appearance store
@@ -72,13 +73,18 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
         />
         <Slider
           label="Color Shift"
-          tooltip="Shifts the emission hue relative to the surface color. Negative = cooler tones, positive = warmer tones."
+          tooltip={
+            representation === 'wigner'
+              ? 'Color shift is not available in Wigner phase-space mode.'
+              : 'Shifts the emission hue relative to the surface color. Negative = cooler tones, positive = warmer tones.'
+          }
           min={-1}
           max={1}
           step={0.1}
           value={faceEmissionColorShift}
           onChange={setFaceEmissionColorShift}
           showValue
+          disabled={representation === 'wigner'}
           data-testid="schroedinger-emission-color-shift"
         />
       </ControlGroup>
