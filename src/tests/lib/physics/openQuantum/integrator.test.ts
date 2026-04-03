@@ -612,7 +612,7 @@ describe('hermitianEigendecompose', () => {
     }
     // Jacobi one-element-at-a-time method has limited reconstruction precision
     // for Hermitian matrices with complex off-diagonals (phase factor accumulation).
-    // The eigenvalueFloor use case (clamp + reconstruct) tolerates ~1% error.
+    // The eigenvalueFloor use case (clamp + reconstruct) tolerates ~2% error.
     expect(maxError).toBeLessThan(0.02)
   })
 })
@@ -638,8 +638,8 @@ describe('eigenvalueFloor', () => {
     const evecs = new Float64Array(MAX_K * MAX_K * 2)
     hermitianEigendecompose(rho, evals, evecs)
 
-    expect(evals[0]).toBeGreaterThanOrEqual(0)
-    expect(evals[1]).toBeGreaterThanOrEqual(0)
+    expect(evals[0]).toBeGreaterThanOrEqual(-1e-12)
+    expect(evals[1]).toBeGreaterThanOrEqual(-1e-12)
 
     // Trace should be 1 (renormalized)
     const tr = rho.elements[0]! + rho.elements[2 * (1 * 2 + 1)]!

@@ -160,8 +160,10 @@ describe('SoundManager throttling', () => {
     vi.resetModules()
   })
 
-  it('allows first playClick call', () => {
-    expect(() => manager.playClick()).not.toThrow()
+  it('allows first playClick call and reaches audio path', () => {
+    const internal = manager as unknown as { ctx: { createBufferSource: ReturnType<typeof vi.fn> } }
+    manager.playClick()
+    expect(internal.ctx.createBufferSource).toHaveBeenCalledTimes(1)
   })
 
   it('suppresses rapid successive playClick calls within throttle window', () => {

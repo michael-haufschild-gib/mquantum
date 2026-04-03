@@ -266,12 +266,12 @@ describe('Dirac setters', () => {
 
     const s = useExtendedObjectStore.getState()
     s.applyDiracPreset('kleinParadox')
-    // Preset application uses dynamic import — poll until the async import resolves
+    // Preset application uses dynamic import — poll until both postconditions resolve
     await vi.waitFor(() => {
       expect(getDirac().needsReset).toBe(true)
+      // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
+      expect(getDirac().stepsPerFrame).toBe(4)
     })
-    // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
-    expect(getDirac().stepsPerFrame).toBe(4)
   })
 
   it('rejects NaN for clamped numeric setters', () => {

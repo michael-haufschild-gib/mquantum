@@ -23,7 +23,8 @@ class SoundManager {
    */
   private throttle(key: string, minIntervalMs: number): boolean {
     const now = performance.now()
-    if (now - (this.lastPlayTime[key] ?? 0) < minIntervalMs) return false
+    const last = this.lastPlayTime[key]
+    if (last !== undefined && now - last < minIntervalMs) return false
     this.lastPlayTime[key] = now
     return true
   }
