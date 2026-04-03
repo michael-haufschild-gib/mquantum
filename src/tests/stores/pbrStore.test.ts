@@ -66,4 +66,39 @@ describe('pbrStore', () => {
     expect(next.face.specularIntensity).toBe(1.2)
     expect(next.face.specularColor).toBe('#123456')
   })
+
+  it('setFacePBR applies and clamps ior, transmission, thickness', () => {
+    usePBRStore.getState().setFacePBR({
+      ior: 5.0,
+      transmission: -1.0,
+      thickness: 20.0,
+    })
+
+    const next = usePBRStore.getState()
+    expect(next.face.ior).toBe(3.0) // clamped from 5.0
+    expect(next.face.transmission).toBe(0.0) // clamped from -1.0
+    expect(next.face.thickness).toBe(10.0) // clamped from 20.0
+  })
+
+  it('setFacePBR ignores non-finite ior/transmission/thickness', () => {
+    usePBRStore.getState().setFacePBR({ ior: 2.0, transmission: 0.5, thickness: 3.0 })
+    usePBRStore.getState().setFacePBR({
+      ior: Number.NaN,
+      transmission: Number.POSITIVE_INFINITY,
+      thickness: Number.NEGATIVE_INFINITY,
+    })
+
+    const next = usePBRStore.getState()
+    expect(next.face.ior).toBe(2.0)
+    expect(next.face.transmission).toBe(0.5)
+    expect(next.face.thickness).toBe(3.0)
+  })
+
+  it('clamps reflectance via direct setter', () => {
+    usePBRStore.getState().setFaceReflectance(5.0)
+    expect(usePBRStore.getState().face.reflectance).toBe(1.0)
+
+    usePBRStore.getState().setFaceReflectance(-1.0)
+    expect(usePBRStore.getState().face.reflectance).toBe(0.0)
+  })
 })

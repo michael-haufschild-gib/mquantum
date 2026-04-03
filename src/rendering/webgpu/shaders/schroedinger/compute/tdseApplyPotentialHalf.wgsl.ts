@@ -49,9 +49,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     psiIm[idx] = im * decay;
   } else {
     // Real-time: exp(-i·V·dt/(2ℏ)) — unitary phase rotation
+    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
     let phase = -arg;
-    let cosP = cos(phase);
-    let sinP = sin(phase);
+    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let cosP = cos(reduced);
+    let sinP = sin(reduced);
     psiRe[idx] = re * cosP - im * sinP;
     psiIm[idx] = re * sinP + im * cosP;
   }

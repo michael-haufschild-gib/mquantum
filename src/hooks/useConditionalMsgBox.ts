@@ -6,7 +6,7 @@
  * automatic checking of the dismissed dialogs store.
  */
 
-import { useCallback } from 'react'
+import { useMemo } from 'react'
 
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { type MsgBoxAction, type MsgBoxType, useMsgBoxStore } from '@/stores/msgBoxStore'
@@ -57,57 +57,37 @@ export interface UseConditionalMsgBoxResult {
  * }
  * ```
  */
-export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
-  const showMsgBox = useMsgBoxStore((state) => state.showMsgBox)
+// Module-level stable functions — no component scope dependencies, so useCallback is unnecessary.
+// Defined here (not inline in the hook) to satisfy @eslint-react/no-unnecessary-use-callback.
 
-  const showOnce = useCallback(
-    (
-      dialogId: string,
-      title: string,
-      message: string,
-      type: MsgBoxType = 'info',
-      actions?: MsgBoxAction[]
-    ): boolean => {
-      // Helper to perform the actual show logic
-      const doShow = (): boolean => {
-        const { isDismissed } = useDismissedDialogsStore.getState()
-        if (isDismissed(dialogId)) {
-          return false
-        }
-        showMsgBox(title, message, type, actions, {
-          dismissible: true,
-          dismissId: dialogId,
-        })
-        return true
-      }
+function showOnce(
+  dialogId: string,
+  title: string,
+  message: string,
+  type: MsgBoxType = 'info',
+  actions?: MsgBoxAction[]
+): boolean {
+  return showConditionalMsgBox(dialogId, title, message, type, actions)
+}
 
-      // Check if store has hydrated from localStorage
-      // If not hydrated, dismissed state may not be loaded yet
-      if (!useDismissedDialogsStore.persist.hasHydrated()) {
-        // Wait for hydration, then check and show if needed
-        useDismissedDialogsStore.persist.onFinishHydration(() => {
-          doShow()
-        })
-        return true // Optimistic return
-      }
-
-      return doShow()
-    },
-    [showMsgBox]
-  )
-
-  const isDismissed = (dialogId: string): boolean => {
-    // For immediate checks, always get fresh state and respect hydration
-    if (!useDismissedDialogsStore.persist.hasHydrated()) {
-      // Not hydrated - can't reliably know if dismissed
-      // Return false (not dismissed) to be safe, but this is a race condition
-      // Callers should prefer showOnce which handles this properly
-      return false
-    }
-    return useDismissedDialogsStore.getState().isDismissed(dialogId)
+function checkIsDismissed(dialogId: string): boolean {
+  if (!useDismissedDialogsStore.persist.hasHydrated()) {
+    // Not hydrated — can't reliably know if dismissed.
+    // Callers should prefer showOnce which handles hydration properly.
+    return false
   }
+  return useDismissedDialogsStore.getState().isDismissed(dialogId)
+}
 
-  return { showOnce, isDismissed }
+/**
+ * Hook for showing dismissible message boxes.
+ * Handles hydration timing to prevent race conditions with localStorage persistence.
+ */
+export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
+  return useMemo<UseConditionalMsgBoxResult>(
+    () => ({ showOnce, isDismissed: checkIsDismissed }),
+    []
+  )
 }
 
 /**

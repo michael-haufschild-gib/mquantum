@@ -83,12 +83,8 @@ import {
   gridParamsBlock,
 } from './densityGrid.wgsl'
 
-/** Quantum mode for compute shader */
-export type ComputeQuantumMode =
-  | 'harmonicOscillator'
-  | 'hydrogenND'
-  | 'hydrogenNDCoupled'
-  | 'freeScalarField'
+/** Quantum mode for density grid compute shader (analytical modes only). */
+export type ComputeQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'hydrogenNDCoupled'
 
 /**
  * Configuration for density grid compute shader

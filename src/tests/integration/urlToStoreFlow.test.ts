@@ -5,58 +5,21 @@
  * produces the correct state. This tests the full chain from URL string
  * to Zustand store values, catching bugs where a new URL param is added
  * to the serializer but not wired through to the stores.
+ *
+ * Uses the production `applyUrlStateParams` — NOT a local copy.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  deserializeState,
-  type ParsedShareableState,
-  serializeState,
-} from '@/lib/url/state-serializer'
+import { applyUrlStateParams } from '@/hooks/useUrlState'
+import { deserializeState, serializeState } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-/**
- * Apply parsed URL state to stores.
- *
- * This mirrors the production `applyUrlStateParams` from useUrlState.ts.
- * The key contract: dimension is applied before objectType, which is applied
- * before quantumMode — the order matters because compute modes enforce
- * minimum dimension constraints.
- */
+/** Deserialize a URL string and apply the result to stores. */
 function applyUrlStateToStores(urlString: string): void {
   const urlState = deserializeState(urlString)
-  applyParsedState(urlState)
-}
-
-function applyParsedState(urlState: ParsedShareableState): void {
-  const geo = useGeometryStore.getState()
-  const ext = useExtendedObjectStore.getState()
-
-  // Core identity — order matters: dimension -> objectType -> quantumMode
-  if (urlState.dimension !== undefined) geo.setDimension(urlState.dimension)
-  if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
-  if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
-
-  // Rendering
-  if (urlState.representation !== undefined)
-    ext.setSchroedingerRepresentation(urlState.representation)
-  if (urlState.isoEnabled !== undefined) ext.setSchroedingerIsoEnabled(urlState.isoEnabled)
-  if (urlState.isoThreshold !== undefined) ext.setSchroedingerIsoThreshold(urlState.isoThreshold)
-  if (urlState.crossSectionEnabled !== undefined)
-    ext.setSchroedingerCrossSectionEnabled(urlState.crossSectionEnabled)
-  if (urlState.densityGain !== undefined) ext.setSchroedingerDensityGain(urlState.densityGain)
-  if (urlState.scale !== undefined) ext.setSchroedingerScale(urlState.scale)
-
-  // Quantum numbers
-  if (urlState.termCount !== undefined) ext.setSchroedingerTermCount(urlState.termCount)
-  if (urlState.seed !== undefined) ext.setSchroedingerSeed(urlState.seed)
-  if (urlState.hydrogenN !== undefined)
-    ext.setSchroedingerPrincipalQuantumNumber(urlState.hydrogenN)
-  if (urlState.hydrogenL !== undefined)
-    ext.setSchroedingerAzimuthalQuantumNumber(urlState.hydrogenL)
-  if (urlState.hydrogenM !== undefined) ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
+  applyUrlStateParams(urlState)
 }
 
 describe('URL params -> store state integration', () => {
@@ -98,6 +61,38 @@ describe('URL params -> store state integration', () => {
     expect(sch.isoThreshold).toBeCloseTo(-3.0)
     expect(sch.densityGain).toBeCloseTo(2.5)
     expect(sch.scale).toBeCloseTo(1.5)
+  })
+
+  it('applies representation param from URL', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&repr=momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
+  })
+
+  it('applies cross-section param from URL', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&cs=1')
+    expect(useExtendedObjectStore.getState().schroedinger.crossSectionEnabled).toBe(true)
+  })
+
+  it('applies TDSE potential type from URL', () => {
+    applyUrlStateToStores('d=3&t=schroedinger&qm=tdseDynamics&pot=harmonicTrap')
+    const tdse = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(tdse.potentialType).toBe('harmonicTrap')
+  })
+
+  it('applies TDSE absorber and diagnostics from URL', () => {
+    applyUrlStateToStores('d=3&t=schroedinger&qm=tdseDynamics&abs=1&diag=1&obs=1')
+    const tdse = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(tdse.absorberEnabled).toBe(true)
+    expect(tdse.diagnosticsEnabled).toBe(true)
+    expect(tdse.observablesEnabled).toBe(true)
+  })
+
+  it('applies open quantum params from URL', () => {
+    applyUrlStateToStores('d=4&t=schroedinger&qm=harmonicOscillator&oq=1&oq_dp=0.50&oq_rx=1.20')
+    const oq = useExtendedObjectStore.getState().schroedinger.openQuantum
+    expect(oq.enabled).toBe(true)
+    expect(oq.dephasingRate).toBeCloseTo(0.5)
+    expect(oq.relaxationRate).toBeCloseTo(1.2)
   })
 
   it('ignores unknown URL params without affecting known ones', () => {

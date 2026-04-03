@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import type { ObjectType } from '@/lib/geometry/types'
+import { logger } from '@/lib/logger'
 import { useRotationUpdates } from '@/rendering/renderers/base'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
@@ -605,8 +606,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 // ============================================================================
 // Pass Setup (imported from scenePassSetup.ts)
 // ============================================================================
-
-import { logger } from '@/lib/logger'
 
 import {
   extractPPConfig,

@@ -91,6 +91,27 @@ const clampSpecularIntensity = (value: number): number => Math.max(0.0, Math.min
  */
 const clampReflectance = (value: number): number => Math.max(0.0, Math.min(1.0, value))
 
+/**
+ * Clamp index of refraction to physically meaningful range
+ * @param value - Value to clamp
+ * @returns Clamped value
+ */
+const clampIOR = (value: number): number => Math.max(1.0, Math.min(3.0, value))
+
+/**
+ * Clamp transmission to valid range
+ * @param value - Value to clamp
+ * @returns Clamped value
+ */
+const clampTransmission = (value: number): number => Math.max(0.0, Math.min(1.0, value))
+
+/**
+ * Clamp thickness to valid range
+ * @param value - Value to clamp
+ * @returns Clamped value
+ */
+const clampThickness = (value: number): number => Math.max(0.0, Math.min(10.0, value))
+
 const isFinitePBRInput = (value: number): boolean => Number.isFinite(value)
 
 // ============================================================================
@@ -200,6 +221,29 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
 
       if (config.specularColor !== undefined) {
         nextFace.specularColor = config.specularColor
+      }
+
+      if (config.ior !== undefined) {
+        if (isFinitePBRInput(config.ior)) {
+          nextFace.ior = clampIOR(config.ior)
+        } else logger.warn('[pbrSlice] Ignoring non-finite ior in setFacePBR:', config.ior)
+      }
+
+      if (config.transmission !== undefined) {
+        if (isFinitePBRInput(config.transmission)) {
+          nextFace.transmission = clampTransmission(config.transmission)
+        } else
+          logger.warn(
+            '[pbrSlice] Ignoring non-finite transmission in setFacePBR:',
+            config.transmission
+          )
+      }
+
+      if (config.thickness !== undefined) {
+        if (isFinitePBRInput(config.thickness)) {
+          nextFace.thickness = clampThickness(config.thickness)
+        } else
+          logger.warn('[pbrSlice] Ignoring non-finite thickness in setFacePBR:', config.thickness)
       }
 
       if (Object.keys(nextFace).length === 0) {
