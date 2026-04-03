@@ -58,6 +58,46 @@ export interface HydrogenNDPreset {
  */
 export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset> = {
   // ============================================
+  // 2D Presets (circular hydrogen orbitals)
+  // ============================================
+  '1s_2d': {
+    name: '1s (Ground State)',
+    description: 'Circularly symmetric ground state of the 2D hydrogen atom',
+    n: 1,
+    l: 0,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.0,
+    dimension: 2,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '2s_2d': {
+    name: '2s',
+    description: 'Circularly symmetric with one radial node in 2D',
+    n: 2,
+    l: 0,
+    m: 0,
+    useReal: true,
+    bohrRadiusScale: 1.5,
+    dimension: 2,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+  '2p_2d': {
+    name: '2px',
+    description: 'Angular lobe orbital in the 2D plane',
+    n: 2,
+    l: 1,
+    m: 1,
+    useReal: true,
+    bohrRadiusScale: 1.5,
+    dimension: 2,
+    extraDimN: [0, 0, 0, 0, 0, 0, 0, 0],
+    extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  },
+
+  // ============================================
   // 3D Presets (standard hydrogen orbitals)
   // ============================================
   '1s_3d': {
