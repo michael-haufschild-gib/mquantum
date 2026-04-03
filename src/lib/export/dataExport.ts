@@ -392,6 +392,31 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
     }
   }
 
+  // Pauli diagnostics
+  if (quantumMode === 'pauliSpinor') {
+    const s = usePauliDiagnosticsStore.getState()
+    if (s.historyCount > 0) {
+      payload.pauli = {
+        current: {
+          totalNorm: s.totalNorm,
+          normDrift: s.normDrift,
+          maxDensity: s.maxDensity,
+          spinUpFraction: s.spinUpFraction,
+          spinDownFraction: s.spinDownFraction,
+          spinExpectationZ: s.spinExpectationZ,
+          coherenceMagnitude: s.coherenceMagnitude,
+          meanPosition: s.meanPosition,
+          larmorFrequency: s.larmorFrequency,
+        },
+        timeSeries: {
+          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+          spinUpFraction: readRingBuffer(s.historySpinUpFrac, s.historyHead, s.historyCount),
+          spinExpectationZ: readRingBuffer(s.historySpinExpZ, s.historyHead, s.historyCount),
+        },
+      }
+    }
+  }
+
   // Open quantum diagnostics (analytic modes)
   if (
     quantumMode === 'harmonicOscillator' ||
