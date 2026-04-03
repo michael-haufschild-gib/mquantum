@@ -2,7 +2,6 @@
  * Unified Device Capability Detection
  *
  * Single source of truth for all device capability detection:
- * - WebGL2 support (required for app to run)
  * - GPU tier classification (for performance scaling)
  * - Mobile device detection (for default settings)
  *
@@ -25,9 +24,6 @@ export type GPUTier = 0 | 1 | 2 | 3
 
 /** Complete device capability information */
 export interface DeviceCapabilities {
-  /** Whether WebGL2 is supported (required for app) */
-  webgl2Supported: boolean
-
   /** GPU performance tier (0=fallback, 1=low, 2=medium, 3=high) */
   gpuTier: GPUTier
 
@@ -46,37 +42,11 @@ export interface DeviceCapabilities {
 
 /** Default capabilities (conservative until detection completes) */
 export const DEFAULT_CAPABILITIES: DeviceCapabilities = {
-  webgl2Supported: false,
   gpuTier: 3, // Assume best until proven otherwise
   isMobileGPU: false,
   gpuName: 'unknown',
   detectionType: 'pending',
   estimatedFps: undefined,
-}
-
-// ============================================================================
-// WebGL2 Detection
-// ============================================================================
-
-/**
- * Check if the browser supports WebGL2.
- *
- * WebGL2 is required for:
- * - GLSL ES 3.00 shaders
- * - Multiple Render Targets (MRT)
- * - GPU timer queries
- * - Advanced texture formats
- *
- * @returns True if WebGL2 is supported
- */
-export function isWebGL2Supported(): boolean {
-  try {
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl2')
-    return gl !== null
-  } catch {
-    return false
-  }
 }
 
 // ============================================================================
@@ -118,27 +88,10 @@ export async function detectGPUTier(): Promise<TierResult> {
  * @returns Promise resolving to complete DeviceCapabilities
  */
 export async function detectDeviceCapabilities(): Promise<DeviceCapabilities> {
-  // 1. Check WebGL2 support first (synchronous, fast)
-  const webgl2Supported = isWebGL2Supported()
-
-  // 2. If no WebGL2, return early with tier 0
-  if (!webgl2Supported) {
-    return {
-      webgl2Supported: false,
-      gpuTier: 0,
-      isMobileGPU: false,
-      gpuName: 'unsupported',
-      detectionType: 'webgl2-missing',
-      estimatedFps: undefined,
-    }
-  }
-
-  // 3. Run GPU tier detection (async, queries benchmark DB)
   try {
     const tierResult = await detectGPUTier()
 
     return {
-      webgl2Supported: true,
       gpuTier: tierResult.tier as GPUTier,
       isMobileGPU: tierResult.isMobile ?? false,
       gpuName: tierResult.gpu ?? 'unknown',
@@ -150,7 +103,6 @@ export async function detectDeviceCapabilities(): Promise<DeviceCapabilities> {
     logger.warn('[DeviceCapabilities] GPU detection failed:', error)
 
     return {
-      webgl2Supported: true,
       gpuTier: 3,
       isMobileGPU: false,
       gpuName: 'detection-failed',

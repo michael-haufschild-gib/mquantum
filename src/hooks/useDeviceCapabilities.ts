@@ -5,7 +5,7 @@
  * appropriate defaults for mobile devices.
  *
  * This hook:
- * 1. Detects WebGL2 support and GPU tier
+ * 1. Detects GPU tier via detect-gpu benchmark database
  * 2. Stores results in performanceStore
  * 3. Applies mobile-optimized defaults (resolution scale, max FPS)
  *
@@ -13,7 +13,6 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
 
 import {
   detectDeviceCapabilities,
@@ -33,22 +32,9 @@ import {
  *
  * Should be called once in the root App component.
  * Detection is async but non-blocking.
- *
- * @returns Object with webgl2Supported boolean for conditional rendering
  */
-export function useDeviceCapabilities(): { webgl2Supported: boolean } {
+export function useDeviceCapabilities(): void {
   const hasRun = useRef(false)
-
-  // Combined selector with useShallow to prevent unnecessary re-renders (CIB-002)
-  const { deviceCapabilitiesDetected, gpuTier } = usePerformanceStore(
-    useShallow((s) => ({
-      deviceCapabilitiesDetected: s.deviceCapabilitiesDetected,
-      gpuTier: s.gpuTier,
-    }))
-  )
-
-  // Get webgl2 support from detection result, default to true until detected
-  const webgl2Supported = deviceCapabilitiesDetected ? gpuTier > 0 : true
 
   useEffect(() => {
     // Only run once
@@ -63,7 +49,7 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
 
       // Apply mobile defaults if detected AND user hasn't set a preference
       // This ensures user's explicit choices are preserved across page loads
-      if (capabilities.isMobileGPU && capabilities.webgl2Supported) {
+      if (capabilities.isMobileGPU) {
         const userHasResolutionPreference = hasPersistedResolutionScale()
         const userHasFpsPreference = hasPersistedMaxFps()
         const perfStore = usePerformanceStore.getState()
@@ -93,18 +79,16 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
           maxFps: userHasFpsPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
           spotlightsRemoved: spotlights.length,
         })
-      } else
+      } else {
         logger.log('[DeviceCapabilities] Detection complete:', {
-          webgl2: capabilities.webgl2Supported,
           tier: capabilities.gpuTier,
           gpu: capabilities.gpuName,
           isMobile: capabilities.isMobileGPU,
           type: capabilities.detectionType,
         })
+      }
     }
 
     void runDetection()
   }, [])
-
-  return { webgl2Supported }
 }
