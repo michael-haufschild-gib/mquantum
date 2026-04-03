@@ -56,11 +56,34 @@ describe('observablesDiagnosticsStore', () => {
     expect(state.totalEnergy).toBe(1.5)
   })
 
-  it('writes per-dimension uncertainty into history arrays', () => {
+  it('per-dimension history arrays advance with head on each push', () => {
     useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot())
-    const state = useDiagnosticsStore.getState().observables
+    const s1 = useDiagnosticsStore.getState().observables
+    expect(s1.historyUncertainty[0]![0]).toBeCloseTo(0.56)
+    expect(s1.historyPositionMean[0]![0]).toBeCloseTo(1)
 
-    expect(state.historyUncertainty[0]![0]).toBeCloseTo(0.56)
-    expect(state.historyPositionMean[0]![0]).toBeCloseTo(1)
+    // Second push — different values at slot 1
+    const snap2 = makeSnapshot()
+    snap2.uncertaintyProduct = new Float64Array([0.7, 0.7, 0.7, 0, 0, 0, 0, 0, 0, 0, 0])
+    snap2.positionMean = new Float64Array([5, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0])
+    useDiagnosticsStore.getState().pushObservablesSnapshot(snap2)
+
+    const s2 = useDiagnosticsStore.getState().observables
+    expect(s2.historyUncertainty[0]![1]).toBeCloseTo(0.7)
+    expect(s2.historyPositionMean[0]![1]).toBeCloseTo(5)
+    // Slot 0 still has first push values
+    expect(s2.historyUncertainty[0]![0]).toBeCloseTo(0.56)
+  })
+
+  it('reset clears per-dimension history arrays', () => {
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot())
+    const before = useDiagnosticsStore.getState().observables.historyUncertainty[0]!
+
+    useDiagnosticsStore.getState().resetObservables()
+    const after = useDiagnosticsStore.getState().observables
+
+    expect(after.historyUncertainty[0]).not.toBe(before)
+    expect(after.historyUncertainty[0]![0]).toBe(0)
+    expect(after.historyPositionMean[0]![0]).toBe(0)
   })
 })

@@ -45,7 +45,7 @@ export function updateObservablesResources(
   state: ObservablesState
 ): void {
   const wantObs = config.observablesEnabled
-  if (wantObs === state.obsEnabled && state.obsResources) return
+  if (wantObs === state.obsEnabled && (state.obsResources || !wantObs)) return
 
   if (!wantObs) {
     destroyObservablesBuffers(state.obsResources)

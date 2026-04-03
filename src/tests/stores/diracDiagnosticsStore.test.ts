@@ -57,15 +57,25 @@ describe('diracDiagnosticsStore', () => {
     expect(state.maxDensity).toBe(0) // unset field stays default
   })
 
-  it('writes particle/antiparticle fractions into separate history arrays', () => {
+  it('writes particle/antiparticle fractions into separate history arrays and advances with head', () => {
     useDiagnosticsStore.getState().updateDirac({
       totalNorm: 0.95,
       particleFraction: 0.6,
       antiparticleFraction: 0.4,
     })
-    const s = useDiagnosticsStore.getState().dirac
-    expect(s.historyParticleFrac[0]).toBeCloseTo(0.6)
-    expect(s.historyAntiparticleFrac[0]).toBeCloseTo(0.4)
+    const s1 = useDiagnosticsStore.getState().dirac
+    expect(s1.historyParticleFrac[0]).toBeCloseTo(0.6)
+    expect(s1.historyAntiparticleFrac[0]).toBeCloseTo(0.4)
+
+    // Second push writes to slot 1 — verifies arrays advance with head
+    useDiagnosticsStore.getState().updateDirac({
+      totalNorm: 0.9,
+      particleFraction: 0.8,
+      antiparticleFraction: 0.2,
+    })
+    const s2 = useDiagnosticsStore.getState().dirac
+    expect(s2.historyParticleFrac[1]).toBeCloseTo(0.8)
+    expect(s2.historyAntiparticleFrac[1]).toBeCloseTo(0.2)
   })
 
   it('reset restores meanPosition and physical constants', () => {
