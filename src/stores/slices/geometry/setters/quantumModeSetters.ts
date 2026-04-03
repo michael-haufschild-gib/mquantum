@@ -81,6 +81,12 @@ export function createQuantumModeSetters(
           updates.representation = 'position'
         }
 
+        // Force position if switching to coupled hydrogen with momentum active
+        // (coupled shader is position-only for momentum representation)
+        if (mode === 'hydrogenNDCoupled' && state.schroedinger.representation === 'momentum') {
+          updates.representation = 'position'
+        }
+
         if (mode === 'freeScalarField') {
           const prev = state.schroedinger.freeScalar
           if (prev.latticeDim !== dim) {
