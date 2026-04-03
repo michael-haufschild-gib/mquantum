@@ -7,7 +7,7 @@
  * @module components/sections/Geometry/PauliSpinorControls/PauliGridControls
  */
 
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -63,28 +63,44 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
     onHbarChange,
     onMassChange,
   }) => {
-    const gridSizeOptions = useMemo(() => {
-      const maxPerDim = Math.round(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim))
-      return ALL_GRID_SIZE_OPTIONS.filter((opt) => parseInt(opt.value) <= maxPerDim)
-    }, [latticeDim])
+    const maxPerDim = useMemo(
+      () => Math.round(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim)),
+      [latticeDim]
+    )
+    const gridSizeOptions = useMemo(
+      () => ALL_GRID_SIZE_OPTIONS.filter((opt) => parseInt(opt.value) <= maxPerDim),
+      [maxPerDim]
+    )
+
+    const activeGridSize = gridSize[0] ?? 64
+    const handleGridSizeChange = useCallback(
+      (v: string) => {
+        const size = parseInt(v)
+        onGridSizeChange(Array.from({ length: latticeDim }, () => size))
+      },
+      [latticeDim, onGridSizeChange]
+    )
+    const totalSites = useMemo(() => {
+      let sites = 1
+      for (let d = 0; d < latticeDim; d++) sites *= gridSize[d] ?? 64
+      return sites
+    }, [gridSize, latticeDim])
+    const memoryKB = Math.round((totalSites * 2 * 2 * 8) / 1024)
 
     return (
       <div className="space-y-3">
-        {/* Grid size per dimension */}
-        {Array.from({ length: latticeDim }, (_, d) => (
-          <Select
-            key={`grid-${d}`}
-            label={`Grid N${AXIS_LABELS[d] ?? d}`}
-            tooltip="Number of lattice points along this axis. More points increase spatial resolution but require more GPU memory."
-            options={gridSizeOptions}
-            value={String(gridSize[d] ?? 64)}
-            onChange={(v) => {
-              const newSize = [...gridSize]
-              newSize[d] = parseInt(v)
-              onGridSizeChange(newSize)
-            }}
-          />
-        ))}
+        {/* Grid size — uniform across all dimensions */}
+        <Select
+          label="Grid Size"
+          tooltip="Number of lattice points per dimension. More points increase spatial resolution but require more GPU memory."
+          options={gridSizeOptions}
+          value={String(activeGridSize)}
+          onChange={handleGridSizeChange}
+          data-testid="pauli-grid-size"
+        />
+        <div className="text-xs text-text-tertiary">
+          {totalSites.toLocaleString()} sites ({maxPerDim}^{latticeDim} max) · {memoryKB} KB
+        </div>
 
         {/* Spacing per dimension */}
         {Array.from({ length: latticeDim }, (_, d) => (

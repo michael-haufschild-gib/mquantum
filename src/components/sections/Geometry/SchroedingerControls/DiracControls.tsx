@@ -8,7 +8,7 @@
  * @module components/sections/Geometry/SchroedingerControls/DiracControls
  */
 
-import React, { useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
@@ -77,14 +77,33 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
   const latticeDim = dirac.latticeDim ?? dimension
 
   // Compute grid size range (power of 2, limited by total sites + alignment)
+  const maxPerDim = useMemo(
+    () => Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / latticeDim)),
+    [latticeDim]
+  )
   const gridSizeOptions = useMemo(() => {
-    const maxPerDim = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / latticeDim))
     const minGrid = minDiracGridPerDim(latticeDim)
     return ALL_GRID_SIZE_OPTIONS.filter((opt) => {
       const v = parseInt(opt.value)
       return v >= minGrid && v <= maxPerDim
     })
-  }, [latticeDim])
+  }, [latticeDim, maxPerDim])
+
+  const activeGridSize = dirac.gridSize[0] ?? 32
+  const handleGridSizeChange = useCallback(
+    (v: string) => {
+      const size = parseInt(v)
+      actions.setGridSize(Array.from({ length: latticeDim }, () => size))
+    },
+    [latticeDim, actions]
+  )
+  const totalSites = useMemo(() => {
+    let sites = 1
+    for (let d = 0; d < latticeDim; d++) sites *= dirac.gridSize[d] ?? 32
+    return sites
+  }, [dirac.gridSize, latticeDim])
+  const spinorComponents = Math.pow(2, Math.floor((latticeDim + 1) / 2))
+  const memoryKB = Math.round((totalSites * spinorComponents * 2 * 4) / 1024)
 
   // Half-extent for position sliders
   const halfExtent = useMemo(() => {
@@ -289,20 +308,18 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         defaultOpen={false}
         data-testid="control-group-dirac-numerics"
       >
-        {Array.from({ length: latticeDim }, (_, d) => (
-          <Select
-            key={`grid-${d}`}
-            label={`Grid ${AXIS_LABELS[d]}`}
-            tooltip="Number of lattice sites along this axis. Total sites across all axes is capped at 262144."
-            value={String(dirac.gridSize[d] ?? 32)}
-            options={gridSizeOptions}
-            onChange={(v) => {
-              const newGrid = [...dirac.gridSize]
-              newGrid[d] = parseInt(v)
-              actions.setGridSize(newGrid)
-            }}
-          />
-        ))}
+        <Select
+          label="Grid Size"
+          tooltip="Number of lattice sites per dimension. Total sites across all dimensions is capped at 262144."
+          value={String(activeGridSize)}
+          options={gridSizeOptions}
+          onChange={handleGridSizeChange}
+          data-testid="dirac-grid-size"
+        />
+        <div className="text-xs text-text-tertiary">
+          {totalSites.toLocaleString()} sites ({maxPerDim}^{latticeDim} max) · S={spinorComponents}{' '}
+          · {memoryKB} KB
+        </div>
         {Array.from({ length: latticeDim }, (_, d) => (
           <Slider
             key={`spacing-${d}`}

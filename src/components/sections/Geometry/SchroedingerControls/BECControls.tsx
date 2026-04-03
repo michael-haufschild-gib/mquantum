@@ -8,7 +8,7 @@
  * @module components/sections/Geometry/SchroedingerControls/BECControls
  */
 
-import React, { useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
@@ -73,6 +73,21 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
       () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
       [maxGridPerDim]
     )
+
+    const activeGridSize = bec.gridSize[0] ?? 64
+    const handleGridSizeChange = useCallback(
+      (v: string) => {
+        const size = parseInt(v, 10)
+        actions.setGridSize(Array.from({ length: activeDims }, () => size))
+      },
+      [activeDims, actions]
+    )
+    const totalSites = useMemo(() => {
+      let sites = 1
+      for (let d = 0; d < activeDims; d++) sites *= bec.gridSize[d] ?? 64
+      return sites
+    }, [bec.gridSize, activeDims])
+    const memoryKB = Math.round((totalSites * 2 * 8) / 1024)
 
     const showVortexControls =
       bec.initialCondition === 'vortexImprint' || bec.initialCondition === 'vortexLattice'
@@ -263,20 +278,17 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
           defaultOpen={false}
           data-testid="control-group-bec-numerics"
         >
-          {Array.from({ length: activeDims }, (_, i) => (
-            <Select
-              key={`grid-${i}`}
-              label={`Grid ${AXIS_LABELS[i]}`}
-              tooltip="Number of lattice points along this axis. Higher values increase spatial resolution but cost O(N^D) memory."
-              value={String(bec.gridSize[i] ?? 64)}
-              onChange={(v) => {
-                const arr = [...bec.gridSize]
-                arr[i] = parseInt(v, 10)
-                actions.setGridSize(arr)
-              }}
-              options={gridSizeOptions}
-            />
-          ))}
+          <Select
+            label="Grid Size"
+            tooltip="Number of lattice points per dimension. Total sites = N^D; larger grids increase spatial resolution but cost O(N^D) memory."
+            value={String(activeGridSize)}
+            onChange={handleGridSizeChange}
+            options={gridSizeOptions}
+            data-testid="bec-grid-size"
+          />
+          <div className="text-xs text-text-tertiary">
+            {totalSites.toLocaleString()} sites ({maxGridPerDim}^{activeDims} max) · {memoryKB} KB
+          </div>
           {Array.from({ length: activeDims }, (_, i) => (
             <Slider
               key={`spacing-${i}`}
