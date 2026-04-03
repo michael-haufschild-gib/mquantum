@@ -5,7 +5,7 @@
  * mass/hbar/c clamping, and potential parameter setters.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -266,10 +266,10 @@ describe('Dirac setters', () => {
 
     const s = useExtendedObjectStore.getState()
     s.applyDiracPreset('kleinParadox')
-    // Preset application uses dynamic import — wait for microtask
-    await new Promise((r) => setTimeout(r, 50))
-
-    expect(getDirac().needsReset).toBe(true)
+    // Preset application uses dynamic import — poll until the async import resolves
+    await vi.waitFor(() => {
+      expect(getDirac().needsReset).toBe(true)
+    })
     // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
     expect(getDirac().stepsPerFrame).toBe(4)
   })
