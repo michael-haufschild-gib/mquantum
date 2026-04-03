@@ -47,7 +47,7 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
     }
 
     case 'periodicLattice': {
-      const phase = (Math.PI * x) / config.latticePeriod
+      const phase = (Math.PI * x) / Math.max(config.latticePeriod, 1e-6)
       const cosVal = Math.cos(phase)
       return config.latticeDepth * cosVal * cosVal
     }

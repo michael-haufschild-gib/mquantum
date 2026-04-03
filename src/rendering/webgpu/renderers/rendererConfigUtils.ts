@@ -14,6 +14,7 @@ import type {
   SchroedingerWGSLShaderConfig,
 } from '../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from './schrodingerRendererTypes'
+import { isFreeScalarAnalysisAlgorithm } from './schrodingerRendererTypes'
 
 // ---------------------------------------------------------------------------
 // Mode classification helpers
@@ -190,10 +191,7 @@ export function buildShaderConfig(
     isQuantumWalk: rendererConfig.quantumMode === 'quantumWalk',
     isPauli,
     freeScalarAnalysis:
-      isFreeScalar &&
-      rendererConfig.colorAlgorithm !== undefined &&
-      rendererConfig.colorAlgorithm >= 12 &&
-      rendererConfig.colorAlgorithm <= 15,
+      isFreeScalar && isFreeScalarAnalysisAlgorithm(rendererConfig.colorAlgorithm),
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,

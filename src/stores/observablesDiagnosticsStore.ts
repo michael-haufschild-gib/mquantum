@@ -12,8 +12,7 @@
 
 import { create } from 'zustand'
 
-/** Maximum supported spatial dimensions */
-const MAX_DIM = 11
+import { MAX_DIMENSION } from '@/constants/dimension'
 /** Ring buffer length — ~2s at 60fps */
 export const HISTORY_LENGTH = 120
 
@@ -70,11 +69,11 @@ interface ObservablesDiagnosticsState extends ObservablesSnapshot {
 }
 
 function createEmptyHistoryArrays(): Float32Array[] {
-  return Array.from({ length: MAX_DIM }, () => new Float32Array(HISTORY_LENGTH))
+  return Array.from({ length: MAX_DIMENSION }, () => new Float32Array(HISTORY_LENGTH))
 }
 
 function createEmptyPositionMeanHistory(): Float64Array[] {
-  return Array.from({ length: MAX_DIM }, () => new Float64Array(HISTORY_LENGTH))
+  return Array.from({ length: MAX_DIMENSION }, () => new Float64Array(HISTORY_LENGTH))
 }
 
 const NUM_ENERGY_BINS = 32
@@ -86,11 +85,11 @@ const INITIAL_STATE: Omit<
   hasData: false,
   readbackGeneration: 0,
   activeDims: 0,
-  positionMean: new Float64Array(MAX_DIM),
-  positionVariance: new Float64Array(MAX_DIM),
-  momentumMean: new Float64Array(MAX_DIM),
-  momentumVariance: new Float64Array(MAX_DIM),
-  uncertaintyProduct: new Float64Array(MAX_DIM),
+  positionMean: new Float64Array(MAX_DIMENSION),
+  positionVariance: new Float64Array(MAX_DIMENSION),
+  momentumMean: new Float64Array(MAX_DIMENSION),
+  momentumVariance: new Float64Array(MAX_DIMENSION),
+  uncertaintyProduct: new Float64Array(MAX_DIMENSION),
   totalEnergy: 0,
   positionNorm: 0,
   momentumNorm: 0,
@@ -140,11 +139,11 @@ export const useObservablesDiagnosticsStore = create<ObservablesDiagnosticsState
     set((state) => ({
       ...INITIAL_STATE,
       readbackGeneration: state.readbackGeneration,
-      positionMean: new Float64Array(MAX_DIM),
-      positionVariance: new Float64Array(MAX_DIM),
-      momentumMean: new Float64Array(MAX_DIM),
-      momentumVariance: new Float64Array(MAX_DIM),
-      uncertaintyProduct: new Float64Array(MAX_DIM),
+      positionMean: new Float64Array(MAX_DIMENSION),
+      positionVariance: new Float64Array(MAX_DIMENSION),
+      momentumMean: new Float64Array(MAX_DIMENSION),
+      momentumVariance: new Float64Array(MAX_DIMENSION),
+      uncertaintyProduct: new Float64Array(MAX_DIMENSION),
       historyUncertainty: createEmptyHistoryArrays(),
       historyEnergy: new Float32Array(HISTORY_LENGTH),
       historyPositionMean: createEmptyPositionMeanHistory(),

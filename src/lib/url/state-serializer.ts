@@ -145,7 +145,7 @@ export type ParsedShareableState = Partial<ShareableObjectState> & Partial<Share
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const INTEGER_RE = /^-?\d+$/
-const FLOAT_RE = /^-?\d+(\.\d+)?$/
+const FLOAT_RE = /^-?(?:\d+\.?\d*|\.\d+)$/
 
 /** Parse a URL param as a clamped integer. Returns undefined on invalid input. */
 function parseIntParam(

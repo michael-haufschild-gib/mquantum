@@ -86,6 +86,18 @@ export const COLOR_ALGORITHM_MAP: Record<string, number> = {
   pauliCoherence: 26,
 }
 
+/**
+ * Check whether a color algorithm integer is in the free scalar field analysis range
+ * (hamiltonianDecomposition..kSpaceOccupation, indices 12-15).
+ */
+export function isFreeScalarAnalysisAlgorithm(algo: number | undefined): boolean {
+  if (algo === undefined) return false
+  return (
+    algo >= COLOR_ALGORITHM_MAP.hamiltonianDecomposition! &&
+    algo <= COLOR_ALGORITHM_MAP.kSpaceOccupation!
+  )
+}
+
 /** Maps nodal line definition names to shader integer constants */
 export const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,

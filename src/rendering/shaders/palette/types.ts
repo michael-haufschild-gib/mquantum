@@ -6,6 +6,8 @@
  *
  */
 
+import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
+
 // ============================================================================
 // Color Algorithm System
 // ============================================================================
@@ -234,6 +236,14 @@ export const DEFAULT_DIVERGING_PSI_SETTINGS: DivergingPsiSettings = {
   negativeColor: '#3166f5',
   intensityFloor: 0.2,
   component: 'real',
+}
+
+/** Map Pauli field view to matching color algorithm for synchronized rendering. */
+export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorithm> = {
+  spinDensity: 'pauliSpinDensity',
+  totalDensity: 'blackbody',
+  spinExpectation: 'pauliSpinExpectation',
+  coherence: 'pauliCoherence',
 }
 
 /**

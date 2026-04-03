@@ -375,6 +375,10 @@ const padeScratch = {
     real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
     imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
   } as ComplexMatrix,
+  sq: {
+    real: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+    imag: new Float64Array(MAX_PADE_N * MAX_PADE_N),
+  } as ComplexMatrix,
 }
 
 /** Zero the first N*N elements of a scratch matrix. */
@@ -489,20 +493,20 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   // Squaring phase: exp(A) = X^{2^s}
   // Alternate between X and a scratch buffer to avoid allocation per squaring step
   if (s > 0) {
-    const sqScratch = complexMatZero(N) // Only one allocation for all squaring steps
+    const sq = useScratch ? (zeroScratch(padeScratch.sq, N), padeScratch.sq) : complexMatZero(N)
     for (let i = 0; i < s; i++) {
       if (i % 2 === 0) {
-        complexMatMul(X, X, sqScratch, N)
+        complexMatMul(X, X, sq, N)
       } else {
-        complexMatMul(sqScratch, sqScratch, X, N)
+        complexMatMul(sq, sq, X, N)
       }
     }
     // Ensure the result is in the correct buffer
     if (s % 2 === 1) {
-      // Result is in sqScratch, copy to a new matrix (need to return owned buffer)
+      // Result is in sq — copy to a new matrix (can't return scratch)
       const result = complexMatZero(N)
-      result.real.set(sqScratch.real.subarray(0, size))
-      result.imag.set(sqScratch.imag.subarray(0, size))
+      result.real.set(sq.real.subarray(0, size))
+      result.imag.set(sq.imag.subarray(0, size))
       return result
     }
   }

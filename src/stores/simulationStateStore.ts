@@ -12,14 +12,15 @@
 
 import { create } from 'zustand'
 
-import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
+import type { SaveableQuantumMode } from '@/lib/export/simulationState'
+import type { PauliConfig } from '@/lib/geometry/extended/types'
 
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
 
 /** Loaded wavefunction data pending injection into GPU buffers */
 export interface PendingLoadData {
-  quantumMode: SchroedingerQuantumMode
+  quantumMode: SaveableQuantumMode
   latticeDim: number
   gridSize: number[]
   totalSites: number
@@ -100,13 +101,25 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         // with the loaded grid parameters.
         const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const loadedConfig = result.config as Record<string, unknown>
-        if ('needsReset' in loadedConfig || result.quantumMode) {
-          loadedConfig.needsReset = true
+
+        if (result.quantumMode === 'pauliSpinor') {
+          // Pauli is a separate object type — switch objectType and apply pauli config
+          const { useGeometryStore } = await import('@/stores/geometryStore')
+          useGeometryStore.getState().setObjectType('pauliSpinor')
+          const pauliConfig = (loadedConfig.pauli ?? loadedConfig) as Partial<PauliConfig>
+          useExtendedObjectStore.getState().setPauliConfig({
+            ...pauliConfig,
+            needsReset: true,
+          })
+        } else {
+          if ('needsReset' in loadedConfig || result.quantumMode) {
+            loadedConfig.needsReset = true
+          }
+          useExtendedObjectStore.getState().setSchroedingerConfig({
+            quantumMode: result.quantumMode,
+            ...loadedConfig,
+          })
         }
-        useExtendedObjectStore.getState().setSchroedingerConfig({
-          quantumMode: result.quantumMode,
-          ...loadedConfig,
-        })
 
         set({
           pendingLoadData: {
