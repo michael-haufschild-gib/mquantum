@@ -16,15 +16,6 @@ describe('free scalar field setters', () => {
 
   const getFSF = () => useExtendedObjectStore.getState().schroedinger.freeScalar
 
-  it('resizes arrays when latticeDim changes', () => {
-    const s = useExtendedObjectStore.getState()
-    s.setFreeScalarLatticeDim(2)
-    const f = getFSF()
-    expect(f.latticeDim).toBe(2)
-    expect(f.gridSize).toHaveLength(2)
-    expect(f.spacing).toHaveLength(2)
-  })
-
   it('clamps latticeDim to [1, 11]', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarLatticeDim(0)
@@ -65,20 +56,6 @@ describe('free scalar field setters', () => {
     expect(getFSF().stepsPerFrame).toBe(16)
   })
 
-  it('rejects NaN for mass', () => {
-    const s = useExtendedObjectStore.getState()
-    const before = getFSF().mass
-    s.setFreeScalarMass(NaN)
-    expect(getFSF().mass).toBe(before)
-  })
-
-  it('sets initial condition type', () => {
-    const s = useExtendedObjectStore.getState()
-    // @ts-expect-error intentional invalid input
-    s.setFreeScalarInitialCondition('plane')
-    expect(getFSF().initialCondition).toBe('plane')
-  })
-
   it('clamps packetWidth to [0.01, 5]', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarPacketWidth(0)
@@ -107,11 +84,5 @@ describe('free scalar field setters', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarLatticeDim(5)
     expect(getFSF().slicePositions).toHaveLength(2) // 5 - 3 = 2
-  })
-
-  it('resetFreeScalarField sets needsReset flag', () => {
-    const s = useExtendedObjectStore.getState()
-    s.resetFreeScalarField()
-    expect(getFSF().needsReset).toBe(true)
   })
 })

@@ -211,20 +211,6 @@ describe('Tabs', () => {
       expect(screen.getByRole('tab', { name: 'Tab 1' })).toHaveAttribute('aria-selected', 'true')
       expect(screen.getByRole('tab', { name: 'Tab 10' })).toHaveAttribute('aria-selected', 'false')
     })
-
-    it('tablist is present for many tabs', () => {
-      const manyTabs: Tab[] = Array.from({ length: 10 }, (_, i) => ({
-        id: `tab${i}`,
-        label: `Tab ${i + 1}`,
-        content: <div>Content {i + 1}</div>,
-      }))
-
-      render(<Tabs tabs={manyTabs} value="tab5" onChange={() => {}} />)
-
-      const tablist = screen.getByRole('tablist')
-      expect(tablist).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: 'Tab 6' })).toHaveAttribute('aria-selected', 'true')
-    })
   })
 
   describe('accessibility', () => {

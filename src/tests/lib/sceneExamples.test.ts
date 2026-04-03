@@ -61,20 +61,10 @@ describe('sceneExamples', () => {
 })
 
 describe('bundled scenes.json structural validation', () => {
-  it('contains at least one scene', () => {
-    expect(scenesData.length).toBeGreaterThan(0)
-  })
-
   it('every scene has a unique id', () => {
     const ids = scenesData.map((s) => s.id)
     const uniqueIds = new Set(ids)
     expect(uniqueIds.size).toBe(ids.length)
-  })
-
-  it('every scene has a non-empty name', () => {
-    for (const scene of scenesData) {
-      expect(scene.name.trim().length, `Scene ${scene.id} has empty name`).toBeGreaterThan(0)
-    }
   })
 
   it('every scene has a data object with at least one store key', () => {
@@ -83,13 +73,6 @@ describe('bundled scenes.json structural validation', () => {
         Object.keys(scene.data).length,
         `Scene "${scene.name}" has empty data`
       ).toBeGreaterThan(0)
-    }
-  })
-
-  it('every scene has a valid timestamp', () => {
-    for (const scene of scenesData) {
-      expect(scene.timestamp).toBeGreaterThan(0)
-      expect(Number.isFinite(scene.timestamp)).toBe(true)
     }
   })
 

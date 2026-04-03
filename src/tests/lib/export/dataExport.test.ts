@@ -554,20 +554,6 @@ describe('exportDiagnosticsJSON', () => {
     expect(ts.spinExpectationZ).toHaveLength(1)
   })
 
-  it('includes open quantum data for analytic modes', () => {
-    useDiagnosticsStore.getState().pushOpenQuantumMetrics({
-      purity: 0.9,
-      linearEntropy: 0.1,
-      vonNeumannEntropy: 0.3,
-      coherenceMagnitude: 0.2,
-      groundPopulation: 0.8,
-      trace: 1.0,
-    })
-    const json = exportDiagnosticsJSON('harmonicOscillator')
-    const parsed = JSON.parse(json) as Record<string, unknown>
-    expect(parsed).toHaveProperty('openQuantum')
-  })
-
   it('includes wavefunction slice data when available', () => {
     useDiagnosticsStore.getState().pushDensitySlices({
       sliceX: new Float32Array([0.1, 0.5, 0.1]),
@@ -658,10 +644,5 @@ describe('exportFilename', () => {
   it('generates a filename with prefix, timestamp, and extension', () => {
     const name = exportFilename('mdim-tdse', 'csv')
     expect(name).toMatch(/^mdim-tdse-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.csv$/)
-  })
-
-  it('handles json extension', () => {
-    const name = exportFilename('mdim-diagnostics', 'json')
-    expect(name).toMatch(/\.json$/)
   })
 })

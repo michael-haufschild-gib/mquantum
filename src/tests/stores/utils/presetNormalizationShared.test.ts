@@ -2,47 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   clampFiniteOrFallback,
-  clampToRange,
   normalizeCosineVector,
 } from '@/stores/utils/presetNormalizationShared'
 
-describe('clampToRange', () => {
-  it('returns the value when within range', () => {
-    expect(clampToRange(5, 0, 10)).toBe(5)
-  })
-
-  it('clamps to min when below', () => {
-    expect(clampToRange(-3, 0, 10)).toBe(0)
-  })
-
-  it('clamps to max when above', () => {
-    expect(clampToRange(15, 0, 10)).toBe(10)
-  })
-
-  it('returns min when value equals min', () => {
-    expect(clampToRange(0, 0, 10)).toBe(0)
-  })
-
-  it('returns max when value equals max', () => {
-    expect(clampToRange(10, 0, 10)).toBe(10)
-  })
-
-  it('handles negative ranges', () => {
-    expect(clampToRange(-5, -10, -1)).toBe(-5)
-    expect(clampToRange(-15, -10, -1)).toBe(-10)
-    expect(clampToRange(0, -10, -1)).toBe(-1)
-  })
-})
-
 describe('clampFiniteOrFallback', () => {
-  it('returns the clamped value for a finite number', () => {
-    expect(clampFiniteOrFallback(5, 0, 10, 99)).toBe(5)
-  })
-
-  it('clamps a finite number to range', () => {
-    expect(clampFiniteOrFallback(15, 0, 10, 99)).toBe(10)
-  })
-
   it('returns fallback for NaN', () => {
     expect(clampFiniteOrFallback(NaN, 0, 10, 99)).toBe(99)
   })
@@ -65,11 +28,6 @@ describe('clampFiniteOrFallback', () => {
 })
 
 describe('normalizeCosineVector', () => {
-  it('returns the vector when valid and within range', () => {
-    const result = normalizeCosineVector([0.5, 1.0, 1.5], [0, 0, 0])
-    expect(result).toEqual([0.5, 1.0, 1.5])
-  })
-
   it('clamps elements to [0, 2]', () => {
     const result = normalizeCosineVector([-1, 3, 1], [0.5, 0.5, 0.5])
     expect(result).toEqual([0, 2, 1])

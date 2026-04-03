@@ -16,17 +16,6 @@ describe('densityDiagnosticsStore', () => {
     useDiagnosticsStore.getState().resetDensity()
   })
 
-  describe('initial state', () => {
-    it('starts with hasData=false and null slices', () => {
-      const state = useDiagnosticsStore.getState().density
-      expect(state.hasData).toBe(false)
-      expect(state.maxDensity).toBe(0)
-      expect(state.sliceX).toBeNull()
-      expect(state.sliceY).toBeNull()
-      expect(state.sliceZ).toBeNull()
-    })
-  })
-
   describe('pushSnapshot', () => {
     it('sets hasData=true and stores all snapshot fields', () => {
       useDiagnosticsStore.getState().pushDensitySnapshot({

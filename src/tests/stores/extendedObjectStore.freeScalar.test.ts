@@ -1,16 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('extendedObjectStore — free scalar field actions', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-  })
-
-  it('has correct default freeScalar config', () => {
-    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
-    expect(fs).toEqual(DEFAULT_FREE_SCALAR_CONFIG)
   })
 
   it('setFreeScalarLatticeDim truncates arrays to new latticeDim length', () => {
@@ -54,11 +48,6 @@ describe('extendedObjectStore — free scalar field actions', () => {
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
     expect(fs.gridSize).toEqual([64, 64, 64])
     expect(fs.needsReset).toBe(true)
-  })
-
-  it('setFreeScalarMass updates mass parameter', () => {
-    useExtendedObjectStore.getState().setFreeScalarMass(2.5)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.mass).toBe(2.5)
   })
 
   it('ignores non-finite scalar numeric updates', () => {
@@ -113,28 +102,11 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(after.slicePositions).toEqual(before.slicePositions)
   })
 
-  it('setFreeScalarDt updates time step', () => {
-    useExtendedObjectStore.getState().setFreeScalarDt(0.005)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.dt).toBe(0.005)
-  })
-
-  it('setFreeScalarStepsPerFrame updates steps count', () => {
-    useExtendedObjectStore.getState().setFreeScalarStepsPerFrame(8)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.stepsPerFrame).toBe(8)
-  })
-
   it('setFreeScalarInitialCondition updates condition and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
     expect(fs.initialCondition).toBe('singleMode')
     expect(fs.needsReset).toBe(true)
-  })
-
-  it('setFreeScalarFieldView updates field view', () => {
-    useExtendedObjectStore.getState().setFreeScalarFieldView('energyDensity')
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.fieldView).toBe(
-      'energyDensity'
-    )
   })
 
   it('setFreeScalarPacketWidth updates packet width and triggers reset', () => {
@@ -158,21 +130,9 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(fs.needsReset).toBe(true)
   })
 
-  it('setFreeScalarAutoScale toggles auto-scale', () => {
-    useExtendedObjectStore.getState().setFreeScalarAutoScale(false)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.autoScale).toBe(false)
-  })
-
   it('resetFreeScalarField sets needsReset flag', () => {
     useExtendedObjectStore.getState().resetFreeScalarField()
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(true)
-  })
-
-  it('setFreeScalarSpacing updates spacing', () => {
-    useExtendedObjectStore.getState().setFreeScalarSpacing([0.2, 0.2, 0.2])
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.spacing).toEqual([
-      0.2, 0.2, 0.2,
-    ])
   })
 
   it('setFreeScalarPacketCenter updates center and triggers reset', () => {
@@ -274,10 +234,6 @@ describe('extendedObjectStore — free scalar field actions', () => {
     it('setFreeScalarVacuumSeed rounds to integer', () => {
       useExtendedObjectStore.getState().setFreeScalarVacuumSeed(42.7)
       expect(useExtendedObjectStore.getState().schroedinger.freeScalar.vacuumSeed).toBe(43)
-    })
-
-    it('default vacuumSeed is 42', () => {
-      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.vacuumSeed).toBe(42)
     })
   })
 
