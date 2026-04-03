@@ -427,10 +427,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             this.carpetSlicePass = new CarpetSliceComputePass()
             this.carpetSlicePass.initialize(this.device)
           }
+          // Analytic modes (HO, hydrogen) store density in .r; compute modes store it in .a
+          const qm = this.rendererConfig.quantumMode
+          const isAnalyticMode =
+            !qm || qm === 'harmonicOscillator' || qm === 'hydrogenND' || qm === 'hydrogenNDCoupled'
           this.carpetSlicePass.dispatch(
             ctx.encoder,
             densityView,
-            carpetState,
+            { ...carpetState, readAlpha: !isAnalyticMode },
             (data, gridSize, wh, tf) => {
               useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
             }
