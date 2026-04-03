@@ -45,7 +45,6 @@ export {
   getQuantumTypeName,
   getQuantumTypesRequiringDimensionAbove,
   isComputeQuantumType,
-  isValidQuantumTypeKey,
   resolveQuantumTypeKey,
 } from './helpers'
 

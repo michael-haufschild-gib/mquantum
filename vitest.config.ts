@@ -48,13 +48,10 @@ export default defineConfig({
         'src/rendering/webgpu/passes/TemporalCloudPass.ts',
         'src/rendering/webgpu/passes/TemporalCloudDepthPass.ts',
         'src/rendering/webgpu/passes/SMAAPass.ts',
-        'src/rendering/webgpu/passes/FullscreenPass.ts',
         'src/rendering/webgpu/passes/FrameBlendingPass.ts',
         'src/rendering/webgpu/passes/CompositePass.ts',
         'src/rendering/webgpu/passes/FXAAPass.ts',
         'src/rendering/webgpu/passes/DepthPass.ts',
-        'src/rendering/webgpu/passes/NormalPass.ts',
-        'src/rendering/webgpu/passes/MainObjectMRTPass.ts',
         // gizmoGround.ts — removed: pure geometry math, no GPU calls, testable
         'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer.ts',
         // skyboxVertexData.ts — removed: mostly pure functions, testable
