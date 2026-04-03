@@ -428,7 +428,9 @@ export async function waitForDiagnostics(
       const storeExports = Object.values(mod) as Array<{
         getState: () => Record<string, { hasData: boolean }>
       }>
-      const store = storeExports.find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+      const store = storeExports.find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
       if (!store) return false
       const state = store.getState()
       if (ch) return (state[ch] as { hasData: boolean } | undefined)?.hasData === true
@@ -473,7 +475,9 @@ export async function waitForFreshReadback(
         Object.values(m) as Array<{
           getState?: () => Record<string, { readbackGeneration: number }>
         }>
-      ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+      ).find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
       if (!store?.getState) return 0
       const state = store.getState()
       if (ch)
@@ -490,7 +494,9 @@ export async function waitForFreshReadback(
         Object.values(m) as Array<{
           getState?: () => Record<string, { readbackGeneration: number }>
         }>
-      ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+      ).find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
       if (!store?.getState) return false
       const state = store.getState()
       const gen = ch
