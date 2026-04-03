@@ -11,6 +11,7 @@ const MODULUS_MODE_OPTIONS = [
   { value: 'logPsiAbs', label: 'log(|psi|)' },
 ] as const
 
+/** Controls for domain coloring visualization: modulus mapping mode and contour line settings. */
 export const DomainColoringControls: React.FC = React.memo(() => {
   const selector = useShallow((state: AppearanceSlice) => ({
     domainColoring: state.domainColoring,

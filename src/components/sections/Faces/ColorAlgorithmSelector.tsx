@@ -73,7 +73,10 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       quantumMode === 'diracEquation' ||
       quantumMode === 'quantumWalk'
 
-    // Auto-switch away from unavailable algorithm when mode changes
+    // Auto-switch away from unavailable algorithm when mode changes.
+    // Spatially misleading algorithms (radialDistance, radial, lch, multiSource)
+    // are already excluded from compute mode availableOptions by
+    // getAvailableColorAlgorithms, so this single effect handles all cases.
     useEffect(() => {
       const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
       if (!isAvailable) {
@@ -84,21 +87,6 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         }
       }
     }, [availableOptions, colorAlgorithm, setColorAlgorithm, isComputeMode, objectType])
-
-    // Auto-switch to a mode-appropriate algorithm when entering compute modes
-    // if the current algorithm is spatially misleading (radialDistance, radial, lch).
-    // These color by geometric position, not by field value, producing false structure.
-    useEffect(() => {
-      const misleadingForCompute = new Set<string>([
-        'radialDistance',
-        'radial',
-        'lch',
-        'multiSource',
-      ])
-      if (isComputeMode && misleadingForCompute.has(colorAlgorithm)) {
-        setColorAlgorithm(objectType === 'pauliSpinor' ? 'pauliSpinDensity' : 'blackbody')
-      }
-    }, [isComputeMode, colorAlgorithm, setColorAlgorithm, objectType])
 
     const handleChange = useCallback(
       (v: string) => {

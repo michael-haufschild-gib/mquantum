@@ -86,11 +86,6 @@ export const Input = ({
       inputRef.current.dispatchEvent(event)
       inputRef.current.focus()
     }
-    if (onChange) {
-      // Create a synthetic event
-      // This is a bit hacky, but React events are complex to mock perfectly
-      // Better to rely on the parent checking the value or passing an explicit onClear
-    }
     if (onClear) onClear()
   }
 
@@ -159,7 +154,7 @@ export const Input = ({
         />
 
         {/* Right Actions */}
-        <div className="absolute right-3 flex items-center gap-2">
+        <div className="absolute end-3 flex items-center gap-2">
           {loading ? (
             <LoadingSpinner size={14} className="text-text-tertiary" />
           ) : (
@@ -202,7 +197,7 @@ export const Input = ({
             initial={{ opacity: 0, y: -5, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -5, height: 0 }}
-            className="text-xs text-danger ml-1"
+            className="text-xs text-danger ms-1"
           >
             {error}
           </m.span>

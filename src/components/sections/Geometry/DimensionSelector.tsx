@@ -164,7 +164,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
         <div className="relative group">
           {canScrollLeft && (
             <div
-              className="absolute left-0 top-0 bottom-0 z-20 flex items-center"
+              className="absolute start-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
             >
@@ -196,7 +196,7 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(
 
           {canScrollRight && (
             <div
-              className="absolute right-0 top-0 bottom-0 z-20 flex items-center"
+              className="absolute end-0 top-0 bottom-0 z-20 flex items-center"
               onPointerDown={handlePreventDefault}
               onMouseDown={handlePreventDefault}
             >

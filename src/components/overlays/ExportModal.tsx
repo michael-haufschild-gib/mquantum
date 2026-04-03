@@ -317,7 +317,7 @@ export const ExportModal = () => {
                         glow
                         className="py-6 text-lg"
                       >
-                        <Icon name="download" className="w-5 h-5 mr-2" /> Download
+                        <Icon name="download" className="w-5 h-5 me-2" /> Download
                       </Button>
                       <Button
                         onClick={() => {

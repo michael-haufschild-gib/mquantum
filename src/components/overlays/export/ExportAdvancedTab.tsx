@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useExportStore, VideoCodec } from '@/stores/exportStore'
 
 export const ExportAdvancedTab = () => {
-  const { settings, updateSettings } = useExportStore()
+  const { settings, updateSettings } = useExportStore(
+    useShallow((s) => ({ settings: s.settings, updateSettings: s.updateSettings }))
+  )
   const [supportedCodecs, setSupportedCodecs] = useState<Record<VideoCodec, boolean>>({
     avc: true,
     hevc: false,
@@ -65,7 +68,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Codec */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-1">
+        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
           Video Codec
         </label>
         <ToggleGroup
@@ -87,7 +90,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Hardware Accel */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-1">
+        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
           Encoding Hardware
         </label>
         <ToggleGroup
@@ -105,7 +108,7 @@ export const ExportAdvancedTab = () => {
 
       {/* Bitrate Mode */}
       <div className="space-y-3">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-1">
+        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest ps-1">
           Bitrate Mode
         </label>
         <ToggleGroup

@@ -14,27 +14,18 @@ import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import type { HydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import type { PauliFieldView } from '@/lib/geometry/extended/types'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
-import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
+import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/types'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
-
-/** Map Pauli field view → matching color algorithm for synchronized rendering. */
-const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorithm> = {
-  spinDensity: 'pauliSpinDensity',
-  totalDensity: 'blackbody',
-  spinExpectation: 'pauliSpinExpectation',
-  coherence: 'pauliCoherence',
-}
 
 const EMPTY_OPTION = { value: '', label: '\u2014 Select Preset \u2014' }
 
@@ -120,20 +111,38 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     useShallow((s) => ({ objectType: s.objectType, dimension: s.dimension }))
   )
 
-  const schroedinger = useExtendedObjectStore((s) => s.schroedinger)
+  const { quantumMode, presetName, hydrogenNDPreset } = useExtendedObjectStore(
+    useShallow((s) => ({
+      quantumMode: s.schroedinger.quantumMode,
+      presetName: s.schroedinger.presetName,
+      hydrogenNDPreset: s.schroedinger.hydrogenNDPreset,
+    }))
+  )
 
-  const quantumMode = schroedinger?.quantumMode ?? 'harmonicOscillator'
-
-  // Store actions
-  const setPresetName = useExtendedObjectStore((s) => s.setSchroedingerPresetName)
-  const setHydrogenNDPreset = useExtendedObjectStore((s) => s.setSchroedingerHydrogenNDPreset)
-  const setSchroedingerConfig = useExtendedObjectStore((s) => s.setSchroedingerConfig)
-  const applyTdsePreset = useExtendedObjectStore((s) => s.applyTdsePreset)
-  const applyBecPreset = useExtendedObjectStore((s) => s.applyBecPreset)
-  const applyDiracPreset = useExtendedObjectStore((s) => s.applyDiracPreset)
-  const applyFreeScalarPreset = useExtendedObjectStore((s) => s.applyFreeScalarPreset)
-  const applyQuantumWalkPreset = useExtendedObjectStore((s) => s.applyQuantumWalkPreset)
-  const setPauliConfig = useExtendedObjectStore((s) => s.setPauliConfig)
+  // Store actions (stable references — single batched selector)
+  const {
+    setPresetName,
+    setHydrogenNDPreset,
+    setSchroedingerConfig,
+    applyTdsePreset,
+    applyBecPreset,
+    applyDiracPreset,
+    applyFreeScalarPreset,
+    applyQuantumWalkPreset,
+    setPauliConfig,
+  } = useExtendedObjectStore(
+    useShallow((s) => ({
+      setPresetName: s.setSchroedingerPresetName,
+      setHydrogenNDPreset: s.setSchroedingerHydrogenNDPreset,
+      setSchroedingerConfig: s.setSchroedingerConfig,
+      applyTdsePreset: s.applyTdsePreset,
+      applyBecPreset: s.applyBecPreset,
+      applyDiracPreset: s.applyDiracPreset,
+      applyFreeScalarPreset: s.applyFreeScalarPreset,
+      applyQuantumWalkPreset: s.applyQuantumWalkPreset,
+      setPauliConfig: s.setPauliConfig,
+    }))
+  )
 
   // Determine active mode key
   const isPauli = objectType === 'pauliSpinor'
@@ -183,17 +192,17 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   const activeValue = useMemo(() => {
     switch (mode) {
       case 'harmonicOscillator': {
-        const name = schroedinger?.presetName ?? 'custom'
+        const name = presetName ?? 'custom'
         return name === 'custom' ? '' : name
       }
       case 'hydrogenND': {
-        const preset = schroedinger?.hydrogenNDPreset ?? 'custom'
+        const preset = hydrogenNDPreset ?? 'custom'
         return preset === 'custom' ? '' : preset
       }
       default:
         return selectedPreset
     }
-  }, [mode, schroedinger?.presetName, schroedinger?.hydrogenNDPreset, selectedPreset])
+  }, [mode, presetName, hydrogenNDPreset, selectedPreset])
 
   // Dispatch change to the correct store action
   const handleChange = useCallback(

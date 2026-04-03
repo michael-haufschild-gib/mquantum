@@ -23,15 +23,19 @@ export const PresetSelector: React.FC<PresetSelectorProps> = React.memo(({ class
   }))
   const { cosineCoefficients, setCosineCoefficients } = useAppearanceStore(appearanceSelector)
 
-  // Find current preset by matching coefficients
+  // Find current preset by approximate coefficient matching (tolerant of floating-point rounding)
   const currentPreset = useMemo(() => {
+    const EPS = 0.005
+    const approxEq = (a: number[], b: number[]): boolean =>
+      a.length === b.length && a.every((v, i) => Math.abs(v - (b[i] ?? 0)) < EPS)
+
     for (const preset of COSINE_PRESET_OPTIONS) {
       const c = preset.coefficients
       if (
-        JSON.stringify(c.a) === JSON.stringify(cosineCoefficients.a) &&
-        JSON.stringify(c.b) === JSON.stringify(cosineCoefficients.b) &&
-        JSON.stringify(c.c) === JSON.stringify(cosineCoefficients.c) &&
-        JSON.stringify(c.d) === JSON.stringify(cosineCoefficients.d)
+        approxEq(c.a, cosineCoefficients.a) &&
+        approxEq(c.b, cosineCoefficients.b) &&
+        approxEq(c.c, cosineCoefficients.c) &&
+        approxEq(c.d, cosineCoefficients.d)
       ) {
         return preset.value
       }

@@ -53,7 +53,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
       return (
         <div className="space-y-6">
           {/* Structure Settings */}
-          <div className="space-y-4 border-l-2 border-accent-primary/20 pl-4">
+          <div className="space-y-4 border-s-2 border-accent-primary/20 ps-4">
             <span className="text-xs font-bold text-accent-primary uppercase tracking-wider block mb-2">
               Structure
             </span>
@@ -89,7 +89,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           </div>
 
           {/* Appearance Settings */}
-          <div className="space-y-4 border-l-2 border-text-secondary/20 pl-4">
+          <div className="space-y-4 border-s-2 border-text-secondary/20 ps-4">
             <span className="text-xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
               Appearance
             </span>
@@ -115,7 +115,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           </div>
 
           {/* Delight Features */}
-          <div className="space-y-4 border-l-2 border-text-secondary/20 pl-4">
+          <div className="space-y-4 border-s-2 border-text-secondary/20 ps-4">
             <span className="text-xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
               Features
             </span>

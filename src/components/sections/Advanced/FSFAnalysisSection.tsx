@@ -35,7 +35,7 @@ const MetricRow: React.FC<{
     <span className="text-[10px] text-text-tertiary">{label}</span>
     <span className="text-[10px] font-mono text-text-secondary tabular-nums">
       {isFinite(value) ? value.toFixed(digits) : 'NaN'}
-      {unit && <span className="text-text-tertiary ml-0.5">{unit}</span>}
+      {unit && <span className="text-text-tertiary ms-0.5">{unit}</span>}
     </span>
   </div>
 )

@@ -1,5 +1,6 @@
 import { AnimatePresence, m } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -11,7 +12,14 @@ import { ExportResolution, useExportStore, VideoCodec } from '@/stores/exportSto
 import { useLayoutStore } from '@/stores/layoutStore'
 
 export const ExportGeneralTab = () => {
-  const { settings, updateSettings, setCropEditorOpen, setModalOpen } = useExportStore()
+  const { settings, updateSettings, setCropEditorOpen, setModalOpen } = useExportStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      updateSettings: s.updateSettings,
+      setCropEditorOpen: s.setCropEditorOpen,
+      setModalOpen: s.setModalOpen,
+    }))
+  )
   const setCinematicMode = useLayoutStore((s) => s.setCinematicMode)
   const [supportedCodecs, setSupportedCodecs] = useState<Record<VideoCodec, boolean>>({
     avc: true,

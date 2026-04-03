@@ -83,7 +83,7 @@ export function PerformanceMonitor() {
         onTap={() => {
           if (!expanded && !didDrag) setExpanded(true)
         }}
-        className="absolute top-20 left-4 z-[50] pointer-events-auto select-none"
+        className="absolute top-20 start-4 z-[50] pointer-events-auto select-none"
       >
         {/* Collapsed View - static, no animations */}
         {!expanded && (

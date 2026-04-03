@@ -194,6 +194,7 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
     step = 1,
     precision = 3,
     onBlur,
+    onKeyDown: externalOnKeyDown,
     ref: externalRef,
     ...props
   }: NumberInputProps & { ref?: React.Ref<HTMLInputElement> }) => {
@@ -289,9 +290,9 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
         if (e.key === 'Enter') {
           e.currentTarget.blur()
         }
-        props.onKeyDown?.(e)
+        externalOnKeyDown?.(e)
       },
-      [props]
+      [externalOnKeyDown]
     )
 
     const handleIncrement = useCallback(() => {

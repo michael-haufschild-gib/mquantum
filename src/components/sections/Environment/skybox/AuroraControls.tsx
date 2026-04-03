@@ -16,7 +16,7 @@ export const AuroraControls: React.FC<AuroraControlsProps> = ({
   setProceduralSettings,
 }) => {
   return (
-    <div className="space-y-4 border-l-2 border-success-border pl-4">
+    <div className="space-y-4 border-s-2 border-success-border ps-4">
       <span className="text-xs font-bold text-success uppercase tracking-wider block mb-2">
         Aurora
       </span>

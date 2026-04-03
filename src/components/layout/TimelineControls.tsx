@@ -161,9 +161,9 @@ export const TimelineControls: FC = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="absolute bottom-full left-0 right-0 mb-2 glass-panel rounded-xl z-20"
+            className="absolute bottom-full inset-x-0 mb-2 glass-panel rounded-xl z-20"
           >
-            <div className="absolute top-0 right-3 -translate-y-1/2 z-10">
+            <div className="absolute top-0 end-3 -translate-y-1/2 z-10">
               <Button
                 variant="ghost"
                 size="icon"
@@ -273,13 +273,13 @@ export const TimelineControls: FC = () => {
             {isPlaying ? (
               <Icon name="pause" size={11} />
             ) : (
-              <Icon name="play" size={11} className="ml-0.5" />
+              <Icon name="play" size={11} className="ms-0.5" />
             )}
           </Button>
         </div>
 
         {/* Speed Slider */}
-        <div className="w-28 sm:w-44 pt-2.5 pl-3 border-l border-border-subtle shrink-0">
+        <div className="w-28 sm:w-44 pt-2.5 ps-3 border-s border-border-subtle shrink-0">
           <Slider
             label="SPEED"
             tooltip="Animation speed multiplier. Controls how fast the wavefunction evolves in time."
@@ -294,7 +294,7 @@ export const TimelineControls: FC = () => {
         </div>
 
         {/* Bias Slider */}
-        <div className="w-28 sm:w-44 pt-2.5 pl-3 border-l border-border-subtle shrink-0">
+        <div className="w-28 sm:w-44 pt-2.5 ps-3 border-s border-border-subtle shrink-0">
           <Slider
             label="BIAS"
             tooltip="Controls how animation time is distributed across dimensions"
@@ -326,7 +326,7 @@ export const TimelineControls: FC = () => {
             >
               Effects
               <span
-                className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
               >
                 {activeAnimationCount}
               </span>
@@ -364,7 +364,7 @@ export const TimelineControls: FC = () => {
           >
             Rotate
             <span
-              className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+              className={`ms-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
             >
               {animatingPlanes.size}
             </span>

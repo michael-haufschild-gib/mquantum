@@ -42,7 +42,7 @@ export const EigenfunctionCacheControls: React.FC = () => {
         tooltip="Cache computed eigenfunctions in GPU textures for faster rendering. Trades memory for performance on repeated evaluations."
         data-testid="eigenfunction-cache-toggle"
       />
-      <div className="ml-4 space-y-2">
+      <div className="ms-4 space-y-2">
         <Switch
           checked={analyticalGradientEnabled}
           onCheckedChange={setAnalyticalGradientEnabled}
@@ -60,7 +60,7 @@ export const EigenfunctionCacheControls: React.FC = () => {
           data-testid="fast-eigen-interpolation-toggle"
         />
       </div>
-      <p className="text-xs text-text-tertiary ml-4">
+      <p className="text-xs text-text-tertiary ms-4">
         Fast Eigen Interpolation ON favors FPS; OFF enables the slower robust interpolation path.
       </p>
     </div>

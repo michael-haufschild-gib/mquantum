@@ -55,11 +55,11 @@ export const ProgressiveRefinementControls: React.FC = () => {
       />
 
       {enabled && (
-        <div className="ml-4 mt-2">
+        <div className="ms-4 mt-2">
           {/* Progress bar */}
           <div className="relative h-2 bg-panel-bg rounded-full overflow-hidden">
             <div
-              className="absolute inset-y-0 left-0 bg-accent transition-all duration-200"
+              className="absolute inset-y-0 start-0 bg-accent transition-all duration-200"
               style={{ width: `${progress}%` }}
             />
           </div>

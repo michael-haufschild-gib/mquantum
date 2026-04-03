@@ -9,10 +9,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/hooks/useToast'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { useUIStore } from '@/stores/uiStore'
 
 /** Props for the application settings section. */
 export interface SettingsSectionProps {
@@ -39,12 +37,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
       }))
     )
 
-    const { showAxisHelper, setShowAxisHelper } = useUIStore(
-      useShallow((state) => ({
-        showAxisHelper: state.showAxisHelper,
-        setShowAxisHelper: state.setShowAxisHelper,
-      }))
-    )
     const handleClearLocalStorage = useCallback(() => {
       try {
         localStorage.clear()
@@ -69,14 +61,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
 
     return (
       <Section title="Settings" defaultOpen={defaultOpen} data-testid="section-settings">
-        <div className="mt-3 pt-3 border-t border-panel-border">
-          <Switch
-            checked={showAxisHelper}
-            onCheckedChange={setShowAxisHelper}
-            label="Show Axis Helper"
-            tooltip="Display an XYZ orientation gizmo in the viewport corner."
-          />
-        </div>
         <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">
           <Button
             variant="secondary"

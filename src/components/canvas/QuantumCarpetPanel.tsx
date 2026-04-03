@@ -194,7 +194,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
       style={{ x, y }}
       onDragStart={() => setIsDragging(true)}
       onDragEnd={() => setTimeout(() => setIsDragging(false), 100)}
-      className="absolute top-20 left-4 z-[45] pointer-events-auto select-none"
+      className="absolute top-20 start-4 z-[45] pointer-events-auto select-none"
       data-testid="quantum-carpet-panel"
       data-carpet-frames={totalFrames}
     >

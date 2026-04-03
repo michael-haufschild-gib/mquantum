@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { ExportPresetCard, type ExportPresetCardId } from '@/components/ui/ExportPresetCard'
 import { soundManager } from '@/lib/audio/SoundManager'
@@ -241,7 +242,9 @@ const isPresetActive = (presetId: ExportPresetCardId, settings: ExportSettings):
 }
 
 export const ExportPresets = () => {
-  const { applyPreset, settings } = useExportStore()
+  const { applyPreset, settings } = useExportStore(
+    useShallow((s) => ({ applyPreset: s.applyPreset, settings: s.settings }))
+  )
   const isMobileGPU = usePerformanceStore((s) => s.isMobileGPU)
 
   const presets = useMemo(() => (isMobileGPU ? MOBILE_PRESETS : DESKTOP_PRESETS), [isMobileGPU])

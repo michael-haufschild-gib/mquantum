@@ -116,7 +116,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
         {axes.map((axis, i) => (
           <div key={axis} className="flex-1 relative">
             <span
-              className={`absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono ${colors[i]}`}
+              className={`absolute start-2 top-1/2 -translate-y-1/2 text-xs font-mono ${colors[i]}`}
             >
               {axis}
             </span>
@@ -126,8 +126,8 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
               onFocus={() => handleFocus(i)}
               onChange={(e) => handleChange(i, e.target.value)}
               onBlur={() => handleBlur(i as 0 | 1 | 2)}
-              step={step * displayMultiplier}
-              className="w-full pl-6 pr-2 py-1.5 text-xs font-mono bg-panel-border/50 border border-panel-border rounded text-text-primary focus:outline-none focus:border-accent"
+              step={step}
+              className="w-full ps-6 pe-2 py-1.5 text-xs font-mono bg-panel-border/50 border border-panel-border rounded text-text-primary focus:outline-none focus:border-accent"
               containerClassName=""
               aria-label={`${label} ${axis}`}
             />
