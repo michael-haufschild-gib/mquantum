@@ -29,15 +29,22 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       }))
     )
 
-    const { quantumMode, representation, openQuantumEnabled, freeScalarInitialCondition } =
-      useExtendedObjectStore(
-        useShallow((s) => ({
-          quantumMode: s.schroedinger.quantumMode,
-          representation: s.schroedinger.representation,
-          openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
-          freeScalarInitialCondition: s.schroedinger.freeScalar.initialCondition,
-        }))
-      )
+    const {
+      quantumMode,
+      representation,
+      openQuantumEnabled,
+      freeScalarInitialCondition,
+      branchingEnabled,
+    } = useExtendedObjectStore(
+      useShallow((s) => ({
+        quantumMode: s.schroedinger.quantumMode,
+        representation: s.schroedinger.representation,
+        openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
+        freeScalarInitialCondition: s.schroedinger.freeScalar.initialCondition,
+        branchingEnabled:
+          s.schroedinger.tdse?.stochasticEnabled && s.schroedinger.tdse?.branchingEnabled,
+      }))
+    )
     const effectiveOpenQuantumEnabled =
       openQuantumEnabled &&
       (quantumMode === 'harmonicOscillator' ||
@@ -95,14 +102,21 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       [setColorAlgorithm]
     )
 
+    const isBranchColored = quantumMode === 'tdseDynamics' && branchingEnabled
+
     return (
       <div className={className}>
         <Select
           label="Color Algorithm"
-          tooltip="How the wavefunction values are mapped to colors. Different algorithms reveal different aspects of the quantum state."
+          tooltip={
+            isBranchColored
+              ? 'Disabled — branch colors are set in the Decoherence section.'
+              : 'How the wavefunction values are mapped to colors. Different algorithms reveal different aspects of the quantum state.'
+          }
           options={selectOptions}
           value={colorAlgorithm}
           onChange={handleChange}
+          disabled={isBranchColored}
         />
       </div>
     )

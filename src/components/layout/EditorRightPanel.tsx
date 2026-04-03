@@ -4,12 +4,12 @@ import React, { useState } from 'react'
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { AnalysisSection } from '@/components/sections/Advanced/AnalysisSection'
-import { KKCompactificationSection } from '@/components/sections/Advanced/KKCompactificationSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/OpenQuantumDiagnosticsSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
+import { DecoherenceSection } from '@/components/sections/Geometry/DecoherenceSection/DecoherenceSection'
 import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
 import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
@@ -25,7 +25,7 @@ const ObjectTabContent: React.FC = React.memo(() => {
       <ExposureSection defaultOpen={true} />
       <AbsorptionSection defaultOpen={true} />
       <AnalysisSection defaultOpen={true} />
-      <KKCompactificationSection defaultOpen={true} />
+      <DecoherenceSection />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <AdvancedObjectControls />
       <OpenQuantumDiagnosticsSection />
