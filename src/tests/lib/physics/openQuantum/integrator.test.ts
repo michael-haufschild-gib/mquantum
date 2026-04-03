@@ -679,7 +679,7 @@ describe('eigenvalueFloor', () => {
     hermitianEigendecompose(rho, evals, evecs)
 
     for (let k = 0; k < 3; k++) {
-      expect(evals[k]!).toBeGreaterThanOrEqual(-1e-11)
+      expect(evals[k]!).toBeGreaterThanOrEqual(-1e-12)
     }
 
     // Trace preserved
