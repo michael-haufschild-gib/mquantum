@@ -350,10 +350,18 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           if (snapped[maxIdx]! <= minGrid) break
           snapped[maxIdx] = snapped[maxIdx]! / 2
         }
+        // Re-clamp packet arrays with new grid extents
+        const prevDirac = state.schroedinger.dirac
+        const newSpacing = prevDirac.spacing
+        const packetCenter = prevDirac.packetCenter.map((v, d) => {
+          const halfExtent = (snapped[d] ?? 32) * (newSpacing[d] ?? 0.15) * 0.5
+          const limit = halfExtent * 0.9
+          return Math.max(-limit, Math.min(limit, v))
+        })
         return {
           schroedinger: {
             ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, gridSize: snapped, needsReset: true },
+            dirac: { ...prevDirac, gridSize: snapped, packetCenter, needsReset: true },
           },
         }
       })
@@ -369,10 +377,27 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           const s = i < spacing.length ? spacing[i]! : 0.15
           return Math.max(0.01, Math.min(1.0, s))
         })
+        // Re-clamp packet arrays with new spacing
+        const prevDirac = state.schroedinger.dirac
+        const packetCenter = prevDirac.packetCenter.map((v, d) => {
+          const halfExtent = (prevDirac.gridSize[d] ?? 32) * (clamped[d] ?? 0.15) * 0.5
+          const limit = halfExtent * 0.9
+          return Math.max(-limit, Math.min(limit, v))
+        })
+        const packetMomentum = prevDirac.packetMomentum.map((v, d) => {
+          const kMax = Math.PI / (clamped[d] ?? 0.15)
+          return Math.max(-kMax, Math.min(kMax, v))
+        })
         return {
           schroedinger: {
             ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, spacing: clamped, needsReset: true },
+            dirac: {
+              ...prevDirac,
+              spacing: clamped,
+              packetCenter,
+              packetMomentum,
+              needsReset: true,
+            },
           },
         }
       })

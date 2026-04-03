@@ -177,7 +177,7 @@ export const CropEditor = () => {
       </div>
 
       {/* Dimensions Label */}
-      <div className="absolute bottom-20 start-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
         <Icon name="image" className="w-3 h-3 text-accent" />
         <span>
           {Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%
@@ -188,7 +188,7 @@ export const CropEditor = () => {
       <m.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="absolute bottom-6 start-1/2 -translate-x-1/2 pointer-events-none z-10"
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none z-10"
       >
         <div className="bg-[var(--bg-overlay)] backdrop-blur-md px-4 py-2 rounded-full border border-border-default text-text-tertiary text-xs">
           Drag corners to resize • Drag center to move

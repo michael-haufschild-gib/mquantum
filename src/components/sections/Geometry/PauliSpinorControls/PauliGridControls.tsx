@@ -18,6 +18,7 @@ const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 const PAULI_MAX_TOTAL_SITES = 262144
 
 const ALL_GRID_SIZE_OPTIONS = [
+  { value: '4', label: '4' },
   { value: '8', label: '8' },
   { value: '16', label: '16' },
   { value: '32', label: '32' },

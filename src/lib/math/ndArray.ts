@@ -20,6 +20,7 @@
  */
 export function computeStrides(gridSize: readonly number[]): number[] {
   const dim = gridSize.length
+  if (dim === 0) return []
   const strides = new Array<number>(dim)
   strides[dim - 1] = 1
   for (let d = dim - 2; d >= 0; d--) {
@@ -84,6 +85,11 @@ export function linearToNDCoordsInto(
  * ```
  */
 export function ndToLinearIdx(coords: readonly number[], strides: readonly number[]): number {
+  if (import.meta.env.DEV && coords.length !== strides.length) {
+    throw new Error(
+      `ndToLinearIdx: coords length (${coords.length}) !== strides length (${strides.length})`
+    )
+  }
   let idx = 0
   for (let d = 0; d < coords.length; d++) {
     idx += coords[d]! * strides[d]!

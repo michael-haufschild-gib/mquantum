@@ -166,7 +166,11 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   // Parse config JSON
   const configBytes = new Uint8Array(data, HEADER_SIZE, configLength)
   const configJSON = new TextDecoder().decode(configBytes)
-  const config = JSON.parse(configJSON) as Record<string, unknown>
+  const configRaw: unknown = JSON.parse(configJSON)
+  const config: Record<string, unknown> =
+    typeof configRaw === 'object' && configRaw !== null
+      ? (configRaw as Record<string, unknown>)
+      : {}
 
   // Parse wavefunction data
   const wavStart = HEADER_SIZE + configLength

@@ -27,7 +27,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = React.memo(({ class
   const currentPreset = useMemo(() => {
     const EPS = 0.005
     const approxEq = (a: number[], b: number[]): boolean =>
-      a.length === b.length && a.every((v, i) => Math.abs(v - (b[i] ?? 0)) < EPS)
+      a.length === b.length && a.every((v, i) => Math.abs(v - (b[i] ?? 0)) <= EPS)
 
     for (const preset of COSINE_PRESET_OPTIONS) {
       const c = preset.coefficients
