@@ -4,25 +4,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ColorPreview } from '@/components/sections/Faces/ColorPreview'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 
-function hexToRgb(hex: string): [number, number, number] {
-  const parsed = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!parsed) return [0, 0, 0]
-  return [parseInt(parsed[1]!, 16), parseInt(parsed[2]!, 16), parseInt(parsed[3]!, 16)]
-}
-
 describe('ColorPreview', () => {
   beforeEach(() => {
     useAppearanceStore.getState().reset()
   })
 
   it('renders spectral hues for radialDistance instead of red-only cosine fallback', async () => {
-    const sampledHex: string[] = []
+    const width = 96
+    const height = 8
+    const imageData = {
+      data: new Uint8ClampedArray(width * height * 4),
+      width,
+      height,
+    }
+    let putCalled = false
+
     const mockContext: Partial<CanvasRenderingContext2D> = {
-      clearRect: vi.fn(),
-      fillStyle: '#000000',
-      fillRect: vi.fn(() => {
-        const fillStyle = mockContext.fillStyle
-        sampledHex.push(typeof fillStyle === 'string' ? fillStyle : '')
+      createImageData: vi.fn(
+        () => imageData
+      ) as unknown as CanvasRenderingContext2D['createImageData'],
+      putImageData: vi.fn(() => {
+        putCalled = true
       }),
     }
 
@@ -34,16 +36,22 @@ describe('ColorPreview', () => {
 
     try {
       useAppearanceStore.getState().setColorAlgorithm('radialDistance')
-      render(<ColorPreview width={96} height={8} />)
+      render(<ColorPreview width={width} height={height} />)
 
       await waitFor(() => {
-        expect(sampledHex.length).toBe(96)
+        expect(putCalled).toBe(true)
       })
     } finally {
       getContextSpy.mockRestore()
     }
 
-    const sampledRgb = sampledHex.map(hexToRgb)
+    // Extract column colors from row 0 of the ImageData buffer
+    const sampledRgb: Array<[number, number, number]> = []
+    for (let x = 0; x < width; x++) {
+      const i = x * 4
+      sampledRgb.push([imageData.data[i]!, imageData.data[i + 1]!, imageData.data[i + 2]!])
+    }
+
     const hasGreenDominant = sampledRgb.some(([r, g, b]) => g > r && g > b)
     const hasBlueDominant = sampledRgb.some(([r, g, b]) => b > r && b > g)
 

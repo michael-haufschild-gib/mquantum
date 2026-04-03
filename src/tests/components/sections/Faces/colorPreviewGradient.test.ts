@@ -8,8 +8,8 @@
  * - Colormap: viridis, densityContours, inferno, particleAntiparticle, pauliSpinDensity, pauliSpinExpectation, pauliCoherence
  * - Fallback: cosine palette
  *
- * Each test verifies the algorithm produces valid RGB output (finite, in [0,1] range)
- * and calls fillRect on the canvas context for every pixel column.
+ * Each test verifies the algorithm produces valid RGB output (finite, in [0,255] range)
+ * across the rendered ImageData buffer.
  */
 import { describe, expect, it, vi } from 'vitest'
 
@@ -18,26 +18,31 @@ import {
   renderColorGradient,
 } from '@/components/sections/Faces/colorPreviewGradient'
 
-/** Create a mock canvas 2D context that records calls. */
-function createMockCtx() {
-  const fillRectCalls: Array<{ x: number; y: number; w: number; h: number }> = []
-  const fillStyles: string[] = []
+/** Create a mock canvas 2D context that captures ImageData writes. */
+function createMockCtx(width: number, height: number) {
+  const imageData = {
+    data: new Uint8ClampedArray(width * height * 4),
+    width,
+    height,
+  }
+  const putImageDataCalls: Array<{ imageData: typeof imageData; dx: number; dy: number }> = []
+
   return {
     ctx: {
-      clearRect: vi.fn(),
-      fillRect: vi.fn((x: number, y: number, w: number, h: number) => {
-        fillRectCalls.push({ x, y, w, h })
+      createImageData: vi.fn((_w: number, _h: number) => imageData),
+      putImageData: vi.fn((data: typeof imageData, dx: number, dy: number) => {
+        putImageDataCalls.push({ imageData: data, dx, dy })
       }),
-      set fillStyle(v: string) {
-        fillStyles.push(v)
-      },
-      get fillStyle() {
-        return fillStyles[fillStyles.length - 1] ?? ''
-      },
     } as unknown as CanvasRenderingContext2D,
-    fillRectCalls,
-    fillStyles,
+    imageData,
+    putImageDataCalls,
   }
+}
+
+/** Extract RGB values for a given column x from row 0 of the ImageData buffer. */
+function getColumnColor(data: Uint8ClampedArray, x: number): [number, number, number] {
+  const i = x * 4
+  return [data[i]!, data[i + 1]!, data[i + 2]!]
 }
 
 /** Default gradient params — overridden per-test. */
@@ -79,11 +84,31 @@ function defaultParams(overrides: Partial<GradientParams> = {}): GradientParams 
   }
 }
 
-/** Assert that all fill styles are valid hex colors (#RRGGBB). */
-function assertValidHexColors(fillStyles: string[]) {
-  for (const style of fillStyles) {
-    expect(style).toMatch(/^#[0-9a-f]{6}$/i)
+/** Assert that all pixel columns contain valid RGB (0-255) with full opacity. */
+function assertValidPixelColors(data: Uint8ClampedArray, width: number, height: number) {
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      const i = (y * width + x) * 4
+      const r = data[i]!
+      const g = data[i + 1]!
+      const b = data[i + 2]!
+      const a = data[i + 3]!
+      expect(Number.isFinite(r), `pixel (${x},${y}) R is finite`).toBe(true)
+      expect(Number.isFinite(g), `pixel (${x},${y}) G is finite`).toBe(true)
+      expect(Number.isFinite(b), `pixel (${x},${y}) B is finite`).toBe(true)
+      expect(a, `pixel (${x},${y}) alpha should be 255`).toBe(255)
+    }
   }
+}
+
+/** Assert that the gradient has color variation (not a solid block). */
+function assertGradientVariation(data: Uint8ClampedArray, width: number) {
+  const colors = new Set<string>()
+  for (let x = 0; x < width; x++) {
+    const [r, g, b] = getColumnColor(data, x)
+    colors.add(`${r},${g},${b}`)
+  }
+  expect(colors.size).toBeGreaterThan(1)
 }
 
 const WIDTH = 50
@@ -92,55 +117,52 @@ const HEIGHT = 10
 describe('renderColorGradient', () => {
   // --- Phase algorithms ---
   it('lch: produces valid gradient', () => {
-    const { ctx, fillStyles, fillRectCalls } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'lch' }))
-    expect(fillRectCalls).toHaveLength(WIDTH)
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
+    assertGradientVariation(imageData.data, WIDTH)
   })
 
   it('phase: produces valid gradient', () => {
-    const { ctx, fillStyles, fillRectCalls } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'phase' }))
-    expect(fillRectCalls).toHaveLength(WIDTH)
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('mixed: produces valid gradient', () => {
-    const { ctx, fillStyles, fillRectCalls } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'mixed' }))
-    expect(fillRectCalls).toHaveLength(WIDTH)
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('phaseCyclicUniform: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'phaseCyclicUniform' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('phaseDensity: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'phaseDensity' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   // --- Diverging algorithms ---
   it('phaseDiverging: uses neutral and wing colors', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'phaseDiverging' }))
-    assertValidHexColors(fillStyles)
-    // Should have variation (not all the same color)
-    expect(new Set(fillStyles).size).toBeGreaterThan(1)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
+    assertGradientVariation(imageData.data, WIDTH)
   })
 
   it('diverging: uses real component by default', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'diverging' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('diverging: imaginary component changes the gradient', () => {
-    const { ctx: ctx1, fillStyles: styles1 } = createMockCtx()
+    const { ctx: ctx1, imageData: img1 } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx1,
       WIDTH,
@@ -157,7 +179,7 @@ describe('renderColorGradient', () => {
       })
     )
 
-    const { ctx: ctx2, fillStyles: styles2 } = createMockCtx()
+    const { ctx: ctx2, imageData: img2 } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx2,
       WIDTH,
@@ -175,17 +197,19 @@ describe('renderColorGradient', () => {
     )
 
     // Real and imaginary should produce different gradients (cos vs sin carrier)
-    expect(styles1).not.toEqual(styles2)
+    const colors1 = Array.from({ length: WIDTH }, (_, x) => getColumnColor(img1.data, x))
+    const colors2 = Array.from({ length: WIDTH }, (_, x) => getColumnColor(img2.data, x))
+    expect(colors1).not.toEqual(colors2)
   })
 
   it('domainColoringPsi: produces gradient without contours', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'domainColoringPsi' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('domainColoringPsi: contours darken the gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx,
       WIDTH,
@@ -201,139 +225,150 @@ describe('renderColorGradient', () => {
         },
       })
     )
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('relativePhase: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'relativePhase' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   // --- Spectral algorithms ---
   it('blackbody: low t is dark, high t is bright', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'blackbody' }))
-    assertValidHexColors(fillStyles)
-    // First pixel (cold) should be darker than last (hot)
-    const firstR = parseInt(fillStyles[0]!.slice(1, 3), 16)
-    const lastR = parseInt(fillStyles[fillStyles.length - 1]!.slice(1, 3), 16)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
+    const firstR = getColumnColor(imageData.data, 0)[0]
+    const lastR = getColumnColor(imageData.data, WIDTH - 1)[0]
     expect(lastR).toBeGreaterThan(firstR)
   })
 
   it('radialDistance: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'radialDistance' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('hamiltonianDecomposition: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx,
       WIDTH,
       HEIGHT,
       defaultParams({ colorAlgorithm: 'hamiltonianDecomposition' })
     )
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('modeCharacter: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'modeCharacter' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('energyFlux: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'energyFlux' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('kSpaceOccupation: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'kSpaceOccupation' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   // --- Colormap algorithms ---
   it('viridis: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'viridis' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('densityContours: produces valid gradient with contour lines', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'densityContours' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('inferno: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'inferno' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('particleAntiparticle: interpolates between two color endpoints', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx,
       WIDTH,
       HEIGHT,
       defaultParams({ colorAlgorithm: 'particleAntiparticle' })
     )
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('pauliSpinDensity: blends spin up/down colors', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'pauliSpinDensity' }))
-    assertValidHexColors(fillStyles)
-    expect(new Set(fillStyles).size).toBeGreaterThan(1)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
+    assertGradientVariation(imageData.data, WIDTH)
   })
 
   it('pauliSpinExpectation: diverging blue/red around neutral', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(
       ctx,
       WIDTH,
       HEIGHT,
       defaultParams({ colorAlgorithm: 'pauliSpinExpectation' })
     )
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   it('pauliCoherence: produces valid gradient', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'pauliCoherence' }))
-    assertValidHexColors(fillStyles)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
   })
 
   // --- Fallback ---
   it('unknown algorithm falls back to cosine palette', () => {
-    const { ctx, fillStyles } = createMockCtx()
+    const { ctx, imageData } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams({ colorAlgorithm: 'cosine' }))
-    assertValidHexColors(fillStyles)
-    expect(fillStyles).toHaveLength(WIDTH)
+    assertValidPixelColors(imageData.data, WIDTH, HEIGHT)
+    assertGradientVariation(imageData.data, WIDTH)
   })
 
   // --- Common behaviors ---
-  it('calls clearRect at the start', () => {
-    const { ctx } = createMockCtx()
+  it('calls putImageData exactly once', () => {
+    const { ctx, putImageDataCalls } = createMockCtx(WIDTH, HEIGHT)
     renderColorGradient(ctx, WIDTH, HEIGHT, defaultParams())
-    expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, WIDTH, HEIGHT)
+    expect(putImageDataCalls).toHaveLength(1)
+    expect(putImageDataCalls[0]!.dx).toBe(0)
+    expect(putImageDataCalls[0]!.dy).toBe(0)
   })
 
-  it('renders one fill column per pixel', () => {
-    const { ctx, fillRectCalls } = createMockCtx()
+  it('fills all columns with consistent rows', () => {
+    const { ctx, imageData } = createMockCtx(100, 20)
     renderColorGradient(ctx, 100, 20, defaultParams())
-    expect(fillRectCalls).toHaveLength(100)
-    // Each column should be 1px wide and full height
-    for (let i = 0; i < 100; i++) {
-      expect(fillRectCalls[i]!.x).toBe(i)
-      expect(fillRectCalls[i]!.w).toBe(1)
-      expect(fillRectCalls[i]!.h).toBe(20)
+    // Each column should have the same color in all rows
+    for (let x = 0; x < 100; x++) {
+      const [r0, g0, b0] = getColumnColor(imageData.data, x)
+      for (let y = 1; y < 20; y++) {
+        const i = (y * 100 + x) * 4
+        expect(imageData.data[i]).toBe(r0)
+        expect(imageData.data[i + 1]).toBe(g0)
+        expect(imageData.data[i + 2]).toBe(b0)
+        expect(imageData.data[i + 3]).toBe(255)
+      }
     }
+  })
+
+  it('handles zero-size canvas gracefully', () => {
+    const { ctx, putImageDataCalls } = createMockCtx(0, 0)
+    renderColorGradient(ctx, 0, 0, defaultParams())
+    expect(putImageDataCalls).toHaveLength(0)
   })
 })
