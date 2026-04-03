@@ -7,12 +7,7 @@
  */
 
 import { logger } from '@/lib/logger'
-import {
-  float64ToVector,
-  isAnimationWasmReady,
-  multiplyMatricesWasm,
-  multiplyMatrixVectorWasm,
-} from '@/lib/wasm'
+import { isAnimationWasmReady, multiplyMatricesWasm, multiplyMatrixVectorWasm } from '@/lib/wasm'
 
 import type { MatrixND, VectorND } from './types'
 import { EPSILON } from './types'
@@ -128,7 +123,7 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
     bF64.set(b)
     const wasmResult = multiplyMatricesWasm(aF64, bF64, dim)
     if (wasmResult) {
-      result.set(new Float32Array(wasmResult))
+      result.set(wasmResult)
       return result
     }
     // WASM failed, fall through to JS implementation
@@ -293,9 +288,8 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
     for (let i = 0; i < v.length; i++) vectorF64[i] = v[i]!
     const wasmResult = multiplyMatrixVectorWasm(matrixF64, vectorF64, dim)
     if (wasmResult) {
-      const jsResult = float64ToVector(wasmResult)
       for (let i = 0; i < dim; i++) {
-        result[i] = jsResult[i]!
+        result[i] = wasmResult[i]!
       }
       return result
     }
