@@ -127,11 +127,13 @@ export function createQuantumModeSetters(
 
     setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {
       if (value !== 'position' && isComputeQuantumType(get().schroedinger.quantumMode)) return
-      // Block non-position for hydrogen at dim=2 (not yet implemented)
       if (value !== 'position') {
         const qm = get().schroedinger.quantumMode
         const dim = useGeometryStore.getState().dimension
+        // Block non-position for hydrogen at dim=2 (not yet implemented)
         if (dim === 2 && (qm === 'hydrogenND' || qm === 'hydrogenNDCoupled')) return
+        // Block momentum for coupled hydrogen ND (shader is position-only)
+        if (value === 'momentum' && qm === 'hydrogenNDCoupled') return
       }
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, representation: value },

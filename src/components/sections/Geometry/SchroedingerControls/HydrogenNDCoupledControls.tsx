@@ -122,18 +122,18 @@ export const HydrogenNDCoupledControls: React.FC<HydrogenNDCoupledControlsProps>
               harmonics.
             </p>
             {Array.from({ length: chainLength }, (_, i) => {
-              const maxL = chainBounds[i] ?? 0
+              const chainMaxL = chainBounds[i] ?? 0
               const subscript = String.fromCodePoint(0x2080 + i + 2) // ₂, ₃, ₄, ...
               return (
                 <Slider
                   key={i}
-                  label={`l${subscript} (0\u2013${maxL})`}
-                  value={Math.min(config.angularChain[i] ?? 0, Math.max(maxL, 0))}
+                  label={`l${subscript} (0\u2013${chainMaxL})`}
+                  value={Math.min(config.angularChain[i] ?? 0, Math.max(chainMaxL, 0))}
                   onChange={handleChainChange(i)}
                   min={0}
-                  max={Math.max(maxL, 0)}
+                  max={Math.max(chainMaxL, 0)}
                   step={1}
-                  disabled={maxL <= 0}
+                  disabled={chainMaxL <= 0}
                 />
               )
             })}

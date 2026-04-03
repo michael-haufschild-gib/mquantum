@@ -10,7 +10,7 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { DEFAULT_PAULI_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
@@ -640,8 +640,8 @@ function packWignerAndPauliFields(
   intView[I.wignerQuadPoints] = schroedinger?.wignerQuadPoints ?? 32
 
   // Pauli spinor colors
-  const spinUp = pauliSpinor?.spinUpColor ?? [0.0, 0.898, 1.0]
-  const spinDown = pauliSpinor?.spinDownColor ?? [1.0, 0.0, 0.898]
+  const spinUp = pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor
+  const spinDown = pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor
   floatView[I.pauliSpinUpColor] = spinUp[0]!
   floatView[I.pauliSpinUpColor + 1] = spinUp[1]!
   floatView[I.pauliSpinUpColor + 2] = spinUp[2]!

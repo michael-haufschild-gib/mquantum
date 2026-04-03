@@ -11,22 +11,13 @@ import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { ColorPicker } from '@/components/ui/ColorPicker'
-import { rgbToHex } from '@/lib/colors/colorUtils'
+import { hexToSrgbTuple, rgbToHex } from '@/lib/colors/colorUtils'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /** Convert 0-1 RGB tuple to hex string for ColorPicker. */
 function tupleToHex(c: [number, number, number]): string {
   return rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
-}
-
-/** Parse hex string to 0-1 RGB tuple. */
-function hexToTuple(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
-  const r = parseInt(h.substring(0, 2), 16) / 255
-  const g = parseInt(h.substring(2, 4), 16) / 255
-  const b = parseInt(h.substring(4, 6), 16) / 255
-  return [r, g, b]
 }
 
 /**
@@ -50,12 +41,12 @@ export const PauliSpinColorPickers: React.FC = React.memo(() => {
     )
 
   const handleSpinUpColor = useCallback(
-    (hex: string) => setPauliSpinUpColor(hexToTuple(hex)),
+    (hex: string) => setPauliSpinUpColor(hexToSrgbTuple(hex)),
     [setPauliSpinUpColor]
   )
 
   const handleSpinDownColor = useCallback(
-    (hex: string) => setPauliSpinDownColor(hexToTuple(hex)),
+    (hex: string) => setPauliSpinDownColor(hexToSrgbTuple(hex)),
     [setPauliSpinDownColor]
   )
 

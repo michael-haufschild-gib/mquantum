@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { logger } from '@/lib/logger'
 
 import { DEFAULT_SPEED, useAnimationStore } from './animationStore'
@@ -525,11 +526,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // into the renderer (e.g. representation='momentum' or crossSectionEnabled=true
         // would corrupt the GPU uniform buffer for density-grid-based pipelines).
         const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
-        const isComputeQm =
-          qm === 'freeScalarField' ||
-          qm === 'tdseDynamics' ||
-          qm === 'becDynamics' ||
-          qm === 'diracEquation'
+        const isComputeQm = qm ? isComputeQuantumType(qm) : false
         if (isComputeQm) {
           if (useGeometryStore.getState().dimension < 3) {
             useGeometryStore.getState().setDimension(3)

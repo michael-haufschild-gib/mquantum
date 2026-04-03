@@ -64,8 +64,18 @@ export const TimelineControls: FC = () => {
     }))
   )
 
-  // Extended object configs for animation state checking
-  const schroedingerConfig = useExtendedObjectStore((state) => state.schroedinger)
+  // Extended object configs — narrow subscription to only the fields this component reads
+  const schroedingerConfig = useExtendedObjectStore(
+    useShallow((state) => ({
+      quantumMode: state.schroedinger.quantumMode,
+      representation: state.schroedinger.representation,
+      sliceAnimationEnabled: state.schroedinger.sliceAnimationEnabled,
+      interferenceEnabled: state.schroedinger.interferenceEnabled,
+      probabilityFlowEnabled: state.schroedinger.probabilityFlowEnabled,
+      probabilityCurrentEnabled: state.schroedinger.probabilityCurrentEnabled,
+      phaseAnimationEnabled: state.schroedinger.phaseAnimationEnabled,
+    }))
+  )
 
   // Reset actions for unified restart button
   const resetActions = useExtendedObjectStore(
