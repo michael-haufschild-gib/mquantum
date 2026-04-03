@@ -51,7 +51,7 @@ interface MsgBoxState {
   closeMsgBox: () => void
 }
 
-export const useMsgBoxStore = create<MsgBoxState>((set) => ({
+export const useMsgBoxStore = create<MsgBoxState>((set, get) => ({
   isOpen: false,
   title: '',
   message: '',
@@ -67,8 +67,7 @@ export const useMsgBoxStore = create<MsgBoxState>((set) => ({
       title,
       message,
       type,
-      actions:
-        actions.length > 0 ? actions : [{ label: 'OK', onClick: () => set({ isOpen: false }) }],
+      actions: actions.length > 0 ? actions : [{ label: 'OK', onClick: () => get().closeMsgBox() }],
       dismissible,
       dismissId: dismissId ?? null,
     })

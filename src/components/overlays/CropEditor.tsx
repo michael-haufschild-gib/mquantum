@@ -162,7 +162,7 @@ export const CropEditor = () => {
             Cancel
           </Button>
           <Button variant="primary" onClick={handleConfirm} glow className="px-6">
-            <Icon name="check" className="mr-2" />
+            <Icon name="check" className="me-2" />
             Confirm Area
           </Button>
         </div>

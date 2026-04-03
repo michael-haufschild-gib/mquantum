@@ -5,7 +5,7 @@
  * mass/hbar/c clamping, and potential parameter setters.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -254,12 +254,24 @@ describe('Dirac setters', () => {
     expect(getDirac().slicePositions[1]).toBe(0.7)
   })
 
-  it('applies a preset and triggers needsReset', () => {
+  it('applies a preset and triggers needsReset', async () => {
+    // First clear needsReset so we can confirm the preset sets it
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        dirac: { ...getDirac(), needsReset: false, stepsPerFrame: 2 },
+      },
+    })
+    expect(getDirac().needsReset).toBe(false)
+
     const s = useExtendedObjectStore.getState()
-    s.applyDiracPreset('freeParticle')
-    expect(getDirac().needsReset).toBe(true)
-    // Preset should have set a valid mass
-    expect(getDirac().mass).toBeGreaterThan(0)
+    s.applyDiracPreset('kleinParadox')
+    // Preset application uses dynamic import — poll until both postconditions resolve
+    await vi.waitFor(() => {
+      expect(getDirac().needsReset).toBe(true)
+      // kleinParadox preset sets stepsPerFrame: 4 (default is 2)
+      expect(getDirac().stepsPerFrame).toBe(4)
+    })
   })
 
   it('rejects NaN for clamped numeric setters', () => {

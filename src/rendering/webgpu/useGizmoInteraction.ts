@@ -23,7 +23,6 @@ import {
   testGizmoHit,
   testGroundTargetHit,
 } from './utils/gizmoHitTesting'
-import { invertMat4, multiplyMat4, transformPoint } from './utils/sceneMath'
 
 /** Dependencies injected from the scene component. */
 export interface GizmoInteractionDeps {
@@ -170,32 +169,9 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
         if (!lighting.showLightGizmos || !lighting.lights.length) return
 
         const rect = overlayRef.current.getBoundingClientRect()
-        const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1
-        const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
-
         const matrices = cameraRef.current.getMatrices()
-        const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
-        if (!invVP) return
-
-        // Unproject near and far points to world space (WebGPU clip z = [0, 1])
-        const nearWorld = transformPoint(invVP, [ndcX, ndcY, 0])
-        const farWorld = transformPoint(invVP, [ndcX, ndcY, 1])
-
-        const rayDir: [number, number, number] = [
-          farWorld[0] - nearWorld[0],
-          farWorld[1] - nearWorld[1],
-          farWorld[2] - nearWorld[2],
-        ]
-        const rayLen = Math.sqrt(rayDir[0] ** 2 + rayDir[1] ** 2 + rayDir[2] ** 2)
-        if (rayLen < 0.0001) return
-        rayDir[0] /= rayLen
-        rayDir[1] /= rayLen
-        rayDir[2] /= rayLen
-
-        const cp = matrices.cameraPosition
-        const camPosX = cp.x,
-          camPosY = cp.y,
-          camPosZ = cp.z
+        const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
+        if (!ray) return
 
         // Test ray-sphere intersection against each light
         let closestDist = Infinity
@@ -204,10 +180,10 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
 
         for (const light of lighting.lights) {
           const lp = light.position
-          const ocX = lp[0] - camPosX
-          const ocY = lp[1] - camPosY
-          const ocZ = lp[2] - camPosZ
-          const tca = ocX * rayDir[0] + ocY * rayDir[1] + ocZ * rayDir[2]
+          const ocX = lp[0] - ray.origin[0]
+          const ocY = lp[1] - ray.origin[1]
+          const ocZ = lp[2] - ray.origin[2]
+          const tca = ocX * ray.dir[0] + ocY * ray.dir[1] + ocZ * ray.dir[2]
           if (tca < 0) continue
           const ocLenSq = ocX ** 2 + ocY ** 2 + ocZ ** 2
           const d2 = ocLenSq - tca * tca

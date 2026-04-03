@@ -156,7 +156,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
       {/* Skip Navigation */}
       <a
         href="#inspector-panel"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-1/2 focus:-translate-x-1/2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg pointer-events-auto"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:start-1/2 focus:-translate-x-1/2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg pointer-events-auto"
       >
         Skip to Inspector
       </a>
@@ -186,7 +186,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
         {/* Floating Exit Cinematic Button */}
         <AnimatePresence>
           {isCinematicMode && (
-            <div className="absolute top-6 right-6 z-50 pointer-events-auto">
+            <div className="absolute top-6 end-6 z-50 pointer-events-auto">
               <m.button
                 initial={{ scale: 0, opacity: 0, rotate: -90 }}
                 animate={{ scale: 1, opacity: 1, rotate: 0 }}
@@ -244,7 +244,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 className={`
                             glass-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col
-                            ${!isDesktop ? 'absolute left-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
+                            ${!isDesktop ? 'absolute start-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
                 <ErrorBoundary
@@ -303,7 +303,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                 className={`
                             glass-panel rounded-xl
                             h-full overflow-hidden w-80 pointer-events-auto flex flex-col
-                            ${!isDesktop ? 'absolute right-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
+                            ${!isDesktop ? 'absolute end-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
                 <ErrorBoundary
@@ -333,7 +333,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
             animate="visible"
             exit="hidden"
             variants={mobileBottomVariants}
-            className="fixed bottom-0 left-0 right-0 z-30 pointer-events-auto pb-[env(safe-area-inset-bottom)]"
+            className="fixed bottom-0 inset-x-0 z-30 pointer-events-auto pb-[env(safe-area-inset-bottom)]"
             data-testid="mobile-timeline-controls"
           >
             <EditorBottomPanel />

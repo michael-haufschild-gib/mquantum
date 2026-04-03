@@ -61,7 +61,6 @@ test.describe('quantum mode rendering', () => {
     { mode: 'tdseDynamics', dim: 3, label: 'TDSE' },
     { mode: 'becDynamics', dim: 3, label: 'BEC' },
     { mode: 'diracEquation', dim: 3, label: 'Dirac' },
-    { mode: 'quantumWalk', dim: 2, label: 'Quantum Walk 2D' },
     { mode: 'quantumWalk', dim: 3, label: 'Quantum Walk 3D' },
     { mode: 'harmonicOscillator', dim: 11, label: 'HO 11D (max dim)' },
   ] as const

@@ -8,6 +8,7 @@
  * @module rendering/webgpu/passes/ObservablesComputeSetup
  */
 
+import { MAX_DIMENSION } from '@/constants/dimension'
 import { logger } from '@/lib/logger'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
 import type { ObservablesSnapshot } from '@/stores/observablesDiagnosticsStore'
@@ -164,11 +165,11 @@ export function processObservablesReadback(
 
   if (posNorm <= 0 || momNorm <= 0) return null
 
-  const positionMean = new Float64Array(11)
-  const positionVariance = new Float64Array(11)
-  const momentumMean = new Float64Array(11)
-  const momentumVariance = new Float64Array(11)
-  const uncertaintyProduct = new Float64Array(11)
+  const positionMean = new Float64Array(MAX_DIMENSION)
+  const positionVariance = new Float64Array(MAX_DIMENSION)
+  const momentumMean = new Float64Array(MAX_DIMENSION)
+  const momentumVariance = new Float64Array(MAX_DIMENSION)
+  const uncertaintyProduct = new Float64Array(MAX_DIMENSION)
 
   let kineticEnergy = 0
 

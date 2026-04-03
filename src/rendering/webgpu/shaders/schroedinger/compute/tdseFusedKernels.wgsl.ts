@@ -56,8 +56,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     newIm = im * decay;
   } else {
     let phase = -arg;
-    let cosP = cos(phase);
-    let sinP = sin(phase);
+    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
+    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let cosP = cos(reduced);
+    let sinP = sin(reduced);
     newRe = re * cosP - im * sinP;
     newIm = re * sinP + im * cosP;
   }
@@ -113,8 +115,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     psiIm[idx] = im * decay;
   } else {
     let phase = -arg;
-    let cosP = cos(phase);
-    let sinP = sin(phase);
+    // Reduce to [-π, π] so f32 cos/sin stay precise for high-V / small-ℏ combos
+    let reduced = phase - round(phase * 0.15915494) * 6.28318530;
+    let cosP = cos(reduced);
+    let sinP = sin(reduced);
     psiRe[idx] = re * cosP - im * sinP;
     psiIm[idx] = re * sinP + im * cosP;
   }

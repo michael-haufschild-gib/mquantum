@@ -189,12 +189,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         const pauliConfig = extState.pauliSpinor
         const gridSize = pauliConfig?.gridSize?.slice(0, pauliConfig?.latticeDim ?? 3) ?? [64]
 
-        // Store Pauli config under a 'pauli' key for the generic save format
-        // quantumMode is stored as tdseDynamics since Pauli uses the same pipeline
         const blob = await serializeSimulationState(
-          { quantumMode: 'tdseDynamics', pauli: pauliConfig } as Record<string, unknown>,
+          { pauli: pauliConfig } as Record<string, unknown>,
           { re, im, totalSites, componentCount: 2 },
-          'tdseDynamics',
+          'pauliSpinor',
           gridSize
         )
         downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')

@@ -239,10 +239,9 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
         {/* Live Preview */}
         <ColorPreview />
 
-        {/* Pauli spin-up / spin-down color pickers */}
-        {(colorAlgorithm === 'pauliSpinDensity' || colorAlgorithm === 'pauliSpinExpectation') && (
-          <PauliSpinColorPickers />
-        )}
+        {/* Pauli spin-up / spin-down color pickers (only for pauliSpinDensity;
+            pauliSpinExpectation uses hardcoded diverging blue/red in the shader) */}
+        {colorAlgorithm === 'pauliSpinDensity' && <PauliSpinColorPickers />}
 
         {/* Base color picker (HSL-based algorithms) */}
         {USES_BASE_COLOR.has(colorAlgorithm) && (

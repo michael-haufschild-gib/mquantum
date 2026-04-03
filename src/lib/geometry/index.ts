@@ -21,7 +21,6 @@ export {
   getQuantumTypeEntry,
   getQuantumTypeName,
   isComputeQuantumType,
-  isValidQuantumTypeKey,
   QUANTUM_TYPE_REGISTRY,
   resolveQuantumTypeKey,
 } from './registry'

@@ -72,10 +72,10 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
 
   // Position classes
   const positionClasses = {
-    'top-left': 'top-4 left-4',
-    'top-right': 'top-4 right-4',
-    'bottom-left': 'bottom-20 left-4',
-    'bottom-right': 'bottom-20 right-4',
+    'top-left': 'top-4 start-4',
+    'top-right': 'top-4 end-4',
+    'bottom-left': 'bottom-20 start-4',
+    'bottom-right': 'bottom-20 end-4',
   }
 
   return createPortal(
@@ -87,7 +87,7 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
         {/* Progress bar */}
         <div className="relative h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden mb-1.5">
           <div
-            className="absolute inset-y-0 left-0 bg-accent transition-all duration-100"
+            className="absolute inset-y-0 start-0 bg-accent transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
         </div>

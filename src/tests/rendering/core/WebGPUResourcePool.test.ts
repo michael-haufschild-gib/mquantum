@@ -174,6 +174,40 @@ describe('WebGPUResourcePool', () => {
     expect(pool.getResource('b')).toBe(null)
   })
 
+  it('resizes ping-pong buffers when viewport changes', () => {
+    pool.addResource({ id: 'pp', ...screenConfig })
+    pool.enablePingPong('pp')
+
+    // Verify initial dimensions via read/write views
+    const readViewBefore = pool.getReadTextureView('pp')
+    expect(readViewBefore).not.toBe(null)
+
+    // Resize viewport — should reallocate both ping-pong buffers
+    pool.setSize(1920, 1080)
+
+    // After resize, views should be fresh (different objects)
+    const readViewAfter = pool.getReadTextureView('pp')
+    expect(readViewAfter).not.toBe(readViewBefore)
+
+    // Verify dimensions are correct via getAllResourceDimensions
+    const dims = pool.getAllResourceDimensions()
+    expect(dims.get('pp')).toEqual({ width: 1920, height: 1080 })
+  })
+
+  it('removeResource cleans up ping-pong buffers', () => {
+    pool.addResource({ id: 'pp', ...screenConfig })
+    pool.enablePingPong('pp')
+
+    const readView = pool.getReadTextureView('pp')
+    expect(readView).not.toBe(null)
+
+    pool.removeResource('pp')
+
+    expect(pool.getReadTextureView('pp')).toBe(null)
+    expect(pool.getWriteTextureView('pp')).toBe(null)
+    expect(pool.getResource('pp')).toBe(null)
+  })
+
   it('setSize is a no-op when dimensions are unchanged', () => {
     pool.addResource({ id: 'test', ...screenConfig })
     pool.getResource('test')

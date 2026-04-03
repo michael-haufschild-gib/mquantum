@@ -7,7 +7,8 @@
 
 import { create } from 'zustand'
 
-import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import { createDefaultSchroedingerConfig } from '@/lib/geometry/extended/schroedinger'
+import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 import { createPauliSpinorSlice } from './slices/geometry/pauliSpinorSlice'
 import { createSchroedingerSlice } from './slices/geometry/schroedingerSlice'
@@ -42,7 +43,7 @@ export const useExtendedObjectStore = create<ExtendedObjectSlice>()((...a) => {
     // --- Reset Action ---
     reset: () => {
       set({
-        schroedinger: { ...DEFAULT_SCHROEDINGER_CONFIG },
+        schroedinger: createDefaultSchroedingerConfig(),
         schroedingerVersion: 0,
         pauliSpinor: { ...DEFAULT_PAULI_CONFIG },
         pauliSpinorVersion: 0,

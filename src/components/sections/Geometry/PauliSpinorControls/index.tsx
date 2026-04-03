@@ -14,18 +14,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import type { PauliFieldView } from '@/lib/geometry/extended/types'
-import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
+import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/types'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-/** Map Pauli field view → matching color algorithm for synchronized rendering. */
-const FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorithm> = {
-  spinDensity: 'pauliSpinDensity',
-  totalDensity: 'blackbody',
-  spinExpectation: 'pauliSpinExpectation',
-  coherence: 'pauliCoherence',
-}
 import { MagneticFieldControls } from './MagneticFieldControls'
 import { PauliGridControls } from './PauliGridControls'
 import { PauliPotentialControls } from './PauliPotentialControls'
@@ -84,7 +77,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
   const handleFieldViewChange = useCallback(
     (view: PauliFieldView) => {
       actions.setPauliFieldView(view)
-      const algo = FIELD_VIEW_TO_COLOR_ALGO[view]
+      const algo = PAULI_FIELD_VIEW_TO_COLOR_ALGO[view]
       if (algo) {
         useAppearanceStore.getState().setColorAlgorithm(algo)
       }

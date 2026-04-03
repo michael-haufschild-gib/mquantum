@@ -182,6 +182,83 @@ describe('extractSchrodingerConfig', () => {
     }
   })
 
+  it('all compute modes force identical gate overrides including gradient and cross-section', () => {
+    const computeModes = [
+      'freeScalarField',
+      'tdseDynamics',
+      'becDynamics',
+      'diracEquation',
+      'quantumWalk',
+    ] as const
+    for (const mode of computeModes) {
+      const extracted = extractSchrodingerConfig(
+        makePassConfig({
+          quantumMode: mode,
+          analyticalGradientEnabled: true,
+          fastEigenInterpolationEnabled: true,
+          crossSectionEnabled: true,
+          probabilityCurrentEnabled: true,
+          openQuantumEnabled: true,
+        })
+      )
+      expect(extracted.analyticalGradientEnabled, `${mode}: analyticalGradientEnabled`).toBe(false)
+      expect(
+        extracted.fastEigenInterpolationEnabled,
+        `${mode}: fastEigenInterpolationEnabled`
+      ).toBe(false)
+      expect(extracted.crossSectionEnabled, `${mode}: crossSectionEnabled`).toBe(false)
+      expect(extracted.probabilityCurrentEnabled, `${mode}: probabilityCurrentEnabled`).toBe(false)
+      expect(extracted.openQuantumEnabled, `${mode}: openQuantumEnabled`).toBe(false)
+    }
+  })
+
+  it('dimension=2 disables analytical features (eigenfunction cache, gradient, temporal, cross-section)', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 2,
+        eigenfunctionCacheEnabled: true,
+        analyticalGradientEnabled: true,
+        fastEigenInterpolationEnabled: true,
+        temporalReprojectionEnabled: true,
+        crossSectionEnabled: true,
+        probabilityCurrentEnabled: true,
+      })
+    )
+    expect(extracted.eigenfunctionCacheEnabled).toBe(false)
+    expect(extracted.analyticalGradientEnabled).toBe(false)
+    expect(extracted.fastEigenInterpolationEnabled).toBe(false)
+    expect(extracted.temporalReprojectionEnabled).toBe(false)
+    expect(extracted.crossSectionEnabled).toBe(false)
+    expect(extracted.probabilityCurrentEnabled).toBe(false)
+    // dimension itself stays at 2 (not clamped for analytic modes)
+    expect(extracted.dimension).toBe(2)
+  })
+
+  it('representation=wigner disables analytical features same as dimension=2', () => {
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({
+        quantumMode: 'harmonicOscillator',
+        dimension: 4,
+        representation: 'wigner',
+        eigenfunctionCacheEnabled: true,
+        analyticalGradientEnabled: true,
+        fastEigenInterpolationEnabled: true,
+        temporalReprojectionEnabled: true,
+        crossSectionEnabled: true,
+        probabilityCurrentEnabled: true,
+      })
+    )
+    expect(extracted.eigenfunctionCacheEnabled).toBe(false)
+    expect(extracted.analyticalGradientEnabled).toBe(false)
+    expect(extracted.fastEigenInterpolationEnabled).toBe(false)
+    expect(extracted.temporalReprojectionEnabled).toBe(false)
+    expect(extracted.crossSectionEnabled).toBe(false)
+    expect(extracted.probabilityCurrentEnabled).toBe(false)
+    // Wigner still preserves its representation
+    expect(extracted.representation).toBe('wigner')
+  })
+
   it('disables nodal and phase when openQuantumEnabled', () => {
     const extracted = extractSchrodingerConfig(
       makePassConfig({

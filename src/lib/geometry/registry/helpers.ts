@@ -264,16 +264,6 @@ export function getQuantumTypeName(key: QuantumTypeKey): string {
 }
 
 /**
- * Validates a string as a QuantumTypeKey.
- *
- * @param key - String to validate
- * @returns true if the string is a valid QuantumTypeKey
- */
-export function isValidQuantumTypeKey(key: string): key is QuantumTypeKey {
-  return QUANTUM_TYPE_REGISTRY.has(key as QuantumTypeKey)
-}
-
-/**
  * Gets all QuantumTypeKeys whose minimum dimension is > the given threshold.
  * Useful for deriving sets like QUANTUM_MODES_3D_ONLY.
  *

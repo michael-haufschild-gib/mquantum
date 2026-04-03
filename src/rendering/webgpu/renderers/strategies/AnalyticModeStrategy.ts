@@ -474,7 +474,7 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
           ctx.device,
           shared.schroedingerUniformData,
           ctx.frame?.time ?? 0,
-          shared.schroedingerFloatView[676 / 4] ?? 0.8
+          shared.schroedingerFloatView[I.timeScale] ?? 0.8
         )
         wignerPass.executeReconstruct(ctx)
       }

@@ -382,14 +382,16 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Progressive Refinement
   setProgressiveRefinementEnabled: (enabled: boolean) => {
-    set({ progressiveRefinementEnabled: enabled })
-    if (!enabled) {
-      set({
-        refinementStage: 'final',
-        refinementProgress: 100,
-        qualityMultiplier: 1.0,
-      })
-    }
+    set(
+      enabled
+        ? { progressiveRefinementEnabled: true }
+        : {
+            progressiveRefinementEnabled: false,
+            refinementStage: 'final' as RefinementStage,
+            refinementProgress: 100,
+            qualityMultiplier: 1.0,
+          }
+    )
   },
 
   setRefinementStage: (stage: RefinementStage) => {

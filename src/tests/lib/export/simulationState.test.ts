@@ -185,6 +185,7 @@ describe('simulationState serialization', () => {
       'becDynamics',
       'diracEquation',
       'quantumWalk',
+      'pauliSpinor',
     ] as const
 
     for (const mode of modes) {
@@ -195,6 +196,50 @@ describe('simulationState serialization', () => {
       const result = await deserializeSimulationState(data)
       expect(result.quantumMode).toBe(mode)
     }
+  })
+
+  it('round-trips Pauli spinor state (2-component)', async () => {
+    const gridSize = [16, 16, 16]
+    const totalSites = 4096
+    const componentCount = 2
+    const wf = makeWavefunction(totalSites, componentCount)
+    const config = {
+      pauli: { fieldType: 'gradient', fieldStrength: 2.0, latticeDim: 3, gridSize: [16, 16, 16] },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'pauliSpinor', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('pauliSpinor')
+    expect(result.latticeDim).toBe(3)
+    expect(result.gridSize).toEqual([16, 16, 16])
+    expect(result.totalSites).toBe(4096)
+    expect(result.componentCount).toBe(2)
+
+    const totalElements = totalSites * componentCount
+    for (let i = 0; i < totalElements; i++) {
+      expect(result.psiRe[i]).toBeCloseTo(wf.re[i]!, 5)
+      expect(result.psiIm[i]).toBeCloseTo(wf.im[i]!, 5)
+    }
+  })
+
+  it('deserializes legacy Pauli save (tdseDynamics + pauli key) as pauliSpinor', async () => {
+    // Old Pauli saves used quantumMode='tdseDynamics' with a 'pauli' config key.
+    // The backward compat path should detect this and return 'pauliSpinor'.
+    const gridSize = [8, 8, 8]
+    const totalSites = 512
+    const wf = makeWavefunction(totalSites, 2)
+    const config = {
+      quantumMode: 'tdseDynamics',
+      pauli: { fieldType: 'uniform', fieldStrength: 3.0 },
+    }
+
+    const blob = await serializeSimulationState(config, wf, 'tdseDynamics', gridSize)
+    const data = await blobToArrayBuffer(blob)
+    const result = await deserializeSimulationState(data)
+
+    expect(result.quantumMode).toBe('pauliSpinor')
   })
 
   it('handles misaligned config length (odd-byte JSON forces copy path)', async () => {

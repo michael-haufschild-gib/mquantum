@@ -221,7 +221,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
               )}
 
               {/* Label overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center">
+              <div className="absolute bottom-0 inset-x-0 p-1 bg-[var(--bg-overlay)] text-center">
                 <span className="text-[10px] font-medium text-white block">{option.name}</span>
               </div>
             </a>

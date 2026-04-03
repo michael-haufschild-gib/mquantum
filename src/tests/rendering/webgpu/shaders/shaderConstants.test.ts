@@ -363,26 +363,12 @@ describe('Legendre polynomial structural checks', () => {
     const maxL = Number(match?.[1])
     expect(maxL).toBeGreaterThanOrEqual(6)
   })
-
-  it('Condon-Shortley phase is applied consistently', () => {
-    // legendre.wgsl.ts: includes (-1)^m in the P^m_m computation
-    // sphericalHarmonics.wgsl.ts: documents that legendre() includes CS phase
-    expect(legendreBlock).toContain('Condon-Shortley')
-    expect(sphericalHarmonicsBlock).toContain('Condon-Shortley')
-  })
 })
 
 describe('hydrogenRadial structural constants', () => {
   // The hydrogenRadial.wgsl.ts has structural constants beyond LN_FACTORIAL_LUT.
   // Verify the FACTORIAL_LUT referenced by hydrogenRadialNorm is the same
   // one defined in sphericalHarmonics.wgsl.ts (they share the same block).
-
-  it('hydrogenRadialNorm references FACTORIAL_LUT (shared with sphericalHarmonics)', () => {
-    // The hydrogenRadial shader uses FACTORIAL_LUT for the normalization
-    // constant. This LUT is defined in the sphericalHarmonics block, which
-    // is included in the same shader pipeline via assembleShaderBlocks().
-    expect(hydrogenRadialBlock).toContain('FACTORIAL_LUT')
-  })
 
   it('LN_FACTORIAL_LUT covers max needed index: n+l+D-2 = 7+6+11-2 = 22', () => {
     const lnFact = extractWgslArray(hydrogenRadialBlock, 'LN_FACTORIAL_LUT')

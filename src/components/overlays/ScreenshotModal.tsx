@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
@@ -11,7 +12,9 @@ import { useScreenshotStore } from '@/stores/screenshotStore'
 import { CropBox, CropValues } from './CropBox'
 
 export const ScreenshotModal = () => {
-  const { isOpen, imageSrc, closeModal } = useScreenshotStore()
+  const { isOpen, imageSrc, closeModal } = useScreenshotStore(
+    useShallow((s) => ({ isOpen: s.isOpen, imageSrc: s.imageSrc, closeModal: s.closeModal }))
+  )
   const { addToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
 
@@ -171,7 +174,7 @@ export const ScreenshotModal = () => {
               className="flex-1 sm:flex-initial"
               data-testid="screenshot-copy-button"
             >
-              <Icon name="copy" className="sm:mr-2" />
+              <Icon name="copy" className="sm:me-2" />
               <span>Copy</span>
             </Button>
             <Button
@@ -183,7 +186,7 @@ export const ScreenshotModal = () => {
               className="flex-1 sm:flex-initial"
               data-testid="screenshot-save-button"
             >
-              <Icon name="download" className="sm:mr-2" />
+              <Icon name="download" className="sm:me-2" />
               <span>Save</span>
             </Button>
           </div>

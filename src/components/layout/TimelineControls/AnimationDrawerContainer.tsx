@@ -57,11 +57,11 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.2 }}
-      className="absolute bottom-full left-0 right-0 mb-2 z-20"
+      className="absolute bottom-full inset-x-0 mb-2 z-20"
       data-testid={dataTestId}
     >
       {onClose && (
-        <div className="absolute top-0 right-3 -translate-y-1/2 z-10">
+        <div className="absolute top-0 end-3 -translate-y-1/2 z-10">
           <Button
             variant="ghost"
             size="icon"

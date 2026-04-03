@@ -25,6 +25,9 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import type { WavefunctionReadbackResult } from '@/rendering/webgpu/utils/wavefunctionReadback'
 
+/** Quantum modes that can be saved/loaded, including pauliSpinor (separate object type). */
+export type SaveableQuantumMode = SchroedingerQuantumMode | 'pauliSpinor'
+
 const MAGIC = 'MQST'
 const VERSION = 1
 const HEADER_SIZE = 64
@@ -37,9 +40,10 @@ const QUANTUM_MODE_INDEX: Record<string, number> = {
   becDynamics: 4,
   diracEquation: 5,
   quantumWalk: 6,
+  pauliSpinor: 7,
 }
 
-const INDEX_TO_QUANTUM_MODE: Record<number, SchroedingerQuantumMode> = {
+const INDEX_TO_QUANTUM_MODE: Record<number, SaveableQuantumMode> = {
   0: 'harmonicOscillator',
   1: 'hydrogenND',
   2: 'freeScalarField',
@@ -47,6 +51,7 @@ const INDEX_TO_QUANTUM_MODE: Record<number, SchroedingerQuantumMode> = {
   4: 'becDynamics',
   5: 'diracEquation',
   6: 'quantumWalk',
+  7: 'pauliSpinor',
 }
 
 /**
@@ -61,7 +66,7 @@ const INDEX_TO_QUANTUM_MODE: Record<number, SchroedingerQuantumMode> = {
 export async function serializeSimulationState(
   config: Record<string, unknown>,
   wavefunction: WavefunctionReadbackResult,
-  quantumMode: SchroedingerQuantumMode,
+  quantumMode: SaveableQuantumMode,
   gridSize: number[]
 ): Promise<Blob> {
   const configJSON = JSON.stringify(config)
@@ -126,7 +131,7 @@ export async function serializeSimulationState(
  * @throws Error if magic bytes or version are invalid
  */
 export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
-  quantumMode: SchroedingerQuantumMode
+  quantumMode: SaveableQuantumMode
   latticeDim: number
   componentCount: number
   gridSize: number[]
@@ -161,7 +166,11 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
   // Parse config JSON
   const configBytes = new Uint8Array(data, HEADER_SIZE, configLength)
   const configJSON = new TextDecoder().decode(configBytes)
-  const config = JSON.parse(configJSON) as Record<string, unknown>
+  const configRaw: unknown = JSON.parse(configJSON)
+  const config: Record<string, unknown> =
+    typeof configRaw === 'object' && configRaw !== null
+      ? (configRaw as Record<string, unknown>)
+      : {}
 
   // Parse wavefunction data
   const wavStart = HEADER_SIZE + configLength
@@ -188,7 +197,21 @@ export async function deserializeSimulationState(data: ArrayBuffer): Promise<{
 
   const quantumMode = INDEX_TO_QUANTUM_MODE[modeIndex] ?? 'tdseDynamics'
 
-  return { quantumMode, latticeDim, componentCount, gridSize, totalSites, config, psiRe, psiIm }
+  // Backward compat: files saved before pauliSpinor was a separate mode
+  // stored quantumMode='tdseDynamics' with a 'pauli' key in config.
+  const effectiveMode: SaveableQuantumMode =
+    quantumMode === 'tdseDynamics' && 'pauli' in config ? 'pauliSpinor' : quantumMode
+
+  return {
+    quantumMode: effectiveMode,
+    latticeDim,
+    componentCount,
+    gridSize,
+    totalSites,
+    config,
+    psiRe,
+    psiIm,
+  }
 }
 
 // ─── Compression utilities ────────────────────────────────────────────────

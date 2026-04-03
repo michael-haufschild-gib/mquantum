@@ -14,7 +14,7 @@ export { SKYBOX_BIND_GROUPS, SKYBOX_BINDINGS } from './types'
 
 // Core modules
 export { constantsBlock } from './core/constants.wgsl'
-export { uniformAliasesBlock, uniformBindingsBlock, uniformStructBlock } from './core/uniforms.wgsl'
+export { uniformBindingsBlock, uniformStructBlock } from './core/uniforms.wgsl'
 export {
   fragmentOutputStruct,
   fragmentOutputStructSingle,

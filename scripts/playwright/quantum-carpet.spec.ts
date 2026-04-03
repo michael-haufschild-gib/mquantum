@@ -20,6 +20,7 @@
 import { expect, test } from './fixtures'
 import {
   gotoMode,
+  gotoPauli,
   requireWebGPU,
   waitForFirstFrame,
   waitForRendererReady,
@@ -58,6 +59,34 @@ async function getCarpetFrames(page: import('@playwright/test').Page): Promise<n
   return page.evaluate(() => {
     const el = document.querySelector('[data-testid="quantum-carpet-panel"]')
     return parseInt(el?.getAttribute('data-carpet-frames') ?? '0', 10)
+  })
+}
+
+/** Enable carpet via store injection (bypasses UI navigation). */
+async function enableCarpetViaStore(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(async () => {
+    const mod = await import('/src/stores/carpetStore.ts')
+    mod.useCarpetStore.getState().setEnabled(true)
+  })
+  await expect(page.getByTestId('quantum-carpet-panel')).toBeVisible({ timeout: 5000 })
+}
+
+/**
+ * Check that carpet readback data contains non-zero density values.
+ * This is the critical assertion: if the shader reads from the wrong
+ * texture channel, the data will be all zeros or contain phase garbage
+ * that doesn't match density patterns.
+ */
+async function getCarpetNonZeroCount(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/carpetStore.ts')
+    const data = mod.useCarpetStore.getState().carpetData
+    if (!data) return 0
+    let count = 0
+    for (let i = 0; i < data.length; i++) {
+      if (data[i]! > 1e-10) count++
+    }
+    return count
   })
 }
 
@@ -265,4 +294,64 @@ test.describe('quantum carpet: GPU accumulation', () => {
     const afterClear = await getCarpetFrames(page)
     expect(afterClear).toBeLessThan(5)
   })
+})
+
+// ─── Cross-mode carpet density readback ─────────────────────────────────────
+// Regression guard: the carpet shader must read density from the correct
+// texture channel for every quantum mode. Analytic modes store density in .r,
+// compute modes store it in .a. If the channel is wrong, readback data will
+// be all zeros or contain non-density values.
+
+const CARPET_MODES: {
+  mode: string
+  label: string
+  objectType?: 'pauliSpinor'
+}[] = [
+  { mode: 'harmonicOscillator', label: 'Harmonic Oscillator' },
+  { mode: 'hydrogenND', label: 'Hydrogen ND' },
+  { mode: 'hydrogenNDCoupled', label: 'Hydrogen ND Coupled' },
+  { mode: 'freeScalarField', label: 'Free Scalar Field' },
+  { mode: 'tdseDynamics', label: 'TDSE Dynamics' },
+  { mode: 'becDynamics', label: 'BEC Dynamics' },
+  { mode: 'quantumWalk', label: 'Quantum Walk' },
+  { mode: 'diracEquation', label: 'Dirac Equation' },
+  { mode: 'pauliSpinor', label: 'Pauli Spinor', objectType: 'pauliSpinor' },
+]
+
+test.describe('quantum carpet: cross-mode density readback', () => {
+  test.setTimeout(120_000)
+
+  for (const { mode, label, objectType } of CARPET_MODES) {
+    test(`${label} produces non-zero carpet data`, async ({ page }) => {
+      // Navigate to mode
+      if (objectType === 'pauliSpinor') {
+        await gotoPauli(page, 3)
+      } else {
+        await gotoMode(page, mode, 3)
+      }
+
+      await requireWebGPU(page, test.info())
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+      await waitForFirstFrame(page)
+
+      // Enable carpet via store (no UI navigation needed)
+      await enableCarpetViaStore(page)
+
+      // Wait for frames to accumulate
+      await expect(async () => {
+        expect(await getCarpetFrames(page)).toBeGreaterThan(10)
+      }).toPass({ timeout: 30_000 })
+
+      // Critical assertion: readback data must contain non-zero density values.
+      // If the shader reads from the wrong texture channel (e.g. phase instead
+      // of density), the data will be zeros or near-zero garbage.
+      await expect(async () => {
+        const nonZero = await getCarpetNonZeroCount(page)
+        expect(nonZero, `${label}: carpet readback must contain non-zero density`).toBeGreaterThan(
+          0
+        )
+      }).toPass({ timeout: 15_000 })
+    })
+  }
 })

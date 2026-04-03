@@ -12,6 +12,8 @@ import { describe, expect, it } from 'vitest'
 import {
   densityMatrixFromCoefficients,
   evolveMultiStep,
+  hermitianEigendecompose,
+  MAX_K,
 } from '@/lib/physics/openQuantum/integrator'
 import { purity } from '@/lib/physics/openQuantum/metrics'
 import type { DensityMatrix, LindbladChannel } from '@/lib/physics/openQuantum/types'
@@ -38,9 +40,12 @@ function checkHermitian(rho: DensityMatrix, tol = 1e-8): boolean {
   return true
 }
 
-function checkPositiveDiagonals(rho: DensityMatrix): boolean {
+function checkPositiveSemiDefinite(rho: DensityMatrix, tol = 1e-10): boolean {
+  const evals = new Float64Array(MAX_K)
+  const evecs = new Float64Array(MAX_K * MAX_K * 2)
+  hermitianEigendecompose(rho, evals, evecs)
   for (let k = 0; k < rho.K; k++) {
-    if (rho.elements[2 * (k * rho.K + k)]! < -1e-10) return false
+    if (evals[k]! < -tol) return false
   }
   return true
 }
@@ -79,7 +84,7 @@ describe('multi-step Lindblad evolution', () => {
       expect(checkHermitian(rho)).toBe(true)
     })
 
-    it('diagonal elements remain non-negative after 200 steps', () => {
+    it('remains positive semi-definite after 200 steps', () => {
       const K = 4
       const rho = densityMatrixFromCoefficients([0.5, 0.5, 0.5, 0.5], [0, 0, 0, 0], K)
       const energies = new Float64Array([0, 1, 3, 6])
@@ -88,7 +93,7 @@ describe('multi-step Lindblad evolution', () => {
 
       evolveMultiStep(rho, energies, channels, dt, 200)
 
-      expect(checkPositiveDiagonals(rho)).toBe(true)
+      expect(checkPositiveSemiDefinite(rho)).toBe(true)
     })
   })
 

@@ -2,7 +2,7 @@
  * Skybox core shader modules index
  */
 export { constantsBlock } from './constants.wgsl'
-export { uniformAliasesBlock, uniformBindingsBlock, uniformStructBlock } from './uniforms.wgsl'
+export { uniformBindingsBlock, uniformStructBlock } from './uniforms.wgsl'
 export {
   fragmentOutputStruct,
   fragmentOutputStructSingle,

@@ -11,6 +11,7 @@
  */
 
 import { fftNd } from '@/lib/math/fft'
+import { computeStrides, linearToNDCoordsInto } from '@/lib/math/ndArray'
 import { computeOmegaK, M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /** Size of the 3D output density grid (must match DENSITY_GRID_SIZE in compute pass). */
@@ -89,55 +90,8 @@ export function packR16F(out: Uint16Array, pixelIdx: number, r: number): void {
   out[pixelIdx * 4] = float32ToFloat16(r)
 }
 
-/**
- * Compute row-major strides for an N-D grid.
- */
-export function computeStrides(gridSize: readonly number[]): number[] {
-  const dim = gridSize.length
-  const strides = new Array<number>(dim)
-  strides[dim - 1] = 1
-  for (let d = dim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-  return strides
-}
-
-/**
- * Convert a linear index to N-D coordinates.
- */
-export function linearToNDCoords(flatIdx: number, gridSize: readonly number[]): number[] {
-  const dim = gridSize.length
-  const coords = new Array<number>(dim)
-  let remaining = flatIdx
-  for (let d = dim - 1; d >= 0; d--) {
-    coords[d] = remaining % gridSize[d]!
-    remaining = Math.floor(remaining / gridSize[d]!)
-  }
-  return coords
-}
-
-/**
- * Convert a linear index to N-D coordinates, writing into a pre-allocated output array.
- * Avoids per-call array allocation.
- */
-function linearToNDCoordsInto(flatIdx: number, gridSize: readonly number[], out: number[]): void {
-  let remaining = flatIdx
-  for (let d = gridSize.length - 1; d >= 0; d--) {
-    out[d] = remaining % gridSize[d]!
-    remaining = Math.floor(remaining / gridSize[d]!)
-  }
-}
-
-/**
- * Convert N-D coordinates to a linear index using strides.
- */
-export function ndToLinearIdx(coords: readonly number[], strides: readonly number[]): number {
-  let idx = 0
-  for (let d = 0; d < coords.length; d++) {
-    idx += coords[d]! * strides[d]!
-  }
-  return idx
-}
+// Re-export N-D index utilities from shared module (canonical source: @/lib/math/ndArray)
+export { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
 
 // ============================================================================
 // Raw Physics Stage
@@ -322,8 +276,38 @@ export function computeRawKSpaceDataFromComplex(
   mass: number,
   latticeDim: number
 ): KSpaceRawData {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
+    throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
+  }
+
   const activeDims = gridSize.slice(0, latticeDim)
   const totalSites = activeDims.reduce((a, b) => a * b, 1)
+
+  if (spacing.length < latticeDim) {
+    throw new Error(`spacing must provide at least ${latticeDim} entries, got ${spacing.length}`)
+  }
+
+  for (let d = 0; d < latticeDim; d++) {
+    const n = activeDims[d]!
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`gridSize[${d}] must be a positive integer, got ${n}`)
+    }
+    const a = spacing[d]!
+    if (!Number.isFinite(a) || a <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive number, got ${a}`)
+    }
+  }
+
+  if (!Number.isFinite(mass)) {
+    throw new Error(`mass must be finite, got ${mass}`)
+  }
+
+  const expectedLen = totalSites * 2
+  if (phiComplex.length < expectedLen || piComplex.length < expectedLen) {
+    throw new Error(
+      `Complex arrays too small: need ${expectedLen}, got phi=${phiComplex.length}, pi=${piComplex.length}`
+    )
+  }
 
   // Forward FFT (in-place)
   fftNd(phiComplex, activeDims)

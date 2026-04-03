@@ -172,6 +172,64 @@ describe('quantum mode switching', () => {
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
   })
 
+  it('blocks momentum representation for hydrogenNDCoupled (shader is position-only)', () => {
+    const store = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(4)
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
+
+    store.setSchroedingerRepresentation('momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+
+    // wigner should still work for coupled hydrogen
+    store.setSchroedingerRepresentation('wigner')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+  })
+
+  it('blocks non-position representation for hydrogenND at dim=2', () => {
+    const store = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(2)
+    store.setSchroedingerQuantumMode('hydrogenND')
+
+    store.setSchroedingerRepresentation('momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+
+    store.setSchroedingerRepresentation('wigner')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+  })
+
+  it('allows non-position representation for hydrogenND at dim >= 3', () => {
+    const store = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(3)
+    store.setSchroedingerQuantumMode('hydrogenND')
+
+    store.setSchroedingerRepresentation('momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
+  })
+
+  it('switching to hydrogenNDCoupled forces position if currently momentum', () => {
+    const store = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(4)
+    store.setSchroedingerQuantumMode('hydrogenND')
+    store.setSchroedingerRepresentation('momentum')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
+
+    // Switching to coupled must force position — coupled shader is position-only for momentum
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+  })
+
+  it('switching to hydrogenNDCoupled preserves wigner representation', () => {
+    const store = useExtendedObjectStore.getState()
+    useGeometryStore.getState().setDimension(4)
+    store.setSchroedingerQuantumMode('hydrogenND')
+    store.setSchroedingerRepresentation('wigner')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+
+    // Coupled hydrogen supports wigner — should be preserved
+    store.setSchroedingerQuantumMode('hydrogenNDCoupled')
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+  })
+
   it('round-trip through all modes preserves config', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerPrincipalQuantumNumber(4)

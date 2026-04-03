@@ -18,6 +18,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { ifftNd } from '@/lib/math/fft'
+import { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /** Minimum mass used for zero-mode regularization when physical mass is zero. */
@@ -115,55 +116,6 @@ function validateVacuumConfig(
       throw new Error(`spacing[${d}] must be a finite positive value, got ${a}`)
     }
   }
-}
-
-/**
- * Computes row-major strides for an N-D array.
- *
- * @param gridSize - Per-dimension sizes
- * @returns Array of strides (last dimension has stride 1)
- */
-function computeStrides(gridSize: readonly number[]): number[] {
-  const dim = gridSize.length
-  const strides = new Array<number>(dim)
-  strides[dim - 1] = 1
-  for (let d = dim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-  return strides
-}
-
-/**
- * Converts a flat index to N-D coordinates (row-major, last dim varies fastest).
- *
- * @param flatIdx - Linear index
- * @param gridSize - Per-dimension sizes
- * @returns Array of coordinates
- */
-function linearToNDCoords(flatIdx: number, gridSize: readonly number[]): number[] {
-  const dim = gridSize.length
-  const coords = new Array<number>(dim)
-  let remaining = flatIdx
-  for (let d = dim - 1; d >= 0; d--) {
-    coords[d] = remaining % gridSize[d]!
-    remaining = Math.floor(remaining / gridSize[d]!)
-  }
-  return coords
-}
-
-/**
- * Converts N-D coordinates to a flat index (row-major).
- *
- * @param coords - Per-dimension coordinates
- * @param strides - Row-major strides
- * @returns Linear index
- */
-function ndToLinearIdx(coords: readonly number[], strides: readonly number[]): number {
-  let idx = 0
-  for (let d = 0; d < coords.length; d++) {
-    idx += coords[d]! * strides[d]!
-  }
-  return idx
 }
 
 /**

@@ -340,7 +340,7 @@ export const CommandPalette: React.FC = React.memo(() => {
             className="w-full max-w-lg relative z-10 overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-2xl glass-panel-dark"
           >
             <div className="relative border-b border-[var(--border-subtle)]">
-              <div className="absolute left-4 top-3.5 text-[var(--text-tertiary)]">
+              <div className="absolute start-4 top-3.5 text-[var(--text-tertiary)]">
                 <svg
                   width="20"
                   height="20"
@@ -360,9 +360,9 @@ export const CommandPalette: React.FC = React.memo(() => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleListKeyDown}
-                className="w-full border-none py-3.5 pl-12 pr-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base rounded-none"
+                className="w-full border-none py-3.5 ps-12 pe-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base rounded-none"
               />
-              <div className="absolute right-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)]">
+              <div className="absolute end-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)]">
                 ESC
               </div>
             </div>

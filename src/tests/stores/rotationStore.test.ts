@@ -9,10 +9,11 @@ import { useRotationStore } from '@/stores/rotationStore'
 
 describe('rotationStore', () => {
   beforeEach(() => {
-    // Reset store state before each test
+    // Reset store state before each test (including version for dirty-tracking tests)
     useRotationStore.setState({
       rotations: new Map(),
       dimension: 4,
+      version: 0,
     })
   })
 
@@ -227,6 +228,49 @@ describe('rotationStore', () => {
 
       const { rotations } = useRotationStore.getState()
       expect(rotations.size).toBe(0)
+    })
+  })
+
+  describe('version counter (dirty tracking)', () => {
+    it('increments on setRotation', () => {
+      const before = useRotationStore.getState().version
+      useRotationStore.getState().setRotation('XY', Math.PI / 4)
+      expect(useRotationStore.getState().version).toBe(before + 1)
+    })
+
+    it('increments on updateRotations with actual changes', () => {
+      const before = useRotationStore.getState().version
+      useRotationStore.getState().updateRotations(new Map([['XY', 0.5]]))
+      expect(useRotationStore.getState().version).toBe(before + 1)
+    })
+
+    it('does NOT increment on updateRotations with identical values', () => {
+      // Set initial rotation
+      useRotationStore.getState().setRotation('XY', 1.0)
+      const before = useRotationStore.getState().version
+
+      // Update with same value — two-pass optimization should skip the version bump
+      useRotationStore.getState().updateRotations(new Map([['XY', 1.0]]))
+      expect(useRotationStore.getState().version).toBe(before)
+    })
+
+    it('increments on resetAllRotations', () => {
+      useRotationStore.getState().setRotation('XY', 1.0)
+      const before = useRotationStore.getState().version
+      useRotationStore.getState().resetAllRotations()
+      expect(useRotationStore.getState().version).toBe(before + 1)
+    })
+
+    it('increments on setDimension when dimension changes', () => {
+      const before = useRotationStore.getState().version
+      useRotationStore.getState().setDimension(5)
+      expect(useRotationStore.getState().version).toBe(before + 1)
+    })
+
+    it('does NOT increment on setDimension with same dimension', () => {
+      const before = useRotationStore.getState().version
+      useRotationStore.getState().setDimension(4) // already 4
+      expect(useRotationStore.getState().version).toBe(before)
     })
   })
 

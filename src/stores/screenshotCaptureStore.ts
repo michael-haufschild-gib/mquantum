@@ -41,10 +41,10 @@ export interface ScreenshotCaptureState {
   // Actions
   /** Request a screenshot capture. Returns active request ID. */
   requestCapture: () => number
-  /** Set the captured image result */
-  setCapturedImage: (dataUrl: string, requestId?: number) => void
-  /** Set an error state */
-  setError: (error: string, requestId?: number) => void
+  /** Set the captured image result. Requires the request ID to reject stale completions. */
+  setCapturedImage: (dataUrl: string, requestId: number) => void
+  /** Set an error state. Requires the request ID to reject stale completions. */
+  setError: (error: string, requestId: number) => void
   /** Reset to idle state */
   reset: () => void
 }
@@ -67,15 +67,12 @@ export const useScreenshotCaptureStore = create<ScreenshotCaptureState>((set, ge
   },
   setCapturedImage: (dataUrl, requestId) =>
     set((state) => {
-      if (requestId !== undefined && requestId !== state.requestId) return state
-      // Ignore stale completions if a request was cancelled/reset.
-      if (requestId !== undefined && state.status !== 'capturing') return state
+      if (requestId !== state.requestId || state.status !== 'capturing') return state
       return { status: 'ready', capturedImage: dataUrl, error: null }
     }),
   setError: (error, requestId) =>
     set((state) => {
-      if (requestId !== undefined && requestId !== state.requestId) return state
-      if (requestId !== undefined && state.status !== 'capturing') return state
+      if (requestId !== state.requestId || state.status !== 'capturing') return state
       return { status: 'error', error, capturedImage: null }
     }),
   reset: () =>

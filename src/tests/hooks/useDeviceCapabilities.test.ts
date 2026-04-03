@@ -46,7 +46,6 @@ describe('useDeviceCapabilities', () => {
 
   it('should detect desktop GPU and not apply mobile defaults', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: true,
       gpuTier: 3,
       isMobileGPU: false,
       gpuName: 'nvidia geforce rtx 3080',
@@ -69,7 +68,6 @@ describe('useDeviceCapabilities', () => {
 
   it('should detect mobile GPU and apply mobile defaults', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: true,
       gpuTier: 2,
       isMobileGPU: true,
       gpuName: 'apple a14 gpu',
@@ -97,7 +95,6 @@ describe('useDeviceCapabilities', () => {
     localStorage.setItem('mdim_max_fps', '45fps')
 
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: true,
       gpuTier: 2,
       isMobileGPU: true,
       gpuName: 'apple a14 gpu',
@@ -117,13 +114,12 @@ describe('useDeviceCapabilities', () => {
     expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
   })
 
-  it('should handle WebGL2 not supported', async () => {
+  it('should handle detect-gpu failure gracefully (tier 3 fallback)', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: false,
-      gpuTier: 0,
+      gpuTier: 3,
       isMobileGPU: false,
-      gpuName: 'unsupported',
-      detectionType: 'webgl2-missing',
+      gpuName: 'detection-failed',
+      detectionType: 'error',
       estimatedFps: undefined,
     })
 
@@ -133,14 +129,13 @@ describe('useDeviceCapabilities', () => {
       expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
     })
 
-    expect(usePerformanceStore.getState().gpuTier).toBe(0)
-    // Should NOT apply mobile defaults for unsupported
+    expect(usePerformanceStore.getState().gpuTier).toBe(3)
+    // Should NOT apply mobile defaults for fallback
     expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
   })
 
   it('should only run detection once', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: true,
       gpuTier: 3,
       isMobileGPU: false,
       gpuName: 'test gpu',
@@ -161,25 +156,5 @@ describe('useDeviceCapabilities', () => {
 
     // Should only have called detection once
     expect(detectDeviceCapabilities).toHaveBeenCalledTimes(1)
-  })
-
-  it('should return correct webgl2Supported after detection', async () => {
-    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: false,
-      gpuTier: 0,
-      isMobileGPU: false,
-      gpuName: 'unsupported',
-      detectionType: 'webgl2-missing',
-      estimatedFps: undefined,
-    })
-
-    const { result } = renderHook(() => useDeviceCapabilities())
-
-    await waitFor(() => {
-      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
-    })
-
-    // After detection, should reflect actual support
-    expect(result.current.webgl2Supported).toBe(false)
   })
 })

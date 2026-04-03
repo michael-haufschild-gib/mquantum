@@ -12,6 +12,7 @@ const COMPONENT_OPTIONS: { value: DivergingPsiSettings['component']; label: stri
   { value: 'imag', label: 'Im(ψ)' },
 ]
 
+/** Controls for the zero-centered diverging colormap: component selection, wing colors, and intensity floor. */
 export const RealImagDivergingControls: React.FC = React.memo(() => {
   const selector = useShallow((state: AppearanceSlice) => ({
     divergingPsi: state.divergingPsi,

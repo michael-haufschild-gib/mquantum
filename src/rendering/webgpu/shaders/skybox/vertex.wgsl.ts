@@ -2,6 +2,7 @@
  * Skybox vertex shader for WGSL
  * Port of vertex portion from compose.ts
  */
+import { generateVertexOutputStruct } from './core/varyings.wgsl'
 import { SkyboxEffects } from './types'
 
 /**
@@ -34,28 +35,6 @@ fn getModelViewMatrix() -> mat4x4<f32> { return vertexUniforms.modelViewMatrix; 
 fn getProjectionMatrix() -> mat4x4<f32> { return vertexUniforms.projectionMatrix; }
 fn getRotationMatrix() -> mat3x3<f32> { return vertexUniforms.rotationMatrix; }
 `
-
-/**
- * Generate vertex output struct based on enabled effects
- * @param effects
- */
-export function generateVertexOutputStruct(effects: SkyboxEffects): string {
-  const fields = [
-    '@builtin(position) position: vec4<f32>,',
-    '@location(0) worldDirection: vec3<f32>,',
-  ]
-
-  if (effects.vignette) {
-    fields.push('@location(1) screenUV: vec2<f32>,')
-  }
-
-  return `
-// --- Vertex Output ---
-struct VertexOutput {
-  ${fields.join('\n  ')}
-}
-`
-}
 
 /**
  * Generate the complete vertex shader

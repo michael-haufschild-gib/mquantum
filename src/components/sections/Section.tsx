@@ -152,7 +152,7 @@ export const Section: React.FC<SectionProps> = React.memo(
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               onClick={handleResetClick}
-              className="mr-3 p-1 text-[var(--text-tertiary)] hover:text-accent transition-colors rounded hover:bg-[var(--bg-hover)] relative z-20"
+              className="me-3 p-1 text-[var(--text-tertiary)] hover:text-accent transition-colors rounded hover:bg-[var(--bg-hover)] relative z-20"
               title={`Reset ${title} settings`}
               data-testid={dataTestId ? `${dataTestId}-reset` : undefined}
             >

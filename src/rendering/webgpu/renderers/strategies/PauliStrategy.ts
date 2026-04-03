@@ -147,9 +147,10 @@ export class PauliStrategy implements QuantumModeStrategy {
     }
     if (simState.pendingLoadData) {
       const loadData = simState.pendingLoadData
-      // Pauli states are saved with quantumMode = 'tdseDynamics' (shared pipeline)
-      // but they should also check for explicit pauli config in the data
-      if (loadData.config && 'pauli' in loadData.config) {
+      if (
+        loadData.quantumMode === 'pauliSpinor' ||
+        (loadData.config && 'pauli' in loadData.config)
+      ) {
         pauliPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
         simState.clearLoadData()
       }

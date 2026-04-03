@@ -244,9 +244,11 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     }
     device.queue.writeBuffer(this.coinStateA, 0, initData)
 
-    // Rebuild coin/shift/absorber bind groups
+    // Rebuild coin/shift/absorber/writeGrid bind groups
     this.rebuildCoinShiftBindGroups(device)
     this.rebuildAbsorberBindGroup(device)
+    this.initializeDensityTexture(device)
+    this.rebuildWriteGridBindGroup(device)
     this.pingPong = 0
     this.stepCount = 0
     this.stepAccumulator = 0
@@ -473,7 +475,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       }
     }
 
-    // Write density grid uniforms and rebuild bind group
+    // Write density grid uniforms (bind group is stable — rebuilt only in initializeState)
     device.queue.writeBuffer(
       this.writeGridUniformBuffer!,
       0,
@@ -488,8 +490,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         boundingRadius
       )
     )
-    this.rebuildWriteGridBindGroup(device)
-
     if (this.writeGridPipeline && this.writeGridBG) {
       // Clear atomic max buffer before write-grid dispatch
       if (this.maxDensityAtomicBuffer) {

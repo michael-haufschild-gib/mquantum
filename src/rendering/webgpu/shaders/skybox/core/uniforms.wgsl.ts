@@ -77,29 +77,3 @@ export const uniformBindingsBlock = `
 @group(1) @binding(0) var skyboxTexture: texture_cube<f32>;
 @group(1) @binding(1) var skyboxSampler: sampler;
 `
-
-/**
- * Helper to access uniforms with shorter names (for shader code clarity)
- */
-export const uniformAliasesBlock = `
-// --- Uniform Aliases (for code clarity) ---
-fn getMode() -> f32 { return uniforms.mode; }
-fn getTime() -> f32 { return uniforms.time; }
-fn getIntensity() -> f32 { return uniforms.intensity; }
-fn getHue() -> f32 { return uniforms.hue; }
-fn getSaturation() -> f32 { return uniforms.saturation; }
-fn getScale() -> f32 { return uniforms.scale; }
-fn getComplexity() -> f32 { return uniforms.complexity; }
-fn getTimeScale() -> f32 { return uniforms.timeScale; }
-fn getEvolution() -> f32 { return uniforms.evolution; }
-fn getDistortion() -> f32 { return uniforms.distortion; }
-fn getVignette() -> f32 { return uniforms.vignette; }
-fn getTurbulence() -> f32 { return uniforms.turbulence; }
-fn getDualTone() -> f32 { return uniforms.dualTone; }
-fn getSunIntensity() -> f32 { return uniforms.sunIntensity; }
-fn getPalA() -> vec3<f32> { return uniforms.palA; }
-fn getPalB() -> vec3<f32> { return uniforms.palB; }
-fn getPalC() -> vec3<f32> { return uniforms.palC; }
-fn getPalD() -> vec3<f32> { return uniforms.palD; }
-fn getSunPosition() -> vec3<f32> { return uniforms.sunPosition; }
-`

@@ -305,6 +305,13 @@ describe('state-serializer', () => {
       expect(d.isoThreshold).toBeCloseTo(0) // clamped to max
     })
 
+    it('accepts leading-dot floats (.5) in URL params', () => {
+      const d = deserializeState('scale=.75&dg=.5&iso_t=-.5')
+      expect(d.scale).toBeCloseTo(0.75)
+      expect(d.densityGain).toBeCloseTo(0.5)
+      expect(d.isoThreshold).toBeCloseTo(-0.5)
+    })
+
     it('ignores invalid enum values', () => {
       const d = deserializeState('repr=invalid&pot=unknown')
       expect(d.representation).toBeUndefined()

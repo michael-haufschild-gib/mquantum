@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { detectDeviceCapabilities, isWebGL2Supported } from '@/lib/deviceCapabilities'
+import { detectDeviceCapabilities } from '@/lib/deviceCapabilities'
 
 // Mock detect-gpu module
 vi.mock('detect-gpu', () => ({
@@ -16,79 +16,16 @@ vi.mock('detect-gpu', () => ({
 import { getGPUTier } from 'detect-gpu'
 
 describe('deviceCapabilities', () => {
-  describe('isWebGL2Supported', () => {
-    let originalCreateElement: typeof document.createElement
-
-    beforeEach(() => {
-      originalCreateElement = document.createElement.bind(document)
-    })
-
-    afterEach(() => {
-      document.createElement = originalCreateElement
-    })
-
-    it('should return true when WebGL2 context is available', () => {
-      // Mock canvas with WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue({}), // Non-null = supported
-      })
-
-      expect(isWebGL2Supported()).toBe(true)
-    })
-
-    it('should return false when WebGL2 context is not available', () => {
-      // Mock canvas without WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue(null),
-      })
-
-      expect(isWebGL2Supported()).toBe(false)
-    })
-
-    it('should return false when getContext throws', () => {
-      // Mock canvas that throws
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockImplementation(() => {
-          throw new Error('WebGL not available')
-        }),
-      })
-
-      expect(isWebGL2Supported()).toBe(false)
-    })
-  })
-
   describe('detectDeviceCapabilities', () => {
-    let originalCreateElement: typeof document.createElement
-
     beforeEach(() => {
-      originalCreateElement = document.createElement.bind(document)
       vi.clearAllMocks()
     })
 
     afterEach(() => {
-      document.createElement = originalCreateElement
-    })
-
-    it('should return tier 0 when WebGL2 is not supported', async () => {
-      // Mock no WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue(null),
-      })
-
-      const result = await detectDeviceCapabilities()
-
-      expect(result.webgl2Supported).toBe(false)
-      expect(result.gpuTier).toBe(0)
-      expect(result.detectionType).toBe('webgl2-missing')
+      vi.restoreAllMocks()
     })
 
     it('should detect desktop GPU correctly', async () => {
-      // Mock WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue({}),
-      })
-
-      // Mock detect-gpu result for desktop
       vi.mocked(getGPUTier).mockResolvedValue({
         tier: 3,
         isMobile: false,
@@ -99,7 +36,6 @@ describe('deviceCapabilities', () => {
 
       const result = await detectDeviceCapabilities()
 
-      expect(result.webgl2Supported).toBe(true)
       expect(result.gpuTier).toBe(3)
       expect(result.isMobileGPU).toBe(false)
       expect(result.gpuName).toBe('nvidia geforce rtx 3080')
@@ -107,12 +43,6 @@ describe('deviceCapabilities', () => {
     })
 
     it('should detect mobile GPU correctly', async () => {
-      // Mock WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue({}),
-      })
-
-      // Mock detect-gpu result for mobile
       vi.mocked(getGPUTier).mockResolvedValue({
         tier: 2,
         isMobile: true,
@@ -123,37 +53,23 @@ describe('deviceCapabilities', () => {
 
       const result = await detectDeviceCapabilities()
 
-      expect(result.webgl2Supported).toBe(true)
       expect(result.gpuTier).toBe(2)
       expect(result.isMobileGPU).toBe(true)
       expect(result.gpuName).toBe('apple a14 gpu')
     })
 
     it('should handle detect-gpu errors gracefully', async () => {
-      // Mock WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue({}),
-      })
-
-      // Mock detect-gpu throwing an error
       vi.mocked(getGPUTier).mockRejectedValue(new Error('Detection failed'))
 
       const result = await detectDeviceCapabilities()
 
       // Should fall back to tier 3 desktop
-      expect(result.webgl2Supported).toBe(true)
       expect(result.gpuTier).toBe(3)
       expect(result.isMobileGPU).toBe(false)
       expect(result.detectionType).toBe('error')
     })
 
     it('should handle undefined isMobile gracefully', async () => {
-      // Mock WebGL2 support
-      document.createElement = vi.fn().mockReturnValue({
-        getContext: vi.fn().mockReturnValue({}),
-      })
-
-      // Mock detect-gpu result with undefined isMobile
       vi.mocked(getGPUTier).mockResolvedValue({
         tier: 2,
         isMobile: undefined,

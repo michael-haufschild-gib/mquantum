@@ -60,8 +60,8 @@ export function quantumNumbersToLabel(n: number, l: number, m: number): string {
     if (m === 0) return `${n}dz²`
     if (m === 1) return `${n}dxz`
     if (m === -1) return `${n}dyz`
-    if (m === 2) return `${n}dxy`
-    if (m === -2) return `${n}dx²-y²`
+    if (m === 2) return `${n}dx²-y²`
+    if (m === -2) return `${n}dxy`
   }
 
   return `${n}${letter} (m=${m})`

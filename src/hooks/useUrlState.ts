@@ -44,9 +44,13 @@ function applyTdseParams(
 
 /**
  * Apply individual URL state parameters to stores.
+ *
+ * Exported for integration testing — this is the single source of truth for
+ * URL param → store wiring. Tests should import this instead of duplicating it.
+ *
  * @param urlState - Parsed URL state to apply
  */
-function applyUrlStateParams(urlState: ParsedShareableState): void {
+export function applyUrlStateParams(urlState: ParsedShareableState): void {
   try {
     const geo = useGeometryStore.getState()
     const ext = useExtendedObjectStore.getState()

@@ -1,3 +1,5 @@
+import { useShallow } from 'zustand/react/shallow'
+
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Input } from '@/components/ui/Input'
 import { NumberInput } from '@/components/ui/NumberInput'
@@ -8,7 +10,9 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useExportStore } from '@/stores/exportStore'
 
 export const ExportTextTab = () => {
-  const { settings, updateSettings } = useExportStore()
+  const { settings, updateSettings } = useExportStore(
+    useShallow((s) => ({ settings: s.settings, updateSettings: s.updateSettings }))
+  )
   const { textOverlay } = settings
 
   const update = (partial: Partial<typeof textOverlay>) =>

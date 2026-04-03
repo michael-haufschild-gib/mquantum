@@ -4,12 +4,13 @@
  * Extracts a 1D line from the 3D density texture and writes it
  * as a single row in the 2D rolling carpet texture.
  *
- * Always reads raw |ψ|² from the density texture's alpha channel (.a),
- * which stores the field-view-independent normalized density. This ensures
- * the quantum carpet always shows probability density regardless of which
- * field view (density, phase, current, velocity, etc.) is active.
+ * Reads raw |ψ|² density from the 3D density texture. The source channel
+ * depends on the quantum mode:
+ * - Analytic modes (HO, hydrogen): density is always in .r
+ * - Compute modes (TDSE, Dirac, FSF, QW): density is in .a (field-view-independent)
  *
- * Alpha dual encoding: .a >= 0 is rawDensity, .a < 0 is -potOverlay.
+ * The `readAlpha` uniform selects which channel to read.
+ * For compute modes, alpha dual encoding: .a >= 0 is rawDensity, .a < 0 is -potOverlay.
  * The carpet takes max(.a, 0) to ignore potential overlay values.
  *
  * @module rendering/webgpu/shaders/schroedinger/compute/carpetSlice
@@ -23,8 +24,8 @@ struct CarpetSliceParams {
   slicePosZ: f32,
   useLogScale: u32,
   gridSize: u32,
+  readAlpha: u32,
   _pad0: u32,
-  _pad1: u32,
 }
 
 @group(0) @binding(0) var<uniform> params: CarpetSliceParams;
@@ -49,8 +50,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let sample = textureLoad(densityTex, coord, 0);
-  // Read raw |ψ|² from .a (always non-negative density; negative = potOverlay, ignored)
-  let rawDensity = max(sample.a, 0.0);
+  // Analytic modes: density in .r (always density, no field-view concept)
+  // Compute modes: density in .a (field-view-independent; negative = potOverlay, ignored)
+  let rawDensity = select(sample.r, max(sample.a, 0.0), params.readAlpha == 1u);
   let value = select(rawDensity, log(rawDensity + 1e-10), params.useLogScale == 1u);
 
   textureStore(carpetTex, vec2u(i, params.writeRow), vec4f(value, 0.0, 0.0, 1.0));

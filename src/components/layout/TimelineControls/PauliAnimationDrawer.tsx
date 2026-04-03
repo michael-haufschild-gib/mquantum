@@ -102,7 +102,7 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
             </label>
           </div>
           <Button variant="secondary" size="sm" onClick={resetField} className="w-full">
-            <Icon name="redo" size={12} className="mr-2" />
+            <Icon name="redo" size={12} className="me-2" />
             Reinitialize Spinor
           </Button>
           <p className="text-xs text-text-tertiary">

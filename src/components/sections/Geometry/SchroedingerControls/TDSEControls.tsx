@@ -41,14 +41,15 @@ import type { TdseControlsProps } from './types'
 export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
     const td = config.tdse
+    const activeDims = useMemo(() => td.latticeDim, [td.latticeDim])
 
     const handleGridSizeChange = useCallback(
-      (dimIdx: number, value: number) => {
-        const newGrid = [...td.gridSize]
-        newGrid[dimIdx] = value
+      (value: string) => {
+        const size = Number(value)
+        const newGrid = Array.from({ length: activeDims }, () => size)
         actions.setGridSize(newGrid)
       },
-      [td.gridSize, actions]
+      [activeDims, actions]
     )
 
     const handleSpacingChange = useCallback(
@@ -78,8 +79,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
       [td.packetMomentum, actions]
     )
 
-    const activeDims = useMemo(() => td.latticeDim, [td.latticeDim])
-
     // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
     const maxGridPerDim = useMemo(
       () => Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
@@ -89,6 +88,14 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
       () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
       [maxGridPerDim]
     )
+
+    const activeGridSize = td.gridSize[0] ?? 32
+    const totalSites = useMemo(() => {
+      let sites = 1
+      for (let d = 0; d < activeDims; d++) sites *= td.gridSize[d] ?? 32
+      return sites
+    }, [td.gridSize, activeDims])
+    const memoryKB = Math.round((totalSites * 2 * 8) / 1024)
 
     return (
       <div className="space-y-1" data-testid="tdse-controls">
@@ -215,17 +222,17 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             showValue
             data-testid="tdse-lattice-dim"
           />
-          {Array.from({ length: activeDims }, (_, d) => (
-            <Select
-              key={`grid-${d}`}
-              label={`Grid ${AXIS_LABELS[d]}`}
-              tooltip="Number of lattice points along this axis. More points increase resolution but use more GPU memory."
-              options={gridSizeOptions}
-              value={String(td.gridSize[d] ?? 32)}
-              onChange={(v) => handleGridSizeChange(d, Number(v))}
-              data-testid={`tdse-grid-${d}`}
-            />
-          ))}
+          <Select
+            label="Grid Size"
+            tooltip="Number of lattice points per dimension. Total sites = N^D; larger grids increase resolution but use more GPU memory."
+            options={gridSizeOptions}
+            value={String(activeGridSize)}
+            onChange={handleGridSizeChange}
+            data-testid="tdse-grid-size"
+          />
+          <div className="text-xs text-text-tertiary">
+            {totalSites.toLocaleString()} sites ({maxGridPerDim}^{activeDims} max) · {memoryKB} KB
+          </div>
           {Array.from({ length: activeDims }, (_, d) => (
             <Slider
               key={`spacing-${d}`}

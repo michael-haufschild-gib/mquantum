@@ -8,6 +8,7 @@ import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroe
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import {
   type BecConfig,
+  createDefaultSchroedingerConfig,
   DEFAULT_SCHROEDINGER_CONFIG,
   type DiracConfig,
   type FreeScalarConfig,
@@ -104,7 +105,7 @@ export const createSchroedingerSlice: StateCreator<
   }
 
   return {
-    schroedinger: { ...DEFAULT_SCHROEDINGER_CONFIG },
+    schroedinger: createDefaultSchroedingerConfig(),
 
     // === Geometry Settings ===
     setSchroedingerScale: (scale) => {

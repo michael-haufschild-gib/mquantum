@@ -49,7 +49,7 @@ describe('Dirac setters — extended coverage', () => {
   })
 
   describe('setDiracPotentialStrength', () => {
-    it('sets value and triggers needsReset', () => {
+    it('clamps to [-100, 100]', () => {
       store().setDiracPotentialStrength(5.0)
       expect(dirac().potentialStrength).toBe(5.0)
     })
@@ -141,6 +141,14 @@ describe('Dirac setters — extended coverage', () => {
       expect(dirac().packetCenter[0]).toBe(0.5)
     })
 
+    it('clamps to 90% of grid half-extent', () => {
+      // Default: gridSize[0]=64, spacing[0]=0.15 → halfExtent=4.8, limit=4.32
+      store().setDiracPacketCenter(0, 100)
+      expect(dirac().packetCenter[0]).toBeCloseTo(4.32, 2)
+      store().setDiracPacketCenter(0, -100)
+      expect(dirac().packetCenter[0]).toBeCloseTo(-4.32, 2)
+    })
+
     it('rejects non-finite', () => {
       const orig = dirac().packetCenter[0]
       store().setDiracPacketCenter(0, NaN)
@@ -152,6 +160,15 @@ describe('Dirac setters — extended coverage', () => {
     it('sets momentum for a dimension index', () => {
       store().setDiracPacketMomentum(0, 3.0)
       expect(dirac().packetMomentum[0]).toBe(3.0)
+    })
+
+    it('clamps to Nyquist limit π/spacing', () => {
+      // Default spacing[0]=0.15 → kMax = π/0.15 ≈ 20.944
+      const kMax = Math.PI / 0.15
+      store().setDiracPacketMomentum(0, 1000)
+      expect(dirac().packetMomentum[0]).toBeCloseTo(kMax, 2)
+      store().setDiracPacketMomentum(0, -1000)
+      expect(dirac().packetMomentum[0]).toBeCloseTo(-kMax, 2)
     })
 
     it('rejects non-finite', () => {

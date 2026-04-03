@@ -52,7 +52,8 @@ export function computeHydrogenRadialNormND(
   const lnNum = lnFactorial(nr)
   const lnDen = Math.log(2.0 * nEff) + lnFactorial(denomFactIdx)
   const lnRatio = lnNum - lnDen
-  return front * Math.sqrt(Math.exp(lnRatio))
+  // Use exp(x/2) instead of sqrt(exp(x)) to match WGSL and avoid intermediate overflow
+  return front * Math.exp(0.5 * lnRatio)
 }
 
 /**

@@ -34,6 +34,8 @@ export interface CarpetDispatchParams {
   historyLength: number
   writeHead: number
   totalFrames: number
+  /** When true, read density from alpha channel (compute modes); otherwise read from red (analytic modes). */
+  readAlpha: boolean
 }
 
 /** Callback to deliver readback data to the store with capture-time metadata. */
@@ -182,7 +184,15 @@ export class CarpetSliceComputePass {
   ): void {
     if (!this.device || !this.pipeline || !this.uniformBuffer || !this.bindGroupLayout) return
 
-    const { sliceAxis, slicePositionY, slicePositionZ, logScale, historyLength, writeHead } = params
+    const {
+      sliceAxis,
+      slicePositionY,
+      slicePositionZ,
+      logScale,
+      historyLength,
+      writeHead,
+      readAlpha,
+    } = params
 
     this.ensureTextures(historyLength)
     if (!this.carpetTextureView) return
@@ -194,7 +204,7 @@ export class CarpetSliceComputePass {
     this.uniformF32[3] = slicePositionZ
     this.uniformU32[4] = logScale ? 1 : 0
     this.uniformU32[5] = DENSITY_GRID_SIZE
-    this.uniformU32[6] = 0
+    this.uniformU32[6] = readAlpha ? 1 : 0
     this.uniformU32[7] = 0
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
 

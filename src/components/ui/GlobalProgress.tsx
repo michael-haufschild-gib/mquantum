@@ -44,7 +44,7 @@ export const GlobalProgress: React.FC = React.memo(() => {
           initial={{ opacity: 0, scaleY: 0 }}
           animate={{ opacity: 1, scaleY: 1 }}
           exit={{ opacity: 0, scaleY: 0 }}
-          className="absolute top-0 left-0 right-0 h-[2px] z-[100] origin-left pointer-events-none overflow-hidden"
+          className="absolute top-0 inset-x-0 h-[2px] z-[100] origin-left pointer-events-none overflow-hidden"
         >
           {/* Background Track */}
           <div className="absolute inset-0 bg-[var(--bg-active)]" />
@@ -54,7 +54,7 @@ export const GlobalProgress: React.FC = React.memo(() => {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent to-transparent w-[50%] animate-[shimmer_1.5s_infinite] translate-x-[-100%]" />
           ) : (
             <m.div
-              className="absolute inset-y-0 left-0 bg-accent shadow-[0_0_10px_var(--color-accent)]"
+              className="absolute inset-y-0 start-0 bg-accent shadow-[0_0_10px_var(--color-accent)]"
               initial={{ width: 0 }}
               animate={{ width: `${refinementProgress}%` }}
               transition={{ type: 'spring', stiffness: 100, damping: 20 }}

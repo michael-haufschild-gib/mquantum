@@ -23,7 +23,12 @@ import type {
   SchroedingerWGSLShaderConfig,
 } from '../shaders/schroedinger/compose'
 import { packLightingUniforms } from '../utils/lighting'
-import { applyModeOverrides, buildPipelineOutputs, buildShaderConfig } from './rendererConfigUtils'
+import {
+  applyModeOverrides,
+  buildPipelineOutputs,
+  buildShaderConfig,
+  isComputeQuantumMode,
+} from './rendererConfigUtils'
 import {
   computeBasisUpdate,
   computeCameraUpdate,
@@ -427,10 +432,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             this.carpetSlicePass = new CarpetSliceComputePass()
             this.carpetSlicePass.initialize(this.device)
           }
+          // Analytic modes (HO, hydrogen) store density in .r; compute modes store it in .a
+          const computeMode = isComputeQuantumMode(this.rendererConfig)
           this.carpetSlicePass.dispatch(
             ctx.encoder,
             densityView,
-            carpetState,
+            { ...carpetState, readAlpha: computeMode },
             (data, gridSize, wh, tf) => {
               useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
             }

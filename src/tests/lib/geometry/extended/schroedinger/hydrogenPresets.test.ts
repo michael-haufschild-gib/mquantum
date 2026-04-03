@@ -70,7 +70,8 @@ describe('Hydrogen Quantum Number Utilities', () => {
       expect(quantumNumbersToLabel(2, 1, 1)).toBe('2px')
       expect(quantumNumbersToLabel(2, 1, -1)).toBe('2py')
       expect(quantumNumbersToLabel(3, 2, 0)).toBe('3dz²')
-      expect(quantumNumbersToLabel(3, 2, 2)).toBe('3dxy')
+      expect(quantumNumbersToLabel(3, 2, 2)).toBe('3dx²-y²')
+      expect(quantumNumbersToLabel(3, 2, -2)).toBe('3dxy')
     })
 
     it('falls back to generic label for unsupported combinations', () => {

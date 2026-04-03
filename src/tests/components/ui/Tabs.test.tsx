@@ -245,10 +245,16 @@ describe('Tabs', () => {
       render(<Tabs tabs={mockTabs} value="tab1" onChange={() => {}} />)
 
       const tab1 = screen.getByRole('tab', { name: 'Tab 1' })
-      expect(tab1).toHaveAttribute('aria-controls', 'panel-tab1')
+      const ariaControls = tab1.getAttribute('aria-controls')!
+      expect(ariaControls).toContain('panel-tab1')
 
       const panel = screen.getByRole('tabpanel')
-      expect(panel).toHaveAttribute('aria-labelledby', 'tab-tab1')
+      const labelledBy = panel.getAttribute('aria-labelledby')!
+      expect(labelledBy).toContain('tab-tab1')
+
+      // Verify the ARIA link is bidirectional (tab → panel → tab)
+      expect(panel.id).toBe(ariaControls)
+      expect(tab1.id).toBe(labelledBy)
     })
   })
 })

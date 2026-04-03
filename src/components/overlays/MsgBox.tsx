@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
 import { Icon, type IconName } from '@/components/ui/Icon'
@@ -9,7 +10,18 @@ import { useMsgBoxStore } from '@/stores/msgBoxStore'
 
 export const MsgBox: React.FC = () => {
   const { isOpen, title, message, type, actions, dismissible, dismissId, closeMsgBox } =
-    useMsgBoxStore()
+    useMsgBoxStore(
+      useShallow((s) => ({
+        isOpen: s.isOpen,
+        title: s.title,
+        message: s.message,
+        type: s.type,
+        actions: s.actions,
+        dismissible: s.dismissible,
+        dismissId: s.dismissId,
+        closeMsgBox: s.closeMsgBox,
+      }))
+    )
   const dismiss = useDismissedDialogsStore((state) => state.dismiss)
 
   // Local state for the "don't show again" checkbox

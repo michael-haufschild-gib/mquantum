@@ -7,7 +7,7 @@
  * @module components/sections/Faces/colorPreviewGradient
  */
 
-import { hexToSrgbTuple, rgbToHex } from '@/lib/colors/colorUtils'
+import { hexToSrgbTuple } from '@/lib/colors/colorUtils'
 import { applyDistributionTS, getCosinePaletteColorTS } from '@/rendering/shaders/palette'
 
 // ---------------------------------------------------------------------------
@@ -359,7 +359,11 @@ export function renderColorGradient(
   height: number,
   params: GradientParams
 ): void {
-  ctx.clearRect(0, 0, width, height)
+  if (width <= 0 || height <= 0) return
+  if (typeof ctx.createImageData !== 'function') return
+
+  const imageData = ctx.createImageData(width, height)
+  const data = imageData.data
 
   for (let x = 0; x < width; x++) {
     const t = x / width
@@ -369,7 +373,15 @@ export function renderColorGradient(
     const g8 = Math.round(Math.max(0, Math.min(1, g)) * 255)
     const b8 = Math.round(Math.max(0, Math.min(1, b)) * 255)
 
-    ctx.fillStyle = rgbToHex(r8, g8, b8)
-    ctx.fillRect(x, 0, 1, height)
+    // Write column: same color for all rows
+    for (let y = 0; y < height; y++) {
+      const i = (y * width + x) * 4
+      data[i] = r8
+      data[i + 1] = g8
+      data[i + 2] = b8
+      data[i + 3] = 255
+    }
   }
+
+  ctx.putImageData(imageData, 0, 0)
 }

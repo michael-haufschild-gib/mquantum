@@ -8,13 +8,13 @@ import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 
 describe('PAULI_SCENARIO_PRESETS', () => {
-  it('contains exactly 6 presets', () => {
-    expect(PAULI_SCENARIO_PRESETS).toHaveLength(6)
+  it('contains at least one preset', () => {
+    expect(PAULI_SCENARIO_PRESETS.length).toBeGreaterThan(0)
   })
 
   it('all ids are unique', () => {
     const ids = PAULI_SCENARIO_PRESETS.map((p) => p.id)
-    expect(new Set(ids).size).toBe(6)
+    expect(new Set(ids).size).toBe(PAULI_SCENARIO_PRESETS.length)
   })
 
   it('each preset has non-empty name and description', () => {

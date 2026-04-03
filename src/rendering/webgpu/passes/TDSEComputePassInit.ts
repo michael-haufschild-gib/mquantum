@@ -119,7 +119,7 @@ export function maybeInitialize(
         ic.potentialBuffer,
         ic.totalSites,
         linearWG,
-        ic.dispatchCompute.bind(null) as typeof ic.dispatchCompute
+        ic.dispatchCompute
       )
     }
   }

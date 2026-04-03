@@ -109,8 +109,8 @@ export const HYDROGEN_ND_PRESETS: Record<HydrogenNDPresetName, HydrogenNDPreset>
     extraDimOmega: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   },
   '3dxy_3d': {
-    name: '3dxy',
-    description: 'Clover-shaped orbital in the xy-plane',
+    name: '3dx²-y²',
+    description: 'Clover-shaped orbital with lobes along x and y axes',
     n: 3,
     l: 2,
     m: 2,

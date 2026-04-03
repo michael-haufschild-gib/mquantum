@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 import { Icon } from '@/components/ui/Icon'
 import { useExportStore } from '@/stores/exportStore'
@@ -24,7 +25,13 @@ const getExportWidth = (resolution: string, customWidth: number): number => {
 }
 
 export const ExportPreview = () => {
-  const { settings, canvasAspectRatio, previewImage } = useExportStore()
+  const { settings, canvasAspectRatio, previewImage } = useExportStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      canvasAspectRatio: s.canvasAspectRatio,
+      previewImage: s.previewImage,
+    }))
+  )
   const { crop, textOverlay, resolution, customWidth } = settings
 
   const cropBoxRef = useRef<HTMLDivElement>(null)
@@ -135,7 +142,7 @@ export const ExportPreview = () => {
       </div>
 
       {/* Status Overlays */}
-      <div className="absolute top-4 left-4 flex gap-2">
+      <div className="absolute top-4 start-4 flex gap-2">
         <div className="px-2 py-1 glass-panel rounded text-[10px] font-mono text-[var(--text-secondary)]">
           PREVIEW
         </div>

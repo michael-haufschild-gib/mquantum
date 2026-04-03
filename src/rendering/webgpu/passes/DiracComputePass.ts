@@ -664,7 +664,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       initialNorm: this.initialNorm,
       maxDensity: this.maxDensity,
       diagMappingInFlight: this.diagMappingInFlight,
-      diagGeneration: this.diagGeneration,
+      getDiagGeneration: () => this.diagGeneration,
       dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
     }
     dispatchDiagnostics(ctx, config, params, (result) => {

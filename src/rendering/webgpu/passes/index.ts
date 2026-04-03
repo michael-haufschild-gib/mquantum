@@ -30,24 +30,10 @@ export type { EnvironmentCompositePassConfig } from './EnvironmentCompositePass'
 export { EnvironmentCompositePass } from './EnvironmentCompositePass'
 export type { FrameBlendingPassConfig } from './FrameBlendingPass'
 export { FrameBlendingPass } from './FrameBlendingPass'
-export type {
-  FullscreenPassConfig,
-  FullscreenUniform,
-  FullscreenUniformType,
-} from './FullscreenPass'
-export { FullscreenPass } from './FullscreenPass'
 export type { FXAAPassOptions } from './FXAAPass'
 export { FXAAPass } from './FXAAPass'
 export type { LightGizmoPassConfig } from './LightGizmoPass'
 export { LightGizmoPass } from './LightGizmoPass'
-export type {
-  MainObjectMRTPassConfig,
-  MRTAttachmentConfig,
-  MRTPipelineConfig,
-} from './MainObjectMRTPass'
-export { createMRTPipelineConfig, MainObjectMRTPass } from './MainObjectMRTPass'
-export type { NormalPassConfig } from './NormalPass'
-export { NormalPass } from './NormalPass'
 export type { PaperTexturePassConfig } from './PaperTexturePass'
 export { PaperTexturePass } from './PaperTexturePass'
 export type { SMAAPassOptions } from './SMAAPass'
