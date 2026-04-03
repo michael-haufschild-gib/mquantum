@@ -77,6 +77,10 @@ export const TimelineControls: FC = () => {
     }))
   )
 
+  const pauliSliceAnimationEnabled = useExtendedObjectStore(
+    (state) => state.pauliSpinor.sliceAnimationEnabled
+  )
+
   // Reset actions for unified restart button
   const resetActions = useExtendedObjectStore(
     useShallow((state) => ({
@@ -91,7 +95,7 @@ export const TimelineControls: FC = () => {
   )
 
   const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
-  // Count active animations for Schroedinger
+  // Count active animations across object types
   const activeAnimationCount = useMemo(() => {
     const configKey = getConfigStoreKey(objectType)
 
@@ -105,6 +109,10 @@ export const TimelineControls: FC = () => {
       ].filter(Boolean).length
     }
 
+    if (configKey === 'pauliSpinor') {
+      return pauliSliceAnimationEnabled ? 1 : 0
+    }
+
     return 0
   }, [
     objectType,
@@ -113,6 +121,7 @@ export const TimelineControls: FC = () => {
     schroedingerConfig.probabilityFlowEnabled,
     schroedingerConfig.probabilityCurrentEnabled,
     schroedingerConfig.phaseAnimationEnabled,
+    pauliSliceAnimationEnabled,
   ])
 
   const configStoreKey = getConfigStoreKey(objectType)

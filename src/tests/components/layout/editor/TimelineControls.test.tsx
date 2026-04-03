@@ -31,6 +31,10 @@ const mockExtendedState = {
     interferenceEnabled: false,
     probabilityFlowEnabled: false,
     probabilityCurrentEnabled: false,
+    phaseAnimationEnabled: false,
+  },
+  pauliSpinor: {
+    sliceAnimationEnabled: false,
   },
   resetSchroedingerParameters: mockResetSchroedingerParameters,
   resetFreeScalarField: mockResetFreeScalarField,

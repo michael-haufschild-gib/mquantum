@@ -107,12 +107,12 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
   }, [isOpen, closeDropdown])
 
   const items: MenuItem[] = useMemo(() => {
-    const m = getModifierSymbols()
+    const mod = getModifierSymbols()
     return [
       { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
       { label: 'Toggle Cinematic Mode', shortcut: 'C', action: toggleCinematicMode },
       { type: 'separator', label: '' },
-      { label: 'Toggle Left Panel', shortcut: `${m.shift}+\\`, action: toggleLeftPanel },
+      { label: 'Toggle Left Panel', shortcut: `${mod.shift}+\\`, action: toggleLeftPanel },
       { label: 'Toggle Right Panel', shortcut: '\\', action: toggleCollapsed },
     ]
   }, [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed])
