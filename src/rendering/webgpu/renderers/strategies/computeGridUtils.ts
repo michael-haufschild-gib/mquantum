@@ -36,11 +36,14 @@ export function computeLatticeBoundingRadius(
 /**
  * Apply shared PML (perfectly matched layer) absorber overrides.
  * Each mode stores per-mode PML settings, but the shared schroedinger-level
- * absorber controls take precedence when set.
+ * absorber controls interact with per-mode settings:
+ * - `absorberEnabled`: AND logic — both shared and per-mode must be true.
+ *   The shared toggle acts as a master switch; per-mode can additionally disable.
+ * - `absorberWidth`, `pmlTargetReflection`: shared overrides per-mode (fallback).
  *
  * @param config - Mode-specific config object
  * @param schroedinger - Parent schroedinger store snapshot
- * @returns Config with shared PML values overriding per-mode values
+ * @returns Config with shared PML values merged into per-mode values
  */
 export function applySharedPml<
   T extends {
@@ -60,7 +63,7 @@ export function applySharedPml<
 ): T {
   return {
     ...config,
-    absorberEnabled: schroedinger?.absorberEnabled ?? config.absorberEnabled,
+    absorberEnabled: (schroedinger?.absorberEnabled ?? true) && (config.absorberEnabled ?? true),
     absorberWidth: schroedinger?.absorberWidth ?? config.absorberWidth,
     pmlTargetReflection: schroedinger?.pmlTargetReflection ?? config.pmlTargetReflection,
   }
