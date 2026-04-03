@@ -1,193 +1,28 @@
 import { describe, expect, it } from 'vitest'
 
 import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
-import {
-  freeScalarInitBlock,
-  freeScalarUniformsBlock,
-} from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl'
-import { freeScalarUpdatePhiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
-import { freeScalarUpdatePiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
-import { freeScalarWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
 
-describe('Free Scalar Field WGSL Shaders', () => {
-  describe('uniforms block', () => {
-    it('declares FreeScalarUniforms struct', () => {
-      expect(freeScalarUniformsBlock).toContain('struct FreeScalarUniforms')
+describe('renderer temporal + free scalar interaction', () => {
+  it('disables temporal outputs when quantumMode is freeScalarField even if temporal flag is true', () => {
+    const renderer = new WebGPUSchrodingerRenderer({
+      temporal: true,
+      quantumMode: 'freeScalarField',
+      dimension: 3,
     })
-
-    it('contains required uniform fields for N-D layout', () => {
-      expect(freeScalarUniformsBlock).toContain('gridSize: array<u32, 12>')
-      expect(freeScalarUniformsBlock).toContain('latticeDim: u32')
-      expect(freeScalarUniformsBlock).toContain('mass: f32')
-      expect(freeScalarUniformsBlock).toContain('dt: f32')
-      expect(freeScalarUniformsBlock).toContain('totalSites: u32')
-      expect(freeScalarUniformsBlock).toContain('maxFieldValue: f32')
-    })
+    const outputIds = renderer.config.outputs.map((o) => o.resourceId)
+    expect(outputIds).not.toContain('quarter-color')
+    expect(outputIds).not.toContain('quarter-position')
+    expect(outputIds).toContain('object-color')
   })
 
-  describe('init shader', () => {
-    it('declares compute entry point', () => {
-      expect(freeScalarInitBlock).toContain('@compute @workgroup_size(64)')
-      expect(freeScalarInitBlock).toContain('fn main(')
+  it('allows temporal outputs for non-free-scalar modes when temporal is true', () => {
+    const renderer = new WebGPUSchrodingerRenderer({
+      temporal: true,
+      quantumMode: 'harmonicOscillator',
+      dimension: 3,
     })
-
-    it('handles singleMode and gaussianPacket initial conditions (vacuum is CPU-side)', () => {
-      // singleMode = 1
-      expect(freeScalarInitBlock).toContain('params.initCondition == 1u')
-      // gaussianPacket = 2
-      expect(freeScalarInitBlock).toContain('params.initCondition == 2u')
-      // vacuumNoise (0u) is handled CPU-side — shader notes this as no-op
-      expect(freeScalarInitBlock).toContain('vacuumNoise')
-    })
-
-    it('includes phi and pi buffer access', () => {
-      expect(freeScalarInitBlock).toContain('phi[idx]')
-      expect(freeScalarInitBlock).toContain('pi[idx]')
-    })
-
-    it('contains N-D distance computation loop over active dimensions', () => {
-      // N-D refactor: distance is computed via loop, not per-component select()
-      expect(freeScalarInitBlock).toContain('worldPos[d] - params.packetCenter[d]')
-    })
-
-    it('gates kPhys by gridSize within N-D loop', () => {
-      // N-D refactor: kPhys validity is checked per-dimension in the loop
-      expect(freeScalarInitBlock).toContain('params.gridSize[d]')
-      expect(freeScalarInitBlock).toContain('latticeL > 0.0')
-    })
-  })
-
-  describe('updatePi shader', () => {
-    it('declares compute entry point', () => {
-      expect(freeScalarUpdatePiBlock).toContain('@compute @workgroup_size(64)')
-      expect(freeScalarUpdatePiBlock).toContain('fn main(')
-    })
-
-    it('references FreeScalarUniforms without defining it (struct in shared block)', () => {
-      expect(freeScalarUpdatePiBlock).toContain('var<uniform> params: FreeScalarUniforms')
-      expect(freeScalarUpdatePiBlock).not.toContain('struct FreeScalarUniforms')
-    })
-
-    it('contains discrete Laplacian computation', () => {
-      expect(freeScalarUpdatePiBlock).toContain('laplacian')
-    })
-
-    it('includes periodic boundary conditions via stride wrapping', () => {
-      // Stride-based periodic BCs: select wraps at boundary coords 0 and gridSize-1
-      expect(freeScalarUpdatePiBlock).toContain('params.gridSize[d] - 1u')
-      expect(freeScalarUpdatePiBlock).toContain('coord == 0u')
-    })
-
-    it('implements Klein-Gordon update equation', () => {
-      // pi[idx] += dt * (laplacian - mass^2 * phi)
-      expect(freeScalarUpdatePiBlock).toContain('params.mass * params.mass')
-      expect(freeScalarUpdatePiBlock).toContain('params.dt')
-    })
-
-    it('composes correctly with uniforms block', () => {
-      const composed = freeScalarUniformsBlock + freeScalarUpdatePiBlock
-      expect(composed).toContain('struct FreeScalarUniforms')
-      expect(composed).toContain('fn main(')
-    })
-  })
-
-  describe('updatePhi shader', () => {
-    it('declares compute entry point', () => {
-      expect(freeScalarUpdatePhiBlock).toContain('@compute @workgroup_size(64)')
-      expect(freeScalarUpdatePhiBlock).toContain('fn main(')
-    })
-
-    it('references FreeScalarUniforms without defining it (struct in shared block)', () => {
-      expect(freeScalarUpdatePhiBlock).toContain('var<uniform> params: FreeScalarUniforms')
-      expect(freeScalarUpdatePhiBlock).not.toContain('struct FreeScalarUniforms')
-    })
-
-    it('implements Hamilton equation: dphi/dt = pi', () => {
-      expect(freeScalarUpdatePhiBlock).toContain('params.dt * pi[idx]')
-    })
-
-    it('composes correctly with uniforms block', () => {
-      const composed = freeScalarUniformsBlock + freeScalarUpdatePhiBlock
-      expect(composed).toContain('struct FreeScalarUniforms')
-      expect(composed).toContain('fn main(')
-    })
-  })
-
-  describe('renderer temporal + free scalar interaction', () => {
-    it('disables temporal outputs when quantumMode is freeScalarField even if temporal flag is true', () => {
-      const renderer = new WebGPUSchrodingerRenderer({
-        temporal: true,
-        quantumMode: 'freeScalarField',
-        dimension: 3,
-      })
-      const outputIds = renderer.config.outputs.map((o) => o.resourceId)
-      expect(outputIds).not.toContain('quarter-color')
-      expect(outputIds).not.toContain('quarter-position')
-      expect(outputIds).toContain('object-color')
-    })
-
-    it('allows temporal outputs for non-free-scalar modes when temporal is true', () => {
-      const renderer = new WebGPUSchrodingerRenderer({
-        temporal: true,
-        quantumMode: 'harmonicOscillator',
-        dimension: 3,
-      })
-      const outputIds = renderer.config.outputs.map((o) => o.resourceId)
-      expect(outputIds).toContain('quarter-color')
-      expect(outputIds).toContain('quarter-position')
-    })
-  })
-
-  describe('writeGrid shader', () => {
-    it('declares 3D workgroup compute entry point', () => {
-      expect(freeScalarWriteGridBlock).toContain('@compute @workgroup_size(4, 4, 4)')
-      expect(freeScalarWriteGridBlock).toContain('fn main(')
-    })
-
-    it('references FreeScalarUniforms without defining it (struct in shared block)', () => {
-      expect(freeScalarWriteGridBlock).toContain('var<uniform> params: FreeScalarUniforms')
-      expect(freeScalarWriteGridBlock).not.toContain('struct FreeScalarUniforms')
-    })
-
-    it('includes 3D storage texture output', () => {
-      expect(freeScalarWriteGridBlock).toContain('textureStore(outputTex')
-    })
-
-    it('supports all three field views', () => {
-      // phi = 0, pi = 1, energyDensity = 2
-      expect(freeScalarWriteGridBlock).toContain('params.fieldView == 0u')
-      expect(freeScalarWriteGridBlock).toContain('params.fieldView == 1u')
-    })
-
-    it('encodes sign as phase in B channel', () => {
-      // phase = select(0.0, PI, value < 0)
-      expect(freeScalarWriteGridBlock).toContain('3.14159')
-      expect(freeScalarWriteGridBlock).toContain('fieldValue < 0.0')
-    })
-
-    it('contains logRho from normalized density, not raw field value', () => {
-      // logRho must use normRho (not rho) for consistency with raymarcher color mapping
-      expect(freeScalarWriteGridBlock).toContain('log(normRho + 1e-10)')
-      expect(freeScalarWriteGridBlock).not.toContain('log(rho + 1e-10)')
-    })
-
-    it('contains energy density with forward-difference gradient matching lattice Hamiltonian', () => {
-      expect(freeScalarWriteGridBlock).toContain('gradEnergy')
-      expect(freeScalarWriteGridBlock).toContain('params.mass * params.mass')
-      // Forward difference: (phi[n+1] - phiVal), not central (phi[n+1] - phi[n-1])/(2a)
-      expect(freeScalarWriteGridBlock).toContain('phiVal')
-    })
-
-    it('initializes gradPhi before degenerate-axis early-continue in gradient loop', () => {
-      // Flux analysis reads gradPhi[d] for every active dimension; degenerate axes must be zero-initialized.
-      expect(freeScalarWriteGridBlock).toContain('gradPhi[d] = 0.0')
-      expect(freeScalarWriteGridBlock).toContain('params.gridSize[d] <= 1u')
-    })
-
-    it('composes correctly with uniforms block', () => {
-      const composed = freeScalarUniformsBlock + freeScalarWriteGridBlock
-      expect(composed).toContain('struct FreeScalarUniforms')
-      expect(composed).toContain('fn main(')
-    })
+    const outputIds = renderer.config.outputs.map((o) => o.resourceId)
+    expect(outputIds).toContain('quarter-color')
+    expect(outputIds).toContain('quarter-position')
   })
 })

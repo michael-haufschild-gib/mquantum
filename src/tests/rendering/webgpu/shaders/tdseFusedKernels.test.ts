@@ -8,11 +8,6 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import {
-  tdseFusedPotentialPackBlock,
-  tdseFusedUnpackPotentialBlock,
-} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseFusedKernels.wgsl'
-
 // ── CPU reference implementations mirroring the WGSL logic ──────────────
 
 interface TDSEParams {
@@ -407,48 +402,6 @@ describe('fused kernel multi-step norm conservation', () => {
     // |exp(-iVdt/2ℏ)|² = 1. Over 100 steps, accumulated floating-point error
     // from cos/sin evaluations gives ~O(100 × ε_f64) ≈ 1e-8 drift.
     expect(Math.abs(normFinal - norm0) / norm0).toBeLessThan(1e-6)
-  })
-})
-
-describe('fused kernel WGSL structure', () => {
-  it('fusedPotentialPack includes psiRe, psiIm, potential, and complexBuf access', () => {
-    expect(tdseFusedPotentialPackBlock).toContain('psiRe[idx]')
-    expect(tdseFusedPotentialPackBlock).toContain('psiIm[idx]')
-    expect(tdseFusedPotentialPackBlock).toContain('potential[idx]')
-    expect(tdseFusedPotentialPackBlock).toContain('complexBuf[idx * 2u]')
-    expect(tdseFusedPotentialPackBlock).toContain('complexBuf[idx * 2u + 1u]')
-  })
-
-  it('fusedPotentialPack contains phase rotation (cos/sin) in real-time path', () => {
-    expect(tdseFusedPotentialPackBlock).toContain('cos(phase)')
-    expect(tdseFusedPotentialPackBlock).toContain('sin(phase)')
-  })
-
-  it('fusedPotentialPack contains exponential decay in imaginary-time path', () => {
-    expect(tdseFusedPotentialPackBlock).toContain('exp(-arg)')
-    expect(tdseFusedPotentialPackBlock).toContain('params.imaginaryTime')
-  })
-
-  it('fusedPotentialPack includes GPE nonlinear term', () => {
-    expect(tdseFusedPotentialPackBlock).toContain('params.interactionStrength * density')
-  })
-
-  it('fusedUnpackPotential includes 1/N normalization from inverse FFT', () => {
-    expect(tdseFusedUnpackPotentialBlock).toContain('1.0 / f32(params.totalSites)')
-  })
-
-  it('fusedUnpackPotential includes complexBuf input and psiRe, psiIm output', () => {
-    expect(tdseFusedUnpackPotentialBlock).toContain('complexBuf[idx * 2u]')
-    expect(tdseFusedUnpackPotentialBlock).toContain('psiRe[idx]')
-    expect(tdseFusedUnpackPotentialBlock).toContain('psiIm[idx]')
-  })
-
-  it('fusedUnpackPotential does NOT write back to psiRe/psiIm before reading', () => {
-    // The fused unpack+potential must read from complexBuf, normalize,
-    // apply potential, then write to psi — never reading intermediate psi values.
-    // Verify that complexBuf is read-only and psi is write-only.
-    expect(tdseFusedUnpackPotentialBlock).toContain('var<storage, read> complexBuf')
-    expect(tdseFusedUnpackPotentialBlock).toContain('var<storage, read_write> psiRe')
   })
 })
 

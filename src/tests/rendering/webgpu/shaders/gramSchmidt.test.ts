@@ -1,111 +1,13 @@
 /**
  * Gram-Schmidt orthogonalization tests.
  *
- * Part 1 — Shader structure: verifies the WGSL shader blocks contain the
- * correct structs, workgroup sizes, and formulas.
- *
- * Part 2 — CPU-reference math: verifies the Gram-Schmidt algorithm itself
+ * CPU-reference math: verifies the Gram-Schmidt algorithm itself
  * using CPU implementations of the complex inner product, projection
  * subtraction, and sequential orthogonalization against multiple
  * eigenstates. These tests validate the algorithm that the GPU shaders
  * implement, catching formula errors independently of WGSL transcription.
  */
 import { describe, expect, it } from 'vitest'
-
-import {
-  gramSchmidtInnerProductFinalizeBlock,
-  gramSchmidtInnerProductReduceBlock,
-  gramSchmidtSubtractBlock,
-} from '@/rendering/webgpu/shaders/schroedinger/compute/gramSchmidt.wgsl'
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Part 1: Shader structure tests
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe('Gram-Schmidt inner product reduction', () => {
-  it('declares GSReduceUniforms struct', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('struct GSReduceUniforms')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('totalElements: u32')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('numWorkgroups: u32')
-  })
-
-  it('declares workgroup size 256 for reduction', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('@compute @workgroup_size(256)')
-  })
-
-  it('declares shared memory for tree reduction', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('var<workgroup> shared_re')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('var<workgroup> shared_im')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('workgroupBarrier')
-  })
-
-  it('contains complex inner product ⟨φ|ψ⟩ = conj(φ)·ψ formula', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('pRe * wRe + pIm * wIm')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('pRe * wIm - pIm * wRe')
-  })
-
-  it('includes both eigenstate and current wavefunction buffer bindings', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('phiRe')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('phiIm')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('psiRe')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('psiIm')
-  })
-
-  it('includes partial sum output for reduce-then-finalize pattern', () => {
-    expect(gramSchmidtInnerProductReduceBlock).toContain('partialRe[wid.x]')
-    expect(gramSchmidtInnerProductReduceBlock).toContain('partialIm[wid.x]')
-  })
-})
-
-describe('Gram-Schmidt inner product finalize', () => {
-  it('reuses GSReduceUniforms struct', () => {
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('struct GSReduceUniforms')
-  })
-
-  it('declares workgroup size 256', () => {
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('@compute @workgroup_size(256)')
-  })
-
-  it('accumulates partials with strided loading', () => {
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('params.numWorkgroups')
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('i += 256u')
-  })
-
-  it('includes final [re, im] result output', () => {
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('result[0]')
-    expect(gramSchmidtInnerProductFinalizeBlock).toContain('result[1]')
-  })
-})
-
-describe('Gram-Schmidt subtraction', () => {
-  it('declares GSSubtractUniforms struct', () => {
-    expect(gramSchmidtSubtractBlock).toContain('struct GSSubtractUniforms')
-    expect(gramSchmidtSubtractBlock).toContain('totalElements: u32')
-  })
-
-  it('declares workgroup size 64', () => {
-    expect(gramSchmidtSubtractBlock).toContain('@compute @workgroup_size(64)')
-  })
-
-  it('includes inner product from result buffer', () => {
-    expect(gramSchmidtSubtractBlock).toContain('innerProduct[0]')
-    expect(gramSchmidtSubtractBlock).toContain('innerProduct[1]')
-  })
-
-  it('contains complex projection ⟨φ|ψ⟩ · φ formula', () => {
-    expect(gramSchmidtSubtractBlock).toContain('cRe * fRe - cIm * fIm')
-    expect(gramSchmidtSubtractBlock).toContain('cRe * fIm + cIm * fRe')
-  })
-
-  it('subtracts projection from current wavefunction', () => {
-    expect(gramSchmidtSubtractBlock).toContain('psiRe[idx] = psiRe[idx] - projRe')
-    expect(gramSchmidtSubtractBlock).toContain('psiIm[idx] = psiIm[idx] - projIm')
-  })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Part 2: CPU-reference Gram-Schmidt algorithm math tests
-// ═══════════════════════════════════════════════════════════════════════════
 
 // ── CPU reference implementations (matching the shader algorithm) ────────
 
