@@ -82,8 +82,8 @@ export const HYDROGEN_COUPLED_PRESETS: HydrogenCoupledScenarioPreset[] = [
   },
   {
     id: '3dxy',
-    name: '3dxy Clover',
-    description: 'Clover-shaped orbital in the xy-plane',
+    name: '3dx²-y² Clover',
+    description: 'Clover-shaped orbital with lobes along x and y axes',
     minDim: 3,
     overrides: {
       principalQuantumNumber: 3,
