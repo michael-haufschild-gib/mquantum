@@ -10,6 +10,8 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 
+import { DECOHERENCE_PRESETS } from './decoherencePresets'
+
 /** Subset of TdseConfig fields that a scenario preset can override */
 export type TdsePresetOverride = Partial<Omit<TdseConfig, 'needsReset' | 'slicePositions'>>
 
@@ -382,6 +384,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       autoScale: true,
     },
   },
+  ...DECOHERENCE_PRESETS,
 ]
 
 /** Lookup a preset by its id */

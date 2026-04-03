@@ -30,6 +30,7 @@ import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassS
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { dispatchGramSchmidt as gsDispatch, type GramSchmidtState } from './TDSEGramSchmidt'
 import type { ObservablesState } from './TDSEObservablesDispatch'
+import { maybeDispatchStochasticLoc, type StochasticLocState } from './TDSEStochasticLocalization'
 import { runVortexDetection, type VortexDetectState } from './TDSEVortexDetect'
 
 /** Mutable state updated by the evolution loop each frame. */
@@ -46,6 +47,8 @@ export interface EvolutionResources {
   diagNumWorkgroups: number
   fwdStageCount: number
   gsState: GramSchmidtState
+  /** Stochastic localization state (optional — null when feature not built). */
+  stochasticState: StochasticLocState | null
   /** Dispatch a compute pass. */
   dc: (
     pe: GPUComputePassEncoder,
@@ -113,6 +116,19 @@ export function runStrangEvolution(
     const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
     dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
     fusedUnpackV.end()
+
+    // 7.5. Stochastic localization (CSL) — conditional on γ > 0
+    if (res.stochasticState) {
+      maybeDispatchStochasticLoc(
+        ctx.device,
+        ctx,
+        config,
+        res.stochasticState,
+        linearWG,
+        step,
+        (pass, pipeline, bindGroups, wgX) => dc(pass, pipeline, bindGroups, wgX)
+      )
+    }
 
     // 8. Absorber (separate pass AFTER the Strang step)
     // Applied once per step, after the FFT kinetic step has completed.

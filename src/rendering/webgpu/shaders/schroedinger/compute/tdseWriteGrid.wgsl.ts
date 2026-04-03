@@ -351,10 +351,25 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Alpha channel dual encoding:
   // .a >= 0 → raw |ψ|² density (used by quantum carpet, always available)
   // .a <  0 → -potOverlay intensity (used by raymarcher potential overlay)
+  //
+  // Branch mode (branchingEnabled=1) overrides alpha with branch fraction:
+  // .a in [2.0, 3.0] → branch fraction encoded as 2.0 + fraction (0=pure A, 1=pure B)
+  // The 2.0 offset distinguishes branch data from both raw density and potential overlay.
   let rawDensityScaled = clamp(normDensityRaw * perpFalloff, 0.0, 1.0);
   var alphaChannel: f32 = rawDensityScaled;
 
-  if (params.showPotential == 1u && params.fieldView != 3u) {
+  if (params.branchingEnabled == 1u) {
+    // Determine branch membership: axis-0 world coordinate vs branch plane
+    let halfExtent0 = f32(params.gridSize[0]) * params.spacing[0] * 0.5;
+    let threshold = params.branchPlanePosition * halfExtent0;
+    // Compute axis-0 coordinate using nearest-neighbor (from ndWorldPos[0])
+    let x0 = ndWorldPos[0];
+    // Encode: 2.0 = pure branch A (left), 3.0 = pure branch B (right)
+    // Smooth transition near the boundary to avoid aliasing
+    let transitionWidth = params.spacing[0] * 2.0;
+    let branchFrac = smoothstep(threshold - transitionWidth, threshold + transitionWidth, x0);
+    alphaChannel = 2.0 + branchFrac;
+  } else if (params.showPotential == 1u && params.fieldView != 3u) {
     let potentialScale = getPotentialScale();
     let normPot = abs(potentialVal) / potentialScale;
     let fadeout = 1.0 - smoothstep(1.5, 3.0, normPot);

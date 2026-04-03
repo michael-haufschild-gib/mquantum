@@ -204,6 +204,12 @@ const SCHROEDINGER_FIELDS = [
   // Eliminates redundant log/exp/gamma calls that are constant per quantum state.
   // [0].x = radial norm, [0].yzw...[2].xyzw = hyperspherical layer norms (up to 8)
   { name: 'coupledNorms', type: arr('vec4f', 3) },
+
+  // --- Decoherent branching visualization colors ---
+  { name: 'branchColorA', type: 'vec3f' },
+  { name: '_padBranchA', type: 'f32' },
+  { name: 'branchColorB', type: 'vec3f' },
+  { name: '_padBranchB', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

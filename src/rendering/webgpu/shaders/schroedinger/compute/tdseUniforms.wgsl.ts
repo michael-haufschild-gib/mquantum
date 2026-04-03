@@ -110,5 +110,9 @@ struct TDSEUniforms {
   vortexCount: u32,          // offset 728 — number of vortices to seed (1 or 2)
   anharmonicLambda: f32,     // offset 732 — coupling λ for coupled anharmonic potential
   compactDimsMask: u32,      // offset 736 — bitmask: bit d = 1 means dimension d is compact (periodic KK)
+
+  // Stochastic decoherence branching (8 bytes)
+  branchingEnabled: u32,     // offset 740 — 0=off, 1=on: encode branch fraction in alpha channel
+  branchPlanePosition: f32,  // offset 744 — normalized partition position along axis 0 (-1..1)
 }
 `

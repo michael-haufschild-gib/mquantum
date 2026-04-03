@@ -295,6 +295,12 @@ struct SchroedingerUniforms {
   // Eliminates redundant log/exp/gamma per-sample — these are constant per quantum state.
   // [0].x = radial norm, [0].yzw...[2].xyzw = hyperspherical layer norms (up to 8 layers)
   coupledNorms: array<vec4f, 3>,
+
+  // Decoherent branching visualization colors (offset 1568)
+  branchColorA: vec3f,              // offset 1568 — branch A color (default cyan)
+  _padBranchA: f32,                 // offset 1580
+  branchColorB: vec3f,              // offset 1584 — branch B color (default magenta)
+  _padBranchB: f32,                 // offset 1596
 }
 
 // ============================================

@@ -122,6 +122,16 @@ export interface ShareableObjectState {
   openQuantumRelaxationRate?: number
   /** Open quantum thermal excitation rate */
   openQuantumThermalUpRate?: number
+
+  // ── Stochastic Decoherence ──────────────────────────────────────────────
+  /** Stochastic localization enabled */
+  stochasticEnabled?: boolean
+  /** Monitoring rate γ */
+  stochasticGamma?: number
+  /** Localization width σ */
+  stochasticSigma?: number
+  /** Collapse sites per step */
+  stochasticNumSites?: number
 }
 
 /**
@@ -280,6 +290,15 @@ export function serializeState(state: ShareableState): string {
     setFloatParam(params, 'oq_rx', state.openQuantumRelaxationRate, true)
     setFloatParam(params, 'oq_th', state.openQuantumThermalUpRate, true)
   }
+
+  // Stochastic decoherence
+  if (state.stochasticEnabled) {
+    params.set('sloc', '1')
+    setFloatParam(params, 'sloc_g', state.stochasticGamma, true)
+    setFloatParam(params, 'sloc_s', state.stochasticSigma, true)
+    setIntParam(params, 'sloc_n', state.stochasticNumSites)
+  }
+
   return params.toString()
 }
 
@@ -353,6 +372,15 @@ export function deserializeState(searchParams: string): ParsedShareableState {
     state.openQuantumDephasingRate = parseFloatParam(params, 'oq_dp', 0, 5)
     state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
     state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
+  }
+
+  // Stochastic decoherence
+  const sloc = parseBoolParam(params, 'sloc')
+  if (sloc !== undefined) {
+    state.stochasticEnabled = sloc
+    state.stochasticGamma = parseFloatParam(params, 'sloc_g', 0, 10)
+    state.stochasticSigma = parseFloatParam(params, 'sloc_s', 0.5, 5)
+    state.stochasticNumSites = parseIntParam(params, 'sloc_n', 1, 32)
   }
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

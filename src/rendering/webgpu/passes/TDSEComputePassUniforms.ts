@@ -265,6 +265,10 @@ export function writeTdseUniforms(
   // KK compactification bitmask (offset 736, index 184)
   u32[184] = buildCompactDimsMask(config.compactDims, config.latticeDim)
 
+  // Stochastic decoherence branching (offsets 740-744, indices 185-186)
+  u32[185] = config.branchingEnabled ? 1 : 0
+  f32[186] = config.branchPlanePosition ?? 0.0
+
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
 
