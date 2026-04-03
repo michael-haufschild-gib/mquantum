@@ -1,98 +1,89 @@
 /**
- * Tests for the observable expectation values diagnostics store.
+ * Tests for the observables diagnostics channel.
  *
- * @module tests/stores/observablesDiagnosticsStore
+ * Ring buffer behavior is tested by the shared factory. This file covers
+ * Observables-specific concerns: per-dimension Float64Array propagation,
+ * energy history writes, and activeDims tracking.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+
+import { describeRingBufferBehavior } from './diagnostics/ringBufferTests'
+
+function makeSnapshot(overrides: Partial<{ activeDims: number; totalEnergy: number }> = {}) {
+  return {
+    activeDims: overrides.activeDims ?? 3,
+    positionMean: new Float64Array([1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0]),
+    positionVariance: new Float64Array([0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0]),
+    momentumMean: new Float64Array([0.1, 0.2, 0.3, 0, 0, 0, 0, 0, 0, 0, 0]),
+    momentumVariance: new Float64Array([0.25, 0.25, 0.25, 0, 0, 0, 0, 0, 0, 0, 0]),
+    uncertaintyProduct: new Float64Array([0.56, 0.56, 0.56, 0, 0, 0, 0, 0, 0, 0, 0]),
+    totalEnergy: overrides.totalEnergy ?? 1.5,
+    positionNorm: 1.0,
+    momentumNorm: 1.0,
+  }
+}
 
 describe('observablesDiagnosticsStore', () => {
   beforeEach(() => {
-    useObservablesDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetObservables()
+  })
+
+  describeRingBufferBehavior({
+    channelKey: 'observables',
+    pushOnce: () => useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot()),
+    pushWithValue: (v) =>
+      useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot({ totalEnergy: v })),
+    resetFn: 'resetObservables',
+    historyArrayKey: 'historyEnergy',
+    testValue: 1.5,
   })
 
   it('starts with no data', () => {
-    const state = useObservablesDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().observables
     expect(state.hasData).toBe(false)
     expect(state.activeDims).toBe(0)
-    expect(state.historyHead).toBe(0)
-    expect(state.historyCount).toBe(0)
   })
 
-  it('pushSnapshot sets hasData and stores values', () => {
-    const snapshot = {
-      activeDims: 3,
-      positionMean: new Float64Array([1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0]),
-      positionVariance: new Float64Array([0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0]),
-      momentumMean: new Float64Array([0.1, 0.2, 0.3, 0, 0, 0, 0, 0, 0, 0, 0]),
-      momentumVariance: new Float64Array([0.25, 0.25, 0.25, 0, 0, 0, 0, 0, 0, 0, 0]),
-      uncertaintyProduct: new Float64Array([0.56, 0.56, 0.56, 0, 0, 0, 0, 0, 0, 0, 0]),
-      totalEnergy: 1.5,
-      positionNorm: 1.0,
-      momentumNorm: 1.0,
-    }
+  it('stores activeDims and Float64Array fields from snapshot', () => {
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot())
+    const state = useDiagnosticsStore.getState().observables
 
-    useObservablesDiagnosticsStore.getState().pushSnapshot(snapshot)
-    const state = useObservablesDiagnosticsStore.getState()
-
-    expect(state.hasData).toBe(true)
     expect(state.activeDims).toBe(3)
     expect(state.positionMean[0]).toBe(1)
     expect(state.totalEnergy).toBe(1.5)
-    expect(state.historyHead).toBe(1)
-    expect(state.historyCount).toBe(1)
   })
 
-  it('ring buffer wraps at capacity', () => {
-    const store = useObservablesDiagnosticsStore.getState()
-    const snapshot = {
-      activeDims: 1,
-      positionMean: new Float64Array(11),
-      positionVariance: new Float64Array(11),
-      momentumMean: new Float64Array(11),
-      momentumVariance: new Float64Array(11),
-      uncertaintyProduct: new Float64Array(11),
-      totalEnergy: 0,
-      positionNorm: 1,
-      momentumNorm: 1,
-    }
+  it('per-dimension history arrays advance with head on each push', () => {
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot())
+    const s1 = useDiagnosticsStore.getState().observables
+    expect(s1.historyUncertainty[0]![0]).toBeCloseTo(0.56)
+    expect(s1.historyPositionMean[0]![0]).toBeCloseTo(1)
 
-    // Push 130 snapshots (exceeds 120 buffer length)
-    for (let i = 0; i < 130; i++) {
-      snapshot.totalEnergy = i
-      store.pushSnapshot(snapshot)
-    }
+    // Second push — different values at slot 1
+    const snap2 = makeSnapshot()
+    snap2.uncertaintyProduct = new Float64Array([0.7, 0.7, 0.7, 0, 0, 0, 0, 0, 0, 0, 0])
+    snap2.positionMean = new Float64Array([5, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0])
+    useDiagnosticsStore.getState().pushObservablesSnapshot(snap2)
 
-    const state = useObservablesDiagnosticsStore.getState()
-    expect(state.historyCount).toBe(120) // capped at buffer length
-    expect(state.historyHead).toBe(10) // (130 % 120)
-    // Latest energy should be in the ring buffer
-    expect(state.historyEnergy[(state.historyHead - 1 + 120) % 120]).toBe(129)
+    const s2 = useDiagnosticsStore.getState().observables
+    expect(s2.historyUncertainty[0]![1]).toBeCloseTo(0.7)
+    expect(s2.historyPositionMean[0]![1]).toBeCloseTo(5)
+    // Slot 0 still has first push values
+    expect(s2.historyUncertainty[0]![0]).toBeCloseTo(0.56)
   })
 
-  it('reset clears all data', () => {
-    const store = useObservablesDiagnosticsStore.getState()
-    store.pushSnapshot({
-      activeDims: 2,
-      positionMean: new Float64Array(11),
-      positionVariance: new Float64Array(11),
-      momentumMean: new Float64Array(11),
-      momentumVariance: new Float64Array(11),
-      uncertaintyProduct: new Float64Array(11),
-      totalEnergy: 42,
-      positionNorm: 1,
-      momentumNorm: 1,
-    })
+  it('reset clears per-dimension history arrays', () => {
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot())
+    const before = useDiagnosticsStore.getState().observables.historyUncertainty[0]!
 
-    expect(useObservablesDiagnosticsStore.getState().hasData).toBe(true)
-    store.reset()
+    useDiagnosticsStore.getState().resetObservables()
+    const after = useDiagnosticsStore.getState().observables
 
-    const state = useObservablesDiagnosticsStore.getState()
-    expect(state.hasData).toBe(false)
-    expect(state.totalEnergy).toBe(0)
-    expect(state.historyHead).toBe(0)
-    expect(state.historyCount).toBe(0)
+    expect(after.historyUncertainty[0]).not.toBe(before)
+    expect(after.historyUncertainty[0]![0]).toBe(0)
+    expect(after.historyPositionMean[0]![0]).toBe(0)
   })
 })

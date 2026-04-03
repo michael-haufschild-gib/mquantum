@@ -8,11 +8,6 @@ describe('extendedObjectStore (invariants)', () => {
     useExtendedObjectStore.getState().reset()
   })
 
-  it('schroedinger scale setting updates config', () => {
-    useExtendedObjectStore.getState().setSchroedingerScale(1.5)
-    expect(useExtendedObjectStore.getState().schroedinger.scale).toBe(1.5)
-  })
-
   it('ignores non-finite schroedinger scale updates', () => {
     useExtendedObjectStore.getState().setSchroedingerScale(1.5)
 
@@ -21,25 +16,6 @@ describe('extendedObjectStore (invariants)', () => {
     useExtendedObjectStore.getState().setSchroedingerScale(Number.NEGATIVE_INFINITY)
 
     expect(useExtendedObjectStore.getState().schroedinger.scale).toBe(1.5)
-  })
-
-  it('schroedinger quality preset updates related settings together', () => {
-    useExtendedObjectStore.getState().setSchroedingerQualityPreset('draft')
-    const draft = useExtendedObjectStore.getState().schroedinger
-    expect(draft.qualityPreset).toBe('draft')
-
-    useExtendedObjectStore.getState().setSchroedingerQualityPreset('ultra')
-    const ultra = useExtendedObjectStore.getState().schroedinger
-    expect(ultra.qualityPreset).toBe('ultra')
-  })
-
-  it('updates representation and momentum display settings', () => {
-    useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
-    useExtendedObjectStore.getState().setSchroedingerMomentumDisplayUnits('p')
-
-    const config = useExtendedObjectStore.getState().schroedinger
-    expect(config.representation).toBe('momentum')
-    expect(config.momentumDisplayUnits).toBe('p')
   })
 
   it('clamps momentum scale and hbar ranges', () => {

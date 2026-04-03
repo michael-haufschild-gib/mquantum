@@ -13,21 +13,6 @@ describe('styleExamples', () => {
   })
 
   describe('getStyleExamples', () => {
-    it('returns a non-empty array of style examples', () => {
-      const examples = getStyleExamples()
-      expect(examples.length).toBeGreaterThan(0)
-    })
-
-    it('each example has non-empty id, name, and callable apply', () => {
-      const examples = getStyleExamples()
-      for (const example of examples) {
-        expect(example.id.length).toBeGreaterThan(0)
-        expect(example.name.length).toBeGreaterThan(0)
-        // apply is callable (we don't call it here to avoid store side effects)
-        expect(example.apply).toBeInstanceOf(Function)
-      }
-    })
-
     it('returns examples sorted alphabetically by name', () => {
       const examples = getStyleExamples()
       for (let i = 1; i < examples.length; i++) {

@@ -57,6 +57,9 @@ src/assets/skyboxes/*/*.png
 # Standalone test/reproduction cases
 safari-test/
 
+# Investigation/audit reports (local-only)
+docs/reports/
+
 # Screenshots and test artifacts
 screenshots/
 scripts/playwright/videos/

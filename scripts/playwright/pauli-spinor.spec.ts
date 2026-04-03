@@ -34,10 +34,10 @@ import {
   requireWebGPU,
   waitForDiagnostics,
   waitForFrameAdvance,
+  waitForFreshReadback,
   waitForModeReady,
   waitForRendererReady,
   waitForShaderCompilation,
-  waitForSimulationFrames,
   waitForUniformUpdate,
 } from './helpers/app-helpers'
 
@@ -133,7 +133,10 @@ test.describe('Pauli spinor: preset rendering matrix', () => {
         await applyPauliPreset(page, id)
         await waitForShaderCompilation(page)
         const fc = await getFrameCount(page)
-        await waitForFrameAdvance(page, fc + 120)
+        // 5D/6D Pauli frames are slower (2-component FFTs across more axes).
+        // The sparse frame counter (updates every 60 frames) adds up to 59
+        // extra frames of effective wait, so use a generous timeout at dim >= 5.
+        await waitForFrameAdvance(page, fc + 120, dim >= 5 ? 30_000 : 10_000)
 
         // Higher dimensions produce fainter slices
         const minPx = dim >= 5 ? 1 : 5
@@ -313,13 +316,16 @@ test.describe('Pauli spinor: physics validation', () => {
   test('directional: spinFlip (Rabi) drives spin population transfer', async ({ page }) => {
     // Spin flip preset starts with pure spin-up in a resonant rotating field.
     // After sufficient evolution, spin-down fraction should grow appreciably.
-    // Rabi oscillations can be slow depending on field strength and frequency
-    // matching — allow 500 frames for appreciable population transfer.
+    // Use relative frame counting from preset application to ensure enough
+    // Rabi evolution time regardless of how many frames the setup consumed.
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'spinFlip')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 500)
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
+    const fcAfterPreset = await getFrameCount(page)
+    await waitForFrameAdvance(page, fcAfterPreset + 300, 30_000)
+    // Ensure the most recent GPU readback is reflected in the store
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'pauli')
 
     const diag = await readPauliDiagnostics(page)
     expect(diag.hasData, 'spinFlip diagnostics must have data').toBe(true)
@@ -339,8 +345,10 @@ test.describe('Pauli spinor: physics validation', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'spinCoherence')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 200)
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
+    const fcAfterPreset = await getFrameCount(page)
+    await waitForFrameAdvance(page, fcAfterPreset + 200, 30_000)
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'pauli')
 
     const diag = await readPauliDiagnostics(page)
     expect(diag.hasData, 'spinCoherence diagnostics must have data').toBe(true)
@@ -355,8 +363,10 @@ test.describe('Pauli spinor: physics validation', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'freeSpinUp')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 200)
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
+    const fcAfterPreset = await getFrameCount(page)
+    await waitForFrameAdvance(page, fcAfterPreset + 200, 30_000)
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'pauli')
 
     const diag = await readPauliDiagnostics(page)
     expect(diag.hasData, 'freeSpinUp diagnostics must have data').toBe(true)
@@ -376,8 +386,10 @@ test.describe('Pauli spinor: physics validation', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'harmonicTrap')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 200)
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
+    const fcAfterPreset = await getFrameCount(page)
+    await waitForFrameAdvance(page, fcAfterPreset + 200, 30_000)
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'pauli')
 
     const diag = await readPauliDiagnostics(page)
     expect(diag.hasData, 'harmonicTrap diagnostics must have data').toBe(true)
@@ -435,15 +447,16 @@ test.describe('Pauli spinor: feature toggles', () => {
     // Use Larmor preset for active dynamics
     await applyPauliPreset(page, 'larmorPrecession')
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 60)
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
+    const fcStart = await getFrameCount(page)
+    await waitForFrameAdvance(page, fcStart + 60, 30_000)
 
     const fc1 = await getFrameCount(page)
     const snap1 = await readPauliDiagnostics(page)
     expect(snap1.hasData, 'first snapshot must have data').toBe(true)
 
-    // Let 200 more frames evolve
-    await waitForSimulationFrames(page, 200)
+    // Let 200 more frames evolve (relative to current position)
+    await waitForFrameAdvance(page, fc1 + 200, 30_000)
     const fc2 = await getFrameCount(page)
 
     const snap2 = await readPauliDiagnostics(page)

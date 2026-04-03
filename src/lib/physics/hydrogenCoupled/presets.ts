@@ -31,18 +31,18 @@ export interface HydrogenCoupledScenarioPreset {
   id: string
   name: string
   description: string
-  /** Minimum geometry dimension required (mode requires ≥3). */
+  /** Minimum geometry dimension required. */
   minDim: number
   overrides: HydrogenCoupledPresetOverride
 }
 
 export const HYDROGEN_COUPLED_PRESETS: HydrogenCoupledScenarioPreset[] = [
-  // ── 3D presets (standard hydrogen, chain empty) ─────────────────────
+  // ── 2D+ presets (valid in 2D and higher) ────────────────────────────
   {
     id: '1s_ground',
     name: '1s Ground State',
-    description: 'Spherically symmetric ground state — the simplest hydrogen orbital',
-    minDim: 3,
+    description: 'Circularly/spherically symmetric ground state — the simplest hydrogen orbital',
+    minDim: 2,
     overrides: {
       principalQuantumNumber: 1,
       azimuthalQuantumNumber: 0,
@@ -52,6 +52,22 @@ export const HYDROGEN_COUPLED_PRESETS: HydrogenCoupledScenarioPreset[] = [
       bohrRadiusScale: 1.0,
     },
   },
+  {
+    id: '2p_2d',
+    name: '2px Angular (2D)',
+    description: 'Angular lobe orbital visible in the 2D plane',
+    minDim: 2,
+    overrides: {
+      principalQuantumNumber: 2,
+      azimuthalQuantumNumber: 1,
+      magneticQuantumNumber: 1,
+      angularChain: [],
+      useRealOrbitals: true,
+      bohrRadiusScale: 1.5,
+    },
+  },
+
+  // ── 3D presets (standard hydrogen, chain empty) ─────────────────────
   {
     id: '2pz',
     name: '2pz Dumbbell',

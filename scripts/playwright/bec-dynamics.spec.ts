@@ -238,7 +238,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'attractiveBec')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readBecDiagnostics(page)
@@ -255,7 +255,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'singleVortex')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readBecDiagnostics(page)
@@ -271,7 +271,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'darkSoliton')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readBecDiagnostics(page)
@@ -290,7 +290,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'breathingMode')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readBecDiagnostics(page)
@@ -310,7 +310,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
     const diagWeak = await readBecDiagnostics(page)
     expect(diagWeak.hasData, 'g=500 diagnostics must have data').toBe(true)
@@ -321,7 +321,7 @@ test.describe('BEC dynamics: physics validation', () => {
     await applyBecPreset(page, 'groundState')
     await setInteractionStrength(page, 5000)
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
     const diagStrong = await readBecDiagnostics(page)
     expect(diagStrong.hasData, 'g=5000 diagnostics must have data').toBe(true)
@@ -396,7 +396,7 @@ test.describe('BEC dynamics: feature toggles', () => {
 
     const fc0 = await getFrameCount(page)
     await waitForFrameAdvance(page, fc0 + 60)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
 
     const snap1 = await readBecDiagnostics(page)
     expect(snap1.hasData, 'first snapshot must have data').toBe(true)

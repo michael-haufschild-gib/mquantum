@@ -16,7 +16,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import type { TdseFieldView, TdseInitialCondition } from '@/lib/geometry/extended/types'
-import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import {
@@ -335,8 +335,8 @@ TDSEControls.displayName = 'TDSEControls'
 
 const StoreEigenstateButton: React.FC = React.memo(() => {
   const count = useSimulationStateStore((s) => s.storedEigenstateCount)
-  const eigenstates = useEigenstateDiagnosticsStore((s) => s.eigenstates)
-  const levelSpacing = useEigenstateDiagnosticsStore((s) => s.levelSpacing)
+  const eigenstates = useDiagnosticsStore((s) => s.eigenstate.eigenstates)
+  const levelSpacing = useDiagnosticsStore((s) => s.eigenstate.levelSpacing)
 
   return (
     <div className="space-y-2">

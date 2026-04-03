@@ -15,7 +15,7 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /**
@@ -258,17 +258,17 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
     comptonWavelength,
     zitterbewegungFreq,
     kleinThreshold,
-  } = useDiracDiagnosticsStore(
+  } = useDiagnosticsStore(
     useShallow((s) => ({
-      hasData: s.hasData,
-      totalNorm: s.totalNorm,
-      normDrift: s.normDrift,
-      maxDensity: s.maxDensity,
-      particleFraction: s.particleFraction,
-      antiparticleFraction: s.antiparticleFraction,
-      comptonWavelength: s.comptonWavelength,
-      zitterbewegungFreq: s.zitterbewegungFreq,
-      kleinThreshold: s.kleinThreshold,
+      hasData: s.dirac.hasData,
+      totalNorm: s.dirac.totalNorm,
+      normDrift: s.dirac.normDrift,
+      maxDensity: s.dirac.maxDensity,
+      particleFraction: s.dirac.particleFraction,
+      antiparticleFraction: s.dirac.antiparticleFraction,
+      comptonWavelength: s.dirac.comptonWavelength,
+      zitterbewegungFreq: s.dirac.zitterbewegungFreq,
+      kleinThreshold: s.dirac.kleinThreshold,
     }))
   )
 

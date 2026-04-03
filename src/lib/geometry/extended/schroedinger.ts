@@ -117,6 +117,9 @@ export type SchroedingerProbabilityCurrentColorMode = 'magnitude' | 'direction' 
  * Format: {orbital}_{dimension}d (e.g., '2pz_4d' = 2pz orbital in 4D)
  */
 export type HydrogenNDPresetName =
+  | '1s_2d'
+  | '2s_2d'
+  | '2p_2d'
   | '1s_3d'
   | '2s_3d'
   | '2pz_3d'

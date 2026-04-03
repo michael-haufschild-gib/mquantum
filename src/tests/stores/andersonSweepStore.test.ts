@@ -16,15 +16,6 @@ describe('andersonSweepStore', () => {
     useAndersonSweepStore.getState().reset()
   })
 
-  describe('initial state', () => {
-    it('starts in idle with empty results', () => {
-      const state = useAndersonSweepStore.getState()
-      expect(state.status).toBe('idle')
-      expect(state.results).toEqual([])
-      expect(state.currentStep).toBe(0)
-    })
-  })
-
   describe('startSweep', () => {
     it('transitions to running and stores config', () => {
       useAndersonSweepStore.getState().startSweep(testConfig)

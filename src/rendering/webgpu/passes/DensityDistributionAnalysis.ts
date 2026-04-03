@@ -7,7 +7,7 @@
  * @module rendering/webgpu/passes/DensityDistributionAnalysis
  */
 
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 // PERF: Precomputed 2^(exponent-15) lookup table for Float16 decoding.
 // Exponents 0..30 (31 is Inf/NaN handled separately). Avoids Math.pow per voxel.
@@ -123,7 +123,7 @@ export class DensityDistributionAnalyzer {
       this.prefixMass = null
       this.totalMass = 0
       this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
-      useDensityDiagnosticsStore.getState().pushSnapshot({
+      useDiagnosticsStore.getState().pushDensitySnapshot({
         maxDensity: 0,
         totalDensityMass: 0,
         activeVoxelCount: 0,
@@ -152,8 +152,8 @@ export class DensityDistributionAnalyzer {
     const centerOffset = (centerZ + centerY + half) * readbackTexelStrideHalfs
     const centerDensity = decodeFloat16(halfView[centerOffset] ?? 0)
 
-    const store = useDensityDiagnosticsStore.getState()
-    store.pushSnapshot({
+    const store = useDiagnosticsStore.getState()
+    store.pushDensitySnapshot({
       maxDensity: this.sortedRhoValues[0] ?? 0,
       totalDensityMass: cumulativeMass,
       activeVoxelCount: count,
@@ -187,7 +187,7 @@ export class DensityDistributionAnalyzer {
       sliceZ[i] = decodeFloat16(halfView[zOffset] ?? 0)
     }
 
-    store.pushSlices({
+    store.pushDensitySlices({
       sliceX,
       sliceY,
       sliceZ,

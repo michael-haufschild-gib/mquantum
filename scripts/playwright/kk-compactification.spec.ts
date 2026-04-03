@@ -264,7 +264,7 @@ test.describe('KK compactification: PML interaction', () => {
 
     // Let simulation run enough to see norm behavior
     await waitForSimulationFrames(page, 180)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     const diag = await readTdseDiagnostics(page)
     expect(diag.hasData).toBe(true)
@@ -333,7 +333,7 @@ test.describe('KK compactification: BEC mode', () => {
     await waitForUniformUpdate(page)
 
     await waitForSimulationFrames(page, 180)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
 
     const diag = await readBecDiagnostics(page)
     expect(diag.hasData).toBe(true)

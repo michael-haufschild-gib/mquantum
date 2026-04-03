@@ -296,7 +296,7 @@ test.describe('Measurement Physics Accuracy', () => {
 
   test('simulation remains stable after wavefunction collapse', async ({ page }) => {
     // Wait for diagnostics baseline
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     const diagBefore = await readTdseDiagnostics(page)
     expect(diagBefore.hasData).toBe(true)

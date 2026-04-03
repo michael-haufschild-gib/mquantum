@@ -297,8 +297,8 @@ export function filterBenignErrors(errors: string[]): string[] {
 /** Read TDSE diagnostics from the running app (GPU readback values). */
 export async function readTdseDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/tdseDiagnosticsStore.ts')
-    const s = mod.useTdseDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().tdse
     return {
       hasData: s.hasData,
       totalNorm: s.totalNorm,
@@ -315,8 +315,8 @@ export async function readTdseDiagnostics(page: Page) {
 /** Read Pauli spinor diagnostics from the running app (GPU readback values). */
 export async function readPauliDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/pauliDiagnosticsStore.ts')
-    const s = mod.usePauliDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().pauli
     return {
       hasData: s.hasData,
       totalNorm: s.totalNorm,
@@ -334,8 +334,8 @@ export async function readPauliDiagnostics(page: Page) {
 /** Read BEC diagnostics from the running app (GPU readback values). */
 export async function readBecDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/becDiagnosticsStore.ts')
-    const s = mod.useBecDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().bec
     return {
       hasData: s.hasData,
       totalNorm: s.totalNorm,
@@ -359,8 +359,8 @@ export async function readBecDiagnostics(page: Page) {
 /** Read Dirac diagnostics from the running app (GPU readback values). */
 export async function readDiracDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diracDiagnosticsStore.ts')
-    const s = mod.useDiracDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().dirac
     return {
       hasData: s.hasData,
       totalNorm: s.totalNorm,
@@ -375,8 +375,8 @@ export async function readDiracDiagnostics(page: Page) {
 /** Read free scalar field diagnostics from the running app (GPU readback values). */
 export async function readFsfDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/fsfDiagnosticsStore.ts')
-    const s = mod.useFsfDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().fsf
     return {
       hasData: s.hasData,
       totalEnergy: s.totalEnergy,
@@ -393,8 +393,8 @@ export async function readFsfDiagnostics(page: Page) {
 /** Read density grid diagnostics from the running app (GPU readback values). */
 export async function readDensityDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/densityDiagnosticsStore.ts')
-    const s = mod.useDensityDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().density
     return {
       hasData: s.hasData,
       maxDensity: s.maxDensity,
@@ -410,21 +410,34 @@ export async function readDensityDiagnostics(page: Page) {
 /**
  * Wait for a diagnostic store to report hasData === true.
  * Diagnostics are decimated (every 5-60 frames), so this may take a few seconds.
+ *
+ * For the unified diagnosticsStore, pass the `channel` parameter to specify
+ * which channel to check (e.g. 'tdse', 'bec', 'density'). Without `channel`,
+ * checks top-level `hasData` (for legacy per-store modules).
  */
 export async function waitForDiagnostics(
   page: Page,
   storeModule: string,
-  timeout = 30_000
+  timeout?: number,
+  channel?: string
 ): Promise<void> {
+  const effectiveTimeout = timeout ?? 30_000
   await page.waitForFunction(
-    async (modulePath: string) => {
+    async ([modulePath, ch]: [string, string | null]) => {
       const mod = await import(/* @vite-ignore */ modulePath)
-      const storeExports = Object.values(mod) as Array<{ getState: () => { hasData: boolean } }>
-      const store = storeExports.find((v) => typeof v === 'object' && v !== null && 'getState' in v)
-      return store?.getState().hasData === true
+      const storeExports = Object.values(mod) as Array<{
+        getState: () => Record<string, { hasData: boolean }>
+      }>
+      const store = storeExports.find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
+      if (!store) return false
+      const state = store.getState()
+      if (ch) return (state[ch] as { hasData: boolean } | undefined)?.hasData === true
+      return (state as unknown as { hasData: boolean }).hasData === true
     },
-    storeModule,
-    { timeout }
+    [storeModule, channel ?? null] as [string, string | null],
+    { timeout: effectiveTimeout }
   )
 }
 
@@ -440,34 +453,58 @@ export async function waitForDiagnostics(
  * Use this instead of bare `waitForDiagnostics` after changing quantum
  * numbers, potential type, OQ config, or any parameter that changes what
  * the GPU computes.
+ *
+ * For the unified diagnosticsStore, pass the `channel` parameter to specify
+ * which channel's readbackGeneration to track (e.g. 'tdse', 'density').
  */
 export async function waitForFreshReadback(
   page: Page,
   storeModule: string,
-  timeout = 30_000
+  timeout = 30_000,
+  channel?: string
 ): Promise<void> {
   // Phase 1: drain stale in-flight readbacks (typically ≤1 in flight)
   const fc = await getFrameCount(page)
   await waitForFrameAdvance(page, fc + 3, timeout)
 
   // Phase 2: snapshot generation and wait for a post-drain readback
-  const gen = await page.evaluate(async (mod: string) => {
-    const m = await import(/* @vite-ignore */ mod)
-    const store = (
-      Object.values(m) as Array<{ getState?: () => { readbackGeneration: number } }>
-    ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
-    return store?.getState?.().readbackGeneration ?? 0
-  }, storeModule)
-
-  await page.waitForFunction(
-    async ([mod, prevGen]: [string, number]) => {
+  const gen = await page.evaluate(
+    async ([mod, ch]: [string, string | null]) => {
       const m = await import(/* @vite-ignore */ mod)
       const store = (
-        Object.values(m) as Array<{ getState?: () => { readbackGeneration: number } }>
-      ).find((v) => typeof v === 'object' && v !== null && 'getState' in v)
-      return (store?.getState?.().readbackGeneration ?? 0) > prevGen
+        Object.values(m) as Array<{
+          getState?: () => Record<string, { readbackGeneration: number }>
+        }>
+      ).find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
+      if (!store?.getState) return 0
+      const state = store.getState()
+      if (ch)
+        return (state[ch] as { readbackGeneration: number } | undefined)?.readbackGeneration ?? 0
+      return (state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0
     },
-    [storeModule, gen] as [string, number],
+    [storeModule, channel ?? null] as [string, string | null]
+  )
+
+  await page.waitForFunction(
+    async ([mod, prevGen, ch]: [string, number, string | null]) => {
+      const m = await import(/* @vite-ignore */ mod)
+      const store = (
+        Object.values(m) as Array<{
+          getState?: () => Record<string, { readbackGeneration: number }>
+        }>
+      ).find(
+        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
+      )
+      if (!store?.getState) return false
+      const state = store.getState()
+      const gen = ch
+        ? ((state[ch] as { readbackGeneration: number } | undefined)?.readbackGeneration ?? 0)
+        : ((state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0)
+      return gen > prevGen
+    },
+    [storeModule, gen, channel ?? null] as [string, number, string | null],
     { timeout }
   )
 }
@@ -481,10 +518,10 @@ export async function resetAndWaitForDensityDiagnostics(
   timeout = 30_000
 ): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/densityDiagnosticsStore.ts')
-    mod.useDensityDiagnosticsStore.getState().reset()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    mod.useDiagnosticsStore.getState().resetDensity()
   })
-  await waitForFreshReadback(page, '/src/stores/densityDiagnosticsStore.ts', timeout)
+  await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', timeout, 'density')
 }
 
 /**
@@ -977,7 +1014,7 @@ export async function setupAndWaitForDensity(page: Page, mode: string, dim: numb
   await waitForRendererReady(page)
   await waitForShaderCompilation(page)
   await pauseAnimation(page)
-  await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+  await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'density')
 }
 
 // ─── Open Quantum Diagnostics ────────────────────────────────────────────────
@@ -998,8 +1035,8 @@ export interface OQDiagnosticsSnapshot {
 /** Read the open quantum diagnostics store from the running app. */
 export async function readOQDiagnostics(page: Page): Promise<OQDiagnosticsSnapshot> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
-    const s = mod.useOpenQuantumDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().openQuantum
     return {
       purity: s.purity,
       linearEntropy: s.linearEntropy,
@@ -1026,8 +1063,8 @@ export async function waitForOQEvolution(
 ): Promise<void> {
   await page.waitForFunction(
     async (min: number) => {
-      const mod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
-      return mod.useOpenQuantumDiagnosticsStore.getState().historyCount >= min
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      return mod.useDiagnosticsStore.getState().openQuantum.historyCount >= min
     },
     minUpdates,
     { timeout }
@@ -1076,12 +1113,12 @@ export async function setOQConfig(page: Page, config: Record<string, unknown>): 
  */
 export async function resetOQState(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const diagMod = await import('/src/stores/openQuantumDiagnosticsStore.ts')
-    diagMod.useOpenQuantumDiagnosticsStore.getState().reset()
+    const diagMod = await import('/src/stores/diagnosticsStore.ts')
+    diagMod.useDiagnosticsStore.getState().resetOpenQuantum()
     const extMod = await import('/src/stores/extendedObjectStore.ts')
     extMod.useExtendedObjectStore.getState().requestOpenQuantumStateReset()
   })
-  await waitForFreshReadback(page, '/src/stores/openQuantumDiagnosticsStore.ts')
+  await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'openQuantum')
 }
 
 // ─── Observables Readback ────────────────────────────────────────────────────
@@ -1089,8 +1126,8 @@ export async function resetOQState(page: Page): Promise<void> {
 /** Read observables diagnostics from the GPU readback store. */
 export async function readObservablesDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-    const s = mod.useObservablesDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().observables
     return {
       hasData: s.hasData,
       activeDims: s.activeDims,
@@ -1109,8 +1146,8 @@ export async function readObservablesDiagnostics(page: Page) {
 /** Read quantum walk diagnostics from the running app (GPU readback values). */
 export async function readQwDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-    const s = mod.useQwDiagnosticsStore.getState()
+    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const s = mod.useDiagnosticsStore.getState().qw
     return {
       hasData: s.hasData,
       totalNorm: s.totalNorm,

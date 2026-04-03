@@ -11,8 +11,8 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 
 /**
  * Expand the Observables ControlGroup by clicking its header.
@@ -28,7 +28,7 @@ function expandObservablesSection(): void {
 describe('ObservablesDisplay', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-    useObservablesDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetObservables()
   })
 
   it('shows waiting message when enabled but no data', () => {
@@ -44,7 +44,7 @@ describe('ObservablesDisplay', () => {
   it('renders per-dimension uncertainty products when data is available', () => {
     useExtendedObjectStore.getState().setTdseObservablesEnabled(true)
 
-    useObservablesDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushObservablesSnapshot({
       activeDims: 2,
       positionMean: new Float64Array([1.5, -0.3, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       positionVariance: new Float64Array([0.5, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
@@ -81,8 +81,8 @@ describe('ObservablesDisplay', () => {
     })
 
     // Push 2 snapshots so sparklines have enough data to render
-    useObservablesDiagnosticsStore.getState().pushSnapshot(makeSnapshot(1.0))
-    useObservablesDiagnosticsStore.getState().pushSnapshot(makeSnapshot(1.1))
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot(1.0))
+    useDiagnosticsStore.getState().pushObservablesSnapshot(makeSnapshot(1.1))
 
     render(<TDSEAnalysisContent />)
     expandObservablesSection()

@@ -74,8 +74,8 @@ async function setupTdseWithObservables(page: import('@playwright/test').Page) {
 async function waitForObservablesData(page: import('@playwright/test').Page) {
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-      return mod.useObservablesDiagnosticsStore.getState().hasData
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      return mod.useDiagnosticsStore.getState().observables.hasData
     },
     { timeout: 30_000 }
   )
@@ -109,16 +109,16 @@ test.describe('Observable Expectation Values', () => {
 
     // Wait for data AND read it atomically to avoid race with store resets
     const obs = await page.evaluate(async () => {
-      const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-      const store = mod.useObservablesDiagnosticsStore
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const store = mod.useDiagnosticsStore
 
       // Poll until hasData is true
       const deadline = Date.now() + 30_000
-      while (!store.getState().hasData && Date.now() < deadline) {
+      while (!store.getState().observables.hasData && Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 100))
       }
 
-      const s = store.getState()
+      const s = store.getState().observables
       return {
         hasData: s.hasData,
         activeDims: s.activeDims,

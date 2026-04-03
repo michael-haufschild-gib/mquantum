@@ -160,23 +160,23 @@ test.describe('quantum scarring features', () => {
     // Test the eigenstate diagnostics store from the browser context
     // Level spacing requires ≥10 eigenstates with valid energies
     const result = await page.evaluate(async () => {
-      const mod = await import('/src/stores/eigenstateDiagnosticsStore.ts')
-      const store = mod.useEigenstateDiagnosticsStore
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const store = mod.useDiagnosticsStore
 
-      store.getState().clear()
+      store.getState().clearEigenstate()
 
       // Push 3 eigenstates — not enough for level spacing
       store.getState().pushEigenstate(1.5, 0.01)
       store.getState().pushEigenstate(3.0, 0.02)
       store.getState().pushEigenstate(5.5, 0.03)
-      const noLevelSpacing = store.getState().levelSpacing === null
+      const noLevelSpacing = store.getState().eigenstate.levelSpacing === null
 
       // Push 7 more (total 10) — now level spacing should be computed
       for (let i = 3; i < 10; i++) {
         store.getState().pushEigenstate((i + 0.5) * 1.5, 0.01 + i * 0.005)
       }
 
-      const state = store.getState()
+      const state = store.getState().eigenstate
       return {
         count: state.eigenstates.length,
         noLevelSpacingAt3: noLevelSpacing,

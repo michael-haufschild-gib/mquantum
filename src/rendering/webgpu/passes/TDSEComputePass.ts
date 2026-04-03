@@ -70,7 +70,7 @@ import {
 /** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
 const UNIFORM_SIZE = 740
 
-import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import {
   buildDisorderPipeline,
@@ -469,7 +469,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._obsState.obsEnabled = false // force rebuild on next check
       gsClearEigenstates(this._gsState) // eigenstates are grid-size-specific
       useSimulationStateStore.getState().clearStoredEigenstates()
-      useEigenstateDiagnosticsStore.getState().clear()
+      useDiagnosticsStore.getState().clearEigenstate()
     }
 
     // Create/destroy observables resources when toggle changes or after rebuild

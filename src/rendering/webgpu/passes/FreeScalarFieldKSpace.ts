@@ -10,7 +10,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { computeFsfDiagnostics } from './FreeScalarFieldComputePassUniforms'
 
@@ -282,7 +282,7 @@ export class FsfKSpaceManager {
       phiBuf.unmap()
       piBuf.unmap()
 
-      useFsfDiagnosticsStore.getState().pushSnapshot(snapshot)
+      useDiagnosticsStore.getState().pushFsfSnapshot(snapshot)
       this.diagMappingInFlight = false
     } catch (e) {
       // Buffer may be destroyed mid-readback during mode transitions.

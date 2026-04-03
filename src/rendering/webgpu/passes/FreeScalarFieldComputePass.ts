@@ -18,7 +18,7 @@ import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -442,7 +442,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Without this, a stale readback from the old field can resolve between frames,
     // pass the epoch check, and set initialEnergy from old data — corrupting energyDrift.
     this.kSpace.invalidateReadbacks()
-    useFsfDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetFsf()
   }
 
   /**

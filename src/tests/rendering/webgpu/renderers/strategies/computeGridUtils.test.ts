@@ -62,4 +62,21 @@ describe('applySharedPml', () => {
     expect(result.dt).toBe(0.01)
     expect(result.mass).toBe(1.0)
   })
+
+  it('per-mode disable overrides shared enable (AND logic)', () => {
+    const config = { absorberEnabled: false, absorberWidth: 0.2, pmlTargetReflection: 1e-6 }
+    const shared = { absorberEnabled: true, absorberWidth: 0.3, pmlTargetReflection: 1e-8 }
+    const result = applySharedPml(config, shared)
+    expect(result.absorberEnabled).toBe(false)
+    // Width/reflection still use shared override (non-boolean fields)
+    expect(result.absorberWidth).toBe(0.3)
+    expect(result.pmlTargetReflection).toBe(1e-8)
+  })
+
+  it('both enabled → absorber on', () => {
+    const config = { absorberEnabled: true }
+    const shared = { absorberEnabled: true }
+    const result = applySharedPml(config, shared)
+    expect(result.absorberEnabled).toBe(true)
+  })
 })

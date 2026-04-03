@@ -7,14 +7,7 @@
  * @module lib/export/dataExport
  */
 
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 // ─── Ring buffer utility ──────────────────────────────────────────────────
@@ -45,7 +38,7 @@ export function readRingBuffer(buffer: Float32Array, head: number, count: number
  * @returns CSV string with columns: simTime, frame, norm, R, T
  */
 export function exportTdseDiagnosticsCSV(): string {
-  const state = useTdseDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().tdse
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -68,7 +61,7 @@ export function exportTdseDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, chemicalPotential, healingLength
  */
 export function exportBecDiagnosticsCSV(): string {
-  const state = useBecDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().bec
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -90,7 +83,7 @@ export function exportBecDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, energy, norm
  */
 export function exportFsfDiagnosticsCSV(): string {
-  const state = useFsfDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().fsf
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -111,7 +104,7 @@ export function exportFsfDiagnosticsCSV(): string {
  * @returns CSV string with per-dimension uncertainty products and total energy
  */
 export function exportObservablesDiagnosticsCSV(): string {
-  const state = useObservablesDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().observables
   const { historyHead: head, historyCount: count, activeDims } = state
 
   if (count === 0 || activeDims === 0) return ''
@@ -146,7 +139,7 @@ export function exportObservablesDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, purity, vonNeumannEntropy, coherence
  */
 export function exportOpenQuantumDiagnosticsCSV(): string {
-  const state = useOpenQuantumDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().openQuantum
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -168,7 +161,7 @@ export function exportOpenQuantumDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, particleFraction, antiparticleFraction
  */
 export function exportDiracDiagnosticsCSV(): string {
-  const state = useDiracDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().dirac
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -190,7 +183,7 @@ export function exportDiracDiagnosticsCSV(): string {
  * @returns CSV string with columns: frame, norm, spinUpFraction, spinExpectationZ
  */
 export function exportPauliDiagnosticsCSV(): string {
-  const state = usePauliDiagnosticsStore.getState()
+  const state = useDiagnosticsStore.getState().pauli
   const { historyHead: head, historyCount: count } = state
 
   if (count === 0) return ''
@@ -211,7 +204,7 @@ function readSliceSource(
   axis: 'x' | 'y' | 'z'
 ): { data: Float32Array; gridSize: number; worldBound: number } | null {
   if (source === 'density') {
-    const state = useDensityDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().density
     const axisMap = { x: state.sliceX, y: state.sliceY, z: state.sliceZ }
     const data = axisMap[axis]
     if (!data || state.sliceGridSize === 0) return null
@@ -268,7 +261,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // TDSE diagnostics
   if (quantumMode === 'tdseDynamics') {
-    const s = useTdseDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().tdse
     if (s.historyCount > 0) {
       payload.tdse = {
         current: {
@@ -290,7 +283,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // BEC diagnostics
   if (quantumMode === 'becDynamics') {
-    const s = useBecDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().bec
     if (s.historyCount > 0) {
       payload.bec = {
         current: {
@@ -312,7 +305,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // FSF diagnostics
   if (quantumMode === 'freeScalarField') {
-    const s = useFsfDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().fsf
     if (s.historyCount > 0) {
       payload.fsf = {
         current: {
@@ -334,7 +327,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // Dirac diagnostics
   if (quantumMode === 'diracEquation') {
-    const s = useDiracDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().dirac
     if (s.historyCount > 0) {
       payload.dirac = {
         current: {
@@ -363,7 +356,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // Observables diagnostics (TDSE/BEC modes)
   if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
-    const s = useObservablesDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().observables
     if (s.historyCount > 0 && s.activeDims > 0) {
       const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
       const uncertaintyTimeSeries: Record<string, number[]> = {}
@@ -394,7 +387,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
 
   // Pauli diagnostics
   if (quantumMode === 'pauliSpinor') {
-    const s = usePauliDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().pauli
     if (s.historyCount > 0) {
       payload.pauli = {
         current: {
@@ -423,7 +416,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
     quantumMode === 'hydrogenND' ||
     quantumMode === 'hydrogenNDCoupled'
   ) {
-    const s = useOpenQuantumDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().openQuantum
     if (s.historyCount > 0) {
       payload.openQuantum = {
         current: {
@@ -444,7 +437,7 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
   }
 
   // Wavefunction slices (if available)
-  const density = useDensityDiagnosticsStore.getState()
+  const density = useDiagnosticsStore.getState().density
   if (density.sliceX && density.sliceGridSize > 0) {
     const positions = Array.from(
       { length: density.sliceGridSize },

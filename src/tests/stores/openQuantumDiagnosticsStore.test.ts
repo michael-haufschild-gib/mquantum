@@ -1,11 +1,18 @@
+/**
+ * Tests for the open quantum diagnostics channel.
+ *
+ * Ring buffer behavior is tested by the shared factory. This file covers
+ * OpenQuantum-specific concerns: initial scalar values, metric propagation
+ * from OpenQuantumMetrics, and multi-array history writes.
+ */
+
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { OpenQuantumMetrics } from '@/lib/physics/openQuantum/types'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-const store = useOpenQuantumDiagnosticsStore
+import { describeRingBufferBehavior } from './diagnostics/ringBufferTests'
 
-/** Helper to build a metrics snapshot with distinct values */
 function makeMetrics(seed: number): OpenQuantumMetrics {
   return {
     purity: seed * 0.1,
@@ -17,14 +24,25 @@ function makeMetrics(seed: number): OpenQuantumMetrics {
   }
 }
 
-describe('useOpenQuantumDiagnosticsStore', () => {
+describe('useOpenQuantumDiagnosticsStore (unified)', () => {
   beforeEach(() => {
-    store.getState().reset()
+    useDiagnosticsStore.getState().resetOpenQuantum()
+  })
+
+  describeRingBufferBehavior({
+    channelKey: 'openQuantum',
+    pushOnce: () => useDiagnosticsStore.getState().pushOpenQuantumMetrics(makeMetrics(3)),
+    pushWithValue: (v) =>
+      useDiagnosticsStore.getState().pushOpenQuantumMetrics({ ...makeMetrics(1), purity: v }),
+    resetFn: 'resetOpenQuantum',
+    historyArrayKey: 'historyPurity',
+    testValue: 0.3,
+    hasDataField: false,
   })
 
   describe('initial state', () => {
     it('has purity=1, groundPopulation=1, trace=1 and all other metrics at 0', () => {
-      const s = store.getState()
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.purity).toBe(1)
       expect(s.linearEntropy).toBe(0)
       expect(s.vonNeumannEntropy).toBe(0)
@@ -33,10 +51,8 @@ describe('useOpenQuantumDiagnosticsStore', () => {
       expect(s.trace).toBe(1)
     })
 
-    it('has empty ring buffer with head=0 and count=0', () => {
-      const s = store.getState()
-      expect(s.historyHead).toBe(0)
-      expect(s.historyCount).toBe(0)
+    it('has zeroed history arrays of length 120', () => {
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.historyPurity.length).toBe(120)
       expect(s.historyEntropy.length).toBe(120)
       expect(s.historyCoherence.length).toBe(120)
@@ -48,10 +64,9 @@ describe('useOpenQuantumDiagnosticsStore', () => {
 
   describe('pushMetrics', () => {
     it('updates current metric values to the pushed snapshot', () => {
-      const metrics = makeMetrics(5)
-      store.getState().pushMetrics(metrics)
+      useDiagnosticsStore.getState().pushOpenQuantumMetrics(makeMetrics(5))
 
-      const s = store.getState()
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.purity).toBe(0.5)
       expect(s.linearEntropy).toBe(1.0)
       expect(s.vonNeumannEntropy).toBe(1.5)
@@ -60,75 +75,22 @@ describe('useOpenQuantumDiagnosticsStore', () => {
       expect(s.trace).toBe(3.0)
     })
 
-    it('writes purity, entropy, coherence into ring buffer at current head', () => {
-      const metrics = makeMetrics(3)
-      store.getState().pushMetrics(metrics)
+    it('writes purity, entropy, coherence into separate history arrays', () => {
+      useDiagnosticsStore.getState().pushOpenQuantumMetrics(makeMetrics(3))
 
-      const s = store.getState()
-      // Values were written at index 0 (initial head)
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.historyPurity[0]).toBeCloseTo(0.3)
       expect(s.historyEntropy[0]).toBeCloseTo(0.9)
       expect(s.historyCoherence[0]).toBeCloseTo(1.2)
     })
-
-    it('advances historyHead by 1 after each push', () => {
-      store.getState().pushMetrics(makeMetrics(1))
-      expect(store.getState().historyHead).toBe(1)
-
-      store.getState().pushMetrics(makeMetrics(2))
-      expect(store.getState().historyHead).toBe(2)
-
-      store.getState().pushMetrics(makeMetrics(3))
-      expect(store.getState().historyHead).toBe(3)
-    })
-
-    it('increments historyCount up to the capacity of 120', () => {
-      for (let i = 0; i < 5; i++) {
-        store.getState().pushMetrics(makeMetrics(i + 1))
-      }
-      expect(store.getState().historyCount).toBe(5)
-    })
-  })
-
-  describe('ring buffer wrapping', () => {
-    it('wraps historyHead back to 0 after 120 pushes', () => {
-      for (let i = 0; i < 120; i++) {
-        store.getState().pushMetrics(makeMetrics(i + 1))
-      }
-      expect(store.getState().historyHead).toBe(0)
-      expect(store.getState().historyCount).toBe(120)
-    })
-
-    it('caps historyCount at 120 and does not exceed it', () => {
-      for (let i = 0; i < 130; i++) {
-        store.getState().pushMetrics(makeMetrics(i + 1))
-      }
-      expect(store.getState().historyCount).toBe(120)
-      expect(store.getState().historyHead).toBe(10)
-    })
-
-    it('overwrites oldest entry when buffer wraps', () => {
-      // Fill all 120 slots
-      for (let i = 0; i < 120; i++) {
-        store.getState().pushMetrics(makeMetrics(i + 1))
-      }
-
-      // Slot 0 was written by makeMetrics(1): purity = 0.1
-      expect(store.getState().historyPurity[0]).toBeCloseTo(0.1)
-
-      // Push one more — overwrites slot 0
-      store.getState().pushMetrics(makeMetrics(99))
-      expect(store.getState().historyPurity[0]).toBeCloseTo(9.9)
-      expect(store.getState().historyHead).toBe(1)
-    })
   })
 
   describe('reset', () => {
-    it('restores all scalar metrics to initial values after pushes', () => {
-      store.getState().pushMetrics(makeMetrics(7))
-      store.getState().reset()
+    it('restores all scalar metrics to initial values', () => {
+      useDiagnosticsStore.getState().pushOpenQuantumMetrics(makeMetrics(7))
+      useDiagnosticsStore.getState().resetOpenQuantum()
 
-      const s = store.getState()
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.purity).toBe(1)
       expect(s.linearEntropy).toBe(0)
       expect(s.vonNeumannEntropy).toBe(0)
@@ -137,16 +99,13 @@ describe('useOpenQuantumDiagnosticsStore', () => {
       expect(s.trace).toBe(1)
     })
 
-    it('clears ring buffer head, count, and all history arrays', () => {
+    it('clears all history arrays to zero', () => {
       for (let i = 0; i < 50; i++) {
-        store.getState().pushMetrics(makeMetrics(i + 1))
+        useDiagnosticsStore.getState().pushOpenQuantumMetrics(makeMetrics(i + 1))
       }
 
-      store.getState().reset()
-      const s = store.getState()
-
-      expect(s.historyHead).toBe(0)
-      expect(s.historyCount).toBe(0)
+      useDiagnosticsStore.getState().resetOpenQuantum()
+      const s = useDiagnosticsStore.getState().openQuantum
       expect(s.historyPurity.every((v) => v === 0)).toBe(true)
       expect(s.historyEntropy.every((v) => v === 0)).toBe(true)
       expect(s.historyCoherence.every((v) => v === 0)).toBe(true)

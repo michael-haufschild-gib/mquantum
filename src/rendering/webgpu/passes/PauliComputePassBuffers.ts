@@ -7,7 +7,7 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { FFT_UNIFORM_SIZE, MAX_DIM, PACK_UNIFORM_SIZE } from './computePassUtils'
 
@@ -189,7 +189,7 @@ export function rebuildPauliBuffers(
   device.queue.writeBuffer(diagUniformBuffer, 0, diagData)
 
   // Reset diagnostics store to clear stale observables from previous config
-  usePauliDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetPauli()
 
   return {
     spinorReBuffer,

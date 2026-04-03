@@ -317,7 +317,7 @@ test.describe('TDSE dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'classicTunneling')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 300)
     const diagThin = await readTdseDiagnostics(page)
     expect(diagThin.hasData, 'classicTunneling diagnostics must have data').toBe(true)
@@ -327,7 +327,7 @@ test.describe('TDSE dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'thickBarrier')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 300)
     const diagThick = await readTdseDiagnostics(page)
     expect(diagThick.hasData, 'thickBarrier diagnostics must have data').toBe(true)
@@ -359,7 +359,7 @@ test.describe('TDSE dynamics: physics validation', () => {
     })
 
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 60)
 
     // Read maxDensity before imaginary time
@@ -390,7 +390,7 @@ test.describe('TDSE dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'boundState')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -410,7 +410,7 @@ test.describe('TDSE dynamics: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'periodicLattice')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -479,7 +479,7 @@ test.describe('TDSE dynamics: feature toggles', () => {
 
     const fc0 = await getFrameCount(page)
     await waitForFrameAdvance(page, fc0 + 60)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     const snap1 = await readTdseDiagnostics(page)
     expect(snap1.hasData, 'first snapshot must have data').toBe(true)

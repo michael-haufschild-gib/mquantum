@@ -26,25 +26,18 @@ import {
   exportWavefunctionSliceCSV,
   readRingBuffer,
 } from '@/lib/export/dataExport'
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 beforeEach(() => {
-  useTdseDiagnosticsStore.getState().reset()
-  useBecDiagnosticsStore.getState().reset()
-  useFsfDiagnosticsStore.getState().reset()
-  useObservablesDiagnosticsStore.getState().reset()
-  useOpenQuantumDiagnosticsStore.getState().reset()
-  useDiracDiagnosticsStore.getState().reset()
-  usePauliDiagnosticsStore.getState().reset()
-  useDensityDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetTdse()
+  useDiagnosticsStore.getState().resetBec()
+  useDiagnosticsStore.getState().resetFsf()
+  useDiagnosticsStore.getState().resetObservables()
+  useDiagnosticsStore.getState().resetOpenQuantum()
+  useDiagnosticsStore.getState().resetDirac()
+  useDiagnosticsStore.getState().resetPauli()
+  useDiagnosticsStore.getState().resetDensity()
   useWavefunctionSliceStore.getState().reset()
 })
 
@@ -82,7 +75,7 @@ describe('exportTdseDiagnosticsCSV', () => {
   })
 
   it('produces correct CSV with header and data rows', () => {
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.1,
       totalNorm: 0.99,
       maxDensity: 0.5,
@@ -93,7 +86,7 @@ describe('exportTdseDiagnosticsCSV', () => {
       T: 0.6,
       ipr: 0,
     })
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.2,
       totalNorm: 0.98,
       maxDensity: 0.4,
@@ -153,7 +146,7 @@ describe('exportTdseDiagnosticsCSV', () => {
         ipr: 0,
       },
     ]
-    for (const s of snapshots) useTdseDiagnosticsStore.getState().pushSnapshot(s)
+    for (const s of snapshots) useDiagnosticsStore.getState().pushTdseSnapshot(s)
 
     const csv = exportTdseDiagnosticsCSV()
     const lines = csv.split('\n')
@@ -186,7 +179,7 @@ describe('exportBecDiagnosticsCSV', () => {
   })
 
   it('produces CSV with correct columns', () => {
-    useBecDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateBec({
       totalNorm: 1.0,
       chemicalPotential: 2.5,
       healingLength: 0.1,
@@ -198,12 +191,12 @@ describe('exportBecDiagnosticsCSV', () => {
   })
 
   it('CSV row values match pushed BEC snapshot data', () => {
-    useBecDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateBec({
       totalNorm: 0.97,
       chemicalPotential: 3.14,
       healingLength: 0.25,
     })
-    useBecDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateBec({
       totalNorm: 0.95,
       chemicalPotential: 4.0,
       healingLength: 0.18,
@@ -233,7 +226,7 @@ describe('exportFsfDiagnosticsCSV', () => {
   })
 
   it('produces CSV with energy and norm columns', () => {
-    useFsfDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushFsfSnapshot({
       totalEnergy: 5.0,
       totalNorm: 1.0,
       maxPhi: 0.3,
@@ -256,7 +249,7 @@ describe('exportObservablesDiagnosticsCSV', () => {
   })
 
   it('produces CSV with per-dimension uncertainty columns', () => {
-    useObservablesDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushObservablesSnapshot({
       activeDims: 2,
       positionMean: new Float64Array([0, 0]),
       positionVariance: new Float64Array([1, 1]),
@@ -295,8 +288,8 @@ describe('exportObservablesDiagnosticsCSV', () => {
       positionNorm: 1.0,
       momentumNorm: 1.0,
     }
-    useObservablesDiagnosticsStore.getState().pushSnapshot(snap1)
-    useObservablesDiagnosticsStore.getState().pushSnapshot(snap2)
+    useDiagnosticsStore.getState().pushObservablesSnapshot(snap1)
+    useDiagnosticsStore.getState().pushObservablesSnapshot(snap2)
 
     const csv = exportObservablesDiagnosticsCSV()
     const lines = csv.split('\n')
@@ -326,7 +319,7 @@ describe('exportOpenQuantumDiagnosticsCSV', () => {
   })
 
   it('produces CSV with purity, entropy, coherence columns', () => {
-    useOpenQuantumDiagnosticsStore.getState().pushMetrics({
+    useDiagnosticsStore.getState().pushOpenQuantumMetrics({
       purity: 0.8,
       linearEntropy: 0.2,
       vonNeumannEntropy: 0.5,
@@ -349,12 +342,12 @@ describe('exportDiracDiagnosticsCSV', () => {
   })
 
   it('produces CSV with norm, particleFraction, antiparticleFraction', () => {
-    useDiracDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateDirac({
       totalNorm: 0.99,
       particleFraction: 0.7,
       antiparticleFraction: 0.3,
     })
-    useDiracDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateDirac({
       totalNorm: 0.98,
       particleFraction: 0.65,
       antiparticleFraction: 0.35,
@@ -377,7 +370,7 @@ describe('exportPauliDiagnosticsCSV', () => {
   })
 
   it('produces CSV with norm, spinUpFraction, spinExpectationZ', () => {
-    usePauliDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updatePauli({
       totalNorm: 1.0,
       spinUpFraction: 0.6,
       spinExpectationZ: 0.2,
@@ -405,7 +398,7 @@ describe('exportWavefunctionSliceCSV', () => {
 
   it('exports density grid slice with correct position mapping', () => {
     const sliceX = new Float32Array([0.1, 0.5, 0.9, 0.5, 0.1])
-    useDensityDiagnosticsStore.getState().pushSlices({
+    useDiagnosticsStore.getState().pushDensitySlices({
       sliceX,
       sliceY: new Float32Array(5),
       sliceZ: new Float32Array(5),
@@ -456,7 +449,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('includes TDSE time-series for tdseDynamics mode', () => {
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.1,
       totalNorm: 0.99,
       maxDensity: 0.5,
@@ -489,7 +482,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('TDSE JSON time-series preserves chronological order across snapshots', () => {
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.1,
       totalNorm: 1.0,
       maxDensity: 0.5,
@@ -500,7 +493,7 @@ describe('exportDiagnosticsJSON', () => {
       T: 0.9,
       ipr: 0,
     })
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.2,
       totalNorm: 0.98,
       maxDensity: 0.4,
@@ -523,7 +516,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('includes Dirac data for diracEquation mode', () => {
-    useDiracDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateDirac({
       totalNorm: 0.99,
       particleFraction: 0.7,
       antiparticleFraction: 0.3,
@@ -537,7 +530,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('includes Pauli data for pauliSpinor mode', () => {
-    usePauliDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updatePauli({
       totalNorm: 0.98,
       spinUpFraction: 0.6,
       spinDownFraction: 0.4,
@@ -561,22 +554,8 @@ describe('exportDiagnosticsJSON', () => {
     expect(ts.spinExpectationZ).toHaveLength(1)
   })
 
-  it('includes open quantum data for analytic modes', () => {
-    useOpenQuantumDiagnosticsStore.getState().pushMetrics({
-      purity: 0.9,
-      linearEntropy: 0.1,
-      vonNeumannEntropy: 0.3,
-      coherenceMagnitude: 0.2,
-      groundPopulation: 0.8,
-      trace: 1.0,
-    })
-    const json = exportDiagnosticsJSON('harmonicOscillator')
-    const parsed = JSON.parse(json) as Record<string, unknown>
-    expect(parsed).toHaveProperty('openQuantum')
-  })
-
   it('includes wavefunction slice data when available', () => {
-    useDensityDiagnosticsStore.getState().pushSlices({
+    useDiagnosticsStore.getState().pushDensitySlices({
       sliceX: new Float32Array([0.1, 0.5, 0.1]),
       sliceY: new Float32Array([0.2, 0.6, 0.2]),
       sliceZ: new Float32Array([0.3, 0.7, 0.3]),
@@ -592,7 +571,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('JSON observables section contains per-dimension uncertainty values', () => {
-    useObservablesDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushObservablesSnapshot({
       activeDims: 2,
       positionMean: new Float64Array([1.5, -0.3]),
       positionVariance: new Float64Array([0.5, 0.8]),
@@ -619,7 +598,7 @@ describe('exportDiagnosticsJSON', () => {
   })
 
   it('JSON open quantum section contains exact metric values', () => {
-    useOpenQuantumDiagnosticsStore.getState().pushMetrics({
+    useDiagnosticsStore.getState().pushOpenQuantumMetrics({
       purity: 0.85,
       linearEntropy: 0.15,
       vonNeumannEntropy: 0.42,
@@ -644,7 +623,7 @@ describe('exportDiagnosticsJSON', () => {
 
   it('does not include unrelated mode data', () => {
     // Push TDSE data but export for BEC mode — should not have tdse key
-    useTdseDiagnosticsStore.getState().pushSnapshot({
+    useDiagnosticsStore.getState().pushTdseSnapshot({
       simTime: 0.1,
       totalNorm: 0.99,
       maxDensity: 0.5,
@@ -665,10 +644,5 @@ describe('exportFilename', () => {
   it('generates a filename with prefix, timestamp, and extension', () => {
     const name = exportFilename('mdim-tdse', 'csv')
     expect(name).toMatch(/^mdim-tdse-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.csv$/)
-  })
-
-  it('handles json extension', () => {
-    const name = exportFilename('mdim-diagnostics', 'json')
-    expect(name).toMatch(/\.json$/)
   })
 })

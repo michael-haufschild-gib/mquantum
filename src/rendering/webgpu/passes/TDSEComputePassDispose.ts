@@ -9,7 +9,7 @@
  * @module rendering/webgpu/passes/TDSEComputePassDispose
  */
 
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { TdseBindGroupResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
@@ -42,7 +42,7 @@ export function disposeTdseResources(
   diagState.diagStagingBuffer?.destroy()
   diagState.diagResultBuffer = diagState.diagStagingBuffer = null
   diagState.diagHistory.clear()
-  useTdseDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetTdse()
 
   // Gram-Schmidt eigenstates and infrastructure
   destroyGSBuffers(gsState)

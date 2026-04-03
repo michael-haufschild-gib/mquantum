@@ -3,7 +3,7 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { DIAG_DECIMATION } from './computePassUtils'
 import {
@@ -45,7 +45,7 @@ export function updateObservablesResources(
   state: ObservablesState
 ): void {
   const wantObs = config.observablesEnabled
-  if (wantObs === state.obsEnabled && state.obsResources) return
+  if (wantObs === state.obsEnabled && (state.obsResources || !wantObs)) return
 
   if (!wantObs) {
     destroyObservablesBuffers(state.obsResources)
@@ -55,7 +55,7 @@ export function updateObservablesResources(
     state.obsMomReduceBG = null
     state.obsMomFinalBG = null
     state.obsEnabled = false
-    useObservablesDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetObservables()
     return
   }
 
@@ -130,7 +130,11 @@ export function writeObservablesUniforms(
 
   // Effective spacing accounts for KK compactification
   const effSpacing = computeEffectiveSpacing(
-    config.gridSize, config.spacing, config.compactDims, config.compactRadii, config.latticeDim
+    config.gridSize,
+    config.spacing,
+    config.compactDims,
+    config.compactRadii,
+    config.latticeDim
   )
 
   const uniformSize = 16 + 12 * 4 * 3
@@ -267,9 +271,9 @@ export function dispatchObservablesReadback(
           }
           esStaging.unmap()
 
-          const store = useObservablesDiagnosticsStore.getState()
-          if (snapshot) store.pushSnapshot(snapshot)
-          store.setEnergySpectrum(spectrum)
+          const store = useDiagnosticsStore.getState()
+          if (snapshot) store.pushObservablesSnapshot(snapshot)
+          store.setObservablesEnergySpectrum(spectrum)
           state.obsMappingInFlight = false
         })
         .catch(() => {

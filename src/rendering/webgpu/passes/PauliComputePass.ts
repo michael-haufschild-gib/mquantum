@@ -24,7 +24,7 @@
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -329,7 +329,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     this.initialized = true
     // Invalidate in-flight readbacks before resetting diagnostics store
     this.diagGeneration++
-    usePauliDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetPauli()
   }
 
   /** Upload uniform data to GPU */
@@ -666,7 +666,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
               const normDrift =
                 this.initialNorm > 0 ? (totalNorm - this.initialNorm) / this.initialNorm : 0
 
-              usePauliDiagnosticsStore.getState().update({
+              useDiagnosticsStore.getState().updatePauli({
                 totalNorm,
                 normDrift,
                 maxDensity: this.maxDensity,

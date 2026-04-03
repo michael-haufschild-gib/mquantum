@@ -15,7 +15,7 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /* ── SVG layout constants ── */
@@ -85,16 +85,16 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
     healingLength,
     soundSpeed,
     thomasFermiRadius,
-  } = useBecDiagnosticsStore(
+  } = useDiagnosticsStore(
     useShallow((s) => ({
-      hasData: s.hasData,
-      totalNorm: s.totalNorm,
-      maxDensity: s.maxDensity,
-      normDrift: s.normDrift,
-      chemicalPotential: s.chemicalPotential,
-      healingLength: s.healingLength,
-      soundSpeed: s.soundSpeed,
-      thomasFermiRadius: s.thomasFermiRadius,
+      hasData: s.bec.hasData,
+      totalNorm: s.bec.totalNorm,
+      maxDensity: s.bec.maxDensity,
+      normDrift: s.bec.normDrift,
+      chemicalPotential: s.bec.chemicalPotential,
+      healingLength: s.bec.healingLength,
+      soundSpeed: s.bec.soundSpeed,
+      thomasFermiRadius: s.bec.thomasFermiRadius,
     }))
   )
 

@@ -24,9 +24,8 @@ import {
   getPotentialPlotScale,
   samplePotentialProfile,
 } from '@/lib/physics/tdse/potentialProfile'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260
@@ -107,17 +106,17 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
   const isScattering = SCATTERING_POTENTIALS.has(tdse.potentialType)
   const isAnderson = tdse.potentialType === 'andersonDisorder'
   const { R, T, totalNorm, normDrift, ipr, hasData, historyIpr, historyCount, historyHead } =
-    useTdseDiagnosticsStore(
+    useDiagnosticsStore(
       useShallow((s) => ({
-        R: s.R,
-        T: s.T,
-        totalNorm: s.totalNorm,
-        normDrift: s.normDrift,
-        ipr: s.ipr,
-        hasData: s.hasData,
-        historyIpr: s.historyIpr,
-        historyCount: s.historyCount,
-        historyHead: s.historyHead,
+        R: s.tdse.R,
+        T: s.tdse.T,
+        totalNorm: s.tdse.totalNorm,
+        normDrift: s.tdse.normDrift,
+        ipr: s.tdse.ipr,
+        hasData: s.tdse.hasData,
+        historyIpr: s.tdse.historyIpr,
+        historyCount: s.tdse.historyCount,
+        historyHead: s.tdse.historyHead,
       }))
     )
 
@@ -377,20 +376,20 @@ interface ObservablesDisplayProps {
  */
 const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
   ({ enabled, onEnabledChange, hbar }) => {
-    const obs = useObservablesDiagnosticsStore(
+    const obs = useDiagnosticsStore(
       useShallow((s) => ({
-        hasData: s.hasData,
-        activeDims: s.activeDims,
-        positionMean: s.positionMean,
-        positionVariance: s.positionVariance,
-        momentumMean: s.momentumMean,
-        momentumVariance: s.momentumVariance,
-        uncertaintyProduct: s.uncertaintyProduct,
-        totalEnergy: s.totalEnergy,
-        historyEnergy: s.historyEnergy,
-        historyUncertainty: s.historyUncertainty,
-        historyHead: s.historyHead,
-        historyCount: s.historyCount,
+        hasData: s.observables.hasData,
+        activeDims: s.observables.activeDims,
+        positionMean: s.observables.positionMean,
+        positionVariance: s.observables.positionVariance,
+        momentumMean: s.observables.momentumMean,
+        momentumVariance: s.observables.momentumVariance,
+        uncertaintyProduct: s.observables.uncertaintyProduct,
+        totalEnergy: s.observables.totalEnergy,
+        historyEnergy: s.observables.historyEnergy,
+        historyUncertainty: s.observables.historyUncertainty,
+        historyHead: s.observables.historyHead,
+        historyCount: s.observables.historyCount,
       }))
     )
 
@@ -516,7 +515,7 @@ const ES_PLOT_H = ES_H - ES_PAD.top - ES_PAD.bottom
  * Shows the wavefunction's kinetic energy distribution from GPU readback.
  */
 export const EnergySpectrumDisplay: React.FC = React.memo(() => {
-  const spectrum = useObservablesDiagnosticsStore((s) => s.energySpectrum)
+  const spectrum = useDiagnosticsStore((s) => s.observables.energySpectrum)
 
   const maxVal = useMemo(() => {
     let m = 0
