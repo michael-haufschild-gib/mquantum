@@ -331,6 +331,8 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
       mapped = Math.pow(mapped, gamma)
     }
     grid.nk[i] = mapped
+    // Keep nkOmega consistent with post-exposure nk (matches broadening's convention)
+    grid.nkOmega[i] = mapped * grid.omegaNorm[i]!
   }
 
   grid.nkMax = 1.0

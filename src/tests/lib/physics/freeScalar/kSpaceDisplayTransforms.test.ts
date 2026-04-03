@@ -197,6 +197,84 @@ describe('projectToDisplayGrid — FFT shift', () => {
 })
 
 // ============================================================================
+// Low-Dimensional Projection
+// ============================================================================
+
+describe('projectToDisplayGrid — low dimensions', () => {
+  it('1D field produces non-zero values only along the X center line', () => {
+    const N = 8
+    const gridSize = [N]
+    const spacing = [1.0]
+    const totalSites = N
+    const phi = new Float32Array(totalSites)
+    const pi = new Float32Array(totalSites)
+
+    // 1D plane wave along the single dimension
+    for (let ix = 0; ix < N; ix++) {
+      phi[ix] = Math.cos((2 * Math.PI * ix) / N)
+    }
+
+    const raw = computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 1)
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: false })
+
+    const G = OUTPUT_GRID_SIZE
+    const center = Math.floor(G / 2)
+    const offset = Math.floor((G - N) / 2)
+
+    // Voxels on the center line (y=center, z=center, x varies in active range) should have values
+    let onLineNonZero = 0
+    for (let ix = offset; ix < offset + N; ix++) {
+      const idx = (center * G + center) * G + ix
+      if (grid.nk[idx]! > 0) onLineNonZero++
+    }
+    expect(onLineNonZero).toBeGreaterThan(0)
+
+    // Voxels off the center line should be zero
+    // Check a Y-neighbor of a non-zero voxel
+    const activeIdx = (center * G + center) * G + (offset + 1)
+    const yNeighborIdx = (center * G + (center + 1)) * G + (offset + 1)
+    expect(grid.nk[activeIdx]).toBeGreaterThan(0)
+    expect(grid.nk[yNeighborIdx]).toBe(0)
+  })
+
+  it('2D field produces non-zero values only in the center Z plane', () => {
+    const N = 4
+    const gridSize = [N, N]
+    const spacing = [1.0, 1.0]
+    const totalSites = N * N
+    const phi = new Float32Array(totalSites)
+    const pi = new Float32Array(totalSites)
+
+    for (let iy = 0; iy < N; iy++) {
+      for (let ix = 0; ix < N; ix++) {
+        phi[iy * N + ix] = Math.cos((2 * Math.PI * ix) / N)
+      }
+    }
+
+    const raw = computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 2)
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: false })
+
+    const G = OUTPUT_GRID_SIZE
+    const center = Math.floor(G / 2)
+    const offset = Math.floor((G - N) / 2)
+
+    // Voxels in the center Z plane (z=center) should have values
+    let inPlaneNonZero = 0
+    for (let iy = offset; iy < offset + N; iy++) {
+      for (let ix = offset; ix < offset + N; ix++) {
+        const idx = (center * G + iy) * G + ix
+        if (grid.nk[idx]! > 0) inPlaneNonZero++
+      }
+    }
+    expect(inPlaneNonZero).toBeGreaterThan(0)
+
+    // Voxels one Z-step away from center should be zero
+    const offPlaneIdx = ((center + 1) * G + offset) * G + offset
+    expect(grid.nk[offPlaneIdx]).toBe(0)
+  })
+})
+
+// ============================================================================
 // Exposure Transfer
 // ============================================================================
 
@@ -461,6 +539,26 @@ describe('applyExposureTransfer', () => {
       expect(Number.isFinite(grid.nk[i]!)).toBe(true)
       expect(grid.nk[i]).toBeGreaterThanOrEqual(0)
       expect(grid.nk[i]).toBeLessThanOrEqual(1)
+    }
+  })
+
+  it('updates nkOmega to be consistent with remapped nk', () => {
+    const raw = makeTestRawData(8)
+    const grid = projectToDisplayGrid(raw, PASSTHROUGH_KSPACE_VIZ)
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'linear',
+      lowPercentile: 0,
+      highPercentile: 100,
+      gamma: 1.0,
+    })
+
+    // After exposure, nkOmega[i] should equal nk[i] * omegaNorm[i] for all occupied voxels
+    for (let i = 0; i < grid.nk.length; i++) {
+      if (grid.nk[i]! <= 0) continue
+      const expected = grid.nk[i]! * grid.omegaNorm[i]!
+      expect(grid.nkOmega[i]).toBeCloseTo(expected, 12)
     }
   })
 })

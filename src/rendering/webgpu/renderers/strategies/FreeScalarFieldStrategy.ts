@@ -15,6 +15,7 @@ import {
   type AnimationState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
+  isFreeScalarAnalysisAlgorithm,
 } from '../schrodingerRendererTypes'
 import { applySharedPml, computeLatticeBoundingRadius } from './computeGridUtils'
 import type {
@@ -76,10 +77,7 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
 
     // Analysis texture for educational color modes (binding 6)
-    const freeScalarAnalysis =
-      config.colorAlgorithm !== undefined &&
-      config.colorAlgorithm >= 12 &&
-      config.colorAlgorithm <= 15
+    const freeScalarAnalysis = isFreeScalarAnalysisAlgorithm(config.colorAlgorithm)
     if (freeScalarAnalysis) {
       const analysisTextureView = this.freeScalarFieldPass.getAnalysisTextureView() ?? null
       if (analysisTextureView) {
