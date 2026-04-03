@@ -111,10 +111,10 @@ const TabButton = React.memo(
         ref={tabRef}
         type="button"
         role="tab"
-        id={`tab-${tab.id}`}
+        id={`${instanceId}-tab-${tab.id}`}
         aria-selected={isActive}
         aria-disabled={isDisabled || undefined}
-        aria-controls={`panel-${tab.id}`}
+        aria-controls={`${instanceId}-panel-${tab.id}`}
         tabIndex={isDisabled ? -1 : isActive ? 0 : -1}
         disabled={isDisabled}
         onClick={handleClick}
@@ -344,17 +344,17 @@ export const Tabs: React.FC<TabsProps> = React.memo(
           return (
             <div
               key={tab.id}
-              id={`panel-${tab.id}`}
+              id={`${instanceId}-panel-${tab.id}`}
               className={`w-full h-full ${tab.id === value ? 'block animate-fade-in' : 'hidden'}`}
               role="tabpanel"
-              aria-labelledby={`tab-${tab.id}`}
+              aria-labelledby={`${instanceId}-tab-${tab.id}`}
               data-testid={testId ? `${testId}-panel-${tab.id}` : undefined}
             >
               {tab.content}
             </div>
           )
         }),
-      [tabs, mountedTabIds, value, testId]
+      [tabs, mountedTabIds, value, testId, instanceId]
     )
 
     return (
