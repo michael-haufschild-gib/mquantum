@@ -23,7 +23,7 @@ import type { DiracConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -446,7 +446,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.initialized = true
     // Invalidate in-flight readbacks before resetting diagnostics store
     this.diagGeneration++
-    useDiracDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetDirac()
   }
 
   private updateUniforms(

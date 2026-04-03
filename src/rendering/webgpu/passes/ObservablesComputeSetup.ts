@@ -11,7 +11,7 @@
 import { MAX_DIMENSION } from '@/constants/dimension'
 import { logger } from '@/lib/logger'
 import { NUM_ENERGY_BINS } from '@/rendering/webgpu/shaders/schroedinger/compute/energySpectralDensity.wgsl'
-import type { ObservablesSnapshot } from '@/stores/observablesDiagnosticsStore'
+import type { ObservablesSnapshot } from '@/stores/diagnostics/types'
 
 /**
  * Maximum observable channels: 1 norm + 2 * 11 dims + 1 potential = 24

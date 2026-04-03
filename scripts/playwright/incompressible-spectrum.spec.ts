@@ -43,8 +43,8 @@ async function waitForSpectrumData(
 ): Promise<void> {
   await page.waitForFunction(
     async () => {
-      const mod = await import('/src/stores/becDiagnosticsStore.ts')
-      const s = mod.useBecDiagnosticsStore.getState()
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const s = mod.useDiagnosticsStore.getState().bec
       // Spectrum is computed asynchronously; wait until at least one bin is nonzero
       // or totalIncompressibleEnergy is finite and > 0 or = 0 (computed successfully)
       return (
@@ -165,15 +165,15 @@ test.describe('incompressible kinetic energy spectrum', () => {
 
     // Verify spectrum has the expected number of bins (via store inspection)
     const binCount = await page.evaluate(async () => {
-      const mod = await import('/src/stores/becDiagnosticsStore.ts')
-      return mod.useBecDiagnosticsStore.getState().incompressibleSpectrum.length
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      return mod.useDiagnosticsStore.getState().bec.incompressibleSpectrum.length
     })
     expect(binCount).toBe(32)
 
     // Verify kValues are populated, positive, and monotonically increasing
     const kValues = await page.evaluate(async () => {
-      const mod = await import('/src/stores/becDiagnosticsStore.ts')
-      return Array.from(mod.useBecDiagnosticsStore.getState().spectrumKValues)
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      return Array.from(mod.useDiagnosticsStore.getState().bec.spectrumKValues)
     })
     expect(kValues.length).toBe(32)
     for (let i = 0; i < kValues.length; i++) {

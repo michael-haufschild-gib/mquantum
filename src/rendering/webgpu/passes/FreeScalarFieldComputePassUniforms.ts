@@ -13,7 +13,7 @@ import {
   estimateVacuumMaxPi,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
-import type { FsfDiagnosticsSnapshot } from '@/stores/fsfDiagnosticsStore'
+import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
 import { MAX_DIM } from './computePassUtils'
 

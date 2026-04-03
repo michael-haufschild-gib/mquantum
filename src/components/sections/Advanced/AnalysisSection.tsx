@@ -39,10 +39,9 @@ import {
   exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
 import { useCarpetStore } from '@/stores/carpetStore'
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -100,7 +99,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     )
     const objectType = useGeometryStore((s) => s.objectType)
     const dimension = useGeometryStore((s) => s.dimension)
-    const observablesHasData = useObservablesDiagnosticsStore((s) => s.hasData)
+    const observablesHasData = useDiagnosticsStore((s) => s.observables.hasData)
 
     // Wire diagnosticsEnabled to section open/close state for all dynamic modes
     const handleOpenChange = useCallback(
@@ -282,8 +281,8 @@ const DataExportButtons: React.FC<{
     quantumMode === 'pauliSpinor'
 
   // Wavefunction slice availability
-  const densitySliceAvailable = useDensityDiagnosticsStore(
-    (s) => s.sliceX !== null && s.sliceGridSize > 0
+  const densitySliceAvailable = useDiagnosticsStore(
+    (s) => s.density.sliceX !== null && s.density.sliceGridSize > 0
   )
   const wfSliceHasData = useWavefunctionSliceStore((s) => s.hasData)
 

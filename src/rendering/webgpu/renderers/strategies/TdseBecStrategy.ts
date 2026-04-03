@@ -13,10 +13,8 @@ import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
-import { useEigenstateDiagnosticsStore } from '@/stores/eigenstateDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -206,7 +204,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         newCount >= 0 ? newCount : tdsePass.getStoredEigenstateCount()
       )
       if (newCount >= 0) {
-        useEigenstateDiagnosticsStore.getState().pushEigenstate(energy, NaN)
+        useDiagnosticsStore.getState().pushEigenstate(energy, NaN)
       }
     }
 
@@ -216,7 +214,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
   /** Read the current eigenstate energy from the observables store if available. */
   private static getCurrentEigenstateEnergy(): number {
-    const obs = useObservablesDiagnosticsStore.getState()
+    const obs = useDiagnosticsStore.getState().observables
     return obs.hasData ? obs.totalEnergy : NaN
   }
 
@@ -242,8 +240,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     const gridSize = tdseConfig.gridSize.slice(0, tdseConfig.latticeDim)
     const spacing = computeEffectiveSpacing(
-      tdseConfig.gridSize, tdseConfig.spacing,
-      tdseConfig.compactDims, tdseConfig.compactRadii, tdseConfig.latticeDim
+      tdseConfig.gridSize,
+      tdseConfig.spacing,
+      tdseConfig.compactDims,
+      tdseConfig.compactRadii,
+      tdseConfig.latticeDim
     )
     const measureAxis = mState.measureAxis
     const collapseWidth = mState.collapseWidth
@@ -453,8 +454,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         vortexSeparation: bec.vortexSeparation ?? 0.0,
         vortexPairCount: bec.vortexPairCount ?? 2,
         // Kaluza-Klein compactification (pass through from BEC config)
-        compactDims: bec.compactDims ?? new Array(latDim).fill(false) as boolean[],
-        compactRadii: bec.compactRadii ?? new Array(latDim).fill(1.0) as number[],
+        compactDims: bec.compactDims ?? (new Array(latDim).fill(false) as boolean[]),
+        compactRadii: bec.compactRadii ?? (new Array(latDim).fill(1.0) as number[]),
       },
     }
   }
@@ -497,7 +498,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const [vortexPlaquettes, posCharge, negCharge] = tdsePass.getVortexCounts()
     const estimatedVortexCount = Math.max(posCharge, negCharge)
 
-    useBecDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updateBec({
       totalNorm: diag.totalNorm,
       maxDensity: peakN,
       normDrift: diag.normDrift,
@@ -532,7 +533,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     const gridSize = bec.gridSize.slice(0, bec.latticeDim)
     const spacingArr = computeEffectiveSpacing(
-      bec.gridSize as number[], bec.spacing as number[],
+      bec.gridSize as number[],
+      bec.spacing as number[],
       bec.compactDims as boolean[] | undefined,
       bec.compactRadii as number[] | undefined,
       bec.latticeDim as number
@@ -553,9 +555,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
             hbar,
             mass
           )
-          useBecDiagnosticsStore
+          useDiagnosticsStore
             .getState()
-            .setIncompressibleSpectrum(
+            .setBecIncompressibleSpectrum(
               spec.spectrum,
               spec.kValues,
               spec.totalIncompressible,

@@ -7,7 +7,7 @@
 
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import type {
@@ -195,7 +195,7 @@ export function rebuildDiracBuffers(
     size: DIAG_RESULT_COUNT * 4,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   })
-  useDiracDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetDirac()
 
   return {
     spinorReBuffer,

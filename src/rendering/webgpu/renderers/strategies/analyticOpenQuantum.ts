@@ -31,7 +31,7 @@ import {
   packForGPU,
 } from '@/lib/physics/openQuantum/statePacking'
 import type { DensityMatrix, LindbladChannel } from '@/lib/physics/openQuantum/types'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../../core/types'
 import type { DensityGridComputePass } from '../../passes/DensityGridComputePass'
@@ -274,8 +274,8 @@ export class AnalyticOpenQuantumExecutor {
       this.lastVonNeumann = metrics.vonNeumannEntropy
     }
 
-    const diagStore = useOpenQuantumDiagnosticsStore.getState()
-    diagStore.pushMetrics(metrics)
+    const diagStore = useDiagnosticsStore.getState()
+    diagStore.pushOpenQuantumMetrics(metrics)
 
     const pops = new Float32Array(K)
     const el = this.state!.elements
@@ -287,7 +287,7 @@ export class AnalyticOpenQuantumExecutor {
     const labels = this.hydrogenBasisLabels.length
       ? this.hydrogenBasisLabels
       : this.getHOPopulationLabels(K)
-    diagStore.setPopulations(pops, labels)
+    diagStore.setOpenQuantumPopulations(pops, labels)
 
     const renderBasisK = this.getRenderBasisLimit(performance, K)
     const populationK = computeActiveK(this.state!)

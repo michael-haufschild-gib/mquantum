@@ -79,7 +79,7 @@ test.describe('TDSE integrator unitarity', () => {
       s.resetTdseField()
     })
 
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 300)
 
     const diag = await readTdseDiagnostics(page)
@@ -124,7 +124,7 @@ test.describe('TDSE integrator unitarity', () => {
       s.resetTdseField()
     })
 
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -184,7 +184,7 @@ test.describe('hydrogen orbital density structure', () => {
 
     await setupAndWaitForDensity(page, 'hydrogenND', 3)
     await setHydrogenQuantumNumbers(page, 4, 3, 0)
-    await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'density')
     const diag = await readDensityDiagnostics(page)
     expect(diag.hasData).toBe(true)
 
@@ -410,19 +410,42 @@ test.describe('free scalar field energy conservation', () => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
 
-    // Explicitly disable self-interaction to isolate the free Hamiltonian
+    // Disable self-interaction AND absorber to isolate the free Hamiltonian.
+    // The PML absorber is intentionally dissipative (drains boundary energy),
+    // so it must be off when testing symplectic energy conservation.
+    // Use gaussianPacket initial condition for clean, localized energy.
+    // Enable diagnostics readback (FSF defaults to diagnosticsEnabled=false).
     await page.evaluate(async () => {
       const mod = await import('/src/stores/extendedObjectStore.ts')
       const s = mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       s.setFreeScalarSelfInteractionEnabled(false)
+      s.setFreeScalarAbsorberEnabled(false)
+      s.setFreeScalarDiagnosticsEnabled(true)
+      s.setFreeScalarInitialCondition('gaussianPacket')
       s.resetFreeScalarField()
     })
 
+    // Verify settings took effect
+    const fsfConfig = await page.evaluate(async () => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const fs = mod.useExtendedObjectStore.getState().schroedinger.freeScalar
+      return {
+        absorberEnabled: fs.absorberEnabled,
+        initialCondition: fs.initialCondition,
+        diagnosticsEnabled: fs.diagnosticsEnabled,
+      }
+    })
+    expect(fsfConfig.absorberEnabled, 'absorber must be disabled').toBe(false)
+    expect(fsfConfig.initialCondition, 'initial condition must be gaussianPacket').toBe(
+      'gaussianPacket'
+    )
+    expect(fsfConfig.diagnosticsEnabled, 'diagnostics must be enabled').toBe(true)
+
     // Wait for a fresh post-reset readback so initialEnergy is from the new field,
     // not a stale in-flight readback from the pre-reset configuration.
-    await waitForFreshReadback(page, '/src/stores/fsfDiagnosticsStore.ts')
-    await waitForSimulationFrames(page, 200)
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
 
+    await waitForSimulationFrames(page, 200)
     const diag = await readFsfDiagnostics(page)
     expect(diag.hasData, 'FSF diagnostics must have data').toBe(true)
     expect(Number.isFinite(diag.totalEnergy), 'energy must be finite').toBe(true)
@@ -482,8 +505,8 @@ test.describe('TDSE observables physics', () => {
     // Wait for observables diagnostic data
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-        return mod.useObservablesDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
     )
@@ -530,8 +553,8 @@ test.describe('TDSE observables physics', () => {
     // Read initial position
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-        return mod.useObservablesDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
     )
@@ -599,8 +622,8 @@ test.describe('quantum walk norm conservation', () => {
     // Wait for QW diagnostics to appear
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-        return mod.useQwDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
     )
@@ -639,8 +662,8 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-        return mod.useQwDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
     )
@@ -683,8 +706,8 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-        return mod.useQwDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
     )
@@ -718,8 +741,8 @@ test.describe('quantum walk norm conservation', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-        return mod.useQwDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
     )
@@ -746,8 +769,8 @@ test.describe('quantum walk norm conservation', () => {
     // Wait for initial diagnostics
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/qwDiagnosticsStore.ts')
-        return mod.useQwDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().qw.hasData
       },
       { timeout: 30_000 }
     )
@@ -801,7 +824,7 @@ test.describe('BEC physics — strong validation', () => {
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readBecDiagnostics(page)
@@ -825,7 +848,7 @@ test.describe('BEC physics — strong validation', () => {
       s.setBecInitialCondition('thomasFermi')
       s.resetBecField()
     })
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
     const diagLow = await readBecDiagnostics(page)
 
@@ -836,7 +859,7 @@ test.describe('BEC physics — strong validation', () => {
       s.setBecInteractionStrength(1000)
       s.resetBecField()
     })
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
     const diagHigh = await readBecDiagnostics(page)
 
@@ -864,7 +887,7 @@ test.describe('BEC physics — strong validation', () => {
       s.setBecAbsorberEnabled(false)
       s.resetBecField()
     })
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readBecDiagnostics(page)
@@ -889,7 +912,7 @@ test.describe('BEC physics — strong validation', () => {
       s.setBecInitialCondition('thomasFermi')
       s.resetBecField()
     })
-    await waitForDiagnostics(page, '/src/stores/densityDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'density')
 
     const diag = await readDensityDiagnostics(page)
     expect(diag.hasData).toBe(true)
@@ -904,7 +927,7 @@ test.describe('BEC physics — strong validation', () => {
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readBecDiagnostics(page)
@@ -957,7 +980,7 @@ test.describe('FSF physics — strong validation', () => {
       s.setFreeScalarInitialCondition('vacuum')
       s.resetFreeScalarField()
     })
-    await waitForFreshReadback(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readFsfDiagnostics(page)
@@ -979,7 +1002,7 @@ test.describe('FSF physics — strong validation', () => {
       s.setFreeScalarInitialCondition('vacuum')
       s.resetFreeScalarField()
     })
-    await waitForFreshReadback(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readFsfDiagnostics(page)
@@ -1002,7 +1025,7 @@ test.describe('FSF physics — strong validation', () => {
       s.setFreeScalarInitialCondition('gaussianPacket')
       s.resetFreeScalarField()
     })
-    await waitForFreshReadback(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
     await waitForSimulationFrames(page, 60)
     const diagFree = await readFsfDiagnostics(page)
 
@@ -1014,7 +1037,7 @@ test.describe('FSF physics — strong validation', () => {
       s.setFreeScalarSelfInteractionLambda(2.0)
       s.resetFreeScalarField()
     })
-    await waitForFreshReadback(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'fsf')
     await waitForSimulationFrames(page, 60)
     const diagSI = await readFsfDiagnostics(page)
 
@@ -1034,7 +1057,7 @@ test.describe('FSF physics — strong validation', () => {
   test('conjugate momentum stays bounded: maxPi finite after 200 frames', async ({ page }) => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readFsfDiagnostics(page)
@@ -1046,7 +1069,7 @@ test.describe('FSF physics — strong validation', () => {
   test('field norm stays finite and positive over 200 frames', async ({ page }) => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readFsfDiagnostics(page)

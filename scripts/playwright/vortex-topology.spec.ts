@@ -211,7 +211,7 @@ test.describe('vortex topology: diagnostics', () => {
     await applyBecPreset(page, 'vortex4DReconnection')
     await enableDiagnostics(page)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readBecDiagnostics(page)
@@ -235,7 +235,7 @@ test.describe('vortex topology: diagnostics', () => {
     await applyBecPreset(page, 'vortex4DReconnection')
     await enableDiagnostics(page)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readBecDiagnostics(page)

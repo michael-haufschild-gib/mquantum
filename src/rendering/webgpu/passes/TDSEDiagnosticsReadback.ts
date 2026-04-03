@@ -5,7 +5,7 @@ import {
   type TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 /** Number of f32 values in diagnostic result buffer: [norm, maxDensity, normLeft, normRight, sumPsi4] */
 const DIAG_RESULT_COUNT = 5
@@ -131,7 +131,7 @@ export function scheduleNormReadback(
               ipr,
             }
             s.diagHistory.push(snapshot)
-            useTdseDiagnosticsStore.getState().pushSnapshot(snapshot)
+            useDiagnosticsStore.getState().pushTdseSnapshot(snapshot)
           }
           s.diagMappingInFlight = false
         })

@@ -10,7 +10,7 @@
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { clampKKState } from '@/lib/physics/compactification'
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -88,7 +88,16 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
   const rawRadii = Array.from({ length: newDim }, (_, i) =>
     i < (prev.compactRadii?.length ?? 0) ? (prev.compactRadii[i] ?? 0.15) : 0.15
   )
-  const kk = clampKKState(prev.dt, gridSize, spacing, compactDims, rawRadii, newDim, mass, clampDtWithCfl)
+  const kk = clampKKState(
+    prev.dt,
+    gridSize,
+    spacing,
+    compactDims,
+    rawRadii,
+    newDim,
+    mass,
+    clampDtWithCfl
+  )
   return {
     latticeDim: newDim,
     gridSize,
@@ -347,7 +356,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       const clamped = Math.max(0.1, Math.min(10, mass))
       setWithVersion((state) => {
         const bec = state.schroedinger.bec
-        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, bec.compactDims, bec.compactRadii, bec.latticeDim, clamped, clampDtWithCfl)
+        const kk = clampKKState(
+          bec.dt,
+          bec.gridSize,
+          bec.spacing,
+          bec.compactDims,
+          bec.compactRadii,
+          bec.latticeDim,
+          clamped,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -390,7 +408,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           snapped[maxIdx] = snapped[maxIdx]! / 2
         }
         const bec = state.schroedinger.bec
-        const kk = clampKKState(bec.dt, snapped, bec.spacing, bec.compactDims, bec.compactRadii, latticeDim, bec.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          bec.dt,
+          snapped,
+          bec.spacing,
+          bec.compactDims,
+          bec.compactRadii,
+          latticeDim,
+          bec.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -410,7 +437,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           const s = i < spacing.length ? spacing[i]! : 0.15
           return Math.max(0.01, Math.min(1.0, s))
         })
-        const kk = clampKKState(bec.dt, bec.gridSize, clamped, bec.compactDims, bec.compactRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          bec.dt,
+          bec.gridSize,
+          clamped,
+          bec.compactDims,
+          bec.compactRadii,
+          bec.latticeDim,
+          bec.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -442,7 +478,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           while (compactDims.length < bec.latticeDim) compactDims.push(false)
           compactDims[dimIndex] = compact
         }
-        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, compactDims, bec.compactRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          bec.dt,
+          bec.gridSize,
+          bec.spacing,
+          compactDims,
+          bec.compactRadii,
+          bec.latticeDim,
+          bec.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -463,7 +508,16 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           while (rawRadii.length < bec.latticeDim) rawRadii.push(0.15)
           rawRadii[dimIndex] = radius
         }
-        const kk = clampKKState(bec.dt, bec.gridSize, bec.spacing, bec.compactDims, rawRadii, bec.latticeDim, bec.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          bec.dt,
+          bec.gridSize,
+          bec.spacing,
+          bec.compactDims,
+          rawRadii,
+          bec.latticeDim,
+          bec.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -495,11 +549,11 @@ export function createBecSetters(ctx: SetterContext): BecActions {
             },
           }
         })
-        useBecDiagnosticsStore.getState().reset()
+        useDiagnosticsStore.getState().resetBec()
       })
     },
     resetBecField: () => {
-      useBecDiagnosticsStore.getState().reset()
+      useDiagnosticsStore.getState().resetBec()
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

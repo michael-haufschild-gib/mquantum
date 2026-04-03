@@ -9,16 +9,16 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useDensityDiagnosticsStore } from '@/stores/densityDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 describe('densityDiagnosticsStore', () => {
   beforeEach(() => {
-    useDensityDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetDensity()
   })
 
   describe('initial state', () => {
     it('starts with hasData=false and null slices', () => {
-      const state = useDensityDiagnosticsStore.getState()
+      const state = useDiagnosticsStore.getState().density
       expect(state.hasData).toBe(false)
       expect(state.maxDensity).toBe(0)
       expect(state.sliceX).toBeNull()
@@ -29,7 +29,7 @@ describe('densityDiagnosticsStore', () => {
 
   describe('pushSnapshot', () => {
     it('sets hasData=true and stores all snapshot fields', () => {
-      useDensityDiagnosticsStore.getState().pushSnapshot({
+      useDiagnosticsStore.getState().pushDensitySnapshot({
         maxDensity: 1.5,
         totalDensityMass: 100.0,
         activeVoxelCount: 500,
@@ -38,7 +38,7 @@ describe('densityDiagnosticsStore', () => {
         worldBound: 5.0,
       })
 
-      const state = useDensityDiagnosticsStore.getState()
+      const state = useDiagnosticsStore.getState().density
       expect(state.hasData).toBe(true)
       expect(state.maxDensity).toBe(1.5)
       expect(state.totalDensityMass).toBe(100.0)
@@ -49,7 +49,7 @@ describe('densityDiagnosticsStore', () => {
     })
 
     it('overwrites previous snapshot completely', () => {
-      useDensityDiagnosticsStore.getState().pushSnapshot({
+      useDiagnosticsStore.getState().pushDensitySnapshot({
         maxDensity: 1.5,
         totalDensityMass: 100.0,
         activeVoxelCount: 500,
@@ -57,7 +57,7 @@ describe('densityDiagnosticsStore', () => {
         gridSize: 64,
         worldBound: 5.0,
       })
-      useDensityDiagnosticsStore.getState().pushSnapshot({
+      useDiagnosticsStore.getState().pushDensitySnapshot({
         maxDensity: 2.0,
         totalDensityMass: 200.0,
         activeVoxelCount: 1000,
@@ -66,7 +66,7 @@ describe('densityDiagnosticsStore', () => {
         worldBound: 10.0,
       })
 
-      const state = useDensityDiagnosticsStore.getState()
+      const state = useDiagnosticsStore.getState().density
       expect(state.maxDensity).toBe(2.0)
       expect(state.gridSize).toBe(128)
     })
@@ -77,7 +77,7 @@ describe('densityDiagnosticsStore', () => {
       const sliceX = new Float32Array([0.1, 0.5, 0.9, 0.5, 0.1])
       const sliceY = new Float32Array([0.2, 0.6, 1.0, 0.6, 0.2])
 
-      useDensityDiagnosticsStore.getState().pushSlices({
+      useDiagnosticsStore.getState().pushDensitySlices({
         sliceX,
         sliceY,
         sliceZ: null,
@@ -85,7 +85,7 @@ describe('densityDiagnosticsStore', () => {
         sliceWorldBound: 3.0,
       })
 
-      const state = useDensityDiagnosticsStore.getState()
+      const state = useDiagnosticsStore.getState().density
       expect(state.sliceX).toBe(sliceX)
       expect(state.sliceY).toBe(sliceY)
       expect(state.sliceZ).toBeNull()
@@ -93,7 +93,7 @@ describe('densityDiagnosticsStore', () => {
     })
 
     it('does not affect hasData or snapshot fields', () => {
-      useDensityDiagnosticsStore.getState().pushSlices({
+      useDiagnosticsStore.getState().pushDensitySlices({
         sliceX: new Float32Array(4),
         sliceY: new Float32Array(4),
         sliceZ: new Float32Array(4),
@@ -102,13 +102,13 @@ describe('densityDiagnosticsStore', () => {
       })
 
       // hasData should still be false (only pushSnapshot sets it)
-      expect(useDensityDiagnosticsStore.getState().hasData).toBe(false)
+      expect(useDiagnosticsStore.getState().density.hasData).toBe(false)
     })
   })
 
   describe('reset', () => {
     it('clears all fields including slices', () => {
-      useDensityDiagnosticsStore.getState().pushSnapshot({
+      useDiagnosticsStore.getState().pushDensitySnapshot({
         maxDensity: 5.0,
         totalDensityMass: 500.0,
         activeVoxelCount: 2000,
@@ -116,7 +116,7 @@ describe('densityDiagnosticsStore', () => {
         gridSize: 128,
         worldBound: 10.0,
       })
-      useDensityDiagnosticsStore.getState().pushSlices({
+      useDiagnosticsStore.getState().pushDensitySlices({
         sliceX: new Float32Array(10),
         sliceY: new Float32Array(10),
         sliceZ: new Float32Array(10),
@@ -124,9 +124,9 @@ describe('densityDiagnosticsStore', () => {
         sliceWorldBound: 5.0,
       })
 
-      useDensityDiagnosticsStore.getState().reset()
+      useDiagnosticsStore.getState().resetDensity()
 
-      const state = useDensityDiagnosticsStore.getState()
+      const state = useDiagnosticsStore.getState().density
       expect(state.hasData).toBe(false)
       expect(state.maxDensity).toBe(0)
       expect(state.sliceX).toBeNull()

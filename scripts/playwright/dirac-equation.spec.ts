@@ -356,7 +356,7 @@ test.describe('Dirac equation: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyDiracPreset(page, 'zitterbewegung')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readDiracDiagnostics(page)
@@ -383,7 +383,7 @@ test.describe('Dirac equation: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyDiracPreset(page, 'diracOscillator')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readDiracDiagnostics(page)
@@ -412,7 +412,7 @@ test.describe('Dirac equation: physics validation', () => {
       ).setDiracPotentialType('none')
     })
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 300)
     const diagFree = await readDiracDiagnostics(page)
     expect(diagFree.hasData, 'free propagation diagnostics must have data').toBe(true)
@@ -424,7 +424,7 @@ test.describe('Dirac equation: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyDiracPreset(page, 'diracBarrierTunneling')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 300)
     const diagBarrier = await readDiracDiagnostics(page)
     expect(diagBarrier.hasData, 'barrier diagnostics must have data').toBe(true)
@@ -443,7 +443,7 @@ test.describe('Dirac equation: physics validation', () => {
     await waitForShaderCompilation(page)
     await applyDiracPreset(page, 'relativisticHydrogen')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readDiracDiagnostics(page)
@@ -513,7 +513,7 @@ test.describe('Dirac equation: feature toggles', () => {
 
     const fc0 = await getFrameCount(page)
     await waitForFrameAdvance(page, fc0 + 60)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
 
     const snap1 = await readDiracDiagnostics(page)
     expect(snap1.hasData, 'first snapshot must have data').toBe(true)

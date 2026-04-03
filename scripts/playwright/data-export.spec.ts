@@ -59,7 +59,7 @@ test.describe('Data Export', () => {
     await expandDataExport(page)
 
     // Wait for diagnostics data to arrive
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     await expect(page.getByTestId('export-diagnostics-csv')).toBeVisible({ timeout: 5000 })
     await expect(page.getByTestId('export-diagnostics-json')).toBeVisible({ timeout: 5000 })
@@ -70,7 +70,7 @@ test.describe('Data Export', () => {
     await expandDataExport(page)
 
     // Wait for diagnostics data
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     // Intercept download
     const [download] = await Promise.all([
@@ -87,7 +87,7 @@ test.describe('Data Export', () => {
     await expandDataExport(page)
 
     // Wait for diagnostics data
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 10_000 }),
@@ -115,7 +115,7 @@ test.describe('Data Export', () => {
     await expandDataExport(page)
 
     // Wait for diagnostics
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
 
     // Verify the Dirac CSV export button exists and works
     await expect(page.getByTestId('export-diagnostics-csv')).toBeVisible({ timeout: 5000 })
@@ -126,7 +126,7 @@ test.describe('Data Export', () => {
     await setupModeContext(page, 'becDynamics')
     await expandDataExport(page)
 
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await expect(page.getByTestId('export-diagnostics-csv')).toBeVisible({ timeout: 5000 })
     await expect(page.getByTestId('export-diagnostics-json')).toBeVisible({ timeout: 5000 })
   })

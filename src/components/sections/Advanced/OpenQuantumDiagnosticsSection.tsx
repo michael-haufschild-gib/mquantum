@@ -15,8 +15,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
 
 /**
  * Diagnostics readout for the open quantum system.
@@ -45,31 +45,31 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     )
   })
 
-  const metrics = useOpenQuantumDiagnosticsStore(
+  const metrics = useDiagnosticsStore(
     useShallow((s) => ({
-      purity: s.purity,
-      linearEntropy: s.linearEntropy,
-      vonNeumannEntropy: s.vonNeumannEntropy,
-      coherenceMagnitude: s.coherenceMagnitude,
-      groundPopulation: s.groundPopulation,
+      purity: s.openQuantum.purity,
+      linearEntropy: s.openQuantum.linearEntropy,
+      vonNeumannEntropy: s.openQuantum.vonNeumannEntropy,
+      coherenceMagnitude: s.openQuantum.coherenceMagnitude,
+      groundPopulation: s.openQuantum.groundPopulation,
     }))
   )
 
-  const history = useOpenQuantumDiagnosticsStore(
+  const history = useDiagnosticsStore(
     useShallow((s) => ({
-      historyPurity: s.historyPurity,
-      historyEntropy: s.historyEntropy,
-      historyCoherence: s.historyCoherence,
-      historyHead: s.historyHead,
-      historyCount: s.historyCount,
+      historyPurity: s.openQuantum.historyPurity,
+      historyEntropy: s.openQuantum.historyEntropy,
+      historyCoherence: s.openQuantum.historyCoherence,
+      historyHead: s.openQuantum.historyHead,
+      historyCount: s.openQuantum.historyCount,
     }))
   )
 
-  const populationData = useOpenQuantumDiagnosticsStore(
+  const populationData = useDiagnosticsStore(
     useShallow((s) => ({
-      populations: s.populations,
-      basisLabels: s.basisLabels,
-      basisCount: s.basisCount,
+      populations: s.openQuantum.populations,
+      basisLabels: s.openQuantum.basisLabels,
+      basisCount: s.openQuantum.basisCount,
     }))
   )
 

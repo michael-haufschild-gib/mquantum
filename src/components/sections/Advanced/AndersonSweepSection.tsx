@@ -14,8 +14,8 @@ import { Button } from '@/components/ui/Button'
 import { Slider } from '@/components/ui/Slider'
 import type { SweepConfig, SweepResult } from '@/stores/andersonSweepStore'
 import { seedForStep, useAndersonSweepStore, wForStep } from '@/stores/andersonSweepStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** SVG layout for the sweep results scatter plot. */
 const SVG_W = 260
@@ -226,7 +226,7 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
 
     // Poll diagnostics every 200ms to check if enough simTime has elapsed
     sweepTickRef.current = setInterval(() => {
-      const diag = useTdseDiagnosticsStore.getState()
+      const diag = useDiagnosticsStore.getState().tdse
       if (!diag.hasData) return
 
       const nextW = useAndersonSweepStore.getState().tick(diag.simTime, diag.ipr, diag.normDrift)

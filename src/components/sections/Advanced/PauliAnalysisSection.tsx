@@ -15,8 +15,8 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 
 /**
  * Analysis content for pauliSpinor mode.
@@ -73,17 +73,17 @@ const PauliDiagnosticsInline: React.FC = React.memo(() => {
     spinExpectationZ,
     coherenceMagnitude,
     larmorFrequency,
-  } = usePauliDiagnosticsStore(
+  } = useDiagnosticsStore(
     useShallow((s) => ({
-      hasData: s.hasData,
-      totalNorm: s.totalNorm,
-      normDrift: s.normDrift,
-      maxDensity: s.maxDensity,
-      spinUpFraction: s.spinUpFraction,
-      spinDownFraction: s.spinDownFraction,
-      spinExpectationZ: s.spinExpectationZ,
-      coherenceMagnitude: s.coherenceMagnitude,
-      larmorFrequency: s.larmorFrequency,
+      hasData: s.pauli.hasData,
+      totalNorm: s.pauli.totalNorm,
+      normDrift: s.pauli.normDrift,
+      maxDensity: s.pauli.maxDensity,
+      spinUpFraction: s.pauli.spinUpFraction,
+      spinDownFraction: s.pauli.spinDownFraction,
+      spinExpectationZ: s.pauli.spinExpectationZ,
+      coherenceMagnitude: s.pauli.coherenceMagnitude,
+      larmorFrequency: s.pauli.larmorFrequency,
     }))
   )
 

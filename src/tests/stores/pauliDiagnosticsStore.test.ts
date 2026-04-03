@@ -7,15 +7,15 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 describe('pauliDiagnosticsStore', () => {
   beforeEach(() => {
-    usePauliDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetPauli()
   })
 
   it('initializes with hasData false and all zeroes', () => {
-    const state = usePauliDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().pauli
     expect(state.hasData).toBe(false)
     expect(state.totalNorm).toBe(0)
     expect(state.normDrift).toBe(0)
@@ -31,13 +31,13 @@ describe('pauliDiagnosticsStore', () => {
   })
 
   it('update sets hasData true and merges partial snapshot', () => {
-    usePauliDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updatePauli({
       totalNorm: 0.998,
       spinUpFraction: 0.7,
       spinDownFraction: 0.3,
     })
 
-    const state = usePauliDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().pauli
     expect(state.hasData).toBe(true)
     expect(state.totalNorm).toBe(0.998)
     expect(state.spinUpFraction).toBe(0.7)
@@ -47,42 +47,42 @@ describe('pauliDiagnosticsStore', () => {
   })
 
   it('update overwrites previous values', () => {
-    const { update } = usePauliDiagnosticsStore.getState()
-    update({ spinExpectationZ: 0.5 })
-    expect(usePauliDiagnosticsStore.getState().spinExpectationZ).toBe(0.5)
+    const { updatePauli } = useDiagnosticsStore.getState()
+    updatePauli({ spinExpectationZ: 0.5 })
+    expect(useDiagnosticsStore.getState().pauli.spinExpectationZ).toBe(0.5)
 
-    update({ spinExpectationZ: -0.3 })
-    expect(usePauliDiagnosticsStore.getState().spinExpectationZ).toBe(-0.3)
+    updatePauli({ spinExpectationZ: -0.3 })
+    expect(useDiagnosticsStore.getState().pauli.spinExpectationZ).toBe(-0.3)
   })
 
   it('update preserves hasData across multiple calls', () => {
-    const { update } = usePauliDiagnosticsStore.getState()
-    update({ totalNorm: 1.0 })
-    update({ coherenceMagnitude: 0.45 })
+    const { updatePauli } = useDiagnosticsStore.getState()
+    updatePauli({ totalNorm: 1.0 })
+    updatePauli({ coherenceMagnitude: 0.45 })
 
-    const state = usePauliDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().pauli
     expect(state.hasData).toBe(true)
     expect(state.totalNorm).toBe(1.0)
     expect(state.coherenceMagnitude).toBe(0.45)
   })
 
   it('ring buffer advances head and count on update', () => {
-    usePauliDiagnosticsStore.getState().update({ totalNorm: 0.99, spinUpFraction: 0.6 })
-    expect(usePauliDiagnosticsStore.getState().historyHead).toBe(1)
-    expect(usePauliDiagnosticsStore.getState().historyCount).toBe(1)
+    useDiagnosticsStore.getState().updatePauli({ totalNorm: 0.99, spinUpFraction: 0.6 })
+    expect(useDiagnosticsStore.getState().pauli.historyHead).toBe(1)
+    expect(useDiagnosticsStore.getState().pauli.historyCount).toBe(1)
 
-    usePauliDiagnosticsStore.getState().update({ totalNorm: 0.98, spinUpFraction: 0.55 })
-    expect(usePauliDiagnosticsStore.getState().historyHead).toBe(2)
-    expect(usePauliDiagnosticsStore.getState().historyCount).toBe(2)
+    useDiagnosticsStore.getState().updatePauli({ totalNorm: 0.98, spinUpFraction: 0.55 })
+    expect(useDiagnosticsStore.getState().pauli.historyHead).toBe(2)
+    expect(useDiagnosticsStore.getState().pauli.historyCount).toBe(2)
   })
 
   it('ring buffer writes values into TypedArrays', () => {
-    usePauliDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updatePauli({
       totalNorm: 0.97,
       spinUpFraction: 0.65,
       spinExpectationZ: 0.3,
     })
-    const s = usePauliDiagnosticsStore.getState()
+    const s = useDiagnosticsStore.getState().pauli
     expect(s.historyNorm[0]).toBeCloseTo(0.97)
     expect(s.historySpinUpFrac[0]).toBeCloseTo(0.65)
     expect(s.historySpinExpZ[0]).toBeCloseTo(0.3)
@@ -90,26 +90,26 @@ describe('pauliDiagnosticsStore', () => {
 
   it('ring buffer wraps at capacity (120 entries)', () => {
     for (let i = 0; i < 120; i++) {
-      usePauliDiagnosticsStore.getState().update({ totalNorm: 1 - i * 0.001 })
+      useDiagnosticsStore.getState().updatePauli({ totalNorm: 1 - i * 0.001 })
     }
-    expect(usePauliDiagnosticsStore.getState().historyHead).toBe(0) // wrapped
-    expect(usePauliDiagnosticsStore.getState().historyCount).toBe(120)
+    expect(useDiagnosticsStore.getState().pauli.historyHead).toBe(0) // wrapped
+    expect(useDiagnosticsStore.getState().pauli.historyCount).toBe(120)
 
     // One more — wraps to head=1
-    usePauliDiagnosticsStore.getState().update({ totalNorm: 0.5 })
-    expect(usePauliDiagnosticsStore.getState().historyHead).toBe(1)
-    expect(usePauliDiagnosticsStore.getState().historyCount).toBe(120)
-    expect(usePauliDiagnosticsStore.getState().historyNorm[0]).toBeCloseTo(0.5)
+    useDiagnosticsStore.getState().updatePauli({ totalNorm: 0.5 })
+    expect(useDiagnosticsStore.getState().pauli.historyHead).toBe(1)
+    expect(useDiagnosticsStore.getState().pauli.historyCount).toBe(120)
+    expect(useDiagnosticsStore.getState().pauli.historyNorm[0]).toBeCloseTo(0.5)
   })
 
   it('reset clears all fields and allocates fresh TypedArrays', () => {
     for (let i = 0; i < 10; i++) {
-      usePauliDiagnosticsStore.getState().update({ totalNorm: 0.9, spinUpFraction: 0.6 })
+      useDiagnosticsStore.getState().updatePauli({ totalNorm: 0.9, spinUpFraction: 0.6 })
     }
-    const normBefore = usePauliDiagnosticsStore.getState().historyNorm
-    usePauliDiagnosticsStore.getState().reset()
+    const normBefore = useDiagnosticsStore.getState().pauli.historyNorm
+    useDiagnosticsStore.getState().resetPauli()
 
-    const state = usePauliDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().pauli
     expect(state.hasData).toBe(false)
     expect(state.historyHead).toBe(0)
     expect(state.historyCount).toBe(0)
@@ -125,9 +125,9 @@ describe('pauliDiagnosticsStore', () => {
   })
 
   it('meanPosition update replaces array reference', () => {
-    usePauliDiagnosticsStore.getState().update({
+    useDiagnosticsStore.getState().updatePauli({
       meanPosition: [1.5, -0.3, 2.1],
     })
-    expect(usePauliDiagnosticsStore.getState().meanPosition).toEqual([1.5, -0.3, 2.1])
+    expect(useDiagnosticsStore.getState().pauli.meanPosition).toEqual([1.5, -0.3, 2.1])
   })
 })

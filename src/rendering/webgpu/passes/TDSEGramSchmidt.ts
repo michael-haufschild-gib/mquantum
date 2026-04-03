@@ -145,12 +145,12 @@ export function storeCurrentEigenstate(
   ).then((diag) => {
     eigenstateEntry.ipr = diag.ipr
     // Push orbit correlation back to the diagnostics store
-    void import('@/stores/eigenstateDiagnosticsStore').then((m) => {
-      m.useEigenstateDiagnosticsStore.getState().updateIPR(eigIdx, diag.ipr)
+    void import('@/stores/diagnosticsStore').then((m) => {
+      m.useDiagnosticsStore.getState().updateEigenstateIPR(eigIdx, diag.ipr)
       if (Number.isFinite(diag.orbitCorrelation)) {
-        m.useEigenstateDiagnosticsStore
+        m.useDiagnosticsStore
           .getState()
-          .updateOrbitCorrelation(eigIdx, diag.orbitCorrelation)
+          .updateEigenstateOrbitCorrelation(eigIdx, diag.orbitCorrelation)
       }
     })
   })

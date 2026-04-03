@@ -6,7 +6,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
@@ -253,7 +253,7 @@ export function rebuildTdseBuffers(
     size: DIAG_RESULT_COUNT * 4,
     usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
   })
-  useTdseDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetTdse()
 
   return {
     psiReBuffer,

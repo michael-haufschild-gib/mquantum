@@ -8,7 +8,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { LINEAR_WG } from './computePassUtils'
@@ -140,5 +140,5 @@ export function maybeInitialize(
     device.queue.writeBuffer(ic.bg.renormalizeUniformBuffer, 4, new Float32Array([1.0]))
   }
   ic.diagState.diagHistory.clear()
-  useTdseDiagnosticsStore.getState().reset()
+  useDiagnosticsStore.getState().resetTdse()
 }

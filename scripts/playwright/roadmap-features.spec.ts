@@ -196,8 +196,8 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
     // Poll until observables store has data
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-        return mod.useObservablesDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
     )
@@ -251,10 +251,10 @@ test.describe('A3: Observables — GPU reduction + Heisenberg', () => {
     // The readbackGeneration drain+snapshot pattern ensures we never read
     // stale data from the previous Classic Tunneling configuration.
     await page.evaluate(async () => {
-      const obsMod = await import('/src/stores/observablesDiagnosticsStore.ts')
-      obsMod.useObservablesDiagnosticsStore.getState().reset()
+      const obsMod = await import('/src/stores/diagnosticsStore.ts')
+      obsMod.useDiagnosticsStore.getState().resetObservables()
     })
-    await waitForFreshReadback(page, '/src/stores/observablesDiagnosticsStore.ts', 60_000)
+    await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 60_000, 'observables')
 
     const obs = await readObservablesDiagnostics(page)
     expect(obs.hasData).toBe(true)
@@ -283,7 +283,7 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForFirstFrame(page)
     // Wait for enough simulation to populate diagnostics history for export.
     await waitForSimulationFrames(page, 120)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
 
     // Open analysis section
     await page.getByTestId('toggle-right-panel').click()
@@ -327,7 +327,7 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForShaderCompilation(page)
     await waitForFirstFrame(page)
     await waitForSimulationFrames(page, 120)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
 
     await page.getByTestId('toggle-right-panel').click()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
@@ -384,7 +384,7 @@ test.describe('B3: Imaginary Time — convergence + renormalization', () => {
       s.resetTdseField()
     })
 
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -717,8 +717,8 @@ test.describe('Combined: multiple roadmap features simultaneously', () => {
 
     await page.waitForFunction(
       async () => {
-        const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-        return mod.useObservablesDiagnosticsStore.getState().hasData
+        const mod = await import('/src/stores/diagnosticsStore.ts')
+        return mod.useDiagnosticsStore.getState().observables.hasData
       },
       { timeout: 30_000 }
     )

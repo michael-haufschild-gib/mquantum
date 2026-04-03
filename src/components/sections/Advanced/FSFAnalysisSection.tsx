@@ -19,8 +19,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 
 /**
  * Compact metric row for diagnostics display.
@@ -114,13 +114,13 @@ const SparklineRow: React.FC<{
 )
 
 const SparklineCharts: React.FC = React.memo(() => {
-  const { hasData, historyEnergy, historyNorm, historyHead, historyCount } = useFsfDiagnosticsStore(
+  const { hasData, historyEnergy, historyNorm, historyHead, historyCount } = useDiagnosticsStore(
     useShallow((s) => ({
-      hasData: s.hasData,
-      historyEnergy: s.historyEnergy,
-      historyNorm: s.historyNorm,
-      historyHead: s.historyHead,
-      historyCount: s.historyCount,
+      hasData: s.fsf.hasData,
+      historyEnergy: s.fsf.historyEnergy,
+      historyNorm: s.fsf.historyNorm,
+      historyHead: s.fsf.historyHead,
+      historyCount: s.fsf.historyCount,
     }))
   )
 
@@ -283,16 +283,16 @@ KGDispersionDiagram.displayName = 'KGDispersionDiagram'
 
 const MetricsDisplay: React.FC = React.memo(() => {
   const { hasData, totalEnergy, totalNorm, maxPhi, maxPi, energyDrift, meanPhi, variancePhi } =
-    useFsfDiagnosticsStore(
+    useDiagnosticsStore(
       useShallow((s) => ({
-        hasData: s.hasData,
-        totalEnergy: s.totalEnergy,
-        totalNorm: s.totalNorm,
-        maxPhi: s.maxPhi,
-        maxPi: s.maxPi,
-        energyDrift: s.energyDrift,
-        meanPhi: s.meanPhi,
-        variancePhi: s.variancePhi,
+        hasData: s.fsf.hasData,
+        totalEnergy: s.fsf.totalEnergy,
+        totalNorm: s.fsf.totalNorm,
+        maxPhi: s.fsf.maxPhi,
+        maxPi: s.fsf.maxPi,
+        energyDrift: s.fsf.energyDrift,
+        meanPhi: s.fsf.meanPhi,
+        variancePhi: s.fsf.variancePhi,
       }))
     )
 

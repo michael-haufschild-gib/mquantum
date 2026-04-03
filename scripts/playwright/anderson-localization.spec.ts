@@ -31,12 +31,11 @@ import {
 
 test.setTimeout(300_000)
 
-const TDSE_DIAG_STORE = '/src/stores/tdseDiagnosticsStore.ts'
+const DIAG_STORE = '/src/stores/diagnosticsStore.ts'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const waitForAndersonReady = (page: Page, extraFrames = 120) =>
-  waitForModeReady(page, extraFrames)
+const waitForAndersonReady = (page: Page, extraFrames = 120) => waitForModeReady(page, extraFrames)
 
 /** Navigate to Anderson disorder with specific W and seed. */
 async function gotoAnderson(
@@ -94,7 +93,7 @@ test.describe('Anderson Localization', () => {
     await waitForAndersonReady(page)
 
     // Wait for diagnostics to accumulate
-    await waitForDiagnostics(page, TDSE_DIAG_STORE)
+    await waitForDiagnostics(page, DIAG_STORE, undefined, 'tdse')
 
     const diag = await readTdseDiagnostics(page)
     expect(diag.hasData).toBe(true)
@@ -158,7 +157,7 @@ test.describe('Anderson Localization', () => {
     const fc = await getFrameCount(page)
     await waitForFrameAdvance(page, fc + 60)
 
-    await waitForDiagnostics(page, TDSE_DIAG_STORE)
+    await waitForDiagnostics(page, DIAG_STORE, undefined, 'tdse')
     const diag = await readTdseDiagnostics(page)
     expect(diag.hasData).toBe(true)
     // Norm should be conserved within 5% (f32 precision + split-operator error)
@@ -198,7 +197,7 @@ test.describe('Anderson Localization', () => {
       await waitForRendererReady(page)
       await waitForShaderCompilation(page)
       await waitForAndersonReady(page)
-      await waitForDiagnostics(page, TDSE_DIAG_STORE)
+      await waitForDiagnostics(page, DIAG_STORE, undefined, 'tdse')
 
       const diag = await readTdseDiagnostics(page)
       results.push({ w, ipr: diag.ipr })
@@ -216,26 +215,24 @@ test.describe('Anderson Localization', () => {
     expect(allSame).toBe(false)
   })
 
-  test('energy spectrum produces non-zero histogram with observables enabled', async ({
-    page,
-  }) => {
+  test('energy spectrum produces non-zero histogram with observables enabled', async ({ page }) => {
     await gotoAnderson(page, 3, 10.0, 42, { obs: '1' })
     await waitForRendererReady(page)
     await waitForShaderCompilation(page)
     await waitForAndersonReady(page)
 
     // Wait for observables diagnostics data
-    await waitForDiagnostics(page, '/src/stores/observablesDiagnosticsStore.ts')
+    await waitForDiagnostics(page, DIAG_STORE, undefined, 'observables')
 
     // Let a few diagnostic frames accumulate so the energy spectrum has data
     const fc = await getFrameCount(page)
     await waitForFrameAdvance(page, fc + 30)
-    await waitForDiagnostics(page, '/src/stores/observablesDiagnosticsStore.ts')
+    await waitForDiagnostics(page, DIAG_STORE, undefined, 'observables')
 
     // Read energy spectrum from store
     const spectrum = await page.evaluate(async () => {
-      const mod = await import('/src/stores/observablesDiagnosticsStore.ts')
-      const s = mod.useObservablesDiagnosticsStore.getState()
+      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const s = mod.useDiagnosticsStore.getState().observables
       return Array.from(s.energySpectrum)
     })
 

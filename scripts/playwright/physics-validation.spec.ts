@@ -55,7 +55,7 @@ test.describe('TDSE physics invariants', () => {
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'classicTunneling')
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -71,7 +71,7 @@ test.describe('TDSE physics invariants', () => {
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForShaderCompilation(page)
     await applyTdsePreset(page, 'classicTunneling')
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readTdseDiagnostics(page)
@@ -86,7 +86,7 @@ test.describe('TDSE physics invariants', () => {
     // PML should have absorbed a significant fraction.
     await gotoMode(page, 'tdseDynamics', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/tdseDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'tdse')
     await waitForSimulationFrames(page, 300)
 
     const diag = await readTdseDiagnostics(page)
@@ -113,7 +113,7 @@ test.describe('BEC physics invariants', () => {
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readBecDiagnostics(page)
@@ -129,7 +129,7 @@ test.describe('BEC physics invariants', () => {
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readBecDiagnostics(page)
@@ -142,7 +142,7 @@ test.describe('BEC physics invariants', () => {
     await gotoMode(page, 'becDynamics', 3)
     await waitForShaderCompilation(page)
     await applyBecPreset(page, 'groundState')
-    await waitForDiagnostics(page, '/src/stores/becDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'bec')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readBecDiagnostics(page)
@@ -165,7 +165,7 @@ test.describe('Dirac equation physics invariants', () => {
     // Free Dirac equation is unitary — norm should be conserved.
     await gotoMode(page, 'diracEquation', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readDiracDiagnostics(page)
@@ -176,7 +176,7 @@ test.describe('Dirac equation physics invariants', () => {
   test('particle + antiparticle fractions sum to ~1 (completeness)', async ({ page }) => {
     await gotoMode(page, 'diracEquation', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readDiracDiagnostics(page)
@@ -191,7 +191,7 @@ test.describe('Dirac equation physics invariants', () => {
     await gotoMode(page, 'diracEquation', 3)
     await waitForShaderCompilation(page)
     await applyDiracPreset(page, 'kleinParadox')
-    await waitForDiagnostics(page, '/src/stores/diracDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
     await waitForSimulationFrames(page, 300)
 
     const diag = await readDiracDiagnostics(page)
@@ -223,7 +223,7 @@ test.describe('Pauli spinor physics invariants', () => {
         mod.useExtendedObjectStore.getState() as Record<string, (...a: unknown[]) => void>
       ).setPauliConfig({ absorberEnabled: false, needsReset: true })
     })
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readPauliDiagnostics(page)
@@ -237,7 +237,7 @@ test.describe('Pauli spinor physics invariants', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'larmorPrecession')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readPauliDiagnostics(page)
@@ -252,7 +252,7 @@ test.describe('Pauli spinor physics invariants', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'larmorPrecession')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readPauliDiagnostics(page)
@@ -269,7 +269,7 @@ test.describe('Pauli spinor physics invariants', () => {
     await gotoPauli(page, 3)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'sternGerlach')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readPauliDiagnostics(page)
@@ -294,7 +294,7 @@ test.describe('free scalar field physics invariants', () => {
     // that energy stays finite (no blowup) and positive (no sign error).
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readFsfDiagnostics(page)
@@ -308,7 +308,7 @@ test.describe('free scalar field physics invariants', () => {
   test('field values remain finite (no NaN/Inf blowup)', async ({ page }) => {
     await gotoMode(page, 'freeScalarField', 3)
     await waitForShaderCompilation(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 60)
 
     const diag = await readFsfDiagnostics(page)
@@ -330,7 +330,7 @@ test.describe('Pauli spinor in higher dimensions', () => {
     await gotoPauli(page, 5)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'larmorPrecession')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readPauliDiagnostics(page)
@@ -342,7 +342,7 @@ test.describe('Pauli spinor in higher dimensions', () => {
     await gotoPauli(page, 6)
     await waitForShaderCompilation(page)
     await applyPauliPreset(page, 'larmorPrecession')
-    await waitForDiagnostics(page, '/src/stores/pauliDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'pauli')
     await waitForSimulationFrames(page, 120)
 
     const diag = await readPauliDiagnostics(page)

@@ -17,9 +17,9 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** Analytical modes have no time evolution — auto-scale gain cap is irrelevant. */
 const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
@@ -257,10 +257,10 @@ ExposureSectionInner.displayName = 'ExposureSectionInner'
  * it to the first snapshot's maxDensity to compute the amplification factor.
  */
 const ExposureIndicator: React.FC = React.memo(() => {
-  const { maxDensity, hasData } = useTdseDiagnosticsStore(
+  const { maxDensity, hasData } = useDiagnosticsStore(
     useShallow((s) => ({
-      maxDensity: s.maxDensity,
-      hasData: s.hasData,
+      maxDensity: s.tdse.maxDensity,
+      hasData: s.tdse.hasData,
     }))
   )
 

@@ -396,7 +396,7 @@ test.describe('free scalar field: animation', () => {
     await waitForFrameAdvance(page, fc0 + 60)
 
     // Wait for first diagnostic readback
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
 
     const snap1 = await readFsfDiagnostics(page)
     expect(snap1.hasData, 'first diagnostic snapshot must have data').toBe(true)
@@ -448,7 +448,7 @@ test.describe('free scalar field: physics', () => {
     })
 
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readFsfDiagnostics(page)
@@ -470,7 +470,7 @@ test.describe('free scalar field: physics', () => {
 
     await setInitialCondition(page, 'kinkProfile')
     await enableDiagnostics(page)
-    await waitForDiagnostics(page, '/src/stores/fsfDiagnosticsStore.ts')
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
     await waitForSimulationFrames(page, 200)
 
     const diag = await readFsfDiagnostics(page)

@@ -7,7 +7,7 @@
  * @module rendering/webgpu/passes/QuantumWalkDiagnostics
  */
 
-import { useQwDiagnosticsStore } from '@/stores/qwDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -102,7 +102,7 @@ export class QwDiagnostics {
   /** Reset accumulator and store state. */
   reset(): void {
     this.stepAccumulator = 0
-    useQwDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetQw()
   }
 
   /**
@@ -258,9 +258,9 @@ export class QwDiagnostics {
             this.mappingInFlight = false
 
             if (isFinite(totalNorm)) {
-              useQwDiagnosticsStore
+              useDiagnosticsStore
                 .getState()
-                .pushDiagnostics(totalNorm, stepCount, posSum, posSqSum)
+                .pushQwDiagnostics(totalNorm, stepCount, posSum, posSqSum)
             }
           })
           .catch(() => {

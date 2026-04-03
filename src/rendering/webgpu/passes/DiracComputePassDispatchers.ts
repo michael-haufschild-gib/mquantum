@@ -11,7 +11,7 @@ import {
   kleinThreshold,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
-import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
@@ -163,7 +163,7 @@ export function dispatchDiagnostics(
               const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
               const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
 
-              useDiracDiagnosticsStore.getState().update({
+              useDiagnosticsStore.getState().updateDirac({
                 totalNorm,
                 normDrift,
                 maxDensity: maxDens,

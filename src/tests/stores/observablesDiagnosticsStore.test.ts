@@ -6,15 +6,15 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { useObservablesDiagnosticsStore } from '@/stores/observablesDiagnosticsStore'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 describe('observablesDiagnosticsStore', () => {
   beforeEach(() => {
-    useObservablesDiagnosticsStore.getState().reset()
+    useDiagnosticsStore.getState().resetObservables()
   })
 
   it('starts with no data', () => {
-    const state = useObservablesDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().observables
     expect(state.hasData).toBe(false)
     expect(state.activeDims).toBe(0)
     expect(state.historyHead).toBe(0)
@@ -34,8 +34,8 @@ describe('observablesDiagnosticsStore', () => {
       momentumNorm: 1.0,
     }
 
-    useObservablesDiagnosticsStore.getState().pushSnapshot(snapshot)
-    const state = useObservablesDiagnosticsStore.getState()
+    useDiagnosticsStore.getState().pushObservablesSnapshot(snapshot)
+    const state = useDiagnosticsStore.getState().observables
 
     expect(state.hasData).toBe(true)
     expect(state.activeDims).toBe(3)
@@ -46,7 +46,7 @@ describe('observablesDiagnosticsStore', () => {
   })
 
   it('ring buffer wraps at capacity', () => {
-    const store = useObservablesDiagnosticsStore.getState()
+    const store = useDiagnosticsStore.getState()
     const snapshot = {
       activeDims: 1,
       positionMean: new Float64Array(11),
@@ -62,10 +62,10 @@ describe('observablesDiagnosticsStore', () => {
     // Push 130 snapshots (exceeds 120 buffer length)
     for (let i = 0; i < 130; i++) {
       snapshot.totalEnergy = i
-      store.pushSnapshot(snapshot)
+      store.pushObservablesSnapshot(snapshot)
     }
 
-    const state = useObservablesDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().observables
     expect(state.historyCount).toBe(120) // capped at buffer length
     expect(state.historyHead).toBe(10) // (130 % 120)
     // Latest energy should be in the ring buffer
@@ -73,8 +73,8 @@ describe('observablesDiagnosticsStore', () => {
   })
 
   it('reset clears all data', () => {
-    const store = useObservablesDiagnosticsStore.getState()
-    store.pushSnapshot({
+    const store = useDiagnosticsStore.getState()
+    store.pushObservablesSnapshot({
       activeDims: 2,
       positionMean: new Float64Array(11),
       positionVariance: new Float64Array(11),
@@ -86,10 +86,10 @@ describe('observablesDiagnosticsStore', () => {
       momentumNorm: 1,
     })
 
-    expect(useObservablesDiagnosticsStore.getState().hasData).toBe(true)
-    store.reset()
+    expect(useDiagnosticsStore.getState().observables.hasData).toBe(true)
+    store.resetObservables()
 
-    const state = useObservablesDiagnosticsStore.getState()
+    const state = useDiagnosticsStore.getState().observables
     expect(state.hasData).toBe(false)
     expect(state.totalEnergy).toBe(0)
     expect(state.historyHead).toBe(0)
