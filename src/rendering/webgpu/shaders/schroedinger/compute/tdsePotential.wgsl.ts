@@ -169,6 +169,34 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     V = harmonic + params.anharmonicLambda * coupling;
   }
 
+  // Soft transverse confinement for directional (1D/2D) potentials.
+  // Prevents unphysical FFT periodic wrapping in unconfined dimensions.
+  // Uses a quartic wall: V_perp = A * (x_d/L_d)^4 where L_d is the half-extent.
+  // The quartic rises steeply near edges but is negligible at the center.
+  // Applied only to potentials that don't already confine all dimensions:
+  // types 0-3, 5-8 (directional); skipped for 4, 9, 10, 13 (radial/all-dim).
+  let isDirectional = params.potentialType <= 3u
+    || params.potentialType == 5u
+    || params.potentialType == 6u
+    || params.potentialType == 7u
+    || params.potentialType == 8u;
+  if (isDirectional && params.latticeDim >= 2u) {
+    // Quartic wall strength: strong enough to confine but gentle at center
+    let wallStrength = max(params.barrierHeight, 10.0);
+    for (var dt: u32 = 1u; dt < params.latticeDim; dt++) {
+      // For doubleSlit (type 6), axis 1 has slit structure — don't confine it
+      if (params.potentialType == 6u && dt == 1u) {
+        continue;
+      }
+      let posT = (f32(coords[dt]) - f32(params.gridSize[dt]) * 0.5 + 0.5) * params.spacing[dt];
+      let halfExtentT = f32(params.gridSize[dt]) * params.spacing[dt] * 0.5;
+      let normT = posT / halfExtentT; // -1 to +1
+      let n2 = normT * normT;
+      // Quartic: rises as (x/L)^4 — negligible at center, ~wallStrength at edges
+      V += wallStrength * n2 * n2;
+    }
+  }
+
   potential[idx] = V;
 }
 `
