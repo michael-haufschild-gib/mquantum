@@ -57,6 +57,8 @@ describe('useOpenQuantumDiagnosticsStore (unified)', () => {
       expect(s.historyEntropy.length).toBe(120)
       expect(s.historyCoherence.length).toBe(120)
       expect(s.historyPurity.every((v) => v === 0)).toBe(true)
+      expect(s.historyEntropy.every((v) => v === 0)).toBe(true)
+      expect(s.historyCoherence.every((v) => v === 0)).toBe(true)
     })
   })
 

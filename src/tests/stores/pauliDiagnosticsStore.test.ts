@@ -89,10 +89,13 @@ describe('pauliDiagnosticsStore', () => {
   })
 
   it('meanPosition update replaces array reference', () => {
+    const before = useDiagnosticsStore.getState().pauli.meanPosition
     useDiagnosticsStore.getState().updatePauli({
       meanPosition: [1.5, -0.3, 2.1],
     })
-    expect(useDiagnosticsStore.getState().pauli.meanPosition).toEqual([1.5, -0.3, 2.1])
+    const after = useDiagnosticsStore.getState().pauli.meanPosition
+    expect(after).not.toBe(before)
+    expect(after).toEqual([1.5, -0.3, 2.1])
   })
 
   it('reset restores meanPosition and spin fields', () => {
