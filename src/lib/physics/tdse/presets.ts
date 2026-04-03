@@ -273,17 +273,20 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     },
   },
   // ── Anderson Localization Presets ──────────────────────────────────────────
+  // Disorder strength W is in tight-binding units (W/t where t = ℏ²/(2m·dx²)).
+  // The upload code scales W by t automatically, so presets work at any spacing.
+  // 3D critical value: Wc/t ≈ 16.5.
   {
     id: 'andersonLocalized3D',
     name: 'Anderson: Localized (3D)',
     description:
-      'Strong disorder W=25 in 3D — well above the critical value Wc≈16.5. Wavepacket remains localized.',
+      'Strong disorder W/t=25 — well above Wc/t≈16.5. Wavepacket remains exponentially localized.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
       spacing: [0.1, 0.1, 0.1],
-      dt: 0.005,
-      stepsPerFrame: 4,
+      dt: 0.002,
+      stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
       packetCenter: [0, 0, 0],
       packetWidth: 0.3,
@@ -304,13 +307,14 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   {
     id: 'andersonExtended3D',
     name: 'Anderson: Extended (3D)',
-    description: 'Weak disorder W=5 in 3D — below critical value. Wavepacket spreads diffusively.',
+    description:
+      'Weak disorder W/t=5 — below Wc/t≈16.5. Wavepacket spreads diffusively across the lattice.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
       spacing: [0.1, 0.1, 0.1],
-      dt: 0.005,
-      stepsPerFrame: 4,
+      dt: 0.002,
+      stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
       packetCenter: [0, 0, 0],
       packetWidth: 0.3,
@@ -332,13 +336,13 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     id: 'andersonTransition4D',
     name: 'Anderson: 4D Transition',
     description:
-      'Moderate disorder in 4D (32⁴ lattice). Transport properties at the Anderson transition in higher dimensions.',
+      'Moderate disorder W/t=15 in 4D. Probes transport at the Anderson transition in higher dimensions.',
     overrides: {
       latticeDim: 4,
       gridSize: [32, 32, 32, 32],
       spacing: [0.1, 0.1, 0.1, 0.1],
-      dt: 0.005,
-      stepsPerFrame: 4,
+      dt: 0.002,
+      stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
       packetCenter: [0, 0, 0, 0],
       packetWidth: 0.25,
@@ -360,13 +364,13 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     id: 'andersonTransition5D',
     name: 'Anderson: 5D Transport',
     description:
-      'Disorder in 5D (16⁵ lattice). Probes localization in dimensions where exact diagonalization is infeasible.',
+      'Disorder W/t=15 in 5D. Probes localization in dimensions where exact diagonalization is infeasible.',
     overrides: {
       latticeDim: 5,
       gridSize: [16, 16, 16, 16, 16],
       spacing: [0.1, 0.1, 0.1, 0.1, 0.1],
-      dt: 0.005,
-      stepsPerFrame: 4,
+      dt: 0.002,
+      stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
       packetCenter: [0, 0, 0, 0, 0],
       packetWidth: 0.2,
