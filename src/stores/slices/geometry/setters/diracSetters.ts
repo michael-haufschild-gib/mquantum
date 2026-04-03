@@ -380,9 +380,12 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracPacketCenter: (dimIndex, value) => {
       if (!isFinite(value)) return
       setWithVersion((state) => {
+        const { gridSize, spacing } = state.schroedinger.dirac
         const arr = [...state.schroedinger.dirac.packetCenter]
         if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
+          const halfExtent = (gridSize[dimIndex] ?? 32) * (spacing[dimIndex] ?? 0.15) * 0.5
+          const limit = halfExtent * 0.9
+          arr[dimIndex] = Math.max(-limit, Math.min(limit, value))
         }
         return {
           schroedinger: {
@@ -395,9 +398,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracPacketMomentum: (dimIndex, value) => {
       if (!isFinite(value)) return
       setWithVersion((state) => {
+        const { spacing } = state.schroedinger.dirac
         const arr = [...state.schroedinger.dirac.packetMomentum]
         if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
+          const kMax = Math.PI / (spacing[dimIndex] ?? 0.15)
+          arr[dimIndex] = Math.max(-kMax, Math.min(kMax, value))
         }
         return {
           schroedinger: {

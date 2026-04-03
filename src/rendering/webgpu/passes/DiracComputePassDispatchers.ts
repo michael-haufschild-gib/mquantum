@@ -35,8 +35,8 @@ export interface DiagDispatchParams {
   readonly initialNorm: number
   readonly maxDensity: number
   readonly diagMappingInFlight: boolean
-  /** Generation counter for invalidating stale readbacks after field reinit. */
-  readonly diagGeneration: number
+  /** Returns the current generation counter for invalidating stale readbacks after field reinit. */
+  readonly getDiagGeneration: () => number
   readonly dispatchCompute: (
     pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
@@ -105,7 +105,7 @@ export function dispatchDiagnostics(
       diagMappingInFlight: true,
     })
     const staging = params.diagStagingBuffer
-    const capturedGen = params.diagGeneration
+    const capturedGen = params.getDiagGeneration()
     const renormBuf = bg.renormalizeUniformBuffer
     let currentMaxDensity = params.maxDensity
     let currentInitialNorm = params.initialNorm
@@ -114,7 +114,7 @@ export function dispatchDiagnostics(
       .onSubmittedWorkDone()
       .then(() => {
         // Discard stale readback if field was reinitialized since dispatch
-        if (capturedGen !== params.diagGeneration) {
+        if (capturedGen !== params.getDiagGeneration()) {
           onResult({
             maxDensity: currentMaxDensity,
             initialNorm: currentInitialNorm,

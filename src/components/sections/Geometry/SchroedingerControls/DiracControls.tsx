@@ -215,9 +215,9 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
                 tooltip="Nuclear charge for the Coulomb potential V = -Z/r. Above Z ≈ 137 the Dirac equation becomes supercritical."
                 value={dirac.coulombZ}
                 onChange={actions.setCoulombZ}
-                min={0.1}
+                min={1}
                 max={10}
-                step={0.1}
+                step={1}
               />
             )}
           </>
@@ -266,18 +266,21 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           max={1}
           step={0.01}
         />
-        {Array.from({ length: Math.min(latticeDim, 3) }, (_, d) => (
-          <Slider
-            key={`mom-${d}`}
-            label={`Momentum k${AXIS_LABELS[d]}`}
-            tooltip="Initial crystal momentum of the wavepacket along this axis in units of 1/a."
-            value={dirac.packetMomentum[d] ?? 0}
-            onChange={(v) => actions.setPacketMomentum(d, v)}
-            min={-20}
-            max={20}
-            step={0.5}
-          />
-        ))}
+        {Array.from({ length: Math.min(latticeDim, 3) }, (_, d) => {
+          const kMax = Math.PI / (dirac.spacing[d] ?? 0.15)
+          return (
+            <Slider
+              key={`mom-${d}`}
+              label={`Momentum k${AXIS_LABELS[d]}`}
+              tooltip="Initial crystal momentum of the wavepacket along this axis in units of 1/a."
+              value={dirac.packetMomentum[d] ?? 0}
+              onChange={(v) => actions.setPacketMomentum(d, v)}
+              min={-kMax}
+              max={kMax}
+              step={0.5}
+            />
+          )
+        })}
       </ControlGroup>
 
       <ControlGroup
