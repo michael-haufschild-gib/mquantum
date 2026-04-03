@@ -15,6 +15,18 @@ class SoundManager {
   private masterGain: GainNode | null = null
   private initialized: boolean = false
   private listeners: Set<() => void> = new Set()
+  private lastPlayTime: Record<string, number> = {}
+
+  /**
+   * Returns true if enough time has elapsed since the last play of this sound type.
+   * Prevents audio spam when rapidly hovering across many controls.
+   */
+  private throttle(key: string, minIntervalMs: number): boolean {
+    const now = performance.now()
+    if (now - (this.lastPlayTime[key] ?? 0) < minIntervalMs) return false
+    this.lastPlayTime[key] = now
+    return true
+  }
 
   constructor() {
     // Lazy init on first interaction
@@ -62,6 +74,7 @@ class SoundManager {
 
   public playClick(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
+    if (!this.throttle('click', 50)) return
 
     const now = this.ctx.currentTime
     const duration = 0.02
@@ -97,10 +110,15 @@ class SoundManager {
 
     source.start(now)
     source.stop(now + duration)
+    source.onended = () => {
+      filter.disconnect()
+      gain.disconnect()
+    }
   }
 
   public playHover(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
+    if (!this.throttle('hover', 100)) return
 
     const osc = this.ctx.createOscillator()
     const gain = this.ctx.createGain()
@@ -122,10 +140,15 @@ class SoundManager {
 
     osc.start()
     osc.stop(this.ctx.currentTime + 0.05)
+    osc.onended = () => {
+      filter.disconnect()
+      gain.disconnect()
+    }
   }
 
   public playSnap(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
+    if (!this.throttle('snap', 50)) return
 
     const now = this.ctx.currentTime
     const duration = 0.025
@@ -159,10 +182,15 @@ class SoundManager {
 
     source.start(now)
     source.stop(now + duration)
+    source.onended = () => {
+      filter.disconnect()
+      gain.disconnect()
+    }
   }
 
   public playSuccess(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
+    if (!this.throttle('success', 200)) return
     const ctx = this.ctx
     const masterGain = this.masterGain
 
@@ -185,6 +213,9 @@ class SoundManager {
 
       osc.start(now + i * 0.05)
       osc.stop(now + i * 0.05 + 0.4)
+      osc.onended = () => {
+        gain.disconnect()
+      }
     })
   }
 
@@ -194,6 +225,7 @@ class SoundManager {
    */
   public playSwish(): void {
     if (!this.ctx || !this.masterGain || !this.enabled) return
+    if (!this.throttle('swish', 100)) return
 
     const now = this.ctx.currentTime
     const duration = 0.08
@@ -230,6 +262,10 @@ class SoundManager {
 
     source.start(now)
     source.stop(now + duration)
+    source.onended = () => {
+      filter.disconnect()
+      gain.disconnect()
+    }
   }
 
   public toggle(enabled: boolean): void {
