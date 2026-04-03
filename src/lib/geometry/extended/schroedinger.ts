@@ -732,3 +732,21 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   // Open Quantum System
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,
 }
+
+/**
+ * Create a fresh copy of the default Schroedinger config.
+ *
+ * Clones mutable typed arrays (basisX/Y/Z, origin) to prevent shared
+ * references between store instances and the global default constant.
+ * Use this instead of `{ ...DEFAULT_SCHROEDINGER_CONFIG }` in store
+ * factories and reset actions.
+ */
+export function createDefaultSchroedingerConfig(): SchroedingerConfig {
+  return {
+    ...DEFAULT_SCHROEDINGER_CONFIG,
+    basisX: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisX),
+    basisY: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisY),
+    basisZ: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisZ),
+    origin: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.origin),
+  }
+}
