@@ -297,10 +297,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                 />
                 <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
               </div>
-              {/* Hex Text */}
-              <span className="text-xs font-mono text-text-tertiary group-hover:text-text-primary transition-colors">
-                {value}
-              </span>
             </div>
           }
           content={
