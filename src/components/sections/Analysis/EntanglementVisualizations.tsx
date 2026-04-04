@@ -7,7 +7,7 @@
  *
  * Extracted from CoordinateEntanglementSection to keep file size under lint limit.
  *
- * @module components/sections/Advanced/EntanglementVisualizations
+ * @module components/sections/Analysis/EntanglementVisualizations
  */
 
 import React, { useEffect, useRef } from 'react'

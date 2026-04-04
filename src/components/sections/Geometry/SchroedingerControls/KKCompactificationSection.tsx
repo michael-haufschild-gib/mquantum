@@ -9,7 +9,7 @@
  * - Per-dimension compactification radius R slider
  * - KK energy level diagram (SVG) showing discrete mass spectrum
  *
- * @module components/sections/Advanced/KKCompactificationSection
+ * @module components/sections/Geometry/SchroedingerControls/KKCompactificationSection
  */
 
 import React, { useCallback, useMemo } from 'react'

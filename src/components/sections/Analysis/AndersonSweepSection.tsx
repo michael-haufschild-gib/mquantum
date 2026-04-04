@@ -4,7 +4,7 @@
  * Controls for automated parameter scans across disorder strength W.
  * Displays a scatter plot of W vs IPR after the sweep completes.
  *
- * @module components/sections/Advanced/AndersonSweepSection
+ * @module components/sections/Analysis/AndersonSweepSection
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'

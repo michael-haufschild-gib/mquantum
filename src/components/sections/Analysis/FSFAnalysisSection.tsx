@@ -10,7 +10,7 @@
  *
  * Used inside the unified AnalysisSection.
  *
- * @module components/sections/Advanced/FSFAnalysisSection
+ * @module components/sections/Analysis/FSFAnalysisSection
  */
 
 import React, { useMemo } from 'react'

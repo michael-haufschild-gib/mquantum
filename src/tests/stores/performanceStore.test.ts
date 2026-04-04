@@ -5,6 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
 import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
 import {
   hasPersistedMaxFps,
@@ -280,8 +281,10 @@ describe('performanceStore', () => {
 
       // Reset should overwrite with defaults in localStorage
       store.reset()
-      expect(localStorage.getItem('mdim_render_resolution_scale')).not.toBe('0.5')
-      expect(localStorage.getItem('mdim_max_fps')).not.toBe('90')
+      expect(localStorage.getItem('mdim_render_resolution_scale')).toBe(
+        String(DESKTOP_DEFAULT_RESOLUTION_SCALE)
+      )
+      expect(localStorage.getItem('mdim_max_fps')).toBe(String(DEFAULT_MAX_FPS))
     })
   })
 })
@@ -442,6 +445,20 @@ describe('max FPS persistence', () => {
         usePerformanceStore.getState().setMaxFps(input)
         expect(usePerformanceStore.getState().maxFps).toBe(expected)
       }
+    })
+
+    it('accepts 0 as transient uncapped FPS without persisting', () => {
+      const { setMaxFps } = usePerformanceStore.getState()
+
+      // First set a normal value to populate localStorage
+      setMaxFps(60)
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60')
+
+      // Setting 0 should update state but not persist
+      setMaxFps(0)
+      expect(usePerformanceStore.getState().maxFps).toBe(0)
+      // localStorage should still have the previous value
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60')
     })
 
     it('ignores non-finite max FPS values', () => {

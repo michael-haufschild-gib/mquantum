@@ -8,7 +8,7 @@
 
 import React from 'react'
 
-import { KKCompactificationSection } from '@/components/sections/Advanced/KKCompactificationSection'
+import { KKCompactificationSection } from './KKCompactificationSection'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'

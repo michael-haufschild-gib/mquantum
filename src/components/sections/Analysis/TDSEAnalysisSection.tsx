@@ -8,13 +8,13 @@
  *
  * Used inside the unified AnalysisSection.
  *
- * @module components/sections/Advanced/TDSEAnalysisSection
+ * @module components/sections/Analysis/TDSEAnalysisSection
  */
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { AndersonSweepSection } from '@/components/sections/Advanced/AndersonSweepSection'
+import { AndersonSweepSection } from '@/components/sections/Analysis/AndersonSweepSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'

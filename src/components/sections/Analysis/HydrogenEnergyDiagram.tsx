@@ -5,7 +5,7 @@
  * with the radial probability density r²|R_{nl}(r)|².
  * Left Y-axis: r²|R|² (blue curve). Right Y-axis: energy levels (accent lines).
  *
- * @module components/sections/Advanced/HydrogenEnergyDiagram
+ * @module components/sections/Analysis/HydrogenEnergyDiagram
  */
 
 import React, { useMemo } from 'react'

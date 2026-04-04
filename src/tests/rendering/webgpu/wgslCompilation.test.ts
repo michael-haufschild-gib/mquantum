@@ -54,7 +54,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
         temporal: true,
 
-        sss: false,
+
         quantumMode: 'hydrogenND',
       })
 
@@ -80,7 +80,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
         temporal: false,
 
-        sss: false,
+
         quantumMode,
       })
 
@@ -92,7 +92,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -109,7 +109,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -125,7 +125,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 2,
       temporal: false,
-      sss: false,
+
       quantumMode: 'hydrogenND',
     })
 
@@ -140,7 +140,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 2,
       temporal: false,
-      sss: false,
+
       quantumMode: 'hydrogenNDCoupled',
     })
 
@@ -154,7 +154,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 6,
       temporal: false,
-      sss: false,
+
       quantumMode: 'hydrogenND',
     })
 
@@ -168,7 +168,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -184,7 +184,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -204,7 +204,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'hydrogenND',
     })
 
@@ -224,7 +224,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       nodal: false,
       uncertaintyBoundary: false,
       quantumMode: 'harmonicOscillator',
@@ -263,7 +263,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -284,7 +284,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 5,
     })
@@ -307,7 +307,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -322,7 +322,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -336,7 +336,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -351,7 +351,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporalAccumulation: true,
 
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -364,7 +364,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       isFreeScalar: true,
     })
@@ -460,7 +460,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -482,7 +482,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -500,7 +500,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -511,7 +511,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { modules } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
     expect(modules).not.toContain('Color Selector')
@@ -526,7 +526,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -543,7 +543,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -560,7 +560,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -575,7 +575,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -589,7 +589,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { modules, features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -604,7 +604,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { modules } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         colorAlgorithm: alg,
       })
@@ -619,7 +619,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       const { wgsl } = composeSchroedingerShader({
         dimension: 5,
         temporal: false,
-        sss: false,
+
         quantumMode: 'hydrogenND',
         colorAlgorithm: alg,
       })
@@ -633,7 +633,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 4,
     })
@@ -645,7 +645,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 8,
     })
@@ -657,7 +657,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 9,
     })
@@ -669,7 +669,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 7,
     })
@@ -683,7 +683,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 10,
     })
@@ -695,7 +695,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 11,
     })
@@ -707,7 +707,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       isosurface: true,
       useDensityGrid: true,
@@ -723,7 +723,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 8,
     })
@@ -785,7 +785,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
     })
 
@@ -796,7 +796,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     const { modules } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 4,
     })
@@ -971,7 +971,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl, modules, features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       useEigenfunctionCache: true,
     })
@@ -995,7 +995,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       useEigenfunctionCache: true,
       useAnalyticalGradient: false,
@@ -1010,7 +1010,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl: robustOn } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       useEigenfunctionCache: true,
       useRobustEigenInterpolation: true,
@@ -1018,7 +1018,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl: robustOff } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       useEigenfunctionCache: true,
       useRobustEigenInterpolation: false,
@@ -1034,7 +1034,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
       const { wgsl, modules } = composeSchroedingerShader({
         dimension: 3,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         useEigenfunctionCache: true,
         termCount,
@@ -1052,7 +1052,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
       const { wgsl } = composeSchroedingerShader({
         dimension,
         temporal: false,
-        sss: false,
+
         quantumMode: 'harmonicOscillator',
         useEigenfunctionCache: true,
       })
@@ -1067,7 +1067,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl, modules } = composeSchroedingerShader({
       dimension: 5,
       temporal: false,
-      sss: false,
+
       quantumMode: 'hydrogenND',
       useEigenfunctionCache: true,
     })
@@ -1089,7 +1089,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl, modules } = composeSchroedingerShader({
       dimension: 3,
       temporal: false,
-      sss: false,
+
       quantumMode: 'hydrogenND',
       useEigenfunctionCache: true,
     })
@@ -1110,7 +1110,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
       const { wgsl } = composeSchroedingerShader({
         dimension,
         temporal: false,
-        sss: false,
+
         quantumMode: 'hydrogenND',
         useEigenfunctionCache: true,
       })
@@ -1127,7 +1127,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 3,
       isosurface: true,
-      sss: false,
+
       quantumMode: 'harmonicOscillator',
       useEigenfunctionCache: true,
     })

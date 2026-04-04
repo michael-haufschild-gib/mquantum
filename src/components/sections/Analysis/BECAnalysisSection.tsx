@@ -8,7 +8,7 @@
  *
  * Used inside the unified AnalysisSection.
  *
- * @module components/sections/Advanced/BECAnalysisSection
+ * @module components/sections/Analysis/BECAnalysisSection
  */
 
 import React, { useMemo } from 'react'

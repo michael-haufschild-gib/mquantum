@@ -166,7 +166,6 @@ export interface ShaderConfigOverrides {
   termCount?: number
   colorAlgorithm?: number
   temporal?: boolean
-  sss?: boolean
   nodal?: boolean
   uncertaintyBoundary?: boolean
   useEigenfunctionCache?: boolean
@@ -182,7 +181,6 @@ export function createShaderConfig(overrides: ShaderConfigOverrides = {}) {
     termCount: 1,
     colorAlgorithm: 4,
     temporal: false,
-    sss: false,
     ...overrides,
   }
 }

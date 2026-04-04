@@ -27,55 +27,14 @@ export interface WGSLShaderConfig {
   dimension: number
   /** Enable temporal reprojection */
   temporal?: boolean
-  /** Enable subsurface scattering */
-  sss?: boolean
-  /** Enable fresnel/rim shading modules */
-  fresnel?: boolean
   /** Enable nodal visualization modules */
   nodal?: boolean
-  /** Enable energy-color modules */
-  energyColor?: boolean
   /** Enable uncertainty-boundary modules */
   uncertaintyBoundary?: boolean
   /** Compile-time color algorithm hint */
   colorAlgorithm?: number
-  /** Compile-time lighting mode hint */
-  lightingMode?: 'none' | 'simple' | 'pbr'
   /** Custom overrides for shader blocks */
   overrides?: Array<{ target: string; replacement: string }>
-}
-
-/**
- * Feature flags derived from config.
- */
-export interface FeatureFlags {
-  defines: string[]
-  features: {
-    temporal: boolean
-    sss: boolean
-  }
-}
-
-/**
- * Process configuration into feature flags.
- * @param config
- */
-export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
-  const { dimension, temporal = false, sss = false } = config
-
-  const defines: string[] = [
-    `const DIMENSION: i32 = ${dimension};`,
-    `const TEMPORAL_ENABLED: bool = ${temporal};`,
-    `const SSS_ENABLED: bool = ${sss};`,
-  ]
-
-  return {
-    defines,
-    features: {
-      temporal,
-      sss,
-    },
-  }
 }
 
 /**
@@ -170,26 +129,6 @@ struct FragmentOutput {
   @location(0) color: vec4f,
 }
 `
-
-/**
- * Generate bind group declarations for standard uniforms.
- * Uses 4 separate groups (0-3) for devices with 8+ bind group support.
- */
-export function generateStandardBindGroups(): string {
-  return /* wgsl */ `
-// Group 0: Camera and frame uniforms
-@group(0) @binding(0) var<uniform> camera: CameraUniforms;
-
-// Group 1: Lighting uniforms
-@group(1) @binding(0) var<uniform> lighting: LightingUniforms;
-
-// Group 2: Material uniforms
-@group(2) @binding(0) var<uniform> material: MaterialUniforms;
-
-// Group 3: Quality uniforms
-@group(3) @binding(0) var<uniform> quality: QualityUniforms;
-`
-}
 
 /**
  * Generate consolidated bind group declarations for standard uniforms.

@@ -4,7 +4,7 @@
  * Born rule measurement UI: toggle, collapse width, partial measurement
  * axis selector, statistics display, and clear button.
  *
- * @module components/sections/Advanced/MeasurementControls
+ * @module components/sections/Analysis/MeasurementControls
  */
 
 import React, { useCallback } from 'react'
