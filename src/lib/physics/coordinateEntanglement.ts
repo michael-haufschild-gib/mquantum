@@ -570,7 +570,8 @@ export function computeCoordinateEntanglement(
 
         const jointEigs = hermitianEigenvalues(jointRdm.re, jointRdm.im, jointRdm.M)
         const jointEntropy = vonNeumannEntropy(jointEigs)
-        const mi = entropies[d1]! + entropies[d2]! - jointEntropy
+        // MI is non-negative by definition; clamp to 0 for float precision artifacts
+        const mi = Math.max(entropies[d1]! + entropies[d2]! - jointEntropy, 0)
         mutualInfo[d1 * N + d2] = mi
         mutualInfo[d2 * N + d1] = mi
       }
