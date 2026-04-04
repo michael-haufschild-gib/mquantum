@@ -2,6 +2,7 @@ import React from 'react'
 
 import ArrowLeftIcon from '@/assets/icons/arrow-left-filled.svg?react'
 import ArrowRightIcon from '@/assets/icons/arrow-right-filled.svg?react'
+import ChartIcon from '@/assets/icons/chart.svg?react'
 // SVGR imports
 import CheckIcon from '@/assets/icons/checkmark.svg?react'
 import ChevronDownIcon from '@/assets/icons/chevron-down.svg?react'
@@ -66,6 +67,7 @@ const icons = {
   settings: CogIcon,
   layers: LayersIcon,
   dice: DiceIcon,
+  chart: ChartIcon,
 } as const
 
 /** Union of all available icon names from the built-in icon set. */

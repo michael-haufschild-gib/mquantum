@@ -33,7 +33,7 @@ test.setTimeout(120_000)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Navigate to TDSE 3D, open right panel Object tab, expand analysis section. */
+/** Navigate to TDSE 3D, open right panel, switch to Analysis tab. */
 async function setupTdseCarpetContext(page: import('@playwright/test').Page) {
   await gotoMode(page, 'tdseDynamics', 3)
 
@@ -42,7 +42,7 @@ async function setupTdseCarpetContext(page: import('@playwright/test').Page) {
 
   const rightPanel = new RightPanel(page)
   await rightPanel.waitForVisible()
-  // Object tab is default — analysis section should be visible
+  await rightPanel.switchToAnalysisTab()
   await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 }
 
@@ -169,6 +169,7 @@ test.describe('quantum carpet: UI controls', () => {
 
     const rightPanel = new RightPanel(page)
     await rightPanel.waitForVisible()
+    await rightPanel.switchToAnalysisTab()
 
     // Analysis section returns null for analytic modes at dim<=2
     await expect(page.getByTestId('analysis-section')).not.toBeVisible({ timeout: 3000 })
@@ -196,6 +197,7 @@ test.describe('quantum carpet: GPU accumulation', () => {
 
     const rightPanel = new RightPanel(page)
     await rightPanel.waitForVisible()
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     await enableCarpet(page)
@@ -214,6 +216,8 @@ test.describe('quantum carpet: GPU accumulation', () => {
 
     const topBar = new TopBar(page)
     await topBar.openRightPanel()
+    const rightPanel = new RightPanel(page)
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     await enableCarpet(page)
@@ -276,6 +280,8 @@ test.describe('quantum carpet: GPU accumulation', () => {
 
     const topBar = new TopBar(page)
     await topBar.openRightPanel()
+    const rightPanel = new RightPanel(page)
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     await enableCarpet(page)

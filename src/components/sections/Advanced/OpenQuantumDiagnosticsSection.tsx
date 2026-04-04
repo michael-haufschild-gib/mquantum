@@ -13,6 +13,7 @@ import React, { useCallback, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
@@ -76,7 +77,14 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
   const [showFormulas, setShowFormulas] = useState(false)
   const toggleFormulas = useCallback(() => setShowFormulas((v) => !v), [])
 
-  if (!enabled) return null
+  if (!enabled) {
+    return (
+      <UnavailableSection
+        title="Open Quantum Diagnostics"
+        reason="Enable open quantum in analytic mode (non-Wigner)"
+      />
+    )
+  }
 
   return (
     <Section title="Open Quantum Diagnostics" defaultOpen={false}>

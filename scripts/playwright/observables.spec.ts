@@ -67,6 +67,7 @@ async function setupTdseWithObservables(page: import('@playwright/test').Page) {
   await topBar.openRightPanel()
   const rightPanel = new RightPanel(page)
   await rightPanel.waitForVisible()
+  await rightPanel.switchToAnalysisTab()
   await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 }
 
@@ -181,6 +182,8 @@ test.describe('Observable Expectation Values', () => {
 
     const topBar = new TopBar(page)
     await topBar.openRightPanel()
+    const rightPanel = new RightPanel(page)
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     // Expand the Data Export group (collapsed by default)
