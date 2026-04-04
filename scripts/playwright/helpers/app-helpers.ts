@@ -8,8 +8,6 @@
 import { expect, type Page } from '@playwright/test'
 import sharp from 'sharp'
 
-import { BENIGN_GPU_PATTERNS } from './gpu-patterns'
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const RENDERER_READY_TIMEOUT = 15_000
@@ -216,67 +214,10 @@ export async function getAppState(page: Page) {
 }
 
 // ─── Error Collection ────────────────────────────────────────────────────────
-
-/** Attach a listener that collects fatal GPU errors. Returns the array (mutated in-place). */
-export function collectFatalGpuErrors(page: Page): string[] {
-  const errors: string[] = []
-  page.on('console', (msg) => {
-    if (msg.type() !== 'error') return
-    const text = msg.text()
-    if (/device.*lost|rendergraph.*cycle|unhandled.*gpu/i.test(text)) {
-      errors.push(text)
-    }
-  })
-  return errors
-}
-
-/**
- * Collect console errors and warnings that indicate GPU/shader problems.
- * Catches: shader compilation failures, WGSL errors, pipeline errors,
- * WebGPU validation, bind group mismatches, and renderer-level error logs.
- *
- * Returns the array (mutated in-place by the listener).
- */
-export function collectGpuWarningsAndErrors(page: Page): string[] {
-  const issues: string[] = []
-  page.on('console', (msg) => {
-    const type = msg.type()
-    if (type !== 'error' && type !== 'warning') return
-    const text = msg.text()
-    // Skip known-benign teardown races (shared pattern list — see gpu-patterns.ts)
-    if (BENIGN_GPU_PATTERNS.some((p) => p.test(text))) return
-    // WGSL shader errors (unresolved values, syntax errors, etc.)
-    if (/\[WGSL ERROR\]|unresolved value|shader.*error/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-      return
-    }
-    // Shader / pipeline errors
-    if (/GPUPipelineError|shader.*compil|pipeline.*fail|binding.*doesn.*exist/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-      return
-    }
-    // WebGPU validation errors
-    if (/GPUValidationError|validation.*error/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-      return
-    }
-    // Renderer-level errors logged via logger.error
-    if (/\[SchrodingerRenderer\].*fail|\[WebGPU.*\].*fail|\[WebGPU.*\].*error/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-      return
-    }
-    // Dawn context lines — any "While ..." prefix indicates a GPU validation problem
-    if (/While encoding|While finishing|While calling|While initializing/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-      return
-    }
-    // Device lost / fatal
-    if (/device.*lost|rendergraph.*cycle|unhandled.*gpu/i.test(text)) {
-      issues.push(`[${type}] ${text}`)
-    }
-  })
-  return issues
-}
+//
+// GPU/shader error collection is handled automatically by the test fixtures
+// (see fixtures.ts). The collectFatalGpuErrors and collectGpuWarningsAndErrors
+// functions were removed — use fixtures instead.
 
 /** Attach a listener for all uncaught page errors. Returns the array (mutated in-place). */
 export function collectPageErrors(page: Page): string[] {

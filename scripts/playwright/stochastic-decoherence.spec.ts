@@ -5,28 +5,14 @@
  * physics: norm conservation, determinism, localization strength.
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectGpuErrors,
   gotoModeWithParams,
   waitForFirstFrame,
   waitForRendererSettled,
 } from './helpers/app-helpers'
 
 test.describe('Stochastic Decoherence GPU Pipeline', () => {
-  let gpuErrors: string[]
-
-  test.beforeEach(async ({ page }) => {
-    gpuErrors = []
-    collectGpuErrors(page, gpuErrors)
-  })
-
-  test.afterEach(() => {
-    const real = gpuErrors.filter((e) => !e.includes('[benign]'))
-    expect(real, 'GPU/shader errors detected').toHaveLength(0)
-  })
-
   test('stochastic localization preserves norm (γ > 0, no absorber)', async ({ page }) => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, {
       pot: 'doubleWell',

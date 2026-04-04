@@ -5,28 +5,14 @@
  * for the monitoring transition exploration feature.
  */
 
-import { expect, test } from '@playwright/test'
-
+import { expect, test } from './fixtures'
 import {
-  collectGpuErrors,
   gotoModeWithParams,
   waitForFirstFrame,
   waitForRendererSettled,
 } from './helpers/app-helpers'
 
 test.describe('Continuous Monitoring Transition', () => {
-  let gpuErrors: string[]
-
-  test.beforeEach(async ({ page }) => {
-    gpuErrors = []
-    collectGpuErrors(page, gpuErrors)
-  })
-
-  test.afterEach(() => {
-    const real = gpuErrors.filter((e) => !e.includes('[benign]'))
-    expect(real, 'GPU/shader errors detected').toHaveLength(0)
-  })
-
   test('IPR diagnostics produce valid values with monitoring', async ({ page }) => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, {
       pot: 'harmonicTrap',
