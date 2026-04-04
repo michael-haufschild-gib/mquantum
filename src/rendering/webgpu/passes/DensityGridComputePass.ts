@@ -447,7 +447,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Upload open quantum density matrix uniforms to the GPU buffer.
    *
    * @param device - GPU device
-   * @param data - Packed Float32Array (136 floats = 544 bytes) from statePacking.packForGPU
+   * @param data - Packed Float32Array (400 floats = 1600 bytes) from statePacking.packForGPU
    */
   updateOpenQuantumUniforms(device: GPUDevice, data: Float32Array): void {
     if (!this.openQuantumBuffer) return
@@ -669,8 +669,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.needsRecompute = false
     this.lastDimension = this.passConfig.dimension
     this.lastQuantumMode = this.passConfig.quantumMode
-    const timeNow = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    this.lastTimeBucket = Math.floor(timeNow * 60.0)
+    this.lastTimeBucket = Math.floor(time * 60.0)
   }
 
   postFrame(): void {

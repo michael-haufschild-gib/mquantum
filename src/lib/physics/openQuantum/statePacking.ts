@@ -3,7 +3,7 @@
  *
  * Packs the density matrix and scalar metrics into a GPU-uploadable Float32Array.
  *
- * Buffer layout (800 bytes = 200 floats):
+ * Buffer layout (1600 bytes = 400 floats):
  *   [0..391]   : ρ matrix — K×K complex values packed into 14×14 grid (392 floats)
  *                index = k*14+l, stored as xy pairs in vec4f: rho[idx/2].xy or .zw
  *   [392]      : purity
