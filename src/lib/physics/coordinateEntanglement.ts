@@ -347,7 +347,6 @@ export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: numb
         // ── Step 1: Phase rotation ──────────────────────────────────
         // Make a_{pi,pj} real by multiplying column pj by e^{-iα}
         // and row pj by e^{iα}, where α = arg(a_{pi,pj}).
-        let effectiveMag = aijMag
         if (Math.abs(aijIm) > 1e-30 * aijMag) {
           // e^{-iα} = conj(a_{pq}) / |a_{pq}|
           const eMinusAlphaRe = aijRe / aijMag
@@ -373,17 +372,18 @@ export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: numb
             workRe[ridx] = r * eAlphaRe - i * eAlphaIm
             workIm[ridx] = r * eAlphaIm + i * eAlphaRe
           }
-
-          // Re-read the now-real off-diagonal magnitude
-          effectiveMag = Math.abs(workRe[pi * M + pj]!)
-          if (effectiveMag < tolerance) continue
         }
+
+        // After phase rotation the off-diagonal is real; use the signed value
+        // so the Jacobi angle picks the correct rotation direction.
+        const aijReal = workRe[pi * M + pj]!
+        if (Math.abs(aijReal) < tolerance) continue
 
         // ── Step 2: Real Jacobi rotation ────────────────────────────
         const aii = workRe[pi * M + pi]!
         const ajj = workRe[pj * M + pj]!
 
-        const tau = (aii - ajj) / (2 * effectiveMag)
+        const tau = (aii - ajj) / (2 * aijReal)
         const t =
           tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
         const c = 1 / Math.sqrt(1 + t * t)

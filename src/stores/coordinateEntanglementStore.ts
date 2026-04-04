@@ -227,9 +227,10 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const head = state.historyHead
     const N = result.entropies.length
 
-    // Write per-dimension entropies into ring buffer (0 for null/skipped dimensions)
+    // Write per-dimension entropies into ring buffer (NaN for null/skipped dimensions
+    // so downstream consumers can distinguish "not computed" from genuinely separable S=0)
     for (let d = 0; d < N && d < MAX_DIMS; d++) {
-      state.historyEntropies[d]![head] = result.entropies[d] ?? 0
+      state.historyEntropies[d]![head] = result.entropies[d] ?? NaN
     }
     state.historyAverage[head] = result.averageEntropy
 
