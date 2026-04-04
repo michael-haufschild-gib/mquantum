@@ -290,7 +290,10 @@ fn volumeRaymarchGrid(
         // Branch coloring: when alpha encodes branch fraction (2.0 + frac),
         // tint emission toward branch A or branch B color.
         // Guard: only TDSE dynamics (mode 3) produces branch-encoded alpha.
-        if (uniforms.quantumMode == 3 && gridSample.a >= 1.99) {
+        // branchSeparation > 0.5 means stochastic decoherence is active (γ > 0).
+        // Without this guard, enabling "show branches" at γ=0 would recolor
+        // the volume without any actual decoherence happening.
+        if (uniforms.quantumMode == 3 && gridSample.a >= 1.99 && uniforms.branchSeparation > 0.5) {
           let branchFrac = clamp(gridSample.a - 2.0, 0.0, 1.0);
           let branchColorA = vec3f(uniforms.branchColorA[0], uniforms.branchColorA[1], uniforms.branchColorA[2]);
           let branchColorB = vec3f(uniforms.branchColorB[0], uniforms.branchColorB[1], uniforms.branchColorB[2]);

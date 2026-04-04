@@ -97,19 +97,21 @@ describe('useMonitoringSweepStore', () => {
       expect(result).toBeNull()
     })
 
-    it('advances to next step and returns next gamma', () => {
+    it('advances to next step and returns next gamma with time-averaged IPR', () => {
       useMonitoringSweepStore.getState().startSweep(config)
-      // First tick sets start time at 1.0
+      // First tick sets start time at 1.0, records first IPR sample
       useMonitoringSweepStore.getState().tick(1.0, 0.5, 0.01)
-      // Enough time elapsed (>= 1.0s)
+      // Enough time elapsed (>= 1.0s) — records second sample, averages
       const nextGamma = useMonitoringSweepStore.getState().tick(2.0, 0.4, 0.02)
       expect(nextGamma).toBeCloseTo(gammaForStep(config, 1))
       const state = useMonitoringSweepStore.getState()
       expect(state.currentStep).toBe(1)
       expect(state.results).toHaveLength(1)
       expect(state.results[0]!.gamma).toBeCloseTo(1.0)
-      expect(state.results[0]!.ipr).toBe(0.4)
-      expect(state.results[0]!.normDrift).toBe(0.02)
+      // Time-averaged: (0.5 + 0.4) / 2 = 0.45
+      expect(state.results[0]!.ipr).toBeCloseTo(0.45)
+      // Time-averaged: (0.01 + 0.02) / 2 = 0.015
+      expect(state.results[0]!.normDrift).toBeCloseTo(0.015)
     })
 
     it('completes sweep at last step', () => {

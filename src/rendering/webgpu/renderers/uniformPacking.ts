@@ -97,6 +97,8 @@ export interface SchroedingerPackParams {
   // Decoherent branching colors [r, g, b] in 0–1 range
   branchColorA?: [number, number, number]
   branchColorB?: [number, number, number]
+  /** Branch separation metric: 0 = coherent (equal populations), 1 = fully separated */
+  branchSeparation?: number
 }
 
 /**
@@ -125,12 +127,13 @@ export function packSchroedingerUniforms(
   packRepresentationAndColorOverlays(floatView, intView, p, hydrogenResult)
   packWignerAndPauliFields(floatView, intView, p)
 
-  // Decoherent branching colors
+  // Decoherent branching colors + separation metric
   const branchA = p.branchColorA ?? [0, 1, 1]
   const branchB = p.branchColorB ?? [1, 0, 1]
   floatView[I.branchColorA] = branchA[0]
   floatView[I.branchColorA + 1] = branchA[1]
   floatView[I.branchColorA + 2] = branchA[2]
+  floatView[I.branchSeparation] = p.branchSeparation ?? 0
   floatView[I.branchColorB] = branchB[0]
   floatView[I.branchColorB + 1] = branchB[1]
   floatView[I.branchColorB + 2] = branchB[2]

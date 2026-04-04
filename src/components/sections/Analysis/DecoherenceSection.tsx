@@ -16,6 +16,7 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /** Decoherence section — controls CSL localization and branch visualization. */
@@ -109,7 +110,7 @@ function DecoherenceContent() {
             value={tdse.stochasticNumSites}
             onChange={setStochasticNumSites}
             min={1}
-            max={32}
+            max={MAX_STOCHASTIC_SITES}
             step={1}
           />
           <NumberInput

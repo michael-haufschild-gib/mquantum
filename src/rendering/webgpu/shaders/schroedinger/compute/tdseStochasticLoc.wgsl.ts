@@ -7,11 +7,13 @@
  *
  *   dψ = (-i/ℏ)Hψ dt + Σ_k √γ (L_k - ⟨L_k⟩) ψ dW_k
  *
- * Simplified to the renormalization-corrected form (no ⟨L_k⟩ subtraction):
- *   ψ[i] *= (1 + Σ_k √(γ·dt)·G(x_i, c_k, σ)·ξ_k)   where ξ_k ~ N(0,1)
+ * The ⟨L_k⟩ expectation values are computed by a separate reduction pass and
+ * stored in the expectation buffer. If the expectation buffer is not available,
+ * falls back to the renormalization-corrected form (no ⟨L_k⟩ subtraction).
  *
- * Norm drift from the multiplicative noise is corrected by the existing
- * renormalization pass (step 9 in Strang splitting).
+ * Center packing: 3 vec4f per center (12 floats):
+ *   vec4(x0, x1, x2, x3), vec4(x4, x5, x6, x7), vec4(x8, x9, x10, noise)
+ * Supports up to 11 spatial dimensions.
  *
  * @workgroup_size(64) — matches LINEAR_WG
  * @module
@@ -27,14 +29,29 @@ struct StochasticParams {
   dt: f32,
   _pad0: u32,
   _pad1: u32,
-  // Collapse centers: packed as (x, y, z, noise_value) × 8
-  centers: array<vec4f, 8>,
+  // Collapse centers: packed as 3 × vec4f per center × 8 centers = 24 vec4f
+  // Per center: (x0,x1,x2,x3), (x4,x5,x6,x7), (x8,x9,x10,noise)
+  centers: array<vec4f, 24>,
 };
 
 @group(0) @binding(0) var<uniform> tdseParams: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
 @group(0) @binding(3) var<uniform> sParams: StochasticParams;
+@group(0) @binding(4) var<storage, read> expectations: array<f32>;
+
+// Helper: read coordinate d from center k's packed vec4 triplet
+fn getCenterCoord(k: u32, d: u32) -> f32 {
+  let vecIdx = k * 3u + d / 4u;
+  let comp = d % 4u;
+  return sParams.centers[vecIdx][comp];
+}
+
+// Helper: read noise value from center k (stored at index 11 within the triplet)
+fn getCenterNoise(k: u32) -> f32 {
+  // Noise is at vec4 index k*3+2, component 3
+  return sParams.centers[k * 3u + 2u][3];
+}
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -60,26 +77,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let invTwoSigmaSq = 1.0 / (2.0 * sParams.sigma * sParams.sigma);
 
   for (var k: u32 = 0u; k < sParams.numCollapseSites; k++) {
-    let center = sParams.centers[k];
-    // center.xyz = world-space collapse center, center.w = dW noise value
-
-    // Compute squared distance from this site to collapse center
+    // Compute squared distance from this site to collapse center in all dims
     var distSq: f32 = 0.0;
-    // Use first 3 dims (matching visible lattice dims for the center)
-    let numDims = min(tdseParams.latticeDim, 3u);
-    for (var d: u32 = 0u; d < numDims; d++) {
-      var diff: f32;
-      if (d == 0u) { diff = coords[0] - center.x; }
-      else if (d == 1u) { diff = coords[1] - center.y; }
-      else { diff = coords[2] - center.z; }
+    for (var d: u32 = 0u; d < tdseParams.latticeDim; d++) {
+      let diff = coords[d] - getCenterCoord(k, d);
       distSq += diff * diff;
     }
 
     // Gaussian weight: exp(-|x - c|² / (2σ²))
     let weight = exp(-distSq * invTwoSigmaSq);
 
-    // Euler-Maruyama diffusion: √(γ·dt) · G(x, c, σ) · ξ,  ξ ~ N(0,1)
-    totalFactor += sqrt(sParams.gamma * sParams.dt) * weight * center.w;
+    // SSE diffusion: √(γ·dt) · G(x, c, σ) · (ξ_k - ⟨L_k⟩)
+    let noise = getCenterNoise(k);
+    let expectation = expectations[k];
+    totalFactor += sqrt(sParams.gamma * sParams.dt) * weight * (noise - expectation);
   }
 
   // Multiplicative update: ψ *= (1 + totalFactor)

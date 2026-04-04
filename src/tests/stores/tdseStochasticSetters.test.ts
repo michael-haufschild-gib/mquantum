@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('TDSE stochastic setters', () => {
@@ -81,11 +82,11 @@ describe('TDSE stochastic setters', () => {
       expect(getTdse().stochasticNumSites).toBe(8)
     })
 
-    it('clamps numSites to [1, 32] and floors', () => {
+    it(`clamps numSites to [1, ${MAX_STOCHASTIC_SITES}] and floors`, () => {
       useExtendedObjectStore.getState().setTdseStochasticNumSites(0)
       expect(getTdse().stochasticNumSites).toBe(1)
       useExtendedObjectStore.getState().setTdseStochasticNumSites(50)
-      expect(getTdse().stochasticNumSites).toBe(32)
+      expect(getTdse().stochasticNumSites).toBe(MAX_STOCHASTIC_SITES)
       useExtendedObjectStore.getState().setTdseStochasticNumSites(4.7)
       expect(getTdse().stochasticNumSites).toBe(4)
     })

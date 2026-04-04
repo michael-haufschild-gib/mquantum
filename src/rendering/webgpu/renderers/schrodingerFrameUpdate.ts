@@ -254,6 +254,17 @@ function readFrameInputs(
 
   const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
 
+  // Branch separation: continuous 0..1 metric derived from stochastic γ.
+  // Uses 1 - exp(-γ) as a monotonic proxy: γ=0 → 0, γ→∞ → 1.
+  // The raymarcher uses > 0.5 as the threshold for branch coloring.
+  const tdseConf = schroedinger?.tdse
+  const gammaRaw = tdseConf?.stochasticGamma ?? 0
+  const stochasticGamma = Number.isFinite(gammaRaw) ? Math.max(0, gammaRaw) : 0
+  const branchSeparation =
+    tdseConf?.branchingEnabled && tdseConf?.stochasticEnabled
+      ? Math.min(1, 1 - Math.exp(-stochasticGamma))
+      : 0.0
+
   return {
     extended,
     schroedinger,
@@ -267,6 +278,7 @@ function readFrameInputs(
     quantumModeInt: QUANTUM_MODE_MAP[quantumModeStr] ?? 0,
     uncertaintyConfidenceMass: schroedinger?.uncertaintyConfidenceMass ?? 0.68,
     uncertaintyBoundaryWidth: schroedinger?.uncertaintyBoundaryWidth ?? 0.3,
+    branchSeparation,
     isUniformComputeMode:
       quantumModeStr === 'freeScalarField' ||
       quantumModeStr === 'tdseDynamics' ||
@@ -315,6 +327,7 @@ function buildPackParams(
     rendererTermCount: config.termCount,
     branchColorA: inputs.schroedinger?.tdse?.branchColorA as [number, number, number] | undefined,
     branchColorB: inputs.schroedinger?.tdse?.branchColorB as [number, number, number] | undefined,
+    branchSeparation: inputs.branchSeparation,
   }
 }
 

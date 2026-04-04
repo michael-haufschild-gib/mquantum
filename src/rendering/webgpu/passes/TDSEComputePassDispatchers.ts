@@ -186,9 +186,16 @@ export function dispatchDiagnostics(
   const dF32 = new Float32Array(diagData)
   dU32[0] = p.totalSites
   dU32[1] = p.diagNumWorkgroups
-  dF32[2] = config.barrierCenter
-  dU32[3] = config.gridSize[0] ?? 64
-  dF32[4] = config.spacing[0] ?? 0.1
+  // When branch visualization is active, partition at the branch plane position
+  // instead of the barrier center so diagnostics match the visual coloring.
+  const gridSize0 = config.gridSize[0] ?? 64
+  const spacing0 = config.spacing[0] ?? 0.1
+  const partitionCenter = config.branchingEnabled
+    ? (config.branchPlanePosition ?? 0) * gridSize0 * spacing0 * 0.5
+    : config.barrierCenter
+  dF32[2] = partitionCenter
+  dU32[3] = gridSize0
+  dF32[4] = spacing0
   dU32[5] = strides[0] ?? 1
   device.queue.writeBuffer(p.diagUniformBuffer, 0, diagData)
 

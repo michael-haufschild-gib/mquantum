@@ -10,12 +10,20 @@
 
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
+/**
+ * Maximum collapse centers per stochastic localization step.
+ * Constrained by the GPU uniform struct packing (3×vec4f per center, 8 centers max).
+ */
+export const MAX_STOCHASTIC_SITES = 8
+
 /** A collapse center with world-space position and noise value. */
 export interface CollapseCenter {
   /** World-space position (length = latticeDim, max 3 for visible dims) */
   position: number[]
   /** Gaussian noise value dW ~ N(0, 1) */
   noise: number
+  /** GPU-computed expectation ⟨L_k⟩ for this center (default 0 when not available). */
+  expectation?: number
 }
 
 /**

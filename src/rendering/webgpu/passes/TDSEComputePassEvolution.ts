@@ -125,6 +125,7 @@ export function runStrangEvolution(
         config,
         res.stochasticState,
         linearWG,
+        res.totalSites,
         step,
         (pass, pipeline, bindGroups, wgX) => dc(pass, pipeline, bindGroups, wgX)
       )
