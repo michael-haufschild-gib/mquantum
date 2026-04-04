@@ -13,6 +13,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
+import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 
 import type { WebGPURenderContext } from '../core/types'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
@@ -23,8 +24,8 @@ import {
 import { tdseStochasticLocBlock } from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 
-/** Maximum collapse centers per dispatch (packed into uniform struct). */
-const MAX_CENTERS_PER_DISPATCH = 8
+/** Maximum collapse centers per dispatch (mirrors physics constant). */
+const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
 
 /** Workgroup size for expectation reduction shaders (must match @workgroup_size in WGSL). */
 export const EXPECT_WG = 256

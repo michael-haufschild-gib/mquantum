@@ -7,6 +7,8 @@
  * @module stores/slices/geometry/setters/tdseStochasticSetters
  */
 
+import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
+
 import type { SchroedingerSliceActions } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 
@@ -71,7 +73,7 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
         warnNonFinite('tdse.stochasticNumSites', numSites)
         return
       }
-      const clamped = Math.max(1, Math.min(8, Math.floor(numSites)))
+      const clamped = Math.max(1, Math.min(MAX_STOCHASTIC_SITES, Math.floor(numSites)))
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

@@ -70,6 +70,10 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
   }, [status])
 
   const handleStartSweep = useCallback(() => {
+    // Validate inputs are finite before mutating state
+    if (![gammaMin, gammaMax, steps, timePerStep].every(Number.isFinite)) return
+    if (steps < 1) return
+
     const gMin = Math.min(gammaMin, gammaMax)
     const gMax = Math.max(gammaMin, gammaMax)
     const cfg: MonitoringSweepConfig = {
