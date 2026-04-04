@@ -32,12 +32,12 @@ const MAX_PAIRWISE_RDM = 1024
 
 /** Result of computing coordinate entanglement for one diagnostic frame. */
 export interface CoordinateEntanglementResult {
-  /** Per-dimension entanglement entropy S_d (d vs rest). */
-  entropies: number[]
-  /** Average entropy S̄ = (1/N) Σ S_d. */
+  /** Per-dimension entanglement entropy S_d (d vs rest). null if M_d > MAX_RDM_SIZE. */
+  entropies: (number | null)[]
+  /** Average entropy S̄ over computed dimensions only. */
   averageEntropy: number
-  /** Maximum possible entropy log(M_d) for each dimension. */
-  maxEntropies: number[]
+  /** Maximum possible entropy log(M_d) for each dimension. null if skipped. */
+  maxEntropies: (number | null)[]
   /** Normalized average S̄ / max(S̄) ∈ [0, 1]. */
   normalizedEntropy: number
   /** Bipartition entropies S_{k|N-k} for k=1,...,⌊N/2⌋ (null if too expensive). */
@@ -331,116 +331,109 @@ export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: numb
   const tolerance = 1e-14
 
   for (let sweep = 0; sweep < maxSweeps; sweep++) {
-    // Find max off-diagonal magnitude
-    let maxOffDiag = 0
-    let pi = 0
-    let pj = 1
+    // ── Cyclic Jacobi sweep: visit every upper-triangular pair (i,j) ──
+    let sweepMaxOffDiag = 0
 
-    for (let i = 0; i < M; i++) {
-      for (let j = i + 1; j < M; j++) {
-        const idx = i * M + j
-        const mag = Math.sqrt(workRe[idx]! * workRe[idx]! + workIm[idx]! * workIm[idx]!)
-        if (mag > maxOffDiag) {
-          maxOffDiag = mag
-          pi = i
-          pj = j
+    for (let pi = 0; pi < M - 1; pi++) {
+      for (let pj = pi + 1; pj < M; pj++) {
+        const idx = pi * M + pj
+        const aijRe = workRe[idx]!
+        const aijIm = workIm[idx]!
+        const aijMag = Math.sqrt(aijRe * aijRe + aijIm * aijIm)
+
+        if (aijMag > sweepMaxOffDiag) sweepMaxOffDiag = aijMag
+        if (aijMag < tolerance) continue
+
+        // ── Step 1: Phase rotation ──────────────────────────────────
+        // Make a_{pi,pj} real by multiplying column pj by e^{-iα}
+        // and row pj by e^{iα}, where α = arg(a_{pi,pj}).
+        let effectiveMag = aijMag
+        if (Math.abs(aijIm) > 1e-30 * aijMag) {
+          // e^{-iα} = conj(a_{pq}) / |a_{pq}|
+          const eMinusAlphaRe = aijRe / aijMag
+          const eMinusAlphaIm = -aijIm / aijMag
+          // e^{iα} = a_{pq} / |a_{pq}|
+          const eAlphaRe = aijRe / aijMag
+          const eAlphaIm = aijIm / aijMag
+
+          // Multiply column pj by e^{-iα}
+          for (let k = 0; k < M; k++) {
+            const cidx = k * M + pj
+            const r = workRe[cidx]!
+            const i = workIm[cidx]!
+            workRe[cidx] = r * eMinusAlphaRe - i * eMinusAlphaIm
+            workIm[cidx] = r * eMinusAlphaIm + i * eMinusAlphaRe
+          }
+
+          // Multiply row pj by e^{iα}
+          for (let k = 0; k < M; k++) {
+            const ridx = pj * M + k
+            const r = workRe[ridx]!
+            const i = workIm[ridx]!
+            workRe[ridx] = r * eAlphaRe - i * eAlphaIm
+            workIm[ridx] = r * eAlphaIm + i * eAlphaRe
+          }
+
+          // Re-read the now-real off-diagonal magnitude
+          effectiveMag = Math.abs(workRe[pi * M + pj]!)
+          if (effectiveMag < tolerance) continue
         }
+
+        // ── Step 2: Real Jacobi rotation ────────────────────────────
+        const aii = workRe[pi * M + pi]!
+        const ajj = workRe[pj * M + pj]!
+
+        const tau = (aii - ajj) / (2 * effectiveMag)
+        const t =
+          tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
+        const c = 1 / Math.sqrt(1 + t * t)
+        const s = t * c
+
+        // Apply real rotation R = [[c, -s], [s, c]] as similarity: R^T · A · R
+        // Column rotation: B = A · R (columns pi and pj)
+        for (let k = 0; k < M; k++) {
+          const idxKI = k * M + pi
+          const idxKJ = k * M + pj
+          const akiRe = workRe[idxKI]!
+          const akiIm = workIm[idxKI]!
+          const akjRe = workRe[idxKJ]!
+          const akjIm = workIm[idxKJ]!
+
+          workRe[idxKI] = c * akiRe + s * akjRe
+          workIm[idxKI] = c * akiIm + s * akjIm
+          workRe[idxKJ] = -s * akiRe + c * akjRe
+          workIm[idxKJ] = -s * akiIm + c * akjIm
+        }
+
+        // Row rotation: A' = R^T · B (rows pi and pj)
+        for (let k = 0; k < M; k++) {
+          const idxIK = pi * M + k
+          const idxJK = pj * M + k
+          const aikRe = workRe[idxIK]!
+          const aikIm = workIm[idxIK]!
+          const ajkRe = workRe[idxJK]!
+          const ajkIm = workIm[idxJK]!
+
+          workRe[idxIK] = c * aikRe + s * ajkRe
+          workIm[idxIK] = c * aikIm + s * ajkIm
+          workRe[idxJK] = -s * aikRe + c * ajkRe
+          workIm[idxJK] = -s * aikIm + c * ajkIm
+        }
+
+        // Force exact zero at (pi,pj) and (pj,pi) to prevent drift
+        workRe[pi * M + pj] = 0
+        workIm[pi * M + pj] = 0
+        workRe[pj * M + pi] = 0
+        workIm[pj * M + pi] = 0
+
+        // Force diagonal to be real
+        workIm[pi * M + pi] = 0
+        workIm[pj * M + pj] = 0
       }
     }
 
-    if (maxOffDiag < tolerance) break
-
-    // ── Step 1: Phase rotation ──────────────────────────────────────
-    // Make a_{pi,pj} real by multiplying column pj by e^{-iα}
-    // and row pj by e^{iα}, where α = arg(a_{pi,pj}).
-    const aijRe = workRe[pi * M + pj]!
-    const aijIm = workIm[pi * M + pj]!
-    const aijMag = Math.sqrt(aijRe * aijRe + aijIm * aijIm)
-
-    if (aijMag > 1e-30 && Math.abs(aijIm) > 1e-30 * aijMag) {
-      // e^{-iα} = conj(a_{pq}) / |a_{pq}|
-      const eMinusAlphaRe = aijRe / aijMag
-      const eMinusAlphaIm = -aijIm / aijMag
-      // e^{iα} = a_{pq} / |a_{pq}|
-      const eAlphaRe = aijRe / aijMag
-      const eAlphaIm = aijIm / aijMag
-
-      // Multiply column pj by e^{-iα}
-      for (let k = 0; k < M; k++) {
-        const idx = k * M + pj
-        const r = workRe[idx]!
-        const i = workIm[idx]!
-        workRe[idx] = r * eMinusAlphaRe - i * eMinusAlphaIm
-        workIm[idx] = r * eMinusAlphaIm + i * eMinusAlphaRe
-      }
-
-      // Multiply row pj by e^{iα}
-      for (let k = 0; k < M; k++) {
-        const idx = pj * M + k
-        const r = workRe[idx]!
-        const i = workIm[idx]!
-        workRe[idx] = r * eAlphaRe - i * eAlphaIm
-        workIm[idx] = r * eAlphaIm + i * eAlphaRe
-      }
-    }
-
-    // After phase rotation, a_{pi,pj} should be real and positive (= aijMag)
-    // a_{pj,pi} should also be real (= aijMag, since Hermitian)
-
-    // ── Step 2: Real Jacobi rotation ────────────────────────────────
-    const aii = workRe[pi * M + pi]!
-    const ajj = workRe[pj * M + pj]!
-
-    const tau = (aii - ajj) / (2 * aijMag)
-    const t =
-      tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
-    const c = 1 / Math.sqrt(1 + t * t)
-    const s = t * c
-
-    // Apply real rotation R = [[c, -s], [s, c]] as similarity: R^T · A · R
-    // Column rotation: B = A · R (columns pi and pj)
-    for (let k = 0; k < M; k++) {
-      const idxKI = k * M + pi
-      const idxKJ = k * M + pj
-      const akiRe = workRe[idxKI]!
-      const akiIm = workIm[idxKI]!
-      const akjRe = workRe[idxKJ]!
-      const akjIm = workIm[idxKJ]!
-
-      // B_{k,pi} = c · A_{k,pi} + s · A_{k,pj}
-      workRe[idxKI] = c * akiRe + s * akjRe
-      workIm[idxKI] = c * akiIm + s * akjIm
-      // B_{k,pj} = -s · A_{k,pi} + c · A_{k,pj}
-      workRe[idxKJ] = -s * akiRe + c * akjRe
-      workIm[idxKJ] = -s * akiIm + c * akjIm
-    }
-
-    // Row rotation: A' = R^T · B (rows pi and pj)
-    for (let k = 0; k < M; k++) {
-      const idxIK = pi * M + k
-      const idxJK = pj * M + k
-      const aikRe = workRe[idxIK]!
-      const aikIm = workIm[idxIK]!
-      const ajkRe = workRe[idxJK]!
-      const ajkIm = workIm[idxJK]!
-
-      // A'_{pi,k} = c · B_{pi,k} + s · B_{pj,k}
-      workRe[idxIK] = c * aikRe + s * ajkRe
-      workIm[idxIK] = c * aikIm + s * ajkIm
-      // A'_{pj,k} = -s · B_{pi,k} + c · B_{pj,k}
-      workRe[idxJK] = -s * aikRe + c * ajkRe
-      workIm[idxJK] = -s * aikIm + c * ajkIm
-    }
-
-    // Force exact zero at (pi,pj) and (pj,pi) to prevent drift
-    workRe[pi * M + pj] = 0
-    workIm[pi * M + pj] = 0
-    workRe[pj * M + pi] = 0
-    workIm[pj * M + pi] = 0
-
-    // Force diagonal to be real
-    workIm[pi * M + pi] = 0
-    workIm[pj * M + pj] = 0
+    // Converged when largest off-diagonal element across the full sweep is below tolerance
+    if (sweepMaxOffDiag < tolerance) break
   }
 
   // Extract eigenvalues from diagonal
@@ -508,29 +501,37 @@ export function computeCoordinateEntanglement(
   const N = gridSize.length
 
   // ── Per-dimension entropies ────────────────────────────────────────────
-  const entropies = new Array<number>(N)
-  const maxEntropies = new Array<number>(N)
+  const entropies = new Array<number | null>(N)
+  const maxEntropies = new Array<number | null>(N)
   let firstSpectrum: number[] = []
+  let computedSum = 0
+  let computedMaxSum = 0
+  let computedCount = 0
 
   for (let d = 0; d < N; d++) {
     const M = gridSize[d]!
     if (M > MAX_RDM_SIZE) {
-      // Skip dimensions with grid size exceeding the RDM limit
-      entropies[d] = 0
-      maxEntropies[d] = Math.log(M)
+      // Dimension too large for RDM — mark as not computed
+      entropies[d] = null
+      maxEntropies[d] = null
       continue
     }
     const rdm = computeReducedDensityMatrix(psiRe, psiIm, gridSize, d)
     const eigenvalues = hermitianEigenvalues(rdm.re, rdm.im, rdm.M)
-    entropies[d] = vonNeumannEntropy(eigenvalues)
-    maxEntropies[d] = Math.log(rdm.M)
+    const S = vonNeumannEntropy(eigenvalues)
+    const maxS = Math.log(rdm.M)
+    entropies[d] = S
+    maxEntropies[d] = maxS
+    computedSum += S
+    computedMaxSum += maxS
+    computedCount++
     if (d === 0) {
       firstSpectrum = Array.from(eigenvalues)
     }
   }
 
-  const averageEntropy = entropies.reduce((a, b) => a + b, 0) / N
-  const maxAvg = maxEntropies.reduce((a, b) => a + b, 0) / N
+  const averageEntropy = computedCount > 0 ? computedSum / computedCount : 0
+  const maxAvg = computedCount > 0 ? computedMaxSum / computedCount : 0
   const normalizedEntropy = maxAvg > 0 ? averageEntropy / maxAvg : 0
 
   // ── Bipartition entropies S_{k|N-k} for k=1,...,⌊N/2⌋ ────────────────
@@ -561,7 +562,11 @@ export function computeCoordinateEntanglement(
   if (options.computePairwiseMI && N >= 2) {
     mutualInfo = new Float64Array(N * N)
     for (let d1 = 0; d1 < N; d1++) {
+      const s1 = entropies[d1]
+      if (s1 === null || s1 === undefined) continue
       for (let d2 = d1 + 1; d2 < N; d2++) {
+        const s2 = entropies[d2]
+        if (s2 === null || s2 === undefined) continue
         const jointSize = gridSize[d1]! * gridSize[d2]!
         if (jointSize > MAX_PAIRWISE_RDM) continue
 
@@ -571,7 +576,7 @@ export function computeCoordinateEntanglement(
         const jointEigs = hermitianEigenvalues(jointRdm.re, jointRdm.im, jointRdm.M)
         const jointEntropy = vonNeumannEntropy(jointEigs)
         // MI is non-negative by definition; clamp to 0 for float precision artifacts
-        const mi = Math.max(entropies[d1]! + entropies[d2]! - jointEntropy, 0)
+        const mi = Math.max(s1 + s2 - jointEntropy, 0)
         mutualInfo[d1 * N + d2] = mi
         mutualInfo[d2 * N + d1] = mi
       }

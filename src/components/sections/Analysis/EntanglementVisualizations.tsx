@@ -35,8 +35,8 @@ const HEATMAP_SIZE = 120
 
 /** Horizontal bar chart of S_d / log(M_d) for each dimension. */
 export const PerDimensionBars: React.FC<{
-  entropies: number[]
-  maxEntropies: number[]
+  entropies: (number | null)[]
+  maxEntropies: (number | null)[]
 }> = React.memo(({ entropies, maxEntropies }) => {
   if (entropies.length === 0) return null
   const N = entropies.length
@@ -47,8 +47,9 @@ export const PerDimensionBars: React.FC<{
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${BAR_W} ${BAR_H}`} className="block">
           {entropies.map((S, d) => {
-            const maxS = maxEntropies[d]!
-            const frac = maxS > 0 ? Math.min(S / maxS, 1) : 0
+            const maxS = maxEntropies[d] ?? null
+            const skipped = S === null || maxS === null
+            const frac = skipped || maxS <= 0 ? 0 : Math.min(S / maxS, 1)
             const y = PAD.top + (d / N) * PLOT_H
             const h = Math.max(PLOT_H / N - 1, 2)
             return (
@@ -61,14 +62,27 @@ export const PerDimensionBars: React.FC<{
                   fill="var(--bg-elevated)"
                   rx={1}
                 />
-                <rect
-                  x={PAD.left}
-                  y={y}
-                  width={Math.max(frac * PLOT_W, 1)}
-                  height={h}
-                  fill="var(--chart-pass-2)"
-                  rx={1}
-                />
+                {skipped ? (
+                  <text
+                    x={PAD.left + PLOT_W / 2}
+                    y={y + h / 2}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="var(--text-tertiary)"
+                    fontSize={7}
+                  >
+                    N/A
+                  </text>
+                ) : (
+                  <rect
+                    x={PAD.left}
+                    y={y}
+                    width={Math.max(frac * PLOT_W, 1)}
+                    height={h}
+                    fill="var(--chart-pass-2)"
+                    rx={1}
+                  />
+                )}
                 <text
                   x={PAD.left - 4}
                   y={y + h / 2}

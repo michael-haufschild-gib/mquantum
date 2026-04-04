@@ -155,7 +155,7 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
               />
               <Switch
                 label="Bipartitions"
-                tooltip="Compute bipartition entropy S_{k|N-k} for all k. Only feasible for small per-dimension grid sizes."
+                tooltip="Compute sequential bipartition entropy S({0..k-1}|{k..N-1}) for each k up to N/2. Uses the first k coordinates as the kept subsystem. Only feasible for small per-dimension grid sizes."
                 checked={computeBipartitions}
                 onCheckedChange={handleBipartitionChange}
               />

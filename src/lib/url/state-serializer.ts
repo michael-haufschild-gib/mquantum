@@ -138,6 +138,8 @@ export interface ShareableObjectState {
   entanglementEnabled?: boolean
   /** Pairwise mutual information computation enabled */
   entanglementPairwiseMI?: boolean
+  /** Bipartition entropy computation enabled */
+  entanglementBipartitions?: boolean
 }
 
 /**
@@ -308,6 +310,7 @@ export function serializeState(state: ShareableState): string {
   // Coordinate entanglement
   setBoolParam(params, 'ent', state.entanglementEnabled)
   setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
+  setBoolParam(params, 'ent_bi', state.entanglementBipartitions)
 
   return params.toString()
 }
@@ -351,6 +354,7 @@ function deserializeFeatureParams(params: URLSearchParams, state: ParsedShareabl
 
   state.entanglementEnabled = parseBoolParam(params, 'ent')
   state.entanglementPairwiseMI = parseBoolParam(params, 'ent_mi')
+  state.entanglementBipartitions = parseBoolParam(params, 'ent_bi')
 }
 
 /**

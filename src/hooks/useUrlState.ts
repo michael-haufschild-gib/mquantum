@@ -87,6 +87,9 @@ function applyEntanglementParams(urlState: ParsedShareableState): void {
     if (urlState.entanglementPairwiseMI !== undefined) {
       entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
     }
+    if (urlState.entanglementBipartitions !== undefined) {
+      entStore.setComputeBipartitions(urlState.entanglementBipartitions)
+    }
   })
 }
 

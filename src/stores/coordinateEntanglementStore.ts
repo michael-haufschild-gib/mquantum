@@ -70,14 +70,14 @@ interface CoordinateEntanglementState {
   historyCount: number
 
   // ── Latest snapshot ─────────────────────────────────────────────────────
-  /** Per-dimension entanglement entropies S_d. */
-  currentEntropies: number[]
-  /** Average entropy S̄. */
+  /** Per-dimension entanglement entropies S_d. null if dimension was too large to compute. */
+  currentEntropies: (number | null)[]
+  /** Average entropy S̄ (over computed dimensions only). */
   currentAverageEntropy: number
   /** Normalized average entropy S̄ / max(S̄). */
   currentNormalizedEntropy: number
-  /** Maximum possible entropy log(M_d) per dimension. */
-  currentMaxEntropies: number[]
+  /** Maximum possible entropy log(M_d) per dimension. null if skipped. */
+  currentMaxEntropies: (number | null)[]
   /** Eigenvalue spectrum of ρ₁ (first dimension). */
   currentSpectrum: number[]
   /** Bipartition entropies S_{k|N-k}, null entries if skipped. */
@@ -227,9 +227,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const head = state.historyHead
     const N = result.entropies.length
 
-    // Write per-dimension entropies into ring buffer
+    // Write per-dimension entropies into ring buffer (0 for null/skipped dimensions)
     for (let d = 0; d < N && d < MAX_DIMS; d++) {
-      state.historyEntropies[d]![head] = result.entropies[d]!
+      state.historyEntropies[d]![head] = result.entropies[d] ?? 0
     }
     state.historyAverage[head] = result.averageEntropy
 
@@ -350,18 +350,23 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     })
   },
 
-  completeSweep: () =>
+  completeSweep: () => {
+    // Clear live data so sweep-era samples don't persist as if they were live diagnostics
+    get().clearHistory()
     set({
       sweepStatus: 'complete',
       sweepProgress: 1,
-    }),
+    })
+  },
 
-  abortSweep: () =>
+  abortSweep: () => {
+    get().clearHistory()
     set({
       sweepStatus: 'idle',
       sweepProgress: 0,
       sweepCurrentStep: 0,
-    }),
+    })
+  },
 
   resetSweep: () =>
     set({
