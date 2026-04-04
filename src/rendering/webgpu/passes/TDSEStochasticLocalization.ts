@@ -392,61 +392,42 @@ export function maybeDispatchStochasticLoc(
     return
   }
 
-  // Cap to MAX_CENTERS_PER_DISPATCH (8) per step. Multi-batch dispatch is
-  // broken: device.queue.writeBuffer overwrites the uniform buffer before
-  // any encoded compute passes execute, so only the last batch's data
-  // would be visible to all passes. Single-batch is correct and the
-  // performance difference at 8 vs 32 centers is negligible.
+  // Cap to MAX_CENTERS_PER_DISPATCH (8). Single dispatch — multi-batch is
+  // broken because device.queue.writeBuffer overwrites the uniform buffer
+  // before encoded compute passes execute.
   const nLoc = Math.max(1, Math.min(MAX_CENTERS_PER_DISPATCH, config.stochasticNumSites))
-  const numDispatches = 1
 
-  for (let batch = 0; batch < numDispatches; batch++) {
-    const batchStart = batch * MAX_CENTERS_PER_DISPATCH
-    const batchCount = Math.min(MAX_CENTERS_PER_DISPATCH, nLoc - batchStart)
+  const uniformData = packStochasticUniforms(config, state, 0, nLoc)
+  device.queue.writeBuffer(state.uniformBuffer, 0, uniformData)
 
-    const uniformData = packStochasticUniforms(config, state, batchStart, batchCount)
-    device.queue.writeBuffer(state.uniformBuffer, 0, uniformData)
+  // Compute ⟨L_k⟩ expectations via two-pass reduction
+  const hasExpectPipeline =
+    state.expectReducePipeline &&
+    state.expectReduceBG &&
+    state.expectFinalizePipeline &&
+    state.expectFinalizeBG
 
-    // Compute ⟨L_k⟩ expectations via two-pass reduction.
-    // Only valid for batch 0: device.queue.writeBuffer overwrites the uniform
-    // buffer immediately, so multi-batch encoding within a single command encoder
-    // means only the last write is visible when passes execute. For batches > 0,
-    // zero the expectations (falling back to renormalization-corrected form).
-    const hasExpectPipeline =
-      state.expectReducePipeline &&
-      state.expectReduceBG &&
-      state.expectFinalizePipeline &&
-      state.expectFinalizeBG
-
-    if (hasExpectPipeline && batch === 0) {
-      const expectWG = Math.ceil(totalSites / EXPECT_WG)
-      const rPass = ctx.beginComputePass({
-        label: `tdse-stochastic-expect-reduce-step${step}`,
-      })
-      dispatchCompute(rPass, state.expectReducePipeline!, [state.expectReduceBG!], expectWG)
-      rPass.end()
-
-      const fPass = ctx.beginComputePass({
-        label: `tdse-stochastic-expect-finalize-step${step}`,
-      })
-      dispatchCompute(fPass, state.expectFinalizePipeline!, [state.expectFinalizeBG!], 1)
-      fPass.end()
-    } else if (batch > 0) {
-      // Zero expectations for non-first batches (no ⟨L_k⟩ subtraction)
-      device.queue.writeBuffer(
-        state.expectResultBuffer!,
-        0,
-        new Float32Array(MAX_EXPECTATION_FLOATS)
-      )
-    }
-
-    // Apply the stochastic localization kick
-    const pass = ctx.beginComputePass({
-      label: `tdse-stochastic-loc-step${step}-batch${batch}`,
+  if (hasExpectPipeline) {
+    const expectWG = Math.ceil(totalSites / EXPECT_WG)
+    const rPass = ctx.beginComputePass({
+      label: `tdse-stochastic-expect-reduce-step${step}`,
     })
-    dispatchCompute(pass, state.pipeline, [state.bg], linearWG)
-    pass.end()
+    dispatchCompute(rPass, state.expectReducePipeline!, [state.expectReduceBG!], expectWG)
+    rPass.end()
+
+    const fPass = ctx.beginComputePass({
+      label: `tdse-stochastic-expect-finalize-step${step}`,
+    })
+    dispatchCompute(fPass, state.expectFinalizePipeline!, [state.expectFinalizeBG!], 1)
+    fPass.end()
   }
+
+  // Apply the stochastic localization kick
+  const pass = ctx.beginComputePass({
+    label: `tdse-stochastic-loc-step${step}`,
+  })
+  dispatchCompute(pass, state.pipeline, [state.bg], linearWG)
+  pass.end()
 
   state.stepCounter++
 }

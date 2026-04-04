@@ -258,7 +258,8 @@ function readFrameInputs(
   // Uses 1 - exp(-γ) as a monotonic proxy: γ=0 → 0, γ→∞ → 1.
   // The raymarcher uses > 0.5 as the threshold for branch coloring.
   const tdseConf = schroedinger?.tdse
-  const stochasticGamma = Math.max(0, tdseConf?.stochasticGamma ?? 0)
+  const gammaRaw = tdseConf?.stochasticGamma ?? 0
+  const stochasticGamma = Number.isFinite(gammaRaw) ? Math.max(0, gammaRaw) : 0
   const branchSeparation =
     tdseConf?.branchingEnabled && tdseConf?.stochasticEnabled
       ? Math.min(1, 1 - Math.exp(-stochasticGamma))

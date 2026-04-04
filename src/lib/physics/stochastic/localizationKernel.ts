@@ -16,6 +16,8 @@ export interface CollapseCenter {
   position: number[]
   /** Gaussian noise value dW ~ N(0, 1) */
   noise: number
+  /** GPU-computed expectation ⟨L_k⟩ for this center (default 0 when not available). */
+  expectation?: number
 }
 
 /**

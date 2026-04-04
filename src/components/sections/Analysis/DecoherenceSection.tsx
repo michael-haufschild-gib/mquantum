@@ -13,6 +13,7 @@ import { MonitoringSweepSection } from '@/components/sections/Analysis/Monitorin
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -108,17 +109,16 @@ function DecoherenceContent() {
             value={tdse.stochasticNumSites}
             onChange={setStochasticNumSites}
             min={1}
-            max={32}
+            max={8}
             step={1}
           />
-          <Slider
+          <NumberInput
             label="Seed"
             value={tdse.stochasticSeed}
             onChange={setStochasticSeed}
             min={0}
             max={999999}
             step={1}
-            showValue={false}
           />
 
           <Switch

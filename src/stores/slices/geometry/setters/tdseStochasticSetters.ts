@@ -71,7 +71,7 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
         warnNonFinite('tdse.stochasticNumSites', numSites)
         return
       }
-      const clamped = Math.max(1, Math.min(32, Math.floor(numSites)))
+      const clamped = Math.max(1, Math.min(8, Math.floor(numSites)))
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,

@@ -70,9 +70,11 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
   }, [status])
 
   const handleStartSweep = useCallback(() => {
+    const gMin = Math.min(gammaMin, gammaMax)
+    const gMax = Math.max(gammaMin, gammaMax)
     const cfg: MonitoringSweepConfig = {
-      gammaMin,
-      gammaMax,
+      gammaMin: gMin,
+      gammaMax: gMax,
       steps,
       timePerStep,
     }

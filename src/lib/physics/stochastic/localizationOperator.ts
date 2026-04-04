@@ -50,7 +50,7 @@ export function applyLocalizationStep1D(
       const diff = x - center.position[0]!
       const distSq = diff * diff
       const weight = Math.exp(-distSq * invTwoSigmaSq)
-      totalFactor += sqrtGammaDt * weight * center.noise
+      totalFactor += sqrtGammaDt * weight * (center.noise - (center.expectation ?? 0))
     }
 
     const scale = 1 + totalFactor
@@ -111,11 +111,12 @@ export function applyLocalizationStepND(
     for (const center of centers) {
       let distSq = 0
       for (let d = 0; d < latticeDim; d++) {
+        // Centers only have visible-dim (≤3) coordinates; higher dims default to origin
         const diff = coords[d]! - (center.position[d] ?? 0)
         distSq += diff * diff
       }
       const weight = Math.exp(-distSq * invTwoSigmaSq)
-      totalFactor += sqrtGammaDt * weight * center.noise
+      totalFactor += sqrtGammaDt * weight * (center.noise - (center.expectation ?? 0))
     }
 
     const scale = 1 + totalFactor
@@ -140,10 +141,11 @@ export function computeNorm(psiRe: Float64Array, psiIm: Float64Array): number {
 }
 
 /**
- * Compute the Inverse Participation Ratio (as Σ p_i² where p_i = |ψ_i|²/N_norm).
+ * Compute the Participation Ratio: Σ p_i² where p_i = |ψ_i|²/N_norm.
  *
- * Returns Σ|ψ|⁴ / (Σ|ψ|²)² — consistent with existing codebase convention.
- * Goes from 1/N (delocalized) to 1 (fully localized).
+ * Returns Σ|ψ|⁴ / (Σ|ψ|²)² — the sum of squared probabilities.
+ * Goes from 1/N (fully delocalized) to 1 (fully localized).
+ * The inverse (IPR = 1/PR) is computed by {@link inverseParticipationRatio} in ipr.ts.
  *
  * @param psiRe - Real part
  * @param psiIm - Imaginary part
