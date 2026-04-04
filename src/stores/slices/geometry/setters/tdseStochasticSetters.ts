@@ -80,13 +80,15 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
       }))
     },
     setTdseStochasticSeed: (seed) => {
+      if (!isFinite(seed)) {
+        warnNonFinite('tdse.stochasticSeed', seed)
+        return
+      }
+      const clamped = Math.max(0, Math.min(999999, Math.floor(seed)))
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: {
-            ...state.schroedinger.tdse,
-            stochasticSeed: Math.max(0, Math.min(999999, Math.floor(seed))),
-          },
+          tdse: { ...state.schroedinger.tdse, stochasticSeed: clamped },
         },
       }))
     },

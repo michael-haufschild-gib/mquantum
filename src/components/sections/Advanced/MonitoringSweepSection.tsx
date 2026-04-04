@@ -16,7 +16,11 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { type MonitoringSweepConfig, useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import {
+  gammaForStep,
+  type MonitoringSweepConfig,
+  useMonitoringSweepStore,
+} from '@/stores/monitoringSweepStore'
 
 /** Monitoring sweep controls and IPR display. */
 export const MonitoringSweepSection: React.FC = React.memo(() => {
@@ -54,6 +58,11 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
       steps: 20,
       timePerStep: 1.0,
     }
+    // Set initial γ and trigger reset so step 0 starts deterministically
+    const initialGamma = gammaForStep(cfg, 0)
+    const store = useExtendedObjectStore.getState()
+    store.setTdseStochasticGamma(initialGamma)
+    store.resetTdseField()
     startSweep(cfg)
   }, [startSweep])
 
@@ -76,18 +85,11 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
         .tick(diag.simTime, diag.ipr, diag.normDrift)
 
       if (nextGamma !== null) {
-        // Advance to next γ value — update config and trigger reset
-        const { schroedinger } = useExtendedObjectStore.getState()
-        useExtendedObjectStore.setState({
-          schroedinger: {
-            ...schroedinger,
-            tdse: {
-              ...schroedinger.tdse,
-              needsReset: true,
-              stochasticGamma: nextGamma,
-            },
-          },
-        })
+        // Advance to next γ value via store actions so version counters
+        // bump and validation/clamping is applied consistently
+        const store = useExtendedObjectStore.getState()
+        store.setTdseStochasticGamma(nextGamma)
+        store.resetTdseField()
       }
     }, 200)
 
