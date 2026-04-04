@@ -158,8 +158,9 @@ describe('applyLocalizationStep — single site 1D', () => {
     applyLocalizationStep1D(psiRe, psiIm, n, spacing, centers, 1.0, 2.0, 0.005)
     const normAfter = computeNorm(psiRe, psiIm)
 
-    // Without expectation subtraction, norm drifts slightly but stays close
-    // (corrected by renormalization in the pipeline)
-    expect(Math.abs(normAfter - normBefore) / normBefore).toBeLessThan(0.05)
+    // With correct SDE scaling (√(γ·dt)), single-step norm drift can be
+    // significant — the pipeline renormalizes after each step to correct this.
+    // We verify drift is bounded, not tiny.
+    expect(Math.abs(normAfter - normBefore) / normBefore).toBeLessThan(0.5)
   })
 })

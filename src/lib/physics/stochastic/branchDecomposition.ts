@@ -37,7 +37,19 @@ export function spatialBranchPartition(
   latticeDim: number,
   planePosition: number = 0
 ): BranchPartition {
-  const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  if (gridSize.length < latticeDim || spacing.length < latticeDim) {
+    throw new Error(
+      `gridSize/spacing must have at least ${latticeDim} entries (got ${gridSize.length}/${spacing.length})`
+    )
+  }
+
+  const totalSites = gridSize.slice(0, latticeDim).reduce((a, b) => a * b, 1)
+
+  if (psiRe.length < totalSites || psiIm.length < totalSites) {
+    throw new Error(
+      `psiRe/psiIm length (${psiRe.length}) does not match totalSites (${totalSites})`
+    )
+  }
 
   // Compute strides (row-major)
   const strides = new Array(latticeDim)

@@ -62,14 +62,18 @@ test.describe('Decoherent Branching Visualization', () => {
       return { normLeft: s.normLeft, normRight: s.normRight, totalNorm: s.totalNorm }
     })
 
+    // Norm must be non-trivial — fail loudly if simulation didn't produce data
+    expect(
+      totalNorm,
+      'wavefunction norm too low — simulation may not have started'
+    ).toBeGreaterThan(0.01)
+
     // Without decoherence, symmetric initial state should have roughly equal populations
-    if (totalNorm > 0.01) {
-      const fracLeft = normLeft / totalNorm
-      const fracRight = normRight / totalNorm
-      // Both should be between 0.2 and 0.8 for a symmetric state
-      expect(fracLeft).toBeGreaterThan(0.1)
-      expect(fracRight).toBeGreaterThan(0.1)
-    }
+    const fracLeft = normLeft / totalNorm
+    const fracRight = normRight / totalNorm
+    // Both should be between 0.2 and 0.8 for a symmetric state
+    expect(fracLeft).toBeGreaterThan(0.2)
+    expect(fracRight).toBeGreaterThan(0.2)
   })
 
   test('different potentials produce different branching dynamics', async ({ page }) => {

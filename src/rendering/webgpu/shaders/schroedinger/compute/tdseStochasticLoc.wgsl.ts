@@ -8,7 +8,7 @@
  *   dψ = (-i/ℏ)Hψ dt + Σ_k √γ (L_k - ⟨L_k⟩) ψ dW_k
  *
  * Simplified to the renormalization-corrected form (no ⟨L_k⟩ subtraction):
- *   ψ[i] *= (1 + Σ_k γ·dt·G(x_i, c_k, σ)·dW_k)
+ *   ψ[i] *= (1 + Σ_k √(γ·dt)·G(x_i, c_k, σ)·ξ_k)   where ξ_k ~ N(0,1)
  *
  * Norm drift from the multiplicative noise is corrected by the existing
  * renormalization pass (step 9 in Strang splitting).
@@ -78,8 +78,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Gaussian weight: exp(-|x - c|² / (2σ²))
     let weight = exp(-distSq * invTwoSigmaSq);
 
-    // Accumulate: γ · dt · G(x, c, σ) · dW
-    totalFactor += sParams.gamma * sParams.dt * weight * center.w;
+    // Euler-Maruyama diffusion: √(γ·dt) · G(x, c, σ) · ξ,  ξ ~ N(0,1)
+    totalFactor += sqrt(sParams.gamma * sParams.dt) * weight * center.w;
   }
 
   // Multiplicative update: ψ *= (1 + totalFactor)
