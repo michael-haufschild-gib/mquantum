@@ -236,14 +236,15 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Normalize chirality by blended probability (correct density-weighted average)
   let chirality = select(blendedChirality / max(blendedProb, 1e-20), 0.0, blendedProb < 1e-30);
 
-  // Track peak probability for next-frame normalization.
+  // Track peak raw probability for next-frame normalization.
+  // Use raw blendedProb (without perpFalloff) so normalization reflects actual
+  // wavefunction amplitudes. perpFalloff is a visual effect applied at output only.
   // IEEE 754 positive floats compare correctly as unsigned integers,
   // so bitcast to u32 for atomicMax.
-  let rawProb = blendedProb * perpFalloff;
-  atomicMax(&maxDensityAtomic, bitcast<u32>(rawProb));
+  atomicMax(&maxDensityAtomic, bitcast<u32>(blendedProb));
 
   let maxD = max(params.maxDensity, 1e-20);
-  let normDensityRaw = clamp(rawProb / maxD, 0.0, 1.0);
+  let normDensityRaw = clamp(blendedProb / maxD, 0.0, 1.0);
   let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
 
   // Field view branching — select displayScalar per visualization mode
