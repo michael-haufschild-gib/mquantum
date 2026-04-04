@@ -40,7 +40,19 @@ export interface NamedPresetConfig {
 }
 
 /**
- * Generate a quantum preset with the given parameters
+ * Per-term RNG offset prime — used to create independent PRNG sequences
+ * for each superposition term so that adding/removing terms does not
+ * affect the quantum numbers or coefficients of other terms.
+ */
+const TERM_RNG_PRIME = 0x9e3779b9 // ≈ 2^32 × golden ratio, Knuth multiplicative hash
+
+/**
+ * Generate a quantum preset with the given parameters.
+ *
+ * Uses per-term independent PRNG sequences so that each term's quantum
+ * numbers and coefficients are determined solely by (seed, termIndex).
+ * Changing termCount or maxQuantumNumber produces incremental visual
+ * changes rather than wholesale randomization.
  *
  * @param seed - Random seed for deterministic generation
  * @param dimension - Number of dimensions (3-11)
@@ -56,18 +68,17 @@ export function generateQuantumPreset(
   maxN: number = 5,
   frequencySpread: number = 0.02
 ): QuantumPreset {
-  const rng = mulberry32(seed)
-
   // Clamp parameters to valid ranges
   const dim = Math.min(Math.max(dimension, 3), MAX_DIM)
   const terms = Math.min(Math.max(termCount, 1), MAX_TERMS)
   const nMax = Math.min(Math.max(maxN, 1), 6)
   const spread = Math.min(Math.max(frequencySpread, 0), 0.5)
 
-  // Generate per-dimension frequencies (0.8 - 1.3 base range)
+  // Omega uses the base seed — independent of term count
+  const omegaRng = mulberry32(seed)
   const omega: number[] = []
   for (let j = 0; j < dim; j++) {
-    const baseFreq = 0.8 + rng() * spread * 2
+    const baseFreq = 0.8 + omegaRng() * spread * 2
     // Add slight golden-ratio-based offset for each dimension
     // This creates non-repeating patterns
     const offset = (j * 0.618033988749895) % 1.0
@@ -75,17 +86,21 @@ export function generateQuantumPreset(
   }
 
   // Generate quantum numbers and coefficients for each term
+  // Each term uses its own PRNG so terms are fully independent.
   const quantumNumbers: number[][] = []
   const coefficients: [number, number][] = []
   const energies: number[] = []
 
   for (let k = 0; k < terms; k++) {
+    // Per-term RNG: hash(seed, k) gives each term a unique sequence
+    const termRng = mulberry32((seed + (k + 1) * TERM_RNG_PRIME) | 0)
+
     // Quantum numbers: distribution biased toward low values
     // This creates smoother, more organic shapes
     const n: number[] = []
 
     for (let j = 0; j < dim; j++) {
-      const r = rng()
+      const r = termRng()
       let quantumN: number
 
       // For dimensions beyond the 3D visualization slice (j >= 3),
@@ -106,7 +121,7 @@ export function generateQuantumPreset(
       } else if (r < 0.92) {
         quantumN = mustBeEven ? Math.min(4, evenMax) : Math.min(3, nMax)
       } else {
-        const raw = Math.floor(rng() * (nMax + 1))
+        const raw = Math.floor(termRng() * (nMax + 1))
         quantumN = mustBeEven ? Math.min(raw & ~1, evenMax) : Math.min(raw, nMax)
       }
 
@@ -127,7 +142,7 @@ export function generateQuantumPreset(
     // Coefficient: amplitude decreases with energy, random phase
     // This keeps low-energy (smooth) terms dominant
     const amplitude = 1.0 / (1.0 + 0.15 * E)
-    const phase = rng() * 2 * Math.PI
+    const phase = termRng() * 2 * Math.PI
     coefficients.push([amplitude * Math.cos(phase), amplitude * Math.sin(phase)])
   }
 

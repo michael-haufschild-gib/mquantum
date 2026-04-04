@@ -565,7 +565,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   presetName: 'custom',
   seed: 13,
   termCount: 1,
-  maxQuantumNumber: 6,
+  maxQuantumNumber: 2,
   frequencySpread: 0.01,
 
   // Hydrogen state

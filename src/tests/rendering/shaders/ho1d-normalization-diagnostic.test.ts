@@ -127,7 +127,7 @@ function computeAlpha(rho: number, stepLen: number, densityGain: number): number
 // ============================================================================
 
 describe('HO1D canonical normalization', () => {
-  const SEED = 42
+  const SEED = 41
   const DIM = 3
   const TERM_COUNT = 1
   const MAX_N = 6
