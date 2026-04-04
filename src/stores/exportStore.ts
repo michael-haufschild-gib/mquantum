@@ -185,6 +185,19 @@ const DEFAULT_SETTINGS: ExportSettings = {
   },
 }
 
+const VALID_VERTICAL: ReadonlySet<string> = new Set(['top', 'center', 'bottom'])
+const VALID_HORIZONTAL: ReadonlySet<string> = new Set(['left', 'center', 'right'])
+
+/** Resolve a numeric field: return clamped value if finite, otherwise the default. */
+const resolveNumeric = (
+  value: unknown,
+  fallback: number,
+  clamp?: (v: number) => number
+): number => {
+  if (!isFiniteNumber(value)) return fallback
+  return clamp ? clamp(value) : value
+}
+
 const sanitizeHydratedTextOverlay = (rawTextOverlay: unknown): TextOverlaySettings => {
   const textOverlay = {
     ...DEFAULT_SETTINGS.textOverlay,
@@ -203,39 +216,27 @@ const sanitizeHydratedTextOverlay = (rawTextOverlay: unknown): TextOverlaySettin
     }
   }
 
-  textOverlay.fontSize = isFiniteNumber(textOverlay.fontSize)
-    ? clampMin(textOverlay.fontSize, 1)
-    : DEFAULT_SETTINGS.textOverlay.fontSize
-  textOverlay.fontWeight = isFiniteNumber(textOverlay.fontWeight)
-    ? clampToRange(Math.round(textOverlay.fontWeight), 100, 900)
-    : DEFAULT_SETTINGS.textOverlay.fontWeight
-  textOverlay.letterSpacing = isFiniteNumber(textOverlay.letterSpacing)
-    ? textOverlay.letterSpacing
-    : DEFAULT_SETTINGS.textOverlay.letterSpacing
-  textOverlay.opacity = isFiniteNumber(textOverlay.opacity)
-    ? clampToRange(textOverlay.opacity, 0, 1)
-    : DEFAULT_SETTINGS.textOverlay.opacity
-  textOverlay.shadowBlur = isFiniteNumber(textOverlay.shadowBlur)
-    ? clampMin(textOverlay.shadowBlur, 0)
-    : DEFAULT_SETTINGS.textOverlay.shadowBlur
-  textOverlay.padding = isFiniteNumber(textOverlay.padding)
-    ? clampMin(textOverlay.padding, 0)
-    : DEFAULT_SETTINGS.textOverlay.padding
+  const defaults = DEFAULT_SETTINGS.textOverlay
+  textOverlay.fontSize = resolveNumeric(textOverlay.fontSize, defaults.fontSize, (v) =>
+    clampMin(v, 1)
+  )
+  textOverlay.fontWeight = resolveNumeric(textOverlay.fontWeight, defaults.fontWeight, (v) =>
+    clampToRange(Math.round(v), 100, 900)
+  )
+  textOverlay.letterSpacing = resolveNumeric(textOverlay.letterSpacing, defaults.letterSpacing)
+  textOverlay.opacity = resolveNumeric(textOverlay.opacity, defaults.opacity, (v) =>
+    clampToRange(v, 0, 1)
+  )
+  textOverlay.shadowBlur = resolveNumeric(textOverlay.shadowBlur, defaults.shadowBlur, (v) =>
+    clampMin(v, 0)
+  )
+  textOverlay.padding = resolveNumeric(textOverlay.padding, defaults.padding, (v) => clampMin(v, 0))
 
-  if (
-    textOverlay.verticalPlacement !== 'top' &&
-    textOverlay.verticalPlacement !== 'center' &&
-    textOverlay.verticalPlacement !== 'bottom'
-  ) {
-    textOverlay.verticalPlacement = DEFAULT_SETTINGS.textOverlay.verticalPlacement
+  if (!VALID_VERTICAL.has(textOverlay.verticalPlacement)) {
+    textOverlay.verticalPlacement = defaults.verticalPlacement
   }
-
-  if (
-    textOverlay.horizontalPlacement !== 'left' &&
-    textOverlay.horizontalPlacement !== 'center' &&
-    textOverlay.horizontalPlacement !== 'right'
-  ) {
-    textOverlay.horizontalPlacement = DEFAULT_SETTINGS.textOverlay.horizontalPlacement
+  if (!VALID_HORIZONTAL.has(textOverlay.horizontalPlacement)) {
+    textOverlay.horizontalPlacement = defaults.horizontalPlacement
   }
 
   return textOverlay
@@ -260,47 +261,50 @@ const sanitizeHydratedCrop = (rawCrop: unknown): CropSettings => {
   return crop
 }
 
+/** Return value if it is a finite positive number, else fallback. Optionally clamp. */
+const resolvePositive = (
+  value: unknown,
+  fallback: number,
+  clamp?: (v: number) => number
+): number => {
+  if (!isFiniteNumber(value) || value <= 0) return fallback
+  return clamp ? clamp(value) : value
+}
+
+/** Return value if it passes the guard, else fallback. */
+const resolveEnum = <T>(value: unknown, fallback: T, guard: (v: unknown) => v is T): T =>
+  guard(value) ? value : fallback
+
 const sanitizeHydratedSettings = (
   rawPersistedSettings: Partial<ExportSettings> | undefined
 ): ExportSettings => {
   const persistedSettings =
     rawPersistedSettings && typeof rawPersistedSettings === 'object' ? rawPersistedSettings : {}
   const merged = { ...DEFAULT_SETTINGS, ...persistedSettings }
+  const d = DEFAULT_SETTINGS
+
+  const roundClamp2to8192 = (v: number) => clampToRange(Math.round(v), 2, 8192)
 
   return {
-    format: isExportFormat(merged.format) ? merged.format : DEFAULT_SETTINGS.format,
-    codec: isVideoCodec(merged.codec) ? merged.codec : DEFAULT_SETTINGS.codec,
-    resolution: isExportResolution(merged.resolution)
-      ? merged.resolution
-      : DEFAULT_SETTINGS.resolution,
-    customWidth:
-      isFiniteNumber(merged.customWidth) && merged.customWidth > 0
-        ? clampToRange(Math.round(merged.customWidth), 2, 8192)
-        : DEFAULT_SETTINGS.customWidth,
-    customHeight:
-      isFiniteNumber(merged.customHeight) && merged.customHeight > 0
-        ? clampToRange(Math.round(merged.customHeight), 2, 8192)
-        : DEFAULT_SETTINGS.customHeight,
-    fps: isFiniteNumber(merged.fps) && merged.fps > 0 ? merged.fps : DEFAULT_SETTINGS.fps,
-    duration:
-      isFiniteNumber(merged.duration) && merged.duration > 0
-        ? merged.duration
-        : DEFAULT_SETTINGS.duration,
-    bitrate:
-      isFiniteNumber(merged.bitrate) && merged.bitrate > 0
-        ? clampToRange(merged.bitrate, 2, 100)
-        : DEFAULT_SETTINGS.bitrate,
-    bitrateMode: isBitrateMode(merged.bitrateMode)
-      ? merged.bitrateMode
-      : DEFAULT_SETTINGS.bitrateMode,
-    hardwareAcceleration: isHardwareAcceleration(merged.hardwareAcceleration)
-      ? merged.hardwareAcceleration
-      : DEFAULT_SETTINGS.hardwareAcceleration,
+    format: resolveEnum(merged.format, d.format, isExportFormat),
+    codec: resolveEnum(merged.codec, d.codec, isVideoCodec),
+    resolution: resolveEnum(merged.resolution, d.resolution, isExportResolution),
+    customWidth: resolvePositive(merged.customWidth, d.customWidth, roundClamp2to8192),
+    customHeight: resolvePositive(merged.customHeight, d.customHeight, roundClamp2to8192),
+    fps: resolvePositive(merged.fps, d.fps),
+    duration: resolvePositive(merged.duration, d.duration),
+    bitrate: resolvePositive(merged.bitrate, d.bitrate, (v) => clampToRange(v, 2, 100)),
+    bitrateMode: resolveEnum(merged.bitrateMode, d.bitrateMode, isBitrateMode),
+    hardwareAcceleration: resolveEnum(
+      merged.hardwareAcceleration,
+      d.hardwareAcceleration,
+      isHardwareAcceleration
+    ),
     warmupFrames:
       isFiniteNumber(merged.warmupFrames) && merged.warmupFrames >= 0
         ? Math.max(0, Math.round(merged.warmupFrames))
-        : DEFAULT_SETTINGS.warmupFrames,
-    rotation: isRotation(merged.rotation) ? merged.rotation : DEFAULT_SETTINGS.rotation,
+        : d.warmupFrames,
+    rotation: resolveEnum(merged.rotation, d.rotation, isRotation),
     textOverlay: sanitizeHydratedTextOverlay(persistedSettings.textOverlay),
     crop: sanitizeHydratedCrop(persistedSettings.crop),
   }
@@ -311,6 +315,113 @@ const detectBrowser = (): BrowserType => {
     return 'chromium-capable'
   }
   return 'standard'
+}
+
+/** Strip a numeric field from the patch if it is not a finite positive number. */
+const stripNonFinitePositive = (
+  settings: Partial<ExportSettings>,
+  key: 'fps' | 'duration' | 'bitrate' | 'customWidth' | 'customHeight'
+): void => {
+  const value = settings[key]
+  if (value === undefined) return
+  if (!Number.isFinite(value) || value <= 0) {
+    logger.warn(`[exportStore] Ignoring invalid ${key} update:`, value)
+    delete settings[key]
+  }
+}
+
+/** Round and clamp a custom dimension field to [2, 8192]. */
+const normalizeCustomDimension = (
+  settings: Partial<ExportSettings>,
+  key: 'customWidth' | 'customHeight'
+): void => {
+  const value = settings[key]
+  if (value === undefined) return
+  settings[key] = Math.max(2, Math.min(8192, Math.round(value)))
+}
+
+/** Sanitize warmupFrames: must be finite and non-negative. */
+const sanitizeWarmupFrames = (settings: Partial<ExportSettings>): void => {
+  if (settings.warmupFrames === undefined) return
+  const { warmupFrames } = settings
+  if (!Number.isFinite(warmupFrames) || warmupFrames < 0) {
+    logger.warn('[exportStore] Ignoring invalid warmupFrames update:', warmupFrames)
+    delete settings.warmupFrames
+    return
+  }
+  settings.warmupFrames = Math.max(0, Math.round(warmupFrames))
+}
+
+/** Validate and clamp all fields of an incoming settings patch in-place. */
+const sanitizeSettingsPatch = (newSettings: Partial<ExportSettings>): void => {
+  for (const key of ['fps', 'duration', 'bitrate', 'customWidth', 'customHeight'] as const) {
+    stripNonFinitePositive(newSettings, key)
+  }
+
+  if (newSettings.bitrate !== undefined) {
+    newSettings.bitrate = clampToRange(newSettings.bitrate, 2, 100)
+  }
+
+  normalizeCustomDimension(newSettings, 'customWidth')
+  normalizeCustomDimension(newSettings, 'customHeight')
+  sanitizeWarmupFrames(newSettings)
+
+  stripInvalidEnum(newSettings, 'format', isExportFormat)
+  stripInvalidEnum(newSettings, 'codec', isVideoCodec)
+  stripInvalidEnum(newSettings, 'resolution', isExportResolution)
+  stripInvalidEnum(newSettings, 'bitrateMode', isBitrateMode)
+  stripInvalidEnum(newSettings, 'hardwareAcceleration', isHardwareAcceleration)
+  stripInvalidEnum(newSettings, 'rotation', isRotation)
+
+  if (newSettings.textOverlay) {
+    newSettings.textOverlay = sanitizeTextOverlayPatch(
+      newSettings.textOverlay as Partial<TextOverlaySettings>
+    ) as ExportSettings['textOverlay']
+  }
+  if (newSettings.crop) {
+    newSettings.crop = sanitizeCropPatch(
+      newSettings.crop as Partial<CropSettings>
+    ) as ExportSettings['crop']
+  }
+}
+
+/** Merge settings with deep merge for nested objects (textOverlay, crop). */
+const mergeSettingsWithDeepNested = (
+  current: ExportSettings,
+  patch: Partial<ExportSettings>
+): ExportSettings => {
+  const merged = { ...current, ...patch }
+  if (patch.textOverlay) {
+    merged.textOverlay = { ...current.textOverlay, ...patch.textOverlay }
+  }
+  if (patch.crop) {
+    merged.crop = { ...current.crop, ...patch.crop }
+  }
+  return merged
+}
+
+/** Auto-adjust bitrate when resolution/fps/dimensions change (unless bitrate was explicitly set). */
+const autoAdjustBitrate = (
+  current: ExportSettings,
+  patch: Partial<ExportSettings>,
+  updated: ExportSettings
+): void => {
+  if ('bitrate' in patch) return
+
+  const resolutionChanged = 'resolution' in patch && patch.resolution !== current.resolution
+  const fpsChanged = 'fps' in patch && patch.fps !== current.fps
+  const customDimensionsChanged =
+    ('customWidth' in patch && patch.customWidth !== current.customWidth) ||
+    ('customHeight' in patch && patch.customHeight !== current.customHeight)
+
+  if (resolutionChanged || fpsChanged || customDimensionsChanged) {
+    updated.bitrate = getRecommendedBitrate(
+      updated.resolution,
+      updated.fps,
+      updated.customWidth,
+      updated.customHeight
+    )
+  }
 }
 
 export const useExportStore = create<ExportStore>()(
@@ -376,100 +487,10 @@ export const useExportStore = create<ExportStore>()(
           typeof newSettingsOrFn === 'function' ? newSettingsOrFn(currentSettings) : newSettingsOrFn
         const newSettings: Partial<ExportSettings> = { ...rawNewSettings }
 
-        const stripNonFinitePositive = (
-          key: 'fps' | 'duration' | 'bitrate' | 'customWidth' | 'customHeight'
-        ): void => {
-          const value = newSettings[key]
-          if (value === undefined) {
-            return
-          }
-          if (!Number.isFinite(value) || value <= 0) {
-            logger.warn(`[exportStore] Ignoring invalid ${key} update:`, value)
-            delete newSettings[key]
-          }
-        }
+        sanitizeSettingsPatch(newSettings)
 
-        stripNonFinitePositive('fps')
-        stripNonFinitePositive('duration')
-        stripNonFinitePositive('bitrate')
-        stripNonFinitePositive('customWidth')
-        stripNonFinitePositive('customHeight')
-
-        if (newSettings.bitrate !== undefined) {
-          newSettings.bitrate = clampToRange(newSettings.bitrate, 2, 100)
-        }
-
-        const normalizeCustomDimension = (key: 'customWidth' | 'customHeight'): void => {
-          const value = newSettings[key]
-          if (value === undefined) {
-            return
-          }
-          newSettings[key] = Math.max(2, Math.min(8192, Math.round(value)))
-        }
-
-        normalizeCustomDimension('customWidth')
-        normalizeCustomDimension('customHeight')
-
-        if (newSettings.warmupFrames !== undefined) {
-          const { warmupFrames } = newSettings
-          if (!Number.isFinite(warmupFrames) || warmupFrames < 0) {
-            logger.warn('[exportStore] Ignoring invalid warmupFrames update:', warmupFrames)
-            delete newSettings.warmupFrames
-          } else {
-            newSettings.warmupFrames = Math.max(0, Math.round(warmupFrames))
-          }
-        }
-
-        stripInvalidEnum(newSettings, 'format', isExportFormat)
-        stripInvalidEnum(newSettings, 'codec', isVideoCodec)
-        stripInvalidEnum(newSettings, 'resolution', isExportResolution)
-        stripInvalidEnum(newSettings, 'bitrateMode', isBitrateMode)
-        stripInvalidEnum(newSettings, 'hardwareAcceleration', isHardwareAcceleration)
-        stripInvalidEnum(newSettings, 'rotation', isRotation)
-
-        if (newSettings.textOverlay) {
-          newSettings.textOverlay = sanitizeTextOverlayPatch(
-            newSettings.textOverlay as Partial<TextOverlaySettings>
-          ) as ExportSettings['textOverlay']
-        }
-
-        if (newSettings.crop) {
-          newSettings.crop = sanitizeCropPatch(
-            newSettings.crop as Partial<CropSettings>
-          ) as ExportSettings['crop']
-        }
-
-        const updatedSettings = { ...currentSettings, ...newSettings }
-
-        // Deep merge for nested objects if they are partials
-        if (newSettings.textOverlay)
-          updatedSettings.textOverlay = {
-            ...currentSettings.textOverlay,
-            ...newSettings.textOverlay,
-          }
-        if (newSettings.crop)
-          updatedSettings.crop = { ...currentSettings.crop, ...newSettings.crop }
-
-        // Auto-adjust bitrate when resolution, fps, or custom dimensions change
-        // (but NOT when bitrate itself is being explicitly set)
-        const resolutionChanged =
-          'resolution' in newSettings && newSettings.resolution !== currentSettings.resolution
-        const fpsChanged = 'fps' in newSettings && newSettings.fps !== currentSettings.fps
-        const customDimensionsChanged =
-          ('customWidth' in newSettings &&
-            newSettings.customWidth !== currentSettings.customWidth) ||
-          ('customHeight' in newSettings &&
-            newSettings.customHeight !== currentSettings.customHeight)
-        const bitrateExplicitlySet = 'bitrate' in newSettings
-
-        if ((resolutionChanged || fpsChanged || customDimensionsChanged) && !bitrateExplicitlySet) {
-          updatedSettings.bitrate = getRecommendedBitrate(
-            updatedSettings.resolution,
-            updatedSettings.fps,
-            updatedSettings.customWidth,
-            updatedSettings.customHeight
-          )
-        }
+        const updatedSettings = mergeSettingsWithDeepNested(currentSettings, newSettings)
+        autoAdjustBitrate(currentSettings, newSettings, updatedSettings)
 
         set({ settings: updatedSettings })
       },

@@ -24,6 +24,61 @@ export interface PopoverProps {
   offset?: number
 }
 
+const VIEWPORT_MARGIN = 8
+
+/** Computes the horizontal position based on alignment. */
+function computeHorizontalPosition(
+  align: 'start' | 'end' | 'center',
+  triggerRect: DOMRect,
+  popoverWidth: number
+): number {
+  if (align === 'end') return triggerRect.right - popoverWidth
+  if (align === 'center') return triggerRect.left + triggerRect.width / 2 - popoverWidth / 2
+  return triggerRect.left
+}
+
+/** Computes the vertical position, flipping to the opposite side when needed. */
+function computeVerticalPosition(
+  side: 'top' | 'bottom',
+  triggerRect: DOMRect,
+  popoverHeight: number,
+  offset: number
+): number {
+  const spaceBelow = window.innerHeight - triggerRect.bottom - offset
+  const spaceAbove = triggerRect.top - offset
+
+  const belowTop = triggerRect.bottom + offset
+  const aboveTop = triggerRect.top - popoverHeight - offset
+
+  if (side === 'bottom') {
+    return popoverHeight > spaceBelow && spaceAbove > spaceBelow ? aboveTop : belowTop
+  }
+  return popoverHeight > spaceAbove && spaceBelow > spaceAbove ? belowTop : aboveTop
+}
+
+/** Computes clamped popover coordinates relative to the trigger element. */
+function computePopoverCoords(
+  triggerRect: DOMRect,
+  popoverRect: { width: number; height: number },
+  side: 'top' | 'bottom',
+  align: 'start' | 'end' | 'center',
+  offset: number
+): { top: number; left: number } {
+  const top = computeVerticalPosition(side, triggerRect, popoverRect.height, offset)
+  const left = computeHorizontalPosition(align, triggerRect, popoverRect.width)
+
+  return {
+    top: Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(top, window.innerHeight - popoverRect.height - VIEWPORT_MARGIN)
+    ),
+    left: Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(left, window.innerWidth - popoverRect.width - VIEWPORT_MARGIN)
+    ),
+  }
+}
+
 /**
  * Floating popover component with automatic positioning and animations.
  *
@@ -139,99 +194,45 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     }, [isOpen, handleOpenChange])
 
     useLayoutEffect(() => {
+      if (!isOpen) return undefined
+
       const updatePosition = () => {
-        if (triggerRef.current && isOpen) {
-          const triggerRect = triggerRef.current.getBoundingClientRect()
-          const popoverRect = popoverRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
-
-          let top: number
-          let left: number
-
-          // Vertical Positioning
-          if (side === 'bottom') {
-            top = triggerRect.bottom + offset
-          } else {
-            top = triggerRect.top - popoverRect.height - offset
-          }
-
-          // Horizontal Positioning
-          if (align === 'start') {
-            left = triggerRect.left
-          } else if (align === 'end') {
-            left = triggerRect.right - popoverRect.width
-          } else {
-            left = triggerRect.left + triggerRect.width / 2 - popoverRect.width / 2
-          }
-
-          // Viewport Collision Detection
-          const viewportWidth = window.innerWidth
-          const viewportHeight = window.innerHeight
-          const margin = 8
-
-          // Calculate available space in each direction
-          const spaceBelow = viewportHeight - triggerRect.bottom - offset
-          const spaceAbove = triggerRect.top - offset
-
-          // Smart vertical positioning: flip if needed and beneficial
-          if (side === 'bottom') {
-            if (popoverRect.height > spaceBelow && spaceAbove > spaceBelow) {
-              top = triggerRect.top - popoverRect.height - offset
-            }
-          } else {
-            if (popoverRect.height > spaceAbove && spaceBelow > spaceAbove) {
-              top = triggerRect.bottom + offset
-            }
-          }
-
-          // Clamp vertical position to keep within viewport bounds
-          top = Math.max(margin, Math.min(top, viewportHeight - popoverRect.height - margin))
-
-          // Clamp horizontal position to keep within viewport bounds
-          left = Math.max(margin, Math.min(left, viewportWidth - popoverRect.width - margin))
-
-          setCoords({ top, left })
-        }
+        if (!triggerRef.current) return
+        const triggerRect = triggerRef.current.getBoundingClientRect()
+        const popoverRect = popoverRef.current?.getBoundingClientRect() || { width: 0, height: 0 }
+        setCoords(computePopoverCoords(triggerRect, popoverRect, side, align, offset))
       }
 
-      if (isOpen) {
-        // Initial position (may have zero dimensions)
-        const initialPositionTimer = window.setTimeout(() => {
-          updatePosition()
-        }, 0)
+      // Initial position (may have zero dimensions)
+      const initialPositionTimer = window.setTimeout(updatePosition, 0)
 
-        // Re-position after content renders and has actual dimensions
-        // Use double rAF to ensure content is painted before measuring
-        let rafId: number
-        const reposition = () => {
-          rafId = requestAnimationFrame(() => {
-            rafId = requestAnimationFrame(() => {
-              updatePosition()
-            })
-          })
-        }
-        reposition()
-
-        // Use ResizeObserver to reposition when content dimensions change
-        let resizeObserver: ResizeObserver | null = null
-        if (popoverRef.current) {
-          resizeObserver = new ResizeObserver(() => {
-            updatePosition()
-          })
-          resizeObserver.observe(popoverRef.current)
-        }
-
-        window.addEventListener('resize', updatePosition)
-        window.addEventListener('scroll', updatePosition, true) // Capture phase for nested scrolls
-
-        return () => {
-          clearTimeout(initialPositionTimer)
-          cancelAnimationFrame(rafId)
-          resizeObserver?.disconnect()
-          window.removeEventListener('resize', updatePosition)
-          window.removeEventListener('scroll', updatePosition, true)
-        }
+      // Re-position after content renders and has actual dimensions
+      // Use double rAF to ensure content is painted before measuring
+      let rafId: number
+      const reposition = () => {
+        rafId = requestAnimationFrame(() => {
+          rafId = requestAnimationFrame(updatePosition)
+        })
       }
-      return undefined
+      reposition()
+
+      // Use ResizeObserver to reposition when content dimensions change
+      let resizeObserver: ResizeObserver | null = null
+      if (popoverRef.current) {
+        resizeObserver = new ResizeObserver(updatePosition)
+        resizeObserver.observe(popoverRef.current)
+      }
+
+      window.addEventListener('resize', updatePosition)
+      window.addEventListener('scroll', updatePosition, true) // Capture phase for nested scrolls
+
+      return () => {
+        clearTimeout(initialPositionTimer)
+        cancelAnimationFrame(rafId)
+        resizeObserver?.disconnect()
+        window.removeEventListener('resize', updatePosition)
+        window.removeEventListener('scroll', updatePosition, true)
+      }
     }, [isOpen, side, align, offset])
 
     return (

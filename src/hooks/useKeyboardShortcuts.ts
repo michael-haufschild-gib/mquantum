@@ -111,104 +111,71 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       return
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in input fields
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return
+    /** Handle light-specific shortcuts. Returns true if event was consumed. */
+    const handleLightShortcut = (event: KeyboardEvent, lowerKey: string): boolean => {
+      if (!selectedLightId) return false
+
+      const { key, shiftKey, ctrlKey, metaKey } = event
+
+      if (key === 'Delete' || key === 'Backspace') {
+        event.preventDefault()
+        removeLight(selectedLightId)
+        return true
       }
 
+      if (key === 'Escape') {
+        event.preventDefault()
+        selectLight(null)
+        return true
+      }
+
+      if (shiftKey || ctrlKey || metaKey) return false
+
+      const lightActions: Record<string, () => void> = {
+        w: () => setTransformMode('translate'),
+        e: () => setTransformMode('rotate'),
+        d: () => {
+          const newId = duplicateLight(selectedLightId)
+          if (newId) selectLight(newId)
+        },
+      }
+
+      const action = lightActions[lowerKey]
+      if (!action) return false
+
+      event.preventDefault()
+      action()
+      return true
+    }
+
+    /** Handle global shortcuts. Returns true if event was consumed. */
+    const handleGlobalShortcut = (event: KeyboardEvent, lowerKey: string): boolean => {
       const { key, ctrlKey, metaKey, shiftKey } = event
       const isCtrlOrMeta = ctrlKey || metaKey
-      const lowerKey = key.toLowerCase()
 
-      // --- Light-specific shortcuts (High Priority) ---
-      if (selectedLightId) {
-        // Actions that ignore modifiers (mostly) or handle them specifically
-        if (key === 'Delete' || key === 'Backspace') {
-          event.preventDefault()
-          removeLight(selectedLightId)
-          return
-        }
-
-        if (key === 'Escape') {
-          event.preventDefault()
-          selectLight(null)
-          return
-        }
-
-        // Mode switching / Actions requiring NO modifiers
-        if (!shiftKey && !isCtrlOrMeta) {
-          const lightActions: Record<string, () => void> = {
-            w: () => setTransformMode('translate'),
-            e: () => setTransformMode('rotate'),
-            d: () => {
-              const newId = duplicateLight(selectedLightId)
-              if (newId) selectLight(newId)
-            },
-          }
-
-          if (lightActions[lowerKey]) {
-            event.preventDefault()
-            lightActions[lowerKey]()
-            return
-          }
-        }
+      // Modifier-specific actions dispatched via lookup table
+      const modifierActions: Record<string, () => void> = {
+        ...(isCtrlOrMeta && {
+          s: () => void exportSceneToPNG({ filename: generateTimestampFilename('ndimensional') }),
+        }),
+        ...(isCtrlOrMeta && shiftKey && { e: () => useExportStore.getState().setModalOpen(true) }),
       }
 
-      // --- Global Shortcuts ---
-
-      // 1. Modifier-specific actions
-      if (isCtrlOrMeta && lowerKey === 's') {
+      const modAction = modifierActions[lowerKey]
+      if (modAction) {
         event.preventDefault()
-        const filename = generateTimestampFilename('ndimensional')
-        void exportSceneToPNG({ filename })
-        return
+        modAction()
+        return true
       }
 
-      if (isCtrlOrMeta && shiftKey && lowerKey === 'e') {
-        event.preventDefault()
-        useExportStore.getState().setModalOpen(true)
-        return
-      }
+      if (isCtrlOrMeta) return false
 
-      if (!isCtrlOrMeta && !shiftKey && lowerKey === 'c') {
-        event.preventDefault()
-        toggleCinematicMode()
-        return
-      }
-
-      // Toggle right sidebar: \
-      if (!isCtrlOrMeta && !shiftKey && key === '\\') {
-        event.preventDefault()
-        toggleCollapsed()
-        return
-      }
-
-      // Toggle left sidebar: Shift+\
-      if (!isCtrlOrMeta && shiftKey && key === '|') {
-        // Shift+\ produces '|' on most keyboards
-        event.preventDefault()
-        toggleLeftPanel()
-        return
-      }
-
-      // Reset camera: R (only when no light is selected)
-      if (!isCtrlOrMeta && !shiftKey && lowerKey === 'r' && !selectedLightId) {
-        event.preventDefault()
-        resetCamera()
-        return
-      }
-
-      // Show shortcuts: ? (Shift+/ on most keyboards)
-      if (!isCtrlOrMeta && key === '?') {
-        event.preventDefault()
-        toggleShortcuts()
-        return
-      }
-
-      // 2. Simple Key Map (Modifiers ignored/allowed as per original implementation)
-      // Note: Original implementation allowed modifiers for Arrows and Numbers
-      const globalKeyMap: Record<string, () => void> = {
+      // Plain or shift-only actions
+      const plainActions: Record<string, () => void> = {
+        ...(!shiftKey && { c: toggleCinematicMode }),
+        ...(!shiftKey && { '\\': toggleCollapsed }),
+        ...(!shiftKey && !selectedLightId && { r: resetCamera }),
+        '?': toggleShortcuts,
         ArrowUp: () => {
           if (dimension < MAX_DIMENSION) setDimension(dimension + 1)
         },
@@ -217,13 +184,30 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         },
       }
 
-      if (globalKeyMap[key]) {
+      // Shift+\ produces '|' on most keyboards
+      if (shiftKey && key === '|') {
         event.preventDefault()
-        globalKeyMap[key]()
+        toggleLeftPanel()
+        return true
+      }
+
+      const plainAction = plainActions[key] ?? plainActions[lowerKey]
+      if (!plainAction) return false
+
+      event.preventDefault()
+      plainAction()
+      return true
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in input fields
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return
       }
 
-      // Note: WASD keys are handled by useCameraMovement hook for camera movement
+      const lowerKey = event.key.toLowerCase()
+      if (handleLightShortcut(event, lowerKey)) return
+      handleGlobalShortcut(event, lowerKey)
     }
 
     window.addEventListener('keydown', handleKeyDown)

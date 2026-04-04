@@ -12,7 +12,59 @@ export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'>
   precision?: number
 }
 
+/** Formats a number for display, trimming trailing zeros. */
+function formatNumericValue(num: number, precision: number): string {
+  return Number(num)
+    .toFixed(precision)
+    .replace(/\.?0+$/, '')
+}
+
+/** Handles revert logic when the user's input is empty or an invalid expression. */
+function revertOnInvalid(
+  trimmedInput: string,
+  currentValue: number,
+  precision: number,
+  errorTimerRef: React.MutableRefObject<number | null>,
+  setLocalValue: (v: string) => void,
+  setError: (e: string | null) => void
+): void {
+  // Empty input — revert silently
+  if (trimmedInput === '') {
+    setLocalValue(formatNumericValue(currentValue, precision))
+    setError(null)
+    return
+  }
+
+  // Invalid expression — show error and revert after delay
+  setError('Invalid expression')
+  if (errorTimerRef.current !== null) {
+    clearTimeout(errorTimerRef.current)
+  }
+  errorTimerRef.current = window.setTimeout(() => {
+    setLocalValue(formatNumericValue(currentValue, precision))
+    setError(null)
+    errorTimerRef.current = null
+  }, 1500)
+}
+
 const DECIMAL_TOKEN_PATTERN = /^(?:\d+\.?\d*|\.\d+)$/
+const WHITESPACE = /\s/
+const DIGIT_OR_DOT = /[0-9.]/
+const OPERATORS = '+-*/()%'
+
+/** Reads a numeric literal starting at position `i`, returning the parsed number and new index. */
+function readNumber(expr: string, start: number): { value: number; end: number } | null {
+  let numStr = ''
+  let i = start
+  while (i < expr.length && DIGIT_OR_DOT.test(expr.charAt(i))) {
+    numStr += expr.charAt(i)
+    i++
+  }
+  if (!DECIMAL_TOKEN_PATTERN.test(numStr)) return null
+  const value = parseFloat(numStr)
+  if (isNaN(value)) return null
+  return { value, end: i }
+}
 
 /**
  * Tokenizes a math expression into numbers, operators, and parentheses.
@@ -26,34 +78,25 @@ function tokenize(expr: string): (string | number)[] | null {
   while (i < expr.length) {
     const char = expr.charAt(i)
 
-    // Skip whitespace
-    if (/\s/.test(char)) {
+    if (WHITESPACE.test(char)) {
       i++
       continue
     }
 
-    // Operators and parentheses
-    if ('+-*/()%'.includes(char)) {
+    if (OPERATORS.includes(char)) {
       tokens.push(char)
       i++
       continue
     }
 
-    // Numbers (including decimals and negative)
-    if (/[0-9.]/.test(char)) {
-      let numStr = ''
-      while (i < expr.length && /[0-9.]/.test(expr.charAt(i))) {
-        numStr += expr.charAt(i)
-        i++
-      }
-      if (!DECIMAL_TOKEN_PATTERN.test(numStr)) return null
-      const num = parseFloat(numStr)
-      if (isNaN(num)) return null
-      tokens.push(num)
+    if (DIGIT_OR_DOT.test(char)) {
+      const result = readNumber(expr, i)
+      if (!result) return null
+      tokens.push(result.value)
+      i = result.end
       continue
     }
 
-    // Invalid character
     return null
   }
 
@@ -206,9 +249,10 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
 
     // Cleanup error timer on unmount
     useEffect(() => {
+      const ref = errorTimerRef
       return () => {
-        if (errorTimerRef.current !== null) {
-          clearTimeout(errorTimerRef.current)
+        if (ref.current !== null) {
+          clearTimeout(ref.current)
         }
       }
     }, [])
@@ -217,11 +261,7 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
       // Only update local value when not focused to allow typing without snapping
       if (!isFocused) {
         const syncValueTimer = window.setTimeout(() => {
-          setLocalValue(
-            Number(value)
-              .toFixed(precision)
-              .replace(/\.?0+$/, '')
-          )
+          setLocalValue(formatNumericValue(value, precision))
         }, 0)
         return () => clearTimeout(syncValueTimer)
       }
@@ -245,39 +285,17 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
         if (parsed !== null) {
           const clamped = Math.min(Math.max(parsed, min), max)
           onChange(clamped)
-          setLocalValue(
-            Number(clamped)
-              .toFixed(precision)
-              .replace(/\.?0+$/, '')
-          )
+          setLocalValue(formatNumericValue(clamped, precision))
           setError(null)
         } else {
-          // Revert to last valid value for empty or invalid input
-          if (localValue.trim() === '') {
-            // Empty input - revert silently
-            setLocalValue(
-              Number(value)
-                .toFixed(precision)
-                .replace(/\.?0+$/, '')
-            )
-            setError(null)
-          } else {
-            // Invalid expression - show error and revert after delay
-            setError('Invalid expression')
-            // Clear any existing timer before setting a new one
-            if (errorTimerRef.current !== null) {
-              clearTimeout(errorTimerRef.current)
-            }
-            errorTimerRef.current = window.setTimeout(() => {
-              setLocalValue(
-                Number(value)
-                  .toFixed(precision)
-                  .replace(/\.?0+$/, '')
-              )
-              setError(null)
-              errorTimerRef.current = null
-            }, 1500)
-          }
+          revertOnInvalid(
+            localValue.trim(),
+            value,
+            precision,
+            errorTimerRef,
+            setLocalValue,
+            setError
+          )
         }
 
         if (onBlur) onBlur(e)

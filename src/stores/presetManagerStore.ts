@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 
 import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
 import { isComputeQuantumType } from '@/lib/geometry/registry'
+import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 
 import { DEFAULT_SPEED, useAnimationStore } from './animationStore'
@@ -125,6 +126,128 @@ function scheduleSceneLoadComplete(): void {
     usePerformanceStore.getState().setIsLoadingScene(false)
     usePerformanceStore.getState().setSceneTransitioning(false)
   })
+}
+
+/** Restore style stores (appearance, lighting, post-processing, environment, PBR) from scene data. */
+function restoreStyleStores(data: SavedScene['data']): void {
+  useAppearanceStore.setState({
+    ...APPEARANCE_INITIAL_STATE,
+    ...normalizeAppearanceLoadData(sanitizeLoadedState(data.appearance)),
+  })
+  useLightingStore.setState({
+    ...LIGHTING_INITIAL_STATE,
+    ...normalizeLightingLoadData(sanitizeLoadedState(data.lighting)),
+  })
+  usePostProcessingStore.setState({
+    ...POST_PROCESSING_INITIAL_STATE,
+    ...normalizePostProcessingLoadData(sanitizeLoadedState(data.postProcessing)),
+  })
+
+  const envData = normalizeEnvironmentLoadData(sanitizeLoadedState({ ...data.environment }))
+  useEnvironmentStore.setState({ ...SKYBOX_INITIAL_STATE, ...envData })
+
+  const pbrData = data.pbr ? sanitizeLoadedState(data.pbr) : ({} as Record<string, unknown>)
+  if (Object.keys(pbrData).length > 0) {
+    usePBRStore.setState({ ...PBR_INITIAL_STATE, ...normalizePbrLoadData(pbrData) })
+  } else {
+    usePBRStore.getState().resetPBR()
+  }
+}
+
+/**
+ * Restore geometry and extended object state.
+ */
+function restoreGeometryAndExtended(data: SavedScene['data']): void {
+  const geometryData = sanitizeLoadedState(data.geometry) as {
+    dimension?: number
+    objectType?: string
+  }
+  const loadedObjectType = (geometryData.objectType ??
+    useGeometryStore.getState().objectType) as ObjectType
+
+  if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
+    useGeometryStore
+      .getState()
+      .loadGeometry(geometryData.dimension, geometryData.objectType as ObjectType)
+  } else if (geometryData.dimension !== undefined) {
+    useGeometryStore.getState().setDimension(geometryData.dimension)
+  } else if (geometryData.objectType !== undefined) {
+    useGeometryStore.getState().setObjectType(geometryData.objectType as ObjectType)
+  }
+
+  useExtendedObjectStore.setState(
+    mergeExtendedObjectStateForType(sanitizeExtendedLoadedState(data.extended), loadedObjectType)
+  )
+}
+
+/** Restore transform state via store actions to preserve invariants. */
+function restoreTransformState(data: Record<string, unknown>): void {
+  const transformData = sanitizeLoadedState(data) as {
+    uniformScale?: unknown
+    perAxisScale?: unknown
+    scaleLocked?: unknown
+  }
+  const store = useTransformStore.getState()
+  store.resetAll()
+  if (typeof transformData.scaleLocked === 'boolean') {
+    store.setScaleLocked(transformData.scaleLocked)
+  }
+  if (typeof transformData.uniformScale === 'number') {
+    store.setUniformScale(transformData.uniformScale)
+  }
+  if (!useTransformStore.getState().scaleLocked && Array.isArray(transformData.perAxisScale)) {
+    for (let axis = 0; axis < transformData.perAxisScale.length; axis++) {
+      const axisScale = transformData.perAxisScale[axis]
+      if (typeof axisScale === 'number') {
+        useTransformStore.getState().setAxisScale(axis, axisScale)
+      }
+    }
+  }
+}
+
+/** Restore camera position and target from serialized data. */
+function restoreCameraState(data: Record<string, unknown>): void {
+  if (Object.keys(data).length === 0) return
+  const cameraData = sanitizeLoadedState(data) as {
+    position?: [number, number, number]
+    target?: [number, number, number]
+  }
+  if (cameraData.position && cameraData.target) {
+    useCameraStore.getState().applyState({
+      position: cameraData.position,
+      target: cameraData.target,
+    })
+  }
+}
+
+/**
+ * Enforce post-load invariants for compute quantum modes.
+ * Compute modes require dimension >= 3, position representation, and no cross-section.
+ */
+function enforceComputeModeInvariants(): void {
+  const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
+  if (!qm || !isComputeQuantumType(qm)) return
+
+  if (useGeometryStore.getState().dimension < 3) {
+    useGeometryStore.getState().setDimension(3)
+  }
+  const sch = useExtendedObjectStore.getState().schroedinger
+  const patches: Record<string, unknown> = {}
+  if (sch?.representation !== 'position') patches.representation = 'position'
+  if (sch?.crossSectionEnabled) patches.crossSectionEnabled = false
+  if (Object.keys(patches).length > 0) {
+    useExtendedObjectStore.setState({ schroedinger: { ...sch, ...patches } })
+  }
+}
+
+/** Bump all version counters to trigger re-renders after direct setState calls. */
+function bumpAllVersionCounters(): void {
+  useAppearanceStore.getState().bumpVersion()
+  useLightingStore.getState().bumpVersion()
+  useEnvironmentStore.getState().bumpAllVersions()
+  usePBRStore.getState().bumpVersion()
+  useRotationStore.getState().bumpVersion()
+  useExtendedObjectStore.getState().bumpAllVersions()
 }
 
 // Re-export preset types for backward compatibility
@@ -392,176 +515,28 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         const scene = get().savedScenes.find((s) => s.id === id)
         if (!scene) return
 
-        // All store updates execute synchronously and are batched by React 18's automatic batching
-        // Set both flags: isLoadingScene prevents hook-based rotation reset,
-        // sceneTransitioning enables progressive refinement for visual quality
         usePerformanceStore.getState().setIsLoadingScene(true)
         usePerformanceStore.getState().setSceneTransitioning(true)
 
-        // Restore style components: spread defaults first, then override with loaded data.
-        // This ensures fields missing from older presets reset to defaults instead
-        // of retaining whatever the current store value happens to be.
-        useAppearanceStore.setState({
-          ...APPEARANCE_INITIAL_STATE,
-          ...normalizeAppearanceLoadData(sanitizeLoadedState(scene.data.appearance)),
-        })
-        useLightingStore.setState({
-          ...LIGHTING_INITIAL_STATE,
-          ...normalizeLightingLoadData(sanitizeLoadedState(scene.data.lighting)),
-        })
-        usePostProcessingStore.setState({
-          ...POST_PROCESSING_INITIAL_STATE,
-          ...normalizePostProcessingLoadData(sanitizeLoadedState(scene.data.postProcessing)),
-        })
+        restoreStyleStores(scene.data)
+        restoreGeometryAndExtended(scene.data)
+        restoreTransformState(scene.data.transform)
 
-        // Handle legacy environment data and keep unified skybox fields canonical.
-        const envData = normalizeEnvironmentLoadData(
-          sanitizeLoadedState({ ...scene.data.environment })
-        )
-        useEnvironmentStore.setState({ ...SKYBOX_INITIAL_STATE, ...envData })
-
-        // Restore PBR settings (legacy imports without pbr should reset to defaults)
-        const scenePbrData = scene.data.pbr
-          ? sanitizeLoadedState(scene.data.pbr)
-          : ({} as Record<string, unknown>)
-        if (Object.keys(scenePbrData).length > 0) {
-          usePBRStore.setState({ ...PBR_INITIAL_STATE, ...normalizePbrLoadData(scenePbrData) })
-        } else {
-          usePBRStore.getState().resetPBR()
-        }
-
-        // Restore Geometry atomically using loadGeometry
-        // This sets both dimension and objectType without auto-adjustments
-        const geometryData = sanitizeLoadedState(scene.data.geometry) as {
-          dimension?: number
-          objectType?: string
-        }
-        // Determine the object type for loading (either from saved data or keep current)
-        const loadedObjectType = (geometryData.objectType ??
-          useGeometryStore.getState().objectType) as import('@/lib/geometry/types').ObjectType
-
-        if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
-          useGeometryStore
-            .getState()
-            .loadGeometry(
-              geometryData.dimension,
-              geometryData.objectType as import('@/lib/geometry/types').ObjectType
-            )
-        } else if (geometryData.dimension !== undefined) {
-          useGeometryStore.getState().setDimension(geometryData.dimension)
-        } else if (geometryData.objectType !== undefined) {
-          useGeometryStore
-            .getState()
-            .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
-        }
-
-        // Restore only the extended config for the loaded object type
-        // This prevents overwriting configs for other object types
-        // mergeExtendedObjectStateForType merges with defaults and only touches the relevant config
-        useExtendedObjectStore.setState(
-          mergeExtendedObjectStateForType(
-            sanitizeExtendedLoadedState(scene.data.extended),
-            loadedObjectType
-          )
-        )
-        // Restore transform via store actions to preserve invariants tied to geometry dimension.
-        const transformData = sanitizeLoadedState(scene.data.transform) as {
-          uniformScale?: unknown
-          perAxisScale?: unknown
-          scaleLocked?: unknown
-        }
-        const transformStore = useTransformStore.getState()
-        transformStore.resetAll()
-        if (typeof transformData.scaleLocked === 'boolean') {
-          transformStore.setScaleLocked(transformData.scaleLocked)
-        }
-        if (typeof transformData.uniformScale === 'number') {
-          transformStore.setUniformScale(transformData.uniformScale)
-        }
-        if (
-          !useTransformStore.getState().scaleLocked &&
-          Array.isArray(transformData.perAxisScale)
-        ) {
-          for (let axis = 0; axis < transformData.perAxisScale.length; axis++) {
-            const axisScale = transformData.perAxisScale[axis]
-            if (typeof axisScale === 'number') {
-              useTransformStore.getState().setAxisScale(axis, axisScale)
-            }
-          }
-        }
-
-        // UI payloads are intentionally narrow: keep only canonical, non-transient fields.
         const uiData = normalizeUiLoadData(
           sanitizeLoadedState(scene.data.ui) as Record<string, unknown>
         )
         useUIStore.setState(uiData)
 
-        // Special handling for Rotation
-        if (scene.data.rotation) {
-          restoreRotationState(scene.data.rotation)
-        }
+        if (scene.data.rotation) restoreRotationState(scene.data.rotation)
+        if (scene.data.animation) restoreAnimationState(scene.data.animation)
+        if (scene.data.camera) restoreCameraState(scene.data.camera)
 
-        // Special handling for Animation (Array -> Set)
-        if (scene.data.animation) {
-          restoreAnimationState(scene.data.animation)
-        }
+        enforceComputeModeInvariants()
+        bumpAllVersionCounters()
 
-        // Special handling for Camera
-        if (scene.data.camera && Object.keys(scene.data.camera).length > 0) {
-          const cameraData = sanitizeLoadedState(scene.data.camera) as {
-            position?: [number, number, number]
-            target?: [number, number, number]
-          }
-          if (cameraData.position && cameraData.target) {
-            useCameraStore.getState().applyState({
-              position: cameraData.position,
-              target: cameraData.target,
-            })
-          }
-        }
-
-        // Post-load invariants for compute modes.
-        // loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement,
-        // so we must normalize here to prevent stale/incompatible state from leaking
-        // into the renderer (e.g. representation='momentum' or crossSectionEnabled=true
-        // would corrupt the GPU uniform buffer for density-grid-based pipelines).
-        const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
-        const isComputeQm = qm ? isComputeQuantumType(qm) : false
-        if (isComputeQm) {
-          if (useGeometryStore.getState().dimension < 3) {
-            useGeometryStore.getState().setDimension(3)
-          }
-          const sch = useExtendedObjectStore.getState().schroedinger
-          const computePatches: Record<string, unknown> = {}
-          if (sch?.representation !== 'position') {
-            computePatches.representation = 'position'
-          }
-          if (sch?.crossSectionEnabled) {
-            computePatches.crossSectionEnabled = false
-          }
-          if (Object.keys(computePatches).length > 0) {
-            useExtendedObjectStore.setState({
-              schroedinger: { ...sch, ...computePatches },
-            })
-          }
-        }
-
-        // Bump version counters to trigger re-renders after direct setState calls
-        // This is necessary because setState bypasses the wrapped setters that auto-increment versions
-        useAppearanceStore.getState().bumpVersion()
-        useLightingStore.getState().bumpVersion()
-
-        useEnvironmentStore.getState().bumpAllVersions()
-        usePBRStore.getState().bumpVersion()
-        useRotationStore.getState().bumpVersion()
-        useExtendedObjectStore.getState().bumpAllVersions()
-
-        // Increment preset load version to trigger material recreation in renderers
-        // This ensures material properties (transparent, depthWrite) match loaded state
         logger.log('[loadScene] incrementPresetLoadVersion')
         usePerformanceStore.getState().incrementPresetLoadVersion()
 
-        // Signal load complete after React settles - uses helper to prevent race conditions
         scheduleSceneLoadComplete()
       },
 

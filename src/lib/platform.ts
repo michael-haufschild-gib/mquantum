@@ -4,11 +4,19 @@
  */
 
 /**
- * Detect if the current platform is macOS/iOS
- * Uses navigator.platform with non-browser guard
+ * Detect if the current platform is macOS/iOS.
+ *
+ * Prefers navigator.userAgentData.platform when available, and falls back to
+ * the deprecated navigator.platform for browsers that do not expose
+ * userAgentData.
  */
 export const isMac =
-  typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+  typeof navigator !== 'undefined' &&
+  ('userAgentData' in navigator
+    ? /macOS|iOS|iPadOS/i.test(
+        (navigator as Navigator & { userAgentData: { platform: string } }).userAgentData.platform
+      )
+    : /Mac|iPod|iPhone|iPad/.test(navigator.platform))
 
 /**
  * Get all modifier key symbols for the current platform

@@ -85,71 +85,41 @@ function pickKeys(
 // Appearance normalization
 // ---------------------------------------------------------------------------
 
+/** Normalize a 3-color diverging palette object, falling back per field. */
+function normalizeDivergingColors(
+  raw: Record<string, unknown>,
+  defaults: { neutralColor: string; positiveColor: string; negativeColor: string }
+): { neutralColor: string; positiveColor: string; negativeColor: string } {
+  return {
+    neutralColor: typeof raw.neutralColor === 'string' ? raw.neutralColor : defaults.neutralColor,
+    positiveColor:
+      typeof raw.positiveColor === 'string' ? raw.positiveColor : defaults.positiveColor,
+    negativeColor:
+      typeof raw.negativeColor === 'string' ? raw.negativeColor : defaults.negativeColor,
+  }
+}
+
 /** Normalize phaseDiverging and divergingPsi fields. */
 function normalizeAppearanceDivergingFields(
   appearance: Record<string, unknown>,
   fallback: ReturnType<typeof useAppearanceStore.getState>
 ): void {
-  if ('phaseDiverging' in appearance) {
-    if (
-      appearance.phaseDiverging &&
-      typeof appearance.phaseDiverging === 'object' &&
-      !Array.isArray(appearance.phaseDiverging)
-    ) {
-      const pd = appearance.phaseDiverging as Record<string, unknown>
-      appearance.phaseDiverging = {
-        neutralColor:
-          typeof pd.neutralColor === 'string'
-            ? pd.neutralColor
-            : fallback.phaseDiverging.neutralColor,
-        positiveColor:
-          typeof pd.positiveColor === 'string'
-            ? pd.positiveColor
-            : fallback.phaseDiverging.positiveColor,
-        negativeColor:
-          typeof pd.negativeColor === 'string'
-            ? pd.negativeColor
-            : fallback.phaseDiverging.negativeColor,
-      }
-    } else {
-      delete appearance.phaseDiverging
-    }
-  }
+  normalizeObjectField(appearance, 'phaseDiverging', (pd) =>
+    normalizeDivergingColors(pd, fallback.phaseDiverging)
+  )
 
-  if ('divergingPsi' in appearance) {
-    if (
-      appearance.divergingPsi &&
-      typeof appearance.divergingPsi === 'object' &&
-      !Array.isArray(appearance.divergingPsi)
-    ) {
-      const dp = appearance.divergingPsi as Record<string, unknown>
-      appearance.divergingPsi = {
-        neutralColor:
-          typeof dp.neutralColor === 'string'
-            ? dp.neutralColor
-            : fallback.divergingPsi.neutralColor,
-        positiveColor:
-          typeof dp.positiveColor === 'string'
-            ? dp.positiveColor
-            : fallback.divergingPsi.positiveColor,
-        negativeColor:
-          typeof dp.negativeColor === 'string'
-            ? dp.negativeColor
-            : fallback.divergingPsi.negativeColor,
-        intensityFloor: clampFiniteOrFallback(
-          dp.intensityFloor,
-          0,
-          1,
-          fallback.divergingPsi.intensityFloor
-        ),
-        component: DIVERGING_COMPONENT_SET.has(dp.component as never)
-          ? dp.component
-          : fallback.divergingPsi.component,
-      }
-    } else {
-      delete appearance.divergingPsi
-    }
-  }
+  normalizeObjectField(appearance, 'divergingPsi', (dp) => ({
+    ...normalizeDivergingColors(dp, fallback.divergingPsi),
+    intensityFloor: clampFiniteOrFallback(
+      dp.intensityFloor,
+      0,
+      1,
+      fallback.divergingPsi.intensityFloor
+    ),
+    component: DIVERGING_COMPONENT_SET.has(dp.component as never)
+      ? dp.component
+      : fallback.divergingPsi.component,
+  }))
 }
 
 /**

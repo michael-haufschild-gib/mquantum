@@ -37,6 +37,54 @@ const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
  * @param loaded - The loaded state (may be partial or undefined)
  * @returns Merged object with all default keys present
  */
+/**
+ * Determines whether a loaded array value should replace the default.
+ * Returns false (skip) when the default is a plain object (type mismatch)
+ * or a fixed-size array whose length doesn't match.
+ */
+function shouldAcceptLoadedArray(
+  loadedVal: unknown[],
+  defaultVal: unknown,
+  defaultIsObject: boolean,
+  defaultIsArray: boolean
+): boolean {
+  // Loaded array where default is a plain object: type mismatch.
+  if (defaultIsObject) return false
+  // Fixed-size default array whose length doesn't match: reject.
+  if (!defaultIsArray) return true
+  const defaultArr = defaultVal as unknown[]
+  return defaultArr.length === 0 || loadedVal.length === defaultArr.length
+}
+
+/** Resolve a single key during deep-merge, returning the value to set or `undefined` to skip. */
+function resolveMergeKey(
+  loadedVal: unknown,
+  defaultVal: unknown,
+  defaultIsObject: boolean,
+  defaultIsArray: boolean
+): unknown | undefined {
+  // Null loaded where default is a structured type: keep default.
+  if (loadedVal === null && (defaultIsObject || defaultIsArray)) return undefined
+
+  if (Array.isArray(loadedVal)) {
+    return shouldAcceptLoadedArray(loadedVal, defaultVal, defaultIsObject, defaultIsArray)
+      ? loadedVal
+      : undefined
+  }
+
+  // Default is array but loaded is not: type mismatch.
+  if (defaultIsArray) return undefined
+
+  // Both are plain objects: recurse.
+  if (loadedVal !== null && typeof loadedVal === 'object' && defaultIsObject) {
+    return deepMerge(defaultVal as object, loadedVal)
+  }
+
+  // Primitives: only accept when types match (prevents number replacing an expected object).
+  if (!defaultIsObject || typeof loadedVal === typeof defaultVal) return loadedVal
+  return undefined
+}
+
 function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
   // If loaded is null/undefined/not-object/array, return copy of defaults
   if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) {
@@ -44,68 +92,22 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
   }
 
   const result = { ...defaults } as T
-  // After the guard above, loaded is a non-null, non-array object
   const loadedObj = loaded as Record<string, unknown>
 
   for (const key of Object.keys(loadedObj)) {
-    // Only merge keys that exist in defaults to preserve canonical state shape.
-    if (!Object.prototype.hasOwnProperty.call(defaults, key)) {
-      continue
-    }
+    if (!Object.prototype.hasOwnProperty.call(defaults, key)) continue
 
     const loadedVal = loadedObj[key]
+    if (loadedVal === undefined) continue
+
     const defaultVal = (defaults as Record<string, unknown>)[key]
-
-    if (loadedVal === undefined) {
-      // Undefined in loaded means use default (already in result)
-      continue
-    }
-
     const defaultIsObject =
       defaultVal !== null && typeof defaultVal === 'object' && !Array.isArray(defaultVal)
-
     const defaultIsArray = Array.isArray(defaultVal)
 
-    if (loadedVal === null && (defaultIsObject || defaultIsArray)) {
-      // Null loaded where default is an object or array: keep the default to prevent
-      // downstream property-access crashes (e.g., cosineParams: null → cosineParams.a fails,
-      // or cosineParams.a: null → cosineParams.a.length fails)
-      continue
-    }
-
-    if (Array.isArray(loadedVal)) {
-      if (defaultIsObject) {
-        // Loaded array where default is a plain object: type mismatch.
-        // Keep the default to preserve expected property structure
-        // (e.g., cosineParams: [] would lose a/b/c/d properties).
-        continue
-      }
-      // Arrays are replaced, not merged — but validate length for fixed-size arrays.
-      // When the default array is non-empty (fixed-size, e.g., cosineParams.a = [0.5, 0.5, 0.5]),
-      // the loaded array must match that length; otherwise downstream code that indexes into it
-      // will read undefined values. Variable-length arrays (default = []) accept any length.
-      const defaultArr = defaultVal as unknown[]
-      if (
-        defaultIsArray &&
-        defaultArr.length > 0 &&
-        (loadedVal as unknown[]).length !== defaultArr.length
-      ) {
-        continue
-      }
-      ;(result as Record<string, unknown>)[key] = loadedVal
-    } else if (defaultIsArray) {
-      // Default is an array but loaded is not an array (it's a non-array object or primitive).
-      // Type mismatch: keep the default to preserve array structure
-      // (e.g., cosineParams.a: {} would lose the [0.5, 0.5, 0.5] array).
-      continue
-    } else if (loadedVal !== null && typeof loadedVal === 'object' && defaultIsObject) {
-      // Recursively merge nested objects (e.g., cosineParams, customPalette)
-      ;(result as Record<string, unknown>)[key] = deepMerge(defaultVal as object, loadedVal)
-    } else if (!defaultIsObject || typeof loadedVal === typeof defaultVal) {
-      // Primitives: loaded value overrides default, but only if types match
-      // (prevents a number replacing an expected object or array,
-      // e.g., cosineParams: 42, parameterValues: "garbage")
-      ;(result as Record<string, unknown>)[key] = loadedVal
+    const resolved = resolveMergeKey(loadedVal, defaultVal, defaultIsObject, defaultIsArray)
+    if (resolved !== undefined) {
+      ;(result as Record<string, unknown>)[key] = resolved
     }
   }
 

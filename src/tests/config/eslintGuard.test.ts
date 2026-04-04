@@ -16,12 +16,19 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '../../../..')
 const config = readFileSync(resolve(ROOT, 'eslint.config.js'), 'utf8')
 
 describe('eslint config: no per-file exemptions for structural quality rules', () => {
-  it('complexity rule has exactly 3 definitions (base at 30 + GPU override at 40 + form/orchestration override at 35)', () => {
-    // Base config: complexity 30 for most code.
-    // GPU pipeline override: 40 for inherently-complex render passes, uniform packing, render graph.
-    // Form/orchestration override: 35 for complex quantum-mode forms, keyboard shortcuts, video export, scene load.
-    // If this fails, someone added a new per-file complexity override — split the file instead.
+  it('complexity rule is defined exactly once (off — sonarjs/cognitive-complexity is the active rule)', () => {
+    // Base config: complexity: 'off' (disabled in favor of sonarjs/cognitive-complexity).
+    // If this fails, someone added a per-file complexity override — use sonarjs/cognitive-complexity instead.
     const matches = [...config.matchAll(/^\s+complexity\s*:/gm)]
+    expect(matches).toHaveLength(1)
+  })
+
+  it('sonarjs/cognitive-complexity has exactly 3 definitions (base + off for physics/rendering/tests + re-enable for rendering hooks)', () => {
+    // Base config: error at 15 for all code.
+    // Exclusion: off for src/lib/physics, src/rendering, src/tests.
+    // Re-enable: error at 15 for rendering hooks (useExportRuntime, useGizmoInteraction, gizmoHitTesting).
+    // If this fails, someone added a per-file override — refactor the file instead.
+    const matches = [...config.matchAll(/^\s+'sonarjs\/cognitive-complexity'\s*:/gm)]
     expect(matches).toHaveLength(3)
   })
 

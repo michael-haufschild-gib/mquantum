@@ -5,6 +5,7 @@ import tsparser from '@typescript-eslint/parser'
 import jsdoc from 'eslint-plugin-jsdoc'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import sonarjs from 'eslint-plugin-sonarjs'
 import testingLibrary from 'eslint-plugin-testing-library'
 import globals from 'globals'
 
@@ -744,6 +745,7 @@ export default [
       jsdoc: jsdoc,
       'project-rules': projectRulesPlugin,
       'simple-import-sort': simpleImportSort,
+      sonarjs: sonarjs,
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -844,8 +846,10 @@ export default [
       // ErrorBoundary files are exempt — they must log in production.
       'no-console': 'error',
 
-      // Complexity: error at 30 (hard limit for most code)
-      complexity: ['error', 30],
+      // Cognitive complexity: error at 15 (sonarjs measures nesting/control-flow weight, not branch counting)
+      'sonarjs/cognitive-complexity': ['error', 15],
+      complexity: 'off',
+      'max-depth': ['error', 4],
 
       // Custom project rules
       'project-rules/no-direct-asset-imports': 'error',
@@ -983,36 +987,30 @@ export default [
       'no-useless-assignment': 'off',
     },
   },
-  // GPU pipeline code: uniform packing, compute pass orchestration, and render graph
-  // execution have inherently high cyclomatic complexity from branching on quantum modes,
-  // representation types, and feature flags. These functions are linear sequences of
-  // conditional setup, not deeply nested logic. Limit raised to 40.
+  // Physics, rendering, and test code: exempt from cognitive complexity limits.
+  // Physics functions are dictated by equations; rendering code branches on quantum
+  // modes, representations, and GPU features; tests need freedom for thorough coverage.
   {
     files: [
-      'src/rendering/webgpu/passes/**/*.ts',
-      'src/rendering/webgpu/renderers/**/*.ts',
-      'src/rendering/webgpu/graph/WebGPURenderGraph.ts',
-      'src/rendering/webgpu/useExportRuntime.ts',
-      'src/rendering/webgpu/shaders/schroedinger/compose.ts',
-      'src/rendering/webgpu/shaders/schroedinger/composeBlockBuilders.ts',
+      'src/lib/physics/**/*.ts',
+      'src/rendering/**/*.ts',
+      'src/tests/**/*.{ts,tsx}',
     ],
     rules: {
-      complexity: ['error', 40],
+      'sonarjs/cognitive-complexity': 'off',
+      'max-depth': 'off',
     },
   },
-  // Complex form components, hooks, and store orchestration: conditional rendering for
-  // quantum mode configurations, keyboard shortcuts dispatch tables, video capture,
-  // and scene load/save orchestration create inherent branching. Limit raised to 35.
+  // Rendering hooks (non-GPU, non-hot-path interaction/export code): standard limits apply.
   {
     files: [
-      'src/components/sections/Advanced/SchroedingerQuantumEffectsSection.tsx',
-      'src/components/layout/TimelineControls/SchroedingerAnimationDrawer.tsx',
-      'src/hooks/useKeyboardShortcuts.ts',
-      'src/lib/export/video.ts',
-      'src/stores/presetManagerStore.ts',
+      'src/rendering/webgpu/useExportRuntime.ts',
+      'src/rendering/webgpu/useGizmoInteraction.ts',
+      'src/rendering/webgpu/utils/gizmoHitTesting.ts',
     ],
     rules: {
-      complexity: ['error', 35],
+      'sonarjs/cognitive-complexity': ['error', 15],
+      'max-depth': ['error', 4],
     },
   },
   // Import boundary: render passes must not import state stores directly.

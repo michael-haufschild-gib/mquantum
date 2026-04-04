@@ -305,6 +305,223 @@ export function exportWavefunctionSliceCSV(
 
 // ─── JSON export ──────────────────────────────────────────────────────────
 
+// ─── Per-mode JSON payload builders ──────────────────────────────────────
+
+function buildTdsePayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().tdse
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      maxDensity: s.maxDensity,
+      R: s.R,
+      T: s.T,
+      simTime: s.simTime,
+    },
+    timeSeries: {
+      norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+      R: readRingBuffer(s.historyR, s.historyHead, s.historyCount),
+      T: readRingBuffer(s.historyT, s.historyHead, s.historyCount),
+    },
+  }
+}
+
+function buildBecPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().bec
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      chemicalPotential: s.chemicalPotential,
+      healingLength: s.healingLength,
+      soundSpeed: s.soundSpeed,
+      thomasFermiRadius: s.thomasFermiRadius,
+    },
+    timeSeries: {
+      norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+      chemicalPotential: readRingBuffer(s.historyChemPot, s.historyHead, s.historyCount),
+      healingLength: readRingBuffer(s.historyHealingLen, s.historyHead, s.historyCount),
+    },
+  }
+}
+
+function buildFsfPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().fsf
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      totalEnergy: s.totalEnergy,
+      totalNorm: s.totalNorm,
+      energyDrift: s.energyDrift,
+      maxPhi: s.maxPhi,
+      maxPi: s.maxPi,
+      meanPhi: s.meanPhi,
+      variancePhi: s.variancePhi,
+    },
+    timeSeries: {
+      energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
+      norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+    },
+  }
+}
+
+function buildDiracPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().dirac
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      maxDensity: s.maxDensity,
+      particleFraction: s.particleFraction,
+      antiparticleFraction: s.antiparticleFraction,
+      comptonWavelength: s.comptonWavelength,
+      zitterbewegungFreq: s.zitterbewegungFreq,
+      kleinThreshold: s.kleinThreshold,
+      meanPosition: s.meanPosition,
+    },
+    timeSeries: {
+      norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+      particleFraction: readRingBuffer(s.historyParticleFrac, s.historyHead, s.historyCount),
+      antiparticleFraction: readRingBuffer(
+        s.historyAntiparticleFrac,
+        s.historyHead,
+        s.historyCount
+      ),
+    },
+  }
+}
+
+function buildObservablesPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().observables
+  if (s.historyCount === 0 || s.activeDims === 0) return null
+  const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+  const uncertaintyTimeSeries: Record<string, number[]> = {}
+  const currentUncertainty: Record<string, number> = {}
+  for (let d = 0; d < s.activeDims; d++) {
+    const label = dimLabels[d]!
+    uncertaintyTimeSeries[`dxdp_${label}`] = readRingBuffer(
+      s.historyUncertainty[d]!,
+      s.historyHead,
+      s.historyCount
+    )
+    currentUncertainty[`dxdp_${label}`] = s.uncertaintyProduct[d]!
+  }
+  return {
+    current: {
+      totalEnergy: s.totalEnergy,
+      positionNorm: s.positionNorm,
+      momentumNorm: s.momentumNorm,
+      ...currentUncertainty,
+    },
+    timeSeries: {
+      energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
+      ...uncertaintyTimeSeries,
+    },
+  }
+}
+
+function buildPauliPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().pauli
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      maxDensity: s.maxDensity,
+      spinUpFraction: s.spinUpFraction,
+      spinDownFraction: s.spinDownFraction,
+      spinExpectationZ: s.spinExpectationZ,
+      coherenceMagnitude: s.coherenceMagnitude,
+      meanPosition: s.meanPosition,
+      larmorFrequency: s.larmorFrequency,
+    },
+    timeSeries: {
+      norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
+      spinUpFraction: readRingBuffer(s.historySpinUpFrac, s.historyHead, s.historyCount),
+      spinExpectationZ: readRingBuffer(s.historySpinExpZ, s.historyHead, s.historyCount),
+    },
+  }
+}
+
+function buildOpenQuantumPayload(): Record<string, unknown> | null {
+  const s = useDiagnosticsStore.getState().openQuantum
+  if (s.historyCount === 0) return null
+  return {
+    current: {
+      purity: s.purity,
+      linearEntropy: s.linearEntropy,
+      vonNeumannEntropy: s.vonNeumannEntropy,
+      coherenceMagnitude: s.coherenceMagnitude,
+      groundPopulation: s.groundPopulation,
+      trace: s.trace,
+    },
+    timeSeries: {
+      purity: readRingBuffer(s.historyPurity, s.historyHead, s.historyCount),
+      vonNeumannEntropy: readRingBuffer(s.historyEntropy, s.historyHead, s.historyCount),
+      coherence: readRingBuffer(s.historyCoherence, s.historyHead, s.historyCount),
+    },
+  }
+}
+
+/** Build grid positions for a slice export. */
+function buildGridPositions(gridSize: number, worldBound: number): number[] {
+  return Array.from(
+    { length: gridSize },
+    (_, i) => -worldBound + (2 * worldBound * i) / (gridSize - 1 || 1)
+  )
+}
+
+function appendWavefunctionSlices(payload: Record<string, unknown>): void {
+  const density = useDiagnosticsStore.getState().density
+  if (density.sliceX && density.sliceGridSize > 0) {
+    payload.wavefunctionSlices = {
+      gridSize: density.sliceGridSize,
+      worldBound: density.sliceWorldBound,
+      positions: buildGridPositions(density.sliceGridSize, density.sliceWorldBound),
+      x: Array.from(density.sliceX),
+      y: density.sliceY ? Array.from(density.sliceY) : null,
+      z: density.sliceZ ? Array.from(density.sliceZ) : null,
+    }
+  }
+
+  const wfSlice = useWavefunctionSliceStore.getState()
+  if (wfSlice.hasData && wfSlice.sliceData) {
+    payload.wavefunctionSlice = {
+      axis: wfSlice.sliceAxis,
+      gridSize: wfSlice.sliceGridSize,
+      worldBound: wfSlice.sliceWorldBound,
+      positions: buildGridPositions(wfSlice.sliceGridSize, wfSlice.sliceWorldBound),
+      density: Array.from(wfSlice.sliceData),
+    }
+  }
+}
+
+// ─── Mode → payload key + builder mapping ────────────────────────────────
+
+/** Mapping from quantum mode to the payload key and builder function. */
+const MODE_PAYLOAD_BUILDERS: Record<
+  string,
+  { key: string; build: () => Record<string, unknown> | null }[]
+> = {
+  tdseDynamics: [
+    { key: 'tdse', build: buildTdsePayload },
+    { key: 'observables', build: buildObservablesPayload },
+  ],
+  becDynamics: [
+    { key: 'bec', build: buildBecPayload },
+    { key: 'observables', build: buildObservablesPayload },
+  ],
+  freeScalarField: [{ key: 'fsf', build: buildFsfPayload }],
+  diracEquation: [{ key: 'dirac', build: buildDiracPayload }],
+  pauliSpinor: [{ key: 'pauli', build: buildPauliPayload }],
+  harmonicOscillator: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],
+  hydrogenND: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],
+  hydrogenNDCoupled: [{ key: 'openQuantum', build: buildOpenQuantumPayload }],
+}
+
 /**
  * Export all active diagnostics as a single JSON object.
  * Includes metadata, current snapshot values, and full time-series histories.
@@ -322,218 +539,15 @@ export function exportDiagnosticsJSON(quantumMode: string): string {
     },
   }
 
-  // TDSE diagnostics
-  if (quantumMode === 'tdseDynamics') {
-    const s = useDiagnosticsStore.getState().tdse
-    if (s.historyCount > 0) {
-      payload.tdse = {
-        current: {
-          totalNorm: s.totalNorm,
-          normDrift: s.normDrift,
-          maxDensity: s.maxDensity,
-          R: s.R,
-          T: s.T,
-          simTime: s.simTime,
-        },
-        timeSeries: {
-          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
-          R: readRingBuffer(s.historyR, s.historyHead, s.historyCount),
-          T: readRingBuffer(s.historyT, s.historyHead, s.historyCount),
-        },
-      }
+  const builders = MODE_PAYLOAD_BUILDERS[quantumMode]
+  if (builders) {
+    for (const { key, build } of builders) {
+      const data = build()
+      if (data) payload[key] = data
     }
   }
 
-  // BEC diagnostics
-  if (quantumMode === 'becDynamics') {
-    const s = useDiagnosticsStore.getState().bec
-    if (s.historyCount > 0) {
-      payload.bec = {
-        current: {
-          totalNorm: s.totalNorm,
-          normDrift: s.normDrift,
-          chemicalPotential: s.chemicalPotential,
-          healingLength: s.healingLength,
-          soundSpeed: s.soundSpeed,
-          thomasFermiRadius: s.thomasFermiRadius,
-        },
-        timeSeries: {
-          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
-          chemicalPotential: readRingBuffer(s.historyChemPot, s.historyHead, s.historyCount),
-          healingLength: readRingBuffer(s.historyHealingLen, s.historyHead, s.historyCount),
-        },
-      }
-    }
-  }
-
-  // FSF diagnostics
-  if (quantumMode === 'freeScalarField') {
-    const s = useDiagnosticsStore.getState().fsf
-    if (s.historyCount > 0) {
-      payload.fsf = {
-        current: {
-          totalEnergy: s.totalEnergy,
-          totalNorm: s.totalNorm,
-          energyDrift: s.energyDrift,
-          maxPhi: s.maxPhi,
-          maxPi: s.maxPi,
-          meanPhi: s.meanPhi,
-          variancePhi: s.variancePhi,
-        },
-        timeSeries: {
-          energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
-          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
-        },
-      }
-    }
-  }
-
-  // Dirac diagnostics
-  if (quantumMode === 'diracEquation') {
-    const s = useDiagnosticsStore.getState().dirac
-    if (s.historyCount > 0) {
-      payload.dirac = {
-        current: {
-          totalNorm: s.totalNorm,
-          normDrift: s.normDrift,
-          maxDensity: s.maxDensity,
-          particleFraction: s.particleFraction,
-          antiparticleFraction: s.antiparticleFraction,
-          comptonWavelength: s.comptonWavelength,
-          zitterbewegungFreq: s.zitterbewegungFreq,
-          kleinThreshold: s.kleinThreshold,
-          meanPosition: s.meanPosition,
-        },
-        timeSeries: {
-          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
-          particleFraction: readRingBuffer(s.historyParticleFrac, s.historyHead, s.historyCount),
-          antiparticleFraction: readRingBuffer(
-            s.historyAntiparticleFrac,
-            s.historyHead,
-            s.historyCount
-          ),
-        },
-      }
-    }
-  }
-
-  // Observables diagnostics (TDSE/BEC modes)
-  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
-    const s = useDiagnosticsStore.getState().observables
-    if (s.historyCount > 0 && s.activeDims > 0) {
-      const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
-      const uncertaintyTimeSeries: Record<string, number[]> = {}
-      const currentUncertainty: Record<string, number> = {}
-      for (let d = 0; d < s.activeDims; d++) {
-        const label = dimLabels[d]!
-        uncertaintyTimeSeries[`dxdp_${label}`] = readRingBuffer(
-          s.historyUncertainty[d]!,
-          s.historyHead,
-          s.historyCount
-        )
-        currentUncertainty[`dxdp_${label}`] = s.uncertaintyProduct[d]!
-      }
-      payload.observables = {
-        current: {
-          totalEnergy: s.totalEnergy,
-          positionNorm: s.positionNorm,
-          momentumNorm: s.momentumNorm,
-          ...currentUncertainty,
-        },
-        timeSeries: {
-          energy: readRingBuffer(s.historyEnergy, s.historyHead, s.historyCount),
-          ...uncertaintyTimeSeries,
-        },
-      }
-    }
-  }
-
-  // Pauli diagnostics
-  if (quantumMode === 'pauliSpinor') {
-    const s = useDiagnosticsStore.getState().pauli
-    if (s.historyCount > 0) {
-      payload.pauli = {
-        current: {
-          totalNorm: s.totalNorm,
-          normDrift: s.normDrift,
-          maxDensity: s.maxDensity,
-          spinUpFraction: s.spinUpFraction,
-          spinDownFraction: s.spinDownFraction,
-          spinExpectationZ: s.spinExpectationZ,
-          coherenceMagnitude: s.coherenceMagnitude,
-          meanPosition: s.meanPosition,
-          larmorFrequency: s.larmorFrequency,
-        },
-        timeSeries: {
-          norm: readRingBuffer(s.historyNorm, s.historyHead, s.historyCount),
-          spinUpFraction: readRingBuffer(s.historySpinUpFrac, s.historyHead, s.historyCount),
-          spinExpectationZ: readRingBuffer(s.historySpinExpZ, s.historyHead, s.historyCount),
-        },
-      }
-    }
-  }
-
-  // Open quantum diagnostics (analytic modes)
-  if (
-    quantumMode === 'harmonicOscillator' ||
-    quantumMode === 'hydrogenND' ||
-    quantumMode === 'hydrogenNDCoupled'
-  ) {
-    const s = useDiagnosticsStore.getState().openQuantum
-    if (s.historyCount > 0) {
-      payload.openQuantum = {
-        current: {
-          purity: s.purity,
-          linearEntropy: s.linearEntropy,
-          vonNeumannEntropy: s.vonNeumannEntropy,
-          coherenceMagnitude: s.coherenceMagnitude,
-          groundPopulation: s.groundPopulation,
-          trace: s.trace,
-        },
-        timeSeries: {
-          purity: readRingBuffer(s.historyPurity, s.historyHead, s.historyCount),
-          vonNeumannEntropy: readRingBuffer(s.historyEntropy, s.historyHead, s.historyCount),
-          coherence: readRingBuffer(s.historyCoherence, s.historyHead, s.historyCount),
-        },
-      }
-    }
-  }
-
-  // Wavefunction slices (if available)
-  const density = useDiagnosticsStore.getState().density
-  if (density.sliceX && density.sliceGridSize > 0) {
-    const positions = Array.from(
-      { length: density.sliceGridSize },
-      (_, i) =>
-        -density.sliceWorldBound +
-        (2 * density.sliceWorldBound * i) / (density.sliceGridSize - 1 || 1)
-    )
-    payload.wavefunctionSlices = {
-      gridSize: density.sliceGridSize,
-      worldBound: density.sliceWorldBound,
-      positions,
-      x: Array.from(density.sliceX),
-      y: density.sliceY ? Array.from(density.sliceY) : null,
-      z: density.sliceZ ? Array.from(density.sliceZ) : null,
-    }
-  }
-
-  const wfSlice = useWavefunctionSliceStore.getState()
-  if (wfSlice.hasData && wfSlice.sliceData) {
-    const positions = Array.from(
-      { length: wfSlice.sliceGridSize },
-      (_, i) =>
-        -wfSlice.sliceWorldBound +
-        (2 * wfSlice.sliceWorldBound * i) / (wfSlice.sliceGridSize - 1 || 1)
-    )
-    payload.wavefunctionSlice = {
-      axis: wfSlice.sliceAxis,
-      gridSize: wfSlice.sliceGridSize,
-      worldBound: wfSlice.sliceWorldBound,
-      positions,
-      density: Array.from(wfSlice.sliceData),
-    }
-  }
+  appendWavefunctionSlices(payload)
 
   return JSON.stringify(payload, null, 2)
 }

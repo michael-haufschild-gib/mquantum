@@ -37,6 +37,12 @@ export function validateQuantumNumbers(n: number, l: number, m: number): boolean
   return true
 }
 
+/** Lookup table mapping (l, m) → orbital suffix for well-known orbitals. */
+const ORBITAL_SUFFIX: Record<number, Record<number, string>> = {
+  1: { 0: 'pz', 1: 'px', '-1': 'py' },
+  2: { 0: 'dz²', 1: 'dxz', '-1': 'dyz', 2: 'dx²-y²', '-2': 'dxy' },
+}
+
 /**
  * Generate a label for arbitrary quantum numbers.
  * @param n - Principal quantum number
@@ -46,23 +52,10 @@ export function validateQuantumNumbers(n: number, l: number, m: number): boolean
  */
 export function quantumNumbersToLabel(n: number, l: number, m: number): string {
   const letter = orbitalShapeLetter(l)
-  if (l === 0) {
-    return `${n}${letter}`
-  }
+  if (l === 0) return `${n}${letter}`
 
-  if (l === 1) {
-    if (m === 0) return `${n}pz`
-    if (m === 1) return `${n}px`
-    if (m === -1) return `${n}py`
-  }
-
-  if (l === 2) {
-    if (m === 0) return `${n}dz²`
-    if (m === 1) return `${n}dxz`
-    if (m === -1) return `${n}dyz`
-    if (m === 2) return `${n}dx²-y²`
-    if (m === -2) return `${n}dxy`
-  }
+  const suffix = ORBITAL_SUFFIX[l]?.[m]
+  if (suffix) return `${n}${suffix}`
 
   return `${n}${letter} (m=${m})`
 }

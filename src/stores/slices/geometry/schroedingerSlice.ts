@@ -32,6 +32,136 @@ import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
+// ============================================================================
+// Helpers for initializeSchroedingerForDimension
+// ============================================================================
+
+interface ModeResizeUpdates {
+  freeScalar?: Partial<FreeScalarConfig>
+  tdse?: Partial<TdseConfig>
+  bec?: Partial<BecConfig>
+  dirac?: Partial<DiracConfig>
+  quantumWalk?: Partial<import('@/lib/geometry/extended/quantumWalk').QuantumWalkConfig>
+}
+
+/** Derive hydrogen-specific adjustments when switching to 2D. */
+function buildHydrogenDimUpdate(
+  dimension: number,
+  current: SchroedingerConfig
+): Record<string, unknown> {
+  if (dimension !== 2) return {}
+  const isHydrogen =
+    current.quantumMode === 'hydrogenND' || current.quantumMode === 'hydrogenNDCoupled'
+  if (!isHydrogen) return {}
+
+  const update: Record<string, unknown> = {}
+  // In 2D hydrogen, l is not independent — it equals |m|.
+  // The shader uses abs(magneticM) as effective l, but keep the store consistent.
+  const absM = Math.abs(current.magneticQuantumNumber)
+  if (current.azimuthalQuantumNumber !== absM) {
+    update.azimuthalQuantumNumber = absM
+  }
+  // Force position representation (momentum/Wigner not implemented for 2D hydrogen)
+  if (current.representation !== 'position') {
+    update.representation = 'position'
+  }
+  return update
+}
+
+function resizeFreeScalarForDim(
+  prev: SchroedingerConfig['freeScalar'],
+  dimension: number
+): Partial<FreeScalarConfig> | undefined {
+  if (prev.latticeDim === dimension) return undefined
+  const resized = resizeFreeScalarArrays(prev, dimension)
+  const newSpacing = resized.spacing ?? prev.spacing
+  const newDt = clampDtWithCfl(prev.dt, newSpacing, dimension, prev.mass)
+  return { ...resized, dt: newDt, needsReset: true }
+}
+
+function resizeTdseForDim(
+  prev: SchroedingerConfig['tdse'],
+  dimension: number
+): Partial<TdseConfig> | undefined {
+  if (prev.latticeDim === dimension) return undefined
+  const potentialType = dimension < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : undefined
+  return {
+    ...resizeTdseArrays(prev, dimension),
+    ...(potentialType ? { potentialType } : {}),
+    needsReset: true,
+  }
+}
+
+function resizeSimpleModeForDim<T extends { latticeDim: number }>(
+  prev: T,
+  dimension: number,
+  resizeFn: (p: T, d: number) => Partial<T>,
+  needsReset = true
+): Partial<T> | undefined {
+  if (prev.latticeDim === dimension) return undefined
+  return { ...resizeFn(prev, dimension), ...(needsReset ? { needsReset: true } : {}) } as Partial<T>
+}
+
+/** Mode-to-resize-key dispatcher — avoids a long if/else chain. */
+const MODE_RESIZE_MAP: Record<
+  string,
+  ((state: SchroedingerConfig, dim: number) => ModeResizeUpdates) | undefined
+> = {
+  freeScalarField: (state, dim) => {
+    const update = resizeFreeScalarForDim(state.freeScalar, dim)
+    return update ? { freeScalar: update } : {}
+  },
+  tdseDynamics: (state, dim) => {
+    const update = resizeTdseForDim(state.tdse, dim)
+    return update ? { tdse: update } : {}
+  },
+  becDynamics: (state, dim) => {
+    const update = resizeSimpleModeForDim(state.bec, dim, resizeBecArrays)
+    return update ? { bec: update } : {}
+  },
+  diracEquation: (state, dim) => {
+    const update = resizeSimpleModeForDim(state.dirac, dim, resizeDiracArrays)
+    return update ? { dirac: update } : {}
+  },
+  quantumWalk: (state, dim) => {
+    const update = resizeSimpleModeForDim(state.quantumWalk, dim, resizeQuantumWalkArrays, false)
+    return update ? { quantumWalk: update } : {}
+  },
+}
+
+/** Compute resize updates for the active compute mode (only when latticeDim changed). */
+function buildModeResizeUpdates(
+  currentState: SchroedingerConfig,
+  dimension: number
+): ModeResizeUpdates {
+  const handler = MODE_RESIZE_MAP[currentState.quantumMode]
+  return handler ? handler(currentState, dimension) : {}
+}
+
+/** Spread mode resize updates onto the schroedinger state, merging nested configs. */
+function applyModeResizeUpdates(
+  schroedinger: SchroedingerConfig,
+  updates: ModeResizeUpdates
+): Partial<SchroedingerConfig> {
+  const result: Partial<SchroedingerConfig> = {}
+  if (updates.freeScalar) {
+    result.freeScalar = { ...schroedinger.freeScalar, ...updates.freeScalar }
+  }
+  if (updates.tdse) {
+    result.tdse = { ...schroedinger.tdse, ...updates.tdse }
+  }
+  if (updates.bec) {
+    result.bec = { ...schroedinger.bec, ...updates.bec }
+  }
+  if (updates.dirac) {
+    result.dirac = { ...schroedinger.dirac, ...updates.dirac }
+  }
+  if (updates.quantumWalk) {
+    result.quantumWalk = { ...schroedinger.quantumWalk, ...updates.quantumWalk }
+  }
+  return result
+}
+
 export const createSchroedingerSlice: StateCreator<
   ExtendedObjectSlice,
   [],
@@ -451,74 +581,9 @@ export const createSchroedingerSlice: StateCreator<
       const dimensionBoost = dimension > 4 ? 1.0 + (dimension - 4) * 0.4 : 1.0
       const densityGain = Math.min(baseDensityGain * dimensionBoost, 5.0)
 
-      const hydrogenUpdate: Record<string, unknown> = {}
-      if (dimension === 2) {
-        const current = get().schroedinger
-        if (current.quantumMode === 'hydrogenND' || current.quantumMode === 'hydrogenNDCoupled') {
-          // In 2D hydrogen, l is not independent — it equals |m|.
-          // The shader uses abs(magneticM) as effective l, but keep the store consistent.
-          const absM = Math.abs(current.magneticQuantumNumber)
-          if (current.azimuthalQuantumNumber !== absM) {
-            hydrogenUpdate.azimuthalQuantumNumber = absM
-          }
-          // Force position representation (momentum/Wigner not implemented for 2D hydrogen)
-          if (current.representation !== 'position') {
-            hydrogenUpdate.representation = 'position'
-          }
-        }
-      }
-
       const currentState = get().schroedinger
-      let freeScalarUpdate: Partial<FreeScalarConfig> | undefined
-      if (currentState.quantumMode === 'freeScalarField') {
-        const prev = currentState.freeScalar
-        if (prev.latticeDim !== dimension) {
-          const resized = resizeFreeScalarArrays(prev, dimension)
-          const newSpacing = resized.spacing ?? prev.spacing
-          const newDt = clampDtWithCfl(prev.dt, newSpacing, dimension, prev.mass)
-          freeScalarUpdate = { ...resized, dt: newDt, needsReset: true }
-        }
-      }
-
-      let tdseUpdate: Partial<TdseConfig> | undefined
-      if (currentState.quantumMode === 'tdseDynamics') {
-        const prev = currentState.tdse
-        if (prev.latticeDim !== dimension) {
-          const potentialType =
-            dimension < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : undefined
-          tdseUpdate = {
-            ...resizeTdseArrays(prev, dimension),
-            ...(potentialType ? { potentialType } : {}),
-            needsReset: true,
-          }
-        }
-      }
-
-      let becUpdate: Partial<BecConfig> | undefined
-      if (currentState.quantumMode === 'becDynamics') {
-        const prev = currentState.bec
-        if (prev.latticeDim !== dimension) {
-          becUpdate = { ...resizeBecArrays(prev, dimension), needsReset: true }
-        }
-      }
-
-      let diracUpdate: Partial<DiracConfig> | undefined
-      if (currentState.quantumMode === 'diracEquation') {
-        const prev = currentState.dirac
-        if (prev.latticeDim !== dimension) {
-          diracUpdate = { ...resizeDiracArrays(prev, dimension), needsReset: true }
-        }
-      }
-
-      let quantumWalkUpdate:
-        | Partial<import('@/lib/geometry/extended/quantumWalk').QuantumWalkConfig>
-        | undefined
-      if (currentState.quantumMode === 'quantumWalk') {
-        const prev = currentState.quantumWalk
-        if (prev.latticeDim !== dimension) {
-          quantumWalkUpdate = resizeQuantumWalkArrays(prev, dimension)
-        }
-      }
+      const hydrogenUpdate = buildHydrogenDimUpdate(dimension, currentState)
+      const modeResizeUpdates = buildModeResizeUpdates(currentState, dimension)
 
       setWithVersion((state) => ({
         schroedinger: {
@@ -534,15 +599,7 @@ export const createSchroedingerSlice: StateCreator<
             Math.max(0, dimension - 1)
           ),
           ...hydrogenUpdate,
-          ...(freeScalarUpdate
-            ? { freeScalar: { ...state.schroedinger.freeScalar, ...freeScalarUpdate } }
-            : {}),
-          ...(tdseUpdate ? { tdse: { ...state.schroedinger.tdse, ...tdseUpdate } } : {}),
-          ...(becUpdate ? { bec: { ...state.schroedinger.bec, ...becUpdate } } : {}),
-          ...(diracUpdate ? { dirac: { ...state.schroedinger.dirac, ...diracUpdate } } : {}),
-          ...(quantumWalkUpdate
-            ? { quantumWalk: { ...state.schroedinger.quantumWalk, ...quantumWalkUpdate } }
-            : {}),
+          ...applyModeResizeUpdates(state.schroedinger, modeResizeUpdates),
         },
       }))
     },

@@ -167,39 +167,45 @@ function warnDroppedNonFinitePresetValue(path: string, value: number): void {
   logger.warn(`[presetSerialization] Dropping non-finite numeric value at "${path}":`, value)
 }
 
+/** Sanitize an array value, returning undefined if any element is non-finite. */
+function sanitizeFiniteArray(value: unknown[], path: string): unknown[] | undefined {
+  const sanitizedArray: unknown[] = []
+  for (let index = 0; index < value.length; index += 1) {
+    const sanitizedItem = sanitizeFiniteLoadedValue(value[index], `${path}[${index}]`)
+    // Preserve array shape invariants by dropping the whole array when any item is invalid.
+    if (sanitizedItem === undefined) return undefined
+    sanitizedArray.push(sanitizedItem)
+  }
+  return sanitizedArray
+}
+
+/** Sanitize a record value, dropping keys whose values are non-finite. */
+function sanitizeFiniteRecord(
+  value: Record<string, unknown>,
+  path: string
+): Record<string, unknown> {
+  const sanitizedRecord: Record<string, unknown> = {}
+  for (const [key, candidateValue] of Object.entries(value)) {
+    const sanitizedChild = sanitizeFiniteLoadedValue(candidateValue, `${path}.${key}`)
+    if (sanitizedChild !== undefined) {
+      sanitizedRecord[key] = sanitizedChild
+    }
+  }
+  return sanitizedRecord
+}
+
 function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | undefined {
   if (typeof value === 'number') {
-    if (Number.isFinite(value)) {
-      return value
+    if (!Number.isFinite(value)) {
+      warnDroppedNonFinitePresetValue(path, value)
+      return undefined
     }
-    warnDroppedNonFinitePresetValue(path, value)
-    return undefined
+    return value
   }
 
-  if (Array.isArray(value)) {
-    const sanitizedArray: unknown[] = []
-    for (let index = 0; index < value.length; index += 1) {
-      const sanitizedItem = sanitizeFiniteLoadedValue(value[index], `${path}[${index}]`)
-      // Preserve array shape invariants by dropping the whole array when any item is invalid.
-      if (sanitizedItem === undefined) {
-        return undefined
-      }
-      sanitizedArray.push(sanitizedItem)
-    }
-    return sanitizedArray
-  }
-
-  if (value && typeof value === 'object') {
-    const sanitizedRecord: Record<string, unknown> = {}
-    for (const [key, candidateValue] of Object.entries(value as Record<string, unknown>)) {
-      const sanitizedChild = sanitizeFiniteLoadedValue(candidateValue, `${path}.${key}`)
-      if (sanitizedChild !== undefined) {
-        sanitizedRecord[key] = sanitizedChild
-      }
-    }
-    return sanitizedRecord
-  }
-
+  if (Array.isArray(value)) return sanitizeFiniteArray(value, path)
+  if (value && typeof value === 'object')
+    return sanitizeFiniteRecord(value as Record<string, unknown>, path)
   return value
 }
 
@@ -259,51 +265,53 @@ export const serializeRotationState = <T extends object>(state: T): Record<strin
  * @param objectType - The current object type being saved
  * @returns A serialized state containing only the relevant config
  */
+/**
+ * Strip functions and transient fields from a flat record (one level deep).
+ * Used to clean nested config objects inside extended state.
+ */
+function stripTransientFields(record: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {}
+  for (const key of Object.keys(record)) {
+    if (typeof record[key] === 'function') continue
+    if (TRANSIENT_FIELDS.has(key)) continue
+    clean[key] = record[key]
+  }
+  return clean
+}
+
+/**
+ * Filter transient fields from a config record, recursing one level into nested objects.
+ */
+function filterConfigFields(configRecord: Record<string, unknown>): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {}
+  for (const key of Object.keys(configRecord)) {
+    if (typeof configRecord[key] === 'function') continue
+    if (TRANSIENT_FIELDS.has(key)) continue
+    const val = configRecord[key]
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      filtered[key] = stripTransientFields(val as Record<string, unknown>)
+    } else {
+      filtered[key] = val
+    }
+  }
+  return filtered
+}
+
 export const serializeExtendedState = <T extends object>(
   state: T,
   objectType: ObjectType
 ): Record<string, unknown> => {
   const configKey = OBJECT_TYPE_TO_CONFIG_KEY[objectType]
   if (!configKey) {
-    // Unknown object type - return empty (shouldn't happen)
     logger.warn(`Unknown object type for extended config: ${objectType}`)
     return {}
   }
 
-  const stateRecord = state as Record<string, unknown>
-  const config = stateRecord[configKey]
+  const config = (state as Record<string, unknown>)[configKey]
+  if (!config || typeof config !== 'object') return {}
 
-  if (!config || typeof config !== 'object') {
-    return {}
-  }
-
-  // Filter transient fields from the nested config before cloning
-  const configRecord = config as Record<string, unknown>
-  const filtered: Record<string, unknown> = {}
-  for (const key of Object.keys(configRecord)) {
-    if (typeof configRecord[key] === 'function') continue
-    if (TRANSIENT_FIELDS.has(key)) continue
-    const val = configRecord[key]
-    // Recursively strip transient fields from nested objects (e.g., freeScalar.needsReset)
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      const nested = val as Record<string, unknown>
-      const cleanNested: Record<string, unknown> = {}
-      for (const nk of Object.keys(nested)) {
-        if (typeof nested[nk] === 'function') continue
-        if (TRANSIENT_FIELDS.has(nk)) continue
-        cleanNested[nk] = nested[nk]
-      }
-      filtered[key] = cleanNested
-    } else {
-      filtered[key] = val
-    }
-  }
-
-  // Return only the relevant config, keyed by its config key
-  // This allows mergeExtendedObjectState to properly merge on load
-  return {
-    [configKey]: JSON.parse(JSON.stringify(filtered)),
-  }
+  const filtered = filterConfigFields(config as Record<string, unknown>)
+  return { [configKey]: JSON.parse(JSON.stringify(filtered)) }
 }
 
 /**

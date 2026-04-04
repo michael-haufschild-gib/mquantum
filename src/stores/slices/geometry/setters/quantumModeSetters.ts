@@ -18,6 +18,147 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
 
+/** Resizer function signatures indexed by mode. */
+interface ModeResizers {
+  resizeFreeScalarArrays: (
+    prev: SchroedingerConfig['freeScalar'],
+    dim: number
+  ) => Partial<SchroedingerConfig['freeScalar']>
+  resizeTdseArrays: (
+    prev: SchroedingerConfig['tdse'],
+    dim: number
+  ) => Partial<SchroedingerConfig['tdse']>
+  resizeBecArrays: (
+    prev: SchroedingerConfig['bec'],
+    dim: number
+  ) => Partial<SchroedingerConfig['bec']>
+  resizeDiracArrays: (
+    prev: SchroedingerConfig['dirac'],
+    dim: number
+  ) => Partial<SchroedingerConfig['dirac']>
+}
+
+/** Enforce dimension constraints when switching quantum mode. */
+function enforceDimensionConstraints(mode: SchroedingerConfig['quantumMode']): void {
+  const geo = useGeometryStore.getState()
+  const currentDim = geo.dimension
+
+  if (QUANTUM_MODES_3D_ONLY.has(mode) && currentDim < 3) {
+    geo.setDimension(3)
+  }
+  const entry = getQuantumTypeEntry(mode as QuantumTypeKey)
+  if (entry && currentDim > entry.dimensions.max) {
+    geo.setDimension(entry.dimensions.recommended ?? entry.dimensions.max)
+  }
+}
+
+/** Force position representation when the mode/dimension combo requires it. */
+function buildRepresentationOverrides(
+  mode: SchroedingerConfig['quantumMode'],
+  dim: number,
+  currentRepr: string,
+  crossSectionEnabled: boolean
+): Partial<SchroedingerConfig> {
+  const overrides: Partial<SchroedingerConfig> = {}
+
+  if (isComputeQuantumType(mode)) {
+    if (currentRepr !== 'position') overrides.representation = 'position'
+    if (crossSectionEnabled) overrides.crossSectionEnabled = false
+    return overrides
+  }
+
+  const isHydrogen2D = dim === 2 && (mode === 'hydrogenND' || mode === 'hydrogenNDCoupled')
+  if (isHydrogen2D && currentRepr !== 'position') {
+    overrides.representation = 'position'
+  }
+
+  if (mode === 'hydrogenNDCoupled' && currentRepr === 'momentum') {
+    overrides.representation = 'position'
+  }
+
+  return overrides
+}
+
+function resizeFreeScalar(
+  state: SchroedingerConfig,
+  dim: number,
+  resizers: ModeResizers
+): Partial<SchroedingerConfig> {
+  const prev = state.freeScalar
+  if (prev.latticeDim === dim) return {}
+  const resized = resizers.resizeFreeScalarArrays(prev, dim)
+  const newSpacing = resized.spacing ?? prev.spacing
+  const newDt = clampDtWithCfl(prev.dt, newSpacing, dim, prev.mass)
+  return { freeScalar: { ...prev, ...resized, dt: newDt, needsReset: true } }
+}
+
+function resizeTdse(
+  state: SchroedingerConfig,
+  dim: number,
+  resizers: ModeResizers
+): Partial<SchroedingerConfig> {
+  const prev = state.tdse
+  if (prev.latticeDim === dim) return {}
+  const resized = resizers.resizeTdseArrays(prev, dim)
+  const potentialType =
+    dim < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
+  return { tdse: { ...prev, ...resized, potentialType, needsReset: true } }
+}
+
+function resizeBec(
+  state: SchroedingerConfig,
+  dim: number,
+  resizers: ModeResizers
+): Partial<SchroedingerConfig> {
+  let becDim = dim
+  if (becDim < 3) {
+    useGeometryStore.getState().setDimension(3)
+    becDim = 3
+  }
+  const prev = state.bec
+  if (prev.latticeDim === becDim) return {}
+  const resized = resizers.resizeBecArrays(prev, becDim)
+  return { bec: { ...prev, ...resized, needsReset: true } }
+}
+
+function resizeDirac(
+  state: SchroedingerConfig,
+  dim: number,
+  resizers: ModeResizers
+): Partial<SchroedingerConfig> {
+  const prev = state.dirac
+  if (prev.latticeDim === dim) return {}
+  const resized = resizers.resizeDiracArrays(prev, dim)
+  return { dirac: { ...prev, ...resized, needsReset: true } }
+}
+
+function resizeQWalk(state: SchroedingerConfig, dim: number): Partial<SchroedingerConfig> {
+  const prev = state.quantumWalk
+  if (prev.latticeDim === dim) return {}
+  return { quantumWalk: { ...prev, ...resizeQuantumWalkArrays(prev, dim) } }
+}
+
+/** Resize compute-mode arrays when dimension changed during mode switch. */
+function buildModeResizeUpdate(
+  mode: SchroedingerConfig['quantumMode'],
+  state: SchroedingerConfig,
+  dim: number,
+  resizers: ModeResizers
+): Partial<SchroedingerConfig> {
+  const handlers: Record<
+    string,
+    ((s: SchroedingerConfig, d: number, r: ModeResizers) => Partial<SchroedingerConfig>) | undefined
+  > = {
+    freeScalarField: resizeFreeScalar,
+    tdseDynamics: resizeTdse,
+    becDynamics: resizeBec,
+    diracEquation: resizeDirac,
+    quantumWalk: (s, d) => resizeQWalk(s, d),
+  }
+  const handler = handlers[mode]
+  return handler ? handler(state, dim, resizers) : {}
+}
+
 /**
  * Create quantum mode, representation, and quantum number setters.
  *
@@ -25,109 +166,33 @@ import { clampDtWithCfl } from './sliceSetterUtils'
  * @param resizers - Array resize functions from domain setters
  * @returns Object with all quantum mode and quantum number setters
  */
-export function createQuantumModeSetters(
-  ctx: SetterContext,
-  resizers: {
-    resizeFreeScalarArrays: (
-      prev: SchroedingerConfig['freeScalar'],
-      dim: number
-    ) => Partial<SchroedingerConfig['freeScalar']>
-    resizeTdseArrays: (
-      prev: SchroedingerConfig['tdse'],
-      dim: number
-    ) => Partial<SchroedingerConfig['tdse']>
-    resizeBecArrays: (
-      prev: SchroedingerConfig['bec'],
-      dim: number
-    ) => Partial<SchroedingerConfig['bec']>
-    resizeDiracArrays: (
-      prev: SchroedingerConfig['dirac'],
-      dim: number
-    ) => Partial<SchroedingerConfig['dirac']>
-  }
-) {
+export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResizers) {
   const { setWithVersion, get } = ctx
   const isFinite = ctx.isFinite
   const warn = ctx.warnNonFinite
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
-      const geo = useGeometryStore.getState()
-      const currentDim = geo.dimension
+      enforceDimensionConstraints(mode)
 
-      // Enforce dimension constraints from the quantum type registry
-      const needsDim3 = QUANTUM_MODES_3D_ONLY.has(mode)
-      if (needsDim3 && currentDim < 3) {
-        geo.setDimension(3)
-      }
-      const entry = getQuantumTypeEntry(mode as QuantumTypeKey)
-      if (entry && currentDim > entry.dimensions.max) {
-        geo.setDimension(entry.dimensions.recommended ?? entry.dimensions.max)
-      }
       setWithVersion((state) => {
-        const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
         const dim = useGeometryStore.getState().dimension
+        const reprOverrides = buildRepresentationOverrides(
+          mode,
+          dim,
+          state.schroedinger.representation,
+          state.schroedinger.crossSectionEnabled
+        )
+        const resizeUpdates = buildModeResizeUpdate(mode, state.schroedinger, dim, resizers)
 
-        // Force position representation and disable cross-section for compute modes
-        if (isComputeQuantumType(mode)) {
-          if (state.schroedinger.representation !== 'position') updates.representation = 'position'
-          if (state.schroedinger.crossSectionEnabled) updates.crossSectionEnabled = false
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            quantumMode: mode,
+            ...reprOverrides,
+            ...resizeUpdates,
+          },
         }
-
-        // Force position representation for hydrogen at dim=2
-        // (momentum/Wigner not yet implemented for 2D hydrogen)
-        const isHydrogen2D = dim === 2 && (mode === 'hydrogenND' || mode === 'hydrogenNDCoupled')
-        if (isHydrogen2D && state.schroedinger.representation !== 'position') {
-          updates.representation = 'position'
-        }
-
-        // Force position if switching to coupled hydrogen with momentum active
-        // (coupled shader is position-only for momentum representation)
-        if (mode === 'hydrogenNDCoupled' && state.schroedinger.representation === 'momentum') {
-          updates.representation = 'position'
-        }
-
-        if (mode === 'freeScalarField') {
-          const prev = state.schroedinger.freeScalar
-          if (prev.latticeDim !== dim) {
-            const resized = resizers.resizeFreeScalarArrays(prev, dim)
-            const newSpacing = resized.spacing ?? prev.spacing
-            const newDt = clampDtWithCfl(prev.dt, newSpacing, dim, prev.mass)
-            updates.freeScalar = { ...prev, ...resized, dt: newDt, needsReset: true }
-          }
-        } else if (mode === 'tdseDynamics') {
-          const prev = state.schroedinger.tdse
-          if (prev.latticeDim !== dim) {
-            const resized = resizers.resizeTdseArrays(prev, dim)
-            const potentialType =
-              dim < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
-            updates.tdse = { ...prev, ...resized, potentialType, needsReset: true }
-          }
-        } else if (mode === 'becDynamics') {
-          let becDim = dim
-          if (becDim < 3) {
-            useGeometryStore.getState().setDimension(3)
-            becDim = 3
-          }
-          const prev = state.schroedinger.bec
-          if (prev.latticeDim !== becDim) {
-            const resized = resizers.resizeBecArrays(prev, becDim)
-            updates.bec = { ...prev, ...resized, needsReset: true }
-          }
-        } else if (mode === 'diracEquation') {
-          const prev = state.schroedinger.dirac
-          if (prev.latticeDim !== dim) {
-            const resized = resizers.resizeDiracArrays(prev, dim)
-            updates.dirac = { ...prev, ...resized, needsReset: true }
-          }
-        } else if (mode === 'quantumWalk') {
-          const prev = state.schroedinger.quantumWalk
-          if (prev.latticeDim !== dim) {
-            const resized = resizeQuantumWalkArrays(prev, dim)
-            updates.quantumWalk = { ...prev, ...resized }
-          }
-        }
-        return { schroedinger: { ...state.schroedinger, ...updates } }
       })
     },
 

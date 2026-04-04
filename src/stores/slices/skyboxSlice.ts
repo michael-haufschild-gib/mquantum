@@ -118,69 +118,72 @@ function warnInvalidProceduralSetting(path: string, value: unknown): void {
   logger.warn(`[skyboxSlice] Ignoring invalid procedural setting "${path}":`, value)
 }
 
-function sanitizeProceduralValue(
+/** Validate a numeric value against a numeric schema entry. */
+function sanitizeNumericValue(value: unknown, path: string): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  warnInvalidProceduralSetting(path, value)
+  return undefined
+}
+
+/** Validate an array value against an array schema entry. */
+function sanitizeArrayValue(
   value: unknown,
-  schema: unknown,
+  schema: unknown[],
   path: string
-): unknown | undefined {
-  if (typeof schema === 'number') {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value
-    }
+): unknown[] | undefined {
+  if (!Array.isArray(value) || value.length !== schema.length) {
     warnInvalidProceduralSetting(path, value)
     return undefined
   }
 
-  if (Array.isArray(schema)) {
-    if (!Array.isArray(value) || value.length !== schema.length) {
-      warnInvalidProceduralSetting(path, value)
+  if (!schema.every((item) => typeof item === 'number')) return value
+
+  const finiteNumberTuple: number[] = []
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index]
+    if (typeof item !== 'number' || !Number.isFinite(item)) {
+      warnInvalidProceduralSetting(`${path}[${index}]`, item)
       return undefined
     }
-
-    if (schema.every((item) => typeof item === 'number')) {
-      const finiteNumberTuple: number[] = []
-      for (let index = 0; index < value.length; index += 1) {
-        const item = value[index]
-        if (typeof item !== 'number' || !Number.isFinite(item)) {
-          warnInvalidProceduralSetting(`${path}[${index}]`, item)
-          return undefined
-        }
-        finiteNumberTuple.push(item)
-      }
-      return finiteNumberTuple
-    }
-
-    return value
+    finiteNumberTuple.push(item)
   }
+  return finiteNumberTuple
+}
 
-  if (!isObjectRecord(schema)) {
-    return undefined
-  }
-
+/** Validate an object value against an object schema entry. */
+function sanitizeObjectValue(
+  value: unknown,
+  schema: Record<string, unknown>,
+  path: string
+): Record<string, unknown> | undefined {
   if (!isObjectRecord(value)) {
     warnInvalidProceduralSetting(path, value)
     return undefined
   }
 
-  const schemaRecord = schema as Record<string, unknown>
   const sanitized: Record<string, unknown> = {}
   for (const [key, candidateValue] of Object.entries(value)) {
-    if (!(key in schemaRecord)) {
+    if (!(key in schema)) {
       warnInvalidProceduralSetting(`${path}.${key}`, candidateValue)
       continue
     }
-
-    const sanitizedChild = sanitizeProceduralValue(
-      candidateValue,
-      schemaRecord[key],
-      `${path}.${key}`
-    )
+    const sanitizedChild = sanitizeProceduralValue(candidateValue, schema[key], `${path}.${key}`)
     if (sanitizedChild !== undefined) {
       sanitized[key] = sanitizedChild
     }
   }
-
   return Object.keys(sanitized).length > 0 ? sanitized : undefined
+}
+
+function sanitizeProceduralValue(
+  value: unknown,
+  schema: unknown,
+  path: string
+): unknown | undefined {
+  if (typeof schema === 'number') return sanitizeNumericValue(value, path)
+  if (Array.isArray(schema)) return sanitizeArrayValue(value, schema, path)
+  if (isObjectRecord(schema)) return sanitizeObjectValue(value, schema, path)
+  return undefined
 }
 
 function sanitizeProceduralSettingsPatch(

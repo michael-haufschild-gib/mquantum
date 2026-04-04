@@ -47,6 +47,73 @@ export interface NamedPresetConfig {
 const TERM_RNG_PRIME = 0x9e3779b9 // ≈ 2^32 × golden ratio, Knuth multiplicative hash
 
 /**
+ * Sample a biased quantum number for one dimension.
+ *
+ * For extra dimensions (j >= 3), only even quantum numbers are allowed
+ * because Hermite polynomials H_n(0) = 0 for odd n at the slice coordinate 0.
+ *
+ * @param r - Uniform random sample in [0,1)
+ * @param nMax - Maximum quantum number
+ * @param mustBeEven - Whether only even values are allowed
+ * @param evenMax - Largest even number <= nMax
+ * @param rng - PRNG for the tail of the distribution
+ * @returns Biased quantum number
+ */
+function sampleQuantumNumber(
+  r: number,
+  nMax: number,
+  mustBeEven: boolean,
+  evenMax: number,
+  rng: () => number
+): number {
+  if (r < 0.4) return 0
+  if (r < 0.65) return mustBeEven ? Math.min(2, evenMax) : Math.min(1, nMax)
+  if (r < 0.82) return Math.min(2, mustBeEven ? evenMax : nMax)
+  if (r < 0.92) return mustBeEven ? Math.min(4, evenMax) : Math.min(3, nMax)
+  const raw = Math.floor(rng() * (nMax + 1))
+  return mustBeEven ? Math.min(raw & ~1, evenMax) : Math.min(raw, nMax)
+}
+
+/**
+ * Generate quantum numbers for a single superposition term.
+ *
+ * @param termRng - Per-term PRNG
+ * @param dim - Number of dimensions
+ * @param nMax - Maximum quantum number per dimension
+ * @returns Array of quantum numbers for each dimension
+ */
+function generateTermQuantumNumbers(termRng: () => number, dim: number, nMax: number): number[] {
+  const evenMax = nMax & ~1
+  const n: number[] = []
+  for (let j = 0; j < dim; j++) {
+    n.push(sampleQuantumNumber(termRng(), nMax, j >= 3, evenMax, termRng))
+  }
+  return n
+}
+
+/**
+ * Compute energy and coefficient for a superposition term.
+ *
+ * @param n - Quantum numbers for this term
+ * @param omega - Per-dimension angular frequencies
+ * @param termRng - Per-term PRNG (used for phase)
+ * @returns Tuple of [energy, [re, im] coefficient]
+ */
+function computeTermEnergyAndCoeff(
+  n: number[],
+  omega: number[],
+  termRng: () => number
+): { energy: number; coeff: [number, number] } {
+  let E = 0
+  for (let j = 0; j < n.length; j++) {
+    E += (omega[j] ?? 1.0) * ((n[j] ?? 0) + 0.5)
+  }
+  const amplitude = 1.0 / (1.0 + 0.15 * E)
+  const phase = termRng() * 2 * Math.PI
+  return { energy: E, coeff: [amplitude * Math.cos(phase), amplitude * Math.sin(phase)] }
+}
+
+/**
  * Generate a quantum preset with the given parameters.
  *
  * Uses per-term independent PRNG sequences so that each term's quantum
@@ -79,71 +146,22 @@ export function generateQuantumPreset(
   const omega: number[] = []
   for (let j = 0; j < dim; j++) {
     const baseFreq = 0.8 + omegaRng() * spread * 2
-    // Add slight golden-ratio-based offset for each dimension
-    // This creates non-repeating patterns
     const offset = (j * 0.618033988749895) % 1.0
     omega.push(baseFreq + offset * spread * 0.5)
   }
 
-  // Generate quantum numbers and coefficients for each term
-  // Each term uses its own PRNG so terms are fully independent.
   const quantumNumbers: number[][] = []
   const coefficients: [number, number][] = []
   const energies: number[] = []
 
   for (let k = 0; k < terms; k++) {
-    // Per-term RNG: hash(seed, k) gives each term a unique sequence
     const termRng = mulberry32((seed + (k + 1) * TERM_RNG_PRIME) | 0)
-
-    // Quantum numbers: distribution biased toward low values
-    // This creates smoother, more organic shapes
-    const n: number[] = []
-
-    for (let j = 0; j < dim; j++) {
-      const r = termRng()
-      let quantumN: number
-
-      // For dimensions beyond the 3D visualization slice (j >= 3),
-      // we MUST use even quantum numbers. This is because when the
-      // slice coordinate is 0, Hermite polynomials H_n(0) = 0 for odd n,
-      // which would zero out the entire wavefunction term.
-      const mustBeEven = j >= 3
-      // Maximum even quantum number that fits within nMax
-      const evenMax = nMax & ~1 // e.g. nMax=3 → 2, nMax=4 → 4, nMax=1 → 0
-
-      // Biased distribution: lower numbers more likely
-      if (r < 0.4) {
-        quantumN = 0
-      } else if (r < 0.65) {
-        quantumN = mustBeEven ? Math.min(2, evenMax) : Math.min(1, nMax)
-      } else if (r < 0.82) {
-        quantumN = Math.min(2, mustBeEven ? evenMax : nMax)
-      } else if (r < 0.92) {
-        quantumN = mustBeEven ? Math.min(4, evenMax) : Math.min(3, nMax)
-      } else {
-        const raw = Math.floor(termRng() * (nMax + 1))
-        quantumN = mustBeEven ? Math.min(raw & ~1, evenMax) : Math.min(raw, nMax)
-      }
-
-      n.push(quantumN)
-    }
-
+    const n = generateTermQuantumNumbers(termRng, dim, nMax)
     quantumNumbers.push(n)
 
-    // Compute energy: E_k = Σ ω_j(n_{kj} + 0.5)
-    let E = 0
-    for (let j = 0; j < dim; j++) {
-      const omegaJ = omega[j] ?? 1.0
-      const nJ = n[j] ?? 0
-      E += omegaJ * (nJ + 0.5)
-    }
-    energies.push(E)
-
-    // Coefficient: amplitude decreases with energy, random phase
-    // This keeps low-energy (smooth) terms dominant
-    const amplitude = 1.0 / (1.0 + 0.15 * E)
-    const phase = termRng() * 2 * Math.PI
-    coefficients.push([amplitude * Math.cos(phase), amplitude * Math.sin(phase)])
+    const { energy, coeff } = computeTermEnergyAndCoeff(n, omega, termRng)
+    energies.push(energy)
+    coefficients.push(coeff)
   }
 
   // Normalize coefficients so Σ|c_k|² = 1 (valid quantum state)

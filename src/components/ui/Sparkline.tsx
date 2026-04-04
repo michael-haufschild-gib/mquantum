@@ -33,6 +33,131 @@ export interface SparklineProps {
   referenceLabel?: string
 }
 
+interface SparklineBounds {
+  lo: number
+  hi: number
+}
+
+interface SparklineGeometry {
+  polyline: string
+  fillPath: string
+  refLineY: number | null
+  lo: number
+  hi: number
+}
+
+const VIEW_WIDTH = 200
+const VIEW_HEIGHT = 50
+const PADDING = 2
+
+/** Ensures bounds span a non-zero range and include the reference line. */
+function normalizeBounds(lo: number, hi: number, referenceLine?: number): SparklineBounds {
+  if (referenceLine != null) {
+    if (referenceLine < lo) lo = referenceLine
+    if (referenceLine > hi) hi = referenceLine
+  }
+  if (hi - lo < 1e-10) {
+    lo -= 0.5
+    hi += 0.5
+  }
+  return { lo, hi }
+}
+
+/** Computes the Y-axis SVG coordinate for a value within the given bounds. */
+function valueToY(value: number, lo: number, hi: number, usableHeight: number): number {
+  return PADDING + usableHeight - ((value - lo) / (hi - lo)) * usableHeight
+}
+
+/** Reads the ring buffer in chronological order (oldest first). */
+function readRingBuffer(data: Float32Array, head: number, count: number): Float32Array {
+  const len = data.length
+  const n = Math.min(count, len)
+  const values = new Float32Array(n)
+  const startIdx = count >= len ? head : 0
+  for (let i = 0; i < n; i++) {
+    values[i] = data[(startIdx + i) % len]!
+  }
+  return values
+}
+
+/** Computes auto-scaled Y-axis bounds from the data, merging with explicit min/max props. */
+function computeBoundsFromData(
+  values: Float32Array,
+  minProp: number | undefined,
+  maxProp: number | undefined
+): SparklineBounds {
+  let lo = minProp ?? Infinity
+  let hi = maxProp ?? -Infinity
+  if (lo === Infinity || hi === -Infinity) {
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i]!
+      if (v < lo) lo = v
+      if (v > hi) hi = v
+    }
+  }
+  return { lo, hi }
+}
+
+/** Builds SVG polyline points and a closed fill path from the ordered values. */
+function buildPaths(
+  values: Float32Array,
+  lo: number,
+  hi: number
+): { polyline: string; fillPath: string } {
+  const n = values.length
+  const usableWidth = VIEW_WIDTH - PADDING * 2
+  const usableHeight = VIEW_HEIGHT - PADDING * 2
+
+  const pts: string[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    const x = PADDING + (i / (n - 1)) * usableWidth
+    const y = valueToY(values[i]!, lo, hi, usableHeight)
+    pts[i] = `${x.toFixed(1)},${y.toFixed(1)}`
+  }
+
+  const polyline = pts.join(' ')
+  const fillPath =
+    `M ${pts[0]} ` +
+    pts
+      .slice(1)
+      .map((p) => `L ${p}`)
+      .join(' ') +
+    ` L ${(PADDING + usableWidth).toFixed(1)},${(PADDING + usableHeight).toFixed(1)}` +
+    ` L ${PADDING.toFixed(1)},${(PADDING + usableHeight).toFixed(1)} Z`
+
+  return { polyline, fillPath }
+}
+
+/** Computes all sparkline geometry from ring-buffer data. */
+function computeSparklineGeometry(
+  data: Float32Array,
+  head: number,
+  count: number,
+  minProp: number | undefined,
+  maxProp: number | undefined,
+  referenceLine: number | undefined
+): SparklineGeometry {
+  const usableHeight = VIEW_HEIGHT - PADDING * 2
+
+  if (count < 2) {
+    if (referenceLine == null) {
+      return { polyline: '', fillPath: '', refLineY: null, lo: 0, hi: 1 }
+    }
+    const { lo, hi } = normalizeBounds(minProp ?? 0, maxProp ?? 1, referenceLine)
+    const refY = valueToY(referenceLine, lo, hi, usableHeight)
+    return { polyline: '', fillPath: '', refLineY: refY, lo, hi }
+  }
+
+  const values = readRingBuffer(data, head, count)
+  const rawBounds = computeBoundsFromData(values, minProp, maxProp)
+  const { lo, hi } = normalizeBounds(rawBounds.lo, rawBounds.hi, referenceLine)
+  const { polyline, fillPath } = buildPaths(values, lo, hi)
+
+  const refLineY = referenceLine != null ? valueToY(referenceLine, lo, hi, usableHeight) : null
+
+  return { polyline, fillPath, refLineY, lo, hi }
+}
+
 /**
  * Renders a Float32Array ring buffer as a smooth SVG polyline sparkline.
  *
@@ -72,95 +197,15 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
     const id = useId()
     const gradientId = `sparkline-fill-${id}`
 
-    const viewWidth = 200
-    const viewHeight = 50
-    const padding = 2
-
-    const { polyline, fillPath, refLineY, lo, hi } = useMemo(() => {
-      if (count < 2) {
-        // No data for polyline/fill, but still render reference line if provided
-        if (referenceLine != null) {
-          let lo = minProp ?? 0
-          let hi = maxProp ?? 1
-          if (referenceLine < lo) lo = referenceLine
-          if (referenceLine > hi) hi = referenceLine
-          if (hi - lo < 1e-10) {
-            lo -= 0.5
-            hi += 0.5
-          }
-          const usableHeight = viewHeight - padding * 2
-          const refY = padding + usableHeight - ((referenceLine - lo) / (hi - lo)) * usableHeight
-          return { polyline: '', fillPath: '', refLineY: refY, lo, hi }
-        }
-        return { polyline: '', fillPath: '', refLineY: null, lo: 0, hi: 1 }
-      }
-
-      const len = data.length
-      const n = Math.min(count, len)
-
-      // Read ring buffer in chronological order (oldest first)
-      const values = new Float32Array(n)
-      const startIdx = count >= len ? head : 0
-      for (let i = 0; i < n; i++) {
-        values[i] = data[(startIdx + i) % len]!
-      }
-
-      // Compute Y-axis bounds
-      let lo = minProp ?? Infinity
-      let hi = maxProp ?? -Infinity
-      if (lo === Infinity || hi === -Infinity) {
-        for (let i = 0; i < n; i++) {
-          const v = values[i]!
-          if (lo === Infinity || v < lo) lo = v
-          if (hi === -Infinity || v > hi) hi = v
-        }
-      }
-      // Ensure reference line is within visible range
-      if (referenceLine != null) {
-        if (lo !== -Infinity && referenceLine < lo) lo = referenceLine
-        if (hi !== Infinity && referenceLine > hi) hi = referenceLine
-      }
-      // Avoid division by zero when all values are equal
-      if (hi - lo < 1e-10) {
-        lo -= 0.5
-        hi += 0.5
-      }
-
-      const usableWidth = viewWidth - padding * 2
-      const usableHeight = viewHeight - padding * 2
-
-      const pts: string[] = new Array(n)
-      for (let i = 0; i < n; i++) {
-        const x = padding + (i / (n - 1)) * usableWidth
-        const val = values[i]!
-        const y = padding + usableHeight - ((val - lo) / (hi - lo)) * usableHeight
-        pts[i] = `${x.toFixed(1)},${y.toFixed(1)}`
-      }
-
-      const line = pts.join(' ')
-      // Closed fill path: line points -> bottom-right -> bottom-left
-      const fill =
-        `M ${pts[0]} ` +
-        pts
-          .slice(1)
-          .map((p) => `L ${p}`)
-          .join(' ') +
-        ` L ${(padding + usableWidth).toFixed(1)},${(padding + usableHeight).toFixed(1)}` +
-        ` L ${padding.toFixed(1)},${(padding + usableHeight).toFixed(1)} Z`
-
-      // Compute reference line Y position
-      let refLineY: number | null = null
-      if (referenceLine != null) {
-        refLineY = padding + usableHeight - ((referenceLine - lo) / (hi - lo)) * usableHeight
-      }
-
-      return { polyline: line, fillPath: fill, refLineY, lo, hi }
-    }, [data, head, count, minProp, maxProp, referenceLine])
+    const { polyline, fillPath, refLineY, lo, hi } = useMemo(
+      () => computeSparklineGeometry(data, head, count, minProp, maxProp, referenceLine),
+      [data, head, count, minProp, maxProp, referenceLine]
+    )
 
     return (
       <svg
         className={className}
-        viewBox={`0 0 ${viewWidth} ${viewHeight}`}
+        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         preserveAspectRatio="none"
         width="100%"
         height={height}
@@ -190,9 +235,9 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
           <>
             <line
               data-testid="sparkline-reference"
-              x1={padding}
+              x1={PADDING}
               y1={refLineY}
-              x2={viewWidth - padding}
+              x2={VIEW_WIDTH - PADDING}
               y2={refLineY}
               stroke="var(--color-warning)"
               strokeWidth="1"
@@ -202,7 +247,7 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
             />
             {referenceLabel && (
               <text
-                x={viewWidth - padding - 2}
+                x={VIEW_WIDTH - PADDING - 2}
                 y={refLineY - 2}
                 textAnchor="end"
                 fill="var(--color-warning)"

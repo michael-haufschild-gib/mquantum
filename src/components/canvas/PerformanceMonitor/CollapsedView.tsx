@@ -5,6 +5,79 @@ import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import { FPS_COLORS, type FpsColorLevel, getFpsColorLevel } from './utils'
 
 // ============================================================================
+// DOM-update helpers (avoid cognitive complexity in the subscription callback)
+// ============================================================================
+
+type PrevValues = { fps: number; frameTime: number; colorLevel: FpsColorLevel | '' }
+
+function updateFpsText(
+  fps: number,
+  prev: PrevValues,
+  ref: React.RefObject<HTMLSpanElement | null>
+): void {
+  if (fps === prev.fps || !ref.current) return
+  ref.current.textContent = String(fps)
+  prev.fps = fps
+}
+
+function updateFrameTimeText(
+  frameTime: number,
+  prev: PrevValues,
+  ref: React.RefObject<HTMLSpanElement | null>
+): void {
+  const newRounded = Math.round(frameTime * 10)
+  const oldRounded = Math.round(prev.frameTime * 10)
+  if (newRounded === oldRounded || !ref.current) return
+  ref.current.textContent = frameTime.toFixed(1)
+  prev.frameTime = frameTime
+}
+
+function updateSparklinePath(
+  state: { history: { fps: number[] } },
+  prevState: { history: { fps: number[] } },
+  ref: React.RefObject<SVGPathElement | null>
+): void {
+  if (!ref.current || state.history.fps === prevState.history.fps) return
+  const data = state.history.fps
+  if (data.length < 2) return
+  const width = 64
+  const height = 20
+  const range = 70
+  const stepX = width / (data.length - 1)
+  const points = data
+    .map((val, i) => {
+      const x = i * stepX
+      const normalizedY = Math.max(0, Math.min(1, val / range))
+      const y = height - normalizedY * height
+      return `${x},${y}`
+    })
+    .join(' ')
+  ref.current.setAttribute('d', `M ${points}`)
+}
+
+function updateColorLevel(
+  fps: number,
+  prev: PrevValues,
+  indicatorRef: React.RefObject<HTMLSpanElement | null>,
+  fpsContainerRef: React.RefObject<HTMLSpanElement | null>,
+  sparklineRef: React.RefObject<SVGPathElement | null>
+): void {
+  const level = getFpsColorLevel(fps)
+  if (level === prev.colorLevel) return
+  const color = FPS_COLORS[level]
+  if (indicatorRef.current) {
+    indicatorRef.current.className = `relative inline-flex rounded-full h-2.5 w-2.5 ${color.bg}`
+  }
+  if (fpsContainerRef.current) {
+    fpsContainerRef.current.className = `text-lg font-bold font-mono leading-none ${color.text}`
+  }
+  if (sparklineRef.current) {
+    sparklineRef.current.setAttribute('stroke', color.stroke)
+  }
+  prev.colorLevel = level
+}
+
+// ============================================================================
 // COLLAPSED VIEW - Zero re-renders, updates via refs
 // ============================================================================
 export const CollapsedView = React.memo(function CollapsedView() {
@@ -35,62 +108,10 @@ export const CollapsedView = React.memo(function CollapsedView() {
       }
 
       const prev = prevValuesRef.current
-
-      // Update FPS text only if changed
-      if (state.fps !== prev.fps && fpsRef.current) {
-        fpsRef.current.textContent = String(state.fps)
-        prev.fps = state.fps
-      }
-
-      // Update frame time only if changed
-      const newFrameTime = Math.round(state.frameTime * 10)
-      const oldFrameTime = Math.round(prev.frameTime * 10)
-      if (newFrameTime !== oldFrameTime && frameTimeRef.current) {
-        frameTimeRef.current.textContent = state.frameTime.toFixed(1)
-        prev.frameTime = state.frameTime
-      }
-
-      // Update sparkline path only if history changed
-      if (sparklineRef.current && state.history.fps !== prevState.history.fps) {
-        const data = state.history.fps
-        if (data.length >= 2) {
-          const width = 64
-          const height = 20
-          const minY = 0
-          const maxY = 70
-          const range = maxY - minY
-          const stepX = width / (data.length - 1)
-
-          const points = data
-            .map((val, i) => {
-              const x = i * stepX
-              const normalizedY = Math.max(0, Math.min(1, (val - minY) / range))
-              const y = height - normalizedY * height
-              return `${x},${y}`
-            })
-            .join(' ')
-
-          sparklineRef.current.setAttribute('d', `M ${points}`)
-        }
-      }
-
-      // Update colors ONLY if color level changed
-      const newColorLevel = getFpsColorLevel(state.fps)
-      if (newColorLevel !== prev.colorLevel) {
-        const color = FPS_COLORS[newColorLevel]
-
-        if (indicatorRef.current) {
-          indicatorRef.current.className = `relative inline-flex rounded-full h-2.5 w-2.5 ${color.bg}`
-        }
-        if (fpsContainerRef.current) {
-          fpsContainerRef.current.className = `text-lg font-bold font-mono leading-none ${color.text}`
-        }
-        if (sparklineRef.current) {
-          sparklineRef.current.setAttribute('stroke', color.stroke)
-        }
-
-        prev.colorLevel = newColorLevel
-      }
+      updateFpsText(state.fps, prev, fpsRef)
+      updateFrameTimeText(state.frameTime, prev, frameTimeRef)
+      updateSparklinePath(state, prevState, sparklineRef)
+      updateColorLevel(state.fps, prev, indicatorRef, fpsContainerRef, sparklineRef)
     })
 
     return unsubscribe

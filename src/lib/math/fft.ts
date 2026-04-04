@@ -242,6 +242,98 @@ export function ifft3d(data: FFTArray, nx: number, ny: number, nz: number): void
  * @param gridSize - Array of grid sizes per dimension (each must be power of 2)
  * @param transform1d - 1D transform function (fft or ifft)
  */
+/**
+ * Computes row-major strides for an N-D grid.
+ *
+ * @param gridSize - Array of grid sizes per dimension
+ * @returns Array of strides (last dimension has stride 1)
+ */
+function computeStrides(gridSize: readonly number[]): number[] {
+  const dim = gridSize.length
+  const strides = new Array<number>(dim)
+  strides[dim - 1] = 1
+  for (let d = dim - 2; d >= 0; d--) {
+    strides[d] = strides[d + 1]! * gridSize[d + 1]!
+  }
+  return strides
+}
+
+/**
+ * Collects dimension indices to iterate over (all except the target dimension), in reverse order.
+ *
+ * @param dim - Total number of dimensions
+ * @param excludeDim - Dimension to exclude
+ * @returns Array of dimension indices in reverse order
+ */
+function collectOtherDims(dim: number, excludeDim: number): number[] {
+  const otherDims: number[] = []
+  for (let dd = dim - 1; dd >= 0; dd--) {
+    if (dd !== excludeDim) otherDims.push(dd)
+  }
+  return otherDims
+}
+
+/**
+ * Decomposes a linear fiber index into a base offset for the N-D grid,
+ * accounting for all dimensions except the target fiber dimension.
+ *
+ * @param fiberIndex - Linear index among all fibers
+ * @param otherDims - Dimension indices to iterate (from collectOtherDims)
+ * @param gridSize - Grid sizes per dimension
+ * @param strides - Row-major strides per dimension
+ * @returns Base flat index into the data array
+ */
+function computeFiberBase(
+  fiberIndex: number,
+  otherDims: readonly number[],
+  gridSize: readonly number[],
+  strides: readonly number[]
+): number {
+  let base = 0
+  let remaining = fiberIndex
+  for (const dd of otherDims) {
+    const coord = remaining % gridSize[dd]!
+    remaining = Math.floor(remaining / gridSize[dd]!)
+    base += coord * strides[dd]!
+  }
+  return base
+}
+
+/**
+ * Extracts a 1D fiber from N-D data, transforms it, and writes the result back.
+ *
+ * @param data - Interleaved complex data buffer
+ * @param fiber - Scratch buffer for the extracted 1D fiber
+ * @param base - Base flat index in data
+ * @param fiberStride - Stride between consecutive fiber elements
+ * @param n - Number of complex elements along this fiber
+ * @param transform1d - 1D transform function to apply
+ */
+function transformFiber(
+  data: FFTArray,
+  fiber: FFTArray,
+  base: number,
+  fiberStride: number,
+  n: number,
+  transform1d: (data: FFTArray, n: number) => void
+): void {
+  // Extract fiber
+  for (let i = 0; i < n; i++) {
+    const flatIdx = base + i * fiberStride
+    fiber[i * 2] = data[flatIdx * 2]!
+    fiber[i * 2 + 1] = data[flatIdx * 2 + 1]!
+  }
+
+  transform1d(fiber, n)
+
+  // Write back
+  for (let i = 0; i < n; i++) {
+    const flatIdx = base + i * fiberStride
+    data[flatIdx * 2] = fiber[i * 2]!
+    data[flatIdx * 2 + 1] = fiber[i * 2 + 1]!
+  }
+}
+
 function ndTransform(
   data: FFTArray,
   gridSize: readonly number[],
@@ -256,12 +348,7 @@ function ndTransform(
   assertComplexDataLength(data, totalSites)
   if (totalSites <= 1) return
 
-  // Row-major strides: last dimension has stride 1
-  const strides = new Array<number>(dim)
-  strides[dim - 1] = 1
-  for (let d = dim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
+  const strides = computeStrides(gridSize)
 
   for (let d = 0; d < dim; d++) {
     const n = gridSize[d]!
@@ -271,38 +358,11 @@ function ndTransform(
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n
     const fiber = new (data.constructor as { new (length: number): FFTArray })(2 * n)
-
-    // Collect dimensions to iterate (all except d), in reverse for decomposition
-    const otherDims: number[] = []
-    for (let dd = dim - 1; dd >= 0; dd--) {
-      if (dd !== d) otherDims.push(dd)
-    }
+    const otherDims = collectOtherDims(dim, d)
 
     for (let f = 0; f < fiberCount; f++) {
-      // Decompose fiber index f into coordinates for all dims except d
-      let base = 0
-      let remaining = f
-      for (const dd of otherDims) {
-        const coord = remaining % gridSize[dd]!
-        remaining = Math.floor(remaining / gridSize[dd]!)
-        base += coord * strides[dd]!
-      }
-
-      // Extract fiber along dimension d
-      for (let i = 0; i < n; i++) {
-        const flatIdx = base + i * fiberStride
-        fiber[i * 2] = data[flatIdx * 2]!
-        fiber[i * 2 + 1] = data[flatIdx * 2 + 1]!
-      }
-
-      transform1d(fiber, n)
-
-      // Write back
-      for (let i = 0; i < n; i++) {
-        const flatIdx = base + i * fiberStride
-        data[flatIdx * 2] = fiber[i * 2]!
-        data[flatIdx * 2 + 1] = fiber[i * 2 + 1]!
-      }
+      const base = computeFiberBase(f, otherDims, gridSize, strides)
+      transformFiber(data, fiber, base, fiberStride, n, transform1d)
     }
   }
 }

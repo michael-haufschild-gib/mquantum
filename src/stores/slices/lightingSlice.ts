@@ -160,6 +160,76 @@ function isValidRotationTuple(value: [number, number, number]): boolean {
 }
 
 // ============================================================================
+// Light Update Helpers
+// ============================================================================
+
+/** Numeric fields that require finite-number validation and clamping. */
+type NumericLightKey = 'intensity' | 'coneAngle' | 'penumbra' | 'range' | 'decay'
+const NUMERIC_LIGHT_FIELDS: ReadonlyArray<{
+  key: NumericLightKey
+  label: string
+  clamp: (v: number) => number
+}> = [
+  { key: 'intensity', label: 'light intensity', clamp: clampIntensity },
+  { key: 'coneAngle', label: 'cone angle', clamp: clampConeAngle },
+  { key: 'penumbra', label: 'penumbra', clamp: clampPenumbra },
+  { key: 'range', label: 'range', clamp: clampRange },
+  { key: 'decay', label: 'decay', clamp: clampDecay },
+]
+
+/**
+ * Strip invalid numeric/rotation values from light updates, logging warnings.
+ * @param updates - Raw partial light updates
+ * @returns Sanitized updates with invalid fields removed
+ */
+function sanitizeLightUpdates(
+  updates: Partial<Omit<LightSource, 'id'>>
+): Partial<Omit<LightSource, 'id'>> {
+  const sanitized: Partial<Omit<LightSource, 'id'>> = { ...updates }
+
+  for (const { key, label } of NUMERIC_LIGHT_FIELDS) {
+    const value = sanitized[key]
+    if (value === undefined) continue
+    if (!isValidLightingNumber(value as number)) {
+      logger.warn(`[lightingSlice] Ignoring non-finite ${label} update:`, value)
+      delete sanitized[key]
+    }
+  }
+
+  if (sanitized.rotation !== undefined && !isValidRotationTuple(sanitized.rotation)) {
+    logger.warn('[lightingSlice] Ignoring non-finite rotation update:', sanitized.rotation)
+    delete sanitized.rotation
+  }
+
+  return sanitized
+}
+
+/**
+ * Merge sanitized updates into a light, clamping numeric fields.
+ * @param light - Existing light source
+ * @param sanitized - Sanitized partial updates
+ * @returns New light object
+ */
+function applyLightUpdates(
+  light: LightSource,
+  sanitized: Partial<Omit<LightSource, 'id'>>
+): LightSource {
+  const merged = { ...light, ...sanitized }
+
+  for (const { key, clamp } of NUMERIC_LIGHT_FIELDS) {
+    if (sanitized[key] !== undefined) {
+      ;(merged as Record<string, unknown>)[key] = clamp(sanitized[key] as number)
+    }
+  }
+
+  if (sanitized.rotation !== undefined) {
+    merged.rotation = normalizeRotationTupleSigned(sanitized.rotation)
+  }
+
+  return merged
+}
+
+// ============================================================================
 // Slice Creator
 // ============================================================================
 
@@ -279,71 +349,8 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
       version: state.version + 1,
       lights: state.lights.map((light) => {
         if (light.id !== id) return light
-        const hasInvalidIntensity =
-          updates.intensity !== undefined && !isValidLightingNumber(updates.intensity)
-        const hasInvalidConeAngle =
-          updates.coneAngle !== undefined && !isValidLightingNumber(updates.coneAngle)
-        const hasInvalidPenumbra =
-          updates.penumbra !== undefined && !isValidLightingNumber(updates.penumbra)
-        const hasInvalidRange = updates.range !== undefined && !isValidLightingNumber(updates.range)
-        const hasInvalidDecay = updates.decay !== undefined && !isValidLightingNumber(updates.decay)
-        const hasInvalidRotation =
-          updates.rotation !== undefined && !isValidRotationTuple(updates.rotation)
-
-        if (hasInvalidIntensity) {
-          logger.warn(
-            '[lightingSlice] Ignoring non-finite light intensity update:',
-            updates.intensity
-          )
-        }
-        if (hasInvalidConeAngle) {
-          logger.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
-        }
-        if (hasInvalidPenumbra) {
-          logger.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
-        }
-        if (hasInvalidRange) {
-          logger.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
-        }
-        if (hasInvalidDecay) {
-          logger.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
-        }
-        if (hasInvalidRotation) {
-          logger.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
-        }
-
-        const sanitizedUpdates: Partial<Omit<LightSource, 'id'>> = { ...updates }
-        if (hasInvalidIntensity) delete sanitizedUpdates.intensity
-        if (hasInvalidConeAngle) delete sanitizedUpdates.coneAngle
-        if (hasInvalidPenumbra) delete sanitizedUpdates.penumbra
-        if (hasInvalidRange) delete sanitizedUpdates.range
-        if (hasInvalidDecay) delete sanitizedUpdates.decay
-        if (hasInvalidRotation) delete sanitizedUpdates.rotation
-
-        return {
-          ...light,
-          ...sanitizedUpdates,
-          intensity:
-            sanitizedUpdates.intensity !== undefined
-              ? clampIntensity(sanitizedUpdates.intensity)
-              : light.intensity,
-          coneAngle:
-            sanitizedUpdates.coneAngle !== undefined
-              ? clampConeAngle(sanitizedUpdates.coneAngle)
-              : light.coneAngle,
-          penumbra:
-            sanitizedUpdates.penumbra !== undefined
-              ? clampPenumbra(sanitizedUpdates.penumbra)
-              : light.penumbra,
-          range:
-            sanitizedUpdates.range !== undefined ? clampRange(sanitizedUpdates.range) : light.range,
-          decay:
-            sanitizedUpdates.decay !== undefined ? clampDecay(sanitizedUpdates.decay) : light.decay,
-          rotation:
-            sanitizedUpdates.rotation !== undefined
-              ? normalizeRotationTupleSigned(sanitizedUpdates.rotation)
-              : light.rotation,
-        }
+        const sanitized = sanitizeLightUpdates(updates)
+        return applyLightUpdates(light, sanitized)
       }),
     }))
   },

@@ -44,6 +44,99 @@ export interface VideoExportOptions {
   crop?: CropSettings
 }
 
+// ─── Composition helpers ────────────────────────────────────────────────────
+
+/** Check whether crop settings represent a valid, enabled crop region. */
+function isValidCrop(crop: CropSettings | undefined): boolean {
+  return (
+    !!crop?.enabled &&
+    Number.isFinite(crop.x) &&
+    Number.isFinite(crop.y) &&
+    Number.isFinite(crop.width) &&
+    Number.isFinite(crop.height) &&
+    crop.width > 0 &&
+    crop.height > 0
+  )
+}
+
+/** Compute letterbox/pillarbox destination rect for a given source aspect ratio. */
+function computeLetterbox(
+  srcAspect: number,
+  dstWidth: number,
+  dstHeight: number
+): { dx: number; dy: number; dw: number; dh: number } {
+  const dstAspect = dstWidth / dstHeight
+  if (Math.abs(srcAspect - dstAspect) < 0.01) {
+    return { dx: 0, dy: 0, dw: dstWidth, dh: dstHeight }
+  }
+  if (srcAspect > dstAspect) {
+    const dh = dstWidth / srcAspect
+    return { dx: 0, dy: (dstHeight - dh) / 2, dw: dstWidth, dh }
+  }
+  const dw = dstHeight * srcAspect
+  return { dx: (dstWidth - dw) / 2, dy: 0, dw, dh: dstHeight }
+}
+
+/** Horizontal placement → x coordinate and textAlign. */
+const H_PLACEMENT: Record<string, (w: number, p: number) => { x: number; align: CanvasTextAlign }> =
+  {
+    left: (_w, p) => ({ x: p, align: 'left' }),
+    right: (w, p) => ({ x: w - p, align: 'right' }),
+    center: (w) => ({ x: w / 2, align: 'center' }),
+  }
+
+/** Vertical placement → y coordinate and textBaseline. */
+const V_PLACEMENT: Record<
+  string,
+  (h: number, p: number) => { y: number; baseline: CanvasTextBaseline }
+> = {
+  top: (_h, p) => ({ y: p, baseline: 'top' }),
+  bottom: (h, p) => ({ y: h - p, baseline: 'bottom' }),
+  center: (h) => ({ y: h / 2, baseline: 'middle' }),
+}
+
+/** Draw a text overlay onto a 2D canvas context. */
+function drawTextOverlay(
+  ctx: CanvasRenderingContext2D,
+  overlay: TextOverlaySettings,
+  width: number,
+  height: number
+): void {
+  ctx.save()
+
+  const fontWeight = overlay.fontWeight || 700
+  const fontFamily = overlay.fontFamily || 'Inter, sans-serif'
+  ctx.font = `${fontWeight} ${overlay.fontSize}px ${fontFamily}`
+
+  const hPlace = H_PLACEMENT[overlay.horizontalPlacement] ?? H_PLACEMENT.center!
+  const { x, align } = hPlace(width, overlay.padding)
+  ctx.textAlign = align
+
+  const vPlace = V_PLACEMENT[overlay.verticalPlacement] ?? V_PLACEMENT['center']!
+  const { y, baseline } = vPlace(height, overlay.padding)
+  ctx.textBaseline = baseline
+
+  if (overlay.shadowBlur > 0) {
+    ctx.shadowColor = overlay.shadowColor
+    ctx.shadowBlur = overlay.shadowBlur
+    ctx.shadowOffsetX = 0
+    ctx.shadowOffsetY = 2
+  }
+
+  ctx.fillStyle = overlay.color
+  ctx.globalAlpha = overlay.opacity
+
+  if (overlay.letterSpacing !== 0) {
+    const ctxAny = ctx as unknown as { letterSpacing?: string }
+    if (typeof ctxAny.letterSpacing !== 'undefined') {
+      ctxAny.letterSpacing = `${overlay.letterSpacing}px`
+    }
+  }
+
+  ctx.fillText(overlay.text, x, y)
+  ctx.restore()
+}
+
 /**
  * Handles video recording from a canvas using WebCodecs and MediaBunny.
  * Supports both in-memory buffering and direct-to-disk streaming.
@@ -226,184 +319,85 @@ export class VideoRecorder {
     }
 
     try {
-      // Perform Composition if needed
       if (this.compositionCanvas && this.compositionCtx) {
-        const ctx = this.compositionCtx
-        const { width, height, crop, textOverlay } = this.options
-
-        // 1. Background (Clear)
-        ctx.globalCompositeOperation = 'source-over'
-        ctx.fillStyle = '#000000'
-        ctx.fillRect(0, 0, width, height)
-
-        // 2. Draw Scene (with Crop)
-        // Reset filters for drawing the image (unless we want filters applied to the image source)
-        // We apply filters to the drawImage call context
-
-        ctx.filter = 'none'
-
-        const hasValidCrop =
-          crop?.enabled &&
-          Number.isFinite(crop.x) &&
-          Number.isFinite(crop.y) &&
-          Number.isFinite(crop.width) &&
-          Number.isFinite(crop.height) &&
-          crop.width > 0 &&
-          crop.height > 0
-
-        if (hasValidCrop && crop) {
-          // Clamp crop coordinates to normalized canvas bounds.
-          const normalizedX = Math.min(Math.max(crop.x, 0), 1)
-          const normalizedY = Math.min(Math.max(crop.y, 0), 1)
-          const normalizedWidth = Math.min(Math.max(crop.width, 0), 1)
-          const normalizedHeight = Math.min(Math.max(crop.height, 0), 1)
-
-          // Source coordinates (relative to original canvas)
-          const sx = normalizedX * this.canvas.width
-          const sy = normalizedY * this.canvas.height
-          const sw = normalizedWidth * this.canvas.width
-          const sh = normalizedHeight * this.canvas.height
-
-          // Calculate aspect ratios to maintain proportions (no stretching)
-          const cropAspect = sw / sh
-          const exportAspect = width / height
-
-          let dw: number, dh: number, dx: number, dy: number
-
-          if (Math.abs(cropAspect - exportAspect) < 0.01) {
-            // Aspect ratios match - fill entire frame
-            dx = 0
-            dy = 0
-            dw = width
-            dh = height
-          } else if (cropAspect > exportAspect) {
-            // Crop is wider than export - fit to width, letterbox top/bottom
-            dw = width
-            dh = width / cropAspect
-            dx = 0
-            dy = (height - dh) / 2
-          } else {
-            // Crop is taller than export - fit to height, pillarbox left/right
-            dh = height
-            dw = height * cropAspect
-            dx = (width - dw) / 2
-            dy = 0
-          }
-
-          ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh)
-        } else {
-          // No crop - preserve aspect ratio with letterbox/pillarbox if needed
-          const srcAspect = this.canvas.width / this.canvas.height
-          const dstAspect = width / height
-
-          let dw: number, dh: number, dx: number, dy: number
-
-          if (Math.abs(srcAspect - dstAspect) < 0.01) {
-            // Aspect ratios match - fill entire frame
-            dx = 0
-            dy = 0
-            dw = width
-            dh = height
-          } else if (srcAspect > dstAspect) {
-            // Source is wider than destination - fit to width, letterbox top/bottom
-            dw = width
-            dh = width / srcAspect
-            dx = 0
-            dy = (height - dh) / 2
-          } else {
-            // Source is taller than destination - fit to height, pillarbox left/right
-            dh = height
-            dw = height * srcAspect
-            dx = (width - dw) / 2
-            dy = 0
-          }
-
-          ctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, dx, dy, dw, dh)
-        }
-
-        // 3. Reset Filter for Overlays
-        ctx.filter = 'none'
-
-        // 6. Text Overlay
-        if (textOverlay?.enabled && textOverlay.text.trim()) {
-          ctx.save()
-
-          const fontSize = textOverlay.fontSize
-          const fontWeight = textOverlay.fontWeight || 700
-          const fontFamily = textOverlay.fontFamily || 'Inter, sans-serif'
-          const { verticalPlacement, horizontalPlacement, padding } = textOverlay
-
-          ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`
-
-          // Horizontal position and alignment
-          let x: number
-          if (horizontalPlacement === 'left') {
-            x = padding
-            ctx.textAlign = 'left'
-          } else if (horizontalPlacement === 'right') {
-            x = width - padding
-            ctx.textAlign = 'right'
-          } else {
-            x = width / 2
-            ctx.textAlign = 'center'
-          }
-
-          // Vertical position and baseline
-          let y: number
-          if (verticalPlacement === 'top') {
-            y = padding
-            ctx.textBaseline = 'top'
-          } else if (verticalPlacement === 'bottom') {
-            y = height - padding
-            ctx.textBaseline = 'bottom'
-          } else {
-            y = height / 2
-            ctx.textBaseline = 'middle'
-          }
-
-          // Text Shadow
-          if (textOverlay.shadowBlur > 0) {
-            ctx.shadowColor = textOverlay.shadowColor
-            ctx.shadowBlur = textOverlay.shadowBlur
-            ctx.shadowOffsetX = 0
-            ctx.shadowOffsetY = 2
-          }
-
-          ctx.fillStyle = textOverlay.color
-          ctx.globalAlpha = textOverlay.opacity
-
-          // Letter Spacing support (modern browsers)
-          if (textOverlay.letterSpacing !== 0) {
-            // Use letterSpacing if available (Chrome 94+, Firefox 125+, Safari 17+)
-            const ctxAny = ctx as unknown as { letterSpacing?: string }
-            if (typeof ctxAny.letterSpacing !== 'undefined') {
-              ctxAny.letterSpacing = `${textOverlay.letterSpacing}px`
-            }
-          }
-          ctx.fillText(textOverlay.text, x, y)
-
-          ctx.restore()
-        }
+        this.composeFrame()
       }
 
       await this.source.add(timestamp, duration)
-
-      if (this.options.onProgress) {
-        const hasValidDuration = Number.isFinite(this.options.duration) && this.options.duration > 0
-        const progress = hasValidDuration
-          ? (() => {
-              const rawProgress = timestamp / this.options.duration
-              return Number.isFinite(rawProgress) ? Math.min(Math.max(rawProgress, 0), 0.99) : 0
-            })()
-          : 0
-        this.options.onProgress(progress)
-      }
+      this.reportProgress(timestamp)
     } catch (error) {
       throw new Error(
         `Frame capture failed at ${timestamp.toFixed(2)}s: ${error instanceof Error ? error.message : 'Unknown error'}`,
         { cause: error }
       )
     }
+  }
+
+  /** Compose the full frame: background, scene draw (with optional crop), and text overlay. */
+  private composeFrame(): void {
+    const ctx = this.compositionCtx!
+    const { width, height, crop, textOverlay } = this.options
+
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, width, height)
+    ctx.filter = 'none'
+
+    if (isValidCrop(crop)) {
+      this.drawCroppedScene(ctx, crop!, width, height)
+    } else {
+      this.drawFullScene(ctx, width, height)
+    }
+
+    ctx.filter = 'none'
+
+    if (textOverlay?.enabled && textOverlay.text.trim()) {
+      drawTextOverlay(ctx, textOverlay, width, height)
+    }
+  }
+
+  /** Draw the source canvas cropped to the given region, letterboxed into the export frame. */
+  private drawCroppedScene(
+    ctx: CanvasRenderingContext2D,
+    crop: CropSettings,
+    width: number,
+    height: number
+  ): void {
+    const normalizedX = Math.min(Math.max(crop.x, 0), 1)
+    const normalizedY = Math.min(Math.max(crop.y, 0), 1)
+    const normalizedWidth = Math.min(Math.max(crop.width, 0), 1)
+    const normalizedHeight = Math.min(Math.max(crop.height, 0), 1)
+
+    const sx = normalizedX * this.canvas.width
+    const sy = normalizedY * this.canvas.height
+    const sw = normalizedWidth * this.canvas.width
+    const sh = normalizedHeight * this.canvas.height
+
+    const { dx, dy, dw, dh } = computeLetterbox(sw / sh, width, height)
+    ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh)
+  }
+
+  /** Draw the full source canvas letterboxed into the export frame. */
+  private drawFullScene(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const { dx, dy, dw, dh } = computeLetterbox(
+      this.canvas.width / this.canvas.height,
+      width,
+      height
+    )
+    ctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, dx, dy, dw, dh)
+  }
+
+  /** Report encoding progress to the callback, if registered. */
+  private reportProgress(timestamp: number): void {
+    if (!this.options.onProgress) return
+    const hasValidDuration = Number.isFinite(this.options.duration) && this.options.duration > 0
+    if (!hasValidDuration) {
+      this.options.onProgress(0)
+      return
+    }
+    const rawProgress = timestamp / this.options.duration
+    const progress = Number.isFinite(rawProgress) ? Math.min(Math.max(rawProgress, 0), 0.99) : 0
+    this.options.onProgress(progress)
   }
 
   /**
