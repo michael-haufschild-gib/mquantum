@@ -508,7 +508,9 @@ export function computeCoordinateEntanglement(
   for (let i = 0; i < psiRe.length; i++) {
     norm2 += psiRe[i]! * psiRe[i]! + psiIm[i]! * psiIm[i]!
   }
-  if (norm2 > 0 && Math.abs(norm2 - 1) > 1e-6) {
+  // Guard against near-zero norm (numerical noise from GPU readback) —
+  // amplifying 1e-20 by invNorm ≈ 1e10 would produce nonsensical RDMs.
+  if (norm2 > 1e-12 && Math.abs(norm2 - 1) > 1e-6) {
     const invNorm = 1 / Math.sqrt(norm2)
     const normRe = new Float32Array(psiRe.length)
     const normIm = new Float32Array(psiIm.length)

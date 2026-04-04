@@ -131,6 +131,12 @@ export function useSweepController(): {
         clearInterval(sweepTickRef.current)
         sweepTickRef.current = null
       }
+      // If unmounting while a sweep is running, abort and restore the
+      // pre-sweep physics state so stores don't remain in sweep configuration.
+      if (useCoordinateEntanglementStore.getState().sweepStatus === 'running') {
+        useCoordinateEntanglementStore.getState().abortSweep()
+        restorePreSweepState()
+      }
     }
   }, [sweepStatus])
 

@@ -237,14 +237,23 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)
 
-    // Update long-time statistics (skip NaN to prevent poisoning running sums)
-    const safeAvg = Number.isFinite(result.averageEntropy) ? result.averageEntropy : 0
-    const newLtN = state.longTimeN + 1
-    const newLtSum = state.longTimeSum + safeAvg
-    const newLtSumSq = state.longTimeSumSq + safeAvg * safeAvg
-    const newLtAvg = newLtSum / newLtN
-    // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
-    const newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
+    // Update long-time statistics only for finite frames — non-finite results
+    // (GPU divergence, skipped dims) must not advance the sweep clock or
+    // dilute the running average with phantom zeros.
+    let newLtN = state.longTimeN
+    let newLtSum = state.longTimeSum
+    let newLtSumSq = state.longTimeSumSq
+    let newLtAvg = state.longTimeAverage
+    let newLtVar = state.longTimeVariance
+
+    if (Number.isFinite(result.averageEntropy)) {
+      newLtN = state.longTimeN + 1
+      newLtSum = state.longTimeSum + result.averageEntropy
+      newLtSumSq = state.longTimeSumSq + result.averageEntropy * result.averageEntropy
+      newLtAvg = newLtSum / newLtN
+      // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
+      newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
+    }
 
     set({
       historyHead: newHead,
