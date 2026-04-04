@@ -166,6 +166,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                   onChange={(v) => setRepresentation(v as 'position' | 'momentum' | 'wigner')}
                   ariaLabel="Select representation space"
                   tooltip="Choose the space in which the wavefunction is displayed: position-space, momentum-space (Fourier transform), or Wigner phase-space."
+                  fullWidth
                   data-testid="representation-selector"
                 />
 
@@ -180,6 +181,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                       onChange={(v) => setMomentumDisplayUnits(v as 'k' | 'p')}
                       ariaLabel="Select momentum display units"
                       tooltip="Display units: k-space (wavenumber) or p-space (momentum p = hbar * k)."
+                      fullWidth
                       data-testid="momentum-units-selector"
                     />
                     <Slider
