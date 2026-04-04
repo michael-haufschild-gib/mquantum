@@ -298,7 +298,7 @@ struct SchroedingerUniforms {
 
   // Decoherent branching visualization colors (offset 1568)
   branchColorA: vec3f,              // offset 1568 — branch A color (default cyan)
-  _padBranchA: f32,                 // offset 1580
+  branchSeparation: f32,            // offset 1580 — 0 = fully coherent, 1 = fully separated
   branchColorB: vec3f,              // offset 1584 — branch B color (default magenta)
   _padBranchB: f32,                 // offset 1596
 }

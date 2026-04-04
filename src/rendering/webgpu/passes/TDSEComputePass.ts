@@ -101,9 +101,11 @@ import {
   type SaveLoadState,
 } from './TDSEStateSaveLoad'
 import {
+  buildExpectationPipelines,
   buildStochasticLocPipeline,
   createStochasticLocState,
   disposeStochasticLoc,
+  rebuildExpectationBindGroups,
   rebuildStochasticLocBindGroup,
   type StochasticLocState,
 } from './TDSEStochasticLocalization'
@@ -394,6 +396,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.createShaderModule.bind(this),
       this.createComputePipeline.bind(this)
     )
+    buildExpectationPipelines(
+      device,
+      this._stochasticState,
+      this.createShaderModule.bind(this),
+      this.createComputePipeline.bind(this)
+    )
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
@@ -413,7 +421,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       } as TdseBindGroupInputs,
       this.bg?.renormalizeUniformBuffer ?? null
     )
-    // Rebuild stochastic localization bind group
+    // Rebuild stochastic localization bind group + expectation reduction
     if (this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
       rebuildStochasticLocBindGroup(
         device,
@@ -421,6 +429,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.uniformBuffer,
         this.psiReBuffer,
         this.psiImBuffer
+      )
+      const numWG = Math.ceil(this.totalSites / LINEAR_WG)
+      rebuildExpectationBindGroups(
+        device,
+        this._stochasticState,
+        this.uniformBuffer,
+        this.psiReBuffer,
+        this.psiImBuffer,
+        numWG
       )
     }
   }

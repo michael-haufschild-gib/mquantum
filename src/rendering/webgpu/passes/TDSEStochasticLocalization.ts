@@ -16,6 +16,10 @@ import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 import type { WebGPURenderContext } from '../core/types'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import {
+  tdseStochasticExpectFinalizeBlock,
+  tdseStochasticExpectReduceBlock,
+} from '../shaders/schroedinger/compute/tdseStochasticExpect.wgsl'
 import { tdseStochasticLocBlock } from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 
@@ -24,14 +28,28 @@ const MAX_CENTERS_PER_DISPATCH = 8
 
 /**
  * StochasticParams struct size in bytes.
- * Layout: 8 scalars × 4 bytes = 32, then array<vec4f, 8> = 128. Total = 160.
+ * Layout: 8 scalars × 4 bytes = 32, then array<vec4f, 24> = 384. Total = 416.
+ * Each center uses 3 vec4f: (x0..x3), (x4..x7), (x8..x10, noise).
  */
-const STOCHASTIC_UNIFORM_SIZE = 160
+const STOCHASTIC_UNIFORM_SIZE = 416
+
+/** Maximum floats for ⟨L_k⟩ expectations (one per center). */
+const MAX_EXPECTATION_FLOATS = MAX_CENTERS_PER_DISPATCH
 
 /** Mutable state for the stochastic localization pass. */
 export interface StochasticLocState {
   uniformBuffer: GPUBuffer | null
   pipeline: GPUComputePipeline | null
+  expectReducePipeline: GPUComputePipeline | null
+  expectFinalizePipeline: GPUComputePipeline | null
+  expectReduceBGL: GPUBindGroupLayout | null
+  expectFinalizeBGL: GPUBindGroupLayout | null
+  expectReduceBG: GPUBindGroup | null
+  expectFinalizeBG: GPUBindGroup | null
+  /** Partial sums buffer for expectation reduction: MAX_CENTERS × numWorkgroups floats */
+  expectPartialBuffer: GPUBuffer | null
+  /** Final expectation values: MAX_CENTERS floats */
+  expectResultBuffer: GPUBuffer | null
   bgl: GPUBindGroupLayout | null
   bg: GPUBindGroup | null
   /** Per-frame step counter for PRNG seeding. */
@@ -46,6 +64,14 @@ export function createStochasticLocState(): StochasticLocState {
   return {
     uniformBuffer: null,
     pipeline: null,
+    expectReducePipeline: null,
+    expectFinalizePipeline: null,
+    expectReduceBGL: null,
+    expectFinalizeBGL: null,
+    expectReduceBG: null,
+    expectFinalizeBG: null,
+    expectPartialBuffer: null,
+    expectResultBuffer: null,
     bgl: null,
     bg: null,
     stepCounter: 0,
@@ -62,6 +88,7 @@ export function createStochasticLocState(): StochasticLocState {
  *   binding 1: psiRe (storage, read-write)
  *   binding 2: psiIm (storage, read-write)
  *   binding 3: StochasticParams (uniform, new)
+ *   binding 4: expectations (storage, read — ⟨L_k⟩ values from reduction)
  */
 export function buildStochasticLocPipeline(
   device: GPUDevice,
@@ -81,6 +108,7 @@ export function buildStochasticLocPipeline(
       { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
     ],
   })
 
@@ -94,6 +122,16 @@ export function buildStochasticLocPipeline(
     size: STOCHASTIC_UNIFORM_SIZE,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
+
+  // Expectation result buffer: holds ⟨L_k⟩ for up to 8 centers.
+  // Zero-initialized to prevent uninitialized reads before first reduction.
+  state.expectResultBuffer?.destroy()
+  state.expectResultBuffer = device.createBuffer({
+    label: 'tdse-stochastic-expect-result',
+    size: MAX_EXPECTATION_FLOATS * 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  })
+  device.queue.writeBuffer(state.expectResultBuffer, 0, new Float32Array(MAX_EXPECTATION_FLOATS))
 }
 
 /**
@@ -106,7 +144,7 @@ export function rebuildStochasticLocBindGroup(
   psiReBuffer: GPUBuffer,
   psiImBuffer: GPUBuffer
 ): void {
-  if (!state.bgl || !state.uniformBuffer) return
+  if (!state.bgl || !state.uniformBuffer || !state.expectResultBuffer) return
   state.bg = device.createBindGroup({
     label: 'tdse-stochastic-loc-bg',
     layout: state.bgl,
@@ -115,6 +153,129 @@ export function rebuildStochasticLocBindGroup(
       { binding: 1, resource: { buffer: psiReBuffer } },
       { binding: 2, resource: { buffer: psiImBuffer } },
       { binding: 3, resource: { buffer: state.uniformBuffer } },
+      { binding: 4, resource: { buffer: state.expectResultBuffer } },
+    ],
+  })
+}
+
+/** Size of the expectation finalize uniform buffer (16 bytes). */
+const EXPECT_FINALIZE_UNIFORM_SIZE = 16
+
+/**
+ * Build the expectation reduction pipelines for computing ⟨L_k⟩.
+ * Called once during initial pipeline setup.
+ */
+export function buildExpectationPipelines(
+  device: GPUDevice,
+  state: StochasticLocState,
+  createShaderModule: (device: GPUDevice, code: string, label: string) => GPUShaderModule,
+  createComputePipeline: (
+    device: GPUDevice,
+    module: GPUShaderModule,
+    layouts: GPUBindGroupLayout[],
+    label: string
+  ) => GPUComputePipeline
+): void {
+  // Reduce BGL: TDSEUniforms, psiRe, psiIm, StochasticParams, partialExpect
+  state.expectReduceBGL = device.createBindGroupLayout({
+    label: 'tdse-stochastic-expect-reduce-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ],
+  })
+
+  const reduceCode = tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticExpectReduceBlock
+  const reduceSm = createShaderModule(device, reduceCode, 'tdse-stochastic-expect-reduce')
+  state.expectReducePipeline = createComputePipeline(
+    device,
+    reduceSm,
+    [state.expectReduceBGL],
+    'tdse-stochastic-expect-reduce'
+  )
+
+  // Finalize BGL: FinalizeUniforms, partialExpect(read), result(read-write)
+  state.expectFinalizeBGL = device.createBindGroupLayout({
+    label: 'tdse-stochastic-expect-finalize-bgl',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+    ],
+  })
+
+  const finalizeCode = tdseStochasticExpectFinalizeBlock
+  const finalizeSm = createShaderModule(device, finalizeCode, 'tdse-stochastic-expect-finalize')
+  state.expectFinalizePipeline = createComputePipeline(
+    device,
+    finalizeSm,
+    [state.expectFinalizeBGL],
+    'tdse-stochastic-expect-finalize'
+  )
+}
+
+/**
+ * Rebuild expectation reduction buffers and bind groups.
+ * Call after psi buffer reallocation (which changes numWorkgroups).
+ */
+export function rebuildExpectationBindGroups(
+  device: GPUDevice,
+  state: StochasticLocState,
+  uniformBuffer: GPUBuffer,
+  psiReBuffer: GPUBuffer,
+  psiImBuffer: GPUBuffer,
+  numWorkgroups: number
+): void {
+  if (
+    !state.expectReduceBGL ||
+    !state.expectFinalizeBGL ||
+    !state.uniformBuffer ||
+    !state.expectResultBuffer
+  )
+    return
+
+  // Partial sums buffer: 8 centers × numWorkgroups floats
+  state.expectPartialBuffer?.destroy()
+  state.expectPartialBuffer = device.createBuffer({
+    label: 'tdse-stochastic-expect-partial',
+    size: MAX_EXPECTATION_FLOATS * numWorkgroups * 4,
+    usage: GPUBufferUsage.STORAGE,
+  })
+
+  // Reduce bind group
+  state.expectReduceBG = device.createBindGroup({
+    label: 'tdse-stochastic-expect-reduce-bg',
+    layout: state.expectReduceBGL,
+    entries: [
+      { binding: 0, resource: { buffer: uniformBuffer } },
+      { binding: 1, resource: { buffer: psiReBuffer } },
+      { binding: 2, resource: { buffer: psiImBuffer } },
+      { binding: 3, resource: { buffer: state.uniformBuffer } },
+      { binding: 4, resource: { buffer: state.expectPartialBuffer } },
+    ],
+  })
+
+  // Finalize uniform buffer (16 bytes: numWorkgroups + padding)
+  const finalizeUniformBuf = device.createBuffer({
+    label: 'tdse-stochastic-expect-finalize-uniform',
+    size: EXPECT_FINALIZE_UNIFORM_SIZE,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  })
+  const uData = new Uint32Array(4)
+  uData[0] = numWorkgroups
+  device.queue.writeBuffer(finalizeUniformBuf, 0, uData)
+
+  // Finalize bind group
+  state.expectFinalizeBG = device.createBindGroup({
+    label: 'tdse-stochastic-expect-finalize-bg',
+    layout: state.expectFinalizeBGL,
+    entries: [
+      { binding: 0, resource: { buffer: finalizeUniformBuf } },
+      { binding: 1, resource: { buffer: state.expectPartialBuffer } },
+      { binding: 2, resource: { buffer: state.expectResultBuffer } },
     ],
   })
 }
@@ -126,7 +287,7 @@ export function rebuildStochasticLocBindGroup(
  * @param state - Stochastic state (owns the PRNG)
  * @param batchStart - First center index in this batch
  * @param batchCount - Number of centers in this batch (≤ 8)
- * @returns Float32Array of packed uniform data (160 bytes)
+ * @returns ArrayBuffer of packed uniform data
  */
 function packStochasticUniforms(
   config: TdseConfig,
@@ -154,33 +315,30 @@ function packStochasticUniforms(
   u32[6] = 0 // _pad0
   u32[7] = 0 // _pad1
 
-  // Collapse centers: 8 × vec4f starting at offset 32 bytes (f32 index 8)
+  // Collapse centers: 8 × 3 vec4f starting at offset 32 bytes (f32 index 8)
+  // Each center: 3 vec4f = 12 floats: (x0..x3), (x4..x7), (x8..x10, noise)
   const rng = state.rng
-  const latticeDim = Math.min(config.latticeDim, 3)
+  const latticeDim = config.latticeDim
 
   for (let k = 0; k < MAX_CENTERS_PER_DISPATCH; k++) {
-    const baseIdx = 8 + k * 4 // f32 offset for this center
+    const baseIdx = 8 + k * 12 // f32 offset for this center (3 vec4 × 4 floats)
 
     if (k < batchCount) {
-      // Generate world-space center coordinates (within grid extent)
-      for (let d = 0; d < 3; d++) {
+      // Generate world-space center coordinates for all latticeDim dimensions
+      for (let d = 0; d < 11; d++) {
         if (d < latticeDim) {
           const halfExtent = config.gridSize[d]! * config.spacing[d]! * 0.5
-          // Random position within the grid
           f32[baseIdx + d] = rng() * 2 * halfExtent - halfExtent
         } else {
           f32[baseIdx + d] = 0
         }
       }
-      // Gaussian noise dW ~ N(0, 1) for this center
+      // Gaussian noise dW ~ N(0, 1) at the last slot of the 3rd vec4
       const [g1] = gaussianPair(rng)
-      f32[baseIdx + 3] = g1
+      f32[baseIdx + 11] = g1
     } else {
-      // Unused center slot — zero weight
-      f32[baseIdx] = 0
-      f32[baseIdx + 1] = 0
-      f32[baseIdx + 2] = 0
-      f32[baseIdx + 3] = 0
+      // Unused center slot — zero all 12 floats
+      for (let i = 0; i < 12; i++) f32[baseIdx + i] = 0
     }
   }
 
@@ -225,8 +383,13 @@ export function maybeDispatchStochasticLoc(
     return
   }
 
-  const nLoc = Math.max(1, Math.min(32, config.stochasticNumSites))
-  const numDispatches = Math.ceil(nLoc / MAX_CENTERS_PER_DISPATCH)
+  // Cap to MAX_CENTERS_PER_DISPATCH (8) per step. Multi-batch dispatch is
+  // broken: device.queue.writeBuffer overwrites the uniform buffer before
+  // any encoded compute passes execute, so only the last batch's data
+  // would be visible to all passes. Single-batch is correct and the
+  // performance difference at 8 vs 32 centers is negligible.
+  const nLoc = Math.max(1, Math.min(MAX_CENTERS_PER_DISPATCH, config.stochasticNumSites))
+  const numDispatches = 1
 
   for (let batch = 0; batch < numDispatches; batch++) {
     const batchStart = batch * MAX_CENTERS_PER_DISPATCH
@@ -235,6 +398,39 @@ export function maybeDispatchStochasticLoc(
     const uniformData = packStochasticUniforms(config, state, batchStart, batchCount)
     device.queue.writeBuffer(state.uniformBuffer, 0, uniformData)
 
+    // Compute ⟨L_k⟩ expectations via two-pass reduction.
+    // Only valid for batch 0: device.queue.writeBuffer overwrites the uniform
+    // buffer immediately, so multi-batch encoding within a single command encoder
+    // means only the last write is visible when passes execute. For batches > 0,
+    // zero the expectations (falling back to renormalization-corrected form).
+    const hasExpectPipeline =
+      state.expectReducePipeline &&
+      state.expectReduceBG &&
+      state.expectFinalizePipeline &&
+      state.expectFinalizeBG
+
+    if (hasExpectPipeline && batch === 0) {
+      const rPass = ctx.beginComputePass({
+        label: `tdse-stochastic-expect-reduce-step${step}`,
+      })
+      dispatchCompute(rPass, state.expectReducePipeline!, [state.expectReduceBG!], linearWG)
+      rPass.end()
+
+      const fPass = ctx.beginComputePass({
+        label: `tdse-stochastic-expect-finalize-step${step}`,
+      })
+      dispatchCompute(fPass, state.expectFinalizePipeline!, [state.expectFinalizeBG!], 1)
+      fPass.end()
+    } else if (batch > 0) {
+      // Zero expectations for non-first batches (no ⟨L_k⟩ subtraction)
+      device.queue.writeBuffer(
+        state.expectResultBuffer!,
+        0,
+        new Float32Array(MAX_EXPECTATION_FLOATS)
+      )
+    }
+
+    // Apply the stochastic localization kick
     const pass = ctx.beginComputePass({
       label: `tdse-stochastic-loc-step${step}-batch${batch}`,
     })
@@ -256,7 +452,13 @@ export function resetStochasticLocState(state: StochasticLocState): void {
 export function disposeStochasticLoc(state: StochasticLocState): void {
   state.uniformBuffer?.destroy()
   state.uniformBuffer = null
+  state.expectPartialBuffer?.destroy()
+  state.expectPartialBuffer = null
+  state.expectResultBuffer?.destroy()
+  state.expectResultBuffer = null
   state.bg = null
+  state.expectReduceBG = null
+  state.expectFinalizeBG = null
   state.stepCounter = 0
   state.rng = null
   state.lastSeed = -1

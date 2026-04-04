@@ -3,8 +3,8 @@
  *
  * State machine for automated parameter scans across monitoring rate γ.
  * Mirrors andersonSweepStore.ts architecture: each sweep point runs for
- * a configured simulation time, records IPR + norm drift, then advances
- * to the next γ value.
+ * a configured simulation time, records time-averaged IPR + norm drift,
+ * then advances to the next γ value.
  *
  * Coordinates with the TDSE render loop via simTime progression:
  * the consumer reads tick() each diagnostic frame and applies the
@@ -31,7 +31,7 @@ export interface MonitoringSweepConfig {
 export interface MonitoringSweepResult {
   /** Monitoring rate γ for this point */
   gamma: number
-  /** Inverse participation ratio at the end of the point */
+  /** Time-averaged inverse participation ratio over the measurement window */
   ipr: number
   /** Fractional norm drift from initial value */
   normDrift: number
@@ -51,6 +51,10 @@ interface MonitoringSweepState {
   stepStartTime: number
   /** Accumulated results from completed points */
   results: MonitoringSweepResult[]
+  /** IPR samples accumulated during the current step for time-averaging */
+  iprAccumulator: number[]
+  /** Norm drift samples accumulated during the current step */
+  normDriftAccumulator: number[]
 
   /** Start a new sweep. Caller must set the initial γ in the TDSE config. */
   startSweep: (config: MonitoringSweepConfig) => void
@@ -91,6 +95,8 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
   currentStep: 0,
   stepStartTime: 0,
   results: [],
+  iprAccumulator: [],
+  normDriftAccumulator: [],
 
   startSweep: (config) => {
     set({
@@ -99,6 +105,8 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
       currentStep: 0,
       stepStartTime: 0,
       results: [],
+      iprAccumulator: [],
+      normDriftAccumulator: [],
     })
   },
 
@@ -108,24 +116,39 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
 
     // On first tick of a new step, record the start time
     if (state.stepStartTime === 0 && simTime > 0) {
-      set({ stepStartTime: simTime })
+      set({ stepStartTime: simTime, iprAccumulator: [ipr], normDriftAccumulator: [normDrift] })
       return null
     }
 
+    // Accumulate samples for time-averaging
+    const iprSamples = [...state.iprAccumulator, ipr]
+    const ndSamples = [...state.normDriftAccumulator, normDrift]
+
     // Check if enough simulation time has elapsed
     const elapsed = simTime - state.stepStartTime
-    if (elapsed < state.config.timePerStep) return null
+    if (elapsed < state.config.timePerStep) {
+      set({ iprAccumulator: iprSamples, normDriftAccumulator: ndSamples })
+      return null
+    }
 
-    // Record result for current step
+    // Record time-averaged result for current step
     const step = state.currentStep
     const gamma = gammaForStep(state.config, step)
-    const result: MonitoringSweepResult = { gamma, ipr, normDrift }
+    const avgIpr = iprSamples.reduce((a, b) => a + b, 0) / iprSamples.length
+    const avgNormDrift = ndSamples.reduce((a, b) => a + b, 0) / ndSamples.length
+    const result: MonitoringSweepResult = { gamma, ipr: avgIpr, normDrift: avgNormDrift }
     const newResults = [...state.results, result]
     const nextStep = step + 1
 
     if (nextStep >= state.config.steps) {
       // Sweep complete
-      set({ status: 'complete', results: newResults, currentStep: nextStep })
+      set({
+        status: 'complete',
+        results: newResults,
+        currentStep: nextStep,
+        iprAccumulator: [],
+        normDriftAccumulator: [],
+      })
       return null
     }
 
@@ -135,12 +158,20 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
       currentStep: nextStep,
       stepStartTime: 0,
       results: newResults,
+      iprAccumulator: [],
+      normDriftAccumulator: [],
     })
     return nextGamma
   },
 
   abort: () => {
-    set({ status: 'idle', currentStep: 0, stepStartTime: 0 })
+    set({
+      status: 'idle',
+      currentStep: 0,
+      stepStartTime: 0,
+      iprAccumulator: [],
+      normDriftAccumulator: [],
+    })
   },
 
   reset: () => {
@@ -150,6 +181,8 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
       currentStep: 0,
       stepStartTime: 0,
       results: [],
+      iprAccumulator: [],
+      normDriftAccumulator: [],
     })
   },
 }))

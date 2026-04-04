@@ -72,9 +72,9 @@ export function scheduleNormReadback(
           const sumPsi4 = data[4]!
           staging.unmap()
 
-          // Inverse Participation Ratio: IPR = Σ|ψ|⁴ / (Σ|ψ|²)²
-          // IPR → 1/N for extended states, IPR → 1 for fully localized
-          const ipr = totalNorm > 0 ? sumPsi4 / (totalNorm * totalNorm) : 0
+          // Inverse Participation Ratio: IPR = (Σ|ψ|²)² / Σ|ψ|⁴ = 1 / Σp²
+          // IPR → N for extended (delocalized) states, IPR → 1 for fully localized
+          const ipr = sumPsi4 > 0 ? (totalNorm * totalNorm) / sumPsi4 : 0
 
           // Asymmetric maxDensity smoothing
           if (maxDens > 0) {

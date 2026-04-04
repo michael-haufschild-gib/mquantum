@@ -1,9 +1,9 @@
 /**
  * Inverse Participation Ratio (IPR) Utilities
  *
- * Standalone IPR computation for analytical benchmarking.
- * Follows the existing codebase convention: returns Σ|ψ|⁴ / (Σ|ψ|²)²,
- * which goes from 1/N (delocalized) to 1 (fully localized).
+ * IPR = (Σ|ψ|²)² / Σ|ψ|⁴ = 1 / Σp_i²
+ *
+ * Goes from 1 (fully localized / delta) to N (fully delocalized / uniform).
  *
  * @module lib/physics/stochastic/ipr
  */
@@ -13,7 +13,7 @@
  *
  * @param psiRe - Real part
  * @param psiIm - Imaginary part
- * @returns Participation ratio Σ|ψ|⁴/(Σ|ψ|²)² ∈ (0, 1]
+ * @returns IPR = (Σ|ψ|²)² / Σ|ψ|⁴. Ranges from 1 (localized) to N (delocalized).
  */
 export function inverseParticipationRatio(psiRe: Float64Array, psiIm: Float64Array): number {
   let sumPsi2 = 0
@@ -23,32 +23,28 @@ export function inverseParticipationRatio(psiRe: Float64Array, psiIm: Float64Arr
     sumPsi2 += d
     sumPsi4 += d * d
   }
-  if (sumPsi2 === 0) return 0
-  return sumPsi4 / (sumPsi2 * sumPsi2)
+  if (sumPsi4 === 0) return 0
+  return (sumPsi2 * sumPsi2) / sumPsi4
 }
 
 /**
- * Compute normalized IPR: IPR_norm = IPR * N.
+ * Compute normalized IPR: IPR_norm = IPR / N.
  *
- * Maps to [IPR_raw * N] which gives 1 for fully delocalized (uniform)
- * and N for fully localized (delta). This is the conventional "effective
- * number of occupied sites".
- *
- * Note: with our convention IPR_raw = Σp², IPR_raw * N goes from 1 (delocalized) to N (localized).
+ * Maps to [0, 1]: 1/N for fully localized (delta), 1 for fully delocalized (uniform).
  *
  * @param psiRe - Real part
  * @param psiIm - Imaginary part
- * @returns Normalized IPR (1 = delocalized, N = localized)
+ * @returns Normalized IPR ∈ [1/N, 1]
  */
 export function normalizedIPR(psiRe: Float64Array, psiIm: Float64Array): number {
-  return inverseParticipationRatio(psiRe, psiIm) * psiRe.length
+  return inverseParticipationRatio(psiRe, psiIm) / psiRe.length
 }
 
 /**
  * Compute IPR from real-valued density array (|ψ|² already computed).
  *
  * @param density - Array of |ψ_i|² values
- * @returns Participation ratio
+ * @returns IPR = (Σd)² / Σd². Ranges from 1 (localized) to N (delocalized).
  */
 export function iprFromDensity(density: Float64Array | number[]): number {
   let sum2 = 0
@@ -58,6 +54,6 @@ export function iprFromDensity(density: Float64Array | number[]): number {
     sum2 += d
     sum4 += d * d
   }
-  if (sum2 === 0) return 0
-  return sum4 / (sum2 * sum2)
+  if (sum4 === 0) return 0
+  return (sum2 * sum2) / sum4
 }

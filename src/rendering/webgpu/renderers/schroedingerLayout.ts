@@ -207,7 +207,7 @@ const SCHROEDINGER_FIELDS = [
 
   // --- Decoherent branching visualization colors ---
   { name: 'branchColorA', type: 'vec3f' },
-  { name: '_padBranchA', type: 'f32' },
+  { name: 'branchSeparation', type: 'f32' },
   { name: 'branchColorB', type: 'vec3f' },
   { name: '_padBranchB', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]

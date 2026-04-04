@@ -6,7 +6,8 @@
  * truth for GPU shader verification.
  *
  * The operator applies multiplicative Gaussian-weighted noise kicks:
- *   ψ[i] *= (1 + Σ_k √(γ·dt)·G(x_i, c_k, σ)·ξ_k)   where ξ_k ~ N(0,1)
+ *   ψ[i] *= (1 + Σ_k √(γ·dt)·G(x_i, c_k, σ)·(ξ_k - ⟨L_k⟩))
+ * where ξ_k ~ N(0,1) and ⟨L_k⟩ is the expectation of the localization operator.
  *
  * @module lib/physics/stochastic/localizationOperator
  */
@@ -95,7 +96,6 @@ export function applyLocalizationStepND(
   const invTwoSigmaSq = 1 / (2 * sigma * sigma)
   const sqrtGammaDt = Math.sqrt(gamma * dt)
   const halfExtents = gridSize.map((g, d) => g * spacing[d]! * 0.5)
-  const visibleDims = Math.min(latticeDim, 3)
 
   for (let idx = 0; idx < totalSites; idx++) {
     // Convert flat index to coordinates
@@ -110,8 +110,8 @@ export function applyLocalizationStepND(
     let totalFactor = 0
     for (const center of centers) {
       let distSq = 0
-      for (let d = 0; d < visibleDims; d++) {
-        const diff = coords[d]! - center.position[d]!
+      for (let d = 0; d < latticeDim; d++) {
+        const diff = coords[d]! - (center.position[d] ?? 0)
         distSq += diff * diff
       }
       const weight = Math.exp(-distSq * invTwoSigmaSq)

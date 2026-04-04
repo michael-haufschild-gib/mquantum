@@ -1,6 +1,9 @@
 /**
  * IPR computation tests against analytical values.
  *
+ * Convention: IPR = (Σ|ψ|²)² / Σ|ψ|⁴ = 1/Σp²
+ * Ranges from 1 (fully localized / delta) to N (fully delocalized / uniform).
+ *
  * Pattern: follows analyticalBenchmarks.test.ts
  * (exact analytical values, stated tolerances).
  */
@@ -14,15 +17,15 @@ import {
 } from '@/lib/physics/stochastic/ipr'
 
 describe('inverseParticipationRatio', () => {
-  it('IPR of uniform distribution = 1/N', () => {
+  it('IPR of uniform distribution = N', () => {
     const N = 256
     const amp = 1 / Math.sqrt(N)
     const psiRe = new Float64Array(N).fill(amp)
     const psiIm = new Float64Array(N).fill(0)
 
     const ipr = inverseParticipationRatio(psiRe, psiIm)
-    // Σ|ψ|⁴ = N * (1/N)² = 1/N, (Σ|ψ|²)² = 1, so IPR = 1/N
-    expect(Math.abs(ipr - 1 / N)).toBeLessThan(1e-10)
+    // Σ|ψ|⁴ = N * (1/N)² = 1/N, (Σ|ψ|²)² = 1, so IPR = 1/(1/N) = N
+    expect(Math.abs(ipr - N)).toBeLessThan(1e-6)
   })
 
   it('IPR of delta function = 1', () => {
@@ -35,7 +38,7 @@ describe('inverseParticipationRatio', () => {
     expect(Math.abs(ipr - 1)).toBeLessThan(1e-10)
   })
 
-  it('IPR of two equal peaks = 1/2', () => {
+  it('IPR of two equal peaks = 2', () => {
     const N = 256
     const psiRe = new Float64Array(N)
     const psiIm = new Float64Array(N)
@@ -43,11 +46,11 @@ describe('inverseParticipationRatio', () => {
     psiRe[50] = 1 / Math.sqrt(2)
 
     const ipr = inverseParticipationRatio(psiRe, psiIm)
-    // Σ|ψ|⁴ = 2*(1/2)² = 1/2, (Σ|ψ|²)² = 1, so IPR = 1/2
-    expect(Math.abs(ipr - 0.5)).toBeLessThan(1e-10)
+    // Σ|ψ|⁴ = 2*(1/2)² = 1/2, (Σ|ψ|²)² = 1, so IPR = 1/(1/2) = 2
+    expect(Math.abs(ipr - 2)).toBeLessThan(1e-10)
   })
 
-  it('IPR of Gaussian wavepacket is between delta (1) and uniform (1/N)', () => {
+  it('IPR of Gaussian wavepacket is between delta (1) and uniform (N)', () => {
     const N = 256
     const spacing = 0.1
     const sigma = 0.5
@@ -67,11 +70,11 @@ describe('inverseParticipationRatio', () => {
 
     const ipr = inverseParticipationRatio(psiRe, psiIm)
 
-    // Gaussian is between uniform (1/N) and delta (1)
-    expect(ipr).toBeGreaterThan(1 / N)
-    expect(ipr).toBeLessThan(1)
+    // Gaussian is between delta (1) and uniform (N)
+    expect(ipr).toBeGreaterThan(1)
+    expect(ipr).toBeLessThan(N)
 
-    // Narrower Gaussian → higher IPR (more localized)
+    // Narrower Gaussian → lower IPR (more localized)
     const sigma2 = 0.2
     const psiRe2 = new Float64Array(N)
     const psiIm2 = new Float64Array(N)
@@ -85,7 +88,7 @@ describe('inverseParticipationRatio', () => {
     for (let i = 0; i < N; i++) psiRe2[i]! *= scale2
 
     const ipr2 = inverseParticipationRatio(psiRe2, psiIm2)
-    expect(ipr2).toBeGreaterThan(ipr) // Narrower → more localized → higher IPR
+    expect(ipr2).toBeLessThan(ipr) // Narrower → more localized → lower IPR
   })
 
   it('returns 0 for zero wavefunction', () => {
@@ -105,13 +108,13 @@ describe('normalizedIPR', () => {
     expect(Math.abs(nipr - 1)).toBeLessThan(1e-8)
   })
 
-  it('delta → normalizedIPR = N', () => {
+  it('delta → normalizedIPR = 1/N', () => {
     const N = 100
     const psiRe = new Float64Array(N)
     const psiIm = new Float64Array(N)
     psiRe[50] = 1.0
     const nipr = normalizedIPR(psiRe, psiIm)
-    expect(Math.abs(nipr - N)).toBeLessThan(1e-8)
+    expect(Math.abs(nipr - 1 / N)).toBeLessThan(1e-8)
   })
 })
 
