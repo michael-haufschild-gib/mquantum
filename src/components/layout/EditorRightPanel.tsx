@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { AnalysisSection } from '@/components/sections/Advanced/AnalysisSection'
+import { CoordinateEntanglementSection } from '@/components/sections/Advanced/CoordinateEntanglementSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/OpenQuantumDiagnosticsSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
@@ -26,6 +27,7 @@ const ObjectTabContent: React.FC = React.memo(() => {
       <AbsorptionSection defaultOpen={true} />
       <AnalysisSection defaultOpen={true} />
       <DecoherenceSection />
+      <CoordinateEntanglementSection />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <AdvancedObjectControls />
       <OpenQuantumDiagnosticsSection />

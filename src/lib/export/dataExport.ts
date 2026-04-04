@@ -7,6 +7,7 @@
  * @module lib/export/dataExport
  */
 
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -21,6 +22,24 @@ import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
  * @returns Array of values in chronological order (oldest first)
  */
 export function readRingBuffer(buffer: Float32Array, head: number, count: number): number[] {
+  const result: number[] = []
+  const len = buffer.length
+  const start = (head - count + len) % len
+  for (let i = 0; i < count; i++) {
+    result.push(buffer[(start + i) % len]!)
+  }
+  return result
+}
+
+/**
+ * Read a Float64Array ring buffer in chronological order.
+ *
+ * @param buffer - Ring buffer source
+ * @param head - Current write head position
+ * @param count - Number of valid entries
+ * @returns Array of values in chronological order
+ */
+export function readRingBuffer64(buffer: Float64Array, head: number, count: number): number[] {
   const result: number[] = []
   const len = buffer.length
   const start = (head - count + len) % len
@@ -195,6 +214,50 @@ export function exportPauliDiagnosticsCSV(): string {
   const lines = ['frame,norm,spinUpFraction,spinExpectationZ']
   for (let i = 0; i < count; i++) {
     lines.push(`${i},${norm[i]},${spinUp[i]},${spinExpZ[i]}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Export coordinate entanglement time-series as CSV.
+ *
+ * @returns CSV string with columns: frame, averageEntropy, per-dimension entropies
+ */
+export function exportEntanglementCSV(): string {
+  const state = useCoordinateEntanglementStore.getState()
+  const { historyHead: head, historyCount: count } = state
+
+  if (count === 0) return ''
+
+  const avg = readRingBuffer64(state.historyAverage, head, count)
+  const N = state.currentEntropies.length
+  const perDim: number[][] = []
+  for (let d = 0; d < N; d++) {
+    perDim.push(readRingBuffer64(state.historyEntropies[d]!, head, count))
+  }
+
+  const dimHeaders = Array.from({ length: N }, (_, d) => `S_${d}`).join(',')
+  const lines = [`frame,averageEntropy,${dimHeaders}`]
+  for (let i = 0; i < count; i++) {
+    const dimVals = perDim.map((arr) => arr[i]).join(',')
+    lines.push(`${i},${avg[i]},${dimVals}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Export atlas sweep results as CSV.
+ *
+ * @returns CSV string with columns: lambda, dimension, normalizedEntropy
+ */
+export function exportAtlasSweepCSV(): string {
+  const state = useCoordinateEntanglementStore.getState()
+
+  if (state.sweepResults.length === 0) return ''
+
+  const lines = ['lambda,dimension,normalizedEntropy']
+  for (const r of state.sweepResults) {
+    lines.push(`${r.lambda},${r.dim},${r.entropy}`)
   }
   return lines.join('\n')
 }
