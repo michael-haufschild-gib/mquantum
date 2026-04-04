@@ -394,7 +394,7 @@ export const TimelineControls: FC = () => {
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
               className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
-              Open Q
+              Open Quantum
             </ToggleButton>
           )}
 
