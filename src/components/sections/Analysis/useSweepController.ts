@@ -10,6 +10,7 @@
 import { useEffect, useRef } from 'react'
 
 import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
+import { logger } from '@/lib/logger'
 import {
   type AtlasSweepConfig,
   lambdaForStep,
@@ -96,33 +97,43 @@ export function useSweepController(): {
     }
 
     sweepTickRef.current = setInterval(() => {
-      const entStore = useCoordinateEntanglementStore.getState()
-      if (entStore.sweepStatus !== 'running') return
+      try {
+        const entStore = useCoordinateEntanglementStore.getState()
+        if (entStore.sweepStatus !== 'running') return
 
-      const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
-      const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
+        const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
+        const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
 
-      if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
-        entStore.recordSweepSample(entStore.currentNormalizedEntropy)
-      }
-
-      if (samplesSinceStart >= totalNeeded) {
-        entStore.completeSweepStep()
-        const next = entStore.advanceSweepStep()
-
-        if (next) {
-          stepStartNRef.current = entStore.longTimeN
-          const ext = useExtendedObjectStore.getState()
-          ext.setTdseAnharmonicLambda(next.lambda)
-          const currentDim = useGeometryStore.getState().dimension
-          if (currentDim !== next.dim) {
-            useGeometryStore.getState().setDimension(next.dim)
-          }
-          ext.resetTdseField()
-        } else {
-          entStore.completeSweep()
-          restorePreSweepState()
+        if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
+          entStore.recordSweepSample(entStore.currentNormalizedEntropy)
         }
+
+        if (samplesSinceStart >= totalNeeded) {
+          entStore.completeSweepStep()
+          const next = entStore.advanceSweepStep()
+
+          if (next) {
+            stepStartNRef.current = entStore.longTimeN
+            const ext = useExtendedObjectStore.getState()
+            ext.setTdseAnharmonicLambda(next.lambda)
+            const currentDim = useGeometryStore.getState().dimension
+            if (currentDim !== next.dim) {
+              useGeometryStore.getState().setDimension(next.dim)
+            }
+            ext.resetTdseField()
+          } else {
+            entStore.completeSweep()
+            restorePreSweepState()
+          }
+        }
+      } catch (err) {
+        logger.error('[SweepController] poll error, aborting sweep:', err)
+        if (sweepTickRef.current) {
+          clearInterval(sweepTickRef.current)
+          sweepTickRef.current = null
+        }
+        useCoordinateEntanglementStore.getState().abortSweep()
+        restorePreSweepState()
       }
     }, SWEEP_POLL_MS)
 

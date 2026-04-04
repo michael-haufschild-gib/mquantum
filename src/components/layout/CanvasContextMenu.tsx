@@ -169,7 +169,7 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
                 >
                   <span>{item.label}</span>
                   {item.shortcut && (
-                    <span className="text-[9px] font-mono text-text-tertiary group-hover:text-text-secondary">
+                    <span className="text-xs font-mono text-text-tertiary group-hover:text-text-secondary">
                       {item.shortcut}
                     </span>
                   )}

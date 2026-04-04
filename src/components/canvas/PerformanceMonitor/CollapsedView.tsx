@@ -167,9 +167,7 @@ export const CollapsedView = React.memo(function CollapsedView() {
           >
             <span ref={fpsRef}>{initialState.fps}</span>
           </span>
-          <span className="text-[9px] uppercase tracking-wider text-text-tertiary font-bold">
-            FPS
-          </span>
+          <span className="text-xs uppercase tracking-wider text-text-tertiary font-bold">FPS</span>
         </div>
       </div>
 

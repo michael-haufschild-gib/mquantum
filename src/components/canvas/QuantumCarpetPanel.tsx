@@ -291,7 +291,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
 
           {/* Color bar */}
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[9px] text-neutral-500">max</span>
+            <span className="text-xs text-neutral-500">max</span>
             <canvas
               ref={colorBarCanvasRef}
               width={COLORBAR_W}
@@ -299,14 +299,14 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               className="block rounded-sm"
               style={{ width: COLORBAR_W, height: CARPET_CANVAS_H }}
             />
-            <span className="text-[9px] text-neutral-500">0</span>
+            <span className="text-xs text-neutral-500">0</span>
           </div>
 
           {/* Y-axis label (time) */}
           <div className="flex flex-col justify-between items-center py-2">
-            <span className="text-[9px] text-neutral-500 [writing-mode:vertical-rl]">old</span>
-            <span className="text-[9px] text-neutral-400 [writing-mode:vertical-rl]">t</span>
-            <span className="text-[9px] text-neutral-500 [writing-mode:vertical-rl]">new</span>
+            <span className="text-xs text-neutral-500 [writing-mode:vertical-rl]">old</span>
+            <span className="text-xs text-neutral-400 [writing-mode:vertical-rl]">t</span>
+            <span className="text-xs text-neutral-500 [writing-mode:vertical-rl]">new</span>
           </div>
         </div>
 

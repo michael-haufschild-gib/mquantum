@@ -90,7 +90,7 @@ const PauliDiagnosticsInline: React.FC = React.memo(() => {
   return (
     <div className="mt-2" data-testid="pauli-analysis-inline">
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <div className="px-2 py-1.5 space-y-0.5 text-[9px] font-mono leading-tight text-text-secondary">
+        <div className="px-2 py-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
               {/* Spin component fractions */}

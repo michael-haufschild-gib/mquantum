@@ -121,8 +121,9 @@ export const MeasurementControls: React.FC = React.memo(() => {
       }
     >
       {enabled && (
-        <div
-          className={`space-y-3 transition-opacity${sweepRunning ? ' pointer-events-none opacity-50' : ''}`}
+        <fieldset
+          disabled={sweepRunning}
+          className={`space-y-3 transition-opacity border-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
         >
           <div className="text-xs text-text-tertiary">Click the volume to sample from |psi|^2</div>
 
@@ -183,7 +184,7 @@ export const MeasurementControls: React.FC = React.memo(() => {
           >
             Clear Measurements
           </Button>
-        </div>
+        </fieldset>
       )}
     </ControlGroup>
   )

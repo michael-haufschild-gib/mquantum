@@ -242,7 +242,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
         </svg>
 
         {/* BEC observables readout */}
-        <div className="px-2 pb-1.5 space-y-0.5 text-[9px] font-mono leading-tight text-text-secondary">
+        <div className="px-2 pb-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
               <div className="flex gap-3">

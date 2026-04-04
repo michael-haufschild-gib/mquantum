@@ -147,6 +147,7 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
             tooltip="Track inter-dimensional entanglement entropy via reduced density matrices. Runs in a Web Worker to avoid blocking rendering."
             checked={enabled}
             onCheckedChange={handleEnableChange}
+            disabled={sweepStatus === 'running'}
           />
           {enabled && (sweepStatus === 'idle' || sweepStatus === 'complete') && (
             <Button variant="primary" size="sm" onClick={handleStartSweep}>

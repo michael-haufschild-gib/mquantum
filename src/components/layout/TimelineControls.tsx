@@ -254,6 +254,21 @@ export const TimelineControls: FC = () => {
                   )
                 })}
               </div>
+
+              <div className="pt-3 border-t border-border-subtle">
+                <div className="w-48">
+                  <Slider
+                    label="SPEED BIAS"
+                    tooltip="Varies rotation speed per plane. At 0 all planes rotate uniformly; at 1 each plane gets a unique speed spread via the golden ratio."
+                    min={MIN_ANIMATION_BIAS}
+                    max={MAX_ANIMATION_BIAS}
+                    step={0.05}
+                    value={animationBias}
+                    onChange={setAnimationBias}
+                    showValue={true}
+                  />
+                </div>
+              </div>
             </div>
           </m.div>
         )}
@@ -340,20 +355,6 @@ export const TimelineControls: FC = () => {
           />
         </div>
 
-        {/* Bias Slider */}
-        <div className="w-28 sm:w-44 pt-2.5 ps-3 border-s border-border-subtle shrink-0">
-          <Slider
-            label="BIAS"
-            tooltip="Controls how animation time is distributed across dimensions"
-            min={MIN_ANIMATION_BIAS}
-            max={MAX_ANIMATION_BIAS}
-            step={0.05}
-            value={animationBias}
-            onChange={setAnimationBias}
-            showValue={true}
-          />
-        </div>
-
         <div className="flex-1 min-w-3" />
 
         {/* Drawer Toggles */}
@@ -373,7 +374,7 @@ export const TimelineControls: FC = () => {
             >
               Effects
               <span
-                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
               >
                 {activeAnimationCount}
               </span>
@@ -411,7 +412,7 @@ export const TimelineControls: FC = () => {
           >
             Rotate
             <span
-              className={`ms-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+              className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
             >
               {animatingPlanes.size}
             </span>

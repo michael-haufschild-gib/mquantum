@@ -84,8 +84,9 @@ function DecoherenceContent() {
 
   return (
     <Section title="Decoherence">
-      <div
-        className={`space-y-0 transition-opacity${sweepRunning ? ' pointer-events-none opacity-50' : ''}`}
+      <fieldset
+        disabled={sweepRunning}
+        className={`space-y-0 transition-opacity border-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
       >
         <Switch
           label="Enable Decoherence"
@@ -159,7 +160,7 @@ function DecoherenceContent() {
             <MonitoringSweepSection />
           </>
         )}
-      </div>
+      </fieldset>
     </Section>
   )
 }

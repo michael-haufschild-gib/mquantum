@@ -78,7 +78,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
               {activeShaderInfo.features.map((f) => (
                 <span
                   key={f}
-                  className="px-2 py-1 bg-success border border-success-border text-success rounded text-[9px] font-mono uppercase tracking-wide"
+                  className="px-2 py-1 bg-success border border-success-border text-success rounded text-xs font-mono uppercase tracking-wide"
                 >
                   {f}
                 </span>

@@ -21,7 +21,7 @@ export const InfoCard = ({
   highlight?: boolean
 }) => (
   <div className="bg-[var(--bg-hover)] rounded-md p-2 border border-[var(--border-subtle)]">
-    <div className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">
+    <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">
       {label}
     </div>
     <div
@@ -44,7 +44,7 @@ export const ProgressBar = ({
   color: string
 }) => (
   <div>
-    <div className="flex justify-between text-[9px] text-[var(--text-tertiary)] mb-1">
+    <div className="flex justify-between text-xs text-[var(--text-tertiary)] mb-1">
       <span>{label}</span>
       <span>{formatBytes(value)}</span>
     </div>
@@ -78,7 +78,7 @@ export const BufferRow = ({
       <span className="text-xs font-mono text-[var(--text-tertiary)]">
         {w}×{h}
       </span>
-      <span className="text-[9px] font-mono text-[var(--text-tertiary)] w-8 text-right">
+      <span className="text-xs font-mono text-[var(--text-tertiary)] w-8 text-right">
         {baseW > 0 ? (w / baseW).toFixed(2) : '-'}x
       </span>
     </div>

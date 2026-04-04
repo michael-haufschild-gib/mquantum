@@ -284,7 +284,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
         </svg>
 
         {/* Metrics readout */}
-        <div className="px-2 pb-1.5 flex gap-3 text-[9px] font-mono leading-tight text-text-secondary">
+        <div className="px-2 pb-1.5 flex gap-3 text-xs font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
               {isAnderson ? (

@@ -257,7 +257,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                   data-testid={dataTestId ? `${dataTestId}-input` : undefined}
                 />
                 {unit && (
-                  <span className="absolute end-1.5 top-1/2 -translate-y-1/2 text-[9px] text-text-tertiary font-medium pointer-events-none">
+                  <span className="absolute end-1.5 top-1/2 -translate-y-1/2 text-xs text-text-tertiary font-medium pointer-events-none">
                     {unit}
                   </span>
                 )}
@@ -268,7 +268,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
 
         {/* Track Labels */}
         {(minLabel || maxLabel) && (
-          <div className="flex justify-between text-[9px] text-text-tertiary mb-1 px-0.5">
+          <div className="flex justify-between text-xs text-text-tertiary mb-1 px-0.5">
             <span>{minLabel}</span>
             <span>{maxLabel}</span>
           </div>

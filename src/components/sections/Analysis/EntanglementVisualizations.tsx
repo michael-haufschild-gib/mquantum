@@ -445,10 +445,10 @@ export const AtlasHeatmap: React.FC<{
             λ = {hovered.lambda.toFixed(2)}, N = {hovered.dim}
           </div>
           <div className="text-xs text-text-secondary mt-0.5">
-            S̄/S_max = {(hovered.frac * 100).toFixed(1)}% — {entropyLabel(hovered.frac)}
+            S̄/S_max = {(hovered.entropy * 100).toFixed(1)}% — {entropyLabel(hovered.entropy)}
           </div>
           <div className="text-xs text-text-tertiary mt-0.5 leading-snug">
-            {entropyDesc(hovered.frac)}
+            {entropyDesc(hovered.entropy)}
           </div>
         </div>
       )}
