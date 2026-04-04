@@ -18,28 +18,76 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
+/** Mapping from URL state key → TDSE setter name on the extended object store. */
+const TDSE_PARAM_MAP: ReadonlyArray<
+  readonly [keyof ParsedShareableState, keyof ReturnType<typeof useExtendedObjectStore.getState>]
+> = [
+  ['potentialType', 'setTdsePotentialType'],
+  ['absorberEnabled', 'setTdseAbsorberEnabled'],
+  ['diagnosticsEnabled', 'setTdseDiagnosticsEnabled'],
+  ['observablesEnabled', 'setTdseObservablesEnabled'],
+  ['imaginaryTimeEnabled', 'setTdseImaginaryTimeEnabled'],
+  ['customPotentialExpression', 'setTdseCustomPotentialExpression'],
+  ['anharmonicLambda', 'setTdseAnharmonicLambda'],
+  ['disorderStrength', 'setTdseDisorderStrength'],
+  ['disorderSeed', 'setTdseDisorderSeed'],
+  ['disorderDistribution', 'setTdseDisorderDistribution'],
+] as const
+
 /** Apply TDSE-specific URL state params. */
 function applyTdseParams(
   urlState: ParsedShareableState,
   ext: ReturnType<typeof useExtendedObjectStore.getState>
 ): void {
-  if (urlState.potentialType !== undefined) ext.setTdsePotentialType(urlState.potentialType)
-  if (urlState.absorberEnabled !== undefined) ext.setTdseAbsorberEnabled(urlState.absorberEnabled)
-  if (urlState.diagnosticsEnabled !== undefined)
-    ext.setTdseDiagnosticsEnabled(urlState.diagnosticsEnabled)
-  if (urlState.observablesEnabled !== undefined)
-    ext.setTdseObservablesEnabled(urlState.observablesEnabled)
-  if (urlState.imaginaryTimeEnabled !== undefined)
-    ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
-  if (urlState.customPotentialExpression !== undefined)
-    ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
-  if (urlState.anharmonicLambda !== undefined)
-    ext.setTdseAnharmonicLambda(urlState.anharmonicLambda)
-  if (urlState.disorderStrength !== undefined)
-    ext.setTdseDisorderStrength(urlState.disorderStrength)
-  if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
-  if (urlState.disorderDistribution !== undefined)
-    ext.setTdseDisorderDistribution(urlState.disorderDistribution as 'uniform' | 'gaussian')
+  for (const [urlKey, setter] of TDSE_PARAM_MAP) {
+    if (urlState[urlKey] !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic dispatch from validated lookup table
+      ;(ext[setter] as (v: any) => void)(urlState[urlKey])
+    }
+  }
+}
+
+/** Apply open-quantum URL state params. */
+function applyOpenQuantumParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.openQuantumEnabled === undefined) return
+
+  ext.setOpenQuantumEnabled(urlState.openQuantumEnabled)
+  if (urlState.openQuantumDephasingRate !== undefined)
+    ext.setOpenQuantumDephasingRate(urlState.openQuantumDephasingRate)
+  if (urlState.openQuantumRelaxationRate !== undefined)
+    ext.setOpenQuantumRelaxationRate(urlState.openQuantumRelaxationRate)
+  if (urlState.openQuantumThermalUpRate !== undefined)
+    ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
+}
+
+/** Apply stochastic decoherence URL state params. */
+function applyStochasticParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.stochasticEnabled === undefined) return
+
+  ext.setTdseStochasticEnabled(urlState.stochasticEnabled)
+  if (urlState.stochasticGamma !== undefined) ext.setTdseStochasticGamma(urlState.stochasticGamma)
+  if (urlState.stochasticSigma !== undefined) ext.setTdseStochasticSigma(urlState.stochasticSigma)
+  if (urlState.stochasticNumSites !== undefined)
+    ext.setTdseStochasticNumSites(urlState.stochasticNumSites)
+}
+
+/** Apply coordinate entanglement URL state params (lazy import). */
+function applyEntanglementParams(urlState: ParsedShareableState): void {
+  if (urlState.entanglementEnabled === undefined) return
+
+  void import('@/stores/coordinateEntanglementStore').then(({ useCoordinateEntanglementStore }) => {
+    const entStore = useCoordinateEntanglementStore.getState()
+    entStore.setEnabled(urlState.entanglementEnabled!)
+    if (urlState.entanglementPairwiseMI !== undefined) {
+      entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+    }
+  })
 }
 
 /**
@@ -84,39 +132,9 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyTdseParams(urlState, ext)
 
     // ── Features ─────────────────────────────────────────────────────────────
-    if (urlState.openQuantumEnabled !== undefined) {
-      ext.setOpenQuantumEnabled(urlState.openQuantumEnabled)
-      if (urlState.openQuantumDephasingRate !== undefined)
-        ext.setOpenQuantumDephasingRate(urlState.openQuantumDephasingRate)
-      if (urlState.openQuantumRelaxationRate !== undefined)
-        ext.setOpenQuantumRelaxationRate(urlState.openQuantumRelaxationRate)
-      if (urlState.openQuantumThermalUpRate !== undefined)
-        ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
-    }
-
-    // Stochastic decoherence
-    if (urlState.stochasticEnabled !== undefined) {
-      ext.setTdseStochasticEnabled(urlState.stochasticEnabled)
-      if (urlState.stochasticGamma !== undefined)
-        ext.setTdseStochasticGamma(urlState.stochasticGamma)
-      if (urlState.stochasticSigma !== undefined)
-        ext.setTdseStochasticSigma(urlState.stochasticSigma)
-      if (urlState.stochasticNumSites !== undefined)
-        ext.setTdseStochasticNumSites(urlState.stochasticNumSites)
-    }
-
-    // Coordinate entanglement (lazy import to avoid loading code for non-TDSE modes)
-    if (urlState.entanglementEnabled !== undefined) {
-      void import('@/stores/coordinateEntanglementStore').then(
-        ({ useCoordinateEntanglementStore }) => {
-          const entStore = useCoordinateEntanglementStore.getState()
-          entStore.setEnabled(urlState.entanglementEnabled!)
-          if (urlState.entanglementPairwiseMI !== undefined) {
-            entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
-          }
-        }
-      )
-    }
+    applyOpenQuantumParams(urlState, ext)
+    applyStochasticParams(urlState, ext)
+    applyEntanglementParams(urlState)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   }

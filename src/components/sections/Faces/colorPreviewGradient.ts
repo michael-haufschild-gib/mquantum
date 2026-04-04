@@ -137,62 +137,113 @@ function computePhaseColor(
   return null
 }
 
+/** Blend a neutral color with a wing color by strength, scaled by brightness. */
+function blendNeutralWing(
+  neutral: readonly [number, number, number],
+  wing: readonly [number, number, number],
+  strength: number,
+  brightness: number
+): [number, number, number] {
+  return [
+    (neutral[0] * (1 - strength) + wing[0] * strength) * brightness,
+    (neutral[1] * (1 - strength) + wing[1] * strength) * brightness,
+    (neutral[2] * (1 - strength) + wing[2] * strength) * brightness,
+  ]
+}
+
+function computePhaseDiverging(t: number, p: GradientParams): [number, number, number] {
+  const signCarrier = Math.cos(t * Math.PI * 2)
+  const signStrength = Math.abs(signCarrier)
+  const neutral = hexToSrgbTuple(p.phaseDiverging.neutralColor)
+  const wing = hexToSrgbTuple(
+    signCarrier >= 0 ? p.phaseDiverging.positiveColor : p.phaseDiverging.negativeColor
+  )
+  return blendNeutralWing(neutral, wing, signStrength, 0.2 + 0.8 * t)
+}
+
+function computeDivergingPsi(t: number, p: GradientParams): [number, number, number] {
+  const signCarrier =
+    p.divergingPsi.component === 'imag' ? Math.sin(t * Math.PI * 2) : Math.cos(t * Math.PI * 2)
+  const signStrength = Math.abs(signCarrier)
+  const neutral = hexToSrgbTuple(p.divergingPsi.neutralColor)
+  const wing = hexToSrgbTuple(
+    signCarrier >= 0 ? p.divergingPsi.positiveColor : p.divergingPsi.negativeColor
+  )
+  const floor = Math.max(0, Math.min(1, p.divergingPsi.intensityFloor))
+  return blendNeutralWing(neutral, wing, signStrength, floor + (1 - floor) * signStrength)
+}
+
+function computeDomainColoringPsi(t: number, p: GradientParams): [number, number, number] {
+  const isLog = p.domainColoring.modulusMode === 'logPsiAbs'
+  const modulusValue = isLog ? 0.5 + 0.5 * t : t
+  const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * modulusValue))
+  const [r, g, b] = hslToRgb(t, 0.85, lightness)
+  if (!p.domainColoring.contoursEnabled) return [r, g, b]
+  const cd = Math.max(1, p.domainColoring.contourDensity)
+  const cw = Math.max(0.005, Math.min(0.25, p.domainColoring.contourWidth))
+  const cs = Math.max(0, Math.min(1, p.domainColoring.contourStrength))
+  const logMod = isLog ? -4 + 4 * t : -8 + 8 * t
+  const cp = (((logMod * cd) % 1) + 1) % 1
+  const ld = Math.min(cp, 1 - cp)
+  const ew = Math.max(0.001, cw * 0.5)
+  const lm = ld <= ew ? 1 : Math.max(0, 1 - (ld - ew) / ew)
+  const darken = 1 - cs * lm * 0.85
+  return [r * darken, g * darken, b * darken]
+}
+
+type ColorFn = (t: number, p: GradientParams) => [number, number, number]
+
+const DIVERGING_ALGORITHMS: Record<string, ColorFn> = {
+  phaseDiverging: computePhaseDiverging,
+  diverging: computeDivergingPsi,
+  domainColoringPsi: computeDomainColoringPsi,
+  relativePhase: (t) => hslToRgb(t, 0.85, t),
+}
+
 /** Compute color for diverging/domain-coloring algorithms. */
 function computeDivergingColor(
   alg: string,
   t: number,
   p: GradientParams
 ): [number, number, number] | null {
-  if (alg === 'phaseDiverging') {
-    const signCarrier = Math.cos(t * Math.PI * 2)
-    const signStrength = Math.abs(signCarrier)
-    const neutral = hexToSrgbTuple(p.phaseDiverging.neutralColor)
-    const wing =
-      signCarrier >= 0
-        ? hexToSrgbTuple(p.phaseDiverging.positiveColor)
-        : hexToSrgbTuple(p.phaseDiverging.negativeColor)
-    const mag = 0.2 + 0.8 * t
-    return [
-      (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * mag,
-      (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * mag,
-      (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * mag,
-    ]
-  }
-  if (alg === 'diverging') {
-    const signCarrier =
-      p.divergingPsi.component === 'imag' ? Math.sin(t * Math.PI * 2) : Math.cos(t * Math.PI * 2)
-    const signStrength = Math.abs(signCarrier)
-    const neutral = hexToSrgbTuple(p.divergingPsi.neutralColor)
-    const wing =
-      signCarrier >= 0
-        ? hexToSrgbTuple(p.divergingPsi.positiveColor)
-        : hexToSrgbTuple(p.divergingPsi.negativeColor)
-    const floor = Math.max(0, Math.min(1, p.divergingPsi.intensityFloor))
-    const intensity = floor + (1 - floor) * signStrength
-    return [
-      (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * intensity,
-      (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * intensity,
-      (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * intensity,
-    ]
-  }
-  if (alg === 'domainColoringPsi') {
-    const modulusValue = p.domainColoring.modulusMode === 'logPsiAbs' ? 0.5 + 0.5 * t : t
-    const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * modulusValue))
-    const [r, g, b] = hslToRgb(t, 0.85, lightness)
-    if (!p.domainColoring.contoursEnabled) return [r, g, b]
-    const cd = Math.max(1, p.domainColoring.contourDensity)
-    const cw = Math.max(0.005, Math.min(0.25, p.domainColoring.contourWidth))
-    const cs = Math.max(0, Math.min(1, p.domainColoring.contourStrength))
-    const logMod = p.domainColoring.modulusMode === 'logPsiAbs' ? -4 + 4 * t : -8 + 8 * t
-    const cp = (((logMod * cd) % 1) + 1) % 1
-    const ld = Math.min(cp, 1 - cp)
-    const ew = Math.max(0.001, cw * 0.5)
-    const lm = ld <= ew ? 1 : Math.max(0, 1 - (ld - ew) / ew)
-    const darken = 1 - cs * lm * 0.85
-    return [r * darken, g * darken, b * darken]
-  }
-  if (alg === 'relativePhase') return hslToRgb(t, 0.85, t)
-  return null
+  const fn = DIVERGING_ALGORITHMS[alg]
+  return fn ? fn(t, p) : null
+}
+
+function computeBlackbody(t: number): [number, number, number] {
+  const temp = t * 12000
+  if (temp < 500) return [0, 0, 0]
+  const tk = temp / 100
+  const r = tk <= 66 ? 1.0 : (329.698727446 * Math.pow(tk - 60, -0.1332047592)) / 255
+  const g =
+    tk <= 66
+      ? (99.4708025861 * Math.log(tk) - 161.1195681661) / 255
+      : (288.1221695283 * Math.pow(tk - 60, -0.0755148492)) / 255
+  const b =
+    tk >= 66 ? 1.0 : tk <= 19 ? 0 : (138.5177312231 * Math.log(tk - 10) - 305.0447927307) / 255
+  return [Math.min(1, Math.max(0, r)), Math.min(1, Math.max(0, g)), Math.min(1, Math.max(0, b))]
+}
+
+type SpectralColorFn = (t: number) => [number, number, number]
+
+const SPECTRAL_ALGORITHMS: Record<string, SpectralColorFn> = {
+  blackbody: computeBlackbody,
+  radialDistance: (t) => hslToRgb(0.8 * Math.max(0, Math.min(1, t)), 1.0, 0.5),
+  hamiltonianDecomposition: (t) => {
+    const br = Math.max(0, Math.min(1, t * 1.5))
+    return [t * t * br, Math.sin(t * Math.PI) * 0.8 * br, (1 - t) * (1 - t) * br]
+  },
+  modeCharacter: (t) => hslToRgb(t * 0.8, Math.min(1, t * 10), Math.min(1, Math.sqrt(t) * 2) * 0.5),
+  energyFlux: (t) => {
+    const br = Math.max(0, Math.min(1, Math.log(t + 1e-6) / 4 + 1))
+    return hslToRgb(t, 0.8, Math.max(0.2, 0.6 * br))
+  },
+  kSpaceOccupation: (t) =>
+    hslToRgb(
+      0.7 + (0.12 - 0.7) * t,
+      0.6 + (0.95 - 0.6) * Math.min(1, Math.max(0, t / 0.5)),
+      0.08 + (0.55 - 0.08) * t
+    ),
 }
 
 /** Compute color for spectral/scientific colormaps. */
@@ -201,41 +252,8 @@ function computeSpectralColor(
   t: number,
   _p: GradientParams
 ): [number, number, number] | null {
-  if (alg === 'blackbody') {
-    const temp = t * 12000
-    if (temp < 500) return [0, 0, 0]
-    const tk = temp / 100
-    let r = tk <= 66 ? 1.0 : (329.698727446 * Math.pow(tk - 60, -0.1332047592)) / 255
-    let g =
-      tk <= 66
-        ? (99.4708025861 * Math.log(tk) - 161.1195681661) / 255
-        : (288.1221695283 * Math.pow(tk - 60, -0.0755148492)) / 255
-    let b =
-      tk >= 66 ? 1.0 : tk <= 19 ? 0 : (138.5177312231 * Math.log(tk - 10) - 305.0447927307) / 255
-    r = Math.min(1, Math.max(0, r))
-    g = Math.min(1, Math.max(0, g))
-    b = Math.min(1, Math.max(0, b))
-    return [r, g, b]
-  }
-  if (alg === 'radialDistance') return hslToRgb(0.8 * Math.max(0, Math.min(1, t)), 1.0, 0.5)
-  if (alg === 'hamiltonianDecomposition') {
-    const br = Math.max(0, Math.min(1, t * 1.5))
-    return [t * t * br, Math.sin(t * Math.PI) * 0.8 * br, (1 - t) * (1 - t) * br]
-  }
-  if (alg === 'modeCharacter')
-    return hslToRgb(t * 0.8, Math.min(1, t * 10), Math.min(1, Math.sqrt(t) * 2) * 0.5)
-  if (alg === 'energyFlux') {
-    const br = Math.max(0, Math.min(1, Math.log(t + 1e-6) / 4 + 1))
-    return hslToRgb(t, 0.8, Math.max(0.2, 0.6 * br))
-  }
-  if (alg === 'kSpaceOccupation') {
-    return hslToRgb(
-      0.7 + (0.12 - 0.7) * t,
-      0.6 + (0.95 - 0.6) * Math.min(1, Math.max(0, t / 0.5)),
-      0.08 + (0.55 - 0.08) * t
-    )
-  }
-  return null
+  const fn = SPECTRAL_ALGORITHMS[alg]
+  return fn ? fn(t) : null
 }
 
 /** 5-stop piecewise linear interpolation. */

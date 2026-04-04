@@ -19,6 +19,167 @@ import { ExportTextTab } from './export/ExportTextTab'
 
 type ExportTabId = 'preview' | 'presets' | 'general' | 'text' | 'advanced'
 
+/** Rendering/previewing progress indicator with cancel button. */
+function RenderingView({
+  status,
+  progress,
+  effectiveMode,
+  eta,
+  onCancel,
+}: {
+  status: string
+  progress: number
+  effectiveMode: string
+  eta: string | null
+  onCancel: () => void
+}) {
+  const heading =
+    status === 'previewing'
+      ? 'Generating Preview...'
+      : effectiveMode === 'stream'
+        ? 'Streaming to Disk...'
+        : 'Rendering Sequence...'
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-8 text-center animate-in fade-in zoom-in-95 duration-300">
+      <div className="relative w-40 h-40">
+        <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full animate-pulse" />
+        <svg className="w-full h-full transform -rotate-90 relative z-10">
+          <circle
+            cx="80"
+            cy="80"
+            r="70"
+            className="stroke-border-subtle fill-none"
+            strokeWidth="6"
+          />
+          <circle
+            cx="80"
+            cy="80"
+            r="70"
+            className="stroke-accent fill-none"
+            strokeWidth="6"
+            strokeDasharray={440}
+            strokeDashoffset={440 * (1 - progress)}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
+          <span className="text-4xl font-mono font-bold tracking-tighter text-white">
+            {Math.round(progress * 100)}%
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-2 max-w-sm">
+        <h3 className="text-xl font-bold text-accent animate-pulse">{heading}</h3>
+        {eta && status !== 'previewing' && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-hover)] border border-border-default">
+            <Icon name="clock" className="w-3 h-3 text-text-tertiary" />
+            <span className="text-xs font-mono text-text-secondary">Time Remaining: {eta}</span>
+          </div>
+        )}
+        <p className="text-sm text-text-tertiary pt-2">
+          Please keep this window open for best performance.
+        </p>
+      </div>
+
+      <Button
+        onClick={onCancel}
+        variant="danger"
+        size="sm"
+        className="opacity-50 hover:opacity-100"
+      >
+        Cancel Operation
+      </Button>
+    </div>
+  )
+}
+
+/** Encoding spinner shown while finalizing the video. */
+function EncodingView() {
+  return (
+    <div className="flex flex-col items-center justify-center gap-6 text-center animate-in fade-in zoom-in-95 duration-300 py-8">
+      <div className="relative">
+        <div className="w-20 h-20 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Icon name="settings" className="text-accent/50 w-8 h-8 animate-pulse" />
+        </div>
+      </div>
+      <div>
+        <h3 className="text-xl font-bold text-white">Finalizing Video</h3>
+        <p className="text-text-secondary">Encoding media stream...</p>
+      </div>
+    </div>
+  )
+}
+
+/** Completion view dispatching to in-memory, stream, or segmented result. */
+function CompletedView({
+  completionDetails,
+  previewUrl,
+  onDownload,
+  onReset,
+}: {
+  completionDetails: { type: string; segmentCount?: number } | null
+  previewUrl: string | null
+  onDownload: () => void
+  onReset: () => void
+}) {
+  const detailType = completionDetails?.type ?? 'in-memory'
+
+  if (detailType === 'stream') {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 py-4">
+        <div className="w-20 h-20 bg-success border border-success-border rounded-full flex items-center justify-center">
+          <Icon name="check" className="text-success w-10 h-10" />
+        </div>
+        <div className="text-center space-y-2">
+          <h3 className="text-2xl font-bold text-white">Export Successful</h3>
+          <p className="text-text-secondary">Video saved directly to your device.</p>
+        </div>
+        <Button onClick={onReset} variant="secondary" size="lg" className="w-full">
+          Start New Export
+        </Button>
+      </div>
+    )
+  }
+
+  if (detailType === 'segmented') {
+    return (
+      <div className="flex flex-col gap-6 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <Icon name="layers" className="text-warning w-12 h-12" />
+          <h3 className="text-xl font-bold text-warning">Segmented Export Complete</h3>
+          <p className="text-sm text-text-secondary">
+            {completionDetails?.segmentCount ?? 0} segments downloaded.
+          </p>
+        </div>
+        <Button onClick={onReset} variant="secondary" size="lg" className="w-full">
+          Back to Editor
+        </Button>
+      </div>
+    )
+  }
+
+  // in-memory (default)
+  if (!previewUrl) return null
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl overflow-hidden border border-border-default bg-black aspect-video relative group shadow-2xl">
+        <video src={previewUrl} controls autoPlay loop className="w-full h-full object-contain" />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Button onClick={onDownload} variant="primary" size="lg" glow className="py-6 text-lg">
+          <Icon name="download" className="w-5 h-5 me-2" /> Download
+        </Button>
+        <Button onClick={onReset} variant="secondary" size="lg" className="py-6">
+          New Export
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // Create selector outside component to avoid hook rules violation
 const exportModalSelector = (state: ReturnType<typeof useExportStore.getState>) => ({
   isModalOpen: state.isModalOpen,
@@ -133,11 +294,10 @@ export const ExportModal = () => {
 
   // Update canvas aspect ratio when modal opens
   useEffect(() => {
-    if (isModalOpen) {
-      const canvas = document.querySelector('canvas')
-      if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-        setCanvasAspectRatio(canvas.clientWidth / canvas.clientHeight)
-      }
+    if (!isModalOpen) return
+    const canvas = document.querySelector('canvas')
+    if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+      setCanvasAspectRatio(canvas.clientWidth / canvas.clientHeight)
     }
   }, [isModalOpen, setCanvasAspectRatio])
 
@@ -169,38 +329,31 @@ export const ExportModal = () => {
   }
 
   const handleDownload = () => {
-    if (previewUrl) {
-      const link = document.createElement('a')
-      link.href = previewUrl
-      const ext = settings.format === 'webm' ? 'webm' : 'mp4'
-      link.download = `mquantum-${Date.now()}.${ext}`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      soundManager.playSuccess()
-    }
+    if (!previewUrl) return
+    const link = document.createElement('a')
+    link.href = previewUrl
+    const ext = settings.format === 'webm' ? 'webm' : 'mp4'
+    link.download = `mquantum-${Date.now()}.${ext}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    soundManager.playSuccess()
   }
 
   // Check if stream mode is available (Chromium browsers only)
   const isStreamAvailable = browserType === 'chromium-capable'
 
   // Get contextual guidance based on selected mode
-  const getModeGuidance = () => {
-    if (effectiveMode === 'in-memory') {
-      return 'Video stays in memory until download. Best for short exports.'
-    }
-    if (effectiveMode === 'stream') {
-      return 'Writes directly to disk. Recommended for long exports.'
-    }
-    return 'Downloads multiple segments. Combine with video editor after.'
+  const MODE_GUIDANCE: Record<string, string> = {
+    'in-memory': 'Video stays in memory until download. Best for short exports.',
+    stream: 'Writes directly to disk. Recommended for long exports.',
   }
+  const modeGuidance =
+    MODE_GUIDANCE[effectiveMode] ?? 'Downloads multiple segments. Combine with video editor after.'
 
   // Determine modal width based on state
-  const isProcessActive =
-    status === 'rendering' ||
-    status === 'encoding' ||
-    status === 'previewing' ||
-    status === 'completed'
+  const ACTIVE_STATUSES = new Set(['rendering', 'encoding', 'previewing', 'completed'])
+  const isProcessActive = ACTIVE_STATUSES.has(status)
   const widthClass = isProcessActive ? 'max-w-xl' : 'max-w-6xl'
 
   return (
@@ -214,171 +367,27 @@ export const ExportModal = () => {
         {/* ACTIVE PROCESSING STATE (Centered, Focused) */}
         {isProcessActive ? (
           <div className="py-8 px-4">
-            {/* RENDERING / PREVIEWING */}
             {(status === 'rendering' || status === 'previewing') && (
-              <div className="flex flex-col items-center justify-center gap-8 text-center animate-in fade-in zoom-in-95 duration-300">
-                <div className="relative w-40 h-40">
-                  {/* Outer Glow */}
-                  <div className="absolute inset-0 bg-accent/20 blur-xl rounded-full animate-pulse" />
-
-                  <svg className="w-full h-full transform -rotate-90 relative z-10">
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r="70"
-                      className="stroke-border-subtle fill-none"
-                      strokeWidth="6"
-                    />
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r="70"
-                      className="stroke-accent fill-none"
-                      strokeWidth="6"
-                      strokeDasharray={440}
-                      strokeDashoffset={440 * (1 - progress)}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
-                    <span className="text-4xl font-mono font-bold tracking-tighter text-white">
-                      {Math.round(progress * 100)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 max-w-sm">
-                  <h3 className="text-xl font-bold text-accent animate-pulse">
-                    {status === 'previewing'
-                      ? 'Generating Preview...'
-                      : effectiveMode === 'stream'
-                        ? 'Streaming to Disk...'
-                        : 'Rendering Sequence...'}
-                  </h3>
-                  {eta && status !== 'previewing' && (
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-hover)] border border-border-default">
-                      <Icon name="clock" className="w-3 h-3 text-text-tertiary" />
-                      <span className="text-xs font-mono text-text-secondary">
-                        Time Remaining: {eta}
-                      </span>
-                    </div>
-                  )}
-                  <p className="text-sm text-text-tertiary pt-2">
-                    Please keep this window open for best performance.
-                  </p>
-                </div>
-
-                <Button
-                  onClick={() => setIsExporting(false)}
-                  variant="danger"
-                  size="sm"
-                  className="opacity-50 hover:opacity-100"
-                >
-                  Cancel Operation
-                </Button>
-              </div>
+              <RenderingView
+                status={status}
+                progress={progress}
+                effectiveMode={effectiveMode}
+                eta={eta}
+                onCancel={() => setIsExporting(false)}
+              />
             )}
-
-            {/* ENCODING */}
-            {status === 'encoding' && (
-              <div className="flex flex-col items-center justify-center gap-6 text-center animate-in fade-in zoom-in-95 duration-300 py-8">
-                <div className="relative">
-                  <div className="w-20 h-20 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Icon name="settings" className="text-accent/50 w-8 h-8 animate-pulse" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Finalizing Video</h3>
-                  <p className="text-text-secondary">Encoding media stream...</p>
-                </div>
-              </div>
-            )}
-
-            {/* COMPLETED */}
+            {status === 'encoding' && <EncodingView />}
             {status === 'completed' && (
               <div className="animate-in fade-in zoom-in-95 duration-300">
-                {(!completionDetails || completionDetails?.type === 'in-memory') && previewUrl && (
-                  <div className="space-y-6">
-                    <div className="rounded-xl overflow-hidden border border-border-default bg-black aspect-video relative group shadow-2xl">
-                      <video
-                        src={previewUrl}
-                        controls
-                        autoPlay
-                        loop
-                        className="w-full h-full object-contain"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <Button
-                        onClick={handleDownload}
-                        variant="primary"
-                        size="lg"
-                        glow
-                        className="py-6 text-lg"
-                      >
-                        <Icon name="download" className="w-5 h-5 me-2" /> Download
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          reset()
-                          setStatus('idle')
-                        }}
-                        variant="secondary"
-                        size="lg"
-                        className="py-6"
-                      >
-                        New Export
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {completionDetails?.type === 'stream' && (
-                  <div className="flex flex-col items-center justify-center gap-6 py-4">
-                    <div className="w-20 h-20 bg-success border border-success-border rounded-full flex items-center justify-center">
-                      <Icon name="check" className="text-success w-10 h-10" />
-                    </div>
-                    <div className="text-center space-y-2">
-                      <h3 className="text-2xl font-bold text-white">Export Successful</h3>
-                      <p className="text-text-secondary">Video saved directly to your device.</p>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        reset()
-                        setStatus('idle')
-                      }}
-                      variant="secondary"
-                      size="lg"
-                      className="w-full"
-                    >
-                      Start New Export
-                    </Button>
-                  </div>
-                )}
-
-                {completionDetails?.type === 'segmented' && (
-                  <div className="flex flex-col gap-6 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <Icon name="layers" className="text-warning w-12 h-12" />
-                      <h3 className="text-xl font-bold text-warning">Segmented Export Complete</h3>
-                      <p className="text-sm text-text-secondary">
-                        {completionDetails.segmentCount} segments downloaded.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        reset()
-                        setStatus('idle')
-                      }}
-                      variant="secondary"
-                      size="lg"
-                      className="w-full"
-                    >
-                      Back to Editor
-                    </Button>
-                  </div>
-                )}
+                <CompletedView
+                  completionDetails={completionDetails}
+                  previewUrl={previewUrl}
+                  onDownload={handleDownload}
+                  onReset={() => {
+                    reset()
+                    setStatus('idle')
+                  }}
+                />
               </div>
             )}
           </div>
@@ -409,7 +418,7 @@ export const ExportModal = () => {
                 />
 
                 <p className="text-[11px] text-text-tertiary leading-relaxed">
-                  {getModeGuidance()}
+                  {modeGuidance}
                   {!isStreamAvailable && (
                     <span className="block mt-1">Stream mode requires Chrome or Edge.</span>
                   )}
@@ -470,7 +479,7 @@ export const ExportModal = () => {
                   onChange={(val) => setExportModeOverride(val as ExportMode)}
                   tooltip="Memory holds the video in RAM. Stream writes directly to disk. Segmented downloads in chunks."
                 />
-                <p className="text-[10px] text-text-tertiary pb-3">{getModeGuidance()}</p>
+                <p className="text-[10px] text-text-tertiary pb-3">{modeGuidance}</p>
               </div>
 
               <div

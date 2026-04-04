@@ -124,6 +124,50 @@ export const PBR_INITIAL_STATE: PBRSliceState = {
 }
 
 // ============================================================================
+// Batch PBR Update Helper
+// ============================================================================
+
+/** Numeric PBR fields with their clamping functions. */
+const PBR_NUMERIC_FIELDS: ReadonlyArray<{
+  key: keyof PBRConfig
+  label: string
+  clamp: (v: number) => number
+}> = [
+  { key: 'roughness', label: 'roughness', clamp: clampRoughness },
+  { key: 'metallic', label: 'metallic', clamp: clampMetallic },
+  { key: 'reflectance', label: 'reflectance', clamp: clampReflectance },
+  { key: 'specularIntensity', label: 'specular intensity', clamp: clampSpecularIntensity },
+  { key: 'ior', label: 'ior', clamp: clampIOR },
+  { key: 'transmission', label: 'transmission', clamp: clampTransmission },
+  { key: 'thickness', label: 'thickness', clamp: clampThickness },
+]
+
+/**
+ * Validate and clamp all provided PBR config fields.
+ * @param config - Partial PBR config to validate
+ * @returns Sanitized partial PBR config with only valid values
+ */
+function buildValidatedPBRPatch(config: Partial<PBRConfig>): Partial<PBRConfig> {
+  const result: Partial<PBRConfig> = {}
+
+  for (const { key, label, clamp } of PBR_NUMERIC_FIELDS) {
+    const value = config[key]
+    if (value === undefined) continue
+    if (isFinitePBRInput(value as number)) {
+      ;(result as Record<string, unknown>)[key] = clamp(value as number)
+    } else {
+      logger.warn(`[pbrSlice] Ignoring non-finite ${label} in setFacePBR:`, value)
+    }
+  }
+
+  if (config.specularColor !== undefined) {
+    result.specularColor = config.specularColor
+  }
+
+  return result
+}
+
+// ============================================================================
 // Slice Creator
 // ============================================================================
 
@@ -183,68 +227,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
 
   setFacePBR: (config) =>
     set((state) => {
-      const nextFace: Partial<PBRConfig> = {}
-
-      if (config.roughness !== undefined) {
-        if (isFinitePBRInput(config.roughness)) {
-          nextFace.roughness = clampRoughness(config.roughness)
-        } else
-          logger.warn('[pbrSlice] Ignoring non-finite roughness in setFacePBR:', config.roughness)
-      }
-
-      if (config.metallic !== undefined) {
-        if (isFinitePBRInput(config.metallic)) {
-          nextFace.metallic = clampMetallic(config.metallic)
-        } else
-          logger.warn('[pbrSlice] Ignoring non-finite metallic in setFacePBR:', config.metallic)
-      }
-
-      if (config.reflectance !== undefined) {
-        if (isFinitePBRInput(config.reflectance)) {
-          nextFace.reflectance = clampReflectance(config.reflectance)
-        } else
-          logger.warn(
-            '[pbrSlice] Ignoring non-finite reflectance in setFacePBR:',
-            config.reflectance
-          )
-      }
-
-      if (config.specularIntensity !== undefined) {
-        if (isFinitePBRInput(config.specularIntensity)) {
-          nextFace.specularIntensity = clampSpecularIntensity(config.specularIntensity)
-        } else
-          logger.warn(
-            '[pbrSlice] Ignoring non-finite specular intensity in setFacePBR:',
-            config.specularIntensity
-          )
-      }
-
-      if (config.specularColor !== undefined) {
-        nextFace.specularColor = config.specularColor
-      }
-
-      if (config.ior !== undefined) {
-        if (isFinitePBRInput(config.ior)) {
-          nextFace.ior = clampIOR(config.ior)
-        } else logger.warn('[pbrSlice] Ignoring non-finite ior in setFacePBR:', config.ior)
-      }
-
-      if (config.transmission !== undefined) {
-        if (isFinitePBRInput(config.transmission)) {
-          nextFace.transmission = clampTransmission(config.transmission)
-        } else
-          logger.warn(
-            '[pbrSlice] Ignoring non-finite transmission in setFacePBR:',
-            config.transmission
-          )
-      }
-
-      if (config.thickness !== undefined) {
-        if (isFinitePBRInput(config.thickness)) {
-          nextFace.thickness = clampThickness(config.thickness)
-        } else
-          logger.warn('[pbrSlice] Ignoring non-finite thickness in setFacePBR:', config.thickness)
-      }
+      const nextFace = buildValidatedPBRPatch(config)
 
       if (Object.keys(nextFace).length === 0) {
         return state

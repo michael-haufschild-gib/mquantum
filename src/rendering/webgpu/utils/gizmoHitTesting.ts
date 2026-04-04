@@ -171,6 +171,87 @@ export function rayPlaneIntersect(
   return [rayO[0] + t * rayD[0], rayO[1] + t * rayD[1], rayO[2] + t * rayD[2]]
 }
 
+/** Unit axis vectors, indexed by XYZ. */
+const UNIT_AXES: [number, number, number][] = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+]
+
+/** Translate drag kind names, indexed by XYZ. */
+const TRANSLATE_KINDS: GizmoDragKind[] = ['translate-x', 'translate-y', 'translate-z']
+/** Rotate drag kind names, indexed by XYZ. */
+const ROTATE_KINDS: GizmoDragKind[] = ['rotate-x', 'rotate-y', 'rotate-z']
+
+/** Compute ring angle for a given axis index and displacement from center. */
+function computeRingAngle(axisIdx: number, dx: number, dy: number, dz: number): number {
+  if (axisIdx === 0) return Math.atan2(dz, dy)
+  if (axisIdx === 1) return Math.atan2(dx, dz)
+  return Math.atan2(dy, dx)
+}
+
+type GizmoHitResult = { kind: GizmoDragKind; axisT: number; angle: number }
+
+/**
+ * Test if a ray hits a translate gizmo (axis shafts).
+ */
+function testTranslateHit(
+  ray: { origin: [number, number, number]; dir: [number, number, number] },
+  lightPos: [number, number, number],
+  scale: number
+): GizmoHitResult | null {
+  let bestDist = Infinity
+  let bestKind: GizmoDragKind | null = null
+  let bestT = 0
+
+  for (let i = 0; i < 3; i++) {
+    const [t, dist] = rayAxisClosest(ray.origin, ray.dir, lightPos, UNIT_AXES[i]!)
+    const withinShaft = t > 0 && t < TRANSLATE_SHAFT * scale
+    const withinThreshold = dist < AXIS_HIT_THRESHOLD * scale && dist < bestDist
+    if (withinShaft && withinThreshold) {
+      bestDist = dist
+      bestKind = TRANSLATE_KINDS[i]!
+      bestT = t
+    }
+  }
+
+  return bestKind ? { kind: bestKind, axisT: bestT, angle: 0 } : null
+}
+
+/**
+ * Test if a ray hits a rotate gizmo (axis rings).
+ */
+function testRotateHit(
+  ray: { origin: [number, number, number]; dir: [number, number, number] },
+  lightPos: [number, number, number],
+  scale: number
+): GizmoHitResult | null {
+  const ringRadius = ROTATE_RING_RADIUS * scale
+  const tolerance = AXIS_HIT_THRESHOLD * scale
+  let bestDist = Infinity
+  let bestKind: GizmoDragKind | null = null
+  let bestAngle = 0
+
+  for (let i = 0; i < 3; i++) {
+    const hit = rayPlaneIntersect(ray.origin, ray.dir, UNIT_AXES[i]!, lightPos)
+    if (!hit) continue
+
+    const dx = hit[0] - lightPos[0]
+    const dy = hit[1] - lightPos[1]
+    const dz = hit[2] - lightPos[2]
+    const distFromCenter = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    const ringError = Math.abs(distFromCenter - ringRadius)
+
+    if (ringError < tolerance && ringError < bestDist) {
+      bestDist = ringError
+      bestKind = ROTATE_KINDS[i]!
+      bestAngle = computeRingAngle(i, dx, dy, dz)
+    }
+  }
+
+  return bestKind ? { kind: bestKind, axisT: 0, angle: bestAngle } : null
+}
+
 /**
  * Test if a mouse ray hits any transform gizmo axis or ring for the selected light.
  * @returns The drag kind and initial parameters, or null if no hit
@@ -180,68 +261,34 @@ export function testGizmoHit(
   lightPos: [number, number, number],
   scale: number,
   mode: 'translate' | 'rotate'
-): { kind: GizmoDragKind; axisT: number; angle: number } | null {
-  const axes: [number, number, number][] = [
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
-  ]
-  const axisNames: GizmoDragKind[] =
-    mode === 'translate'
-      ? ['translate-x', 'translate-y', 'translate-z']
-      : ['rotate-x', 'rotate-y', 'rotate-z']
+): GizmoHitResult | null {
+  return mode === 'translate'
+    ? testTranslateHit(ray, lightPos, scale)
+    : testRotateHit(ray, lightPos, scale)
+}
 
-  if (mode === 'translate') {
-    let bestDist = Infinity
-    let bestKind: GizmoDragKind | null = null
-    let bestT = 0
+/** Light data needed for ground target hit testing. */
+interface GroundTargetLight {
+  id: string
+  type: string
+  position: [number, number, number]
+  rotation: [number, number, number]
+  range: number
+}
 
-    for (let i = 0; i < 3; i++) {
-      const [t, dist] = rayAxisClosest(ray.origin, ray.dir, lightPos, axes[i]!)
-      if (
-        t > 0 &&
-        t < TRANSLATE_SHAFT * scale &&
-        dist < AXIS_HIT_THRESHOLD * scale &&
-        dist < bestDist
-      ) {
-        bestDist = dist
-        bestKind = axisNames[i]!
-        bestT = t
-      }
-    }
-    if (bestKind) return { kind: bestKind, axisT: bestT, angle: 0 }
-  } else {
-    const ringRadius = ROTATE_RING_RADIUS * scale
-    const tolerance = AXIS_HIT_THRESHOLD * scale
-    let bestDist = Infinity
-    let bestKind: GizmoDragKind | null = null
-    let bestAngle = 0
+/**
+ * Compute the XZ ground target position for a light, or null if it has none.
+ */
+function getGroundTargetXZ(light: GroundTargetLight): [number, number] | null {
+  if (light.type === 'spot' || light.type === 'directional') {
+    const dir = rotationToDirection(light.rotation)
+    const gi = calculateGroundIntersection(light.position, dir)
+    return gi ? [gi[0], gi[2]] : null
+  }
 
-    const normals: [number, number, number][] = [
-      [1, 0, 0],
-      [0, 1, 0],
-      [0, 0, 1],
-    ]
-
-    for (let i = 0; i < 3; i++) {
-      const hit = rayPlaneIntersect(ray.origin, ray.dir, normals[i]!, lightPos)
-      if (!hit) continue
-
-      const dx = hit[0] - lightPos[0]
-      const dy = hit[1] - lightPos[1]
-      const dz = hit[2] - lightPos[2]
-      const distFromCenter = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-      const ringError = Math.abs(distFromCenter - ringRadius)
-      if (ringError < tolerance && ringError < bestDist) {
-        bestDist = ringError
-        bestKind = axisNames[i]!
-        if (i === 0) bestAngle = Math.atan2(dz, dy)
-        else if (i === 1) bestAngle = Math.atan2(dx, dz)
-        else bestAngle = Math.atan2(dy, dx)
-      }
-    }
-    if (bestKind) return { kind: bestKind, axisT: 0, angle: bestAngle }
+  if (light.type === 'point') {
+    const si = calculateSphereGroundIntersection(light.position, light.range)
+    return si ? [si.center[0], si.center[2]] : null
   }
 
   return null
@@ -253,13 +300,7 @@ export function testGizmoHit(
  */
 export function testGroundTargetHit(
   ray: { origin: [number, number, number]; dir: [number, number, number] },
-  lights: Array<{
-    id: string
-    type: string
-    position: [number, number, number]
-    rotation: [number, number, number]
-    range: number
-  }>
+  lights: GroundTargetLight[]
 ): string | null {
   const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
   if (!groundHit) return null
@@ -268,28 +309,11 @@ export function testGroundTargetHit(
   let closestId: string | null = null
 
   for (const light of lights) {
-    let targetX: number | undefined
-    let targetZ: number | undefined
+    const target = getGroundTargetXZ(light)
+    if (!target) continue
 
-    if (light.type === 'spot' || light.type === 'directional') {
-      const dir = rotationToDirection(light.rotation as [number, number, number])
-      const gi = calculateGroundIntersection(light.position, dir)
-      if (gi) {
-        targetX = gi[0]
-        targetZ = gi[2]
-      }
-    } else if (light.type === 'point') {
-      const si = calculateSphereGroundIntersection(light.position, light.range)
-      if (si) {
-        targetX = si.center[0]
-        targetZ = si.center[2]
-      }
-    }
-
-    if (targetX === undefined || targetZ === undefined) continue
-
-    const dx = groundHit[0] - targetX
-    const dz = groundHit[2] - targetZ
+    const dx = groundHit[0] - target[0]
+    const dz = groundHit[2] - target[1]
     const dist = Math.sqrt(dx * dx + dz * dz)
 
     if (dist < GROUND_TARGET_RADIUS && dist < closestDist) {

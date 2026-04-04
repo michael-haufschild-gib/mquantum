@@ -61,20 +61,24 @@ export default defineConfig({
         'src/rendering/webgpu/passes/PauliComputePassSetup.ts',
         'src/rendering/webgpu/passes/FreeScalarFieldComputePassSetup.ts',
         'src/rendering/webgpu/passes/DiracComputePassBuffers.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassSetup.ts',
+        'src/rendering/webgpu/passes/TDSEComputePassBuffers.ts',
+        'src/rendering/webgpu/passes/WebGPUTemporalCloudPass.ts',
+        'src/rendering/webgpu/passes/WebGPUTemporalCloudPassSetup.ts',
       ],
       // Coverage ratchet: thresholds track current actuals (rounded down to
       // nearest 0.5%). Raise when coverage improves. Lower only when the
       // denominator changes (new files, exclusion list changes) — document why.
-      // Last measured 2026-04-02: stmts 62.19%, branches 54.74%, funcs 62.51%, lines 62.36%
-      // (Recalibrated after 3 GPU-only files added post-2026-03-31 expanded denominator.
-      // Added GPU-only pass setup files to exclusions. Added 7 new test files: mat4,
-      // raycasting, eigenstateDiagnostics, presetImportExport, presetNormalizationShared,
-      // quantumTypes, andersonSweep — 88 new tests total.)
+      // Last measured 2026-04-04: stmts 63.05%, branches 54.79%, funcs 61.74%, lines 63.21%
+      // Recalibrated: added 4 GPU-only setup/buffer files to exclusions (TDSE, TemporalCloud).
+      // Added 7 new test files: ndArray, monitoringSweepStore, diagnosticsStore,
+      // coordinateEntanglementStore, tdseStochasticSetters, tdseUiSetters,
+      // decoherencePresets — 136 new tests covering recent feature additions.
       thresholds: {
-        statements: 61.5,
-        branches: 54,
-        functions: 61,
-        lines: 61.5,
+        statements: 62.5,
+        branches: 54.5,
+        functions: 61.5,
+        lines: 62.5,
       },
     },
   },

@@ -182,52 +182,48 @@ function getAliasScratch(dim: number): MatrixND {
  * @throws {Error} If matrix dimensions are incompatible (DEV only)
  * @note Validation is DEV-only for performance in production hot paths
  */
-export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): void {
-  const len = a.length
+/**
+ * OPT-MAT-1: Unrolled 4x4 matrix multiply into target buffer.
+ * Benchmarked at 2.5x faster than generic loop for dim=4.
+ *
+ * @param target - Output buffer (may be scratch if aliased)
+ * @param a - First 4x4 matrix
+ * @param b - Second 4x4 matrix
+ */
+function multiplyMatrices4x4Into(target: MatrixND, a: MatrixND, b: MatrixND): void {
+  target[0] = a[0]! * b[0]! + a[1]! * b[4]! + a[2]! * b[8]! + a[3]! * b[12]!
+  target[1] = a[0]! * b[1]! + a[1]! * b[5]! + a[2]! * b[9]! + a[3]! * b[13]!
+  target[2] = a[0]! * b[2]! + a[1]! * b[6]! + a[2]! * b[10]! + a[3]! * b[14]!
+  target[3] = a[0]! * b[3]! + a[1]! * b[7]! + a[2]! * b[11]! + a[3]! * b[15]!
+  target[4] = a[4]! * b[0]! + a[5]! * b[4]! + a[6]! * b[8]! + a[7]! * b[12]!
+  target[5] = a[4]! * b[1]! + a[5]! * b[5]! + a[6]! * b[9]! + a[7]! * b[13]!
+  target[6] = a[4]! * b[2]! + a[5]! * b[6]! + a[6]! * b[10]! + a[7]! * b[14]!
+  target[7] = a[4]! * b[3]! + a[5]! * b[7]! + a[6]! * b[11]! + a[7]! * b[15]!
+  target[8] = a[8]! * b[0]! + a[9]! * b[4]! + a[10]! * b[8]! + a[11]! * b[12]!
+  target[9] = a[8]! * b[1]! + a[9]! * b[5]! + a[10]! * b[9]! + a[11]! * b[13]!
+  target[10] = a[8]! * b[2]! + a[9]! * b[6]! + a[10]! * b[10]! + a[11]! * b[14]!
+  target[11] = a[8]! * b[3]! + a[9]! * b[7]! + a[10]! * b[11]! + a[11]! * b[15]!
+  target[12] = a[12]! * b[0]! + a[13]! * b[4]! + a[14]! * b[8]! + a[15]! * b[12]!
+  target[13] = a[12]! * b[1]! + a[13]! * b[5]! + a[14]! * b[9]! + a[15]! * b[13]!
+  target[14] = a[12]! * b[2]! + a[13]! * b[6]! + a[14]! * b[10]! + a[15]! * b[14]!
+  target[15] = a[12]! * b[3]! + a[13]! * b[7]! + a[14]! * b[11]! + a[15]! * b[15]!
+}
 
-  if (import.meta.env.DEV) {
-    if (len === 0) throw new Error('Cannot multiply empty matrices')
-    if (len !== b.length || len !== out.length) {
-      throw new Error('Matrix dimensions incompatible')
-    }
-  }
-
-  // OPT-MAT-1: Fast path for 4×4 matrices (most common case in 4D visualization)
-  // Benchmarked at 2.5× faster than generic loop for dim=4
-  if (len === 16) {
-    const isAliased = out === a || out === b
-    const target = isAliased ? getAliasScratch(4) : out
-
-    target[0] = a[0]! * b[0]! + a[1]! * b[4]! + a[2]! * b[8]! + a[3]! * b[12]!
-    target[1] = a[0]! * b[1]! + a[1]! * b[5]! + a[2]! * b[9]! + a[3]! * b[13]!
-    target[2] = a[0]! * b[2]! + a[1]! * b[6]! + a[2]! * b[10]! + a[3]! * b[14]!
-    target[3] = a[0]! * b[3]! + a[1]! * b[7]! + a[2]! * b[11]! + a[3]! * b[15]!
-    target[4] = a[4]! * b[0]! + a[5]! * b[4]! + a[6]! * b[8]! + a[7]! * b[12]!
-    target[5] = a[4]! * b[1]! + a[5]! * b[5]! + a[6]! * b[9]! + a[7]! * b[13]!
-    target[6] = a[4]! * b[2]! + a[5]! * b[6]! + a[6]! * b[10]! + a[7]! * b[14]!
-    target[7] = a[4]! * b[3]! + a[5]! * b[7]! + a[6]! * b[11]! + a[7]! * b[15]!
-    target[8] = a[8]! * b[0]! + a[9]! * b[4]! + a[10]! * b[8]! + a[11]! * b[12]!
-    target[9] = a[8]! * b[1]! + a[9]! * b[5]! + a[10]! * b[9]! + a[11]! * b[13]!
-    target[10] = a[8]! * b[2]! + a[9]! * b[6]! + a[10]! * b[10]! + a[11]! * b[14]!
-    target[11] = a[8]! * b[3]! + a[9]! * b[7]! + a[10]! * b[11]! + a[11]! * b[15]!
-    target[12] = a[12]! * b[0]! + a[13]! * b[4]! + a[14]! * b[8]! + a[15]! * b[12]!
-    target[13] = a[12]! * b[1]! + a[13]! * b[5]! + a[14]! * b[9]! + a[15]! * b[13]!
-    target[14] = a[12]! * b[2]! + a[13]! * b[6]! + a[14]! * b[10]! + a[15]! * b[14]!
-    target[15] = a[12]! * b[3]! + a[13]! * b[7]! + a[14]! * b[11]! + a[15]! * b[15]!
-
-    if (isAliased) {
-      out.set(target)
-    }
-    return
-  }
-
-  // Generic path for all other dimensions (5×5 through 11×11+)
-  // Benchmarked: generic loop is within 0.012% of frame budget vs unrolled for dim>=5
-  const dim = squareDimensionFromLength(len)
-
-  const isAliased = out === a || out === b
-  const target = isAliased ? getAliasScratch(dim) : out
-
+/**
+ * Generic NxN matrix multiply into target buffer.
+ * Benchmarked: within 0.012% of frame budget vs unrolled for dim>=5.
+ *
+ * @param target - Output buffer (may be scratch if aliased)
+ * @param a - First NxN matrix
+ * @param b - Second NxN matrix
+ * @param dim - Matrix dimension
+ */
+function multiplyMatricesGenericInto(
+  target: MatrixND,
+  a: MatrixND,
+  b: MatrixND,
+  dim: number
+): void {
   for (let i = 0; i < dim; i++) {
     const rowOffset = i * dim
     for (let j = 0; j < dim; j++) {
@@ -238,10 +234,51 @@ export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): v
       target[rowOffset + j] = sum
     }
   }
+}
 
-  if (isAliased) {
-    out.set(target)
+/**
+ * Multiplies two matrices and writes the result directly into an output buffer.
+ * This is the allocation-free variant for hot paths (animation loops).
+ * Assumes square matrices of same dimension.
+ *
+ * Formula: out[i][j] = Sigma(A[i][k] * B[k][j])
+ *
+ * IMPORTANT: Handles aliasing safely - if out === a or out === b, uses internal
+ * scratch buffer to compute result before copying to out.
+ *
+ * OPT-MAT-1: Specialized unrolled path for 4x4 matrices (most common case)
+ *
+ * @param out - Pre-allocated output matrix. Modified in place.
+ * @param a - First matrix
+ * @param b - Second matrix
+ * @throws {Error} If matrix dimensions are incompatible (DEV only)
+ * @note Validation is DEV-only for performance in production hot paths
+ */
+export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): void {
+  const len = a.length
+
+  if (import.meta.env.DEV) {
+    if (len === 0) throw new Error('Cannot multiply empty matrices')
+    if (len !== b.length || len !== out.length) {
+      throw new Error('Matrix dimensions incompatible')
+    }
   }
+
+  const isAliased = out === a || out === b
+
+  // OPT-MAT-1: Fast path for 4×4 matrices (most common case in 4D visualization)
+  if (len === 16) {
+    const target = isAliased ? getAliasScratch(4) : out
+    multiplyMatrices4x4Into(target, a, b)
+    if (isAliased) out.set(target)
+    return
+  }
+
+  // Generic path for all other dimensions (5×5 through 11×11+)
+  const dim = squareDimensionFromLength(len)
+  const target = isAliased ? getAliasScratch(dim) : out
+  multiplyMatricesGenericInto(target, a, b, dim)
+  if (isAliased) out.set(target)
 }
 
 /**
@@ -253,6 +290,60 @@ export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): v
  * @param m - Matrix (n×n)
  * @param v - Vector (n)
  * @param out
+ * @returns Result vector (n)
+ * @throws {Error} If dimensions are incompatible
+ */
+/**
+ * Attempts WASM-accelerated matrix-vector multiplication.
+ *
+ * @param result - Output vector to populate on success
+ * @param m - Matrix (n*n flat)
+ * @param v - Input vector
+ * @param dim - Matrix dimension
+ * @returns True if WASM succeeded and result was populated
+ */
+function tryWasmMatrixVector(result: VectorND, m: MatrixND, v: VectorND, dim: number): boolean {
+  const len = m.length
+  const matrixF64 = getScratch(scratchMatrixA, len)
+  const vectorF64 = getScratch(scratchVector, v.length)
+  matrixF64.set(m)
+  for (let i = 0; i < v.length; i++) vectorF64[i] = v[i]!
+  const wasmResult = multiplyMatrixVectorWasm(matrixF64, vectorF64, dim)
+  if (!wasmResult) return false
+  for (let i = 0; i < dim; i++) {
+    result[i] = wasmResult[i]!
+  }
+  return true
+}
+
+/**
+ * JS fallback for matrix-vector multiplication.
+ *
+ * @param result - Output vector
+ * @param m - Matrix (n*n flat)
+ * @param v - Input vector
+ * @param dim - Matrix dimension
+ */
+function jsMatrixVector(result: VectorND, m: MatrixND, v: VectorND, dim: number): void {
+  for (let i = 0; i < dim; i++) {
+    let sum = 0
+    const rowOffset = i * dim
+    for (let j = 0; j < dim; j++) {
+      sum += m[rowOffset + j]! * v[j]!
+    }
+    result[i] = sum
+  }
+}
+
+/**
+ * Multiplies a matrix by a vector.
+ * Formula: b[i] = Sigma(M[i][j] * v[j])
+ *
+ * Uses WASM acceleration when available for improved performance.
+ *
+ * @param m - Matrix (n*n)
+ * @param v - Vector (n)
+ * @param out - Optional output vector to avoid allocation
  * @returns Result vector (n)
  * @throws {Error} If dimensions are incompatible
  */
@@ -272,38 +363,15 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
   const result: VectorND = out ?? new Array(dim)
 
   // If reusing array, ensure it has correct length (caller should manage this for perf)
-  if (out && out.length < dim) {
-    if (import.meta.env.DEV) {
-      logger.warn(
-        `multiplyMatrixVector: Output array length (${out.length}) is smaller than result rows (${dim}). Results may be truncated.`
-      )
-    }
+  if (out && out.length < dim && import.meta.env.DEV) {
+    logger.warn(
+      `multiplyMatrixVector: Output array length (${out.length}) is smaller than result rows (${dim}). Results may be truncated.`
+    )
   }
 
-  // Try WASM path if available
-  if (isAnimationWasmReady()) {
-    const matrixF64 = getScratch(scratchMatrixA, len)
-    const vectorF64 = getScratch(scratchVector, v.length)
-    matrixF64.set(m)
-    for (let i = 0; i < v.length; i++) vectorF64[i] = v[i]!
-    const wasmResult = multiplyMatrixVectorWasm(matrixF64, vectorF64, dim)
-    if (wasmResult) {
-      for (let i = 0; i < dim; i++) {
-        result[i] = wasmResult[i]!
-      }
-      return result
-    }
-    // WASM failed, fall through to JS implementation
-  }
-
-  // JS fallback
-  for (let i = 0; i < dim; i++) {
-    let sum = 0
-    const rowOffset = i * dim
-    for (let j = 0; j < dim; j++) {
-      sum += m[rowOffset + j]! * v[j]!
-    }
-    result[i] = sum
+  // Try WASM path if available, then JS fallback
+  if (!isAnimationWasmReady() || !tryWasmMatrixVector(result, m, v, dim)) {
+    jsMatrixVector(result, m, v, dim)
   }
 
   return result

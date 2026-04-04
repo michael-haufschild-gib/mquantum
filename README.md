@@ -8,7 +8,7 @@ An N-dimensional quantum physics visualizer running entirely in the browser via 
 
 This is a vibecoded project. I have no real understanding of the quantum mechanics math behind it. I don't know whether the rendered wavefunctions or the values displayed in the UI are physically correct. It looks cool, and that's about as far as my confidence goes.
 
-The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase — ~600 source files, 83 WGSL shaders, Rust/WASM math, 2000+ tests, and this README — was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
+The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase — ~1000 source files, 131 WGSL shaders, Rust/WASM math, 5700+ tests, and this README — was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
 
 ## What It Does
 
@@ -27,7 +27,7 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 - **State**: Zustand 5
 - **Styling**: Tailwind CSS 4
 - **Math**: Rust/WASM for rotation and projection math
-- **Testing**: Vitest (2000+ tests) + Playwright E2E
+- **Testing**: Vitest (5700+ tests) + Playwright E2E + Stryker mutation testing
 
 ## Prerequisites
 
@@ -130,7 +130,7 @@ The quantum math implementations are validated by an extensive automated test su
 - **TDSE dynamics**: Energy conservation, probability normalization, potential evaluation
 - **BEC/Dirac/Pauli**: Mode-specific diagnostics and state evolution correctness
 
-Run `npx vitest run` to execute the full suite (2000+ tests).
+Run `npx vitest run` to execute the full suite (5700+ tests).
 
 ## CI/CD
 

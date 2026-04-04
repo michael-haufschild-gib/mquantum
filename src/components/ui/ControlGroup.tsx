@@ -19,6 +19,57 @@ export interface ControlGroupProps {
   'data-testid'?: string
 }
 
+const CARD_CONTAINER_CLASS =
+  'border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-hover)] overflow-hidden'
+const DEFAULT_CONTAINER_CLASS = 'border-b border-[var(--border-subtle)] pb-2 last:border-0'
+
+const COLLAPSIBLE_HEADER_CLASS =
+  'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset'
+const CARD_HEADER_CLASS = 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]'
+
+function getTitleTextClass(collapsible: boolean): string {
+  const base = 'text-xs font-semibold uppercase tracking-wider'
+  return collapsible
+    ? `${base} text-text-secondary group-hover:text-text-primary`
+    : `${base} text-text-secondary`
+}
+
+function TitleLabel({
+  title,
+  tooltip,
+  collapsible,
+}: {
+  title: string
+  tooltip?: string
+  collapsible: boolean
+}) {
+  const textClass = getTitleTextClass(collapsible)
+  const label = <span className={textClass}>{title}</span>
+  if (!tooltip) return label
+  return (
+    <Tooltip content={tooltip} position="top">
+      {label}
+    </Tooltip>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  )
+}
+
 export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
   ({
     title,
@@ -34,27 +85,24 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
     const [isOpen, setIsOpen] = useState(defaultOpen)
 
     const toggle = useCallback(() => {
-      if (collapsible) {
-        setIsOpen((prev) => !prev)
-        soundManager.playClick()
-      }
+      if (!collapsible) return
+      setIsOpen((prev) => !prev)
+      soundManager.playClick()
     }, [collapsible])
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
-        if (collapsible && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          setIsOpen((prev) => !prev)
-          soundManager.playClick()
-        }
+        if (!collapsible) return
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        setIsOpen((prev) => !prev)
+        soundManager.playClick()
       },
       [collapsible]
     )
 
     const handleMouseEnter = useCallback(() => {
-      if (collapsible) {
-        soundManager.playHover()
-      }
+      if (collapsible) soundManager.playHover()
     }, [collapsible])
 
     const handleRightElementClick = (e: React.MouseEvent) => {
@@ -63,29 +111,24 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
 
     const isCard = variant === 'card'
     const showTitleSection = collapsible || title.trim() !== ''
+    const containerClass = isCard ? CARD_CONTAINER_CLASS : DEFAULT_CONTAINER_CLASS
+    const headerClass = `flex items-center justify-between py-1.5 ${isCard ? CARD_HEADER_CLASS : ''} ${collapsible ? COLLAPSIBLE_HEADER_CLASS : ''}`
+    const headerA11y = collapsible
+      ? {
+          role: 'button' as const,
+          tabIndex: 0,
+          'aria-expanded': isOpen,
+          'aria-label': `${title} section, ${isOpen ? 'expanded' : 'collapsed'}`,
+          'data-testid': `${testId}-header`,
+        }
+      : {}
 
     return (
-      <div
-        className={`
-      ${isCard ? 'border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-hover)] overflow-hidden' : 'border-b border-[var(--border-subtle)] pb-2 last:border-0'}
-      ${className}
-    `}
-        data-testid={testId}
-      >
+      <div className={`${containerClass} ${className}`} data-testid={testId}>
         {showTitleSection && (
           <div
-            role={collapsible ? 'button' : undefined}
-            tabIndex={collapsible ? 0 : undefined}
-            aria-expanded={collapsible ? isOpen : undefined}
-            aria-label={
-              collapsible ? `${title} section, ${isOpen ? 'expanded' : 'collapsed'}` : undefined
-            }
-            data-testid={collapsible ? `${testId}-header` : undefined}
-            className={`
-            flex items-center justify-between py-1.5
-            ${isCard ? 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]' : ''}
-            ${collapsible ? 'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset' : ''}
-          `}
+            {...headerA11y}
+            className={headerClass}
             onClick={toggle}
             onMouseEnter={handleMouseEnter}
             onKeyDown={handleKeyDown}
@@ -97,35 +140,10 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
                   transition={{ duration: 0.2 }}
                   className="text-text-tertiary"
                 >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
+                  <ChevronIcon />
                 </m.div>
               )}
-              {tooltip ? (
-                <Tooltip content={tooltip} position="top">
-                  <span
-                    className={`text-xs font-semibold uppercase tracking-wider ${collapsible ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary'}`}
-                  >
-                    {title}
-                  </span>
-                </Tooltip>
-              ) : (
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wider ${collapsible ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary'}`}
-                >
-                  {title}
-                </span>
-              )}
+              <TitleLabel title={title} tooltip={tooltip} collapsible={collapsible} />
             </div>
 
             {rightElement && <div onClick={handleRightElementClick}>{rightElement}</div>}

@@ -71,6 +71,172 @@ const IconButton: React.FC<IconButtonProps> = React.memo(
 
 IconButton.displayName = 'IconButton'
 
+const REPRESENTATION_LABELS: Record<string, string> = {
+  position: 'Position',
+  momentum: 'Momentum',
+  wigner: 'Wigner',
+}
+
+const COMPUTE_MODES = new Set([
+  'freeScalarField',
+  'tdseDynamics',
+  'becDynamics',
+  'diracEquation',
+  'quantumWalk',
+])
+
+function getRepresentationLabel(representation: string): string {
+  return REPRESENTATION_LABELS[representation] ?? 'Position'
+}
+
+interface SharedControlsProps {
+  representation: string
+  isComputeMode: boolean
+  toggleRepresentation: () => void
+  showPerfMonitor: boolean
+  togglePerfMonitor: () => void
+  isSoundEnabled: boolean
+  toggleSound: () => void
+  isCinematicMode: boolean
+  toggleCinematic: () => void
+  isFullscreen: boolean
+  toggleFullscreen: () => void
+}
+
+/** Compact (mobile) variant of the top bar controls. */
+const CompactControls: React.FC<SharedControlsProps> = React.memo(
+  ({
+    representation,
+    isComputeMode,
+    toggleRepresentation,
+    showPerfMonitor,
+    togglePerfMonitor,
+    isSoundEnabled,
+    toggleSound,
+    isCinematicMode,
+    toggleCinematic,
+    isFullscreen,
+    toggleFullscreen,
+  }) => (
+    <div className="flex gap-1">
+      <IconButton
+        icon={representation === 'position' ? TargetIcon : WaveIcon}
+        active={representation === 'wigner'}
+        onClick={toggleRepresentation}
+        disabled={isComputeMode}
+        label={
+          isComputeMode
+            ? 'Position only (compute mode)'
+            : `Representation: ${getRepresentationLabel(representation)}`
+        }
+        small
+      />
+      <IconButton
+        icon={PerfIcon}
+        active={showPerfMonitor}
+        onClick={togglePerfMonitor}
+        label="Performance Monitor"
+        small
+      />
+      <IconButton
+        icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
+        active={isSoundEnabled}
+        onClick={toggleSound}
+        label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
+        small
+      />
+      <IconButton
+        icon={CinematicIcon}
+        active={isCinematicMode}
+        onClick={toggleCinematic}
+        label="Cinematic Mode"
+        small
+      />
+      <IconButton
+        icon={FullscreenIcon}
+        active={isFullscreen}
+        onClick={toggleFullscreen}
+        label="Fullscreen"
+        small
+      />
+    </div>
+  )
+)
+CompactControls.displayName = 'CompactControls'
+
+/** Desktop variant of the top bar controls. */
+const DesktopControls: React.FC<SharedControlsProps> = React.memo(
+  ({
+    representation,
+    isComputeMode,
+    toggleRepresentation,
+    showPerfMonitor,
+    togglePerfMonitor,
+    isSoundEnabled,
+    toggleSound,
+    isCinematicMode,
+    toggleCinematic,
+    isFullscreen,
+    toggleFullscreen,
+  }) => (
+    <>
+      <Button
+        onClick={toggleRepresentation}
+        onMouseEnter={() => soundManager.playHover()}
+        disabled={isComputeMode}
+        aria-label="Switch Representation Space"
+        title={
+          isComputeMode
+            ? 'Position only (compute mode)'
+            : 'Switch representation (Position → Momentum → Wigner)'
+        }
+        data-testid="control-representation-toggle"
+        className={`
+          rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
+          px-3 py-1.5
+          bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
+          ${isComputeMode ? 'opacity-40 pointer-events-none' : ''}
+        `}
+        variant="ghost"
+        size="md"
+      >
+        {isComputeMode ? 'Position (locked)' : getRepresentationLabel(representation)}
+      </Button>
+
+      <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+
+      <IconButton
+        icon={PerfIcon}
+        active={showPerfMonitor}
+        onClick={togglePerfMonitor}
+        label="Performance Monitor"
+      />
+      <IconButton
+        icon={FullscreenIcon}
+        active={isFullscreen}
+        onClick={toggleFullscreen}
+        label="Fullscreen"
+      />
+
+      <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+
+      <IconButton
+        icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
+        active={isSoundEnabled}
+        onClick={toggleSound}
+        label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
+      />
+      <IconButton
+        icon={CinematicIcon}
+        active={isCinematicMode}
+        onClick={toggleCinematic}
+        label="Cinematic Mode"
+      />
+    </>
+  )
+)
+DesktopControls.displayName = 'DesktopControls'
+
 export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compact = false }) => {
   const { addToast } = useToast()
 
@@ -95,13 +261,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   const { representation, setRepresentation, quantumMode } =
     useExtendedObjectStore(representationSelector)
   const objectType = useGeometryStore((s) => s.objectType)
-  const isComputeMode =
-    objectType === 'pauliSpinor' ||
-    quantumMode === 'freeScalarField' ||
-    quantumMode === 'tdseDynamics' ||
-    quantumMode === 'becDynamics' ||
-    quantumMode === 'diracEquation' ||
-    quantumMode === 'quantumWalk'
+  const isComputeMode = objectType === 'pauliSpinor' || COMPUTE_MODES.has(quantumMode)
 
   // Local State
   const [isFullscreen, setIsFullscreen] = React.useState(false)
@@ -129,10 +289,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
 
   const toggleCinematic = () => {
     soundManager.playClick()
-    if (isCinematicMode) {
-      toggleCinematicMode()
-    } else {
-      toggleCinematicMode()
+    toggleCinematicMode()
+    if (!isCinematicMode) {
       useAnimationStore.getState().play()
       addToast('Cinematic Mode Enabled', 'info')
     }
@@ -154,121 +312,29 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     soundManager.playClick()
   }
 
+  const togglePerfMonitor = () => {
+    setShowPerfMonitor(!showPerfMonitor)
+    soundManager.playClick()
+  }
+
+  const controlProps: SharedControlsProps = {
+    representation,
+    isComputeMode,
+    toggleRepresentation,
+    showPerfMonitor,
+    togglePerfMonitor,
+    isSoundEnabled,
+    toggleSound,
+    isCinematicMode,
+    toggleCinematic,
+    isFullscreen,
+    toggleFullscreen,
+  }
+
+  const ControlsVariant = compact ? CompactControls : DesktopControls
   return (
     <div className="flex items-center gap-1">
-      {/* Mobile: utility icon buttons */}
-      {compact ? (
-        <div className="flex gap-1">
-          <IconButton
-            icon={representation === 'position' ? TargetIcon : WaveIcon}
-            active={representation === 'wigner'}
-            onClick={toggleRepresentation}
-            disabled={isComputeMode}
-            label={
-              isComputeMode
-                ? 'Position only (compute mode)'
-                : `Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`
-            }
-            small
-          />
-          <IconButton
-            icon={PerfIcon}
-            active={showPerfMonitor}
-            onClick={() => {
-              setShowPerfMonitor(!showPerfMonitor)
-              soundManager.playClick()
-            }}
-            label="Performance Monitor"
-            small
-          />
-          <IconButton
-            icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
-            active={isSoundEnabled}
-            onClick={toggleSound}
-            label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
-            small
-          />
-          <IconButton
-            icon={CinematicIcon}
-            active={isCinematicMode}
-            onClick={toggleCinematic}
-            label="Cinematic Mode"
-            small
-          />
-          <IconButton
-            icon={FullscreenIcon}
-            active={isFullscreen}
-            onClick={toggleFullscreen}
-            label="Fullscreen"
-            small
-          />
-        </div>
-      ) : (
-        /* Desktop: utility icon buttons */
-        <>
-          <Button
-            onClick={toggleRepresentation}
-            onMouseEnter={() => soundManager.playHover()}
-            disabled={isComputeMode}
-            aria-label="Switch Representation Space"
-            title={
-              isComputeMode
-                ? 'Position only (compute mode)'
-                : 'Switch representation (Position → Momentum → Wigner)'
-            }
-            data-testid="control-representation-toggle"
-            className={`
-              rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
-              px-3 py-1.5
-              bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
-              ${isComputeMode ? 'opacity-40 pointer-events-none' : ''}
-            `}
-            variant="ghost"
-            size="md"
-          >
-            {isComputeMode
-              ? 'Position (locked)'
-              : representation === 'position'
-                ? 'Position'
-                : representation === 'momentum'
-                  ? 'Momentum'
-                  : 'Wigner'}
-          </Button>
-
-          <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
-
-          <IconButton
-            icon={PerfIcon}
-            active={showPerfMonitor}
-            onClick={() => {
-              setShowPerfMonitor(!showPerfMonitor)
-              soundManager.playClick()
-            }}
-            label="Performance Monitor"
-          />
-          <IconButton
-            icon={FullscreenIcon}
-            active={isFullscreen}
-            onClick={toggleFullscreen}
-            label="Fullscreen"
-          />
-
-          <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
-
-          <IconButton
-            icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
-            active={isSoundEnabled}
-            onClick={toggleSound}
-            label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
-          />
-          <IconButton
-            icon={CinematicIcon}
-            active={isCinematicMode}
-            onClick={toggleCinematic}
-            label="Cinematic Mode"
-          />
-        </>
-      )}
+      <ControlsVariant {...controlProps} />
     </div>
   )
 })

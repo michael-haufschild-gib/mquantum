@@ -97,37 +97,38 @@ export function getScenarioPresetOptions(dim: number): { value: string; label: s
 }
 
 /**
+ * Check whether a single override value matches the corresponding config value.
+ *
+ * Arrays are compared only over their overlapping prefix because TDSE arrays
+ * are resized to match the current dimension at runtime.
+ */
+function overrideValueMatches(expected: unknown, actual: unknown): boolean {
+  if (!Array.isArray(expected)) return actual === expected
+  if (!Array.isArray(actual)) return false
+  const len = Math.min(expected.length, (actual as number[]).length)
+  return !expected.slice(0, len).some((v, i) => v !== (actual as number[])[i])
+}
+
+/**
+ * Check whether every override in a preset matches the current config.
+ * `latticeDim` is skipped because `applyTdsePreset` strips it.
+ */
+function presetMatchesConfig(overrides: Record<string, unknown>, config: TdseConfig): boolean {
+  return Object.entries(overrides).every(([key, expected]) => {
+    if (key === 'latticeDim') return true
+    return overrideValueMatches(expected, config[key as keyof TdseConfig])
+  })
+}
+
+/**
  * Compare current config against all presets to find a match.
  *
  * @param config - Current TDSE configuration
  * @returns The matching preset id, or empty string if no match
  */
 export function detectActivePreset(config: TdseConfig): string {
-  for (const preset of TDSE_SCENARIO_PRESETS) {
-    let matches = true
-    for (const [key, expected] of Object.entries(preset.overrides)) {
-      // Skip latticeDim — presets define a default but applyTdsePreset strips it,
-      // so the runtime dim may differ from the preset's original value.
-      if (key === 'latticeDim') continue
-      const actual = config[key as keyof TdseConfig]
-      if (Array.isArray(expected)) {
-        // Compare only the overlapping prefix — arrays are resized to match
-        // the current dimension, so lengths may differ from the preset's original.
-        if (!Array.isArray(actual)) {
-          matches = false
-          break
-        }
-        const len = Math.min(expected.length, (actual as number[]).length)
-        if (expected.slice(0, len).some((v, i) => v !== (actual as number[])[i])) {
-          matches = false
-          break
-        }
-      } else if (actual !== expected) {
-        matches = false
-        break
-      }
-    }
-    if (matches) return preset.id
-  }
-  return ''
+  const match = TDSE_SCENARIO_PRESETS.find((preset) =>
+    presetMatchesConfig(preset.overrides, config)
+  )
+  return match?.id ?? ''
 }

@@ -314,6 +314,45 @@ export function serializeState(state: ShareableState): string {
 
 // ─── Deserialize ─────────────────────────────────────────────────────────────
 
+/** Parse potential-type-specific TDSE params into state. */
+function deserializePotentialParams(params: URLSearchParams, state: ParsedShareableState): void {
+  if (state.potentialType === 'custom') {
+    const cpx = params.get('cpx')
+    if (cpx && cpx.length <= 200) state.customPotentialExpression = cpx
+  }
+  if (state.potentialType === 'coupledAnharmonic') {
+    state.anharmonicLambda = parseFloatParam(params, 'anh_l', 0, 100)
+  }
+  if (state.potentialType === 'andersonDisorder') {
+    state.disorderStrength = parseFloatParam(params, 'dis_w', 0, 100)
+    state.disorderSeed = parseIntParam(params, 'dis_s', 0, 999999)
+    const dd = params.get('dis_d')
+    if (dd === 'uniform' || dd === 'gaussian') state.disorderDistribution = dd
+  }
+}
+
+/** Parse open quantum and stochastic feature params into state. */
+function deserializeFeatureParams(params: URLSearchParams, state: ParsedShareableState): void {
+  const oq = parseBoolParam(params, 'oq')
+  if (oq !== undefined) {
+    state.openQuantumEnabled = oq
+    state.openQuantumDephasingRate = parseFloatParam(params, 'oq_dp', 0, 5)
+    state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
+    state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
+  }
+
+  const sloc = parseBoolParam(params, 'sloc')
+  if (sloc !== undefined) {
+    state.stochasticEnabled = sloc
+    state.stochasticGamma = parseFloatParam(params, 'sloc_g', 0, 10)
+    state.stochasticSigma = parseFloatParam(params, 'sloc_s', 0.5, 5)
+    state.stochasticNumSites = parseIntParam(params, 'sloc_n', 1, 32)
+  }
+
+  state.entanglementEnabled = parseBoolParam(params, 'ent')
+  state.entanglementPairwiseMI = parseBoolParam(params, 'ent_mi')
+}
+
 /**
  * Deserializes state from URL search params.
  * Unknown params are silently ignored. Missing params stay undefined (use app defaults).
@@ -361,41 +400,10 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.diagnosticsEnabled = parseBoolParam(params, 'diag')
   state.observablesEnabled = parseBoolParam(params, 'obs')
   state.imaginaryTimeEnabled = parseBoolParam(params, 'it')
-  if (state.potentialType === 'custom') {
-    const cpx = params.get('cpx')
-    if (cpx && cpx.length <= 200) state.customPotentialExpression = cpx
-  }
-  if (state.potentialType === 'coupledAnharmonic') {
-    state.anharmonicLambda = parseFloatParam(params, 'anh_l', 0, 100)
-  }
-  if (state.potentialType === 'andersonDisorder') {
-    state.disorderStrength = parseFloatParam(params, 'dis_w', 0, 100)
-    state.disorderSeed = parseIntParam(params, 'dis_s', 0, 999999)
-    const dd = params.get('dis_d')
-    if (dd === 'uniform' || dd === 'gaussian') state.disorderDistribution = dd
-  }
+  deserializePotentialParams(params, state)
 
-  // Features — open quantum
-  const oq = parseBoolParam(params, 'oq')
-  if (oq !== undefined) {
-    state.openQuantumEnabled = oq
-    state.openQuantumDephasingRate = parseFloatParam(params, 'oq_dp', 0, 5)
-    state.openQuantumRelaxationRate = parseFloatParam(params, 'oq_rx', 0, 5)
-    state.openQuantumThermalUpRate = parseFloatParam(params, 'oq_th', 0, 5)
-  }
-
-  // Stochastic decoherence
-  const sloc = parseBoolParam(params, 'sloc')
-  if (sloc !== undefined) {
-    state.stochasticEnabled = sloc
-    state.stochasticGamma = parseFloatParam(params, 'sloc_g', 0, 10)
-    state.stochasticSigma = parseFloatParam(params, 'sloc_s', 0.5, 5)
-    state.stochasticNumSites = parseIntParam(params, 'sloc_n', 1, 32)
-  }
-
-  // Coordinate entanglement
-  state.entanglementEnabled = parseBoolParam(params, 'ent')
-  state.entanglementPairwiseMI = parseBoolParam(params, 'ent_mi')
+  // Features
+  deserializeFeatureParams(params, state)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

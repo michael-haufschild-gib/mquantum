@@ -257,6 +257,126 @@ function getAxisName(index: number): string {
  * @returns The composed rotation matrix
  * @throws {Error} If invalid plane names are provided (DEV only)
  */
+/**
+ * Validates and resolves a plane name + angle pair. Returns resolved indices or null to skip.
+ *
+ * @param planeName - Rotation plane name (e.g. "XY")
+ * @param angle - Rotation angle in radians
+ * @param planeIndices - Lookup map from plane name to axis index pair
+ * @param dimension - Dimensionality (for error messages)
+ * @returns Resolved axis index pair, or null if the entry should be skipped
+ */
+function resolveRotationEntry(
+  planeName: string,
+  angle: number,
+  planeIndices: Map<string, [number, number]>,
+  dimension: number
+): [number, number] | null {
+  const indices = planeIndices.get(planeName)
+
+  if (import.meta.env.DEV && !indices) {
+    throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
+  }
+  if (import.meta.env.DEV && !Number.isFinite(angle)) {
+    throw new Error(`Rotation angle for plane "${planeName}" must be finite`)
+  }
+
+  // Skip invalid entries in production (shouldn't happen with valid input)
+  if (!indices || !Number.isFinite(angle)) return null
+  return indices
+}
+
+/**
+ * Attempts WASM-accelerated rotation composition.
+ *
+ * @param result - Output matrix to populate on success
+ * @param dimension - Dimensionality of the space
+ * @param angles - Map from plane name to angle in radians
+ * @param planeIndices - Lookup map from plane name to axis index pair
+ * @returns True if WASM succeeded and result was populated
+ */
+function tryWasmCompose(
+  result: MatrixND,
+  dimension: number,
+  angles: Map<string, number>,
+  planeIndices: Map<string, [number, number]>
+): boolean {
+  const buffers = getWasmComposeBuffers(angles.size)
+  let rotationCount = 0
+
+  for (const [planeName, angle] of angles.entries()) {
+    const indices = resolveRotationEntry(planeName, angle, planeIndices, dimension)
+    if (!indices) continue
+
+    const pairOffset = rotationCount * 2
+    buffers.planeIndices[pairOffset] = indices[0]
+    buffers.planeIndices[pairOffset + 1] = indices[1]
+    buffers.angles[rotationCount] = angle
+    rotationCount++
+  }
+
+  const wasmResult = composeRotationsIndexedWasm(
+    dimension,
+    buffers.planeIndices,
+    buffers.angles,
+    rotationCount
+  )
+  if (!wasmResult) return false
+
+  result.set(wasmResult)
+  return true
+}
+
+/**
+ * JS fallback for rotation composition using swap-based scratch buffers.
+ *
+ * @param result - Output matrix
+ * @param dimension - Dimensionality of the space
+ * @param angles - Map from plane name to angle in radians
+ * @param planeIndices - Lookup map from plane name to axis index pair
+ */
+function jsCompose(
+  result: MatrixND,
+  dimension: number,
+  angles: Map<string, number>,
+  planeIndices: Map<string, [number, number]>
+): void {
+  const scratch = getScratchMatrices(dimension)
+
+  // Initialize swap buffers: start with identity in resultA
+  resetToIdentity(scratch.resultA, dimension)
+  let current = scratch.resultA
+  let next = scratch.resultB
+
+  for (const [planeName, angle] of angles.entries()) {
+    const indices = resolveRotationEntry(planeName, angle, planeIndices, dimension)
+    if (!indices) continue
+
+    createRotationMatrixInto(scratch.rotation, dimension, indices[0], indices[1], angle)
+    multiplyMatricesInto(next, current, scratch.rotation)
+
+    // Swap references for next iteration
+    const temp = current
+    current = next
+    next = temp
+  }
+
+  copyMatrix(current, result)
+}
+
+/**
+ * Composes multiple rotations from a map of plane names to angles.
+ * Rotations are applied in the order they appear when iterating the map.
+ *
+ * Uses WASM acceleration when available, otherwise falls back to
+ * swap-based composition with pre-allocated scratch buffers.
+ *
+ * @param dimension - The dimensionality of the space
+ * @param angles - Map from plane name (e.g., "XY", "XW") to angle in radians
+ * @param out - Optional output matrix to avoid allocation (must be dimension * dimension)
+ * @returns The composed rotation matrix
+ * @throws {Error} If invalid plane names are provided (DEV only)
+ */
 export function composeRotations(
   dimension: number,
   angles: Map<string, number>,
@@ -269,101 +389,18 @@ export function composeRotations(
 
   // Early exit if no rotations
   if (angles.size === 0) {
-    // Reset to identity if reusing
-    if (out) {
-      resetToIdentity(result, dimension)
-    }
+    if (out) resetToIdentity(result, dimension)
     return result
   }
 
   // OPT-ROT-1: Use cached lookup for O(1) plane name to indices resolution
   const planeIndices = getPlaneIndicesLookup(dimension)
 
-  // Try WASM path if available
-  if (isAnimationWasmReady()) {
-    const buffers = getWasmComposeBuffers(angles.size)
-    let rotationCount = 0
-
-    for (const [planeName, angle] of angles.entries()) {
-      const indices = planeIndices.get(planeName)
-
-      // Validate plane name (DEV only)
-      if (import.meta.env.DEV && !indices) {
-        throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
-      }
-      if (import.meta.env.DEV && !Number.isFinite(angle)) {
-        throw new Error(`Rotation angle for plane "${planeName}" must be finite`)
-      }
-
-      // Skip invalid planes in production (shouldn't happen with valid input)
-      if (!indices) continue
-      if (!Number.isFinite(angle)) continue
-
-      const pairOffset = rotationCount * 2
-      buffers.planeIndices[pairOffset] = indices[0]
-      buffers.planeIndices[pairOffset + 1] = indices[1]
-      buffers.angles[rotationCount] = angle
-      rotationCount++
-    }
-
-    const wasmResult = composeRotationsIndexedWasm(
-      dimension,
-      buffers.planeIndices,
-      buffers.angles,
-      rotationCount
-    )
-    if (wasmResult) {
-      // Copy Float64Array result into Float32Array output without intermediate allocation.
-      result.set(wasmResult)
-      return result
-    }
-    // WASM failed, fall through to JS implementation
+  // Try WASM path if available, then JS fallback
+  if (!isAnimationWasmReady() || !tryWasmCompose(result, dimension, angles, planeIndices)) {
+    if (out) resetToIdentity(result, dimension)
+    jsCompose(result, dimension, angles, planeIndices)
   }
-
-  // Reset to identity if reusing (only for JS path, WASM handles this internally)
-  if (out) {
-    resetToIdentity(result, dimension)
-  }
-
-  // Get scratch matrices for this dimension
-  const scratch = getScratchMatrices(dimension)
-
-  // Initialize swap buffers: start with identity in resultA
-  resetToIdentity(scratch.resultA, dimension)
-  let current = scratch.resultA
-  let next = scratch.resultB
-
-  // Apply each rotation using swap-based composition
-  for (const [planeName, angle] of angles.entries()) {
-    // OPT-ROT-1: O(1) lookup instead of O(n) find()
-    const indices = planeIndices.get(planeName)
-
-    // Validate plane name (DEV only)
-    if (import.meta.env.DEV && !indices) {
-      throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
-    }
-    if (import.meta.env.DEV && !Number.isFinite(angle)) {
-      throw new Error(`Rotation angle for plane "${planeName}" must be finite`)
-    }
-
-    // Skip invalid planes in production (shouldn't happen with valid input)
-    if (!indices) continue
-    if (!Number.isFinite(angle)) continue
-
-    // Create rotation matrix directly into scratch buffer
-    createRotationMatrixInto(scratch.rotation, dimension, indices[0], indices[1], angle)
-
-    // Multiply: next = current * rotation (no intermediate allocation)
-    multiplyMatricesInto(next, current, scratch.rotation)
-
-    // Swap references for next iteration
-    const temp = current
-    current = next
-    next = temp
-  }
-
-  // Copy final result to output
-  copyMatrix(current, result)
 
   return result
 }

@@ -265,22 +265,33 @@ function validateBooleanField(obj: Record<string, unknown>, key: string): void {
   }
 }
 
+/** Parse and validate the raw lights array, returning valid lights or null. */
+function parseLightsArray(rawLights: unknown): LightSource[] | null {
+  if (!Array.isArray(rawLights)) return null
+  const parsed = rawLights
+    .map((rawLight, index) => normalizeLoadedLight(rawLight, index))
+    .filter((light): light is LightSource => light !== null)
+    .slice(0, MAX_LIGHTS)
+  return parsed.length > 0 ? parsed : null
+}
+
+/** Ensure selectedLightId references an existing light from the normalized array. */
+function reconcileSelectedLightId(lighting: Record<string, unknown>, lights: LightSource[]): void {
+  const currentSelected =
+    typeof lighting.selectedLightId === 'string' ? lighting.selectedLightId : null
+  const hasValidSelected =
+    currentSelected !== null && lights.some((light) => light.id === currentSelected)
+  lighting.selectedLightId = hasValidSelected ? currentSelected : lights[0]!.id
+}
+
 /** Normalize the lights array and selected light id within a lighting record. */
 function normalizeLightsArray(lighting: Record<string, unknown>): LightSource[] | null {
   let normalizedLights: LightSource[] | null = null
 
   if ('lights' in lighting) {
-    if (Array.isArray(lighting.lights)) {
-      normalizedLights = lighting.lights
-        .map((rawLight, index) => normalizeLoadedLight(rawLight, index))
-        .filter((light): light is LightSource => light !== null)
-        .slice(0, MAX_LIGHTS)
-
-      if (normalizedLights.length > 0) {
-        lighting.lights = normalizedLights
-      } else {
-        delete lighting.lights
-      }
+    normalizedLights = parseLightsArray(lighting.lights)
+    if (normalizedLights) {
+      lighting.lights = normalizedLights
     } else {
       delete lighting.lights
     }
@@ -293,11 +304,7 @@ function normalizeLightsArray(lighting: Record<string, unknown>): LightSource[] 
   }
 
   if (normalizedLights && normalizedLights.length > 0) {
-    const currentSelected =
-      typeof lighting.selectedLightId === 'string' ? lighting.selectedLightId : null
-    const hasValidSelected =
-      currentSelected !== null && normalizedLights.some((light) => light.id === currentSelected)
-    lighting.selectedLightId = hasValidSelected ? currentSelected : normalizedLights[0]!.id
+    reconcileSelectedLightId(lighting, normalizedLights)
   }
 
   return normalizedLights
@@ -336,75 +343,58 @@ export function normalizeLightingLoadData(
   return normalized
 }
 
+/** Numeric PBR face field descriptors: [min, max]. */
+const PBR_FACE_NUMERIC_FIELDS: readonly (readonly [string, number, number])[] = [
+  ['roughness', 0.04, 1.0],
+  ['metallic', 0.0, 1.0],
+  ['reflectance', 0.0, 1.0],
+  ['specularIntensity', 0.0, 2.0],
+  ['ior', 1.0, 3.0],
+  ['transmission', 0.0, 1.0],
+  ['thickness', 0.0, 10.0],
+] as const
+
+/** All PBR face field names (numeric + string). */
+const PBR_FACE_ALL_KEYS = [...PBR_FACE_NUMERIC_FIELDS.map(([k]) => k), 'specularColor'] as const
+
+/** Build a normalized face object from source fields and fallback defaults. */
+function buildNormalizedFace(
+  source: Record<string, unknown>,
+  fallback: Record<string, unknown>
+): Record<string, unknown> {
+  const face: Record<string, unknown> = {}
+  for (const [key, min, max] of PBR_FACE_NUMERIC_FIELDS) {
+    const v = source[key]
+    face[key] =
+      typeof v === 'number' && Number.isFinite(v) ? clampToRange(v, min, max) : fallback[key]
+  }
+  face.specularColor =
+    typeof source.specularColor === 'string' ? source.specularColor : fallback.specularColor
+  return face
+}
+
 /** Normalize imported PBR material data: clamp roughness, metallic, reflectance, etc. */
 export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<string, unknown> {
   const pbr = { ...rawPbr }
-  const fallbackFace = usePBRStore.getState().face
+  const fallbackFace = usePBRStore.getState().face as unknown as Record<string, unknown>
 
   const faceSource =
     pbr.face && typeof pbr.face === 'object' && !Array.isArray(pbr.face)
       ? (pbr.face as Record<string, unknown>)
       : pbr
 
-  const hasAnyFaceField =
-    'roughness' in faceSource ||
-    'metallic' in faceSource ||
-    'reflectance' in faceSource ||
-    'specularIntensity' in faceSource ||
-    'specularColor' in faceSource ||
-    'ior' in faceSource ||
-    'transmission' in faceSource ||
-    'thickness' in faceSource
+  const hasAnyFaceField = PBR_FACE_ALL_KEYS.some((key) => key in faceSource)
 
   if (hasAnyFaceField) {
-    pbr.face = {
-      roughness:
-        typeof faceSource.roughness === 'number' && Number.isFinite(faceSource.roughness)
-          ? clampToRange(faceSource.roughness, 0.04, 1.0)
-          : fallbackFace.roughness,
-      metallic:
-        typeof faceSource.metallic === 'number' && Number.isFinite(faceSource.metallic)
-          ? clampToRange(faceSource.metallic, 0.0, 1.0)
-          : fallbackFace.metallic,
-      reflectance:
-        typeof faceSource.reflectance === 'number' && Number.isFinite(faceSource.reflectance)
-          ? clampToRange(faceSource.reflectance, 0.0, 1.0)
-          : fallbackFace.reflectance,
-      specularIntensity:
-        typeof faceSource.specularIntensity === 'number' &&
-        Number.isFinite(faceSource.specularIntensity)
-          ? clampToRange(faceSource.specularIntensity, 0.0, 2.0)
-          : fallbackFace.specularIntensity,
-      specularColor:
-        typeof faceSource.specularColor === 'string'
-          ? faceSource.specularColor
-          : fallbackFace.specularColor,
-      ior:
-        typeof faceSource.ior === 'number' && Number.isFinite(faceSource.ior)
-          ? clampToRange(faceSource.ior, 1.0, 3.0)
-          : fallbackFace.ior,
-      transmission:
-        typeof faceSource.transmission === 'number' && Number.isFinite(faceSource.transmission)
-          ? clampToRange(faceSource.transmission, 0.0, 1.0)
-          : fallbackFace.transmission,
-      thickness:
-        typeof faceSource.thickness === 'number' && Number.isFinite(faceSource.thickness)
-          ? clampToRange(faceSource.thickness, 0.0, 10.0)
-          : fallbackFace.thickness,
-    }
+    pbr.face = buildNormalizedFace(faceSource, fallbackFace)
   } else {
     delete pbr.face
   }
 
   // Drop legacy flat face PBR fields once normalized into `face`.
-  delete pbr.roughness
-  delete pbr.metallic
-  delete pbr.reflectance
-  delete pbr.specularIntensity
-  delete pbr.specularColor
-  delete pbr.ior
-  delete pbr.transmission
-  delete pbr.thickness
+  for (const key of PBR_FACE_ALL_KEYS) {
+    delete pbr[key]
+  }
 
   const normalized: Record<string, unknown> = {}
   if ('face' in pbr) {
@@ -414,46 +404,41 @@ export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<st
   return normalized
 }
 
+/** Validate the animatingPlanes field: keep arrays of strings and Sets, delete anything else. */
+function validateAnimatingPlanes(animation: Record<string, unknown>): void {
+  if (!('animatingPlanes' in animation)) return
+  if (Array.isArray(animation.animatingPlanes)) {
+    animation.animatingPlanes = animation.animatingPlanes.filter(
+      (plane): plane is string => typeof plane === 'string'
+    )
+  } else if (!(animation.animatingPlanes instanceof Set)) {
+    delete animation.animatingPlanes
+  }
+}
+
+/** Validate a finite-number field: delete if not a finite number. */
+function validateFiniteField(obj: Record<string, unknown>, key: string): void {
+  if (!(key in obj)) return
+  if (typeof obj[key] !== 'number' || !Number.isFinite(obj[key])) {
+    delete obj[key]
+  }
+}
+
 /** Normalize imported animation data: clamp speed, validate direction. */
 export function normalizeAnimationLoadData(
   rawAnimation: Record<string, unknown>
 ): Record<string, unknown> {
   const animation = { ...rawAnimation }
 
-  if ('speed' in animation) {
-    if (typeof animation.speed === 'number' && Number.isFinite(animation.speed)) {
-      animation.speed = Math.max(MIN_SPEED, Math.min(MAX_SPEED, animation.speed))
-    } else {
-      delete animation.speed
-    }
-  }
+  clampNumericField(animation, 'speed', MIN_SPEED, MAX_SPEED)
 
   if ('direction' in animation && animation.direction !== 1 && animation.direction !== -1) {
     delete animation.direction
   }
 
-  if ('isPlaying' in animation && typeof animation.isPlaying !== 'boolean') {
-    delete animation.isPlaying
-  }
-
-  if ('accumulatedTime' in animation) {
-    if (
-      typeof animation.accumulatedTime !== 'number' ||
-      !Number.isFinite(animation.accumulatedTime)
-    ) {
-      delete animation.accumulatedTime
-    }
-  }
-
-  if ('animatingPlanes' in animation) {
-    if (Array.isArray(animation.animatingPlanes)) {
-      animation.animatingPlanes = animation.animatingPlanes.filter(
-        (plane): plane is string => typeof plane === 'string'
-      )
-    } else if (!(animation.animatingPlanes instanceof Set)) {
-      delete animation.animatingPlanes
-    }
-  }
+  validateBooleanField(animation, 'isPlaying')
+  validateFiniteField(animation, 'accumulatedTime')
+  validateAnimatingPlanes(animation)
 
   const normalized: Record<string, unknown> = {}
   for (const key of ANIMATION_LOAD_KEYS) {
