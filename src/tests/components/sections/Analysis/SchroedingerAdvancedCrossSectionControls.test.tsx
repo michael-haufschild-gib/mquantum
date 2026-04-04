@@ -81,47 +81,19 @@ describe('CrossSectionAnalysisContent controls', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders HydrogenEnergyDiagram for hydrogenND mode', () => {
+  it.each([
+    ['hydrogenND', 'hydrogen-energy-diagram'],
+    ['hydrogenNDCoupled', 'hydrogen-energy-diagram'],
+    ['hydrogenND', 'control-group-radial-probability'],
+    ['hydrogenNDCoupled', 'control-group-radial-probability'],
+  ] as const)('renders %s mode with %s element', (quantumMode, testId) => {
     useExtendedObjectStore.setState({
       schroedinger: {
         ...useExtendedObjectStore.getState().schroedinger,
-        quantumMode: 'hydrogenND',
+        quantumMode,
       },
     })
     render(<CrossSectionAnalysisContent />)
-    expect(screen.getByTestId('hydrogen-energy-diagram')).toBeInTheDocument()
-  })
-
-  it('renders HydrogenEnergyDiagram for hydrogenNDCoupled mode', () => {
-    useExtendedObjectStore.setState({
-      schroedinger: {
-        ...useExtendedObjectStore.getState().schroedinger,
-        quantumMode: 'hydrogenNDCoupled',
-      },
-    })
-    render(<CrossSectionAnalysisContent />)
-    expect(screen.getByTestId('hydrogen-energy-diagram')).toBeInTheDocument()
-  })
-
-  it('renders radial probability controls for hydrogenND mode', () => {
-    useExtendedObjectStore.setState({
-      schroedinger: {
-        ...useExtendedObjectStore.getState().schroedinger,
-        quantumMode: 'hydrogenND',
-      },
-    })
-    render(<CrossSectionAnalysisContent />)
-    expect(screen.getByTestId('control-group-radial-probability')).toBeInTheDocument()
-  })
-
-  it('renders radial probability controls for hydrogenNDCoupled mode', () => {
-    useExtendedObjectStore.setState({
-      schroedinger: {
-        ...useExtendedObjectStore.getState().schroedinger,
-        quantumMode: 'hydrogenNDCoupled',
-      },
-    })
-    render(<CrossSectionAnalysisContent />)
-    expect(screen.getByTestId('control-group-radial-probability')).toBeInTheDocument()
+    expect(screen.getByTestId(testId)).toBeInTheDocument()
   })
 })
