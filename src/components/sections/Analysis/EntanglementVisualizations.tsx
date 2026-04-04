@@ -232,7 +232,9 @@ export const AtlasHeatmap: React.FC<{
 
   const dims = [...new Set(results.map((r) => r.dim))].sort((a, b) => a - b)
   const lambdas = [...new Set(results.map((r) => r.lambda))].sort((a, b) => a - b)
-  const maxEntropy = Math.max(...results.map((r) => r.entropy), 1e-6)
+  // Filter NaN entropies to prevent Math.max poisoning
+  const finiteEntropies = results.map((r) => r.entropy).filter(Number.isFinite)
+  const maxEntropy = finiteEntropies.length > 0 ? Math.max(...finiteEntropies, 1e-6) : 1e-6
 
   const cellW = PLOT_W / lambdas.length
   const cellH = PLOT_H / dims.length
@@ -248,7 +250,7 @@ export const AtlasHeatmap: React.FC<{
             const li = lambdas.indexOf(r.lambda)
             const di = dims.indexOf(r.dim)
             if (li < 0 || di < 0) return null
-            const frac = r.entropy / maxEntropy
+            const frac = Number.isFinite(r.entropy) ? r.entropy / maxEntropy : 0
             const lightness = 0.95 - 0.55 * frac
             return (
               <rect
