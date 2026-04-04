@@ -1,8 +1,6 @@
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
-
 /** Props for the collapsible sidebar section container. */
 export interface SectionProps {
   title: string
@@ -98,14 +96,13 @@ export const Section: React.FC<SectionProps> = React.memo(
       `}
         data-testid={dataTestId}
       >
-        <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
-          <Button
+        <div className="flex items-center bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
+          <m.button
+            type="button"
             onClick={handleToggle}
-            className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none border-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10"
+            className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10 bg-transparent"
             aria-expanded={isOpen}
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
-            variant="ghost"
-            size="md"
           >
             <div className="flex items-center gap-3">
               {/* LED Indicator - static glow, no animation = 0 style recalcs */}
@@ -144,7 +141,7 @@ export const Section: React.FC<SectionProps> = React.memo(
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </m.div>
-          </Button>
+          </m.button>
 
           {isOpen && onReset && (
             <m.button
