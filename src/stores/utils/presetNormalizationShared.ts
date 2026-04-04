@@ -89,7 +89,6 @@ export const POST_PROCESSING_LOAD_KEYS = [
 export const APPEARANCE_LOAD_KEYS = [
   'edgeColor',
   'faceColor',
-  'backgroundColor',
   'perDimensionColorEnabled',
   'colorAlgorithm',
   'cosineCoefficients',

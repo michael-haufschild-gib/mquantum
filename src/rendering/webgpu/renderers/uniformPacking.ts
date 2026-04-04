@@ -12,6 +12,7 @@
 
 import { DEFAULT_PAULI_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
+import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
@@ -359,16 +360,11 @@ function packNodalAndColorSystem(
   floatView[I.distOffset] = appearance?.distribution?.offset ?? 0.0
 
   // Cosine palette coefficients
-  const cosineCoeffs = appearance?.cosineCoefficients ?? {
-    a: [0.5, 0.5, 0.5],
-    b: [0.5, 0.5, 0.5],
-    c: [1.0, 1.0, 1.0],
-    d: [0.0, 0.33, 0.67],
-  }
-  packVec4Color(floatView, I.cosineA, cosineCoeffs.a, [0.5, 0.5, 0.5])
-  packVec4Color(floatView, I.cosineB, cosineCoeffs.b, [0.5, 0.5, 0.5])
-  packVec4Color(floatView, I.cosineC, cosineCoeffs.c, [1.0, 1.0, 1.0])
-  packVec4Color(floatView, I.cosineD, cosineCoeffs.d, [0.0, 0.33, 0.67])
+  const cosineCoeffs = appearance?.cosineCoefficients ?? DEFAULT_COSINE_COEFFICIENTS
+  packVec4Color(floatView, I.cosineA, cosineCoeffs.a, DEFAULT_COSINE_COEFFICIENTS.a)
+  packVec4Color(floatView, I.cosineB, cosineCoeffs.b, DEFAULT_COSINE_COEFFICIENTS.b)
+  packVec4Color(floatView, I.cosineC, cosineCoeffs.c, DEFAULT_COSINE_COEFFICIENTS.c)
+  packVec4Color(floatView, I.cosineD, cosineCoeffs.d, DEFAULT_COSINE_COEFFICIENTS.d)
 }
 
 /** Pack phase materiality and interference fields. */
