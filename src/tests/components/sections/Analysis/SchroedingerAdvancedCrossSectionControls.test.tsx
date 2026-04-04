@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('CrossSectionAnalysisContent controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.setState(useGeometryStore.getInitialState())
   })
 
   it('reveals cross-section controls only when enabled', () => {
@@ -77,5 +79,38 @@ describe('CrossSectionAnalysisContent controls', () => {
         'Slice scalar colors use the active Faces color algorithm and palette settings.'
       )
     ).toBeInTheDocument()
+  })
+
+  it('renders HydrogenEnergyDiagram for hydrogenND mode', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'hydrogenND',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId('hydrogen-energy-diagram')).toBeInTheDocument()
+  })
+
+  it('renders HydrogenEnergyDiagram for hydrogenNDCoupled mode', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'hydrogenNDCoupled',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId('hydrogen-energy-diagram')).toBeInTheDocument()
+  })
+
+  it('renders radial probability controls for hydrogenND mode', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'hydrogenND',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId('control-group-radial-probability')).toBeInTheDocument()
   })
 })
