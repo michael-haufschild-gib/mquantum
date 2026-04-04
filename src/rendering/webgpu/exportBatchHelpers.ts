@@ -109,7 +109,8 @@ export async function acquireStreamHandle(
     )
   }
 
-  const descriptor = FORMAT_DESCRIPTORS[format] ?? FORMAT_DESCRIPTORS.mp4
+  // mp4 always exists — non-null assertion is safe for the fallback
+  const descriptor = (FORMAT_DESCRIPTORS[format] ?? FORMAT_DESCRIPTORS['mp4'])!
   try {
     return await window.showSaveFilePicker({
       suggestedName: `mquantum-${Date.now()}${descriptor.extension}`,

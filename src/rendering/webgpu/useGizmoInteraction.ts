@@ -374,7 +374,7 @@ function applyTranslateDrag(
   const delta = currentT - drag.startAxisT
 
   const newPos: [number, number, number] = [...drag.startLightPos]
-  newPos[axisIdx] += delta
+  newPos[axisIdx as 0 | 1 | 2] += delta
   lighting.updateLight(drag.lightId, { position: newPos })
 }
 
@@ -403,7 +403,7 @@ function applyRotateDrag(drag: GizmoDragState, ray: GizmoDragRay, lighting: Ligh
   const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta))
 
   const newRot: [number, number, number] = [...drag.startLightRot]
-  newRot[axisIdx] += deltaAngle
+  newRot[axisIdx as 0 | 1 | 2] += deltaAngle
   lighting.updateLight(drag.lightId, { rotation: newRot })
 }
 

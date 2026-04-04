@@ -164,8 +164,9 @@ function isValidRotationTuple(value: [number, number, number]): boolean {
 // ============================================================================
 
 /** Numeric fields that require finite-number validation and clamping. */
+type NumericLightKey = 'intensity' | 'coneAngle' | 'penumbra' | 'range' | 'decay'
 const NUMERIC_LIGHT_FIELDS: ReadonlyArray<{
-  key: keyof LightSource
+  key: NumericLightKey
   label: string
   clamp: (v: number) => number
 }> = [
