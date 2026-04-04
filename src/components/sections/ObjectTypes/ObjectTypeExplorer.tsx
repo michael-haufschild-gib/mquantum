@@ -11,8 +11,10 @@ import {
   getQuantumTypeEntry,
   resolveQuantumTypeKey,
 } from '@/lib/geometry/registry'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
+import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(
@@ -45,6 +47,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const handleSelect = useCallback(
     (entry: AvailableQuantumTypeInfo) => {
       soundManager.playClick()
+
+      // Abort any running sweep before switching type/mode so disabled controls re-enable
+      useCoordinateEntanglementStore.getState().abortSweep()
+      useMonitoringSweepStore.getState().abort()
+
       const prevDim = useGeometryStore.getState().dimension
 
       if (entry.key === 'pauliSpinor') {

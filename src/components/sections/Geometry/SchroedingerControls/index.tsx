@@ -8,7 +8,6 @@
 
 import React from 'react'
 
-import { KKCompactificationSection } from './KKCompactificationSection'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
@@ -22,6 +21,7 @@ import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { HydrogenNDCoupledControls } from './HydrogenNDCoupledControls'
+import { KKCompactificationSection } from './KKCompactificationSection'
 import { QuantumWalkControls } from './QuantumWalkControls'
 import { TDSEControls } from './TDSEControls'
 import type {

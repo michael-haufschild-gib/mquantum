@@ -146,112 +146,118 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
   const isComplete = status === 'complete'
 
   return (
-    <ControlGroup title="Monitoring Dynamics" collapsible defaultOpen={false}>
-      <div className="space-y-2">
-        {/* Current IPR display */}
-        <div className="flex items-center justify-between text-xs text-text-secondary">
-          <span>IPR (1=localized, N=delocalized)</span>
-          <span className="font-mono">{ipr.toFixed(4)}</span>
-        </div>
-        {count > 2 && <Sparkline data={historyIpr} head={head} count={count} height={32} />}
-
-        <div className="flex items-center justify-between text-xs text-text-secondary">
-          <span>Norm</span>
-          <span className="font-mono">{totalNorm.toFixed(4)}</span>
-        </div>
-        <div className="flex items-center justify-between text-xs text-text-secondary">
-          <span>Norm drift</span>
-          <span className="font-mono">{(normDrift * 100).toFixed(2)}%</span>
-        </div>
-
-        {/* Sweep controls */}
-        <div className="border-t border-panel-border/50 pt-2 mt-2">
-          <div className="flex items-center justify-between text-xs text-text-secondary mb-1">
-            <span>γ Sweep</span>
-            <span className="font-mono">
-              {isRunning && `${currentStep}/${config.steps}`}
-              {isComplete && `${results.length} pts`}
-              {!isRunning && !isComplete && 'Ready'}
-            </span>
+    <>
+      <ControlGroup title="Monitoring Dynamics" collapsible defaultOpen={false}>
+        <div className="space-y-2">
+          {/* Current IPR display */}
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span>IPR (1=localized, N=delocalized)</span>
+            <span className="font-mono">{ipr.toFixed(4)}</span>
           </div>
+          {count > 2 && <Sparkline data={historyIpr} head={head} count={count} height={32} />}
 
-          {/* Configurable sweep parameters — hidden while running */}
-          {!isRunning && !isComplete && (
-            <div className="space-y-1 mb-2">
-              <div className="flex gap-2">
-                <NumberInput
-                  label="γ min"
-                  value={gammaMin}
-                  onChange={setGammaMin}
-                  min={0.001}
-                  max={10}
-                  step={0.01}
-                />
-                <NumberInput
-                  label="γ max"
-                  value={gammaMax}
-                  onChange={setGammaMax}
-                  min={0.01}
-                  max={10}
-                  step={0.1}
-                />
-              </div>
-              <div className="flex gap-2">
-                <NumberInput
-                  label="Steps"
-                  value={steps}
-                  onChange={(v) => setSteps(Math.floor(v))}
-                  min={5}
-                  max={50}
-                  step={1}
-                />
-                <NumberInput
-                  label="Time/step"
-                  value={timePerStep}
-                  onChange={setTimePerStep}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                />
-              </div>
-            </div>
-          )}
-
-          {!isRunning && !isComplete && (
-            <Button size="sm" onClick={handleStartSweep}>
-              Start Sweep
-            </Button>
-          )}
-          {isRunning && (
-            <Button size="sm" variant="secondary" onClick={abort}>
-              Abort
-            </Button>
-          )}
-          {isComplete && (
-            <Button size="sm" variant="secondary" onClick={reset}>
-              Clear
-            </Button>
-          )}
-
-          {/* Sweep results plot */}
-          {sweepData && sweepData.length > 1 && (
-            <div className="mt-2">
-              <Sparkline
-                data={sweepData}
-                head={sweepData.length}
-                count={sweepData.length}
-                height={48}
-              />
-              <div className="flex justify-between text-xs text-text-tertiary mt-0.5">
-                <span>γ={results[0]?.gamma.toFixed(2)}</span>
-                <span>γ={results[results.length - 1]?.gamma.toFixed(2)}</span>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span>Norm</span>
+            <span className="font-mono">{totalNorm.toFixed(4)}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span>Norm drift</span>
+            <span className="font-mono">{(normDrift * 100).toFixed(2)}%</span>
+          </div>
         </div>
-      </div>
-    </ControlGroup>
+      </ControlGroup>
+
+      <ControlGroup
+        title="Sweep"
+        collapsible
+        defaultOpen
+        data-testid="control-group-monitoring-sweep"
+        className={isRunning ? 'pointer-events-none opacity-70' : ''}
+        rightElement={
+          <span className="font-mono text-xs">
+            {isRunning && `${currentStep}/${config.steps}`}
+            {isComplete && `${results.length} pts`}
+            {!isRunning && !isComplete && 'Ready'}
+          </span>
+        }
+      >
+        {/* Sweep controls */}
+
+        {/* Configurable sweep parameters — hidden while running */}
+        {!isRunning && !isComplete && (
+          <div className="space-y-1 mb-2">
+            <div className="flex gap-2">
+              <NumberInput
+                label="γ min"
+                value={gammaMin}
+                onChange={setGammaMin}
+                min={0.001}
+                max={10}
+                step={0.01}
+              />
+              <NumberInput
+                label="γ max"
+                value={gammaMax}
+                onChange={setGammaMax}
+                min={0.01}
+                max={10}
+                step={0.1}
+              />
+            </div>
+            <div className="flex gap-2">
+              <NumberInput
+                label="Steps"
+                value={steps}
+                onChange={(v) => setSteps(Math.floor(v))}
+                min={5}
+                max={50}
+                step={1}
+              />
+              <NumberInput
+                label="Time/step"
+                value={timePerStep}
+                onChange={setTimePerStep}
+                min={0.1}
+                max={10}
+                step={0.1}
+              />
+            </div>
+          </div>
+        )}
+
+        {!isRunning && !isComplete && (
+          <Button size="sm" onClick={handleStartSweep}>
+            Start Sweep
+          </Button>
+        )}
+        {isRunning && (
+          <Button size="sm" variant="primary" onClick={abort}>
+            Abort
+          </Button>
+        )}
+        {isComplete && (
+          <Button size="sm" variant="primary" onClick={reset}>
+            Clear
+          </Button>
+        )}
+
+        {/* Sweep results plot */}
+        {sweepData && sweepData.length > 1 && (
+          <div className="mt-2">
+            <Sparkline
+              data={sweepData}
+              head={sweepData.length}
+              count={sweepData.length}
+              height={48}
+            />
+            <div className="flex justify-between text-xs text-text-tertiary mt-0.5">
+              <span>γ={results[0]?.gamma.toFixed(2)}</span>
+              <span>γ={results[results.length - 1]?.gamma.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+      </ControlGroup>
+    </>
   )
 })
-
 MonitoringSweepSection.displayName = 'MonitoringSweepSection'

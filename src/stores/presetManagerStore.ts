@@ -9,11 +9,13 @@ import { logger } from '@/lib/logger'
 import { DEFAULT_SPEED, useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
 import { useCameraStore } from './cameraStore'
+import { useCoordinateEntanglementStore } from './coordinateEntanglementStore'
 import { DIALOG_IDS } from './dismissedDialogsStore'
 import { useEnvironmentStore } from './environmentStore'
 import { useExtendedObjectStore } from './extendedObjectStore'
 import { useGeometryStore } from './geometryStore'
 import { useLightingStore } from './lightingStore'
+import { useMonitoringSweepStore } from './monitoringSweepStore'
 import { useMsgBoxStore } from './msgBoxStore'
 import { usePBRStore } from './pbrStore'
 import { usePerformanceStore } from './performanceStore'
@@ -514,6 +516,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
       loadScene: (id) => {
         const scene = get().savedScenes.find((s) => s.id === id)
         if (!scene) return
+
+        // Abort any running sweeps so their disabled UI controls re-enable before state changes
+        useCoordinateEntanglementStore.getState().abortSweep()
+        useMonitoringSweepStore.getState().abort()
 
         usePerformanceStore.getState().setIsLoadingScene(true)
         usePerformanceStore.getState().setSceneTransitioning(true)
