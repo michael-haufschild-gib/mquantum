@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
 import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 import { canUseGridOnly } from '@/rendering/webgpu/shaders/schroedinger/composeConfig'
 
@@ -46,14 +47,29 @@ describe('Schroedinger cross-section WGSL composition', () => {
   })
 
   it('disables gridOnly when crossSectionEnabled is true, preserving real evalPsi', () => {
-    // Config that would be gridOnly WITHOUT cross-section:
-    // useDensityGrid=true, non-phase color alg, no quantum effects
-    const gridOnlyBase = {
+    // canUseGridOnly accepts the string-typed config interface
+    const gridOnlyConfig = {
+      useDensityGrid: true,
+      colorAlgorithm: 'radialDistance' as const,
+      phaseMateriality: false,
+      interference: false,
+      nodal: false,
+      probabilityCurrentEnabled: false,
+      useDensityMatrix: false,
+      crossSectionEnabled: false,
+    }
+
+    expect(canUseGridOnly(gridOnlyConfig, false)).toBe(true)
+    expect(canUseGridOnly({ ...gridOnlyConfig, crossSectionEnabled: true }, false)).toBe(false)
+
+    // composeSchroedingerShader uses numeric colorAlgorithm internally;
+    // use COLOR_ALGORITHM_TO_INT for the compose call
+    const composeBase = {
       dimension: 5,
       quantumMode: 'harmonicOscillator' as const,
       isosurface: false,
       useDensityGrid: true,
-      colorAlgorithm: 11, // radialDistance — not a phase color algorithm
+      colorAlgorithm: COLOR_ALGORITHM_TO_INT.radialDistance,
       phaseMateriality: false,
       interference: false,
       nodal: false,
@@ -63,14 +79,14 @@ describe('Schroedinger cross-section WGSL composition', () => {
     }
 
     // Without cross-section → gridOnly=true → stubs
-    expect(canUseGridOnly(gridOnlyBase, false)).toBe(true)
-    const { wgsl: gridOnlyWgsl } = composeSchroedingerShader(gridOnlyBase)
+    const { wgsl: gridOnlyWgsl } = composeSchroedingerShader(composeBase)
     expect(gridOnlyWgsl).toContain('Quantum Math Stubs (grid-only)')
 
     // With cross-section → gridOnly=false → real quantum math
-    const withCrossSection = { ...gridOnlyBase, crossSectionEnabled: true }
-    expect(canUseGridOnly(withCrossSection, false)).toBe(false)
-    const { wgsl: crossSectionWgsl } = composeSchroedingerShader(withCrossSection)
+    const { wgsl: crossSectionWgsl } = composeSchroedingerShader({
+      ...composeBase,
+      crossSectionEnabled: true,
+    })
     expect(crossSectionWgsl).not.toContain('Quantum Math Stubs (grid-only)')
     expect(crossSectionWgsl).toContain('fn evalPsi(')
     expect(crossSectionWgsl).toContain('fn mapPosToND(')
