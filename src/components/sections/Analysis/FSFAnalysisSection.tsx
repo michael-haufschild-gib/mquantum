@@ -32,8 +32,8 @@ const MetricRow: React.FC<{
   unit?: string
 }> = ({ label, value, digits = 4, unit = '' }) => (
   <div className="flex items-center justify-between py-0.5">
-    <span className="text-[10px] text-text-tertiary">{label}</span>
-    <span className="text-[10px] font-mono text-text-secondary tabular-nums">
+    <span className="text-xs text-text-tertiary">{label}</span>
+    <span className="text-xs font-mono text-text-secondary tabular-nums">
       {isFinite(value) ? value.toFixed(digits) : 'NaN'}
       {unit && <span className="text-text-tertiary ms-0.5">{unit}</span>}
     </span>
@@ -100,7 +100,7 @@ const SparklineRow: React.FC<{
   max?: number
 }> = ({ label, data, head, count, min, max }) => (
   <div>
-    <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</span>
+    <span className="text-xs text-text-tertiary uppercase tracking-wider">{label}</span>
     <Sparkline
       data={data}
       head={head}
@@ -127,7 +127,7 @@ const SparklineCharts: React.FC = React.memo(() => {
   if (!hasData) {
     return (
       <div className="px-1 py-3 text-center">
-        <p className="text-[10px] text-text-tertiary italic">Waiting for first readback...</p>
+        <p className="text-xs text-text-tertiary italic">Waiting for first readback...</p>
       </div>
     )
   }
@@ -190,9 +190,7 @@ const KGDispersionDiagram: React.FC<{ mass: number }> = React.memo(({ mass }) =>
 
   return (
     <div data-testid="kg-dispersion">
-      <p className="text-[10px] text-text-secondary mb-1">
-        Klein-Gordon Dispersion ω(k) = √(k² + m²)
-      </p>
+      <p className="text-xs text-text-secondary mb-1">Klein-Gordon Dispersion ω(k) = √(k² + m²)</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${KG_WIDTH} ${KG_HEIGHT}`} className="block">
           {/* Zero line */}

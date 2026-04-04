@@ -93,7 +93,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
             data-testid="frame-blending-factor-slider"
           />
         </div>
-        <p className="text-[10px] text-text-secondary mt-1">
+        <p className="text-xs text-text-secondary mt-1">
           Blends frames for smoother motion. Higher values may cause ghosting.
         </p>
       </ControlGroup>

@@ -162,7 +162,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
 
   return (
     <div className="mt-2" data-testid="tdse-energy-diagram-inline">
-      <p className="text-[10px] text-text-secondary mb-1">Potential V(x) & Kinetic Energy</p>
+      <p className="text-xs text-text-secondary mb-1">Potential V(x) & Kinetic Energy</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}
@@ -311,9 +311,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
       {/* IPR sparkline for Anderson disorder */}
       {isAnderson && historyCount > 1 && (
         <div className="mt-1.5">
-          <p className="text-[10px] text-text-secondary mb-0.5">
-            IPR (Inverse Participation Ratio)
-          </p>
+          <p className="text-xs text-text-secondary mb-0.5">IPR (Inverse Participation Ratio)</p>
           <Sparkline data={historyIpr} head={historyHead} count={historyCount} height={40} />
         </div>
       )}
@@ -414,7 +412,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
         {enabled && obs.hasData && (
           <div className="space-y-3" data-testid="observables-panel">
             {/* Per-dimension table */}
-            <div className="text-[10px] font-mono space-y-0.5">
+            <div className="text-xs font-mono space-y-0.5">
               <div className="flex gap-2 text-text-tertiary font-semibold">
                 <span className="w-4">d</span>
                 <span className="w-16 text-right">&lt;x&gt;</span>
@@ -448,7 +446,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
 
             {/* Energy sparkline */}
             <div className="space-y-1">
-              <div className="text-[10px] text-text-tertiary" data-testid="energy-readout">
+              <div className="text-xs text-text-tertiary" data-testid="energy-readout">
                 &lt;E&gt; = {obs.totalEnergy.toFixed(4)}
               </div>
               <Sparkline
@@ -466,7 +464,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
               if (!histData) return null
               return (
                 <div key={d} className="space-y-1" data-testid={`uncertainty-sparkline-${d}`}>
-                  <div className="text-[10px] text-text-tertiary">
+                  <div className="text-xs text-text-tertiary">
                     &Delta;{DIM_LABELS[d]}&Delta;p
                     <span className="text-text-quaternary ms-1">
                       (bound: {minUncertainty.toFixed(2)})
@@ -489,7 +487,7 @@ const ObservablesDisplay: React.FC<ObservablesDisplayProps> = React.memo(
         )}
 
         {enabled && !obs.hasData && (
-          <div className="text-[10px] text-text-tertiary" data-testid="observables-waiting">
+          <div className="text-xs text-text-tertiary" data-testid="observables-waiting">
             Waiting for GPU readback...
           </div>
         )}
@@ -532,7 +530,7 @@ export const EnergySpectrumDisplay: React.FC = React.memo(() => {
 
   return (
     <div className="mt-2" data-testid="energy-spectrum-display">
-      <p className="text-[10px] text-text-secondary mb-0.5">Energy Spectrum ρ(E)</p>
+      <p className="text-xs text-text-secondary mb-0.5">Energy Spectrum ρ(E)</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${ES_W} ${ES_H}`} className="block">
           {Array.from({ length: numBins }, (_, i) => {

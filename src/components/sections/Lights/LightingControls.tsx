@@ -44,7 +44,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
           data-testid="control-group-scene-lights"
           rightElement={
             <div className="flex items-center gap-2" title="Show light indicators in scene">
-              <span className="text-[10px] text-text-tertiary uppercase tracking-wider font-semibold">
+              <span className="text-xs text-text-tertiary uppercase tracking-wider font-semibold">
                 Gizmos
               </span>
               <Switch

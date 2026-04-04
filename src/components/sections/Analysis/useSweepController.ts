@@ -1,0 +1,138 @@
+/**
+ * Atlas Sweep Controller Hook
+ *
+ * Manages the lifecycle of an entanglement atlas sweep: start/abort,
+ * polling for convergence, physics state snapshot/restore.
+ *
+ * @module components/sections/Analysis/useSweepController
+ */
+
+import { useEffect, useRef } from 'react'
+
+import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
+import {
+  type AtlasSweepConfig,
+  lambdaForStep,
+  useCoordinateEntanglementStore,
+} from '@/stores/coordinateEntanglementStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+
+const SWEEP_EVOLVE_ENTRIES = 20
+const SWEEP_MEASURE_ENTRIES = 10
+const SWEEP_POLL_MS = 500
+
+interface PreSweepSnapshot {
+  potentialType: TdsePotentialType
+  anharmonicLambda: number
+  dimension: number
+}
+
+/** Manages atlas sweep lifecycle: start/abort, polling, physics state snapshot/restore. */
+export function useSweepController(): {
+  handleStartSweep: () => void
+  handleAbortSweep: () => void
+} {
+  const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stepStartNRef = useRef(0)
+  const preSweepRef = useRef<PreSweepSnapshot | null>(null)
+
+  const sweepStatus = useCoordinateEntanglementStore((s) => s.sweepStatus)
+
+  const restorePreSweepState = () => {
+    const snap = preSweepRef.current
+    if (!snap) return
+    preSweepRef.current = null
+    const ext = useExtendedObjectStore.getState()
+    ext.setTdsePotentialType(snap.potentialType)
+    ext.setTdseAnharmonicLambda(snap.anharmonicLambda)
+    useGeometryStore.getState().setDimension(snap.dimension)
+    // Defer field reset so dimension/potential changes fully propagate first
+    queueMicrotask(() => {
+      useExtendedObjectStore.getState().resetTdseField()
+    })
+  }
+
+  const handleStartSweep = () => {
+    const config: AtlasSweepConfig = {
+      lambdaMin: 0.01,
+      lambdaMax: 50,
+      lambdaSteps: 15,
+      dimensions: [3, 4, 5],
+    }
+
+    const ext = useExtendedObjectStore.getState()
+    const tdseState = ext.schroedinger.tdse
+    preSweepRef.current = {
+      potentialType: tdseState.potentialType,
+      anharmonicLambda: tdseState.anharmonicLambda,
+      dimension: useGeometryStore.getState().dimension,
+    }
+
+    const entStore = useCoordinateEntanglementStore.getState()
+    entStore.clearHistory()
+    entStore.startSweep(config)
+    stepStartNRef.current = 0
+
+    const firstLambda = lambdaForStep(config, 0)
+    ext.setTdsePotentialType('coupledAnharmonic')
+    ext.setTdseAnharmonicLambda(firstLambda)
+    useGeometryStore.getState().setDimension(config.dimensions[0]!)
+    ext.resetTdseField()
+  }
+
+  const handleAbortSweep = () => {
+    useCoordinateEntanglementStore.getState().abortSweep()
+    restorePreSweepState()
+  }
+
+  useEffect(() => {
+    if (sweepStatus !== 'running') {
+      if (sweepTickRef.current) {
+        clearInterval(sweepTickRef.current)
+        sweepTickRef.current = null
+      }
+      return
+    }
+
+    sweepTickRef.current = setInterval(() => {
+      const entStore = useCoordinateEntanglementStore.getState()
+      if (entStore.sweepStatus !== 'running') return
+
+      const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
+      const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
+
+      if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
+        entStore.recordSweepSample(entStore.currentNormalizedEntropy)
+      }
+
+      if (samplesSinceStart >= totalNeeded) {
+        entStore.completeSweepStep()
+        const next = entStore.advanceSweepStep()
+
+        if (next) {
+          stepStartNRef.current = entStore.longTimeN
+          const ext = useExtendedObjectStore.getState()
+          ext.setTdseAnharmonicLambda(next.lambda)
+          const currentDim = useGeometryStore.getState().dimension
+          if (currentDim !== next.dim) {
+            useGeometryStore.getState().setDimension(next.dim)
+          }
+          ext.resetTdseField()
+        } else {
+          entStore.completeSweep()
+          restorePreSweepState()
+        }
+      }
+    }, SWEEP_POLL_MS)
+
+    return () => {
+      if (sweepTickRef.current) {
+        clearInterval(sweepTickRef.current)
+        sweepTickRef.current = null
+      }
+    }
+  }, [sweepStatus])
+
+  return { handleStartSweep, handleAbortSweep }
+}

@@ -17,6 +17,7 @@ import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /** Decoherence section — controls CSL localization and branch visualization. */
@@ -32,6 +33,7 @@ export function DecoherenceSection() {
 
 /** Inner content — only rendered when quantumMode === 'tdseDynamics'. */
 function DecoherenceContent() {
+  const sweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
   const {
     tdse,
     setStochasticEnabled,
@@ -82,77 +84,82 @@ function DecoherenceContent() {
 
   return (
     <Section title="Decoherence">
-      <Switch
-        label="Enable Decoherence"
-        checked={tdse.stochasticEnabled}
-        onCheckedChange={setStochasticEnabled}
-      />
-      {tdse.stochasticEnabled && (
-        <>
-          <Slider
-            label="Monitoring rate (γ)"
-            value={tdse.stochasticGamma}
-            onChange={setStochasticGamma}
-            min={0}
-            max={10}
-            step={0.1}
-          />
-          <Slider
-            label="Localization width (σ)"
-            value={tdse.stochasticSigma}
-            onChange={setStochasticSigma}
-            min={0.5}
-            max={5.0}
-            step={0.1}
-          />
-          <Slider
-            label="Collapse sites/step"
-            value={tdse.stochasticNumSites}
-            onChange={setStochasticNumSites}
-            min={1}
-            max={MAX_STOCHASTIC_SITES}
-            step={1}
-          />
-          <NumberInput
-            label="Seed"
-            value={tdse.stochasticSeed}
-            onChange={setStochasticSeed}
-            min={0}
-            max={999999}
-            step={1}
-          />
+      <div
+        className={`space-y-0 transition-opacity${sweepRunning ? ' pointer-events-none opacity-50' : ''}`}
+      >
+        <Switch
+          label="Enable Decoherence"
+          checked={tdse.stochasticEnabled}
+          onCheckedChange={setStochasticEnabled}
+          disabled={sweepRunning}
+        />
+        {tdse.stochasticEnabled && (
+          <>
+            <Slider
+              label="Monitoring rate (γ)"
+              value={tdse.stochasticGamma}
+              onChange={setStochasticGamma}
+              min={0}
+              max={10}
+              step={0.1}
+            />
+            <Slider
+              label="Localization width (σ)"
+              value={tdse.stochasticSigma}
+              onChange={setStochasticSigma}
+              min={0.5}
+              max={5.0}
+              step={0.1}
+            />
+            <Slider
+              label="Collapse sites/step"
+              value={tdse.stochasticNumSites}
+              onChange={setStochasticNumSites}
+              min={1}
+              max={MAX_STOCHASTIC_SITES}
+              step={1}
+            />
+            <NumberInput
+              label="Seed"
+              value={tdse.stochasticSeed}
+              onChange={setStochasticSeed}
+              min={0}
+              max={999999}
+              step={1}
+            />
 
-          <Switch
-            label="Show branches"
-            checked={tdse.branchingEnabled}
-            onCheckedChange={setBranchingEnabled}
-          />
-          {tdse.branchingEnabled && (
-            <>
-              <Slider
-                label="Branch plane"
-                value={tdse.branchPlanePosition}
-                onChange={setBranchPlanePosition}
-                min={-1.0}
-                max={1.0}
-                step={0.01}
-              />
-              <ColorPicker
-                label="Branch A"
-                value={rgbToHex(tdse.branchColorA)}
-                onChange={(hex) => setBranchColorA(hexToRgb(hex))}
-              />
-              <ColorPicker
-                label="Branch B"
-                value={rgbToHex(tdse.branchColorB)}
-                onChange={(hex) => setBranchColorB(hexToRgb(hex))}
-              />
-            </>
-          )}
+            <Switch
+              label="Show branches"
+              checked={tdse.branchingEnabled}
+              onCheckedChange={setBranchingEnabled}
+            />
+            {tdse.branchingEnabled && (
+              <>
+                <Slider
+                  label="Branch plane"
+                  value={tdse.branchPlanePosition}
+                  onChange={setBranchPlanePosition}
+                  min={-1.0}
+                  max={1.0}
+                  step={0.01}
+                />
+                <ColorPicker
+                  label="Branch A"
+                  value={rgbToHex(tdse.branchColorA)}
+                  onChange={(hex) => setBranchColorA(hexToRgb(hex))}
+                />
+                <ColorPicker
+                  label="Branch B"
+                  value={rgbToHex(tdse.branchColorB)}
+                  onChange={(hex) => setBranchColorB(hexToRgb(hex))}
+                />
+              </>
+            )}
 
-          <MonitoringSweepSection />
-        </>
-      )}
+            <MonitoringSweepSection />
+          </>
+        )}
+      </div>
     </Section>
   )
 }

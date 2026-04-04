@@ -141,7 +141,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
 
       {/* No GPU Timing Warning */}
       {!hasGpuTimings && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning border border-warning-border text-[10px] text-warning">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning border border-warning-border text-xs text-warning">
           <Icons.AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>GPU timing unavailable — timestamp-query not supported</span>
         </div>
@@ -171,17 +171,17 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: PASS_COLORS[i % PASS_COLORS.length] }}
                   />
-                  <span className="text-[10px] font-mono text-text-secondary truncate">
+                  <span className="text-xs font-mono text-text-secondary truncate">
                     {formatPassId(p.passId)}
                   </span>
                 </div>
-                <span className={`text-[10px] font-mono text-right ${getCostColor(p.gpuTimeMs)}`}>
+                <span className={`text-xs font-mono text-right ${getCostColor(p.gpuTimeMs)}`}>
                   {hasGpuTimings ? fmtMs(p.gpuTimeMs) : '—'}
                 </span>
-                <span className="text-[10px] font-mono text-right text-text-tertiary">
+                <span className="text-xs font-mono text-right text-text-tertiary">
                   {fmtMs(p.cpuTimeMs)}
                 </span>
-                <span className="text-[10px] font-mono text-right text-text-tertiary">
+                <span className="text-xs font-mono text-right text-text-tertiary">
                   {hasGpuTimings && totalGpuTimeMs > 0 ? `${pct.toFixed(0)}%` : '—'}
                 </span>
               </div>

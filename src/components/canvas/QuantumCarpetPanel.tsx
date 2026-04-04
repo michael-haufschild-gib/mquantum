@@ -281,11 +281,11 @@ const CarpetPanelInner: React.FC = React.memo(() => {
             />
             {/* X-axis label */}
             <div className="flex justify-between mt-0.5 px-0.5">
-              <span className="text-[10px] text-neutral-500">0</span>
-              <span className="text-[10px] text-neutral-400">
+              <span className="text-xs text-neutral-500">0</span>
+              <span className="text-xs text-neutral-400">
                 Position x{String.fromCharCode(0x2080 + sliceAxis)}
               </span>
-              <span className="text-[10px] text-neutral-500">L</span>
+              <span className="text-xs text-neutral-500">L</span>
             </div>
           </div>
 
@@ -311,7 +311,7 @@ const CarpetPanelInner: React.FC = React.memo(() => {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-[10px] text-neutral-500">
+        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-xs text-neutral-500">
           <span>Frames: {totalFrames}</span>
           <span>
             {totalFrames}/{historyLength}

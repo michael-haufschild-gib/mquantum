@@ -351,13 +351,10 @@ const StoreEigenstateButton: React.FC = React.memo(() => {
         >
           Store Eigenstate
         </Button>
-        {count > 0 && <span className="text-[10px] text-text-tertiary">{count} stored</span>}
+        {count > 0 && <span className="text-xs text-text-tertiary">{count} stored</span>}
       </div>
       {eigenstates.length > 0 && (
-        <div
-          className="space-y-1 text-[10px] text-text-tertiary"
-          data-testid="eigenstate-diagnostics"
-        >
+        <div className="space-y-1 text-xs text-text-tertiary" data-testid="eigenstate-diagnostics">
           {eigenstates.map((es) => (
             <div key={es.index} className="flex gap-2">
               <span>|{es.index}\u27E9</span>

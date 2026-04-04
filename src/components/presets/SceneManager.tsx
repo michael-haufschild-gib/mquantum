@@ -201,7 +201,7 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
                           if (!editing) setEditingSceneId(null)
                         }}
                       />
-                      <div className="text-[10px] text-text-secondary">
+                      <div className="text-xs text-text-secondary">
                         {formatDate(scene.timestamp)}
                       </div>
                     </div>

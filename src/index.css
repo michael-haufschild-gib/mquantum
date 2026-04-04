@@ -75,6 +75,22 @@
   --animate-shimmer: shimmer 2s linear infinite;
   --animate-fade-in: fadein 0.5s ease-out forwards;
   --animate-scale-in: scalein 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-glow-breathe: glow-breathe 3s ease-in-out infinite;
+
+  @keyframes glow-breathe {
+    0%,
+    100% {
+      box-shadow:
+        0 0 8px color-mix(in oklch, var(--theme-accent-glow) 40%, transparent),
+        0 0 2px color-mix(in oklch, var(--theme-accent-glow) 25%, transparent);
+    }
+
+    50% {
+      box-shadow:
+        0 0 18px color-mix(in oklch, var(--theme-accent-glow) 55%, transparent),
+        0 0 6px color-mix(in oklch, var(--theme-accent-glow) 35%, transparent);
+    }
+  }
 
   @keyframes float {
     0%,

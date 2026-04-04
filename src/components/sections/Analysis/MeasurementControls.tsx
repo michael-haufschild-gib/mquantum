@@ -15,6 +15,7 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
@@ -34,6 +35,7 @@ function getLatticeHalfExtent(): number {
  * partial measurement axis, statistics.
  */
 export const MeasurementControls: React.FC = React.memo(() => {
+  const sweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
   const dimension = useGeometryStore((s) => s.dimension)
   const {
     enabled,
@@ -112,16 +114,17 @@ export const MeasurementControls: React.FC = React.memo(() => {
         <Switch
           checked={enabled}
           onCheckedChange={handleToggle}
+          disabled={sweepRunning}
           tooltip="Enable Born-rule measurement: click the volume to sample from |ψ|² and collapse the wavefunction."
           data-testid="measurement-toggle"
         />
       }
     >
       {enabled && (
-        <div className="space-y-3">
-          <div className="text-[10px] text-text-tertiary">
-            Click the volume to sample from |psi|^2
-          </div>
+        <div
+          className={`space-y-3 transition-opacity${sweepRunning ? ' pointer-events-none opacity-50' : ''}`}
+        >
+          <div className="text-xs text-text-tertiary">Click the volume to sample from |psi|^2</div>
 
           <Slider
             label="Collapse Width"
@@ -147,18 +150,16 @@ export const MeasurementControls: React.FC = React.memo(() => {
           )}
 
           {isCollapsing && (
-            <div className="text-[10px] text-accent-primary animate-pulse">Collapsing...</div>
+            <div className="text-xs text-accent-primary animate-pulse">Collapsing...</div>
           )}
           {!isCollapsing && cooldownFrames > 0 && (
-            <div className="text-[10px] text-text-tertiary">
-              Evolving... ({cooldownFrames} frames)
-            </div>
+            <div className="text-xs text-text-tertiary">Evolving... ({cooldownFrames} frames)</div>
           )}
 
-          <div className="text-[10px] text-text-secondary">Measurements: {totalCount}</div>
+          <div className="text-xs text-text-secondary">Measurements: {totalCount}</div>
 
           {measurements.length > 0 && positionMean.length > 0 && (
-            <div className="text-[10px] font-mono space-y-0.5">
+            <div className="text-xs font-mono space-y-0.5">
               <div className="flex gap-2 text-text-tertiary font-semibold">
                 <span className="w-4">d</span>
                 <span className="w-16 text-right">mean</span>

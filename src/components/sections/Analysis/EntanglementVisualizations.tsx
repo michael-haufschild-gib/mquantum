@@ -10,18 +10,9 @@
  * @module components/sections/Analysis/EntanglementVisualizations
  */
 
-import React, { useEffect, useRef } from 'react'
+import React, { useState } from 'react'
 
-import { Button } from '@/components/ui/Button'
-import { ControlGroup } from '@/components/ui/ControlGroup'
-import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
-import {
-  type AtlasSweepConfig,
-  lambdaForStep,
-  useCoordinateEntanglementStore,
-} from '@/stores/coordinateEntanglementStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { Tooltip } from '@/components/ui/Tooltip'
 
 /* ── SVG layout constants ── */
 const BAR_W = 260
@@ -44,7 +35,7 @@ export const PerDimensionBars: React.FC<{
 
   return (
     <div className="mt-1">
-      <p className="text-[10px] text-text-secondary mb-0.5">Per-dimension S_d / S_max</p>
+      <p className="text-xs text-text-secondary mb-0.5">Per-dimension S_d / S_max</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${BAR_W} ${BAR_H}`} className="block">
           {entropies.map((S, d) => {
@@ -117,7 +108,7 @@ export const SpectrumBars: React.FC<{ spectrum: number[] }> = React.memo(({ spec
 
   return (
     <div className="mt-1">
-      <p className="text-[10px] text-text-secondary mb-0.5">
+      <p className="text-xs text-text-secondary mb-0.5">
         ρ₁ spectrum ({significant.length} non-zero)
       </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
@@ -165,7 +156,7 @@ export const MutualInfoHeatmap: React.FC<{
 
   return (
     <div className="mt-1">
-      <p className="text-[10px] text-text-secondary mb-0.5">Pairwise mutual information</p>
+      <p className="text-xs text-text-secondary mb-0.5">Pairwise mutual information</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)] inline-block">
         <svg width={HEATMAP_SIZE + 20} height={HEATMAP_SIZE + 20} className="block">
           {Array.from({ length: N }, (_, i) =>
@@ -224,220 +215,247 @@ MutualInfoHeatmap.displayName = 'MutualInfoHeatmap'
 
 /* ── Atlas Sweep Heatmap ── */
 
-/** 2D heatmap of S̄_∞(λ, N) sweep results. */
+const ATLAS = { W: 280, H: 120, pad: { left: 26, right: 10, top: 18, bottom: 28 } }
+const ATLAS_PW = ATLAS.W - ATLAS.pad.left - ATLAS.pad.right
+const ATLAS_PH = ATLAS.H - ATLAS.pad.top - ATLAS.pad.bottom
+
+function fmtLambda(v: number): string {
+  return v >= 10 ? v.toFixed(0) : v >= 1 ? v.toFixed(1) : v.toFixed(2)
+}
+
+function entropyLabel(frac: number): string {
+  if (frac < 0.1) return 'Nearly separable'
+  if (frac < 0.3) return 'Weak entanglement'
+  if (frac < 0.6) return 'Moderate entanglement'
+  if (frac < 0.85) return 'Strong entanglement'
+  return 'Near-maximal entanglement'
+}
+
+function entropyDesc(frac: number): string {
+  if (frac < 0.1) return 'Dimensions evolve almost independently — close to a product state.'
+  if (frac < 0.3)
+    return 'Some inter-dimensional coupling, but each dimension retains most of its identity.'
+  if (frac < 0.6)
+    return 'Significant correlation — the wavefunction cannot be easily factored across dimensions.'
+  if (frac < 0.85)
+    return 'Highly coupled — tracing out any dimension loses substantial information.'
+  return 'Approaching a fully mixed reduced state — maximum quantum correlation between dimensions.'
+}
+
+function atlasInsight(
+  results: { lambda: number; dim: number; entropy: number }[],
+  maxE: number
+): string {
+  if (results.length < 2) return 'Collecting data — need at least 2 points for analysis.'
+  const sorted = [...results].sort((a, b) => a.entropy - b.entropy)
+  const lo = sorted[0]!,
+    hi = sorted[sorted.length - 1]!
+  const rangePct = maxE > 0 ? (((hi.entropy - lo.entropy) / maxE) * 100).toFixed(0) : '0'
+
+  const byDim = new Map<number, { lambda: number; entropy: number }[]>()
+  for (const r of results) {
+    const arr = byDim.get(r.dim) ?? []
+    arr.push(r)
+    byDim.set(r.dim, arr)
+  }
+  let up = 0,
+    down = 0
+  for (const [, g] of byDim) {
+    if (g.length < 2) continue
+    const s = [...g].sort((a, b) => a.lambda - b.lambda)
+    if (s[s.length - 1]!.entropy > s[0]!.entropy * 1.1) up++
+    else if (s[0]!.entropy > s[s.length - 1]!.entropy * 1.1) down++
+  }
+  const trend =
+    up > down
+      ? 'Entropy rises with λ — coupling drives entanglement as expected.'
+      : down > up
+        ? 'Entropy falls with λ — possible Anderson-like localization.'
+        : 'No clear λ-dependence at this resolution.'
+
+  return `Range: ${rangePct}% of S_max. Peak at λ=${fmtLambda(hi.lambda)}, ${hi.dim}D. ${trend}`
+}
+
+interface HoveredAtlasCell {
+  lambda: number
+  dim: number
+  entropy: number
+  frac: number
+  x: number
+  y: number
+}
+
+/** Interactive heatmap of S̄_∞(λ, N) sweep results with tooltips and auto-interpretation. */
 export const AtlasHeatmap: React.FC<{
   results: { lambda: number; dim: number; entropy: number }[]
 }> = React.memo(({ results }) => {
+  const [hovered, setHovered] = useState<HoveredAtlasCell | null>(null)
+
   if (results.length === 0) return null
 
   const dims = [...new Set(results.map((r) => r.dim))].sort((a, b) => a - b)
   const lambdas = [...new Set(results.map((r) => r.lambda))].sort((a, b) => a - b)
-  // Filter NaN entropies to prevent Math.max poisoning
   const finiteEntropies = results.map((r) => r.entropy).filter(Number.isFinite)
   const maxEntropy = finiteEntropies.length > 0 ? Math.max(...finiteEntropies, 1e-6) : 1e-6
 
-  const cellW = PLOT_W / lambdas.length
-  const cellH = PLOT_H / dims.length
+  const cellW = ATLAS_PW / lambdas.length
+  const cellH = ATLAS_PH / dims.length
+  const maxTicks = 7
+  const tickStep = Math.max(1, Math.ceil(lambdas.length / maxTicks))
+  const insight = atlasInsight(results, maxEntropy)
 
   return (
-    <div className="mt-1">
-      <p className="text-[10px] text-text-secondary mb-0.5">
-        Atlas: S̄_∞(λ, N) — {results.length} points
-      </p>
-      <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <svg width="100%" viewBox={`0 0 ${BAR_W} ${BAR_H + 10}`} className="block">
+    <div className="mt-1 relative">
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <Tooltip
+          position="bottom"
+          content={
+            <div className="max-w-[260px]">
+              <p className="font-semibold mb-1">Entanglement Atlas</p>
+              <p className="mb-1">
+                Maps normalized entanglement entropy (S̄/S_max) across coupling strength (λ) and
+                spatial dimensions (N).
+              </p>
+              <p className="mb-1">
+                Each cell is one simulated configuration. The sweep automatically evolves the TDSE,
+                measures long-time-average entropy, then moves to the next (λ, N) point.
+              </p>
+              <p>
+                <strong>Reading the colors:</strong> Light = low entanglement (near product state).
+                Dark red = high entanglement (near maximally mixed). Look for entropy growing with λ
+                (coupling drives entanglement) and with N (more entanglement pathways). Deviations
+                hint at localization or dimensional saturation.
+              </p>
+            </div>
+          }
+        >
+          <span className="text-xs text-text-secondary cursor-help underline decoration-dotted decoration-text-tertiary underline-offset-2">
+            Entanglement Atlas
+          </span>
+        </Tooltip>
+        <span className="text-xs text-text-tertiary ml-auto">{results.length} pts</span>
+      </div>
+
+      <div className="rounded-md overflow-visible bg-[var(--bg-surface)]">
+        <svg width="100%" viewBox={`0 0 ${ATLAS.W} ${ATLAS.H}`} className="block">
           {results.map((r) => {
             const li = lambdas.indexOf(r.lambda)
             const di = dims.indexOf(r.dim)
             if (li < 0 || di < 0) return null
             const frac = Number.isFinite(r.entropy) ? r.entropy / maxEntropy : 0
             const lightness = 0.95 - 0.55 * frac
+            const active = hovered?.lambda === r.lambda && hovered?.dim === r.dim
             return (
-              <rect
+              <g
                 key={`${r.lambda}-${r.dim}`}
-                x={PAD.left + li * cellW}
-                y={PAD.top + di * cellH}
-                width={Math.max(cellW - 1, 2)}
-                height={Math.max(cellH - 1, 2)}
-                // Dynamic heatmap gradient — cannot use static CSS variable
-                fill={`oklch(${lightness} ${0.18 * frac} 30)`} // eslint-disable-line project-rules/no-hardcoded-colors
-                rx={1}
-              />
+                className="cursor-crosshair"
+                onMouseEnter={(e) => {
+                  const box = (e.currentTarget as unknown as Element).getBoundingClientRect()
+                  setHovered({
+                    lambda: r.lambda,
+                    dim: r.dim,
+                    entropy: r.entropy,
+                    frac,
+                    x: box.left + box.width / 2,
+                    y: box.top,
+                  })
+                }}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <rect
+                  x={ATLAS.pad.left + li * cellW}
+                  y={ATLAS.pad.top + di * cellH}
+                  width={Math.max(cellW - 1, 2)}
+                  height={Math.max(cellH - 1, 2)}
+                  fill={`oklch(${lightness} ${0.18 * frac} 30)`} // eslint-disable-line project-rules/no-hardcoded-colors
+                  rx={1}
+                  stroke={active ? 'var(--text-primary)' : 'none'}
+                  strokeWidth={active ? 0.8 : 0}
+                />
+              </g>
             )
           })}
-          <text
-            x={BAR_W / 2}
-            y={BAR_H + 8}
-            textAnchor="middle"
-            fill="var(--text-secondary)"
-            fontSize={8}
-          >
-            λ →
-          </text>
-          <text
-            x={4}
-            y={BAR_H / 2}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill="var(--text-secondary)"
-            fontSize={8}
-            transform={`rotate(-90, 4, ${BAR_H / 2})`}
-          >
-            N
-          </text>
+
+          {/* Y-axis: dimension labels */}
+          {dims.map((dim, di) => (
+            <text
+              key={`y-${dim}`}
+              x={ATLAS.pad.left - 4}
+              y={ATLAS.pad.top + di * cellH + cellH / 2}
+              textAnchor="end"
+              dominantBaseline="central"
+              fill="var(--text-secondary)"
+              className="text-xs"
+            >
+              {dim}D
+            </text>
+          ))}
+
+          {/* X-axis: lambda tick values */}
+          {lambdas.map((l, li) => {
+            if (li % tickStep !== 0 && li !== lambdas.length - 1) return null
+            return (
+              <text
+                key={`x-${l}`}
+                x={ATLAS.pad.left + li * cellW + cellW / 2}
+                y={ATLAS.H - 4}
+                textAnchor="middle"
+                fill="var(--text-tertiary)"
+                className="text-xs"
+              >
+                {fmtLambda(l)}
+              </text>
+            )
+          })}
         </svg>
       </div>
+
+      {/* Axis label + color legend, centered */}
+      <div className="flex flex-col items-center mt-0.5 gap-0.5">
+        <Tooltip
+          position="bottom"
+          content="λ = anharmonic coupling strength. Controls how strongly the spatial dimensions interact via the potential V(x) = ½x² + λx⁴. Higher λ drives more inter-dimensional entanglement."
+        >
+          <span className="text-xs text-text-tertiary cursor-help">Coupling (λ) →</span>
+        </Tooltip>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-text-tertiary">low</span>
+          <div
+            className="w-14 h-2 rounded-full"
+            style={{
+              background: 'linear-gradient(to right, oklch(0.95 0 30), oklch(0.40 0.18 30))', // eslint-disable-line project-rules/no-hardcoded-colors
+            }}
+          />
+          <span className="text-xs text-text-tertiary">high</span>
+        </div>
+      </div>
+
+      {/* Floating cell tooltip */}
+      {hovered && (
+        <div
+          className="fixed z-[100] glass-panel-dark border border-border-default rounded-lg px-3 py-2 pointer-events-none max-w-[240px] shadow-lg"
+          style={{
+            left: `${hovered.x}px`,
+            top: `${hovered.y - 8}px`,
+            transform: 'translate(-50%, -100%)',
+            textShadow: '0 1px 2px var(--bg-overlay)',
+          }}
+        >
+          <div className="text-xs font-medium text-text-primary">
+            λ = {hovered.lambda.toFixed(2)}, N = {hovered.dim}
+          </div>
+          <div className="text-xs text-text-secondary mt-0.5">
+            S̄/S_max = {(hovered.frac * 100).toFixed(1)}% — {entropyLabel(hovered.frac)}
+          </div>
+          <div className="text-xs text-text-tertiary mt-0.5 leading-snug">
+            {entropyDesc(hovered.frac)}
+          </div>
+        </div>
+      )}
+
+      {/* Auto-generated insight */}
+      <p className="text-xs text-text-tertiary mt-1 leading-snug">{insight}</p>
     </div>
   )
 })
 AtlasHeatmap.displayName = 'AtlasHeatmap'
-
-/* ── Sweep Controls ── */
-
-const SWEEP_EVOLVE_ENTRIES = 20
-const SWEEP_MEASURE_ENTRIES = 10
-const SWEEP_POLL_MS = 500
-
-/** Atlas sweep controls: start/abort/progress + results heatmap. */
-/** Snapshot of physics state before a sweep, used to restore on completion/abort. */
-interface PreSweepSnapshot {
-  potentialType: TdsePotentialType
-  anharmonicLambda: number
-  dimension: number
-}
-
-export const SweepControls: React.FC<{
-  sweepStatus: string
-  sweepProgress: number
-  sweepResults: { lambda: number; dim: number; entropy: number }[]
-}> = React.memo(({ sweepStatus, sweepProgress, sweepResults }) => {
-  const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  /** longTimeN at the start of the current sweep step — monotonically increasing, never caps. */
-  const stepStartNRef = useRef(0)
-  /** Physics state snapshot taken before sweep start, restored on complete/abort. */
-  const preSweepRef = useRef<PreSweepSnapshot | null>(null)
-
-  /** Restore physics state to pre-sweep values and reset the field. */
-  const restorePreSweepState = () => {
-    const snap = preSweepRef.current
-    if (!snap) return
-    const ext = useExtendedObjectStore.getState()
-    ext.setTdsePotentialType(snap.potentialType)
-    ext.setTdseAnharmonicLambda(snap.anharmonicLambda)
-    useGeometryStore.getState().setDimension(snap.dimension)
-    ext.resetTdseField()
-    preSweepRef.current = null
-  }
-
-  const handleStartSweep = () => {
-    const config: AtlasSweepConfig = {
-      lambdaMin: 0.01,
-      lambdaMax: 50,
-      lambdaSteps: 15,
-      dimensions: [3, 4, 5],
-    }
-
-    // Snapshot current physics state for restoration on complete/abort
-    const ext = useExtendedObjectStore.getState()
-    const tdseState = ext.schroedinger.tdse
-    preSweepRef.current = {
-      potentialType: tdseState.potentialType,
-      anharmonicLambda: tdseState.anharmonicLambda,
-      dimension: useGeometryStore.getState().dimension,
-    }
-
-    const entStore = useCoordinateEntanglementStore.getState()
-    entStore.clearHistory()
-    entStore.startSweep(config)
-    stepStartNRef.current = 0
-
-    const firstLambda = lambdaForStep(config, 0)
-    ext.setTdsePotentialType('coupledAnharmonic')
-    ext.setTdseAnharmonicLambda(firstLambda)
-    useGeometryStore.getState().setDimension(config.dimensions[0]!)
-    ext.resetTdseField()
-  }
-
-  const handleAbortSweep = () => {
-    useCoordinateEntanglementStore.getState().abortSweep()
-    restorePreSweepState()
-  }
-
-  useEffect(() => {
-    if (sweepStatus !== 'running') {
-      if (sweepTickRef.current) {
-        clearInterval(sweepTickRef.current)
-        sweepTickRef.current = null
-      }
-      return
-    }
-
-    sweepTickRef.current = setInterval(() => {
-      const entStore = useCoordinateEntanglementStore.getState()
-      if (entStore.sweepStatus !== 'running') return
-
-      // Use longTimeN (monotonically increasing) instead of historyCount (caps at ring buffer size)
-      const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
-      const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
-
-      if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
-        entStore.recordSweepSample(entStore.currentNormalizedEntropy)
-      }
-
-      if (samplesSinceStart >= totalNeeded) {
-        entStore.completeSweepStep()
-        const next = entStore.advanceSweepStep()
-
-        if (next) {
-          stepStartNRef.current = entStore.longTimeN
-          const ext = useExtendedObjectStore.getState()
-          ext.setTdseAnharmonicLambda(next.lambda)
-          const currentDim = useGeometryStore.getState().dimension
-          if (currentDim !== next.dim) {
-            useGeometryStore.getState().setDimension(next.dim)
-          }
-          ext.resetTdseField()
-        } else {
-          entStore.completeSweep()
-          restorePreSweepState()
-        }
-      }
-    }, SWEEP_POLL_MS)
-
-    return () => {
-      if (sweepTickRef.current) {
-        clearInterval(sweepTickRef.current)
-        sweepTickRef.current = null
-      }
-    }
-  }, [sweepStatus])
-
-  return (
-    <div className="mt-2 border-t border-border-subtle pt-1">
-      <ControlGroup title="Atlas Sweep">
-        {sweepStatus === 'idle' && (
-          <Button variant="secondary" size="sm" onClick={handleStartSweep}>
-            Start λ×N Sweep
-          </Button>
-        )}
-        {sweepStatus === 'running' && (
-          <>
-            <div className="text-[10px] text-text-secondary mb-1">
-              Sweep progress: {(sweepProgress * 100).toFixed(0)}%
-            </div>
-            <Button variant="secondary" size="sm" onClick={handleAbortSweep}>
-              Abort Sweep
-            </Button>
-          </>
-        )}
-        {sweepStatus === 'complete' && (
-          <div className="text-[10px] text-text-secondary">
-            Sweep complete — {sweepResults.length} points
-          </div>
-        )}
-      </ControlGroup>
-      {sweepResults.length > 0 && <AtlasHeatmap results={sweepResults} />}
-    </div>
-  )
-})
-SweepControls.displayName = 'SweepControls'

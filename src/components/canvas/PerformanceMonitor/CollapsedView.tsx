@@ -192,7 +192,7 @@ export const CollapsedView = React.memo(function CollapsedView() {
       </div>
 
       <div className="flex flex-col items-end min-w-[32px]">
-        <span className="text-[10px] font-mono text-text-secondary">
+        <span className="text-xs font-mono text-text-secondary">
           <span ref={frameTimeRef}>{initialState.frameTime.toFixed(1)}</span>
         </span>
         <span className="text-[8px] text-text-tertiary">ms</span>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { formatBytes } from './utils'
 
 export const SectionHeader = ({ icon, label }: { icon: React.ReactNode; label: string }) => (
-  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-text-tertiary">
+  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-text-tertiary">
     <span className="opacity-70">{icon}</span>
     <span>{label}</span>
   </div>
@@ -73,9 +73,9 @@ export const BufferRow = ({
   <div
     className={`flex items-center justify-between p-2 rounded-md border ${highlight ? 'bg-warning border-warning-border' : 'bg-[var(--bg-hover)] border-[var(--border-subtle)]'}`}
   >
-    <span className="text-[10px] text-[var(--text-secondary)] font-medium">{label}</span>
+    <span className="text-xs text-[var(--text-secondary)] font-medium">{label}</span>
     <div className="flex items-center gap-3">
-      <span className="text-[10px] font-mono text-[var(--text-tertiary)]">
+      <span className="text-xs font-mono text-[var(--text-tertiary)]">
         {w}×{h}
       </span>
       <span className="text-[9px] font-mono text-[var(--text-tertiary)] w-8 text-right">
@@ -101,7 +101,7 @@ export const DebugToggle = ({
     size="sm"
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`text-[10px] font-bold uppercase tracking-wider ${active ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm' : ''}`}
+    className={`text-xs font-bold uppercase tracking-wider ${active ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm' : ''}`}
   >
     {label}
   </Button>

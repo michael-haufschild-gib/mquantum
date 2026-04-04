@@ -45,7 +45,7 @@ const FPSHeader = React.memo(function FPSHeader() {
               FPS
             </span>
           </div>
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
             Min {minFpsLabel} • Max {maxFpsLabel}
           </div>
         </div>
@@ -54,7 +54,7 @@ const FPSHeader = React.memo(function FPSHeader() {
             {frameTime.toFixed(1)}
             <span className="text-xs text-text-tertiary ml-1">ms</span>
           </div>
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+          <div className="text-xs text-text-tertiary uppercase tracking-wider mt-1 font-medium">
             Frame Time
           </div>
         </div>
@@ -136,7 +136,7 @@ export const ExpandedContent = React.memo(function ExpandedContent({
             setPerfMonitorTab(id as 'perf' | 'passes' | 'sys' | 'shader' | 'buffers')
           }
           tabs={tabs}
-          className="h-full border-b border-border-subtle text-[10px]"
+          className="h-full border-b border-border-subtle text-xs"
           contentClassName="h-full"
         />
       </div>

@@ -85,7 +85,7 @@ export const ProgressiveRefinementControls: React.FC = () => {
                   <div
                     className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-accent shadow-[0_0_6px_var(--color-accent)]' : isActive ? 'bg-text-secondary' : 'bg-panel-bg'}`}
                   />
-                  <span className="text-[10px] mt-1">{getStageLabel(s)}</span>
+                  <span className="text-xs mt-1">{getStageLabel(s)}</span>
                 </div>
               )
             })}

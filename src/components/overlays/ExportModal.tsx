@@ -417,7 +417,7 @@ export const ExportModal = () => {
                   tooltip="Memory holds the video in RAM. Stream writes directly to disk. Segmented downloads in chunks."
                 />
 
-                <p className="text-[11px] text-text-tertiary leading-relaxed">
+                <p className="text-xs text-text-tertiary leading-relaxed">
                   {modeGuidance}
                   {!isStreamAvailable && (
                     <span className="block mt-1">Stream mode requires Chrome or Edge.</span>
@@ -426,7 +426,7 @@ export const ExportModal = () => {
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-2">
                   <div>
-                    <div className="text-[10px] text-text-tertiary uppercase">Res</div>
+                    <div className="text-xs text-text-tertiary uppercase">Res</div>
                     <div
                       className="font-bold text-sm text-text-primary"
                       data-testid="quick-stat-res"
@@ -435,7 +435,7 @@ export const ExportModal = () => {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-text-tertiary uppercase">FPS</div>
+                    <div className="text-xs text-text-tertiary uppercase">FPS</div>
                     <div
                       className="font-bold text-sm text-text-primary"
                       data-testid="quick-stat-fps"
@@ -444,7 +444,7 @@ export const ExportModal = () => {
                     </div>
                   </div>
                   <div>
-                    <div className="text-[10px] text-text-tertiary uppercase">Dur</div>
+                    <div className="text-xs text-text-tertiary uppercase">Dur</div>
                     <div
                       className="font-bold text-sm text-text-primary"
                       data-testid="quick-stat-dur"
@@ -464,7 +464,7 @@ export const ExportModal = () => {
                   <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">
                     Processing Mode
                   </span>
-                  <span className="text-[10px] text-text-tertiary">
+                  <span className="text-xs text-text-tertiary">
                     {settings.resolution === 'custom' ? 'Custom' : settings.resolution} •{' '}
                     {settings.fps}fps • {settings.duration}s
                   </span>
@@ -479,7 +479,7 @@ export const ExportModal = () => {
                   onChange={(val) => setExportModeOverride(val as ExportMode)}
                   tooltip="Memory holds the video in RAM. Stream writes directly to disk. Segmented downloads in chunks."
                 />
-                <p className="text-[10px] text-text-tertiary pb-3">{modeGuidance}</p>
+                <p className="text-xs text-text-tertiary pb-3">{modeGuidance}</p>
               </div>
 
               <div

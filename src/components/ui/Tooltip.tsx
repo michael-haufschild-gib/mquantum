@@ -96,7 +96,7 @@ export const Tooltip: React.FC<TooltipProps> = React.memo(
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                  className="fixed z-[100] px-3 py-1.5 text-[11px] font-medium text-text-primary glass-panel-dark border border-border-default rounded-lg shadow-lg pointer-events-none max-w-xs break-words tracking-wide"
+                  className="fixed z-[100] px-3 py-1.5 text-xs font-medium text-text-primary glass-panel-dark border border-border-default rounded-lg shadow-lg pointer-events-none max-w-xs break-words tracking-wide"
                   style={{
                     left: `${coords.x}px`,
                     top: `${coords.y}px`,

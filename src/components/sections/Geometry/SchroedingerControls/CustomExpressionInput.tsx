@@ -71,14 +71,14 @@ export const CustomExpressionInput: React.FC<CustomExpressionInputProps> = React
           className="font-mono text-xs"
           data-testid="tdse-custom-expression"
         />
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex items-center gap-2 text-xs">
           {parseResult.success ? (
             <span className="text-success">Valid</span>
           ) : (
             <span className="text-danger">{parseResult.error}</span>
           )}
         </div>
-        <div className="text-[10px] text-text-tertiary">Variables: {vars}</div>
+        <div className="text-xs text-text-tertiary">Variables: {vars}</div>
         <div className="flex flex-wrap gap-1">
           {EXPRESSION_PRESETS.map((p) => (
             <Button
@@ -89,7 +89,7 @@ export const CustomExpressionInput: React.FC<CustomExpressionInputProps> = React
                 setLocalExpr(p.expr)
                 onChange(p.expr)
               }}
-              className="px-2 py-0.5 text-[10px]"
+              className="px-2 py-0.5 text-xs"
             >
               {p.label}
             </Button>

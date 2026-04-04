@@ -457,9 +457,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                 {mode === 'HEX' && (
                   <div className="flex gap-2">
                     <div className="flex-1 bg-[var(--bg-hover)] border border-border-default rounded px-2 py-1 flex items-center gap-2 group-focus-within:border-accent/50 transition-colors">
-                      <span className="text-[10px] text-text-tertiary font-mono select-none">
-                        #
-                      </span>
+                      <span className="text-xs text-text-tertiary font-mono select-none">#</span>
                       <input
                         type="text"
                         value={hexInput.replace('#', '')}

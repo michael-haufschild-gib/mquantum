@@ -58,9 +58,7 @@ export const ExportAdvancedTab = () => {
           tooltip="Higher = Better Quality, Larger File"
         />
         <div className="flex justify-end -mt-2">
-          <span className="text-[10px] text-text-tertiary">
-            Higher = Better Quality, Larger File
-          </span>
+          <span className="text-xs text-text-tertiary">Higher = Better Quality, Larger File</span>
         </div>
       </div>
 

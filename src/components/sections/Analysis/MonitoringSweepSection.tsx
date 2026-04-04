@@ -242,7 +242,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
                 count={sweepData.length}
                 height={48}
               />
-              <div className="flex justify-between text-[10px] text-text-tertiary mt-0.5">
+              <div className="flex justify-between text-xs text-text-tertiary mt-0.5">
                 <span>γ={results[0]?.gamma.toFixed(2)}</span>
                 <span>γ={results[results.length - 1]?.gamma.toFixed(2)}</span>
               </div>

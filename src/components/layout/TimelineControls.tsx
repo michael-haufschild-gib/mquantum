@@ -1,4 +1,4 @@
-import { AnimatePresence, m } from 'motion/react'
+import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { type FC, useCallback, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -127,6 +127,15 @@ export const TimelineControls: FC = () => {
   const configStoreKey = getConfigStoreKey(objectType)
   const isSchroedinger = configStoreKey === 'schroedinger'
   const isPauliSpinor = configStoreKey === 'pauliSpinor'
+
+  const isComputeMode =
+    isPauliSpinor ||
+    schroedingerConfig.quantumMode === 'freeScalarField' ||
+    schroedingerConfig.quantumMode === 'tdseDynamics' ||
+    schroedingerConfig.quantumMode === 'becDynamics' ||
+    schroedingerConfig.quantumMode === 'diracEquation' ||
+    schroedingerConfig.quantumMode === 'quantumWalk'
+
   const supportsOpenQuantumControls =
     isSchroedinger &&
     (schroedingerConfig.quantumMode === 'harmonicOscillator' ||
@@ -163,6 +172,8 @@ export const TimelineControls: FC = () => {
     }
   }, [isPauliSpinor, schroedingerConfig.quantumMode, resetActions])
 
+  const prefersReducedMotion = useReducedMotion()
+
   const [showRotation, setShowRotation] = useState(false)
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
@@ -195,7 +206,7 @@ export const TimelineControls: FC = () => {
             </div>
             <div className="p-4 flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                <h3 className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                   Rotation Planes
                 </h3>
                 <div className="flex gap-2 items-center">
@@ -203,7 +214,7 @@ export const TimelineControls: FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => animateAll(dimension)}
-                    className="text-[10px] uppercase font-bold text-accent hover:text-accent-glow px-2 py-1"
+                    className="text-xs uppercase font-bold text-accent hover:text-accent-glow px-2 py-1"
                   >
                     Select All
                   </Button>
@@ -211,7 +222,7 @@ export const TimelineControls: FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => clearAllPlanes()}
-                    className="text-[10px] uppercase font-bold px-2 py-1"
+                    className="text-xs uppercase font-bold px-2 py-1"
                   >
                     Deselect All
                   </Button>
@@ -236,7 +247,7 @@ export const TimelineControls: FC = () => {
                       pressed={isActive}
                       onToggle={() => togglePlane(plane.name)}
                       ariaLabel={`Toggle ${plane.name} rotation`}
-                      className="flex-1 min-w-[60px] px-3 py-2 text-[10px] font-mono text-center uppercase tracking-wider"
+                      className="flex-1 min-w-[60px] px-3 py-2 text-xs font-mono text-center uppercase tracking-wider"
                     >
                       {plane.name}
                     </ToggleButton>
@@ -267,16 +278,33 @@ export const TimelineControls: FC = () => {
       <div className="h-14 flex items-center px-4 gap-4 shrink-0 overflow-x-auto overflow-y-hidden scrollbar-none relative glass-panel rounded-t-xl sm:rounded-xl">
         {/* Playback Controls */}
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="primary"
-            size="icon"
-            onClick={handleReset}
-            ariaLabel="Reset wavefunction"
-            tooltip="Reset the wavefunction to its initial state and re-initialize all mode parameters."
-            className="w-9 h-9 rounded-full"
-          >
-            <Icon name="reset" size={14} />
-          </Button>
+          <div className="relative">
+            {isComputeMode && !prefersReducedMotion && (
+              <m.div
+                className="absolute inset-0 rounded-full animate-glow-breathe"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.4 }}
+                aria-hidden
+              />
+            )}
+            <Button
+              variant="primary"
+              size="icon"
+              onClick={handleReset}
+              ariaLabel="Reset wavefunction"
+              tooltip="Reset the wavefunction to its initial state and re-initialize all mode parameters."
+              className={
+                isComputeMode
+                  ? 'w-10 h-10 rounded-full ring-1 ring-accent/40 relative z-10'
+                  : 'w-9 h-9 rounded-full'
+              }
+              glow={isComputeMode}
+            >
+              <Icon name="reset" size={isComputeMode ? 16 : 14} />
+            </Button>
+          </div>
 
           <Button
             variant={isPlaying ? 'primary' : 'secondary'}
@@ -341,7 +369,7 @@ export const TimelineControls: FC = () => {
               sound="swish"
               ariaLabel="Toggle animations drawer"
               tooltip="Open the quantum animation effects panel (phase, interference, probability flow)."
-              className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+              className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Effects
               <span
@@ -363,7 +391,7 @@ export const TimelineControls: FC = () => {
               sound="swish"
               ariaLabel="Toggle open quantum drawer"
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
-              className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+              className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Open Q
             </ToggleButton>
@@ -379,7 +407,7 @@ export const TimelineControls: FC = () => {
             sound="swish"
             ariaLabel="Toggle rotation drawer"
             tooltip="Select which N-dimensional rotation planes to animate."
-            className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
+            className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
           >
             Rotate
             <span

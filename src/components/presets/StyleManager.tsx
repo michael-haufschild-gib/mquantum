@@ -201,7 +201,7 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
                           if (!editing) setEditingStyleId(null)
                         }}
                       />
-                      <div className="text-[10px] text-text-secondary">
+                      <div className="text-xs text-text-secondary">
                         {formatDate(style.timestamp)}
                       </div>
                     </div>

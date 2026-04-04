@@ -142,7 +142,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             <p className="text-xs text-text-tertiary italic">
               Animation effects are not available in this mode.
             </p>
-            <p className="text-[10px] text-text-tertiary mt-1">
+            <p className="text-xs text-text-tertiary mt-1">
               These effects use inline wavefunction evaluation, which requires Harmonic Oscillator
               or Hydrogen mode.
             </p>

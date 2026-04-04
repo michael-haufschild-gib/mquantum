@@ -284,7 +284,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-danger mt-0.5"
+                      className="text-xs text-danger mt-0.5"
                     >
                       {error}
                     </m.span>
