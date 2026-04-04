@@ -362,7 +362,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                 onKeyDown={handleListKeyDown}
                 className="w-full border-none py-3.5 ps-12 pe-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base rounded-none"
               />
-              <div className="absolute end-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)]">
+              <div className="absolute end-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-xs font-mono text-[var(--text-tertiary)]">
                 ESC
               </div>
             </div>
@@ -402,7 +402,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                           <span>{cmd.label}</span>
                         </div>
                         {cmd.shortcut && (
-                          <span className="text-[10px] font-mono opacity-50 border border-[var(--border-subtle)] px-1.5 py-0.5 rounded">
+                          <span className="text-xs font-mono opacity-50 border border-[var(--border-subtle)] px-1.5 py-0.5 rounded">
                             {cmd.shortcut}
                           </span>
                         )}
@@ -413,7 +413,7 @@ export const CommandPalette: React.FC = React.memo(() => {
               )}
             </div>
 
-            <div className="px-4 py-2 bg-[var(--bg-hover)] border-t border-[var(--border-subtle)] flex justify-between text-[10px] text-[var(--text-tertiary)]">
+            <div className="px-4 py-2 bg-[var(--bg-hover)] border-t border-[var(--border-subtle)] flex justify-between text-xs text-[var(--text-tertiary)]">
               <span>
                 Navigate <span className="font-mono">↑↓</span>
               </span>

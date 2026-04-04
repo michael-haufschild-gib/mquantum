@@ -131,7 +131,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
               )
             })}
           </div>
-          <div className="flex gap-3 text-[9px] text-text-tertiary">
+          <div className="flex gap-3 text-xs text-text-tertiary">
             <span>Setup {fmtMs(cpuBreakdown.setupMs)}</span>
             <span>Passes {fmtMs(cpuBreakdown.passesMs)}</span>
             <span>Submit {fmtMs(cpuBreakdown.submitMs)}</span>
@@ -141,7 +141,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
 
       {/* No GPU Timing Warning */}
       {!hasGpuTimings && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning border border-warning-border text-[10px] text-warning">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning border border-warning-border text-xs text-warning">
           <Icons.AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           <span>GPU timing unavailable — timestamp-query not supported</span>
         </div>
@@ -152,7 +152,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
         <SectionHeader icon={<Icons.Layers />} label="Per-Pass Timing" />
         <div className="border border-border-subtle rounded-lg overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-[1fr_60px_60px_48px] gap-1 px-3 py-1.5 bg-[var(--bg-hover)] border-b border-border-subtle text-[9px] text-text-tertiary uppercase tracking-wider font-bold">
+          <div className="grid grid-cols-[1fr_60px_60px_48px] gap-1 px-3 py-1.5 bg-[var(--bg-hover)] border-b border-border-subtle text-xs text-text-tertiary uppercase tracking-wider font-bold">
             <span>Pass</span>
             <span className="text-right">GPU</span>
             <span className="text-right">CPU</span>
@@ -171,17 +171,17 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: PASS_COLORS[i % PASS_COLORS.length] }}
                   />
-                  <span className="text-[10px] font-mono text-text-secondary truncate">
+                  <span className="text-xs font-mono text-text-secondary truncate">
                     {formatPassId(p.passId)}
                   </span>
                 </div>
-                <span className={`text-[10px] font-mono text-right ${getCostColor(p.gpuTimeMs)}`}>
+                <span className={`text-xs font-mono text-right ${getCostColor(p.gpuTimeMs)}`}>
                   {hasGpuTimings ? fmtMs(p.gpuTimeMs) : '—'}
                 </span>
-                <span className="text-[10px] font-mono text-right text-text-tertiary">
+                <span className="text-xs font-mono text-right text-text-tertiary">
                   {fmtMs(p.cpuTimeMs)}
                 </span>
-                <span className="text-[10px] font-mono text-right text-text-tertiary">
+                <span className="text-xs font-mono text-right text-text-tertiary">
                   {hasGpuTimings && totalGpuTimeMs > 0 ? `${pct.toFixed(0)}%` : '—'}
                 </span>
               </div>
@@ -189,7 +189,7 @@ export const PassesTabContent = React.memo(function PassesTabContent() {
           })}
           {/* Skipped passes */}
           {passTimings.filter((p) => p.skipped).length > 0 && (
-            <div className="px-3 py-1.5 text-[9px] text-text-tertiary italic">
+            <div className="px-3 py-1.5 text-xs text-text-tertiary italic">
               {passTimings.filter((p) => p.skipped).length} passes skipped
             </div>
           )}

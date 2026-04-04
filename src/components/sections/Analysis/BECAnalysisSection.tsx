@@ -137,9 +137,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
 
   return (
     <div className="mt-2" data-testid="bec-analysis-inline">
-      <p className="text-[10px] text-text-secondary mb-1">
-        Harmonic Trap V(x) & Chemical Potential
-      </p>
+      <p className="text-xs text-text-secondary mb-1">Harmonic Trap V(x) & Chemical Potential</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}
@@ -244,7 +242,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
         </svg>
 
         {/* BEC observables readout */}
-        <div className="px-2 pb-1.5 space-y-0.5 text-[9px] font-mono leading-tight text-text-secondary">
+        <div className="px-2 pb-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
               <div className="flex gap-3">

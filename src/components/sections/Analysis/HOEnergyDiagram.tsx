@@ -11,8 +11,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
-import { getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
+import { generateQuantumPreset, getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -159,7 +158,7 @@ export const HOEnergyDiagram: React.FC = React.memo(() => {
 
   return (
     <div data-testid="ho-energy-diagram">
-      <p className="text-[10px] text-text-secondary mb-1">
+      <p className="text-xs text-text-secondary mb-1">
         Energy Levels & Wavefunction |ψ<sub>n</sub>(x)|²
       </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">

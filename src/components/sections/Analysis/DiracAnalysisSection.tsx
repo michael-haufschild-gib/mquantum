@@ -115,7 +115,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
 
     return (
       <div className="mt-2" data-testid="dirac-dispersion">
-        <p className="text-[10px] text-text-secondary mb-1">
+        <p className="text-xs text-text-secondary mb-1">
           Dirac Dispersion E(k) = ±√((ck)² + (mc²)²)
         </p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
@@ -275,7 +275,7 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
   return (
     <div className="mt-2" data-testid="dirac-analysis-inline">
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <div className="px-2 py-1.5 space-y-0.5 text-[9px] font-mono leading-tight text-text-secondary">
+        <div className="px-2 py-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
               {/* Upper / lower spinor component fractions */}

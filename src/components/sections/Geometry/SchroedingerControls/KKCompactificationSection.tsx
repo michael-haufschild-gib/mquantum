@@ -239,16 +239,13 @@ const KKEnergyDiagram: React.FC<KKEnergyDiagramProps> = React.memo(
     if (spectra.length === 0) return null
 
     // Find global energy max for Y-axis scaling
-    const eMax = Math.max(
-      ...spectra.flatMap((s) => s.levels.map((l) => l.energy)),
-      1e-6
-    )
+    const eMax = Math.max(...spectra.flatMap((s) => s.levels.map((l) => l.energy)), 1e-6)
 
     const colWidth = PW / spectra.length
 
     return (
       <div className="border-t border-border-subtle pt-2">
-        <p className="text-[10px] text-text-tertiary mb-1">
+        <p className="text-xs text-text-tertiary mb-1">
           KK Energy Spectrum — E<sub>n</sub> = (n\u210F)\u00B2 / (2mR\u00B2)
         </p>
         <svg

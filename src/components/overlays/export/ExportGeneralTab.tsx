@@ -80,7 +80,7 @@ export const ExportGeneralTab = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Container
             </label>
             <ToggleGroup
@@ -98,7 +98,7 @@ export const ExportGeneralTab = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Resolution
             </label>
             <ToggleGroup
@@ -124,9 +124,7 @@ export const ExportGeneralTab = () => {
               className="flex gap-4 pt-2 overflow-hidden"
             >
               <div className="space-y-1.5 flex-1">
-                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">
-                  Width
-                </label>
+                <label className="text-xs text-text-tertiary uppercase tracking-wide">Width</label>
                 <NumberInput
                   value={settings.customWidth}
                   onChange={(val) => updateSettings({ customWidth: clampDimension(val) })}
@@ -137,9 +135,7 @@ export const ExportGeneralTab = () => {
                 />
               </div>
               <div className="space-y-1.5 flex-1">
-                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">
-                  Height
-                </label>
+                <label className="text-xs text-text-tertiary uppercase tracking-wide">Height</label>
                 <NumberInput
                   value={settings.customHeight}
                   onChange={(val) => updateSettings({ customHeight: clampDimension(val) })}
@@ -165,7 +161,7 @@ export const ExportGeneralTab = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Framerate
             </label>
             <ToggleGroup
@@ -217,7 +213,7 @@ export const ExportGeneralTab = () => {
           </div>
           <div>
             <div className="text-sm font-bold text-text-primary">Crop Frame</div>
-            <div className="text-[10px] text-text-secondary uppercase tracking-wider">
+            <div className="text-xs text-text-secondary uppercase tracking-wider">
               {settings.crop.enabled ? 'Custom area active' : 'Exporting full frame'}
             </div>
           </div>

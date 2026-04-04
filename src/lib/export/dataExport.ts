@@ -239,8 +239,11 @@ export function exportEntanglementCSV(): string {
   const dimHeaders = Array.from({ length: N }, (_, d) => `S_${d}`).join(',')
   const lines = [`frame,averageEntropy,${dimHeaders}`]
   for (let i = 0; i < count; i++) {
-    const dimVals = perDim.map((arr) => arr[i]).join(',')
-    lines.push(`${i},${avg[i]},${dimVals}`)
+    // Replace NaN (skipped/oversized dimensions) with empty string so CSV
+    // consumers can distinguish "not computed" from genuine zero entropy.
+    const dimVals = perDim.map((arr) => (Number.isNaN(arr[i]) ? '' : arr[i])).join(',')
+    const avgVal = Number.isNaN(avg[i]) ? '' : avg[i]
+    lines.push(`${i},${avgVal},${dimVals}`)
   }
   return lines.join('\n')
 }

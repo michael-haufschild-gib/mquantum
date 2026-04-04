@@ -38,12 +38,12 @@ export const UnavailableSection: React.FC<UnavailableSectionProps> = React.memo(
               <div className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />
             </div>
 
-            <h3 className="text-[11px] font-bold tracking-widest uppercase text-[var(--text-tertiary)]">
+            <h3 className="text-xs font-bold tracking-widest uppercase text-[var(--text-tertiary)]">
               {title}
             </h3>
           </div>
 
-          <span className="text-[10px] text-[var(--text-tertiary)] italic max-w-[200px] text-right leading-tight">
+          <span className="text-xs text-[var(--text-tertiary)] italic max-w-[200px] text-right leading-tight">
             {reason}
           </span>
         </div>

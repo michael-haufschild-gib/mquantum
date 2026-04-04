@@ -143,11 +143,11 @@ export const ExportPreview = () => {
 
       {/* Status Overlays */}
       <div className="absolute top-4 start-4 flex gap-2">
-        <div className="px-2 py-1 glass-panel rounded text-[10px] font-mono text-[var(--text-secondary)]">
+        <div className="px-2 py-1 glass-panel rounded text-xs font-mono text-[var(--text-secondary)]">
           PREVIEW
         </div>
         {crop.enabled && (
-          <div className="px-2 py-1 bg-accent/20 border border-accent/30 rounded text-[10px] font-mono text-accent">
+          <div className="px-2 py-1 bg-accent/20 border border-accent/30 rounded text-xs font-mono text-accent">
             CROP ON
           </div>
         )}

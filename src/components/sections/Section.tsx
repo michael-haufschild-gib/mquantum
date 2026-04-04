@@ -114,7 +114,7 @@ export const Section: React.FC<SectionProps> = React.memo(
               </div>
 
               <h3
-                className={`text-[11px] font-bold tracking-widest uppercase transition-colors duration-200 ${isOpen ? 'text-[var(--text-primary)] text-glow-subtle' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}
+                className={`text-xs font-bold tracking-widest uppercase transition-colors duration-200 ${isOpen ? 'text-[var(--text-primary)] text-glow-subtle' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}
               >
                 {title}
               </h3>

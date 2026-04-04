@@ -125,7 +125,7 @@ export const CropEditor = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-text-primary text-sm">Crop Selection</span>
-              <span className="text-[10px] text-text-tertiary uppercase tracking-widest">
+              <span className="text-xs text-text-tertiary uppercase tracking-widest">
                 Cinematic Mode
               </span>
             </div>
@@ -177,7 +177,7 @@ export const CropEditor = () => {
       </div>
 
       {/* Dimensions Label */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
+      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-xs px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
         <Icon name="image" className="w-3 h-3 text-accent" />
         <span>
           {Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%

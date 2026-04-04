@@ -81,7 +81,7 @@ export const ExportPresetCard = ({
 
       <div className="min-w-0 flex-1">
         <div className="font-semibold text-xs sm:text-sm text-text-primary truncate">{label}</div>
-        <div className="hidden sm:block text-[10px] text-text-tertiary truncate">{description}</div>
+        <div className="hidden sm:block text-xs text-text-tertiary truncate">{description}</div>
       </div>
 
       {isActive && <Icon name="check" className="w-4 h-4 text-accent shrink-0" />}

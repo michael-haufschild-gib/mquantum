@@ -52,7 +52,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
             size="sm"
             onClick={() => setSelectedShaderKey(key)}
             className={`
-              rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap
+              rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap
               ${selectedShaderKey === key ? 'bg-accent/20 text-accent border-accent/30' : ''}
             `}
           >
@@ -78,7 +78,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
               {activeShaderInfo.features.map((f) => (
                 <span
                   key={f}
-                  className="px-2 py-1 bg-success border border-success-border text-success rounded text-[9px] font-mono uppercase tracking-wide"
+                  className="px-2 py-1 bg-success border border-success-border text-success rounded text-xs font-mono uppercase tracking-wide"
                 >
                   {f}
                 </span>
@@ -96,7 +96,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
                     className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors"
                   >
                     <span
-                      className={`text-[10px] font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}
+                      className={`text-xs font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}
                     >
                       {mod}
                     </span>

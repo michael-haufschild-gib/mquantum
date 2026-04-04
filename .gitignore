@@ -12,7 +12,8 @@ dist
 dist-ssr
 *.local
 
-# Claude Code launch scripts
+# Claude Code
+.claude/scheduled_tasks.lock
 claude.sh
 claude-mcp.sh
 

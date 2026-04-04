@@ -63,6 +63,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private entanglementWorker: Worker | null = null
   /** Epoch counter for entanglement worker results ordering. */
   private entanglementEpoch = 0
+  /** Set on dispose to prevent late async callbacks from resurrecting resources. */
+  private disposed = false
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute mode overrides applied by renderer constructor
@@ -627,6 +629,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     void tdsePass.requestMeasurementReadback(ctx).then(
       (result) => {
+        // Guard against late callbacks after dispose()
+        if (this.disposed) return
+
         if (!result) {
           this.entanglementInFlight = false
           return
@@ -641,6 +646,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
           this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
             this.entanglementInFlight = false
             if (e.data.type !== 'result') return
+            // Discard stale results from previous epochs
+            if (e.data.epoch !== this.entanglementEpoch) return
             useCoordinateEntanglementStore.getState().pushResult(e.data.result)
           }
           this.entanglementWorker.onerror = () => {
@@ -675,6 +682,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   }
 
   dispose(): void {
+    this.disposed = true
     this.tdsePass?.dispose()
     this.tdsePass = null
     this.entanglementWorker?.terminate()

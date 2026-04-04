@@ -286,7 +286,7 @@ const ExposureIndicator: React.FC = React.memo(() => {
 
   return (
     <div
-      className="flex items-center justify-between px-1 py-0.5 text-[10px] font-mono"
+      className="flex items-center justify-between px-1 py-0.5 text-xs font-mono"
       data-testid="exposure-gain-indicator"
     >
       <span className="text-[var(--text-tertiary)]">Current gain</span>

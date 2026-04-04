@@ -141,7 +141,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
 
   return (
     <div data-testid="hydrogen-energy-diagram">
-      <p className="text-[10px] text-text-secondary mb-1">
+      <p className="text-xs text-text-secondary mb-1">
         Energy Levels & Radial Probability r²|R<sub>nl</sub>(r)|²
       </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">

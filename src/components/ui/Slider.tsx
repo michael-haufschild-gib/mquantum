@@ -218,7 +218,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
           <label
             htmlFor={id}
             className={`
-            text-[11px] font-medium transition-colors tracking-wide flex items-center gap-1 min-w-0 truncate
+            text-xs font-medium transition-colors tracking-wide flex items-center gap-1 min-w-0 truncate
             ${isLabelDragging ? 'text-accent cursor-ew-resize' : 'text-text-secondary group-hover/slider:text-text-primary cursor-ew-resize'}
           `}
             title="Drag label to adjust value"
@@ -246,7 +246,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                   disabled={disabled}
                   aria-label={`${label} value`}
                   className={`
-                    w-full h-full ps-1.5 text-right font-mono text-[10px]
+                    w-full h-full ps-1.5 text-right font-mono text-xs
                     bg-[var(--bg-hover)] border border-border-subtle rounded
                     text-text-primary
                     hover:border-border-default hover:bg-[var(--bg-active)]
@@ -257,7 +257,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                   data-testid={dataTestId ? `${dataTestId}-input` : undefined}
                 />
                 {unit && (
-                  <span className="absolute end-1.5 top-1/2 -translate-y-1/2 text-[9px] text-text-tertiary font-medium pointer-events-none">
+                  <span className="absolute end-1.5 top-1/2 -translate-y-1/2 text-xs text-text-tertiary font-medium pointer-events-none">
                     {unit}
                   </span>
                 )}
@@ -268,7 +268,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
 
         {/* Track Labels */}
         {(minLabel || maxLabel) && (
-          <div className="flex justify-between text-[9px] text-text-tertiary mb-1 px-0.5">
+          <div className="flex justify-between text-xs text-text-tertiary mb-1 px-0.5">
             <span>{minLabel}</span>
             <span>{maxLabel}</span>
           </div>
@@ -331,7 +331,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                 initial={{ opacity: 0, y: 10, scale: 0.8 }}
                 animate={{ opacity: 1, y: -20, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                className="absolute top-0 -translate-x-1/2 px-2 py-1 glass-panel-dark border border-border-default rounded text-[10px] font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
+                className="absolute top-0 -translate-x-1/2 px-2 py-1 glass-panel-dark border border-border-default rounded text-xs font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
                 style={{ left: `${percentage}%` }}
               >
                 {displayValue}

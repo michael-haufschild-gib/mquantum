@@ -281,17 +281,17 @@ const CarpetPanelInner: React.FC = React.memo(() => {
             />
             {/* X-axis label */}
             <div className="flex justify-between mt-0.5 px-0.5">
-              <span className="text-[10px] text-neutral-500">0</span>
-              <span className="text-[10px] text-neutral-400">
+              <span className="text-xs text-neutral-500">0</span>
+              <span className="text-xs text-neutral-400">
                 Position x{String.fromCharCode(0x2080 + sliceAxis)}
               </span>
-              <span className="text-[10px] text-neutral-500">L</span>
+              <span className="text-xs text-neutral-500">L</span>
             </div>
           </div>
 
           {/* Color bar */}
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-[9px] text-neutral-500">max</span>
+            <span className="text-xs text-neutral-500">max</span>
             <canvas
               ref={colorBarCanvasRef}
               width={COLORBAR_W}
@@ -299,19 +299,19 @@ const CarpetPanelInner: React.FC = React.memo(() => {
               className="block rounded-sm"
               style={{ width: COLORBAR_W, height: CARPET_CANVAS_H }}
             />
-            <span className="text-[9px] text-neutral-500">0</span>
+            <span className="text-xs text-neutral-500">0</span>
           </div>
 
           {/* Y-axis label (time) */}
           <div className="flex flex-col justify-between items-center py-2">
-            <span className="text-[9px] text-neutral-500 [writing-mode:vertical-rl]">old</span>
-            <span className="text-[9px] text-neutral-400 [writing-mode:vertical-rl]">t</span>
-            <span className="text-[9px] text-neutral-500 [writing-mode:vertical-rl]">new</span>
+            <span className="text-xs text-neutral-500 [writing-mode:vertical-rl]">old</span>
+            <span className="text-xs text-neutral-400 [writing-mode:vertical-rl]">t</span>
+            <span className="text-xs text-neutral-500 [writing-mode:vertical-rl]">new</span>
           </div>
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-[10px] text-neutral-500">
+        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-xs text-neutral-500">
           <span>Frames: {totalFrames}</span>
           <span>
             {totalFrames}/{historyLength}

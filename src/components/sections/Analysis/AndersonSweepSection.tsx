@@ -41,7 +41,7 @@ const SweepPlot: React.FC<{ results: SweepResult[]; config: SweepConfig }> = Rea
 
     return (
       <div className="mt-2" data-testid="anderson-sweep-plot">
-        <p className="text-[10px] text-text-secondary mb-1">W vs IPR</p>
+        <p className="text-xs text-text-secondary mb-1">W vs IPR</p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
           <svg width="100%" viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="block">
             {/* Axes */}
@@ -262,7 +262,7 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
       className="border-t border-border-subtle pt-3 space-y-3"
       data-testid="anderson-sweep-section"
     >
-      <p className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">
+      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
         Disorder Sweep
       </p>
 
@@ -321,7 +321,7 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
       {isRunning && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-text-secondary font-mono">
+            <span className="text-xs text-text-secondary font-mono">
               Step {currentStep + 1}/{config.steps} — W={wForStep(config, currentStep).toFixed(1)}
             </span>
             <Button size="sm" variant="secondary" onClick={handleAbort} data-testid="sweep-abort">
@@ -340,7 +340,7 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
 
       {isComplete && (
         <div className="space-y-2">
-          <span className="text-[10px] text-text-secondary font-mono">
+          <span className="text-xs text-text-secondary font-mono">
             Sweep complete — {results.length} realizations
           </span>
           <Button size="sm" variant="secondary" onClick={handleReset} data-testid="sweep-reset">

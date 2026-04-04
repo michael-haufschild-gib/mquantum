@@ -9,6 +9,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -21,6 +22,7 @@ const SURFACE_MODE_OPTIONS = [
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
+  const sweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )
@@ -64,9 +66,12 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
         </div>
       ),
       content: (
-        <div className="min-h-full">
+        <fieldset
+          disabled={sweepRunning}
+          className={`min-h-full transition-opacity border-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
+        >
           <ObjectSettingsSection />
-        </div>
+        </fieldset>
       ),
     },
   ]
@@ -83,9 +88,12 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
       {/* Content Container */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
         {/* Fixed Header Section with Dimension Selector */}
-        <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-hover)] shrink-0">
+        <fieldset
+          disabled={sweepRunning}
+          className={`border-b border-[var(--border-subtle)] bg-[var(--bg-hover)] shrink-0 transition-opacity border-t-0 border-x-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
+        >
           <div className="px-4 py-2">
-            <DimensionSelector />
+            <DimensionSelector disabled={sweepRunning} />
           </div>
           {dimension >= 2 && representation !== 'wigner' && objectType !== 'pauliSpinor' && (
             <div className="px-4 pb-2">
@@ -118,7 +126,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 pb-2">
             <ScenarioSelector />
           </div>
-        </div>
+        </fieldset>
 
         {/* Tabs Section */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">

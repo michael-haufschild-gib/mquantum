@@ -121,7 +121,7 @@ const TabButton = React.memo(
         onMouseEnter={handleMouseEnter}
         onKeyDown={handleKeyDownWrapper}
         className={`
-        relative px-4 py-2 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200
+        relative px-4 py-2 text-xs uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200
         outline-none border-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:rounded-sm
         ${fullWidth ? 'flex-1' : ''}
         ${

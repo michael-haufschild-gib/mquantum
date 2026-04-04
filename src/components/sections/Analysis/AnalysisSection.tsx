@@ -27,9 +27,11 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import {
   downloadFile,
+  exportAtlasSweepCSV,
   exportBecDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
+  exportEntanglementCSV,
   exportFilename,
   exportFsfDiagnosticsCSV,
   exportObservablesDiagnosticsCSV,
@@ -39,6 +41,7 @@ import {
   exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
 import { useCarpetStore } from '@/stores/carpetStore'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -286,6 +289,10 @@ const DataExportButtons: React.FC<{
   )
   const wfSliceHasData = useWavefunctionSliceStore((s) => s.hasData)
 
+  // Entanglement export availability
+  const entEnabled = useCoordinateEntanglementStore((s) => s.enabled)
+  const hasSweepResults = useCoordinateEntanglementStore((s) => s.sweepResults.length > 0)
+
   return (
     <ControlGroup
       title="Data Export"
@@ -340,6 +347,36 @@ const DataExportButtons: React.FC<{
               Export Observables (CSV)
             </Button>
           )}
+
+        {/* Entanglement CSV (TDSE with entanglement enabled) */}
+        {quantumMode === 'tdseDynamics' && entEnabled && (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const csv = exportEntanglementCSV()
+                if (csv) downloadFile(csv, exportFilename('mdim-entanglement', 'csv'))
+              }}
+              data-testid="export-entanglement-csv"
+            >
+              Export Entanglement (CSV)
+            </Button>
+            {hasSweepResults && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const csv = exportAtlasSweepCSV()
+                  if (csv) downloadFile(csv, exportFilename('mdim-atlas-sweep', 'csv'))
+                }}
+                data-testid="export-atlas-sweep-csv"
+              >
+                Export Atlas Sweep (CSV)
+              </Button>
+            )}
+          </>
+        )}
 
         {/* Wavefunction slice CSV (analytic: from density grid) */}
         {isAnalytic && densitySliceAvailable && (

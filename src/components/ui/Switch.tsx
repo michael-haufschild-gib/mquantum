@@ -106,7 +106,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
                 <m.div
                   initial={false}
                   animate={{ opacity: checked ? 1 : 0, scale: checked ? 1 : 0.5 }}
-                  className="absolute text-accent text-[10px]"
+                  className="absolute text-accent text-xs"
                 >
                   {iconOn}
                 </m.div>
@@ -115,7 +115,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
                 <m.div
                   initial={false}
                   animate={{ opacity: checked ? 0 : 1, scale: checked ? 0.5 : 1 }}
-                  className="absolute text-background text-[10px]"
+                  className="absolute text-background text-xs"
                 >
                   {iconOff}
                 </m.div>

@@ -70,14 +70,14 @@ interface CoordinateEntanglementState {
   historyCount: number
 
   // ── Latest snapshot ─────────────────────────────────────────────────────
-  /** Per-dimension entanglement entropies S_d. */
-  currentEntropies: number[]
-  /** Average entropy S̄. */
+  /** Per-dimension entanglement entropies S_d. null if dimension was too large to compute. */
+  currentEntropies: (number | null)[]
+  /** Average entropy S̄ (over computed dimensions only). */
   currentAverageEntropy: number
   /** Normalized average entropy S̄ / max(S̄). */
   currentNormalizedEntropy: number
-  /** Maximum possible entropy log(M_d) per dimension. */
-  currentMaxEntropies: number[]
+  /** Maximum possible entropy log(M_d) per dimension. null if skipped. */
+  currentMaxEntropies: (number | null)[]
   /** Eigenvalue spectrum of ρ₁ (first dimension). */
   currentSpectrum: number[]
   /** Bipartition entropies S_{k|N-k}, null entries if skipped. */
@@ -227,22 +227,33 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const head = state.historyHead
     const N = result.entropies.length
 
-    // Write per-dimension entropies into ring buffer
+    // Write per-dimension entropies into ring buffer (NaN for null/skipped dimensions
+    // so downstream consumers can distinguish "not computed" from genuinely separable S=0)
     for (let d = 0; d < N && d < MAX_DIMS; d++) {
-      state.historyEntropies[d]![head] = result.entropies[d]!
+      state.historyEntropies[d]![head] = result.entropies[d] ?? NaN
     }
     state.historyAverage[head] = result.averageEntropy
 
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)
 
-    // Update long-time statistics
-    const newLtN = state.longTimeN + 1
-    const newLtSum = state.longTimeSum + result.averageEntropy
-    const newLtSumSq = state.longTimeSumSq + result.averageEntropy * result.averageEntropy
-    const newLtAvg = newLtSum / newLtN
-    // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
-    const newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
+    // Update long-time statistics only for finite frames — non-finite results
+    // (GPU divergence, skipped dims) must not advance the sweep clock or
+    // dilute the running average with phantom zeros.
+    let newLtN = state.longTimeN
+    let newLtSum = state.longTimeSum
+    let newLtSumSq = state.longTimeSumSq
+    let newLtAvg = state.longTimeAverage
+    let newLtVar = state.longTimeVariance
+
+    if (Number.isFinite(result.averageEntropy)) {
+      newLtN = state.longTimeN + 1
+      newLtSum = state.longTimeSum + result.averageEntropy
+      newLtSumSq = state.longTimeSumSq + result.averageEntropy * result.averageEntropy
+      newLtAvg = newLtSum / newLtN
+      // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
+      newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
+    }
 
     set({
       historyHead: newHead,
@@ -326,6 +337,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   },
 
   recordSweepSample: (entropy) => {
+    // Guard against NaN from GPU divergence or skipped dimensions —
+    // a single NaN poisons the accumulator irreversibly.
+    if (!Number.isFinite(entropy)) return
     const state = get()
     set({
       sweepFramesEvolved: state.sweepFramesEvolved + 1,
@@ -350,18 +364,23 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     })
   },
 
-  completeSweep: () =>
+  completeSweep: () => {
+    // Clear live data so sweep-era samples don't persist as if they were live diagnostics
+    get().clearHistory()
     set({
       sweepStatus: 'complete',
       sweepProgress: 1,
-    }),
+    })
+  },
 
-  abortSweep: () =>
+  abortSweep: () => {
+    get().clearHistory()
     set({
       sweepStatus: 'idle',
       sweepProgress: 0,
       sweepCurrentStep: 0,
-    }),
+    })
+  },
 
   resetSweep: () =>
     set({

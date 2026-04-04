@@ -14,18 +14,19 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
-import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { Switch } from '@/components/ui/Switch'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import {
+  AtlasHeatmap,
   MutualInfoHeatmap,
   PerDimensionBars,
   SpectrumBars,
-  SweepControls,
 } from './EntanglementVisualizations'
+import { useSweepController } from './useSweepController'
 
 /* ── Helpers ── */
 
@@ -121,6 +122,8 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
     const sparklineData = f64ToF32(historyAverage)
     const maxEnts = useCoordinateEntanglementStore((s) => s.currentMaxEntropies)
 
+    const { handleStartSweep, handleAbortSweep } = useSweepController()
+
     const handleEnableChange = useCallback((v: boolean) => setEnabled(v), [setEnabled])
     const handleMIChange = useCallback(
       (v: boolean) => setComputePairwiseMI(v),
@@ -137,37 +140,79 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
         defaultOpen={defaultOpen}
         data-testid="coordinate-entanglement-section"
       >
-        <Switch
-          label="Enable"
-          tooltip="Track inter-dimensional entanglement entropy via reduced density matrices. Runs in a Web Worker to avoid blocking rendering."
-          checked={enabled}
-          onCheckedChange={handleEnableChange}
-        />
+        {/* Row 1: Enable toggle + sweep action (right-aligned) */}
+        <div className="flex items-center justify-between">
+          <Switch
+            label="Enable"
+            tooltip="Track inter-dimensional entanglement entropy via reduced density matrices. Runs in a Web Worker to avoid blocking rendering."
+            checked={enabled}
+            onCheckedChange={handleEnableChange}
+            disabled={sweepStatus === 'running'}
+          />
+          {enabled && (sweepStatus === 'idle' || sweepStatus === 'complete') && (
+            <Button variant="primary" size="sm" onClick={handleStartSweep}>
+              Start λ×N Sweep
+            </Button>
+          )}
+          {enabled && sweepStatus === 'running' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-secondary">
+                {(sweepProgress * 100).toFixed(0)}%
+              </span>
+              <Button variant="secondary" size="sm" onClick={handleAbortSweep}>
+                Abort
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Atlas heatmap directly below the header row */}
+        {enabled && sweepResults.length > 0 && <AtlasHeatmap results={sweepResults} />}
 
         {enabled && (
           <>
-            <ControlGroup title="Options">
-              <Switch
-                label="Pairwise MI"
-                tooltip="Compute pairwise mutual information I(d₁,d₂) between all dimension pairs. CPU-expensive for large grids (M > 32)."
-                checked={computePairwiseMI}
-                onCheckedChange={handleMIChange}
-              />
-              <Switch
-                label="Bipartitions"
-                tooltip="Compute bipartition entropy S_{k|N-k} for all k. Only feasible for small per-dimension grid sizes."
-                checked={computeBipartitions}
-                onCheckedChange={handleBipartitionChange}
-              />
-            </ControlGroup>
+            {/* Options: toggles left, extra info right */}
+            <div className="mt-1 flex gap-4">
+              <div className="flex flex-col gap-1 shrink-0">
+                <Switch
+                  label="Pairwise MI"
+                  tooltip="Compute pairwise mutual information I(d₁,d₂) between all dimension pairs. CPU-expensive for large grids (M > 32)."
+                  checked={computePairwiseMI}
+                  onCheckedChange={handleMIChange}
+                  disabled={sweepStatus === 'running'}
+                />
+                <Switch
+                  label="Bipartitions"
+                  tooltip="Compute sequential bipartition entropy S({0..k-1}|{k..N-1}) for each k up to N/2. Uses the first k coordinates as the kept subsystem. Only feasible for small per-dimension grid sizes."
+                  checked={computeBipartitions}
+                  onCheckedChange={handleBipartitionChange}
+                  disabled={sweepStatus === 'running'}
+                />
+              </div>
+              <div className="flex-1 min-w-0 text-xs text-text-secondary pt-0.5">
+                {currentBipartitionEntropies.length > 0 && (
+                  <div className="flex flex-wrap gap-x-2">
+                    <span>Bipartition S:</span>
+                    {currentBipartitionEntropies.map((s, k) => (
+                      <span key={k}>
+                        k={k + 1}: {s !== null ? s.toFixed(3) : '—'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {mutualInfoMatrix && currentEntropies.length > 0 && (
+                  <MutualInfoHeatmap matrix={mutualInfoMatrix} N={currentEntropies.length} />
+                )}
+              </div>
+            </div>
 
-            <div className="mt-1 flex gap-3 text-[10px] text-text-secondary">
+            <div className="mt-1 flex gap-3 text-xs text-text-secondary">
               <span>S̄ = {currentAverageEntropy.toFixed(4)}</span>
               <span>S̄/S_max = {(currentNormalizedEntropy * 100).toFixed(1)}%</span>
             </div>
 
             {longTimeAverage > 0 && (
-              <div className="flex gap-3 text-[10px] text-text-secondary">
+              <div className="flex gap-3 text-xs text-text-secondary">
                 <span>⟨S̄⟩ = {longTimeAverage.toFixed(4)}</span>
                 <span>σ = {Math.sqrt(Math.max(longTimeVariance, 0)).toFixed(4)}</span>
               </div>
@@ -175,7 +220,7 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
 
             {historyCount > 1 && (
               <div className="mt-1">
-                <p className="text-[10px] text-text-secondary mb-0.5">S̄(t) time series</p>
+                <p className="text-xs text-text-secondary mb-0.5">S̄(t) time series</p>
                 <Sparkline
                   data={sparklineData}
                   head={historyHead}
@@ -188,27 +233,6 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
 
             <PerDimensionBars entropies={currentEntropies} maxEntropies={maxEnts} />
             <SpectrumBars spectrum={currentSpectrum} />
-
-            {currentBipartitionEntropies.length > 0 && (
-              <div className="mt-1 text-[10px] text-text-secondary">
-                <span>Bipartition S: </span>
-                {currentBipartitionEntropies.map((s, k) => (
-                  <span key={k} className="mr-2">
-                    k={k + 1}: {s !== null ? s.toFixed(3) : '—'}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {mutualInfoMatrix && currentEntropies.length > 0 && (
-              <MutualInfoHeatmap matrix={mutualInfoMatrix} N={currentEntropies.length} />
-            )}
-
-            <SweepControls
-              sweepStatus={sweepStatus}
-              sweepProgress={sweepProgress}
-              sweepResults={sweepResults}
-            />
           </>
         )}
       </Section>

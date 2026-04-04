@@ -125,7 +125,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
       {/* Per-state populations (hydrogen mode) */}
       {populationData.basisCount > 0 && (
         <div className="mt-3 space-y-1 px-1">
-          <span className="text-[10px] text-text-tertiary uppercase tracking-wider">
+          <span className="text-xs text-text-tertiary uppercase tracking-wider">
             State Populations
           </span>
           {populationData.basisLabels.map((label, i) => (
@@ -181,14 +181,14 @@ function PopulationBar({ label, value }: { label: string; value: number }) {
   const pct = Math.max(0, Math.min(100, value * 100))
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-text-secondary font-mono w-8 shrink-0">{label}</span>
+      <span className="text-xs text-text-secondary font-mono w-8 shrink-0">{label}</span>
       <div className="flex-1 h-2 rounded-full bg-panel-border/40 overflow-hidden">
         <div
           className="h-full rounded-full bg-accent-cyan/70 transition-[width] duration-100"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-[10px] text-text-tertiary font-mono tabular-nums w-10 text-end">
+      <span className="text-xs text-text-tertiary font-mono tabular-nums w-10 text-end">
         {(value * 100).toFixed(1)}%
       </span>
     </div>
@@ -213,7 +213,7 @@ function SparklineRow({
 }) {
   return (
     <div>
-      <span className="text-[10px] text-text-tertiary uppercase tracking-wider">{label}</span>
+      <span className="text-xs text-text-tertiary uppercase tracking-wider">{label}</span>
       <Sparkline
         data={data}
         head={head}

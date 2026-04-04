@@ -29,7 +29,7 @@ export const ExportTextTab = () => {
       >
         <div className="flex flex-col">
           <span className="font-bold text-sm text-text-primary">Enable Overlay</span>
-          <span className="text-[10px] text-text-tertiary uppercase tracking-wide">
+          <span className="text-xs text-text-tertiary uppercase tracking-wide">
             Add watermarks or titles
           </span>
         </div>
@@ -43,7 +43,7 @@ export const ExportTextTab = () => {
       {textOverlay.enabled && (
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Text Content
             </label>
             <Input
@@ -56,7 +56,7 @@ export const ExportTextTab = () => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
                 Font Size
               </label>
               <NumberInput
@@ -68,7 +68,7 @@ export const ExportTextTab = () => {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+              <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
                 Weight
               </label>
               <Select
@@ -87,7 +87,7 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Opacity
             </label>
             <Slider
@@ -104,7 +104,7 @@ export const ExportTextTab = () => {
           <div className="space-y-4 pt-4 border-t border-border-subtle">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
                   Text Color
                 </label>
                 <ColorPicker
@@ -114,7 +114,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+                <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
                   Shadow Color
                 </label>
                 <ColorPicker
@@ -127,12 +127,12 @@ export const ExportTextTab = () => {
           </div>
 
           <div className="space-y-4 pt-4 border-t border-border-subtle">
-            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">
+            <label className="text-xs text-text-tertiary uppercase font-bold tracking-widest">
               Placement
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">
+                <label className="text-xs text-text-tertiary uppercase tracking-wide">
                   Vertical
                 </label>
                 <ToggleGroup
@@ -149,7 +149,7 @@ export const ExportTextTab = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">
+                <label className="text-xs text-text-tertiary uppercase tracking-wide">
                   Horizontal
                 </label>
                 <ToggleGroup

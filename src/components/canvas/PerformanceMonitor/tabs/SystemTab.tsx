@@ -59,7 +59,7 @@ export const SystemTabContent = React.memo(function SystemTabContent() {
         <SectionHeader icon={<Icons.Database />} label="VRAM Estimation" />
         <div className="bg-[var(--bg-hover)] rounded-lg p-3 space-y-3 border border-border-subtle">
           <div className="flex justify-between items-baseline">
-            <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Total</span>
+            <span className="text-xs text-text-tertiary uppercase tracking-wider">Total</span>
             <span className="text-sm font-bold font-mono text-text-primary">
               {formatBytes(vram.total)}
             </span>

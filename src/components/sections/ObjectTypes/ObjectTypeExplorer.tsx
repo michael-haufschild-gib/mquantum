@@ -109,7 +109,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         <div className="flex items-center justify-between w-full mb-1">
           <span className="font-medium text-sm">{entry.name}</span>
           <div className="flex items-center gap-2">
-            <span className="text-[9px] text-text-tertiary font-mono">
+            <span className="text-xs text-text-tertiary font-mono">
               {getQuantumTypeEntry(entry.key)?.dimensions.min ?? 1}D+
             </span>
             {isSelected && (
@@ -134,11 +134,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       initial="hidden"
       animate="show"
     >
-      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1">
+      <div className="text-xs font-bold uppercase tracking-widest text-text-tertiary px-1">
         Analytic
       </div>
       {analyticTypes.map(renderCard)}
-      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">
+      <div className="text-xs font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">
         Compute (GPU)
       </div>
       {computeTypes.map(renderCard)}

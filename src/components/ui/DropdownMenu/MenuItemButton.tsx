@@ -46,7 +46,7 @@ export const MenuItemButton = React.memo(
       >
         <span className="flex items-center gap-2">
           {item.checked !== undefined && (
-            <span className={`text-[10px] ${item.checked ? 'text-accent' : 'opacity-0'}`}>
+            <span className={`text-xs ${item.checked ? 'text-accent' : 'opacity-0'}`}>
               {'\u2022'}
             </span>
           )}
