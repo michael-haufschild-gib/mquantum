@@ -105,6 +105,7 @@ import {
   buildStochasticLocPipeline,
   createStochasticLocState,
   disposeStochasticLoc,
+  EXPECT_WG,
   rebuildExpectationBindGroups,
   rebuildStochasticLocBindGroup,
   type StochasticLocState,
@@ -430,7 +431,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.psiReBuffer,
         this.psiImBuffer
       )
-      const numWG = Math.ceil(this.totalSites / LINEAR_WG)
+      const numWG = Math.ceil(this.totalSites / EXPECT_WG)
       rebuildExpectationBindGroups(
         device,
         this._stochasticState,

@@ -254,16 +254,14 @@ function readFrameInputs(
 
   const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
 
-  // Branch coloring gate: 1.0 when stochastic decoherence is active (γ > 0) and
-  // branching visualization is enabled. 0.0 otherwise. The raymarcher uses > 0.5
-  // as the threshold, so this is effectively a boolean flag.
-  // No dependency on diagnostics data — branch colors appear immediately.
+  // Branch separation: continuous 0..1 metric derived from stochastic γ.
+  // Uses 1 - exp(-γ) as a monotonic proxy: γ=0 → 0, γ→∞ → 1.
+  // The raymarcher uses > 0.5 as the threshold for branch coloring.
   const tdseConf = schroedinger?.tdse
+  const stochasticGamma = Math.max(0, tdseConf?.stochasticGamma ?? 0)
   const branchSeparation =
-    tdseConf?.branchingEnabled &&
-    tdseConf?.stochasticEnabled &&
-    (tdseConf?.stochasticGamma ?? 0) > 0
-      ? 1.0
+    tdseConf?.branchingEnabled && tdseConf?.stochasticEnabled
+      ? Math.min(1, 1 - Math.exp(-stochasticGamma))
       : 0.0
 
   return {

@@ -26,6 +26,9 @@ import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.
 /** Maximum collapse centers per dispatch (packed into uniform struct). */
 const MAX_CENTERS_PER_DISPATCH = 8
 
+/** Workgroup size for expectation reduction shaders (must match @workgroup_size in WGSL). */
+export const EXPECT_WG = 256
+
 /**
  * StochasticParams struct size in bytes.
  * Layout: 8 scalars × 4 bytes = 32, then array<vec4f, 24> = 384. Total = 416.
@@ -50,6 +53,8 @@ export interface StochasticLocState {
   expectPartialBuffer: GPUBuffer | null
   /** Final expectation values: MAX_CENTERS floats */
   expectResultBuffer: GPUBuffer | null
+  /** Uniform buffer for the finalize pass (numWorkgroups + padding) */
+  expectFinalizeUniformBuffer: GPUBuffer | null
   bgl: GPUBindGroupLayout | null
   bg: GPUBindGroup | null
   /** Per-frame step counter for PRNG seeding. */
@@ -72,6 +77,7 @@ export function createStochasticLocState(): StochasticLocState {
     expectFinalizeBG: null,
     expectPartialBuffer: null,
     expectResultBuffer: null,
+    expectFinalizeUniformBuffer: null,
     bgl: null,
     bg: null,
     stepCounter: 0,
@@ -259,21 +265,22 @@ export function rebuildExpectationBindGroups(
   })
 
   // Finalize uniform buffer (16 bytes: numWorkgroups + padding)
-  const finalizeUniformBuf = device.createBuffer({
+  state.expectFinalizeUniformBuffer?.destroy()
+  state.expectFinalizeUniformBuffer = device.createBuffer({
     label: 'tdse-stochastic-expect-finalize-uniform',
     size: EXPECT_FINALIZE_UNIFORM_SIZE,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   })
   const uData = new Uint32Array(4)
   uData[0] = numWorkgroups
-  device.queue.writeBuffer(finalizeUniformBuf, 0, uData)
+  device.queue.writeBuffer(state.expectFinalizeUniformBuffer, 0, uData)
 
   // Finalize bind group
   state.expectFinalizeBG = device.createBindGroup({
     label: 'tdse-stochastic-expect-finalize-bg',
     layout: state.expectFinalizeBGL,
     entries: [
-      { binding: 0, resource: { buffer: finalizeUniformBuf } },
+      { binding: 0, resource: { buffer: state.expectFinalizeUniformBuffer } },
       { binding: 1, resource: { buffer: state.expectPartialBuffer } },
       { binding: 2, resource: { buffer: state.expectResultBuffer } },
     ],
@@ -355,7 +362,8 @@ function packStochasticUniforms(
  * @param ctx - Render context for beginComputePass
  * @param config - TDSE configuration
  * @param state - Stochastic localization state
- * @param linearWG - Workgroup count for linear dispatch
+ * @param linearWG - Workgroup count for linear dispatch (workgroup_size=64)
+ * @param totalSites - Total lattice sites (for expectation reduction dispatch sizing)
  * @param step - Current step index within the frame
  * @param dispatchCompute - Pass's dispatch helper
  */
@@ -365,6 +373,7 @@ export function maybeDispatchStochasticLoc(
   config: TdseConfig,
   state: StochasticLocState,
   linearWG: number,
+  totalSites: number,
   step: number,
   dispatchCompute: (
     pass: GPUComputePassEncoder,
@@ -410,10 +419,11 @@ export function maybeDispatchStochasticLoc(
       state.expectFinalizeBG
 
     if (hasExpectPipeline && batch === 0) {
+      const expectWG = Math.ceil(totalSites / EXPECT_WG)
       const rPass = ctx.beginComputePass({
         label: `tdse-stochastic-expect-reduce-step${step}`,
       })
-      dispatchCompute(rPass, state.expectReducePipeline!, [state.expectReduceBG!], linearWG)
+      dispatchCompute(rPass, state.expectReducePipeline!, [state.expectReduceBG!], expectWG)
       rPass.end()
 
       const fPass = ctx.beginComputePass({
@@ -456,6 +466,8 @@ export function disposeStochasticLoc(state: StochasticLocState): void {
   state.expectPartialBuffer = null
   state.expectResultBuffer?.destroy()
   state.expectResultBuffer = null
+  state.expectFinalizeUniformBuffer?.destroy()
+  state.expectFinalizeUniformBuffer = null
   state.bg = null
   state.expectReduceBG = null
   state.expectFinalizeBG = null
