@@ -341,7 +341,7 @@ describe('msgBoxStore dismissible options (invariants)', () => {
     expect(state.dismissId).toBeNull()
   })
 
-  it('closeMsgBox_resetsDissmissibleState', () => {
+  it('closeMsgBox_resetsDismissibleState', () => {
     const { showMsgBox, closeMsgBox } = useMsgBoxStore.getState()
 
     showMsgBox('Title', 'Message', 'info', [], {
