@@ -500,6 +500,26 @@ export function computeCoordinateEntanglement(
 ): CoordinateEntanglementResult {
   const N = gridSize.length
 
+  // ── Normalize wavefunction ────────────────────────────────────────────
+  // GPU wavefunctions are stored on a spatial grid without volume-element
+  // normalization, so ‖ψ‖² ≠ 1. The RDM must have trace 1 for von Neumann
+  // entropy to be physically meaningful.
+  let norm2 = 0
+  for (let i = 0; i < psiRe.length; i++) {
+    norm2 += psiRe[i]! * psiRe[i]! + psiIm[i]! * psiIm[i]!
+  }
+  if (norm2 > 0 && Math.abs(norm2 - 1) > 1e-6) {
+    const invNorm = 1 / Math.sqrt(norm2)
+    const normRe = new Float32Array(psiRe.length)
+    const normIm = new Float32Array(psiIm.length)
+    for (let i = 0; i < psiRe.length; i++) {
+      normRe[i] = psiRe[i]! * invNorm
+      normIm[i] = psiIm[i]! * invNorm
+    }
+    psiRe = normRe
+    psiIm = normIm
+  }
+
   // ── Per-dimension entropies ────────────────────────────────────────────
   const entropies = new Array<number | null>(N)
   const maxEntropies = new Array<number | null>(N)
