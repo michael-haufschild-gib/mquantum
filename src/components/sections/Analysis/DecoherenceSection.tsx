@@ -140,17 +140,6 @@ function DecoherenceContent() {
                 onChange={setStochasticSeed}
                 data-testid="decoherence-seed-slider"
               />
-              <Slider
-                label="Seed"
-                tooltip="Random seed."
-                min={0}
-                max={999999}
-                step={1}
-                value={tdse.stochasticSeed}
-                onChange={setStochasticSeed}
-                showValue={false}
-                data-testid="schroedinger-seed-slider"
-              />
             </ControlGroup>
 
             <ControlGroup
