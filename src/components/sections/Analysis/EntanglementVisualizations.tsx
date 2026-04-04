@@ -14,6 +14,7 @@ import React, { useEffect, useRef } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
+import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import {
   type AtlasSweepConfig,
   lambdaForStep,
@@ -291,6 +292,13 @@ const SWEEP_MEASURE_ENTRIES = 10
 const SWEEP_POLL_MS = 500
 
 /** Atlas sweep controls: start/abort/progress + results heatmap. */
+/** Snapshot of physics state before a sweep, used to restore on completion/abort. */
+interface PreSweepSnapshot {
+  potentialType: TdsePotentialType
+  anharmonicLambda: number
+  dimension: number
+}
+
 export const SweepControls: React.FC<{
   sweepStatus: string
   sweepProgress: number
@@ -299,6 +307,20 @@ export const SweepControls: React.FC<{
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
   /** longTimeN at the start of the current sweep step — monotonically increasing, never caps. */
   const stepStartNRef = useRef(0)
+  /** Physics state snapshot taken before sweep start, restored on complete/abort. */
+  const preSweepRef = useRef<PreSweepSnapshot | null>(null)
+
+  /** Restore physics state to pre-sweep values and reset the field. */
+  const restorePreSweepState = () => {
+    const snap = preSweepRef.current
+    if (!snap) return
+    const ext = useExtendedObjectStore.getState()
+    ext.setTdsePotentialType(snap.potentialType)
+    ext.setTdseAnharmonicLambda(snap.anharmonicLambda)
+    useGeometryStore.getState().setDimension(snap.dimension)
+    ext.resetTdseField()
+    preSweepRef.current = null
+  }
 
   const handleStartSweep = () => {
     const config: AtlasSweepConfig = {
@@ -307,13 +329,22 @@ export const SweepControls: React.FC<{
       lambdaSteps: 15,
       dimensions: [3, 4, 5],
     }
+
+    // Snapshot current physics state for restoration on complete/abort
+    const ext = useExtendedObjectStore.getState()
+    const tdseState = ext.schroedinger.tdse
+    preSweepRef.current = {
+      potentialType: tdseState.potentialType,
+      anharmonicLambda: tdseState.anharmonicLambda,
+      dimension: useGeometryStore.getState().dimension,
+    }
+
     const entStore = useCoordinateEntanglementStore.getState()
     entStore.clearHistory()
     entStore.startSweep(config)
     stepStartNRef.current = 0
 
     const firstLambda = lambdaForStep(config, 0)
-    const ext = useExtendedObjectStore.getState()
     ext.setTdsePotentialType('coupledAnharmonic')
     ext.setTdseAnharmonicLambda(firstLambda)
     useGeometryStore.getState().setDimension(config.dimensions[0]!)
@@ -322,6 +353,7 @@ export const SweepControls: React.FC<{
 
   const handleAbortSweep = () => {
     useCoordinateEntanglementStore.getState().abortSweep()
+    restorePreSweepState()
   }
 
   useEffect(() => {
@@ -360,6 +392,7 @@ export const SweepControls: React.FC<{
           ext.resetTdseField()
         } else {
           entStore.completeSweep()
+          restorePreSweepState()
         }
       }
     }, SWEEP_POLL_MS)
