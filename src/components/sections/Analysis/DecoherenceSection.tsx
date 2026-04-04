@@ -82,7 +82,7 @@ function DecoherenceContent() {
   return (
     <Section title="Decoherence">
       <Switch
-        label="Enable"
+        label="Enable Decoherence"
         checked={tdse.stochasticEnabled}
         onCheckedChange={setStochasticEnabled}
       />

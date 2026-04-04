@@ -44,7 +44,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
             <Switch
               checked={bloomEnabled}
               onCheckedChange={setBloomEnabled}
-              label="Enable"
+              label="Enable Bloom"
               tooltip="Add a luminous glow around bright regions of the wavefunction. Creates a more cinematic, photorealistic appearance."
               data-testid="bloom-enabled-switch"
             />
@@ -62,7 +62,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
             <Switch
               checked={cinematicEnabled}
               onCheckedChange={setCinematicEnabled}
-              label="Enable"
+              label="Enable Cinematic"
               tooltip="Apply cinematic effects: depth of field (bokeh blur), vignette, chromatic aberration, and film grain."
             />
             <div className={!cinematicEnabled ? 'opacity-50 pointer-events-none' : ''}>
@@ -79,7 +79,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
             <Switch
               checked={paperEnabled}
               onCheckedChange={setPaperEnabled}
-              label="Enable"
+              label="Enable Paper Texture"
               tooltip="Overlay a textured paper grain effect for an academic/illustration aesthetic."
             />
             <div className={!paperEnabled ? 'opacity-50 pointer-events-none' : ''}>
