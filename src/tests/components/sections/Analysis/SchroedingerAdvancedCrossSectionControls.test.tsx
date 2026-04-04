@@ -8,7 +8,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 describe('CrossSectionAnalysisContent controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
-    useGeometryStore.setState(useGeometryStore.getInitialState())
+    useGeometryStore.getState().reset()
   })
 
   it('reveals cross-section controls only when enabled', () => {
