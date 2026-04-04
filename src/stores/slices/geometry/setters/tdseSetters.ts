@@ -20,6 +20,7 @@ import {
 } from './sliceSetterUtils'
 import { createTdsePotentialSetters } from './tdsePotentialSetters'
 import { createTdseStochasticSetters } from './tdseStochasticSetters'
+import { createTdseUiSetters } from './tdseUiSetters'
 
 type TdseActions = Pick<
   SchroedingerSliceActions,
@@ -424,133 +425,8 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       | 'setTdseDriveAmplitude'
       | 'setTdseDisorderStrength'
     >),
-    setTdseDisorderSeed: (seed) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, disorderSeed: Math.floor(Math.max(0, seed)) },
-        },
-      }))
-    },
-    setTdseDisorderDistribution: (distribution) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, disorderDistribution: distribution },
-        },
-      }))
-    },
-    setTdseAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setTdseAbsorberWidth: (width) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.absorberWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberWidth: clamped },
-        },
-      }))
-    },
-    setTdsePmlTargetReflection: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('tdse.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, pmlTargetReflection: clamped },
-        },
-      }))
-    },
-    setTdseFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, fieldView: view },
-        },
-      }))
-    },
-    setTdseAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoScale },
-        },
-      }))
-    },
-    setTdseShowPotential: (showPotential) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, showPotential },
-        },
-      }))
-    },
-    setTdseAutoLoop: (autoLoop) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoLoop },
-        },
-      }))
-    },
-    setTdseDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDiagnosticsInterval: (interval) => {
-      if (!isFinite(interval)) {
-        warnNonFinite('tdse.diagnosticsInterval', interval)
-        return
-      }
-      const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setTdseObservablesEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, observablesEnabled: enabled },
-        },
-      }))
-    },
-    setTdseImaginaryTimeEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, imaginaryTimeEnabled: enabled },
-        },
-      }))
-    },
-    setTdseCustomPotentialExpression: (expression) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, customPotentialExpression: expression },
-        },
-      }))
-    },
+    // UI, diagnostic, absorber, and disorder setters (extracted to tdseUiSetters.ts)
+    ...createTdseUiSetters(ctx),
     setTdseSlicePosition: (dimIndex, value) => {
       if (!isFinite(value)) {
         warnNonFinite('tdse.slicePositions', value)
