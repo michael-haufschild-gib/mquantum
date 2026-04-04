@@ -104,6 +104,19 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
       if (urlState.stochasticNumSites !== undefined)
         ext.setTdseStochasticNumSites(urlState.stochasticNumSites)
     }
+
+    // Coordinate entanglement (lazy import to avoid loading code for non-TDSE modes)
+    if (urlState.entanglementEnabled !== undefined) {
+      void import('@/stores/coordinateEntanglementStore').then(
+        ({ useCoordinateEntanglementStore }) => {
+          const entStore = useCoordinateEntanglementStore.getState()
+          entStore.setEnabled(urlState.entanglementEnabled!)
+          if (urlState.entanglementPairwiseMI !== undefined) {
+            entStore.setComputePairwiseMI(urlState.entanglementPairwiseMI)
+          }
+        }
+      )
+    }
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   }

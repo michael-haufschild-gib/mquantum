@@ -46,6 +46,7 @@ import {
   waitForSimulationFrames,
   waitForUniformUpdate,
 } from './helpers/app-helpers'
+import { RightPanel } from './pages/RightPanel'
 
 test.setTimeout(120_000)
 
@@ -287,6 +288,8 @@ test.describe('B2: Data Export — content integrity', () => {
 
     // Open analysis section
     await page.getByTestId('toggle-right-panel').click()
+    const rightPanel = new RightPanel(page)
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     // Expand data export group and wait for expand animation
@@ -330,6 +333,8 @@ test.describe('B2: Data Export — content integrity', () => {
     await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'dirac')
 
     await page.getByTestId('toggle-right-panel').click()
+    const rightPanel = new RightPanel(page)
+    await rightPanel.switchToAnalysisTab()
     await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 
     // Expand data export group and wait for expand animation

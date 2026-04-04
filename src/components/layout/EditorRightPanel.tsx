@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { AnalysisSection } from '@/components/sections/Advanced/AnalysisSection'
+import { CoordinateEntanglementSection } from '@/components/sections/Advanced/CoordinateEntanglementSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/OpenQuantumDiagnosticsSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
@@ -17,22 +18,32 @@ import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
 import { Icon } from '@/components/ui/Icon'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 
-/** Object tab content — extracted so it can subscribe to quantum mode */
+/** Object tab content — appearance, exposure, absorption, and advanced rendering. */
 const ObjectTabContent: React.FC = React.memo(() => {
   return (
     <div>
       <FacesSection defaultOpen={true} />
       <ExposureSection defaultOpen={true} />
       <AbsorptionSection defaultOpen={true} />
-      <AnalysisSection defaultOpen={true} />
-      <DecoherenceSection />
-      <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <AdvancedObjectControls />
-      <OpenQuantumDiagnosticsSection />
     </div>
   )
 })
 ObjectTabContent.displayName = 'ObjectTabContent'
+
+/** Analysis tab content — cross-section, decoherence, entanglement, and quantum effects. */
+const AnalysisTabContent: React.FC = React.memo(() => {
+  return (
+    <div>
+      <AnalysisSection defaultOpen={true} />
+      <DecoherenceSection />
+      <CoordinateEntanglementSection />
+      <SchroedingerQuantumEffectsSection defaultOpen={true} />
+      <OpenQuantumDiagnosticsSection />
+    </div>
+  )
+})
+AnalysisTabContent.displayName = 'AnalysisTabContent'
 
 export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
@@ -41,8 +52,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
   const tabs: Tab[] = [
     {
       id: 'object',
-      tooltip:
-        'Appearance, exposure, absorption, analysis, and rendering for the active quantum object.',
+      tooltip: 'Appearance, exposure, absorption, and rendering for the active quantum object.',
       label: (
         <div className="flex items-center gap-2">
           <Icon name="sphere" size={14} />
@@ -50,6 +60,17 @@ export const EditorRightPanel: React.FC = React.memo(() => {
         </div>
       ),
       content: <ObjectTabContent />,
+    },
+    {
+      id: 'analysis',
+      tooltip: 'Cross-section analysis, decoherence, entanglement, and quantum effects.',
+      label: (
+        <div className="flex items-center gap-2">
+          <Icon name="chart" size={14} />
+          <span>Analysis</span>
+        </div>
+      ),
+      content: <AnalysisTabContent />,
     },
     {
       id: 'scene',

@@ -40,6 +40,11 @@ export class RightPanel {
     await expect(tab).toHaveAttribute('aria-selected', 'true')
   }
 
+  /** Switch to the Analysis tab and wait for the tab to become active. */
+  async switchToAnalysisTab(): Promise<void> {
+    await this.switchTab('Analysis')
+  }
+
   // ─── Sections ────────────────────────────────────────────────────────
 
   /** Check that the Faces/Surface section is visible in Object tab. */

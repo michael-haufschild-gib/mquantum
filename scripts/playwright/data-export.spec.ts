@@ -34,6 +34,7 @@ async function setupModeContext(page: import('@playwright/test').Page, mode: str
   await topBar.openRightPanel()
   const rightPanel = new RightPanel(page)
   await rightPanel.waitForVisible()
+  await rightPanel.switchToAnalysisTab()
   await expect(page.getByTestId('analysis-section')).toBeVisible({ timeout: 5000 })
 }
 

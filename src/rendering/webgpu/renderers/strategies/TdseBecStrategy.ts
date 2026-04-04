@@ -13,6 +13,11 @@ import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
+import type {
+  EntanglementWorkerRequest,
+  EntanglementWorkerResponse,
+} from '@/lib/physics/coordinateEntanglement.worker'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
@@ -38,6 +43,9 @@ import type {
 /** Interval (in diagnostic cycles) between spectrum computations. */
 const SPECTRUM_INTERVAL = 4
 
+/** Interval (in frames) between entanglement readbacks. */
+const ENTANGLEMENT_DECIMATION = 10
+
 /** Strategy for TDSE and BEC dynamics modes using split-operator compute dispatch. */
 export class TdseBecStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
@@ -47,6 +55,14 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private spectrumCounter = 0
   /** Guard to prevent overlapping spectrum readbacks. */
   private spectrumInFlight = false
+  /** Frame counter for entanglement readback decimation. */
+  private entanglementFrameCounter = 0
+  /** Guard to prevent overlapping entanglement readbacks. */
+  private entanglementInFlight = false
+  /** Web Worker for entanglement computation (lazy-initialized). */
+  private entanglementWorker: Worker | null = null
+  /** Epoch counter for entanglement worker results ordering. */
+  private entanglementEpoch = 0
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute mode overrides applied by renderer constructor
@@ -167,6 +183,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     if (isBecMode) {
       this.updateBecDiagnostics(tdsePass, extended)
       this.maybeComputeSpectrum(ctx, tdsePass, extended)
+    }
+
+    // Coordinate entanglement diagnostics (TDSE mode only)
+    if (!isBecMode && isPlaying) {
+      this.maybeComputeEntanglement(ctx, tdsePass, tdseConfig)
     }
 
     // B1: Simulation state save/load
@@ -583,6 +604,72 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     )
   }
 
+  /**
+   * Trigger async coordinate entanglement computation at decimated intervals.
+   * Reads back psi from GPU, ships to a Web Worker for CPU-side
+   * reduced density matrix + eigendecomposition.
+   */
+  private maybeComputeEntanglement(
+    ctx: WebGPURenderContext,
+    tdsePass: TDSEComputePass,
+    config: TdseConfig
+  ): void {
+    const entStore = useCoordinateEntanglementStore.getState()
+    if (!entStore.enabled || this.entanglementInFlight) return
+
+    this.entanglementFrameCounter++
+    if (this.entanglementFrameCounter < ENTANGLEMENT_DECIMATION) return
+    this.entanglementFrameCounter = 0
+    this.entanglementInFlight = true
+
+    const gridSize = config.gridSize.slice(0, config.latticeDim)
+    const epoch = ++this.entanglementEpoch
+
+    void tdsePass.requestMeasurementReadback(ctx).then(
+      (result) => {
+        if (!result) {
+          this.entanglementInFlight = false
+          return
+        }
+
+        // Lazy-initialize the worker
+        if (!this.entanglementWorker) {
+          this.entanglementWorker = new Worker(
+            new URL('../../../../lib/physics/coordinateEntanglement.worker.ts', import.meta.url),
+            { type: 'module' }
+          )
+          this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
+            this.entanglementInFlight = false
+            if (e.data.type !== 'result') return
+            useCoordinateEntanglementStore.getState().pushResult(e.data.result)
+          }
+          this.entanglementWorker.onerror = () => {
+            this.entanglementInFlight = false
+            logger.warn('[Entanglement] Worker error')
+          }
+        }
+
+        const request: EntanglementWorkerRequest = {
+          type: 'compute',
+          epoch,
+          psiRe: result.re,
+          psiIm: result.im,
+          gridSize,
+          options: {
+            computePairwiseMI: entStore.computePairwiseMI,
+            computeBipartitions: entStore.computeBipartitions,
+          },
+        }
+
+        // Transfer psi arrays to worker (zero-copy)
+        this.entanglementWorker.postMessage(request, [result.re.buffer, result.im.buffer])
+      },
+      () => {
+        this.entanglementInFlight = false
+      }
+    )
+  }
+
   getDensityTextureView(): GPUTextureView | null {
     return this.tdsePass?.getDensityTextureView() ?? null
   }
@@ -590,5 +677,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   dispose(): void {
     this.tdsePass?.dispose()
     this.tdsePass = null
+    this.entanglementWorker?.terminate()
+    this.entanglementWorker = null
   }
 }

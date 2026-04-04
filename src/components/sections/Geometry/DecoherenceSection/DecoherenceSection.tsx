@@ -11,6 +11,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { MonitoringSweepSection } from '@/components/sections/Advanced/MonitoringSweepSection'
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
@@ -19,6 +20,17 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /** Decoherence section — controls CSL localization and branch visualization. */
 export function DecoherenceSection() {
+  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+
+  if (quantumMode !== 'tdseDynamics') {
+    return <UnavailableSection title="Decoherence" reason="Available in TDSE Dynamics mode" />
+  }
+
+  return <DecoherenceContent />
+}
+
+/** Inner content — only rendered when quantumMode === 'tdseDynamics'. */
+function DecoherenceContent() {
   const {
     tdse,
     setStochasticEnabled,

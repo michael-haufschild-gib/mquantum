@@ -132,6 +132,12 @@ export interface ShareableObjectState {
   stochasticSigma?: number
   /** Collapse sites per step */
   stochasticNumSites?: number
+
+  // ── Coordinate Entanglement ────────────────────────────────────────────
+  /** Coordinate entanglement tracking enabled */
+  entanglementEnabled?: boolean
+  /** Pairwise mutual information computation enabled */
+  entanglementPairwiseMI?: boolean
 }
 
 /**
@@ -299,6 +305,10 @@ export function serializeState(state: ShareableState): string {
     setIntParam(params, 'sloc_n', state.stochasticNumSites)
   }
 
+  // Coordinate entanglement
+  setBoolParam(params, 'ent', state.entanglementEnabled)
+  setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
+
   return params.toString()
 }
 
@@ -382,6 +392,11 @@ export function deserializeState(searchParams: string): ParsedShareableState {
     state.stochasticSigma = parseFloatParam(params, 'sloc_s', 0.5, 5)
     state.stochasticNumSites = parseIntParam(params, 'sloc_n', 1, 32)
   }
+
+  // Coordinate entanglement
+  state.entanglementEnabled = parseBoolParam(params, 'ent')
+  state.entanglementPairwiseMI = parseBoolParam(params, 'ent_mi')
+
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {
     if (state[key] === undefined) delete state[key]
