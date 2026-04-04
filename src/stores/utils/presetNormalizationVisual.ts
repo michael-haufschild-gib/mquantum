@@ -264,7 +264,6 @@ export function normalizeAppearanceLoadData(
   // Simple scalar/string/boolean fields
   validateStringField(appearance, 'edgeColor')
   validateStringField(appearance, 'faceColor')
-  validateStringField(appearance, 'backgroundColor')
   validateBooleanField(appearance, 'perDimensionColorEnabled')
   validateEnumField(appearance, 'colorAlgorithm', COLOR_ALGORITHM_SET as Set<string>)
 

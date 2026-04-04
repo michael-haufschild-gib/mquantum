@@ -12,7 +12,7 @@ import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
 /** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
-const UNIFORM_SIZE = 740
+const UNIFORM_SIZE = 748
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */

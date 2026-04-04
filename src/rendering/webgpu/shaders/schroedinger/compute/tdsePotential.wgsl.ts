@@ -169,6 +169,53 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     V = harmonic + params.anharmonicLambda * coupling;
   }
 
+  // Soft transverse confinement for directional (1D/2D) potentials.
+  // Prevents unphysical FFT periodic wrapping in unconfined dimensions.
+  // Uses a shifted quartic wall that activates only in the outer 25% of each
+  // transverse axis: V_perp = A * ((|x/L| - onset) / (1 - onset))^4.
+  // The inner 75% is completely free; the wall rises to A at the edge.
+  // Applied only to potentials that don't already confine all dimensions:
+  // types 0-3, 5-8 (directional); skipped for 4, 9, 10, 13 (radial/all-dim).
+  let isDirectional = params.potentialType <= 3u
+    || params.potentialType == 5u
+    || params.potentialType == 6u
+    || params.potentialType == 7u
+    || params.potentialType == 8u;
+  if (isDirectional && params.latticeDim >= 2u) {
+    // Wall strength from the active potential type's own energy scale.
+    var wallStrength: f32;
+    if (params.potentialType == 2u) {
+      wallStrength = params.stepHeight;
+    } else if (params.potentialType == 3u) {
+      wallStrength = params.wellDepth;
+    } else if (params.potentialType == 7u) {
+      wallStrength = params.latticeDepth;
+    } else if (params.potentialType == 8u) {
+      let a2 = params.doubleWellSeparation * params.doubleWellSeparation;
+      wallStrength = params.doubleWellLambda * a2 * a2;
+    } else {
+      // types 0, 1, 5, 6: barrier-family — use barrierHeight
+      wallStrength = params.barrierHeight;
+    }
+    wallStrength = max(wallStrength, 5.0);
+
+    let onset = 0.75; // quartic activates at 75% of half-extent
+    let invRange = 1.0 / (1.0 - onset); // = 4.0
+
+    for (var dt: u32 = 1u; dt < params.latticeDim; dt++) {
+      // For doubleSlit (type 6), axis 1 has slit structure — don't confine it
+      if (params.potentialType == 6u && dt == 1u) {
+        continue;
+      }
+      let posT = (f32(coords[dt]) - f32(params.gridSize[dt]) * 0.5 + 0.5) * params.spacing[dt];
+      let halfExtentT = f32(params.gridSize[dt]) * params.spacing[dt] * 0.5;
+      let abNormT = abs(posT / halfExtentT); // 0 to 1
+      let shifted = max(abNormT - onset, 0.0) * invRange; // 0 inside onset, 0→1 outside
+      let s2 = shifted * shifted;
+      V += wallStrength * s2 * s2;
+    }
+  }
+
   potential[idx] = V;
 }
 `

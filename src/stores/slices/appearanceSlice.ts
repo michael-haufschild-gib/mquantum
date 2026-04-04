@@ -20,7 +20,13 @@ import {
 import { COLOR_INITIAL_STATE, createColorSlice } from './visual/colorSlice'
 import { createMaterialSlice, MATERIAL_INITIAL_STATE } from './visual/materialSlice'
 import { createRenderSlice, RENDER_INITIAL_STATE } from './visual/renderSlice'
-import { AppearanceSlice as AppearanceSliceType } from './visual/types'
+import {
+  type AdvancedRenderingState,
+  AppearanceSlice as AppearanceSliceType,
+  type ColorSliceState,
+  type MaterialSliceState,
+  type RenderSliceState,
+} from './visual/types'
 
 /** Re-export of the composed appearance slice type. */
 export type AppearanceSlice = AppearanceSliceType
@@ -30,12 +36,18 @@ export * from './visual/types'
 // Initial State
 // ============================================================================
 
-export const APPEARANCE_INITIAL_STATE: AppearanceSliceType = {
+/** State-only initial values (no actions). Safe for use with Zustand's shallow-merge `set()`. */
+export type AppearanceInitialState = ColorSliceState &
+  MaterialSliceState &
+  RenderSliceState &
+  AdvancedRenderingState
+
+export const APPEARANCE_INITIAL_STATE: AppearanceInitialState = {
   ...COLOR_INITIAL_STATE,
   ...MATERIAL_INITIAL_STATE,
   ...RENDER_INITIAL_STATE,
   ...ADVANCED_RENDERING_INITIAL_STATE,
-} as AppearanceSliceType
+}
 
 // ============================================================================
 // Slice Creator

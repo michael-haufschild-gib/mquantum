@@ -26,7 +26,7 @@ import { useUrlState } from '@/hooks/useUrlState'
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { logger } from '@/lib/logger'
 import { WebGPUCanvas, WebGPUScene } from '@/rendering/webgpu'
-import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -105,8 +105,8 @@ function AppContent() {
   const objectType = useGeometryStore((state) => state.objectType)
   const dimension = useGeometryStore((state) => state.dimension)
 
-  // Get background color from visual store
-  const backgroundColor = useAppearanceStore((state) => state.backgroundColor)
+  // Get background color from environment store (single source of truth)
+  const backgroundColor = useEnvironmentStore((state) => state.backgroundColor)
 
   // Get performance monitor state
   const showPerfMonitor = useUIStore((state) => state.showPerfMonitor)

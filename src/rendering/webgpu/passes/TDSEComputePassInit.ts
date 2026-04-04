@@ -22,6 +22,8 @@ import { estimateInitialDensity } from './TDSEComputePassDispatchers'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { injectLoadedWavefunction, type SaveLoadState } from './TDSEStateSaveLoad'
+import type { StochasticLocState } from './TDSEStochasticLocalization'
+import { resetStochasticLocState } from './TDSEStochasticLocalization'
 
 /** State references needed by the init logic. */
 export interface InitContext {
@@ -38,6 +40,7 @@ export interface InitContext {
   diagState: DiagReadbackState
   slState: SaveLoadState
   disorderState: DisorderState
+  stochasticState: StochasticLocState | null
   dispatchCompute: (
     pass: GPUComputePassEncoder,
     pipeline: GPUComputePipeline,
@@ -131,6 +134,7 @@ export function maybeInitialize(
   ic.diagState.stagnationCount = 0
   ic.simTime = 0
   ic.stepAccumulator = 0
+  if (ic.stochasticState) resetStochasticLocState(ic.stochasticState)
   ic.diagState.pendingAutoReset = false
   ic.diagState.diagGeneration++
   ic.initialized = true

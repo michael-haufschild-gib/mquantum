@@ -93,6 +93,17 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
       if (urlState.openQuantumThermalUpRate !== undefined)
         ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
     }
+
+    // Stochastic decoherence
+    if (urlState.stochasticEnabled !== undefined) {
+      ext.setTdseStochasticEnabled(urlState.stochasticEnabled)
+      if (urlState.stochasticGamma !== undefined)
+        ext.setTdseStochasticGamma(urlState.stochasticGamma)
+      if (urlState.stochasticSigma !== undefined)
+        ext.setTdseStochasticSigma(urlState.stochasticSigma)
+      if (urlState.stochasticNumSites !== undefined)
+        ext.setTdseStochasticNumSites(urlState.stochasticNumSites)
+    }
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   }

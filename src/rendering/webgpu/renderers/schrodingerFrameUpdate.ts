@@ -313,6 +313,8 @@ function buildPackParams(
     rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
     rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
     rendererTermCount: config.termCount,
+    branchColorA: inputs.schroedinger?.tdse?.branchColorA as [number, number, number] | undefined,
+    branchColorB: inputs.schroedinger?.tdse?.branchColorB as [number, number, number] | undefined,
   }
 }
 

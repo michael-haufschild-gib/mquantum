@@ -456,6 +456,16 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         // Kaluza-Klein compactification (pass through from BEC config)
         compactDims: bec.compactDims ?? (new Array(latDim).fill(false) as boolean[]),
         compactRadii: bec.compactRadii ?? (new Array(latDim).fill(1.0) as number[]),
+        // Stochastic decoherence: disabled for BEC mode
+        stochasticEnabled: false,
+        stochasticGamma: 0,
+        stochasticSigma: 2.0,
+        stochasticNumSites: 4,
+        stochasticSeed: 42,
+        branchingEnabled: false,
+        branchPlanePosition: 0.0,
+        branchColorA: [0, 1, 1] as [number, number, number],
+        branchColorB: [1, 0, 1] as [number, number, number],
       },
     }
   }

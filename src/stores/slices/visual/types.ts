@@ -23,7 +23,6 @@ export interface ColorSliceState {
   // Basic
   edgeColor: string
   faceColor: string
-  backgroundColor: string
   perDimensionColorEnabled: boolean
 
   // Advanced
@@ -42,7 +41,6 @@ export interface ColorSliceState {
 export interface ColorSliceActions {
   setEdgeColor: (color: string) => void
   setFaceColor: (color: string) => void
-  setBackgroundColor: (color: string) => void
   setPerDimensionColorEnabled: (enabled: boolean) => void
 
   setColorAlgorithm: (algorithm: ColorAlgorithm) => void

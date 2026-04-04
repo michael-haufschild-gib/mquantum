@@ -343,6 +343,17 @@ export interface SchroedingerSliceActions {
   resetTdseField: () => void
   clearTdseNeedsReset: () => void
 
+  // Stochastic Decoherence
+  setTdseStochasticEnabled: (enabled: boolean) => void
+  setTdseStochasticGamma: (gamma: number) => void
+  setTdseStochasticSigma: (sigma: number) => void
+  setTdseStochasticNumSites: (numSites: number) => void
+  setTdseStochasticSeed: (seed: number) => void
+  setTdseBranchingEnabled: (enabled: boolean) => void
+  setTdseBranchPlanePosition: (position: number) => void
+  setTdseBranchColorA: (color: [number, number, number]) => void
+  setTdseBranchColorB: (color: [number, number, number]) => void
+
   // BEC (Gross-Pitaevskii Equation) Configuration
   setBecInteractionStrength: (g: number) => void
   setBecTrapOmega: (omega: number) => void

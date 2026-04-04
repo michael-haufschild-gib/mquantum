@@ -19,6 +19,8 @@ import {
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
 import { createTdsePotentialSetters } from './tdsePotentialSetters'
+import { createTdseStochasticSetters } from './tdseStochasticSetters'
+import { createTdseUiSetters } from './tdseUiSetters'
 
 type TdseActions = Pick<
   SchroedingerSliceActions,
@@ -83,6 +85,15 @@ type TdseActions = Pick<
   | 'applyTdsePreset'
   | 'resetTdseField'
   | 'clearTdseNeedsReset'
+  | 'setTdseStochasticEnabled'
+  | 'setTdseStochasticGamma'
+  | 'setTdseStochasticSigma'
+  | 'setTdseStochasticNumSites'
+  | 'setTdseStochasticSeed'
+  | 'setTdseBranchingEnabled'
+  | 'setTdseBranchPlanePosition'
+  | 'setTdseBranchColorA'
+  | 'setTdseBranchColorB'
 >
 
 /**
@@ -130,7 +141,16 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
     i < (prev.compactRadii?.length ?? 0) ? (prev.compactRadii[i] ?? 0.15) : 0.15
   )
 
-  const kk = clampKKState(prev.dt, gridSize, spacing, compactDims, rawRadii, newDim, prev.mass, clampDtWithCfl)
+  const kk = clampKKState(
+    prev.dt,
+    gridSize,
+    spacing,
+    compactDims,
+    rawRadii,
+    newDim,
+    prev.mass,
+    clampDtWithCfl
+  )
   return {
     latticeDim: newDim,
     gridSize,
@@ -204,7 +224,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         }
         const clamped = reduceToFit(snapped)
         const td = state.schroedinger.tdse
-        const kk = clampKKState(td.dt, clamped, td.spacing, td.compactDims, td.compactRadii, latticeDim, td.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          td.dt,
+          clamped,
+          td.spacing,
+          td.compactDims,
+          td.compactRadii,
+          latticeDim,
+          td.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -223,7 +252,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         const clamped = Array.from({ length: td.latticeDim }, (_, i) =>
           Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
         )
-        const kk = clampKKState(td.dt, td.gridSize, clamped, td.compactDims, td.compactRadii, td.latticeDim, td.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          td.dt,
+          td.gridSize,
+          clamped,
+          td.compactDims,
+          td.compactRadii,
+          td.latticeDim,
+          td.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -240,7 +278,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       const clamped = Math.max(0.01, Math.min(100.0, mass))
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
-        const kk = clampKKState(td.dt, td.gridSize, td.spacing, td.compactDims, td.compactRadii, td.latticeDim, clamped, clampDtWithCfl)
+        const kk = clampKKState(
+          td.dt,
+          td.gridSize,
+          td.spacing,
+          td.compactDims,
+          td.compactRadii,
+          td.latticeDim,
+          clamped,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -378,133 +425,8 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       | 'setTdseDriveAmplitude'
       | 'setTdseDisorderStrength'
     >),
-    setTdseDisorderSeed: (seed) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, disorderSeed: Math.floor(Math.max(0, seed)) },
-        },
-      }))
-    },
-    setTdseDisorderDistribution: (distribution) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, disorderDistribution: distribution },
-        },
-      }))
-    },
-    setTdseAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setTdseAbsorberWidth: (width) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.absorberWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberWidth: clamped },
-        },
-      }))
-    },
-    setTdsePmlTargetReflection: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('tdse.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, pmlTargetReflection: clamped },
-        },
-      }))
-    },
-    setTdseFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, fieldView: view },
-        },
-      }))
-    },
-    setTdseAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoScale },
-        },
-      }))
-    },
-    setTdseShowPotential: (showPotential) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, showPotential },
-        },
-      }))
-    },
-    setTdseAutoLoop: (autoLoop) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoLoop },
-        },
-      }))
-    },
-    setTdseDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDiagnosticsInterval: (interval) => {
-      if (!isFinite(interval)) {
-        warnNonFinite('tdse.diagnosticsInterval', interval)
-        return
-      }
-      const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setTdseObservablesEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, observablesEnabled: enabled },
-        },
-      }))
-    },
-    setTdseImaginaryTimeEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, imaginaryTimeEnabled: enabled },
-        },
-      }))
-    },
-    setTdseCustomPotentialExpression: (expression) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, customPotentialExpression: expression },
-        },
-      }))
-    },
+    // UI, diagnostic, absorber, and disorder setters (extracted to tdseUiSetters.ts)
+    ...createTdseUiSetters(ctx),
     setTdseSlicePosition: (dimIndex, value) => {
       if (!isFinite(value)) {
         warnNonFinite('tdse.slicePositions', value)
@@ -534,7 +456,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           while (compactDims.length < td.latticeDim) compactDims.push(false)
           compactDims[dimIndex] = compact
         }
-        const kk = clampKKState(td.dt, td.gridSize, td.spacing, compactDims, td.compactRadii, td.latticeDim, td.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          td.dt,
+          td.gridSize,
+          td.spacing,
+          compactDims,
+          td.compactRadii,
+          td.latticeDim,
+          td.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -555,7 +486,16 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           while (rawRadii.length < td.latticeDim) rawRadii.push(0.15)
           rawRadii[dimIndex] = radius
         }
-        const kk = clampKKState(td.dt, td.gridSize, td.spacing, td.compactDims, rawRadii, td.latticeDim, td.mass, clampDtWithCfl)
+        const kk = clampKKState(
+          td.dt,
+          td.gridSize,
+          td.spacing,
+          td.compactDims,
+          rawRadii,
+          td.latticeDim,
+          td.mass,
+          clampDtWithCfl
+        )
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -607,5 +547,6 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         },
       }))
     },
+    ...createTdseStochasticSetters(ctx),
   }
 }

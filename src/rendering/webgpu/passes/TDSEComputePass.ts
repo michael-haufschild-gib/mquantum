@@ -68,7 +68,7 @@ import {
 } from './TDSEObservablesDispatch'
 
 /** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
-const UNIFORM_SIZE = 740
+const UNIFORM_SIZE = 748
 
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
@@ -100,6 +100,13 @@ import {
   requestStateSave as slRequestSave,
   type SaveLoadState,
 } from './TDSEStateSaveLoad'
+import {
+  buildStochasticLocPipeline,
+  createStochasticLocState,
+  disposeStochasticLoc,
+  rebuildStochasticLocBindGroup,
+  type StochasticLocState,
+} from './TDSEStochasticLocalization'
 import {
   createVortexDetectState,
   disposeVortexDetect,
@@ -212,6 +219,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private customPotentialScale = 1.0
 
   private readonly _disorderState: DisorderState = createDisorderState()
+  private readonly _stochasticState: StochasticLocState = createStochasticLocState()
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -380,6 +388,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.createShaderModule.bind(this),
       this.createComputePipeline.bind(this)
     )
+    buildStochasticLocPipeline(
+      device,
+      this._stochasticState,
+      this.createShaderModule.bind(this),
+      this.createComputePipeline.bind(this)
+    )
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
@@ -399,6 +413,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       } as TdseBindGroupInputs,
       this.bg?.renormalizeUniformBuffer ?? null
     )
+    // Rebuild stochastic localization bind group
+    if (this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
+      rebuildStochasticLocBindGroup(
+        device,
+        this._stochasticState,
+        this.uniformBuffer,
+        this.psiReBuffer,
+        this.psiImBuffer
+      )
+    }
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
@@ -417,6 +441,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       diagState: this._diagState,
       slState: this._slState,
       disorderState: this._disorderState,
+      stochasticState: this._stochasticState,
       dispatchCompute: this.dc,
     }
     extMaybeInitialize(ctx, config, ic)
@@ -563,6 +588,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         diagNumWorkgroups: this.diagNumWorkgroups,
         fwdStageCount: this.fwdAxisCount,
         gsState: this._gsState,
+        stochasticState: this._stochasticState,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
       })
@@ -593,6 +619,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   dispose(): void {
     disposeVortexDetect(this._vdState)
     disposeDisorder(this._disorderState)
+    disposeStochasticLoc(this._stochasticState)
     const gpu: TdseGpuFields = {
       psiReBuffer: this.psiReBuffer,
       psiImBuffer: this.psiImBuffer,

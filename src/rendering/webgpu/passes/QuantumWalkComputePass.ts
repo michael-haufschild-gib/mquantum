@@ -59,10 +59,9 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   private absorberPipeline: GPUComputePipeline | null = null
 
   // Bind groups
-  private coinBG_AtoB: GPUBindGroup | null = null
-  private coinBG_BtoA: GPUBindGroup | null = null
-  private shiftBG_AtoB: GPUBindGroup | null = null
-  private shiftBG_BtoA: GPUBindGroup | null = null
+  // Coin+shift always follows A→B→A pattern per step (no ping-pong swap needed)
+  private coinBG: GPUBindGroup | null = null // coin reads A, writes B
+  private shiftBG: GPUBindGroup | null = null // shift reads B, writes A
   private writeGridBG: GPUBindGroup | null = null
   private absorberBG: GPUBindGroup | null = null
 
@@ -93,7 +92,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   private pipelinesCreated = false
   private totalSites = 0
   private latticeDim = 0
-  private pingPong = 0 // 0 = A is current, 1 = B is current
   private lastConfigHash = ''
   private stepCount = 0
   private stepAccumulator = 0
@@ -249,7 +247,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     this.rebuildAbsorberBindGroup(device)
     this.initializeDensityTexture(device)
     this.rebuildWriteGridBindGroup(device)
-    this.pingPong = 0
     this.stepCount = 0
     this.stepAccumulator = 0
     this.lastGridSize0 = config.gridSize[0] ?? 64
@@ -265,7 +262,9 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const coinBGL = this.coinPipeline!.getBindGroupLayout(0)
     const shiftBGL = this.shiftPipeline!.getBindGroupLayout(0)
 
-    this.coinBG_AtoB = device.createBindGroup({
+    // Each step: coin reads A → writes B, then shift reads B → writes A.
+    // Result always returns to A — no ping-pong needed.
+    this.coinBG = device.createBindGroup({
       layout: coinBGL,
       entries: [
         { binding: 0, resource: { buffer: this.coinUniformBuffer } },
@@ -273,23 +272,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         { binding: 2, resource: { buffer: this.coinStateB } },
       ],
     })
-    this.coinBG_BtoA = device.createBindGroup({
-      layout: coinBGL,
-      entries: [
-        { binding: 0, resource: { buffer: this.coinUniformBuffer } },
-        { binding: 1, resource: { buffer: this.coinStateB } },
-        { binding: 2, resource: { buffer: this.coinStateA } },
-      ],
-    })
-    this.shiftBG_AtoB = device.createBindGroup({
-      layout: shiftBGL,
-      entries: [
-        { binding: 0, resource: { buffer: this.shiftUniformBuffer } },
-        { binding: 1, resource: { buffer: this.coinStateA } },
-        { binding: 2, resource: { buffer: this.coinStateB } },
-      ],
-    })
-    this.shiftBG_BtoA = device.createBindGroup({
+    this.shiftBG = device.createBindGroup({
       layout: shiftBGL,
       entries: [
         { binding: 0, resource: { buffer: this.shiftUniformBuffer } },
@@ -436,19 +419,15 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       for (let step = 0; step < stepsThisFrame; step++) {
-        // Coin: reads current → writes other
-        const coinBG = this.pingPong === 0 ? this.coinBG_AtoB! : this.coinBG_BtoA!
+        // Coin: reads A → writes B
         const coinPass = ctx.beginComputePass({ label: `qw-coin-${step}` })
-        this.dispatchCompute(coinPass, this.coinPipeline, [coinBG], linearWG)
+        this.dispatchCompute(coinPass, this.coinPipeline, [this.coinBG!], linearWG)
         coinPass.end()
 
-        // After coin, the result is in the "other" buffer. Shift reads that → writes back.
-        const shiftBG = this.pingPong === 0 ? this.shiftBG_BtoA! : this.shiftBG_AtoB!
+        // Shift: reads B → writes A (result back in A)
         const shiftPass = ctx.beginComputePass({ label: `qw-shift-${step}` })
-        this.dispatchCompute(shiftPass, this.shiftPipeline, [shiftBG], linearWG)
+        this.dispatchCompute(shiftPass, this.shiftPipeline, [this.shiftBG!], linearWG)
         shiftPass.end()
-
-        // After coin(A→B) + shift(B→A), result is back in A. Ping-pong stays same.
 
         // Absorber: damp amplitudes near boundaries (after shift, per step)
         if (config.absorberEnabled && this.absorberPipeline && this.absorberBG) {

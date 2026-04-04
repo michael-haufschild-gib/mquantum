@@ -8,6 +8,7 @@
 
 import React from 'react'
 
+import { KKCompactificationSection } from '@/components/sections/Advanced/KKCompactificationSection'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
@@ -66,9 +67,19 @@ function renderModeControls(p: {
   if (p.isDiracEquation)
     return <DiracControls config={p.config} dimension={p.dimension} actions={p.diracActions} />
   if (p.isBecDynamics)
-    return <BECControls config={p.config} dimension={p.dimension} actions={p.becActions} />
+    return (
+      <>
+        <BECControls config={p.config} dimension={p.dimension} actions={p.becActions} />
+        <KKCompactificationSection defaultOpen={false} />
+      </>
+    )
   if (p.isTdseDynamics)
-    return <TDSEControls config={p.config} dimension={p.dimension} actions={p.tdseActions} />
+    return (
+      <>
+        <TDSEControls config={p.config} dimension={p.dimension} actions={p.tdseActions} />
+        <KKCompactificationSection defaultOpen={false} />
+      </>
+    )
   if (p.isFreeScalarField)
     return (
       <FreeScalarFieldControls

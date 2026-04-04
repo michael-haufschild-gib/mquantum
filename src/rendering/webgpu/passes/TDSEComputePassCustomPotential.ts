@@ -59,9 +59,11 @@ export function computePotentialHash(config: TdseConfig, simTime: number): strin
         config.disorderSeed,
       ].join('|')
   const custom = config.potentialType === 'custom' ? config.customPotentialExpression : ''
+  // Anderson hash includes hbar because t_eff = ℏ²/(2m·dx²) scales the disorder.
+  // spacing and mass are already in the base hash.
   const anderson =
     config.potentialType === 'andersonDisorder'
-      ? `${config.disorderStrength}|${config.disorderSeed}|${config.disorderDistribution}`
+      ? `${config.disorderStrength}|${config.disorderSeed}|${config.disorderDistribution}|${config.hbar}`
       : ''
   return `${base}|${custom}|${anderson}`
 }
@@ -116,6 +118,12 @@ export function uploadCustomPotentialBuffer(
 /**
  * Generate Anderson disorder potential and upload to GPU buffer.
  *
+ * The user-facing `disorderStrength` (W) is in tight-binding units, i.e.
+ * measured relative to the nearest-neighbor hopping energy t = ℏ²/(2m·dx²).
+ * The Anderson metal–insulator transition in 3D occurs at W_c/t ≈ 16.5.
+ * This function multiplies W by t so the actual lattice potential has the
+ * correct physical scale regardless of grid spacing, mass, or ℏ.
+ *
  * Returns the maximum absolute potential value for display normalization.
  *
  * @param device - GPU device for buffer write
@@ -130,11 +138,19 @@ export function uploadAndersonDisorderBuffer(
 ): number {
   if (!potentialBuffer) return 0
 
+  // Effective hopping energy t = ℏ²/(2m·dx²). Scale disorder by t so that
+  // config.disorderStrength is in tight-binding units (W/t).
+  const dx = config.spacing[0] ?? 0.1
+  const hbar = config.hbar ?? 1
+  const mass = config.mass ?? 1
+  const tEff = (hbar * hbar) / (2 * mass * dx * dx)
+  const effectiveStrength = config.disorderStrength * tEff
+
   const gridSize = config.gridSize.slice(0, config.latticeDim)
   const potential = generateDisorderPotential(
     gridSize,
     config.latticeDim,
-    config.disorderStrength,
+    effectiveStrength,
     config.disorderSeed,
     config.disorderDistribution
   )
@@ -148,7 +164,8 @@ export function uploadAndersonDisorderBuffer(
     if (absV > maxAbsV) maxAbsV = absV
   }
   logger.log(
-    `[TDSE] Anderson disorder: W=${config.disorderStrength}, seed=${config.disorderSeed}, ` +
+    `[TDSE] Anderson disorder: W/t=${config.disorderStrength}, t=${tEff.toFixed(2)}, ` +
+      `W_eff=${effectiveStrength.toFixed(1)}, seed=${config.disorderSeed}, ` +
       `dist=${config.disorderDistribution}, maxV=${maxAbsV.toFixed(3)}`
   )
   return maxAbsV

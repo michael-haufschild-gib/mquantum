@@ -263,6 +263,28 @@ export interface TdseConfig {
   vortexSeparation?: number
   /** Number of vortices to seed (1 = single configurable-plane vortex, 2 = reconnection pair) */
   vortexPairCount?: number
+
+  // === Stochastic Decoherence (CSL localization) ===
+  /** Enable stochastic localization (CSL) applied each Strang step */
+  stochasticEnabled: boolean
+  /** Monitoring/decoherence rate γ — strength of environment coupling (0–10) */
+  stochasticGamma: number
+  /** Localization Gaussian width σ in world units (0.5–5.0 grid spacings) */
+  stochasticSigma: number
+  /** Number of random collapse sites per step (1–32) */
+  stochasticNumSites: number
+  /** Deterministic PRNG seed for noise reproducibility */
+  stochasticSeed: number
+
+  // === Decoherent Branching Visualization ===
+  /** Enable dual-color branch visualization in the density texture alpha channel */
+  branchingEnabled: boolean
+  /** Normalized branch plane position along axis 0 (-1.0 to 1.0, 0 = center) */
+  branchPlanePosition: number
+  /** Branch A color as [r, g, b] in 0–1 range */
+  branchColorA: [number, number, number]
+  /** Branch B color as [r, g, b] in 0–1 range */
+  branchColorB: [number, number, number]
 }
 
 /**
@@ -340,6 +362,17 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   compactDims: [false, false, false],
   compactRadii: [0.15, 0.15, 0.15],
+
+  stochasticEnabled: false,
+  stochasticGamma: 0.5,
+  stochasticSigma: 2.0,
+  stochasticNumSites: 4,
+  stochasticSeed: 42,
+
+  branchingEnabled: false,
+  branchPlanePosition: 0.0,
+  branchColorA: [0.0, 1.0, 1.0],
+  branchColorB: [1.0, 0.0, 1.0],
 
   needsReset: false,
   slicePositions: [],

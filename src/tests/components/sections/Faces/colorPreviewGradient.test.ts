@@ -60,7 +60,7 @@ function defaultParams(overrides: Partial<GradientParams> = {}): GradientParams 
     lchChroma: 0.12,
     faceColor: '#4488cc',
     domainColoring: {
-      modulusMode: 'linear',
+      modulusMode: 'logPsiAbsSquared',
       contoursEnabled: false,
       contourDensity: 5,
       contourWidth: 0.1,

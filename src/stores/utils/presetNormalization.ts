@@ -351,7 +351,10 @@ export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<st
     'metallic' in faceSource ||
     'reflectance' in faceSource ||
     'specularIntensity' in faceSource ||
-    'specularColor' in faceSource
+    'specularColor' in faceSource ||
+    'ior' in faceSource ||
+    'transmission' in faceSource ||
+    'thickness' in faceSource
 
   if (hasAnyFaceField) {
     pbr.face = {
@@ -376,6 +379,18 @@ export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<st
         typeof faceSource.specularColor === 'string'
           ? faceSource.specularColor
           : fallbackFace.specularColor,
+      ior:
+        typeof faceSource.ior === 'number' && Number.isFinite(faceSource.ior)
+          ? clampToRange(faceSource.ior, 1.0, 3.0)
+          : fallbackFace.ior,
+      transmission:
+        typeof faceSource.transmission === 'number' && Number.isFinite(faceSource.transmission)
+          ? clampToRange(faceSource.transmission, 0.0, 1.0)
+          : fallbackFace.transmission,
+      thickness:
+        typeof faceSource.thickness === 'number' && Number.isFinite(faceSource.thickness)
+          ? clampToRange(faceSource.thickness, 0.0, 10.0)
+          : fallbackFace.thickness,
     }
   } else {
     delete pbr.face
@@ -387,6 +402,9 @@ export function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<st
   delete pbr.reflectance
   delete pbr.specularIntensity
   delete pbr.specularColor
+  delete pbr.ior
+  delete pbr.transmission
+  delete pbr.thickness
 
   const normalized: Record<string, unknown> = {}
   if ('face' in pbr) {

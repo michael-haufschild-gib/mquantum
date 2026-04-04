@@ -133,10 +133,12 @@ describe('state-serializer', () => {
     it('should roundtrip all quantum modes', () => {
       const modes = [
         'hydrogenND',
+        'hydrogenNDCoupled',
         'freeScalarField',
         'tdseDynamics',
         'becDynamics',
         'diracEquation',
+        'quantumWalk',
       ] as const
 
       for (const mode of modes) {
@@ -148,6 +150,16 @@ describe('state-serializer', () => {
         const deserialized = deserializeState(serialized)
         expect(deserialized.quantumMode, `roundtrip failed for ${mode}`).toBe(mode)
       }
+    })
+
+    it('should roundtrip pauliSpinor object type', () => {
+      const serialized = serializeState({
+        dimension: 3,
+        objectType: 'pauliSpinor',
+      })
+      const deserialized = deserializeState(serialized)
+      expect(deserialized.objectType).toBe('pauliSpinor')
+      expect(deserialized.dimension).toBe(3)
     })
 
     it('should roundtrip all valid dimensions (3-11)', () => {
@@ -389,6 +401,91 @@ describe('state-serializer', () => {
       expect(d.disorderStrength).toBeCloseTo(8.0, 1)
       expect(d.disorderSeed).toBe(42)
       expect(d.disorderDistribution).toBe('gaussian')
+    })
+  })
+
+  describe('stochastic decoherence params', () => {
+    it('serializes stochastic params when enabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        stochasticEnabled: true,
+        stochasticGamma: 2.0,
+        stochasticSigma: 1.5,
+        stochasticNumSites: 8,
+      }
+      const result = serializeState(state)
+      expect(result).toContain('sloc=1')
+      expect(result).toContain('sloc_g=2.00')
+      expect(result).toContain('sloc_s=1.50')
+      expect(result).toContain('sloc_n=8')
+    })
+
+    it('omits stochastic params when disabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        stochasticEnabled: false,
+        stochasticGamma: 2.0,
+      }
+      const result = serializeState(state)
+      expect(result).not.toContain('sloc')
+    })
+
+    it('roundtrips stochastic decoherence state', () => {
+      const original: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        stochasticEnabled: true,
+        stochasticGamma: 3.5,
+        stochasticSigma: 2.0,
+        stochasticNumSites: 12,
+      }
+      const deserialized = deserializeState(serializeState(original))
+      expect(deserialized.stochasticEnabled).toBe(true)
+      expect(deserialized.stochasticGamma).toBeCloseTo(3.5)
+      expect(deserialized.stochasticSigma).toBeCloseTo(2.0)
+      expect(deserialized.stochasticNumSites).toBe(12)
+    })
+
+    it('clamps stochastic params to valid ranges', () => {
+      const d = deserializeState('sloc=1&sloc_g=-1&sloc_s=99&sloc_n=99')
+      expect(d.stochasticGamma).toBe(0)
+      expect(d.stochasticSigma).toBe(5)
+      expect(d.stochasticNumSites).toBe(32)
+    })
+  })
+
+  describe('custom potential expression', () => {
+    it('roundtrips custom potential expression', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        potentialType: 'custom',
+        customPotentialExpression: 'x*x + y*y',
+      }
+      const d = deserializeState(serializeState(state))
+      expect(d.potentialType).toBe('custom')
+      expect(d.customPotentialExpression).toBe('x*x + y*y')
+    })
+
+    it('omits custom expression for non-custom potentials', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        potentialType: 'harmonicTrap',
+        customPotentialExpression: 'x*x',
+      }
+      const s = serializeState(state)
+      expect(s).not.toContain('cpx')
+    })
+
+    it('rejects overly long custom expressions', () => {
+      const longExpr = 'x'.repeat(201)
+      const d = deserializeState(`pot=custom&cpx=${longExpr}`)
+      expect(d.potentialType).toBe('custom')
+      expect(d.customPotentialExpression).toBeUndefined()
     })
   })
 
