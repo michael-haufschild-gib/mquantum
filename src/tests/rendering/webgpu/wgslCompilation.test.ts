@@ -54,7 +54,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
         temporal: true,
 
-
         quantumMode: 'hydrogenND',
       })
 
@@ -79,7 +78,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
         dimension: 4,
 
         temporal: false,
-
 
         quantumMode,
       })
@@ -184,7 +182,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-
       quantumMode: 'harmonicOscillator',
     })
 
@@ -204,7 +201,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-
       quantumMode: 'hydrogenND',
     })
 
@@ -223,7 +219,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       dimension: 5,
 
       temporal: false,
-
 
       nodal: false,
       uncertaintyBoundary: false,
@@ -263,7 +258,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-
       quantumMode: 'harmonicOscillator',
     })
 
@@ -283,7 +277,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       dimension: 4,
 
       temporal: false,
-
 
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 5,
@@ -307,7 +300,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-
       quantumMode: 'harmonicOscillator',
     })
 
@@ -322,7 +314,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       temporal: false,
 
-
       quantumMode: 'harmonicOscillator',
     })
 
@@ -335,7 +326,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       dimension: 4,
 
       temporal: false,
-
 
       quantumMode: 'harmonicOscillator',
     })
@@ -350,7 +340,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       dimension: 4,
 
       temporalAccumulation: true,
-
 
       quantumMode: 'harmonicOscillator',
     })
@@ -446,6 +435,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       interference: false,
       uncertaintyBoundary: false,
       probabilityCurrentEnabled: false,
+      crossSectionEnabled: false,
       colorAlgorithm: 11, // radialDistance — non-phase, enables gridOnly
     })
 
