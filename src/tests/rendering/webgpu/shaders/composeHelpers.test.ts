@@ -1,7 +1,7 @@
 /**
  * Tests for WGSL shader composition utility functions.
  *
- * Validates generateTextureBindings, assembleShaderBlocks, and generateConsolidatedBindGroups.
+ * Validates generateTextureBindings and assembleShaderBlocks.
  * These utilities feed into every shader composition path — a bug here affects all shaders.
  *
  * @module tests/rendering/webgpu/shaders/composeHelpers

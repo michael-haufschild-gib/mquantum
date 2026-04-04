@@ -201,8 +201,8 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
           />
         </ControlGroup>
 
-        {/* Volume Effects */}
-        {showVolumetric && (
+        {/* Volume Effects (Schrödinger volumetric only — Pauli has no powderScale/scatteringAnisotropy) */}
+        {showVolumetric && !isPauli && (
           <ControlGroup
             title="Volume Effects"
             collapsible
