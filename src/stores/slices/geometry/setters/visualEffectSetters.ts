@@ -188,7 +188,17 @@ export function createVisualEffectSetters(
     setSchroedingerCrossSectionEnabled: valueSetter('crossSectionEnabled'),
     setSchroedingerCrossSectionCompositeMode: valueSetter('crossSectionCompositeMode'),
     setSchroedingerCrossSectionScalar: valueSetter('crossSectionScalar'),
-    setSchroedingerCrossSectionPlaneMode: valueSetter('crossSectionPlaneMode'),
+    setSchroedingerCrossSectionPlaneMode: (mode: 'axisAligned' | 'free') => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          crossSectionPlaneMode: mode,
+          ...(mode === 'axisAligned'
+            ? { crossSectionPlaneNormal: axisToNormal(state.schroedinger.crossSectionAxis ?? 'z') }
+            : {}),
+        },
+      }))
+    },
     setSchroedingerCrossSectionAxis: (axis: 'x' | 'y' | 'z') => {
       setWithVersion((state) => ({
         schroedinger: {

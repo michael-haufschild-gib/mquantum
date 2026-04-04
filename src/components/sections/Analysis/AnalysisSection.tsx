@@ -60,6 +60,7 @@ export interface AnalysisSectionProps {
 const MODE_LABELS: Record<string, string> = {
   harmonicOscillator: 'Cross Section',
   hydrogenND: 'Cross Section',
+  hydrogenNDCoupled: 'Cross Section',
   freeScalarField: 'FSF',
   tdseDynamics: 'TDSE',
   becDynamics: 'BEC',

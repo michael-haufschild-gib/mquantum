@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('CrossSectionAnalysisContent controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
+    useGeometryStore.getState().reset()
   })
 
   it('reveals cross-section controls only when enabled', () => {
@@ -77,5 +79,21 @@ describe('CrossSectionAnalysisContent controls', () => {
         'Slice scalar colors use the active Faces color algorithm and palette settings.'
       )
     ).toBeInTheDocument()
+  })
+
+  it.each([
+    ['hydrogenND', 'hydrogen-energy-diagram'],
+    ['hydrogenNDCoupled', 'hydrogen-energy-diagram'],
+    ['hydrogenND', 'control-group-radial-probability'],
+    ['hydrogenNDCoupled', 'control-group-radial-probability'],
+  ] as const)('renders %s mode with %s element', (quantumMode, testId) => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode,
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId(testId)).toBeInTheDocument()
   })
 })
