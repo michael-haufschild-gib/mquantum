@@ -37,6 +37,9 @@ export function spatialBranchPartition(
   latticeDim: number,
   planePosition: number = 0
 ): BranchPartition {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1) {
+    throw new Error(`latticeDim must be a positive integer (got ${latticeDim})`)
+  }
   if (gridSize.length < latticeDim || spacing.length < latticeDim) {
     throw new Error(
       `gridSize/spacing must have at least ${latticeDim} entries (got ${gridSize.length}/${spacing.length})`
