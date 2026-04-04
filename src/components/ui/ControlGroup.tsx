@@ -27,24 +27,10 @@ const COLLAPSIBLE_HEADER_CLASS =
   'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset'
 const CARD_HEADER_CLASS = 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]'
 
-function getTitleTextClass(collapsible: boolean): string {
-  const base = 'text-xs font-semibold uppercase tracking-wider'
-  return collapsible
-    ? `${base} text-text-secondary group-hover:text-text-primary`
-    : `${base} text-text-secondary`
-}
+const TITLE_TEXT_CLASS = 'text-xs font-semibold uppercase tracking-wider text-text-secondary'
 
-function TitleLabel({
-  title,
-  tooltip,
-  collapsible,
-}: {
-  title: string
-  tooltip?: string
-  collapsible: boolean
-}) {
-  const textClass = getTitleTextClass(collapsible)
-  const label = <span className={textClass}>{title}</span>
+function TitleLabel({ title, tooltip }: { title: string; tooltip?: string }) {
+  const label = <span className={TITLE_TEXT_CLASS}>{title}</span>
   if (!tooltip) return label
   return (
     <Tooltip content={tooltip} position="top">
@@ -143,7 +129,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
                   <ChevronIcon />
                 </m.div>
               )}
-              <TitleLabel title={title} tooltip={tooltip} collapsible={collapsible} />
+              <TitleLabel title={title} tooltip={tooltip} />
             </div>
 
             {rightElement && <div onClick={handleRightElementClick}>{rightElement}</div>}

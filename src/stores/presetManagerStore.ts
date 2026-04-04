@@ -156,7 +156,6 @@ function restoreStyleStores(data: SavedScene['data']): void {
 
 /**
  * Restore geometry and extended object state.
- * @returns The resolved object type for downstream consumers.
  */
 function restoreGeometryAndExtended(data: SavedScene['data']): void {
   const geometryData = sanitizeLoadedState(data.geometry) as {

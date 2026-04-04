@@ -6,14 +6,14 @@
 /**
  * Detect if the current platform is macOS/iOS.
  *
- * Prefers navigator.userAgentData.platform (Chromium 90+) over the deprecated
- * navigator.platform. Since the app requires WebGPU (Chrome 113+),
- * userAgentData is always available in supported browsers.
+ * Prefers navigator.userAgentData.platform when available, and falls back to
+ * the deprecated navigator.platform for browsers that do not expose
+ * userAgentData.
  */
 export const isMac =
   typeof navigator !== 'undefined' &&
   ('userAgentData' in navigator
-    ? /macOS/i.test(
+    ? /macOS|iOS|iPadOS/i.test(
         (navigator as Navigator & { userAgentData: { platform: string } }).userAgentData.platform
       )
     : /Mac|iPod|iPhone|iPad/.test(navigator.platform))

@@ -38,6 +38,8 @@ export async function teardownRecorder(recorder: ExportRecorder | null): Promise
   try {
     await recorder.cancel()
   } catch {
+    // Best-effort cancellation; always dispose below to release resources.
+  } finally {
     recorder.dispose()
   }
   return null

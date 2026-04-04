@@ -92,7 +92,7 @@ const V_PLACEMENT: Record<
 > = {
   top: (_h, p) => ({ y: p, baseline: 'top' }),
   bottom: (h, p) => ({ y: h - p, baseline: 'bottom' }),
-  middle: (h) => ({ y: h / 2, baseline: 'middle' }),
+  center: (h) => ({ y: h / 2, baseline: 'middle' }),
 }
 
 /** Draw a text overlay onto a 2D canvas context. */
@@ -112,7 +112,7 @@ function drawTextOverlay(
   const { x, align } = hPlace(width, overlay.padding)
   ctx.textAlign = align
 
-  const vPlace = V_PLACEMENT[overlay.verticalPlacement] ?? V_PLACEMENT.middle!
+  const vPlace = V_PLACEMENT[overlay.verticalPlacement] ?? V_PLACEMENT['center']!
   const { y, baseline } = vPlace(height, overlay.padding)
   ctx.textBaseline = baseline
 
