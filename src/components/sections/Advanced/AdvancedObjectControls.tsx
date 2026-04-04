@@ -16,11 +16,6 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )
 
-  if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
-    return null
-  }
-
-  const isPauli = objectType === 'pauliSpinor'
   const isoEnabled = useExtendedObjectStore(
     (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
   )
@@ -28,27 +23,14 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     (state: ExtendedObjectState) => state.schroedinger?.representation ?? 'position'
   )
 
-  const extendedSelector = useShallow((state: ExtendedObjectState) => ({
-    config: state.schroedinger,
-    setPowderScale: state.setSchroedingerPowderScale,
-    setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
-  }))
-  const { config, setPowderScale, setScatteringAnisotropy } =
-    useExtendedObjectStore(extendedSelector)
+  const { config, setPowderScale, setScatteringAnisotropy } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.schroedinger,
+      setPowderScale: state.setSchroedingerPowderScale,
+      setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
+    }))
+  )
 
-  // SSS
-  const sssSelector = useShallow((state: AppearanceSlice) => ({
-    sssEnabled: state.sssEnabled,
-    setSssEnabled: state.setSssEnabled,
-    sssIntensity: state.sssIntensity,
-    setSssIntensity: state.setSssIntensity,
-    sssColor: state.sssColor,
-    setSssColor: state.setSssColor,
-    sssThickness: state.sssThickness,
-    setSssThickness: state.setSssThickness,
-    sssJitter: state.sssJitter,
-    setSssJitter: state.setSssJitter,
-  }))
   const {
     sssEnabled,
     setSssEnabled,
@@ -60,17 +42,21 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     setSssThickness,
     sssJitter,
     setSssJitter,
-  } = useAppearanceStore(sssSelector)
+  } = useAppearanceStore(
+    useShallow((state: AppearanceSlice) => ({
+      sssEnabled: state.sssEnabled,
+      setSssEnabled: state.setSssEnabled,
+      sssIntensity: state.sssIntensity,
+      setSssIntensity: state.setSssIntensity,
+      sssColor: state.sssColor,
+      setSssColor: state.setSssColor,
+      sssThickness: state.sssThickness,
+      setSssThickness: state.setSssThickness,
+      sssJitter: state.sssJitter,
+      setSssJitter: state.setSssJitter,
+    }))
+  )
 
-  // Emission
-  const emissionSelector = useShallow((state: AppearanceSlice) => ({
-    faceEmission: state.faceEmission,
-    faceEmissionThreshold: state.faceEmissionThreshold,
-    faceEmissionColorShift: state.faceEmissionColorShift,
-    setFaceEmission: state.setFaceEmission,
-    setFaceEmissionThreshold: state.setFaceEmissionThreshold,
-    setFaceEmissionColorShift: state.setFaceEmissionColorShift,
-  }))
   const {
     faceEmission,
     faceEmissionThreshold,
@@ -78,7 +64,16 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     setFaceEmission,
     setFaceEmissionThreshold,
     setFaceEmissionColorShift,
-  } = useAppearanceStore(emissionSelector)
+  } = useAppearanceStore(
+    useShallow((state: AppearanceSlice) => ({
+      faceEmission: state.faceEmission,
+      faceEmissionThreshold: state.faceEmissionThreshold,
+      faceEmissionColorShift: state.faceEmissionColorShift,
+      setFaceEmission: state.setFaceEmission,
+      setFaceEmissionThreshold: state.setFaceEmissionThreshold,
+      setFaceEmissionColorShift: state.setFaceEmissionColorShift,
+    }))
+  )
 
   const handleSssColorChange = useCallback(
     (c: string) => {
@@ -87,8 +82,12 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     [setSssColor]
   )
 
-  const showVolumetric =
-    isPauli || (!isoEnabled && dimension > 2 && representation !== 'wigner')
+  if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
+    return null
+  }
+
+  const isPauli = objectType === 'pauliSpinor'
+  const showVolumetric = isPauli || (!isoEnabled && dimension > 2 && representation !== 'wigner')
 
   return (
     <Section title="Advanced Rendering" defaultOpen={true} data-testid="advanced-object-controls">
