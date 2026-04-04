@@ -76,7 +76,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
         <Switch
           checked={frameBlendingEnabled}
           onCheckedChange={setFrameBlendingEnabled}
-          label="Enable Frame Blending"
+          label="Enable"
           tooltip="Blends consecutive frames for smoother animation with temporal accumulation. Reduces noise in volumetric rendering."
           data-testid="frame-blending-switch"
         />

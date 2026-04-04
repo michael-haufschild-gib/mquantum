@@ -8,7 +8,7 @@
  *
  * Used inside the unified AnalysisSection.
  *
- * @module components/sections/Advanced/PauliAnalysisSection
+ * @module components/sections/Analysis/PauliAnalysisSection
  */
 
 import React from 'react'

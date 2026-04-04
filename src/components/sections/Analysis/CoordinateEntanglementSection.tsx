@@ -6,7 +6,7 @@
  * When available, displays entropy time series, per-dimension bars, spectrum,
  * MI heatmap, and atlas sweep controls.
  *
- * @module components/sections/Advanced/CoordinateEntanglementSection
+ * @module components/sections/Analysis/CoordinateEntanglementSection
  */
 
 import React, { useCallback } from 'react'

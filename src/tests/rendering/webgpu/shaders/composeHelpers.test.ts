@@ -1,7 +1,7 @@
 /**
  * Tests for WGSL shader composition utility functions.
  *
- * Validates processFeatureFlags, generateStandardBindGroups, generateTextureBindings.
+ * Validates generateTextureBindings, assembleShaderBlocks, and generateConsolidatedBindGroups.
  * These utilities feed into every shader composition path — a bug here affects all shaders.
  *
  * @module tests/rendering/webgpu/shaders/composeHelpers
@@ -9,50 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  generateStandardBindGroups,
-  generateTextureBindings,
-  processFeatureFlags,
-} from '@/rendering/webgpu/shaders/shared/compose-helpers'
-
-describe('processFeatureFlags', () => {
-  it('generates DIMENSION define from config', () => {
-    const result = processFeatureFlags({ dimension: 7 })
-    expect(result.defines).toContain('const DIMENSION: i32 = 7;')
-  })
-
-  it('defaults temporal and sss to false', () => {
-    const result = processFeatureFlags({ dimension: 3 })
-    expect(result.defines).toContain('const TEMPORAL_ENABLED: bool = false;')
-    expect(result.defines).toContain('const SSS_ENABLED: bool = false;')
-    expect(result.features.temporal).toBe(false)
-    expect(result.features.sss).toBe(false)
-  })
-
-  it('enables temporal when config.temporal = true', () => {
-    const result = processFeatureFlags({ dimension: 3, temporal: true })
-    expect(result.defines).toContain('const TEMPORAL_ENABLED: bool = true;')
-    expect(result.features.temporal).toBe(true)
-  })
-
-  it('enables sss when config.sss = true', () => {
-    const result = processFeatureFlags({ dimension: 3, sss: true })
-    expect(result.defines).toContain('const SSS_ENABLED: bool = true;')
-    expect(result.features.sss).toBe(true)
-  })
-})
-
-describe('generateStandardBindGroups', () => {
-  it('generates WGSL with 4 bind groups (0-3)', () => {
-    const wgsl = generateStandardBindGroups()
-    expect(wgsl).toContain('@group(0) @binding(0)')
-    expect(wgsl).toContain('@group(1) @binding(0)')
-    expect(wgsl).toContain('@group(2) @binding(0)')
-    expect(wgsl).toContain('@group(3) @binding(0)')
-    expect(wgsl).toContain('CameraUniforms')
-    expect(wgsl).toContain('LightingUniforms')
-  })
-})
+import { generateTextureBindings } from '@/rendering/webgpu/shaders/shared/compose-helpers'
 
 describe('generateTextureBindings', () => {
   it('generates paired texture + sampler bindings', () => {

@@ -1,16 +1,16 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { SchroedingerAdvanced } from '@/components/sections/Advanced/SchroedingerAdvanced'
+import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
-describe('SchroedingerAdvanced probability current controls', () => {
+describe('AdvancedObjectControls probability current controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
   })
 
   it('does not render probability current controls in the right editor panel', () => {
-    render(<SchroedingerAdvanced />)
+    render(<AdvancedObjectControls />)
 
     expect(screen.queryByTestId('schroedinger-probability-current-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-probability-current-style')).not.toBeInTheDocument()

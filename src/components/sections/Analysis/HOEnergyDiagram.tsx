@@ -5,7 +5,7 @@
  * with the probability density |ψ_n(x)|² for the dominant superposition term.
  * Left Y-axis: |ψ|² (blue curve). Right Y-axis: energy levels (accent lines).
  *
- * @module components/sections/Advanced/HOEnergyDiagram
+ * @module components/sections/Analysis/HOEnergyDiagram
  */
 
 import React, { useMemo } from 'react'

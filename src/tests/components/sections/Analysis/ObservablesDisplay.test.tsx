@@ -4,13 +4,13 @@
  * Verifies that the observables panel renders per-dimension statistics,
  * energy readout, and uncertainty sparklines when data is available.
  *
- * @module tests/components/sections/Advanced/ObservablesDisplay
+ * @module tests/components/sections/Analysis/ObservablesDisplay
  */
 
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
+import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysisSection'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 

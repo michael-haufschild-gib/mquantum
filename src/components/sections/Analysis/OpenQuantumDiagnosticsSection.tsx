@@ -6,7 +6,7 @@
  * Includes rolling sparkline charts and collapsible formula reference.
  * Only visible when open quantum system mode is enabled.
  *
- * @module components/sections/Advanced/OpenQuantumDiagnosticsSection
+ * @module components/sections/Analysis/OpenQuantumDiagnosticsSection
  */
 
 import React, { useCallback, useState } from 'react'

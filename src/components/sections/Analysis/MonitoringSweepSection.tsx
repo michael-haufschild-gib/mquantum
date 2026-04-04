@@ -5,7 +5,7 @@
  * Shows current IPR, sweep controls, and IPR(γ) sparkline. Drives the
  * sweep state machine via a polling interval on diagnostics.
  *
- * @module components/sections/Advanced/MonitoringSweepSection
+ * @module components/sections/Analysis/MonitoringSweepSection
  */
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react'

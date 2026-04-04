@@ -4,12 +4,12 @@
  * Shows when quantum mode is tdseDynamics. Controls CSL parameters (γ, σ, N_loc)
  * and dual-color branching visualization.
  *
- * @module components/sections/Geometry/DecoherenceSection
+ * @module components/sections/Analysis/DecoherenceSection
  */
 
 import { useShallow } from 'zustand/react/shallow'
 
-import { MonitoringSweepSection } from '@/components/sections/Advanced/MonitoringSweepSection'
+import { MonitoringSweepSection } from '@/components/sections/Analysis/MonitoringSweepSection'
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
@@ -82,7 +82,7 @@ function DecoherenceContent() {
   return (
     <Section title="Decoherence">
       <Switch
-        label="Enable decoherence"
+        label="Enable"
         checked={tdse.stochasticEnabled}
         onCheckedChange={setStochasticEnabled}
       />

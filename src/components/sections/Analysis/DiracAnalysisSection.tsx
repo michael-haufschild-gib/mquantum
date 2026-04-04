@@ -8,7 +8,7 @@
  *
  * Used inside the unified AnalysisSection.
  *
- * @module components/sections/Advanced/DiracAnalysisSection
+ * @module components/sections/Analysis/DiracAnalysisSection
  */
 
 import React, { useMemo } from 'react'

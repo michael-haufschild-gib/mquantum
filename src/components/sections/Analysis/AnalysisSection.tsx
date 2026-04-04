@@ -8,19 +8,19 @@
  *
  * Returns null when no analysis content is applicable (e.g. dim <= 2 in Wigner mode).
  *
- * @module components/sections/Advanced/AnalysisSection
+ * @module components/sections/Analysis/AnalysisSection
  */
 
 import React, { useCallback, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { BECAnalysisContent } from '@/components/sections/Advanced/BECAnalysisSection'
-import { DiracAnalysisContent } from '@/components/sections/Advanced/DiracAnalysisSection'
-import { FSFAnalysisContent } from '@/components/sections/Advanced/FSFAnalysisSection'
-import { MeasurementControls } from '@/components/sections/Advanced/MeasurementControls'
-import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalysisSection'
-import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
-import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
+import { BECAnalysisContent } from '@/components/sections/Analysis/BECAnalysisSection'
+import { DiracAnalysisContent } from '@/components/sections/Analysis/DiracAnalysisSection'
+import { FSFAnalysisContent } from '@/components/sections/Analysis/FSFAnalysisSection'
+import { MeasurementControls } from '@/components/sections/Analysis/MeasurementControls'
+import { PauliAnalysisContent } from '@/components/sections/Analysis/PauliAnalysisSection'
+import { CrossSectionAnalysisContent } from '@/components/sections/Analysis/SchroedingerCrossSectionSection'
+import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysisSection'
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'

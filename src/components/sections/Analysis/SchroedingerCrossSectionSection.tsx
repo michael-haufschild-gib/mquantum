@@ -1,8 +1,8 @@
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { HOEnergyDiagram } from '@/components/sections/Advanced/HOEnergyDiagram'
-import { HydrogenEnergyDiagram } from '@/components/sections/Advanced/HydrogenEnergyDiagram'
+import { HOEnergyDiagram } from '@/components/sections/Analysis/HOEnergyDiagram'
+import { HydrogenEnergyDiagram } from '@/components/sections/Analysis/HydrogenEnergyDiagram'
 import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
 import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
 import { ColorPicker } from '@/components/ui/ColorPicker'
