@@ -360,7 +360,7 @@ export function canUseGridOnly(config: SchroedingerWGSLShaderConfig, is2D: boole
     nodal = true,
     probabilityCurrentEnabled = true,
     useDensityMatrix = false,
-    crossSectionEnabled = false,
+    crossSectionEnabled = true,
   } = config
 
   const isPhaseColorAlg = PHASE_COLOR_ALGS.includes(

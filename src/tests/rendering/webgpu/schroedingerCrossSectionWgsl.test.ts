@@ -66,6 +66,10 @@ describe('Schroedinger cross-section WGSL composition', () => {
 
     // With cross-section → gridOnly must be false so real evalPsi is compiled
     expect(canUseGridOnly({ ...gridOnlyConfig, crossSectionEnabled: true }, false)).toBe(false)
+
+    // Omitted crossSectionEnabled defaults to true → gridOnly is false (safe default)
+    const { crossSectionEnabled: _, ...omitted } = gridOnlyConfig
+    expect(canUseGridOnly(omitted, false)).toBe(false)
   })
 
   it('includes real quantum math when cross-section is active with density grid', () => {

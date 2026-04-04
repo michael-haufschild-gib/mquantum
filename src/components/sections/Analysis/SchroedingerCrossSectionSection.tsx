@@ -347,7 +347,7 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
         )}
       </ControlGroup>
 
-      {/* Radial Probability (hydrogen ND only) */}
+      {/* Radial Probability (hydrogen ND and coupled hydrogen ND modes) */}
       {(config.quantumMode === 'hydrogenND' || config.quantumMode === 'hydrogenNDCoupled') && (
         <ControlGroup
           title="Radial Probability P(r)"
