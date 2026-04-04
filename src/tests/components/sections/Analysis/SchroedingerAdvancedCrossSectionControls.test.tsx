@@ -113,4 +113,15 @@ describe('CrossSectionAnalysisContent controls', () => {
     render(<CrossSectionAnalysisContent />)
     expect(screen.getByTestId('control-group-radial-probability')).toBeInTheDocument()
   })
+
+  it('renders radial probability controls for hydrogenNDCoupled mode', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'hydrogenNDCoupled',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId('control-group-radial-probability')).toBeInTheDocument()
+  })
 })
