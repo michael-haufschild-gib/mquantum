@@ -1,3 +1,12 @@
+/**
+ * Domain Coloring Controls Component
+ *
+ * Controls for domain coloring visualization: modulus mapping mode
+ * and contour line settings (density, width, strength).
+ *
+ * @module components/sections/Faces/DomainColoringControls
+ */
+
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 

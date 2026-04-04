@@ -8,7 +8,15 @@
  */
 
 import { hexToSrgbTuple } from '@/lib/colors/colorUtils'
-import { applyDistributionTS, getCosinePaletteColorTS } from '@/rendering/shaders/palette'
+import {
+  applyDistributionTS,
+  type CosineCoefficients,
+  type DistributionSettings,
+  type DivergingPsiSettings,
+  type DomainColoringSettings,
+  getCosinePaletteColorTS,
+  type PhaseDivergingSettings,
+} from '@/rendering/shaders/palette'
 
 // ---------------------------------------------------------------------------
 // Color conversion helpers
@@ -26,8 +34,6 @@ function hexToHsl(hex: string): [number, number, number] {
   if (max === g) return [((b - r) / d + 2) / 6, s, l]
   return [((r - g) / d + 4) / 6, s, l]
 }
-
-const hexToRgb = hexToSrgbTuple
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   const c = (1 - Math.abs(2 * l - 1)) * s
@@ -79,26 +85,14 @@ function oklabToLinearSrgb(L: number, a: number, b_: number): [number, number, n
 /** Parameters needed by all color algorithms. */
 export interface GradientParams {
   colorAlgorithm: string
-  cosineCoefficients: { a: number[]; b: number[]; c: number[]; d: number[] }
-  distribution: { power: number; cycles: number; offset: number }
+  cosineCoefficients: CosineCoefficients
+  distribution: DistributionSettings
   lchLightness: number
   lchChroma: number
   faceColor: string
-  domainColoring: {
-    modulusMode: string
-    contoursEnabled: boolean
-    contourDensity: number
-    contourWidth: number
-    contourStrength: number
-  }
-  phaseDiverging: { neutralColor: string; positiveColor: string; negativeColor: string }
-  divergingPsi: {
-    component: string
-    neutralColor: string
-    positiveColor: string
-    negativeColor: string
-    intensityFloor: number
-  }
+  domainColoring: DomainColoringSettings
+  phaseDiverging: PhaseDivergingSettings
+  divergingPsi: DivergingPsiSettings
   pauliSpinUpColor: readonly [number, number, number]
   pauliSpinDownColor: readonly [number, number, number]
 }
@@ -152,11 +146,11 @@ function computeDivergingColor(
   if (alg === 'phaseDiverging') {
     const signCarrier = Math.cos(t * Math.PI * 2)
     const signStrength = Math.abs(signCarrier)
-    const neutral = hexToRgb(p.phaseDiverging.neutralColor)
+    const neutral = hexToSrgbTuple(p.phaseDiverging.neutralColor)
     const wing =
       signCarrier >= 0
-        ? hexToRgb(p.phaseDiverging.positiveColor)
-        : hexToRgb(p.phaseDiverging.negativeColor)
+        ? hexToSrgbTuple(p.phaseDiverging.positiveColor)
+        : hexToSrgbTuple(p.phaseDiverging.negativeColor)
     const mag = 0.2 + 0.8 * t
     return [
       (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * mag,
@@ -168,11 +162,11 @@ function computeDivergingColor(
     const signCarrier =
       p.divergingPsi.component === 'imag' ? Math.sin(t * Math.PI * 2) : Math.cos(t * Math.PI * 2)
     const signStrength = Math.abs(signCarrier)
-    const neutral = hexToRgb(p.divergingPsi.neutralColor)
+    const neutral = hexToSrgbTuple(p.divergingPsi.neutralColor)
     const wing =
       signCarrier >= 0
-        ? hexToRgb(p.divergingPsi.positiveColor)
-        : hexToRgb(p.divergingPsi.negativeColor)
+        ? hexToSrgbTuple(p.divergingPsi.positiveColor)
+        : hexToSrgbTuple(p.divergingPsi.negativeColor)
     const floor = Math.max(0, Math.min(1, p.divergingPsi.intensityFloor))
     const intensity = floor + (1 - floor) * signStrength
     return [
@@ -328,10 +322,10 @@ function computeGradientColor(t: number, p: GradientParams): [number, number, nu
     (() => {
       const color = getCosinePaletteColorTS(
         t,
-        p.cosineCoefficients.a as [number, number, number],
-        p.cosineCoefficients.b as [number, number, number],
-        p.cosineCoefficients.c as [number, number, number],
-        p.cosineCoefficients.d as [number, number, number],
+        p.cosineCoefficients.a,
+        p.cosineCoefficients.b,
+        p.cosineCoefficients.c,
+        p.cosineCoefficients.d,
         p.distribution.power,
         p.distribution.cycles,
         p.distribution.offset
