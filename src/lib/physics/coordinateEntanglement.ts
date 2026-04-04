@@ -560,7 +560,9 @@ export function computeCoordinateEntanglement(
   // ── Pairwise mutual information ───────────────────────────────────────
   let mutualInfo: Float64Array | null = null
   if (options.computePairwiseMI && N >= 2) {
-    mutualInfo = new Float64Array(N * N)
+    mutualInfo = new Float64Array(N * N).fill(NaN)
+    // Set diagonal MI to 0 (self-information is not meaningful in this context)
+    for (let d = 0; d < N; d++) mutualInfo[d * N + d] = 0
     for (let d1 = 0; d1 < N; d1++) {
       const s1 = entropies[d1]
       if (s1 === null || s1 === undefined) continue

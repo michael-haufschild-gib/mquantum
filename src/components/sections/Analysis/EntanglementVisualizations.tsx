@@ -171,7 +171,8 @@ export const MutualInfoHeatmap: React.FC<{
           {Array.from({ length: N }, (_, i) =>
             Array.from({ length: N }, (__, j) => {
               const val = matrix[i * N + j]!
-              const frac = maxMI > 0 ? Math.min(val / maxMI, 1) : 0
+              const notComputed = Number.isNaN(val)
+              const frac = notComputed ? 0 : maxMI > 0 ? Math.min(val / maxMI, 1) : 0
               const lightness = 0.95 - 0.55 * frac
               return (
                 <rect
@@ -181,7 +182,11 @@ export const MutualInfoHeatmap: React.FC<{
                   width={cellSize - 1}
                   height={cellSize - 1}
                   // Dynamic heatmap gradient — cannot use static CSS variable
-                  fill={`oklch(${lightness} ${0.15 * frac} 30)`} // eslint-disable-line project-rules/no-hardcoded-colors
+                  fill={
+                    notComputed
+                      ? 'var(--bg-elevated)' // Hatched/neutral for "not computed"
+                      : `oklch(${lightness} ${0.15 * frac} 30)` // eslint-disable-line project-rules/no-hardcoded-colors
+                  }
                   rx={1}
                 />
               )

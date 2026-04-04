@@ -348,8 +348,8 @@ const DataExportButtons: React.FC<{
             </Button>
           )}
 
-        {/* Entanglement CSV (TDSE/BEC with entanglement enabled) */}
-        {(quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') && entEnabled && (
+        {/* Entanglement CSV (TDSE with entanglement enabled) */}
+        {quantumMode === 'tdseDynamics' && entEnabled && (
           <>
             <Button
               variant="ghost"
