@@ -54,7 +54,7 @@ export function computeRadialShells(raw: KSpaceRawData, binCount: number): Radia
   for (let i = 0; i < raw.totalSites; i++) {
     const n = Math.max(raw.nk[i]!, 0)
     const k = raw.kMag[i]!
-    const bin = Math.min(bins - 1, Math.floor((k / kMax) * (bins - 1)))
+    const bin = Math.min(bins - 1, Math.floor((k / kMax) * bins))
 
     shellSumNk[bin]! += n
     shellSumK[bin]! += k
@@ -154,7 +154,7 @@ export function buildRadialDisplayGrid(
         const kMagVal = Math.sqrt(kSq)
         const bin = Math.min(
           shells.binCount - 1,
-          Math.floor((kMagVal / shells.kMax) * (shells.binCount - 1))
+          Math.floor((kMagVal / shells.kMax) * shells.binCount)
         )
 
         const n = shells.shellMeanNk[bin]!
