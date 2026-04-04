@@ -42,7 +42,7 @@ export interface CoordinateEntanglementResult {
   normalizedEntropy: number
   /** Bipartition entropies S_{k|N-k} for k=1,...,⌊N/2⌋ (null if too expensive). */
   bipartitionEntropies: (number | null)[]
-  /** Pairwise mutual information I(d₁,d₂) — flat upper triangle, or null if skipped. */
+  /** Pairwise mutual information I(d₁,d₂) — full symmetric N×N matrix (row-major), or null if skipped. */
   mutualInfo: Float64Array | null
   /** Eigenvalue spectrum of ρ₁ for the first dimension (diagnostic). */
   spectrum: number[]
@@ -513,6 +513,13 @@ export function computeCoordinateEntanglement(
   let firstSpectrum: number[] = []
 
   for (let d = 0; d < N; d++) {
+    const M = gridSize[d]!
+    if (M > MAX_RDM_SIZE) {
+      // Skip dimensions with grid size exceeding the RDM limit
+      entropies[d] = 0
+      maxEntropies[d] = Math.log(M)
+      continue
+    }
     const rdm = computeReducedDensityMatrix(psiRe, psiIm, gridSize, d)
     const eigenvalues = hermitianEigenvalues(rdm.re, rdm.im, rdm.M)
     entropies[d] = vonNeumannEntropy(eigenvalues)

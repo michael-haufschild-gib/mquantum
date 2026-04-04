@@ -138,7 +138,7 @@ describe('HO1D canonical normalization', () => {
 
   const preset = generateQuantumPreset(SEED, DIM, TERM_COUNT, MAX_N, SPREAD)
 
-  it('generates a valid single-term 3D quantum preset from seed 42', () => {
+  it('generates a valid single-term 3D quantum preset from seed 41', () => {
     expect(preset.termCount).toBe(1)
     expect(preset.quantumNumbers).toHaveLength(1)
     expect(preset.quantumNumbers[0]).toHaveLength(3)

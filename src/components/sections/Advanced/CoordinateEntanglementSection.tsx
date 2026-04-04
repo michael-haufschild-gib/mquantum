@@ -9,7 +9,7 @@
  * @module components/sections/Advanced/CoordinateEntanglementSection
  */
 
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
@@ -117,7 +117,8 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
       }))
     )
 
-    const sparklineData = useMemo(() => f64ToF32(historyAverage), [historyAverage])
+    // historyAverage is mutated in place (ring buffer) — compute fresh each render (256 elements, trivially cheap)
+    const sparklineData = f64ToF32(historyAverage)
     const maxEnts = useCoordinateEntanglementStore((s) => s.currentMaxEntropies)
 
     const handleEnableChange = useCallback((v: boolean) => setEnabled(v), [setEnabled])

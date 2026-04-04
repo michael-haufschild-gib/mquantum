@@ -40,7 +40,7 @@ export class RightPanel {
     await expect(tab).toHaveAttribute('aria-selected', 'true')
   }
 
-  /** Switch to the Analysis tab and wait for the analysis section to mount. */
+  /** Switch to the Analysis tab and wait for the tab to become active. */
   async switchToAnalysisTab(): Promise<void> {
     await this.switchTab('Analysis')
   }

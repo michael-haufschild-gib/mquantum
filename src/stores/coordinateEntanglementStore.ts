@@ -241,7 +241,8 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     const newLtSum = state.longTimeSum + result.averageEntropy
     const newLtSumSq = state.longTimeSumSq + result.averageEntropy * result.averageEntropy
     const newLtAvg = newLtSum / newLtN
-    const newLtVar = newLtN > 1 ? newLtSumSq / newLtN - newLtAvg * newLtAvg : 0
+    // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
+    const newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
 
     set({
       historyHead: newHead,

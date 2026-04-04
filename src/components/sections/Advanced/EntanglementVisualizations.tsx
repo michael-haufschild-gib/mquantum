@@ -283,7 +283,8 @@ export const SweepControls: React.FC<{
   sweepResults: { lambda: number; dim: number; entropy: number }[]
 }> = React.memo(({ sweepStatus, sweepProgress, sweepResults }) => {
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const stepStartCountRef = useRef(0)
+  /** longTimeN at the start of the current sweep step — monotonically increasing, never caps. */
+  const stepStartNRef = useRef(0)
 
   const handleStartSweep = () => {
     const config: AtlasSweepConfig = {
@@ -295,7 +296,7 @@ export const SweepControls: React.FC<{
     const entStore = useCoordinateEntanglementStore.getState()
     entStore.clearHistory()
     entStore.startSweep(config)
-    stepStartCountRef.current = 0
+    stepStartNRef.current = 0
 
     const firstLambda = lambdaForStep(config, 0)
     const ext = useExtendedObjectStore.getState()
@@ -322,19 +323,20 @@ export const SweepControls: React.FC<{
       const entStore = useCoordinateEntanglementStore.getState()
       if (entStore.sweepStatus !== 'running') return
 
-      const entriesSinceStart = entStore.historyCount - stepStartCountRef.current
+      // Use longTimeN (monotonically increasing) instead of historyCount (caps at ring buffer size)
+      const samplesSinceStart = entStore.longTimeN - stepStartNRef.current
       const totalNeeded = SWEEP_EVOLVE_ENTRIES + SWEEP_MEASURE_ENTRIES
 
-      if (entriesSinceStart >= SWEEP_EVOLVE_ENTRIES && entStore.currentAverageEntropy > 0) {
+      if (samplesSinceStart >= SWEEP_EVOLVE_ENTRIES) {
         entStore.recordSweepSample(entStore.currentNormalizedEntropy)
       }
 
-      if (entriesSinceStart >= totalNeeded) {
+      if (samplesSinceStart >= totalNeeded) {
         entStore.completeSweepStep()
         const next = entStore.advanceSweepStep()
 
         if (next) {
-          stepStartCountRef.current = entStore.historyCount
+          stepStartNRef.current = entStore.longTimeN
           const ext = useExtendedObjectStore.getState()
           ext.setTdseAnharmonicLambda(next.lambda)
           const currentDim = useGeometryStore.getState().dimension
