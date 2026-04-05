@@ -7,6 +7,15 @@
  * @module rendering/webgpu/shaders/schroedinger/mainIsosurfaceTemporal.wgsl
  */
 
+import {
+  generateBinarySearchSample,
+  generateColorSample,
+  generateDensitySample,
+  generateGradientCompute,
+  generateSeedSample,
+} from './isosurfaceSampling'
+import { generateBayerJitterSection, getRayDirSource } from './temporalJitter'
+
 /**
  *
  */
@@ -29,100 +38,14 @@ export function generateMainBlockIsosurfaceTemporal(
 ): string {
   const { bayerJitter = true, useDensityGrid = false } = config
 
-  // Reuse Bayer jitter from temporal mode
-  const bayerJitterSection = bayerJitter
-    ? `
-  // ============================================
-  // Temporal Sub-Pixel Jitter
-  // ============================================
-  let jitterOffset = camera.bayerOffset - vec2f(0.5);
-  let viewDirRaw = normalize(input.vPosition - camera.cameraPosition);
-  let dist = length(input.vPosition - camera.cameraPosition);
-  let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
-  let pixelSizeX = 2.0 * dist * tan(camera.fov * 0.5) * camera.aspectRatio /
-                   camera.resolution.x;
-  let cameraRight = normalize(camera.inverseViewMatrix[0].xyz);
-  let cameraUp = normalize(camera.inverseViewMatrix[1].xyz);
-  let worldOffset = cameraRight * (jitterOffset.x * pixelSizeX) -
-                    cameraUp * (jitterOffset.y * pixelSizeY);
-  let jitteredVPosition = input.vPosition + worldOffset;
-`
-    : ''
+  const bayerJitterSection = generateBayerJitterSection(bayerJitter)
+  const rayDirSource = getRayDirSource(bayerJitter)
 
-  const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
-
-  // Density grid sampling helpers (same as non-temporal isosurface)
-  const densitySample = useDensityGrid
-    ? `if (USE_DENSITY_GRID) {
-      let gridVal = sampleDensityFromGrid(pos, schroedinger);
-      rho = select(gridVal.r, gridVal.r + gridVal.g, IS_DUAL_CHANNEL);
-      if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger); }
-      rho *= isoGain;
-    } else {
-      rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
-    }`
-    : `rho = sampleDensity(pos, animTime, schroedinger) * isoGain;`
-
-  const seedSample = useDensityGrid
-    ? `var seedRho: f32;
-  if (USE_DENSITY_GRID) {
-    let seedGrid = sampleDensityFromGrid(ro + rd * tNear, schroedinger);
-    seedRho = select(seedGrid.r, seedGrid.r + seedGrid.g, IS_DUAL_CHANNEL);
-    if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger); }
-    seedRho *= isoGain;
-  } else {
-    seedRho = sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain;
-  }
-  var prevS = sFromRho(seedRho);`
-    : `var prevS = sFromRho(sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain);`
-
-  const binarySearchSample = useDensityGrid
-    ? `var midRho: f32;
-        if (USE_DENSITY_GRID) {
-          let midGrid = sampleDensityFromGrid(midPos, schroedinger);
-          midRho = select(midGrid.r, midGrid.r + midGrid.g, IS_DUAL_CHANNEL);
-          if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) { midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger); }
-          midRho *= isoGain;
-        } else {
-          midRho = sampleDensity(midPos, animTime, schroedinger) * isoGain;
-        }
-        let midS = sFromRho(midRho);`
-    : `let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);`
-
-  const gradientCompute = useDensityGrid
-    ? `if (USE_DENSITY_GRID) {
-    rawGrad = computeGradientFromGrid(p, schroedinger);
-  } else if (USE_ANALYTICAL_GRADIENT) {
-    rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
-  } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
-  }`
-    : `if (USE_ANALYTICAL_GRADIENT) {
-    rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
-  } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
-  }`
-
-  const colorSample = useDensityGrid
-    ? `var rhoSurface: f32;
-  var dualSecondary: f32 = 0.0;
-  var phase: f32;
-  if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
-    let gridColor = sampleDensityFromGrid(p, schroedinger);
-    rhoSurface = gridColor.r * isoGain;
-    if (IS_DUAL_CHANNEL) {
-      dualSecondary = gridColor.g;
-    }
-    phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
-  } else {
-    let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
-    rhoSurface = densityInfo.x * isoGain;
-    phase = densityInfo.z;
-  }`
-    : `let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
-  let rhoSurface = densityInfo.x * isoGain;
-  let phase = densityInfo.z;
-  let dualSecondary: f32 = 0.0;`
+  const densitySample = generateDensitySample(useDensityGrid)
+  const seedSample = generateSeedSample(useDensityGrid)
+  const binarySearchSample = generateBinarySearchSample(useDensityGrid)
+  const gradientCompute = generateGradientCompute(useDensityGrid)
+  const colorSample = generateColorSample(useDensityGrid)
 
   return /* wgsl */ `
 // ============================================
@@ -131,32 +54,8 @@ export function generateMainBlockIsosurfaceTemporal(
 // Combines isosurface marching + PBR lighting with temporal reprojection.
 // Outputs MRT: color + world position (no normal buffer in temporal mode).
 
-// Helper to get light direction (same as non-temporal isosurface)
-fn getIsosurfaceLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
-  let light = lighting.lights[lightIdx];
-  let lightType = i32(light.position.w);
-
-  if (lightType == LIGHT_TYPE_DIRECTIONAL) {
-    return normalize(-light.direction.xyz);
-  } else {
-    return normalize(light.position.xyz - pos);
-  }
-}
-
-// Helper to get light attenuation (physically-based inverse-range falloff)
-fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
-  let light = lighting.lights[lightIdx];
-  let lightRange = light.direction.w;
-  let decay = light.params.x;
-
-  if (lightRange <= 0.0) {
-    return 1.0;
-  }
-
-  let d = max(distance, EPS_DIVISION);
-  let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
-  return pow(rangeAttenuation, decay);
-}
+// Light helpers: getEmissionLightDir, getEmissionLightAttenuation,
+// getEmissionSpotAttenuation from emission.wgsl.ts (included via emissionPostBlock)
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {
@@ -307,18 +206,9 @@ ${bayerJitterSection}
   let sSurface = select(sFromRho(rhoSurface), dualSecondary, IS_DUAL_CHANNEL);
   var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
 
-  // Phase materiality
+  // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {
-    let phaseMod = fract((phase + PI) / TAU);
-    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-    let smokeWeight = 1.0 - plasmaWeight;
-    let pmStr = schroedinger.phaseMaterialityStrength;
-    let normalizedRho = clamp((sSurface + 8.0) / 8.0, 0.0, 1.0);
-    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
-    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
-    surfaceColor = mix(surfaceColor,
-      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-      pmStr);
+    surfaceColor = applyPhaseMateriality(surfaceColor, phase, sSurface, schroedinger);
   }
 
   // Interference fringing
@@ -353,13 +243,13 @@ ${bayerJitterSection}
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
 
-    let l = getIsosurfaceLightDir(i, p);
+    let l = getEmissionLightDir(i, p);
     var attenuation = lightIntensity;
 
     let lightType = i32(light.position.w);
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
       let distance = length(light.position.xyz - p);
-      attenuation *= getIsosurfaceLightAttenuation(i, distance);
+      attenuation *= getEmissionLightAttenuation(i, distance);
     }
 
     if (lightType == LIGHT_TYPE_SPOT) {
@@ -398,27 +288,8 @@ ${bayerJitterSection}
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
   }
 
-  // HDR Emission Glow
-  if (schroedinger.emissionIntensity > 0.0) {
-    let emNorm = clamp((sSurface + 8.0) / 8.0, 0.0, 1.0);
-    if (emNorm > schroedinger.emissionThreshold) {
-      var emFactor = (emNorm - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
-      emFactor = emFactor * emFactor;
-      var emColor = surfaceColor;
-      if (abs(schroedinger.emissionColorShift) > 0.01) {
-        var emHSL = rgb2hsl(emColor);
-        if (schroedinger.emissionColorShift > 0.0) {
-          emHSL.x = mix(emHSL.x, 0.08, schroedinger.emissionColorShift * 0.5);
-          emHSL.y = mix(emHSL.y, 1.0, schroedinger.emissionColorShift * 0.3);
-        } else {
-          emHSL.x = mix(emHSL.x, 0.6, -schroedinger.emissionColorShift * 0.5);
-          emHSL.z = mix(emHSL.z, 0.9, -schroedinger.emissionColorShift * 0.3);
-        }
-        emColor = hsl2rgb(emHSL.x, emHSL.y, emHSL.z);
-      }
-      col += emColor * schroedinger.emissionIntensity * emFactor;
-    }
-  }
+  // HDR Emission Glow (shared helper)
+  col = applyHDREmissionGlow(col, surfaceColor, sSurface, schroedinger);
 
   // Nodal overlay
   if (
