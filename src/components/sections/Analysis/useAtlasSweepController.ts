@@ -36,6 +36,9 @@ import {
 /** Polling interval for sweep progress (ms). */
 const POLL_MS = 400
 
+/** If no new entanglement sample arrives for this many polls, abort the point as stalled. */
+const STALL_POLL_LIMIT = 75 // 75 × 400ms = 30s
+
 /** Pre-sweep physics state snapshot for restoration on abort/complete. */
 interface PreSweepSnapshot {
   potentialType: TdsePotentialType
@@ -87,6 +90,8 @@ export function useAtlasSweepController(): {
   const samplesRecordedRef = useRef(0)
   /** Tracks entSamples at last poll to detect new worker arrivals. */
   const lastSeenNRef = useRef(0)
+  /** Polls without new entanglement data — detects stalled simulations. */
+  const stallCountRef = useRef(0)
 
   const status = useQuantumnessAtlasStore((s) => s.status)
 
@@ -191,6 +196,19 @@ export function useAtlasSweepController(): {
         // Tick frame counter
         atlas.tickFrame()
 
+        // Stall detection: if no new worker result for STALL_POLL_LIMIT polls, abort
+        if (entSamples === lastSeenNRef.current && entSamples === 0) {
+          stallCountRef.current++
+        } else if (entSamples > lastSeenNRef.current) {
+          stallCountRef.current = 0
+        }
+        if (stallCountRef.current >= STALL_POLL_LIMIT) {
+          logger.warn('[atlas] Sweep stalled — no entanglement results after 30s, aborting')
+          useQuantumnessAtlasStore.getState().abortSweep()
+          restoreSnapshot()
+          return
+        }
+
         // During measurement window: record one sample per poll when new data exists.
         // Intentionally takes one snapshot per poll (not one per worker result) because
         // the entanglement store only holds current values, not a per-result history.
@@ -232,6 +250,7 @@ export function useAtlasSweepController(): {
           pointStartNRef.current = entStore.longTimeN
           samplesRecordedRef.current = 0
           lastSeenNRef.current = 0
+          stallCountRef.current = 0
 
           applyPointConfig(next.dim, next.lambda, next.gamma, next.dimChanged)
         }

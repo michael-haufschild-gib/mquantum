@@ -180,6 +180,8 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
     if (
       !Number.isInteger(config.lambdaSteps) ||
       config.lambdaSteps < 1 ||
+      !Number.isFinite(config.lambdaMin) ||
+      !Number.isFinite(config.lambdaMax) ||
       config.lambdaMin <= 0 ||
       config.lambdaMax <= 0 ||
       config.lambdaMax < config.lambdaMin
@@ -190,6 +192,22 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
     }
     if (config.dimensions.length === 0 || config.gammas.length === 0) {
       throw new Error('dimensions and gammas must be non-empty arrays')
+    }
+    if (
+      !Number.isInteger(config.evolveSamples) ||
+      config.evolveSamples < 0 ||
+      !Number.isInteger(config.measureSamples) ||
+      config.measureSamples < 1
+    ) {
+      throw new Error(
+        `Invalid sample config: evolve=${config.evolveSamples}, measure=${config.measureSamples}`
+      )
+    }
+    if (
+      config.dimensions.some((d) => !Number.isFinite(d)) ||
+      config.gammas.some((g) => !Number.isFinite(g))
+    ) {
+      throw new Error('dimensions and gammas must contain finite numbers')
     }
     set({
       status: 'running',
