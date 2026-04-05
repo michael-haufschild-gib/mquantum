@@ -138,16 +138,15 @@ export function useAtlasSweepController(): {
       computeBipartitions: entStore.computeBipartitions,
     }
 
+    // Start sweep first — if validation throws, no state is mutated
+    atlasStore.startSweep()
+
     // Enable entanglement + Wigner for the sweep, disable expensive MI/bipartitions
     entStore.setEnabled(true)
     entStore.setComputeWignerNegativity(true)
     entStore.setComputePairwiseMI(false)
     entStore.setComputeBipartitions(false)
     entStore.clearHistory()
-
-    // Start sweep — must re-read state after startSweep() because the
-    // atlasStore snapshot captured above is stale after setConfig()/startSweep()
-    atlasStore.startSweep()
 
     const config = useQuantumnessAtlasStore.getState().config
     const firstDim = config.dimensions[0]!

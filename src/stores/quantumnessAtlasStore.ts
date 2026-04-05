@@ -177,7 +177,13 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
 
   startSweep: () => {
     const config = get().config
-    if (config.lambdaMin <= 0 || config.lambdaMax <= 0 || config.lambdaSteps < 1) {
+    if (
+      !Number.isInteger(config.lambdaSteps) ||
+      config.lambdaSteps < 1 ||
+      config.lambdaMin <= 0 ||
+      config.lambdaMax <= 0 ||
+      config.lambdaMax < config.lambdaMin
+    ) {
       throw new Error(
         `Invalid lambda config: min=${config.lambdaMin}, max=${config.lambdaMax}, steps=${config.lambdaSteps}`
       )
