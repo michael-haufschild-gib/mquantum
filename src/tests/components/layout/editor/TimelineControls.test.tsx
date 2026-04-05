@@ -321,8 +321,8 @@ describe('TimelineControls', () => {
 
     render(<TimelineControls />)
 
-    const button = screen.getByRole('button', { name: /toggle open quantum drawer/i })
-    expect(button.textContent).toContain('0')
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 0 active/i })
+    expect(button).toHaveTextContent('0')
   })
 
   it('counts active Lindblad channels in Open Quantum badge', () => {
