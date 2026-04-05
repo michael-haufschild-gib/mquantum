@@ -119,6 +119,10 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'
+    mockExtendedState.schroedinger.openQuantum.enabled = false
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
+    mockExtendedState.schroedinger.openQuantum.thermalEnabled = false
     mockRandomizePlanes.mockClear()
     mockResetSchroedingerParameters.mockClear()
     mockResetFreeScalarField.mockClear()
@@ -334,7 +338,7 @@ describe('TimelineControls', () => {
     render(<TimelineControls />)
 
     const button = screen.getByRole('button', { name: /toggle open quantum drawer, 2 active/i })
-    expect(button).toBeInTheDocument()
+    expect(button).toHaveTextContent('2')
   })
 
   it('shows badge count of 1 for hydrogen modes regardless of channel flags', () => {
@@ -347,6 +351,6 @@ describe('TimelineControls', () => {
     render(<TimelineControls />)
 
     const button = screen.getByRole('button', { name: /toggle open quantum drawer, 1 active/i })
-    expect(button).toBeInTheDocument()
+    expect(button).toHaveTextContent('1')
   })
 })

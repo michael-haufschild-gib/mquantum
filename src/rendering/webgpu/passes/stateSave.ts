@@ -11,6 +11,7 @@
  */
 
 import type { SaveableQuantumMode } from '@/lib/export/simulationState'
+import { logger } from '@/lib/logger'
 
 import type { WebGPURenderContext } from '../core/types'
 
@@ -263,6 +264,7 @@ async function serializeAndDownload(
 
 /** Report save error to the simulation state store. */
 function reportSaveError(err: unknown): void {
+  logger.error('[stateSave] Save failed:', err)
   void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
     useSimulationStateStore.getState().setSaveError(String(err))
   })
