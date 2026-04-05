@@ -180,8 +180,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     psiReBuffer: null,
     psiImBuffer: null,
     totalSites: 0,
-    saveStagingRe: null,
-    saveStagingIm: null,
     saveMappingInFlight: false,
     pendingInjection: null,
   }

@@ -26,8 +26,7 @@ import {
 import { packAbsorberUniforms, packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
 import { QwDiagnostics } from './QuantumWalkDiagnostics'
 import { createQwPipelines } from './QuantumWalkPipelines'
-import type { QwSaveState } from './QuantumWalkStateSave'
-import { requestQwStateSave } from './QuantumWalkStateSave'
+import { requestStateSave } from './stateSave'
 
 const COIN_WG = 64
 
@@ -148,14 +147,36 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
    * @param ctx - Render context with device and command encoder
    */
   requestStateSave(ctx: WebGPURenderContext): void {
-    const state: QwSaveState = {
-      coinStateA: this.coinStateA,
-      saveMappingInFlight: this.saveMappingInFlight,
-      totalSites: this.totalSites,
-      latticeDim: this.latticeDim,
-    }
-    requestQwStateSave(ctx, state)
-    this.saveMappingInFlight = state.saveMappingInFlight
+    if (!this.coinStateA || this.saveMappingInFlight || this.totalSites === 0) return
+    const coinStates = 2 * this.latticeDim
+    const totalElements = this.totalSites * coinStates
+    const latDim = this.latticeDim
+    const totalSites = this.totalSites
+
+    this.saveMappingInFlight = true
+    requestStateSave(ctx, {
+      source: {
+        layout: 'interleaved',
+        buffer: this.coinStateA,
+        byteSize: totalElements * 2 * 4,
+        elementCount: totalElements,
+      },
+      totalSites,
+      label: 'qw',
+      getMetadata: async () => {
+        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
+        const qwConfig = useExtendedObjectStore.getState().schroedinger.quantumWalk
+        return {
+          quantumMode: 'quantumWalk',
+          config: { quantumMode: 'quantumWalk', quantumWalk: qwConfig } as Record<string, unknown>,
+          gridSize: qwConfig.gridSize.slice(0, qwConfig.latticeDim),
+          componentCount: 2 * latDim,
+        }
+      },
+      onFinished: () => {
+        this.saveMappingInFlight = false
+      },
+    })
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {

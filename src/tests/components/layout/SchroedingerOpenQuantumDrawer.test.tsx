@@ -29,29 +29,6 @@ describe('SchroedingerOpenQuantumDrawer', () => {
     expect(useExtendedObjectStore.getState().schroedinger.openQuantum.enabled).toBe(true)
   })
 
-  it('resets to pure state without changing existing Open Quantum settings', () => {
-    const store = useExtendedObjectStore.getState()
-    store.setOpenQuantumEnabled(true)
-    store.setOpenQuantumDephasingRate(1.25)
-    store.setOpenQuantumRelaxationRate(0.75)
-    store.setOpenQuantumThermalUpRate(0.33)
-    store.setOpenQuantumDt(0.037)
-    store.setOpenQuantumSubsteps(7)
-    const resetTokenBefore = store.schroedinger.openQuantum.resetToken
-
-    render(<SchroedingerOpenQuantumDrawer />)
-    fireEvent.click(screen.getByRole('button', { name: /reset density matrix to pure state/i }))
-
-    const oq = useExtendedObjectStore.getState().schroedinger.openQuantum
-    expect(oq.enabled).toBe(true)
-    expect(oq.dephasingRate).toBeCloseTo(1.25)
-    expect(oq.relaxationRate).toBeCloseTo(0.75)
-    expect(oq.thermalUpRate).toBeCloseTo(0.33)
-    expect(oq.dt).toBeCloseTo(0.037)
-    expect(oq.substeps).toBe(7)
-    expect(oq.resetToken).toBe((resetTokenBefore ?? 0) + 1)
-  })
-
   it('does not render in wigner representation', () => {
     useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
 

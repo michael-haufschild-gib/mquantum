@@ -42,6 +42,7 @@ import {
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
+import { requestStateSave } from './stateSave'
 
 /** Uniform buffer size: FreeScalarUniforms struct = 512 bytes (added PML absorber fields) */
 const UNIFORM_SIZE = 512
@@ -188,74 +189,30 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   requestStateSave(ctx: WebGPURenderContext): void {
     if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return
-    const { device, encoder } = ctx
     const byteSize = this.totalSites * 4
 
-    const stagingRe = device.createBuffer({
-      label: 'fsf-save-staging-phi',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-    const stagingIm = device.createBuffer({
-      label: 'fsf-save-staging-pi',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    encoder.copyBufferToBuffer(this.phiBuffer, 0, stagingRe, 0, byteSize)
-    encoder.copyBufferToBuffer(this.piBuffer, 0, stagingIm, 0, byteSize)
     this.saveMappingInFlight = true
-
-    const totalSites = this.totalSites
-
-    device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
-          this.saveMappingInFlight = false
-          return
-        }
-        await Promise.all([
-          stagingRe.mapAsync(GPUMapMode.READ),
-          stagingIm.mapAsync(GPUMapMode.READ),
-        ])
-
-        const re = new Float32Array(stagingRe.getMappedRange()).slice(0)
-        const im = new Float32Array(stagingIm.getMappedRange()).slice(0)
-        stagingRe.unmap()
-        stagingIm.unmap()
-        stagingRe.destroy()
-        stagingIm.destroy()
-
-        const { serializeSimulationState } = await import('@/lib/export/simulationState')
-        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
+    requestStateSave(ctx, {
+      source: { layout: 'separate', reBuffer: this.phiBuffer, imBuffer: this.piBuffer, byteSize },
+      totalSites: this.totalSites,
+      label: 'fsf',
+      getMetadata: async () => {
         const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
-        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
-
-        const extState = useExtendedObjectStore.getState()
-        const schroedinger = extState.schroedinger
-        const fsfConfig = schroedinger.freeScalar
-        const gridSize = fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64]
-
-        const blob = await serializeSimulationState(
-          { quantumMode: 'freeScalarField', freeScalar: schroedinger.freeScalar } as Record<
+        const fsfConfig = useExtendedObjectStore.getState().schroedinger.freeScalar
+        return {
+          quantumMode: 'freeScalarField',
+          config: { quantumMode: 'freeScalarField', freeScalar: fsfConfig } as Record<
             string,
             unknown
           >,
-          { re, im, totalSites, componentCount: 1 },
-          'freeScalarField',
-          gridSize
-        )
-        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
-        useSimulationStateStore.getState().setSaveComplete()
+          gridSize: fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64],
+          componentCount: 1,
+        }
+      },
+      onFinished: () => {
         this.saveMappingInFlight = false
-      })
-      .catch((err) => {
-        void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
-          useSimulationStateStore.getState().setSaveError(String(err))
-        })
-        this.saveMappingInFlight = false
-      })
+      },
+    })
   }
 
   /**

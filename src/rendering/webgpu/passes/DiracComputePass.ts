@@ -50,6 +50,7 @@ import type {
   DiracPipelineResult,
 } from './DiracComputePassTypes'
 import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
+import { requestStateSave } from './stateSave'
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -174,72 +175,33 @@ export class DiracComputePass extends WebGPUBaseComputePass {
    */
   requestStateSave(ctx: WebGPURenderContext): void {
     if (!this.spinorReBuffer || !this.spinorImBuffer || this.saveMappingInFlight) return
-    const { device, encoder } = ctx
     const byteSize = this.currentSpinorSize * this.totalSites * 4
-
-    const stagingRe = device.createBuffer({
-      label: 'dirac-save-staging-re',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-    const stagingIm = device.createBuffer({
-      label: 'dirac-save-staging-im',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    encoder.copyBufferToBuffer(this.spinorReBuffer, 0, stagingRe, 0, byteSize)
-    encoder.copyBufferToBuffer(this.spinorImBuffer, 0, stagingIm, 0, byteSize)
-    this.saveMappingInFlight = true
-
-    const totalSites = this.totalSites
     const componentCount = this.currentSpinorSize
 
-    device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
-          this.saveMappingInFlight = false
-          return
-        }
-        await Promise.all([
-          stagingRe.mapAsync(GPUMapMode.READ),
-          stagingIm.mapAsync(GPUMapMode.READ),
-        ])
-
-        const re = new Float32Array(stagingRe.getMappedRange()).slice(0)
-        const im = new Float32Array(stagingIm.getMappedRange()).slice(0)
-        stagingRe.unmap()
-        stagingIm.unmap()
-        stagingRe.destroy()
-        stagingIm.destroy()
-
-        const { serializeSimulationState } = await import('@/lib/export/simulationState')
-        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
+    this.saveMappingInFlight = true
+    requestStateSave(ctx, {
+      source: {
+        layout: 'separate',
+        reBuffer: this.spinorReBuffer,
+        imBuffer: this.spinorImBuffer,
+        byteSize,
+      },
+      totalSites: this.totalSites,
+      label: 'dirac',
+      getMetadata: async () => {
         const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
-        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
-
-        const extState = useExtendedObjectStore.getState()
-        const schroedinger = extState.schroedinger
-        const diracConfig = schroedinger.dirac
-        const gridSize = diracConfig.gridSize?.slice(0, diracConfig.latticeDim ?? 3) ?? [64]
-
-        const blob = await serializeSimulationState(
-          { quantumMode: 'diracEquation', dirac: schroedinger.dirac } as Record<string, unknown>,
-          { re, im, totalSites, componentCount },
-          'diracEquation',
-          gridSize
-        )
-        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
-        useSimulationStateStore.getState().setSaveComplete()
+        const diracConfig = useExtendedObjectStore.getState().schroedinger.dirac
+        return {
+          quantumMode: 'diracEquation',
+          config: { quantumMode: 'diracEquation', dirac: diracConfig } as Record<string, unknown>,
+          gridSize: diracConfig.gridSize?.slice(0, diracConfig.latticeDim ?? 3) ?? [64],
+          componentCount,
+        }
+      },
+      onFinished: () => {
         this.saveMappingInFlight = false
-      })
-      .catch((err) => {
-        void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
-          useSimulationStateStore.getState().setSaveError(String(err))
-        })
-        this.saveMappingInFlight = false
-      })
+      },
+    })
   }
   getDensityTexture(): GPUTexture | null {
     return this.densityTexture

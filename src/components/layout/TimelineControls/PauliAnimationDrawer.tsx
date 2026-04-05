@@ -6,18 +6,16 @@
  *
  * Controls:
  * - Time step (dt) and steps per frame — simulation speed
- * - Reset button — reinitialize the spinor field
+ * - Slice animation (4D+) — dimensional sweep controls
  *
  * Pauli is a compute-based mode: the GPU evolves the spinor via split-operator
- * Strang splitting. Unlike HO/hydrogen modes, there are no inline wavefunction
- * effects (interference, probability flow, probability current).
+ * Strang splitting. Field reset is handled by the TimelineControls catch-all
+ * reset button.
  */
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { Button } from '@/components/ui/Button'
-import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -50,7 +48,6 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
       setSliceAnimationEnabled,
       setSliceSpeed,
       setSliceAmplitude,
-      resetField,
     } = useExtendedObjectStore(
       useShallow((state: ExtendedObjectState) => ({
         config: state.pauliSpinor,
@@ -59,20 +56,23 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
         setSliceAnimationEnabled: state.setPauliSliceAnimationEnabled,
         setSliceSpeed: state.setPauliSliceSpeed,
         setSliceAmplitude: state.setPauliSliceAmplitude,
-        resetField: state.resetPauliField,
       }))
     )
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="pauli-animation-drawer">
         {/* Simulation Speed */}
-        <div className="space-y-4" data-testid="animation-panel-simulationSpeed">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Simulation
-            </label>
-          </div>
-          <div className="space-y-3">
+
+        <div className="space-y-3" data-testid="animation-panel-simulationSpeed">
+          {dimension >= 4 && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Simulation
+              </p>
+            </div>
+          )}
+
+          <div className={`space-y-3`}>
             <Slider
               label="Time Step (dt)"
               min={0.0001}
@@ -80,6 +80,7 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
               step={0.0001}
               value={config.dt}
               onChange={setDt}
+              tooltip="Integration time step. Smaller values improve accuracy but slow evolution. Too large may cause numerical instability."
               showValue
             />
             <Slider
@@ -87,6 +88,7 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
               min={1}
               max={16}
               step={1}
+              tooltip="Number of integration steps computed per animation frame. Higher values evolve the simulation faster."
               value={config.stepsPerFrame}
               onChange={setStepsPerFrame}
               showValue
@@ -94,30 +96,13 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
           </div>
         </div>
 
-        {/* Reset */}
-        <div className="space-y-4" data-testid="animation-panel-reset">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Field Reset
-            </label>
-          </div>
-          <Button variant="secondary" size="sm" onClick={resetField} className="w-full">
-            <Icon name="redo" size={12} className="me-2" />
-            Reinitialize Spinor
-          </Button>
-          <p className="text-xs text-text-tertiary">
-            Resets the wavefunction to its initial Gaussian wavepacket with the current spin and
-            field settings.
-          </p>
-        </div>
-
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (
-          <div className="space-y-4" data-testid="animation-panel-sliceAnimation">
+          <div className="space-y-3" data-testid="animation-panel-sliceAnimation">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              <p className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Dimensional Sweeps
-              </label>
+              </p>
               <ToggleButton
                 pressed={config.sliceAnimationEnabled}
                 onToggle={() => setSliceAnimationEnabled(!config.sliceAnimationEnabled)}

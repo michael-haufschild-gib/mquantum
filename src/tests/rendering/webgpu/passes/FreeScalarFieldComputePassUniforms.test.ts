@@ -12,10 +12,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
 import {
   computeFsfConfigHash,
   computeFsfInitHash,
-  computeFsfStrides,
   writeFsfUniforms,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
@@ -101,9 +101,9 @@ describe('computeFsfInitHash', () => {
   })
 })
 
-describe('computeFsfStrides', () => {
+describe('computeStridesPadded (used by FSF uniform packing)', () => {
   it('computes correct strides for 3D grid', () => {
-    const strides = computeFsfStrides(createConfig({ gridSize: [8, 16, 32], latticeDim: 3 }))
+    const strides = computeStridesPadded([8, 16, 32], 3)
     // C-order: strides[2] = 1, strides[1] = 32, strides[0] = 16*32 = 512
     expect(strides[2]).toBe(1)
     expect(strides[1]).toBe(32)
@@ -111,12 +111,12 @@ describe('computeFsfStrides', () => {
   })
 
   it('returns stride of 1 for 1D grid', () => {
-    const strides = computeFsfStrides(createConfig({ gridSize: [64], latticeDim: 1 }))
+    const strides = computeStridesPadded([64], 1)
     expect(strides[0]).toBe(1)
   })
 
   it('unused dimensions are zero', () => {
-    const strides = computeFsfStrides(createConfig({ latticeDim: 2 }))
+    const strides = computeStridesPadded([32, 32], 2)
     // Dims 2+ should be 0 (MAX_DIM=12, so indices 2-11 are zero)
     for (let d = 2; d < strides.length; d++) {
       expect(strides[d]).toBe(0)

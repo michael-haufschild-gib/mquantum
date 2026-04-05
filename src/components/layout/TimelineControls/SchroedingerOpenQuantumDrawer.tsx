@@ -12,7 +12,6 @@
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
@@ -71,7 +70,6 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
       setDt,
       setSubsteps,
       setChannelEnabled,
-      requestOpenQuantumStateReset,
       setBathTemperature,
       setCouplingScale,
       setHydrogenBasisMaxN,
@@ -101,7 +99,6 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
         setDt: state.setOpenQuantumDt,
         setSubsteps: state.setOpenQuantumSubsteps,
         setChannelEnabled: state.setOpenQuantumChannelEnabled,
-        requestOpenQuantumStateReset: state.requestOpenQuantumStateReset,
         setBathTemperature: state.setOpenQuantumBathTemperature,
         setCouplingScale: state.setOpenQuantumCouplingScale,
         setHydrogenBasisMaxN: state.setOpenQuantumHydrogenBasisMaxN,
@@ -125,9 +122,6 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
     const onThermalToggle = useCallback(() => {
       setChannelEnabled('thermal', !thermalEnabled)
     }, [setChannelEnabled, thermalEnabled])
-    const onResetToPure = useCallback(() => {
-      requestOpenQuantumStateReset()
-    }, [requestOpenQuantumStateReset])
     const onBasisMaxNChange = useCallback(
       (v: string) => setHydrogenBasisMaxN(parseInt(v, 10)),
       [setHydrogenBasisMaxN]
@@ -343,15 +337,6 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
                   showValue
                 />
               </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onResetToPure}
-                ariaLabel="Reset density matrix to pure state"
-              >
-                Reset to Pure State
-              </Button>
             </div>
           </div>
         </div>
