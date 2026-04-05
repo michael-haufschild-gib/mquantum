@@ -93,7 +93,7 @@ function pushSample(acc: SampleAccumulator, x: number): void {
 }
 
 function meanVariance(acc: SampleAccumulator): { mean: number; variance: number } {
-  if (acc.n === 0) return { mean: 0, variance: 0 }
+  if (acc.n === 0) return { mean: NaN, variance: NaN }
   const mean = acc.sum / acc.n
   const variance = acc.n > 1 ? acc.sumSq / acc.n - mean * mean : 0
   return { mean, variance: Math.max(variance, 0) }
@@ -180,6 +180,7 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
     }),
 
   startSweep: () => {
+    if (get().status === 'running') return
     const config = get().config
     if (
       !Number.isInteger(config.lambdaSteps) ||

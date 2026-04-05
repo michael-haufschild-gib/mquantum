@@ -233,10 +233,23 @@ pub fn compute_scar_correlation(
         return vec![0.0; num_orbits + 4];
     }
 
+    // Validate grid_sizes has enough dimensions
+    if grid_sizes.len() < dim || spacings.len() < dim {
+        return vec![0.0; num_orbits + 4];
+    }
+
     // Compute total grid sites
     let mut total_sites: usize = 1;
     for d in 0..dim {
-        total_sites *= grid_sizes[d] as usize;
+        total_sites = match total_sites.checked_mul(grid_sizes[d] as usize) {
+            Some(t) => t,
+            None => return vec![0.0; num_orbits + 4],
+        };
+    }
+
+    // Validate density arrays have enough elements
+    if density_re.len() < total_sites || density_im.len() < total_sites {
+        return vec![0.0; num_orbits + 4];
     }
 
     // Precompute probability density |ψ|²
@@ -299,6 +312,9 @@ pub fn compute_scar_correlation(
 
         for pt in 0..orbit_len {
             let pt_base = (orbit_offset + pt) * dim;
+            if pt_base + dim > orbit_points_flat.len() {
+                break;
+            }
 
             // Convert orbit position to grid coordinates
             let mut center_grid = vec![0.0f64; dim];
