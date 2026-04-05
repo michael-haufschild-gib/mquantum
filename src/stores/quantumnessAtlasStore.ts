@@ -34,8 +34,8 @@ export interface AtlasPoint {
   varIPR: number
   /** Grid size per dimension (power of 2). */
   gridSizePerDim: number
-  /** Total TDSE steps evolved. */
-  totalSteps: number
+  /** Total entanglement samples (evolve + measure). */
+  totalSamples: number
   /** Number of diagnostic samples in the measurement window. */
   measurementSamples: number
 }
@@ -50,12 +50,10 @@ export interface AtlasSweepConfig {
   dimensions: number[]
   /** Monitoring rates γ to sweep (inner loop — cheapest to change). */
   gammas: number[]
-  /** TDSE steps to evolve before measurement (thermalization). */
-  evolveSteps: number
-  /** TDSE steps for measurement window. */
-  measureSteps: number
-  /** How many TDSE frames between diagnostic samples. */
-  decimation: number
+  /** Entanglement samples to skip before measurement (thermalization window). */
+  evolveSamples: number
+  /** Entanglement samples to collect during measurement window. */
+  measureSamples: number
 }
 
 /** Sweep status: idle → running → complete. */
@@ -149,9 +147,8 @@ export const DEFAULT_ATLAS_CONFIG: AtlasSweepConfig = {
   lambdaSteps: 8,
   dimensions: [3, 4, 5],
   gammas: [0, 0.3, 1, 3, 10],
-  evolveSteps: 150,
-  measureSteps: 50,
-  decimation: 5,
+  evolveSamples: 30,
+  measureSamples: 10,
 }
 
 /** Compute log-spaced lambda for a given step index. */
@@ -199,17 +196,18 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
 
   abortSweep: () => set({ status: 'idle' }),
 
-  recordSample: (entanglement, wignerNegativity, ipr) => {
-    const state = get()
-    pushSample(state.entanglementAcc, entanglement)
-    pushSample(state.wignerAcc, wignerNegativity)
-    pushSample(state.iprAcc, ipr)
-  },
+  recordSample: (entanglement, wignerNegativity, ipr) =>
+    set((state) => {
+      const eAcc = { ...state.entanglementAcc }
+      const wAcc = { ...state.wignerAcc }
+      const iAcc = { ...state.iprAcc }
+      pushSample(eAcc, entanglement)
+      pushSample(wAcc, wignerNegativity)
+      pushSample(iAcc, ipr)
+      return { entanglementAcc: eAcc, wignerAcc: wAcc, iprAcc: iAcc }
+    }),
 
-  tickFrame: () => {
-    const state = get()
-    state.framesEvolved++
-  },
+  tickFrame: () => set((state) => ({ framesEvolved: state.framesEvolved + 1 })),
 
   completePointAndAdvance: (gridSizePerDim) => {
     const state = get()
@@ -232,7 +230,7 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       avgIPR: ipr.mean,
       varIPR: ipr.variance,
       gridSizePerDim,
-      totalSteps: config.evolveSteps + config.measureSteps,
+      totalSamples: config.evolveSamples + config.measureSamples,
       measurementSamples: entanglementAcc.n,
     }
 

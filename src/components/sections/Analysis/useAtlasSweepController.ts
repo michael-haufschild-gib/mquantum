@@ -10,11 +10,11 @@
  * 2. λ (coupling) — moderate cost (potential reconfiguration + field reset)
  * 3. γ (monitoring rate) — cheapest to change (just a uniform update)
  *
- * Each sweep point evolves `evolveSteps` frames for thermalization, then
- * collects diagnostic samples over `measureSteps` frames (decimated by
- * `decimation`). The controller polls the entanglement and diagnostics
- * stores to read results, feeds them to the atlas store accumulators,
- * and advances to the next point when enough samples are collected.
+ * Each sweep point waits for `evolveSamples` entanglement worker results
+ * (thermalization), then collects `measureSamples` diagnostic snapshots.
+ * The controller polls the entanglement and diagnostics stores to read
+ * results, feeds them to the atlas store accumulators, and advances to
+ * the next point when enough samples are collected.
  *
  * @module components/sections/Analysis/useAtlasSweepController
  */
@@ -186,8 +186,8 @@ export function useAtlasSweepController(): {
 
         // How many entanglement worker results have arrived since point start
         const entSamples = entStore.longTimeN - pointStartNRef.current
-        const evolveNeeded = config.evolveSteps
-        const measureNeeded = config.measureSteps
+        const evolveNeeded = config.evolveSamples
+        const measureNeeded = config.measureSamples
 
         // Tick frame counter
         atlas.tickFrame()

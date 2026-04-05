@@ -191,7 +191,7 @@ H6 is the most surprising possible finding: it would mean that a state can be hi
 
 ### 3.1 From ρ_d to Wigner Function
 
-The reduced density matrix ρ_d(i, j) is already computed for coordinate entanglement (/Users/Spare/Documents/code/mquantum/docs/plans/inter-dimensional-entanglement.md). The marginal Wigner function is:
+The reduced density matrix ρ_d(i, j) is already computed for coordinate entanglement ([docs/plans/inter-dimensional-entanglement.md](docs/plans/inter-dimensional-entanglement.md)). The marginal Wigner function is:
 
 ```
 W_d(x_m, p_n) = (1/πℏ) Σ_{k=0}^{M-1} ρ_d(m+k, m-k) · e^{2iπnk/M}
@@ -340,7 +340,7 @@ interface AtlasPoint {
   varIPR: number
   // Metadata
   gridSizePerDim: number
-  totalSteps: number
+  totalSamples: number
   measurementWindow: number
 }
 ```

@@ -601,7 +601,7 @@ export function exportFilename(prefix: string, extension: string): string {
 // ─── Quantumness Atlas Export ───────────────────────────────────────────────
 
 const ATLAS_CSV_HEADER =
-  'dim,lambda,gamma,avg_normalized_entropy,var_normalized_entropy,avg_wigner_negativity,var_wigner_negativity,avg_ipr,var_ipr,grid_size,total_steps,measurement_samples'
+  'dim,lambda,gamma,avg_normalized_entropy,var_normalized_entropy,avg_wigner_negativity,var_wigner_negativity,avg_ipr,var_ipr,grid_size,total_samples,measurement_samples'
 
 /**
  * Serialize atlas sweep results to CSV.
@@ -622,7 +622,7 @@ export function atlasResultsToCSV(results: AtlasPoint[]): string {
       p.avgIPR,
       p.varIPR,
       p.gridSizePerDim,
-      p.totalSteps,
+      p.totalSamples,
       p.measurementSamples,
     ].join(',')
   )

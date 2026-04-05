@@ -664,7 +664,7 @@ describe('atlasResultsToCSV', () => {
     avgIPR: 0.65,
     varIPR: 0.003,
     gridSizePerDim: 64,
-    totalSteps: 200,
+    totalSamples: 200,
     measurementSamples: 10,
   }
 
@@ -704,7 +704,7 @@ describe('atlasResultsToJSON', () => {
       avgIPR: 0.8,
       varIPR: 0.003,
       gridSizePerDim: 32,
-      totalSteps: 200,
+      totalSamples: 200,
       measurementSamples: 10,
     }
     const json = atlasResultsToJSON([point])
