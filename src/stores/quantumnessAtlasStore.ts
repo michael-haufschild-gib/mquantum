@@ -173,7 +173,11 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
   iprAcc: emptyAccumulator(),
   framesEvolved: 0,
 
-  setConfig: (partial) => set((state) => ({ config: { ...state.config, ...partial } })),
+  setConfig: (partial) =>
+    set((state) => {
+      if (state.status === 'running') return state
+      return { config: { ...state.config, ...partial } }
+    }),
 
   startSweep: () => {
     const config = get().config
@@ -233,9 +237,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       const eAcc = { ...state.entanglementAcc }
       const wAcc = { ...state.wignerAcc }
       const iAcc = { ...state.iprAcc }
-      pushSample(eAcc, entanglement)
-      pushSample(wAcc, wignerNegativity)
-      pushSample(iAcc, ipr)
+      if (Number.isFinite(entanglement)) pushSample(eAcc, entanglement)
+      if (Number.isFinite(wignerNegativity)) pushSample(wAcc, wignerNegativity)
+      if (Number.isFinite(ipr)) pushSample(iAcc, ipr)
       return { entanglementAcc: eAcc, wignerAcc: wAcc, iprAcc: iAcc }
     }),
 
@@ -243,6 +247,7 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
 
   completePointAndAdvance: (gridSizePerDim) => {
     const state = get()
+    if (state.status !== 'running') return null
     const { config, progress } = state
     const { entanglementAcc, wignerAcc, iprAcc } = state
 
@@ -324,5 +329,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       status: 'idle',
       results: [],
       progress: { dimIdx: 0, lambdaIdx: 0, gammaIdx: 0, totalPoints: 0, completedPoints: 0 },
+      entanglementAcc: emptyAccumulator(),
+      wignerAcc: emptyAccumulator(),
+      iprAcc: emptyAccumulator(),
+      framesEvolved: 0,
     }),
 }))

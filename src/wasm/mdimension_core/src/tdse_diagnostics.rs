@@ -273,6 +273,10 @@ pub fn compute_scar_correlation(
         }
     }
 
+    if sigma <= 0.0 {
+        // Invalid sigma — return zeros to avoid Inf/NaN in Gaussian weights
+        return vec![0.0; num_orbits + 4];
+    }
     let inv_two_eps_sq = 1.0 / (2.0 * sigma * sigma);
 
     // Kernel radius: 3σ in grid cells
