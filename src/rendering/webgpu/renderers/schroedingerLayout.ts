@@ -122,7 +122,7 @@ const SCHROEDINGER_FIELDS = [
   { name: 'nodalColorNegative', type: 'vec3f' },
   { name: '_padNodal3', type: 'f32' },
 
-  // --- Probability flow + uncertainty (offset 1152) ---
+  // --- Phase shimmer + uncertainty (offset 1152) ---
   { name: 'phaseShimmerEnabled', type: 'u32' },
   { name: 'phaseShimmerSpeed', type: 'f32' },
   { name: 'phaseShimmerStrength', type: 'f32' },

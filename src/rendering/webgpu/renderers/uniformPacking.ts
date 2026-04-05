@@ -417,7 +417,7 @@ function packOverlayControls(
   packPhaseAndInterference(floatView, intView, p.boundingRadius, isDensityMatrixMode, schroedinger)
   packNodalControls(floatView, intView, schroedinger)
 
-  // Probability flow + uncertainty
+  // Phase shimmer + uncertainty
   intView[I.phaseShimmerEnabled] = schroedinger?.phaseShimmerEnabled ? 1 : 0
   floatView[I.phaseShimmerSpeed] = schroedinger?.phaseShimmerSpeed ?? 1.0
   floatView[I.phaseShimmerStrength] = schroedinger?.phaseShimmerStrength ?? 0.3

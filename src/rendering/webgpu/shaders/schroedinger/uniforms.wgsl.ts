@@ -207,7 +207,7 @@ struct SchroedingerUniforms {
   nodalColorNegative: vec3f,     // Negative lobe color
   _padNodal3: f32,
 
-  // Probability Current Flow
+  // Phase Shimmer
   phaseShimmerEnabled: u32,    // Enable density-modulated flow noise
   phaseShimmerSpeed: f32,      // Flow animation speed (0.1-5.0)
   phaseShimmerStrength: f32,   // Flow modulation strength (0.0-1.0)

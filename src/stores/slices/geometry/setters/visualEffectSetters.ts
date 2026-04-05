@@ -170,7 +170,7 @@ export function createVisualEffectSetters(
     },
     setSchroedingerProbabilityCurrentOpacity: clampedSetter('probabilityCurrentOpacity', 0.0, 1.0),
 
-    // Probability flow
+    // Phase shimmer
     setSchroedingerPhaseShimmerEnabled: valueSetter('phaseShimmerEnabled'),
     setSchroedingerPhaseShimmerSpeed: clampedSetter('phaseShimmerSpeed', 0.1, 5.0),
     setSchroedingerPhaseShimmerStrength: clampedSetter('phaseShimmerStrength', 0.0, 1.0),

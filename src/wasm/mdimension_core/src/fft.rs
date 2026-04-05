@@ -9,20 +9,23 @@
 
 use std::cell::RefCell;
 use std::f64::consts::PI;
+use std::rc::Rc;
 
 // ============================================================================
 // Twiddle Factor Cache
 // ============================================================================
 
 /// Maximum supported log2(N). Supports FFT sizes up to 2^20 = 1,048,576.
-const MAX_LOG2: usize = 21;
+/// Public so lib.rs validators can enforce the same upper bound.
+pub const MAX_LOG2: usize = 21;
 
 thread_local! {
     /// Cached twiddle factors indexed by log2(N).
     /// Each entry stores interleaved [re, im] pairs for all butterfly stages of size N.
     /// Layout: stage L=2 (1 factor), stage L=4 (2 factors), ..., stage L=N (N/2 factors).
     /// Total: N-1 complex pairs = 2*(N-1) f64 values.
-    static TWIDDLE_CACHE: RefCell<Vec<Option<Vec<f64>>>> =
+    /// Wrapped in Rc for O(1) clone on cache hits.
+    static TWIDDLE_CACHE: RefCell<Vec<Option<Rc<Vec<f64>>>>> =
         RefCell::new(vec![None; MAX_LOG2]);
 }
 
@@ -35,15 +38,14 @@ fn log2_exact(n: usize) -> usize {
 }
 
 /// Get or compute cached twiddle factors for FFT size `n`.
-/// Returns a cloned `Vec<f64>` from the cache (clone is cheap — the data is reused
-/// across many calls but we need ownership for the borrow checker).
-fn get_twiddle_factors(n: usize) -> Vec<f64> {
+/// Returns an `Rc<Vec<f64>>` — clone is O(1) ref-count increment.
+fn get_twiddle_factors(n: usize) -> Rc<Vec<f64>> {
     TWIDDLE_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
         let idx = log2_exact(n);
 
         if let Some(ref table) = cache[idx] {
-            return table.clone();
+            return Rc::clone(table);
         }
 
         // Total twiddle entries: sum(L/2 for L=2,4,...,N) = N-1
@@ -60,8 +62,9 @@ fn get_twiddle_factors(n: usize) -> Vec<f64> {
             len *= 2;
         }
 
-        cache[idx] = Some(table.clone());
-        table
+        let rc = Rc::new(table);
+        cache[idx] = Some(Rc::clone(&rc));
+        rc
     })
 }
 

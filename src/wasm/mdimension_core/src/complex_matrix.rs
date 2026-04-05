@@ -271,6 +271,12 @@ fn solve_linear_system_into(
         let piv_im = ai[col * n + col];
         let piv_mag2 = piv_re * piv_re + piv_im * piv_im;
         if piv_mag2 < SINGULAR_THRESHOLD {
+            // Near-singular pivot — fill result column with NaN to signal failure
+            // rather than silently returning a wrong answer.
+            for row in 0..n {
+                result_re[row * n + col] = f64::NAN;
+                result_im[row * n + col] = f64::NAN;
+            }
             continue;
         }
 

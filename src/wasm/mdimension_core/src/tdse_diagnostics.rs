@@ -7,7 +7,6 @@
 //! These are called periodically (not every frame) for diagnostic overlays.
 
 // Short variable names (d, n, m, s, b) are conventional in numerical code
-#![allow(clippy::many_single_use)]
 #![allow(clippy::similar_names)]
 
 use std::f64::consts::PI;

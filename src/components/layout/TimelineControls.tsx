@@ -22,11 +22,7 @@ import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnim
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
 
 export const TimelineControls: FC = () => {
-  const { objectType } = useGeometryStore(
-    useShallow((state: GeometryState) => ({
-      objectType: state.objectType,
-    }))
-  )
+  const objectType = useGeometryStore((state: GeometryState) => state.objectType)
 
   const { isPlaying, speed, animatingPlanes, togglePlayPause, setSpeed } = useAnimationStore(
     useShallow((state: AnimationState) => ({

@@ -372,7 +372,7 @@ export interface SchroedingerConfig {
   /** Overlay opacity for current visualization */
   probabilityCurrentOpacity: number
 
-  // === Probability Current Flow ===
+  // === Phase Shimmer ===
   /** Enable legacy density-modulated flow-noise animation */
   phaseShimmerEnabled: boolean
   /** Flow animation speed (0.1-5.0) */
@@ -653,7 +653,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   probabilityCurrentSteps: 20,
   probabilityCurrentOpacity: 0.7,
 
-  // Probability Current Flow
+  // Phase Shimmer
   phaseShimmerEnabled: false,
   phaseShimmerSpeed: 1.0,
   phaseShimmerStrength: 0.3,

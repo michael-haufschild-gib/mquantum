@@ -259,6 +259,22 @@ function tryLevelSpacingWasm(energies: number[], iprs?: number[]): LevelSpacingR
   const brodyBeta = packed[numSpacings]!
   const meanSpacing = packed[numSpacings + 1]!
   const classificationCode = Math.round(packed[numSpacings + 2]!)
+
+  // Validate WASM payload values — fall back to JS if corrupt
+  if (
+    !Number.isFinite(brodyBeta) ||
+    !Number.isFinite(meanSpacing) ||
+    meanSpacing <= 0 ||
+    brodyBeta < 0 ||
+    brodyBeta > 1 ||
+    !(classificationCode in CLASSIFICATION_MAP)
+  ) {
+    return null
+  }
+  for (let i = 0; i < numSpacings; i++) {
+    if (!Number.isFinite(packed[i]!) || packed[i]! < 0) return null
+  }
+
   const classification = CLASSIFICATION_MAP[classificationCode] ?? 'intermediate'
 
   // Sort energies (same as JS path)

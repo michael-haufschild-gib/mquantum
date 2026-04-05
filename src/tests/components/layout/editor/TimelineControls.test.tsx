@@ -5,7 +5,7 @@ import { TimelineControls } from '@/components/layout/TimelineControls'
 
 const mockGeometryState = {
   dimension: 4,
-  objectType: 'hypercube',
+  objectType: 'schroedinger',
 }
 
 vi.mock('@/stores/geometryStore', () => ({

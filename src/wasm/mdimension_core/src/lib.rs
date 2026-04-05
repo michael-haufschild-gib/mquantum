@@ -214,12 +214,14 @@ pub fn dirac_spinor_size_wasm(spatial_dim: usize) -> usize {
 // ============================================================================
 
 /// Validate 1D FFT inputs. Returns false if invalid.
+/// Enforces upper bound of 2^20 (MAX_LOG2 - 1) to prevent twiddle cache panic.
 #[inline]
 fn validate_fft_1d(data_len: usize, n: usize) -> bool {
-    n >= 2 && n.is_power_of_two() && data_len >= 2 * n
+    n >= 2 && n.is_power_of_two() && n.trailing_zeros() < fft::MAX_LOG2 as u32 && data_len >= 2 * n
 }
 
 /// Validate N-D FFT inputs. Returns false if invalid.
+/// Enforces per-axis upper bound of 2^20 (MAX_LOG2 - 1) to prevent twiddle cache panic.
 #[inline]
 fn validate_fft_nd(data_len: usize, grid_size: &[u32]) -> bool {
     if grid_size.is_empty() {
@@ -228,7 +230,7 @@ fn validate_fft_nd(data_len: usize, grid_size: &[u32]) -> bool {
     let mut total: usize = 1;
     for &s in grid_size {
         let s = s as usize;
-        if s < 2 || !s.is_power_of_two() {
+        if s < 2 || !s.is_power_of_two() || s.trailing_zeros() >= fft::MAX_LOG2 as u32 {
             return false;
         }
         total = match total.checked_mul(s) {
@@ -401,7 +403,15 @@ pub fn compute_joint_rdm_wasm(
 /// Eigenvalues sorted descending as `Float64Array`
 #[wasm_bindgen]
 pub fn hermitian_eigenvalues_wasm(re: &[f64], im: &[f64], n: u32) -> Vec<f64> {
-    entanglement::hermitian_eigenvalues(re, im, n as usize)
+    let n = n as usize;
+    if n == 0 {
+        return Vec::new();
+    }
+    let size = n * n;
+    if re.len() < size || im.len() < size {
+        return Vec::new();
+    }
+    entanglement::hermitian_eigenvalues(re, im, n)
 }
 
 /// Von Neumann entropy from eigenvalues: S = -Σ λ_k ln(λ_k).
@@ -434,8 +444,14 @@ pub fn von_neumann_entropy_wasm(eigenvalues: &[f64]) -> f64 {
 #[wasm_bindgen]
 pub fn matrix_exponential_pade_wasm(a_re: &[f64], a_im: &[f64], n: u32) -> Vec<f64> {
     let n = n as usize;
-    let (res_re, res_im) = complex_matrix::matrix_exponential_pade(a_re, a_im, n);
+    if n == 0 {
+        return Vec::new();
+    }
     let size = n * n;
+    if a_re.len() < size || a_im.len() < size {
+        return Vec::new();
+    }
+    let (res_re, res_im) = complex_matrix::matrix_exponential_pade(a_re, a_im, n);
     let mut packed = Vec::with_capacity(2 * size);
     packed.extend_from_slice(&res_re[..size]);
     packed.extend_from_slice(&res_im[..size]);
@@ -460,7 +476,13 @@ pub fn complex_mat_mul_wasm(
     n: u32,
 ) -> Vec<f64> {
     let n = n as usize;
+    if n == 0 {
+        return Vec::new();
+    }
     let size = n * n;
+    if a_re.len() < size || a_im.len() < size || b_re.len() < size || b_im.len() < size {
+        return Vec::new();
+    }
     let mut out_re = vec![0.0; size];
     let mut out_im = vec![0.0; size];
     complex_matrix::complex_mat_mul(a_re, a_im, b_re, b_im, &mut out_re, &mut out_im, n);
