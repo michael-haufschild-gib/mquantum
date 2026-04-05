@@ -133,9 +133,18 @@ const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
     const [selectedDim, setSelectedDim] = useState<number | null>(null)
     const [selectedGamma, setSelectedGamma] = useState<number | null>(null)
 
-    const activeLambda = selectedLambda ?? availableLambdas[0] ?? null
-    const activeDim = selectedDim ?? availableDims[0] ?? null
-    const activeGamma = selectedGamma ?? availableGammas[0] ?? null
+    const activeLambda =
+      selectedLambda !== null && availableLambdas.includes(selectedLambda)
+        ? selectedLambda
+        : (availableLambdas[0] ?? null)
+    const activeDim =
+      selectedDim !== null && availableDims.includes(selectedDim)
+        ? selectedDim
+        : (availableDims[0] ?? null)
+    const activeGamma =
+      selectedGamma !== null && availableGammas.includes(selectedGamma)
+        ? selectedGamma
+        : (availableGammas[0] ?? null)
 
     // Erosion curve data: filter at (λ, N), varying γ
     const erosionData = useMemo<ErosionCurveData[]>(() => {

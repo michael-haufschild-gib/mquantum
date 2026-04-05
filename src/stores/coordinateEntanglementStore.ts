@@ -251,7 +251,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       state.historyEntropies[d]![head] = result.entropies[d] ?? NaN
     }
     state.historyAverage[head] = result.averageEntropy
-    state.historyWignerNegativity[head] = result.averageWignerNegativity
+    state.historyWignerNegativity[head] = result.wignerNegativities.some((v) => v !== null)
+      ? result.averageWignerNegativity
+      : NaN
 
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)

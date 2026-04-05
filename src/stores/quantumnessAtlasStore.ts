@@ -177,6 +177,14 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
 
   startSweep: () => {
     const config = get().config
+    if (config.lambdaMin <= 0 || config.lambdaMax <= 0 || config.lambdaSteps < 1) {
+      throw new Error(
+        `Invalid lambda config: min=${config.lambdaMin}, max=${config.lambdaMax}, steps=${config.lambdaSteps}`
+      )
+    }
+    if (config.dimensions.length === 0 || config.gammas.length === 0) {
+      throw new Error('dimensions and gammas must be non-empty arrays')
+    }
     set({
       status: 'running',
       progress: {
@@ -249,8 +257,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
         lambdaIdx = 0
         dimIdx++
         if (dimIdx >= config.dimensions.length) {
-          // Sweep complete
+          // Sweep complete — set status so UI gating releases immediately
           set({
+            status: 'complete',
             results: newResults,
             progress: { ...progress, completedPoints: completed },
           })

@@ -83,8 +83,9 @@ export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(
   const xOf = (g: number) => PAD.left + ((g - gMin) / gRange) * PW
   const yOf = (v: number) => PAD.top + (1 - v) * PH
 
+  const sorted = [...data].sort((a, b) => a.gamma - b.gamma)
   const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
-    data.map((d) => `${xOf(d.gamma)},${yOf(norm(d[key], maxVal))}`).join(' ')
+    sorted.map((d) => `${xOf(d.gamma)},${yOf(norm(d[key], maxVal))}`).join(' ')
 
   return (
     <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
@@ -400,8 +401,9 @@ export const DimensionComparison: React.FC<{ data: DimCompareData[] }> = React.m
   const xOf = (d: number) => PAD.left + ((d - dMin) / dRange) * PW
   const yOf = (v: number) => PAD.top + (1 - v) * PH
 
+  const dimSorted = [...data].sort((a, b) => a.dim - b.dim)
   const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
-    data.map((d) => `${xOf(d.dim)},${yOf(norm(d[key], maxVal))}`).join(' ')
+    dimSorted.map((d) => `${xOf(d.dim)},${yOf(norm(d[key], maxVal))}`).join(' ')
 
   return (
     <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">

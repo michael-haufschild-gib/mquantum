@@ -279,7 +279,7 @@ Compute pairwise joint Wigner only when M ≤ 16 (N ≥ 5). For lower dimensions
 The sweep runs sequentially over the (λ, N, γ) parameter space. For each point:
 
 1. Reconfigure TDSE (potential, grid, dimension)
-2. Reconfigure monitoring (γ — from docs/plans/stochastic-decoherence-engine.md)
+2. Reconfigure monitoring (γ — see [stochastic-decoherence-engine.md](docs/plans/stochastic-decoherence-engine.md))
 3. Reset wavefunction
 4. Wait for shader compilation (dimension/grid changes trigger recompile)
 5. Evolve T_evolve steps

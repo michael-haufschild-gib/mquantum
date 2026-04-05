@@ -45,6 +45,8 @@ interface PreSweepSnapshot {
   stochasticGamma: number
   entanglementEnabled: boolean
   computeWignerNegativity: boolean
+  computePairwiseMI: boolean
+  computeBipartitions: boolean
 }
 
 /** Configures the TDSE for a specific atlas sweep point. */
@@ -60,13 +62,9 @@ function applyPointConfig(dim: number, lambda: number, gamma: number, dimChanged
   ext.setTdsePotentialType('coupledAnharmonic')
   ext.setTdseAnharmonicLambda(lambda)
 
-  // Configure stochastic monitoring
-  if (gamma > 0) {
-    ext.setTdseStochasticEnabled(true)
-    ext.setTdseStochasticGamma(gamma)
-  } else {
-    ext.setTdseStochasticEnabled(false)
-  }
+  // Configure stochastic monitoring — always set gamma to avoid stale values
+  ext.setTdseStochasticGamma(gamma)
+  ext.setTdseStochasticEnabled(gamma > 0)
 
   // Reset the field to a fresh Gaussian for each point
   ext.resetTdseField()
@@ -101,12 +99,8 @@ export function useAtlasSweepController(): {
     ext.setTdsePotentialType(snap.potentialType)
     ext.setTdseAnharmonicLambda(snap.anharmonicLambda)
 
-    if (snap.stochasticEnabled) {
-      ext.setTdseStochasticEnabled(true)
-      ext.setTdseStochasticGamma(snap.stochasticGamma)
-    } else {
-      ext.setTdseStochasticEnabled(false)
-    }
+    ext.setTdseStochasticGamma(snap.stochasticGamma)
+    ext.setTdseStochasticEnabled(snap.stochasticEnabled)
 
     useGeometryStore.getState().setDimension(snap.dimension)
 
@@ -114,6 +108,8 @@ export function useAtlasSweepController(): {
     const entStore = useCoordinateEntanglementStore.getState()
     entStore.setEnabled(snap.entanglementEnabled)
     entStore.setComputeWignerNegativity(snap.computeWignerNegativity)
+    entStore.setComputePairwiseMI(snap.computePairwiseMI)
+    entStore.setComputeBipartitions(snap.computeBipartitions)
 
     queueMicrotask(() => {
       useExtendedObjectStore.getState().resetTdseField()
@@ -138,11 +134,15 @@ export function useAtlasSweepController(): {
       stochasticGamma: tdse.stochasticGamma,
       entanglementEnabled: entStore.enabled,
       computeWignerNegativity: entStore.computeWignerNegativity,
+      computePairwiseMI: entStore.computePairwiseMI,
+      computeBipartitions: entStore.computeBipartitions,
     }
 
-    // Enable entanglement + Wigner for the sweep
+    // Enable entanglement + Wigner for the sweep, disable expensive MI/bipartitions
     entStore.setEnabled(true)
     entStore.setComputeWignerNegativity(true)
+    entStore.setComputePairwiseMI(false)
+    entStore.setComputeBipartitions(false)
     entStore.clearHistory()
 
     // Start sweep — must re-read state after startSweep() because the
