@@ -95,6 +95,7 @@ import {
   nodalSurfacesStubBlock,
   probabilityCurrentBlock,
   probabilityCurrentStubBlock,
+  volumeCompositingBlock,
   volumeGradientBlock,
   volumeIntegrationBlock,
   volumeRaymarchBlock,
@@ -465,6 +466,7 @@ export function buildVolumeBlocks(opts: {
         : '// Stub: analysis texture unavailable\nfn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !opts.is2D },
+    { name: 'Volume Compositing', content: volumeCompositingBlock, condition: !opts.is2D },
     {
       name: 'Nodal Surfaces',
       content: opts.nodal ? nodalSurfacesBlock : nodalSurfacesStubBlock,

@@ -14,4 +14,8 @@ export {
   generateComputeBaseColor,
   generateEmissionPreBlock,
 } from './emission.wgsl'
-export { volumeGradientBlock, volumeIntegrationBlock } from './integration.wgsl'
+export {
+  volumeCompositingBlock,
+  volumeGradientBlock,
+  volumeIntegrationBlock,
+} from './integration.wgsl'

@@ -59,10 +59,7 @@ fn volumeRaymarch(
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
 
-    if (transmittance < MIN_TRANSMITTANCE) { break; }
-    let remainingDistance = max(tFar - t, 0.0);
-    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
-    if (transmittance * maxRemainingOpacity < MIN_REMAINING_CONTRIBUTION) { break; }
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -99,16 +96,7 @@ fn volumeRaymarch(
       }
     }
 
-    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6, alpha≈σ·6e-6·4·step≈5e-7·σ (sub-pixel).
-    // log(ρ)=-8 → ρ≈3.4e-4, alpha≈σ·3.4e-4·2·step≈1.4e-5·σ (sub-pixel at σ≤10).
-    // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
-    var stepMultiplier = 1.0;
-    if (sCenter < -12.0) {
-      stepMultiplier = 4.0;
-    } else if (sCenter < -8.0) {
-      stepMultiplier = 2.0;
-    }
-    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+    let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
 
     // PERF: When nodal band mode is active, use the combined function that also computes
     // the density gradient from the same tetrahedral samples. This eliminates 4 redundant
@@ -131,17 +119,11 @@ fn volumeRaymarch(
       let fadedIntensity = combined.nodal.intensity * combined.nodal.envelopeWeight;
       if (fadedIntensity > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
-        let nodalOpticalStep = min(adaptiveStep, stepLen * 1.5);
-        let nodalAlpha = clamp(
-          1.0 - exp(-max(fadedIntensity * uniforms.nodalStrength, 0.0) * nodalOpticalStep),
-          0.0,
-          1.0
+        compositeNodalBand(
+          fadedIntensity, uniforms.nodalStrength, nodalColor,
+          min(adaptiveStep, stepLen * 1.5), ambientLight,
+          &transmittance, &accColor
         );
-        if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
-          accColor += transmittance * nodalAlpha * nodalScattered;
-          transmittance *= (1.0 - nodalAlpha * 0.6);
-        }
       }
     }
 
@@ -160,49 +142,18 @@ fn volumeRaymarch(
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrentWithPsi(pos, animTime, rawPsiVec.xy, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
-        pos,
-        currentSample,
-        rho,
-        normalProxy,
-        viewDir,
-        uniforms
+        pos, currentSample, rho, normalProxy, viewDir, uniforms
       );
-      if (currentOverlay.a > 1e-5) {
-        let overlayAlpha = clamp(
-          currentOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0),
-          0.0,
-          1.0
-        );
-        accColor += transmittance * overlayAlpha * currentOverlay.rgb;
-        transmittance *= (1.0 - overlayAlpha * 0.45);
-      }
+      compositeOverlay(currentOverlay, adaptiveStep, stepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
-      if (rProbOverlay.a > 1e-5) {
-        let rProbAlpha = clamp(
-          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
-        );
-        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
-        transmittance *= (1.0 - rProbAlpha * 0.5);
-      }
+      compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
     }
 
-    // Density contrast sharpening: compress low-density tails for sharper lobes
-    var effectiveRho = applyDensityContrast(rho, uniforms);
-    // Phase materiality: smoke regions are denser (more absorbing)
-    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
-      let pmPhase = fract((phase + PI) / TAU);
-      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
-      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
-    }
-    // Nodal plane softening: when inside the cloud, apply a tiny density floor
-    // to fill the thin dark line artifact where |psi|^2 = 0 at nodal surfaces.
-    // Scales with cloud depth so edges and empty space are unaffected.
-    let cloudDepth = 1.0 - transmittance;
-    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
+    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -285,10 +236,7 @@ fn volumeRaymarchHQ(
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
 
-    if (transmittance < MIN_TRANSMITTANCE) { break; }
-    let remainingDistance = max(tFar - t, 0.0);
-    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
-    if (transmittance * maxRemainingOpacity < MIN_REMAINING_CONTRIBUTION) { break; }
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -359,24 +307,13 @@ fn volumeRaymarchHQ(
       // Process nodal contribution inline (avoid duplicate call)
       let fadedIntensityHQ = combined.nodal.intensity * combined.nodal.envelopeWeight;
       if (fadedIntensityHQ > 1e-4) {
-        // Adaptive step needed before nodal compositing
-        var stepMultiplierN = 1.0;
-        if (quickS < -12.0) { stepMultiplierN = 4.0; }
-        else if (quickS < -8.0) { stepMultiplierN = 2.0; }
-        let adaptiveStepN = min(stepLen * stepMultiplierN, tFar - t);
-
+        let adaptiveStepN = computeAdaptiveStep(quickS, stepLen, tFar - t);
         let nodalColor = selectPhysicalNodalColor(uniforms, combined.nodal.colorMode, combined.nodal.signValue);
-        let nodalOpticalStepHQ = min(adaptiveStepN, stepLen * 1.5);
-        let nodalAlpha = clamp(
-          1.0 - exp(-max(fadedIntensityHQ * uniforms.nodalStrength, 0.0) * nodalOpticalStepHQ),
-          0.0,
-          1.0
+        compositeNodalBand(
+          fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
+          min(adaptiveStepN, stepLen * 1.5), ambientLight,
+          &transmittance, &accColor
         );
-        if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
-          accColor += transmittance * nodalAlpha * nodalScattered;
-          transmittance *= (1.0 - nodalAlpha * 0.6);
-        }
       }
       nodalHandled = true;
     } else if (USE_ANALYTICAL_GRADIENT) {
@@ -394,16 +331,7 @@ fn volumeRaymarchHQ(
       gradient = tetra.gradient;
     }
 
-    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6, alpha≈σ·6e-6·4·step≈5e-7·σ (sub-pixel).
-    // log(ρ)=-8 → ρ≈3.4e-4, alpha≈σ·3.4e-4·2·step≈1.4e-5·σ (sub-pixel at σ≤10).
-    // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
-    var stepMultiplier = 1.0;
-    if (quickS < -12.0) {
-      stepMultiplier = 4.0;
-    } else if (quickS < -8.0) {
-      stepMultiplier = 2.0;
-    }
-    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+    let adaptiveStep = computeAdaptiveStep(quickS, stepLen, tFar - t);
 
     // Nodal band processing (only if not already handled by the combined path above)
     if (!nodalHandled && nodalBandActive) {
@@ -411,17 +339,11 @@ fn volumeRaymarchHQ(
       let fadedIntensityHQ = nodal.intensity * nodal.envelopeWeight;
       if (fadedIntensityHQ > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
-        let nodalOpticalStepHQ = min(adaptiveStep, stepLen * 1.5);
-        let nodalAlpha = clamp(
-          1.0 - exp(-max(fadedIntensityHQ * uniforms.nodalStrength, 0.0) * nodalOpticalStepHQ),
-          0.0,
-          1.0
+        compositeNodalBand(
+          fadedIntensityHQ, uniforms.nodalStrength, nodalColor,
+          min(adaptiveStep, stepLen * 1.5), ambientLight,
+          &transmittance, &accColor
         );
-        if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
-          accColor += transmittance * nodalAlpha * nodalScattered;
-          transmittance *= (1.0 - nodalAlpha * 0.6);
-        }
       }
     }
 
@@ -438,47 +360,18 @@ fn volumeRaymarchHQ(
       let normalProxy = normalize(gradient + pos * 0.2 + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
-        pos,
-        currentSample,
-        rho,
-        normalProxy,
-        viewDir,
-        uniforms
+        pos, currentSample, rho, normalProxy, viewDir, uniforms
       );
-      if (currentOverlay.a > 1e-5) {
-        let overlayAlpha = clamp(
-          currentOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0),
-          0.0,
-          1.0
-        );
-        accColor += transmittance * overlayAlpha * currentOverlay.rgb;
-        transmittance *= (1.0 - overlayAlpha * 0.45);
-      }
+      compositeOverlay(currentOverlay, adaptiveStep, stepLen, 0.45, &transmittance, &accColor);
     }
 
     // Radial probability overlay (hydrogen P(r) shells)
     if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
       let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
-      if (rProbOverlay.a > 1e-5) {
-        let rProbAlpha = clamp(
-          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
-        );
-        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
-        transmittance *= (1.0 - rProbAlpha * 0.5);
-      }
+      compositeOverlay(rProbOverlay, adaptiveStep, stepLen, 0.5, &transmittance, &accColor);
     }
 
-    // Density contrast sharpening: compress low-density tails for sharper lobes
-    var effectiveRho = applyDensityContrast(rho, uniforms);
-    // Phase materiality: smoke regions are denser (more absorbing)
-    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
-      let pmPhase = fract((phase + PI) / TAU);
-      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
-      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
-    }
-    // Nodal plane softening: density floor AFTER contrast so sigmoid doesn't kill it
-    let cloudDepthHQ = 1.0 - transmittance;
-    effectiveRho = max(effectiveRho, 5e-4 * cloudDepthHQ * cloudDepthHQ);
+    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
