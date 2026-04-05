@@ -217,7 +217,10 @@ pub fn dirac_spinor_size_wasm(spatial_dim: usize) -> usize {
 /// Enforces upper bound of 2^20 (MAX_LOG2 - 1) to prevent twiddle cache panic.
 #[inline]
 fn validate_fft_1d(data_len: usize, n: usize) -> bool {
-    n >= 2 && n.is_power_of_two() && n.trailing_zeros() < fft::MAX_LOG2 as u32 && data_len >= 2 * n
+    n >= 2
+        && n.is_power_of_two()
+        && n.trailing_zeros() < fft::MAX_LOG2 as u32
+        && matches!(n.checked_mul(2), Some(required) if data_len >= required)
 }
 
 /// Validate N-D FFT inputs. Returns false if invalid.
@@ -238,7 +241,7 @@ fn validate_fft_nd(data_len: usize, grid_size: &[u32]) -> bool {
             None => return false,
         };
     }
-    data_len >= 2 * total
+    matches!(total.checked_mul(2), Some(required) if data_len >= required)
 }
 
 /// In-place 1D forward FFT on interleaved complex data.
@@ -335,8 +338,14 @@ fn validate_rdm_inputs(psi_re_len: usize, psi_im_len: usize, grid_size: &[u32]) 
     if psi_re_len != psi_im_len || grid_size.is_empty() {
         return false;
     }
-    let total: usize = grid_size.iter().map(|&s| s as usize).product();
-    total > 0 && psi_re_len == total
+    let mut total = 1usize;
+    for &s in grid_size {
+        total = match total.checked_mul(s as usize) {
+            Some(t) if t > 0 => t,
+            _ => return false,
+        };
+    }
+    psi_re_len == total
 }
 
 /// Compute the reduced density matrix for a single dimension by tracing out
@@ -407,7 +416,10 @@ pub fn hermitian_eigenvalues_wasm(re: &[f64], im: &[f64], n: u32) -> Vec<f64> {
     if n == 0 {
         return Vec::new();
     }
-    let size = n * n;
+    let size = match n.checked_mul(n) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
     if re.len() < size || im.len() < size {
         return Vec::new();
     }
@@ -447,7 +459,10 @@ pub fn matrix_exponential_pade_wasm(a_re: &[f64], a_im: &[f64], n: u32) -> Vec<f
     if n == 0 {
         return Vec::new();
     }
-    let size = n * n;
+    let size = match n.checked_mul(n) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
     if a_re.len() < size || a_im.len() < size {
         return Vec::new();
     }
@@ -479,7 +494,10 @@ pub fn complex_mat_mul_wasm(
     if n == 0 {
         return Vec::new();
     }
-    let size = n * n;
+    let size = match n.checked_mul(n) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
     if a_re.len() < size || a_im.len() < size || b_re.len() < size || b_im.len() < size {
         return Vec::new();
     }

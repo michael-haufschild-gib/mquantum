@@ -33,8 +33,10 @@ thread_local! {
 /// Panics if n is not a power of 2 or is zero.
 #[inline]
 fn log2_exact(n: usize) -> usize {
-    debug_assert!(n > 0 && n.is_power_of_two(), "n must be a power of 2");
-    n.trailing_zeros() as usize
+    assert!(n > 0 && n.is_power_of_two(), "n must be a non-zero power of 2");
+    let idx = n.trailing_zeros() as usize;
+    assert!(idx < MAX_LOG2, "FFT size exceeds the supported maximum");
+    idx
 }
 
 /// Get or compute cached twiddle factors for FFT size `n`.
@@ -105,8 +107,8 @@ fn bit_reverse(data: &mut [f64], n: usize) {
 /// * `data` - Interleaved `[re0, im0, re1, im1, ...]` of length `2*n`
 /// * `n` - Number of complex elements (must be a power of 2, >= 2)
 pub fn fft_1d(data: &mut [f64], n: usize) {
-    debug_assert!(n >= 2 && n.is_power_of_two());
-    debug_assert!(data.len() >= 2 * n);
+    assert!(n >= 2 && n.is_power_of_two());
+    assert!(data.len() >= 2 * n);
 
     bit_reverse(data, n);
 
@@ -154,8 +156,8 @@ pub fn fft_1d(data: &mut [f64], n: usize) {
 ///
 /// Uses the conjugate-FFT-conjugate-scale trick for exact parity with the TS implementation.
 pub fn ifft_1d(data: &mut [f64], n: usize) {
-    debug_assert!(n >= 1 && n.is_power_of_two());
-    debug_assert!(data.len() >= 2 * n);
+    assert!(n >= 1 && n.is_power_of_two());
+    assert!(data.len() >= 2 * n);
 
     if n <= 1 {
         return;

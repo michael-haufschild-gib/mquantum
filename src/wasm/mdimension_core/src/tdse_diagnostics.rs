@@ -229,6 +229,9 @@ pub fn compute_scar_correlation(
 ) -> Vec<f64> {
     let dim = dim as usize;
     let num_orbits = orbit_lengths.len();
+    if dim == 0 {
+        return vec![0.0; num_orbits + 4];
+    }
 
     // Compute total grid sites
     let mut total_sites: usize = 1;

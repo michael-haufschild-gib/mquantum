@@ -205,9 +205,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
     }
     if (
       config.dimensions.some((d) => !Number.isInteger(d) || d < 3) ||
-      config.gammas.some((g) => !Number.isFinite(g))
+      config.gammas.some((g) => !Number.isFinite(g) || g < 0)
     ) {
-      throw new Error('dimensions must be integers >= 3 and gammas must be finite numbers')
+      throw new Error('dimensions must be integers >= 3 and gammas must be finite numbers >= 0')
     }
     set({
       status: 'running',
