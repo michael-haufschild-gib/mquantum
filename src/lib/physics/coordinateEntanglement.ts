@@ -14,6 +14,8 @@
  * @module lib/physics/coordinateEntanglement
  */
 
+import { wignerNegativityFromRDM } from '@/lib/physics/wigner/wignerFromRDM'
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Maximum supported RDM size (grid points per dimension). */
@@ -46,6 +48,10 @@ export interface CoordinateEntanglementResult {
   mutualInfo: Float64Array | null
   /** Eigenvalue spectrum of ρ₁ for the first dimension (diagnostic). */
   spectrum: number[]
+  /** Per-dimension Wigner negativity from ρ_d. null if skipped or M_d > MAX_RDM_SIZE. */
+  wignerNegativities: (number | null)[]
+  /** Average Wigner negativity across computed dimensions. 0 if none computed. */
+  averageWignerNegativity: number
 }
 
 /** Options controlling which observables to compute. */
@@ -54,6 +60,8 @@ export interface EntanglementOptions {
   computePairwiseMI: boolean
   /** Compute k-dimensional bipartition entropies. */
   computeBipartitions: boolean
+  /** Compute Wigner negativity from each per-dimension RDM ρ_d. */
+  computeWignerNegativity: boolean
 }
 
 // ─── Index Arithmetic ───────────────────────────────────────────────────────
@@ -522,13 +530,16 @@ export function computeCoordinateEntanglement(
     psiIm = normIm
   }
 
-  // ── Per-dimension entropies ────────────────────────────────────────────
+  // ── Per-dimension entropies + Wigner negativity ───────────────────────
   const entropies = new Array<number | null>(N)
   const maxEntropies = new Array<number | null>(N)
+  const wignerNegativities = new Array<number | null>(N)
   let firstSpectrum: number[] = []
   let computedSum = 0
   let computedMaxSum = 0
   let computedCount = 0
+  let wignerSum = 0
+  let wignerCount = 0
 
   for (let d = 0; d < N; d++) {
     const M = gridSize[d]!
@@ -536,6 +547,7 @@ export function computeCoordinateEntanglement(
       // Dimension too large for RDM — mark as not computed
       entropies[d] = null
       maxEntropies[d] = null
+      wignerNegativities[d] = null
       continue
     }
     const rdm = computeReducedDensityMatrix(psiRe, psiIm, gridSize, d)
@@ -549,6 +561,16 @@ export function computeCoordinateEntanglement(
     computedCount++
     if (d === 0) {
       firstSpectrum = Array.from(eigenvalues)
+    }
+
+    // Wigner negativity from the same ρ_d (negligible cost vs RDM computation)
+    if (options.computeWignerNegativity) {
+      const neg = wignerNegativityFromRDM(rdm.re, rdm.im, rdm.M)
+      wignerNegativities[d] = neg
+      wignerSum += neg
+      wignerCount++
+    } else {
+      wignerNegativities[d] = null
     }
   }
 
@@ -607,6 +629,8 @@ export function computeCoordinateEntanglement(
     }
   }
 
+  const averageWignerNegativity = wignerCount > 0 ? wignerSum / wignerCount : 0
+
   return {
     entropies,
     averageEntropy,
@@ -615,5 +639,7 @@ export function computeCoordinateEntanglement(
     bipartitionEntropies,
     mutualInfo,
     spectrum: firstSpectrum,
+    wignerNegativities,
+    averageWignerNegativity,
   }
 }

@@ -13,6 +13,7 @@ import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementS
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
 
@@ -23,9 +24,13 @@ const SURFACE_MODE_OPTIONS = [
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
-  const atlasSweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
+  const entanglementSweepRunning = useCoordinateEntanglementStore(
+    (s) => s.sweepStatus === 'running'
+  )
   const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
-  const sweepRunning = atlasSweepRunning || monitoringSweepRunning
+  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
+  const sweepRunning =
+    entanglementSweepRunning || monitoringSweepRunning || quantumnessAtlasSweepRunning
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )

@@ -9,6 +9,7 @@
 
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 // ─── Ring buffer utility ──────────────────────────────────────────────────
@@ -595,4 +596,65 @@ export function exportFilename(prefix: string, extension: string): string {
   const now = new Date()
   const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
   return `${prefix}-${ts}.${extension}`
+}
+
+// ─── Quantumness Atlas Export ───────────────────────────────────────────────
+
+const ATLAS_CSV_HEADER =
+  'dim,lambda,gamma,avg_normalized_entropy,var_normalized_entropy,avg_wigner_negativity,var_wigner_negativity,avg_ipr,var_ipr,grid_size,total_samples,measurement_samples'
+
+/**
+ * Serialize atlas sweep results to CSV.
+ *
+ * @param results - Completed atlas points
+ * @returns CSV string with header row
+ */
+export function atlasResultsToCSV(results: AtlasPoint[]): string {
+  const rows = results.map((p) =>
+    [
+      p.dim,
+      p.lambda,
+      p.gamma,
+      p.avgNormalizedEntropy,
+      p.varNormalizedEntropy,
+      p.avgWignerNegativity,
+      p.varWignerNegativity,
+      p.avgIPR,
+      p.varIPR,
+      p.gridSizePerDim,
+      p.totalSamples,
+      p.measurementSamples,
+    ].join(',')
+  )
+  return [ATLAS_CSV_HEADER, ...rows].join('\n')
+}
+
+/**
+ * Serialize atlas sweep results to JSON.
+ *
+ * @param results - Completed atlas points
+ * @returns Pretty-printed JSON string
+ */
+export function atlasResultsToJSON(results: AtlasPoint[]): string {
+  return JSON.stringify(results, null, 2)
+}
+
+/**
+ * Download atlas sweep results as CSV.
+ *
+ * @param results - Completed atlas points
+ */
+export function downloadAtlasCSV(results: AtlasPoint[]): void {
+  const csv = atlasResultsToCSV(results)
+  downloadFile(csv, exportFilename('quantumness-atlas', 'csv'), 'text/csv')
+}
+
+/**
+ * Download atlas sweep results as JSON.
+ *
+ * @param results - Completed atlas points
+ */
+export function downloadAtlasJSON(results: AtlasPoint[]): void {
+  const json = atlasResultsToJSON(results)
+  downloadFile(json, exportFilename('quantumness-atlas', 'json'), 'application/json')
 }

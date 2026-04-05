@@ -22,6 +22,8 @@ function makeResult(
     spectrum: [0.7, 0.3],
     bipartitionEntropies: [0.5, 0.4],
     mutualInfo: new Float64Array([0, 0.1, 0.2, 0.1, 0, 0.15, 0.2, 0.15, 0]),
+    wignerNegativities: [0, 0, 0],
+    averageWignerNegativity: 0,
     ...overrides,
   }
 }

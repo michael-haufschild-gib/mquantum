@@ -373,7 +373,7 @@ const DataExportButtons: React.FC<{
                 }}
                 data-testid="export-atlas-sweep-csv"
               >
-                Export Atlas Sweep (CSV)
+                Export λ×N Sweep (CSV)
               </Button>
             )}
           </>
