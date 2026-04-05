@@ -341,16 +341,19 @@ describe('TimelineControls', () => {
     expect(button).toHaveTextContent('2')
   })
 
-  it('shows badge count of 1 for hydrogen modes regardless of channel flags', () => {
-    mockExtendedState.schroedinger.quantumMode = 'hydrogenND'
-    mockExtendedState.schroedinger.openQuantum.enabled = true
-    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
-    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
-    mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
+  it.each(['hydrogenND', 'hydrogenNDCoupled'] as const)(
+    'shows badge count of 1 for %s regardless of channel flags',
+    (mode) => {
+      mockExtendedState.schroedinger.quantumMode = mode
+      mockExtendedState.schroedinger.openQuantum.enabled = true
+      mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+      mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
+      mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
 
-    render(<TimelineControls />)
+      render(<TimelineControls />)
 
-    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 1 active/i })
-    expect(button).toHaveTextContent('1')
-  })
+      const button = screen.getByRole('button', { name: /toggle open quantum drawer, 1 active/i })
+      expect(button).toHaveTextContent('1')
+    }
+  )
 })
