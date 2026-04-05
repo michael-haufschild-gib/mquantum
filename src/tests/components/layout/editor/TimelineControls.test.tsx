@@ -21,7 +21,8 @@ const mockResetFreeScalarField = vi.fn()
 const mockResetTdseField = vi.fn()
 const mockResetBecField = vi.fn()
 const mockSetDiracNeedsReset = vi.fn()
-const mockSetPauliNeedsReset = vi.fn()
+const mockResetPauliField = vi.fn()
+const mockRequestOpenQuantumStateReset = vi.fn()
 
 const mockExtendedState = {
   schroedinger: {
@@ -32,6 +33,12 @@ const mockExtendedState = {
     phaseShimmerEnabled: false,
     probabilityCurrentEnabled: false,
     phaseAnimationEnabled: false,
+    openQuantum: {
+      enabled: false,
+      dephasingEnabled: true,
+      relaxationEnabled: false,
+      thermalEnabled: false,
+    },
   },
   pauliSpinor: {
     sliceAnimationEnabled: false,
@@ -41,7 +48,8 @@ const mockExtendedState = {
   resetTdseField: mockResetTdseField,
   resetBecField: mockResetBecField,
   setDiracNeedsReset: mockSetDiracNeedsReset,
-  setPauliNeedsReset: mockSetPauliNeedsReset,
+  resetPauliField: mockResetPauliField,
+  requestOpenQuantumStateReset: mockRequestOpenQuantumStateReset,
 }
 
 vi.mock('@/stores/animationStore', () => ({
@@ -111,13 +119,18 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'
+    mockExtendedState.schroedinger.openQuantum.enabled = false
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
+    mockExtendedState.schroedinger.openQuantum.thermalEnabled = false
     mockRandomizePlanes.mockClear()
     mockResetSchroedingerParameters.mockClear()
     mockResetFreeScalarField.mockClear()
     mockResetTdseField.mockClear()
     mockResetBecField.mockClear()
     mockSetDiracNeedsReset.mockClear()
-    mockSetPauliNeedsReset.mockClear()
+    mockResetPauliField.mockClear()
+    mockRequestOpenQuantumStateReset.mockClear()
   })
 
   it('toggles Rotate drawer when button is clicked', async () => {
@@ -242,15 +255,19 @@ describe('TimelineControls', () => {
     expect(resetButton).toBeInTheDocument()
   })
 
-  it('calls resetSchroedingerParameters when restart clicked in HO mode', () => {
-    mockGeometryState.objectType = 'schroedinger'
-    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+  it.each(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'] as const)(
+    'calls resetSchroedingerParameters and requestOpenQuantumStateReset when restart clicked in %s mode',
+    (mode) => {
+      mockGeometryState.objectType = 'schroedinger'
+      mockExtendedState.schroedinger.quantumMode = mode
 
-    render(<TimelineControls />)
+      render(<TimelineControls />)
 
-    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
-    expect(mockResetSchroedingerParameters).toHaveBeenCalledOnce()
-  })
+      fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+      expect(mockResetSchroedingerParameters).toHaveBeenCalledOnce()
+      expect(mockRequestOpenQuantumStateReset).toHaveBeenCalledOnce()
+    }
+  )
 
   it('calls resetTdseField when restart clicked in TDSE mode', () => {
     mockGeometryState.objectType = 'schroedinger'
@@ -262,13 +279,13 @@ describe('TimelineControls', () => {
     expect(mockResetTdseField).toHaveBeenCalledOnce()
   })
 
-  it('calls setPauliNeedsReset when restart clicked in Pauli mode', () => {
+  it('calls resetPauliField when restart clicked in Pauli mode', () => {
     mockGeometryState.objectType = 'pauliSpinor'
 
     render(<TimelineControls />)
 
     fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
-    expect(mockSetPauliNeedsReset).toHaveBeenCalledOnce()
+    expect(mockResetPauliField).toHaveBeenCalledOnce()
   })
 
   it('calls resetFreeScalarField when restart clicked in FSF mode', () => {
@@ -300,4 +317,43 @@ describe('TimelineControls', () => {
     fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
     expect(mockSetDiracNeedsReset).toHaveBeenCalledOnce()
   })
+
+  it('shows Open Quantum badge with 0 when disabled', () => {
+    mockExtendedState.schroedinger.openQuantum.enabled = false
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 0 active/i })
+    expect(button).toHaveTextContent('0')
+  })
+
+  it('counts active Lindblad channels in Open Quantum badge', () => {
+    mockExtendedState.schroedinger.openQuantum.enabled = true
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
+    mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 2 active/i })
+    expect(button).toHaveTextContent('2')
+  })
+
+  it.each(['hydrogenND', 'hydrogenNDCoupled'] as const)(
+    'shows badge count of 1 for %s regardless of channel flags',
+    (mode) => {
+      mockExtendedState.schroedinger.quantumMode = mode
+      mockExtendedState.schroedinger.openQuantum.enabled = true
+      mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+      mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
+      mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
+
+      render(<TimelineControls />)
+
+      const button = screen.getByRole('button', { name: /toggle open quantum drawer, 1 active/i })
+      expect(button).toHaveTextContent('1')
+    }
+  )
 })

@@ -43,6 +43,10 @@ export const TimelineControls: FC = () => {
       phaseShimmerEnabled: state.schroedinger.phaseShimmerEnabled,
       probabilityCurrentEnabled: state.schroedinger.probabilityCurrentEnabled,
       phaseAnimationEnabled: state.schroedinger.phaseAnimationEnabled,
+      openQuantumEnabled: state.schroedinger.openQuantum.enabled,
+      openQuantumDephasingEnabled: state.schroedinger.openQuantum.dephasingEnabled,
+      openQuantumRelaxationEnabled: state.schroedinger.openQuantum.relaxationEnabled,
+      openQuantumThermalEnabled: state.schroedinger.openQuantum.thermalEnabled,
     }))
   )
 
@@ -58,7 +62,8 @@ export const TimelineControls: FC = () => {
       resetBecField: state.resetBecField,
       setDiracNeedsReset: state.setDiracNeedsReset,
       resetQuantumWalk: state.resetQuantumWalk,
-      setPauliNeedsReset: state.setPauliNeedsReset,
+      resetPauliField: state.resetPauliField,
+      requestOpenQuantumStateReset: state.requestOpenQuantumStateReset,
     }))
   )
 
@@ -105,9 +110,29 @@ export const TimelineControls: FC = () => {
     pauliSliceAnimationEnabled,
   ])
 
+  const isHydrogen =
+    schroedingerConfig.quantumMode === 'hydrogenND' ||
+    schroedingerConfig.quantumMode === 'hydrogenNDCoupled'
+
+  const activeOpenQuantumCount = useMemo(() => {
+    if (!schroedingerConfig.openQuantumEnabled) return 0
+    if (isHydrogen) return 1
+    return [
+      schroedingerConfig.openQuantumDephasingEnabled,
+      schroedingerConfig.openQuantumRelaxationEnabled,
+      schroedingerConfig.openQuantumThermalEnabled,
+    ].filter(Boolean).length
+  }, [
+    schroedingerConfig.openQuantumEnabled,
+    schroedingerConfig.openQuantumDephasingEnabled,
+    schroedingerConfig.openQuantumRelaxationEnabled,
+    schroedingerConfig.openQuantumThermalEnabled,
+    isHydrogen,
+  ])
+
   const handleReset = useCallback(() => {
     if (isPauliSpinor) {
-      resetActions.setPauliNeedsReset()
+      resetActions.resetPauliField()
       return
     }
     switch (schroedingerConfig.quantumMode) {
@@ -115,6 +140,7 @@ export const TimelineControls: FC = () => {
       case 'hydrogenND':
       case 'hydrogenNDCoupled':
         resetActions.resetSchroedingerParameters()
+        resetActions.requestOpenQuantumStateReset()
         break
       case 'freeScalarField':
         resetActions.resetFreeScalarField()
@@ -272,11 +298,16 @@ export const TimelineControls: FC = () => {
               pressed={showOpenQDrawer}
               onToggle={() => (showOpenQDrawer ? setShowOpenQDrawer(false) : openOpenQDrawer())}
               sound="swish"
-              ariaLabel="Toggle open quantum drawer"
+              ariaLabel={`Toggle open quantum drawer, ${activeOpenQuantumCount} active`}
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
               className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Open Quantum
+              <span
+                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showOpenQDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+              >
+                {activeOpenQuantumCount}
+              </span>
             </ToggleButton>
           )}
 

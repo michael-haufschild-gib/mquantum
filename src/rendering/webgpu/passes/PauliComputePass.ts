@@ -42,6 +42,7 @@ import type { PauliBufferResult } from './PauliComputePassBuffers'
 import { rebuildPauliBuffers, writePauliUniforms } from './PauliComputePassBuffers'
 import type { PauliBindGroupResult, PauliPipelineResult } from './PauliComputePassSetup'
 import { buildPauliPipelines, rebuildPauliBindGroups } from './PauliComputePassSetup'
+import { requestStateSave as genericStateSave } from './stateSave'
 
 /** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
 const UNIFORM_SIZE = 592
@@ -139,72 +140,33 @@ export class PauliComputePass extends WebGPUBaseComputePass {
    */
   requestStateSave(ctx: WebGPURenderContext): void {
     if (!this.buf?.spinorReBuffer || !this.buf?.spinorImBuffer || this.saveMappingInFlight) return
-    const { device, encoder } = ctx
     const byteSize = 2 * (this.buf.totalSites ?? 0) * 4
     if (byteSize === 0) return
 
-    const stagingRe = device.createBuffer({
-      label: 'pauli-save-staging-re',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-    const stagingIm = device.createBuffer({
-      label: 'pauli-save-staging-im',
-      size: byteSize,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    })
-
-    encoder.copyBufferToBuffer(this.buf.spinorReBuffer, 0, stagingRe, 0, byteSize)
-    encoder.copyBufferToBuffer(this.buf.spinorImBuffer, 0, stagingIm, 0, byteSize)
     this.saveMappingInFlight = true
-
-    const totalSites = this.buf.totalSites
-
-    device.queue
-      .onSubmittedWorkDone()
-      .then(async () => {
-        if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
-          this.saveMappingInFlight = false
-          return
-        }
-        await Promise.all([
-          stagingRe.mapAsync(GPUMapMode.READ),
-          stagingIm.mapAsync(GPUMapMode.READ),
-        ])
-
-        const re = new Float32Array(stagingRe.getMappedRange()).slice(0)
-        const im = new Float32Array(stagingIm.getMappedRange()).slice(0)
-        stagingRe.unmap()
-        stagingIm.unmap()
-        stagingRe.destroy()
-        stagingIm.destroy()
-
-        const { serializeSimulationState } = await import('@/lib/export/simulationState')
-        const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
-        const { useSimulationStateStore } = await import('@/stores/simulationStateStore')
-
-        // Pauli uses pauliSpinor config from extendedObjectStore
+    genericStateSave(ctx, {
+      source: {
+        layout: 'separate',
+        reBuffer: this.buf.spinorReBuffer,
+        imBuffer: this.buf.spinorImBuffer,
+        byteSize,
+      },
+      totalSites: this.buf.totalSites,
+      label: 'pauli',
+      getMetadata: async () => {
         const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
-        const extState = useExtendedObjectStore.getState()
-        const pauliConfig = extState.pauliSpinor
-        const gridSize = pauliConfig?.gridSize?.slice(0, pauliConfig?.latticeDim ?? 3) ?? [64]
-
-        const blob = await serializeSimulationState(
-          { pauli: pauliConfig } as Record<string, unknown>,
-          { re, im, totalSites, componentCount: 2 },
-          'pauliSpinor',
-          gridSize
-        )
-        downloadFile(blob, exportFilename('mdim-state', 'mqstate'), 'application/octet-stream')
-        useSimulationStateStore.getState().setSaveComplete()
+        const pauliConfig = useExtendedObjectStore.getState().pauliSpinor
+        return {
+          quantumMode: 'pauliSpinor',
+          config: { pauli: pauliConfig } as Record<string, unknown>,
+          gridSize: pauliConfig?.gridSize?.slice(0, pauliConfig?.latticeDim ?? 3) ?? [64],
+          componentCount: 2,
+        }
+      },
+      onFinished: () => {
         this.saveMappingInFlight = false
-      })
-      .catch((err) => {
-        void import('@/stores/simulationStateStore').then(({ useSimulationStateStore }) => {
-          useSimulationStateStore.getState().setSaveError(String(err))
-        })
-        this.saveMappingInFlight = false
-      })
+      },
+    })
   }
 
   // ============================================================================

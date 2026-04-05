@@ -15,7 +15,7 @@ import {
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
-import { MAX_DIM } from './computePassUtils'
+import { computeStridesPadded, MAX_DIM } from './computePassUtils'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Config hashing
@@ -62,22 +62,6 @@ const FIELD_VIEW_MAP: Record<string, number> = {
   wallDensity: 3,
 }
 
-/**
- * Compute strides for N-D indexing (C-order / last-dimension-fastest):
- * strides[latticeDim-1] = 1, strides[d] = strides[d+1] * gridSize[d+1]
- *
- * @param config - Free scalar field configuration
- * @returns Array of strides (length MAX_DIM, unused entries = 0)
- */
-export function computeFsfStrides(config: FreeScalarConfig): number[] {
-  const strides = new Array(MAX_DIM).fill(0)
-  strides[config.latticeDim - 1] = 1
-  for (let d = config.latticeDim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * config.gridSize[d + 1]!
-  }
-  return strides
-}
-
 /** Parameters for writing FreeScalarUniforms to a GPU buffer. */
 export interface FsfUniformParams {
   config: FreeScalarConfig
@@ -118,7 +102,7 @@ export function writeFsfUniforms(
   // Zero out the entire buffer first (ensures unused array slots are 0)
   u32.fill(0)
 
-  const strides = computeFsfStrides(config)
+  const strides = computeStridesPadded(config.gridSize, config.latticeDim)
 
   // Scalars (offset 0-15, 4 u32s)
   u32[0] = config.latticeDim // offset 0
@@ -360,7 +344,7 @@ export function computeFsfDiagnostics(
   // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
   // All dimensions contribute to total energy (including slice dims d>=3)
   let gradEnergy = 0
-  const strides = computeFsfStrides(config)
+  const strides = computeStridesPadded(config.gridSize, config.latticeDim)
   for (let d = 0; d < config.latticeDim; d++) {
     const stride = strides[d]!
     const Nd = config.gridSize[d]!

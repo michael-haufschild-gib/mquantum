@@ -47,10 +47,7 @@ export function disposeTdseResources(
   // Gram-Schmidt eigenstates and infrastructure
   destroyGSBuffers(gsState)
 
-  // Save/load staging buffers
-  slState.saveStagingRe?.destroy()
-  slState.saveStagingIm?.destroy()
-  slState.saveStagingRe = slState.saveStagingIm = null
+  // Save/load state
   slState.pendingInjection = null
 
   // Observables compute resources

@@ -16,11 +16,9 @@ fn ndToLinear(coords: array<u32, 12>, strides: array<u32, 12>, dim: u32) -> u32 
   return idx;
 }
 
-// Convert linear buffer index to N-D lattice coordinates.
-// PERF: Uses strides directly with forward iteration. This avoids the
-// backward iteration and accumulating quotient+remainder, replacing it
-// with (idx / stride) % gridSize which the compiler can optimize for
-// power-of-2 gridSizes (common for FFT grids).
+// Convert linear buffer index to N-D lattice coordinates via successive
+// division-and-remainder on precomputed strides (C-order, largest stride first).
+// Note: gridSize is passed for call-site consistency but unused by the algorithm.
 fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: u32) -> array<u32, 12> {
   var coords: array<u32, 12>;
   var remaining = idx;
@@ -32,8 +30,4 @@ fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: 
   return coords;
 }
 
-// Periodic boundary wrap for a single coordinate
-fn wrapCoord(coord: i32, size: u32) -> u32 {
-  return u32((coord + i32(size)) % i32(size));
-}
 `
