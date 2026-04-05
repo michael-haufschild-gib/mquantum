@@ -39,6 +39,20 @@ const POLL_MS = 400
 /** If no new entanglement sample arrives for this many polls, abort the point as stalled. */
 const STALL_POLL_LIMIT = 75 // 75 × 400ms = 30s
 
+/** Update stall counter. Returns true if stalled (no progress for STALL_POLL_LIMIT polls). */
+function checkStalled(
+  entSamples: number,
+  lastSeenN: number,
+  stallCountRef: { current: number }
+): boolean {
+  if (entSamples === lastSeenN && entSamples === 0) {
+    stallCountRef.current++
+  } else if (entSamples > lastSeenN) {
+    stallCountRef.current = 0
+  }
+  return stallCountRef.current >= STALL_POLL_LIMIT
+}
+
 /** Pre-sweep physics state snapshot for restoration on abort/complete. */
 interface PreSweepSnapshot {
   potentialType: TdsePotentialType
@@ -196,13 +210,8 @@ export function useAtlasSweepController(): {
         // Tick frame counter
         atlas.tickFrame()
 
-        // Stall detection: if no new worker result for STALL_POLL_LIMIT polls, abort
-        if (entSamples === lastSeenNRef.current && entSamples === 0) {
-          stallCountRef.current++
-        } else if (entSamples > lastSeenNRef.current) {
-          stallCountRef.current = 0
-        }
-        if (stallCountRef.current >= STALL_POLL_LIMIT) {
+        // Stall detection: abort if no worker results for ~30s
+        if (checkStalled(entSamples, lastSeenNRef.current, stallCountRef)) {
           logger.warn('[atlas] Sweep stalled — no entanglement results after 30s, aborting')
           useQuantumnessAtlasStore.getState().abortSweep()
           restoreSnapshot()
