@@ -29,7 +29,7 @@ const mockExtendedState = {
     representation: 'position',
     sliceAnimationEnabled: false,
     interferenceEnabled: false,
-    probabilityFlowEnabled: false,
+    phaseShimmerEnabled: false,
     probabilityCurrentEnabled: false,
     phaseAnimationEnabled: false,
   },
@@ -107,7 +107,7 @@ describe('TimelineControls', () => {
     mockGeometryState.objectType = 'hypercube'
     mockExtendedState.schroedinger.sliceAnimationEnabled = false
     mockExtendedState.schroedinger.interferenceEnabled = false
-    mockExtendedState.schroedinger.probabilityFlowEnabled = false
+    mockExtendedState.schroedinger.phaseShimmerEnabled = false
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'

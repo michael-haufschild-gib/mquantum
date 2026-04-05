@@ -418,9 +418,9 @@ function packOverlayControls(
   packNodalControls(floatView, intView, schroedinger)
 
   // Probability flow + uncertainty
-  intView[I.probabilityFlowEnabled] = schroedinger?.probabilityFlowEnabled ? 1 : 0
-  floatView[I.probabilityFlowSpeed] = schroedinger?.probabilityFlowSpeed ?? 1.0
-  floatView[I.probabilityFlowStrength] = schroedinger?.probabilityFlowStrength ?? 0.3
+  intView[I.phaseShimmerEnabled] = schroedinger?.phaseShimmerEnabled ? 1 : 0
+  floatView[I.phaseShimmerSpeed] = schroedinger?.phaseShimmerSpeed ?? 1.0
+  floatView[I.phaseShimmerStrength] = schroedinger?.phaseShimmerStrength ?? 0.3
   floatView[I.uncertaintyConfidenceMass] = p.uncertaintyConfidenceMass
   floatView[I.lchLightness] = appearance?.lchLightness ?? 0.7
   floatView[I.lchChroma] = appearance?.lchChroma ?? 0.15

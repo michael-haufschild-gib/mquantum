@@ -208,9 +208,9 @@ struct SchroedingerUniforms {
   _padNodal3: f32,
 
   // Probability Current Flow
-  probabilityFlowEnabled: u32,    // Enable density-modulated flow noise
-  probabilityFlowSpeed: f32,      // Flow animation speed (0.1-5.0)
-  probabilityFlowStrength: f32,   // Flow modulation strength (0.0-1.0)
+  phaseShimmerEnabled: u32,    // Enable density-modulated flow noise
+  phaseShimmerSpeed: f32,      // Flow animation speed (0.1-5.0)
+  phaseShimmerStrength: f32,   // Flow modulation strength (0.0-1.0)
   uncertaintyConfidenceMass: f32, // Confidence mass used for threshold extraction
 
   // LCH perceptual color parameters (algorithm 5)

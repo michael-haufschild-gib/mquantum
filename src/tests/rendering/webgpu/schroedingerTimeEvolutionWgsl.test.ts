@@ -12,9 +12,9 @@ describe('Schroedinger time evolution WGSL composition', () => {
     })
 
     expect(wgsl).toContain('uniforms.time * uniforms.interferenceSpeed')
-    expect(wgsl).toContain('uniforms.time * uniforms.probabilityFlowSpeed')
+    expect(wgsl).toContain('uniforms.time * uniforms.phaseShimmerSpeed')
     expect(wgsl).not.toContain('uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed')
-    expect(wgsl).not.toContain('uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed')
+    expect(wgsl).not.toContain('uniforms.time * uniforms.timeScale * uniforms.phaseShimmerSpeed')
   })
 
   it('includes timeScale in the main wavefunction evolution time', () => {

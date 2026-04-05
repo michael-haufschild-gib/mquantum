@@ -67,9 +67,9 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setInterferenceFreq: state.setSchroedingerInterferenceFreq,
       setInterferenceSpeed: state.setSchroedingerInterferenceSpeed,
       // Probability Current Flow
-      setProbabilityFlowEnabled: state.setSchroedingerProbabilityFlowEnabled,
-      setProbabilityFlowSpeed: state.setSchroedingerProbabilityFlowSpeed,
-      setProbabilityFlowStrength: state.setSchroedingerProbabilityFlowStrength,
+      setPhaseShimmerEnabled: state.setSchroedingerPhaseShimmerEnabled,
+      setPhaseShimmerSpeed: state.setSchroedingerPhaseShimmerSpeed,
+      setPhaseShimmerStrength: state.setSchroedingerPhaseShimmerStrength,
       // Probability Current (j-field)
       setProbabilityCurrentEnabled: state.setSchroedingerProbabilityCurrentEnabled,
       setProbabilityCurrentStyle: state.setSchroedingerProbabilityCurrentStyle,
@@ -105,9 +105,9 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setInterferenceFreq,
       setInterferenceSpeed,
       // Probability Current Flow
-      setProbabilityFlowEnabled,
-      setProbabilityFlowSpeed,
-      setProbabilityFlowStrength,
+      setPhaseShimmerEnabled,
+      setPhaseShimmerSpeed,
+      setPhaseShimmerStrength,
       // Probability Current (j-field)
       setProbabilityCurrentEnabled,
       setProbabilityCurrentStyle,
@@ -138,7 +138,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
         {/* Empty state for compute modes with no animation content */}
         {isComputeMode && !isTdse && (
-          <div className="px-4 py-6 text-center">
+          <div className="break-inside-avoid mb-6 last:mb-0 px-4 py-6 text-center">
             <p className="text-xs text-text-tertiary italic">
               Animation effects are not available in this mode.
             </p>
@@ -148,9 +148,34 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             </p>
           </div>
         )}
+
+        {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
+        {!isComputeMode && (
+          <div className="break-inside-avoid mb-6 last:mb-0">
+            <ProbabilityCurrentPanel
+              config={config}
+              setProbabilityCurrentEnabled={setProbabilityCurrentEnabled}
+              setProbabilityCurrentStyle={setProbabilityCurrentStyle}
+              setProbabilityCurrentPlacement={setProbabilityCurrentPlacement}
+              setProbabilityCurrentColorMode={setProbabilityCurrentColorMode}
+              setProbabilityCurrentScale={setProbabilityCurrentScale}
+              setProbabilityCurrentSpeed={setProbabilityCurrentSpeed}
+              setProbabilityCurrentDensityThreshold={setProbabilityCurrentDensityThreshold}
+              setProbabilityCurrentMagnitudeThreshold={setProbabilityCurrentMagnitudeThreshold}
+              setProbabilityCurrentLineDensity={setProbabilityCurrentLineDensity}
+              setProbabilityCurrentStepSize={setProbabilityCurrentStepSize}
+              setProbabilityCurrentSteps={setProbabilityCurrentSteps}
+              setProbabilityCurrentOpacity={setProbabilityCurrentOpacity}
+            />
+          </div>
+        )}
+
         {/* Time Evolution — not applicable for compute modes (each uses its own dt/stepsPerFrame) */}
         {!isComputeMode && (
-          <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-timeEvolution"
+          >
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Time Evolution
@@ -162,6 +187,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0.1}
                 max={2.0}
                 step={0.1}
+                tooltip="Scales the dt fed to the Schrödinger phase integrator each frame. At 1× the wavefunction evolves at natural units; increasing it compresses time so phase winding and beating in superpositions becomes faster and more visible."
                 value={config.timeScale}
                 onChange={setTimeScale}
                 showValue
@@ -172,18 +198,22 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
         {/* TDSE Auto-Loop — reinitialize wavefunction when norm decays */}
         {isTdse && (
-          <div className="space-y-4" data-testid="animation-panel-tdseAutoLoop">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-tdseAutoLoop"
+          >
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Auto-Loop
               </label>
               <ToggleButton
-                pressed={config.tdse?.autoLoop ?? true}
-                onToggle={() => setTdseAutoLoop(!(config.tdse?.autoLoop ?? true))}
+                pressed={config.tdse?.autoLoop ?? false}
+                onToggle={() => setTdseAutoLoop(!(config.tdse?.autoLoop ?? false))}
                 className="text-xs px-2 py-1 h-auto"
+                tooltip="When absorbing boundary conditions have drained most of the norm, the wave packet is re-initialized automatically. Disable to let the simulation run past full absorption into the flat steady state."
                 ariaLabel="Toggle TDSE auto-loop"
               >
-                {(config.tdse?.autoLoop ?? true) ? 'ON' : 'OFF'}
+                {(config.tdse?.autoLoop ?? false) ? 'ON' : 'OFF'}
               </ToggleButton>
             </div>
             <p className="text-xs text-text-tertiary">
@@ -194,7 +224,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
         {/* Interference Fringing — not applicable for compute modes (requires inline wavefunction) */}
         {!isComputeMode && (
-          <div className="space-y-4" data-testid="animation-panel-interference">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-interference"
+          >
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Interference Fringing
@@ -203,6 +236,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 pressed={config.interferenceEnabled}
                 onToggle={() => setInterferenceEnabled(!config.interferenceEnabled)}
                 className="text-xs px-2 py-1 h-auto"
+                tooltip="Modulates the rendered density with a sinusoidal term derived from the wavefunction's local phase. Makes constructive and destructive interference bands visible in superposition states as bright and dark fringes."
                 ariaLabel="Toggle interference fringing"
               >
                 {config.interferenceEnabled ? 'ON' : 'OFF'}
@@ -219,6 +253,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0}
                 max={1}
                 step={0.05}
+                tooltip="How strongly the fringe modulation is mixed into the density. At 0 the effect is invisible; at 1 the fringes dominate, fully overriding the base density in dark bands."
                 value={config.interferenceAmp ?? 0.5}
                 onChange={setInterferenceAmp}
                 showValue
@@ -228,6 +263,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={1}
                 max={50}
                 step={1}
+                tooltip="Spatial frequency of the fringe pattern in phase-space units. Low values produce wide, sweeping interference bands; high values create fine, tightly-packed fringes."
                 value={config.interferenceFreq ?? 10.0}
                 onChange={setInterferenceFreq}
                 showValue
@@ -237,6 +273,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0}
                 max={10}
                 step={0.5}
+                tooltip="Rate at which the fringe pattern sweeps through phase. Low values give a slow, breathing oscillation; high values produce rapid flickering that tracks fast phase winding."
                 value={config.interferenceSpeed ?? 1.0}
                 onChange={setInterferenceSpeed}
                 showValue
@@ -245,38 +282,40 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         )}
 
-        {/* Phase-coherent quantum texture — not applicable for compute modes */}
+        {/* Phase Shimmer — visual-only noise effect, not applicable for compute modes */}
         {!isComputeMode && (
-          <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-phaseShimmer"
+          >
             <div className="flex items-center justify-between">
-              <label
-                className="text-xs font-bold text-text-secondary uppercase tracking-widest"
-                title="Phase-coherent texture: noise patterns aligned with the wavefunction's phase structure. Highlights nodal surfaces for real eigenstates; flows with wavefronts for complex/superposition states."
-              >
-                Quantum Texture
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Phase Shimmer
               </label>
               <ToggleButton
-                pressed={config.probabilityFlowEnabled}
-                onToggle={() => setProbabilityFlowEnabled(!config.probabilityFlowEnabled)}
+                pressed={config.phaseShimmerEnabled}
+                onToggle={() => setPhaseShimmerEnabled(!config.phaseShimmerEnabled)}
                 className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle probability current flow"
+                tooltip="Visual effect — not a physical measurement. Multiplies the density by animated gradient noise whose spatial pattern is biased by the local wavefunction phase angle (cos φ, sin φ). The shimmer moves fastest in low-density regions and stalls at probability peaks, giving a phase-textured glow to the empty space between density lobes."
+                ariaLabel="Toggle phase shimmer"
               >
-                {config.probabilityFlowEnabled ? 'ON' : 'OFF'}
+                {config.phaseShimmerEnabled ? 'ON' : 'OFF'}
               </ToggleButton>
             </div>
             <div
               role="group"
-              aria-label="Probability flow parameters"
-              aria-disabled={!config.probabilityFlowEnabled}
-              className={`space-y-3 ${!config.probabilityFlowEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+              aria-label="Phase shimmer parameters"
+              aria-disabled={!config.phaseShimmerEnabled}
+              className={`space-y-3 ${!config.phaseShimmerEnabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
               <Slider
                 label="Strength"
                 min={0}
                 max={1}
                 step={0.05}
-                value={config.probabilityFlowStrength ?? 0.3}
-                onChange={setProbabilityFlowStrength}
+                tooltip="How strongly the noise modulates the density. Low values add a subtle shimmer in interstitial regions; high values make the noise dominate, visibly eating into the density field."
+                value={config.phaseShimmerStrength ?? 0.3}
+                onChange={setPhaseShimmerStrength}
                 showValue
               />
               <Slider
@@ -284,36 +323,21 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0.1}
                 max={5}
                 step={0.1}
-                value={config.probabilityFlowSpeed ?? 1.0}
-                onChange={setProbabilityFlowSpeed}
+                tooltip="Rate at which the noise pattern drifts over time. The effect is most visible in low-density regions; high-density peaks are always near-static regardless of this value."
+                value={config.phaseShimmerSpeed ?? 1.0}
+                onChange={setPhaseShimmerSpeed}
                 showValue
               />
             </div>
           </div>
         )}
 
-        {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
-        {!isComputeMode && (
-          <ProbabilityCurrentPanel
-            config={config}
-            setProbabilityCurrentEnabled={setProbabilityCurrentEnabled}
-            setProbabilityCurrentStyle={setProbabilityCurrentStyle}
-            setProbabilityCurrentPlacement={setProbabilityCurrentPlacement}
-            setProbabilityCurrentColorMode={setProbabilityCurrentColorMode}
-            setProbabilityCurrentScale={setProbabilityCurrentScale}
-            setProbabilityCurrentSpeed={setProbabilityCurrentSpeed}
-            setProbabilityCurrentDensityThreshold={setProbabilityCurrentDensityThreshold}
-            setProbabilityCurrentMagnitudeThreshold={setProbabilityCurrentMagnitudeThreshold}
-            setProbabilityCurrentLineDensity={setProbabilityCurrentLineDensity}
-            setProbabilityCurrentStepSize={setProbabilityCurrentStepSize}
-            setProbabilityCurrentSteps={setProbabilityCurrentSteps}
-            setProbabilityCurrentOpacity={setProbabilityCurrentOpacity}
-          />
-        )}
-
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (
-          <div className="space-y-4" data-testid="animation-panel-sliceAnimation">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-sliceAnimation"
+          >
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Dimensional Sweeps
@@ -322,7 +346,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 pressed={config.sliceAnimationEnabled}
                 onToggle={() => setSliceAnimationEnabled(!config.sliceAnimationEnabled)}
                 className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle slice animation"
+                tooltip="Continuously oscillates the 4D slice position so the rendered 3D cross-section sweeps through different hyperplanar cuts of the N-dimensional wavefunction over time."
+                ariaLabel="Toggle dimensional sweeps"
               >
                 {config.sliceAnimationEnabled ? 'ON' : 'OFF'}
               </ToggleButton>
@@ -339,6 +364,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0.1}
                 max={1.0}
                 step={0.05}
+                tooltip="How far the 4D slice position oscillates from the origin (in wavefunction units). Large values sweep into the outer regions of the hypervolume, revealing more exotic cross-sections; small values stay near the central slice."
                 value={config.sliceAmplitude}
                 onChange={setSliceAmplitude}
                 showValue
@@ -348,6 +374,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 min={0.01}
                 max={0.1}
                 step={0.01}
+                tooltip="Oscillation rate of the slice position. Slow values give a leisurely drift through dimensional layers; fast values cycle rapidly through the full amplitude, blurring distinctions between cross-sections."
                 value={config.sliceSpeed}
                 onChange={setSliceSpeed}
                 showValue
@@ -358,7 +385,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
         {/* Quantum Phase Evolution - Hydrogen ND mode only */}
         {isHydrogenNDMode && (
-          <div className="space-y-4" data-testid="animation-panel-phaseEvolution">
+          <div
+            className="break-inside-avoid mb-6 last:mb-0 space-y-4"
+            data-testid="animation-panel-phaseEvolution"
+          >
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
                 Quantum Phase Evolution
@@ -367,7 +397,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 pressed={config.phaseAnimationEnabled}
                 onToggle={() => setPhaseAnimationEnabled(!config.phaseAnimationEnabled)}
                 className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle phase animation"
+                tooltip="Continuously winds the hue coloring at a rate proportional to the energy eigenvalue — the visual equivalent of watching ψ(x) e^{−iEt/ℏ} rotate in the complex plane. Speed is set by Time Scale."
+                ariaLabel="Toggle phase evolution animation"
               >
                 {config.phaseAnimationEnabled ? 'ON' : 'OFF'}
               </ToggleButton>

@@ -97,7 +97,7 @@ test.describe('timeline controls', () => {
 
     // Read initial speed from store and pick a target that's guaranteed different
     const initialSpeed = await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
+      const mod = await import('/stores/animationStore')
       return mod.useAnimationStore.getState().speed
     })
     const targetSpeed = Math.abs(initialSpeed - 1.5) < 0.2 ? 2.5 : 1.5

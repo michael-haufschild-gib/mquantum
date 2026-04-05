@@ -34,253 +34,23 @@ export interface IncompressibleSpectrumResult {
 }
 
 // ─── FFT ──────────────────────────────────────────────────────────────────────
+// Delegates to the shared FFT module (which uses WASM when available).
+// The shared module uses interleaved complex format [re0, im0, re1, im1, ...],
+// so this wrapper interleaves split re/im arrays, calls the shared FFT,
+// and de-interleaves back.
 
-// ─── Twiddle Factor Cache ────────────────────────────────────────────────────
+import {
+  fft as sharedFft,
+  fftNd as sharedFftNd,
+  ifft as sharedIfft,
+  ifftNd as sharedIfftNd,
+} from '@/lib/math/fft'
 
 /**
- * Cached twiddle factors for FFT butterfly stages.
- * Key: `${N}_${inverse}` → Float64Array of interleaved [re,im] pairs per stage.
- * Eliminates repeated cos/sin computation across fftND rows sharing the same N.
- */
-const twiddleCache = new Map<string, Float64Array[]>()
-
-/**
- * Get or compute twiddle factors for all butterfly stages of size N.
+ * N-D separable FFT on split real/imaginary arrays.
  *
- * @param N - Transform length (power of 2)
- * @param inverse - Forward or inverse transform
- * @returns Array of Float64Arrays, one per stage (len=2,4,8,...,N)
- */
-function getTwiddleFactors(N: number, inverse: boolean): Float64Array[] {
-  const key = `${N}_${inverse ? 1 : 0}`
-  let cached = twiddleCache.get(key)
-  if (cached) return cached
-
-  const sign = inverse ? 1.0 : -1.0
-  cached = []
-  for (let len = 2; len <= N; len <<= 1) {
-    const halfLen = len >> 1
-    const factors = new Float64Array(halfLen * 2)
-    const angle = (sign * 2 * Math.PI) / len
-    // Pre-compute all twiddle factors for this stage
-    for (let k = 0; k < halfLen; k++) {
-      const theta = angle * k
-      factors[2 * k] = Math.cos(theta)
-      factors[2 * k + 1] = Math.sin(theta)
-    }
-    cached.push(factors)
-  }
-  twiddleCache.set(key, cached)
-  return cached
-}
-
-// Pre-computed constants for N=8 FFT (used in 7D BEC with gridSize=8)
-const SQRT2_INV = 1.0 / Math.sqrt(2.0)
-
-/**
- * Fully unrolled radix-2 FFT for N=8 on interleaved [re, im] data.
- * Eliminates bit-reversal, loop overhead, and twiddle lookups.
- * ~30% faster than generic fft1DInPlace for this size.
- */
-function fft8InPlace(data: Float64Array, inverse: boolean): void {
-  const sign = inverse ? 1.0 : -1.0
-
-  // Bit-reversal for N=8: [0,4,2,6,1,5,3,7]
-  // Swap pairs: (1,4), (3,6)
-  let t: number
-  t = data[2]!
-  data[2] = data[8]!
-  data[8] = t
-  t = data[3]!
-  data[3] = data[9]!
-  data[9] = t
-  t = data[6]!
-  data[6] = data[12]!
-  data[12] = t
-  t = data[7]!
-  data[7] = data[13]!
-  data[13] = t
-
-  // Stage 1: len=2, halfLen=1, w = 1+0i for k=0
-  for (let i = 0; i < 8; i += 2) {
-    const ei = 2 * i
-    const oi = ei + 2
-    const eRe = data[ei]!
-    const eIm = data[ei + 1]!
-    const oRe = data[oi]!
-    const oIm = data[oi + 1]!
-    data[ei] = eRe + oRe
-    data[ei + 1] = eIm + oIm
-    data[oi] = eRe - oRe
-    data[oi + 1] = eIm - oIm
-  }
-
-  // Stage 2: len=4, halfLen=2
-  // k=0: w = 1+0i, k=1: w = cos(π/2) + i·sign·sin(π/2) = 0 + i·sign
-  for (let i = 0; i < 8; i += 4) {
-    const b = 2 * i
-    // k=0: twiddle = 1
-    const e0Re = data[b]!
-    const e0Im = data[b + 1]!
-    const o0Re = data[b + 4]!
-    const o0Im = data[b + 5]!
-    data[b] = e0Re + o0Re
-    data[b + 1] = e0Im + o0Im
-    data[b + 4] = e0Re - o0Re
-    data[b + 5] = e0Im - o0Im
-
-    // k=1: twiddle = i·sign → (re+i·im)·(i·sign) = -sign·im + i·sign·re
-    const e1Re = data[b + 2]!
-    const e1Im = data[b + 3]!
-    const o1Re = data[b + 6]!
-    const o1Im = data[b + 7]!
-    const tRe = -sign * o1Im
-    const tIm = sign * o1Re
-    data[b + 2] = e1Re + tRe
-    data[b + 3] = e1Im + tIm
-    data[b + 6] = e1Re - tRe
-    data[b + 7] = e1Im - tIm
-  }
-
-  // Stage 3: len=8, halfLen=4
-  // k=0: w=1, k=1: w=cos(π/4)+i·sign·sin(π/4), k=2: w=0+i·sign, k=3: w=cos(3π/4)+i·sign·sin(3π/4)
-  const w1r = SQRT2_INV
-  const w1i = sign * SQRT2_INV
-  const w3r = -SQRT2_INV
-  const w3i = sign * SQRT2_INV
-
-  // k=0: w=1
-  {
-    const eRe = data[0]!
-    const eIm = data[1]!
-    const oRe = data[8]!
-    const oIm = data[9]!
-    data[0] = eRe + oRe
-    data[1] = eIm + oIm
-    data[8] = eRe - oRe
-    data[9] = eIm - oIm
-  }
-  // k=1: w = w1r + i·w1i
-  {
-    const eRe = data[2]!
-    const eIm = data[3]!
-    const oRe = data[10]!
-    const oIm = data[11]!
-    const tRe = w1r * oRe - w1i * oIm
-    const tIm = w1r * oIm + w1i * oRe
-    data[2] = eRe + tRe
-    data[3] = eIm + tIm
-    data[10] = eRe - tRe
-    data[11] = eIm - tIm
-  }
-  // k=2: w = 0 + i·sign
-  {
-    const eRe = data[4]!
-    const eIm = data[5]!
-    const oRe = data[12]!
-    const oIm = data[13]!
-    const tRe = -sign * oIm
-    const tIm = sign * oRe
-    data[4] = eRe + tRe
-    data[5] = eIm + tIm
-    data[12] = eRe - tRe
-    data[13] = eIm - tIm
-  }
-  // k=3: w = w3r + i·w3i
-  {
-    const eRe = data[6]!
-    const eIm = data[7]!
-    const oRe = data[14]!
-    const oIm = data[15]!
-    const tRe = w3r * oRe - w3i * oIm
-    const tIm = w3r * oIm + w3i * oRe
-    data[6] = eRe + tRe
-    data[7] = eIm + tIm
-    data[14] = eRe - tRe
-    data[15] = eIm - tIm
-  }
-
-  if (inverse) {
-    const inv = 0.125 // 1/8
-    for (let i = 0; i < 16; i++) data[i] = data[i]! * inv
-  }
-}
-
-/**
- * In-place radix-2 Cooley-Tukey FFT on interleaved [re, im] Float64Array.
- * Uses pre-computed twiddle factors to avoid per-butterfly cos/sin.
- *
- * @param data - Interleaved [re0, im0, re1, im1, ...] of length 2*N
- * @param N - Transform length (must be power of 2)
- * @param inverse - If true, compute inverse FFT (with 1/N normalization)
- * @param twiddles - Pre-computed twiddle factors from getTwiddleFactors()
- */
-function fft1DInPlace(
-  data: Float64Array,
-  N: number,
-  inverse: boolean,
-  twiddles: Float64Array[]
-): void {
-  // Bit-reversal permutation
-  let j = 0
-  for (let i = 0; i < N; i++) {
-    if (i < j) {
-      const ii = 2 * i
-      const jj = 2 * j
-      const tRe = data[ii]!
-      const tIm = data[ii + 1]!
-      data[ii] = data[jj]!
-      data[ii + 1] = data[jj + 1]!
-      data[jj] = tRe
-      data[jj + 1] = tIm
-    }
-    let m = N >> 1
-    while (m >= 1 && j >= m) {
-      j -= m
-      m >>= 1
-    }
-    j += m
-  }
-
-  // Butterfly stages with pre-computed twiddle factors
-  let stageIdx = 0
-  for (let len = 2; len <= N; len <<= 1) {
-    const halfLen = len >> 1
-    const factors = twiddles[stageIdx]!
-    for (let i = 0; i < N; i += len) {
-      for (let k = 0; k < halfLen; k++) {
-        const wRe = factors[2 * k]!
-        const wIm = factors[2 * k + 1]!
-        const evenIdx = 2 * (i + k)
-        const oddIdx = 2 * (i + k + halfLen)
-        const oRe = data[oddIdx]!
-        const oIm = data[oddIdx + 1]!
-        const tRe = wRe * oRe - wIm * oIm
-        const tIm = wRe * oIm + wIm * oRe
-        const eRe = data[evenIdx]!
-        const eIm = data[evenIdx + 1]!
-        data[oddIdx] = eRe - tRe
-        data[oddIdx + 1] = eIm - tIm
-        data[evenIdx] = eRe + tRe
-        data[evenIdx + 1] = eIm + tIm
-      }
-    }
-    stageIdx++
-  }
-
-  // Inverse normalization
-  if (inverse) {
-    const invN = 1.0 / N
-    const len = 2 * N
-    for (let i = 0; i < len; i++) {
-      data[i] = data[i]! * invN
-    }
-  }
-}
-
-/**
- * N-D separable FFT: applies 1D FFT along each axis.
- * Pre-allocates row buffer and twiddle factors to avoid per-row allocations.
+ * Delegates to the shared FFT module (which uses WASM when available).
+ * Interleaves the split arrays, transforms, then de-interleaves the result.
  *
  * @param re - Real part, length = totalSites (modified in place)
  * @param im - Imaginary part, length = totalSites (modified in place)
@@ -293,60 +63,35 @@ export function fftND(
   gridSize: number[],
   inverse: boolean
 ): void {
-  const dim = gridSize.length
   let totalSites = 1
-  for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
+  for (let d = 0; d < gridSize.length; d++) totalSites *= gridSize[d]!
 
-  // Find max grid size across all axes for shared row buffer
-  let maxN = 0
-  for (let d = 0; d < dim; d++) {
-    if (gridSize[d]! > maxN) maxN = gridSize[d]!
+  // Interleave into a single buffer
+  const interleaved = new Float64Array(totalSites * 2)
+  for (let i = 0; i < totalSites; i++) {
+    interleaved[i * 2] = re[i]!
+    interleaved[i * 2 + 1] = im[i]!
   }
-  // Single shared row buffer (allocated once, reused across all axes/rows)
-  const rowBuf = new Float64Array(2 * maxN)
 
-  // For each axis, FFT all 1D "rows" along that axis
-  for (let axis = 0; axis < dim; axis++) {
-    const N = gridSize[axis]!
-    if (N <= 1) continue
-
-    // Pre-compute twiddle factors for this axis size (cached across calls)
-    const twiddles = getTwiddleFactors(N, inverse)
-
-    // Compute stride for this axis and the number of rows
-    let stride = 1
-    for (let d = dim - 1; d > axis; d--) stride *= gridSize[d]!
-    const numRows = totalSites / N
-
-    // Select FFT function: use unrolled N=8 path when applicable
-    const useFFT8 = N === 8
-
-    for (let row = 0; row < numRows; row++) {
-      const outerIdx = (row / stride) | 0 // Integer division (faster than Math.floor for positive)
-      const innerIdx = row % stride
-      const baseIdx = outerIdx * (N * stride) + innerIdx
-
-      // Extract row into contiguous buffer
-      for (let k = 0; k < N; k++) {
-        const idx = baseIdx + k * stride
-        rowBuf[2 * k] = re[idx]!
-        rowBuf[2 * k + 1] = im[idx]!
-      }
-
-      // FFT the row
-      if (useFFT8) {
-        fft8InPlace(rowBuf, inverse)
-      } else {
-        fft1DInPlace(rowBuf, N, inverse, twiddles)
-      }
-
-      // Write back
-      for (let k = 0; k < N; k++) {
-        const idx = baseIdx + k * stride
-        re[idx] = rowBuf[2 * k]!
-        im[idx] = rowBuf[2 * k + 1]!
-      }
+  // Use shared FFT (which tries WASM first, then falls back to TS)
+  if (inverse) {
+    if (gridSize.length === 1) {
+      sharedIfft(interleaved, totalSites)
+    } else {
+      sharedIfftNd(interleaved, gridSize)
     }
+  } else {
+    if (gridSize.length === 1) {
+      sharedFft(interleaved, totalSites)
+    } else {
+      sharedFftNd(interleaved, gridSize)
+    }
+  }
+
+  // De-interleave back to split arrays
+  for (let i = 0; i < totalSites; i++) {
+    re[i] = interleaved[i * 2]!
+    im[i] = interleaved[i * 2 + 1]!
   }
 }
 

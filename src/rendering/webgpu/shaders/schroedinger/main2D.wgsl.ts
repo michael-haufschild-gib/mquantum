@@ -71,9 +71,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   }
 
   // Phase-coherent quantum texture (probability flow animation)
-  if (schroedinger.probabilityFlowEnabled != 0u && schroedinger.probabilityFlowStrength > 0.0) {
+  if (schroedinger.phaseShimmerEnabled != 0u && schroedinger.phaseShimmerStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = schroedinger.time * schroedinger.probabilityFlowSpeed;
+    let pcfTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
@@ -83,7 +83,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * schroedinger.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + pcfNoise * schroedinger.phaseShimmerStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
 
@@ -218,9 +218,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   }
 
   // Phase-coherent quantum texture (probability flow animation)
-  if (schroedinger.probabilityFlowEnabled != 0u && schroedinger.probabilityFlowStrength > 0.0) {
+  if (schroedinger.phaseShimmerEnabled != 0u && schroedinger.phaseShimmerStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = schroedinger.time * schroedinger.probabilityFlowSpeed;
+    let pcfTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
@@ -230,7 +230,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * schroedinger.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + pcfNoise * schroedinger.phaseShimmerStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
 

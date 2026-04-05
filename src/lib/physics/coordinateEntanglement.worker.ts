@@ -16,6 +16,11 @@ import {
   type CoordinateEntanglementResult,
   type EntanglementOptions,
 } from '@/lib/physics/coordinateEntanglement'
+import { initAnimationWasm } from '@/lib/wasm'
+
+// Initialize WASM in the worker thread (non-blocking).
+// Early messages fall back to JS until WASM is ready.
+void initAnimationWasm()
 
 /** Inbound message to the entanglement worker. */
 export interface EntanglementWorkerRequest {

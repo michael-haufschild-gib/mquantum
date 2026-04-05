@@ -127,3 +127,135 @@ export function generate_dirac_matrices_wasm(spatial_dim: number): Float32Array 
 export function dirac_spinor_size_wasm(spatial_dim: number): number {
   return Math.max(2, 1 << Math.floor((spatial_dim + 1) / 2))
 }
+
+// Phase 5: Coordinate entanglement functions
+
+/**
+ * Compute reduced density matrix mock
+ * @param _psi_re - Real part of wavefunction
+ * @param _psi_im - Imaginary part of wavefunction
+ * @param _grid_size - Grid dimensions
+ * @param _dim_index - Dimension to keep
+ * @returns Empty array
+ */
+export function compute_rdm_wasm(
+  _psi_re: Float32Array,
+  _psi_im: Float32Array,
+  _grid_size: Uint32Array,
+  _dim_index: number
+): Float64Array {
+  return new Float64Array(0)
+}
+
+/**
+ * Compute joint reduced density matrix mock
+ * @param _psi_re - Real part of wavefunction
+ * @param _psi_im - Imaginary part of wavefunction
+ * @param _grid_size - Grid dimensions
+ * @param _kept_dims - Dimensions to keep
+ * @returns Empty array
+ */
+export function compute_joint_rdm_wasm(
+  _psi_re: Float32Array,
+  _psi_im: Float32Array,
+  _grid_size: Uint32Array,
+  _kept_dims: Uint32Array
+): Float64Array {
+  return new Float64Array(0)
+}
+
+/**
+ * Hermitian eigendecomposition mock
+ * @param _re - Real part of matrix
+ * @param _im - Imaginary part of matrix
+ * @param _n - Matrix dimension
+ * @returns Empty array
+ */
+export function hermitian_eigenvalues_wasm(
+  _re: Float64Array,
+  _im: Float64Array,
+  _n: number
+): Float64Array {
+  return new Float64Array(0)
+}
+
+/**
+ * Von Neumann entropy mock
+ * @param _eigenvalues - Eigenvalues
+ * @returns Zero
+ */
+export function von_neumann_entropy_wasm(_eigenvalues: Float64Array): number {
+  return 0
+}
+
+// Phase 6: Complex matrix exponential functions
+
+/**
+ * Matrix exponential via Padé(13,13) mock
+ * @param _a_re - Real part of input matrix
+ * @param _a_im - Imaginary part of input matrix
+ * @param _n - Matrix dimension
+ * @returns Empty array
+ */
+export function matrix_exponential_pade_wasm(
+  _a_re: Float64Array,
+  _a_im: Float64Array,
+  _n: number
+): Float64Array {
+  return new Float64Array(0)
+}
+
+/**
+ * Complex matrix multiply mock
+ * @param _a_re - Real part of left matrix
+ * @param _a_im - Imaginary part of left matrix
+ * @param _b_re - Real part of right matrix
+ * @param _b_im - Imaginary part of right matrix
+ * @param _n - Matrix dimension
+ * @returns Empty array
+ */
+export function complex_mat_mul_wasm(
+  _a_re: Float64Array,
+  _a_im: Float64Array,
+  _b_re: Float64Array,
+  _b_im: Float64Array,
+  _n: number
+): Float64Array {
+  return new Float64Array(0)
+}
+
+// Phase 7: TDSE diagnostics functions
+
+/**
+ * Scar correlation mock
+ * @param _density_re - Real part of wavefunction density
+ * @param _density_im - Imaginary part of wavefunction density
+ * @param _grid_sizes - Grid dimensions
+ * @param _spacings - Lattice spacings
+ * @param _orbit_points_flat - Flattened orbit positions
+ * @param _orbit_lengths - Points per orbit
+ * @param _sigma - Gaussian tube width
+ * @param _dim - Number of spatial dimensions
+ * @returns Empty array
+ */
+export function compute_scar_correlation_wasm(
+  _density_re: Float32Array,
+  _density_im: Float32Array,
+  _grid_sizes: Uint32Array,
+  _spacings: Float64Array,
+  _orbit_points_flat: Float64Array,
+  _orbit_lengths: Uint32Array,
+  _sigma: number,
+  _dim: number
+): Float64Array {
+  return new Float64Array(0)
+}
+
+/**
+ * Level spacing mock
+ * @param _energies - Eigenvalue array
+ * @returns Empty array
+ */
+export function compute_level_spacing_wasm(_energies: Float64Array): Float64Array {
+  return new Float64Array(0)
+}

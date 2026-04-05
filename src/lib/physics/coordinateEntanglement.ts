@@ -15,6 +15,12 @@
  */
 
 import { wignerNegativityFromRDM } from '@/lib/physics/wigner/wignerFromRDM'
+import {
+  computeJointRdmWasm,
+  computeRdmWasm,
+  hermitianEigenvaluesWasm,
+  isAnimationWasmReady,
+} from '@/lib/wasm'
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -108,6 +114,21 @@ export function computeReducedDensityMatrix(
 ): { re: Float64Array; im: Float64Array; M: number } {
   const N = gridSize.length
   const M = gridSize[targetDim]!
+
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (isAnimationWasmReady()) {
+    const gridU32 = new Uint32Array(gridSize)
+    const packed = computeRdmWasm(psiRe, psiIm, gridU32, targetDim)
+    if (packed && packed.length === 2 * M * M) {
+      return {
+        re: packed.subarray(0, M * M),
+        im: packed.subarray(M * M),
+        M,
+      }
+    }
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   const totalSites = psiRe.length
 
   const rhoRe = new Float64Array(M * M)
@@ -221,6 +242,23 @@ export function computeJointReducedDensityMatrix(
   for (const d of dims) Mjoint *= gridSize[d]!
   if (Mjoint > MAX_BIPARTITION_RDM) return null
 
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (isAnimationWasmReady()) {
+    const gridU32 = new Uint32Array(gridSize)
+    const keptDimsU32 = new Uint32Array(dims)
+    const packed = computeJointRdmWasm(psiRe, psiIm, gridU32, keptDimsU32)
+    if (packed && packed.length === 2 * Mjoint * Mjoint) {
+      return {
+        re: packed.subarray(0, Mjoint * Mjoint),
+        im: packed.subarray(Mjoint * Mjoint),
+        M: Mjoint,
+      }
+    }
+    // packed.length === 0 means M > MAX_JOINT_RDM in Rust — fall through to JS check
+    if (packed && packed.length === 0) return null
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   const N = gridSize.length
   const totalSites = psiRe.length
   const strides = computeStrides(gridSize)
@@ -331,6 +369,15 @@ export function computeJointReducedDensityMatrix(
  * @returns Eigenvalues sorted descending
  */
 export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: number): Float64Array {
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (isAnimationWasmReady()) {
+    const wasmResult = hermitianEigenvaluesWasm(re, im, M)
+    if (wasmResult && wasmResult.length === M) {
+      return wasmResult
+    }
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   // Work on copies since we mutate during rotation
   const workRe = new Float64Array(re)
   const workIm = new Float64Array(im)

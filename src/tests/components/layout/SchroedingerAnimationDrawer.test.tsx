@@ -69,11 +69,11 @@ describe('SchroedingerAnimationDrawer', () => {
     expect(toggleBtn).toBeInTheDocument()
 
     // Initially off
-    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(false)
+    expect(useExtendedObjectStore.getState().schroedinger.phaseShimmerEnabled).toBe(false)
 
     // Click to enable
     fireEvent.click(toggleBtn)
-    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(true)
+    expect(useExtendedObjectStore.getState().schroedinger.phaseShimmerEnabled).toBe(true)
   })
 
   it('should toggle Slice Animation for 4D', () => {

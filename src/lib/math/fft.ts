@@ -11,8 +11,105 @@
  * @module
  */
 
+import { fft1dWasm, fftNdWasm, ifft1dWasm, ifftNdWasm, isAnimationWasmReady } from '@/lib/wasm'
+
 /** Typed array types accepted by FFT functions. */
 type FFTArray = Float64Array | Float32Array
+
+/**
+ * Minimum 1D FFT size to attempt WASM acceleration.
+ * Below this threshold, WASM boundary copy overhead exceeds compute savings.
+ */
+const WASM_1D_MIN_N = 32
+
+/**
+ * Minimum total grid sites for N-D WASM acceleration.
+ */
+const WASM_ND_MIN_SITES = 256
+
+// ============================================================================
+// WASM FFT Helpers
+// ============================================================================
+
+/**
+ * Attempt WASM-accelerated 1D forward FFT. On success, copies result back
+ * into `data` and returns true. Returns false if WASM is unavailable.
+ *
+ * @param data - Interleaved complex Float64Array (modified in place on success)
+ * @param n - Number of complex elements
+ * @returns True if WASM succeeded
+ */
+function tryWasmFft(data: Float64Array, n: number): boolean {
+  const result = fft1dWasm(data, n)
+  if (!result) return false
+  data.set(result)
+  return true
+}
+
+/**
+ * Attempt WASM-accelerated 1D inverse FFT. On success, copies result back
+ * into `data` and returns true. Returns false if WASM is unavailable.
+ *
+ * @param data - Interleaved complex Float64Array (modified in place on success)
+ * @param n - Number of complex elements
+ * @returns True if WASM succeeded
+ */
+function tryWasmIfft(data: Float64Array, n: number): boolean {
+  const result = ifft1dWasm(data, n)
+  if (!result) return false
+  data.set(result)
+  return true
+}
+
+/** Reusable Uint32Array for N-D grid sizes (avoids per-call allocation). */
+let gridSizeScratch: Uint32Array | null = null
+
+/**
+ * Get a Uint32Array scratch buffer for grid sizes, resizing if needed.
+ *
+ * @param length - Required length
+ * @returns Uint32Array of at least `length` elements
+ */
+function getGridSizeScratch(length: number): Uint32Array {
+  if (!gridSizeScratch || gridSizeScratch.length < length) {
+    gridSizeScratch = new Uint32Array(length)
+  }
+  return gridSizeScratch
+}
+
+/**
+ * Attempt WASM-accelerated N-D forward FFT. On success, copies result back
+ * into `data` and returns true. Returns false if WASM is unavailable.
+ *
+ * @param data - Interleaved complex Float64Array (modified in place on success)
+ * @param gridSize - Grid sizes per dimension
+ * @returns True if WASM succeeded
+ */
+function tryWasmFftNd(data: Float64Array, gridSize: readonly number[]): boolean {
+  const gs = getGridSizeScratch(gridSize.length)
+  for (let i = 0; i < gridSize.length; i++) gs[i] = gridSize[i]!
+  const result = fftNdWasm(data, gs.subarray(0, gridSize.length))
+  if (!result) return false
+  data.set(result)
+  return true
+}
+
+/**
+ * Attempt WASM-accelerated N-D inverse FFT. On success, copies result back
+ * into `data` and returns true. Returns false if WASM is unavailable.
+ *
+ * @param data - Interleaved complex Float64Array (modified in place on success)
+ * @param gridSize - Grid sizes per dimension
+ * @returns True if WASM succeeded
+ */
+function tryWasmIfftNd(data: Float64Array, gridSize: readonly number[]): boolean {
+  const gs = getGridSizeScratch(gridSize.length)
+  for (let i = 0; i < gridSize.length; i++) gs[i] = gridSize[i]!
+  const result = ifftNdWasm(data, gs.subarray(0, gridSize.length))
+  if (!result) return false
+  data.set(result)
+  return true
+}
 
 /**
  * Checks that n is a positive power of 2.
@@ -41,16 +138,19 @@ function assertComplexDataLength(data: FFTArray, n: number): void {
 }
 
 /**
- * Validates N-D FFT grid dimensions.
+ * Validates N-D FFT grid dimensions (each must be a power of 2).
  *
  * @param gridSize - Grid dimensions
- * @throws If any dimension is not a positive integer
+ * @throws If any dimension is not a positive power-of-2 integer
  */
 function assertValidGridSize(gridSize: readonly number[]): void {
   for (let d = 0; d < gridSize.length; d++) {
     const n = gridSize[d]!
     if (!Number.isInteger(n) || n < 1) {
       throw new Error(`FFT dimension must be positive integer, got ${n} at axis ${d}`)
+    }
+    if ((n & (n - 1)) !== 0) {
+      throw new Error(`FFT dimension must be power-of-2, got ${n} at axis ${d}`)
     }
   }
 }
@@ -142,6 +242,11 @@ export function fft(data: FFTArray, n: number): void {
   assertComplexDataLength(data, n)
   if (n <= 1) return
 
+  // Try WASM acceleration for Float64Array with sufficient size
+  if (n >= WASM_1D_MIN_N && data instanceof Float64Array && isAnimationWasmReady()) {
+    if (tryWasmFft(data, n)) return
+  }
+
   bitReverse(data, n)
 
   const twiddle = getTwiddleFactors(n)
@@ -191,6 +296,11 @@ export function fft(data: FFTArray, n: number): void {
 export function ifft(data: FFTArray, n: number): void {
   assertPowerOf2(n)
   assertComplexDataLength(data, n)
+
+  // Try WASM acceleration for Float64Array with sufficient size
+  if (n >= WASM_1D_MIN_N && data instanceof Float64Array && isAnimationWasmReady()) {
+    if (tryWasmIfft(data, n)) return
+  }
 
   // Conjugate
   for (let i = 0; i < n; i++) {
@@ -387,6 +497,12 @@ function ndTransform(
  * ```
  */
 export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
+  // Try N-D WASM path for Float64Array with sufficient total sites
+  if (data instanceof Float64Array && isAnimationWasmReady()) {
+    const totalSites = gridSize.reduce((a, b) => a * b, 1)
+    if (totalSites >= WASM_ND_MIN_SITES && tryWasmIfftNd(data, gridSize)) return
+  }
+
   ndTransform(data, gridSize, ifft)
 }
 
@@ -399,5 +515,11 @@ export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
  * @param gridSize - Array of grid sizes per dimension (each must be power of 2)
  */
 export function fftNd(data: FFTArray, gridSize: readonly number[]): void {
+  // Try N-D WASM path for Float64Array with sufficient total sites
+  if (data instanceof Float64Array && isAnimationWasmReady()) {
+    const totalSites = gridSize.reduce((a, b) => a * b, 1)
+    if (totalSites >= WASM_ND_MIN_SITES && tryWasmFftNd(data, gridSize)) return
+  }
+
   ndTransform(data, gridSize, fft)
 }
