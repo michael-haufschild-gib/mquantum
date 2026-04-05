@@ -4,6 +4,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { computeStrides as computeStridesBase } from '@/lib/math/ndArray'
 
 /** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
 export const LINEAR_WG = 64
@@ -71,18 +72,11 @@ export function reduceGridToFit(grid: number[], maxSites = MAX_LINEAR_DISPATCH_S
 
 /**
  * Compute row-major strides for an N-dimensional grid.
+ * Delegates to {@link @/lib/math/ndArray.computeStrides}.
  * @param gridSize - Array of grid dimensions
  * @returns Array of strides (one per dimension)
  */
-export function computeStrides(gridSize: number[]): number[] {
-  const dim = gridSize.length
-  const strides = new Array<number>(dim)
-  strides[dim - 1] = 1
-  for (let d = dim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-  return strides
-}
+export const computeStrides = computeStridesBase
 
 /**
  * Compute row-major strides for a grid, padded to MAX_DIM with zeros.

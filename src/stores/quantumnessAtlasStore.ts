@@ -10,6 +10,8 @@
 
 import { create } from 'zustand'
 
+import { logStepValue, type SweepStatus } from './utils/sweepUtils'
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 /** A single completed point in the quantumness atlas. */
@@ -56,8 +58,7 @@ export interface AtlasSweepConfig {
   measureSamples: number
 }
 
-/** Sweep status: idle → running → complete. */
-export type AtlasSweepStatus = 'idle' | 'running' | 'complete'
+export type { SweepStatus as AtlasSweepStatus } from './utils/sweepUtils'
 
 /** Progress within the current sweep point. */
 export interface AtlasSweepProgress {
@@ -106,7 +107,7 @@ interface QuantumnessAtlasState {
   config: AtlasSweepConfig
 
   // ── Status ──
-  status: AtlasSweepStatus
+  status: SweepStatus
   progress: AtlasSweepProgress
 
   // ── Results ──
@@ -153,9 +154,7 @@ export const DEFAULT_ATLAS_CONFIG: AtlasSweepConfig = {
 
 /** Compute log-spaced lambda for a given step index. */
 export function lambdaForStep(config: AtlasSweepConfig, idx: number): number {
-  if (config.lambdaSteps <= 1) return config.lambdaMin
-  const t = idx / (config.lambdaSteps - 1)
-  return config.lambdaMin * Math.pow(config.lambdaMax / config.lambdaMin, t)
+  return logStepValue(config.lambdaMin, config.lambdaMax, config.lambdaSteps, idx)
 }
 
 function totalPoints(config: AtlasSweepConfig): number {

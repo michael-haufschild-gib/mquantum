@@ -12,6 +12,8 @@ import { create } from 'zustand'
 
 import type { CoordinateEntanglementResult } from '@/lib/physics/coordinateEntanglement'
 
+import { logStepValue, type SweepStatus } from './utils/sweepUtils'
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Ring buffer length for entropy time series. */
@@ -44,8 +46,7 @@ export interface AtlasSweepPoint {
   entropy: number
 }
 
-/** Atlas sweep state machine phases. */
-export type SweepStatus = 'idle' | 'running' | 'complete'
+export type { SweepStatus } from './utils/sweepUtils'
 
 // ─── Store Type ─────────────────────────────────────────────────────────────
 
@@ -175,11 +176,7 @@ function createHistoryArrays(n: number): Float64Array[] {
  * @returns The lambda value
  */
 export function lambdaForStep(config: AtlasSweepConfig, lambdaIdx: number): number {
-  if (config.lambdaSteps <= 1) return config.lambdaMin
-  const logMin = Math.log10(config.lambdaMin)
-  const logMax = Math.log10(config.lambdaMax)
-  const logVal = logMin + (lambdaIdx * (logMax - logMin)) / (config.lambdaSteps - 1)
-  return Math.pow(10, logVal)
+  return logStepValue(config.lambdaMin, config.lambdaMax, config.lambdaSteps, lambdaIdx)
 }
 
 // ─── Store ──────────────────────────────────────────────────────────────────

@@ -11,6 +11,10 @@
 
 import { create } from 'zustand'
 
+import { linearStepValue, type SweepStatus } from './utils/sweepUtils'
+
+export type { SweepStatus } from './utils/sweepUtils'
+
 /** Number of energy bins for spectral density histogram. */
 export const ENERGY_BINS = 32
 
@@ -39,9 +43,6 @@ export interface SweepResult {
   /** PRNG seed used for this realization */
   seed: number
 }
-
-/** Sweep state machine phases. */
-export type SweepStatus = 'idle' | 'running' | 'complete'
 
 interface AndersonSweepState {
   /** Current sweep status */
@@ -84,8 +85,7 @@ const DEFAULT_CONFIG: SweepConfig = {
  * @returns Disorder strength W
  */
 function wForStep(config: SweepConfig, step: number): number {
-  if (config.steps <= 1) return config.wMin
-  return config.wMin + (step * (config.wMax - config.wMin)) / (config.steps - 1)
+  return linearStepValue(config.wMin, config.wMax, config.steps, step)
 }
 
 /**
