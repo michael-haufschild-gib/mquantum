@@ -174,6 +174,7 @@ describe('coordinate entanglement invariants (property-based)', () => {
         const result = computeCoordinateEntanglement(re, im, gridSize, {
           computePairwiseMI: false,
           computeBipartitions: false,
+          computeWignerNegativity: false,
         })
 
         for (const S of result.entropies) {

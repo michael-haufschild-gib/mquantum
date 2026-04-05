@@ -15,6 +15,7 @@ import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementS
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension, setObjectType } = useGeometryStore(
@@ -51,6 +52,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       // Abort any running sweep before switching type/mode so disabled controls re-enable
       useCoordinateEntanglementStore.getState().abortSweep()
       useMonitoringSweepStore.getState().abort()
+      useQuantumnessAtlasStore.getState().abortSweep()
 
       const prevDim = useGeometryStore.getState().dimension
 

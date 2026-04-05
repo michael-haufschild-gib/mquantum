@@ -20,6 +20,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useMeasurementStore } from '@/stores/measurementStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 
@@ -36,9 +37,13 @@ function getLatticeHalfExtent(): number {
  * partial measurement axis, statistics.
  */
 export const MeasurementControls: React.FC = React.memo(() => {
-  const atlasSweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
+  const entanglementSweepRunning = useCoordinateEntanglementStore(
+    (s) => s.sweepStatus === 'running'
+  )
   const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
-  const sweepRunning = atlasSweepRunning || monitoringSweepRunning
+  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
+  const sweepRunning =
+    entanglementSweepRunning || monitoringSweepRunning || quantumnessAtlasSweepRunning
   const dimension = useGeometryStore((s) => s.dimension)
   const {
     enabled,

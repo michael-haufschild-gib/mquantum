@@ -20,6 +20,7 @@ import { Switch } from '@/components/ui/Switch'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 import {
   AtlasHeatmap,
@@ -74,20 +75,26 @@ CoordinateEntanglementSection.displayName = 'CoordinateEntanglementSection'
 const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.memo(
   ({ defaultOpen }) => {
     const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
+    const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
+    const anySweepRunning = monitoringSweepRunning || quantumnessAtlasSweepRunning
 
     const {
       enabled,
       computePairwiseMI,
       computeBipartitions,
+      computeWignerNegativity,
       setEnabled,
       setComputePairwiseMI,
       setComputeBipartitions,
+      setComputeWignerNegativity,
       historyAverage,
+      historyWignerNegativity,
       historyHead,
       historyCount,
       currentEntropies,
       currentAverageEntropy,
       currentNormalizedEntropy,
+      currentAverageWignerNegativity,
       currentSpectrum,
       currentBipartitionEntropies,
       mutualInfoMatrix,
@@ -101,15 +108,19 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
         enabled: s.enabled,
         computePairwiseMI: s.computePairwiseMI,
         computeBipartitions: s.computeBipartitions,
+        computeWignerNegativity: s.computeWignerNegativity,
         setEnabled: s.setEnabled,
         setComputePairwiseMI: s.setComputePairwiseMI,
         setComputeBipartitions: s.setComputeBipartitions,
+        setComputeWignerNegativity: s.setComputeWignerNegativity,
         historyAverage: s.historyAverage,
+        historyWignerNegativity: s.historyWignerNegativity,
         historyHead: s.historyHead,
         historyCount: s.historyCount,
         currentEntropies: s.currentEntropies,
         currentAverageEntropy: s.currentAverageEntropy,
         currentNormalizedEntropy: s.currentNormalizedEntropy,
+        currentAverageWignerNegativity: s.currentAverageWignerNegativity,
         currentSpectrum: s.currentSpectrum,
         currentBipartitionEntropies: s.currentBipartitionEntropies,
         mutualInfoMatrix: s.mutualInfoMatrix,
@@ -123,6 +134,7 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
 
     // historyAverage is mutated in place (ring buffer) — compute fresh each render (256 elements, trivially cheap)
     const sparklineData = f64ToF32(historyAverage)
+    const wignerSparkData = f64ToF32(historyWignerNegativity)
     const maxEnts = useCoordinateEntanglementStore((s) => s.currentMaxEntropies)
 
     const { handleStartSweep, handleAbortSweep } = useSweepController()
@@ -136,6 +148,10 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
       (v: boolean) => setComputeBipartitions(v),
       [setComputeBipartitions]
     )
+    const handleWignerChange = useCallback(
+      (v: boolean) => setComputeWignerNegativity(v),
+      [setComputeWignerNegativity]
+    )
 
     return (
       <Section
@@ -144,8 +160,8 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
         data-testid="coordinate-entanglement-section"
       >
         <fieldset
-          disabled={monitoringSweepRunning}
-          className={`border-0 p-0 m-0 min-w-0 transition-opacity${monitoringSweepRunning ? ' opacity-50' : ''}`}
+          disabled={anySweepRunning}
+          className={`border-0 p-0 m-0 min-w-0 transition-opacity${anySweepRunning ? ' opacity-50' : ''}`}
         >
           {/* Row 1: Enable toggle + sweep action (right-aligned) */}
           <div className="flex items-center justify-between">
@@ -195,6 +211,13 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
                     onCheckedChange={handleBipartitionChange}
                     disabled={sweepStatus === 'running'}
                   />
+                  <Switch
+                    label="Wigner negativity"
+                    tooltip="Phase-space nonclassicality from per-dimension ρ_d. N_W = 0 for Gaussian states, N_W > 0 for non-Gaussian states."
+                    checked={computeWignerNegativity}
+                    onCheckedChange={handleWignerChange}
+                    disabled={sweepStatus === 'running'}
+                  />
                 </div>
                 <div className="flex-1 min-w-0 text-xs text-text-secondary pt-0.5">
                   {currentBipartitionEntropies.length > 0 && (
@@ -235,6 +258,24 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
                     min={0}
                     height={32}
                   />
+                </div>
+              )}
+
+              {computeWignerNegativity && (
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-text-secondary">
+                    <span>N̄_W (Wigner negativity)</span>
+                    <span className="font-mono">{currentAverageWignerNegativity.toFixed(4)}</span>
+                  </div>
+                  {historyCount > 2 && (
+                    <Sparkline
+                      data={wignerSparkData}
+                      head={historyHead}
+                      count={historyCount}
+                      min={0}
+                      height={24}
+                    />
+                  )}
                 </div>
               )}
 

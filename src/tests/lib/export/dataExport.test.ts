@@ -14,6 +14,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  atlasResultsToCSV,
+  atlasResultsToJSON,
   exportBecDiagnosticsCSV,
   exportDiagnosticsJSON,
   exportDiracDiagnosticsCSV,
@@ -27,6 +29,7 @@ import {
   readRingBuffer,
 } from '@/lib/export/dataExport'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 beforeEach(() => {
@@ -644,5 +647,70 @@ describe('exportFilename', () => {
   it('generates a filename with prefix, timestamp, and extension', () => {
     const name = exportFilename('mdim-tdse', 'csv')
     expect(name).toMatch(/^mdim-tdse-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.csv$/)
+  })
+})
+
+// ─── Quantumness Atlas Export ───────────────────────────────────────────
+
+describe('atlasResultsToCSV', () => {
+  const POINT: AtlasPoint = {
+    lambda: 1.5,
+    dim: 3,
+    gamma: 0.3,
+    avgNormalizedEntropy: 0.42,
+    varNormalizedEntropy: 0.01,
+    avgWignerNegativity: 0.15,
+    varWignerNegativity: 0.002,
+    avgIPR: 0.65,
+    varIPR: 0.003,
+    gridSizePerDim: 64,
+    totalSteps: 200,
+    measurementSamples: 10,
+  }
+
+  it('produces header + data rows', () => {
+    const csv = atlasResultsToCSV([POINT])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toMatch(/^dim,lambda,gamma/)
+    expect(lines[1]).toBe('3,1.5,0.3,0.42,0.01,0.15,0.002,0.65,0.003,64,200,10')
+  })
+
+  it('returns header only for empty results', () => {
+    const csv = atlasResultsToCSV([])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toMatch(/^dim,lambda,gamma/)
+  })
+
+  it('produces one row per point', () => {
+    const p2: AtlasPoint = { ...POINT, dim: 5, gamma: 1.0 }
+    const csv = atlasResultsToCSV([POINT, p2])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(3) // header + 2 data
+  })
+})
+
+describe('atlasResultsToJSON', () => {
+  it('round-trips through JSON.parse', () => {
+    const point: AtlasPoint = {
+      lambda: 2,
+      dim: 4,
+      gamma: 0,
+      avgNormalizedEntropy: 0.5,
+      varNormalizedEntropy: 0.01,
+      avgWignerNegativity: 0.1,
+      varWignerNegativity: 0.002,
+      avgIPR: 0.8,
+      varIPR: 0.003,
+      gridSizePerDim: 32,
+      totalSteps: 200,
+      measurementSamples: 10,
+    }
+    const json = atlasResultsToJSON([point])
+    const parsed = JSON.parse(json) as AtlasPoint[]
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0]!.dim).toBe(4)
+    expect(parsed[0]!.avgNormalizedEntropy).toBe(0.5)
   })
 })

@@ -323,6 +323,7 @@ describe('computeCoordinateEntanglement', () => {
     const result = computeCoordinateEntanglement(re, im, [M, M, M], {
       computePairwiseMI: false,
       computeBipartitions: false,
+      computeWignerNegativity: false,
     })
 
     expect(result.entropies).toHaveLength(3)
@@ -345,6 +346,7 @@ describe('computeCoordinateEntanglement', () => {
     const result = computeCoordinateEntanglement(re, im, [M, M], {
       computePairwiseMI: false,
       computeBipartitions: false,
+      computeWignerNegativity: false,
     })
 
     expect(result.entropies[0]).toBeCloseTo(Math.log(M), 8)
@@ -366,6 +368,7 @@ describe('computeCoordinateEntanglement', () => {
     const result = computeCoordinateEntanglement(re, im, [M, M], {
       computePairwiseMI: false,
       computeBipartitions: false,
+      computeWignerNegativity: false,
     })
 
     // Spectrum (eigenvalues of ρ₁) should be sorted descending
@@ -388,6 +391,7 @@ describe('computeCoordinateEntanglement', () => {
     const result = computeCoordinateEntanglement(re, im, [M, M, M], {
       computePairwiseMI: false,
       computeBipartitions: true,
+      computeWignerNegativity: false,
     })
 
     // For 3D, ⌊N/2⌋ = 1, so bipartitionEntropies has 1 entry (k=1)
@@ -410,6 +414,7 @@ describe('computeCoordinateEntanglement', () => {
     const result = computeCoordinateEntanglement(re, im, [M, M, M], {
       computePairwiseMI: true,
       computeBipartitions: false,
+      computeWignerNegativity: false,
     })
 
     expect(result.mutualInfo).toBeInstanceOf(Float64Array)

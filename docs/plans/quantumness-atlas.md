@@ -191,7 +191,7 @@ H6 is the most surprising possible finding: it would mean that a state can be hi
 
 ### 3.1 From ρ_d to Wigner Function
 
-The reduced density matrix ρ_d(i, j) is already computed for coordinate entanglement (PRD 2). The marginal Wigner function is:
+The reduced density matrix ρ_d(i, j) is already computed for coordinate entanglement (/Users/Spare/Documents/code/mquantum/docs/plans/inter-dimensional-entanglement.md). The marginal Wigner function is:
 
 ```
 W_d(x_m, p_n) = (1/πℏ) Σ_{k=0}^{M-1} ρ_d(m+k, m-k) · e^{2iπnk/M}
@@ -279,7 +279,7 @@ Compute pairwise joint Wigner only when M ≤ 16 (N ≥ 5). For lower dimensions
 The sweep runs sequentially over the (λ, N, γ) parameter space. For each point:
 
 1. Reconfigure TDSE (potential, grid, dimension)
-2. Reconfigure monitoring (γ — from PRD 1)
+2. Reconfigure monitoring (γ — from docs/plans/stochastic-decoherence-engine.md)
 3. Reset wavefunction
 4. Wait for shader compilation (dimension/grid changes trigger recompile)
 5. Evolve T_evolve steps

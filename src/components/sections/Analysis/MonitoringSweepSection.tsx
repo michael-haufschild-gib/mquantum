@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Sparkline } from '@/components/ui/Sparkline'
+import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
@@ -26,6 +27,7 @@ import {
   type MonitoringSweepConfig,
   useMonitoringSweepStore,
 } from '@/stores/monitoringSweepStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 /** Monitoring sweep controls and IPR display. */
 export const MonitoringSweepSection: React.FC = React.memo(() => {
@@ -140,6 +142,12 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
     return arr
   }, [results])
 
+  const entanglementSweepRunning = useCoordinateEntanglementStore(
+    (s) => s.sweepStatus === 'running'
+  )
+  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
+  const otherSweepRunning = entanglementSweepRunning || quantumnessAtlasSweepRunning
+
   if (!tdse?.stochasticEnabled) return null
 
   const isRunning = status === 'running'
@@ -226,7 +234,7 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
         )}
 
         {!isRunning && !isComplete && (
-          <Button size="sm" onClick={handleStartSweep}>
+          <Button size="sm" onClick={handleStartSweep} disabled={otherSweepRunning}>
             Start Sweep
           </Button>
         )}

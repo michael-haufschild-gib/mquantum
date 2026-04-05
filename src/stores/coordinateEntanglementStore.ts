@@ -58,6 +58,8 @@ interface CoordinateEntanglementState {
   computePairwiseMI: boolean
   /** Compute k-dimensional bipartition entropies. */
   computeBipartitions: boolean
+  /** Compute Wigner negativity from per-dimension RDMs. */
+  computeWignerNegativity: boolean
 
   // ── Ring buffer time series ─────────────────────────────────────────────
   /** Per-dimension entropy history: N arrays of length HISTORY_LENGTH. */
@@ -82,6 +84,14 @@ interface CoordinateEntanglementState {
   currentSpectrum: number[]
   /** Bipartition entropies S_{k|N-k}, null entries if skipped. */
   currentBipartitionEntropies: (number | null)[]
+
+  // ── Wigner negativity ────────────────────────────────────────────────────
+  /** Per-dimension Wigner negativity from ρ_d. null entries if skipped. */
+  currentWignerNegativities: (number | null)[]
+  /** Average Wigner negativity across computed dimensions. */
+  currentAverageWignerNegativity: number
+  /** Ring-buffer history for average Wigner negativity. */
+  historyWignerNegativity: Float64Array
 
   // ── Pairwise MI ─────────────────────────────────────────────────────────
   /** N×N mutual information matrix (flat row-major), null when disabled. */
@@ -125,6 +135,7 @@ interface CoordinateEntanglementState {
   setEnabled: (v: boolean) => void
   setComputePairwiseMI: (v: boolean) => void
   setComputeBipartitions: (v: boolean) => void
+  setComputeWignerNegativity: (v: boolean) => void
   pushResult: (result: CoordinateEntanglementResult) => void
   clearHistory: () => void
   startSweep: (config: AtlasSweepConfig) => void
@@ -179,10 +190,12 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   enabled: false,
   computePairwiseMI: false,
   computeBipartitions: false,
+  computeWignerNegativity: false,
 
   // Ring buffer
   historyEntropies: createHistoryArrays(MAX_DIMS),
   historyAverage: new Float64Array(HISTORY_LENGTH),
+  historyWignerNegativity: new Float64Array(HISTORY_LENGTH),
   historyHead: 0,
   historyCount: 0,
 
@@ -193,6 +206,10 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   currentMaxEntropies: [],
   currentSpectrum: [],
   currentBipartitionEntropies: [],
+
+  // Wigner negativity
+  currentWignerNegativities: [],
+  currentAverageWignerNegativity: 0,
 
   // Pairwise MI
   mutualInfoMatrix: null,
@@ -221,6 +238,7 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   setEnabled: (v) => set({ enabled: v }),
   setComputePairwiseMI: (v) => set({ computePairwiseMI: v }),
   setComputeBipartitions: (v) => set({ computeBipartitions: v }),
+  setComputeWignerNegativity: (v) => set({ computeWignerNegativity: v }),
 
   pushResult: (result) => {
     const state = get()
@@ -233,6 +251,7 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       state.historyEntropies[d]![head] = result.entropies[d] ?? NaN
     }
     state.historyAverage[head] = result.averageEntropy
+    state.historyWignerNegativity[head] = result.averageWignerNegativity
 
     const newHead = (head + 1) % HISTORY_LENGTH
     const newCount = Math.min(state.historyCount + 1, HISTORY_LENGTH)
@@ -264,6 +283,8 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       currentMaxEntropies: result.maxEntropies,
       currentSpectrum: result.spectrum,
       currentBipartitionEntropies: result.bipartitionEntropies,
+      currentWignerNegativities: result.wignerNegativities,
+      currentAverageWignerNegativity: result.averageWignerNegativity,
       mutualInfoMatrix: result.mutualInfo,
       longTimeSum: newLtSum,
       longTimeSumSq: newLtSumSq,
@@ -285,6 +306,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       currentMaxEntropies: [],
       currentSpectrum: [],
       currentBipartitionEntropies: [],
+      currentWignerNegativities: [],
+      currentAverageWignerNegativity: 0,
+      historyWignerNegativity: new Float64Array(HISTORY_LENGTH),
       mutualInfoMatrix: null,
       longTimeSum: 0,
       longTimeSumSq: 0,

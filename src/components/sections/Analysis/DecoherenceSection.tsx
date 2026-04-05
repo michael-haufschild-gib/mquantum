@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/Switch'
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 import { ControlGroup } from '../../ui/ControlGroup'
 
@@ -34,7 +35,11 @@ export function DecoherenceSection() {
 
 /** Inner content — only rendered when quantumMode === 'tdseDynamics'. */
 function DecoherenceContent() {
-  const sweepRunning = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
+  const entanglementSweepRunning = useCoordinateEntanglementStore(
+    (s) => s.sweepStatus === 'running'
+  )
+  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
+  const sweepRunning = entanglementSweepRunning || quantumnessAtlasSweepRunning
   const {
     tdse,
     setStochasticEnabled,

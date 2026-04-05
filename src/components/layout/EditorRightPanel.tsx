@@ -7,6 +7,7 @@ import { AnalysisSection } from '@/components/sections/Analysis/AnalysisSection'
 import { CoordinateEntanglementSection } from '@/components/sections/Analysis/CoordinateEntanglementSection'
 import { DecoherenceSection } from '@/components/sections/Analysis/DecoherenceSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Analysis/OpenQuantumDiagnosticsSection'
+import { QuantumnessAtlasSection } from '@/components/sections/Analysis/QuantumnessAtlasSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Analysis/SchroedingerQuantumEffectsSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
@@ -38,6 +39,7 @@ const AnalysisTabContent: React.FC = React.memo(() => {
       <AnalysisSection defaultOpen={true} />
       <DecoherenceSection />
       <CoordinateEntanglementSection />
+      <QuantumnessAtlasSection />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <OpenQuantumDiagnosticsSection />
     </div>

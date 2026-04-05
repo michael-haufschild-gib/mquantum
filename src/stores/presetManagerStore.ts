@@ -20,6 +20,7 @@ import { useMsgBoxStore } from './msgBoxStore'
 import { usePBRStore } from './pbrStore'
 import { usePerformanceStore } from './performanceStore'
 import { usePostProcessingStore } from './postProcessingStore'
+import { useQuantumnessAtlasStore } from './quantumnessAtlasStore'
 import { useRotationStore } from './rotationStore'
 import { APPEARANCE_INITIAL_STATE } from './slices/appearanceSlice'
 import { LIGHTING_INITIAL_STATE } from './slices/lightingSlice'
@@ -520,6 +521,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Abort any running sweeps so their disabled UI controls re-enable before state changes
         useCoordinateEntanglementStore.getState().abortSweep()
         useMonitoringSweepStore.getState().abort()
+        useQuantumnessAtlasStore.getState().abortSweep()
 
         usePerformanceStore.getState().setIsLoadingScene(true)
         usePerformanceStore.getState().setSceneTransitioning(true)

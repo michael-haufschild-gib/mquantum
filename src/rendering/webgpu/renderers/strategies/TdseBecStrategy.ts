@@ -665,6 +665,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
           options: {
             computePairwiseMI: entStore.computePairwiseMI,
             computeBipartitions: entStore.computeBipartitions,
+            computeWignerNegativity: entStore.computeWignerNegativity,
           },
         }
 
