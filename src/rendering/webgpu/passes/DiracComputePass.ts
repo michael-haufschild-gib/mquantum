@@ -50,7 +50,7 @@ import type {
   DiracPipelineResult,
 } from './DiracComputePassTypes'
 import { buildDiracFFTStagingData, writeDiracUniforms } from './DiracComputePassUniforms'
-import { requestStateSave } from './stateSave'
+import { requestStateSave as genericStateSave } from './stateSave'
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -179,7 +179,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     const componentCount = this.currentSpinorSize
 
     this.saveMappingInFlight = true
-    requestStateSave(ctx, {
+    genericStateSave(ctx, {
       source: {
         layout: 'separate',
         reBuffer: this.spinorReBuffer,

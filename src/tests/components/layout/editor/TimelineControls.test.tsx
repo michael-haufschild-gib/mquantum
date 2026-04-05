@@ -251,16 +251,19 @@ describe('TimelineControls', () => {
     expect(resetButton).toBeInTheDocument()
   })
 
-  it('calls resetSchroedingerParameters and requestOpenQuantumStateReset when restart clicked in HO mode', () => {
-    mockGeometryState.objectType = 'schroedinger'
-    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+  it.each(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'] as const)(
+    'calls resetSchroedingerParameters and requestOpenQuantumStateReset when restart clicked in %s mode',
+    (mode) => {
+      mockGeometryState.objectType = 'schroedinger'
+      mockExtendedState.schroedinger.quantumMode = mode
 
-    render(<TimelineControls />)
+      render(<TimelineControls />)
 
-    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
-    expect(mockResetSchroedingerParameters).toHaveBeenCalledOnce()
-    expect(mockRequestOpenQuantumStateReset).toHaveBeenCalledOnce()
-  })
+      fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+      expect(mockResetSchroedingerParameters).toHaveBeenCalledOnce()
+      expect(mockRequestOpenQuantumStateReset).toHaveBeenCalledOnce()
+    }
+  )
 
   it('calls resetTdseField when restart clicked in TDSE mode', () => {
     mockGeometryState.objectType = 'schroedinger'
@@ -309,5 +312,41 @@ describe('TimelineControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
     expect(mockSetDiracNeedsReset).toHaveBeenCalledOnce()
+  })
+
+  it('shows Open Quantum badge with 0 when disabled', () => {
+    mockExtendedState.schroedinger.openQuantum.enabled = false
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer/i })
+    expect(button.textContent).toContain('0')
+  })
+
+  it('counts active Lindblad channels in Open Quantum badge', () => {
+    mockExtendedState.schroedinger.openQuantum.enabled = true
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = false
+    mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 2 active/i })
+    expect(button).toBeInTheDocument()
+  })
+
+  it('shows badge count of 1 for hydrogen modes regardless of channel flags', () => {
+    mockExtendedState.schroedinger.quantumMode = 'hydrogenND'
+    mockExtendedState.schroedinger.openQuantum.enabled = true
+    mockExtendedState.schroedinger.openQuantum.dephasingEnabled = true
+    mockExtendedState.schroedinger.openQuantum.relaxationEnabled = true
+    mockExtendedState.schroedinger.openQuantum.thermalEnabled = true
+
+    render(<TimelineControls />)
+
+    const button = screen.getByRole('button', { name: /toggle open quantum drawer, 1 active/i })
+    expect(button).toBeInTheDocument()
   })
 })

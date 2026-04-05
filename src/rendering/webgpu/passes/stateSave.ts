@@ -71,8 +71,8 @@ export interface StateSaveRequest {
   label: string
   /**
    * Async callback to resolve serialization metadata.
-   * Called only after successful GPU readback, so dynamic imports
-   * and store reads are deferred until data is available.
+   * Called eagerly (before GPU readback starts) to snapshot store state
+   * while it still matches the buffer contents being copied.
    */
   getMetadata: () => Promise<StateSaveMetadata>
   /** Called when the async operation completes (success or failure). */
@@ -84,73 +84,93 @@ export interface StateSaveRequest {
 /**
  * Initiate an async GPU readback → serialize → download state save.
  *
- * Creates staging buffers, encodes copy commands on the current encoder,
- * then asynchronously maps, extracts, serializes, and downloads the data.
- * All staging buffers are destroyed on every code path (success, early
- * return, and error).
+ * Creates a dedicated command encoder, copies source buffers to staging,
+ * submits immediately, then asynchronously maps, extracts, serializes,
+ * and downloads the data. Metadata is captured eagerly before the async
+ * readback to prevent stale store reads. All staging buffers are destroyed
+ * on every code path (success, early return, and error).
  *
- * @param ctx - Render context with device and command encoder
+ * @param ctx - Render context (only `device` is used; the frame encoder is not touched)
  * @param request - Save parameters
  */
 export function requestStateSave(ctx: WebGPURenderContext, request: StateSaveRequest): void {
-  const { device, encoder } = ctx
+  const { device } = ctx
   const { source, totalSites, label, getMetadata, onFinished } = request
 
+  // Capture metadata eagerly — store state must match buffer contents
+  const metadataPromise = getMetadata()
+
   if (source.layout === 'separate') {
-    requestSeparateSave(device, encoder, source, totalSites, label, getMetadata, onFinished)
+    requestSeparateSave(device, source, totalSites, label, metadataPromise, onFinished)
   } else {
-    requestInterleavedSave(device, encoder, source, totalSites, label, getMetadata, onFinished)
+    requestInterleavedSave(device, source, totalSites, label, metadataPromise, onFinished)
   }
 }
 
 /** Save from two separate re/im buffers (TDSE, FSF, Dirac, Pauli). */
 function requestSeparateSave(
   device: GPUDevice,
-  encoder: GPUCommandEncoder,
   source: SeparateBufferSource,
   totalSites: number,
   label: string,
-  getMetadata: () => Promise<StateSaveMetadata>,
+  metadataPromise: Promise<StateSaveMetadata>,
   onFinished: () => void
 ): void {
-  const stagingRe = device.createBuffer({
-    label: `${label}-save-staging-re`,
-    size: source.byteSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
-  const stagingIm = device.createBuffer({
-    label: `${label}-save-staging-im`,
-    size: source.byteSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
+  let stagingRe: GPUBuffer | null = null
+  let stagingIm: GPUBuffer | null = null
 
-  encoder.copyBufferToBuffer(source.reBuffer, 0, stagingRe, 0, source.byteSize)
-  encoder.copyBufferToBuffer(source.imBuffer, 0, stagingIm, 0, source.byteSize)
+  try {
+    stagingRe = device.createBuffer({
+      label: `${label}-save-staging-re`,
+      size: source.byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+    stagingIm = device.createBuffer({
+      label: `${label}-save-staging-im`,
+      size: source.byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    const encoder = device.createCommandEncoder({ label: `${label}-state-save` })
+    encoder.copyBufferToBuffer(source.reBuffer, 0, stagingRe, 0, source.byteSize)
+    encoder.copyBufferToBuffer(source.imBuffer, 0, stagingIm, 0, source.byteSize)
+    device.queue.submit([encoder.finish()])
+  } catch (err) {
+    stagingRe?.destroy()
+    stagingIm?.destroy()
+    reportSaveError(err)
+    onFinished()
+    return
+  }
+
+  const re$ = stagingRe
+  const im$ = stagingIm
 
   device.queue
     .onSubmittedWorkDone()
     .then(async () => {
-      if (stagingRe.mapState !== 'unmapped' || stagingIm.mapState !== 'unmapped') {
-        stagingRe.destroy()
-        stagingIm.destroy()
+      if (re$.mapState !== 'unmapped' || im$.mapState !== 'unmapped') {
+        re$.destroy()
+        im$.destroy()
         onFinished()
         return
       }
-      await Promise.all([stagingRe.mapAsync(GPUMapMode.READ), stagingIm.mapAsync(GPUMapMode.READ)])
+      await Promise.all([re$.mapAsync(GPUMapMode.READ), im$.mapAsync(GPUMapMode.READ)])
 
-      const re = new Float32Array(stagingRe.getMappedRange()).slice(0)
-      const im = new Float32Array(stagingIm.getMappedRange()).slice(0)
-      stagingRe.unmap()
-      stagingIm.unmap()
-      stagingRe.destroy()
-      stagingIm.destroy()
+      const re = new Float32Array(re$.getMappedRange()).slice(0)
+      const im = new Float32Array(im$.getMappedRange()).slice(0)
+      re$.unmap()
+      im$.unmap()
+      re$.destroy()
+      im$.destroy()
 
-      await serializeAndDownload(re, im, totalSites, getMetadata)
+      const meta = await metadataPromise
+      await serializeAndDownload(re, im, totalSites, meta)
       onFinished()
     })
     .catch((err) => {
-      stagingRe.destroy()
-      stagingIm.destroy()
+      re$.destroy()
+      im$.destroy()
       reportSaveError(err)
       onFinished()
     })
@@ -159,31 +179,43 @@ function requestSeparateSave(
 /** Save from a single interleaved complex buffer (Quantum Walk). */
 function requestInterleavedSave(
   device: GPUDevice,
-  encoder: GPUCommandEncoder,
   source: InterleavedBufferSource,
   totalSites: number,
   label: string,
-  getMetadata: () => Promise<StateSaveMetadata>,
+  metadataPromise: Promise<StateSaveMetadata>,
   onFinished: () => void
 ): void {
-  const staging = device.createBuffer({
-    label: `${label}-save-staging`,
-    size: source.byteSize,
-    usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-  })
+  let staging: GPUBuffer | null = null
 
-  encoder.copyBufferToBuffer(source.buffer, 0, staging, 0, source.byteSize)
+  try {
+    staging = device.createBuffer({
+      label: `${label}-save-staging`,
+      size: source.byteSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    const encoder = device.createCommandEncoder({ label: `${label}-state-save` })
+    encoder.copyBufferToBuffer(source.buffer, 0, staging, 0, source.byteSize)
+    device.queue.submit([encoder.finish()])
+  } catch (err) {
+    staging?.destroy()
+    reportSaveError(err)
+    onFinished()
+    return
+  }
+
+  const s$ = staging
 
   device.queue
     .onSubmittedWorkDone()
     .then(async () => {
-      if (staging.mapState !== 'unmapped') {
-        staging.destroy()
+      if (s$.mapState !== 'unmapped') {
+        s$.destroy()
         onFinished()
         return
       }
-      await staging.mapAsync(GPUMapMode.READ)
-      const interleaved = new Float32Array(staging.getMappedRange())
+      await s$.mapAsync(GPUMapMode.READ)
+      const interleaved = new Float32Array(s$.getMappedRange())
 
       const n = source.elementCount
       const re = new Float32Array(n)
@@ -192,14 +224,15 @@ function requestInterleavedSave(
         re[i] = interleaved[i * 2]!
         im[i] = interleaved[i * 2 + 1]!
       }
-      staging.unmap()
-      staging.destroy()
+      s$.unmap()
+      s$.destroy()
 
-      await serializeAndDownload(re, im, totalSites, getMetadata)
+      const meta = await metadataPromise
+      await serializeAndDownload(re, im, totalSites, meta)
       onFinished()
     })
     .catch((err) => {
-      staging.destroy()
+      s$.destroy()
       reportSaveError(err)
       onFinished()
     })
@@ -212,10 +245,8 @@ async function serializeAndDownload(
   re: Float32Array,
   im: Float32Array,
   totalSites: number,
-  getMetadata: () => Promise<StateSaveMetadata>
+  meta: StateSaveMetadata
 ): Promise<void> {
-  const meta = await getMetadata()
-
   const { serializeSimulationState } = await import('@/lib/export/simulationState')
   const { downloadFile, exportFilename } = await import('@/lib/export/dataExport')
   const { useSimulationStateStore } = await import('@/stores/simulationStateStore')

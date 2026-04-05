@@ -26,7 +26,7 @@ import {
 import { packAbsorberUniforms, packWriteGridUniforms } from './QuantumWalkComputePassUniforms'
 import { QwDiagnostics } from './QuantumWalkDiagnostics'
 import { createQwPipelines } from './QuantumWalkPipelines'
-import { requestStateSave } from './stateSave'
+import { requestStateSave as genericStateSave } from './stateSave'
 
 const COIN_WG = 64
 
@@ -154,7 +154,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const totalSites = this.totalSites
 
     this.saveMappingInFlight = true
-    requestStateSave(ctx, {
+    genericStateSave(ctx, {
       source: {
         layout: 'interleaved',
         buffer: this.coinStateA,

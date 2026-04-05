@@ -42,7 +42,7 @@ import {
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
-import { requestStateSave } from './stateSave'
+import { requestStateSave as genericStateSave } from './stateSave'
 
 /** Uniform buffer size: FreeScalarUniforms struct = 512 bytes (added PML absorber fields) */
 const UNIFORM_SIZE = 512
@@ -192,7 +192,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const byteSize = this.totalSites * 4
 
     this.saveMappingInFlight = true
-    requestStateSave(ctx, {
+    genericStateSave(ctx, {
       source: { layout: 'separate', reBuffer: this.phiBuffer, imBuffer: this.piBuffer, byteSize },
       totalSites: this.totalSites,
       label: 'fsf',

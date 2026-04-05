@@ -42,7 +42,7 @@ import type { PauliBufferResult } from './PauliComputePassBuffers'
 import { rebuildPauliBuffers, writePauliUniforms } from './PauliComputePassBuffers'
 import type { PauliBindGroupResult, PauliPipelineResult } from './PauliComputePassSetup'
 import { buildPauliPipelines, rebuildPauliBindGroups } from './PauliComputePassSetup'
-import { requestStateSave } from './stateSave'
+import { requestStateSave as genericStateSave } from './stateSave'
 
 /** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
 const UNIFORM_SIZE = 592
@@ -144,7 +144,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     if (byteSize === 0) return
 
     this.saveMappingInFlight = true
-    requestStateSave(ctx, {
+    genericStateSave(ctx, {
       source: {
         layout: 'separate',
         reBuffer: this.buf.spinorReBuffer,

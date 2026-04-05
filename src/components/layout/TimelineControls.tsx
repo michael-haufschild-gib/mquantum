@@ -298,7 +298,7 @@ export const TimelineControls: FC = () => {
               pressed={showOpenQDrawer}
               onToggle={() => (showOpenQDrawer ? setShowOpenQDrawer(false) : openOpenQDrawer())}
               sound="swish"
-              ariaLabel="Toggle open quantum drawer"
+              ariaLabel={`Toggle open quantum drawer, ${activeOpenQuantumCount} active`}
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
               className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
