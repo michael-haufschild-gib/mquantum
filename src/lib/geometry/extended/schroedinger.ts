@@ -631,7 +631,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   uncertaintyBoundaryEnabled: false,
   uncertaintyBoundaryStrength: 0.5,
   uncertaintyConfidenceMass: 0.68,
-  uncertaintyBoundaryWidth: 0.3,
+  uncertaintyBoundaryWidth: 0.6,
   phaseMaterialityEnabled: false,
   phaseMaterialityStrength: 1.0,
   interferenceEnabled: false,

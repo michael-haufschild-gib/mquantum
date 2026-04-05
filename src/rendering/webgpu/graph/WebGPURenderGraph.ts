@@ -16,6 +16,7 @@ import type {
   ResourceSize,
   WebGPUFrameContext,
   WebGPUFrameStats,
+  WebGPUPassTiming,
   WebGPURenderPass,
   WebGPURenderResourceConfig,
   WebGPUSetupContext,
@@ -97,14 +98,7 @@ export class WebGPURenderGraph {
   private _frameTimedPassIds: string[] = []
   private _frameTimedPassPhases: Array<{ hasCompute: boolean; hasRender: boolean }> = []
   private _frameCpuPassTimings: Map<string, number> = new Map()
-  private _framePassTimingResult: Array<{
-    passId: string
-    gpuTimeMs: number
-    computeGpuTimeMs: number
-    renderGpuTimeMs: number
-    cpuTimeMs: number
-    skipped: boolean
-  }> = []
+  private _framePassTimingResult: WebGPUPassTiming[] = []
   private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
     new Map()
   // PERF: Pre-allocated hook context to avoid per-frame allocation.
@@ -574,14 +568,7 @@ export class WebGPURenderGraph {
     }
   }
 
-  private buildPassTimingResult(passEnabledMemo: Map<string, boolean>): Array<{
-    passId: string
-    gpuTimeMs: number
-    computeGpuTimeMs: number
-    renderGpuTimeMs: number
-    cpuTimeMs: number
-    skipped: boolean
-  }> {
+  private buildPassTimingResult(passEnabledMemo: Map<string, boolean>): WebGPUPassTiming[] {
     const result = this._framePassTimingResult
     const passCount = this.passOrder.length
 

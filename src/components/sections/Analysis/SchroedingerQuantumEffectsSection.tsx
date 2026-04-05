@@ -312,10 +312,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffe
                 <Slider
                   label="Boundary Width"
                   tooltip="Spatial thickness of the boundary shell transition. Larger values produce a softer, more diffuse boundary."
-                  min={0.05}
-                  max={1.0}
-                  step={0.05}
-                  value={config.uncertaintyBoundaryWidth ?? 0.3}
+                  min={0.1}
+                  max={2.0}
+                  step={0.1}
+                  value={config.uncertaintyBoundaryWidth ?? 0.6}
                   onChange={setUncertaintyBoundaryWidth}
                   showValue
                   data-testid="schroedinger-uncertainty-boundary-width"

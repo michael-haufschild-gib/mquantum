@@ -41,6 +41,7 @@ export interface SceneFrameCallbackDeps {
   size: { width: number; height: number }
   objectType: ObjectType
   dimension: number
+  statsCollector: WebGPUStatsCollector
   schroedingerRotation: UseRotationUpdatesResult
   schroedingerBasisCacheRef: RefObject<{
     basisX: Float32Array
@@ -72,13 +73,13 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
     size,
     objectType,
     dimension,
+    statsCollector,
     schroedingerRotation,
     schroedingerBasisCacheRef,
     exportRuntimeRef,
     onFrame,
   } = deps
 
-  const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
   const rotationUpdatesRef = useRef<Map<string, number>>(new Map())
   const originValuesWorkRef = useRef(new Array<number>(11).fill(0))
 
@@ -193,7 +194,7 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
 
       const args = frameMetricsArgsRef.current
       args.graph = graph
-      args.collector = statsCollectorRef.current
+      args.collector = statsCollector
       args.deltaTime = deltaTime
       args.size = frameSize
       args.dpr = effectiveDpr
@@ -209,7 +210,7 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
 
       onFrame?.(deltaTime)
     },
-    [canvas, exportRuntimeRef, graph, onFrame, size.height, size.width]
+    [canvas, exportRuntimeRef, graph, onFrame, size.height, size.width, statsCollector]
   )
 
   return { advanceSceneStateByDelta, executeSceneFrame }

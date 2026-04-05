@@ -197,8 +197,9 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   let szp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzp, 0.0), all(uzp >= vec3f(0.0)) && all(uzp <= vec3f(1.0)));
   let szn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzn, 0.0), all(uzn >= vec3f(0.0)) && all(uzn <= vec3f(1.0)));
 
-  // World-space step for gradient normalization
-  let eps = bound * (2.0 / DENSITY_GRID_SIZE);
+  // World-space half-distance between sample points (each offset is ±uvwStep
+  // = ±2 texels in UVW = ±(2/N * 2*bound) in world, total 2h = 8*bound/N).
+  let eps = bound * (4.0 / DENSITY_GRID_SIZE);
 
   if (IS_DUAL_CHANNEL) {
     let gradX = (sxp.r + sxp.g) - (sxn.r + sxn.g);

@@ -323,28 +323,6 @@ export interface WebGPURenderContext {
 }
 
 // =============================================================================
-// Pipeline Types
-// =============================================================================
-
-/**
- * Cached render pipeline.
- */
-export interface CachedRenderPipeline {
-  pipeline: GPURenderPipeline
-  bindGroupLayout: GPUBindGroupLayout
-  pipelineLayout: GPUPipelineLayout
-}
-
-/**
- * Cached compute pipeline.
- */
-export interface CachedComputePipeline {
-  pipeline: GPUComputePipeline
-  bindGroupLayout: GPUBindGroupLayout
-  pipelineLayout: GPUPipelineLayout
-}
-
-// =============================================================================
 // Frame Statistics
 // =============================================================================
 
@@ -354,6 +332,10 @@ export interface CachedComputePipeline {
 export interface WebGPUPassTiming {
   passId: string
   gpuTimeMs: number
+  /** GPU time spent in compute passes (FFT, density grid). 0 if no compute work. */
+  computeGpuTimeMs: number
+  /** GPU time spent in render passes (volume raymarch, post-processing). 0 if no render work. */
+  renderGpuTimeMs: number
   cpuTimeMs: number
   skipped: boolean
 }
@@ -403,9 +385,7 @@ export interface WebGPUCpuBreakdown {
   submitMs: number
 }
 
-/**
- *
- */
+/** Aggregated frame statistics from render graph execution. */
 export interface WebGPUFrameStats {
   totalTimeMs: number
   passTiming: WebGPUPassTiming[]

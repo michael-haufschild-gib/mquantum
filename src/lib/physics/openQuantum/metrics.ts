@@ -8,7 +8,7 @@
 import { hermitianEigendecompose, MAX_K } from './integrator'
 import type { DensityMatrix, OpenQuantumMetrics } from './types'
 
-// Scratch buffers for eigendecomposition (shared with integrator module)
+// Module-local scratch buffers for eigendecomposition (separate from integrator's)
 const eigenvaluesScratch = new Float64Array(MAX_K)
 const eigenvectorsScratch = new Float64Array(MAX_K * MAX_K * 2)
 
