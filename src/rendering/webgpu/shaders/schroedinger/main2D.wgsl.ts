@@ -70,20 +70,20 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     rho = max(rho, 0.0);
   }
 
-  // Phase-coherent quantum texture (probability flow animation)
-  if (schroedinger.probabilityFlowEnabled != 0u && schroedinger.probabilityFlowStrength > 0.0) {
-    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = schroedinger.time * schroedinger.probabilityFlowSpeed;
-    let pcfOffset = pcfTime * pcfSpeedMod;
+  // Phase shimmer — density-modulated flow-noise animation
+  if (schroedinger.phaseShimmerEnabled != 0u && schroedinger.phaseShimmerStrength > 0.0) {
+    let shimmerSpeed = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
+    let shimmerTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
+    let shimmerOffset = shimmerTime * shimmerSpeed;
     let psiLen = max(length(psi), 1e-8);
-    let pcfCosP = psi.x / psiLen;
-    let pcfSinP = psi.y / psiLen;
-    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
-        pcfOffset + pcfCosP * 0.5,
-        pcfSinP * 0.5,
-        pcfOffset * 0.7 + pcfCosP * 0.3
+    let shimmerCosP = psi.x / psiLen;
+    let shimmerSinP = psi.y / psiLen;
+    let shimmerNoise = gradientNoise(pos * 2.0 + vec3f(
+        shimmerOffset + shimmerCosP * 0.5,
+        shimmerSinP * 0.5,
+        shimmerOffset * 0.7 + shimmerCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * schroedinger.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + shimmerNoise * schroedinger.phaseShimmerStrength * shimmerSpeed);
     rho = max(rho, 0.0);
   }
 
@@ -217,20 +217,20 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     rho = max(rho, 0.0);
   }
 
-  // Phase-coherent quantum texture (probability flow animation)
-  if (schroedinger.probabilityFlowEnabled != 0u && schroedinger.probabilityFlowStrength > 0.0) {
-    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = schroedinger.time * schroedinger.probabilityFlowSpeed;
-    let pcfOffset = pcfTime * pcfSpeedMod;
+  // Phase shimmer — density-modulated flow-noise animation
+  if (schroedinger.phaseShimmerEnabled != 0u && schroedinger.phaseShimmerStrength > 0.0) {
+    let shimmerSpeed = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
+    let shimmerTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
+    let shimmerOffset = shimmerTime * shimmerSpeed;
     let psiLen = max(length(psi), 1e-8);
-    let pcfCosP = psi.x / psiLen;
-    let pcfSinP = psi.y / psiLen;
-    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
-        pcfOffset + pcfCosP * 0.5,
-        pcfSinP * 0.5,
-        pcfOffset * 0.7 + pcfCosP * 0.3
+    let shimmerCosP = psi.x / psiLen;
+    let shimmerSinP = psi.y / psiLen;
+    let shimmerNoise = gradientNoise(pos * 2.0 + vec3f(
+        shimmerOffset + shimmerCosP * 0.5,
+        shimmerSinP * 0.5,
+        shimmerOffset * 0.7 + shimmerCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * schroedinger.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + shimmerNoise * schroedinger.phaseShimmerStrength * shimmerSpeed);
     rho = max(rho, 0.0);
   }
 

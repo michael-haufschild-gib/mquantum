@@ -5,7 +5,7 @@ import { TimelineControls } from '@/components/layout/TimelineControls'
 
 const mockGeometryState = {
   dimension: 4,
-  objectType: 'hypercube',
+  objectType: 'schroedinger',
 }
 
 vi.mock('@/stores/geometryStore', () => ({
@@ -29,7 +29,7 @@ const mockExtendedState = {
     representation: 'position',
     sliceAnimationEnabled: false,
     interferenceEnabled: false,
-    probabilityFlowEnabled: false,
+    phaseShimmerEnabled: false,
     probabilityCurrentEnabled: false,
     phaseAnimationEnabled: false,
   },
@@ -104,10 +104,10 @@ vi.mock('@/lib/audio/SoundManager', () => ({
 describe('TimelineControls', () => {
   beforeEach(() => {
     mockGeometryState.dimension = 4
-    mockGeometryState.objectType = 'hypercube'
+    mockGeometryState.objectType = 'schroedinger'
     mockExtendedState.schroedinger.sliceAnimationEnabled = false
     mockExtendedState.schroedinger.interferenceEnabled = false
-    mockExtendedState.schroedinger.probabilityFlowEnabled = false
+    mockExtendedState.schroedinger.phaseShimmerEnabled = false
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'

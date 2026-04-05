@@ -223,9 +223,9 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
   // texture flows coherently with wavefronts rather than randomly.
   // For real eigenstates: highlights nodal surfaces (phase jumps 0 → π).
   // For complex/superposition states: patterns evolve with the phase field.
-  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
+  if (uniforms.phaseShimmerEnabled != 0u && uniforms.phaseShimmerStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
+    let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
@@ -235,7 +235,7 @@ fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUn
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + pcfNoise * uniforms.phaseShimmerStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
 
@@ -280,9 +280,9 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     rho *= fringe;
     rho = max(rho, 0.0);
   }
-  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
+  if (uniforms.phaseShimmerEnabled != 0u && uniforms.phaseShimmerStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
+    let pcfTime = uniforms.time * uniforms.phaseShimmerSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
@@ -292,7 +292,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
     ));
-    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
+    rho *= (1.0 + pcfNoise * uniforms.phaseShimmerStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
   let s = sFromRho(rho);

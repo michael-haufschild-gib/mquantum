@@ -5,7 +5,7 @@
  * - Time Evolution
  * - Wavepacket Dispersion
  * - Interference Fringing
- * - Probability Flow
+ * - Phase Shimmer
  * - Slice Animation (4D+ only)
  */
 
@@ -62,25 +62,25 @@ describe('SchroedingerAnimationDrawer', () => {
     expect(screen.queryByTestId('animation-panel-openQuantum')).not.toBeInTheDocument()
   })
 
-  it('should toggle Probability Flow', () => {
+  it('should toggle Phase Shimmer', () => {
     render(<SchroedingerAnimationDrawer />)
 
-    const toggleBtn = screen.getByRole('button', { name: /toggle probability current flow/i })
+    const toggleBtn = screen.getByRole('button', { name: /toggle phase shimmer/i })
     expect(toggleBtn).toBeInTheDocument()
 
     // Initially off
-    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(false)
+    expect(useExtendedObjectStore.getState().schroedinger.phaseShimmerEnabled).toBe(false)
 
     // Click to enable
     fireEvent.click(toggleBtn)
-    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(true)
+    expect(useExtendedObjectStore.getState().schroedinger.phaseShimmerEnabled).toBe(true)
   })
 
   it('should toggle Slice Animation for 4D', () => {
     useGeometryStore.getState().setDimension(4)
     render(<SchroedingerAnimationDrawer />)
 
-    const toggleBtn = screen.getByRole('button', { name: /toggle slice animation/i })
+    const toggleBtn = screen.getByRole('button', { name: /toggle dimensional sweeps/i })
     fireEvent.click(toggleBtn)
     expect(useExtendedObjectStore.getState().schroedinger.sliceAnimationEnabled).toBe(true)
   })
@@ -105,8 +105,8 @@ describe('SchroedingerAnimationDrawer', () => {
   it('should have disabled state when animation is off', () => {
     render(<SchroedingerAnimationDrawer />)
 
-    // Probability Flow is off — its parameter group should be aria-disabled
-    const paramGroup = screen.getByRole('group', { name: 'Probability flow parameters' })
+    // Phase Shimmer is off — its parameter group should be aria-disabled
+    const paramGroup = screen.getByRole('group', { name: 'Phase shimmer parameters' })
     expect(paramGroup).toHaveAttribute('aria-disabled', 'true')
   })
 

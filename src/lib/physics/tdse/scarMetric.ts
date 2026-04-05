@@ -27,7 +27,15 @@
  * @module lib/physics/tdse/scarMetric
  */
 
+import { computeScarCorrelationWasm, isAnimationWasmReady } from '@/lib/wasm'
+
 import type { ClassicalTrajectory } from './classicalOrbit'
+
+/**
+ * Minimum total grid sites to attempt WASM acceleration for scar correlation.
+ * Below this, JS execution is fast enough that WASM boundary overhead dominates.
+ */
+const WASM_SCAR_MIN_SITES = 1000
 
 /** Result of scar correlation analysis for one eigenstate. */
 export interface ScarResult {
@@ -71,6 +79,23 @@ export function computeScarCorrelation(
   const dim = gridSize.length
   let totalSites = 1
   for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
+
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (orbits.length > 0 && totalSites >= WASM_SCAR_MIN_SITES && isAnimationWasmReady()) {
+    const wasmResult = tryScarCorrelationWasm(
+      densityRe,
+      densityIm,
+      orbits,
+      gridSize,
+      spacing,
+      tubeWidth,
+      dim,
+      totalSites
+    )
+    if (wasmResult) return wasmResult
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
 
   // Precompute probability density |ψ|²
   const density = new Float64Array(totalSites)
@@ -235,5 +260,77 @@ function addGaussianKernel(
       if (d === 0) break outer
       coords[d] = lo[d]!
     }
+  }
+}
+
+// ============================================================================
+// WASM Acceleration
+// ============================================================================
+
+/**
+ * Attempt WASM-accelerated scar correlation. Flattens orbit data into typed
+ * arrays for the WASM boundary, then unpacks the result into a ScarResult.
+ *
+ * @returns ScarResult if WASM succeeded, null otherwise
+ */
+function tryScarCorrelationWasm(
+  densityRe: Float32Array,
+  densityIm: Float32Array,
+  orbits: ClassicalTrajectory[],
+  gridSize: number[],
+  spacing: number[],
+  tubeWidth: number,
+  dim: number,
+  _totalSites: number
+): ScarResult | null {
+  // Count total orbit points for flat buffer sizing
+  let totalPoints = 0
+  for (const orbit of orbits) totalPoints += orbit.points.length
+
+  // Flatten orbit positions into a single Float64Array: [x0_d0, x0_d1, ..., x1_d0, ...]
+  const orbitPointsFlat = new Float64Array(totalPoints * dim)
+  const orbitLengths = new Uint32Array(orbits.length)
+  let offset = 0
+  for (let oi = 0; oi < orbits.length; oi++) {
+    const pts = orbits[oi]!.points
+    orbitLengths[oi] = pts.length
+    for (const pt of pts) {
+      for (let d = 0; d < dim; d++) {
+        orbitPointsFlat[offset++] = pt.x[d]!
+      }
+    }
+  }
+
+  const gridSizesU32 = new Uint32Array(gridSize)
+  const spacingsF64 = new Float64Array(spacing)
+
+  const packed = computeScarCorrelationWasm(
+    densityRe,
+    densityIm,
+    gridSizesU32,
+    spacingsF64,
+    orbitPointsFlat,
+    orbitLengths,
+    tubeWidth,
+    dim
+  )
+
+  if (!packed || packed.length < orbits.length + 4) {
+    return null
+  }
+
+  // Unpack: [corr_0, ..., corr_N, max, mean, orbit_correlation, strongest_idx]
+  const numOrbits = orbits.length
+  const orbitCorrelations: number[] = []
+  for (let i = 0; i < numOrbits; i++) {
+    orbitCorrelations.push(packed[i]!)
+  }
+
+  return {
+    orbitCorrelations,
+    maxCorrelation: packed[numOrbits]!,
+    meanCorrelation: packed[numOrbits + 1]!,
+    orbitCorrelation: packed[numOrbits + 2]!,
+    strongestOrbitIndex: Math.round(packed[numOrbits + 3]!),
   }
 }

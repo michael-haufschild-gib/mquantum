@@ -22,10 +22,10 @@ describe('animationStore', () => {
       useAnimationStore.getState().pause()
       expect(useAnimationStore.getState().isPlaying).toBe(false)
 
-      useAnimationStore.getState().toggle()
+      useAnimationStore.getState().togglePlayPause()
       expect(useAnimationStore.getState().isPlaying).toBe(true)
 
-      useAnimationStore.getState().toggle()
+      useAnimationStore.getState().togglePlayPause()
       expect(useAnimationStore.getState().isPlaying).toBe(false)
     })
   })

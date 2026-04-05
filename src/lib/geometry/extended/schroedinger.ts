@@ -372,13 +372,13 @@ export interface SchroedingerConfig {
   /** Overlay opacity for current visualization */
   probabilityCurrentOpacity: number
 
-  // === Probability Current Flow ===
+  // === Phase Shimmer ===
   /** Enable legacy density-modulated flow-noise animation */
-  probabilityFlowEnabled: boolean
+  phaseShimmerEnabled: boolean
   /** Flow animation speed (0.1-5.0) */
-  probabilityFlowSpeed: number
+  phaseShimmerSpeed: number
   /** Flow modulation strength (0.0-1.0) */
-  probabilityFlowStrength: number
+  phaseShimmerStrength: number
 
   // === Isosurface Mode (Optional) ===
   /** Enable isosurface rendering instead of volumetric */
@@ -653,10 +653,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   probabilityCurrentSteps: 20,
   probabilityCurrentOpacity: 0.7,
 
-  // Probability Current Flow
-  probabilityFlowEnabled: false,
-  probabilityFlowSpeed: 1.0,
-  probabilityFlowStrength: 0.3,
+  // Phase Shimmer
+  phaseShimmerEnabled: false,
+  phaseShimmerSpeed: 1.0,
+  phaseShimmerStrength: 0.3,
 
   // Isosurface (disabled by default)
   isoEnabled: false,

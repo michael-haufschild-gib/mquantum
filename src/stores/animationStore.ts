@@ -42,7 +42,7 @@ export interface AnimationState {
   // Actions
   play: () => void
   pause: () => void
-  toggle: () => void
+  togglePlayPause: () => void
   setSpeed: (speed: number) => void
   toggleDirection: () => void
   togglePlane: (plane: string) => void
@@ -111,7 +111,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
     set({ isPlaying: false })
   },
 
-  toggle: () => {
+  togglePlayPause: () => {
     set((state) => ({ isPlaying: !state.isPlaying }))
   },
 

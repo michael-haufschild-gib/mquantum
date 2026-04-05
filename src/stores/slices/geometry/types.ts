@@ -173,10 +173,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerProbabilityCurrentStepSize: (stepSize: number) => void
   setSchroedingerProbabilityCurrentSteps: (steps: number) => void
   setSchroedingerProbabilityCurrentOpacity: (opacity: number) => void
-  // Probability Current Flow
-  setSchroedingerProbabilityFlowEnabled: (enabled: boolean) => void
-  setSchroedingerProbabilityFlowSpeed: (speed: number) => void
-  setSchroedingerProbabilityFlowStrength: (strength: number) => void
+  // Phase Shimmer
+  setSchroedingerPhaseShimmerEnabled: (enabled: boolean) => void
+  setSchroedingerPhaseShimmerSpeed: (speed: number) => void
+  setSchroedingerPhaseShimmerStrength: (strength: number) => void
 
   // Radial Probability Overlay (hydrogen)
   setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void

@@ -7,8 +7,13 @@
  *
  * For K=14 hydrogen basis, the Liouvillian is 196×196 complex.
  *
+ * WASM acceleration: matrixExponentialPade and complexMatMul delegate to
+ * Rust/WASM when available, falling back to the TypeScript implementations.
+ *
  * @module lib/physics/openQuantum/complexMatrix
  */
+
+import { complexMatMulWasm, isAnimationWasmReady, matrixExponentialPadeWasm } from '@/lib/wasm'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,6 +62,9 @@ export function complexMatIdentity(N: number): ComplexMatrix {
 // Arithmetic
 // ---------------------------------------------------------------------------
 
+/** Minimum N for WASM complex matmul — below this, FFI overhead dominates. */
+const WASM_MATMUL_MIN_N = 64
+
 /**
  * Complex matrix multiply: C = A × B for N×N matrices.
  * Output must not alias A or B.
@@ -64,6 +72,8 @@ export function complexMatIdentity(N: number): ComplexMatrix {
  * Uses i-k-j loop order for optimal row-major cache access. The inner j-loop
  * accesses B[k,:] and out[i,:] sequentially (~3KB working set for N=196),
  * fitting comfortably in L1 cache.
+ *
+ * Delegates to WASM for N >= 64 when available.
  *
  * @param A - Left matrix
  * @param B - Right matrix
@@ -76,6 +86,18 @@ export function complexMatMul(
   out: ComplexMatrix,
   N: number
 ): void {
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (N >= WASM_MATMUL_MIN_N && isAnimationWasmReady()) {
+    const packed = complexMatMulWasm(A.real, A.imag, B.real, B.imag, N)
+    if (packed && packed.length === 2 * N * N) {
+      const size = N * N
+      out.real.set(packed.subarray(0, size))
+      out.imag.set(packed.subarray(size))
+      return
+    }
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   const Ar = A.real,
     Ai = A.imag
   const Br = B.real,
@@ -395,12 +417,26 @@ function zeroScratch(m: ComplexMatrix, N: number): void {
  * Al-Mohy & Higham (2009), same as MATLAB's expm / scipy's expm.
  *
  * Uses pre-allocated scratch pool for N ≤ 196 to eliminate GC pressure.
+ * Delegates to WASM when available for ~2-3x speedup on large matrices.
  *
  * @param A - Input matrix (not modified)
  * @param N - Matrix dimension
  * @returns exp(A)
  */
 export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatrix {
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (isAnimationWasmReady()) {
+    const packed = matrixExponentialPadeWasm(A.real, A.imag, N)
+    if (packed && packed.length === 2 * N * N) {
+      const size = N * N
+      return {
+        real: packed.slice(0, size),
+        imag: packed.slice(size),
+      }
+    }
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   const norm = complexMatNorm1(A, N)
 
   // Handle zero matrix

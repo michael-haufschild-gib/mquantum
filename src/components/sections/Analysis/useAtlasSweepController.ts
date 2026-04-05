@@ -45,7 +45,7 @@ function checkStalled(
   lastSeenN: number,
   stallCountRef: { current: number }
 ): boolean {
-  if (entSamples === lastSeenN && entSamples === 0) {
+  if (entSamples === lastSeenN) {
     stallCountRef.current++
   } else if (entSamples > lastSeenN) {
     stallCountRef.current = 0
@@ -249,8 +249,7 @@ export function useAtlasSweepController(): {
           const next = atlas.completePointAndAdvance(gridSizePerDim)
 
           if (next === null) {
-            // Sweep complete
-            atlas.completeSweep()
+            // Sweep complete — completePointAndAdvance already set status: 'complete'
             restoreSnapshot()
             return
           }

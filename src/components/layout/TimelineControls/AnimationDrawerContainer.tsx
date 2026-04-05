@@ -74,7 +74,7 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
         </div>
       )}
       <div className="glass-panel rounded-xl max-h-[400px] overflow-y-auto">
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">{children}</div>
+        <div className="p-4 columns-1 md:columns-2 gap-6">{children}</div>
       </div>
     </m.div>
   )

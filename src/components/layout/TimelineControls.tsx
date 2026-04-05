@@ -7,71 +7,40 @@ import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import { getConfigStoreKey, hasTimelineControls } from '@/lib/geometry/registry'
-import { getRotationPlanes } from '@/lib/math'
 import {
   type AnimationState,
   MAX_SPEED,
   MIN_SPEED,
   useAnimationStore,
 } from '@/stores/animationStore'
-import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
-import { useUIStore } from '@/stores/uiStore'
 
 import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
+import { RotationAnimationDrawer } from './TimelineControls/RotationAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
 
 export const TimelineControls: FC = () => {
-  // Consolidated geometry store subscription
-  const { dimension, objectType } = useGeometryStore(
-    useShallow((state: GeometryState) => ({
-      dimension: state.dimension,
-      objectType: state.objectType,
+  const objectType = useGeometryStore((state: GeometryState) => state.objectType)
+
+  const { isPlaying, speed, animatingPlanes, togglePlayPause, setSpeed } = useAnimationStore(
+    useShallow((state: AnimationState) => ({
+      isPlaying: state.isPlaying,
+      speed: state.speed,
+      animatingPlanes: state.animatingPlanes,
+      togglePlayPause: state.togglePlayPause,
+      setSpeed: state.setSpeed,
     }))
   )
 
-  // Animation Store
-  const animationSelector = useShallow((state: AnimationState) => ({
-    isPlaying: state.isPlaying,
-    speed: state.speed,
-    animatingPlanes: state.animatingPlanes,
-    toggle: state.toggle,
-    setSpeed: state.setSpeed,
-    togglePlane: state.togglePlane,
-    animateAll: state.animateAll,
-    randomizePlanes: state.randomizePlanes,
-    clearAllPlanes: state.clearAllPlanes,
-  }))
-
-  const {
-    isPlaying,
-    speed,
-    animatingPlanes,
-    toggle,
-    setSpeed,
-    togglePlane,
-    animateAll,
-    randomizePlanes,
-    clearAllPlanes,
-  } = useAnimationStore(animationSelector)
-
-  const { animationBias, setAnimationBias } = useUIStore(
-    useShallow((state) => ({
-      animationBias: state.animationBias,
-      setAnimationBias: state.setAnimationBias,
-    }))
-  )
-
-  // Extended object configs — narrow subscription to only the fields this component reads
   const schroedingerConfig = useExtendedObjectStore(
     useShallow((state) => ({
       quantumMode: state.schroedinger.quantumMode,
       representation: state.schroedinger.representation,
       sliceAnimationEnabled: state.schroedinger.sliceAnimationEnabled,
       interferenceEnabled: state.schroedinger.interferenceEnabled,
-      probabilityFlowEnabled: state.schroedinger.probabilityFlowEnabled,
+      phaseShimmerEnabled: state.schroedinger.phaseShimmerEnabled,
       probabilityCurrentEnabled: state.schroedinger.probabilityCurrentEnabled,
       phaseAnimationEnabled: state.schroedinger.phaseAnimationEnabled,
     }))
@@ -81,7 +50,6 @@ export const TimelineControls: FC = () => {
     (state) => state.pauliSpinor.sliceAnimationEnabled
   )
 
-  // Reset actions for unified restart button
   const resetActions = useExtendedObjectStore(
     useShallow((state) => ({
       resetSchroedingerParameters: state.resetSchroedingerParameters,
@@ -93,36 +61,6 @@ export const TimelineControls: FC = () => {
       setPauliNeedsReset: state.setPauliNeedsReset,
     }))
   )
-
-  const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
-  // Count active animations across object types
-  const activeAnimationCount = useMemo(() => {
-    const configKey = getConfigStoreKey(objectType)
-
-    if (configKey === 'schroedinger') {
-      return [
-        schroedingerConfig.sliceAnimationEnabled,
-        schroedingerConfig.interferenceEnabled,
-        schroedingerConfig.probabilityFlowEnabled,
-        schroedingerConfig.probabilityCurrentEnabled,
-        schroedingerConfig.phaseAnimationEnabled,
-      ].filter(Boolean).length
-    }
-
-    if (configKey === 'pauliSpinor') {
-      return pauliSliceAnimationEnabled ? 1 : 0
-    }
-
-    return 0
-  }, [
-    objectType,
-    schroedingerConfig.sliceAnimationEnabled,
-    schroedingerConfig.interferenceEnabled,
-    schroedingerConfig.probabilityFlowEnabled,
-    schroedingerConfig.probabilityCurrentEnabled,
-    schroedingerConfig.phaseAnimationEnabled,
-    pauliSliceAnimationEnabled,
-  ])
 
   const configStoreKey = getConfigStoreKey(objectType)
   const isSchroedinger = configStoreKey === 'schroedinger'
@@ -142,6 +80,30 @@ export const TimelineControls: FC = () => {
       schroedingerConfig.quantumMode === 'hydrogenND' ||
       schroedingerConfig.quantumMode === 'hydrogenNDCoupled') &&
     schroedingerConfig.representation !== 'wigner'
+
+  const activeAnimationCount = useMemo(() => {
+    if (configStoreKey === 'schroedinger') {
+      return [
+        schroedingerConfig.sliceAnimationEnabled,
+        schroedingerConfig.interferenceEnabled,
+        schroedingerConfig.phaseShimmerEnabled,
+        schroedingerConfig.probabilityCurrentEnabled,
+        schroedingerConfig.phaseAnimationEnabled,
+      ].filter(Boolean).length
+    }
+    if (configStoreKey === 'pauliSpinor') {
+      return pauliSliceAnimationEnabled ? 1 : 0
+    }
+    return 0
+  }, [
+    configStoreKey,
+    schroedingerConfig.sliceAnimationEnabled,
+    schroedingerConfig.interferenceEnabled,
+    schroedingerConfig.phaseShimmerEnabled,
+    schroedingerConfig.probabilityCurrentEnabled,
+    schroedingerConfig.phaseAnimationEnabled,
+    pauliSliceAnimationEnabled,
+  ])
 
   const handleReset = useCallback(() => {
     if (isPauliSpinor) {
@@ -174,116 +136,44 @@ export const TimelineControls: FC = () => {
 
   const prefersReducedMotion = useReducedMotion()
 
-  const [showRotation, setShowRotation] = useState(false)
+  const [showRotationDrawer, setShowRotationDrawer] = useState(false)
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
 
-  // Derive effective drawer visibility — drawer auto-hides when controls become unavailable
   const effectiveShowOpenQDrawer = showOpenQDrawer && supportsOpenQuantumControls
+
+  // Shared close-others helper — only one drawer open at a time
+  const openRotation = () => {
+    setShowRotationDrawer(true)
+    setShowAnimDrawer(false)
+    setShowOpenQDrawer(false)
+  }
+  const openAnimDrawer = () => {
+    setShowAnimDrawer(true)
+    setShowRotationDrawer(false)
+    setShowOpenQDrawer(false)
+  }
+  const openOpenQDrawer = () => {
+    setShowOpenQDrawer(true)
+    setShowAnimDrawer(false)
+    setShowRotationDrawer(false)
+  }
 
   return (
     <div className="flex flex-col w-full h-full relative">
       <AnimatePresence>
-        {/* Rotation Drawer */}
-        {showRotation && (
-          <m.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className="absolute bottom-full inset-x-0 mb-2 glass-panel rounded-xl z-20"
-          >
-            <div className="absolute top-0 end-3 -translate-y-1/2 z-10">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowRotation(false)}
-                ariaLabel="Close drawer"
-                className="w-6 h-6 p-0 rounded-full glass-panel flex items-center justify-center text-text-tertiary hover:text-text-primary"
-              >
-                <Icon name="chevron-down" size={12} />
-              </Button>
-            </div>
-            <div className="p-4 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-                  Rotation Planes
-                </h3>
-                <div className="flex gap-2 items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => animateAll(dimension)}
-                    className="text-xs uppercase font-bold text-accent hover:text-accent-glow px-2 py-1"
-                  >
-                    Select All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => clearAllPlanes()}
-                    className="text-xs uppercase font-bold px-2 py-1"
-                  >
-                    Deselect All
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => randomizePlanes(dimension)}
-                    ariaLabel="Randomize rotation planes"
-                    className="w-7 h-7 p-0 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent"
-                  >
-                    <Icon name="dice" size={14} />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-panel-border">
-                {planes.map((plane) => {
-                  const isActive = animatingPlanes.has(plane.name)
-                  return (
-                    <ToggleButton
-                      key={plane.name}
-                      pressed={isActive}
-                      onToggle={() => togglePlane(plane.name)}
-                      ariaLabel={`Toggle ${plane.name} rotation`}
-                      className="flex-1 min-w-[60px] px-3 py-2 text-xs font-mono text-center uppercase tracking-wider"
-                    >
-                      {plane.name}
-                    </ToggleButton>
-                  )
-                })}
-              </div>
-
-              <div className="pt-3 border-t border-border-subtle">
-                <div className="w-48">
-                  <Slider
-                    label="SPEED BIAS"
-                    tooltip="Varies rotation speed per plane. At 0 all planes rotate uniformly; at 1 each plane gets a unique speed spread via the golden ratio."
-                    min={MIN_ANIMATION_BIAS}
-                    max={MAX_ANIMATION_BIAS}
-                    step={0.05}
-                    value={animationBias}
-                    onChange={setAnimationBias}
-                    showValue={true}
-                  />
-                </div>
-              </div>
-            </div>
-          </m.div>
+        {showRotationDrawer && (
+          <RotationAnimationDrawer onClose={() => setShowRotationDrawer(false)} />
         )}
 
-        {/* Schroedinger Animation Drawer */}
         {showAnimDrawer && isSchroedinger && (
           <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
         )}
 
-        {/* Pauli Animation Drawer */}
         {showAnimDrawer && isPauliSpinor && (
           <PauliAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
         )}
 
-        {/* Schroedinger Open Quantum Drawer */}
         {effectiveShowOpenQDrawer && (
           <SchroedingerOpenQuantumDrawer onClose={() => setShowOpenQDrawer(false)} />
         )}
@@ -324,7 +214,7 @@ export const TimelineControls: FC = () => {
           <Button
             variant={isPlaying ? 'primary' : 'secondary'}
             size="icon"
-            onClick={toggle}
+            onClick={togglePlayPause}
             ariaLabel={isPlaying ? 'Pause' : 'Play'}
             tooltip={
               isPlaying ? 'Pause the time evolution.' : 'Start the time evolution animation.'
@@ -344,7 +234,7 @@ export const TimelineControls: FC = () => {
         <div className="w-28 sm:w-44 pt-2.5 ps-3 border-s border-border-subtle shrink-0">
           <Slider
             label="SPEED"
-            tooltip="Animation speed multiplier. Controls how fast the wavefunction evolves in time."
+            tooltip="Animation speed multiplier + controls how fast the wavefunction evolves in time."
             min={MIN_SPEED}
             max={MAX_SPEED}
             step={0.1}
@@ -362,11 +252,7 @@ export const TimelineControls: FC = () => {
           {hasTimelineControls(objectType) && (
             <ToggleButton
               pressed={showAnimDrawer}
-              onToggle={() => {
-                setShowAnimDrawer(!showAnimDrawer)
-                setShowRotation(false)
-                setShowOpenQDrawer(false)
-              }}
+              onToggle={() => (showAnimDrawer ? setShowAnimDrawer(false) : openAnimDrawer())}
               sound="swish"
               ariaLabel="Toggle animations drawer"
               tooltip="Open the quantum animation effects panel (phase, interference, probability flow)."
@@ -384,11 +270,7 @@ export const TimelineControls: FC = () => {
           {supportsOpenQuantumControls && (
             <ToggleButton
               pressed={showOpenQDrawer}
-              onToggle={() => {
-                setShowOpenQDrawer(!showOpenQDrawer)
-                setShowAnimDrawer(false)
-                setShowRotation(false)
-              }}
+              onToggle={() => (showOpenQDrawer ? setShowOpenQDrawer(false) : openOpenQDrawer())}
               sound="swish"
               ariaLabel="Toggle open quantum drawer"
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
@@ -399,12 +281,8 @@ export const TimelineControls: FC = () => {
           )}
 
           <ToggleButton
-            pressed={showRotation}
-            onToggle={() => {
-              setShowRotation(!showRotation)
-              setShowAnimDrawer(false)
-              setShowOpenQDrawer(false)
-            }}
+            pressed={showRotationDrawer}
+            onToggle={() => (showRotationDrawer ? setShowRotationDrawer(false) : openRotation())}
             sound="swish"
             ariaLabel="Toggle rotation drawer"
             tooltip="Select which N-dimensional rotation planes to animate."
@@ -412,7 +290,7 @@ export const TimelineControls: FC = () => {
           >
             Rotate
             <span
-              className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+              className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showRotationDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
             >
               {animatingPlanes.size}
             </span>

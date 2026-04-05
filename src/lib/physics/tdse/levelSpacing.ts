@@ -14,6 +14,14 @@
  * @module lib/physics/tdse/levelSpacing
  */
 
+import { computeLevelSpacingWasm, isAnimationWasmReady } from '@/lib/wasm'
+
+/**
+ * Minimum number of eigenvalues to attempt WASM acceleration for level spacing.
+ * Below this, the WASM boundary overhead may exceed compute savings.
+ */
+const WASM_LEVEL_SPACING_MIN_ENERGIES = 50
+
 /** Result of level spacing analysis. */
 export interface LevelSpacingResult {
   /** Sorted eigenvalues used for the analysis */
@@ -45,6 +53,13 @@ export interface LevelSpacingResult {
  * @returns Level spacing statistics and classification
  */
 export function computeLevelSpacing(energies: number[], iprs?: number[]): LevelSpacingResult {
+  // ── WASM fast path ──────────────────────────────────────────────────
+  if (energies.length >= WASM_LEVEL_SPACING_MIN_ENERGIES && isAnimationWasmReady()) {
+    const wasmResult = tryLevelSpacingWasm(energies, iprs)
+    if (wasmResult) return wasmResult
+  }
+
+  // ── JS fallback ─────────────────────────────────────────────────────
   const sorted = [...energies].sort((a, b) => a - b)
 
   // Nearest-neighbor spacings
@@ -203,4 +218,79 @@ export function classifyLocalization(
   if (normalized < 3) return 'extended'
   if (normalized > 10) return 'localized'
   return 'critical'
+}
+
+// ============================================================================
+// WASM Acceleration
+// ============================================================================
+
+/** Classification code to string mapping (matches Rust compute_level_spacing). */
+const CLASSIFICATION_MAP: LevelSpacingResult['classification'][] = [
+  'poisson',
+  'intermediate',
+  'wigner-dyson',
+]
+
+/**
+ * Attempt WASM-accelerated level spacing computation. Packs energies into
+ * a Float64Array, calls WASM, and unpacks the result.
+ *
+ * IPR computation stays in TypeScript since it's a simple mean of an optional
+ * input array — not worth the WASM boundary crossing.
+ *
+ * @returns LevelSpacingResult if WASM succeeded, null otherwise
+ */
+function tryLevelSpacingWasm(energies: number[], iprs?: number[]): LevelSpacingResult | null {
+  const energiesF64 = new Float64Array(energies)
+  const packed = computeLevelSpacingWasm(energiesF64)
+
+  if (!packed) return null
+
+  const numSpacings = energies.length - 1
+  // Expected: numSpacings + 3 (brody_beta, mean_spacing, classification_code)
+  if (packed.length < numSpacings + 3) return null
+
+  // Unpack spacings
+  const spacings: number[] = []
+  for (let i = 0; i < numSpacings; i++) {
+    spacings.push(packed[i]!)
+  }
+
+  const brodyBeta = packed[numSpacings]!
+  const meanSpacing = packed[numSpacings + 1]!
+  const classificationCode = Math.round(packed[numSpacings + 2]!)
+
+  // Validate WASM payload values — fall back to JS if corrupt
+  if (
+    !Number.isFinite(brodyBeta) ||
+    !Number.isFinite(meanSpacing) ||
+    meanSpacing <= 0 ||
+    brodyBeta < 0 ||
+    brodyBeta > 1 ||
+    !(classificationCode in CLASSIFICATION_MAP)
+  ) {
+    return null
+  }
+  for (let i = 0; i < numSpacings; i++) {
+    if (!Number.isFinite(packed[i]!) || packed[i]! < 0) return null
+  }
+
+  const classification = CLASSIFICATION_MAP[classificationCode] ?? 'intermediate'
+
+  // Sort energies (same as JS path)
+  const sorted = [...energies].sort((a, b) => a - b)
+
+  // Mean IPR (computed in TS — trivial operation)
+  const validIPRs = iprs?.filter((v) => Number.isFinite(v)) ?? []
+  const meanIPR =
+    validIPRs.length > 0 ? validIPRs.reduce((a, b) => a + b, 0) / validIPRs.length : NaN
+
+  return {
+    energies: sorted,
+    spacings,
+    meanSpacing,
+    brodyBeta,
+    classification,
+    meanIPR,
+  }
 }

@@ -6,18 +6,34 @@
  */
 
 export {
+  // Phase 6: Complex matrix exponential functions
+  complexMatMulWasm,
   // Phase 1: Animation functions
   composeRotationsIndexedWasm,
+  // Phase 5: Coordinate entanglement functions
+  computeJointRdmWasm,
+  // Phase 7: TDSE diagnostics functions
+  computeLevelSpacingWasm,
+  computeRdmWasm,
+  computeScarCorrelationWasm,
   dotProductWasm,
+  // Phase 4: FFT functions
+  fft1dWasm,
+  fftNdWasm,
   // Data conversion helpers
   float64ToVector,
+  hermitianEigenvaluesWasm,
+  ifft1dWasm,
+  ifftNdWasm,
   // Initialization
   initAnimationWasm,
   isAnimationWasmReady,
   magnitudeWasm,
+  matrixExponentialPadeWasm,
   // Phase 2: Matrix and vector functions
   multiplyMatricesWasm,
   multiplyMatrixVectorWasm,
   normalizeVectorWasm,
   subtractVectorsWasm,
+  vonNeumannEntropyWasm,
 } from './animation-wasm'

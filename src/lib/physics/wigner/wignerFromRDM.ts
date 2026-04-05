@@ -91,7 +91,16 @@ function fillAntiDiagonalSlice(
  * @returns Wigner function grid and total negativity
  */
 export function wignerFromRDM(rhoRe: Float64Array, rhoIm: Float64Array, M: number): WignerResult {
-  const W = new Float64Array(M * M)
+  if (M <= 0 || !Number.isInteger(M)) {
+    throw new RangeError(`wignerFromRDM: M must be a positive integer, got ${M}`)
+  }
+  const size = M * M
+  if (rhoRe.length < size || rhoIm.length < size) {
+    throw new RangeError(
+      `wignerFromRDM: buffer too small (need ${size}, got re=${rhoRe.length}, im=${rhoIm.length})`
+    )
+  }
+  const W = new Float64Array(size)
   let negSum = 0
 
   // Interleaved complex buffer for one anti-diagonal slice, reused per row

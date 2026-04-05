@@ -637,40 +637,45 @@ export class TdseBecStrategy implements QuantumModeStrategy {
           return
         }
 
-        // Lazy-initialize the worker
-        if (!this.entanglementWorker) {
-          this.entanglementWorker = new Worker(
-            new URL('../../../../lib/physics/coordinateEntanglement.worker.ts', import.meta.url),
-            { type: 'module' }
-          )
-          this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
-            this.entanglementInFlight = false
-            if (e.data.type !== 'result') return
-            // Discard stale results from previous epochs
-            if (e.data.epoch !== this.entanglementEpoch) return
-            useCoordinateEntanglementStore.getState().pushResult(e.data.result)
+        try {
+          // Lazy-initialize the worker
+          if (!this.entanglementWorker) {
+            this.entanglementWorker = new Worker(
+              new URL('../../../../lib/physics/coordinateEntanglement.worker.ts', import.meta.url),
+              { type: 'module' }
+            )
+            this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
+              this.entanglementInFlight = false
+              if (e.data.type !== 'result') return
+              // Discard stale results from previous epochs
+              if (e.data.epoch !== this.entanglementEpoch) return
+              useCoordinateEntanglementStore.getState().pushResult(e.data.result)
+            }
+            this.entanglementWorker.onerror = () => {
+              this.entanglementInFlight = false
+              logger.warn('[Entanglement] Worker error')
+            }
           }
-          this.entanglementWorker.onerror = () => {
-            this.entanglementInFlight = false
-            logger.warn('[Entanglement] Worker error')
+
+          const request: EntanglementWorkerRequest = {
+            type: 'compute',
+            epoch,
+            psiRe: result.re,
+            psiIm: result.im,
+            gridSize,
+            options: {
+              computePairwiseMI: entStore.computePairwiseMI,
+              computeBipartitions: entStore.computeBipartitions,
+              computeWignerNegativity: entStore.computeWignerNegativity,
+            },
           }
-        }
 
-        const request: EntanglementWorkerRequest = {
-          type: 'compute',
-          epoch,
-          psiRe: result.re,
-          psiIm: result.im,
-          gridSize,
-          options: {
-            computePairwiseMI: entStore.computePairwiseMI,
-            computeBipartitions: entStore.computeBipartitions,
-            computeWignerNegativity: entStore.computeWignerNegativity,
-          },
+          // Transfer psi arrays to worker (zero-copy)
+          this.entanglementWorker.postMessage(request, [result.re.buffer, result.im.buffer])
+        } catch (err) {
+          this.entanglementInFlight = false
+          logger.warn('[Entanglement] Failed to dispatch to worker:', err)
         }
-
-        // Transfer psi arrays to worker (zero-copy)
-        this.entanglementWorker.postMessage(request, [result.re.buffer, result.im.buffer])
       },
       () => {
         this.entanglementInFlight = false

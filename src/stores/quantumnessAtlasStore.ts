@@ -93,7 +93,7 @@ function pushSample(acc: SampleAccumulator, x: number): void {
 }
 
 function meanVariance(acc: SampleAccumulator): { mean: number; variance: number } {
-  if (acc.n === 0) return { mean: 0, variance: 0 }
+  if (acc.n === 0) return { mean: NaN, variance: NaN }
   const mean = acc.sum / acc.n
   const variance = acc.n > 1 ? acc.sumSq / acc.n - mean * mean : 0
   return { mean, variance: Math.max(variance, 0) }
@@ -173,9 +173,14 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
   iprAcc: emptyAccumulator(),
   framesEvolved: 0,
 
-  setConfig: (partial) => set((state) => ({ config: { ...state.config, ...partial } })),
+  setConfig: (partial) =>
+    set((state) => {
+      if (state.status === 'running') return state
+      return { config: { ...state.config, ...partial } }
+    }),
 
   startSweep: () => {
+    if (get().status === 'running') return
     const config = get().config
     if (
       !Number.isInteger(config.lambdaSteps) ||
@@ -204,10 +209,10 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       )
     }
     if (
-      config.dimensions.some((d) => !Number.isFinite(d)) ||
-      config.gammas.some((g) => !Number.isFinite(g))
+      config.dimensions.some((d) => !Number.isInteger(d) || d < 3) ||
+      config.gammas.some((g) => !Number.isFinite(g) || g < 0)
     ) {
-      throw new Error('dimensions and gammas must contain finite numbers')
+      throw new Error('dimensions must be integers >= 3 and gammas must be finite numbers >= 0')
     }
     set({
       status: 'running',
@@ -233,9 +238,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       const eAcc = { ...state.entanglementAcc }
       const wAcc = { ...state.wignerAcc }
       const iAcc = { ...state.iprAcc }
-      pushSample(eAcc, entanglement)
-      pushSample(wAcc, wignerNegativity)
-      pushSample(iAcc, ipr)
+      if (Number.isFinite(entanglement)) pushSample(eAcc, entanglement)
+      if (Number.isFinite(wignerNegativity)) pushSample(wAcc, wignerNegativity)
+      if (Number.isFinite(ipr)) pushSample(iAcc, ipr)
       return { entanglementAcc: eAcc, wignerAcc: wAcc, iprAcc: iAcc }
     }),
 
@@ -243,6 +248,7 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
 
   completePointAndAdvance: (gridSizePerDim) => {
     const state = get()
+    if (state.status !== 'running') return null
     const { config, progress } = state
     const { entanglementAcc, wignerAcc, iprAcc } = state
 
@@ -324,5 +330,9 @@ export const useQuantumnessAtlasStore = create<QuantumnessAtlasState>((set, get)
       status: 'idle',
       results: [],
       progress: { dimIdx: 0, lambdaIdx: 0, gammaIdx: 0, totalPoints: 0, completedPoints: 0 },
+      entanglementAcc: emptyAccumulator(),
+      wignerAcc: emptyAccumulator(),
+      iprAcc: emptyAccumulator(),
+      framesEvolved: 0,
     }),
 }))
