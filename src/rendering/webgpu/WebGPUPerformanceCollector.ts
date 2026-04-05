@@ -277,6 +277,8 @@ export class WebGPUStatsCollector {
     this.accumulated.memHistory.shift()
     this.accumulated.memHistory.push(heapMB)
 
+    const vramMB = graph.getVRAMUsage() / (1024 * 1024)
+
     // Build GPU stats (averaged per frame)
     const gpuStats: GPUStats = {
       calls: Math.round(this.accumulated.drawCalls / frameCount),
@@ -301,9 +303,9 @@ export class WebGPUStatsCollector {
         heap: heapMB,
       },
       vram: {
-        geometries: graph.getVRAMUsage() / (1024 * 1024), // Convert to MB
+        geometries: vramMB,
         textures: 0,
-        total: graph.getVRAMUsage() / (1024 * 1024),
+        total: vramMB,
       },
       viewport: {
         width: size.width,
@@ -338,8 +340,8 @@ export class WebGPUStatsCollector {
           return {
             passId: pt.passId,
             gpuTimeMs: pt.gpuTimeMs,
-            computeGpuTimeMs: (pt as { computeGpuTimeMs?: number }).computeGpuTimeMs ?? 0,
-            renderGpuTimeMs: (pt as { renderGpuTimeMs?: number }).renderGpuTimeMs ?? 0,
+            computeGpuTimeMs: pt.computeGpuTimeMs,
+            renderGpuTimeMs: pt.renderGpuTimeMs,
             cpuTimeMs: pt.cpuTimeMs,
             skipped: pt.skipped,
           }

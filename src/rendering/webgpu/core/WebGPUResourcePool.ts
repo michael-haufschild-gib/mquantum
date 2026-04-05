@@ -257,7 +257,8 @@ export class WebGPUResourcePool {
 
     const countResource = (r: WebGPUResource): number => {
       const bytesPerPixel = this.getBytesPerPixel(r.config.format ?? 'rgba16float')
-      let size = r.width * r.height * bytesPerPixel
+      const layers = r.config.arrayLayerCount ?? 1
+      let size = r.width * r.height * bytesPerPixel * layers
       if (r.depthTexture) {
         size += r.width * r.height * 4 // Assume 4 bytes for depth
       }
@@ -333,6 +334,7 @@ export class WebGPUResourcePool {
 
     // Create main texture
     const texture = this.device.createTexture({
+      label: `pool-${config.id}`,
       size: {
         width,
         height,
@@ -355,6 +357,7 @@ export class WebGPUResourcePool {
     if (config.type === 'depthStencil' || config.depthFormat) {
       const depthFormat = config.depthFormat ?? 'depth24plus'
       depthTexture = this.device.createTexture({
+        label: `pool-${config.id}-depth`,
         size: { width, height, depthOrArrayLayers: 1 },
         format: depthFormat,
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,

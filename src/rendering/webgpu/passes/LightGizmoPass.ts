@@ -352,9 +352,6 @@ export class LightGizmoPass extends WebGPUBasePass {
     })
   }
 
-  /**
-   * Execute the gizmo render pass.
-   */
   /** Generate vertices for a single light's gizmo, ground visualization, and selection ring. */
   private generateLightVertices(
     light: LightSource,

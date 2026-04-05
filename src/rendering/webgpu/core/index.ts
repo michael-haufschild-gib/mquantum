@@ -9,8 +9,6 @@
 // Types
 export type {
   AccessMode,
-  CachedComputePipeline,
-  CachedRenderPipeline,
   ResourceSize,
   ResourceSizeMode,
   WebGPUCapabilities,

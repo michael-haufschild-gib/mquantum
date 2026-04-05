@@ -8,7 +8,7 @@
  * Functions: sin, cos, tan, exp, sqrt, abs, log, ln, tanh, cosh, sinh, atan2, min, max
  * Constants: pi, e
  * Variables: x, y, z, w, v, u, t, s, r, q, p (matching axis labels)
- * Special: r = sqrt(sum(x_i^2)) computed from all active dimensions
+ * Special: radius = sqrt(sum(x_i^2)) computed from all active dimensions
  *
  * @module lib/physics/expressionParser
  */
@@ -67,12 +67,20 @@ const UNARY_FUNCTIONS = new Set([
   'asin',
   'acos',
   'atan',
+  'asinh',
+  'acosh',
+  'atanh',
+  'cbrt',
+  'log2',
+  'log10',
   'floor',
   'ceil',
+  'round',
+  'trunc',
   'sign',
 ])
 
-const BINARY_FUNCTIONS = new Set(['atan2', 'min', 'max', 'pow'])
+const BINARY_FUNCTIONS = new Set(['atan2', 'min', 'max', 'pow', 'hypot'])
 
 const BLOCKED_IDENTS = new Set([
   'eval',
@@ -345,6 +353,11 @@ class Parser {
       // Constant
       if (name in CONSTANTS) {
         return { type: 'number', value: CONSTANTS[name]! }
+      }
+
+      // Radial distance: radius = sqrt(sum(x_i^2)) across all active dimensions
+      if (name === 'radius') {
+        return { type: 'radial' }
       }
 
       // Variable

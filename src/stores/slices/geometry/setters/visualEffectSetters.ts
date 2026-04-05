@@ -119,7 +119,7 @@ export function createVisualEffectSetters(
       1.0
     ),
     setSchroedingerUncertaintyConfidenceMass: clampedSetter('uncertaintyConfidenceMass', 0.5, 0.99),
-    setSchroedingerUncertaintyBoundaryWidth: clampedSetter('uncertaintyBoundaryWidth', 0.05, 1.0),
+    setSchroedingerUncertaintyBoundaryWidth: clampedSetter('uncertaintyBoundaryWidth', 0.1, 2.0),
 
     // Phase materiality
     setSchroedingerPhaseMaterialityEnabled: valueSetter('phaseMaterialityEnabled'),

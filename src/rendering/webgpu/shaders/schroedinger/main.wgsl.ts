@@ -41,33 +41,33 @@ function phaseAlgorithmCondition(uniformName: string): string {
 }
 
 /**
- * Configuration for volumetric main block generation.
+ * Shared options for raymarch call generation across volumetric and temporal paths.
  */
-export interface VolumetricMainBlockConfig {
-  /** Use pre-computed density grid for faster raymarching */
-  useDensityGrid?: boolean
-  /** When true, the grid-only path is guaranteed — no inline wavefunction fallback needed. */
-  gridOnly?: boolean
+interface RaymarchCallOptions {
+  useDensityGrid: boolean
+  gridOnly: boolean
+  /** Suppress safety fallback to inline when grid returns transparent (density matrix mode). */
+  useDensityMatrix?: boolean
 }
 
 /**
- * Generator function for volumetric main block.
- * Selects between volumeRaymarch() (fast) and volumeRaymarchHQ() (high quality).
- * @param config
+ * Generate the WGSL raymarch dispatch logic — shared by volumetric and temporal paths.
+ *
+ * Decision tree:
+ * 1. gridOnly → grid call only, no inline fallback compiled
+ * 2. useDensityGrid → grid preferred, with inline fallback for phase-dependent modes
+ *    and a safety fallback if grid returns transparent (unless density matrix mode)
+ * 3. no grid → direct inline fast/HQ toggle
  */
-export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
-  const { useDensityGrid = false, gridOnly = false } = config
+function generateRaymarchCall(opts: RaymarchCallOptions): string {
+  const { useDensityGrid, gridOnly, useDensityMatrix = false } = opts
 
-  // When gridOnly=true, the density grid handles ALL rendering — no inline
-  // wavefunction fallback is compiled. This dramatically reduces the fragment
-  // shader size (removes ~1000 lines of quantum math, inline density sampling,
-  // tetrahedral gradient, and both volumeRaymarch/HQ functions), which avoids
-  // a GPU occupancy cliff on Apple Silicon's Metal compiler (Safari WebGPU).
-  let raymarchCall: string
   if (gridOnly) {
-    raymarchCall = `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
-  } else if (useDensityGrid) {
-    raymarchCall = `let phaseDependentMode =
+    return `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
+  }
+
+  if (useDensityGrid) {
+    return `let phaseDependentMode =
     ${phaseAlgorithmCondition('schroedinger')} ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
@@ -94,15 +94,60 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
       volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
     }
   } else {
-    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
+    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);${
+      useDensityMatrix
+        ? `
+    // No inline fallback in density matrix mode: the grid is the authoritative
+    // density source (Tr(ρ|x⟩⟨x|)). Falling back to inline single-wavefunction
+    // evaluation would produce incorrect density and a visible ring artifact.`
+        : `
+    // Safety fallback: if grid path yields a fully transparent sample,
+    // re-evaluate with direct sampling to avoid blank frames.
+    // This can happen when the density grid hasn't been populated yet
+    // or when coordinate mapping produces out-of-range lookups.
+    // Skip for free scalar: inline HO evaluation is wrong for lattice data.
+    if (!IS_FREE_SCALAR && volumeResult.alpha < 0.01) {
+      if (fastMode) {
+        volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
+      } else {
+        volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
+      }
+    }`
+    }
   }`
-  } else {
-    raymarchCall = `if (fastMode) {
+  }
+
+  return `if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
   }`
-  }
+}
+
+/**
+ * Configuration for volumetric main block generation.
+ */
+export interface VolumetricMainBlockConfig {
+  /** Use pre-computed density grid for faster raymarching */
+  useDensityGrid?: boolean
+  /** When true, the grid-only path is guaranteed — no inline wavefunction fallback needed. */
+  gridOnly?: boolean
+}
+
+/**
+ * Generator function for volumetric main block.
+ * Selects between volumeRaymarch() (fast) and volumeRaymarchHQ() (high quality).
+ * @param config
+ */
+export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
+  const { useDensityGrid = false, gridOnly = false } = config
+
+  // When gridOnly=true, the density grid handles ALL rendering — no inline
+  // wavefunction fallback is compiled. This dramatically reduces the fragment
+  // shader size (removes ~1000 lines of quantum math, inline density sampling,
+  // tetrahedral gradient, and both volumeRaymarch/HQ functions), which avoids
+  // a GPU occupancy cliff on Apple Silicon's Metal compiler (Safari WebGPU).
+  const raymarchCall = generateRaymarchCall({ useDensityGrid, gridOnly })
 
   return /* wgsl */ `
 // ============================================
@@ -326,65 +371,7 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
   // When jitter is applied, use jitteredVPosition for ray direction
   const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
 
-  let raymarchCall: string
-  if (gridOnly) {
-    raymarchCall = `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
-  } else if (useDensityGrid) {
-    raymarchCall = `let phaseDependentMode =
-    ${phaseAlgorithmCondition('schroedinger')} ||
-    (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
-    (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
-
-  let probabilityCurrentVolumeMode =
-    FEATURE_PROBABILITY_CURRENT &&
-    schroedinger.probabilityCurrentEnabled != 0u &&
-    (
-      schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_VOLUME ||
-      (
-        schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_ISOSURFACE &&
-        schroedinger.isoEnabled == 0u
-      )
-    );
-
-  let requiresDirectSampling =
-    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE) ||
-    probabilityCurrentVolumeMode;
-
-  if (requiresDirectSampling) {
-    if (fastMode) {
-      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-    } else {
-      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-    }
-  } else {
-    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);${
-      useDensityMatrix
-        ? `
-    // No inline fallback in density matrix mode: the grid is the authoritative
-    // density source (Tr(ρ|x⟩⟨x|)). Falling back to inline single-wavefunction
-    // evaluation would produce incorrect density and a visible ring artifact.`
-        : `
-    // Safety fallback: if grid path yields a fully transparent sample,
-    // re-evaluate with direct sampling to avoid blank frames.
-    // This can happen when the density grid hasn't been populated yet
-    // or when coordinate mapping produces out-of-range lookups.
-    // Skip for free scalar: inline HO evaluation is wrong for lattice data.
-    if (!IS_FREE_SCALAR && volumeResult.alpha < 0.01) {
-      if (fastMode) {
-        volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-      } else {
-        volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-      }
-    }`
-    }
-  }`
-  } else {
-    raymarchCall = `if (fastMode) {
-    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-  } else {
-    volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-  }`
-  }
+  const raymarchCall = generateRaymarchCall({ useDensityGrid, gridOnly, useDensityMatrix })
 
   return /* wgsl */ `
 // ============================================

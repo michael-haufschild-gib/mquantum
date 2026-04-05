@@ -220,8 +220,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           stagingIm.mapAsync(GPUMapMode.READ),
         ])
 
-        const re = new Float32Array(new Float32Array(stagingRe.getMappedRange()).slice(0))
-        const im = new Float32Array(new Float32Array(stagingIm.getMappedRange()).slice(0))
+        const re = new Float32Array(stagingRe.getMappedRange()).slice(0)
+        const im = new Float32Array(stagingIm.getMappedRange()).slice(0)
         stagingRe.unmap()
         stagingIm.unmap()
         stagingRe.destroy()
