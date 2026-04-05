@@ -192,9 +192,11 @@ export function useAtlasSweepController(): {
         // Tick frame counter
         atlas.tickFrame()
 
-        // During measurement window: record one sample per poll if new data arrived
+        // During measurement window: record one sample per poll when new data exists.
+        // Intentionally takes one snapshot per poll (not one per worker result) because
+        // the entanglement store only holds current values, not a per-result history.
+        // The 400ms polling interval provides natural decorrelation between samples.
         if (entSamples >= evolveNeeded && samplesRecordedRef.current < measureNeeded) {
-          // Check if at least one new worker result arrived since last poll
           if (entSamples > lastSeenNRef.current) {
             lastSeenNRef.current = entSamples
             const S = entStore.currentNormalizedEntropy

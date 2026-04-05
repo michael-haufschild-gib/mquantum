@@ -329,9 +329,9 @@ interface AtlasPoint {
   lambda: number
   dim: number
   gamma: number
-  // Diagnostic A: coordinate entanglement
-  avgCoordEntanglement: number
-  varCoordEntanglement: number
+  // Diagnostic A: normalized coordinate entanglement S̄/log(M)
+  avgNormalizedEntropy: number
+  varNormalizedEntropy: number
   // Diagnostic B: Wigner negativity
   avgWignerNegativity: number
   varWignerNegativity: number
@@ -341,7 +341,7 @@ interface AtlasPoint {
   // Metadata
   gridSizePerDim: number
   totalSamples: number
-  measurementWindow: number
+  measurementSamples: number
 }
 ```
 
