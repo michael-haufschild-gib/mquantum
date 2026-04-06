@@ -8,6 +8,8 @@
  * @module lib/physics/stochastic/branchDecomposition
  */
 
+import { computeStrides } from '@/lib/math/ndArray'
+
 /** Result of a spatial branch partition computation. */
 export interface BranchPartition {
   /** Population fraction in branch A (left of partition) */
@@ -54,13 +56,7 @@ export function spatialBranchPartition(
     )
   }
 
-  // Compute strides (row-major)
-  const strides = new Array(latticeDim)
-  let stride = 1
-  for (let d = latticeDim - 1; d >= 0; d--) {
-    strides[d] = stride
-    stride *= gridSize[d]!
-  }
+  const strides = computeStrides(gridSize.slice(0, latticeDim))
 
   // Partition threshold along axis 0 (world coordinate)
   const halfExtent0 = gridSize[0]! * spacing[0]! * 0.5

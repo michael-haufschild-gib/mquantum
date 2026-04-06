@@ -12,6 +12,8 @@
  * @module lib/physics/stochastic/localizationOperator
  */
 
+import { computeStrides } from '@/lib/math/ndArray'
+
 import type { CollapseCenter } from './localizationKernel'
 
 /**
@@ -86,12 +88,7 @@ export function applyLocalizationStepND(
   if (gamma === 0) return
 
   const totalSites = gridSize.reduce((a, b) => a * b, 1)
-  const strides = new Array(latticeDim)
-  let stride = 1
-  for (let d = latticeDim - 1; d >= 0; d--) {
-    strides[d] = stride
-    stride *= gridSize[d]!
-  }
+  const strides = computeStrides(gridSize.slice(0, latticeDim))
 
   const invTwoSigmaSq = 1 / (2 * sigma * sigma)
   const sqrtGammaDt = Math.sqrt(gamma * dt)

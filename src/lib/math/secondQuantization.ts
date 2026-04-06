@@ -11,6 +11,7 @@
  */
 
 import type { SecondQuantizationMode } from '@/lib/geometry/extended/types'
+import { factorial } from '@/lib/math/specialFunctions'
 
 // ============================================================================
 // Types
@@ -76,20 +77,6 @@ export interface SecondQuantMetrics {
 // ============================================================================
 // Internal helpers
 // ============================================================================
-
-/**
- * Compute factorial n! using iterative multiplication.
- * @param n - Non-negative integer
- * @returns n!
- */
-function factorial(n: number): number {
-  if (n <= 1) return 1
-  let result = 1
-  for (let i = 2; i <= n; i++) {
-    result *= i
-  }
-  return result
-}
 
 /**
  * Normalize Fock quantum number to a physically valid basis index.
