@@ -38,6 +38,9 @@ export function linearStepValue(min: number, max: number, steps: number, step: n
  * @returns Log-interpolated value
  */
 export function logStepValue(min: number, max: number, steps: number, step: number): number {
+  if (min <= 0 || max <= 0) {
+    throw new RangeError(`logStepValue requires positive min and max, got min=${min}, max=${max}`)
+  }
   if (steps <= 1) return min
   const t = step / (steps - 1)
   return min * Math.pow(max / min, t)

@@ -5,8 +5,8 @@ export const MIN_DIMENSION = 2
 export const MAX_DIMENSION = 11
 
 /**
- * Human-readable axis labels for up to 12 dimensions.
- * Index 0 = 'x', 1 = 'y', ..., 11 = 'o'.
+ * Human-readable axis labels for dimension indices.
+ * With MAX_DIMENSION = 11, indices 0..10 are currently used.
  */
 export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o'] as const
 

@@ -149,11 +149,13 @@ export function createMockCommandEncoder(): GPUCommandEncoder {
 }
 
 /** Create a mock GPUQuerySet. */
-export function createMockQuerySet(): GPUQuerySet {
+export function createMockQuerySet(
+  desc: Partial<GPUQuerySetDescriptor> = {},
+): GPUQuerySet {
   return {
-    label: '',
-    type: 'occlusion' as GPUQueryType,
-    count: 0,
+    label: desc.label ?? '',
+    type: (desc.type ?? 'occlusion') as GPUQueryType,
+    count: desc.count ?? 0,
     destroy: vi.fn(),
   } as unknown as GPUQuerySet
 }
@@ -232,8 +234,8 @@ function createWebGPUMock() {
     createdResources.commandEncoders.add(encoder)
     return encoder
   }
-  const trackedCreateQuerySet = (): GPUQuerySet => {
-    const qs = createMockQuerySet()
+  const trackedCreateQuerySet = (desc: Partial<GPUQuerySetDescriptor> = {}): GPUQuerySet => {
+    const qs = createMockQuerySet(desc)
     createdResources.querysets.add(qs)
     return qs
   }
@@ -308,11 +310,11 @@ function createWebGPUMock() {
     createPipelineLayout: vi.fn(() => trackedCreatePipelineLayout()),
     createRenderPipeline: vi.fn(() => trackedCreateRenderPipeline()),
     createComputePipeline: vi.fn(() => trackedCreateComputePipeline()),
-    createRenderPipelineAsync: vi.fn().mockResolvedValue(trackedCreateRenderPipeline()),
-    createComputePipelineAsync: vi.fn().mockResolvedValue(trackedCreateComputePipeline()),
+    createRenderPipelineAsync: vi.fn(async () => trackedCreateRenderPipeline()),
+    createComputePipelineAsync: vi.fn(async () => trackedCreateComputePipeline()),
     createCommandEncoder: vi.fn(() => trackedCreateCommandEncoder()),
     createRenderBundleEncoder: vi.fn(),
-    createQuerySet: vi.fn(() => trackedCreateQuerySet()),
+    createQuerySet: vi.fn((desc: Partial<GPUQuerySetDescriptor> = {}) => trackedCreateQuerySet(desc)),
     pushErrorScope: vi.fn(),
     popErrorScope: vi.fn().mockResolvedValue(null),
     onuncapturederror: null,

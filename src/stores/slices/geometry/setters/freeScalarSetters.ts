@@ -204,7 +204,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         }
       })
     },
-    setFreeScalarStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16),
+    setFreeScalarStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setFreeScalarInitialCondition: (condition) => {
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar

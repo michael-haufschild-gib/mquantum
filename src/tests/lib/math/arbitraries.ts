@@ -31,7 +31,7 @@ export function arbNonZeroVector(dim: number, range = 50, minMag = 0.01) {
   return arbVector(dim, range).filter((v) => {
     let sum = 0
     for (const x of v) sum += x * x
-    return Math.sqrt(sum) > minMag
+    return sum > minMag * minMag
   })
 }
 

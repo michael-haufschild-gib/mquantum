@@ -50,7 +50,7 @@ export function reduceGridToFit(grid: number[], maxTotal: number, minPerDim = 2)
       if (grid[i]! > grid[maxIdx]!) maxIdx = i
     }
     if (grid[maxIdx]! <= minPerDim) break
-    grid[maxIdx] = grid[maxIdx]! / 2
+    grid[maxIdx] = Math.floor(grid[maxIdx]! / 2)
   }
   return grid
 }

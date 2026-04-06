@@ -61,6 +61,10 @@ export function generateDensityGridBindingsBlock(opts: {
     includeHydrogenBasis = false,
   } = opts
 
+  if (includeHydrogenBasis && !includeOpenQuantum) {
+    throw new Error('includeHydrogenBasis requires includeOpenQuantum')
+  }
+
   let wgsl = /* wgsl */ `
 // ============================================
 // Compute Shader Bind Groups

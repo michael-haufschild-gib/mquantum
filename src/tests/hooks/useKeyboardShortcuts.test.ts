@@ -74,14 +74,14 @@ describe('useKeyboardShortcuts', () => {
     expect(useGeometryStore.getState().dimension).toBe(3)
   })
 
-  it('should not decrease dimension below 3', () => {
-    useGeometryStore.getState().setDimension(3)
+  it('should not decrease dimension below MIN_DIMENSION', () => {
+    useGeometryStore.getState().setDimension(2)
     renderHook(() => useKeyboardShortcuts({ enabled: true }))
 
     const event = new KeyboardEvent('keydown', { key: 'ArrowDown' })
     window.dispatchEvent(event)
 
-    expect(useGeometryStore.getState().dimension).toBe(3)
+    expect(useGeometryStore.getState().dimension).toBe(2)
   })
 
   it('should not reverse direction on d key (now used for camera movement)', () => {
