@@ -223,7 +223,7 @@ describe('writeFsfUniforms', () => {
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
   })
 
-  it('packs self-interaction params at offsets 480-492', () => {
+  it('packs self-interaction params at offsets 480-488', () => {
     const config = createConfig({
       selfInteractionEnabled: true,
       selfInteractionLambda: 2.5,
