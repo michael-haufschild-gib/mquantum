@@ -68,7 +68,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         description: 'N-dimensional quantum superposition states.',
         category: 'analytic',
         dimensions: {
-          min: 1,
+          min: 2,
           max: 11,
           recommended: 4,
           recommendedReason: '4D provides rich quantum interference patterns with good performance',

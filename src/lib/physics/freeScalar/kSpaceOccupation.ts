@@ -10,12 +10,16 @@
  * 2. Display: coordinate mapping, exposure, broadening, packing (kSpaceDisplayTransforms.ts)
  */
 
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { fftNd } from '@/lib/math/fft'
 import { computeStrides, linearToNDCoordsInto } from '@/lib/math/ndArray'
 import { computeOmegaK, M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
-/** Size of the 3D output density grid (must match DENSITY_GRID_SIZE in compute pass). */
-export const OUTPUT_GRID_SIZE = 64
+/**
+ * Size of the 3D output density grid — re-exported from the shared constant
+ * so existing consumers that import `OUTPUT_GRID_SIZE` continue to work.
+ */
+export const OUTPUT_GRID_SIZE = DENSITY_GRID_SIZE
 
 // Reusable buffer for float32-to-float16 conversion (avoids per-call allocation)
 const _f16Buf = new ArrayBuffer(4)

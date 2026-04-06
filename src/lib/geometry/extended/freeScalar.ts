@@ -105,7 +105,7 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
  * Controls lattice geometry, physics parameters, initial conditions, and visualization.
  */
 export interface FreeScalarConfig {
-  /** Spatial dimensionality of the lattice (1-11), driven by global dimension selector */
+  /** Spatial dimensionality of the lattice (3-6), enforced by the quantum type registry */
   latticeDim: number
   /** Lattice grid size per dimension — length equals latticeDim */
   gridSize: number[]
