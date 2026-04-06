@@ -19,6 +19,7 @@ import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeSc
 import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Types
@@ -89,14 +90,11 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   const uniformsAndIndex = freeScalarUniformsBlock + freeScalarNDIndexBlock
 
   // === Init pipeline (phi + pi read_write) ===
-  const initBGL = device.createBindGroupLayout({
-    label: 'free-scalar-init-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const initBGL = createComputeBGL(device, 'free-scalar-init-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+  ])
   const initPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, uniformsAndIndex + freeScalarInitBlock, 'free-scalar-init'),
@@ -117,14 +115,11 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   )
 
   // === Update Pi pipeline (phi read-only, pi read_write) ===
-  const updatePiBGL = device.createBindGroupLayout({
-    label: 'free-scalar-update-pi-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const updatePiBGL = createComputeBGL(device, 'free-scalar-update-pi-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const updatePiPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -137,14 +132,11 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   )
 
   // === Update Phi pipeline (phi read_write, pi read-only) ===
-  const updatePhiBGL = device.createBindGroupLayout({
-    label: 'free-scalar-update-phi-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const updatePhiBGL = createComputeBGL(device, 'free-scalar-update-phi-bgl', [
+    'uniform',
+    'storage',
+    'read-only-storage',
+  ])
   const updatePhiPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(

@@ -15,6 +15,7 @@ import {
   vortexDetectReduceBlock,
 } from '../shaders/schroedinger/compute/vortexDetect.wgsl'
 import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 /** Vortex detection state managed by TDSEComputePass. */
 export interface VortexDetectState {
@@ -119,18 +120,15 @@ export function initVortexDetect(
     code: reduceCode,
   })
 
-  const reduceLayout = device.createBindGroupLayout({
-    label: 'vortex-detect-reduce-layout',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const reduceLayout = createComputeBGL(device, 'vortex-detect-reduce-layout', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'uniform',
+    'storage',
+    'storage',
+    'storage',
+  ])
 
   state.reducePipeline = device.createComputePipeline({
     label: 'vortex-detect-reduce-pipeline',
@@ -161,16 +159,13 @@ export function initVortexDetect(
     code: finalizeCode,
   })
 
-  const finalizeLayout = device.createBindGroupLayout({
-    label: 'vortex-detect-finalize-layout',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const finalizeLayout = createComputeBGL(device, 'vortex-detect-finalize-layout', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
 
   state.finalizePipeline = device.createComputePipeline({
     label: 'vortex-detect-finalize-pipeline',

@@ -21,6 +21,7 @@ import {
   qwWriteGridBlock,
   qwWriteGridUniformsBlock,
 } from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 /** All GPU resources created by the pipeline factory. */
 export interface QwPipelineResult {
@@ -67,22 +68,16 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
       quantumWalkAbsorberBlock,
   })
 
-  const coinBGL = device.createBindGroupLayout({
-    label: 'qw-coin-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
-  const shiftBGL = device.createBindGroupLayout({
-    label: 'qw-shift-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const coinBGL = createComputeBGL(device, 'qw-coin-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
+  const shiftBGL = createComputeBGL(device, 'qw-shift-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const writeGridBGL = device.createBindGroupLayout({
     label: 'qw-write-grid-bgl',
     entries: [
@@ -96,13 +91,7 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
       { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
     ],
   })
-  const absorberBGL = device.createBindGroupLayout({
-    label: 'qw-absorber-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const absorberBGL = createComputeBGL(device, 'qw-absorber-bgl', ['uniform', 'storage'])
 
   return {
     coinPipeline: device.createComputePipeline({

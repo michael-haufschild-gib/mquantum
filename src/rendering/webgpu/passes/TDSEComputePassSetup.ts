@@ -29,6 +29,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 import { buildObsGSPipelines } from './TDSEObservablesGSPipelines'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -156,14 +157,7 @@ export function buildTdsePipelines(
   const unifAndIndex = tdseUniformsBlock + freeScalarNDIndexBlock
 
   // Init
-  const initBGL = device.createBindGroupLayout({
-    label: 'tdse-init-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const initBGL = createComputeBGL(device, 'tdse-init-bgl', ['uniform', 'storage', 'storage'])
   const initPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + tdseInitBlock, 'tdse-init'),
@@ -172,13 +166,7 @@ export function buildTdsePipelines(
   )
 
   // Potential fill
-  const potentialBGL = device.createBindGroupLayout({
-    label: 'tdse-potential-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const potentialBGL = createComputeBGL(device, 'tdse-potential-bgl', ['uniform', 'storage'])
   const potentialPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + tdsePotentialBlock, 'tdse-potential'),
@@ -187,15 +175,12 @@ export function buildTdsePipelines(
   )
 
   // Potential half-step
-  const potentialHalfBGL = device.createBindGroupLayout({
-    label: 'tdse-potential-half-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const potentialHalfBGL = createComputeBGL(device, 'tdse-potential-half-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+    'read-only-storage',
+  ])
   const potentialHalfPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -209,16 +194,13 @@ export function buildTdsePipelines(
 
   // PERF: Fused potentialHalf + pack kernel
   // Bindings: uniform, psiRe(rw), psiIm(rw), potential(r), complexBuf(rw)
-  const fusedPotentialPackBGL = device.createBindGroupLayout({
-    label: 'tdse-fused-potential-pack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const fusedPotentialPackBGL = createComputeBGL(device, 'tdse-fused-potential-pack-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+    'read-only-storage',
+    'storage',
+  ])
   const fusedPotentialPackPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -232,16 +214,13 @@ export function buildTdsePipelines(
 
   // PERF: Fused unpack + potentialHalf kernel
   // Bindings: uniform, complexBuf(r), psiRe(rw), psiIm(rw), potential(r)
-  const fusedUnpackPotentialBGL = device.createBindGroupLayout({
-    label: 'tdse-fused-unpack-potential-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const fusedUnpackPotentialBGL = createComputeBGL(device, 'tdse-fused-unpack-potential-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+    'read-only-storage',
+  ])
   const fusedUnpackPotentialPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -270,15 +249,12 @@ export function buildTdsePipelines(
 
   // Renormalization: reads diagResult[0] (totalNorm) and scales ψ by 1/√(totalNorm).
   // Layout: uniform(totalElements) + diagResult(read) + psiRe(rw) + psiIm(rw)
-  const renormalizeBGL = device.createBindGroupLayout({
-    label: 'tdse-renormalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const renormalizeBGL = createComputeBGL(device, 'tdse-renormalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const renormalizePipeline = device.createComputePipeline({
     label: 'tdse-renormalize-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
@@ -297,15 +273,12 @@ struct PackUniforms {
   _pad1: u32,
 }
 `
-  const packBGL = device.createBindGroupLayout({
-    label: 'tdse-pack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const packBGL = createComputeBGL(device, 'tdse-pack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
   const packPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -318,15 +291,12 @@ struct PackUniforms {
   )
 
   // Unpack
-  const unpackBGL = device.createBindGroupLayout({
-    label: 'tdse-unpack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const unpackBGL = createComputeBGL(device, 'tdse-unpack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const unpackPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -339,14 +309,11 @@ struct PackUniforms {
   )
 
   // FFT stage
-  const fftStageBGL = device.createBindGroupLayout({
-    label: 'tdse-fft-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const fftStageBGL = createComputeBGL(device, 'tdse-fft-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const fftStagePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -359,13 +326,10 @@ struct PackUniforms {
   )
 
   // Shared-memory FFT: one dispatch per axis (all stages in workgroup shared memory)
-  const fftSharedMemBGL = device.createBindGroupLayout({
-    label: 'tdse-fft-shared-mem-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const fftSharedMemBGL = createComputeBGL(device, 'tdse-fft-shared-mem-bgl', [
+    'uniform',
+    'storage',
+  ])
   const fftSharedMemPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -378,13 +342,7 @@ struct PackUniforms {
   )
 
   // Kinetic (operates on interleaved complex buffer)
-  const kineticBGL = device.createBindGroupLayout({
-    label: 'tdse-kinetic-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const kineticBGL = createComputeBGL(device, 'tdse-kinetic-bgl', ['uniform', 'storage'])
   const kineticPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + tdseApplyKineticBlock, 'tdse-kinetic'),
@@ -419,19 +377,16 @@ struct PackUniforms {
   )
 
   // Diagnostics: norm reduction (pass 1)
-  const diagReduceBGL = device.createBindGroupLayout({
-    label: 'tdse-diag-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 7, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const diagReduceBGL = createComputeBGL(device, 'tdse-diag-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'storage',
+    'storage',
+    'storage',
+    'storage',
+  ])
   const diagReducePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, tdseDiagNormReduceBlock, 'tdse-diag-reduce'),
@@ -440,18 +395,15 @@ struct PackUniforms {
   )
 
   // Diagnostics: norm finalize (pass 2)
-  const diagFinalizeBGL = device.createBindGroupLayout({
-    label: 'tdse-diag-finalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const diagFinalizeBGL = createComputeBGL(device, 'tdse-diag-finalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+  ])
   const diagFinalizePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, tdseDiagNormFinalizeBlock, 'tdse-diag-finalize'),

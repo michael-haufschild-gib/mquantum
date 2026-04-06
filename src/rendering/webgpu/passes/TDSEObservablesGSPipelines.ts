@@ -25,6 +25,7 @@ import {
   observablesPositionFinalizeBlock,
   observablesPositionReduceBlock,
 } from '../shaders/schroedinger/compute/observablesPositionReduce.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 import type { TdsePassHelpers } from './TDSEComputePassSetup'
 
 /** Pipeline results for observables + Gram-Schmidt. */
@@ -60,16 +61,13 @@ export function buildObsGSPipelines(
 ): ObsGSPipelineResult {
   // ── Observable Expectation Value Reduction ──
 
-  const obsPosReduceBGL = device.createBindGroupLayout({
-    label: 'obs-pos-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const obsPosReduceBGL = createComputeBGL(device, 'obs-pos-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'read-only-storage',
+  ])
   const obsPosReducePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -81,14 +79,11 @@ export function buildObsGSPipelines(
     'obs-pos-reduce'
   )
 
-  const obsPosFinalBGL = device.createBindGroupLayout({
-    label: 'obs-pos-final-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const obsPosFinalBGL = createComputeBGL(device, 'obs-pos-final-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const obsPosFinalPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -100,14 +95,11 @@ export function buildObsGSPipelines(
     'obs-pos-final'
   )
 
-  const obsMomReduceBGL = device.createBindGroupLayout({
-    label: 'obs-mom-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const obsMomReduceBGL = createComputeBGL(device, 'obs-mom-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const obsMomReducePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -119,14 +111,11 @@ export function buildObsGSPipelines(
     'obs-mom-reduce'
   )
 
-  const obsMomFinalBGL = device.createBindGroupLayout({
-    label: 'obs-mom-final-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const obsMomFinalBGL = createComputeBGL(device, 'obs-mom-final-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const obsMomFinalPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -140,18 +129,15 @@ export function buildObsGSPipelines(
 
   // ── Gram-Schmidt Orthogonalization ──
 
-  const gsReduceBGL = device.createBindGroupLayout({
-    label: 'gs-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const gsReduceBGL = createComputeBGL(device, 'gs-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const gsReducePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, gramSchmidtInnerProductReduceBlock, 'gs-reduce'),
@@ -159,15 +145,12 @@ export function buildObsGSPipelines(
     'gs-reduce'
   )
 
-  const gsFinalizeBGL = device.createBindGroupLayout({
-    label: 'gs-finalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const gsFinalizeBGL = createComputeBGL(device, 'gs-finalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
   const gsFinalizePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, gramSchmidtInnerProductFinalizeBlock, 'gs-finalize'),
@@ -175,17 +158,14 @@ export function buildObsGSPipelines(
     'gs-finalize'
   )
 
-  const gsSubtractBGL = device.createBindGroupLayout({
-    label: 'gs-subtract-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const gsSubtractBGL = createComputeBGL(device, 'gs-subtract-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const gsSubtractPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, gramSchmidtSubtractBlock, 'gs-subtract'),
@@ -194,14 +174,11 @@ export function buildObsGSPipelines(
   )
 
   // ── Energy Spectral Density ──
-  const energySpectrumBGL = device.createBindGroupLayout({
-    label: 'energy-spectrum-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const energySpectrumBGL = createComputeBGL(device, 'energy-spectrum-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
 
   // NDIndex block provides linearToND (not used by this shader but the uniform struct references
   // array types that need the block prepended for WGSL parsing context). Actually, this shader
