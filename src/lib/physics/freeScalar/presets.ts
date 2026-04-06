@@ -15,7 +15,7 @@ export type FreeScalarPresetOverride = Partial<
   Omit<FreeScalarConfig, 'needsReset' | 'slicePositions' | 'kSpaceViz'>
 >
 
-/** Parent-level SchrodingerConfig rendering fields that a preset can override. */
+/** Parent-level SchroedingerConfig rendering fields that a preset can override. */
 export interface FreeScalarRenderingOverrides {
   densityGain?: number
   densityContrast?: number

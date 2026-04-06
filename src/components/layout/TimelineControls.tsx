@@ -1,5 +1,5 @@
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { type FC, useCallback, useMemo, useState } from 'react'
+import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
@@ -185,6 +185,11 @@ export const TimelineControls: FC = () => {
   const [showRotationDrawer, setShowRotationDrawer] = useState(false)
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
+
+  // Close the effects drawer when switching to a mode that has no drawer content
+  useEffect(() => {
+    if (!hasEffectsDrawerContent) setShowAnimDrawer(false)
+  }, [hasEffectsDrawerContent])
 
   const effectiveShowOpenQDrawer = showOpenQDrawer && supportsOpenQuantumControls
 

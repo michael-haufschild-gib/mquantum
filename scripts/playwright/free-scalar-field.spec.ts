@@ -495,12 +495,22 @@ test.describe('free scalar field: self-interaction scenario presets', () => {
     await requireWebGPU(page, test.info())
   })
 
-  /** Apply an FSF scenario preset by id. */
+  /** Apply an FSF scenario preset by id, waiting for the store to update. */
   async function applyFsfPreset(page: Page, presetId: string): Promise<void> {
     await page.evaluate(async (id) => {
       const mod = await import('/src/stores/extendedObjectStore.ts')
       mod.useExtendedObjectStore.getState().applyFreeScalarPreset(id)
     }, presetId)
+
+    // applyFreeScalarPreset uses a dynamic import internally, so the store
+    // update is async. Wait until needsReset flips to true (preset applied).
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/extendedObjectStore.ts')
+        return mod.useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset === true
+      },
+      { timeout: 5_000 }
+    )
   }
 
   test('mexicanHat preset renders and produces finite energy', async ({ page }) => {
