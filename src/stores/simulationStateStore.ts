@@ -14,6 +14,8 @@ import { create } from 'zustand'
 
 import type { SaveableQuantumMode } from '@/lib/export/simulationState'
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
@@ -99,12 +101,10 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         // before the strategy checks pendingLoadData for wavefunction injection.
         // Force needsReset on the mode sub-config so the compute pass reinitializes
         // with the loaded grid parameters.
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const loadedConfig = result.config as Record<string, unknown>
 
         if (result.quantumMode === 'pauliSpinor') {
           // Pauli is a separate object type — switch objectType and apply pauli config
-          const { useGeometryStore } = await import('@/stores/geometryStore')
           useGeometryStore.getState().setObjectType('pauliSpinor')
           const pauliConfig = (loadedConfig.pauli ?? loadedConfig) as Partial<PauliConfig>
           useExtendedObjectStore.getState().setPauliConfig({

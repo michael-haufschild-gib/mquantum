@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
+import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import {
   comptonWavelength,
   kleinThreshold,
   maxStableDt,
   relativisticEnergy,
-  spinorSize,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
 

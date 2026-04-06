@@ -12,6 +12,7 @@ import WaveIcon from '@/assets/icons/wave.svg?react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import { useAnimationStore } from '@/stores/animationStore'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -77,13 +78,6 @@ const REPRESENTATION_LABELS: Record<string, string> = {
   wigner: 'Wigner',
 }
 
-const COMPUTE_MODES = new Set([
-  'freeScalarField',
-  'tdseDynamics',
-  'becDynamics',
-  'diracEquation',
-  'quantumWalk',
-])
 
 function getRepresentationLabel(representation: string): string {
   return REPRESENTATION_LABELS[representation] ?? 'Position'
@@ -261,7 +255,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   const { representation, setRepresentation, quantumMode } =
     useExtendedObjectStore(representationSelector)
   const objectType = useGeometryStore((s) => s.objectType)
-  const isComputeMode = objectType === 'pauliSpinor' || COMPUTE_MODES.has(quantumMode)
+  const isComputeMode = objectType === 'pauliSpinor' || isComputeQuantumType(quantumMode)
 
   // Local State
   const [isFullscreen, setIsFullscreen] = React.useState(false)

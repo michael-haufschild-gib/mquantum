@@ -19,6 +19,7 @@ import { logger } from '@/lib/logger'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -197,7 +198,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       totalSites: this.totalSites,
       label: 'fsf',
       getMetadata: async () => {
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const fsfConfig = useExtendedObjectStore.getState().schroedinger.freeScalar
         return {
           quantumMode: 'freeScalarField',

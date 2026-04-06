@@ -13,6 +13,8 @@
 
 import { fft1dWasm, fftNdWasm, ifft1dWasm, ifftNdWasm, isAnimationWasmReady } from '@/lib/wasm'
 
+import { computeStrides } from './ndArray'
+
 /** Typed array types accepted by FFT functions. */
 type FFTArray = Float64Array | Float32Array
 
@@ -352,21 +354,6 @@ export function ifft3d(data: FFTArray, nx: number, ny: number, nz: number): void
  * @param gridSize - Array of grid sizes per dimension (each must be power of 2)
  * @param transform1d - 1D transform function (fft or ifft)
  */
-/**
- * Computes row-major strides for an N-D grid.
- *
- * @param gridSize - Array of grid sizes per dimension
- * @returns Array of strides (last dimension has stride 1)
- */
-function computeStrides(gridSize: readonly number[]): number[] {
-  const dim = gridSize.length
-  const strides = new Array<number>(dim)
-  strides[dim - 1] = 1
-  for (let d = dim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-  return strides
-}
 
 /**
  * Collects dimension indices to iterate over (all except the target dimension), in reverse order.

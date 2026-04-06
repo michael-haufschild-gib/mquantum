@@ -11,6 +11,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { FFT_UNIFORM_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
 import {
@@ -20,66 +21,7 @@ import {
 } from '@/rendering/webgpu/passes/TDSEComputePassUniforms'
 
 function createTdseConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
-  return {
-    latticeDim: 3,
-    gridSize: [64, 64, 64],
-    spacing: [0.1, 0.1, 0.1],
-    mass: 1.0,
-    hbar: 1.0,
-    dt: 0.005,
-    stepsPerFrame: 4,
-    initialCondition: 'gaussianPacket',
-    packetCenter: [0, 0, 0],
-    packetWidth: 0.4,
-    packetAmplitude: 1.0,
-    packetMomentum: [5, 0, 0],
-    potentialType: 'barrier',
-    barrierHeight: 10,
-    barrierWidth: 0.2,
-    barrierCenter: 0.5,
-    wellDepth: 5,
-    wellWidth: 2,
-    harmonicOmega: 1,
-    stepHeight: 8,
-    slitSeparation: 2,
-    slitWidth: 0.4,
-    wallThickness: 0.3,
-    wallHeight: 100,
-    latticePeriod: 1,
-    latticeDepth: 5,
-    doubleWellSeparation: 1,
-    doubleWellLambda: 1,
-    doubleWellAsymmetry: 0,
-    driveEnabled: false,
-    driveAmplitude: 1,
-    driveFrequency: 1,
-    driveWaveform: 'sine',
-    absorberEnabled: true,
-    absorberWidth: 0.2,
-    pmlTargetReflection: 1e-6,
-    fieldView: 'density',
-    autoScale: true,
-    autoLoop: false,
-    diagnosticsEnabled: true,
-    diagnosticsInterval: 5,
-    slicePositions: [],
-    showPotential: false,
-    radialWellInner: 0.6,
-    radialWellOuter: 1.8,
-    radialWellDepth: 50,
-    radialWellTilt: 0.5,
-    anharmonicLambda: 1.0,
-    disorderStrength: 0,
-    disorderSeed: 42,
-    becEnabled: false,
-    becInteractionStrength: 0,
-    trapAnisotropy: [1, 1, 1],
-    imaginaryTimeEnabled: false,
-    observablesEnabled: false,
-    needsReset: false,
-    autoScaleMaxGain: 20,
-    ...overrides,
-  } as TdseConfig
+  return { ...DEFAULT_TDSE_CONFIG, ...overrides }
 }
 
 /** Build TdseUniformParams with sensible defaults for testing. */

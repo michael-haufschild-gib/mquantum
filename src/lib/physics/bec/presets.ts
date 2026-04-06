@@ -8,17 +8,12 @@
  */
 
 import type { BecConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
-/**
- * A named BEC scenario preset.
- */
-export interface BecScenarioPreset {
-  id: string
-  name: string
-  description: string
-  /** Minimum spatial dimension required for this preset (default: 2) */
+/** A named BEC scenario preset. */
+export interface BecScenarioPreset extends ScenarioPreset<Partial<BecConfig>> {
+  /** Minimum spatial dimension required for this preset (default: 2). */
   minDim?: number
-  overrides: Partial<BecConfig>
 }
 
 /**

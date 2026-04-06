@@ -14,6 +14,8 @@
 
 import { usePerformanceStore } from '@/stores/performanceStore'
 
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -475,11 +477,9 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
     // Update camera matrices for next frame
     // Get camera data from stores (consistent with other passes)
-    const camera = ctx.frame?.stores?.['camera'] as {
-      projectionMatrix?: { elements: number[] }
-      viewMatrix?: { elements: number[] }
-      matrixWorldInverse?: { elements: number[] }
-    }
+    const camera = getStoreSnapshot<CameraSnapshot & {
+      matrixWorldInverse?: { elements: ArrayLike<number> }
+    }>(ctx, 'camera')
 
     // Get view matrix - prefer viewMatrix, fallback to matrixWorldInverse
     const viewMatrixElements = camera?.viewMatrix?.elements ?? camera?.matrixWorldInverse?.elements

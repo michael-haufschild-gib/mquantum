@@ -17,6 +17,8 @@
 import type { LightSource, TransformMode } from '@/rendering/lights/types'
 import { rotationToDirection } from '@/rendering/lights/types'
 
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -528,24 +530,16 @@ export class LightGizmoPass extends WebGPUBasePass {
     }
 
     // ---- Read stores ----
-    const lighting = ctx.frame?.stores?.['lighting'] as
-      | {
-          lights?: LightSource[]
-          showLightGizmos?: boolean
-          selectedLightId?: string | null
-          transformMode?: TransformMode
-        }
-      | undefined
+    const lighting = getStoreSnapshot<{
+      lights?: LightSource[]
+      showLightGizmos?: boolean
+      selectedLightId?: string | null
+      transformMode?: TransformMode
+    }>(ctx, 'lighting')
 
     if (!lighting?.showLightGizmos || !lighting.lights?.length) return
 
-    const camera = ctx.frame?.stores?.['camera'] as
-      | {
-          viewProjectionMatrix?: { elements: number[] | Float32Array }
-          inverseViewMatrix?: { elements: number[] | Float32Array }
-          position?: { x: number; y: number; z: number } | [number, number, number]
-        }
-      | undefined
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
     if (!camera?.viewProjectionMatrix?.elements) return
 
@@ -553,7 +547,7 @@ export class LightGizmoPass extends WebGPUBasePass {
     const vpElements = camera.viewProjectionMatrix.elements
     let camPos: [number, number, number]
     if (Array.isArray(camera.position)) {
-      camPos = camera.position as [number, number, number]
+      camPos = camera.position as unknown as [number, number, number]
     } else if (camera.position && 'x' in camera.position) {
       camPos = [camera.position.x, camera.position.y, camera.position.z]
     } else {
@@ -564,7 +558,7 @@ export class LightGizmoPass extends WebGPUBasePass {
     let camRight: [number, number, number] = [1, 0, 0]
     let camUp: [number, number, number] = [0, 1, 0]
     if (invViewElements && invViewElements.length >= 8) {
-      ;[camRight, camUp] = extractCameraBasis(invViewElements)
+      ;[camRight, camUp] = extractCameraBasis(invViewElements as number[] | Float32Array)
     }
 
     // ---- Generate vertex data for all lights ----

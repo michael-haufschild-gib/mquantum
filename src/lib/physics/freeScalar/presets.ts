@@ -8,6 +8,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 /** Subset of FreeScalarConfig fields that a preset can override. */
 export type FreeScalarPresetOverride = Partial<
@@ -15,12 +16,7 @@ export type FreeScalarPresetOverride = Partial<
 >
 
 /** A named free scalar field scenario preset. */
-export interface FreeScalarScenarioPreset {
-  id: string
-  name: string
-  description: string
-  overrides: FreeScalarPresetOverride
-}
+export type FreeScalarScenarioPreset = ScenarioPreset<FreeScalarPresetOverride>
 
 export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
   {

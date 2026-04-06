@@ -17,35 +17,22 @@ import {
   scaleVector,
   subtractVectors,
 } from '@/lib/math'
+import { arbDim, arbScalar, arbVector } from '@/tests/lib/math/arbitraries'
 
 // ---------------------------------------------------------------------------
-// Arbitraries
+// Derived Arbitraries
 // ---------------------------------------------------------------------------
-
-/** Arbitrary vector of a given dimension with finite, non-extreme components */
-function arbVector(dim: number) {
-  return fc.array(fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }), {
-    minLength: dim,
-    maxLength: dim,
-  })
-}
-
-/** Arbitrary dimension in the project's supported range */
-const arbDim = fc.integer({ min: 2, max: 11 })
-
-/** Arbitrary scalar with finite, non-extreme values */
-const arbScalar = fc.double({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true })
 
 /** Pair of same-dim vectors */
 const arbVecPair = arbDim.chain((dim) =>
-  fc.tuple(arbVector(dim), arbVector(dim)).map(([a, b]) => ({ dim, a, b }))
+  fc.tuple(arbVector(dim, 100), arbVector(dim, 100)).map(([a, b]) => ({ dim, a, b }))
 )
 
 /** Single vector with its dimension */
-const arbVecWithDim = arbDim.chain((dim) => arbVector(dim).map((v) => ({ dim, v })))
+const arbVecWithDim = arbDim.chain((dim) => arbVector(dim, 100).map((v) => ({ dim, v })))
 
 /** Arbitrary 3D vector */
-const arbVec3 = arbVector(3)
+const arbVec3 = arbVector(3, 100)
 
 // ---------------------------------------------------------------------------
 // Vector addition properties

@@ -254,6 +254,16 @@ export function isComputeQuantumType(key: QuantumTypeKey): boolean {
 }
 
 /**
+ * Checks if a quantum type key is an analytic mode (closed-form wavefunction).
+ *
+ * @param key - The quantum type key
+ * @returns true if the type uses analytic basis evaluation (not GPU compute)
+ */
+export function isAnalyticQuantumType(key: QuantumTypeKey): boolean {
+  return QUANTUM_TYPE_REGISTRY.get(key)?.category === 'analytic'
+}
+
+/**
  * Gets the display name for a quantum type.
  *
  * @param key - The quantum type key
@@ -281,3 +291,12 @@ export function getQuantumTypesRequiringDimensionAbove(
   }
   return result
 }
+
+/**
+ * Quantum modes that require 3D+ dimensions (no 2D rendering path).
+ * Compute modes render a 3D density grid via volume raymarching;
+ * the 2D heatmap pipeline cannot sample their density grids.
+ *
+ * Derived from the quantum type registry: all entries with dimensions.min > 2.
+ */
+export const QUANTUM_MODES_3D_ONLY = getQuantumTypesRequiringDimensionAbove(2)

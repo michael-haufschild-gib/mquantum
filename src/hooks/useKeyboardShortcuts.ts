@@ -10,7 +10,8 @@ import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useExportStore } from '@/stores/exportStore'
-import { MAX_DIMENSION, useGeometryStore } from '@/stores/geometryStore'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { useLightingStore } from '@/stores/lightingStore'
 
@@ -180,7 +181,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
           if (dimension < MAX_DIMENSION) setDimension(dimension + 1)
         },
         ArrowDown: () => {
-          if (dimension > 3) setDimension(dimension - 1)
+          if (dimension > MIN_DIMENSION) setDimension(dimension - 1)
         },
       }
 

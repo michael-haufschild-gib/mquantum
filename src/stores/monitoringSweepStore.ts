@@ -15,6 +15,10 @@
 
 import { create } from 'zustand'
 
+import { linearStepValue, type SweepStatus } from './utils/sweepUtils'
+
+export type { SweepStatus as MonitoringSweepStatus } from './utils/sweepUtils'
+
 /** Configuration for a monitoring sweep. */
 export interface MonitoringSweepConfig {
   /** Minimum monitoring rate γ */
@@ -37,12 +41,9 @@ export interface MonitoringSweepResult {
   normDrift: number
 }
 
-/** Sweep state machine phases. */
-export type MonitoringSweepStatus = 'idle' | 'running' | 'complete'
-
 interface MonitoringSweepState {
   /** Current sweep status */
-  status: MonitoringSweepStatus
+  status: SweepStatus
   /** Sweep configuration (set at start) */
   config: MonitoringSweepConfig
   /** Current step index (0-based) */
@@ -84,8 +85,7 @@ const DEFAULT_CONFIG: MonitoringSweepConfig = {
  * @returns Monitoring rate γ
  */
 export function gammaForStep(config: MonitoringSweepConfig, step: number): number {
-  if (config.steps <= 1) return config.gammaMin
-  return config.gammaMin + (step * (config.gammaMax - config.gammaMin)) / (config.steps - 1)
+  return linearStepValue(config.gammaMin, config.gammaMax, config.steps, step)
 }
 
 /** Zustand store for monitoring sweep mode. */

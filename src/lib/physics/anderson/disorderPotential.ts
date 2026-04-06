@@ -15,9 +15,6 @@
 import type { TdseDisorderDistribution } from '@/lib/geometry/extended/types'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
-// Re-export for backward compatibility with tests that import from this module
-export { mulberry32 } from '@/lib/math/rng'
-
 /**
  * Generate a random disorder potential on an N-D lattice.
  *

@@ -11,12 +11,8 @@ import { Icon } from '@/components/ui/Icon'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { getQuantumTypeEntry, resolveQuantumTypeKey } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import {
-  type GeometryState,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
-  useGeometryStore,
-} from '@/stores/geometryStore'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
+import { type GeometryState, useGeometryStore } from '@/stores/geometryStore'
 
 /** Props for the dimension (2-11D) selector control. */
 export interface DimensionSelectorProps {

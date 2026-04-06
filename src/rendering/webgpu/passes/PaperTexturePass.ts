@@ -17,6 +17,7 @@
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
@@ -431,7 +432,7 @@ export class PaperTexturePass extends WebGPUBasePass {
    * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
-    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+    const postProcessing = getStoreSnapshot<{
       paperIntensity?: number
       paperRoughness?: number
       paperContrast?: number
@@ -447,7 +448,7 @@ export class PaperTexturePass extends WebGPUBasePass {
       paperColorFront?: string
       paperColorBack?: string
       paperQuality?: string
-    }
+    }>(ctx, 'postProcessing')
 
     if (postProcessing?.paperIntensity !== undefined) {
       this.intensity = postProcessing.paperIntensity

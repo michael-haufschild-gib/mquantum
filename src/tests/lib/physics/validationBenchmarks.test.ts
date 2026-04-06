@@ -21,12 +21,12 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/tdse'
 import { fft, ifft } from '@/lib/math/fft'
+import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import {
   comptonWavelength,
   kleinThreshold,
   maxStableDt,
   relativisticEnergy,
-  spinorSize,
   zitterbewegungFrequency,
 } from '@/lib/physics/dirac/scales'
 import { computeOmegaK, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'

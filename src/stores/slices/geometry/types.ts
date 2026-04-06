@@ -7,7 +7,6 @@ import {
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
   HydrogenNDPresetName,
-  type OpenQuantumVisualizationMode,
   type PauliConfig,
   type PauliFieldType,
   type PauliFieldView,
@@ -28,6 +27,7 @@ import {
   type TdseInitialCondition,
   type TdsePotentialType,
 } from '@/lib/geometry/extended/types'
+import type { OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
 
 // ============================================================================
 // Schroedinger Slice

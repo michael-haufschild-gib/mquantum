@@ -8,10 +8,18 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
 
 import type { SchroedingerSliceActions } from '../types'
-import type { SetterContext } from './sliceSetterUtils'
+import {
+  defaultDiracGridPerDim,
+  DIRAC_MAX_TOTAL_SITES,
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 type DiracActions = Pick<
   SchroedingerSliceActions,
@@ -50,9 +58,6 @@ type DiracActions = Pick<
   | 'applyDiracPreset'
 >
 
-/** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
-const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
-
 /**
  * WebGPU minStorageBufferOffsetAlignment is 256 bytes.
  * Dirac pack/unpack bind groups view spinor components at offset
@@ -68,16 +73,6 @@ const MIN_ALIGNED_TOTAL_SITES = 64
 export const minDiracGridPerDim = (dim: number): number => {
   const raw = Math.ceil(Math.pow(MIN_ALIGNED_TOTAL_SITES, 1 / dim))
   return Math.max(2, 2 ** Math.ceil(Math.log2(raw)))
-}
-
-const defaultDiracGridPerDim = (d: number): number => {
-  const raw = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / d))
-  let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-  pow2 = Math.max(2, Math.min(128, pow2))
-  while (pow2 > 2 && Math.pow(pow2, d) > DIRAC_MAX_TOTAL_SITES) {
-    pow2 = pow2 / 2
-  }
-  return pow2
 }
 
 /**
@@ -128,38 +123,12 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
  */
 export function createDiracSetters(ctx: SetterContext): DiracActions {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+  const D = 'dirac' as const
 
   return {
-    setDiracMass: (mass) => {
-      if (!isFinite(mass)) return
-      const clamped = Math.max(0.01, Math.min(10, mass))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, mass: clamped },
-        },
-      }))
-    },
-    setDiracSpeedOfLight: (c) => {
-      if (!isFinite(c)) return
-      const clamped = Math.max(0.01, Math.min(10, c))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, speedOfLight: clamped },
-        },
-      }))
-    },
-    setDiracHbar: (hbar) => {
-      if (!isFinite(hbar)) return
-      const clamped = Math.max(0.01, Math.min(10, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, hbar: clamped },
-        },
-      }))
-    },
+    setDiracMass: nestedClampedSetter(ctx, D, 'mass', 0.01, 10),
+    setDiracSpeedOfLight: nestedClampedSetter(ctx, D, 'speedOfLight', 0.01, 10),
+    setDiracHbar: nestedClampedSetter(ctx, D, 'hbar', 0.01, 10),
     setDiracDt: (dt) => {
       if (!isFinite(dt)) {
         warnNonFinite('dirac.dt', dt)
@@ -177,15 +146,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         }
       })
     },
-    setDiracStepsPerFrame: (steps) => {
-      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, stepsPerFrame: clamped },
-        },
-      }))
-    },
+    setDiracStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16),
     setDiracPotentialType: (type) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -194,56 +155,11 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         },
       }))
     },
-    setDiracPotentialStrength: (strength) => {
-      if (!isFinite(strength)) return
-      const clamped = Math.max(-100, Math.min(100, strength))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialStrength: clamped },
-        },
-      }))
-    },
-    setDiracPotentialWidth: (width) => {
-      if (!isFinite(width)) return
-      const clamped = Math.max(0.01, Math.min(10, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialWidth: clamped },
-        },
-      }))
-    },
-    setDiracPotentialCenter: (center) => {
-      if (!isFinite(center)) return
-      const clamped = Math.max(-10, Math.min(10, center))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialCenter: clamped },
-        },
-      }))
-    },
-    setDiracHarmonicOmega: (omega) => {
-      if (!isFinite(omega)) return
-      const clamped = Math.max(0.01, Math.min(10, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, harmonicOmega: clamped },
-        },
-      }))
-    },
-    setDiracCoulombZ: (z) => {
-      if (!isFinite(z)) return
-      const clamped = Math.max(1, Math.min(137, Math.round(z)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, coulombZ: clamped },
-        },
-      }))
-    },
+    setDiracPotentialStrength: nestedClampedSetter(ctx, D, 'potentialStrength', -100, 100),
+    setDiracPotentialWidth: nestedClampedSetter(ctx, D, 'potentialWidth', 0.01, 10),
+    setDiracPotentialCenter: nestedClampedSetter(ctx, D, 'potentialCenter', -10, 10),
+    setDiracHarmonicOmega: nestedClampedSetter(ctx, D, 'harmonicOmega', 0.01, 10),
+    setDiracCoulombZ: nestedIntSetter(ctx, D, 'coulombZ', 1, 137),
     setDiracInitialCondition: (condition) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -272,61 +188,12 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         },
       }))
     },
-    setDiracFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, fieldView: view },
-        },
-      }))
-    },
-    setDiracAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, autoScale },
-        },
-      }))
-    },
-    setDiracShowPotential: (showPotential) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, showPotential },
-        },
-      }))
-    },
-    setDiracAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setDiracAbsorberWidth: (width) => {
-      if (!isFinite(width)) return
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, absorberWidth: clamped },
-        },
-      }))
-    },
-    setDiracPmlTargetReflection: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('dirac.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, pmlTargetReflection: clamped },
-        },
-      }))
-    },
+    setDiracFieldView: nestedValueSetter(ctx, D, 'fieldView'),
+    setDiracAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
+    setDiracShowPotential: nestedValueSetter(ctx, D, 'showPotential'),
+    setDiracAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled'),
+    setDiracAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setDiracPmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
     setDiracGridSize: (size) => {
       if (!hasOnlyFinite(size)) {
         warnNonFinite('dirac.gridSize', size)
@@ -342,14 +209,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           const log2 = Math.round(Math.log2(val))
           return Math.max(minGrid, Math.min(gridDefault, 2 ** log2))
         })
-        while (snapped.reduce((a, b) => a * b, 1) > DIRAC_MAX_TOTAL_SITES) {
-          let maxIdx = 0
-          for (let i = 1; i < snapped.length; i++) {
-            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
-          }
-          if (snapped[maxIdx]! <= minGrid) break
-          snapped[maxIdx] = snapped[maxIdx]! / 2
-        }
+        reduceGridToFit(snapped, DIRAC_MAX_TOTAL_SITES, minGrid)
         // Re-clamp packet arrays with new grid extents
         const prevDirac = state.schroedinger.dirac
         const newSpacing = prevDirac.spacing
@@ -452,39 +312,10 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         }
       })
     },
-    setDiracParticleColor: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, particleColor: color },
-        },
-      }))
-    },
-    setDiracAntiparticleColor: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, antiparticleColor: color },
-        },
-      }))
-    },
-    setDiracDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setDiracDiagnosticsInterval: (interval) => {
-      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, diagnosticsInterval: clamped },
-        },
-      }))
-    },
+    setDiracParticleColor: nestedValueSetter(ctx, D, 'particleColor'),
+    setDiracAntiparticleColor: nestedValueSetter(ctx, D, 'antiparticleColor'),
+    setDiracDiagnosticsEnabled: nestedValueSetter(ctx, D, 'diagnosticsEnabled'),
+    setDiracDiagnosticsInterval: nestedIntSetter(ctx, D, 'diagnosticsInterval', 1, 60),
     setDiracNeedsReset: () => {
       setWithVersion((state) => ({
         schroedinger: {

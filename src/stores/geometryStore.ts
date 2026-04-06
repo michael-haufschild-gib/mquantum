@@ -7,13 +7,14 @@
 
 import { create } from 'zustand'
 
-import { MAX_DIMENSION, MIN_DIMENSION, QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   getDimensionConstraints,
   getRecommendedDimension,
   getUnavailabilityReason,
   isAvailableForDimension,
   isValidObjectType as isValidObjectTypeRegistry,
+  QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
@@ -67,9 +68,6 @@ function scheduleTransitionComplete(): void {
     usePerformanceStore.getState().setCameraTeleported(false)
   })
 }
-
-// Re-export dimension constants for backward compatibility
-export { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 /** Default dimension (3D) */
 export const DEFAULT_DIMENSION = 3

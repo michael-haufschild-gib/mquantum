@@ -1019,6 +1019,7 @@ export default [
   //   - Diagnostic stores (*DiagnosticsStore) — write-direction: passes push metrics to UI
   //   - simulationStateStore — TDSE compute pass manages simulation lifecycle
   //   - performanceStore — TemporalDepthCapturePass reads temporal reprojection flag
+  //   - extendedObjectStore — async getMetadata callbacks (state save) lack ctx access
   //   - Store defaults — static config, no runtime coupling
   //   - Type-only imports (allowTypeImports: true)
   {
@@ -1033,6 +1034,7 @@ export default [
             '!@/stores/*DiagnosticsStore',
             '!@/stores/simulationStateStore',
             '!@/stores/performanceStore',
+            '!@/stores/extendedObjectStore',
           ],
           allowTypeImports: true,
           message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, performanceStore, and defaults/* are exempt.',

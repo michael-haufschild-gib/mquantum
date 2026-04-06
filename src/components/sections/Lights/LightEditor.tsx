@@ -100,68 +100,22 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     [selectedLightId, updateLight]
   )
 
-  const handleIntensityChange = useCallback(
-    (intensity: number) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { intensity })
-      }
-    },
+  /** Create a handler that updates a single light property. */
+  const lightPropHandler = useCallback(
+    <K extends keyof LightSource>(key: K) =>
+      (value: LightSource[K]) => {
+        if (selectedLightId) updateLight(selectedLightId, { [key]: value } as Partial<LightSource>)
+      },
     [selectedLightId, updateLight]
   )
 
-  const handlePositionChange = useCallback(
-    (position: [number, number, number]) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { position })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
-
-  const handleRotationChange = useCallback(
-    (rotation: [number, number, number]) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { rotation })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
-
-  const handleConeAngleChange = useCallback(
-    (coneAngle: number) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { coneAngle })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
-
-  const handlePenumbraChange = useCallback(
-    (penumbra: number) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { penumbra })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
-
-  const handleRangeChange = useCallback(
-    (range: number) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { range })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
-
-  const handleDecayChange = useCallback(
-    (decay: number) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { decay })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
+  const handleIntensityChange = lightPropHandler('intensity')
+  const handlePositionChange = lightPropHandler('position')
+  const handleRotationChange = lightPropHandler('rotation')
+  const handleConeAngleChange = lightPropHandler('coneAngle')
+  const handlePenumbraChange = lightPropHandler('penumbra')
+  const handleRangeChange = lightPropHandler('range')
+  const handleDecayChange = lightPropHandler('decay')
 
   const handleDuplicate = useCallback(() => {
     if (selectedLightId) {
@@ -172,14 +126,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     }
   }, [selectedLightId, duplicateLight, selectLight])
 
-  const handleColorChange = useCallback(
-    (val: string) => {
-      if (selectedLightId) {
-        updateLight(selectedLightId, { color: val })
-      }
-    },
-    [selectedLightId, updateLight]
-  )
+  const handleColorChange = lightPropHandler('color')
 
   // Show ambient light editor if ambient is selected
   if (isAmbientLightSelected) {

@@ -6,6 +6,8 @@ import type {
   WebGPUResourceAccess,
 } from '@/rendering/webgpu/core/types'
 
+import { createMockComputePassEncoder, createMockRenderPassEncoder } from '../../__mocks__/webgpu'
+
 function createRenderPassConfig(
   id: string,
   outputs: WebGPUResourceAccess[]
@@ -17,32 +19,11 @@ function createRenderPassConfig(
   }
 }
 
-function createNoopRenderPassEncoder(): GPURenderPassEncoder {
-  return {
-    end: vi.fn(),
-    setPipeline: vi.fn(),
-    setBindGroup: vi.fn(),
-    setVertexBuffer: vi.fn(),
-    setIndexBuffer: vi.fn(),
-    draw: vi.fn(),
-    drawIndexed: vi.fn(),
-  } as unknown as GPURenderPassEncoder
-}
-
-function createNoopComputePassEncoder(): GPUComputePassEncoder {
-  return {
-    end: vi.fn(),
-    setPipeline: vi.fn(),
-    setBindGroup: vi.fn(),
-    dispatchWorkgroups: vi.fn(),
-  } as unknown as GPUComputePassEncoder
-}
-
 async function createGraphHarness(pass: WebGPURenderPass) {
   const { WebGPURenderGraph } = await import('@/rendering/webgpu/graph/WebGPURenderGraph')
 
-  const beginRenderPass = vi.fn((_: GPURenderPassDescriptor) => createNoopRenderPassEncoder())
-  const beginComputePass = vi.fn((_: GPUComputePassDescriptor) => createNoopComputePassEncoder())
+  const beginRenderPass = vi.fn((_: GPURenderPassDescriptor) => createMockRenderPassEncoder())
+  const beginComputePass = vi.fn((_: GPUComputePassDescriptor) => createMockComputePassEncoder())
   const resolveQuerySet = vi.fn()
   const copyBufferToBuffer = vi.fn()
 

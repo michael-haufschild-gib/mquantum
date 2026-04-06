@@ -40,6 +40,7 @@ import {
   exportTdseDiagnosticsCSV,
   exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
+import { isAnalyticQuantumType, isComputeQuantumType, type QuantumTypeKey } from '@/lib/geometry/registry'
 import { useCarpetStore } from '@/stores/carpetStore'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
@@ -152,10 +153,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       )
     }
 
-    const isAnalytic =
-      quantumMode === 'harmonicOscillator' ||
-      quantumMode === 'hydrogenND' ||
-      quantumMode === 'hydrogenNDCoupled'
+    const isAnalytic = isAnalyticQuantumType(quantumMode)
 
     // Analytic modes require 3D+ and non-Wigner representation for cross-section
     if (isAnalytic && (dimension <= 2 || representation === 'wigner')) return null
@@ -269,20 +267,11 @@ const CSV_EXPORTERS: Record<string, { fn: () => string; prefix: string }> = {
  * slice export, and save/load controls as appropriate for the mode.
  */
 const DataExportButtons: React.FC<{
-  quantumMode: string
+  quantumMode: QuantumTypeKey
   observablesHasData?: boolean
 }> = React.memo(({ quantumMode, observablesHasData }) => {
-  const isAnalytic =
-    quantumMode === 'harmonicOscillator' ||
-    quantumMode === 'hydrogenND' ||
-    quantumMode === 'hydrogenNDCoupled'
-  const hasSaveLoad =
-    quantumMode === 'tdseDynamics' ||
-    quantumMode === 'becDynamics' ||
-    quantumMode === 'freeScalarField' ||
-    quantumMode === 'diracEquation' ||
-    quantumMode === 'quantumWalk' ||
-    quantumMode === 'pauliSpinor'
+  const isAnalytic = isAnalyticQuantumType(quantumMode)
+  const hasSaveLoad = isComputeQuantumType(quantumMode) || quantumMode === 'pauliSpinor'
 
   // Wavefunction slice availability
   const densitySliceAvailable = useDiagnosticsStore(

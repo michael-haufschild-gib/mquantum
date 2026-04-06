@@ -9,21 +9,6 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 
-/** Axis labels for N-dimensional controls. */
-export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
-
-/** TDSE max total sites — must match store constant. */
-export const TDSE_MAX_TOTAL_SITES = 262144
-
-/** Power-of-2 grid sizes required by Stockham FFT. */
-export const ALL_GRID_SIZE_OPTIONS = [
-  { value: '8', label: '8' },
-  { value: '16', label: '16' },
-  { value: '32', label: '32' },
-  { value: '64', label: '64' },
-  { value: '128', label: '128' },
-]
-
 /** Initial wavefunction shape options. */
 export const INITIAL_CONDITION_OPTIONS = [
   { value: 'gaussianPacket', label: 'Gaussian Packet' },

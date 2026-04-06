@@ -12,12 +12,14 @@
 import React, { useCallback, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
-import { Sparkline } from '@/components/ui/Sparkline'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
+import { MetricRow, SparklineRow } from './AnalysisPrimitives'
 
 /**
  * Diagnostics readout for the open quantum system.
@@ -41,7 +43,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     const repr = s.schroedinger.representation
     return (
       oq &&
-      (mode === 'harmonicOscillator' || mode === 'hydrogenND' || mode === 'hydrogenNDCoupled') &&
+      isAnalyticQuantumType(mode) &&
       repr !== 'wigner'
     )
   })
@@ -105,6 +107,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
           count={history.historyCount}
           min={0}
           max={1}
+          sparklineClassName="w-full opacity-80"
         />
         <SparklineRow
           label="Entropy"
@@ -112,6 +115,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
           head={history.historyHead}
           count={history.historyCount}
           min={0}
+          sparklineClassName="w-full opacity-80"
         />
         <SparklineRow
           label="Coherence"
@@ -119,6 +123,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
           head={history.historyHead}
           count={history.historyCount}
           min={0}
+          sparklineClassName="w-full opacity-80"
         />
       </div>
 
@@ -166,16 +171,6 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
 
 OpenQuantumDiagnosticsSection.displayName = 'OpenQuantumDiagnosticsSection'
 
-/** Single metric row with label and formatted value */
-function MetricRow({ label, value, digits }: { label: string; value: number; digits: number }) {
-  return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-text-secondary">{label}</span>
-      <span className="text-text-primary font-mono tabular-nums">{value.toFixed(digits)}</span>
-    </div>
-  )
-}
-
 /** Per-state population bar with label and percentage */
 function PopulationBar({ label, value }: { label: string; value: number }) {
   const pct = Math.max(0, Math.min(100, value * 100))
@@ -195,34 +190,3 @@ function PopulationBar({ label, value }: { label: string; value: number }) {
   )
 }
 
-/** Labeled sparkline row for a single metric history */
-function SparklineRow({
-  label,
-  data,
-  head,
-  count,
-  min,
-  max,
-}: {
-  label: string
-  data: Float32Array
-  head: number
-  count: number
-  min?: number
-  max?: number
-}) {
-  return (
-    <div>
-      <span className="text-xs text-text-tertiary uppercase tracking-wider">{label}</span>
-      <Sparkline
-        data={data}
-        head={head}
-        count={count}
-        min={min}
-        max={max}
-        height={28}
-        className="w-full opacity-80"
-      />
-    </div>
-  )
-}

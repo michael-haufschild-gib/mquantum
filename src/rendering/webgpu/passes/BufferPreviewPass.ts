@@ -14,6 +14,8 @@
  */
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -345,7 +347,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     }
 
     // Dynamic configuration from stores — skip if no preview active
-    const previewConfig = ctx.frame?.stores?.['bufferPreview'] as BufferPreviewStoreConfig | null
+    const previewConfig = getStoreSnapshot<BufferPreviewStoreConfig>(ctx, 'bufferPreview')
     if (!previewConfig) return
 
     // Update buffer type and input based on which debug flag is active
@@ -360,7 +362,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     }
 
     // Update camera clip planes from camera store
-    const camera = ctx.frame?.stores?.['camera'] as { near?: number; far?: number } | null
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
     if (camera) {
       this.nearClip = camera.near ?? 0.1
       this.farClip = camera.far ?? 100

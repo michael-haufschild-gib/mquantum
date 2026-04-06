@@ -30,6 +30,32 @@ export function computeStrides(gridSize: readonly number[]): number[] {
 }
 
 /**
+ * Reduce a per-dimension grid array so the total product fits within a budget.
+ * Repeatedly halves the largest dimension until the product is within bounds.
+ *
+ * @param grid - Mutable array of per-dimension grid sizes (modified in place and returned)
+ * @param maxTotal - Maximum total lattice sites (product of all dimensions)
+ * @param minPerDim - Minimum allowed size per dimension (default 2)
+ * @returns The same `grid` array, reduced to fit
+ *
+ * @example
+ * ```ts
+ * reduceGridToFit([128, 128, 128], 262144) // → [64, 64, 64]
+ * ```
+ */
+export function reduceGridToFit(grid: number[], maxTotal: number, minPerDim = 2): number[] {
+  while (grid.reduce((a, b) => a * b, 1) > maxTotal) {
+    let maxIdx = 0
+    for (let i = 1; i < grid.length; i++) {
+      if (grid[i]! > grid[maxIdx]!) maxIdx = i
+    }
+    if (grid[maxIdx]! <= minPerDim) break
+    grid[maxIdx] = Math.floor(grid[maxIdx]! / 2)
+  }
+  return grid
+}
+
+/**
  * Convert a linear index to N-D coordinates (row-major, last dim varies fastest).
  *
  * @param flatIdx - Linear index

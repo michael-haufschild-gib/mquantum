@@ -34,17 +34,38 @@ struct GridParams {
 `
 
 /**
- * Compute shader bind group layout block
- * Uses a dedicated layout for compute:
+ * Compute shader bind group layout block.
+ *
+ * Base bindings (always included):
  * - Group 0, Binding 0: SchroedingerUniforms
  * - Group 0, Binding 1: BasisVectors
  * - Group 0, Binding 2: GridParams
  * - Group 0, Binding 3: Output texture (storage)
+ *
+ * Optional bindings:
+ * - Binding 4: OpenQuantumUniforms (when `includeOpenQuantum` is true)
+ * - Binding 5: HydrogenBasisUniforms (when `includeHydrogenBasis` is true)
+ *
+ * @param opts.storageFormat - Texture format: 'r16float' (density-only) or 'rgba16float' (phase-capable)
+ * @param opts.includeOpenQuantum - Include open quantum density matrix uniforms at binding 4
+ * @param opts.includeHydrogenBasis - Include hydrogen basis quantum numbers at binding 5
  */
-export function generateDensityGridBindingsBlock(
-  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
-): string {
-  return /* wgsl */ `
+export function generateDensityGridBindingsBlock(opts: {
+  storageFormat?: 'r16float' | 'rgba16float'
+  includeOpenQuantum?: boolean
+  includeHydrogenBasis?: boolean
+} = {}): string {
+  const {
+    storageFormat = 'rgba16float',
+    includeOpenQuantum = false,
+    includeHydrogenBasis = false,
+  } = opts
+
+  if (includeHydrogenBasis && !includeOpenQuantum) {
+    throw new Error('includeHydrogenBasis requires includeOpenQuantum')
+  }
+
+  let wgsl = /* wgsl */ `
 // ============================================
 // Compute Shader Bind Groups
 // ============================================
@@ -55,66 +76,28 @@ export function generateDensityGridBindingsBlock(
 @group(0) @binding(2) var<uniform> gridParams: GridParams;
 
 // Output texture (write-only)
-// r16float is used for density-only mode, rgba16float for phase-capable mode.
 @group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
 `
+
+  if (includeOpenQuantum) {
+    wgsl += /* wgsl */ `
+// Open quantum density matrix uniforms
+@group(0) @binding(4) var<uniform> oq: OpenQuantumUniforms;
+`
+  }
+
+  if (includeHydrogenBasis) {
+    wgsl += /* wgsl */ `
+// Hydrogen per-basis quantum numbers
+@group(0) @binding(5) var<uniform> hydrogenBasis: HydrogenBasisUniforms;
+`
+  }
+
+  return wgsl
 }
 
 // Backward-compatible default bindings block (rgba16float payload)
 export const densityGridBindingsBlock = generateDensityGridBindingsBlock()
-
-/**
- * Extended bindings block that includes the open quantum uniform buffer
- * at group 0, binding 4.
- */
-export function generateDensityGridBindingsWithOpenQuantumBlock(
-  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
-): string {
-  return /* wgsl */ `
-// ============================================
-// Compute Shader Bind Groups (Open Quantum)
-// ============================================
-
-// Uniform bindings (read-only)
-@group(0) @binding(0) var<uniform> schroedinger: SchroedingerUniforms;
-@group(0) @binding(1) var<uniform> basis: BasisVectors;
-@group(0) @binding(2) var<uniform> gridParams: GridParams;
-
-// Output texture (write-only)
-@group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
-
-// Open quantum density matrix uniforms
-@group(0) @binding(4) var<uniform> oq: OpenQuantumUniforms;
-`
-}
-
-/**
- * Extended bindings block that includes both the open quantum and
- * hydrogen basis uniform buffers (bindings 4 and 5).
- */
-export function generateDensityGridBindingsWithHydrogenBasisBlock(
-  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
-): string {
-  return /* wgsl */ `
-// ============================================
-// Compute Shader Bind Groups (Open Quantum + Hydrogen Basis)
-// ============================================
-
-// Uniform bindings (read-only)
-@group(0) @binding(0) var<uniform> schroedinger: SchroedingerUniforms;
-@group(0) @binding(1) var<uniform> basis: BasisVectors;
-@group(0) @binding(2) var<uniform> gridParams: GridParams;
-
-// Output texture (write-only)
-@group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
-
-// Open quantum density matrix uniforms
-@group(0) @binding(4) var<uniform> oq: OpenQuantumUniforms;
-
-// Hydrogen per-basis quantum numbers
-@group(0) @binding(5) var<uniform> hydrogenBasis: HydrogenBasisUniforms;
-`
-}
 
 /**
  * Main compute shader entry point

@@ -24,6 +24,7 @@ import { logger } from '@/lib/logger'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -189,7 +190,6 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       totalSites: this.totalSites,
       label: 'dirac',
       getMetadata: async () => {
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const diracConfig = useExtendedObjectStore.getState().schroedinger.dirac
         return {
           quantumMode: 'diracEquation',

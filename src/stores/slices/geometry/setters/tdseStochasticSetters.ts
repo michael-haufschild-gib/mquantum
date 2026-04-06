@@ -10,7 +10,12 @@
 import { MAX_STOCHASTIC_SITES } from '@/lib/physics/stochastic/localizationKernel'
 
 import type { SchroedingerSliceActions } from '../types'
-import type { SetterContext } from './sliceSetterUtils'
+import {
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 type StochasticActions = Pick<
   SchroedingerSliceActions,
@@ -31,105 +36,24 @@ type StochasticActions = Pick<
  * @param ctx - Shared setter context with set/get and validation helpers
  */
 export function createTdseStochasticSetters(ctx: SetterContext): StochasticActions {
-  const { setWithVersion, isFinite, warnNonFinite } = ctx
+  const D = 'tdse' as const
 
   return {
-    setTdseStochasticEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stochasticEnabled: enabled },
-        },
-      }))
-    },
-    setTdseStochasticGamma: (gamma) => {
-      if (!isFinite(gamma)) {
-        warnNonFinite('tdse.stochasticGamma', gamma)
-        return
-      }
-      const clamped = Math.max(0, Math.min(10, gamma))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stochasticGamma: clamped },
-        },
-      }))
-    },
-    setTdseStochasticSigma: (sigma) => {
-      if (!isFinite(sigma)) {
-        warnNonFinite('tdse.stochasticSigma', sigma)
-        return
-      }
-      const clamped = Math.max(0.5, Math.min(5.0, sigma))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stochasticSigma: clamped },
-        },
-      }))
-    },
-    setTdseStochasticNumSites: (numSites) => {
-      if (!isFinite(numSites)) {
-        warnNonFinite('tdse.stochasticNumSites', numSites)
-        return
-      }
-      const clamped = Math.max(1, Math.min(MAX_STOCHASTIC_SITES, Math.floor(numSites)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stochasticNumSites: clamped },
-        },
-      }))
-    },
-    setTdseStochasticSeed: (seed) => {
-      if (!isFinite(seed)) {
-        warnNonFinite('tdse.stochasticSeed', seed)
-        return
-      }
-      const clamped = Math.max(0, Math.min(999999, Math.floor(seed)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stochasticSeed: clamped },
-        },
-      }))
-    },
-    setTdseBranchingEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, branchingEnabled: enabled },
-        },
-      }))
-    },
-    setTdseBranchPlanePosition: (position) => {
-      if (!isFinite(position)) {
-        warnNonFinite('tdse.branchPlanePosition', position)
-        return
-      }
-      const clamped = Math.max(-1.0, Math.min(1.0, position))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, branchPlanePosition: clamped },
-        },
-      }))
-    },
-    setTdseBranchColorA: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, branchColorA: color },
-        },
-      }))
-    },
-    setTdseBranchColorB: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, branchColorB: color },
-        },
-      }))
-    },
+    setTdseStochasticEnabled: nestedValueSetter(ctx, D, 'stochasticEnabled'),
+    setTdseStochasticGamma: nestedClampedSetter(ctx, D, 'stochasticGamma', 0, 10),
+    setTdseStochasticSigma: nestedClampedSetter(ctx, D, 'stochasticSigma', 0.5, 5.0),
+    setTdseStochasticNumSites: nestedIntSetter(
+      ctx,
+      D,
+      'stochasticNumSites',
+      1,
+      MAX_STOCHASTIC_SITES,
+      'floor'
+    ),
+    setTdseStochasticSeed: nestedIntSetter(ctx, D, 'stochasticSeed', 0, 999999, 'floor'),
+    setTdseBranchingEnabled: nestedValueSetter(ctx, D, 'branchingEnabled'),
+    setTdseBranchPlanePosition: nestedClampedSetter(ctx, D, 'branchPlanePosition', -1.0, 1.0),
+    setTdseBranchColorA: nestedValueSetter(ctx, D, 'branchColorA'),
+    setTdseBranchColorB: nestedValueSetter(ctx, D, 'branchColorB'),
   }
 }

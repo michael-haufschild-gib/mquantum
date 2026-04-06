@@ -11,7 +11,6 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/emission.wgsl
  */
 
-import type { ColorAlgorithm } from '../../types'
 
 /**
  * Generate emission pre-block WGSL with only the helpers needed by the active algorithm.
@@ -25,7 +24,7 @@ import type { ColorAlgorithm } from '../../types'
  * - blackbody(): referenced in main.wgsl.ts / main2D.wgsl.ts behind
  *   FEATURE_PHASE_MATERIALITY guards (WGSL requires symbol resolution in dead branches)
  */
-export function generateEmissionPreBlock(colorAlgorithm: ColorAlgorithm, is2D: boolean): string {
+export function generateEmissionPreBlock(colorAlgorithm: number, is2D: boolean): string {
   const parts: string[] = [
     /* wgsl */ `
 // ============================================
@@ -106,6 +105,51 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   return fract(clamp(curved * cycles + offset, 0.0, 0.999));
 }`)
   }
+
+  // applyPhaseMateriality(): shared plasma/smoke color modulation for all render modes.
+  // Depends on blackbody() (above). Placed before applyHDREmissionGlow since both are
+  // called sequentially in the same main blocks.
+  parts.push(/* wgsl */ `
+// Phase materiality: modulate surface color based on quantum phase.
+// Positive phase → plasma (blackbody), negative phase → cool smoke.
+fn applyPhaseMateriality(baseColor: vec3f, phase: f32, s: f32, u: SchroedingerUniforms) -> vec3f {
+  let phaseMod = fract((phase + PI) / TAU);
+  let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
+  let smokeWeight = 1.0 - plasmaWeight;
+  let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
+  let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
+  let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(baseColor), 0.1);
+  return mix(baseColor,
+    plasmaColor * plasmaWeight + smokeColor * smokeWeight,
+    u.phaseMaterialityStrength);
+}`)
+
+  // applyHDREmissionGlow(): shared post-lighting emission glow for all render modes.
+  // Placed in pre-block (always included) so both 2D main blocks and 3D isosurface/
+  // volumetric can call it. Depends on rgb2hsl/hsl2rgb from the HSL block (composed earlier).
+  parts.push(/* wgsl */ `
+// HDR emission glow with optional color shift via HSL.
+// Adds emissive contribution to already-lit color based on log-density threshold.
+fn applyHDREmissionGlow(col: vec3f, baseColor: vec3f, s: f32, u: SchroedingerUniforms) -> vec3f {
+  if (u.emissionIntensity <= 0.0) { return col; }
+  let emNorm = clamp((s + 8.0) / 8.0, 0.0, 1.0);
+  if (emNorm <= u.emissionThreshold) { return col; }
+  var emFactor = (emNorm - u.emissionThreshold) / (1.0 - u.emissionThreshold);
+  emFactor = emFactor * emFactor;
+  var emColor = baseColor;
+  if (abs(u.emissionColorShift) > 0.01) {
+    var hsl = rgb2hsl(emColor);
+    if (u.emissionColorShift > 0.0) {
+      hsl.x = mix(hsl.x, 0.08, u.emissionColorShift * 0.5);
+      hsl.y = mix(hsl.y, 1.0, u.emissionColorShift * 0.3);
+    } else {
+      hsl.x = mix(hsl.x, 0.6, -u.emissionColorShift * 0.5);
+      hsl.z = mix(hsl.z, 0.9, -u.emissionColorShift * 0.3);
+    }
+    emColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
+  }
+  return col + emColor * u.emissionIntensity * emFactor;
+}`)
 
   return parts.join('\n')
 }
@@ -474,7 +518,7 @@ const ALGO_BRANCH: Record<number, string> = {
     col = hsl2rgb(hue, saturation, lightness);`,
 }
 
-/** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
+/** Human-readable names for color algorithms (indexed by number value) */
 export { ALGO_BRANCH }
 export { COLOR_ALG_NAMES } from './emissionConstants'
 
@@ -482,7 +526,7 @@ export { COLOR_ALG_NAMES } from './emissionConstants'
  * Generate the computeBaseColor() WGSL function for a specific color algorithm.
  * Emits only that algorithm's branch (no if/else chain) for compile-time specialization.
  */
-export function generateComputeBaseColor(colorAlgorithm: ColorAlgorithm): string {
+export function generateComputeBaseColor(colorAlgorithm: number): string {
   // Only algorithms 3 (Phase) and 4 (Mixed) use baseHSL from material color
   const needsBaseHSL = colorAlgorithm === 3 || colorAlgorithm === 4
   const header = /* wgsl */ `
@@ -513,18 +557,9 @@ export const emissionPostBlock = /* wgsl */ `
 fn computeEmission(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   var surfaceColor = computeBaseColor(rho, s, phase, pos, uniforms);
 
-  // Phase materiality: matter (plasma) vs anti-matter (smoke)
+  // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
-    let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
-    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-    let smokeWeight = 1.0 - plasmaWeight;
-    let str = uniforms.phaseMaterialityStrength;
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
-    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
-    surfaceColor = mix(surfaceColor,
-      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-      str);
+    surfaceColor = applyPhaseMateriality(surfaceColor, phase, s, uniforms);
   }
 
   var col = surfaceColor * lighting.ambientColor * lighting.ambientIntensity;
@@ -587,18 +622,9 @@ fn computeEmissionLit(
 
   var surfaceColor = computeBaseColor(rho, s, phase, p, uniforms);
 
-  // Phase materiality: matter (plasma) vs anti-matter (smoke)
+  // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
-    let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
-    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-    let smokeWeight = 1.0 - plasmaWeight;
-    let str = uniforms.phaseMaterialityStrength;
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
-    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
-    surfaceColor = mix(surfaceColor,
-      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-      str);
+    surfaceColor = applyPhaseMateriality(surfaceColor, phase, s, uniforms);
   }
 
   // Start with ambient (Lambertian — no PBR metallic suppression for volumetric)
@@ -680,35 +706,8 @@ fn computeEmissionLit(
     }
   }
 
-  // Use pre-computed log-density (passed in as parameter, saves log() call)
-  let cachedS = s;
-
-  // HDR Emission Glow
-  if (uniforms.emissionIntensity > 0.0) {
-    let normalizedRho = clamp((cachedS + 8.0) / 8.0, 0.0, 1.0);
-
-    if (normalizedRho > uniforms.emissionThreshold) {
-      var emissionFactor = (normalizedRho - uniforms.emissionThreshold) / (1.0 - uniforms.emissionThreshold);
-      // PERF: Use multiplication instead of pow(x, 2.0)
-      emissionFactor = emissionFactor * emissionFactor;
-
-      var emissionColor = surfaceColor;
-
-      if (abs(uniforms.emissionColorShift) > 0.01) {
-        var hsl = rgb2hsl(emissionColor);
-        if (uniforms.emissionColorShift > 0.0) {
-          hsl.x = mix(hsl.x, 0.08, uniforms.emissionColorShift * 0.5);
-          hsl.y = mix(hsl.y, 1.0, uniforms.emissionColorShift * 0.3);
-        } else {
-          hsl.x = mix(hsl.x, 0.6, -uniforms.emissionColorShift * 0.5);
-          hsl.z = mix(hsl.z, 0.9, -uniforms.emissionColorShift * 0.3);
-        }
-        emissionColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
-      }
-
-      col += emissionColor * uniforms.emissionIntensity * emissionFactor;
-    }
-  }
+  // HDR Emission Glow (shared helper)
+  col = applyHDREmissionGlow(col, surfaceColor, s, uniforms);
 
   return col;
 }

@@ -10,9 +10,8 @@ import React, { useCallback, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { AXIS_LABELS } from '@/constants/dimension'
 import { parseExpression } from '@/lib/physics/expressionParser'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 
 const EXPRESSION_PRESETS = [
   { label: 'Harmonic', expr: '0.5 * (x^2 + y^2)' },

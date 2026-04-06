@@ -1,32 +1,12 @@
 /**
- * WebGPU Rendering Backend
+ * WebGPU Rendering Backend — React entry points.
  *
- * Complete WebGPU rendering infrastructure including:
- * - Device management and resource pooling
- * - Render graph for pass orchestration
- * - WGSL shader composition system
- * - Post-processing passes
- * - Object renderers
+ * Import core, passes, renderers, and shaders directly from their
+ * own modules (e.g. `@/rendering/webgpu/core/WebGPUDevice`).
  *
  * @module rendering/webgpu
  */
 
-// Core infrastructure
-export * from './core'
-
-// Render graph
-export * from './graph'
-
-// Render passes
-export * from './passes'
-
-// Object renderers
-export * from './renderers'
-
-// Shaders
-export * from './shaders'
-
-// React Components
 export type { WebGPUCanvasProps } from './WebGPUCanvas'
 export { WebGPUCanvas } from './WebGPUCanvas'
 export type { WebGPUCanvasContext } from './WebGPUContext'

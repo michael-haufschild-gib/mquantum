@@ -12,7 +12,6 @@
  */
 
 import type { WGSLShaderConfig } from '../shared/compose-helpers'
-import type { ColorAlgorithm } from '../types'
 import {
   generateMainBlockIsosurface,
   generateMainBlockIsosurfaceTemporal,
@@ -45,7 +44,7 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   /** Number of HO superposition terms (1-8) */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color algorithm specialization (defaults to Mixed) */
-  colorAlgorithm?: ColorAlgorithm
+  colorAlgorithm?: number
   /** Compile-time specialization for phase materiality branching. */
   phaseMateriality?: boolean
   /** Compile-time specialization for interference branching. */

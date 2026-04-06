@@ -10,18 +10,23 @@
 
 import type { TdseDisorderDistribution, TdseFieldView } from '@/lib/geometry/extended/tdse'
 
-import type { SetterContext } from './sliceSetterUtils'
+import {
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 /**
  * Creates UI, diagnostic, absorber, and disorder setters for the TDSE slice.
  * @param ctx - Shared setter context with set/get and validation helpers
  */
 export function createTdseUiSetters(ctx: SetterContext) {
-  const { setWithVersion, isFinite, warnNonFinite } = ctx
+  const D = 'tdse' as const
 
   return {
     setTdseDisorderSeed: (seed: number) => {
-      setWithVersion((state) => ({
+      ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, disorderSeed: Math.floor(Math.max(0, seed)) },
@@ -29,123 +34,36 @@ export function createTdseUiSetters(ctx: SetterContext) {
       }))
     },
     setTdseDisorderDistribution: (distribution: TdseDisorderDistribution) => {
-      setWithVersion((state) => ({
+      ctx.setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, disorderDistribution: distribution },
         },
       }))
     },
-    setTdseAbsorberEnabled: (enabled: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setTdseAbsorberWidth: (width: number) => {
-      if (!isFinite(width)) {
-        warnNonFinite('tdse.absorberWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberWidth: clamped },
-        },
-      }))
-    },
-    setTdsePmlTargetReflection: (r: number) => {
-      if (!isFinite(r)) {
-        warnNonFinite('tdse.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, pmlTargetReflection: clamped },
-        },
-      }))
-    },
-    setTdseFieldView: (view: TdseFieldView) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, fieldView: view },
-        },
-      }))
-    },
-    setTdseAutoScale: (autoScale: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoScale },
-        },
-      }))
-    },
-    setTdseShowPotential: (showPotential: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, showPotential },
-        },
-      }))
-    },
-    setTdseAutoLoop: (autoLoop: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoLoop },
-        },
-      }))
-    },
-    setTdseDiagnosticsEnabled: (enabled: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDiagnosticsInterval: (interval: number) => {
-      if (!isFinite(interval)) {
-        warnNonFinite('tdse.diagnosticsInterval', interval)
-        return
-      }
-      const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setTdseObservablesEnabled: (enabled: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, observablesEnabled: enabled },
-        },
-      }))
-    },
-    setTdseImaginaryTimeEnabled: (enabled: boolean) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, imaginaryTimeEnabled: enabled },
-        },
-      }))
-    },
-    setTdseCustomPotentialExpression: (expression: string) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, customPotentialExpression: expression },
-        },
-      }))
-    },
+    setTdseAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled') as (
+      enabled: boolean
+    ) => void,
+    setTdseAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setTdsePmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
+    setTdseFieldView: nestedValueSetter(ctx, D, 'fieldView') as (view: TdseFieldView) => void,
+    setTdseAutoScale: nestedValueSetter(ctx, D, 'autoScale') as (autoScale: boolean) => void,
+    setTdseShowPotential: nestedValueSetter(ctx, D, 'showPotential') as (
+      showPotential: boolean
+    ) => void,
+    setTdseAutoLoop: nestedValueSetter(ctx, D, 'autoLoop') as (autoLoop: boolean) => void,
+    setTdseDiagnosticsEnabled: nestedValueSetter(ctx, D, 'diagnosticsEnabled') as (
+      enabled: boolean
+    ) => void,
+    setTdseDiagnosticsInterval: nestedIntSetter(ctx, D, 'diagnosticsInterval', 1, 60, 'floor'),
+    setTdseObservablesEnabled: nestedValueSetter(ctx, D, 'observablesEnabled') as (
+      enabled: boolean
+    ) => void,
+    setTdseImaginaryTimeEnabled: nestedValueSetter(ctx, D, 'imaginaryTimeEnabled') as (
+      enabled: boolean
+    ) => void,
+    setTdseCustomPotentialExpression: nestedValueSetter(ctx, D, 'customPotentialExpression') as (
+      expression: string
+    ) => void,
   }
 }

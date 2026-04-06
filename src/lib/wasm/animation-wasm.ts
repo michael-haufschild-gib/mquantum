@@ -206,7 +206,6 @@ export function multiplyMatrixVectorWasm(
     return null
   }
 
-  // Input validation
   if (!Number.isInteger(dimension) || dimension < 1) {
     return null
   }
@@ -246,7 +245,6 @@ export function multiplyMatricesWasm(
     return null
   }
 
-  // Input validation
   if (!Number.isInteger(dimension) || dimension < 1) {
     return null
   }

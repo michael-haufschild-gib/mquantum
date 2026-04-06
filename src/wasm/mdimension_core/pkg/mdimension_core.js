@@ -88,6 +88,13 @@ function passArray32ToWasm0(arg, malloc) {
     return ptr;
 }
 
+function passArrayF32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getFloat32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
 function passArrayF64ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 8, 8) >>> 0;
     getFloat64ArrayMemory0().set(arg, ptr / 8);
@@ -178,6 +185,45 @@ if (!('encodeInto' in cachedTextEncoder)) {
 let WASM_VECTOR_LEN = 0;
 
 /**
+ * Complex matrix multiply: C = A × B for N×N matrices.
+ *
+ * # Arguments
+ * * `a_re`, `a_im` - Left matrix (N×N, row-major)
+ * * `b_re`, `b_im` - Right matrix (N×N, row-major)
+ * * `n` - Matrix dimension
+ *
+ * # Returns
+ * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
+ * @param {Float64Array} a_re
+ * @param {Float64Array} a_im
+ * @param {Float64Array} b_re
+ * @param {Float64Array} b_im
+ * @param {number} n
+ * @returns {Float64Array}
+ */
+export function complex_mat_mul_wasm(a_re, a_im, b_re, b_im, n) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(b_re, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArrayF64ToWasm0(b_im, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        wasm.complex_mat_mul_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, n);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v5 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v5;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Composes multiple rotations from flattened plane indices and angles.
  *
  * # Arguments
@@ -246,6 +292,164 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
 }
 
 /**
+ * Compute the joint reduced density matrix for a set of dimensions.
+ *
+ * # Arguments
+ * * `psi_re` - Real part of wavefunction (Float32Array)
+ * * `psi_im` - Imaginary part of wavefunction (Float32Array)
+ * * `grid_size` - Grid dimensions
+ * * `kept_dims` - Indices of dimensions to keep (sorted ascending)
+ *
+ * # Returns
+ * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = Π kept dims`.
+ * Empty on invalid input or `M > 1024`.
+ * @param {Float32Array} psi_re
+ * @param {Float32Array} psi_im
+ * @param {Uint32Array} grid_size
+ * @param {Uint32Array} kept_dims
+ * @returns {Float64Array}
+ */
+export function compute_joint_rdm_wasm(psi_re, psi_im, grid_size, kept_dims) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray32ToWasm0(kept_dims, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        wasm.compute_joint_rdm_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v5 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v5;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Compute level spacing statistics from energy eigenvalues.
+ *
+ * # Arguments
+ * * `energies` - Eigenvalue array
+ *
+ * # Returns
+ * Packed `Float64Array`: `[spacings..., brody_beta, mean_spacing, classification_code]`
+ * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
+ * @param {Float64Array} energies
+ * @returns {Float64Array}
+ */
+export function compute_level_spacing_wasm(energies) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(energies, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.compute_level_spacing_wasm(retptr, ptr0, len0);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v2 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v2;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Compute the reduced density matrix for a single dimension by tracing out
+ * all other dimensions.
+ *
+ * # Arguments
+ * * `psi_re` - Real part of wavefunction (Float32Array from GPU readback)
+ * * `psi_im` - Imaginary part of wavefunction (Float32Array)
+ * * `grid_size` - Grid dimensions `[M_0, M_1, ..., M_{N-1}]`
+ * * `dim_index` - Which dimension to keep (0-based)
+ *
+ * # Returns
+ * Packed `Float64Array`: `[re_flat(M*M), im_flat(M*M)]` where `M = grid_size[dim_index]`.
+ * Empty on invalid input.
+ * @param {Float32Array} psi_re
+ * @param {Float32Array} psi_im
+ * @param {Uint32Array} grid_size
+ * @param {number} dim_index
+ * @returns {Float64Array}
+ */
+export function compute_rdm_wasm(psi_re, psi_im, grid_size, dim_index) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        wasm.compute_rdm_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, dim_index);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v4 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v4;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Compute scar correlation between eigenstate density and classical orbits.
+ *
+ * # Arguments
+ * * `density_re` - Eigenstate ψ_re on the lattice (f32 from GPU readback)
+ * * `density_im` - Eigenstate ψ_im on the lattice (f32)
+ * * `grid_sizes` - Per-dimension grid sizes
+ * * `spacings` - Per-dimension lattice spacings (f64)
+ * * `orbit_points_flat` - Flattened orbit positions `[x0_d0, x0_d1, ..., x1_d0, ...]` (f64)
+ * * `orbit_lengths` - Number of points per orbit
+ * * `sigma` - Gaussian tube width ε
+ * * `dim` - Number of spatial dimensions
+ *
+ * # Returns
+ * Packed `Float64Array`: `[corr_0, ..., corr_N, max, mean, orbit_correlation, strongest_idx]`
+ * @param {Float32Array} density_re
+ * @param {Float32Array} density_im
+ * @param {Uint32Array} grid_sizes
+ * @param {Float64Array} spacings
+ * @param {Float64Array} orbit_points_flat
+ * @param {Uint32Array} orbit_lengths
+ * @param {number} sigma
+ * @param {number} dim
+ * @returns {Float64Array}
+ */
+export function compute_scar_correlation_wasm(density_re, density_im, grid_sizes, spacings, orbit_points_flat, orbit_lengths, sigma, dim) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(density_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(density_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(grid_sizes, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArrayF64ToWasm0(spacings, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        const ptr4 = passArrayF64ToWasm0(orbit_points_flat, wasm.__wbindgen_export);
+        const len4 = WASM_VECTOR_LEN;
+        const ptr5 = passArray32ToWasm0(orbit_lengths, wasm.__wbindgen_export);
+        const len5 = WASM_VECTOR_LEN;
+        wasm.compute_scar_correlation_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, sigma, dim);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v7 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v7;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Returns the spinor size for a given spatial dimension.
  * @param {number} spatial_dim
  * @returns {number}
@@ -278,6 +482,70 @@ export function dot_product_wasm(a, b) {
 }
 
 /**
+ * In-place 1D forward FFT on interleaved complex data.
+ *
+ * Convention: `X[k] = Σ x[n] * exp(-i * 2π * k * n / N)`.
+ *
+ * # Arguments
+ * * `data` - Interleaved `[re0, im0, re1, im1, ...]` (length 2*n)
+ * * `n` - Number of complex elements (must be a power of 2, >= 2)
+ *
+ * # Returns
+ * Transformed data as a new `Float64Array`, or empty on invalid input
+ * @param {Float64Array} data
+ * @param {number} n
+ * @returns {Float64Array}
+ */
+export function fft_1d_wasm(data, n) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.fft_1d_wasm(retptr, ptr0, len0, n);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v2 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v2;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * N-dimensional forward FFT on interleaved complex data.
+ *
+ * Applies 1D forward FFT along each axis sequentially.
+ *
+ * # Arguments
+ * * `data` - Interleaved complex data (length `2 * product(grid_size)`)
+ * * `grid_size` - Grid sizes per dimension (each must be a power of 2, >= 2)
+ *
+ * # Returns
+ * Transformed data as a new `Float64Array`, or empty on invalid input
+ * @param {Float64Array} data
+ * @param {Uint32Array} grid_size
+ * @returns {Float64Array}
+ */
+export function fft_nd_wasm(data, grid_size) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.fft_nd_wasm(retptr, ptr0, len0, ptr1, len1);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v3 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v3;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Generates Dirac gamma matrices for N spatial dimensions.
  *
  * # Arguments
@@ -305,6 +573,103 @@ export function generate_dirac_matrices_wasm(spatial_dim) {
 }
 
 /**
+ * Hermitian eigendecomposition via Jacobi iteration.
+ *
+ * # Arguments
+ * * `re` - Real part of Hermitian matrix (row-major, n×n)
+ * * `im` - Imaginary part of Hermitian matrix (row-major, n×n)
+ * * `n` - Matrix dimension
+ *
+ * # Returns
+ * Eigenvalues sorted descending as `Float64Array`
+ * @param {Float64Array} re
+ * @param {Float64Array} im
+ * @param {number} n
+ * @returns {Float64Array}
+ */
+export function hermitian_eigenvalues_wasm(re, im, n) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.hermitian_eigenvalues_wasm(retptr, ptr0, len0, ptr1, len1, n);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v3 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v3;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * In-place 1D inverse FFT with 1/N normalization.
+ *
+ * Convention: `x[n] = (1/N) Σ X[k] * exp(+i * 2π * k * n / N)`.
+ *
+ * # Arguments
+ * * `data` - Interleaved `[re0, im0, re1, im1, ...]` (length 2*n)
+ * * `n` - Number of complex elements (must be a power of 2)
+ *
+ * # Returns
+ * Transformed data as a new `Float64Array`, or empty on invalid input
+ * @param {Float64Array} data
+ * @param {number} n
+ * @returns {Float64Array}
+ */
+export function ifft_1d_wasm(data, n) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.ifft_1d_wasm(retptr, ptr0, len0, n);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v2 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v2;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * N-dimensional inverse FFT on interleaved complex data.
+ *
+ * Applies 1D inverse FFT along each axis sequentially.
+ *
+ * # Arguments
+ * * `data` - Interleaved complex data (length `2 * product(grid_size)`)
+ * * `grid_size` - Grid sizes per dimension (each must be a power of 2, >= 2)
+ *
+ * # Returns
+ * Transformed data as a new `Float64Array`, or empty on invalid input
+ * @param {Float64Array} data
+ * @param {Uint32Array} grid_size
+ * @returns {Float64Array}
+ */
+export function ifft_nd_wasm(data, grid_size) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(data, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.ifft_nd_wasm(retptr, ptr0, len0, ptr1, len1);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v3 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v3;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Computes the magnitude (length) of a vector
  *
  * # Arguments
@@ -320,6 +685,41 @@ export function magnitude_wasm(v) {
     const len0 = WASM_VECTOR_LEN;
     const ret = wasm.magnitude_wasm(ptr0, len0);
     return ret;
+}
+
+/**
+ * Matrix exponential via Padé(13,13) with scaling-and-squaring.
+ *
+ * Computes exp(A) for an N×N complex matrix stored as separate real/imag arrays.
+ *
+ * # Arguments
+ * * `a_re` - Real part of input matrix (N×N, row-major)
+ * * `a_im` - Imaginary part of input matrix (N×N, row-major)
+ * * `n` - Matrix dimension
+ *
+ * # Returns
+ * Packed `Float64Array`: `[re_flat(N*N), im_flat(N*N)]`
+ * @param {Float64Array} a_re
+ * @param {Float64Array} a_im
+ * @param {number} n
+ * @returns {Float64Array}
+ */
+export function matrix_exponential_pade_wasm(a_re, a_im, n) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF64ToWasm0(a_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(a_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.matrix_exponential_pade_wasm(retptr, ptr0, len0, ptr1, len1, n);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v3 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v3;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
 }
 
 /**
@@ -483,6 +883,24 @@ export function subtract_vectors_wasm(a, b) {
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
+}
+
+/**
+ * Von Neumann entropy from eigenvalues: S = -Σ λ_k ln(λ_k).
+ *
+ * # Arguments
+ * * `eigenvalues` - Eigenvalues of a density matrix
+ *
+ * # Returns
+ * Entropy value (natural log, nats), clamped to >= 0
+ * @param {Float64Array} eigenvalues
+ * @returns {number}
+ */
+export function von_neumann_entropy_wasm(eigenvalues) {
+    const ptr0 = passArrayF64ToWasm0(eigenvalues, wasm.__wbindgen_export);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.von_neumann_entropy_wasm(ptr0, len0);
+    return ret;
 }
 
 const EXPECTED_RESPONSE_TYPES = new Set(['basic', 'cors', 'default']);

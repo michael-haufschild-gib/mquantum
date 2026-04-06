@@ -16,11 +16,10 @@ import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-/** Analytical modes have no time evolution — PML is irrelevant. */
-const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
 
 /**
  * Selects the shared absorber state and setters.
@@ -35,7 +34,7 @@ function useAbsorber(objectType: string) {
       const cfg = s.schroedinger
       const qm = cfg.quantumMode
 
-      const isStatic = objectType !== 'pauliSpinor' && STATIC_MODES.has(qm)
+      const isStatic = objectType !== 'pauliSpinor' && isAnalyticQuantumType(qm)
 
       return {
         disabled: isStatic,

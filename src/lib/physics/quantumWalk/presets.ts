@@ -8,6 +8,7 @@
  */
 
 import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 /** Subset of QuantumWalkConfig fields that a preset can override. */
 export type QuantumWalkPresetOverride = Partial<
@@ -15,12 +16,7 @@ export type QuantumWalkPresetOverride = Partial<
 >
 
 /** A named quantum walk scenario preset. */
-export interface QuantumWalkScenarioPreset {
-  id: string
-  name: string
-  description: string
-  overrides: QuantumWalkPresetOverride
-}
+export type QuantumWalkScenarioPreset = ScenarioPreset<QuantumWalkPresetOverride>
 
 export const QUANTUM_WALK_PRESETS: QuantumWalkScenarioPreset[] = [
   {

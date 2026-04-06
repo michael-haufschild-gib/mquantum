@@ -14,6 +14,7 @@
 import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 import { logger } from '@/lib/logger'
 import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -164,7 +165,6 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       totalSites,
       label: 'qw',
       getMetadata: async () => {
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const qwConfig = useExtendedObjectStore.getState().schroedinger.quantumWalk
         return {
           quantumMode: 'quantumWalk',

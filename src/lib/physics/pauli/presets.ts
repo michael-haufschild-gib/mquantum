@@ -7,14 +7,10 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 /** A curated Pauli spinor scenario with dimension-agnostic config overrides. */
-export interface PauliScenarioPreset {
-  id: string
-  name: string
-  description: string
-  overrides: Partial<PauliConfig>
-}
+export type PauliScenarioPreset = ScenarioPreset<Partial<PauliConfig>>
 
 export const PAULI_SCENARIO_PRESETS: PauliScenarioPreset[] = [
   {

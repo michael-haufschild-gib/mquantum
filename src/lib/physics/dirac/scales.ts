@@ -71,6 +71,3 @@ export function maxStableDt(spacing: number[], c: number): number {
   return minSpacing / (c * Math.sqrt(n))
 }
 
-// Re-export spinorSize from the canonical location for consumers
-// that import from this module.
-export { spinorSize } from './cliffordAlgebraFallback'

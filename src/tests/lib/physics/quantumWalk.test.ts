@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
+
 // ── CPU reference implementations matching the WGSL shaders ──
 
 /** Apply Grover coin to all sites (CPU reference). */
@@ -109,35 +111,15 @@ function applyShift(
 ): void {
   const numCoinStates = 2 * latticeDim
 
-  // Compute strides (row-major)
-  const strides = new Array<number>(latticeDim)
-  strides[latticeDim - 1] = 1
-  for (let d = latticeDim - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-
-  // Decompose linear index to N-D coords
-  function linearToND(idx: number): number[] {
-    const coords = new Array<number>(latticeDim)
-    let remaining = idx
-    for (let d = latticeDim - 1; d >= 0; d--) {
-      coords[d] = remaining % gridSize[d]!
-      remaining = Math.floor(remaining / gridSize[d]!)
-    }
-    return coords
-  }
+  const strides = computeStrides(gridSize)
 
   function ndToLinear(coords: number[]): number {
-    let idx = 0
-    for (let d = 0; d < latticeDim; d++) {
-      idx += coords[d]! * strides[d]!
-    }
-    return idx
+    return ndToLinearIdx(coords, strides)
   }
 
   for (let destSite = 0; destSite < totalSites; destSite++) {
     const destBase = destSite * numCoinStates * 2
-    const destCoords = linearToND(destSite)
+    const destCoords = linearToNDCoords(destSite, gridSize)
 
     for (let cs = 0; cs < numCoinStates; cs++) {
       const dim = Math.floor(cs / 2)

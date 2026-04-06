@@ -20,6 +20,8 @@
 
 import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette/types'
 
+import { generateBayerJitterSection, getRayDirSource } from './temporalJitter'
+
 // Phase-dependent color algorithms that require direct wavefunction sampling
 // (cannot use pre-computed density grid because they need complex phase information).
 export const PHASE_COLOR_ALGS = [
@@ -323,53 +325,8 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     gridOnly = false,
   } = config
 
-  // Bayer jitter section - applies sub-pixel offset for quarter-res rendering
-  // NOTE: Unlike the incorrect previous implementation that DISCARDED pixels,
-  // this correctly JITTERS the ray direction to sample different sub-pixels.
-  // ALL quarter-res pixels render - no discard based on Bayer pattern!
-  const bayerJitterSection = bayerJitter
-    ? `
-  // ============================================
-  // Temporal Sub-Pixel Jitter
-  // ============================================
-  // In quarter-res mode, each pixel covers a 2×2 block of full-res pixels.
-  // The Bayer offset determines which sub-pixel within the block we sample.
-  // Over 4 frames (with cycling offsets), all sub-pixels are covered.
-  //
-  // NO DISCARD HERE! All quarter-res pixels must render for proper accumulation.
-  // The jitter offsets the ray direction to sample different sub-pixel positions.
-
-  // Compute jitter offset from Bayer pattern
-  // bayerOffset is in [0,1], convert to [-0.5, 0.5] for symmetric jitter
-  let jitterOffset = camera.bayerOffset - vec2f(0.5);
-
-  // Compute per-pixel view direction and distance
-  let viewDir = normalize(input.vPosition - camera.cameraPosition);
-  let dist = length(input.vPosition - camera.cameraPosition);
-
-  // Compute world-space pixel sizes at this depth (perspective projection)
-  // Note: camera.fov is in radians.
-  let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
-  let pixelSizeX = 2.0 * dist * tan(camera.fov * 0.5) * camera.aspectRatio /
-                   camera.resolution.x;
-
-  // Use camera basis vectors (stable screen-space axes) for jitter.
-  // This avoids per-pixel basis flips that can cause visible seam artifacts.
-  let cameraRight = normalize(camera.inverseViewMatrix[0].xyz);
-  let cameraUp = normalize(camera.inverseViewMatrix[1].xyz);
-
-  // Apply sub-pixel offset in world space.
-  // jitterOffset is in full-pixel units [-0.5, 0.5].
-  // NOTE: Screen-space Y grows downward (texture coordinates), while cameraUp
-  // points upward in world space, so Y must be inverted to match reconstruction.
-  let worldOffset = cameraRight * (jitterOffset.x * pixelSizeX) -
-                    cameraUp * (jitterOffset.y * pixelSizeY);
-  let jitteredVPosition = input.vPosition + worldOffset;
-`
-    : ''
-
-  // When jitter is applied, use jitteredVPosition for ray direction
-  const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
+  const bayerJitterSection = generateBayerJitterSection(bayerJitter)
+  const rayDirSource = getRayDirSource(bayerJitter)
 
   const raymarchCall = generateRaymarchCall({ useDensityGrid, gridOnly, useDensityMatrix })
 

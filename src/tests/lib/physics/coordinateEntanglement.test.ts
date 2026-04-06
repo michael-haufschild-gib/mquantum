@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { computeStrides } from '@/lib/math/ndArray'
 import {
   computeCoordinateEntanglement,
   computeJointReducedDensityMatrix,
@@ -31,12 +32,7 @@ function makeProductState(
   const re = new Float32Array(totalSites)
   const im = new Float32Array(totalSites)
 
-  // Compute strides
-  const strides = new Array<number>(N)
-  strides[N - 1] = 1
-  for (let d = N - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
+  const strides = computeStrides(gridSize)
 
   for (let idx = 0; idx < totalSites; idx++) {
     let val = 1.0

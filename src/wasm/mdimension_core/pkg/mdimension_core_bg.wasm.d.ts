@@ -1,17 +1,29 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
+export const compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
+export const compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+export const compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
 export const dirac_spinor_size_wasm: (a: number) => number;
 export const dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
+export const fft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
+export const fft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
 export const generate_dirac_matrices_wasm: (a: number, b: number) => void;
+export const hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const ifft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
+export const ifft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
 export const magnitude_wasm: (a: number, b: number) => number;
+export const matrix_exponential_pade_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const normalize_vector_wasm: (a: number, b: number, c: number) => void;
 export const project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
 export const subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
+export const von_neumann_entropy_wasm: (a: number, b: number) => number;
 export const start: () => void;
 export const __wbindgen_export: (a: number, b: number) => number;
 export const __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;

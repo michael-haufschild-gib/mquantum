@@ -8,6 +8,7 @@
  */
 
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { clampKKState } from '@/lib/physics/compactification'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
@@ -18,6 +19,9 @@ import {
   clampDtWithCfl,
   computeCflLimit,
   defaultTdseGridPerDim,
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
   type SetterContext,
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
@@ -116,34 +120,11 @@ export const resizeBecArrays = (prev: BecConfig, newDim: number): Partial<BecCon
  */
 export function createBecSetters(ctx: SetterContext): BecActions {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+  const D = 'bec' as const
 
   return {
-    setBecInteractionStrength: (g) => {
-      if (!isFinite(g)) {
-        warnNonFinite('bec.interactionStrength', g)
-        return
-      }
-      const clamped = Math.max(-1000, Math.min(10000, g))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, interactionStrength: clamped },
-        },
-      }))
-    },
-    setBecTrapOmega: (omega) => {
-      if (!isFinite(omega)) {
-        warnNonFinite('bec.trapOmega', omega)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, trapOmega: clamped },
-        },
-      }))
-    },
+    setBecInteractionStrength: nestedClampedSetter(ctx, D, 'interactionStrength', -1000, 10000),
+    setBecTrapOmega: nestedClampedSetter(ctx, D, 'trapOmega', 0.01, 10.0),
     setBecTrapAnisotropy: (dimIndex, ratio) => {
       if (!isFinite(ratio)) {
         warnNonFinite('bec.trapAnisotropy', ratio)
@@ -171,14 +152,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         },
       }))
     },
-    setBecFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, fieldView: view },
-        },
-      }))
-    },
+    setBecFieldView: nestedValueSetter(ctx, D, 'fieldView'),
     setBecVortexCharge: (charge) => {
       const clamped = Math.max(-4, Math.min(4, Math.round(charge)))
       setWithVersion((state) => ({
@@ -268,62 +242,12 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         },
       }))
     },
-    setBecAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, autoScale },
-        },
-      }))
-    },
-    setBecAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setBecAbsorberWidth: (width) => {
-      if (!isFinite(width)) return
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberWidth: clamped },
-        },
-      }))
-    },
-    setBecPmlTargetReflection: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('bec.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, pmlTargetReflection: clamped },
-        },
-      }))
-    },
-    setBecDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setBecDiagnosticsInterval: (interval) => {
-      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, diagnosticsInterval: clamped },
-        },
-      }))
-    },
+    setBecAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
+    setBecAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled'),
+    setBecAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setBecPmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
+    setBecDiagnosticsEnabled: nestedValueSetter(ctx, D, 'diagnosticsEnabled'),
+    setBecDiagnosticsInterval: nestedIntSetter(ctx, D, 'diagnosticsInterval', 1, 60),
     setBecDt: (dt) => {
       if (!isFinite(dt)) {
         warnNonFinite('bec.dt', dt)
@@ -342,15 +266,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         }
       })
     },
-    setBecStepsPerFrame: (steps) => {
-      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, stepsPerFrame: clamped },
-        },
-      }))
-    },
+    setBecStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16),
     setBecMass: (mass) => {
       if (!isFinite(mass)) return
       const clamped = Math.max(0.1, Math.min(10, mass))
@@ -374,16 +290,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         }
       })
     },
-    setBecHbar: (hbar) => {
-      if (!isFinite(hbar)) return
-      const clamped = Math.max(0.1, Math.min(10, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, hbar: clamped },
-        },
-      }))
-    },
+    setBecHbar: nestedClampedSetter(ctx, D, 'hbar', 0.1, 10),
     setBecGridSize: (size) => {
       if (!hasOnlyFinite(size)) {
         warnNonFinite('bec.gridSize', size)
@@ -399,14 +306,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           const log2 = Math.round(Math.log2(val))
           return Math.max(2, Math.min(gridDefault, 2 ** log2))
         })
-        while (snapped.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
-          let maxIdx = 0
-          for (let i = 1; i < snapped.length; i++) {
-            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
-          }
-          if (snapped[maxIdx]! <= 2) break
-          snapped[maxIdx] = snapped[maxIdx]! / 2
-        }
+        reduceGridToFit(snapped, TDSE_MAX_TOTAL_SITES)
         const bec = state.schroedinger.bec
         const kk = clampKKState(
           bec.dt,

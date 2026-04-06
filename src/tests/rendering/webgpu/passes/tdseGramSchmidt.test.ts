@@ -23,18 +23,7 @@ import {
   storeCurrentEigenstate,
 } from '@/rendering/webgpu/passes/TDSEGramSchmidt'
 
-function createMockBuffer(label?: string): GPUBuffer {
-  return {
-    label: label ?? 'mock-buffer',
-    size: 1024,
-    usage: 0,
-    mapState: 'unmapped',
-    destroy: vi.fn(),
-    getMappedRange: vi.fn(),
-    mapAsync: vi.fn(),
-    unmap: vi.fn(),
-  } as unknown as GPUBuffer
-}
+import { createMockBuffer } from '../../../__mocks__/webgpu'
 
 function createMockDevice(): GPUDevice {
   return {
@@ -75,10 +64,10 @@ describe('ensureGSBuffers', () => {
 
     // Verify all 4 buffers were created and assigned
     expect(device.createBuffer).toHaveBeenCalledTimes(4)
-    expect(state.gsUniformBuffer).toHaveProperty('label', 'mock-buffer')
-    expect(state.gsPartialReBuffer).toHaveProperty('label', 'mock-buffer')
-    expect(state.gsPartialImBuffer).toHaveProperty('label', 'mock-buffer')
-    expect(state.gsResultBuffer).toHaveProperty('label', 'mock-buffer')
+    expect(state.gsUniformBuffer).toHaveProperty('destroy')
+    expect(state.gsPartialReBuffer).toHaveProperty('destroy')
+    expect(state.gsPartialImBuffer).toHaveProperty('destroy')
+    expect(state.gsResultBuffer).toHaveProperty('destroy')
   })
 
   it('computes workgroup count from totalSites / 256', () => {

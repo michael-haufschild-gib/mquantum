@@ -14,6 +14,7 @@
  * @module lib/physics/coordinateEntanglement
  */
 
+import { computeStrides } from '@/lib/math/ndArray'
 import { wignerNegativityFromRDM } from '@/lib/physics/wigner/wignerFromRDM'
 import {
   computeJointRdmWasm,
@@ -71,22 +72,6 @@ export interface EntanglementOptions {
 }
 
 // ─── Index Arithmetic ───────────────────────────────────────────────────────
-
-/**
- * Compute strides for row-major indexing into an N-dimensional grid.
- *
- * @param gridSize - Grid dimensions [M_0, M_1, ..., M_{N-1}]
- * @returns Strides array where stride[d] = Π_{k>d} M_k
- */
-function computeStrides(gridSize: number[]): number[] {
-  const N = gridSize.length
-  const strides = new Array<number>(N)
-  strides[N - 1] = 1
-  for (let d = N - 2; d >= 0; d--) {
-    strides[d] = strides[d + 1]! * gridSize[d + 1]!
-  }
-  return strides
-}
 
 // ─── Reduced Density Matrix ─────────────────────────────────────────────────
 

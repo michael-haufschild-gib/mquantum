@@ -2,11 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { TemporalDepthCapturePass } from '@/rendering/webgpu/passes/TemporalDepthCapturePass'
 
-function createRenderPassEncoder(): GPURenderPassEncoder {
-  return {
-    end: vi.fn(),
-  } as unknown as GPURenderPassEncoder
-}
+import { createMockRenderPassEncoder } from '../../../__mocks__/webgpu'
 
 describe('pass resource caching', () => {
   it('uses one render pass plus texture copy in TemporalDepthCapture execution', () => {
@@ -35,7 +31,7 @@ describe('pass resource caching', () => {
     ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
     vi.spyOn(pass, 'isEnabled').mockReturnValue(true)
 
-    const beginRenderPass = vi.fn(() => createRenderPassEncoder())
+    const beginRenderPass = vi.fn(() => createMockRenderPassEncoder())
     const copyTextureToTexture = vi.fn()
 
     const renderContext = {

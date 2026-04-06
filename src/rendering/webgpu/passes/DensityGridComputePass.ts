@@ -15,6 +15,8 @@
 
 import { logger } from '@/lib/logger'
 
+import type { AnimationSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
@@ -631,7 +633,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     }
 
     // Early exit if no update needed (same config, no quantum parameter changes)
-    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
+    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const time = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     if (!this.needsUpdate(time, this.passConfig.dimension, this.passConfig.quantumMode)) {
       return

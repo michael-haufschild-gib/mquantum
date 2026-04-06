@@ -8,7 +8,6 @@
  */
 
 import { generateObjectBindGroup } from '../shared/compose-helpers'
-import type { ColorAlgorithm } from '../types'
 import { generateAnalyticalGradientBlock } from './quantum/analyticalGradient.wgsl'
 import { complexMathBlock } from './quantum/complex.wgsl'
 import { densityPostMapBlock, densityPreMapBlock, generateMapPosToND } from './quantum/density.wgsl'
@@ -95,6 +94,7 @@ import {
   nodalSurfacesStubBlock,
   probabilityCurrentBlock,
   probabilityCurrentStubBlock,
+  volumeCompositingBlock,
   volumeGradientBlock,
   volumeIntegrationBlock,
   volumeRaymarchBlock,
@@ -379,7 +379,7 @@ export function buildQuantumMathBlocks(opts: {
 /** Build volume rendering shader blocks (absorption, emission, integration, grid). */
 export function buildVolumeBlocks(opts: {
   is2D: boolean
-  colorAlgorithm: ColorAlgorithm
+  colorAlgorithm: number
   includeHydrogen: boolean
   useCache: boolean
   actualDim: number
@@ -465,6 +465,7 @@ export function buildVolumeBlocks(opts: {
         : '// Stub: analysis texture unavailable\nfn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !opts.is2D },
+    { name: 'Volume Compositing', content: volumeCompositingBlock, condition: !opts.is2D },
     {
       name: 'Nodal Surfaces',
       content: opts.nodal ? nodalSurfacesBlock : nodalSurfacesStubBlock,

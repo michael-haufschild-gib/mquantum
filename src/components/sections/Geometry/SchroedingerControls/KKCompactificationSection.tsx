@@ -18,11 +18,10 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { AXIS_LABELS } from '@/constants/dimension'
 import { computeKKSpectrum, computeMaxCompactRadius } from '@/lib/physics/compactification'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 
 /* ── SVG layout constants ── */
 const WIDTH = 260

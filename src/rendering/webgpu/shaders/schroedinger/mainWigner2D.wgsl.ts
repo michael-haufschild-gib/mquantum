@@ -143,15 +143,8 @@ ${wignerEvalBlock}
   // Ambient lighting
   col = col * lighting.ambientColor * lighting.ambientIntensity;
 
-  // HDR Emission Glow
-  if (schroedinger.emissionIntensity > 0.0) {
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    if (normalizedRho > schroedinger.emissionThreshold) {
-      var emissionFactor = (normalizedRho - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
-      emissionFactor = emissionFactor * emissionFactor;
-      col += col * schroedinger.emissionIntensity * emissionFactor;
-    }
-  }
+  // HDR Emission Glow (shared helper — uses post-ambient col as emission base)
+  col = applyHDREmissionGlow(col, col, s, schroedinger);
 
   // Alpha from Wigner magnitude (adaptive scaling for visibility)
   var alpha = clamp(absW * 8.0, 0.0, 1.0);

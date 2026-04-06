@@ -10,11 +10,10 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useAnimationStore } from '@/stores/animationStore'
 import { useAppearanceStore } from '@/stores/appearanceStore'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   DEFAULT_DIMENSION,
   DEFAULT_OBJECT_TYPE,
-  MAX_DIMENSION,
-  MIN_DIMENSION,
   useGeometryStore,
   validateObjectTypeForDimension,
 } from '@/stores/geometryStore'

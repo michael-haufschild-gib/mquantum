@@ -15,17 +15,13 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type { TdseFieldView, TdseInitialCondition } from '@/lib/geometry/extended/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
+import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
-import {
-  ALL_GRID_SIZE_OPTIONS,
-  AXIS_LABELS,
-  FIELD_VIEW_OPTIONS,
-  INITIAL_CONDITION_OPTIONS,
-  TDSE_MAX_TOTAL_SITES,
-} from './tdseControlsConstants'
+import { FIELD_VIEW_OPTIONS, INITIAL_CONDITION_OPTIONS } from './tdseControlsConstants'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
 import type { TdseControlsProps } from './types'
 

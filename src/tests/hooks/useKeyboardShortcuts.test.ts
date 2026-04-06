@@ -5,6 +5,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { MIN_DIMENSION } from '@/constants/dimension'
 import { getShortcutLabel, SHORTCUTS, useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -74,14 +75,14 @@ describe('useKeyboardShortcuts', () => {
     expect(useGeometryStore.getState().dimension).toBe(3)
   })
 
-  it('should not decrease dimension below 3', () => {
-    useGeometryStore.getState().setDimension(3)
+  it('should not decrease dimension below MIN_DIMENSION', () => {
+    useGeometryStore.getState().setDimension(MIN_DIMENSION)
     renderHook(() => useKeyboardShortcuts({ enabled: true }))
 
     const event = new KeyboardEvent('keydown', { key: 'ArrowDown' })
     window.dispatchEvent(event)
 
-    expect(useGeometryStore.getState().dimension).toBe(3)
+    expect(useGeometryStore.getState().dimension).toBe(MIN_DIMENSION)
   })
 
   it('should not reverse direction on d key (now used for camera movement)', () => {

@@ -41,11 +41,11 @@ type Token =
   | { type: 'comma'; pos: number }
   | { type: 'eof'; pos: number }
 
+import { AXIS_LABELS } from '@/constants/dimension'
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p'] as const
 
 const CONSTANTS: Record<string, number> = {
   pi: Math.PI,

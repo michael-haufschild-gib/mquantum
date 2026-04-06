@@ -9,21 +9,16 @@
  */
 
 /**
- * Generate the 2D heatmap fragment shader main block.
+ * Shared WGSL body for 2D modes: UV → physical coords, wavefunction evaluation,
+ * density effects (hydrogen boost, uncertainty boundary, interference, phase shimmer),
+ * color computation (base color, phase materiality, ambient lighting, HDR emission).
  *
- * Maps UV → physical (x,y), evaluates wavefunction, applies color.
- * Equivalent of volumetric mode for 3D but with direct evaluation.
- *
- * @returns WGSL fragment shader code for 2D heatmap
+ * Produces local variables available to the caller:
+ *   pos (vec3f), animTime (f32), rho (f32), s (f32), spatialPhase (f32),
+ *   baseColor (vec3f), col (vec3f)
  */
-export function generateMainBlock2D(): string {
-  return /* wgsl */ `
-// ============================================
-// Main Fragment Shader - 2D Heatmap Mode
-// ============================================
-
-@fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+function generate2DCommonBody(): string {
+  return `
   // Map UV [0,1] to centered coordinates [-1,1]
   let centeredUV = input.uv * 2.0 - 1.0;
 
@@ -34,8 +29,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // Apply camera pan (model matrix translation)
   let worldPos2D = (camera.modelMatrix * vec4f(physX, physY, 0.0, 1.0)).xyz;
-
-  // Apply camera zoom via inverse model matrix scale
   let pos = vec3f(worldPos2D.x, worldPos2D.y, 0.0);
 
   // Map 3D position (with z=0) to ND coordinates
@@ -92,46 +85,36 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Compute base color using existing color system
   var baseColor = computeBaseColor(rho, s, spatialPhase, pos, schroedinger);
 
-  // Phase materiality: modulate material appearance based on quantum phase
+  // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {
-    let phaseMod = fract((spatialPhase + PI) / TAU);
-    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-    let smokeWeight = 1.0 - plasmaWeight;
-    let pmStr = schroedinger.phaseMaterialityStrength;
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
-    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(baseColor), 0.1);
-    baseColor = mix(baseColor,
-      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-      pmStr);
+    baseColor = applyPhaseMateriality(baseColor, spatialPhase, s, schroedinger);
   }
 
   // Apply emission intensity (ambient-only for 2D — no volumetric lighting)
   var col = baseColor * lighting.ambientColor * lighting.ambientIntensity;
 
-  // HDR Emission Glow
-  if (schroedinger.emissionIntensity > 0.0) {
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    if (normalizedRho > schroedinger.emissionThreshold) {
-      var emissionFactor = (normalizedRho - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
-      emissionFactor = emissionFactor * emissionFactor;
+  // HDR Emission Glow (shared helper)
+  col = applyHDREmissionGlow(col, baseColor, s, schroedinger);
+`
+}
 
-      var emissionColor = baseColor;
-      if (abs(schroedinger.emissionColorShift) > 0.01) {
-        var hsl = rgb2hsl(emissionColor);
-        if (schroedinger.emissionColorShift > 0.0) {
-          hsl.x = mix(hsl.x, 0.08, schroedinger.emissionColorShift * 0.5);
-          hsl.y = mix(hsl.y, 1.0, schroedinger.emissionColorShift * 0.3);
-        } else {
-          hsl.x = mix(hsl.x, 0.6, -schroedinger.emissionColorShift * 0.5);
-          hsl.z = mix(hsl.z, 0.9, -schroedinger.emissionColorShift * 0.3);
-        }
-        emissionColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
-      }
-      col += emissionColor * schroedinger.emissionIntensity * emissionFactor;
-    }
-  }
+/**
+ * Generate the 2D heatmap fragment shader main block.
+ *
+ * Maps UV → physical (x,y), evaluates wavefunction, applies color.
+ * Equivalent of volumetric mode for 3D but with direct evaluation.
+ *
+ * @returns WGSL fragment shader code for 2D heatmap
+ */
+export function generateMainBlock2D(): string {
+  return /* wgsl */ `
+// ============================================
+// Main Fragment Shader - 2D Heatmap Mode
+// ============================================
 
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+${generate2DCommonBody()}
   // Nodal lines (2D equivalent of nodal surfaces)
   if (FEATURE_NODAL && schroedinger.nodalEnabled != 0u && schroedinger.nodalStrength > 0.0) {
     let nodalResult = evaluateNodalLines2D(pos, animTime, schroedinger);
@@ -173,111 +156,7 @@ export function generateMainBlock2DIsolines(): string {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // Map UV [0,1] to centered coordinates [-1,1]
-  let centeredUV = input.uv * 2.0 - 1.0;
-
-  // Scale by bounding radius and aspect ratio
-  let aspect = camera.resolution.x / camera.resolution.y;
-  let physX = centeredUV.x * schroedinger.boundingRadius * aspect;
-  let physY = centeredUV.y * schroedinger.boundingRadius;
-
-  // Apply camera pan (model matrix translation)
-  let worldPos2D = (camera.modelMatrix * vec4f(physX, physY, 0.0, 1.0)).xyz;
-  let pos = vec3f(worldPos2D.x, worldPos2D.y, 0.0);
-
-  // Map 3D position (with z=0) to ND coordinates
-  let xND = mapPosToND(pos, schroedinger);
-
-  // Get animation time
-  let animTime = schroedinger.time * schroedinger.timeScale;
-
-  // Evaluate wavefunction with spatial phase
-  let psiResult = evalPsiWithSpatialPhase(xND, animTime, schroedinger);
-  let psi = psiResult.xy;
-  let spatialPhase = psiResult.z;
-
-  var rho = rhoFromPsi(psi);
-
-  // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    rho *= schroedinger.hydrogenNDBoost;
-  }
-
-  // Uncertainty boundary emphasis
-  if (FEATURE_UNCERTAINTY_BOUNDARY) {
-    let boundaryLogRho = sFromRho(rho);
-    rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, schroedinger);
-  }
-
-  // Interference fringing
-  if (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u && schroedinger.interferenceAmp > 0.0) {
-    let iTime = schroedinger.time * schroedinger.interferenceSpeed;
-    let fringe = 1.0 + schroedinger.interferenceAmp * sin(spatialPhase * schroedinger.interferenceFreq + iTime);
-    rho *= fringe;
-    rho = max(rho, 0.0);
-  }
-
-  // Phase shimmer — density-modulated flow-noise animation
-  if (schroedinger.phaseShimmerEnabled != 0u && schroedinger.phaseShimmerStrength > 0.0) {
-    let shimmerSpeed = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let shimmerTime = schroedinger.time * schroedinger.phaseShimmerSpeed;
-    let shimmerOffset = shimmerTime * shimmerSpeed;
-    let psiLen = max(length(psi), 1e-8);
-    let shimmerCosP = psi.x / psiLen;
-    let shimmerSinP = psi.y / psiLen;
-    let shimmerNoise = gradientNoise(pos * 2.0 + vec3f(
-        shimmerOffset + shimmerCosP * 0.5,
-        shimmerSinP * 0.5,
-        shimmerOffset * 0.7 + shimmerCosP * 0.3
-    ));
-    rho *= (1.0 + shimmerNoise * schroedinger.phaseShimmerStrength * shimmerSpeed);
-    rho = max(rho, 0.0);
-  }
-
-  let s = sFromRho(rho);
-
-  // Compute heatmap base color
-  var baseColor = computeBaseColor(rho, s, spatialPhase, pos, schroedinger);
-
-  // Phase materiality: modulate material appearance based on quantum phase
-  if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {
-    let phaseMod = fract((spatialPhase + PI) / TAU);
-    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
-    let smokeWeight = 1.0 - plasmaWeight;
-    let pmStr = schroedinger.phaseMaterialityStrength;
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
-    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(baseColor), 0.1);
-    baseColor = mix(baseColor,
-      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
-      pmStr);
-  }
-
-  var col = baseColor * lighting.ambientColor * lighting.ambientIntensity;
-
-  // HDR Emission Glow
-  if (schroedinger.emissionIntensity > 0.0) {
-    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-    if (normalizedRho > schroedinger.emissionThreshold) {
-      var emissionFactor = (normalizedRho - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
-      emissionFactor = emissionFactor * emissionFactor;
-
-      var emissionColor = baseColor;
-      if (abs(schroedinger.emissionColorShift) > 0.01) {
-        var hsl = rgb2hsl(emissionColor);
-        if (schroedinger.emissionColorShift > 0.0) {
-          hsl.x = mix(hsl.x, 0.08, schroedinger.emissionColorShift * 0.5);
-          hsl.y = mix(hsl.y, 1.0, schroedinger.emissionColorShift * 0.3);
-        } else {
-          hsl.x = mix(hsl.x, 0.6, -schroedinger.emissionColorShift * 0.5);
-          hsl.z = mix(hsl.z, 0.9, -schroedinger.emissionColorShift * 0.3);
-        }
-        emissionColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
-      }
-      col += emissionColor * schroedinger.emissionIntensity * emissionFactor;
-    }
-  }
-
+${generate2DCommonBody()}
   // Alpha from density
   let densityGained = rho * schroedinger.densityGain;
   var alpha = clamp(densityGained * 8.0, 0.0, 1.0);

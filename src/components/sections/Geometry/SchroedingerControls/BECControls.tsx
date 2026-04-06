@@ -13,22 +13,11 @@ import React, { useCallback, useMemo } from 'react'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
+import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
 import type { BecControlsProps } from './types'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
-
-/** TDSE/BEC max total sites — must match store constant */
-const TDSE_MAX_TOTAL_SITES = 262144
-
-const ALL_GRID_SIZE_OPTIONS = [
-  { value: '8', label: '8' },
-  { value: '16', label: '16' },
-  { value: '32', label: '32' },
-  { value: '64', label: '64' },
-  { value: '128', label: '128' },
-]
 
 const INITIAL_CONDITION_OPTIONS = [
   { value: 'thomasFermi', label: 'Thomas-Fermi' },

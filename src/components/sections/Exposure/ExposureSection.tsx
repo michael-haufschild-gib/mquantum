@@ -17,12 +17,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-/** Analytical modes have no time evolution — auto-scale gain cap is irrelevant. */
-const STATIC_MODES = new Set(['harmonicOscillator', 'hydrogenND', 'hydrogenNDCoupled'])
 
 const noop = () => {}
 
@@ -148,7 +147,7 @@ const ExposureSectionInner: React.FC<{
   defaultOpen: boolean
 }> = React.memo(({ objectType, defaultOpen }) => {
   const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
-  const isStatic = objectType !== 'pauliSpinor' && STATIC_MODES.has(quantumMode)
+  const isStatic = objectType !== 'pauliSpinor' && isAnalyticQuantumType(quantumMode)
   const isDynamic = !isStatic
 
   const autoScale = useAutoScaleValue(objectType)

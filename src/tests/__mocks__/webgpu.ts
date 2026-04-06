@@ -9,6 +9,161 @@
 
 import { vi } from 'vitest'
 
+// =============================================================================
+// Standalone mock factories — importable by any test file
+// =============================================================================
+
+/** Create a mock GPUBuffer with all required methods. */
+export function createMockBuffer(label?: string): GPUBuffer {
+  return {
+    size: 0,
+    usage: 0,
+    mapState: 'unmapped' as GPUBufferMapState,
+    label: label ?? '',
+    getMappedRange: vi.fn(() => new ArrayBuffer(0)),
+    unmap: vi.fn(),
+    destroy: vi.fn(),
+    mapAsync: vi.fn().mockResolvedValue(undefined),
+  } as unknown as GPUBuffer
+}
+
+/** Create a mock GPUTexture with createView and destroy. */
+export function createMockTexture(): GPUTexture {
+  return {
+    width: 1,
+    height: 1,
+    depthOrArrayLayers: 1,
+    mipLevelCount: 1,
+    sampleCount: 1,
+    dimension: '2d' as GPUTextureDimension,
+    format: 'rgba8unorm' as GPUTextureFormat,
+    usage: 0,
+    label: '',
+    createView: vi.fn(() => ({ label: '' })),
+    destroy: vi.fn(),
+  } as unknown as GPUTexture
+}
+
+/** Create a mock GPUSampler. */
+export function createMockSampler(): GPUSampler {
+  return { label: '' } as unknown as GPUSampler
+}
+
+/** Create a mock GPUShaderModule. */
+export function createMockShaderModule(): GPUShaderModule {
+  return {
+    label: '',
+    getCompilationInfo: vi.fn().mockResolvedValue({ messages: [] }),
+  } as unknown as GPUShaderModule
+}
+
+/** Create a mock GPUBindGroupLayout. */
+export function createMockBindGroupLayout(): GPUBindGroupLayout {
+  return { label: '' } as unknown as GPUBindGroupLayout
+}
+
+/** Create a mock GPUBindGroup. */
+export function createMockBindGroup(): GPUBindGroup {
+  return { label: '' } as unknown as GPUBindGroup
+}
+
+/** Create a mock GPUPipelineLayout. */
+export function createMockPipelineLayout(): GPUPipelineLayout {
+  return { label: '' } as unknown as GPUPipelineLayout
+}
+
+/** Create a mock GPURenderPipeline. */
+export function createMockRenderPipeline(): GPURenderPipeline {
+  return {
+    label: '',
+    getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
+  } as unknown as GPURenderPipeline
+}
+
+/** Create a mock GPUComputePipeline. */
+export function createMockComputePipeline(): GPUComputePipeline {
+  return {
+    label: '',
+    getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
+  } as unknown as GPUComputePipeline
+}
+
+/** Create a mock GPURenderPassEncoder with all methods. */
+export function createMockRenderPassEncoder(): GPURenderPassEncoder {
+  return {
+    label: '',
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    setVertexBuffer: vi.fn(),
+    setIndexBuffer: vi.fn(),
+    draw: vi.fn(),
+    drawIndexed: vi.fn(),
+    drawIndirect: vi.fn(),
+    drawIndexedIndirect: vi.fn(),
+    setViewport: vi.fn(),
+    setScissorRect: vi.fn(),
+    setBlendConstant: vi.fn(),
+    setStencilReference: vi.fn(),
+    beginOcclusionQuery: vi.fn(),
+    endOcclusionQuery: vi.fn(),
+    executeBundles: vi.fn(),
+    end: vi.fn(),
+    pushDebugGroup: vi.fn(),
+    popDebugGroup: vi.fn(),
+    insertDebugMarker: vi.fn(),
+  } as unknown as GPURenderPassEncoder
+}
+
+/** Create a mock GPUComputePassEncoder with all methods. */
+export function createMockComputePassEncoder(): GPUComputePassEncoder {
+  return {
+    label: '',
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    dispatchWorkgroups: vi.fn(),
+    dispatchWorkgroupsIndirect: vi.fn(),
+    end: vi.fn(),
+    pushDebugGroup: vi.fn(),
+    popDebugGroup: vi.fn(),
+    insertDebugMarker: vi.fn(),
+  } as unknown as GPUComputePassEncoder
+}
+
+/** Create a mock GPUCommandEncoder. */
+export function createMockCommandEncoder(): GPUCommandEncoder {
+  return {
+    label: '',
+    beginRenderPass: vi.fn(() => createMockRenderPassEncoder()),
+    beginComputePass: vi.fn(() => createMockComputePassEncoder()),
+    copyBufferToBuffer: vi.fn(),
+    copyBufferToTexture: vi.fn(),
+    copyTextureToBuffer: vi.fn(),
+    copyTextureToTexture: vi.fn(),
+    clearBuffer: vi.fn(),
+    resolveQuerySet: vi.fn(),
+    finish: vi.fn(() => ({ label: '' })),
+    pushDebugGroup: vi.fn(),
+    popDebugGroup: vi.fn(),
+    insertDebugMarker: vi.fn(),
+  } as unknown as GPUCommandEncoder
+}
+
+/** Create a mock GPUQuerySet. */
+export function createMockQuerySet(
+  desc: { label?: string; type?: string; count?: number } = {}
+): GPUQuerySet {
+  return {
+    label: desc.label ?? '',
+    type: (desc.type ?? 'occlusion') as GPUQueryType,
+    count: desc.count ?? 0,
+    destroy: vi.fn(),
+  } as unknown as GPUQuerySet
+}
+
+// =============================================================================
+// Comprehensive mock (singleton with resource tracking)
+// =============================================================================
+
 /** Create a comprehensive WebGPU mock for testing. */
 function createWebGPUMock() {
   const createdResources = {
@@ -25,136 +180,66 @@ function createWebGPUMock() {
     querysets: new Set<object>(),
   }
 
-  const createMockBuffer = (): GPUBuffer => {
-    const buffer = {
-      size: 0,
-      usage: 0,
-      mapState: 'unmapped' as GPUBufferMapState,
-      label: '',
-      getMappedRange: vi.fn(() => new ArrayBuffer(0)),
-      unmap: vi.fn(),
-      destroy: vi.fn(),
-      mapAsync: vi.fn().mockResolvedValue(undefined),
-    }
+  /** Buffer factory that tracks in createdResources. */
+  const trackedCreateBuffer = (): GPUBuffer => {
+    const buffer = createMockBuffer()
     createdResources.buffers.add(buffer)
-    return buffer as unknown as GPUBuffer
+    return buffer
   }
 
-  const createMockTexture = (): GPUTexture => {
-    const texture = {
-      width: 1,
-      height: 1,
-      depthOrArrayLayers: 1,
-      mipLevelCount: 1,
-      sampleCount: 1,
-      dimension: '2d' as GPUTextureDimension,
-      format: 'rgba8unorm' as GPUTextureFormat,
-      usage: 0,
-      label: '',
-      createView: vi.fn(() => ({ label: '' })),
-      destroy: vi.fn(),
-    }
+  /** Texture factory that tracks in createdResources. */
+  const trackedCreateTexture = (): GPUTexture => {
+    const texture = createMockTexture()
     createdResources.textures.add(texture)
-    return texture as unknown as GPUTexture
+    return texture
   }
 
-  const createMockSampler = (): GPUSampler => {
-    const s = { label: '' }
+  const trackedCreateSampler = (): GPUSampler => {
+    const s = createMockSampler()
     createdResources.samplers.add(s)
-    return s as unknown as GPUSampler
+    return s
   }
-  const createMockShaderModule = (): GPUShaderModule => {
-    const m = { label: '', getCompilationInfo: vi.fn().mockResolvedValue({ messages: [] }) }
+  const trackedCreateShaderModule = (): GPUShaderModule => {
+    const m = createMockShaderModule()
     createdResources.shaderModules.add(m)
-    return m as unknown as GPUShaderModule
+    return m
   }
-  const createMockBindGroupLayout = (): GPUBindGroupLayout => {
-    const l = { label: '' }
+  const trackedCreateBindGroupLayout = (): GPUBindGroupLayout => {
+    const l = createMockBindGroupLayout()
     createdResources.bindGroupLayouts.add(l)
-    return l as unknown as GPUBindGroupLayout
+    return l
   }
-  const createMockBindGroup = (): GPUBindGroup => {
-    const g = { label: '' }
+  const trackedCreateBindGroup = (): GPUBindGroup => {
+    const g = createMockBindGroup()
     createdResources.bindGroups.add(g)
-    return g as unknown as GPUBindGroup
+    return g
   }
-  const createMockPipelineLayout = (): GPUPipelineLayout => {
-    const l = { label: '' }
+  const trackedCreatePipelineLayout = (): GPUPipelineLayout => {
+    const l = createMockPipelineLayout()
     createdResources.pipelineLayouts.add(l)
-    return l as unknown as GPUPipelineLayout
+    return l
   }
-  const createMockRenderPipeline = (): GPURenderPipeline => {
-    const p = { label: '', getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()) }
+  const trackedCreateRenderPipeline = (): GPURenderPipeline => {
+    const p = createMockRenderPipeline()
     createdResources.renderPipelines.add(p)
-    return p as unknown as GPURenderPipeline
+    return p
   }
-  const createMockComputePipeline = (): GPUComputePipeline => {
-    const p = { label: '', getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()) }
+  const trackedCreateComputePipeline = (): GPUComputePipeline => {
+    const p = createMockComputePipeline()
     createdResources.computePipelines.add(p)
-    return p as unknown as GPUComputePipeline
+    return p
   }
-
-  const createMockRenderPassEncoder = (): GPURenderPassEncoder =>
-    ({
-      label: '',
-      setPipeline: vi.fn(),
-      setBindGroup: vi.fn(),
-      setVertexBuffer: vi.fn(),
-      setIndexBuffer: vi.fn(),
-      draw: vi.fn(),
-      drawIndexed: vi.fn(),
-      drawIndirect: vi.fn(),
-      drawIndexedIndirect: vi.fn(),
-      setViewport: vi.fn(),
-      setScissorRect: vi.fn(),
-      setBlendConstant: vi.fn(),
-      setStencilReference: vi.fn(),
-      beginOcclusionQuery: vi.fn(),
-      endOcclusionQuery: vi.fn(),
-      executeBundles: vi.fn(),
-      end: vi.fn(),
-      pushDebugGroup: vi.fn(),
-      popDebugGroup: vi.fn(),
-      insertDebugMarker: vi.fn(),
-    }) as unknown as GPURenderPassEncoder
-
-  const createMockComputePassEncoder = (): GPUComputePassEncoder =>
-    ({
-      label: '',
-      setPipeline: vi.fn(),
-      setBindGroup: vi.fn(),
-      dispatchWorkgroups: vi.fn(),
-      dispatchWorkgroupsIndirect: vi.fn(),
-      end: vi.fn(),
-      pushDebugGroup: vi.fn(),
-      popDebugGroup: vi.fn(),
-      insertDebugMarker: vi.fn(),
-    }) as unknown as GPUComputePassEncoder
-
-  const createMockCommandEncoder = (): GPUCommandEncoder => {
-    const encoder = {
-      label: '',
-      beginRenderPass: vi.fn(() => createMockRenderPassEncoder()),
-      beginComputePass: vi.fn(() => createMockComputePassEncoder()),
-      copyBufferToBuffer: vi.fn(),
-      copyBufferToTexture: vi.fn(),
-      copyTextureToBuffer: vi.fn(),
-      copyTextureToTexture: vi.fn(),
-      clearBuffer: vi.fn(),
-      resolveQuerySet: vi.fn(),
-      finish: vi.fn(() => ({ label: '' })),
-      pushDebugGroup: vi.fn(),
-      popDebugGroup: vi.fn(),
-      insertDebugMarker: vi.fn(),
-    }
+  const trackedCreateCommandEncoder = (): GPUCommandEncoder => {
+    const encoder = createMockCommandEncoder()
     createdResources.commandEncoders.add(encoder)
-    return encoder as unknown as GPUCommandEncoder
+    return encoder
   }
-
-  const createMockQuerySet = (): GPUQuerySet => {
-    const qs = { label: '', type: 'occlusion' as GPUQueryType, count: 0, destroy: vi.fn() }
+  const trackedCreateQuerySet = (
+    desc: { label?: string; type?: string; count?: number } = {}
+  ): GPUQuerySet => {
+    const qs = createMockQuerySet(desc)
     createdResources.querysets.add(qs)
-    return qs as unknown as GPUQuerySet
+    return qs
   }
 
   const mockQueue: GPUQueue = {
@@ -206,12 +291,12 @@ function createWebGPUMock() {
     queue: mockQueue,
     lost: new Promise(() => {}),
     createBuffer: vi.fn((desc) => {
-      const b = createMockBuffer()
+      const b = trackedCreateBuffer()
       Object.assign(b, { size: desc.size, usage: desc.usage })
       return b
     }),
     createTexture: vi.fn((desc) => {
-      const t = createMockTexture()
+      const t = trackedCreateTexture()
       Object.assign(t, {
         width: desc.size.width ?? desc.size,
         height: desc.size.height ?? 1,
@@ -220,18 +305,20 @@ function createWebGPUMock() {
       })
       return t
     }),
-    createSampler: vi.fn(() => createMockSampler()),
-    createShaderModule: vi.fn(() => createMockShaderModule()),
-    createBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
-    createBindGroup: vi.fn(() => createMockBindGroup()),
-    createPipelineLayout: vi.fn(() => createMockPipelineLayout()),
-    createRenderPipeline: vi.fn(() => createMockRenderPipeline()),
-    createComputePipeline: vi.fn(() => createMockComputePipeline()),
-    createRenderPipelineAsync: vi.fn().mockResolvedValue(createMockRenderPipeline()),
-    createComputePipelineAsync: vi.fn().mockResolvedValue(createMockComputePipeline()),
-    createCommandEncoder: vi.fn(() => createMockCommandEncoder()),
+    createSampler: vi.fn(() => trackedCreateSampler()),
+    createShaderModule: vi.fn(() => trackedCreateShaderModule()),
+    createBindGroupLayout: vi.fn(() => trackedCreateBindGroupLayout()),
+    createBindGroup: vi.fn(() => trackedCreateBindGroup()),
+    createPipelineLayout: vi.fn(() => trackedCreatePipelineLayout()),
+    createRenderPipeline: vi.fn(() => trackedCreateRenderPipeline()),
+    createComputePipeline: vi.fn(() => trackedCreateComputePipeline()),
+    createRenderPipelineAsync: vi.fn(async () => trackedCreateRenderPipeline()),
+    createComputePipelineAsync: vi.fn(async () => trackedCreateComputePipeline()),
+    createCommandEncoder: vi.fn(() => trackedCreateCommandEncoder()),
     createRenderBundleEncoder: vi.fn(),
-    createQuerySet: vi.fn(() => createMockQuerySet()),
+    createQuerySet: vi.fn((desc: { label?: string; type?: string; count?: number } = {}) =>
+      trackedCreateQuerySet(desc)
+    ),
     pushErrorScope: vi.fn(),
     popErrorScope: vi.fn().mockResolvedValue(null),
     onuncapturederror: null,
