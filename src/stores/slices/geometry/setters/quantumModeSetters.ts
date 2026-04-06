@@ -53,6 +53,13 @@ const modeSettingsCache = new Map<string, ModeRenderingSnapshot>()
  */
 const visitedModes = new Set<string>(['harmonicOscillator'])
 
+/** Reset session caches. Call in store reset and test teardown. */
+export function resetModeSessionCaches(): void {
+  modeSettingsCache.clear()
+  visitedModes.clear()
+  visitedModes.add('harmonicOscillator')
+}
+
 /** Per-mode rendering defaults. Modes not listed fall back to DEFAULT_SCHROEDINGER_CONFIG values. */
 const MODE_RENDERING_DEFAULTS: Partial<
   Record<SchroedingerConfig['quantumMode'], ModeRenderingSnapshot>
@@ -253,6 +260,8 @@ function applyFirstPreset(
       break
     case 'hydrogenNDCoupled':
       void import('@/lib/physics/hydrogenCoupled/presets').then(({ HYDROGEN_COUPLED_PRESETS }) => {
+        // Guard: only apply if mode hasn't changed during the async import
+        if (get().schroedinger.quantumMode !== 'hydrogenNDCoupled') return
         const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.id === presetId)
         if (preset) get().setSchroedingerConfig(preset.overrides)
       })

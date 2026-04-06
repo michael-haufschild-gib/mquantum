@@ -9,6 +9,7 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 
 import { BEC_SCENARIO_PRESETS } from './bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from './dirac/presets'
@@ -38,10 +39,20 @@ export function getFirstPresetId(
       // HO named presets are dimension-agnostic — first key
       return 'groundState'
 
-    case 'hydrogenND':
-      // HydrogenND presets are dimension-grouped; first ≤ dim
-      // The simplest default for any dimension is '1s' (ground state)
-      return '1s_2d'
+    case 'hydrogenND': {
+      // HydrogenND presets are dimension-grouped; pick the ground state for the current dim.
+      const groups = getHydrogenNDPresetsWithKeysByDimension()
+      // Find the highest dimension group ≤ current dimension and return its first preset.
+      const matchingDims = Object.keys(groups)
+        .map(Number)
+        .filter((d) => d <= dimension)
+        .sort((a, b) => b - a)
+      if (matchingDims.length > 0) {
+        const presets = groups[matchingDims[0]]
+        if (presets && presets.length > 0) return presets[0][0]
+      }
+      return undefined
+    }
 
     case 'hydrogenNDCoupled': {
       const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.minDim <= dimension)

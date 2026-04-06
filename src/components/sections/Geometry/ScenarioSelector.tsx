@@ -6,7 +6,7 @@
  * The first preset is auto-selected on mode switch.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
@@ -172,24 +172,31 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     }
   }, [mode, dimension])
 
-  // Detect active value.
-  // HO and HydrogenND track the preset name in the store directly.
-  // For Pauli mode, auto-apply the first preset on mode entry
-  // (Pauli is object-type based, not quantum-mode based, so the
-  // quantumModeSetters auto-apply doesn't cover it).
+  // Per-mode selection tracking for compute modes (TDSE, BEC, Dirac, FSF, QW, Pauli).
+  // HO and HydrogenND store their preset name in the Zustand store directly;
+  // compute modes use async apply actions that make reverse-detection unreliable.
+  const [computePreset, setComputePreset] = useState<Record<string, string>>({})
+
   // Auto-apply first Pauli preset on mode entry.
   // Pauli is object-type based (not quantum-mode), so the mode setter auto-apply
   // in quantumModeSetters doesn't cover it.
   const prevModeRef = useRef(mode)
   useEffect(() => {
-    if (prevModeRef.current !== mode && mode === 'pauliSpinor') {
-      const firstId = getFirstPresetId('pauliSpinor', dimension)
-      if (firstId) applyPauliPresetById(firstId, setPauliConfig)
+    if (prevModeRef.current !== mode) {
+      if (mode === 'pauliSpinor') {
+        const firstId = getFirstPresetId('pauliSpinor', dimension)
+        if (firstId) applyPauliPresetById(firstId, setPauliConfig)
+      }
+      // Seed the tracked value with the auto-applied first preset for the new mode
+      const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
+      if (firstId) {
+        setComputePreset((prev) => ({ ...prev, [mode]: firstId }))
+      }
     }
     prevModeRef.current = mode
   }, [mode, dimension, setPauliConfig])
 
-  // Derive the active preset value from store state or first available preset.
+  // Derive the active preset value from store state or tracked selection.
   const activeValue = useMemo(() => {
     switch (mode) {
       case 'harmonicOscillator': {
@@ -201,16 +208,19 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return preset === 'custom' ? (getFirstPresetId('hydrogenND', dimension) ?? '') : preset
       }
       default:
-        // For compute modes, the auto-apply in setSchroedingerQuantumMode
-        // handles selection. Derive from first preset as display default.
-        return getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension) ?? ''
+        return (
+          computePreset[mode] ??
+          getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension) ??
+          ''
+        )
     }
-  }, [mode, presetName, hydrogenNDPreset, dimension])
+  }, [mode, presetName, hydrogenNDPreset, dimension, computePreset])
 
   // Dispatch change to the correct store action
   const handleChange = useCallback(
     (value: string) => {
       if (!value) return
+      setComputePreset((prev) => ({ ...prev, [mode]: value }))
       switch (mode) {
         case 'harmonicOscillator':
           setPresetName(value as SchroedingerPresetName)

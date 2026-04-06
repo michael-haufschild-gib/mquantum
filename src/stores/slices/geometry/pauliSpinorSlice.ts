@@ -167,8 +167,8 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
     setPauliNeedsReset: () => setPauliField('needsReset', true),
     clearPauliNeedsReset: () => setPauliField('needsReset', false),
     resetPauliField: () => {
-      setWithVersion((state) => ({
-        pauliSpinor: { ...state.pauliSpinor, needsReset: true },
+      setWithVersion(() => ({
+        pauliSpinor: { ...DEFAULT_PAULI_CONFIG, needsReset: true },
       }))
     },
     setPauliConfig: (config) => {
