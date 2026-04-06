@@ -66,6 +66,14 @@ const SOURCE_CHUNKS: [string, string][] = [
   ['/components/layout/EditorRightPanel', 'components-panels'],
   ['/components/layout/EditorBottomPanel', 'components-panels'],
   ['/components/sections/', 'components-panels'],
+  // Lazy-loaded overlays — deferred until user action
+  ['/components/canvas/PerformanceMonitor', 'components-deferred'],
+  ['/components/overlays/ScreenshotModal', 'components-deferred'],
+  ['/components/overlays/ExportModal', 'components-deferred'],
+  ['/components/overlays/export/', 'components-deferred'],
+  ['/components/overlays/CropEditor', 'components-deferred'],
+  ['/components/overlays/CropBox', 'components-deferred'],
+  ['/components/presets/', 'components-deferred'],
   ['/components/', 'components'],
 ]
 
@@ -116,6 +124,17 @@ export default defineConfig((_env) => ({
       '@/stores': path.resolve(import.meta.dirname, './src/stores'),
       '@/types': path.resolve(import.meta.dirname, './src/types'),
     },
+  },
+  // Pre-bundle known dependencies to speed up dev server cold start
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'zustand',
+      'zustand/react/shallow',
+      'motion/react',
+    ],
   },
   server: {
     port: 3000,

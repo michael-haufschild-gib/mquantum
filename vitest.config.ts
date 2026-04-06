@@ -11,6 +11,13 @@ export default defineConfig({
     css: true,
     pool: 'vmThreads',
     maxWorkers: 4,
+    // Pure logic tests (no DOM) run in node environment — skips happy-dom init
+    environmentMatchGlobs: [
+      ['src/tests/lib/**', 'node'],
+      ['src/tests/stores/**', 'node'],
+      ['src/tests/wasm/**', 'node'],
+      ['src/tests/rendering/**', 'node'],
+    ],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
