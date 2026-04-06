@@ -10,7 +10,11 @@
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { getQuantumTypeEntry, isComputeQuantumType, QUANTUM_MODES_3D_ONLY } from '@/lib/geometry/registry'
+import {
+  getQuantumTypeEntry,
+  isComputeQuantumType,
+  QUANTUM_MODES_3D_ONLY,
+} from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -137,6 +141,16 @@ function resizeQWalk(state: SchroedingerConfig, dim: number): Partial<Schroeding
   return { quantumWalk: { ...prev, ...resizeQuantumWalkArrays(prev, dim) } }
 }
 
+/** Per-mode rendering defaults applied when switching quantum mode. */
+function buildModeRenderingDefaults(
+  mode: SchroedingerConfig['quantumMode']
+): Partial<SchroedingerConfig> {
+  if (mode === 'freeScalarField') {
+    return { densityGain: 5.0, densityContrast: 2.5 }
+  }
+  return {}
+}
+
 /** Resize compute-mode arrays when dimension changed during mode switch. */
 function buildModeResizeUpdate(
   mode: SchroedingerConfig['quantumMode'],
@@ -183,6 +197,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
           state.schroedinger.crossSectionEnabled
         )
         const resizeUpdates = buildModeResizeUpdate(mode, state.schroedinger, dim, resizers)
+        const renderingDefaults = buildModeRenderingDefaults(mode)
 
         return {
           schroedinger: {
@@ -190,6 +205,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
             quantumMode: mode,
             ...reprOverrides,
             ...resizeUpdates,
+            ...renderingDefaults,
           },
         }
       })

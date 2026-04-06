@@ -526,6 +526,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           return {
             schroedinger: {
               ...state.schroedinger,
+              ...preset.renderingOverrides,
               freeScalar: { ...base, ...resized, needsReset: true },
             },
           }

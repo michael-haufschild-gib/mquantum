@@ -145,13 +145,13 @@ fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
  * This creates a sharper opaque→transparent transition at lobe boundaries
  * without shrinking the visible lobe extent.
  *
- * contrast=1.0: bypass (linear)
- * contrast=1.5: gentle sharpening (width=0.67, saturates above 67% of peak)
+ * contrast=1.0: smoothstep with width=1.0 (gentle S-curve sharpening)
+ * contrast=1.5: width=0.67, saturates above 67% of peak
  * contrast=2.0: moderate (width=0.50, saturates above 50% of peak)
  * contrast=3.0: aggressive (width=0.33, saturates above 33% of peak)
  */
 fn applyDensityContrast(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
-  if (uniforms.densityContrast <= 1.0 || uniforms.peakDensity <= 0.0) { return rho; }
+  if (uniforms.peakDensity <= 0.0) { return rho; }
   let normalized = clamp(rho / uniforms.peakDensity, 0.0, 1.0);
   let width = 1.0 / uniforms.densityContrast;
   return smoothstep(0.0, width, normalized) * uniforms.peakDensity;

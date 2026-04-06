@@ -1,5 +1,5 @@
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { type FC, useCallback, useMemo, useState } from 'react'
+import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
@@ -86,6 +86,16 @@ export const TimelineControls: FC = () => {
       schroedingerConfig.quantumMode === 'hydrogenNDCoupled') &&
     schroedingerConfig.representation !== 'wigner'
 
+  // Compute modes with no animation effects content in the drawer
+  const isEffectlessComputeMode =
+    isSchroedinger &&
+    schroedingerConfig.quantumMode !== 'harmonicOscillator' &&
+    schroedingerConfig.quantumMode !== 'hydrogenND' &&
+    schroedingerConfig.quantumMode !== 'hydrogenNDCoupled' &&
+    schroedingerConfig.quantumMode !== 'tdseDynamics'
+
+  const hasEffectsDrawerContent = !isEffectlessComputeMode
+
   const activeAnimationCount = useMemo(() => {
     if (configStoreKey === 'schroedinger') {
       return [
@@ -113,6 +123,16 @@ export const TimelineControls: FC = () => {
   const isHydrogen =
     schroedingerConfig.quantumMode === 'hydrogenND' ||
     schroedingerConfig.quantumMode === 'hydrogenNDCoupled'
+
+  const effectsTooltip = useMemo(() => {
+    if (isPauliSpinor) {
+      return 'Simulation speed and dimensional sweep controls for the Pauli spinor.'
+    }
+    if (isSchroedinger && schroedingerConfig.quantumMode === 'tdseDynamics') {
+      return 'TDSE auto-loop control for automatic wavepacket re-initialization.'
+    }
+    return 'Quantum animation effects: phase evolution, interference fringes, probability current, and dimensional sweeps.'
+  }, [isPauliSpinor, isSchroedinger, schroedingerConfig.quantumMode])
 
   const activeOpenQuantumCount = useMemo(() => {
     if (!schroedingerConfig.openQuantumEnabled) return 0
@@ -166,6 +186,11 @@ export const TimelineControls: FC = () => {
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
 
+  // Close the effects drawer when switching to a mode that has no drawer content
+  useEffect(() => {
+    if (!hasEffectsDrawerContent) setShowAnimDrawer(false)
+  }, [hasEffectsDrawerContent])
+
   const effectiveShowOpenQDrawer = showOpenQDrawer && supportsOpenQuantumControls
 
   // Shared close-others helper — only one drawer open at a time
@@ -192,7 +217,7 @@ export const TimelineControls: FC = () => {
           <RotationAnimationDrawer onClose={() => setShowRotationDrawer(false)} />
         )}
 
-        {showAnimDrawer && isSchroedinger && (
+        {showAnimDrawer && isSchroedinger && hasEffectsDrawerContent && (
           <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
         )}
 
@@ -275,13 +300,13 @@ export const TimelineControls: FC = () => {
 
         {/* Drawer Toggles */}
         <div className="flex items-center gap-2">
-          {hasTimelineControls(objectType) && (
+          {hasTimelineControls(objectType) && hasEffectsDrawerContent && (
             <ToggleButton
               pressed={showAnimDrawer}
               onToggle={() => (showAnimDrawer ? setShowAnimDrawer(false) : openAnimDrawer())}
               sound="swish"
               ariaLabel="Toggle animations drawer"
-              tooltip="Open the quantum animation effects panel (phase, interference, probability flow)."
+              tooltip={effectsTooltip}
               className="text-xs font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Effects

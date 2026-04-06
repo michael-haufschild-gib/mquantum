@@ -487,6 +487,97 @@ test.describe('free scalar field: physics', () => {
   })
 })
 
+// ─── F2. Self-Interaction Scenario Presets ──────────────────────────────────
+
+test.describe('free scalar field: self-interaction scenario presets', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  /** Apply an FSF scenario preset by id, waiting for the store to update. */
+  async function applyFsfPreset(page: Page, presetId: string): Promise<void> {
+    await page.evaluate(async (id) => {
+      const mod = await import('/src/stores/extendedObjectStore.ts')
+      mod.useExtendedObjectStore.getState().applyFreeScalarPreset(id)
+    }, presetId)
+
+    // applyFreeScalarPreset uses a dynamic import internally, so the store
+    // update is async. Wait until needsReset flips to true (preset applied).
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/extendedObjectStore.ts')
+        return mod.useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset === true
+      },
+      { timeout: 5_000 }
+    )
+  }
+
+  test('mexicanHat preset renders and produces finite energy', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyFsfPreset(page, 'mexicanHat')
+    await enableDiagnostics(page)
+    await waitForShaderCompilation(page)
+
+    const fc = await getFrameCount(page)
+    await waitForFrameAdvance(page, fc + 120)
+    await assertPixels(page, 'mexicanHat preset')
+
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData, 'mexicanHat diagnostics must have data').toBe(true)
+    expect(Number.isFinite(diag.totalEnergy), 'energy must be finite').toBe(true)
+    expect(diag.totalEnergy, 'energy must be positive').toBeGreaterThan(0)
+  })
+
+  test('domainWall preset renders wall density and has finite energy', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyFsfPreset(page, 'domainWall')
+    await waitForShaderCompilation(page)
+
+    const fc = await getFrameCount(page)
+    await waitForFrameAdvance(page, fc + 120)
+    await assertPixels(page, 'domainWall preset')
+
+    // Diagnostics are enabled by preset overrides
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
+    const diag = await readFsfDiagnostics(page)
+    expect(diag.hasData, 'domainWall diagnostics must have data').toBe(true)
+    expect(Number.isFinite(diag.totalEnergy), 'energy must be finite').toBe(true)
+    expect(diag.totalEnergy, 'energy must be positive').toBeGreaterThan(0)
+  })
+
+  test('falseVacuumBubble preset renders and field evolves', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await applyFsfPreset(page, 'falseVacuumBubble')
+    await waitForShaderCompilation(page)
+
+    const fc = await getFrameCount(page)
+    await waitForFrameAdvance(page, fc + 120)
+    await assertPixels(page, 'falseVacuumBubble preset')
+
+    // Diagnostics are enabled by preset overrides
+    await waitForDiagnostics(page, '/src/stores/diagnosticsStore.ts', undefined, 'fsf')
+    const snap1 = await readFsfDiagnostics(page)
+    expect(snap1.hasData, 'first snapshot must have data').toBe(true)
+
+    // Let field evolve further — the perturbation near φ=0 should roll toward ±v
+    await waitForSimulationFrames(page, 100)
+    const snap2 = await readFsfDiagnostics(page)
+    expect(snap2.hasData, 'second snapshot must have data').toBe(true)
+    expect(Number.isFinite(snap2.totalEnergy), 'energy must be finite after evolution').toBe(true)
+  })
+})
+
 // ─── G. Dimension Switching ─────────────────────────────────────────────────
 
 test.describe('free scalar field: dimension switching', () => {
