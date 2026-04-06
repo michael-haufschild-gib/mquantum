@@ -12,14 +12,10 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 /** A curated Dirac equation scenario with dimension-agnostic config overrides. */
-export interface DiracScenarioPreset {
-  id: string
-  name: string
-  description: string
-  overrides: Partial<DiracConfig>
-}
+export type DiracScenarioPreset = ScenarioPreset<Partial<DiracConfig>>
 
 export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
   {

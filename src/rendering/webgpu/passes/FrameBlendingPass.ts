@@ -8,6 +8,7 @@
  */
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -290,9 +291,9 @@ export class FrameBlendingPass extends WebGPUBasePass {
    * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
-    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+    const postProcessing = getStoreSnapshot<{
       frameBlendingFactor?: number
-    }
+    }>(ctx, 'postProcessing')
 
     if (postProcessing?.frameBlendingFactor !== undefined) {
       this.blendFactor = postProcessing.frameBlendingFactor

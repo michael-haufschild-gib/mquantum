@@ -12,41 +12,13 @@ import { expect, test } from '@playwright/test'
 
 import {
   getFrameCount,
+  getPerformanceMetrics,
   gotoMode,
   requireWebGPU,
   waitForFrameAdvance,
   waitForRendererReady,
   waitForShaderCompilation,
 } from './helpers/app-helpers'
-
-interface PassTiming {
-  passId: string
-  gpuTimeMs: number
-  computeGpuTimeMs: number
-  renderGpuTimeMs: number
-  cpuTimeMs: number
-  skipped: boolean
-}
-
-async function getPassTimings(page: import('@playwright/test').Page): Promise<{
-  passTimings: PassTiming[]
-  totalGpuTimeMs: number
-  frameTime: number
-  fps: number
-  cpuBreakdown: { setupMs: number; passesMs: number; submitMs: number }
-}> {
-  return page.evaluate(async () => {
-    const mod = await import('/src/stores/performanceMetricsStore.ts')
-    const state = mod.usePerformanceMetricsStore.getState()
-    return {
-      passTimings: state.passTimings,
-      totalGpuTimeMs: state.totalGpuTimeMs,
-      frameTime: state.frameTime,
-      fps: state.fps,
-      cpuBreakdown: state.cpuBreakdown,
-    }
-  })
-}
 
 test.describe('GPU timing profiler', () => {
   test.beforeEach(async ({ page }) => {
@@ -75,7 +47,7 @@ test.describe('GPU timing profiler', () => {
       await waitForFrameAdvance(page, fc + 120)
 
       // Read GPU timings
-      const data = await getPassTimings(page)
+      const data = await getPerformanceMetrics(page)
 
       console.log(`\n[GPU-PROFILE] === ${label} ===`)
       console.log(`  FPS: ${data.fps.toFixed(1)}, frameTime: ${data.frameTime.toFixed(2)}ms`)

@@ -25,6 +25,7 @@
 import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -154,7 +155,6 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       totalSites: this.buf.totalSites,
       label: 'pauli',
       getMetadata: async () => {
-        const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
         const pauliConfig = useExtendedObjectStore.getState().pauliSpinor
         return {
           quantumMode: 'pauliSpinor',

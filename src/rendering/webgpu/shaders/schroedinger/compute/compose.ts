@@ -78,8 +78,6 @@ import {
   densityGridWithPhaseComputeBlock,
   densityMatrixComputeBlock,
   generateDensityGridBindingsBlock,
-  generateDensityGridBindingsWithHydrogenBasisBlock,
-  generateDensityGridBindingsWithOpenQuantumBlock,
   gridParamsBlock,
 } from './densityGrid.wgsl'
 
@@ -303,11 +301,11 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     // Compute shader bindings
     {
       name: 'Compute Bindings',
-      content: useDensityMatrix
-        ? isHydrogenFamily
-          ? generateDensityGridBindingsWithHydrogenBasisBlock(storageFormat)
-          : generateDensityGridBindingsWithOpenQuantumBlock(storageFormat)
-        : generateDensityGridBindingsBlock(storageFormat),
+      content: generateDensityGridBindingsBlock({
+        storageFormat,
+        includeOpenQuantum: useDensityMatrix,
+        includeHydrogenBasis: useDensityMatrix && isHydrogenFamily,
+      }),
     },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====

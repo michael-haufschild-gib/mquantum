@@ -8,7 +8,6 @@
  */
 
 import { generateObjectBindGroup } from '../shared/compose-helpers'
-import type { ColorAlgorithm } from '../types'
 import { generateAnalyticalGradientBlock } from './quantum/analyticalGradient.wgsl'
 import { complexMathBlock } from './quantum/complex.wgsl'
 import { densityPostMapBlock, densityPreMapBlock, generateMapPosToND } from './quantum/density.wgsl'
@@ -380,7 +379,7 @@ export function buildQuantumMathBlocks(opts: {
 /** Build volume rendering shader blocks (absorption, emission, integration, grid). */
 export function buildVolumeBlocks(opts: {
   is2D: boolean
-  colorAlgorithm: ColorAlgorithm
+  colorAlgorithm: number
   includeHydrogen: boolean
   useCache: boolean
   actualDim: number

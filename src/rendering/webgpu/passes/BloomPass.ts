@@ -18,6 +18,7 @@ import {
   DEFAULT_BLOOM_THRESHOLD,
 } from '@/stores/defaults/visualDefaults'
 
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -158,7 +159,7 @@ export class BloomPass extends WebGPUBasePass {
   }
 
   private updateFromStores(ctx: WebGPURenderContext): void {
-    const postProcessing = ctx.frame?.stores?.['postProcessing'] as BloomStoreState | undefined
+    const postProcessing = getStoreSnapshot<BloomStoreState>(ctx, 'postProcessing')
     if (!postProcessing) return
 
     if (postProcessing.bloomGain !== undefined) {

@@ -37,24 +37,6 @@ async function openPassesTab(page: import('@playwright/test').Page): Promise<voi
   })
 }
 
-/** Read pass timing data directly from the store. */
-async function getPassTimingsFromStore(page: import('@playwright/test').Page) {
-  return page.evaluate(async () => {
-    const mod = await import('/src/stores/performanceMetricsStore.ts')
-    const s = mod.usePerformanceMetricsStore.getState()
-    return {
-      passTimings: s.passTimings.map((p) => ({
-        passId: p.passId,
-        gpuTimeMs: p.gpuTimeMs,
-        cpuTimeMs: p.cpuTimeMs,
-        skipped: p.skipped,
-      })),
-      totalGpuTimeMs: s.totalGpuTimeMs,
-      cpuBreakdown: { ...s.cpuBreakdown },
-    }
-  })
-}
-
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 test.describe('performance profiling', () => {
@@ -73,7 +55,7 @@ test.describe('performance profiling', () => {
     const startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const data = await getPassTimingsFromStore(page)
+    const data = await getPerformanceMetrics(page)
 
     // Must have at least one pass (scene, object renderer, toscreen at minimum)
     expect(data.passTimings.length, 'should have pass timing entries').toBeGreaterThan(0)
@@ -93,7 +75,7 @@ test.describe('performance profiling', () => {
     const startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const data = await getPassTimingsFromStore(page)
+    const data = await getPerformanceMetrics(page)
 
     // Setup phase should be non-zero (captures stores, creates context)
     expect(data.cpuBreakdown.setupMs, 'setup phase should be > 0').toBeGreaterThan(0)
@@ -151,7 +133,7 @@ test.describe('performance profiling', () => {
     let startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const baselineData = await getPassTimingsFromStore(page)
+    const baselineData = await getPerformanceMetrics(page)
     const baselinePassIds = baselineData.passTimings.map((p) => p.passId)
 
     // Switch to free scalar field mode (uses compute passes)
@@ -172,7 +154,7 @@ test.describe('performance profiling', () => {
     startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const newData = await getPassTimingsFromStore(page)
+    const newData = await getPerformanceMetrics(page)
     const newPassIds = newData.passTimings.map((p) => p.passId)
 
     // Both should have pass data
@@ -194,7 +176,7 @@ test.describe('performance profiling', () => {
     const startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const data = await getPassTimingsFromStore(page)
+    const data = await getPerformanceMetrics(page)
 
     // Should have empty pass timings since collector skips when hidden
     expect(data.passTimings.length, 'no pass timings when hidden').toBe(0)
@@ -206,7 +188,7 @@ test.describe('performance profiling', () => {
     const startFrame = await getFrameCount(page)
     await waitForFrameAdvance(page, startFrame + 60)
 
-    const data = await getPassTimingsFromStore(page)
+    const data = await getPerformanceMetrics(page)
     const hasGpuTimings = data.passTimings.some((p) => p.gpuTimeMs > 0)
 
     // Check if the GPU supports timestamp queries

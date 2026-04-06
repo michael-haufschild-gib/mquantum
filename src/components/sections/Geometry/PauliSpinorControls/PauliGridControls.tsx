@@ -11,20 +11,8 @@ import React, { useCallback, useMemo } from 'react'
 
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
-
-/** Max total sites — must match store constant */
-const PAULI_MAX_TOTAL_SITES = 262144
-
-const ALL_GRID_SIZE_OPTIONS = [
-  { value: '4', label: '4' },
-  { value: '8', label: '8' },
-  { value: '16', label: '16' },
-  { value: '32', label: '32' },
-  { value: '64', label: '64' },
-  { value: '128', label: '128' },
-]
+import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
+import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
 interface PauliGridControlsProps {
   latticeDim: number
@@ -65,7 +53,7 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
     onMassChange,
   }) => {
     const maxPerDim = useMemo(
-      () => Math.round(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim)),
+      () => Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / latticeDim)),
       [latticeDim]
     )
     const gridSizeOptions = useMemo(

@@ -16,6 +16,9 @@ import {
   clampDtWithCfl,
   defaultGridPerDim,
   MAX_TOTAL_SITES,
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
   type SetterContext,
 } from './sliceSetterUtils'
 
@@ -91,6 +94,7 @@ export const resizeFreeScalarArrays = (
  */
 export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+  const D = 'freeScalar' as const
 
   return {
     setFreeScalarLatticeDim: (dim) => {
@@ -200,19 +204,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         }
       })
     },
-    setFreeScalarStepsPerFrame: (steps) => {
-      if (!isFinite(steps)) {
-        warnNonFinite('freeScalar.stepsPerFrame', steps)
-        return
-      }
-      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, stepsPerFrame: clamped },
-        },
-      }))
-    },
+    setFreeScalarStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16),
     setFreeScalarInitialCondition: (condition) => {
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
@@ -235,14 +227,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         }
       })
     },
-    setFreeScalarFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, fieldView: view },
-        },
-      }))
-    },
+    setFreeScalarFieldView: nestedValueSetter(ctx, D, 'fieldView'),
     setFreeScalarPacketCenter: (center) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -289,14 +274,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         },
       }))
     },
-    setFreeScalarAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, autoScale },
-        },
-      }))
-    },
+    setFreeScalarAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
     setFreeScalarVacuumSeed: (seed) => {
       if (!isFinite(seed)) {
         warnNonFinite('freeScalar.vacuumSeed', seed)
@@ -321,70 +299,24 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         },
       }))
     },
-    setFreeScalarSelfInteractionEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionEnabled: enabled },
-        },
-      }))
-    },
-    setFreeScalarSelfInteractionLambda: (lambda) => {
-      if (!isFinite(lambda)) {
-        warnNonFinite('freeScalar.selfInteractionLambda', lambda)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, lambda))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionLambda: clamped },
-        },
-      }))
-    },
-    setFreeScalarSelfInteractionVev: (vev) => {
-      if (!isFinite(vev)) {
-        warnNonFinite('freeScalar.selfInteractionVev', vev)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(5.0, vev))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionVev: clamped },
-        },
-      }))
-    },
-    setFreeScalarAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setFreeScalarAbsorberWidth: (width) => {
-      const clamped = Math.max(0.05, Math.min(0.5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, absorberWidth: clamped },
-        },
-      }))
-    },
-    setFreeScalarPmlTargetReflection: (r) => {
-      if (!isFinite(r)) {
-        warnNonFinite('freeScalar.pmlTargetReflection', r)
-        return
-      }
-      const clamped = Math.max(1e-12, Math.min(0.999, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, pmlTargetReflection: clamped },
-        },
-      }))
-    },
+    setFreeScalarSelfInteractionEnabled: nestedValueSetter(ctx, D, 'selfInteractionEnabled'),
+    setFreeScalarSelfInteractionLambda: nestedClampedSetter(
+      ctx,
+      D,
+      'selfInteractionLambda',
+      0.01,
+      10.0
+    ),
+    setFreeScalarSelfInteractionVev: nestedClampedSetter(ctx, D, 'selfInteractionVev', 0.1, 5.0),
+    setFreeScalarAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled'),
+    setFreeScalarAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setFreeScalarPmlTargetReflection: nestedClampedSetter(
+      ctx,
+      D,
+      'pmlTargetReflection',
+      1e-12,
+      0.999
+    ),
     setFreeScalarSlicePosition: (dimIndex, value) => {
       if (!isFinite(value)) {
         warnNonFinite('freeScalar.slicePositions', value)

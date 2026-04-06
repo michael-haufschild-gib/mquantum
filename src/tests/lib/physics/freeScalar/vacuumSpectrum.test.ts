@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_KSPACE_VIZ, type FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,
@@ -10,34 +11,7 @@ import {
 
 /** Minimal config for testing */
 function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig {
-  return {
-    latticeDim: 3,
-    gridSize: [8, 8, 8],
-    spacing: [0.1, 0.1, 0.1],
-    mass: 1.0,
-    dt: 0.01,
-    stepsPerFrame: 4,
-    initialCondition: 'vacuumNoise',
-    packetCenter: [0, 0, 0],
-    packetWidth: 0.3,
-    packetAmplitude: 1.0,
-    modeK: [1, 0, 0],
-    fieldView: 'phi',
-    autoScale: true,
-    needsReset: false,
-    vacuumSeed: 42,
-    slicePositions: [],
-    kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
-    selfInteractionEnabled: false,
-    selfInteractionLambda: 0.5,
-    selfInteractionVev: 1.0,
-    absorberEnabled: false,
-    absorberWidth: 0.2,
-    pmlTargetReflection: 1e-6,
-    diagnosticsEnabled: false,
-    diagnosticsInterval: 60,
-    ...overrides,
-  }
+  return { ...DEFAULT_FREE_SCALAR_CONFIG, ...overrides }
 }
 
 describe('computeOmegaK', () => {

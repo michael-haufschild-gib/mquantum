@@ -16,6 +16,8 @@
  */
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import type { AnimationSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -540,17 +542,17 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
-    const lighting = ctx.frame?.stores?.['lighting'] as {
+    const lighting = getStoreSnapshot<{
       exposure?: number
       toneMappingEnabled?: boolean
       toneMappingAlgorithm?: string
-    }
-    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+    }>(ctx, 'lighting')
+    const postProcessing = getStoreSnapshot<{
       cinematicEnabled?: boolean
       cinematicVignette?: number
       cinematicAberration?: number
       cinematicGrain?: number
-    }
+    }>(ctx, 'postProcessing')
 
     // Exposure from lighting store
     if (lighting?.exposure !== undefined) {
@@ -648,7 +650,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     floatView[1] = ctx.size.height
     // Use animation time (pauses with animation) instead of wall-clock time
     // to prevent film grain noise pattern from jittering when paused
-    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
+    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     floatView[2] = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     intView[3] = this.toneMapping // i32
     floatView[4] = this.exposure

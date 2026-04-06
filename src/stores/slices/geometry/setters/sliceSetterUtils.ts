@@ -10,6 +10,8 @@
 
 import type { StoreApi } from 'zustand'
 
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+
 import type { ExtendedObjectSlice } from '../types'
 
 type ZustandSet = StoreApi<ExtendedObjectSlice>['setState']
@@ -80,6 +82,9 @@ export const clampDtWithCfl = (
 /** Maximum total TDSE/BEC lattice sites — FFT needs power-of-2 per axis */
 export const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
 
+/** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
+export const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
+
 /** Maximum total free scalar lattice sites (~8MB for phi+pi buffers) */
 export const MAX_TOTAL_SITES = 1048576
 
@@ -115,3 +120,112 @@ export const defaultTdseGridPerDim = (d: number): number =>
  * @param d - Number of spatial dimensions
  */
 export const defaultGridPerDim = (d: number): number => computeDefaultGridPerDim(d, MAX_TOTAL_SITES)
+
+/**
+ * Compute default per-dimension grid size for Dirac equation mode.
+ * @param d - Number of spatial dimensions
+ */
+export const defaultDiracGridPerDim = (d: number): number =>
+  computeDefaultGridPerDim(d, DIRAC_MAX_TOTAL_SITES)
+
+
+// ---------------------------------------------------------------------------
+// Nested domain setter factories
+// ---------------------------------------------------------------------------
+// These eliminate boilerplate for the common pattern:
+//   (value) => { validate; clamp; setWithVersion(state => ({
+//     schroedinger: { ...state.schroedinger, DOMAIN: { ...DOMAIN, FIELD: clamped } }
+//   })) }
+// Used by tdse, bec, dirac, freeScalar, openQuantum setter files.
+
+/** Union of SchroedingerConfig keys that hold nested domain config objects. */
+type DomainKey = 'tdse' | 'bec' | 'dirac' | 'freeScalar' | 'openQuantum' | 'quantumWalk'
+
+/**
+ * Create a setter that validates, clamps, and writes a single numeric field
+ * on a nested domain config (e.g. `schroedinger.bec.trapOmega`).
+ *
+ * @param ctx - Setter context
+ * @param domain - Domain key in SchroedingerConfig
+ * @param field - Field name within the domain config
+ * @param min - Minimum allowed value
+ * @param max - Maximum allowed value
+ */
+export function nestedClampedSetter<D extends DomainKey>(
+  ctx: SetterContext,
+  domain: D,
+  field: string & keyof SchroedingerConfig[D],
+  min: number,
+  max: number
+): (value: number) => void {
+  return (value: number) => {
+    if (!ctx.isFinite(value)) {
+      ctx.warnNonFinite(`${domain}.${field}`, value)
+      return
+    }
+    const clamped = Math.max(min, Math.min(max, value))
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        [domain]: { ...state.schroedinger[domain], [field]: clamped },
+      },
+    }))
+  }
+}
+
+/**
+ * Create a setter that writes a single field on a nested domain config
+ * without numeric validation or clamping. Used for booleans, enums, strings.
+ *
+ * @param ctx - Setter context
+ * @param domain - Domain key in SchroedingerConfig
+ * @param field - Field name within the domain config
+ */
+export function nestedValueSetter<D extends DomainKey>(
+  ctx: SetterContext,
+  domain: D,
+  field: string & keyof SchroedingerConfig[D]
+): (value: SchroedingerConfig[D][typeof field]) => void {
+  return (value: SchroedingerConfig[D][typeof field]) => {
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        [domain]: { ...state.schroedinger[domain], [field]: value },
+      },
+    }))
+  }
+}
+
+/**
+ * Create a setter that validates, clamps, rounds to integer, and writes a
+ * single numeric field on a nested domain config.
+ *
+ * @param ctx - Setter context
+ * @param domain - Domain key in SchroedingerConfig
+ * @param field - Field name within the domain config
+ * @param min - Minimum allowed value
+ * @param max - Maximum allowed value
+ */
+export function nestedIntSetter<D extends DomainKey>(
+  ctx: SetterContext,
+  domain: D,
+  field: string & keyof SchroedingerConfig[D],
+  min: number,
+  max: number,
+  round: 'floor' | 'round' = 'round'
+): (value: number) => void {
+  const roundFn = round === 'floor' ? Math.floor : Math.round
+  return (value: number) => {
+    if (!ctx.isFinite(value)) {
+      ctx.warnNonFinite(`${domain}.${field}`, value)
+      return
+    }
+    const clamped = Math.max(min, Math.min(max, roundFn(value)))
+    ctx.setWithVersion((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        [domain]: { ...state.schroedinger[domain], [field]: clamped },
+      },
+    }))
+  }
+}

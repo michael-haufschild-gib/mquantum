@@ -4,7 +4,10 @@
  */
 
 import { logger } from '@/lib/logger'
-import { computeStrides as computeStridesBase } from '@/lib/math/ndArray'
+import {
+  computeStrides as computeStridesBase,
+  reduceGridToFit as reduceGridToFitBase,
+} from '@/lib/math/ndArray'
 
 /** 1D dispatch workgroup size — must match @workgroup_size in 1D compute shaders */
 export const LINEAR_WG = 64
@@ -53,21 +56,12 @@ export function nearestPow2(v: number): number {
  * Reduce grid dimensions until total sites fit within the GPU dispatch limit.
  * Halves the largest axis repeatedly until the product is within bounds.
  *
- * @param grid - Per-axis grid sizes (power-of-2 values)
+ * @param grid - Per-axis grid sizes (power-of-2 values). Input is NOT mutated.
  * @param maxSites - Maximum allowed total sites (defaults to MAX_LINEAR_DISPATCH_SITES)
- * @returns Grid sizes reduced to fit within the dispatch limit
+ * @returns New grid sizes reduced to fit within the dispatch limit
  */
 export function reduceGridToFit(grid: number[], maxSites = MAX_LINEAR_DISPATCH_SITES): number[] {
-  const result = [...grid]
-  while (result.reduce((a, b) => a * b, 1) > maxSites) {
-    let maxIdx = 0
-    for (let i = 1; i < result.length; i++) {
-      if (result[i]! > result[maxIdx]!) maxIdx = i
-    }
-    if (result[maxIdx]! <= 2) break
-    result[maxIdx] = result[maxIdx]! / 2
-  }
-  return result
+  return reduceGridToFitBase([...grid], maxSites)
 }
 
 /**

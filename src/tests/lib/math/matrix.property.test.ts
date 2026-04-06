@@ -16,32 +16,14 @@ import {
   multiplyMatrixVector,
   transposeMatrix,
 } from '@/lib/math'
-import type { MatrixND } from '@/lib/math/types'
+import { arbMatrix, arbVector } from '@/tests/lib/math/arbitraries'
 
 // ---------------------------------------------------------------------------
-// Arbitraries
+// Derived Arbitraries
 // ---------------------------------------------------------------------------
 
 /** Arbitrary dimension for matrix tests (small for perf, 2-6) */
 const arbDim = fc.integer({ min: 2, max: 6 })
-
-/** Arbitrary square matrix of a given dimension with moderate values */
-function arbMatrix(dim: number): fc.Arbitrary<MatrixND> {
-  return fc
-    .array(fc.double({ min: -10, max: 10, noNaN: true, noDefaultInfinity: true }), {
-      minLength: dim * dim,
-      maxLength: dim * dim,
-    })
-    .map((arr) => Float32Array.from(arr))
-}
-
-/** Arbitrary vector of a given dimension */
-function arbVector(dim: number) {
-  return fc.array(fc.double({ min: -10, max: 10, noNaN: true, noDefaultInfinity: true }), {
-    minLength: dim,
-    maxLength: dim,
-  })
-}
 
 /** Single matrix with its dimension */
 const arbMatWithDim = arbDim.chain((dim) => arbMatrix(dim).map((M) => ({ dim, M })))
@@ -196,7 +178,7 @@ describe('determinant — properties', () => {
 
 describe('matrix-vector multiplication — properties', () => {
   it('I * v = v', () => {
-    const arb = arbDim.chain((dim) => arbVector(dim).map((v) => ({ dim, v })))
+    const arb = arbDim.chain((dim) => arbVector(dim, 10).map((v) => ({ dim, v })))
     fc.assert(
       fc.property(arb, ({ dim, v }) => {
         const I = createIdentityMatrix(dim)
@@ -214,7 +196,7 @@ describe('matrix-vector multiplication — properties', () => {
       .integer({ min: 2, max: 5 })
       .chain((dim) =>
         fc
-          .tuple(arbMatrix(dim), arbVector(dim), arbVector(dim), scalar, scalar)
+          .tuple(arbMatrix(dim), arbVector(dim, 10), arbVector(dim, 10), scalar, scalar)
           .map(([A, u, v, alpha, beta]) => ({ dim, A, u, v, alpha, beta }))
       )
     fc.assert(

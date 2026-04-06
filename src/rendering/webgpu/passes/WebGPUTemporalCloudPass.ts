@@ -14,6 +14,8 @@
 
 import { logger } from '@/lib/logger'
 
+import type { AnimationSnapshot, CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { writeInvertMat4 } from '../utils/mat4'
@@ -173,12 +175,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     inverseViewProjectionMatrix: Float32Array
     position: { x: number; y: number; z: number }
   } | null {
-    const cameraStore = ctx.frame?.stores?.['camera'] as
-      | {
-          viewProjectionMatrix?: { elements: number[] }
-          position?: { x: number; y: number; z: number } | number[]
-        }
-      | undefined
+    const cameraStore = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
     if (!cameraStore?.viewProjectionMatrix?.elements) return null
 
@@ -376,7 +373,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     }
 
     // Static scene detection: freeze Bayer cycling when nothing changes
-    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
+    const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)

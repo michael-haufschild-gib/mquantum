@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { generateDisorderPotential, mulberry32 } from '@/lib/physics/anderson/disorderPotential'
+import { generateDisorderPotential } from '@/lib/physics/anderson/disorderPotential'
+import { mulberry32 } from '@/lib/math/rng'
 
 describe('mulberry32', () => {
   it('produces deterministic sequence from seed', () => {

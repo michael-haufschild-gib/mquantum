@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
+import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState } from '@/lib/physics/compactification'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -15,6 +16,9 @@ import type { SchroedingerSliceActions } from '../types'
 import {
   clampDtWithCfl,
   defaultTdseGridPerDim,
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
   type SetterContext,
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
@@ -175,6 +179,7 @@ export const resizeTdseArrays = (prev: TdseConfig, newDim: number): Partial<Tdse
  */
 export function createTdseSetters(ctx: SetterContext): TdseActions {
   const { setWithVersion, set, isFinite, warnNonFinite, hasOnlyFinite } = ctx
+  const D = 'tdse' as const
 
   return {
     setTdseLatticeDim: (dim) => {
@@ -210,19 +215,7 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           const log2 = Math.round(Math.log2(val))
           return Math.max(2, Math.min(128, 2 ** log2))
         })
-        const reduceToFit = (grid: number[]): number[] => {
-          const result = [...grid]
-          while (result.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
-            let maxIdx = 0
-            for (let i = 1; i < result.length; i++) {
-              if (result[i]! > result[maxIdx]!) maxIdx = i
-            }
-            if (result[maxIdx]! <= 2) break
-            result[maxIdx] = result[maxIdx]! / 2
-          }
-          return result
-        }
-        const clamped = reduceToFit(snapped)
+        const clamped = reduceGridToFit([...snapped], TDSE_MAX_TOTAL_SITES)
         const td = state.schroedinger.tdse
         const kk = clampKKState(
           td.dt,
@@ -296,45 +289,9 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         }
       })
     },
-    setTdseHbar: (hbar) => {
-      if (!isFinite(hbar)) {
-        warnNonFinite('tdse.hbar', hbar)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, hbar: clamped },
-        },
-      }))
-    },
-    setTdseDt: (dt) => {
-      if (!isFinite(dt)) {
-        warnNonFinite('tdse.dt', dt)
-        return
-      }
-      const clamped = Math.max(0.0001, Math.min(0.05, dt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, dt: clamped },
-        },
-      }))
-    },
-    setTdseStepsPerFrame: (steps) => {
-      if (!isFinite(steps)) {
-        warnNonFinite('tdse.stepsPerFrame', steps)
-        return
-      }
-      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stepsPerFrame: clamped },
-        },
-      }))
-    },
+    setTdseHbar: nestedClampedSetter(ctx, D, 'hbar', 0.01, 10.0),
+    setTdseDt: nestedClampedSetter(ctx, D, 'dt', 0.0001, 0.05),
+    setTdseStepsPerFrame: nestedIntSetter(ctx, D, 'stepsPerFrame', 1, 16, 'floor'),
     setTdseInitialCondition: (condition) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -385,14 +342,7 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         },
       }))
     },
-    setTdsePotentialType: (type) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, potentialType: type },
-        },
-      }))
-    },
+    setTdsePotentialType: nestedValueSetter(ctx, D, 'potentialType'),
     // Potential and drive parameter setters (data-driven, extracted to tdsePotentialSetters.ts)
     ...(createTdsePotentialSetters(ctx) as unknown as Pick<
       TdseActions,

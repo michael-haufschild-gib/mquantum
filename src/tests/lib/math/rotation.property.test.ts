@@ -21,6 +21,7 @@ import {
   multiplyMatrixVector,
   transposeMatrix,
 } from '@/lib/math'
+import { arbVector } from '@/tests/lib/math/arbitraries'
 
 // Fast trig compounds errors; 0.15 tolerance per element
 const FAST_TRIG_TOL = 0.15
@@ -53,14 +54,6 @@ const arbPlane = arbDim.chain((dim) => {
 const arbRotation = arbPlane.chain(({ dim, i, j }) =>
   arbAngle.map((angle) => ({ dim, i, j, angle }))
 )
-
-/** Arbitrary vector of a given dimension */
-function arbVector(dim: number) {
-  return fc.array(fc.double({ min: -10, max: 10, noNaN: true, noDefaultInfinity: true }), {
-    minLength: dim,
-    maxLength: dim,
-  })
-}
 
 // Helper: Frobenius distance from identity
 function orthoError(M: Float32Array, dim: number): number {
@@ -112,7 +105,7 @@ describe('rotation matrix SO(n) — properties', () => {
 
   it('preserves vector magnitude: |Rv| ≈ |v|', () => {
     const arb = arbRotation.chain(({ dim, i, j, angle }) =>
-      arbVector(dim).map((v) => ({ dim, i, j, angle, v }))
+      arbVector(dim, 10).map((v) => ({ dim, i, j, angle, v }))
     )
     fc.assert(
       fc.property(arb, ({ dim, i, j, angle, v }) => {

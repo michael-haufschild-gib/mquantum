@@ -11,7 +11,6 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/emission.wgsl
  */
 
-import type { ColorAlgorithm } from '../../types'
 
 /**
  * Generate emission pre-block WGSL with only the helpers needed by the active algorithm.
@@ -25,7 +24,7 @@ import type { ColorAlgorithm } from '../../types'
  * - blackbody(): referenced in main.wgsl.ts / main2D.wgsl.ts behind
  *   FEATURE_PHASE_MATERIALITY guards (WGSL requires symbol resolution in dead branches)
  */
-export function generateEmissionPreBlock(colorAlgorithm: ColorAlgorithm, is2D: boolean): string {
+export function generateEmissionPreBlock(colorAlgorithm: number, is2D: boolean): string {
   const parts: string[] = [
     /* wgsl */ `
 // ============================================
@@ -519,7 +518,7 @@ const ALGO_BRANCH: Record<number, string> = {
     col = hsl2rgb(hue, saturation, lightness);`,
 }
 
-/** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
+/** Human-readable names for color algorithms (indexed by number value) */
 export { ALGO_BRANCH }
 export { COLOR_ALG_NAMES } from './emissionConstants'
 
@@ -527,7 +526,7 @@ export { COLOR_ALG_NAMES } from './emissionConstants'
  * Generate the computeBaseColor() WGSL function for a specific color algorithm.
  * Emits only that algorithm's branch (no if/else chain) for compile-time specialization.
  */
-export function generateComputeBaseColor(colorAlgorithm: ColorAlgorithm): string {
+export function generateComputeBaseColor(colorAlgorithm: number): string {
   // Only algorithms 3 (Phase) and 4 (Mixed) use baseHSL from material color
   const needsBaseHSL = colorAlgorithm === 3 || colorAlgorithm === 4
   const header = /* wgsl */ `

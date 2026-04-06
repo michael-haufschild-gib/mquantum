@@ -27,6 +27,8 @@
  * @module rendering/webgpu/passes/TemporalCloudPass
  */
 
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -381,12 +383,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
    */
   /** Extract VP matrix and camera position from store snapshot. */
   private extractCameraState(
-    camera:
-      | {
-          viewProjectionMatrix?: { elements: number[] }
-          position?: { x: number; y: number; z: number } | [number, number, number]
-        }
-      | undefined
+    camera: CameraSnapshot | undefined
   ): { currentVP: Float32Array; camPos: [number, number, number] } {
     const currentVP = this.currentViewProjectionMatrix
     currentVP.fill(0)
@@ -488,10 +485,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
     const cloudHeight = cloudResource?.height ?? height / 2
 
     // Get camera data from stores
-    const camera = ctx.frame?.stores?.['camera'] as {
-      viewProjectionMatrix?: { elements: number[] }
-      position?: { x: number; y: number; z: number } | [number, number, number]
-    }
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
     // Extract camera state
     const { currentVP, camPos } = this.extractCameraState(camera)

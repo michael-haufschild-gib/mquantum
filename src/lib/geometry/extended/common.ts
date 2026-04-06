@@ -2,14 +2,8 @@
  * Shared types for extended n-dimensional quantum objects.
  *
  * Raymarching quality system, color modes, preset names, palette types,
- * quantum mode enum, and OpenQuantum re-exports.
+ * and quantum mode enum.
  */
-
-export type {
-  OpenQuantumConfig,
-  OpenQuantumVisualizationMode,
-} from '@/lib/physics/openQuantum/types'
-export { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
 // ============================================================================
 // Raymarching Quality System

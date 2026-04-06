@@ -11,13 +11,11 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
 import {
   computeRawKSpaceData,
   computeRawKSpaceDataFromComplex,
-  computeStrides,
   float32ToFloat16,
-  linearToNDCoords,
-  ndToLinearIdx,
   packR16F,
   packRG16F,
   packRGBA16F,

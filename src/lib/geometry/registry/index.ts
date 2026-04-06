@@ -44,7 +44,9 @@ export {
   getQuantumTypeEntry,
   getQuantumTypeName,
   getQuantumTypesRequiringDimensionAbove,
+  isAnalyticQuantumType,
   isComputeQuantumType,
+  QUANTUM_MODES_3D_ONLY,
   resolveQuantumTypeKey,
 } from './helpers'
 

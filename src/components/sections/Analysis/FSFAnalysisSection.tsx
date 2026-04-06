@@ -18,27 +18,10 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
-import { Sparkline } from '@/components/ui/Sparkline'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
-/**
- * Compact metric row for diagnostics display.
- */
-const MetricRow: React.FC<{
-  label: string
-  value: number
-  digits?: number
-  unit?: string
-}> = ({ label, value, digits = 4, unit = '' }) => (
-  <div className="flex items-center justify-between py-0.5">
-    <span className="text-xs text-text-tertiary">{label}</span>
-    <span className="text-xs font-mono text-text-secondary tabular-nums">
-      {isFinite(value) ? value.toFixed(digits) : 'NaN'}
-      {unit && <span className="text-text-tertiary ms-0.5">{unit}</span>}
-    </span>
-  </div>
-)
+import { MetricRow, SparklineRow } from './AnalysisPrimitives'
 
 /**
  * Analysis content for freeScalarField mode.
@@ -89,29 +72,6 @@ FSFAnalysisContent.displayName = 'FSFAnalysisContent'
 /* ────────────────────────────────────────────────────────────── */
 /*  Sparkline charts (isolated store subscription)               */
 /* ────────────────────────────────────────────────────────────── */
-
-/** Labeled sparkline row for a single metric history */
-const SparklineRow: React.FC<{
-  label: string
-  data: Float32Array
-  head: number
-  count: number
-  min?: number
-  max?: number
-}> = ({ label, data, head, count, min, max }) => (
-  <div>
-    <span className="text-xs text-text-tertiary uppercase tracking-wider">{label}</span>
-    <Sparkline
-      data={data}
-      head={head}
-      count={count}
-      min={min}
-      max={max}
-      height={28}
-      className="w-full"
-    />
-  </div>
-)
 
 const SparklineCharts: React.FC = React.memo(() => {
   const { hasData, historyEnergy, historyNorm, historyHead, historyCount } = useDiagnosticsStore(

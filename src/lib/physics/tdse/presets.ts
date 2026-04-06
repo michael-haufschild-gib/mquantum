@@ -9,23 +9,15 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 import { DECOHERENCE_PRESETS } from './decoherencePresets'
 
-/** Subset of TdseConfig fields that a scenario preset can override */
+/** Subset of TdseConfig fields that a scenario preset can override. */
 export type TdsePresetOverride = Partial<Omit<TdseConfig, 'needsReset' | 'slicePositions'>>
 
 /** A named TDSE scenario preset with config overrides applied on selection. */
-export interface TdseScenarioPreset {
-  /** Machine-readable key */
-  id: string
-  /** Display name in the UI */
-  name: string
-  /** One-line description of the physics */
-  description: string
-  /** Config overrides to apply on top of DEFAULT_TDSE_CONFIG */
-  overrides: TdsePresetOverride
-}
+export type TdseScenarioPreset = ScenarioPreset<TdsePresetOverride>
 
 /**
  * Curated TDSE scenario presets.

@@ -1,5 +1,3 @@
-import { getQuantumTypesRequiringDimensionAbove } from '@/lib/geometry/registry'
-
 /** Minimum supported dimension for quantum visualization. */
 export const MIN_DIMENSION = 2
 
@@ -7,10 +5,21 @@ export const MIN_DIMENSION = 2
 export const MAX_DIMENSION = 11
 
 /**
- * Quantum modes that require 3D+ dimensions (no 2D rendering path).
- * Compute modes render a 3D density grid via volume raymarching;
- * the 2D heatmap pipeline cannot sample their density grids.
- *
- * Derived from the quantum type registry: all entries with dimensions.min > 2.
+ * Human-readable axis labels for up to 12 dimensions.
+ * Index 0 = 'x', 1 = 'y', ..., 11 = 'o'.
  */
-export const QUANTUM_MODES_3D_ONLY = getQuantumTypesRequiringDimensionAbove(2)
+export const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o'] as const
+
+/**
+ * All power-of-2 grid size options for lattice compute modes.
+ * Individual modes filter this list based on their max grid per dimension.
+ */
+export const ALL_GRID_SIZE_OPTIONS = [
+  { value: '2', label: '2' },
+  { value: '4', label: '4' },
+  { value: '8', label: '8' },
+  { value: '16', label: '16' },
+  { value: '32', label: '32' },
+  { value: '64', label: '64' },
+  { value: '128', label: '128' },
+]

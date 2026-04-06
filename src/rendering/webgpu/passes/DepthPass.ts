@@ -13,6 +13,8 @@
  */
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -318,10 +320,7 @@ export class DepthPass extends WebGPUBasePass {
     if (!outputView) return
 
     // Try to get camera data from frame context
-    const camera = ctx.frame?.stores?.['camera'] as {
-      near?: number
-      far?: number
-    }
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
     // Use camera data if available, otherwise use configured values
     const near = camera?.near ?? this.cameraNear

@@ -14,29 +14,16 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type {
   DiracFieldView,
   DiracInitialCondition,
   DiracPotentialType,
 } from '@/lib/geometry/extended/types'
 import { minDiracGridPerDim } from '@/stores/slices/geometry/setters/diracSetters'
+import { DIRAC_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
 import type { DiracControlsProps } from './types'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
-
-/** Max total sites for Dirac mode — must match store constant */
-const DIRAC_MAX_TOTAL_SITES = 262144
-
-const ALL_GRID_SIZE_OPTIONS = [
-  { value: '2', label: '2' },
-  { value: '4', label: '4' },
-  { value: '8', label: '8' },
-  { value: '16', label: '16' },
-  { value: '32', label: '32' },
-  { value: '64', label: '64' },
-  { value: '128', label: '128' },
-]
 
 const INITIAL_CONDITION_OPTIONS: { value: DiracInitialCondition; label: string }[] = [
   { value: 'gaussianPacket', label: 'Gaussian Packet' },

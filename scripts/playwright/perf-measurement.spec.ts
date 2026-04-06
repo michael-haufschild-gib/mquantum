@@ -29,6 +29,7 @@ test.describe('GPU performance measurement', () => {
     { mode: 'hydrogenND', dim: 5, label: 'Hydrogen 5D' },
     { mode: 'hydrogenND', dim: 7, label: 'Hydrogen 7D' },
     { mode: 'tdseDynamics', dim: 3, label: 'TDSE 3D' },
+    { mode: 'becDynamics', dim: 3, label: 'BEC 3D' },
   ] as const
 
   for (const { mode, dim, label } of modes) {

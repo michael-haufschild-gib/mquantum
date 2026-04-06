@@ -7,11 +7,10 @@
  * @module stores/slices/geometry/setters/quantumModeSetters
  */
 
-import { QUANTUM_MODES_3D_ONLY } from '@/constants/dimension'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
-import { getQuantumTypeEntry, isComputeQuantumType } from '@/lib/geometry/registry'
+import { getQuantumTypeEntry, isComputeQuantumType, QUANTUM_MODES_3D_ONLY } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import { useGeometryStore } from '@/stores/geometryStore'
 

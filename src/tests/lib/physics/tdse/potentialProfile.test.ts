@@ -7,7 +7,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import type { TdseConfig } from '@/lib/geometry/extended/tdse'
+import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/tdse'
 import {
   computePacketKineticEnergy,
   evaluatePotential1D,
@@ -17,53 +17,7 @@ import {
 
 /** Minimal config factory for testing. Override only what each test needs. */
 function createConfig(overrides: Partial<TdseConfig> = {}): TdseConfig {
-  return {
-    latticeDim: 1,
-    gridSize: [64],
-    spacing: [0.1],
-    mass: 1.0,
-    hbar: 1.0,
-    dt: 0.01,
-    stepsPerFrame: 1,
-    initialCondition: 'gaussian',
-    packetCenter: [0],
-    packetWidth: 1.0,
-    packetAmplitude: 1.0,
-    packetMomentum: [5.0],
-    potentialType: 'free',
-    barrierHeight: 10,
-    barrierWidth: 1.0,
-    barrierCenter: 0,
-    wellDepth: 5,
-    wellWidth: 2.0,
-    harmonicOmega: 1.0,
-    stepHeight: 8,
-    slitSeparation: 2,
-    slitWidth: 0.5,
-    wallThickness: 0.2,
-    wallHeight: 20,
-    latticePeriod: 1.0,
-    latticeDepth: 5.0,
-    doubleWellSeparation: 1.0,
-    doubleWellLambda: 1.0,
-    doubleWellAsymmetry: 0,
-    radialWellInner: 0.6,
-    radialWellOuter: 1.8,
-    radialWellDepth: 50.0,
-    radialWellTilt: 0.5,
-    anharmonicLambda: 1.0,
-    driveAmplitude: 1,
-    driveFrequency: 1,
-    driveWaveform: 'sine',
-    pmlEnabled: false,
-    pmlWidth: 8,
-    pmlSigmaMax: 1,
-    // BEC fields
-    becInteractionStrength: 0,
-    becEnabled: false,
-    trapAnisotropy: [1, 1, 1],
-    ...overrides,
-  } as TdseConfig
+  return { ...DEFAULT_TDSE_CONFIG, ...overrides }
 }
 
 describe('evaluatePotential1D', () => {
@@ -270,8 +224,9 @@ describe('evaluatePotential1D', () => {
   it('custom expression returns 0 for missing expression', () => {
     const cfg = createConfig({
       potentialType: 'custom',
+      customPotentialExpression: undefined,
     } as Partial<TdseConfig>)
-    // customPotentialExpression defaults to undefined → fallback to '0'
+    // customPotentialExpression is undefined → fallback to '0'
     expect(evaluatePotential1D(5, cfg)).toBe(0)
   })
 })

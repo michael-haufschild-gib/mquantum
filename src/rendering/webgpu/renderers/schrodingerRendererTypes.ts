@@ -16,8 +16,9 @@ import type { GeometryState } from '@/stores/geometryStore'
 import type { RotationState } from '@/stores/rotationStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
-import type { WebGPURenderContext } from '../core/types'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
+// Re-export shared store access utilities so existing importers keep working.
+export type { CameraMatrix, CameraSnapshot } from '../core/storeAccess'
+export { getStoreSnapshot } from '../core/storeAccess'
 import type { packLightingUniforms } from '../utils/lighting'
 
 // ---------------------------------------------------------------------------
@@ -170,22 +171,8 @@ export const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
 // Snapshot interfaces for store data
 // ---------------------------------------------------------------------------
 
-/** Camera matrix container */
-export type CameraMatrix = { elements: ArrayLike<number> }
-
-/** Camera state snapshot from the frame context */
-export interface CameraSnapshot {
-  viewMatrix?: CameraMatrix
-  projectionMatrix?: CameraMatrix
-  viewProjectionMatrix?: CameraMatrix
-  inverseViewMatrix?: CameraMatrix
-  inverseProjectionMatrix?: CameraMatrix
-  position?: { x: number; y: number; z: number }
-  target?: { x: number; y: number; z: number }
-  near?: number
-  far?: number
-  fov?: number
-}
+// CameraMatrix and CameraSnapshot are now defined in core/storeAccess.ts
+// and re-exported above for backward compatibility.
 
 /** Extended store snapshot (Schrödinger + Pauli config) */
 export interface ExtendedStoreSnapshot {
@@ -232,7 +219,7 @@ export interface SchrodingerRendererConfig {
   quantumMode?: SchroedingerQuantumMode
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
-  colorAlgorithm?: WGSLColorAlgorithm
+  colorAlgorithm?: number
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
   /** Compile-time specialization flag for nodal calculations. */
@@ -265,13 +252,7 @@ export interface SchrodingerRendererConfig {
 // Helper functions
 // ---------------------------------------------------------------------------
 
-/**
- * Type-safe store snapshot accessor from the frame context.
- */
-export function getStoreSnapshot<T>(ctx: WebGPURenderContext, key: string): T | undefined {
-  const snapshot = ctx.frame?.stores?.[key]
-  return snapshot as T | undefined
-}
+// getStoreSnapshot is now defined in core/storeAccess.ts and re-exported above.
 
 /**
  * Pack hydrogen basis states into an ArrayBuffer matching HydrogenBasisUniforms layout.

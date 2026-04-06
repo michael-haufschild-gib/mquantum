@@ -667,6 +667,7 @@ export interface PerfMetricsSnapshot {
   cpuHistory: number[]
   passTimings: PassTimingSnapshot[]
   totalGpuTimeMs: number
+  cpuBreakdown: { setupMs: number; passesMs: number; submitMs: number }
 }
 
 /** Read a performance metrics snapshot from the performanceMetricsStore. */
@@ -692,6 +693,7 @@ export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnap
         skipped: p.skipped,
       })),
       totalGpuTimeMs: s.totalGpuTimeMs,
+      cpuBreakdown: { ...s.cpuBreakdown },
     }
   })
 }

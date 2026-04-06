@@ -7,10 +7,15 @@
  * @module stores/slices/geometry/setters/openQuantumSetters
  */
 
-import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/geometry/extended/types'
+import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
 import type { SchroedingerSliceActions } from '../types'
-import type { SetterContext } from './sliceSetterUtils'
+import {
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 type OpenQuantumActions = Pick<
   SchroedingerSliceActions,
@@ -35,82 +40,16 @@ type OpenQuantumActions = Pick<
  * @param ctx - Shared setter context with set/get and validation helpers
  */
 export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions {
-  const { setWithVersion, isFinite, warnNonFinite } = ctx
+  const { setWithVersion } = ctx
+  const D = 'openQuantum' as const
 
   return {
-    setOpenQuantumEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, enabled },
-        },
-      }))
-    },
-    setOpenQuantumDephasingRate: (rate) => {
-      if (!isFinite(rate)) {
-        warnNonFinite('openQuantum.dephasingRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dephasingRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumRelaxationRate: (rate) => {
-      if (!isFinite(rate)) {
-        warnNonFinite('openQuantum.relaxationRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, relaxationRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumThermalUpRate: (rate) => {
-      if (!isFinite(rate)) {
-        warnNonFinite('openQuantum.thermalUpRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, thermalUpRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumDt: (dt) => {
-      if (!isFinite(dt)) {
-        warnNonFinite('openQuantum.dt', dt)
-        return
-      }
-      const clamped = Math.max(0.001, Math.min(0.1, dt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dt: clamped },
-        },
-      }))
-    },
-    setOpenQuantumSubsteps: (n) => {
-      if (!isFinite(n)) {
-        warnNonFinite('openQuantum.substeps', n)
-        return
-      }
-      const clamped = Math.max(1, Math.min(10, Math.floor(n)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, substeps: clamped },
-        },
-      }))
-    },
+    setOpenQuantumEnabled: nestedValueSetter(ctx, D, 'enabled'),
+    setOpenQuantumDephasingRate: nestedClampedSetter(ctx, D, 'dephasingRate', 0, 5),
+    setOpenQuantumRelaxationRate: nestedClampedSetter(ctx, D, 'relaxationRate', 0, 5),
+    setOpenQuantumThermalUpRate: nestedClampedSetter(ctx, D, 'thermalUpRate', 0, 5),
+    setOpenQuantumDt: nestedClampedSetter(ctx, D, 'dt', 0.001, 0.1),
+    setOpenQuantumSubsteps: nestedIntSetter(ctx, D, 'substeps', 1, 10, 'floor'),
     setOpenQuantumChannelEnabled: (channel, enabled) => {
       const keyMap = {
         dephasing: 'dephasingEnabled',
@@ -125,14 +64,7 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
         },
       }))
     },
-    setOpenQuantumVisualizationMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, visualizationMode: mode },
-        },
-      }))
-    },
+    setOpenQuantumVisualizationMode: nestedValueSetter(ctx, D, 'visualizationMode'),
     requestOpenQuantumStateReset: () => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -152,52 +84,9 @@ export function createOpenQuantumSetters(ctx: SetterContext): OpenQuantumActions
         },
       }))
     },
-    setOpenQuantumBathTemperature: (T) => {
-      if (!isFinite(T)) {
-        warnNonFinite('openQuantum.bathTemperature', T)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100000, T))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, bathTemperature: clamped },
-        },
-      }))
-    },
-    setOpenQuantumCouplingScale: (s) => {
-      if (!isFinite(s)) {
-        warnNonFinite('openQuantum.couplingScale', s)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100, s))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, couplingScale: clamped },
-        },
-      }))
-    },
-    setOpenQuantumHydrogenBasisMaxN: (n) => {
-      if (!isFinite(n)) {
-        warnNonFinite('openQuantum.hydrogenBasisMaxN', n)
-        return
-      }
-      const clamped = Math.max(1, Math.min(3, Math.floor(n)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, hydrogenBasisMaxN: clamped },
-        },
-      }))
-    },
-    setOpenQuantumDephasingModel: (model) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dephasingModel: model },
-        },
-      }))
-    },
+    setOpenQuantumBathTemperature: nestedClampedSetter(ctx, D, 'bathTemperature', 0.1, 100000),
+    setOpenQuantumCouplingScale: nestedClampedSetter(ctx, D, 'couplingScale', 0.01, 100),
+    setOpenQuantumHydrogenBasisMaxN: nestedIntSetter(ctx, D, 'hydrogenBasisMaxN', 1, 3, 'floor'),
+    setOpenQuantumDephasingModel: nestedValueSetter(ctx, D, 'dephasingModel'),
   }
 }

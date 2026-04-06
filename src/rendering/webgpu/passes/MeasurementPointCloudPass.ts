@@ -11,6 +11,8 @@
 import { logger } from '@/lib/logger'
 import type { MeasurementRecord } from '@/stores/measurementStore'
 
+import type { CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -33,10 +35,6 @@ interface MeasurementSnapshot {
   measurements: MeasurementRecord[]
 }
 
-/** Store snapshot shape for camera state. */
-interface CameraSnapshot {
-  viewProjectionMatrix: { elements: Float32Array }
-}
 
 /**
  * Render pass for measurement point cloud visualization.
@@ -136,11 +134,11 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     if (!this.renderPipeline || !this.bindGroup) return
 
     // Read measurement state from frame context
-    const mState = ctx.frame?.stores?.['measurement'] as MeasurementSnapshot | undefined
+    const mState = getStoreSnapshot<MeasurementSnapshot>(ctx, 'measurement')
     if (!mState?.enabled || !mState.measurements.length) return
 
     // Read camera VP matrix from frame context
-    const camera = ctx.frame?.stores?.['camera'] as CameraSnapshot | null
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
     if (!camera?.viewProjectionMatrix?.elements) return
     const vpMatrix = camera.viewProjectionMatrix.elements
 

@@ -12,6 +12,7 @@
  */
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
 /** Subset of SchroedingerConfig that a coupled-hydrogen preset can override. */
 export type HydrogenCoupledPresetOverride = Partial<
@@ -27,13 +28,10 @@ export type HydrogenCoupledPresetOverride = Partial<
 >
 
 /** A named coupled-hydrogen scenario preset. */
-export interface HydrogenCoupledScenarioPreset {
-  id: string
-  name: string
-  description: string
+export interface HydrogenCoupledScenarioPreset
+  extends ScenarioPreset<HydrogenCoupledPresetOverride> {
   /** Minimum geometry dimension required. */
   minDim: number
-  overrides: HydrogenCoupledPresetOverride
 }
 
 export const HYDROGEN_COUPLED_PRESETS: HydrogenCoupledScenarioPreset[] = [

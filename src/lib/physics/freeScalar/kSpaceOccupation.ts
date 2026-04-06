@@ -90,9 +90,6 @@ export function packR16F(out: Uint16Array, pixelIdx: number, r: number): void {
   out[pixelIdx * 4] = float32ToFloat16(r)
 }
 
-// Re-export N-D index utilities from shared module (canonical source: @/lib/math/ndArray)
-export { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
-
 // ============================================================================
 // Raw Physics Stage
 // ============================================================================

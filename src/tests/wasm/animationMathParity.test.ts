@@ -18,63 +18,15 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 
-import { multiplyMatrices, multiplyMatrixVector } from '@/lib/math/matrix'
+import { createIdentityMatrix, multiplyMatrices, multiplyMatrixVector } from '@/lib/math/matrix'
 import { composeRotations, createRotationMatrix, getRotationPlanes } from '@/lib/math/rotation'
 import { fcos, fsin } from '@/lib/math/trig'
 import { dotProduct, magnitude, normalize, subtractVectors } from '@/lib/math/vector'
-
-// ---------------------------------------------------------------------------
-// Arbitraries
-// ---------------------------------------------------------------------------
-
-/** Arbitrary vector as number[] with finite, non-extreme components */
-function arbVector(dim: number) {
-  return fc.array(fc.double({ min: -50, max: 50, noNaN: true, noDefaultInfinity: true }), {
-    minLength: dim,
-    maxLength: dim,
-  })
-}
-
-/** Non-zero vector (magnitude > 0.01) */
-function arbNonZeroVector(dim: number) {
-  return arbVector(dim).filter((v) => {
-    let sum = 0
-    for (const x of v) sum += x * x
-    return Math.sqrt(sum) > 0.01
-  })
-}
-
-/** Arbitrary angle in radians */
-const arbAngle = fc.double({
-  min: -10 * Math.PI,
-  max: 10 * Math.PI,
-  noNaN: true,
-  noDefaultInfinity: true,
-})
-
-/** Arbitrary dimension in supported range */
-const arbDim = fc.integer({ min: 2, max: 11 })
-
-/** Arbitrary square matrix as Float32Array */
-function arbMatrix(dim: number) {
-  return fc
-    .array(fc.double({ min: -10, max: 10, noNaN: true, noDefaultInfinity: true }), {
-      minLength: dim * dim,
-      maxLength: dim * dim,
-    })
-    .map((arr) => new Float32Array(arr))
-}
+import { arbAngle, arbDim, arbMatrix, arbNonZeroVector, arbVector } from '@/tests/lib/math/arbitraries'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Create identity matrix as Float32Array */
-function identityF32(dim: number): Float32Array {
-  const m = new Float32Array(dim * dim)
-  for (let i = 0; i < dim; i++) m[i * dim + i] = 1
-  return m
-}
 
 /**
  * Reference implementation of project_vertices_to_positions.
@@ -456,7 +408,7 @@ describe('multiplyMatrixVector: Rust ↔ TS algorithm parity', () => {
 
   it('identity matrix preserves vector', () => {
     for (let dim = 2; dim <= 11; dim++) {
-      const id = identityF32(dim)
+      const id = createIdentityMatrix(dim)
       const v = Array.from({ length: dim }, (_, i) => i + 1)
       const result = multiplyMatrixVector(id, v)
       for (let i = 0; i < dim; i++) {
@@ -506,7 +458,7 @@ describe('multiplyMatrices: Rust ↔ TS algorithm parity', () => {
 
   it('A * I = A for all dimensions 2-11', () => {
     for (let dim = 2; dim <= 11; dim++) {
-      const id = identityF32(dim)
+      const id = createIdentityMatrix(dim)
       // Create a non-trivial matrix
       const a = new Float32Array(dim * dim)
       for (let i = 0; i < dim * dim; i++) a[i] = ((i * 7 + 3) % 13) - 6
@@ -519,7 +471,7 @@ describe('multiplyMatrices: Rust ↔ TS algorithm parity', () => {
 
   it('I * A = A for all dimensions 2-11', () => {
     for (let dim = 2; dim <= 11; dim++) {
-      const id = identityF32(dim)
+      const id = createIdentityMatrix(dim)
       const a = new Float32Array(dim * dim)
       for (let i = 0; i < dim * dim; i++) a[i] = ((i * 7 + 3) % 13) - 6
       const result = multiplyMatrices(id, a)
@@ -588,7 +540,7 @@ describe('composeRotations: Rust ↔ TS algorithm parity', () => {
   it('empty angles produces identity for dims 2-11', () => {
     for (let dim = 2; dim <= 11; dim++) {
       const result = composeRotations(dim, new Map())
-      const id = identityF32(dim)
+      const id = createIdentityMatrix(dim)
       for (let i = 0; i < dim * dim; i++) {
         expect(Math.abs(result[i]! - id[i]!)).toBeLessThan(1e-7)
       }
@@ -645,7 +597,7 @@ describe('composeRotations: Rust ↔ TS algorithm parity', () => {
             }
           }
           const product = multiplyMatrices(RT, R)
-          const id = identityF32(dim)
+          const id = createIdentityMatrix(dim)
           for (let i = 0; i < dim * dim; i++) {
             // f32 accumulation + fsin/fcos approximation error compound
             expect(Math.abs(product[i]! - id[i]!)).toBeLessThan(0.02)
@@ -662,7 +614,7 @@ describe('composeRotations: Rust ↔ TS algorithm parity', () => {
       const angles = new Map<string, number>()
       for (const p of planes) angles.set(p.name, 0)
       const result = composeRotations(dim, angles)
-      const id = identityF32(dim)
+      const id = createIdentityMatrix(dim)
       for (let i = 0; i < dim * dim; i++) {
         expect(Math.abs(result[i]! - id[i]!)).toBeLessThan(1e-5)
       }

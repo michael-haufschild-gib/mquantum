@@ -11,6 +11,7 @@
 import { test } from './fixtures'
 import {
   gotoMode,
+  type PassTimingSnapshot,
   requireWebGPU,
   waitForRendererReady,
   waitForShaderCompilation,
@@ -20,19 +21,12 @@ import {
 const WARMUP_FRAMES = 30
 const MEASURE_FRAMES = 120
 
-interface PassTiming {
-  passId: string
-  gpuTimeMs: number
-  cpuTimeMs: number
-  skipped: boolean
-}
-
 interface BenchmarkSample {
   fps: number
   frameTimeMs: number
   cpuTimeMs: number
   totalGpuTimeMs: number
-  passTimings: PassTiming[]
+  passTimings: PassTimingSnapshot[]
   cpuBreakdown: { setupMs: number; passesMs: number; submitMs: number }
   vramMB: number
   viewport: { width: number; height: number }
@@ -142,6 +136,8 @@ test.describe('render performance benchmark', () => {
           passTimings: s.passTimings.map((pt) => ({
             passId: pt.passId,
             gpuTimeMs: pt.gpuTimeMs,
+            computeGpuTimeMs: pt.computeGpuTimeMs ?? 0,
+            renderGpuTimeMs: pt.renderGpuTimeMs ?? 0,
             cpuTimeMs: pt.cpuTimeMs,
             skipped: pt.skipped,
           })),

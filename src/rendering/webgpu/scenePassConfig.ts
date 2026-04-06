@@ -21,7 +21,6 @@ import type { WebGPUFrameStats } from './core/types'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { ScenePass } from './passes/ScenePass'
 import { ToScreenPass } from './passes/ToScreenPass'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 import { parseHexColorToLinearRgb } from './utils/color'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
@@ -320,7 +319,7 @@ export function updateToScreenPassSharpness({
 }
 
 /** Resolve a PaletteColorAlgorithm to the WGSL integer constant. */
-export function resolveColorAlgorithmInt(config: PassConfig): WGSLColorAlgorithm | undefined {
+export function resolveColorAlgorithmInt(config: PassConfig): number | undefined {
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
@@ -329,5 +328,5 @@ export function resolveColorAlgorithmInt(config: PassConfig): WGSLColorAlgorithm
     config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
     config.objectType
   )
-  return COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as WGSLColorAlgorithm | undefined
+  return COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm]
 }

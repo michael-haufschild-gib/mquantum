@@ -11,6 +11,7 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
 import {
@@ -21,33 +22,7 @@ import {
 
 /** Minimal FreeScalarConfig factory for testing. */
 function createConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig {
-  return {
-    latticeDim: 3,
-    gridSize: [32, 32, 32],
-    spacing: [0.15, 0.15, 0.15],
-    mass: 0.5,
-    dt: 0.01,
-    stepsPerFrame: 2,
-    initialCondition: 'vacuumNoise',
-    modeK: [1, 0, 0],
-    packetCenter: [0, 0, 0],
-    packetWidth: 0.5,
-    packetAmplitude: 1.0,
-    vacuumSeed: 42,
-    fieldView: 'phi',
-    autoScale: true,
-    showPotential: false,
-    absorberEnabled: false,
-    absorberWidth: 0.15,
-    pmlTargetReflection: 1e-6,
-    selfInteractionEnabled: false,
-    selfInteractionLambda: 0,
-    selfInteractionVev: 0,
-    diagnosticsEnabled: true,
-    diagnosticsInterval: 5,
-    slicePositions: [],
-    ...overrides,
-  } as FreeScalarConfig
+  return { ...DEFAULT_FREE_SCALAR_CONFIG, ...overrides }
 }
 
 describe('computeFsfConfigHash', () => {
@@ -71,7 +46,9 @@ describe('computeFsfConfigHash', () => {
 
 describe('computeFsfInitHash', () => {
   it('encodes initial condition, mass, modeK, and packet params', () => {
-    const hash = computeFsfInitHash(createConfig())
+    const hash = computeFsfInitHash(
+      createConfig({ mass: 0.5, initialCondition: 'vacuumNoise' })
+    )
     expect(hash).toContain('vacuumNoise')
     expect(hash).toContain('m0.5')
     expect(hash).toContain('s42')
@@ -96,8 +73,10 @@ describe('computeFsfInitHash', () => {
   })
 
   it('omits self-interaction params when disabled', () => {
-    const hash = computeFsfInitHash(createConfig({ selfInteractionEnabled: false }))
-    expect(hash).not.toContain('si')
+    const hash = computeFsfInitHash(
+      createConfig({ selfInteractionEnabled: false, initialCondition: 'vacuumNoise' })
+    )
+    expect(hash).not.toContain('_si')
   })
 })
 

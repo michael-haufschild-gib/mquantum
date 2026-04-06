@@ -9,6 +9,7 @@
  */
 
 import { logger } from '@/lib/logger'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { requestStateSave as genericStateSave } from './stateSave'
@@ -42,7 +43,6 @@ export function requestStateSave(ctx: WebGPURenderContext, state: SaveLoadState)
     totalSites: state.totalSites,
     label: 'tdse',
     getMetadata: async () => {
-      const { useExtendedObjectStore } = await import('@/stores/extendedObjectStore')
       const schroedinger = useExtendedObjectStore.getState().schroedinger
       const quantumMode = schroedinger.quantumMode
       const tdseConfig = quantumMode === 'becDynamics' ? schroedinger.bec : schroedinger.tdse

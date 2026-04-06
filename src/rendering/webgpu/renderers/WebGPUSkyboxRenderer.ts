@@ -14,6 +14,8 @@ import type {
   SkyboxTexture,
 } from '@/stores/defaults/visualDefaults'
 
+import type { AnimationSnapshot, CameraSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import {
@@ -377,24 +379,18 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     if (!this.device || !this.uniformBuffer) return
 
     // Access stores from frame context
-    const env = ctx.frame?.stores?.['environment'] as
-      | {
-          skyboxMode?: SkyboxMode
-          skyboxTexture?: SkyboxTexture
-          skyboxIntensity?: number
-          skyboxRotation?: number
-          skyboxAnimationMode?: string
-          skyboxAnimationSpeed?: number
-          skyboxHighQuality?: boolean
-          proceduralSettings?: SkyboxProceduralSettings
-        }
-      | undefined
+    const env = getStoreSnapshot<{
+      skyboxMode?: SkyboxMode
+      skyboxTexture?: SkyboxTexture
+      skyboxIntensity?: number
+      skyboxRotation?: number
+      skyboxAnimationMode?: string
+      skyboxAnimationSpeed?: number
+      skyboxHighQuality?: boolean
+      proceduralSettings?: SkyboxProceduralSettings
+    }>(ctx, 'environment')
 
-    const anim = ctx.frame?.stores?.['animation'] as
-      | {
-          isPlaying?: boolean
-        }
-      | undefined
+    const anim = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
 
     // Get current mode and check for mode changes
     const storeMode = env?.skyboxMode ?? 'procedural_aurora'
@@ -512,18 +508,11 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private updateVertexUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.uniformBuffer) return
 
-    const camera = ctx.frame?.stores?.['camera'] as
-      | {
-          viewMatrix?: { elements: number[] }
-          projectionMatrix?: { elements: number[] }
-        }
-      | undefined
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
 
-    const env = ctx.frame?.stores?.['environment'] as
-      | {
-          skyboxRotation?: number
-        }
-      | undefined
+    const env = getStoreSnapshot<{
+      skyboxRotation?: number
+    }>(ctx, 'environment')
 
     const baseRotation = env?.skyboxRotation ?? 0
 
