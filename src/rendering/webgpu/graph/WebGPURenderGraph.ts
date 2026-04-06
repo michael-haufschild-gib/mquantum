@@ -479,6 +479,7 @@ export class WebGPURenderGraph {
         cpuPassTimings.set(passId, performance.now() - passCpuStart)
         if (canCollectGpuTimings) {
           const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
+          const phases = ctx.getPassPhases()
           ctx.clearPassTimestampWrites()
           if (usedTimestampWrites) {
             timedPassIds.push(passId)
@@ -488,7 +489,6 @@ export class WebGPURenderGraph {
               phaseObj = { hasCompute: false, hasRender: false }
               this._phaseObjectPool[timestampIndex] = phaseObj
             }
-            const phases = ctx.getPassPhases()
             phaseObj.hasCompute = phases.hasCompute
             phaseObj.hasRender = phases.hasRender
             timedPassPhases.push(phaseObj)
