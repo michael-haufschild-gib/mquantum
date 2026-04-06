@@ -17,12 +17,13 @@
  * @returns H_n(x)
  */
 export function hermite(n: number, x: number): number {
-  const order = Math.max(0, Math.floor(n))
-  if (order === 0) return 1
-  if (order === 1) return 2 * x
+  if (!Number.isFinite(n) || n < 0) return NaN
+  n = Math.floor(n)
+  if (n === 0) return 1
+  if (n === 1) return 2 * x
   let h0 = 1
   let h1 = 2 * x
-  for (let k = 2; k <= order; k++) {
+  for (let k = 2; k <= n; k++) {
     const h2 = 2 * x * h1 - 2 * (k - 1) * h0
     h0 = h1
     h1 = h2

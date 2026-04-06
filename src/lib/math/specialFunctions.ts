@@ -8,14 +8,14 @@
  */
 
 // ============================================================================
-// Log-Factorial LUT: ln(k!) for k = 0..30
+// Log-Factorial LUT: ln(k!) for k = 0..170
 // ============================================================================
 
 const LN_FACTORIAL_LUT: number[] = []
 ;(() => {
   LN_FACTORIAL_LUT[0] = 0
   let acc = 0
-  for (let k = 1; k <= 30; k++) {
+  for (let k = 1; k <= 170; k++) {
     acc += Math.log(k)
     LN_FACTORIAL_LUT[k] = acc
   }
@@ -24,50 +24,47 @@ const LN_FACTORIAL_LUT: number[] = []
 /**
  * Log-factorial: ln(k!) via precomputed LUT.
  *
- * For k > 30, falls back to iterative computation.
  * Matches the WGSL LN_FACTORIAL_LUT for k ≤ 22.
  *
  * @param k - Non-negative integer
- * @returns ln(k!), or 0 for k < 0
+ * @returns ln(k!), or 0 for negative / non-finite input
  */
 export function lnFactorial(k: number): number {
+  if (!Number.isFinite(k)) return 0
   const n = Math.floor(k)
   if (n < 0) return 0
-  if (n <= 30) return LN_FACTORIAL_LUT[n]!
-  // Fallback for large n (rare in quantum number contexts)
-  let sum = LN_FACTORIAL_LUT[30]!
-  for (let i = 31; i <= n; i++) sum += Math.log(i)
+  if (n <= 170) return LN_FACTORIAL_LUT[n]!
+  // Beyond LUT — iterative (unreachable for quantum numbers)
+  let sum = LN_FACTORIAL_LUT[170]!
+  for (let i = 171; i <= n; i++) sum += Math.log(i)
   return sum
 }
 
 // ============================================================================
-// Factorial LUT: n! for n = 0..30
+// Factorial LUT: n! for n = 0..170
 // ============================================================================
 
-/** Precomputed n! for n = 0..30 (f64 exact for n ≤ 21, < 1 ULP error for n ≤ 30). */
+/** Precomputed n! for n = 0..170 (f64 exact for n ≤ 21, < 1 ULP error for larger n). */
 const FACTORIAL_LUT: number[] = [1]
 ;(() => {
-  for (let k = 1; k <= 30; k++) FACTORIAL_LUT[k] = FACTORIAL_LUT[k - 1]! * k
+  for (let k = 1; k <= 170; k++) FACTORIAL_LUT[k] = FACTORIAL_LUT[k - 1]! * k
 })()
 
 /**
- * Factorial n! via precomputed lookup table with iterative fallback.
+ * Factorial n! via precomputed lookup table.
  *
- * Uses LUT for n ≤ 30, iterative multiplication for 31 ≤ n ≤ 170.
- * Returns NaN for n < 0 or n > 170 (overflows f64).
- * For log-space computation of very large factorials, use {@link lnFactorial}.
+ * Returns NaN for negative or non-finite input, Infinity for n > 170
+ * (overflows f64). For log-space computation, use {@link lnFactorial}.
  *
- * @param n - Non-negative integer
+ * @param n - Non-negative integer (fractional values are floored)
  * @returns n!
  */
 export function factorial(n: number): number {
+  if (!Number.isFinite(n)) return NaN
   const k = Math.floor(n)
   if (k < 0) return NaN
-  if (k <= 30) return FACTORIAL_LUT[k]!
-  if (k > 170) return NaN // 171! exceeds Number.MAX_VALUE
-  let result = FACTORIAL_LUT[30]!
-  for (let i = 31; i <= k; i++) result *= i
-  return result
+  if (k > 170) return Infinity
+  return FACTORIAL_LUT[k]!
 }
 
 // ============================================================================
@@ -89,9 +86,10 @@ const LN_GAMMA_HALF_LUT: readonly number[] = [
  * Log-gamma-half: ln(Γ(n/2)) via precomputed LUT.
  *
  * @param n - Integer in [1, 30]
- * @returns ln(Γ(n/2)), or 0 if out of range
+ * @returns ln(Γ(n/2)), or 0 if out of range or non-finite
  */
 export function lnGammaHalf(n: number): number {
+  if (!Number.isFinite(n)) return 0
   const k = Math.floor(n)
   if (k < 1 || k > 30) return 0
   return LN_GAMMA_HALF_LUT[k - 1]!
