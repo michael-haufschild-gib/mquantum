@@ -9,11 +9,9 @@ import { Icon } from '@/components/ui/Icon'
 import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
+import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
 
@@ -24,13 +22,7 @@ const SURFACE_MODE_OPTIONS = [
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
-  const entanglementSweepRunning = useCoordinateEntanglementStore(
-    (s) => s.sweepStatus === 'running'
-  )
-  const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
-  const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
-  const sweepRunning =
-    entanglementSweepRunning || monitoringSweepRunning || quantumnessAtlasSweepRunning
+  const sweepRunning = useAnySweepRunning()
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
   )

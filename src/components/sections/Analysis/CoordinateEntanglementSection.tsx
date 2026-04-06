@@ -9,7 +9,7 @@
  * @module components/sections/Analysis/CoordinateEntanglementSection
  */
 
-import React, { useCallback } from 'react'
+import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
@@ -17,10 +17,9 @@ import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { Switch } from '@/components/ui/Switch'
+import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
-import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 
 import {
   AtlasHeatmap,
@@ -74,9 +73,7 @@ CoordinateEntanglementSection.displayName = 'CoordinateEntanglementSection'
 /** Inner content — only rendered when quantumMode === 'tdseDynamics'. */
 const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.memo(
   ({ defaultOpen }) => {
-    const monitoringSweepRunning = useMonitoringSweepStore((s) => s.status === 'running')
-    const quantumnessAtlasSweepRunning = useQuantumnessAtlasStore((s) => s.status === 'running')
-    const anySweepRunning = monitoringSweepRunning || quantumnessAtlasSweepRunning
+    const anySweepRunning = useAnySweepRunning()
 
     const {
       enabled,
@@ -139,20 +136,6 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
 
     const { handleStartSweep, handleAbortSweep } = useSweepController()
 
-    const handleEnableChange = useCallback((v: boolean) => setEnabled(v), [setEnabled])
-    const handleMIChange = useCallback(
-      (v: boolean) => setComputePairwiseMI(v),
-      [setComputePairwiseMI]
-    )
-    const handleBipartitionChange = useCallback(
-      (v: boolean) => setComputeBipartitions(v),
-      [setComputeBipartitions]
-    )
-    const handleWignerChange = useCallback(
-      (v: boolean) => setComputeWignerNegativity(v),
-      [setComputeWignerNegativity]
-    )
-
     return (
       <Section
         title="Coordinate Entanglement"
@@ -169,7 +152,7 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
               label="Enable"
               tooltip="Track inter-dimensional entanglement entropy via reduced density matrices. Runs in a Web Worker to avoid blocking rendering."
               checked={enabled}
-              onCheckedChange={handleEnableChange}
+              onCheckedChange={setEnabled}
               disabled={sweepStatus === 'running'}
             />
             {enabled && (sweepStatus === 'idle' || sweepStatus === 'complete') && (
@@ -201,21 +184,21 @@ const CoordinateEntanglementContent: React.FC<{ defaultOpen: boolean }> = React.
                     label="Pairwise MI"
                     tooltip="Compute pairwise mutual information I(d₁,d₂) between all dimension pairs. CPU-expensive for large grids (M > 32)."
                     checked={computePairwiseMI}
-                    onCheckedChange={handleMIChange}
+                    onCheckedChange={setComputePairwiseMI}
                     disabled={sweepStatus === 'running'}
                   />
                   <Switch
                     label="Bipartitions"
                     tooltip="Compute sequential bipartition entropy S({0..k-1}|{k..N-1}) for each k up to N/2. Uses the first k coordinates as the kept subsystem. Only feasible for small per-dimension grid sizes."
                     checked={computeBipartitions}
-                    onCheckedChange={handleBipartitionChange}
+                    onCheckedChange={setComputeBipartitions}
                     disabled={sweepStatus === 'running'}
                   />
                   <Switch
                     label="Wigner negativity"
                     tooltip="Phase-space nonclassicality from per-dimension ρ_d. N_W = 0 for Gaussian states, N_W > 0 for non-Gaussian states."
                     checked={computeWignerNegativity}
-                    onCheckedChange={handleWignerChange}
+                    onCheckedChange={setComputeWignerNegativity}
                     disabled={sweepStatus === 'running'}
                   />
                 </div>

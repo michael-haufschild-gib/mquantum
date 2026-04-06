@@ -19,6 +19,7 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { Switch } from '@/components/ui/Switch'
+import { AXIS_LABELS } from '@/constants/dimension'
 import {
   computePacketKineticEnergy,
   getPotentialPlotScale,
@@ -352,7 +353,7 @@ function formatNum(v: number): string {
 /*  Observable Expectation Values Display                        */
 /* ────────────────────────────────────────────────────────────── */
 
-const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+const DIM_LABELS = AXIS_LABELS
 
 /** Maximum number of per-dimension uncertainty sparklines to display */
 const MAX_SPARKLINE_DIMS = 3

@@ -185,7 +185,7 @@ describe('SchroedingerOpenQuantumDrawer', () => {
       render(<SchroedingerOpenQuantumDrawer />)
 
       // The parameter group should be aria-disabled
-      const paramGroup = screen.getByRole('group', { name: 'Open quantum parameters' })
+      const paramGroup = screen.getByRole('group', { name: 'Open Quantum parameters' })
       expect(paramGroup).toHaveAttribute('aria-disabled', 'true')
     })
   })

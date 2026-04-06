@@ -19,6 +19,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
+import { DrawerSection } from './DrawerSection'
 
 /** Props for the rotation drawer. */
 export interface RotationAnimationDrawerProps {
@@ -50,15 +51,13 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
     const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
 
     return (
-      <AnimationDrawerContainer onClose={onClose} data-testid="rotation-animation-drawer">
+      <AnimationDrawerContainer onClose={onClose} fullWidth data-testid="rotation-animation-drawer">
         {/* Single column: planes + speed bias below with divider */}
-        <div className="col-span-full [column-span:all] space-y-4">
-          {/* Rotation Planes Header */}
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Rotation Planes
-            </h3>
-            <div className="flex gap-2 items-center">
+        <DrawerSection
+          title="Rotation Planes"
+          className="col-span-full"
+          headerActions={
+            <>
               <Button
                 variant="ghost"
                 size="sm"
@@ -84,8 +83,9 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
               >
                 <Icon name="dice" size={14} />
               </Button>
-            </div>
-          </div>
+            </>
+          }
+        >
           {/* Rotation Planes */}
           <div className="flex flex-wrap gap-2  max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-panel-border">
             {planes.map((plane) => {
@@ -117,7 +117,7 @@ export const RotationAnimationDrawer: React.FC<RotationAnimationDrawerProps> = R
               showValue
             />
           </div>
-        </div>
+        </DrawerSection>
       </AnimationDrawerContainer>
     )
   }

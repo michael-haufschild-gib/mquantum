@@ -108,8 +108,7 @@ describe('useCoordinateEntanglementStore', () => {
       expect(s.longTimeVariance).toBeGreaterThanOrEqual(0)
     })
 
-    it('clamps variance to non-negative', () => {
-      // Push identical values — variance should be 0, not negative from FP
+    it('produces zero variance for identical samples (Welford stability)', () => {
       for (let i = 0; i < 5; i++) {
         useCoordinateEntanglementStore.getState().pushResult(makeResult({ averageEntropy: 0.5 }))
       }
