@@ -12,61 +12,10 @@
  * @module lib/physics/openQuantum/dipoleElements
  */
 
+import { associatedLaguerre } from '@/lib/math/laguerrePolynomial'
+import { factorial, lnFactorial } from '@/lib/math/specialFunctions'
+
 import type { HydrogenBasisState } from './hydrogenBasis'
-
-// ---------------------------------------------------------------------------
-// Factorial / combinatorial helpers
-// ---------------------------------------------------------------------------
-
-/** Precomputed factorials up to 30! (sufficient for n_max ≤ 7) */
-const FACTORIALS: number[] = [1]
-for (let i = 1; i <= 30; i++) {
-  FACTORIALS[i] = FACTORIALS[i - 1]! * i
-}
-
-/**
- * Compute n! from lookup table.
- *
- * @param n - Non-negative integer (0-30)
- * @returns n factorial
- */
-function factorial(n: number): number {
-  if (n < 0 || n > 30) return NaN
-  return FACTORIALS[n]!
-}
-
-// ---------------------------------------------------------------------------
-// Associated Laguerre polynomials
-// ---------------------------------------------------------------------------
-
-/**
- * Evaluate the associated Laguerre polynomial L_p^α(x) via recurrence.
- *
- * L_0^α(x) = 1
- * L_1^α(x) = 1 + α - x
- * (p+1) L_{p+1}^α(x) = (2p+1+α-x) L_p^α(x) - (p+α) L_{p-1}^α(x)
- *
- * @param p - Polynomial degree (≥ 0)
- * @param alpha - Associated parameter (≥ 0)
- * @param x - Evaluation point
- * @returns L_p^α(x)
- */
-function laguerreAssoc(p: number, alpha: number, x: number): number {
-  if (p === 0) return 1
-  if (p === 1) return 1 + alpha - x
-
-  let prev2 = 1
-  let prev1 = 1 + alpha - x
-  let current = 0
-
-  for (let k = 1; k < p; k++) {
-    current = ((2 * k + 1 + alpha - x) * prev1 - (k + alpha) * prev2) / (k + 1)
-    prev2 = prev1
-    prev1 = current
-  }
-
-  return current
-}
 
 // ---------------------------------------------------------------------------
 // Hydrogen radial wavefunction
@@ -87,20 +36,14 @@ function laguerreAssoc(p: number, alpha: number, x: number): number {
  * @returns R_nl(r)
  */
 function hydrogenRadialWavefunction(n: number, l: number, r: number): number {
+  if (n < 1 || l < 0 || l >= n) return 0
   const rho = (2 * r) / n
   const norm = Math.sqrt((8 / (n * n * n)) * (factorial(n - l - 1) / (2 * n * factorial(n + l))))
   const polyDegree = n - l - 1
   const polyAlpha = 2 * l + 1
-  const L = laguerreAssoc(polyDegree, polyAlpha, rho)
+  const L = associatedLaguerre(polyDegree, polyAlpha, rho)
 
   return norm * Math.pow(rho, l) * Math.exp(-rho / 2) * L
-}
-
-/** Log-factorial: ln(k!) */
-function lnFactorial(k: number): number {
-  let sum = 0
-  for (let i = 2; i <= k; i++) sum += Math.log(i)
-  return sum
 }
 
 /**
@@ -136,7 +79,7 @@ function hydrogenRadialWavefunctionND(n: number, l: number, r: number, dim: numb
   const norm = front * Math.sqrt(Math.exp(lnNum - lnDen))
 
   const rhoLambda = Math.pow(Math.max(rho, 1e-20), lambda)
-  const L = laguerreAssoc(nr, 2 * lambda + 1, rho)
+  const L = associatedLaguerre(nr, 2 * lambda + 1, rho)
   const expPart = Math.exp(-rho / 2)
 
   return norm * rhoLambda * L * expPart

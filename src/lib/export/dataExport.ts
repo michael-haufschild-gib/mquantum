@@ -7,6 +7,8 @@
  * @module lib/export/dataExport
  */
 
+import { AXIS_LABELS } from '@/constants/dimension'
+import { generateTimestampFilename } from '@/lib/export/image'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import type { AtlasPoint } from '@/stores/quantumnessAtlasStore'
@@ -17,30 +19,16 @@ import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 /**
  * Read a ring buffer in chronological order.
  *
- * @param buffer - Ring buffer Float32Array
+ * @param buffer - Ring buffer (Float32Array or Float64Array)
  * @param head - Current write head
  * @param count - Number of valid entries
  * @returns Array of values in chronological order (oldest first)
  */
-export function readRingBuffer(buffer: Float32Array, head: number, count: number): number[] {
-  const result: number[] = []
-  const len = buffer.length
-  const start = (head - count + len) % len
-  for (let i = 0; i < count; i++) {
-    result.push(buffer[(start + i) % len]!)
-  }
-  return result
-}
-
-/**
- * Read a Float64Array ring buffer in chronological order.
- *
- * @param buffer - Ring buffer source
- * @param head - Current write head position
- * @param count - Number of valid entries
- * @returns Array of values in chronological order
- */
-export function readRingBuffer64(buffer: Float64Array, head: number, count: number): number[] {
+export function readRingBuffer(
+  buffer: Float32Array | Float64Array,
+  head: number,
+  count: number
+): number[] {
   const result: number[] = []
   const len = buffer.length
   const start = (head - count + len) % len
@@ -136,7 +124,7 @@ export function exportObservablesDiagnosticsCSV(): string {
   }
 
   // Build header: frame, energy, deltaXdeltaP_0, deltaXdeltaP_1, ...
-  const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+  const dimLabels = AXIS_LABELS
   const header = ['frame', 'energy']
   for (let d = 0; d < activeDims; d++) {
     header.push(`dxdp_${dimLabels[d]}`)
@@ -230,11 +218,11 @@ export function exportEntanglementCSV(): string {
 
   if (count === 0) return ''
 
-  const avg = readRingBuffer64(state.historyAverage, head, count)
+  const avg = readRingBuffer(state.historyAverage, head, count)
   const N = state.currentEntropies.length
   const perDim: number[][] = []
   for (let d = 0; d < N; d++) {
-    perDim.push(readRingBuffer64(state.historyEntropies[d]!, head, count))
+    perDim.push(readRingBuffer(state.historyEntropies[d]!, head, count))
   }
 
   const dimHeaders = Array.from({ length: N }, (_, d) => `S_${d}`).join(',')
@@ -401,7 +389,7 @@ function buildDiracPayload(): Record<string, unknown> | null {
 function buildObservablesPayload(): Record<string, unknown> | null {
   const s = useDiagnosticsStore.getState().observables
   if (s.historyCount === 0 || s.activeDims === 0) return null
-  const dimLabels = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+  const dimLabels = AXIS_LABELS
   const uncertaintyTimeSeries: Record<string, number[]> = {}
   const currentUncertainty: Record<string, number> = {}
   for (let d = 0; d < s.activeDims; d++) {
@@ -593,9 +581,7 @@ export function downloadFile(
  * @returns Formatted filename
  */
 export function exportFilename(prefix: string, extension: string): string {
-  const now = new Date()
-  const ts = now.toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  return `${prefix}-${ts}.${extension}`
+  return `${generateTimestampFilename(prefix)}.${extension}`
 }
 
 // ─── Quantumness Atlas Export ───────────────────────────────────────────────

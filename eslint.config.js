@@ -714,6 +714,7 @@ export default [
         GPUBindGroupEntry: 'readonly',
         GPUBindGroupLayoutEntry: 'readonly',
         GPUBlendState: 'readonly',
+        GPUBufferBindingType: 'readonly',
         GPUBufferMapState: 'readonly',
         GPUColorTargetState: 'readonly',
         GPUCompareFunction: 'readonly',

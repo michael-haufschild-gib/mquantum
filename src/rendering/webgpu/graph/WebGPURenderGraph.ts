@@ -97,6 +97,8 @@ export class WebGPURenderGraph {
   private _framePassEnabledMemo: Map<string, boolean> = new Map()
   private _frameTimedPassIds: string[] = []
   private _frameTimedPassPhases: Array<{ hasCompute: boolean; hasRender: boolean }> = []
+  // PERF: Pre-allocated phase objects pool to avoid per-frame allocation
+  private _phaseObjectPool: Array<{ hasCompute: boolean; hasRender: boolean }> = []
   private _frameCpuPassTimings: Map<string, number> = new Map()
   private _framePassTimingResult: WebGPUPassTiming[] = []
   private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
@@ -364,9 +366,7 @@ export class WebGPURenderGraph {
       )
     }
 
-    const encoder = device.createCommandEncoder({
-      label: `frame-${this.frameNumber}`,
-    })
+    const encoder = device.createCommandEncoder()
 
     this.resourceAliases.clear()
 
@@ -431,6 +431,13 @@ export class WebGPURenderGraph {
       return enabled
     }
 
+    // Draw stats — accumulated during main loop to avoid second iteration
+    let totalCalls = 0
+    let totalTriangles = 0
+    let totalVertices = 0
+    let totalLines = 0
+    let totalPoints = 0
+
     for (const passId of this.passOrder) {
       const pass = this.passes.get(passId)
       if (!pass) {
@@ -476,10 +483,28 @@ export class WebGPURenderGraph {
           ctx.clearPassTimestampWrites()
           if (usedTimestampWrites) {
             timedPassIds.push(passId)
-            timedPassPhases.push(phases)
+            // Reuse pooled phase objects to avoid per-frame allocation
+            let phaseObj = this._phaseObjectPool[timestampIndex]
+            if (!phaseObj) {
+              phaseObj = { hasCompute: false, hasRender: false }
+              this._phaseObjectPool[timestampIndex] = phaseObj
+            }
+            phaseObj.hasCompute = phases.hasCompute
+            phaseObj.hasRender = phases.hasRender
+            timedPassPhases.push(phaseObj)
             timestampIndex++
           }
         }
+      }
+
+      // Accumulate draw stats during main loop (avoids second iteration)
+      const passStats = pass.getDrawStats?.()
+      if (passStats) {
+        totalCalls += passStats.calls
+        totalTriangles += passStats.triangles
+        totalVertices += passStats.vertices
+        totalLines += passStats.lines
+        totalPoints += passStats.points
       }
     }
 
@@ -522,28 +547,6 @@ export class WebGPURenderGraph {
 
     for (const [id] of this.resources) {
       this.pool.swapPingPong(id)
-    }
-
-    // Aggregate draw statistics
-    let totalCalls = 0
-    let totalTriangles = 0
-    let totalVertices = 0
-    let totalLines = 0
-    let totalPoints = 0
-
-    for (const passId of this.passOrder) {
-      const pass = this.passes.get(passId)
-      if (!pass) continue
-      const enabled = passEnabledMemo.get(passId) ?? true
-      if (!enabled) continue
-      const passStats = pass.getDrawStats?.()
-      if (passStats) {
-        totalCalls += passStats.calls
-        totalTriangles += passStats.triangles
-        totalVertices += passStats.vertices
-        totalLines += passStats.lines
-        totalPoints += passStats.points
-      }
     }
 
     const cpuSubmitMs = performance.now() - cpuSubmitStart

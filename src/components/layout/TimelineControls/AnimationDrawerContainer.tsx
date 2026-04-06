@@ -7,7 +7,8 @@
  * Features:
  * - Consistent motion animations (fade + slide)
  * - Backdrop blur and panel styling
- * - Responsive grid layout for content
+ * - Auto-sizing: single column when few sections, two columns when 3+
+ * - Right-aligned to sit above the drawer toggle buttons
  * - Max height with overflow scrolling
  * - Optional close button in top-right corner
  *
@@ -17,8 +18,8 @@
  *   onClose={() => setShowDrawer(false)}
  *   data-testid="julia-animation-drawer"
  * >
- *   <AnimationSystemPanel ... />
- *   <AnimationSystemPanel ... />
+ *   <DrawerSection ... />
+ *   <DrawerSection ... />
  * </AnimationDrawerContainer>
  * ```
  */
@@ -37,6 +38,8 @@ export interface AnimationDrawerContainerProps {
   children: React.ReactNode
   /** Optional callback to close the drawer */
   onClose?: () => void
+  /** When true, drawer spans the full parent width instead of auto-sizing to content */
+  fullWidth?: boolean
   /** Optional test ID for testing */
   'data-testid'?: string
 }
@@ -45,19 +48,21 @@ export interface AnimationDrawerContainerProps {
  * Shared container for animation drawer panels.
  *
  * Provides consistent styling, motion animations, and layout for
- * all object-type-specific animation drawers.
+ * all object-type-specific animation drawers. Uses CSS grid with
+ * `:has()` to automatically switch between one and two columns
+ * based on the number of child sections.
  *
  * @param props - Component props
  * @returns Animated drawer container element
  */
 export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> = React.memo(
-  ({ children, onClose, 'data-testid': dataTestId }) => (
+  ({ children, onClose, fullWidth, 'data-testid': dataTestId }) => (
     <m.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 20 }}
       transition={{ duration: 0.2 }}
-      className="absolute bottom-full inset-x-0 mb-2 z-20"
+      className={`absolute bottom-full mb-2 z-20 ${fullWidth ? 'inset-x-0' : 'end-0'}`}
       data-testid={dataTestId}
     >
       {onClose && (
@@ -73,8 +78,12 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
           </Button>
         </div>
       )}
-      <div className="glass-panel rounded-xl max-h-[400px] overflow-y-auto">
-        <div className="p-4 columns-1 md:columns-2 gap-6">{children}</div>
+      <div
+        className={`glass-panel rounded-xl max-h-[400px] overflow-y-auto ${fullWidth ? '' : 'min-w-80 max-w-[calc(100vw-2rem)]'}`}
+      >
+        <div className="p-4 grid grid-cols-1 gap-6 md:[&:has(>:nth-child(3))]:grid-cols-2">
+          {children}
+        </div>
       </div>
     </m.div>
   )

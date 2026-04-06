@@ -5,7 +5,6 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { PauliComputePass } from '../../passes/PauliComputePass'
@@ -17,7 +16,11 @@ import {
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
-import { applySharedPml } from './computeGridUtils'
+import {
+  applySharedPml,
+  createDensityTextureBindings,
+  handleSimulationStateIO,
+} from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -36,50 +39,15 @@ export class PauliStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    const { device } = ctx
-
     this.pauliPass?.dispose()
     this.pauliPass = new PauliComputePass()
-    this.pauliPass.initializeDensityTexture(device)
+    this.pauliPass.initializeDensityTexture(ctx.device)
 
-    const densityTextureView = this.pauliPass.getDensityTextureView() ?? null
-
-    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
-
-    const sampler = densityTextureView
-      ? device.createSampler({
-          label: 'density-grid-sampler',
-          magFilter: 'linear',
-          minFilter: 'linear',
-        })
-      : null
-
-    if (densityTextureView) {
-      additionalLayoutEntries.push(
-        {
-          binding: 4,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        }
-      )
-    }
-
-    return {
-      initPromises: [],
-      additionalLayoutEntries,
-      getBindGroupEntries: () => {
-        if (!densityTextureView || !sampler) return []
-        return [
-          { binding: 4, resource: densityTextureView },
-          { binding: 5, resource: sampler },
-        ]
-      },
-    }
+    const bindings = createDensityTextureBindings(
+      ctx.device,
+      this.pauliPass.getDensityTextureView() ?? null
+    )
+    return { initPromises: [], ...bindings }
   }
 
   computeBoundingRadius(
@@ -139,22 +107,7 @@ export class PauliStrategy implements QuantumModeStrategy {
       extended?.clearPauliNeedsReset?.()
     }
 
-    // Simulation state save/load
-    const simState = useSimulationStateStore.getState()
-    if (simState.saveRequested) {
-      simState.clearSaveRequest()
-      pauliPass.requestStateSave(ctx)
-    }
-    if (simState.pendingLoadData) {
-      const loadData = simState.pendingLoadData
-      if (
-        loadData.quantumMode === 'pauliSpinor' ||
-        (loadData.config && 'pauli' in loadData.config)
-      ) {
-        pauliPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-        simState.clearLoadData()
-      }
-    }
+    handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])
   }
 
   getDensityTextureView(): GPUTextureView | null {

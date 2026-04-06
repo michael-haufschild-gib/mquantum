@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { TemporalDepthCapturePass } from '@/rendering/webgpu/passes/TemporalDepthCapturePass'
-
-import { createMockRenderPassEncoder } from '../../../__mocks__/webgpu'
+import { createMockRenderPassEncoder } from '@/tests/__mocks__/webgpu'
 
 describe('pass resource caching', () => {
   it('uses one render pass plus texture copy in TemporalDepthCapture execution', () => {

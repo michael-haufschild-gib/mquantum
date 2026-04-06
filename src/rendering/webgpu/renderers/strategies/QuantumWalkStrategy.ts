@@ -8,8 +8,6 @@
  * @module rendering/webgpu/renderers/strategies/QuantumWalkStrategy
  */
 
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
-
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { QuantumWalkComputePass } from '../../passes/QuantumWalkComputePass'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
@@ -19,7 +17,12 @@ import {
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
-import { applySharedPml, computeLatticeBoundingRadius } from './computeGridUtils'
+import {
+  applySharedPml,
+  computeLatticeBoundingRadius,
+  createDensityTextureBindings,
+  handleSimulationStateIO,
+} from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -38,50 +41,15 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    const { device } = ctx
-
     this.qwPass?.dispose()
     this.qwPass = new QuantumWalkComputePass()
-    this.qwPass.initializeDensityTexture(device)
+    this.qwPass.initializeDensityTexture(ctx.device)
 
-    const densityTextureView = this.qwPass.getDensityTextureView() ?? null
-
-    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
-
-    const sampler = densityTextureView
-      ? device.createSampler({
-          label: 'density-grid-sampler',
-          magFilter: 'linear',
-          minFilter: 'linear',
-        })
-      : null
-
-    if (densityTextureView) {
-      additionalLayoutEntries.push(
-        {
-          binding: 4,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        }
-      )
-    }
-
-    return {
-      initPromises: [],
-      additionalLayoutEntries,
-      getBindGroupEntries: () => {
-        if (!densityTextureView || !sampler) return []
-        return [
-          { binding: 4, resource: densityTextureView },
-          { binding: 5, resource: sampler },
-        ]
-      },
-    }
+    const bindings = createDensityTextureBindings(
+      ctx.device,
+      this.qwPass.getDensityTextureView() ?? null
+    )
+    return { initPromises: [], ...bindings }
   }
 
   computeBoundingRadius(
@@ -129,19 +97,7 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
       extended?.clearQuantumWalkNeedsReset?.()
     }
 
-    // Simulation state save/load
-    const simState = useSimulationStateStore.getState()
-    if (simState.saveRequested) {
-      simState.clearSaveRequest()
-      qwPass.requestStateSave(ctx)
-    }
-    if (simState.pendingLoadData) {
-      const loadData = simState.pendingLoadData
-      if (loadData.quantumMode === 'quantumWalk') {
-        qwPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-        simState.clearLoadData()
-      }
-    }
+    handleSimulationStateIO(ctx, qwPass, ['quantumWalk'])
   }
 
   getDensityTextureView(): GPUTextureView | null {

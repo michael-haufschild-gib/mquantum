@@ -5,8 +5,7 @@ import type {
   WebGPURenderPassConfig,
   WebGPUResourceAccess,
 } from '@/rendering/webgpu/core/types'
-
-import { createMockComputePassEncoder, createMockRenderPassEncoder } from '../../__mocks__/webgpu'
+import { createMockComputePassEncoder, createMockRenderPassEncoder } from '@/tests/__mocks__/webgpu'
 
 function createRenderPassConfig(
   id: string,

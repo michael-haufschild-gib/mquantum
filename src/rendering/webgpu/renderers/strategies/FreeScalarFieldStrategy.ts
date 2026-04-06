@@ -5,7 +5,6 @@
  */
 
 import { logger } from '@/lib/logger'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { FreeScalarFieldComputePass } from '../../passes/FreeScalarFieldComputePass'
@@ -17,7 +16,12 @@ import {
   getStoreSnapshot,
   isFreeScalarAnalysisAlgorithm,
 } from '../schrodingerRendererTypes'
-import { applySharedPml, computeLatticeBoundingRadius } from './computeGridUtils'
+import {
+  applySharedPml,
+  computeLatticeBoundingRadius,
+  createDensityTextureBindings,
+  handleSimulationStateIO,
+} from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -42,46 +46,19 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
-    const { device } = ctx
-
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = new FreeScalarFieldComputePass()
-    this.freeScalarFieldPass.initializeDensityTexture(device)
+    this.freeScalarFieldPass.initializeDensityTexture(ctx.device)
 
     const densityTextureView = this.freeScalarFieldPass.getDensityTextureView() ?? null
-
-    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
-
-    // Density grid texture + sampler
-    const sampler = densityTextureView
-      ? device.createSampler({
-          label: 'density-grid-sampler',
-          magFilter: 'linear',
-          minFilter: 'linear',
-        })
-      : null
-
-    if (densityTextureView) {
-      additionalLayoutEntries.push(
-        {
-          binding: 4,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        }
-      )
-    }
+    const bindings = createDensityTextureBindings(ctx.device, densityTextureView)
 
     // Analysis texture for educational color modes (binding 6)
     const freeScalarAnalysis = isFreeScalarAnalysisAlgorithm(config.colorAlgorithm)
     if (freeScalarAnalysis) {
       const analysisTextureView = this.freeScalarFieldPass.getAnalysisTextureView() ?? null
       if (analysisTextureView) {
-        additionalLayoutEntries.push({
+        bindings.additionalLayoutEntries.push({
           binding: 6,
           visibility: GPUShaderStage.FRAGMENT,
           texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
@@ -90,16 +67,13 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
 
     const fsfRef = this.freeScalarFieldPass
+    const baseGetEntries = bindings.getBindGroupEntries
 
     return {
       initPromises: [],
-      additionalLayoutEntries,
+      additionalLayoutEntries: bindings.additionalLayoutEntries,
       getBindGroupEntries: () => {
-        const entries: GPUBindGroupEntry[] = []
-        const view = fsfRef?.getDensityTextureView()
-        if (view && sampler) {
-          entries.push({ binding: 4, resource: view }, { binding: 5, resource: sampler })
-        }
+        const entries = baseGetEntries()
         if (freeScalarAnalysis && fsfRef) {
           const analysisView = fsfRef.getAnalysisTextureView()
           if (analysisView) {
@@ -157,19 +131,7 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
       extended?.clearFreeScalarNeedsReset?.()
     }
 
-    // Simulation state save/load
-    const simState = useSimulationStateStore.getState()
-    if (simState.saveRequested) {
-      simState.clearSaveRequest()
-      freeScalarPass.requestStateSave(ctx)
-    }
-    if (simState.pendingLoadData) {
-      const loadData = simState.pendingLoadData
-      if (loadData.quantumMode === 'freeScalarField') {
-        freeScalarPass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-        simState.clearLoadData()
-      }
-    }
+    handleSimulationStateIO(ctx, freeScalarPass, ['freeScalarField'])
 
     // FSF diagnostic: log state changes once per second (dev only)
     if (import.meta.env.DEV) {

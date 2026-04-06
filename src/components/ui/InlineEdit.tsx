@@ -218,16 +218,11 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
       [handleSave, handleCancel]
     )
 
-    const handleChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEditValue(e.target.value)
-        // Clear error when user types
-        if (error) {
-          setError(undefined)
-        }
-      },
-      [error]
-    )
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      setEditValue(e.target.value)
+      // Clear error when user types (no-op when error is already undefined)
+      setError(undefined)
+    }, [])
 
     /** Stop propagation when clicking on the editing container */
     const handleContainerClick = useCallback(
@@ -295,7 +290,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={(e) => handleSave(e)}
+                onClick={handleSave}
                 className="p-1 text-success hover:text-success hover:bg-success/10 shrink-0"
                 ariaLabel="Save"
               >
@@ -305,7 +300,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={(e) => handleCancel(e)}
+                onClick={handleCancel}
                 className="p-1 text-text-secondary hover:text-danger hover:bg-danger-bg shrink-0"
                 ariaLabel="Cancel"
               >

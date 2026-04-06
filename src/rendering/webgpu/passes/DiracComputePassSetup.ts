@@ -32,6 +32,7 @@ import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 export { rebuildDiracBuffers } from './DiracComputePassBuffers'
 export type {
   DiracBindGroupInputs,
@@ -69,14 +70,7 @@ export function buildDiracPipelines(
   const unifAndIndex = diracUniformsBlock + freeScalarNDIndexBlock
 
   // Init: uniforms + spinorRe + spinorIm
-  const initBGL = device.createBindGroupLayout({
-    label: 'dirac-init-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const initBGL = createComputeBGL(device, 'dirac-init-bgl', ['uniform', 'storage', 'storage'])
   const initPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + diracInitBlock, 'dirac-init'),
@@ -85,13 +79,7 @@ export function buildDiracPipelines(
   )
 
   // Potential fill: uniforms + potential
-  const potentialBGL = device.createBindGroupLayout({
-    label: 'dirac-potential-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const potentialBGL = createComputeBGL(device, 'dirac-potential-bgl', ['uniform', 'storage'])
   const potentialPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + diracPotentialBlock, 'dirac-potential'),
@@ -100,15 +88,12 @@ export function buildDiracPipelines(
   )
 
   // Potential half-step: uniforms + spinorRe + spinorIm + potential(read)
-  const potentialHalfBGL = device.createBindGroupLayout({
-    label: 'dirac-potential-half-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const potentialHalfBGL = createComputeBGL(device, 'dirac-potential-half-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+    'read-only-storage',
+  ])
   const potentialHalfPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -136,15 +121,12 @@ export function buildDiracPipelines(
   )
 
   // Renormalization
-  const renormalizeBGL = device.createBindGroupLayout({
-    label: 'dirac-renormalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const renormalizeBGL = createComputeBGL(device, 'dirac-renormalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const renormalizePipeline = device.createComputePipeline({
     label: 'dirac-renormalize-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
@@ -156,15 +138,12 @@ export function buildDiracPipelines(
 
   // Pack/Unpack (reuse TDSE shaders directly — they operate on totalSites elements
   // and include their own PackUniforms struct definition)
-  const packBGL = device.createBindGroupLayout({
-    label: 'dirac-pack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const packBGL = createComputeBGL(device, 'dirac-pack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
   const packPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, tdseComplexPackBlock, 'dirac-pack'),
@@ -172,15 +151,12 @@ export function buildDiracPipelines(
     'dirac-pack'
   )
 
-  const unpackBGL = device.createBindGroupLayout({
-    label: 'dirac-unpack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const unpackBGL = createComputeBGL(device, 'dirac-unpack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const unpackPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, tdseComplexUnpackBlock, 'dirac-unpack'),
@@ -189,14 +165,11 @@ export function buildDiracPipelines(
   )
 
   // FFT stage (reuse TDSE FFT shader)
-  const fftStageBGL = device.createBindGroupLayout({
-    label: 'dirac-fft-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const fftStageBGL = createComputeBGL(device, 'dirac-fft-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const fftStagePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(
@@ -209,15 +182,12 @@ export function buildDiracPipelines(
   )
 
   // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read)
-  const kineticBGL = device.createBindGroupLayout({
-    label: 'dirac-kinetic-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const kineticBGL = createComputeBGL(device, 'dirac-kinetic-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+    'read-only-storage',
+  ])
   const kineticPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + diracKineticBlock, 'dirac-kinetic'),
@@ -253,18 +223,15 @@ export function buildDiracPipelines(
   )
 
   // Diagnostics: reduce (pass 1)
-  const diagReduceBGL = device.createBindGroupLayout({
-    label: 'dirac-diag-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const diagReduceBGL = createComputeBGL(device, 'dirac-diag-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'storage',
+    'storage',
+    'storage',
+  ])
   const diagReducePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, diracDiagNormReduceBlock, 'dirac-diag-reduce'),
@@ -273,17 +240,14 @@ export function buildDiracPipelines(
   )
 
   // Diagnostics: finalize (pass 2)
-  const diagFinalizeBGL = device.createBindGroupLayout({
-    label: 'dirac-diag-finalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  const diagFinalizeBGL = createComputeBGL(device, 'dirac-diag-finalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+    'read-only-storage',
+    'read-only-storage',
+  ])
   const diagFinalizePipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, diracDiagNormFinalizeBlock, 'dirac-diag-finalize'),

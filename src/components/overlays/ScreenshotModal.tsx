@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
+import { downloadFile } from '@/lib/export/dataExport'
 import { logger } from '@/lib/logger'
 import { useScreenshotStore } from '@/stores/screenshotStore'
 
@@ -87,19 +88,7 @@ export const ScreenshotModal = () => {
       const blob = await generateOutput()
       if (!blob) throw new Error('Failed to process image')
 
-      const filename = `mquantum-${Date.now()}.png`
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-
-      setTimeout(() => {
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }, 100)
+      downloadFile(blob, `mquantum-${Date.now()}.png`, 'image/png')
 
       addToast('Screenshot downloaded!', 'success')
       soundManager.playSuccess()

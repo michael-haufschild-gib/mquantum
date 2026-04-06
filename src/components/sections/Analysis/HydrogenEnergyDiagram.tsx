@@ -11,6 +11,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { associatedLaguerre } from '@/lib/math/laguerrePolynomial'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -28,29 +29,13 @@ const PH = HEIGHT - PY - PB
 const WAVE_COLOR = 'var(--dirac-particle)'
 
 /**
- * Associated Laguerre polynomial L_p^k(x) via recurrence.
- */
-function laguerre(p: number, k: number, x: number): number {
-  if (p === 0) return 1
-  if (p === 1) return 1 + k - x
-  let l0 = 1
-  let l1 = 1 + k - x
-  for (let j = 2; j <= p; j++) {
-    const l2 = ((2 * j - 1 + k - x) * l1 - (j - 1 + k) * l0) / j
-    l0 = l1
-    l1 = l2
-  }
-  return l1
-}
-
-/**
  * Radial probability density P(r) = r²|R_{nl}(r)|² (unnormalized).
  */
 function hydrogenRadialProb(n: number, l: number, r: number): number {
   const rho = (2 * r) / n
   const rhoL = Math.pow(rho, l)
   const expFactor = Math.exp(-rho / 2)
-  const lagVal = laguerre(n - l - 1, 2 * l + 1, rho)
+  const lagVal = associatedLaguerre(n - l - 1, 2 * l + 1, rho)
   const R = rhoL * expFactor * lagVal
   return r * r * R * R
 }
@@ -115,8 +100,8 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
       const r1 = samples[i]!.r
       const rho0 = (2 * r0) / n
       const rho1 = (2 * r1) / n
-      const R0 = laguerre(n - l - 1, 2 * l + 1, rho0)
-      const R1 = laguerre(n - l - 1, 2 * l + 1, rho1)
+      const R0 = associatedLaguerre(n - l - 1, 2 * l + 1, rho0)
+      const R1 = associatedLaguerre(n - l - 1, 2 * l + 1, rho1)
       if (R0 * R1 < 0 && r0 > 0) {
         nodes.push(r0 - (R0 * (r1 - r0)) / (R1 - R0))
       }

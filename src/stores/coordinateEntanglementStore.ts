@@ -98,16 +98,14 @@ interface CoordinateEntanglementState {
   /** N×N mutual information matrix (flat row-major), null when disabled. */
   mutualInfoMatrix: Float64Array | null
 
-  // ── Long-time statistics ────────────────────────────────────────────────
-  /** Running mean of S̄. */
-  longTimeSum: number
-  /** Running sum of S̄² for variance. */
-  longTimeSumSq: number
+  // ── Long-time statistics (Welford's online algorithm) ───────────────────
   /** Number of samples for long-time stats. */
   longTimeN: number
-  /** Long-time average ⟨S̄⟩_T. */
+  /** Running mean ⟨S̄⟩_T (Welford's M). */
   longTimeAverage: number
-  /** Long-time variance Var(S̄)_T. */
+  /** Sum of squared deviations from running mean (Welford's M2). */
+  longTimeM2: number
+  /** Long-time variance Var(S̄)_T = M2/N. */
   longTimeVariance: number
 
   // ── Atlas sweep ─────────────────────────────────────────────────────────
@@ -211,11 +209,10 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
   // Pairwise MI
   mutualInfoMatrix: null,
 
-  // Long-time statistics
-  longTimeSum: 0,
-  longTimeSumSq: 0,
+  // Long-time statistics (Welford's online algorithm)
   longTimeN: 0,
   longTimeAverage: 0,
+  longTimeM2: 0,
   longTimeVariance: 0,
 
   // Atlas sweep
@@ -258,19 +255,20 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
     // Update long-time statistics only for finite frames — non-finite results
     // (GPU divergence, skipped dims) must not advance the sweep clock or
     // dilute the running average with phantom zeros.
+    // Uses Welford's online algorithm for numerically stable variance.
     let newLtN = state.longTimeN
-    let newLtSum = state.longTimeSum
-    let newLtSumSq = state.longTimeSumSq
     let newLtAvg = state.longTimeAverage
+    let newLtM2 = state.longTimeM2
     let newLtVar = state.longTimeVariance
 
     if (Number.isFinite(result.averageEntropy)) {
+      const x = result.averageEntropy
       newLtN = state.longTimeN + 1
-      newLtSum = state.longTimeSum + result.averageEntropy
-      newLtSumSq = state.longTimeSumSq + result.averageEntropy * result.averageEntropy
-      newLtAvg = newLtSum / newLtN
-      // Clamp to ≥ 0: E[X²] − E[X]² can go slightly negative from floating-point cancellation
-      newLtVar = newLtN > 1 ? Math.max(newLtSumSq / newLtN - newLtAvg * newLtAvg, 0) : 0
+      const delta = x - state.longTimeAverage
+      newLtAvg = state.longTimeAverage + delta / newLtN
+      const delta2 = x - newLtAvg
+      newLtM2 = state.longTimeM2 + delta * delta2
+      newLtVar = newLtN > 1 ? newLtM2 / newLtN : 0
     }
 
     set({
@@ -285,10 +283,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       currentWignerNegativities: result.wignerNegativities,
       currentAverageWignerNegativity: result.averageWignerNegativity,
       mutualInfoMatrix: result.mutualInfo,
-      longTimeSum: newLtSum,
-      longTimeSumSq: newLtSumSq,
       longTimeN: newLtN,
       longTimeAverage: newLtAvg,
+      longTimeM2: newLtM2,
       longTimeVariance: newLtVar,
     })
   },
@@ -309,10 +306,9 @@ export const useCoordinateEntanglementStore = create<CoordinateEntanglementState
       currentAverageWignerNegativity: 0,
       historyWignerNegativity: new Float64Array(HISTORY_LENGTH),
       mutualInfoMatrix: null,
-      longTimeSum: 0,
-      longTimeSumSq: 0,
       longTimeN: 0,
       longTimeAverage: 0,
+      longTimeM2: 0,
       longTimeVariance: 0,
     }),
 

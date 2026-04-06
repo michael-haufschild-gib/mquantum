@@ -32,7 +32,12 @@ import {
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
-import { applySharedPml, computeLatticeBoundingRadius } from './computeGridUtils'
+import {
+  applySharedPml,
+  computeLatticeBoundingRadius,
+  createDensityTextureBindings,
+  handleSimulationStateIO,
+} from './computeGridUtils'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -71,50 +76,15 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    const { device } = ctx
-
     this.tdsePass?.dispose()
     this.tdsePass = new TDSEComputePass()
-    this.tdsePass.initializeDensityTexture(device)
+    this.tdsePass.initializeDensityTexture(ctx.device)
 
-    const densityTextureView = this.tdsePass.getDensityTextureView() ?? null
-
-    const additionalLayoutEntries: GPUBindGroupLayoutEntry[] = []
-
-    const sampler = densityTextureView
-      ? device.createSampler({
-          label: 'density-grid-sampler',
-          magFilter: 'linear',
-          minFilter: 'linear',
-        })
-      : null
-
-    if (densityTextureView) {
-      additionalLayoutEntries.push(
-        {
-          binding: 4,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        }
-      )
-    }
-
-    return {
-      initPromises: [],
-      additionalLayoutEntries,
-      getBindGroupEntries: () => {
-        if (!densityTextureView || !sampler) return []
-        return [
-          { binding: 4, resource: densityTextureView },
-          { binding: 5, resource: sampler },
-        ]
-      },
-    }
+    const bindings = createDensityTextureBindings(
+      ctx.device,
+      this.tdsePass.getDensityTextureView() ?? null
+    )
+    return { initPromises: [], ...bindings }
   }
 
   computeBoundingRadius(
@@ -192,14 +162,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
       this.maybeComputeEntanglement(ctx, tdsePass, tdseConfig)
     }
 
-    // B1: Simulation state save/load
-    const simState = useSimulationStateStore.getState()
-    if (simState.saveRequested) {
-      simState.clearSaveRequest()
-      tdsePass.requestStateSave(ctx)
-    }
+    // Simulation state save/load
+    handleSimulationStateIO(ctx, tdsePass, ['tdseDynamics', 'becDynamics'])
 
-    // B2: Wavefunction slice capture
+    // Wavefunction slice capture
     const sliceStore = useWavefunctionSliceStore.getState()
     if (sliceStore.captureRequested) {
       sliceStore.clearRequest()
@@ -210,16 +176,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         shared.boundingRadius
       )
     }
-    if (simState.pendingLoadData) {
-      const loadData = simState.pendingLoadData
-      // Only inject if this strategy handles the loaded mode (TDSE or BEC)
-      if (loadData.quantumMode === 'tdseDynamics' || loadData.quantumMode === 'becDynamics') {
-        tdsePass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-        simState.clearLoadData()
-      }
-    }
 
-    // B3: Eigenstate storage for Gram-Schmidt + scar analysis
+    // Eigenstate storage for Gram-Schmidt + scar analysis
+    const simState = useSimulationStateStore.getState()
     if (simState.storeEigenstateRequested) {
       const energy = TdseBecStrategy.getCurrentEigenstateEnergy()
       const newCount = tdsePass.storeCurrentEigenstate(ctx.device, energy, tdseConfig)

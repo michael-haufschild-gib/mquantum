@@ -20,7 +20,7 @@ import { BindGroupCache } from '../core/BindGroupCache'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
-import { parseHexColorToLinearRgb } from '../utils/color'
+import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 
 /**
  * Paper texture pass configuration.
@@ -183,16 +183,9 @@ function generatePaperNoiseData(size: number): Uint8Array {
   return data
 }
 
-/**
- * Convert a hex sRGB color to linear RGBA values (0-1).
- * Paper texture pass operates in linear space like the WebGL render graph.
- * @param hex - Hex color string (e.g., '#ff0000')
- * @returns Tuple of [r, g, b, a] values in 0-1 range (linear RGB)
- */
-function hexToRGBA(hex: string): [number, number, number, number] {
-  const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
-  return [rgb[0], rgb[1], rgb[2], 1.0]
-}
+/** Default paper white in linear sRGB. */
+const DEFAULT_FRONT: Rgb = [0.96, 0.96, 0.86]
+const DEFAULT_BACK: Rgb = [1.0, 1.0, 1.0]
 
 /**
  * Converts quality level to numeric value.
@@ -251,8 +244,8 @@ export class PaperTexturePass extends WebGPUBasePass {
   private drops: number
   private fade: number
   private seed: number
-  private colorFront: [number, number, number, number]
-  private colorBack: [number, number, number, number]
+  private colorFront: Rgb
+  private colorBack: Rgb
   private quality: number
   private intensity: number
 
@@ -282,8 +275,12 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.intensity = config.intensity ?? 1.0
 
     // Set colors
-    this.colorFront = config.colorFront ? hexToRGBA(config.colorFront) : [0.96, 0.96, 0.86, 1.0]
-    this.colorBack = config.colorBack ? hexToRGBA(config.colorBack) : [1.0, 1.0, 1.0, 1.0]
+    this.colorFront = config.colorFront
+      ? parseHexColorToLinearRgb(config.colorFront, DEFAULT_FRONT)
+      : DEFAULT_FRONT
+    this.colorBack = config.colorBack
+      ? parseHexColorToLinearRgb(config.colorBack, DEFAULT_BACK)
+      : DEFAULT_BACK
   }
 
   /**
@@ -487,10 +484,10 @@ export class PaperTexturePass extends WebGPUBasePass {
       this.seed = postProcessing.paperSeed
     }
     if (postProcessing?.paperColorFront !== undefined) {
-      this.colorFront = hexToRGBA(postProcessing.paperColorFront)
+      this.colorFront = parseHexColorToLinearRgb(postProcessing.paperColorFront, DEFAULT_FRONT)
     }
     if (postProcessing?.paperColorBack !== undefined) {
-      this.colorBack = hexToRGBA(postProcessing.paperColorBack)
+      this.colorBack = parseHexColorToLinearRgb(postProcessing.paperColorBack, DEFAULT_BACK)
     }
     if (postProcessing?.paperQuality !== undefined) {
       this.quality = qualityToNumber(postProcessing.paperQuality as PaperQuality)
@@ -498,11 +495,11 @@ export class PaperTexturePass extends WebGPUBasePass {
   }
 
   setColorFront(hex: string): void {
-    this.colorFront = hexToRGBA(hex)
+    this.colorFront = parseHexColorToLinearRgb(hex, DEFAULT_FRONT)
   }
 
   setColorBack(hex: string): void {
-    this.colorBack = hexToRGBA(hex)
+    this.colorBack = parseHexColorToLinearRgb(hex, DEFAULT_BACK)
   }
 
   setQuality(quality: PaperQuality): void {
@@ -555,16 +552,16 @@ export class PaperTexturePass extends WebGPUBasePass {
     data[1] = ctx.size.height
     data[2] = ctx.frame?.time ?? 0
     data[3] = 1.0 // pixelRatio - WebGPU handles DPR internally
-    // colorFront
+    // colorFront (RGBA, alpha always 1.0)
     data[4] = this.colorFront[0]
     data[5] = this.colorFront[1]
     data[6] = this.colorFront[2]
-    data[7] = this.colorFront[3]
-    // colorBack
+    data[7] = 1.0
+    // colorBack (RGBA, alpha always 1.0)
     data[8] = this.colorBack[0]
     data[9] = this.colorBack[1]
     data[10] = this.colorBack[2]
-    data[11] = this.colorBack[3]
+    data[11] = 1.0
     // Parameters
     data[12] = this.contrast
     data[13] = this.roughness

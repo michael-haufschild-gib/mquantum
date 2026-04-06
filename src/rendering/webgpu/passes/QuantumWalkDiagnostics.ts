@@ -15,6 +15,7 @@ import {
   qwDiagFinalizeBlock,
   qwDiagReduceBlock,
 } from '../shaders/schroedinger/compute/qwDiagnostics.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 const DIAG_WG = 256
 const DIAG_INTERVAL = 10
@@ -52,26 +53,20 @@ export class QwDiagnostics {
       label: 'qw-diag-finalize',
       code: qwDiagFinalizeBlock,
     })
-    const reduceBGL = device.createBindGroupLayout({
-      label: 'qw-diag-reduce-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    const finalizeBGL = device.createBindGroupLayout({
-      label: 'qw-diag-finalize-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
+    const reduceBGL = createComputeBGL(device, 'qw-diag-reduce-bgl', [
+      'uniform',
+      'read-only-storage',
+      'storage',
+      'storage',
+      'storage',
+    ])
+    const finalizeBGL = createComputeBGL(device, 'qw-diag-finalize-bgl', [
+      'uniform',
+      'read-only-storage',
+      'read-only-storage',
+      'read-only-storage',
+      'storage',
+    ])
     this.reducePipeline = device.createComputePipeline({
       label: 'qw-diag-reduce-pipeline',
       layout: device.createPipelineLayout({ bindGroupLayouts: [reduceBGL] }),

@@ -12,6 +12,7 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { generateQuantumPreset, getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
+import { hermite } from '@/lib/math/hermitePolynomial'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -27,22 +28,6 @@ const PH = HEIGHT - PY - PB
 
 /** Blue secondary color for wavefunction curve — uses theme token */
 const WAVE_COLOR = 'var(--dirac-particle)'
-
-/**
- * Evaluate the physicist's Hermite polynomial H_n(x) via recurrence.
- */
-function hermite(n: number, x: number): number {
-  if (n === 0) return 1
-  if (n === 1) return 2 * x
-  let h0 = 1
-  let h1 = 2 * x
-  for (let k = 2; k <= n; k++) {
-    const h2 = 2 * x * h1 - 2 * (k - 1) * h0
-    h0 = h1
-    h1 = h2
-  }
-  return h1
-}
 
 /**
  * HO probability density |ψ_n(x)|² (unnormalized, auto-scaled).

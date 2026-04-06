@@ -13,6 +13,7 @@ import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
 
 import type { WebGPURenderContext } from '../core/types'
 import { tdseAddDisorderBlock } from '../shaders/schroedinger/compute/tdseAddDisorder.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 /** Mutable state for the disorder overlay pass. */
 export interface DisorderState {
@@ -48,14 +49,11 @@ export function buildDisorderPipeline(
     label: string
   ) => GPUComputePipeline
 ): void {
-  state.bgl = device.createBindGroupLayout({
-    label: 'tdse-disorder-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  state.bgl = createComputeBGL(device, 'tdse-disorder-bgl', [
+    'uniform',
+    'storage',
+    'read-only-storage',
+  ])
   const sm = createShaderModule(device, tdseAddDisorderBlock, 'tdse-add-disorder')
   state.pipeline = createComputePipeline(device, sm, [state.bgl], 'tdse-add-disorder')
 }

@@ -23,6 +23,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseStochasticExpect.wgsl'
 import { tdseStochasticLocBlock } from '../shaders/schroedinger/compute/tdseStochasticLoc.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 /** Maximum collapse centers per dispatch (mirrors physics constant). */
 const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
@@ -108,16 +109,13 @@ export function buildStochasticLocPipeline(
     label: string
   ) => GPUComputePipeline
 ): void {
-  state.bgl = device.createBindGroupLayout({
-    label: 'tdse-stochastic-loc-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-    ],
-  })
+  state.bgl = createComputeBGL(device, 'tdse-stochastic-loc-bgl', [
+    'uniform',
+    'storage',
+    'storage',
+    'uniform',
+    'read-only-storage',
+  ])
 
   const shaderCode = tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticLocBlock
   const sm = createShaderModule(device, shaderCode, 'tdse-stochastic-loc')
@@ -184,16 +182,13 @@ export function buildExpectationPipelines(
   ) => GPUComputePipeline
 ): void {
   // Reduce BGL: TDSEUniforms, psiRe, psiIm, StochasticParams, partialExpect
-  state.expectReduceBGL = device.createBindGroupLayout({
-    label: 'tdse-stochastic-expect-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  state.expectReduceBGL = createComputeBGL(device, 'tdse-stochastic-expect-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'uniform',
+    'storage',
+  ])
 
   const reduceCode = tdseUniformsBlock + freeScalarNDIndexBlock + tdseStochasticExpectReduceBlock
   const reduceSm = createShaderModule(device, reduceCode, 'tdse-stochastic-expect-reduce')
@@ -205,14 +200,11 @@ export function buildExpectationPipelines(
   )
 
   // Finalize BGL: FinalizeUniforms, partialExpect(read), result(read-write)
-  state.expectFinalizeBGL = device.createBindGroupLayout({
-    label: 'tdse-stochastic-expect-finalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  state.expectFinalizeBGL = createComputeBGL(device, 'tdse-stochastic-expect-finalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
 
   const finalizeCode = tdseStochasticExpectFinalizeBlock
   const finalizeSm = createShaderModule(device, finalizeCode, 'tdse-stochastic-expect-finalize')

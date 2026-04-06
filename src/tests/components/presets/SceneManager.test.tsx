@@ -143,22 +143,19 @@ describe('SceneManager', () => {
   })
 
   describe('export', () => {
-    it('export button creates and clicks a download link', async () => {
+    it('export button triggers file download', async () => {
       usePresetManagerStore.setState({
         savedScenes: [createScene('s1', 'Test Scene')],
       })
 
       const user = userEvent.setup()
       const createObjectURL = vi.fn(() => 'blob:test-url')
-      const revokeObjectURL = vi.fn()
       globalThis.URL.createObjectURL = createObjectURL
-      globalThis.URL.revokeObjectURL = revokeObjectURL
 
       renderWithProviders(<SceneManager onClose={() => {}} />)
       await user.click(screen.getByRole('button', { name: /export/i }))
 
       expect(createObjectURL).toHaveBeenCalled()
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test-url')
     })
   })
 })

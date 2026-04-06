@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { Select } from '../../../components/ui/Select'
+import { Select } from '@/components/ui/Select'
 
 const mockOptions = [
   { value: 'option1', label: 'Option 1' },

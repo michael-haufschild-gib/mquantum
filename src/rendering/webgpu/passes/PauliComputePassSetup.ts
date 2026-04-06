@@ -30,6 +30,7 @@ import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 // ───────────────────────────────────────────────────────────────────────────
 // Type definitions
@@ -111,14 +112,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   const preamble = `${pauliUniformsBlock}\n${freeScalarNDIndexBlock}\n`
 
   // Shared BGL for spinor passes: uniform + spinorRe(rw) + spinorIm(rw)
-  const spinorBGL = device.createBindGroupLayout({
-    label: 'pauli-spinor-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const spinorBGL = createComputeBGL(device, 'pauli-spinor-bgl', ['uniform', 'storage', 'storage'])
   const spinorLayout = device.createPipelineLayout({ bindGroupLayouts: [spinorBGL] })
 
   // Init pipeline
@@ -176,15 +170,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   // Renormalization pipeline: reads totalNorm from diagResultBuffer,
   // scales ψ by 1/√(totalNorm) to counteract f32 norm drift.
   // Layout: uniform(totalElements) + diagResult(read) + spinorRe(rw) + spinorIm(rw)
-  const renormalizeBGL = device.createBindGroupLayout({
-    label: 'pauli-renormalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const renormalizeBGL = createComputeBGL(device, 'pauli-renormalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const renormalizePipeline = device.createComputePipeline({
     label: 'pauli-renormalize-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
@@ -224,15 +215,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // Pack BGL: uniforms + spinorRe + spinorIm + scratchA
-  const packBGL = device.createBindGroupLayout({
-    label: 'pauli-pack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const packBGL = createComputeBGL(device, 'pauli-pack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
   const packPipeline = device.createComputePipeline({
     label: 'pauli-pack-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [packBGL] }),
@@ -246,15 +234,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // Unpack BGL: uniforms + scratchA + spinorRe + spinorIm
-  const unpackBGL = device.createBindGroupLayout({
-    label: 'pauli-unpack-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const unpackBGL = createComputeBGL(device, 'pauli-unpack-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+    'storage',
+  ])
   const unpackPipeline = device.createComputePipeline({
     label: 'pauli-unpack-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [unpackBGL] }),
@@ -268,14 +253,11 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // FFT pipeline (shared Stockham FFT infrastructure)
-  const fftStageBGL = device.createBindGroupLayout({
-    label: 'pauli-fft-stage-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const fftStageBGL = createComputeBGL(device, 'pauli-fft-stage-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const fftStagePipeline = device.createComputePipeline({
     label: 'pauli-fft-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [fftStageBGL] }),
@@ -289,15 +271,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // Diagnostics: reduce BGL
-  const diagReduceBGL = device.createBindGroupLayout({
-    label: 'pauli-diag-reduce-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const diagReduceBGL = createComputeBGL(device, 'pauli-diag-reduce-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'storage',
+  ])
   const diagReducePipeline = device.createComputePipeline({
     label: 'pauli-diag-reduce-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [diagReduceBGL] }),
@@ -311,14 +290,11 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // Diagnostics: finalize BGL
-  const diagFinalizeBGL = device.createBindGroupLayout({
-    label: 'pauli-diag-finalize-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const diagFinalizeBGL = createComputeBGL(device, 'pauli-diag-finalize-bgl', [
+    'uniform',
+    'read-only-storage',
+    'storage',
+  ])
   const diagFinalizePipeline = device.createComputePipeline({
     label: 'pauli-diag-finalize-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [diagFinalizeBGL] }),

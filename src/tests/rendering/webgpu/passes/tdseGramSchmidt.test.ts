@@ -22,8 +22,7 @@ import {
   MAX_STORED_EIGENSTATES,
   storeCurrentEigenstate,
 } from '@/rendering/webgpu/passes/TDSEGramSchmidt'
-
-import { createMockBuffer } from '../../../__mocks__/webgpu'
+import { createMockBuffer } from '@/tests/__mocks__/webgpu'
 
 function createMockDevice(): GPUDevice {
   return {

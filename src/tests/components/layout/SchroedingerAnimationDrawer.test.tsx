@@ -106,7 +106,7 @@ describe('SchroedingerAnimationDrawer', () => {
     render(<SchroedingerAnimationDrawer />)
 
     // Phase Shimmer is off — its parameter group should be aria-disabled
-    const paramGroup = screen.getByRole('group', { name: 'Phase shimmer parameters' })
+    const paramGroup = screen.getByRole('group', { name: 'Phase Shimmer parameters' })
     expect(paramGroup).toHaveAttribute('aria-disabled', 'true')
   })
 

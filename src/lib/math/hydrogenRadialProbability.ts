@@ -9,35 +9,8 @@
  * @module lib/math/hydrogenRadialProbability
  */
 
-/** Associated Laguerre polynomial L^alpha_k(x) via 3-term recurrence */
-function laguerre(k: number, alpha: number, x: number): number {
-  if (k <= 0) return 1.0
-  if (k === 1) return 1.0 + alpha - x
-
-  let lNm2 = 1.0
-  let lNm1 = 1.0 + alpha - x
-  let lN = lNm1
-  for (let i = 2; i <= k; i++) {
-    lN = ((2.0 * i - 1.0 + alpha - x) * lNm1 - (i - 1.0 + alpha) * lNm2) / i
-    lNm2 = lNm1
-    lNm1 = lN
-  }
-  return lN
-}
-
-/** Factorial for small n (n <= 20 sufficient for quantum numbers up to 7) */
-function factorial(n: number): number {
-  let result = 1
-  for (let i = 2; i <= n; i++) result *= i
-  return result
-}
-
-/** Log-factorial: ln(k!) — exact, mirrors WGSL lnFactorial() */
-function lnFactorial(k: number): number {
-  let sum = 0
-  for (let i = 2; i <= k; i++) sum += Math.log(i)
-  return sum
-}
+import { associatedLaguerre } from '@/lib/math/laguerrePolynomial'
+import { factorial, lnFactorial } from '@/lib/math/specialFunctions'
 
 /** Hydrogen radial wavefunction R_nl(r) — mirrors WGSL hydrogenRadial() */
 function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
@@ -58,7 +31,7 @@ function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
   for (let il = 0; il < l; il++) rhoL *= rho
 
   // Associated Laguerre L^{2l+1}_{n-l-1}(rho)
-  const L = laguerre(n - l - 1, 2 * l + 1, rho)
+  const L = associatedLaguerre(n - l - 1, 2 * l + 1, rho)
 
   // Exponential decay
   const expPart = Math.exp(-rho * 0.5)
@@ -90,7 +63,7 @@ function hydrogenRadialND(n: number, l: number, r: number, a0: number, dim: numb
   const rhoLambda = Math.pow(Math.max(rho, 1e-20), lambda)
 
   // Associated Laguerre L^{2λ+1}_{nr}(rho)
-  const L = laguerre(nr, 2 * lambda + 1, rho)
+  const L = associatedLaguerre(nr, 2 * lambda + 1, rho)
 
   const expPart = Math.exp(-rho * 0.5)
 

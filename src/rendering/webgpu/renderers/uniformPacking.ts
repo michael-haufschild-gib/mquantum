@@ -17,7 +17,7 @@ import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 import { MAX_DIM, MAX_EXTRA_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
-import { parseHexColorToLinearRgb } from '../utils/color'
+import { parseHexColorToLinearRgb, type Rgb } from '../utils/color'
 import { zeroReservedFields } from '../utils/structLayout'
 import {
   CROSS_SECTION_COMPOSITE_MODE_MAP,
@@ -40,10 +40,8 @@ const I = SCHROEDINGER_LAYOUT.index
 // Shared helper
 // ---------------------------------------------------------------------------
 
-function parseColor(hex: string): [number, number, number] {
-  const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
-  return [rgb[0], rgb[1], rgb[2]]
-}
+/** Parse hex color to linear RGB, defaulting to white on failure. */
+const parseColor = (hex: string): Rgb => parseHexColorToLinearRgb(hex)
 
 // =========================================================================
 // Schroedinger uniform buffer

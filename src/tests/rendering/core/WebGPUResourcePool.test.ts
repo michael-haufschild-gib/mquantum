@@ -9,8 +9,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { WebGPURenderResourceConfig } from '@/rendering/webgpu/core/types'
 import { WebGPUResourcePool } from '@/rendering/webgpu/core/WebGPUResourcePool'
-
-import { mockWebGPU } from '../../__mocks__/webgpu'
+import { mockWebGPU } from '@/tests/__mocks__/webgpu'
 
 describe('WebGPUResourcePool', () => {
   let pool: WebGPUResourcePool
