@@ -161,8 +161,8 @@ export function handleSimulationStateIO(
   const simState = useSimulationStateStore.getState()
 
   if (simState.saveRequested) {
-    simState.clearSaveRequest()
     pass.requestStateSave(ctx)
+    simState.clearSaveRequest()
   }
 
   if (simState.pendingLoadData) {

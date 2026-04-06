@@ -21,14 +21,14 @@
  * @returns L_p^α(x)
  */
 export function associatedLaguerre(p: number, alpha: number, x: number): number {
-  if (p < 0) return 0
-  if (p === 0) return 1
-  if (p === 1) return 1 + alpha - x
+  const order = Math.floor(p)
+  if (order <= 0) return order < 0 ? 0 : 1
+  if (order === 1) return 1 + alpha - x
 
   let lPrev2 = 1
   let lPrev1 = 1 + alpha - x
   let lCurr = lPrev1
-  for (let j = 2; j <= p; j++) {
+  for (let j = 2; j <= order; j++) {
     lCurr = ((2 * j - 1 + alpha - x) * lPrev1 - (j - 1 + alpha) * lPrev2) / j
     lPrev2 = lPrev1
     lPrev1 = lCurr

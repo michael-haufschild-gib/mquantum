@@ -31,11 +31,12 @@ const LN_FACTORIAL_LUT: number[] = []
  * @returns ln(k!), or 0 for k < 0
  */
 export function lnFactorial(k: number): number {
-  if (k < 0) return 0
-  if (k <= 30) return LN_FACTORIAL_LUT[k]!
-  // Fallback for large k (rare in quantum number contexts)
+  const n = Math.floor(k)
+  if (n < 0) return 0
+  if (n <= 30) return LN_FACTORIAL_LUT[n]!
+  // Fallback for large n (rare in quantum number contexts)
   let sum = LN_FACTORIAL_LUT[30]!
-  for (let i = 31; i <= k; i++) sum += Math.log(i)
+  for (let i = 31; i <= n; i++) sum += Math.log(i)
   return sum
 }
 
@@ -60,11 +61,12 @@ const FACTORIAL_LUT: number[] = [1]
  * @returns n!
  */
 export function factorial(n: number): number {
-  if (n < 0) return NaN
-  if (n <= 30) return FACTORIAL_LUT[n]!
-  if (n > 170) return NaN // 171! exceeds Number.MAX_VALUE
+  const k = Math.floor(n)
+  if (k < 0) return NaN
+  if (k <= 30) return FACTORIAL_LUT[k]!
+  if (k > 170) return NaN // 171! exceeds Number.MAX_VALUE
   let result = FACTORIAL_LUT[30]!
-  for (let i = 31; i <= n; i++) result *= i
+  for (let i = 31; i <= k; i++) result *= i
   return result
 }
 
@@ -90,6 +92,7 @@ const LN_GAMMA_HALF_LUT: readonly number[] = [
  * @returns ln(Γ(n/2)), or 0 if out of range
  */
 export function lnGammaHalf(n: number): number {
-  if (n < 1 || n > 30) return 0
-  return LN_GAMMA_HALF_LUT[n - 1]!
+  const k = Math.floor(n)
+  if (k < 1 || k > 30) return 0
+  return LN_GAMMA_HALF_LUT[k - 1]!
 }

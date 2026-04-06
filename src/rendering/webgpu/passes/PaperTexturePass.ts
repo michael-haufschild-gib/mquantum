@@ -484,10 +484,10 @@ export class PaperTexturePass extends WebGPUBasePass {
       this.seed = postProcessing.paperSeed
     }
     if (postProcessing?.paperColorFront !== undefined) {
-      this.colorFront = parseHexColorToLinearRgb(postProcessing.paperColorFront)
+      this.colorFront = parseHexColorToLinearRgb(postProcessing.paperColorFront, DEFAULT_FRONT)
     }
     if (postProcessing?.paperColorBack !== undefined) {
-      this.colorBack = parseHexColorToLinearRgb(postProcessing.paperColorBack)
+      this.colorBack = parseHexColorToLinearRgb(postProcessing.paperColorBack, DEFAULT_BACK)
     }
     if (postProcessing?.paperQuality !== undefined) {
       this.quality = qualityToNumber(postProcessing.paperQuality as PaperQuality)
@@ -495,11 +495,11 @@ export class PaperTexturePass extends WebGPUBasePass {
   }
 
   setColorFront(hex: string): void {
-    this.colorFront = parseHexColorToLinearRgb(hex)
+    this.colorFront = parseHexColorToLinearRgb(hex, DEFAULT_FRONT)
   }
 
   setColorBack(hex: string): void {
-    this.colorBack = parseHexColorToLinearRgb(hex)
+    this.colorBack = parseHexColorToLinearRgb(hex, DEFAULT_BACK)
   }
 
   setQuality(quality: PaperQuality): void {

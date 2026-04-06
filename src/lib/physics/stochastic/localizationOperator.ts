@@ -87,8 +87,9 @@ export function applyLocalizationStepND(
 ): void {
   if (gamma === 0) return
 
-  const totalSites = gridSize.reduce((a, b) => a * b, 1)
-  const strides = computeStrides(gridSize.slice(0, latticeDim))
+  const activeGrid = gridSize.slice(0, latticeDim)
+  const totalSites = activeGrid.reduce((a, b) => a * b, 1)
+  const strides = computeStrides(activeGrid)
 
   const invTwoSigmaSq = 1 / (2 * sigma * sigma)
   const sqrtGammaDt = Math.sqrt(gamma * dt)
