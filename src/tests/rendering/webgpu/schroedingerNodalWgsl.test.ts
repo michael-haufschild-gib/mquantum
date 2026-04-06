@@ -30,7 +30,7 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('let minAmplitudeScale = mix(5.5, 2.0, strengthT);')
     expect(wgsl).toContain('let minAmplitudeFloor = mix(8e-4, 2e-4, strengthT);')
     expect(wgsl).toContain(
-      'let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor);'
+      'let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor) * ampThresholdScale;'
     )
     expect(wgsl).toContain('if (max(prevSample.amplitude, currSample.amplitude) < minAmplitude)')
     expect(wgsl).toContain(
@@ -49,7 +49,7 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);')
     expect(wgsl).toContain('intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;')
     expect(wgsl).toContain(
-      'let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);'
+      'let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);'
     )
 
     expect(wgsl).not.toContain('fn computeNodalIntensity(')

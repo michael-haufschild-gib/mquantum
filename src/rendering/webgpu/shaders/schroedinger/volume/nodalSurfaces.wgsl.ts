@@ -173,7 +173,13 @@ fn findNodalSurfaceHit(
   let strengthT = clamp(uniforms.nodalStrength * 0.5, 0.0, 1.0);
   let minAmplitudeScale = mix(5.5, 2.0, strengthT);
   let minAmplitudeFloor = mix(8e-4, 2e-4, strengthT);
-  let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor);
+  // Hydrogen amplitude correction: raw |ψ| is much smaller than HO.
+  // Scale threshold down by sqrt(hydrogenNDBoost) so zero-crossings aren't skipped.
+  var ampThresholdScale = 1.0;
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+    ampThresholdScale = 1.0 / max(sqrt(uniforms.hydrogenNDBoost), 1.0);
+  }
+  let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor) * ampThresholdScale;
   var t = tNear;
 
   let p0 = rayOrigin + rayDir * t;
@@ -284,7 +290,10 @@ fn findNodalSurfaceHit(
 // psi evaluations per ray step — a ~44% reduction in per-step wavefunction evaluation cost.
 fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalWithGradient {
   let eps = max(uniforms.nodalTolerance, 1e-6);
-  let delta = 0.05;
+  // Scale tetrahedral sampling radius with bounding radius so samples reach into
+  // adjacent lobes for hydrogen (whose bounding radius is much larger than HO).
+  // Reference radius ~3.0 keeps delta ≈ 0.05 for typical HO states.
+  let delta = 0.05 * max(uniforms.boundingRadius / 3.0, 1.0);
 
   var intensity = 0.0;
   var signValue = 0.0;
@@ -293,6 +302,8 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
   var densityGrad = vec3f(0.0);
   var avgRho = 0.0;
   var avgS = 0.0;
+  // Track max boosted density across branches for hydrogen envelope correction.
+  var maxBoostedRho = 0.0;
 
   // Hydrogen node-family filtering branch
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
@@ -313,6 +324,12 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     } else {
       f0 = h0.y; f1 = h1.y; f2 = h2.y; f3 = h3.y;
     }
+
+    // For family-filter envelope: use max |factor| from tetrahedral samples.
+    // Raw |ψ| is zero at the node by definition, but the individual factor
+    // (radial/angular) at offset positions has reasonable magnitude.
+    let maxFactor = max(max(abs(f0), abs(f1)), max(abs(f2), abs(f3)));
+    maxBoostedRho = maxFactor * maxFactor * uniforms.hydrogenNDBoost;
 
     let fCenter = (f0 + f1 + f2 + f3) * 0.25;
     let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
@@ -349,6 +366,7 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
       rho1 *= uniforms.hydrogenNDBoost;
       rho2 *= uniforms.hydrogenNDBoost;
       rho3 *= uniforms.hydrogenNDBoost;
+      maxBoostedRho = max(max(rho0, rho1), max(rho2, rho3));
     }
     let s0 = sFromRho(rho0); let s1 = sFromRho(rho1);
     let s2 = sFromRho(rho2); let s3 = sFromRho(rho3);
@@ -388,9 +406,17 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
     }
   }
 
+  // Envelope: suppress nodal bands where the wavefunction is negligibly small.
+  // For hydrogen, raw |ψ| is orders of magnitude smaller than HO due to different
+  // normalization (compensated by hydrogenNDBoost for density but not for raw ψ).
+  // Use sqrt(boosted density) for hydrogen so the threshold matches visual significance.
   let envelopeFloor = max(eps * 0.4, 5e-5);
   let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
-  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);
+  var envelopeAmp = maxAbsPsi;
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+    envelopeAmp = sqrt(max(maxBoostedRho, 0.0));
+  }
+  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);
 
   let nodalResult = NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
   return NodalWithGradient(nodalResult, densityGrad, avgRho, avgS);
@@ -399,7 +425,8 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
 // Compute physically grounded nodal intensity from psi, Re(psi), Im(psi), and hydrogen factors.
 fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
   let eps = max(uniforms.nodalTolerance, 1e-6);
-  let delta = 0.05;
+  // Scale tetrahedral sampling radius with bounding radius (see WithGradient variant).
+  let delta = 0.05 * max(uniforms.boundingRadius / 3.0, 1.0);
 
   var intensity = 0.0;
   var signValue = 0.0;
@@ -407,6 +434,8 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   var maxAbsPsi = 0.0;
 
   // Hydrogen node-family filtering: only needs hydrogen factors + center amplitude
+  // Track max factor magnitude for envelope (raw |ψ| is zero at the node itself).
+  var maxFamilyFactor = 0.0;
   if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
     let psiC = samplePsiWithFlow(pos, t, uniforms);
     maxAbsPsi = length(psiC);
@@ -431,6 +460,8 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
       f2 = h2.y;
       f3 = h3.y;
     }
+
+    maxFamilyFactor = max(max(abs(f0), abs(f1)), max(abs(f2), abs(f3)));
 
     let fCenter = (f0 + f1 + f2 + f3) * 0.25;
     let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
@@ -491,9 +522,19 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
     }
   }
 
+  // Hydrogen envelope correction: raw |ψ| is much smaller than HO due to
+  // normalization differences. Scale by sqrt(hydrogenNDBoost) to match the
+  // effective amplitude used in density visualization.
+  // For family-filter mode, use the factor magnitude instead of raw |ψ|
+  // (at a node, |ψ| is zero but the individual factor has nonzero magnitude at offsets).
   let envelopeFloor = max(eps * 0.4, 5e-5);
   let envelopeCeil = max(eps * 2.0, envelopeFloor + 1e-4);
-  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);
+  var envelopeAmp = maxAbsPsi;
+  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
+    let baseAmp = select(maxAbsPsi, maxFamilyFactor, maxFamilyFactor > 0.0);
+    envelopeAmp = sqrt(baseAmp * baseAmp * uniforms.hydrogenNDBoost);
+  }
+  let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, envelopeAmp);
 
   return NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, envelopeWeight);
 }
