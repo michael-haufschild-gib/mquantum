@@ -128,7 +128,6 @@ export const defaultGridPerDim = (d: number): number => computeDefaultGridPerDim
 export const defaultDiracGridPerDim = (d: number): number =>
   computeDefaultGridPerDim(d, DIRAC_MAX_TOTAL_SITES)
 
-
 // ---------------------------------------------------------------------------
 // Nested domain setter factories
 // ---------------------------------------------------------------------------
@@ -151,13 +150,10 @@ type DomainKey = 'tdse' | 'bec' | 'dirac' | 'freeScalar' | 'openQuantum' | 'quan
  * @param min - Minimum allowed value
  * @param max - Maximum allowed value
  */
-export function nestedClampedSetter<D extends DomainKey>(
-  ctx: SetterContext,
-  domain: D,
-  field: string & keyof SchroedingerConfig[D],
-  min: number,
-  max: number
-): (value: number) => void {
+export function nestedClampedSetter<
+  D extends DomainKey,
+  K extends string & keyof SchroedingerConfig[D],
+>(ctx: SetterContext, domain: D, field: K, min: number, max: number): (value: number) => void {
   return (value: number) => {
     if (!ctx.isFinite(value)) {
       ctx.warnNonFinite(`${domain}.${field}`, value)
@@ -181,12 +177,11 @@ export function nestedClampedSetter<D extends DomainKey>(
  * @param domain - Domain key in SchroedingerConfig
  * @param field - Field name within the domain config
  */
-export function nestedValueSetter<D extends DomainKey>(
-  ctx: SetterContext,
-  domain: D,
-  field: string & keyof SchroedingerConfig[D]
-): (value: SchroedingerConfig[D][typeof field]) => void {
-  return (value: SchroedingerConfig[D][typeof field]) => {
+export function nestedValueSetter<
+  D extends DomainKey,
+  K extends string & keyof SchroedingerConfig[D],
+>(ctx: SetterContext, domain: D, field: K): (value: SchroedingerConfig[D][K]) => void {
+  return (value: SchroedingerConfig[D][K]) => {
     ctx.setWithVersion((state) => ({
       schroedinger: {
         ...state.schroedinger,
@@ -206,10 +201,13 @@ export function nestedValueSetter<D extends DomainKey>(
  * @param min - Minimum allowed value
  * @param max - Maximum allowed value
  */
-export function nestedIntSetter<D extends DomainKey>(
+export function nestedIntSetter<
+  D extends DomainKey,
+  K extends string & keyof SchroedingerConfig[D],
+>(
   ctx: SetterContext,
   domain: D,
-  field: string & keyof SchroedingerConfig[D],
+  field: K,
   min: number,
   max: number,
   round: 'floor' | 'round' = 'round'
