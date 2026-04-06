@@ -10,10 +10,19 @@
 import type { BecConfig } from '@/lib/geometry/extended/types'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
+/** Parent-level SchroedingerConfig rendering fields that a BEC preset can override. */
+export interface BecRenderingOverrides {
+  densityGain?: number
+  densityContrast?: number
+  autoScaleMaxGain?: number
+}
+
 /** A named BEC scenario preset. */
 export interface BecScenarioPreset extends ScenarioPreset<Partial<BecConfig>> {
   /** Minimum spatial dimension required for this preset (default: 2). */
   minDim?: number
+  /** Parent-level rendering overrides applied alongside BecConfig overrides. */
+  renderingOverrides?: BecRenderingOverrides
 }
 
 /**
@@ -29,7 +38,9 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       trapOmega: 1.0,
       initialCondition: 'thomasFermi',
       fieldView: 'density',
+      autoScale: true,
     },
+    renderingOverrides: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
   },
   {
     id: 'singleVortex',
@@ -42,6 +53,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       vortexCharge: 1,
       fieldView: 'phase',
     },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 2.6 },
   },
   {
     id: 'vortexDipole',
@@ -56,6 +68,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       vortexAlternateCharge: true,
       fieldView: 'phase',
     },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 2.6 },
   },
   {
     id: 'darkSoliton',
@@ -68,7 +81,9 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       solitonDepth: 1.0,
       solitonVelocity: 0.0,
       fieldView: 'density',
+      autoScale: true,
     },
+    renderingOverrides: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
   },
   {
     id: 'quantumTurbulence',
@@ -83,6 +98,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       dt: 0.001,
       stepsPerFrame: 8,
     },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 2.6 },
   },
   {
     id: 'breathingMode',
@@ -96,7 +112,9 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       initTrapOmega: 1.0,
       initialCondition: 'thomasFermi',
       fieldView: 'density',
+      autoScale: true,
     },
+    renderingOverrides: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
   },
   {
     id: 'attractiveBec',
@@ -108,6 +126,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       initialCondition: 'thomasFermi',
       fieldView: 'density',
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   // === Higher-Dimensional Vortex Topology (D ≥ 4) ===
   {
@@ -129,12 +148,12 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       dt: 0.001,
       stepsPerFrame: 4,
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
     id: 'vortex4DParallel',
     name: '4D Parallel Vortices',
-    description:
-      'Two vortex surfaces in the same plane (both x₀x₁) — no reconnection control case',
+    description: 'Two vortex surfaces in the same plane (both x₀x₁) — no reconnection control case',
     minDim: 4,
     overrides: {
       interactionStrength: 500,
@@ -149,12 +168,12 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       dt: 0.001,
       stepsPerFrame: 4,
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
     id: 'vortex5DReconnection',
     name: '5D Vortex Reconnection',
-    description:
-      'Two vortex 3-volumes in orthogonal planes — first-ever D=5 GPE vortex simulation',
+    description: 'Two vortex 3-volumes in orthogonal planes — first-ever D=5 GPE vortex simulation',
     minDim: 5,
     overrides: {
       interactionStrength: 500,
@@ -169,6 +188,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       dt: 0.0005,
       stepsPerFrame: 8,
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
     id: 'vortex4DSingle',
@@ -187,5 +207,6 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       vortexPairCount: 1,
       fieldView: 'phase',
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
 ]

@@ -445,6 +445,7 @@ export function createBecSetters(ctx: SetterContext): BecActions {
           return {
             schroedinger: {
               ...state.schroedinger,
+              ...preset.renderingOverrides,
               bec: { ...merged, ...resized, needsReset: true },
             },
           }

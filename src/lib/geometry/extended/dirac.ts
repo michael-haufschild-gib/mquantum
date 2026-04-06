@@ -166,7 +166,7 @@ export const DEFAULT_DIRAC_CONFIG: DiracConfig = {
   fieldView: 'totalDensity',
   particleColor: [0.2, 0.6, 1.0],
   antiparticleColor: [1.0, 0.3, 0.2],
-  autoScale: true,
+  autoScale: false,
   showPotential: false,
   absorberEnabled: true,
   absorberWidth: 0.2,

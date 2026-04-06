@@ -22,7 +22,6 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
-
 const noop = () => {}
 
 /**
@@ -251,9 +250,8 @@ const ExposureSectionInner: React.FC<{
 ExposureSectionInner.displayName = 'ExposureSectionInner'
 
 /**
- * Read-only indicator showing the current auto-scale gain.
- * Uses the latest maxDensity from the TDSE diagnostics store and compares
- * it to the first snapshot's maxDensity to compute the amplification factor.
+ * Read-only indicator showing the effective auto-scale gain.
+ * The raw gain is 1/maxDensity; the effective gain is capped at autoScaleMaxGain.
  */
 const ExposureIndicator: React.FC = React.memo(() => {
   const { maxDensity, hasData } = useDiagnosticsStore(
@@ -265,23 +263,13 @@ const ExposureIndicator: React.FC = React.memo(() => {
 
   const autoScaleMaxGain = useExtendedObjectStore((s) => s.schroedinger.autoScaleMaxGain ?? 20)
 
-  // The gain cap is applied via initialMaxDensity / autoScaleMaxGain floor.
-  // Here we just show whether the current maxDensity implies the cap is active.
-  // A simple heuristic: if maxDensity is very small, gain is high.
   if (!hasData || maxDensity <= 0) return null
 
-  // We don't have initialMaxDensity in the store, but we can show a qualitative indicator
-  // by comparing current maxDensity to 1.0 (the typical order-of-magnitude for normalized ψ).
-  // The actual gain cap is enforced GPU-side in the uniform packing.
-  const estimatedGain = 1.0 / Math.max(maxDensity, 1e-10)
-  const isCapped = estimatedGain >= autoScaleMaxGain * 0.95
+  const rawGain = 1.0 / Math.max(maxDensity, 1e-10)
+  const isCapped = rawGain > autoScaleMaxGain
+  const effectiveGain = Math.min(rawGain, autoScaleMaxGain)
 
-  const gainText =
-    estimatedGain >= 100
-      ? `~${Math.round(estimatedGain)}x`
-      : estimatedGain >= 10
-        ? `~${Math.round(estimatedGain)}x`
-        : `~${estimatedGain.toFixed(1)}x`
+  const formatGain = (g: number) => (g >= 10 ? `${Math.round(g)}x` : `${g.toFixed(1)}x`)
 
   return (
     <div
@@ -290,8 +278,8 @@ const ExposureIndicator: React.FC = React.memo(() => {
     >
       <span className="text-[var(--text-tertiary)]">Current gain</span>
       <span className={isCapped ? 'text-[var(--text-warning)]' : 'text-[var(--text-secondary)]'}>
-        {gainText}
-        {isCapped ? ' (capped)' : ''}
+        {formatGain(effectiveGain)}
+        {isCapped ? ` (capped from ~${formatGain(rawGain)})` : ''}
       </span>
     </div>
   )

@@ -192,7 +192,7 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   fieldView: 'spinDensity',
   spinUpColor: [0.0, 0.8, 1.0],
   spinDownColor: [1.0, 0.2, 0.8],
-  autoScale: true,
+  autoScale: false,
 
   absorberEnabled: true,
   absorberWidth: 0.2,

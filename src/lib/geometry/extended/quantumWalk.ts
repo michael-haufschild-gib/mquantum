@@ -62,7 +62,7 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
   stepsPerFrame: 1,
   initialPosition: [32, 32],
   fieldView: 'probability',
-  autoScale: true,
+  autoScale: false,
   spacing: [0.1, 0.1],
   needsReset: false,
   absorberEnabled: true,

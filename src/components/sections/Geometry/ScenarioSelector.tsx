@@ -3,10 +3,10 @@
  *
  * Renders a single "Scenarios" dropdown in the left panel header,
  * with options filtered by the active quantum mode and dimension.
- * Replaces per-mode preset Selects that were buried inside control sections.
+ * The first preset is auto-selected on mode switch.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
@@ -19,6 +19,7 @@ import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
+import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
 import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/types'
 import { useAppearanceStore } from '@/stores/appearanceStore'
@@ -27,84 +28,81 @@ import { useGeometryStore } from '@/stores/geometryStore'
 
 import { getScenarioPresetOptions as getTdsePresetOptions } from './SchroedingerControls/tdseControlsConstants'
 
-const EMPTY_OPTION = { value: '', label: '\u2014 Select Preset \u2014' }
+/** Apply a Pauli preset by ID, setting config and color algorithm. */
+function applyPauliPresetById(
+  presetId: string,
+  setPauliConfig: (config: Partial<import('@/lib/geometry/extended/pauli').PauliConfig>) => void
+): void {
+  const preset = PAULI_SCENARIO_PRESETS.find((p) => p.id === presetId)
+  if (!preset) return
+  setPauliConfig({ ...preset.overrides, needsReset: true })
+  const algo = preset.overrides.fieldView
+    ? PAULI_FIELD_VIEW_TO_COLOR_ALGO[preset.overrides.fieldView]
+    : undefined
+  if (algo) useAppearanceStore.getState().setColorAlgorithm(algo)
+}
 
 /* ── Harmonic Oscillator options ───────────────────────────── */
 
-const HO_PRESET_OPTIONS = [
-  EMPTY_OPTION,
-  ...Object.entries(SCHROEDINGER_NAMED_PRESETS).map(([key, preset]) => ({
-    value: key,
-    label: preset.name,
-  })),
-]
+const HO_PRESET_OPTIONS = Object.entries(SCHROEDINGER_NAMED_PRESETS).map(([key, preset]) => ({
+  value: key,
+  label: preset.name,
+}))
 
 /* ── BEC options (dimension-filtered) ──────────────────────── */
 
 function getBecPresetOptions(dim: number) {
-  return [
-    EMPTY_OPTION,
-    ...BEC_SCENARIO_PRESETS.filter((p) => (p.minDim ?? 2) <= dim).map((p) => ({
-      value: p.id,
-      label: p.name,
-    })),
-  ]
+  return BEC_SCENARIO_PRESETS.filter((p) => (p.minDim ?? 2) <= dim).map((p) => ({
+    value: p.id,
+    label: p.name,
+  }))
 }
 
 /* ── Dirac options ─────────────────────────────────────────── */
 
-const DIRAC_PRESET_OPTIONS = [
-  EMPTY_OPTION,
-  ...DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
+const DIRAC_PRESET_OPTIONS = DIRAC_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
 
 /* ── Pauli options ─────────────────────────────────────────── */
 
-const PAULI_PRESET_OPTIONS = [
-  EMPTY_OPTION,
-  ...PAULI_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
+const PAULI_PRESET_OPTIONS = PAULI_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name }))
 
 /* ── Free Scalar Field options ─────────────────────────────── */
 
-const FREE_SCALAR_PRESET_OPTIONS = [
-  EMPTY_OPTION,
-  ...FREE_SCALAR_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
+const FREE_SCALAR_PRESET_OPTIONS = FREE_SCALAR_PRESETS.map((p) => ({
+  value: p.id,
+  label: p.name,
+}))
 
 /* ── Quantum Walk options ──────────────────────────────────── */
 
-const QUANTUM_WALK_PRESET_OPTIONS = [
-  EMPTY_OPTION,
-  ...QUANTUM_WALK_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
+const QUANTUM_WALK_PRESET_OPTIONS = QUANTUM_WALK_PRESETS.map((p) => ({
+  value: p.id,
+  label: p.name,
+}))
 
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
   const groups = getHydrogenNDPresetsWithKeysByDimension()
-  const opts = Object.entries(groups)
+  return Object.entries(groups)
     .filter(([dim]) => Number(dim) <= dimension)
     .flatMap(([, presets]) => presets.map(([key, preset]) => ({ value: key, label: preset.name })))
-  return [EMPTY_OPTION, ...opts]
 }
 
 /* ── HydrogenND Coupled options (dimension-filtered) ───────── */
 
 function getHydrogenCoupledOptions(dimension: number) {
-  return [
-    EMPTY_OPTION,
-    ...HYDROGEN_COUPLED_PRESETS.filter((p) => p.minDim <= dimension).map((p) => ({
-      value: p.id,
-      label: p.name,
-    })),
-  ]
+  return HYDROGEN_COUPLED_PRESETS.filter((p) => p.minDim <= dimension).map((p) => ({
+    value: p.id,
+    label: p.name,
+  }))
 }
 
 /**
  * Unified scenario selector displayed in the left panel header.
  *
  * Shows preset options for every quantum mode and object type.
+ * Auto-selects the first preset when mode or dimension changes.
  */
 export const ScenarioSelector: React.FC = React.memo(() => {
   const { objectType, dimension } = useGeometryStore(
@@ -148,16 +146,6 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   const isPauli = objectType === 'pauliSpinor'
   const mode = isPauli ? 'pauliSpinor' : quantumMode
 
-  // Local state tracks the user's last selection. Reset when mode changes.
-  const [selectedPreset, setSelectedPreset] = useState('')
-  const prevModeRef = useRef(mode)
-  useEffect(() => {
-    if (prevModeRef.current !== mode) {
-      setSelectedPreset('')
-      prevModeRef.current = mode
-    }
-  }, [mode])
-
   // Build options
   const options = useMemo(() => {
     switch (mode) {
@@ -186,29 +174,43 @@ export const ScenarioSelector: React.FC = React.memo(() => {
 
   // Detect active value.
   // HO and HydrogenND track the preset name in the store directly.
-  // Other modes use local selection state — the store apply actions
-  // are async (dynamic import) and may clamp/resize values, making
-  // reverse detection from config unreliable.
+  // For Pauli mode, auto-apply the first preset on mode entry
+  // (Pauli is object-type based, not quantum-mode based, so the
+  // quantumModeSetters auto-apply doesn't cover it).
+  // Auto-apply first Pauli preset on mode entry.
+  // Pauli is object-type based (not quantum-mode), so the mode setter auto-apply
+  // in quantumModeSetters doesn't cover it.
+  const prevModeRef = useRef(mode)
+  useEffect(() => {
+    if (prevModeRef.current !== mode && mode === 'pauliSpinor') {
+      const firstId = getFirstPresetId('pauliSpinor', dimension)
+      if (firstId) applyPauliPresetById(firstId, setPauliConfig)
+    }
+    prevModeRef.current = mode
+  }, [mode, dimension, setPauliConfig])
+
+  // Derive the active preset value from store state or first available preset.
   const activeValue = useMemo(() => {
     switch (mode) {
       case 'harmonicOscillator': {
         const name = presetName ?? 'custom'
-        return name === 'custom' ? '' : name
+        return name === 'custom' ? (getFirstPresetId('harmonicOscillator', dimension) ?? '') : name
       }
       case 'hydrogenND': {
         const preset = hydrogenNDPreset ?? 'custom'
-        return preset === 'custom' ? '' : preset
+        return preset === 'custom' ? (getFirstPresetId('hydrogenND', dimension) ?? '') : preset
       }
       default:
-        return selectedPreset
+        // For compute modes, the auto-apply in setSchroedingerQuantumMode
+        // handles selection. Derive from first preset as display default.
+        return getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension) ?? ''
     }
-  }, [mode, presetName, hydrogenNDPreset, selectedPreset])
+  }, [mode, presetName, hydrogenNDPreset, dimension])
 
   // Dispatch change to the correct store action
   const handleChange = useCallback(
     (value: string) => {
       if (!value) return
-      setSelectedPreset(value)
       switch (mode) {
         case 'harmonicOscillator':
           setPresetName(value as SchroedingerPresetName)
@@ -236,19 +238,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         case 'quantumWalk':
           applyQuantumWalkPreset(value)
           break
-        case 'pauliSpinor': {
-          const preset = PAULI_SCENARIO_PRESETS.find((p) => p.id === value)
-          if (preset) {
-            setPauliConfig({ ...preset.overrides, needsReset: true })
-            if (preset.overrides.fieldView) {
-              const algo = PAULI_FIELD_VIEW_TO_COLOR_ALGO[preset.overrides.fieldView]
-              if (algo) {
-                useAppearanceStore.getState().setColorAlgorithm(algo)
-              }
-            }
-          }
+        case 'pauliSpinor':
+          applyPauliPresetById(value, setPauliConfig)
           break
-        }
       }
     },
     [
