@@ -14,12 +14,12 @@
  *   Features: `oq`, `co`
  */
 
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
 import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 // ─── Validation Sets ─────────────────────────────────────────────────────────
 

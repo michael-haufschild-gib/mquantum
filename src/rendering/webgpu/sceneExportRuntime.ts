@@ -6,6 +6,7 @@
 
 import type React from 'react'
 
+import { downloadFile } from '@/lib/export/dataExport'
 import type { ExportMode, ExportSettings } from '@/stores/exportStore'
 import { useExportStore } from '@/stores/exportStore'
 
@@ -252,12 +253,5 @@ export function triggerSegmentDownload(
   format: ExportSettings['format']
 ): void {
   const ext = format === 'webm' ? 'webm' : 'mp4'
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `mquantum-${Date.now()}-part${segmentIndex}.${ext}`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  downloadFile(blob, `mquantum-${Date.now()}-part${segmentIndex}.${ext}`, `video/${ext}`)
 }

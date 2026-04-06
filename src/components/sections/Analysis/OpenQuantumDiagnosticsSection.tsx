@@ -12,10 +12,10 @@
 import React, { useCallback, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
+import { isAnalyticQuantumType } from '@/lib/geometry/registry'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -41,11 +41,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
     const oq = s.schroedinger.openQuantum?.enabled ?? false
     const mode = s.schroedinger.quantumMode
     const repr = s.schroedinger.representation
-    return (
-      oq &&
-      isAnalyticQuantumType(mode) &&
-      repr !== 'wigner'
-    )
+    return oq && isAnalyticQuantumType(mode) && repr !== 'wigner'
   })
 
   const metrics = useDiagnosticsStore(
@@ -189,4 +185,3 @@ function PopulationBar({ label, value }: { label: string; value: number }) {
     </div>
   )
 }
-

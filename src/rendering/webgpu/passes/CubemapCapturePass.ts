@@ -13,6 +13,8 @@
  */
 
 import { BindGroupCache } from '../core/BindGroupCache'
+import type { AnimationSnapshot } from '../core/storeAccess'
+import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 
@@ -527,14 +529,12 @@ export class CubemapCapturePass extends WebGPUBasePass {
     this.didCaptureThisFrame = false
 
     // Get environment state for smart capture throttling
-    const env = ctx.frame?.stores?.environment as
-      | {
-          skyboxMode?: string
-          skyboxAnimationMode?: string
-          skyboxAnimationSpeed?: number
-          proceduralSettings?: { timeScale?: number }
-        }
-      | undefined
+    const env = getStoreSnapshot<{
+      skyboxMode?: string
+      skyboxAnimationMode?: string
+      skyboxAnimationSpeed?: number
+      proceduralSettings?: { timeScale?: number }
+    }>(ctx, 'environment')
 
     const currentSkyboxMode = env?.skyboxMode ?? null
 
@@ -564,7 +564,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
     }
 
     // Check if skybox is animating for continuous capture
-    const isPlaying = (ctx.frame?.stores?.animation as { isPlaying?: boolean })?.isPlaying ?? false
+    const isPlaying = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')?.isPlaying ?? false
     const isAnimating = this.isSkyboxAnimating(env, isPlaying)
     if (isAnimating) {
       this.needsCapture = true

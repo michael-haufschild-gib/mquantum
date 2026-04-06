@@ -1,15 +1,6 @@
-import { SchroedingerPalette } from '../types'
+import type { CosineCoefficients } from '@/rendering/shaders/palette/types'
 
-/**
- * Cosine gradient parameters (a, b, c, d)
- * Color = a + b * cos(2 * PI * (c * t + d))
- */
-export interface CosineGradient {
-  a: [number, number, number]
-  b: [number, number, number]
-  c: [number, number, number]
-  d: [number, number, number]
-}
+import { SchroedingerPalette } from '../types'
 
 /**
  * Palette definitions for Schrödinger visualization.
@@ -20,7 +11,7 @@ export interface CosineGradient {
  * Every entry must produce a visually distinct result.
  * Reference: https://iquilezles.org/articles/palettes/
  */
-export const SCHROEDINGER_PALETTE_DEFINITIONS: Record<SchroedingerPalette, CosineGradient> = {
+export const SCHROEDINGER_PALETTE_DEFINITIONS: Record<SchroedingerPalette, CosineCoefficients> = {
   // Standard Hue Shifters — vary only in phase offset d
   monochrome: {
     a: [0.5, 0.5, 0.5],
