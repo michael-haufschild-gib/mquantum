@@ -6,12 +6,25 @@
  * and panel toggle buttons. Responsive design with mobile-friendly unified menu.
  */
 
-import React, { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import React, {
+  Suspense,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { TopBarControls } from '@/components/layout/TopBarControls'
-import { SceneManager } from '@/components/presets/SceneManager'
-import { StyleManager } from '@/components/presets/StyleManager'
+
+// Lazy-load preset managers — only shown when user opens the modal
+const SceneManager = React.lazy(() =>
+  import('@/components/presets/SceneManager').then((m) => ({ default: m.SceneManager }))
+)
+const StyleManager = React.lazy(() =>
+  import('@/components/presets/StyleManager').then((m) => ({ default: m.StyleManager }))
+)
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { InputModal } from '@/components/ui/InputModal'
@@ -444,11 +457,15 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
         </div>
 
         <Modal isOpen={isStyleManagerOpen} onClose={handleCloseStyleManager} title="Manage Styles">
-          <StyleManager onClose={handleCloseStyleManager} />
+          <Suspense fallback={null}>
+            <StyleManager onClose={handleCloseStyleManager} />
+          </Suspense>
         </Modal>
 
         <Modal isOpen={isSceneManagerOpen} onClose={handleCloseSceneManager} title="Manage Scenes">
-          <SceneManager onClose={handleCloseSceneManager} />
+          <Suspense fallback={null}>
+            <SceneManager onClose={handleCloseSceneManager} />
+          </Suspense>
         </Modal>
 
         <InputModal

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InlineEdit } from '@/components/ui/InlineEdit'
 import { useToast } from '@/hooks/useToast'
+import { downloadFile } from '@/lib/export/dataExport'
 import {
   type PresetManagerState,
   type SavedStyle,
@@ -99,19 +100,12 @@ export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }
 
   const handleExport = useCallback(() => {
     const data = exportStyles()
-    const blob = new Blob([data], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    try {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `mquantum-styles-${new Date().toISOString().slice(0, 10)}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      addToast('Styles exported', 'success')
-    } finally {
-      URL.revokeObjectURL(url)
-    }
+    downloadFile(
+      data,
+      `mquantum-styles-${new Date().toISOString().slice(0, 10)}.json`,
+      'application/json'
+    )
+    addToast('Styles exported', 'success')
   }, [exportStyles, addToast])
 
   const handleDeleteConfirm = useCallback(() => {

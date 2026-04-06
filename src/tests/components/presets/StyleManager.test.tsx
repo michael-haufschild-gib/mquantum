@@ -116,22 +116,19 @@ describe('StyleManager', () => {
   })
 
   describe('export', () => {
-    it('export button creates download link and revokes URL', async () => {
+    it('export button triggers file download', async () => {
       usePresetManagerStore.setState({
         savedStyles: [createStyle('s1', 'Test Style')],
       })
 
       const user = userEvent.setup()
       const createObjectURL = vi.fn(() => 'blob:test-url')
-      const revokeObjectURL = vi.fn()
       globalThis.URL.createObjectURL = createObjectURL
-      globalThis.URL.revokeObjectURL = revokeObjectURL
 
       renderWithProviders(<StyleManager onClose={() => {}} />)
       await user.click(screen.getByRole('button', { name: /export/i }))
 
       expect(createObjectURL).toHaveBeenCalled()
-      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test-url')
     })
   })
 })

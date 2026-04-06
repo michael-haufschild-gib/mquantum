@@ -6,15 +6,21 @@
  */
 
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
-import { useCallback, useMemo, useState } from 'react'
+import React, { Suspense, useCallback, useMemo, useState } from 'react'
 
-import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
 import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { MsgBox } from '@/components/overlays/MsgBox'
-import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
+
+// Lazy-load components not needed on first render
+const PerformanceMonitor = React.lazy(() =>
+  import('@/components/canvas/PerformanceMonitor').then((m) => ({ default: m.PerformanceMonitor }))
+)
+const ScreenshotModal = React.lazy(() =>
+  import('@/components/overlays/ScreenshotModal').then((m) => ({ default: m.ScreenshotModal }))
+)
 import { Button } from '@/components/ui/Button'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Modal } from '@/components/ui/Modal'
@@ -243,13 +249,19 @@ function AppContent() {
         {/* Global Message Box Overlay */}
         <MsgBox />
 
-        {showPerfMonitor && <PerformanceMonitor />}
+        {showPerfMonitor && (
+          <Suspense fallback={null}>
+            <PerformanceMonitor />
+          </Suspense>
+        )}
 
         {/* Quantum Carpet Panel */}
         <QuantumCarpetPanel />
 
         {/* Screenshot Preview Modal */}
-        <ScreenshotModal />
+        <Suspense fallback={null}>
+          <ScreenshotModal />
+        </Suspense>
 
         {/* Shader Compilation Overlay */}
         <ShaderCompilationOverlay />

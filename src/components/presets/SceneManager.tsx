@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { InlineEdit } from '@/components/ui/InlineEdit'
 import { useToast } from '@/hooks/useToast'
+import { downloadFile } from '@/lib/export/dataExport'
 import {
   type PresetManagerState,
   type SavedScene,
@@ -99,19 +100,12 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
 
   const handleExport = useCallback(() => {
     const data = exportScenes()
-    const blob = new Blob([data], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    try {
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `mquantum-scenes-${new Date().toISOString().slice(0, 10)}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      addToast('Scenes exported', 'success')
-    } finally {
-      URL.revokeObjectURL(url)
-    }
+    downloadFile(
+      data,
+      `mquantum-scenes-${new Date().toISOString().slice(0, 10)}.json`,
+      'application/json'
+    )
+    addToast('Scenes exported', 'success')
   }, [exportScenes, addToast])
 
   const handleDeleteConfirm = useCallback(() => {
