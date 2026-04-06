@@ -150,7 +150,7 @@ export function createMockCommandEncoder(): GPUCommandEncoder {
 
 /** Create a mock GPUQuerySet. */
 export function createMockQuerySet(
-  desc: Partial<GPUQuerySetDescriptor> = {},
+  desc: { label?: string; type?: string; count?: number } = {}
 ): GPUQuerySet {
   return {
     label: desc.label ?? '',
@@ -234,7 +234,9 @@ function createWebGPUMock() {
     createdResources.commandEncoders.add(encoder)
     return encoder
   }
-  const trackedCreateQuerySet = (desc: Partial<GPUQuerySetDescriptor> = {}): GPUQuerySet => {
+  const trackedCreateQuerySet = (
+    desc: { label?: string; type?: string; count?: number } = {}
+  ): GPUQuerySet => {
     const qs = createMockQuerySet(desc)
     createdResources.querysets.add(qs)
     return qs
@@ -314,7 +316,9 @@ function createWebGPUMock() {
     createComputePipelineAsync: vi.fn(async () => trackedCreateComputePipeline()),
     createCommandEncoder: vi.fn(() => trackedCreateCommandEncoder()),
     createRenderBundleEncoder: vi.fn(),
-    createQuerySet: vi.fn((desc: Partial<GPUQuerySetDescriptor> = {}) => trackedCreateQuerySet(desc)),
+    createQuerySet: vi.fn((desc: { label?: string; type?: string; count?: number } = {}) =>
+      trackedCreateQuerySet(desc)
+    ),
     pushErrorScope: vi.fn(),
     popErrorScope: vi.fn().mockResolvedValue(null),
     onuncapturederror: null,
