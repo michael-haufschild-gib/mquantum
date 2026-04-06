@@ -186,7 +186,7 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   vacuumSeed: 42,
 
   fieldView: 'phi',
-  autoScale: true,
+  autoScale: false,
   needsReset: false,
   slicePositions: [],
   kSpaceViz: { ...DEFAULT_KSPACE_VIZ },

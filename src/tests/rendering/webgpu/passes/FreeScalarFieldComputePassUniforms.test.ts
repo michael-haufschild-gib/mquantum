@@ -17,6 +17,8 @@ import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils
 import {
   computeFsfConfigHash,
   computeFsfInitHash,
+  computeFsfMaxPhiEstimate,
+  estimateFsfMaxFieldValue,
   writeFsfUniforms,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
@@ -46,9 +48,7 @@ describe('computeFsfConfigHash', () => {
 
 describe('computeFsfInitHash', () => {
   it('encodes initial condition, mass, modeK, and packet params', () => {
-    const hash = computeFsfInitHash(
-      createConfig({ mass: 0.5, initialCondition: 'vacuumNoise' })
-    )
+    const hash = computeFsfInitHash(createConfig({ mass: 0.5, initialCondition: 'vacuumNoise' }))
     expect(hash).toContain('vacuumNoise')
     expect(hash).toContain('m0.5')
     expect(hash).toContain('s42')
@@ -221,5 +221,152 @@ describe('writeFsfUniforms', () => {
     })
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
+  })
+
+  it('packs self-interaction params at offsets 480-492', () => {
+    const config = createConfig({
+      selfInteractionEnabled: true,
+      selfInteractionLambda: 2.5,
+      selfInteractionVev: 1.5,
+    })
+    const uniformData = new ArrayBuffer(512)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+    })
+
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+
+    // offset 480 = index 120: selfInteractionEnabled
+    expect(u32[120]).toBe(1)
+    // offset 484 = index 121: selfInteractionLambda
+    expect(f32[121]).toBeCloseTo(2.5)
+    // offset 488 = index 122: selfInteractionVev
+    expect(f32[122]).toBeCloseTo(1.5)
+  })
+
+  it('packs selfInteractionEnabled=0 when disabled', () => {
+    const config = createConfig({ selfInteractionEnabled: false })
+    const uniformData = new ArrayBuffer(512)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+    })
+
+    expect(new Uint32Array(uniformData)[120]).toBe(0)
+  })
+})
+
+describe('estimateFsfMaxFieldValue with self-interaction', () => {
+  it('returns λv⁴ for wallDensity view', () => {
+    const lambda = 2.0
+    const v = 1.5
+    const config = createConfig({
+      fieldView: 'wallDensity',
+      selfInteractionEnabled: true,
+      selfInteractionLambda: lambda,
+      selfInteractionVev: v,
+      autoScale: true,
+    })
+
+    const result = estimateFsfMaxFieldValue(config, 1.0)
+
+    // wallDensity max at φ=0: V(0) = λ(0-v²)² = λv⁴
+    expect(result).toBeCloseTo(lambda * Math.pow(v, 4))
+  })
+
+  it('returns 1.0 for wallDensity when self-interaction is disabled', () => {
+    const config = createConfig({
+      fieldView: 'wallDensity',
+      selfInteractionEnabled: false,
+      autoScale: true,
+    })
+
+    expect(estimateFsfMaxFieldValue(config, 1.0)).toBe(1.0)
+  })
+
+  it('adds λv⁴ to energy density estimate when SI is enabled', () => {
+    const lambda = 1.0
+    const v = 1.0
+    const configNoSI = createConfig({
+      fieldView: 'energyDensity',
+      selfInteractionEnabled: false,
+      autoScale: true,
+      initialCondition: 'gaussianPacket',
+      packetAmplitude: 1.0,
+    })
+    const configSI = createConfig({
+      fieldView: 'energyDensity',
+      selfInteractionEnabled: true,
+      selfInteractionLambda: lambda,
+      selfInteractionVev: v,
+      autoScale: true,
+      initialCondition: 'gaussianPacket',
+      packetAmplitude: 1.0,
+    })
+
+    const maxPhiEstimate = 1.0
+    const noSI = estimateFsfMaxFieldValue(configNoSI, maxPhiEstimate)
+    const withSI = estimateFsfMaxFieldValue(configSI, maxPhiEstimate)
+
+    // SI adds λv⁴ = 1*1 = 1.0 to the energy estimate
+    expect(withSI).toBeCloseTo(noSI + lambda * Math.pow(v, 4))
+  })
+
+  it('returns 1.0 when autoScale is disabled', () => {
+    const config = createConfig({
+      fieldView: 'wallDensity',
+      selfInteractionEnabled: true,
+      selfInteractionLambda: 5.0,
+      selfInteractionVev: 2.0,
+      autoScale: false,
+    })
+
+    expect(estimateFsfMaxFieldValue(config, 1.0)).toBe(1.0)
+  })
+})
+
+describe('computeFsfMaxPhiEstimate with self-interaction', () => {
+  it('returns v for kinkProfile initial condition', () => {
+    const v = 2.5
+    const config = createConfig({
+      initialCondition: 'kinkProfile',
+      selfInteractionEnabled: true,
+      selfInteractionVev: v,
+      autoScale: true,
+    })
+
+    expect(computeFsfMaxPhiEstimate(config)).toBe(v)
+  })
+
+  it('returns packetAmplitude for gaussianPacket (even with SI)', () => {
+    const amplitude = 3.0
+    const config = createConfig({
+      initialCondition: 'gaussianPacket',
+      packetAmplitude: amplitude,
+      selfInteractionEnabled: true,
+      selfInteractionVev: 1.0,
+      autoScale: true,
+    })
+
+    expect(computeFsfMaxPhiEstimate(config)).toBe(amplitude)
+  })
+
+  it('returns 1.0 when autoScale is disabled', () => {
+    const config = createConfig({
+      initialCondition: 'kinkProfile',
+      selfInteractionEnabled: true,
+      selfInteractionVev: 5.0,
+      autoScale: false,
+    })
+
+    expect(computeFsfMaxPhiEstimate(config)).toBe(1.0)
   })
 })
