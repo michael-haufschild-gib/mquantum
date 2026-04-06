@@ -47,9 +47,11 @@ export function getFirstPresetId(
         .map(Number)
         .filter((d) => d <= dimension)
         .sort((a, b) => b - a)
-      if (matchingDims.length > 0) {
-        const presets = groups[matchingDims[0]]
-        if (presets && presets.length > 0) return presets[0][0]
+      const bestDim = matchingDims[0]
+      if (bestDim !== undefined) {
+        const presets = groups[bestDim]
+        const first = presets?.[0]
+        if (first) return first[0]
       }
       return undefined
     }
