@@ -3,6 +3,7 @@
  * (TDSE, Dirac, Pauli, QuantumWalk, FreeScalar).
  */
 
+import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { logger } from '@/lib/logger'
 import {
   computeStrides as computeStridesBase,
@@ -27,8 +28,8 @@ export const MAX_LINEAR_DISPATCH_SITES = MAX_DISPATCH_PER_DIM * LINEAR_WG
 /** 3D dispatch workgroup size for write-grid passes */
 export const GRID_WG = 4
 
-/** Density grid texture resolution */
-export const DENSITY_GRID_SIZE = 96
+// Re-export from shared constant for backward compatibility with existing importers
+export { DENSITY_GRID_SIZE }
 
 /** Maximum supported dimensions */
 export const MAX_DIM = 12
