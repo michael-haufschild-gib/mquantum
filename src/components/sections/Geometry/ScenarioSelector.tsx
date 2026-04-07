@@ -187,11 +187,12 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         const firstId = getFirstPresetId('pauliSpinor', dimension)
         if (firstId) applyPauliPresetById(firstId, setPauliConfig)
       }
-      // Seed the tracked value with the auto-applied first preset for the new mode
-      const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
-      if (firstId) {
-        setComputePreset((prev) => ({ ...prev, [mode]: firstId }))
-      }
+      // Seed tracked value only on first visit (no existing selection)
+      setComputePreset((prev) => {
+        if (prev[mode]) return prev
+        const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
+        return firstId ? { ...prev, [mode]: firstId } : prev
+      })
     }
     prevModeRef.current = mode
   }, [mode, dimension, setPauliConfig])
@@ -199,14 +200,10 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   // Derive the active preset value from store state or tracked selection.
   const activeValue = useMemo(() => {
     switch (mode) {
-      case 'harmonicOscillator': {
-        const name = presetName ?? 'custom'
-        return name === 'custom' ? (getFirstPresetId('harmonicOscillator', dimension) ?? '') : name
-      }
-      case 'hydrogenND': {
-        const preset = hydrogenNDPreset ?? 'custom'
-        return preset === 'custom' ? (getFirstPresetId('hydrogenND', dimension) ?? '') : preset
-      }
+      case 'harmonicOscillator':
+        return presetName ?? ''
+      case 'hydrogenND':
+        return hydrogenNDPreset ?? ''
       default:
         return (
           computePreset[mode] ??

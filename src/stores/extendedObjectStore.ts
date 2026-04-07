@@ -12,6 +12,7 @@ import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 import { createPauliSpinorSlice } from './slices/geometry/pauliSpinorSlice'
 import { createSchroedingerSlice } from './slices/geometry/schroedingerSlice'
+import { resetModeSessionCaches } from './slices/geometry/setters/quantumModeSetters'
 import { ExtendedObjectSlice } from './slices/geometry/types'
 
 // Re-export type for consumers
@@ -42,6 +43,7 @@ export const useExtendedObjectStore = create<ExtendedObjectSlice>()((...a) => {
 
     // --- Reset Action ---
     reset: () => {
+      resetModeSessionCaches()
       set({
         schroedinger: createDefaultSchroedingerConfig(),
         schroedingerVersion: 0,
