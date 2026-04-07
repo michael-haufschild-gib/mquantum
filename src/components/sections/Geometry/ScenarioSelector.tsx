@@ -183,14 +183,14 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   const prevModeRef = useRef(mode)
   useEffect(() => {
     if (prevModeRef.current !== mode) {
-      if (mode === 'pauliSpinor') {
-        const firstId = getFirstPresetId('pauliSpinor', dimension)
-        if (firstId) applyPauliPresetById(firstId, setPauliConfig)
-      }
-      // Seed tracked value only on first visit (no existing selection)
+      // Seed tracked value and auto-apply preset only on first visit
       setComputePreset((prev) => {
         if (prev[mode]) return prev
         const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
+        if (firstId) {
+          // Pauli is object-type based, so the mode setter auto-apply doesn't cover it
+          if (mode === 'pauliSpinor') applyPauliPresetById(firstId, setPauliConfig)
+        }
         return firstId ? { ...prev, [mode]: firstId } : prev
       })
     }
