@@ -201,9 +201,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   const activeValue = useMemo(() => {
     switch (mode) {
       case 'harmonicOscillator':
-        return presetName ?? ''
+        return presetName === 'custom' ? '' : (presetName ?? '')
       case 'hydrogenND':
-        return hydrogenNDPreset ?? ''
+        return hydrogenNDPreset === 'custom' ? '' : (hydrogenNDPreset ?? '')
       default:
         return (
           computePreset[mode] ??

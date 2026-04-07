@@ -21,6 +21,7 @@ import {
   QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
+import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { useGeometryStore } from '@/stores/geometryStore'
 
@@ -258,14 +259,11 @@ function applyFirstPreset(
     case 'hydrogenND':
       store.setSchroedingerHydrogenNDPreset(presetId as HydrogenNDPresetName)
       break
-    case 'hydrogenNDCoupled':
-      void import('@/lib/physics/hydrogenCoupled/presets').then(({ HYDROGEN_COUPLED_PRESETS }) => {
-        // Guard: only apply if mode hasn't changed during the async import
-        if (get().schroedinger.quantumMode !== 'hydrogenNDCoupled') return
-        const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.id === presetId)
-        if (preset) get().setSchroedingerConfig(preset.overrides)
-      })
+    case 'hydrogenNDCoupled': {
+      const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.id === presetId)
+      if (preset) store.setSchroedingerConfig(preset.overrides)
       break
+    }
     case 'tdseDynamics':
       store.applyTdsePreset(presetId)
       break
