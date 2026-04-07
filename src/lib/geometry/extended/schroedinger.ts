@@ -561,11 +561,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   momentumScale: 1.0,
   momentumHbar: 1.0,
 
-  // Harmonic oscillator state
-  presetName: 'custom',
+  // Harmonic oscillator state (matches 'groundState' preset)
+  presetName: 'groundState',
   seed: 13,
   termCount: 1,
-  maxQuantumNumber: 2,
+  maxQuantumNumber: 1,
   frequencySpread: 0.01,
 
   // Hydrogen state

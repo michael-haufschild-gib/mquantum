@@ -133,6 +133,13 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     if (!tdseConfig) return
 
     const schroedinger = extended?.schroedinger
+
+    // For TDSE mode, overlay the top-level autoScaleMaxGain (set by the Exposure slider)
+    // onto the nested TdseConfig. BEC mode already maps this in buildBecConfig.
+    if (!isBecMode && schroedinger?.autoScaleMaxGain !== undefined) {
+      tdseConfig = { ...tdseConfig, autoScaleMaxGain: schroedinger.autoScaleMaxGain }
+    }
+
     const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)
 
     tdsePass.executeTDSE(

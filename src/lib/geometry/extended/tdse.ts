@@ -350,7 +350,7 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   pmlTargetReflection: 1e-6,
 
   fieldView: 'density',
-  autoScale: true,
+  autoScale: false,
   autoScaleMaxGain: 20,
   showPotential: true,
   autoLoop: false,

@@ -7,19 +7,89 @@
  * @module stores/slices/geometry/setters/quantumModeSetters
  */
 
+import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
-import type { HydrogenNDPresetName, SchroedingerConfig } from '@/lib/geometry/extended/types'
+import {
+  DEFAULT_SCHROEDINGER_CONFIG,
+  type HydrogenNDPresetName,
+  type SchroedingerConfig,
+} from '@/lib/geometry/extended/types'
 import {
   getQuantumTypeEntry,
   isComputeQuantumType,
   QUANTUM_MODES_3D_ONLY,
 } from '@/lib/geometry/registry'
 import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
+import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
+import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { useGeometryStore } from '@/stores/geometryStore'
 
+import type { ExtendedObjectSlice } from '../types'
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
+
+// ---------------------------------------------------------------------------
+// Per-mode session cache for shared rendering settings
+// ---------------------------------------------------------------------------
+
+/** Shared rendering settings that bleed across quantum modes on SchroedingerConfig. */
+interface ModeRenderingSnapshot {
+  densityGain: number
+  densityContrast: number
+  autoScaleMaxGain: number
+}
+
+/**
+ * Session-scoped cache: remembers rendering settings per quantum mode.
+ * Lost on page refresh (intentional — session-only memory).
+ */
+const modeSettingsCache = new Map<string, ModeRenderingSnapshot>()
+
+/**
+ * Tracks which modes have been visited this session.
+ * First visit to a mode auto-applies the first preset; subsequent visits
+ * preserve the user's custom state.
+ * Pre-seeded with 'harmonicOscillator' since that's the app's default mode.
+ */
+const visitedModes = new Set<string>(['harmonicOscillator'])
+
+/** Reset session caches. Call in store reset and test teardown. */
+export function resetModeSessionCaches(): void {
+  modeSettingsCache.clear()
+  visitedModes.clear()
+  visitedModes.add('harmonicOscillator')
+}
+
+/** Per-mode rendering defaults. Modes not listed fall back to DEFAULT_SCHROEDINGER_CONFIG values. */
+const MODE_RENDERING_DEFAULTS: Partial<
+  Record<SchroedingerConfig['quantumMode'], ModeRenderingSnapshot>
+> = {
+  freeScalarField: { densityGain: 5.0, densityContrast: 2.5, autoScaleMaxGain: 20 },
+  becDynamics: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
+}
+
+function getDefaultRenderingSettings(
+  mode: SchroedingerConfig['quantumMode']
+): ModeRenderingSnapshot {
+  return (
+    MODE_RENDERING_DEFAULTS[mode] ?? {
+      densityGain: DEFAULT_SCHROEDINGER_CONFIG.densityGain,
+      densityContrast: DEFAULT_SCHROEDINGER_CONFIG.densityContrast,
+      autoScaleMaxGain: DEFAULT_SCHROEDINGER_CONFIG.autoScaleMaxGain,
+    }
+  )
+}
+
+function snapshotRenderingSettings(state: SchroedingerConfig): ModeRenderingSnapshot {
+  return {
+    densityGain: state.densityGain,
+    densityContrast: state.densityContrast,
+    autoScaleMaxGain: state.autoScaleMaxGain,
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /** Resizer function signatures indexed by mode. */
 interface ModeResizers {
@@ -141,14 +211,12 @@ function resizeQWalk(state: SchroedingerConfig, dim: number): Partial<Schroeding
   return { quantumWalk: { ...prev, ...resizeQuantumWalkArrays(prev, dim) } }
 }
 
-/** Per-mode rendering defaults applied when switching quantum mode. */
-function buildModeRenderingDefaults(
-  mode: SchroedingerConfig['quantumMode']
-): Partial<SchroedingerConfig> {
-  if (mode === 'freeScalarField') {
-    return { densityGain: 5.0, densityContrast: 2.5 }
-  }
-  return {}
+/**
+ * Resolve rendering settings for the target mode: cached values from a
+ * previous visit in this session, or per-mode defaults on first visit.
+ */
+function resolveRenderingSettings(mode: SchroedingerConfig['quantumMode']): ModeRenderingSnapshot {
+  return modeSettingsCache.get(mode) ?? getDefaultRenderingSettings(mode)
 }
 
 /** Resize compute-mode arrays when dimension changed during mode switch. */
@@ -173,6 +241,48 @@ function buildModeResizeUpdate(
 }
 
 /**
+ * Dispatch the first dimension-compatible preset for the newly selected mode.
+ *
+ * Compute modes (TDSE, BEC, Dirac, FSF, QW) use async apply actions.
+ * Analytic modes (HO, hydrogen) and Pauli use synchronous setters.
+ */
+function applyFirstPreset(
+  mode: SchroedingerConfig['quantumMode'],
+  presetId: string,
+  get: () => ExtendedObjectSlice
+): void {
+  const store = get()
+  switch (mode) {
+    case 'harmonicOscillator':
+      store.setSchroedingerPresetName(presetId as SchroedingerPresetName)
+      break
+    case 'hydrogenND':
+      store.setSchroedingerHydrogenNDPreset(presetId as HydrogenNDPresetName)
+      break
+    case 'hydrogenNDCoupled': {
+      const preset = HYDROGEN_COUPLED_PRESETS.find((p) => p.id === presetId)
+      if (preset) store.setSchroedingerConfig(preset.overrides)
+      break
+    }
+    case 'tdseDynamics':
+      store.applyTdsePreset(presetId)
+      break
+    case 'becDynamics':
+      store.applyBecPreset(presetId)
+      break
+    case 'diracEquation':
+      store.applyDiracPreset(presetId)
+      break
+    case 'freeScalarField':
+      store.applyFreeScalarPreset(presetId)
+      break
+    case 'quantumWalk':
+      store.applyQuantumWalkPreset(presetId)
+      break
+  }
+}
+
+/**
  * Create quantum mode, representation, and quantum number setters.
  *
  * @param ctx - Setter context with Zustand set/get and validation helpers
@@ -186,6 +296,12 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
 
   return {
     setSchroedingerQuantumMode: (mode: SchroedingerConfig['quantumMode']) => {
+      // Save current mode's rendering settings before switching
+      const currentMode = get().schroedinger.quantumMode
+      if (currentMode !== mode) {
+        modeSettingsCache.set(currentMode, snapshotRenderingSettings(get().schroedinger))
+      }
+
       enforceDimensionConstraints(mode)
 
       setWithVersion((state) => {
@@ -197,7 +313,7 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
           state.schroedinger.crossSectionEnabled
         )
         const resizeUpdates = buildModeResizeUpdate(mode, state.schroedinger, dim, resizers)
-        const renderingDefaults = buildModeRenderingDefaults(mode)
+        const renderingSettings = resolveRenderingSettings(mode)
 
         return {
           schroedinger: {
@@ -205,10 +321,21 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
             quantumMode: mode,
             ...reprOverrides,
             ...resizeUpdates,
-            ...renderingDefaults,
+            ...renderingSettings,
           },
         }
       })
+
+      // Auto-apply first dimension-compatible preset on first visit to a mode.
+      // Subsequent visits preserve the user's custom state.
+      if (currentMode !== mode && !visitedModes.has(mode)) {
+        visitedModes.add(mode)
+        const dim = useGeometryStore.getState().dimension
+        const presetId = getFirstPresetId(mode, dim)
+        if (presetId) {
+          applyFirstPreset(mode, presetId, get)
+        }
+      }
     },
 
     setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {

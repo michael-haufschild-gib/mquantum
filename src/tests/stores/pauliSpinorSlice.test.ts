@@ -129,15 +129,15 @@ describe('pauliSpinorSlice', () => {
 
   // === Lifecycle ===
 
-  it('resetPauliField restores defaults and sets needsReset', () => {
+  it('resetPauliField preserves config and sets needsReset', () => {
     const { setPauliFieldStrength, setPauliFieldType, resetPauliField } =
       useExtendedObjectStore.getState()
     setPauliFieldStrength(42)
     setPauliFieldType('quadrupole')
     resetPauliField()
     const state = useExtendedObjectStore.getState().pauliSpinor
-    expect(state.fieldStrength).toBe(DEFAULT_PAULI_CONFIG.fieldStrength)
-    expect(state.fieldType).toBe(DEFAULT_PAULI_CONFIG.fieldType)
+    expect(state.fieldStrength).toBe(42)
+    expect(state.fieldType).toBe('quadrupole')
     expect(state.needsReset).toBe(true)
   })
 

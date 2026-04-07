@@ -155,7 +155,7 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   compactDims: [false, false, false],
   compactRadii: [0.15, 0.15, 0.15],
   fieldView: 'density',
-  autoScale: true,
+  autoScale: false,
   absorberEnabled: false,
   absorberWidth: 0.2,
   pmlTargetReflection: 1e-6,
