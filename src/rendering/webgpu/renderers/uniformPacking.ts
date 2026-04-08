@@ -139,8 +139,11 @@ export function packSchroedingerUniforms(
   floatView[I.branchColorB] = branchB[0]
   floatView[I.branchColorB + 1] = branchB[1]
   floatView[I.branchColorB + 2] = branchB[2]
-  floatView[I.branchPlaneThreshold] = p.branchPlaneThreshold ?? 0
-  floatView[I.branchTransitionWidth] = p.branchTransitionWidth ?? 0.2
+  floatView[I.branchPlaneThreshold] = Number.isFinite(p.branchPlaneThreshold) ? p.branchPlaneThreshold! : 0
+  const rawTransitionWidth = p.branchTransitionWidth ?? 0.2
+  floatView[I.branchTransitionWidth] = Number.isFinite(rawTransitionWidth) && rawTransitionWidth > 0
+    ? rawTransitionWidth
+    : 0.2
 }
 
 // ---------------------------------------------------------------------------

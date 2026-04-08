@@ -222,10 +222,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       if (isDraggingSV) {
         window.addEventListener('pointermove', onMove)
         window.addEventListener('pointerup', onUp)
+        window.addEventListener('pointercancel', onUp)
       }
       return () => {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', onUp)
+        window.removeEventListener('pointercancel', onUp)
       }
     }, [isDraggingSV, updateSV])
 
@@ -351,7 +353,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                 className="w-full h-[160px] rounded-lg relative cursor-crosshair overflow-hidden shadow-lg ring-1 ring-border-default group"
                 onPointerDown={(e) => {
                   e.preventDefault()
-                  ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+                  e.currentTarget.setPointerCapture(e.pointerId)
                   setIsDraggingSV(true)
                   updateSV(e.clientX, e.clientY)
                 }}

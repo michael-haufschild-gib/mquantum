@@ -6,10 +6,11 @@ import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.
 import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
-  tdsePackUniformsBlock,
+  tdseComplexPackShaderBlock,
+  tdseComplexUnpackShaderBlock,
+  tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseDiagNormFinalizeBlock,
   tdseDiagNormReduceBlock,
@@ -271,7 +272,7 @@ export function buildTdsePipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, tdsePackUniformsBlock + tdseComplexPackBlock, 'tdse-pack'),
+    helpers.createShaderModule(device, assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl, 'tdse-pack'),
     [packBGL],
     'tdse-pack'
   )
@@ -287,7 +288,7 @@ export function buildTdsePipelines(
     device,
     helpers.createShaderModule(
       device,
-      tdsePackUniformsBlock + tdseComplexUnpackBlock,
+      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
       'tdse-unpack'
     ),
     [unpackBGL],

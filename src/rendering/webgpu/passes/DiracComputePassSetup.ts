@@ -25,10 +25,11 @@ import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScal
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
 import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
-  tdsePackUniformsBlock,
+  tdseComplexPackShaderBlock,
+  tdseComplexUnpackShaderBlock,
+  tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
@@ -147,7 +148,7 @@ export function buildDiracPipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, tdsePackUniformsBlock + tdseComplexPackBlock, 'dirac-pack'),
+    helpers.createShaderModule(device, assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl, 'dirac-pack'),
     [packBGL],
     'dirac-pack'
   )
@@ -162,7 +163,7 @@ export function buildDiracPipelines(
     device,
     helpers.createShaderModule(
       device,
-      tdsePackUniformsBlock + tdseComplexUnpackBlock,
+      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
       'dirac-unpack'
     ),
     [unpackBGL],

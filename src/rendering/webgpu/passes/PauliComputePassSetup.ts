@@ -23,10 +23,11 @@ import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteG
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
 import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
-  tdsePackUniformsBlock,
+  tdseComplexPackShaderBlock,
+  tdseComplexUnpackShaderBlock,
+  tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
@@ -221,7 +222,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-pack',
-        code: `\n${tdsePackUniformsBlock}\n${tdseComplexPackBlock}\n`,
+        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl,
       }),
       entryPoint: 'main',
     },
@@ -240,7 +241,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-unpack',
-        code: `\n${tdsePackUniformsBlock}\n${tdseComplexUnpackBlock}\n`,
+        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
       }),
       entryPoint: 'main',
     },

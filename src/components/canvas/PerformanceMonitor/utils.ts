@@ -111,6 +111,11 @@ export function computeSparklinePoints(
 ): string {
   if (data.length < 2) return ''
   const range = maxY - minY
+  if (range <= 0) {
+    // Flat line at vertical center when all values are equal
+    const midY = height * 0.5
+    return data.map((_, i) => `${(i * width) / (data.length - 1)},${midY}`).join(' ')
+  }
   const stepX = width / (data.length - 1)
   const points: string[] = new Array(data.length)
   for (let i = 0; i < data.length; i++) {

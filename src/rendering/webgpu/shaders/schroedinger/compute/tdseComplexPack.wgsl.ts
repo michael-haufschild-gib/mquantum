@@ -11,6 +11,8 @@
  * @module
  */
 
+import type { ShaderBlock } from '../../shared/compose-helpers'
+
 /** Shared uniform struct for pack/unpack shaders. */
 export const tdsePackUniformsBlock = /* wgsl */ `
 struct PackUniforms {
@@ -74,3 +76,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   psiIm[idx] = complexBuf[idx * 2u + 1u] * packUni.invN;
 }
 `
+
+// ShaderBlock exports for assembleShaderBlocks() composition
+
+/** PackUniforms struct as a ShaderBlock. */
+export const tdsePackUniformsShaderBlock: ShaderBlock = {
+  name: 'tdse-pack-uniforms',
+  content: tdsePackUniformsBlock,
+}
+
+/** Complex pack shader as a ShaderBlock. */
+export const tdseComplexPackShaderBlock: ShaderBlock = {
+  name: 'tdse-complex-pack',
+  content: tdseComplexPackBlock,
+}
+
+/** Complex unpack shader as a ShaderBlock. */
+export const tdseComplexUnpackShaderBlock: ShaderBlock = {
+  name: 'tdse-complex-unpack',
+  content: tdseComplexUnpackBlock,
+}

@@ -109,10 +109,16 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     return computeLatticeBoundingRadius(latDim, latticeConfig.gridSize ?? [32], effSpacing)
   }
 
+  private warnedTdsePassNull = false
+  private warnedDensityNull = false
+
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const tdsePass = this.tdsePass
     if (!tdsePass) {
-      logger.warn(`[TdseBecStrategy] executeFrame: tdsePass is NULL`)
+      if (!this.warnedTdsePassNull) {
+        logger.warn(`[TdseBecStrategy] executeFrame: tdsePass is NULL`)
+        this.warnedTdsePassNull = true
+      }
       return
     }
 
@@ -149,7 +155,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)
 
     if (!tdsePass.getDensityTextureView()) {
-      logger.warn(`[TdseBecStrategy] executeFrame: densityTextureView is NULL`)
+      if (!this.warnedDensityNull) {
+        logger.warn(`[TdseBecStrategy] executeFrame: densityTextureView is NULL`)
+        this.warnedDensityNull = true
+      }
     }
 
     tdsePass.executeTDSE(

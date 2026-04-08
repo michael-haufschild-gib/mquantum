@@ -82,8 +82,10 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1', iso: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
-      test.skip(true, 'No WebGPU')
-      return
+      const errorMsg = await page.locator('[data-testid="webgpu-container"]').getAttribute('data-renderer-error')
+      const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
+      test.skip(isGpuUnavailable, 'No WebGPU')
+      throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)
     }
     await waitForFirstFrame(page)
     await waitForShaderCompilation(page)
@@ -99,6 +101,7 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     const pxBefore = await pixels(page)
 
     console.log(`[ISO START] pixels=${pxBefore}`)
+    expect(pxBefore, 'Isosurface must render before mode switch').toBeGreaterThan(5)
 
     // Switch to VOLUMETRIC
     const gen = await getPipelineGen(page)
@@ -120,7 +123,7 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     expect(
       pxAfter,
       'Volumetric must render after switching from iso with decoherence'
-    ).toBeGreaterThan(5)
+    ).toBeGreaterThan(Math.max(pxBefore * 0.1, 20))
   })
 
   test('vol → iso with decoherence kills rendering', async ({ page }) => {
@@ -128,8 +131,10 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
-      test.skip(true, 'No WebGPU')
-      return
+      const errorMsg = await page.locator('[data-testid="webgpu-container"]').getAttribute('data-renderer-error')
+      const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
+      test.skip(isGpuUnavailable, 'No WebGPU')
+      throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)
     }
     await waitForFirstFrame(page)
     await waitForShaderCompilation(page)
@@ -145,6 +150,7 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     const pxBefore = await pixels(page)
 
     console.log(`[VOL START] pixels=${pxBefore}`)
+    expect(pxBefore, 'Volumetric must render before mode switch').toBeGreaterThan(5)
 
     // Switch to ISOSURFACE
     const gen = await getPipelineGen(page)
@@ -165,6 +171,6 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     expect(
       pxAfter,
       'Isosurface must render after switching from vol with decoherence'
-    ).toBeGreaterThan(0)
+    ).toBeGreaterThan(Math.max(pxBefore * 0.1, 20))
   })
 })

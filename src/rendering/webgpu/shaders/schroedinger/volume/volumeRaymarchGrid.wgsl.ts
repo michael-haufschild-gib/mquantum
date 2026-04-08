@@ -106,7 +106,8 @@ fn volumeRaymarchGrid(
     let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
-    if (alpha > 0.001) {
+    let primaryHitThreshold: f32 = 0.01;
+    if (alpha > primaryHitThreshold) {
       if (primaryHitT < 0.0) { primaryHitT = t; }
 
       // Gradient + lit emission

@@ -81,16 +81,21 @@ function ThreeDiagChart<T extends DiagPoint>({
   const xMax = Math.max(...xs)
   const xRange = xMax - xMin || 1
 
-  const maxE = Math.max(...data.map((d) => d.entanglement), 1e-10)
-  const maxW = Math.max(...data.map((d) => d.wigner), 1e-10)
-  const maxI = Math.max(...data.map((d) => d.ipr), 1e-10)
+  const finiteMax = (vals: number[]) =>
+    vals.reduce((m, v) => (Number.isFinite(v) && v > m ? v : m), 1e-10)
+  const maxE = finiteMax(data.map((d) => d.entanglement))
+  const maxW = finiteMax(data.map((d) => d.wigner))
+  const maxI = finiteMax(data.map((d) => d.ipr))
 
   const xOf = (v: number) => PAD.left + ((v - xMin) / xRange) * PW
   const yOf = (v: number) => PAD.top + (1 - v) * PH
 
   const sorted = [...data].sort((a, b) => xAccessor(a) - xAccessor(b))
   const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
-    sorted.map((d) => `${xOf(xAccessor(d))},${yOf(norm(d[key], maxVal))}`).join(' ')
+    sorted
+      .filter((d) => Number.isFinite(d[key]))
+      .map((d) => `${xOf(xAccessor(d))},${yOf(norm(d[key], maxVal))}`)
+      .join(' ')
 
   return (
     <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
