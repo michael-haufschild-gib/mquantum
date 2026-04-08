@@ -34,8 +34,8 @@ import { createComputeBGL } from '../utils/computeBindGroupLayout'
 /** Maximum collapse centers per dispatch (mirrors physics constant). */
 const MAX_CENTERS_PER_DISPATCH = MAX_STOCHASTIC_SITES
 
-/** Workgroup size for expectation reduction shaders. */
-const EXPECT_WG = 256
+/** Workgroup size for expectation reduction shaders (must match @workgroup_size in WGSL). */
+export const EXPECT_WG = 256
 
 /** Number of reduction channels: density-weighted W + bare norm. */
 const EXPECT_CHANNELS = 2
@@ -286,14 +286,14 @@ function packStochasticUniforms(
 
   const rng = state.rng
   const latticeDim = config.latticeDim
-  const maxHalfExtent = config.gridSize[0]! * config.spacing[0]! * 0.5
 
   for (let k = 0; k < MAX_CENTERS_PER_DISPATCH; k++) {
     const baseIdx = 8 + k * 12
     if (k < batchCount) {
       for (let d = 0; d < 11; d++) {
         if (d < latticeDim) {
-          const halfExtent = Math.min(placementRadius, maxHalfExtent)
+          const dimHalfExtent = config.gridSize[d]! * config.spacing[d]! * 0.5
+          const halfExtent = Math.min(placementRadius, dimHalfExtent)
           f32[baseIdx + d] = rng() * 2 * halfExtent - halfExtent
         } else {
           f32[baseIdx + d] = 0
@@ -314,7 +314,7 @@ function packStochasticUniforms(
  * Auto-computed: M = ceil(γ·dt / 0.01), clamped [1, 8].
  */
 export function computeCSLSubsteps(gamma: number, dt: number): number {
-  return Math.max(1, Math.min(8, Math.ceil(gamma * dt / 0.01)))
+  return Math.max(1, Math.min(8, Math.ceil((gamma * dt) / 0.01)))
 }
 
 /** Pre-compute stochastic uniform data for all steps+substeps in the frame. */
@@ -354,9 +354,8 @@ export function prepareStochasticStaging(
     config.stochasticSigma * 2
   )
 
-  const subConfig: TdseConfig = cslSubsteps > 1
-    ? { ...config, stochasticGamma: config.stochasticGamma / cslSubsteps }
-    : config
+  const subConfig: TdseConfig =
+    cslSubsteps > 1 ? { ...config, stochasticGamma: config.stochasticGamma / cslSubsteps } : config
 
   const totalSize = totalSlots * STOCHASTIC_UNIFORM_SIZE
   const combined = new ArrayBuffer(totalSize)
@@ -403,6 +402,8 @@ export function maybeDispatchStochasticLoc(
   ) {
     return
   }
+
+  if (step >= state.stagingSlotCount) return
 
   // Copy this step's uniform data from staging to active buffer
   ctx.encoder.copyBufferToBuffer(

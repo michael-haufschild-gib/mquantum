@@ -11,8 +11,8 @@
  * Pass 2 (finalize): Single workgroup reduces partial sums, divides
  *   channel 0 by channel 1 to produce ⟨W⟩.
  *
- * Result buffer: [⟨W⟩] (1 float). The localization shader reads this
- * and subtracts it from W(x) to center the kick.
+ * Result buffer: [⟨W⟩, normSq] (2 floats). The localization shader reads
+ * result[0] (⟨W⟩) and subtracts it from W(x) to center the kick.
  *
  * @workgroup_size(256) for both passes
  * @module

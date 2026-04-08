@@ -157,7 +157,7 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
 
     // Collect samples
     const samples = await collectSamples(page, 10, 2000)
-    printTable('Schrödinger Cat (σ=2.0, γ=0.2)', samples)
+    printTable('Schrödinger Cat (σ=1.0, γ=2.0)', samples)
 
     console.log(`\n── CSL Debug Logs (${consoleLogs.length} total) ──`)
     for (const log of consoleLogs.slice(0, 15)) console.log(`  ${log}`)
@@ -176,8 +176,8 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
       }
     }
 
-    // This is diagnostic — always pass
-    expect(true).toBe(true)
+    // Diagnostic: verify wavefunction survived (norm > 0)
+    expect(validSamples.length).toBeGreaterThan(0)
   })
 
   /**
@@ -193,7 +193,7 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
     }
     await waitForFirstFrame(page)
 
-    // rapidCollapse has γ=5, σ=1, 8 centers — strongest branching preset
+    // rapidCollapse has γ=5, σ=1, 32 centers — strongest branching preset
     await selectScenario(page, 'rapidCollapse')
 
     const config = await readTdseConfig(page)
@@ -210,6 +210,6 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
     })
     console.log(`\nMax density at end: ${lastMaxDensity.toFixed(6)}`)
 
-    expect(true).toBe(true)
+    expect(lastMaxDensity).toBeGreaterThan(0)
   })
 })
