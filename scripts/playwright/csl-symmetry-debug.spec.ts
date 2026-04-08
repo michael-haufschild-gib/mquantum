@@ -172,7 +172,7 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
       console.log(`\n── Verdict ──`)
       console.log(`Max L/R asymmetry: ${maxDev.toFixed(4)}`)
       if (maxDev < 0.05) {
-        console.log('BUG CONFIRMED: CSL with σ=2.0 does not break symmetry')
+        console.log('BUG CONFIRMED: CSL with σ=1.0 does not break symmetry')
       }
     }
 
