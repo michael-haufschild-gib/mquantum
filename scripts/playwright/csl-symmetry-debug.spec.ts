@@ -113,9 +113,9 @@ function printTable(label: string, samples: Sample[]) {
   if (ratios.length > 0) {
     const maxDev = Math.max(...ratios.map((r) => Math.abs(r - 1.0)))
     console.log(`\nMax deviation from 1.0: ${maxDev.toFixed(4)}`)
-    if (maxDev < 0.05) console.log('⚠ NO symmetry breaking detected')
-    else if (maxDev < 0.2) console.log('~ Weak symmetry breaking')
-    else console.log('✓ Significant symmetry breaking')
+    if (maxDev < 0.05) console.log('[WARN] NO symmetry breaking detected')
+    else if (maxDev < 0.2) console.log('[INFO] Weak symmetry breaking')
+    else console.log('[OK] Significant symmetry breaking')
   }
 }
 
@@ -133,7 +133,10 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
     // Navigate to TDSE mode
     await gotoMode(page, 'tdseDynamics', 3)
     const state = await waitForRendererSettled(page)
-    if (state === 'error') { test.skip(); return }
+    if (state === 'error') {
+      test.skip()
+      return
+    }
     await waitForFirstFrame(page)
 
     // Select the Schrödinger's Cat preset from the dropdown
@@ -149,8 +152,8 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
     expect(config.stochasticEnabled).toBe(true)
     expect(config.stochasticGamma).toBeCloseTo(2.0)
     expect(config.stochasticSigma).toBeCloseTo(1.0)
-    expect(config.packetCenter[0]).toBeCloseTo(0)  // symmetric start
-    expect(config.doubleWellAsymmetry).toBeCloseTo(0)  // symmetric well
+    expect(config.packetCenter[0]).toBeCloseTo(0) // symmetric start
+    expect(config.doubleWellAsymmetry).toBeCloseTo(0) // symmetric well
 
     // Collect samples
     const samples = await collectSamples(page, 10, 2000)
@@ -158,7 +161,8 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
 
     console.log(`\n── CSL Debug Logs (${consoleLogs.length} total) ──`)
     for (const log of consoleLogs.slice(0, 15)) console.log(`  ${log}`)
-    if (consoleLogs.length === 0) console.log('  ⚠ NONE captured — stochastic dispatch may not be running')
+    if (consoleLogs.length === 0)
+      console.log('  [WARN] NONE captured -- stochastic dispatch may not be running')
 
     // Analysis
     const validSamples = samples.filter((s) => s.totalNorm > 1e-6)
@@ -183,7 +187,10 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
   test('rapid collapse preset: one blob must survive', async ({ page }) => {
     await gotoMode(page, 'tdseDynamics', 3)
     const state = await waitForRendererSettled(page)
-    if (state === 'error') { test.skip(); return }
+    if (state === 'error') {
+      test.skip()
+      return
+    }
     await waitForFirstFrame(page)
 
     // rapidCollapse has γ=5, σ=1, 8 centers — strongest branching preset
@@ -205,5 +212,4 @@ test.describe('CSL Symmetry-Breaking Investigation', () => {
 
     expect(true).toBe(true)
   })
-
 })
