@@ -19,7 +19,8 @@ import {
 async function getPipelineGen(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(() => {
     const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
-    return parseInt(canvas?.getAttribute('data-pipeline-gen') ?? '0', 10)
+    if (!canvas) throw new Error('webgpu-canvas not found')
+    return parseInt(canvas.getAttribute('data-pipeline-gen') ?? '0', 10)
   })
 }
 
@@ -82,7 +83,9 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1', iso: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
-      const errorMsg = await page.locator('[data-testid="webgpu-container"]').getAttribute('data-renderer-error')
+      const errorMsg = await page
+        .locator('[data-testid="webgpu-container"]')
+        .getAttribute('data-renderer-error')
       const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
       test.skip(isGpuUnavailable, 'No WebGPU')
       throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)
@@ -131,7 +134,9 @@ test.describe('TDSE Decoherence Mode Switch', () => {
     await gotoModeWithParams(page, 'tdseDynamics', 3, { pot: 'harmonicTrap', diag: '1' })
     const rs = await waitForRendererSettled(page)
     if (rs === 'error') {
-      const errorMsg = await page.locator('[data-testid="webgpu-container"]').getAttribute('data-renderer-error')
+      const errorMsg = await page
+        .locator('[data-testid="webgpu-container"]')
+        .getAttribute('data-renderer-error')
       const isGpuUnavailable = !errorMsg || /webgpu|adapter|gpu.*not.*support/i.test(errorMsg)
       test.skip(isGpuUnavailable, 'No WebGPU')
       throw new Error(`Renderer error (not GPU-unavailable): ${errorMsg}`)

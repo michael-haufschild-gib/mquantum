@@ -49,6 +49,10 @@ function norm(v: number, max: number): number {
   return max > 0 ? Math.min(v / max, 1) : 0
 }
 
+/** NaN/Infinity-safe max — returns floor when all values are non-finite. */
+const finiteMax = (vals: number[], floor = 1e-10) =>
+  vals.reduce((m, v) => (Number.isFinite(v) && v > m ? v : m), floor)
+
 /** Get a dimension-specific color. */
 function dimColor(dim: number, dims: number[]): string {
   const idx = dims.indexOf(dim)
@@ -81,8 +85,6 @@ function ThreeDiagChart<T extends DiagPoint>({
   const xMax = Math.max(...xs)
   const xRange = xMax - xMin || 1
 
-  const finiteMax = (vals: number[]) =>
-    vals.reduce((m, v) => (Number.isFinite(v) && v > m ? v : m), 1e-10)
   const maxE = finiteMax(data.map((d) => d.entanglement))
   const maxW = finiteMax(data.map((d) => d.wigner))
   const maxI = finiteMax(data.map((d) => d.ipr))
@@ -220,8 +222,8 @@ ErosionCurves.displayName = 'ErosionCurves'
 export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo(({ results }) => {
   if (results.length === 0) return null
 
-  const maxE = Math.max(...results.map((r) => r.avgNormalizedEntropy), 1e-10)
-  const maxW = Math.max(...results.map((r) => r.avgWignerNegativity), 1e-10)
+  const maxE = finiteMax(results.map((r) => r.avgNormalizedEntropy))
+  const maxW = finiteMax(results.map((r) => r.avgWignerNegativity))
   const dims = uniqueSorted(results.map((r) => r.dim))
 
   const xOf = (e: number) => PAD.left + norm(e, maxE) * PW
@@ -315,7 +317,7 @@ const DiagHeatmap: React.FC<{
 
   const lambdas = uniqueSorted(results.map((r) => r.lambda))
   const dims = uniqueSorted(results.map((r) => r.dim))
-  const maxVal = Math.max(...results.map(accessor), 1e-10)
+  const maxVal = finiteMax(results.map(accessor))
 
   const cellW = HM_PW / lambdas.length
   const cellH = HM_PH / dims.length
