@@ -56,7 +56,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     disableAlpha = false,
     tooltip,
   }) => {
-    // --- State ---
     const [hsv, setHsv] = useState<HSVA>({ h: 0, s: 0, v: 0, a: 1 })
     const [mode, setMode] = useState<ColorMode>('HEX')
     const [history, setHistory] = useState<string[]>(() => {
@@ -77,10 +76,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     const [isOpen, setIsOpen] = useState(false)
     const [initialColor, setInitialColor] = useState(value) // For comparison
 
-    // Track last emitted value to prevent destructive round-trip updates
-    // When we emit a color via onChange, the parent may echo it back as a prop change.
-    // Without this ref, the useEffect would re-parse the hex and lose hue information
-    // for achromatic colors (where saturation=0 or value=0).
+    // Prevents destructive round-trip: re-parsing echoed hex loses hue for achromatic colors
     const lastEmittedRef = useRef<string>('')
 
     // Local inputs
@@ -95,20 +91,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
         try {
           localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
         } catch {
-          // localStorage quota exceeded or unavailable - silently ignore
+          /* quota exceeded — ignore */
         }
         return newHistory
       })
     }
 
-    // Sync Prop -> State
     useEffect(() => {
-      // Skip if this value is just an echo of what we emitted.
-      // This prevents destructive round-trip: when we emit a color via onChange,
-      // the parent echoes it back as a prop change. Re-parsing would lose hue
-      // for achromatic colors (saturation=0 or value=0).
       if (value === lastEmittedRef.current) {
-        // Still need to handle alpha prop changes even on echoed values
         if (alpha !== undefined && alpha !== hsv.a) {
           const alphaSyncTimer = window.setTimeout(() => {
             setHsv((prev) => ({ ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }))
@@ -149,21 +139,16 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       }
     }
 
-    // --- Internal Updates ---
     const updateExternal = useCallback(
       (newHsv: HSVA) => {
         const safeAlpha = disableAlpha ? 1 : clampAlpha(newHsv.a)
         const safeHsv = safeAlpha === newHsv.a ? newHsv : { ...newHsv, a: safeAlpha }
         let output: string
 
-        // Handle Alpha Output
         if (onChangeAlpha) {
           onChangeAlpha(safeHsv.a)
-          // Convention: if onChangeAlpha is present, assume parent handles them separately
-          // So we output Hex6 to onChange (no alpha channel).
           output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
         } else {
-          // Standard mode: Combine them
           if (safeHsv.a === 1) {
             output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
           } else {
@@ -171,7 +156,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
           }
         }
 
-        // Track what we emit so the sync useEffect can skip echoed values
         lastEmittedRef.current = output
         onChange(output)
         return output
@@ -185,10 +169,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
         setHsv(safeHsv)
         updateExternal(safeHsv)
 
-        // Update local inputs
-        // We display what we emitted, mostly. But if alpha is handled separately,
-        // we might want to still show it in the UI input?
-        // Yes, the UI should reflect the *state* `newHsv`.
         const displayHex =
           safeHsv.a === 1
             ? hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
@@ -199,7 +179,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       [updateExternal, disableAlpha]
     )
 
-    // --- Interactions ---
     const svRef = useRef<HTMLDivElement>(null)
     const [isDraggingSV, setIsDraggingSV] = useState(false)
 
@@ -242,7 +221,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       [hsv, handleHsvChange]
     )
 
-    // --- EyeDropper ---
     const handleEyedropper = async () => {
       if (!window.EyeDropper) return
       try {
@@ -257,7 +235,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       }
     }
 
-    // --- Copy ---
     const handleCopy = async () => {
       try {
         await navigator.clipboard.writeText(value)
@@ -266,10 +243,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       }
     }
 
-    // --- Palette ---
     const palette = generatePalette(hsv.h, hsv.s, hsv.v)
-
-    // --- Render ---
     const saturationBrightnessBackground = hsvToHex(hsv.h, 1, 1)
 
     return (
