@@ -12,9 +12,11 @@ import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /**
  * Maximum collapse centers per stochastic localization step.
- * Constrained by the GPU uniform struct packing (3×vec4f per center, 8 centers max).
+ * More centers produce a smoother effective collapse field, improving
+ * localization quality. Each center costs 3×vec4f (48 bytes) in the
+ * uniform buffer + one loop iteration in the localization shader.
  */
-export const MAX_STOCHASTIC_SITES = 8
+export const MAX_STOCHASTIC_SITES = 32
 
 /** A collapse center with world-space position and noise value. */
 export interface CollapseCenter {

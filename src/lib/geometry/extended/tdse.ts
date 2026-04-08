@@ -366,7 +366,7 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   stochasticEnabled: false,
   stochasticGamma: 0.5,
   stochasticSigma: 2.0,
-  stochasticNumSites: 4,
+  stochasticNumSites: 16,
   stochasticSeed: 42,
 
   branchingEnabled: false,

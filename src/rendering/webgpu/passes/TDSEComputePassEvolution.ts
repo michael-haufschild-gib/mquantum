@@ -30,7 +30,12 @@ import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassS
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { dispatchGramSchmidt as gsDispatch, type GramSchmidtState } from './TDSEGramSchmidt'
 import type { ObservablesState } from './TDSEObservablesDispatch'
-import { maybeDispatchStochasticLoc, type StochasticLocState } from './TDSEStochasticLocalization'
+import {
+  computeCSLSubsteps,
+  maybeDispatchStochasticLoc,
+  prepareStochasticStaging,
+  type StochasticLocState,
+} from './TDSEStochasticLocalization'
 import { runVortexDetection, type VortexDetectState } from './TDSEVortexDetect'
 
 /** Mutable state updated by the evolution loop each frame. */
@@ -49,6 +54,8 @@ export interface EvolutionResources {
   gsState: GramSchmidtState
   /** Stochastic localization state (optional — null when feature not built). */
   stochasticState: StochasticLocState | null
+  /** Dynamic bounding radius of the quantum state (used to concentrate CSL centers). */
+  boundingRadius: number
   /** Dispatch a compute pass. */
   dc: (
     pe: GPUComputePassEncoder,
@@ -89,6 +96,15 @@ export function runStrangEvolution(
   const stepsThisFrame = Math.floor(state.stepAccumulator)
   state.stepAccumulator -= stepsThisFrame
 
+  // Pre-compute stochastic uniforms for all steps (staging buffer pattern).
+  // Must happen before the loop so each step gets independent random data.
+  // Pass bounding radius so centers concentrate near the wavepacket.
+  if (res.stochasticState && stepsThisFrame > 0) {
+    prepareStochasticStaging(
+      ctx.device, config, res.stochasticState, stepsThisFrame, res.boundingRadius
+    )
+  }
+
   for (let step = 0; step < stepsThisFrame; step++) {
     // 1+2. PERF: Fused half-step potential + pack (saves 1 dispatch + 2MB memory)
     const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
@@ -118,17 +134,23 @@ export function runStrangEvolution(
     fusedUnpackV.end()
 
     // 7.5. Stochastic localization (CSL) — conditional on γ > 0
+    // Sub-stepped: M micro-kicks per Strang step, each with γ/M and fresh
+    // random centers. This smooths the effective collapse field and prevents
+    // strong kicks from destroying the wavepacket structure.
     if (res.stochasticState) {
-      maybeDispatchStochasticLoc(
-        ctx.device,
-        ctx,
-        config,
-        res.stochasticState,
-        linearWG,
-        res.totalSites,
-        step,
-        (pass, pipeline, bindGroups, wgX) => dc(pass, pipeline, bindGroups, wgX)
-      )
+      const cslSub = computeCSLSubsteps(config.stochasticGamma, config.dt)
+      for (let sub = 0; sub < cslSub; sub++) {
+        maybeDispatchStochasticLoc(
+          ctx.device,
+          ctx,
+          config,
+          res.stochasticState,
+          linearWG,
+          res.totalSites,
+          step * cslSub + sub,
+          (pass, pipeline, bindGroups, wgX) => dc(pass, pipeline, bindGroups, wgX)
+        )
+      }
     }
 
     // 8. Absorber (separate pass AFTER the Strang step)
@@ -144,10 +166,18 @@ export function runStrangEvolution(
 
     state.simTime += config.dt
 
-    // 9. Renormalization: once per frame for real-time (f32 drift correction),
-    // every step for imaginary-time (decay must be renormalized to prevent ψ→0).
+    // 9. Renormalization:
+    //   - Every step for imaginary-time (decay must be renormalized to prevent ψ→0)
+    //   - Every step when stochastic localization is active (the exponential
+    //     discretization's Itô drift causes systematic norm bias per step;
+    //     without per-step renorm, high γ causes amplitude swings that destroy
+    //     the wavepacket structure before localization can bias one branch)
+    //   - Once per frame otherwise (f32 drift correction)
     const isImaginaryTime = config.imaginaryTimeEnabled
-    if (isImaginaryTime || step === stepsThisFrame - 1) {
+    const needsPerStepRenorm =
+      isImaginaryTime ||
+      (config.stochasticEnabled && config.stochasticGamma > 0)
+    if (needsPerStepRenorm || step === stepsThisFrame - 1) {
       const rPass = ctx.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
       dc(rPass, pl.diagReducePipeline, [bg.diagReduceBG], res.diagNumWorkgroups)
       rPass.end()
