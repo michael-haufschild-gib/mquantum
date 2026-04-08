@@ -49,43 +49,55 @@ function norm(v: number, max: number): number {
   return max > 0 ? Math.min(v / max, 1) : 0
 }
 
+/** NaN/Infinity-safe max — returns floor when all values are non-finite. */
+const finiteMax = (vals: number[], floor = 1e-10) =>
+  vals.reduce((m, v) => (Number.isFinite(v) && v > m ? v : m), floor)
+
 /** Get a dimension-specific color. */
 function dimColor(dim: number, dims: number[]): string {
   const idx = dims.indexOf(dim)
   return DIM_COLORS[idx >= 0 ? idx : DIM_COLORS.length - 1]!
 }
 
-// ─── Erosion Curves ──────────────────────────────────────────────────────────
+// ─── Shared Three-Diagnostic Line Chart ─────────────────────────────────────
 
-/** Data for a single point on an erosion curve. */
-export interface ErosionCurveData {
-  gamma: number
+/** Common shape for data points with three diagnostic values. */
+interface DiagPoint {
   entanglement: number
   wigner: number
   ipr: number
 }
 
-/** SVG overlay of three diagnostic curves vs γ at fixed (λ, N). */
-export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(({ data }) => {
-  if (data.length < 2) {
-    return <p className="text-xs text-text-tertiary italic">Need ≥ 2 γ points for curves</p>
-  }
+/** Shared SVG chart rendering three normalized diagnostic curves with dots. */
+function ThreeDiagChart<T extends DiagPoint>({
+  data,
+  xAccessor,
+  xLabel,
+  formatTick,
+}: {
+  data: T[]
+  xAccessor: (d: T) => number
+  xLabel: string
+  formatTick: (v: number) => string
+}): React.ReactElement {
+  const xs = data.map(xAccessor)
+  const xMin = Math.min(...xs)
+  const xMax = Math.max(...xs)
+  const xRange = xMax - xMin || 1
 
-  const gammas = data.map((d) => d.gamma)
-  const gMin = Math.min(...gammas)
-  const gMax = Math.max(...gammas)
-  const gRange = gMax - gMin || 1
+  const maxE = finiteMax(data.map((d) => d.entanglement))
+  const maxW = finiteMax(data.map((d) => d.wigner))
+  const maxI = finiteMax(data.map((d) => d.ipr))
 
-  const maxE = Math.max(...data.map((d) => d.entanglement), 1e-10)
-  const maxW = Math.max(...data.map((d) => d.wigner), 1e-10)
-  const maxI = Math.max(...data.map((d) => d.ipr), 1e-10)
-
-  const xOf = (g: number) => PAD.left + ((g - gMin) / gRange) * PW
+  const xOf = (v: number) => PAD.left + ((v - xMin) / xRange) * PW
   const yOf = (v: number) => PAD.top + (1 - v) * PH
 
-  const sorted = [...data].sort((a, b) => a.gamma - b.gamma)
+  const sorted = [...data].sort((a, b) => xAccessor(a) - xAccessor(b))
   const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
-    sorted.map((d) => `${xOf(d.gamma)},${yOf(norm(d[key], maxVal))}`).join(' ')
+    sorted
+      .filter((d) => Number.isFinite(d[key]))
+      .map((d) => `${xOf(xAccessor(d))},${yOf(norm(d[key], maxVal))}`)
+      .join(' ')
 
   return (
     <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
@@ -130,18 +142,18 @@ export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(
         fill="var(--text-tertiary)"
         textAnchor="middle"
       >
-        γ
+        {xLabel}
       </text>
       {data.map((d, i) => (
         <text
           key={i}
-          x={xOf(d.gamma)}
+          x={xOf(xAccessor(d))}
           y={PAD.top + PH + 10}
           fontSize={6}
           fill="var(--text-tertiary)"
           textAnchor="middle"
         >
-          {d.gamma < 1 ? d.gamma.toFixed(1) : d.gamma.toFixed(0)}
+          {formatTick(xAccessor(d))}
         </text>
       ))}
       <polyline
@@ -165,22 +177,42 @@ export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(
       {data.map((d, i) => (
         <React.Fragment key={i}>
           <circle
-            cx={xOf(d.gamma)}
+            cx={xOf(xAccessor(d))}
             cy={yOf(norm(d.entanglement, maxE))}
             r={2}
             fill={DIAG_COLORS.entanglement}
           />
           <circle
-            cx={xOf(d.gamma)}
+            cx={xOf(xAccessor(d))}
             cy={yOf(norm(d.wigner, maxW))}
             r={2}
             fill={DIAG_COLORS.wigner}
           />
-          <circle cx={xOf(d.gamma)} cy={yOf(norm(d.ipr, maxI))} r={2} fill={DIAG_COLORS.ipr} />
+          <circle cx={xOf(xAccessor(d))} cy={yOf(norm(d.ipr, maxI))} r={2} fill={DIAG_COLORS.ipr} />
         </React.Fragment>
       ))}
     </svg>
   )
+}
+
+// ─── Erosion Curves ──────────────────────────────────────────────────────────
+
+/** Data for a single point on an erosion curve. */
+export interface ErosionCurveData {
+  gamma: number
+  entanglement: number
+  wigner: number
+  ipr: number
+}
+
+const fmtGamma = (v: number): string => (v < 1 ? v.toFixed(1) : v.toFixed(0))
+
+/** SVG overlay of three diagnostic curves vs γ at fixed (λ, N). */
+export const ErosionCurves: React.FC<{ data: ErosionCurveData[] }> = React.memo(({ data }) => {
+  if (data.length < 2) {
+    return <p className="text-xs text-text-tertiary italic">Need ≥ 2 γ points for curves</p>
+  }
+  return <ThreeDiagChart data={data} xAccessor={(d) => d.gamma} xLabel="γ" formatTick={fmtGamma} />
 })
 ErosionCurves.displayName = 'ErosionCurves'
 
@@ -190,8 +222,8 @@ ErosionCurves.displayName = 'ErosionCurves'
 export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo(({ results }) => {
   if (results.length === 0) return null
 
-  const maxE = Math.max(...results.map((r) => r.avgNormalizedEntropy), 1e-10)
-  const maxW = Math.max(...results.map((r) => r.avgWignerNegativity), 1e-10)
+  const maxE = finiteMax(results.map((r) => r.avgNormalizedEntropy))
+  const maxW = finiteMax(results.map((r) => r.avgWignerNegativity))
   const dims = uniqueSorted(results.map((r) => r.dim))
 
   const xOf = (e: number) => PAD.left + norm(e, maxE) * PW
@@ -285,7 +317,7 @@ const DiagHeatmap: React.FC<{
 
   const lambdas = uniqueSorted(results.map((r) => r.lambda))
   const dims = uniqueSorted(results.map((r) => r.dim))
-  const maxVal = Math.max(...results.map(accessor), 1e-10)
+  const maxVal = finiteMax(results.map(accessor))
 
   const cellW = HM_PW / lambdas.length
   const cellH = HM_PH / dims.length
@@ -299,8 +331,9 @@ const DiagHeatmap: React.FC<{
         {results.map((r) => {
           const li = lambdas.indexOf(r.lambda)
           const di = dims.indexOf(r.dim)
-          if (li < 0 || di < 0) return null
-          const frac = norm(accessor(r), maxVal)
+          const val = accessor(r)
+          if (li < 0 || di < 0 || !Number.isFinite(val)) return null
+          const frac = norm(val, maxVal)
           return (
             <rect
               key={`${r.lambda}-${r.dim}`}
@@ -388,111 +421,13 @@ export const DimensionComparison: React.FC<{ data: DimCompareData[] }> = React.m
   if (data.length < 2) {
     return <p className="text-xs text-text-tertiary italic">Need ≥ 2 dimensions for comparison</p>
   }
-
-  const dims = data.map((d) => d.dim)
-  const dMin = Math.min(...dims)
-  const dMax = Math.max(...dims)
-  const dRange = dMax - dMin || 1
-
-  const maxE = Math.max(...data.map((d) => d.entanglement), 1e-10)
-  const maxW = Math.max(...data.map((d) => d.wigner), 1e-10)
-  const maxI = Math.max(...data.map((d) => d.ipr), 1e-10)
-
-  const xOf = (d: number) => PAD.left + ((d - dMin) / dRange) * PW
-  const yOf = (v: number) => PAD.top + (1 - v) * PH
-
-  const dimSorted = [...data].sort((a, b) => a.dim - b.dim)
-  const polyline = (key: 'entanglement' | 'wigner' | 'ipr', maxVal: number) =>
-    dimSorted.map((d) => `${xOf(d.dim)},${yOf(norm(d[key], maxVal))}`).join(' ')
-
   return (
-    <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
-      <line
-        x1={PAD.left}
-        y1={PAD.top + PH}
-        x2={PAD.left + PW}
-        y2={PAD.top + PH}
-        stroke="var(--text-tertiary)"
-        strokeWidth={0.5}
-      />
-      <line
-        x1={PAD.left}
-        y1={PAD.top}
-        x2={PAD.left}
-        y2={PAD.top + PH}
-        stroke="var(--text-tertiary)"
-        strokeWidth={0.5}
-      />
-      <text
-        x={PAD.left - 2}
-        y={PAD.top + 3}
-        fontSize={7}
-        fill="var(--text-tertiary)"
-        textAnchor="end"
-      >
-        1
-      </text>
-      <text
-        x={PAD.left - 2}
-        y={PAD.top + PH + 1}
-        fontSize={7}
-        fill="var(--text-tertiary)"
-        textAnchor="end"
-      >
-        0
-      </text>
-      <text
-        x={PAD.left + PW / 2}
-        y={CHART_H - 2}
-        fontSize={7}
-        fill="var(--text-tertiary)"
-        textAnchor="middle"
-      >
-        dimension N
-      </text>
-      {data.map((d, i) => (
-        <text
-          key={i}
-          x={xOf(d.dim)}
-          y={PAD.top + PH + 10}
-          fontSize={6}
-          fill="var(--text-tertiary)"
-          textAnchor="middle"
-        >
-          {d.dim}
-        </text>
-      ))}
-      <polyline
-        points={polyline('entanglement', maxE)}
-        fill="none"
-        stroke={DIAG_COLORS.entanglement}
-        strokeWidth={1.5}
-      />
-      <polyline
-        points={polyline('wigner', maxW)}
-        fill="none"
-        stroke={DIAG_COLORS.wigner}
-        strokeWidth={1.5}
-      />
-      <polyline
-        points={polyline('ipr', maxI)}
-        fill="none"
-        stroke={DIAG_COLORS.ipr}
-        strokeWidth={1.5}
-      />
-      {data.map((d, i) => (
-        <React.Fragment key={i}>
-          <circle
-            cx={xOf(d.dim)}
-            cy={yOf(norm(d.entanglement, maxE))}
-            r={2}
-            fill={DIAG_COLORS.entanglement}
-          />
-          <circle cx={xOf(d.dim)} cy={yOf(norm(d.wigner, maxW))} r={2} fill={DIAG_COLORS.wigner} />
-          <circle cx={xOf(d.dim)} cy={yOf(norm(d.ipr, maxI))} r={2} fill={DIAG_COLORS.ipr} />
-        </React.Fragment>
-      ))}
-    </svg>
+    <ThreeDiagChart
+      data={data}
+      xAccessor={(d) => d.dim}
+      xLabel="dimension N"
+      formatTick={(v) => String(v)}
+    />
   )
 })
 DimensionComparison.displayName = 'DimensionComparison'

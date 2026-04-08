@@ -6,9 +6,11 @@ import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.
 import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import {
-  tdseComplexPackBlock,
-  tdseComplexUnpackBlock,
+  tdseComplexPackShaderBlock,
+  tdseComplexUnpackShaderBlock,
+  tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseDiagNormFinalizeBlock,
   tdseDiagNormReduceBlock,
@@ -30,6 +32,7 @@ import {
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
+import type { ObsGSPipelineResult } from './TDSEObservablesGSPipelines'
 import { buildObsGSPipelines } from './TDSEObservablesGSPipelines'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -51,8 +54,6 @@ export interface TdsePassHelpers {
   ) => GPUComputePipeline
   createUniformBuffer: (device: GPUDevice, size: number, label: string) => GPUBuffer
 }
-
-import type { ObsGSPipelineResult } from './TDSEObservablesGSPipelines'
 
 /**
  * Pipeline and bind group layout objects created by {@link buildTdsePipelines}.
@@ -255,24 +256,14 @@ export function buildTdsePipelines(
     'storage',
     'storage',
   ])
-  const renormalizePipeline = device.createComputePipeline({
-    label: 'tdse-renormalize-pipeline',
-    layout: device.createPipelineLayout({ bindGroupLayouts: [renormalizeBGL] }),
-    compute: {
-      module: device.createShaderModule({ label: 'tdse-renormalize', code: renormalizeBlock }),
-      entryPoint: 'main',
-    },
-  })
+  const renormalizePipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(device, renormalizeBlock, 'tdse-renormalize'),
+    [renormalizeBGL],
+    'tdse-renormalize'
+  )
 
   // Pack
-  const packUnifBlock = /* wgsl */ `
-struct PackUniforms {
-  totalElements: u32,
-  invN: f32,
-  _pad0: u32,
-  _pad1: u32,
-}
-`
   const packBGL = createComputeBGL(device, 'tdse-pack-bgl', [
     'uniform',
     'read-only-storage',
@@ -281,11 +272,7 @@ struct PackUniforms {
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(
-      device,
-      packUnifBlock + tdseComplexPackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
-      'tdse-pack'
-    ),
+    helpers.createShaderModule(device, assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl, 'tdse-pack'),
     [packBGL],
     'tdse-pack'
   )
@@ -301,7 +288,7 @@ struct PackUniforms {
     device,
     helpers.createShaderModule(
       device,
-      packUnifBlock + tdseComplexUnpackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
+      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
       'tdse-unpack'
     ),
     [unpackBGL],
@@ -351,24 +338,13 @@ struct PackUniforms {
   )
 
   // Write grid
-  const writeGridBGL = device.createBindGroupLayout({
-    label: 'tdse-write-grid-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      {
-        binding: 4,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-          viewDimension: '3d',
-        },
-      },
-    ],
-  })
+  const writeGridBGL = createComputeBGL(device, 'tdse-write-grid-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
+  ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + tdseWriteGridBlock, 'tdse-write-grid'),

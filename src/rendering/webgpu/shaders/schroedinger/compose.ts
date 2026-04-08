@@ -24,7 +24,6 @@ import {
 } from '../shared/compose-helpers'
 import { constantsBlock } from '../shared/core/constants.wgsl'
 import { uniformsBlock } from '../shared/core/uniforms.wgsl'
-import { temporalBlock } from '../shared/features/temporal.wgsl'
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 import { sphereIntersectBlock } from '../shared/raymarch/sphere-intersect.wgsl'
@@ -242,7 +241,6 @@ struct VertexOutput {
     { name: 'Sphere Intersection', content: sphereIntersectBlock, condition: !is2D },
 
     // Features + output
-    { name: 'Temporal Accumulation', content: temporalBlock, condition: enableTemporal && !is2D },
     {
       name: 'Fragment Output (Isosurface)',
       content: singleOutputBlock,

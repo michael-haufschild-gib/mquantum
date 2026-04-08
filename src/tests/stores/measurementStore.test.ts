@@ -16,20 +16,7 @@ import { useMeasurementStore } from '@/stores/measurementStore'
 
 describe('measurementStore', () => {
   beforeEach(() => {
-    // Reset store to initial state
-    useMeasurementStore.setState({
-      enabled: false,
-      measurements: [],
-      totalCount: 0,
-      collapseWidth: 0.3,
-      autoEvolveFrames: 30,
-      measureAxis: null,
-      isCollapsing: false,
-      pendingMeasurement: null,
-      cooldownFrames: 0,
-      positionMean: [],
-      positionStd: [],
-    })
+    useMeasurementStore.setState(useMeasurementStore.getInitialState())
   })
 
   it('starts in disabled state with no measurements', () => {

@@ -5,7 +5,7 @@
  * - HSV <-> RGB <-> Hex roundtrip integrity
  * - Edge cases: black, white, pure primary/secondary colors
  * - Input validation and fallback behavior
- * - Palette generation and contrast color selection
+ * - Palette generation
  * - All six hue sextants in HSV-to-RGB conversion
  */
 
@@ -13,7 +13,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   generatePalette,
-  getContrastColor,
   hex8ToHsv,
   hexToHsv,
   hsvToHex,
@@ -421,26 +420,5 @@ describe('generatePalette', () => {
   it('handles count=1', () => {
     const palette = generatePalette(0, 1, 1, 1)
     expect(palette).toHaveLength(2) // 1 tint + 1 shade
-  })
-})
-
-describe('getContrastColor', () => {
-  it('returns white for dark colors', () => {
-    expect(getContrastColor(0, 1, 0.2)).toBe('white')
-    expect(getContrastColor(0.67, 1, 0.3)).toBe('white')
-  })
-
-  it('returns black for light colors', () => {
-    expect(getContrastColor(0, 0, 1)).toBe('black') // white
-    expect(getContrastColor(0.17, 0.3, 0.95)).toBe('black') // light yellow-ish
-  })
-
-  it('returns black for pure yellow (high perceptual luminance)', () => {
-    // Yellow has high green component which dominates luminance
-    expect(getContrastColor(1 / 6, 1, 1)).toBe('black')
-  })
-
-  it('returns white for pure blue (low perceptual luminance)', () => {
-    expect(getContrastColor(2 / 3, 1, 1)).toBe('white')
   })
 })

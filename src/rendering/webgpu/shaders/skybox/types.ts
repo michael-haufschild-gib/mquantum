@@ -1,6 +1,5 @@
 /**
- * Skybox types for WebGPU shaders
- * Port of: src/rendering/shaders/skybox/types.ts
+ * Skybox types for WebGPU shaders.
  */
 
 /** Procedural skybox rendering mode that determines the atmosphere shader. */

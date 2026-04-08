@@ -216,18 +216,7 @@ function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | unde
  * @returns A JSON-serializable version of the state.
  */
 export const serializeState = <T extends object>(state: T): Record<string, unknown> => {
-  // 1. Create a shallow copy first to filter functions and transient fields
-  const clean: Record<string, unknown> = {}
-  for (const key of Object.keys(state)) {
-    // Skip functions
-    if (typeof (state as Record<string, unknown>)[key] === 'function') continue
-    // Skip transient fields that shouldn't be persisted
-    if (TRANSIENT_FIELDS.has(key)) continue
-    clean[key] = (state as Record<string, unknown>)[key]
-  }
-
-  // 2. Deep clone via JSON to break references
-  return JSON.parse(JSON.stringify(clean))
+  return JSON.parse(JSON.stringify(stripTransientFields(state as Record<string, unknown>)))
 }
 
 /**

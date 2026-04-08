@@ -22,7 +22,6 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
-import { logger } from '@/lib/logger'
 import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
@@ -500,7 +499,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const configHash = computeConfigHash(config.gridSize, config.latticeDim)
 
     if (configHash !== this.lastConfigHash || !this.psiReBuffer) {
-      logger.log(`[TDSE-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}`)
       this.rebuildBuffers(device, config)
       this.buildPipelines(device)
       this.rebuildBindGroups(device)

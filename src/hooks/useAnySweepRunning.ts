@@ -8,6 +8,7 @@
  * @module hooks/useAnySweepRunning
  */
 
+import { useAndersonSweepStore } from '@/stores/andersonSweepStore'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
 import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
@@ -15,11 +16,12 @@ import { useQuantumnessAtlasStore } from '@/stores/quantumnessAtlasStore'
 /**
  * Returns true if any parameter sweep is currently running.
  *
- * @returns Whether any sweep (entanglement, monitoring, or atlas) is active
+ * @returns Whether any sweep (anderson, entanglement, monitoring, or atlas) is active
  */
 export function useAnySweepRunning(): boolean {
+  const anderson = useAndersonSweepStore((s) => s.status === 'running')
   const entanglement = useCoordinateEntanglementStore((s) => s.sweepStatus === 'running')
   const monitoring = useMonitoringSweepStore((s) => s.status === 'running')
   const atlas = useQuantumnessAtlasStore((s) => s.status === 'running')
-  return entanglement || monitoring || atlas
+  return anderson || entanglement || monitoring || atlas
 }

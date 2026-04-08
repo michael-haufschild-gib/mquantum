@@ -266,7 +266,14 @@ export function writeTdseUniforms(
   u32[184] = buildCompactDimsMask(config.compactDims, config.latticeDim)
 
   // Stochastic decoherence branching (offsets 740-744, indices 185-186)
-  u32[185] = config.branchingEnabled ? 1 : 0
+  // branchingEnabled is always written as 0 in the TDSE compute uniform.
+  // Branch fraction encoding in the density texture alpha channel triggered a
+  // Metal shader compiler bug on Apple Silicon — the runtime if-branch in the
+  // writeGrid WGSL corrupted texture sampling in the fragment shader's raymarching
+  // loop. Branch visualization is now computed directly in the fragment shader
+  // from ray position using branchPlaneThreshold/branchTransitionWidth in
+  // SchroedingerUniforms.
+  u32[185] = 0
   f32[186] = config.branchPlanePosition ?? 0.0
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)

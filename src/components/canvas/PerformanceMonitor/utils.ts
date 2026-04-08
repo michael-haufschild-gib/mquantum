@@ -90,6 +90,44 @@ export function getFpsColorLevel(fps: number): FpsColorLevel {
 }
 
 /**
+ * Compute SVG sparkline points string from a numeric data array.
+ *
+ * Maps each value to an (x, y) coordinate string. X is evenly spaced across
+ * `width`, Y is linearly scaled between `minY`/`maxY` and clamped to [0, height].
+ *
+ * @param data - Array of numeric values
+ * @param width - SVG width in px
+ * @param height - SVG height in px
+ * @param minY - Minimum Y-axis value
+ * @param maxY - Maximum Y-axis value
+ * @returns Space-joined `"x,y"` pairs (no `M` prefix)
+ */
+export function computeSparklinePoints(
+  data: number[],
+  width: number,
+  height: number,
+  minY: number,
+  maxY: number
+): string {
+  if (data.length < 2) return ''
+  const range = maxY - minY
+  if (range <= 0) {
+    // Flat line at vertical center when all values are equal
+    const midY = height * 0.5
+    return data.map((_, i) => `${(i * width) / (data.length - 1)},${midY}`).join(' ')
+  }
+  const stepX = width / (data.length - 1)
+  const points: string[] = new Array(data.length)
+  for (let i = 0; i < data.length; i++) {
+    const x = i * stepX
+    const normalizedY = Math.max(0, Math.min(1, (data[i]! - minY) / range))
+    const y = height - normalizedY * height
+    points[i] = `${x},${y}`
+  }
+  return points.join(' ')
+}
+
+/**
  * Format min/max FPS bounds for monitor labels.
  *
  * Uses a placeholder for uninitialized sentinel values such as Infinity.

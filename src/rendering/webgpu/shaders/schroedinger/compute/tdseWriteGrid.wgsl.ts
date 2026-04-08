@@ -358,18 +358,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let rawDensityScaled = clamp(normDensityRaw * perpFalloff, 0.0, 1.0);
   var alphaChannel: f32 = rawDensityScaled;
 
-  if (params.branchingEnabled == 1u) {
-    // Determine branch membership: axis-0 world coordinate vs branch plane
-    let halfExtent0 = f32(params.gridSize[0]) * params.spacing[0] * 0.5;
-    let threshold = params.branchPlanePosition * halfExtent0;
-    // Compute axis-0 coordinate using nearest-neighbor (from ndWorldPos[0])
-    let x0 = ndWorldPos[0];
-    // Encode: 2.0 = pure branch A (left), 3.0 = pure branch B (right)
-    // Smooth transition near the boundary to avoid aliasing
-    let transitionWidth = params.spacing[0] * 2.0;
-    let branchFrac = smoothstep(threshold - transitionWidth, threshold + transitionWidth, x0);
-    alphaChannel = 2.0 + branchFrac;
-  } else if (params.showPotential == 1u && params.fieldView != 3u) {
+  // NOTE: Branch fraction encoding (alpha = 2.0 + branchFrac) was previously
+  // computed here when params.branchingEnabled == 1u. This triggered a Metal
+  // shader compiler bug on Apple Silicon that corrupted texture sampling in the
+  // fragment shader's raymarching loop. The branch fraction is now computed
+  // directly in the fragment shader from the ray position, using branchPlanePosition
+  // and spacing from SchroedingerUniforms. The TDSE uniform branchingEnabled field
+  // is no longer written as 1 (always 0) — see TDSEComputePassUniforms.ts.
+  if (params.showPotential == 1u && params.fieldView != 3u) {
     let potentialScale = getPotentialScale();
     let normPot = abs(potentialVal) / potentialScale;
     let fadeout = 1.0 - smoothstep(1.5, 3.0, normPot);

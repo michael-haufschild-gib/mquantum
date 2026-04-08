@@ -182,51 +182,35 @@ export const TimelineControls: FC = () => {
 
   const prefersReducedMotion = useReducedMotion()
 
-  const [showRotationDrawer, setShowRotationDrawer] = useState(false)
-  const [showAnimDrawer, setShowAnimDrawer] = useState(false)
-  const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
+  const [activeDrawer, setActiveDrawer] = useState<'rotation' | 'anim' | 'openQ' | null>(null)
 
   // Close the effects drawer when switching to a mode that has no drawer content
   useEffect(() => {
-    if (!hasEffectsDrawerContent) setShowAnimDrawer(false)
-  }, [hasEffectsDrawerContent])
+    if (!hasEffectsDrawerContent && activeDrawer === 'anim') setActiveDrawer(null)
+  }, [hasEffectsDrawerContent, activeDrawer])
 
-  const effectiveShowOpenQDrawer = showOpenQDrawer && supportsOpenQuantumControls
+  const showRotationDrawer = activeDrawer === 'rotation'
+  const showAnimDrawer = activeDrawer === 'anim'
+  const effectiveShowOpenQDrawer = activeDrawer === 'openQ' && supportsOpenQuantumControls
 
-  // Shared close-others helper — only one drawer open at a time
-  const openRotation = () => {
-    setShowRotationDrawer(true)
-    setShowAnimDrawer(false)
-    setShowOpenQDrawer(false)
-  }
-  const openAnimDrawer = () => {
-    setShowAnimDrawer(true)
-    setShowRotationDrawer(false)
-    setShowOpenQDrawer(false)
-  }
-  const openOpenQDrawer = () => {
-    setShowOpenQDrawer(true)
-    setShowAnimDrawer(false)
-    setShowRotationDrawer(false)
-  }
+  const toggleDrawer = (drawer: 'rotation' | 'anim' | 'openQ') =>
+    setActiveDrawer((prev) => (prev === drawer ? null : drawer))
 
   return (
     <div className="flex flex-col w-full h-full relative">
       <AnimatePresence>
-        {showRotationDrawer && (
-          <RotationAnimationDrawer onClose={() => setShowRotationDrawer(false)} />
-        )}
+        {showRotationDrawer && <RotationAnimationDrawer onClose={() => setActiveDrawer(null)} />}
 
         {showAnimDrawer && isSchroedinger && hasEffectsDrawerContent && (
-          <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
+          <SchroedingerAnimationDrawer onClose={() => setActiveDrawer(null)} />
         )}
 
         {showAnimDrawer && isPauliSpinor && (
-          <PauliAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
+          <PauliAnimationDrawer onClose={() => setActiveDrawer(null)} />
         )}
 
         {effectiveShowOpenQDrawer && (
-          <SchroedingerOpenQuantumDrawer onClose={() => setShowOpenQDrawer(false)} />
+          <SchroedingerOpenQuantumDrawer onClose={() => setActiveDrawer(null)} />
         )}
       </AnimatePresence>
 
@@ -303,7 +287,7 @@ export const TimelineControls: FC = () => {
           {hasTimelineControls(objectType) && hasEffectsDrawerContent && (
             <ToggleButton
               pressed={showAnimDrawer}
-              onToggle={() => (showAnimDrawer ? setShowAnimDrawer(false) : openAnimDrawer())}
+              onToggle={() => toggleDrawer('anim')}
               sound="swish"
               ariaLabel="Toggle animations drawer"
               tooltip={effectsTooltip}
@@ -320,8 +304,8 @@ export const TimelineControls: FC = () => {
 
           {supportsOpenQuantumControls && (
             <ToggleButton
-              pressed={showOpenQDrawer}
-              onToggle={() => (showOpenQDrawer ? setShowOpenQDrawer(false) : openOpenQDrawer())}
+              pressed={activeDrawer === 'openQ'}
+              onToggle={() => toggleDrawer('openQ')}
               sound="swish"
               ariaLabel={`Toggle open quantum drawer, ${activeOpenQuantumCount} active`}
               tooltip="Open quantum system controls: decoherence, relaxation, and thermal coupling."
@@ -329,7 +313,7 @@ export const TimelineControls: FC = () => {
             >
               Open Quantum
               <span
-                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${showOpenQDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+                className={`ms-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${activeDrawer === 'openQ' ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
               >
                 {activeOpenQuantumCount}
               </span>
@@ -338,7 +322,7 @@ export const TimelineControls: FC = () => {
 
           <ToggleButton
             pressed={showRotationDrawer}
-            onToggle={() => (showRotationDrawer ? setShowRotationDrawer(false) : openRotation())}
+            onToggle={() => toggleDrawer('rotation')}
             sound="swish"
             ariaLabel="Toggle rotation drawer"
             tooltip="Select which N-dimensional rotation planes to animate."

@@ -869,7 +869,7 @@ export async function pauseAnimation(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const mod = await import('/src/stores/animationStore.ts')
     const store = mod.useAnimationStore.getState()
-    if (store.isPlaying) store.toggle()
+    if (store.isPlaying) store.togglePlayPause()
   })
 }
 

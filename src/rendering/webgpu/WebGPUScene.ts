@@ -373,10 +373,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       )
       const isFullRebuild = needsFullRebuildRef.current || forceFullRebuildForModeTransition
 
-      logger.log(
-        `[WebGPUScene] pass-setup: isFullRebuild=${isFullRebuild} schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} forceMode=${forceFullRebuildForModeTransition} needsRebuild=${needsFullRebuildRef.current}`
-      )
-
       currentObjectTypeRef.current = objectType
 
       const perfStore = usePerformanceStore.getState()

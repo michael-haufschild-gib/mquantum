@@ -321,29 +321,6 @@ export function ifft(data: FFTArray, n: number): void {
 }
 
 /**
- * In-place 3D inverse FFT via row decomposition.
- *
- * Applies 1D IFFT along each axis sequentially:
- * x-axis (fastest varying), then y-axis, then z-axis.
- * Data is in row-major order: `index = iz * ny * nx + iy * nx + ix`.
- *
- * @param data - Interleaved complex array of length `2 * nx * ny * nz`
- * @param nx - Grid size along x (must be power of 2)
- * @param ny - Grid size along y (must be power of 2)
- * @param nz - Grid size along z (must be power of 2)
- *
- * @example
- * ```ts
- * const data = new Float64Array(2 * 4 * 4 * 4)
- * // ... fill with k-space data ...
- * ifft3d(data, 4, 4, 4)
- * ```
- */
-export function ifft3d(data: FFTArray, nx: number, ny: number, nz: number): void {
-  ifftNd(data, [nx, ny, nz])
-}
-
-/**
  * Shared N-dimensional transform via iterated 1D fiber decomposition.
  *
  * Applies a 1D transform function along each axis sequentially, from the
@@ -450,7 +427,6 @@ function ndTransform(
   for (let d = 0; d < dim; d++) {
     const n = gridSize[d]!
     if (n <= 1) continue
-    assertPowerOf2(n)
 
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n

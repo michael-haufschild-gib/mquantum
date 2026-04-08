@@ -11,6 +11,18 @@
  * @module
  */
 
+import type { ShaderBlock } from '../../shared/compose-helpers'
+
+/** Shared uniform struct for pack/unpack shaders. */
+export const tdsePackUniformsBlock = /* wgsl */ `
+struct PackUniforms {
+  totalElements: u32,
+  invN: f32,
+  _pad0: u32,
+  _pad1: u32,
+}
+`
+
 /**
  * Pack shader: psiRe + psiIm -> interleaved complex buffer
  *
@@ -21,13 +33,6 @@
  *   @group(0) @binding(3) complexBuf: array<f32> (write)
  */
 export const tdseComplexPackBlock = /* wgsl */ `
-struct PackUniforms {
-  totalElements: u32,
-  invN: f32,  // 1.0 / N for inverse normalization (unused in pack, used in unpack)
-  _pad0: u32,
-  _pad1: u32,
-}
-
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
@@ -55,13 +60,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *   @group(0) @binding(3) psiIm: array<f32> (write)
  */
 export const tdseComplexUnpackBlock = /* wgsl */ `
-struct PackUniforms {
-  totalElements: u32,
-  invN: f32,
-  _pad0: u32,
-  _pad1: u32,
-}
-
 @group(0) @binding(0) var<uniform> packUni: PackUniforms;
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiRe: array<f32>;
@@ -78,3 +76,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   psiIm[idx] = complexBuf[idx * 2u + 1u] * packUni.invN;
 }
 `
+
+// ShaderBlock exports for assembleShaderBlocks() composition
+
+/** PackUniforms struct as a ShaderBlock. */
+export const tdsePackUniformsShaderBlock: ShaderBlock = {
+  name: 'tdse-pack-uniforms',
+  content: tdsePackUniformsBlock,
+}
+
+/** Complex pack shader as a ShaderBlock. */
+export const tdseComplexPackShaderBlock: ShaderBlock = {
+  name: 'tdse-complex-pack',
+  content: tdseComplexPackBlock,
+}
+
+/** Complex unpack shader as a ShaderBlock. */
+export const tdseComplexUnpackShaderBlock: ShaderBlock = {
+  name: 'tdse-complex-unpack',
+  content: tdseComplexUnpackBlock,
+}

@@ -9,6 +9,7 @@
  */
 
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import {
   flattenPresetForUniforms,
   generateQuantumPreset,
@@ -328,6 +329,40 @@ function buildPackParams(
     branchColorA: inputs.schroedinger?.tdse?.branchColorA as [number, number, number] | undefined,
     branchColorB: inputs.schroedinger?.tdse?.branchColorB as [number, number, number] | undefined,
     branchSeparation: inputs.branchSeparation,
+    // Branch plane in world-space for fragment-shader branch fraction computation
+    // (moved from compute shader density texture alpha to avoid Metal compiler bug)
+    // Uses effective spacing to account for compactified dimensions
+    branchPlaneThreshold: (() => {
+      const tdse = inputs.schroedinger?.tdse
+      if (!tdse) return 0
+      const gridSize = tdse.gridSize ?? [64]
+      const spacing = tdse.spacing ?? [0.1]
+      const latDim = tdse.latticeDim ?? 3
+      const effSpacing = computeEffectiveSpacing(
+        gridSize,
+        spacing,
+        tdse.compactDims as boolean[] | undefined,
+        tdse.compactRadii as number[] | undefined,
+        latDim
+      )
+      const halfExtent = (gridSize[0] ?? 64) * (effSpacing[0] ?? 0.1) * 0.5
+      return (tdse.branchPlanePosition ?? 0) * halfExtent
+    })(),
+    branchTransitionWidth: (() => {
+      const tdse = inputs.schroedinger?.tdse
+      if (!tdse) return 0.2
+      const gridSize = tdse.gridSize ?? [64]
+      const spacing = tdse.spacing ?? [0.1]
+      const latDim = tdse.latticeDim ?? 3
+      const effSpacing = computeEffectiveSpacing(
+        gridSize,
+        spacing,
+        tdse.compactDims as boolean[] | undefined,
+        tdse.compactRadii as number[] | undefined,
+        latDim
+      )
+      return (effSpacing[0] ?? 0.1) * 2.0
+    })(),
   }
 }
 

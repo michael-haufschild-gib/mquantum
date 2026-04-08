@@ -511,7 +511,8 @@ test.describe('C2: Quantum Walk — shaders + coin operators', () => {
       })
       // Resume animation for the new walk
       const anim = await import('/src/stores/animationStore.ts')
-      if (!anim.useAnimationStore.getState().isPlaying) anim.useAnimationStore.getState().toggle()
+      if (!anim.useAnimationStore.getState().isPlaying)
+        anim.useAnimationStore.getState().togglePlayPause()
     })
     await waitForShaderCompilation(page)
     await waitForSimulationFrames(page, 40)
