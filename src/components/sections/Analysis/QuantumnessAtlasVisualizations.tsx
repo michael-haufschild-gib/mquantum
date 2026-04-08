@@ -331,8 +331,9 @@ const DiagHeatmap: React.FC<{
         {results.map((r) => {
           const li = lambdas.indexOf(r.lambda)
           const di = dims.indexOf(r.dim)
-          if (li < 0 || di < 0) return null
-          const frac = norm(accessor(r), maxVal)
+          const val = accessor(r)
+          if (li < 0 || di < 0 || !Number.isFinite(val)) return null
+          const frac = norm(val, maxVal)
           return (
             <rect
               key={`${r.lambda}-${r.dim}`}
