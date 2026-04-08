@@ -2,7 +2,7 @@ import React, { useMemo } from 'react'
 
 import { Button } from '@/components/ui/Button'
 
-import { formatBytes } from './utils'
+import { computeSparklinePoints, formatBytes } from './utils'
 
 export const SectionHeader = ({ icon, label }: { icon: React.ReactNode; label: string }) => (
   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-text-tertiary">
@@ -127,19 +127,10 @@ export const Sparkline = React.memo(function Sparkline({
   minY?: number
   maxY?: number
 }) {
-  const points = useMemo(() => {
-    if (data.length < 2) return ''
-    const range = maxY - minY
-    const stepX = width / (data.length - 1)
-    return data
-      .map((val, i) => {
-        const x = i * stepX
-        const normalizedY = Math.max(0, Math.min(1, (val - minY) / range))
-        const y = height - normalizedY * height
-        return `${x},${y}`
-      })
-      .join(' ')
-  }, [data, width, height, minY, maxY])
+  const points = useMemo(
+    () => computeSparklinePoints(data, width, height, minY, maxY),
+    [data, width, height, minY, maxY]
+  )
 
   const pathD = `M ${points}`
   const fillD = `${pathD} L ${width},${height} L 0,${height} Z`

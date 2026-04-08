@@ -149,32 +149,16 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   )
 
   // === Write Grid pipeline (phi + pi read-only, texture write) ===
-  const writeGridBGL = device.createBindGroupLayout({
-    label: 'free-scalar-write-grid-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-          viewDimension: '3d',
-        },
-      },
-      {
-        binding: 4,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-          viewDimension: '3d',
-        },
-      },
-    ],
-  })
+  const tex3dEntry = {
+    storageTexture: { format: 'rgba16float' as const, viewDimension: '3d' as const },
+  }
+  const writeGridBGL = createComputeBGL(device, 'free-scalar-write-grid-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    tex3dEntry,
+    tex3dEntry,
+  ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(

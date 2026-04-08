@@ -8,6 +8,7 @@
  * @module rendering/webgpu/renderers/strategies/computeGridUtils
  */
 
+import { logger } from '@/lib/logger'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext } from '../../core/types'
@@ -124,6 +125,9 @@ export function createDensityTextureBindings(
     additionalLayoutEntries,
     getBindGroupEntries: () => {
       if (!densityTextureView || !sampler) return []
+      logger.log(
+        `[computeGridUtils] bind density view=${densityTextureView.label ?? 'unlabeled-view'}`
+      )
       return [
         { binding: 4, resource: densityTextureView },
         { binding: 5, resource: sampler },

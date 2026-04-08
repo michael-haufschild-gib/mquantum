@@ -108,7 +108,7 @@ test.describe('differential rendering', () => {
     await page.evaluate(async () => {
       const mod = await import('/src/stores/animationStore.ts')
       const store = mod.useAnimationStore.getState()
-      if (!store.isPlaying) store.toggle()
+      if (!store.isPlaying) store.togglePlayPause()
       store.setSpeed(5.0) // fast animation
     })
 
@@ -145,10 +145,7 @@ test.describe('differential rendering', () => {
     await waitForShaderCompilation(page)
 
     // Pause animation to isolate bloom effect
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
-      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
-    })
+    await pauseAnimation(page)
 
     // Disable bloom completely
     await page.evaluate(async () => {
@@ -185,10 +182,7 @@ test.describe('differential rendering', () => {
     await waitForShaderCompilation(page)
 
     // Pause animation
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
-      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
-    })
+    await pauseAnimation(page)
 
     // Disable cross-section
     await page.evaluate(async () => {
@@ -231,10 +225,7 @@ test.describe('differential rendering', () => {
     await waitForShaderCompilation(page)
 
     // Pause animation for deterministic snapshots
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
-      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
-    })
+    await pauseAnimation(page)
 
     // Position (default)
     const positionSnap = await capturePixelSnapshot(page)
@@ -256,10 +247,7 @@ test.describe('differential rendering', () => {
     await waitForShaderCompilation(page)
 
     // Pause animation for deterministic snapshots
-    await page.evaluate(async () => {
-      const mod = await import('/src/stores/animationStore.ts')
-      if (mod.useAnimationStore.getState().isPlaying) mod.useAnimationStore.getState().toggle()
-    })
+    await pauseAnimation(page)
 
     // Position (default)
     const positionSnap = await capturePixelSnapshot(page)

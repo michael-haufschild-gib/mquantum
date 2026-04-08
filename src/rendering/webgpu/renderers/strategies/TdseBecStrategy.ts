@@ -79,6 +79,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.tdsePass?.dispose()
     this.tdsePass = new TDSEComputePass()
     this.tdsePass.initializeDensityTexture(ctx.device)
+    logger.log(
+      `[TdseBecStrategy] setup densityView=${this.tdsePass.getDensityTextureView()?.label ?? 'null'}`
+    )
 
     const bindings = createDensityTextureBindings(
       ctx.device,
@@ -108,7 +111,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const tdsePass = this.tdsePass
-    if (!tdsePass) return
+    if (!tdsePass) {
+      logger.warn(`[TdseBecStrategy] executeFrame: tdsePass is NULL`)
+      return
+    }
 
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
@@ -141,6 +147,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     }
 
     const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)
+
+    if (!tdsePass.getDensityTextureView()) {
+      logger.warn(`[TdseBecStrategy] executeFrame: densityTextureView is NULL`)
+    }
 
     tdsePass.executeTDSE(
       ctx,

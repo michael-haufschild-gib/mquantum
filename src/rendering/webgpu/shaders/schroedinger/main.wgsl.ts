@@ -183,6 +183,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var tNear = max(0.0, tSphere.x);
   let tFar = tSphere.y;
 
+
   // Volumetric raymarching using functions from integration block
   // Fast mode selection based on quality multiplier
   var volumeResult: VolumeResult;

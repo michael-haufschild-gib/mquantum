@@ -117,7 +117,7 @@ async function resumeAnimation(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const mod = await import('/src/stores/animationStore.ts')
     const store = mod.useAnimationStore.getState()
-    if (!store.isPlaying) store.toggle()
+    if (!store.isPlaying) store.togglePlayPause()
   })
 }
 
@@ -136,7 +136,8 @@ async function resetAndResumeWalk(page: Page): Promise<void> {
       },
     })
     const anim = await import('/src/stores/animationStore.ts')
-    if (!anim.useAnimationStore.getState().isPlaying) anim.useAnimationStore.getState().toggle()
+    if (!anim.useAnimationStore.getState().isPlaying)
+      anim.useAnimationStore.getState().togglePlayPause()
   })
 }
 

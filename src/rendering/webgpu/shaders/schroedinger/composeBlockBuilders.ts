@@ -90,6 +90,7 @@ import {
 } from './volume/emission.wgsl'
 import {
   generateVolumeRaymarchGridBlock,
+  generateVolumeRaymarchGridSimpleBlock,
   nodalSurfacesBlock,
   nodalSurfacesStubBlock,
   probabilityCurrentBlock,
@@ -494,7 +495,9 @@ export function buildVolumeBlocks(opts: {
       name: 'Volume Raymarch Grid',
       condition: !opts.is2D,
       content: opts.useDensityGrid
-        ? generateVolumeRaymarchGridBlock(opts.usePrecomputedNormals)
+        ? opts.gridOnly
+          ? generateVolumeRaymarchGridSimpleBlock()
+          : generateVolumeRaymarchGridBlock(opts.usePrecomputedNormals)
         : [
             '// Stub: grid raymarching unavailable',
             'fn volumeRaymarchGrid(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',

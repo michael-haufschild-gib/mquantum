@@ -14,8 +14,20 @@ import {
 import { logger } from '@/lib/logger'
 
 import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
-import { clampAlpha, HISTORY_KEY, MAX_HISTORY, sanitizeColorHistory } from './colorPickerUtils'
+import {
+  clampAlpha,
+  handleSvArrowKey,
+  HISTORY_KEY,
+  MAX_HISTORY,
+  sanitizeColorHistory,
+} from './colorPickerUtils'
 import { Popover } from './Popover'
+
+const NOISE_BG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`
+const CHECKERBOARD =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='
+const HUE_STOPS = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1] as const
+const HUE_GRADIENT = `linear-gradient(to right, ${HUE_STOPS.map((s) => `${hsvToHex(s, 1, 1)} ${Math.round(s * 100)}%`).join(', ')})`
 
 interface ColorPickerProps {
   value: string // Hex, Hex8, or RGB string
@@ -30,7 +42,7 @@ interface ColorPickerProps {
   tooltip?: string
 }
 
-type ColorMode = 'HEX' | 'RGB' | 'CSS'
+type ColorMode = 'HEX' | 'RGB'
 
 export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
   ({
@@ -203,29 +215,30 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     )
 
     useEffect(() => {
-      const onMove = (e: MouseEvent) => {
+      const onMove = (e: PointerEvent) => {
         if (isDraggingSV) updateSV(e.clientX, e.clientY)
       }
       const onUp = () => setIsDraggingSV(false)
       if (isDraggingSV) {
-        window.addEventListener('mousemove', onMove)
-        window.addEventListener('mouseup', onUp)
+        window.addEventListener('pointermove', onMove)
+        window.addEventListener('pointerup', onUp)
       }
       return () => {
-        window.removeEventListener('mousemove', onMove)
-        window.removeEventListener('mouseup', onUp)
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
       }
     }, [isDraggingSV, updateSV])
 
-    // --- Keyboard Shortcuts ---
-    useEffect(() => {
-      const handleKey = (e: KeyboardEvent) => {
-        if (!isOpen) return
-        if (e.key === 'Escape') setIsOpen(false)
-      }
-      window.addEventListener('keydown', handleKey)
-      return () => window.removeEventListener('keydown', handleKey)
-    }, [isOpen])
+    const handleSvKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        const result = handleSvArrowKey(e.key, e.shiftKey, hsv.s, hsv.v)
+        if (result) {
+          e.preventDefault()
+          handleHsvChange({ ...hsv, ...result })
+        }
+      },
+      [hsv, handleHsvChange]
+    )
 
     // --- EyeDropper ---
     const handleEyedropper = async () => {
@@ -254,18 +267,8 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     // --- Palette ---
     const palette = generatePalette(hsv.h, hsv.s, hsv.v)
 
-    // --- Visual Assets ---
-    // Noise pattern for "premium" feel
-    const noiseBg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`
-    const checkerboard =
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='
-
     // --- Render ---
     const saturationBrightnessBackground = hsvToHex(hsv.h, 1, 1)
-    const hueStops = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1]
-    const hueGradient = `linear-gradient(to right, ${hueStops
-      .map((stop) => `${hsvToHex(stop, 1, 1)} ${Math.round(stop * 100)}%`)
-      .join(', ')})`
 
     return (
       <div className={`flex items-center gap-2 ${className}`}>
@@ -293,7 +296,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
               <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-[box-shadow]">
                 <div
                   className="absolute inset-0 z-0"
-                  style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }}
+                  style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
                 />
                 <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
               </div>
@@ -311,7 +314,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   >
                     <div
                       className="absolute inset-0 -z-10"
-                      style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }}
+                      style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
                     />
                     <div className="w-1/2 h-full" style={{ backgroundColor: initialColor }} />
                     <div className="w-1/2 h-full" style={{ backgroundColor: value }} />
@@ -346,23 +349,26 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
               <div
                 ref={svRef}
                 className="w-full h-[160px] rounded-lg relative cursor-crosshair overflow-hidden shadow-lg ring-1 ring-border-default group"
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   e.preventDefault()
+                  ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
                   setIsDraggingSV(true)
                   updateSV(e.clientX, e.clientY)
                 }}
-                style={{ backgroundColor: saturationBrightnessBackground }}
-                role="slider"
+                style={{ backgroundColor: saturationBrightnessBackground, touchAction: 'none' }}
+                role="application"
                 aria-label="Saturation and brightness"
+                aria-roledescription="2D color area"
                 aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, Brightness ${Math.round(hsv.v * 100)}%`}
                 tabIndex={0}
+                onKeyDown={handleSvKeyDown}
               >
                 {/* Layers */}
                 <div className="absolute inset-0 bg-gradient-to-r from-white to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
                 <div
                   className="absolute inset-0 mix-blend-overlay opacity-30 pointer-events-none"
-                  style={{ backgroundImage: noiseBg }}
+                  style={{ backgroundImage: NOISE_BG }}
                 />
 
                 {/* Cursor */}
@@ -382,7 +388,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   <div
                     className="absolute inset-0"
                     style={{
-                      background: hueGradient,
+                      background: HUE_GRADIENT,
                     }}
                   />
                   <input
@@ -406,7 +412,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                     <div
                       className="absolute inset-0 z-0"
-                      style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }}
+                      style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
                     />
                     <div
                       className="absolute inset-0 z-1"
@@ -466,6 +472,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                         onFocus={(e) => e.target.select()}
                         className="w-full bg-transparent text-xs font-mono text-text-primary outline-none uppercase"
                         spellCheck={false}
+                        aria-label="Hex color value"
                       />
                     </div>
                     {!disableAlpha && (
@@ -483,6 +490,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                             })
                           }
                           className="w-full bg-transparent text-xs font-mono text-text-primary outline-none text-right [&::-webkit-inner-spin-button]:appearance-none"
+                          aria-label="Opacity percentage"
                         />
                       </div>
                     )}
@@ -502,6 +510,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                           min={0}
                           max={255}
                           value={rgbInput[c]}
+                          aria-label={`${c === 'r' ? 'Red' : c === 'g' ? 'Green' : 'Blue'} channel`}
                           onChange={(e) => {
                             const val = Math.min(255, Math.max(0, parseInt(e.target.value) || 0))
                             const newRgb = { ...rgbInput, [c]: val }
@@ -545,7 +554,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       >
                         <div
                           className="absolute inset-0 -z-10"
-                          style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }}
+                          style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
                         />
                         <div className="absolute inset-0" style={{ backgroundColor: c }} />
                       </button>

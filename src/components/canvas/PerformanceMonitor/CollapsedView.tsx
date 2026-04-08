@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react'
 
 import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 
-import { FPS_COLORS, type FpsColorLevel, getFpsColorLevel } from './utils'
+import { computeSparklinePoints, FPS_COLORS, type FpsColorLevel, getFpsColorLevel } from './utils'
 
 // ============================================================================
 // DOM-update helpers (avoid cognitive complexity in the subscription callback)
@@ -38,21 +38,8 @@ function updateSparklinePath(
   ref: React.RefObject<SVGPathElement | null>
 ): void {
   if (!ref.current || state.history.fps === prevState.history.fps) return
-  const data = state.history.fps
-  if (data.length < 2) return
-  const width = 64
-  const height = 20
-  const range = 70
-  const stepX = width / (data.length - 1)
-  const points = data
-    .map((val, i) => {
-      const x = i * stepX
-      const normalizedY = Math.max(0, Math.min(1, val / range))
-      const y = height - normalizedY * height
-      return `${x},${y}`
-    })
-    .join(' ')
-  ref.current.setAttribute('d', `M ${points}`)
+  const points = computeSparklinePoints(state.history.fps, 64, 20, 0, 70)
+  if (points) ref.current.setAttribute('d', `M ${points}`)
 }
 
 function updateColorLevel(
@@ -131,23 +118,8 @@ export const CollapsedView = React.memo(function CollapsedView() {
 
   // Compute initial sparkline path
   const initialPath = useMemo(() => {
-    const data = initialState.history.fps
-    if (data.length < 2) return ''
-    const width = 64
-    const height = 20
-    const minY = 0
-    const maxY = 70
-    const range = maxY - minY
-    const stepX = width / (data.length - 1)
-    const points = data
-      .map((val, i) => {
-        const x = i * stepX
-        const normalizedY = Math.max(0, Math.min(1, (val - minY) / range))
-        const y = height - normalizedY * height
-        return `${x},${y}`
-      })
-      .join(' ')
-    return `M ${points}`
+    const pts = computeSparklinePoints(initialState.history.fps, 64, 20, 0, 70)
+    return pts ? `M ${pts}` : ''
   }, [initialState.history.fps])
 
   return (

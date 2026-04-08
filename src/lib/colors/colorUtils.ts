@@ -346,19 +346,3 @@ export const generatePalette = (h: number, s: number, v: number, count: number =
 
   return palette
 }
-
-/**
- * Get contrasting text color (black/white).
- * @param h - Hue.
- * @param s - Saturation.
- * @param v - Value.
- * @returns 'black' or 'white'.
- */
-export const getContrastColor = (h: number, s: number, v: number): string => {
-  // Simple luminance approximation
-  // Alternatively use YIQ equation
-  // (0.299*R + 0.587*G + 0.114*B)
-  const { r, g, b } = hsvToRgbStruct(h, s, v)
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000
-  return yiq >= 128 ? 'black' : 'white'
-}

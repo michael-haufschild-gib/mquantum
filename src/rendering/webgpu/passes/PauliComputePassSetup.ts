@@ -25,6 +25,7 @@ import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wg
 import {
   tdseComplexPackBlock,
   tdseComplexUnpackBlock,
+  tdsePackUniformsBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
   tdseFFTStageUniformsBlock,
@@ -189,19 +190,12 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
   })
 
   // Write-grid pipeline: uniform + spinorRe(read) + spinorIm(read) + texture_storage_3d(write)
-  const writeGridBGL = device.createBindGroupLayout({
-    label: 'pauli-write-grid-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
-      },
-    ],
-  })
+  const writeGridBGL = createComputeBGL(device, 'pauli-write-grid-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
+  ])
   const writeGridPipeline = device.createComputePipeline({
     label: 'pauli-write-grid-pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [writeGridBGL] }),
@@ -227,7 +221,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-pack',
-        code: `\n${tdseComplexPackBlock}\n`,
+        code: `\n${tdsePackUniformsBlock}\n${tdseComplexPackBlock}\n`,
       }),
       entryPoint: 'main',
     },
@@ -246,7 +240,7 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-unpack',
-        code: `\n${tdseComplexUnpackBlock}\n`,
+        code: `\n${tdsePackUniformsBlock}\n${tdseComplexUnpackBlock}\n`,
       }),
       entryPoint: 'main',
     },

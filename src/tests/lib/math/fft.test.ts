@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fft, fftNd, ifft, ifft3d, ifftNd } from '@/lib/math/fft'
+import { fft, fftNd, ifft, ifftNd } from '@/lib/math/fft'
 
 const TOL = 1e-10
 
@@ -89,7 +89,7 @@ describe('ifft (1D inverse)', () => {
   })
 })
 
-describe('ifft3d', () => {
+describe('ifftNd (3D)', () => {
   it('roundtrips a 4x4x4 signal through 3D FFT/IFFT', () => {
     const nx = 4,
       ny = 4,
@@ -113,16 +113,16 @@ describe('ifft3d', () => {
     fft3dForward(data, nx, ny, nz)
 
     // Inverse 3D FFT
-    ifft3d(data, nx, ny, nz)
+    ifftNd(data, [nx, ny, nz])
 
     expectComplexClose(data, original)
   })
 
   it('throws on non-power-of-2 dimensions', () => {
     const data = new Float64Array(2 * 6 * 4 * 4)
-    expect(() => ifft3d(data, 6, 4, 4)).toThrow('power-of-2')
-    expect(() => ifft3d(data, 4, 6, 4)).toThrow('power-of-2')
-    expect(() => ifft3d(data, 4, 4, 6)).toThrow('power-of-2')
+    expect(() => ifftNd(data, [6, 4, 4])).toThrow('power-of-2')
+    expect(() => ifftNd(data, [4, 6, 4])).toThrow('power-of-2')
+    expect(() => ifftNd(data, [4, 4, 6])).toThrow('power-of-2')
   })
 })
 

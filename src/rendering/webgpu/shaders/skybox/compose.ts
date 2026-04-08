@@ -1,6 +1,5 @@
 /**
- * Skybox shader composition for WGSL
- * Port of: src/rendering/shaders/skybox/compose.ts
+ * Skybox shader composition for WGSL.
  */
 import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
 import { constantsBlock } from './core/constants.wgsl'

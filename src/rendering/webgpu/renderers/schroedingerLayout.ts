@@ -209,7 +209,12 @@ const SCHROEDINGER_FIELDS = [
   { name: 'branchColorA', type: 'vec3f' },
   { name: 'branchSeparation', type: 'f32' },
   { name: 'branchColorB', type: 'vec3f' },
-  { name: '_padBranchB', type: 'f32' },
+  // Branch plane position in world-space (for fragment-shader branch fraction computation).
+  // Moved from compute shader density texture alpha encoding to avoid a Metal shader
+  // compiler bug on Apple Silicon that corrupted texture sampling.
+  { name: 'branchPlaneThreshold', type: 'f32' },
+  { name: 'branchTransitionWidth', type: 'f32' },
+  { name: '_padBranch', type: 'vec3f' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

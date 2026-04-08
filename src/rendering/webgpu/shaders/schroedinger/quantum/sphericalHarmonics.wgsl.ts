@@ -126,6 +126,19 @@ fn realSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
   }
 }
 
+// Spherical harmonic normalization constants (l=0..3)
+// Used by both angle-based (fastRealSphericalHarmonicDirect) and
+// Cartesian (fastRealSphericalHarmonicCartesian) evaluation paths.
+const SH_Y00: f32 = 0.28209479;    // 1/(2√π)
+const SH_Y1:  f32 = 0.48860251;    // √(3/(4π))
+const SH_Y20: f32 = 0.31539157;    // √(5/(16π))
+const SH_Y21: f32 = 1.09254843;    // √(15/(4π)) — includes √2 for real harmonics
+const SH_Y22: f32 = 0.54627422;    // √(15/(16π))
+const SH_Y30: f32 = 0.3731763326;  // √(7/(16π))
+const SH_Y31: f32 = 0.4570457995;  // √(21/(64π))
+const SH_Y32: f32 = 1.4453057213;  // √(105/(16π))
+const SH_Y33: f32 = 0.5900435899;  // √(35/(32π))
+
 /**
  * Fast evaluation for common orbital shapes
  *
@@ -146,22 +159,20 @@ fn fastRealSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> f32 {
 fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -> f32 {
   // s orbital (l=0)
   if (l == 0) {
-    // Y_00 = 1/(2√π)
-    return 0.28209479; // 1/(2*sqrt(PI))
+    return SH_Y00;
   }
 
   // p orbitals (l=1)
   if (l == 1) {
-    let norm = 0.48860251; // sqrt(3/(4*PI))
     if (m == 0) {
       // pz: ∝ cos(θ)
-      return norm * ct;
+      return SH_Y1 * ct;
     } else if (m == 1) {
       // px: ∝ sin(θ)cos(φ)
-      return norm * st * cos(phi);
+      return SH_Y1 * st * cos(phi);
     } else { // m == -1
       // py: ∝ sin(θ)sin(φ)
-      return norm * st * sin(phi);
+      return SH_Y1 * st * sin(phi);
     }
   }
 
@@ -172,24 +183,19 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
 
     if (m == 0) {
       // dz2: ∝ (3cos²θ - 1)
-      let norm = 0.31539157; // sqrt(5/(16*PI))
-      return norm * (3.0 * ct2 - 1.0);
+      return SH_Y20 * (3.0 * ct2 - 1.0);
     } else if (m == 1) {
       // dxz: ∝ sin(θ)cos(θ)cos(φ)
-      let norm = 1.09254843; // sqrt(15/(4*PI)) — includes √2 factor for real harmonics
-      return norm * st * ct * cos(phi);
+      return SH_Y21 * st * ct * cos(phi);
     } else if (m == -1) {
       // dyz: ∝ sin(θ)cos(θ)sin(φ)
-      let norm = 1.09254843;
-      return norm * st * ct * sin(phi);
+      return SH_Y21 * st * ct * sin(phi);
     } else if (m == 2) {
       // dx2-y2: ∝ sin²(θ)cos(2φ)
-      let norm = 0.54627422; // sqrt(15/(16*PI))
-      return norm * st2 * cos(2.0 * phi);
+      return SH_Y22 * st2 * cos(2.0 * phi);
     } else { // m == -2
       // dxy: ∝ sin²(θ)sin(2φ)
-      let norm = 0.54627422;
-      return norm * st2 * sin(2.0 * phi);
+      return SH_Y22 * st2 * sin(2.0 * phi);
     }
   }
 
@@ -198,25 +204,25 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
     let ct2 = ct * ct;
     let st2 = st * st;
     if (m == 0) {
-      return 0.3731763326 * ct * (5.0 * ct2 - 3.0);
+      return SH_Y30 * ct * (5.0 * ct2 - 3.0);
     }
     if (m == 1) {
-      return 0.4570457995 * st * cos(phi) * (5.0 * ct2 - 1.0);
+      return SH_Y31 * st * cos(phi) * (5.0 * ct2 - 1.0);
     }
     if (m == -1) {
-      return 0.4570457995 * st * sin(phi) * (5.0 * ct2 - 1.0);
+      return SH_Y31 * st * sin(phi) * (5.0 * ct2 - 1.0);
     }
     if (m == 2) {
-      return 1.4453057213 * st2 * cos(2.0 * phi) * ct;
+      return SH_Y32 * st2 * cos(2.0 * phi) * ct;
     }
     if (m == -2) {
-      return 1.4453057213 * st2 * sin(2.0 * phi) * ct;
+      return SH_Y32 * st2 * sin(2.0 * phi) * ct;
     }
     if (m == 3) {
-      return 0.5900435899 * st * st2 * cos(3.0 * phi);
+      return SH_Y33 * st * st2 * cos(3.0 * phi);
     }
     // m == -3
-    return 0.5900435899 * st * st2 * sin(3.0 * phi);
+    return SH_Y33 * st * st2 * sin(3.0 * phi);
   }
 
   // Fall back to general computation for l > 3 (needs theta for Legendre)
@@ -237,37 +243,36 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
 fn fastRealSphericalHarmonicCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32) -> f32 {
   // s orbital (l=0)
   if (l == 0) {
-    return 0.28209479; // 1/(2*sqrt(PI))
+    return SH_Y00;
   }
 
   // p orbitals (l=1)
   if (l == 1) {
-    let norm = 0.48860251; // sqrt(3/(4*PI))
-    if (m == 0) { return norm * nz; }       // pz: cos(θ) = z/r
-    if (m == 1) { return norm * nx; }        // px: sin(θ)cos(φ) = x/r
-    return norm * ny;                         // py: sin(θ)sin(φ) = y/r
+    if (m == 0) { return SH_Y1 * nz; }       // pz: cos(θ) = z/r
+    if (m == 1) { return SH_Y1 * nx; }        // px: sin(θ)cos(φ) = x/r
+    return SH_Y1 * ny;                         // py: sin(θ)sin(φ) = y/r
   }
 
   // d orbitals (l=2)
   if (l == 2) {
     if (m == 0) {
       // dz²: (3cos²θ - 1) = (3z²/r² - 1)
-      return 0.31539157 * (3.0 * nz * nz - 1.0);
+      return SH_Y20 * (3.0 * nz * nz - 1.0);
     }
     if (m == 1) {
       // dxz: sin(θ)cos(θ)cos(φ) = xz/r²
-      return 1.09254843 * nx * nz;
+      return SH_Y21 * nx * nz;
     }
     if (m == -1) {
       // dyz: sin(θ)cos(θ)sin(φ) = yz/r²
-      return 1.09254843 * ny * nz;
+      return SH_Y21 * ny * nz;
     }
     if (m == 2) {
       // dx²-y²: sin²(θ)cos(2φ) = (x²-y²)/r²
-      return 0.54627422 * (nx * nx - ny * ny);
+      return SH_Y22 * (nx * nx - ny * ny);
     }
     // dxy: sin²(θ)sin(2φ) = 2xy/r²
-    return 0.54627422 * 2.0 * nx * ny;
+    return SH_Y22 * 2.0 * nx * ny;
   }
 
   // f orbitals (l=3) — Cartesian real spherical harmonics
@@ -277,30 +282,30 @@ fn fastRealSphericalHarmonicCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32)
     let nz2 = nz * nz;
     if (m == 0) {
       // f_z³ ∝ nz(5nz²-3)
-      return 0.3731763326 * nz * (5.0 * nz2 - 3.0);
+      return SH_Y30 * nz * (5.0 * nz2 - 3.0);
     }
     if (m == 1) {
       // f_xz² ∝ nx(5nz²-1)
-      return 0.4570457995 * nx * (5.0 * nz2 - 1.0);
+      return SH_Y31 * nx * (5.0 * nz2 - 1.0);
     }
     if (m == -1) {
       // f_yz² ∝ ny(5nz²-1)
-      return 0.4570457995 * ny * (5.0 * nz2 - 1.0);
+      return SH_Y31 * ny * (5.0 * nz2 - 1.0);
     }
     if (m == 2) {
       // f_z(x²-y²) ∝ (nx²-ny²)nz
-      return 1.4453057213 * (nx * nx - ny * ny) * nz;
+      return SH_Y32 * (nx * nx - ny * ny) * nz;
     }
     if (m == -2) {
-      // f_xyz ∝ nx·ny·nz
-      return 2.8906114426 * nx * ny * nz;
+      // f_xyz ∝ nx·ny·nz — note: 2*SH_Y32 = 2.8906114426
+      return 2.0 * SH_Y32 * nx * ny * nz;
     }
     if (m == 3) {
       // f_x(x²-3y²) ∝ nx(nx²-3ny²)
-      return 0.5900435899 * nx * (nx * nx - 3.0 * ny * ny);
+      return SH_Y33 * nx * (nx * nx - 3.0 * ny * ny);
     }
     // m == -3: f_y(3x²-y²) ∝ ny(3nx²-ny²)
-    return 0.5900435899 * ny * (3.0 * nx * nx - ny * ny);
+    return SH_Y33 * ny * (3.0 * nx * nx - ny * ny);
   }
 
   // Should not reach here for l <= 3

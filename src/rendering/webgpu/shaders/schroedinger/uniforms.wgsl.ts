@@ -300,7 +300,9 @@ struct SchroedingerUniforms {
   branchColorA: vec3f,              // offset 1568 — branch A color (default cyan)
   branchSeparation: f32,            // offset 1580 — 0 = fully coherent, 1 = fully separated
   branchColorB: vec3f,              // offset 1584 — branch B color (default magenta)
-  _padBranchB: f32,                 // offset 1596
+  branchPlaneThreshold: f32,        // offset 1596 — world-space branch plane threshold (axis 0)
+  branchTransitionWidth: f32,       // offset 1600 — smoothstep transition half-width
+  _padBranch: vec3f,                // offset 1604 — padding
 }
 
 // ============================================

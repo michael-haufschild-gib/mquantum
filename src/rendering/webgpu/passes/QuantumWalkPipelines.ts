@@ -78,19 +78,12 @@ export function createQwPipelines(device: GPUDevice): QwPipelineResult {
     'read-only-storage',
     'storage',
   ])
-  const writeGridBGL = device.createBindGroupLayout({
-    label: 'qw-write-grid-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
-      },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-    ],
-  })
+  const writeGridBGL = createComputeBGL(device, 'qw-write-grid-bgl', [
+    'uniform',
+    'read-only-storage',
+    { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
+    'storage',
+  ])
   const absorberBGL = createComputeBGL(device, 'qw-absorber-bgl', ['uniform', 'storage'])
 
   return {

@@ -328,6 +328,15 @@ function buildPackParams(
     branchColorA: inputs.schroedinger?.tdse?.branchColorA as [number, number, number] | undefined,
     branchColorB: inputs.schroedinger?.tdse?.branchColorB as [number, number, number] | undefined,
     branchSeparation: inputs.branchSeparation,
+    // Branch plane in world-space for fragment-shader branch fraction computation
+    // (moved from compute shader density texture alpha to avoid Metal compiler bug)
+    branchPlaneThreshold: (() => {
+      const tdse = inputs.schroedinger?.tdse
+      if (!tdse) return 0
+      const halfExtent = (tdse.gridSize?.[0] ?? 64) * (tdse.spacing?.[0] ?? 0.1) * 0.5
+      return (tdse.branchPlanePosition ?? 0) * halfExtent
+    })(),
+    branchTransitionWidth: (inputs.schroedinger?.tdse?.spacing?.[0] ?? 0.1) * 2.0,
   }
 }
 

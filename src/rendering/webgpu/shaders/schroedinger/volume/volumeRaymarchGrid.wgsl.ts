@@ -4,6 +4,13 @@
  * Uses pre-computed 3D density grid texture instead of inline wavefunction evaluation.
  * Extracted from integration.wgsl.ts for file-size management.
  *
+ * Two variants:
+ * - Full: all features (analytical modes with density grid)
+ * - Simple: stripped for gridOnly compute modes (TDSE/BEC/Dirac/FSF/QW)
+ *   Removes dead branches that trigger Metal shader compiler miscompilation
+ *   on Apple Silicon when combined with heavy register pressure from the
+ *   complex full loop body.
+ *
  * Profiling strip flags (compile-time, dead-code-eliminated when false):
  * - PROFILING_STRIP_GRADIENT: replace 6-fetch gradient with constant normal
  * - PROFILING_STRIP_LIGHTING: replace lit emission with flat baseColor
@@ -16,7 +23,132 @@
  */
 
 /**
+ * Generate the simplified grid-only volume raymarching block.
  *
+ * For compute modes (gridOnly=true), this variant removes all compile-time-dead
+ * feature branches: nodal surfaces, uncertainty boundary, probability current,
+ * radial probability, cross-section, dual-channel, and profiling overrides.
+ * These branches are always false in compute modes but their presence in the
+ * full function triggers a Metal shader compiler bug on Apple Silicon that
+ * causes sampleDensityFromGrid to return zero within the loop body.
+ */
+export function generateVolumeRaymarchGridSimpleBlock(): string {
+  return /* wgsl */ `
+// ============================================
+// Grid-Based Volume Raymarching (Simplified — compute modes only)
+// ============================================
+
+fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  return computeGradientFromGrid(pos, uniforms);
+}
+
+fn volumeRaymarchGrid(
+  rayOrigin: vec3f,
+  rayDir: vec3f,
+  tNear: f32,
+  tFar: f32,
+  uniforms: SchroedingerUniforms
+) -> VolumeResult {
+  var accColor = vec3f(0.0);
+  var iterCount: i32 = 0;
+  var primaryHitT: f32 = -1.0;
+
+  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
+  let stepLen = (tFar - tNear) / f32(sampleCount);
+  var t = tNear;
+  let viewDir = -rayDir;
+  var transmittance: f32 = 1.0;
+
+  for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
+    if (i >= sampleCount) { break; }
+    iterCount = i + 1;
+
+    if (shouldTerminateRay(transmittance, uniforms.densityGain, max(tFar - t, 0.0))) { break; }
+
+    let pos = rayOrigin + rayDir * t;
+    let gridSample = sampleDensityFromGrid(pos, uniforms);
+    var rho = gridSample.r;
+    let sCenter = gridSample.g;
+    let phase = gridSample.b;
+
+    // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
+    let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
+
+    // Empty-skip: jump ahead when density is negligible
+    if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
+        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
+        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
+        let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
+
+    // Adaptive step
+    let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+
+    // Potential overlay rendering
+    if (DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
+      let potColor = vec3f(0.35, 0.45, 0.55);
+      let potIntensity = abs(gridSample.a);
+      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.2);
+      accColor += transmittance * potOpacity * potColor;
+      transmittance *= (1.0 - potOpacity);
+    }
+
+    // Density → alpha
+    let effectiveRho = computeEffectiveDensity(rho, phase, transmittance, uniforms);
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+
+    if (alpha > 0.001) {
+      if (primaryHitT < 0.0) { primaryHitT = t; }
+
+      // Gradient + lit emission
+      let gradient = fetchGradient(pos, uniforms);
+      var emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+
+      // Branch coloring: compute from ray position (not density texture alpha)
+      if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
+        let branchFrac = smoothstep(
+          uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
+          uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
+          pos.x
+        );
+        let branchColorA = vec3f(uniforms.branchColorA[0], uniforms.branchColorA[1], uniforms.branchColorA[2]);
+        let branchColorB = vec3f(uniforms.branchColorB[0], uniforms.branchColorB[1], uniforms.branchColorB[2]);
+        let branchColor = mix(branchColorA, branchColorB, branchFrac);
+        let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
+        emission = branchColor * lum;
+      }
+
+      accColor += transmittance * alpha * emission;
+      transmittance *= (1.0 - alpha);
+    }
+
+    t += adaptiveStep;
+  }
+
+  let finalAlpha = 1.0 - transmittance;
+  if (primaryHitT < 0.0) {
+    primaryHitT = (tNear + tFar) * 0.5;
+  }
+  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
+}
+`
+}
+
+/**
+ * Generate the full-featured grid-based volume raymarching block.
+ *
+ * Used by analytical modes (HO, hydrogen) with density grid, which need
+ * all feature overlays (nodal, uncertainty boundary, probability current,
+ * radial probability, cross-section, dual-channel).
  */
 export function generateVolumeRaymarchGridBlock(usePrecomputedNormals: boolean): string {
   // Generate the gradient fetch function — either delegates to the precomputed
@@ -252,8 +384,15 @@ fn volumeRaymarchGrid(
         // branchSeparation > 0.5 means stochastic decoherence is active (γ > 0).
         // Without this guard, enabling "show branches" at γ=0 would recolor
         // the volume without any actual decoherence happening.
-        if (uniforms.quantumMode == 3 && gridSample.a >= 1.99 && uniforms.branchSeparation > 0.5) {
-          let branchFrac = clamp(gridSample.a - 2.0, 0.0, 1.0);
+        // Branch coloring: compute branch fraction from ray position
+        // (previously read from density texture alpha, but that triggered a Metal
+        // shader compiler bug — see tdseWriteGrid.wgsl.ts for details)
+        if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
+          let branchFrac = smoothstep(
+            uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
+            uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
+            pos.x
+          );
           let branchColorA = vec3f(uniforms.branchColorA[0], uniforms.branchColorA[1], uniforms.branchColorA[2]);
           let branchColorB = vec3f(uniforms.branchColorB[0], uniforms.branchColorB[1], uniforms.branchColorB[2]);
           let branchColor = mix(branchColorA, branchColorB, branchFrac);

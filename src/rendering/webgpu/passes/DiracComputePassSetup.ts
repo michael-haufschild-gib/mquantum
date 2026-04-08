@@ -27,6 +27,7 @@ import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wg
 import {
   tdseComplexPackBlock,
   tdseComplexUnpackBlock,
+  tdsePackUniformsBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
   tdseFFTStageUniformsBlock,
@@ -146,7 +147,7 @@ export function buildDiracPipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, tdseComplexPackBlock, 'dirac-pack'),
+    helpers.createShaderModule(device, tdsePackUniformsBlock + tdseComplexPackBlock, 'dirac-pack'),
     [packBGL],
     'dirac-pack'
   )
@@ -159,7 +160,11 @@ export function buildDiracPipelines(
   ])
   const unpackPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, tdseComplexUnpackBlock, 'dirac-unpack'),
+    helpers.createShaderModule(
+      device,
+      tdsePackUniformsBlock + tdseComplexUnpackBlock,
+      'dirac-unpack'
+    ),
     [unpackBGL],
     'dirac-unpack'
   )
@@ -196,25 +201,14 @@ export function buildDiracPipelines(
   )
 
   // Write grid: uniforms + spinorRe + spinorIm + potential + gamma + outputTex
-  const writeGridBGL = device.createBindGroupLayout({
-    label: 'dirac-write-grid-bgl',
-    entries: [
-      { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-      { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      {
-        binding: 5,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only',
-          format: 'rgba16float',
-          viewDimension: '3d',
-        },
-      },
-    ],
-  })
+  const writeGridBGL = createComputeBGL(device, 'dirac-write-grid-bgl', [
+    'uniform',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    'read-only-storage',
+    { storageTexture: { format: 'rgba16float', viewDimension: '3d' } },
+  ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
     helpers.createShaderModule(device, unifAndIndex + diracWriteGridBlock, 'dirac-write-grid'),

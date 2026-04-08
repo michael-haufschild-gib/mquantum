@@ -211,7 +211,10 @@ export { probabilityCurrentBlock, probabilityCurrentStubBlock } from './probabil
 // Re-export raymarching block from dedicated module
 export { volumeRaymarchBlock } from './volumeRaymarch.wgsl'
 
-// Re-export grid raymarching block from dedicated module
-export { generateVolumeRaymarchGridBlock } from './volumeRaymarchGrid.wgsl'
+// Re-export grid raymarching blocks from dedicated module
+export {
+  generateVolumeRaymarchGridBlock,
+  generateVolumeRaymarchGridSimpleBlock,
+} from './volumeRaymarchGrid.wgsl'
 
 // EOF — nodalSurfaces and probabilityCurrent blocks extracted to dedicated files
