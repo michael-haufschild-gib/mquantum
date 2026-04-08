@@ -100,7 +100,6 @@ import {
   type SaveLoadState,
 } from './TDSEStateSaveLoad'
 import {
-  buildExpectationPipelines,
   buildStochasticLocPipeline,
   createStochasticLocState,
   disposeStochasticLoc,
@@ -394,12 +393,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.createShaderModule.bind(this),
       this.createComputePipeline.bind(this)
     )
-    buildExpectationPipelines(
-      device,
-      this._stochasticState,
-      this.createShaderModule.bind(this),
-      this.createComputePipeline.bind(this)
-    )
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
@@ -428,14 +421,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.psiReBuffer,
         this.psiImBuffer
       )
-      const numWG = Math.ceil(this.totalSites / EXPECT_WG)
+      const expectWG = Math.ceil(this.totalSites / EXPECT_WG)
       rebuildExpectationBindGroups(
         device,
         this._stochasticState,
         this.uniformBuffer,
         this.psiReBuffer,
         this.psiImBuffer,
-        numWG
+        expectWG
       )
     }
   }
@@ -603,6 +596,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         fwdStageCount: this.fwdAxisCount,
         gsState: this._gsState,
         stochasticState: this._stochasticState,
+        boundingRadius: boundingRadius ?? 2.0,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
       })
