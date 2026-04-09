@@ -44,6 +44,13 @@ import {
 } from './QuantumnessAtlasVisualizations'
 import { useAtlasSweepController } from './useAtlasSweepController'
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Extract unique sorted values from an array. */
+function uniqueSorted(arr: number[]): number[] {
+  return [...new Set(arr)].sort((a, b) => a - b)
+}
+
 // ─── View Types ──────────────────────────────────────────────────────────────
 
 type AtlasView = 'erosion' | 'scatter' | 'heatmap' | 'dimCompare'
@@ -54,11 +61,6 @@ const VIEW_OPTIONS = [
   { value: 'heatmap' as const, label: 'λ × N Heatmaps' },
   { value: 'dimCompare' as const, label: 'Dimension Comparison' },
 ]
-
-/** Extract unique sorted values from an array. */
-function uniqueSorted(arr: number[]): number[] {
-  return [...new Set(arr)].sort((a, b) => a - b)
-}
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -102,14 +104,13 @@ QuantumnessAtlasSection.displayName = 'QuantumnessAtlasSection'
 /** Inner content — only rendered when TDSE mode and dim >= 3. */
 const QuantumnessAtlasContent: React.FC<{ defaultOpen: boolean }> = React.memo(
   ({ defaultOpen }) => {
-    const { status, progress, results, config } = useQuantumnessAtlasStore(
-      useShallow((s) => ({
-        status: s.status,
-        progress: s.progress,
-        results: s.results,
-        config: s.config,
-      }))
-    )
+    const atlasSelector = useShallow((s: ReturnType<typeof useQuantumnessAtlasStore.getState>) => ({
+      status: s.status,
+      progress: s.progress,
+      results: s.results,
+      config: s.config,
+    }))
+    const { status, progress, results, config } = useQuantumnessAtlasStore(atlasSelector)
 
     const entanglementSweepRunning = useCoordinateEntanglementStore(
       (s) => s.sweepStatus === 'running'

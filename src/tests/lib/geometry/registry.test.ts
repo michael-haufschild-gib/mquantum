@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  getAvailableQuantumTypes,
   getAvailableTypesForDimension,
   getConfigStoreKey,
   // UI
@@ -16,15 +17,22 @@ import {
   getDimensionConstraints,
   // Core lookups
   getObjectTypeEntry,
+  getQuantumTypeEntry,
+  getQuantumTypeName,
   getRecommendedDimension,
   hasTimelineControls,
+  isAnalyticQuantumType,
   isAvailableForDimension,
+  isComputeQuantumType,
   // Rendering capabilities
   isRaymarchingType,
   // Validation
   isValidObjectType,
   // Registry data
   OBJECT_TYPE_REGISTRY,
+  QUANTUM_MODES_3D_ONLY,
+  QUANTUM_TYPE_REGISTRY,
+  resolveQuantumTypeKey,
 } from '@/lib/geometry/registry'
 import { getControlsComponent, hasControlsComponent } from '@/lib/geometry/registry/components'
 
@@ -165,5 +173,140 @@ describe('Object Type Registry', () => {
     it('getConfigStoreKey returns correct key', () => {
       expect(getConfigStoreKey('schroedinger')).toBe('schroedinger')
     })
+  })
+})
+
+describe('Quantum Type Registry (Flat Model)', () => {
+  describe('Registry Structure', () => {
+    it('contains all expected quantum type entries', () => {
+      const keys = Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort()
+      expect(keys).toEqual([
+        'becDynamics',
+        'diracEquation',
+        'freeScalarField',
+        'harmonicOscillator',
+        'hydrogenND',
+        'hydrogenNDCoupled',
+        'pauliSpinor',
+        'quantumWalk',
+        'tdseDynamics',
+      ])
+    })
+
+    it('every entry has a valid internal bridge', () => {
+      for (const [key, entry] of QUANTUM_TYPE_REGISTRY) {
+        expect(entry.internal.objectType).toMatch(/^(schroedinger|pauliSpinor)$/)
+        expect(entry.internal.configStoreKey).toMatch(/^(schroedinger|pauliSpinor)$/)
+        if (entry.internal.objectType === 'schroedinger') {
+          expect(entry.internal.quantumMode).toBe(key)
+        }
+      }
+    })
+  })
+
+  describe('Category Classification', () => {
+    it('classifies analytic modes correctly', () => {
+      expect(isAnalyticQuantumType('harmonicOscillator')).toBe(true)
+      expect(isAnalyticQuantumType('hydrogenND')).toBe(true)
+    })
+
+    it('classifies compute modes correctly', () => {
+      expect(isComputeQuantumType('freeScalarField')).toBe(true)
+      expect(isComputeQuantumType('tdseDynamics')).toBe(true)
+      expect(isComputeQuantumType('becDynamics')).toBe(true)
+      expect(isComputeQuantumType('diracEquation')).toBe(true)
+      expect(isComputeQuantumType('quantumWalk')).toBe(true)
+      expect(isComputeQuantumType('pauliSpinor')).toBe(true)
+    })
+
+    it('analytic and compute are mutually exclusive', () => {
+      for (const [key] of QUANTUM_TYPE_REGISTRY) {
+        const isAnalytic = isAnalyticQuantumType(key)
+        const isCompute = isComputeQuantumType(key)
+        // Exactly one must be true — XOR
+        expect(isAnalytic).not.toBe(isCompute)
+      }
+    })
+  })
+
+  describe('resolveQuantumTypeKey', () => {
+    it('resolves schroedinger + quantumMode to the mode key', () => {
+      expect(resolveQuantumTypeKey('schroedinger', 'harmonicOscillator')).toBe('harmonicOscillator')
+      expect(resolveQuantumTypeKey('schroedinger', 'tdseDynamics')).toBe('tdseDynamics')
+    })
+
+    it('resolves pauliSpinor to pauliSpinor', () => {
+      expect(resolveQuantumTypeKey('pauliSpinor')).toBe('pauliSpinor')
+    })
+
+    it('returns undefined for schroedinger without quantumMode', () => {
+      expect(resolveQuantumTypeKey('schroedinger')).toBeUndefined()
+    })
+  })
+
+  describe('getQuantumTypeName', () => {
+    it('returns display name for known types', () => {
+      expect(getQuantumTypeName('harmonicOscillator')).toBe('Harmonic Oscillator')
+      expect(getQuantumTypeName('pauliSpinor')).toBe('Pauli Spinor')
+    })
+  })
+
+  describe('getAvailableQuantumTypes', () => {
+    it('all compute modes require 3D+', () => {
+      const at2D = getAvailableQuantumTypes(2)
+      for (const info of at2D) {
+        if (isComputeQuantumType(info.key)) {
+          expect(info.available, `${info.key} should not be available at 2D`).toBe(false)
+        }
+      }
+    })
+
+    it('all types available at 3D', () => {
+      const at3D = getAvailableQuantumTypes(3)
+      expect(at3D.map((t) => t.key).sort()).toEqual(Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort())
+      expect(at3D.every((t) => t.available)).toBe(true)
+    })
+  })
+
+  describe('QUANTUM_MODES_3D_ONLY', () => {
+    it('includes all compute modes', () => {
+      for (const [key] of QUANTUM_TYPE_REGISTRY) {
+        if (isComputeQuantumType(key)) {
+          expect(QUANTUM_MODES_3D_ONLY.has(key), `${key} should be marked 3D-only`).toBe(true)
+        }
+      }
+    })
+
+    it('excludes analytic modes with min=2', () => {
+      expect(QUANTUM_MODES_3D_ONLY.has('harmonicOscillator')).toBe(false)
+      expect(QUANTUM_MODES_3D_ONLY.has('hydrogenND')).toBe(false)
+    })
+  })
+})
+
+describe('Cross-Registry Consistency', () => {
+  it('pauliSpinor dimension constraints match between both registries', () => {
+    const legacy = getObjectTypeEntry('pauliSpinor')
+    const flat = getQuantumTypeEntry('pauliSpinor')
+    expect(legacy?.type).toBe('pauliSpinor')
+    expect(flat?.key).toBe('pauliSpinor')
+    expect(legacy!.dimensions.min).toBe(flat!.dimensions.min)
+    expect(legacy!.dimensions.max).toBe(flat!.dimensions.max)
+  })
+
+  it('schroedinger dimension constraints match the widest quantum type range', () => {
+    const legacy = getObjectTypeEntry('schroedinger')
+    expect(legacy?.type).toBe('schroedinger')
+    // schroedinger wraps all quantum modes — its range must be the union
+    let minOfAllModes = Infinity
+    let maxOfAllModes = -Infinity
+    for (const [, entry] of QUANTUM_TYPE_REGISTRY) {
+      if (entry.internal.objectType === 'schroedinger') {
+        minOfAllModes = Math.min(minOfAllModes, entry.dimensions.min)
+        maxOfAllModes = Math.max(maxOfAllModes, entry.dimensions.max)
+      }
+    }
+    expect(legacy!.dimensions.min).toBe(minOfAllModes)
+    expect(legacy!.dimensions.max).toBe(maxOfAllModes)
   })
 })

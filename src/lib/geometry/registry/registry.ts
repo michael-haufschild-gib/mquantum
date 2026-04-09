@@ -97,7 +97,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
       category: 'quantum',
 
       dimensions: {
-        min: 2,
+        min: 3,
         max: 6,
         recommended: 3,
         recommendedReason:

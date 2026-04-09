@@ -176,7 +176,10 @@ export function generateSkyboxCubeVertices(size = 1.0): Float32Array {
 }
 
 /**
- *
+ * Maps a store-level skybox mode (e.g. 'procedural_ocean') to the shader-level
+ * mode identifier (e.g. 'ocean') used for shader composition and uniform packing.
+ * @param storeMode - Store-level skybox mode with 'procedural_' prefix
+ * @returns Shader-level mode identifier without prefix
  */
 export function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
   switch (storeMode) {

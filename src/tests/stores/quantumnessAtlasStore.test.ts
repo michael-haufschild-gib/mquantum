@@ -112,16 +112,16 @@ describe('quantumnessAtlasStore', () => {
       expect(result.measurementSamples).toBe(3)
     })
 
-    it('computes correct variance', () => {
+    it('computes correct sample variance (Bessel-corrected)', () => {
       const store = useQuantumnessAtlasStore.getState()
       store.startSweep()
-      // Values: 1, 3 → mean=2, variance = E[x²] - E[x]² = (1+9)/2 - 4 = 1
+      // Values: 1, 3 → mean=2, sample variance = Σ(x-x̄)²/(n-1) = (1+1)/1 = 2
       store.recordSample(1, 0, 0)
       store.recordSample(3, 0, 0)
       store.completePointAndAdvance(64)
 
       const result = useQuantumnessAtlasStore.getState().results[0]!
-      expect(result.varNormalizedEntropy).toBeCloseTo(1, 10)
+      expect(result.varNormalizedEntropy).toBeCloseTo(2, 10)
     })
 
     it('returns zero variance for single sample', () => {

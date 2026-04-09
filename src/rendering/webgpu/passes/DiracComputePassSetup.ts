@@ -29,11 +29,11 @@ import {
   tdseComplexUnpackShaderBlock,
   tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 export { rebuildDiracBuffers } from './DiracComputePassBuffers'
 export type {
@@ -148,7 +148,11 @@ export function buildDiracPipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl, 'dirac-pack'),
+    helpers.createShaderModule(
+      device,
+      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl,
+      'dirac-pack'
+    ),
     [packBGL],
     'dirac-pack'
   )

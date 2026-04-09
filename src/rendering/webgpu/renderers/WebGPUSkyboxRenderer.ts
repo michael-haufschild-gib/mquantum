@@ -78,6 +78,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   // Current shader mode (for pipeline recreation on mode change)
   private currentShaderMode: ShaderSkyboxMode = 'aurora'
   private pipelineNeedsRecreation = false
+  private pipelineRecreationRetries = 0
+  private static readonly MAX_PIPELINE_RETRIES = 3
 
   // Cached setup context for pipeline recreation
   private cachedSetupCtx: WebGPUSetupContext | null = null
@@ -131,6 +133,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     if (this.currentShaderMode !== shaderMode) {
       this.currentShaderMode = shaderMode
       this.pipelineNeedsRecreation = true
+      this.pipelineRecreationRetries = 0
     }
   }
 
@@ -169,6 +172,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     // Create shader modules
     const vertexModule = this.createShaderModule(device, vertexShader, 'skybox-vertex')
     const fragmentModule = this.createShaderModule(device, fragmentShader, 'skybox-fragment')
+
+    // Hold reference to old buffer — destroyed after successful replacement
+    const oldUniformBuffer = this.uniformBuffer
 
     // Create bind group layouts
     // Group 0: Uniforms (skybox params + vertex uniforms)
@@ -253,6 +259,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     // Create bind groups (will be recreated when textures change)
     this.recreateBindGroups(device)
+
+    // Safe to destroy old buffer now that new resources are wired up
+    oldUniformBuffer?.destroy()
   }
 
   /**
@@ -399,6 +408,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     if (shaderMode !== this.currentShaderMode) {
       this.currentShaderMode = shaderMode
       this.pipelineNeedsRecreation = true
+      this.pipelineRecreationRetries = 0
     }
 
     // Load classic cube texture when mode is 'classic' and texture name or quality changes
@@ -635,10 +645,25 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     // Handle pipeline recreation for mode changes
     if (this.pipelineNeedsRecreation && this.cachedSetupCtx) {
       this.pipelineNeedsRecreation = false
-      // Trigger async recreation - pipeline will update for next frame
-      this.createPipelineForMode(this.device, this.currentShaderMode).catch((err) => {
-        logger.error('[WebGPU Skybox] Failed to recreate pipeline for mode change:', err)
-      })
+      this.createPipelineForMode(this.device, this.currentShaderMode)
+        .then(() => {
+          this.pipelineRecreationRetries = 0
+        })
+        .catch((err) => {
+          this.pipelineRecreationRetries++
+          if (this.pipelineRecreationRetries < WebGPUSkyboxRenderer.MAX_PIPELINE_RETRIES) {
+            logger.warn(
+              `[WebGPU Skybox] Pipeline recreation failed (attempt ${this.pipelineRecreationRetries}/${WebGPUSkyboxRenderer.MAX_PIPELINE_RETRIES}), retrying:`,
+              err
+            )
+            this.pipelineNeedsRecreation = true
+          } else {
+            logger.error(
+              `[WebGPU Skybox] Pipeline recreation failed after ${WebGPUSkyboxRenderer.MAX_PIPELINE_RETRIES} attempts, giving up:`,
+              err
+            )
+          }
+        })
     }
 
     // Update uniforms from stores

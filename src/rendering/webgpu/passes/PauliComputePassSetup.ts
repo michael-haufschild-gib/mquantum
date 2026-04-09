@@ -27,11 +27,11 @@ import {
   tdseComplexUnpackShaderBlock,
   tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -241,7 +241,8 @@ export function buildPauliPipelines(device: GPUDevice): PauliPipelineResult {
     compute: {
       module: device.createShaderModule({
         label: 'pauli-unpack',
-        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock]).wgsl,
+        code: assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexUnpackShaderBlock])
+          .wgsl,
       }),
       entryPoint: 'main',
     },

@@ -39,17 +39,16 @@ interface SceneManagerProps {
  * @returns The scene manager component
  */
 export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }) => {
+  const sceneManagerSelector = useShallow((state: PresetManagerState) => ({
+    savedScenes: state.savedScenes,
+    loadScene: state.loadScene,
+    deleteScene: state.deleteScene,
+    renameScene: state.renameScene,
+    importScenes: state.importScenes,
+    exportScenes: state.exportScenes,
+  }))
   const { savedScenes, loadScene, deleteScene, renameScene, importScenes, exportScenes } =
-    usePresetManagerStore(
-      useShallow((state: PresetManagerState) => ({
-        savedScenes: state.savedScenes,
-        loadScene: state.loadScene,
-        deleteScene: state.deleteScene,
-        renameScene: state.renameScene,
-        importScenes: state.importScenes,
-        exportScenes: state.exportScenes,
-      }))
-    )
+    usePresetManagerStore(sceneManagerSelector)
   const { addToast } = useToast()
   const [sceneToDelete, setSceneToDelete] = useState<SavedScene | null>(null)
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null)

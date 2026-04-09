@@ -202,6 +202,7 @@ export class WebGPUTimestampCollector {
   }
 
   dispose(): void {
+    this.querySet?.destroy()
     this.querySet = null
     this.resolveBuffer?.destroy()
     this.resolveBuffer = null

@@ -10,12 +10,11 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { type EnvironmentStore, useEnvironmentStore } from '@/stores/environmentStore'
 
 export const BackgroundColorControls: React.FC = React.memo(() => {
-  const { backgroundColor, setBackgroundColor } = useEnvironmentStore(
-    useShallow((state: EnvironmentStore) => ({
-      backgroundColor: state.backgroundColor,
-      setBackgroundColor: state.setBackgroundColor,
-    }))
-  )
+  const backgroundSelector = useShallow((state: EnvironmentStore) => ({
+    backgroundColor: state.backgroundColor,
+    setBackgroundColor: state.setBackgroundColor,
+  }))
+  const { backgroundColor, setBackgroundColor } = useEnvironmentStore(backgroundSelector)
 
   return (
     <div className="space-y-4">

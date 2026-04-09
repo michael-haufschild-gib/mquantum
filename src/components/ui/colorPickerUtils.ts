@@ -1,5 +1,20 @@
+import { hsvToHex } from '@/lib/colors/colorUtils'
+
 const MAX_HISTORY = 8
 const HISTORY_KEY = 'mquantum_color_history'
+
+/** Noise texture data URI for alpha checkerboard backgrounds. */
+const NOISE_BG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`
+
+/** Checkerboard background for transparent color preview. */
+const CHECKERBOARD =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='
+
+/** Hue gradient stops for the hue slider track. */
+const HUE_STOPS = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1] as const
+
+/** CSS linear gradient covering the full hue wheel. */
+const HUE_GRADIENT = `linear-gradient(to right, ${HUE_STOPS.map((s) => `${hsvToHex(s, 1, 1)} ${Math.round(s * 100)}%`).join(', ')})`
 
 /**
  * Normalize persisted color history into a bounded string list.
@@ -52,4 +67,13 @@ function handleSvArrowKey(
   }
 }
 
-export { clampAlpha, handleSvArrowKey, HISTORY_KEY, MAX_HISTORY, sanitizeColorHistory }
+export {
+  CHECKERBOARD,
+  clampAlpha,
+  handleSvArrowKey,
+  HISTORY_KEY,
+  HUE_GRADIENT,
+  MAX_HISTORY,
+  NOISE_BG,
+  sanitizeColorHistory,
+}

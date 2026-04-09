@@ -114,7 +114,7 @@ describe('geometryStore', () => {
     })
 
     it('preserves objectType when it remains valid for new dimension', () => {
-      // pauliSpinor is valid at dim=2..6, so changing dimension within range should preserve it
+      // pauliSpinor is valid at dim=3..6, so changing dimension within range should preserve it
       useGeometryStore.getState().setObjectType('pauliSpinor')
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
 
@@ -194,7 +194,7 @@ describe('geometryStore', () => {
     })
 
     it('preserves objectType when valid for dimension during load', () => {
-      // pauliSpinor is valid at dim=5 (range 2-11)
+      // pauliSpinor is valid at dim=5 (range 3-6)
       useGeometryStore.getState().loadGeometry(5, 'pauliSpinor')
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
       expect(useGeometryStore.getState().dimension).toBe(5)
@@ -239,12 +239,14 @@ describe('geometryStore', () => {
       }
     })
 
-    it('returns valid for pauliSpinor across its dimension range (2-6)', () => {
-      for (let d = 2; d <= 6; d++) {
+    it('returns valid for pauliSpinor across its dimension range (3-6)', () => {
+      for (let d = 3; d <= 6; d++) {
         const result = validateObjectTypeForDimension('pauliSpinor', d)
         expect(result.valid, `pauliSpinor should be valid at dim=${d}`).toBe(true)
       }
-      // dim=7+ should be invalid
+      // dim=2 and dim=7+ should be invalid
+      const result2 = validateObjectTypeForDimension('pauliSpinor', 2)
+      expect(result2.valid, 'pauliSpinor should be invalid at dim=2').toBe(false)
       const result7 = validateObjectTypeForDimension('pauliSpinor', 7)
       expect(result7.valid, 'pauliSpinor should be invalid at dim=7').toBe(false)
     })
