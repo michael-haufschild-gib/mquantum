@@ -263,6 +263,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
 
     it('all types available at 3D', () => {
       const at3D = getAvailableQuantumTypes(3)
+      expect(at3D.map((t) => t.key).sort()).toEqual(Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort())
       expect(at3D.every((t) => t.available)).toBe(true)
     })
   })

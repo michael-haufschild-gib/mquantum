@@ -108,7 +108,16 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
     if (value === lastEmittedRef.current) {
       if (alpha !== undefined && alpha !== hsv.a) {
         const alphaSyncTimer = window.setTimeout(() => {
-          setHsv((prev) => ({ ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }))
+          setHsv((prev) => {
+            const next = { ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }
+            setHexInput(
+              next.a === 1
+                ? hsvToHex(next.h, next.s, next.v)
+                : hsvToHex8(next.h, next.s, next.v, next.a)
+            )
+            setRgbInput(hsvToRgb(next.h, next.s, next.v, next.a))
+            return next
+          })
         }, 0)
         return () => clearTimeout(alphaSyncTimer)
       }
@@ -190,6 +199,7 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
     (clientX: number, clientY: number) => {
       if (!svRef.current) return
       const rect = svRef.current.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return
       const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
       handleHsvChange({ ...hsv, s: x, v: 1 - y })
