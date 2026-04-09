@@ -1,33 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React from 'react'
 
 import { Tooltip } from '@/components/ui/Tooltip'
-import {
-  generatePalette,
-  type HSVA,
-  hsvToHex,
-  hsvToHex8,
-  hsvToRgb,
-  isValidHex,
-  parseColorToHsv,
-  rgbToHex,
-} from '@/lib/colors/colorUtils'
-import { logger } from '@/lib/logger'
+import { hsvToHex, isValidHex, parseColorToHsv, rgbToHex } from '@/lib/colors/colorUtils'
 
 import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
-import {
-  clampAlpha,
-  handleSvArrowKey,
-  HISTORY_KEY,
-  MAX_HISTORY,
-  sanitizeColorHistory,
-} from './colorPickerUtils'
+import { CHECKERBOARD, HUE_GRADIENT, NOISE_BG } from './colorPickerUtils'
 import { Popover } from './Popover'
-
-const NOISE_BG = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`
-const CHECKERBOARD =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='
-const HUE_STOPS = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1] as const
-const HUE_GRADIENT = `linear-gradient(to right, ${HUE_STOPS.map((s) => `${hsvToHex(s, 1, 1)} ${Math.round(s * 100)}%`).join(', ')})`
+import { useColorPickerState } from './useColorPickerState'
 
 interface ColorPickerProps {
   value: string // Hex, Hex8, or RGB string
@@ -42,8 +21,6 @@ interface ColorPickerProps {
   tooltip?: string
 }
 
-type ColorMode = 'HEX' | 'RGB'
-
 export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
   ({
     value,
@@ -56,195 +33,28 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     disableAlpha = false,
     tooltip,
   }) => {
-    const [hsv, setHsv] = useState<HSVA>({ h: 0, s: 0, v: 0, a: 1 })
-    const [mode, setMode] = useState<ColorMode>('HEX')
-    const [history, setHistory] = useState<string[]>(() => {
-      try {
-        const stored = localStorage.getItem(HISTORY_KEY)
-        if (!stored) return []
-        const parsed: unknown = JSON.parse(stored)
-        return sanitizeColorHistory(parsed)
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          logger.warn('ColorPicker: localStorage quota exceeded')
-        } else {
-          logger.error('ColorPicker: failed to load color history', error)
-        }
-        return []
-      }
-    })
-    const [isOpen, setIsOpen] = useState(false)
-    const [initialColor, setInitialColor] = useState(value) // For comparison
-
-    // Prevents destructive round-trip: re-parsing echoed hex loses hue for achromatic colors
-    const lastEmittedRef = useRef<string>('')
-
-    // Local inputs
-    const [hexInput, setHexInput] = useState(value)
-    const [rgbInput, setRgbInput] = useState({ r: 0, g: 0, b: 0, a: 1 })
-
-    const addToHistory = (color: string) => {
-      setHistory((prev) => {
-        const safePrev = sanitizeColorHistory(prev)
-        const filtered = safePrev.filter((c) => c !== color)
-        const newHistory = [color, ...filtered].slice(0, MAX_HISTORY)
-        try {
-          localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
-        } catch {
-          /* quota exceeded — ignore */
-        }
-        return newHistory
-      })
-    }
-
-    useEffect(() => {
-      if (value === lastEmittedRef.current) {
-        if (alpha !== undefined && alpha !== hsv.a) {
-          const alphaSyncTimer = window.setTimeout(() => {
-            setHsv((prev) => ({ ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }))
-          }, 0)
-          return () => clearTimeout(alphaSyncTimer)
-        }
-        return
-      }
-
-      const newHsv = parseColorToHsv(value)
-
-      // Override alpha if prop provided or disabled
-      if (disableAlpha) {
-        newHsv.a = 1
-      } else if (alpha !== undefined) {
-        newHsv.a = clampAlpha(alpha)
-      }
-
-      const propSyncTimer = window.setTimeout(() => {
-        setHsv(newHsv)
-        setHexInput(
-          newHsv.a === 1
-            ? hsvToHex(newHsv.h, newHsv.s, newHsv.v)
-            : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)
-        )
-        setRgbInput(hsvToRgb(newHsv.h, newHsv.s, newHsv.v, newHsv.a))
-      }, 0)
-      return () => clearTimeout(propSyncTimer)
-    }, [value, alpha, disableAlpha, hsv.a])
-
-    // On Open -> Capture Initial
-    const handleOpenChange = (open: boolean) => {
-      setIsOpen(open)
-      if (open) {
-        setInitialColor(value)
-      } else {
-        addToHistory(value)
-      }
-    }
-
-    const updateExternal = useCallback(
-      (newHsv: HSVA) => {
-        const safeAlpha = disableAlpha ? 1 : clampAlpha(newHsv.a)
-        const safeHsv = safeAlpha === newHsv.a ? newHsv : { ...newHsv, a: safeAlpha }
-        let output: string
-
-        if (onChangeAlpha) {
-          onChangeAlpha(safeHsv.a)
-          output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
-        } else {
-          if (safeHsv.a === 1) {
-            output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
-          } else {
-            output = hsvToHex8(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a)
-          }
-        }
-
-        lastEmittedRef.current = output
-        onChange(output)
-        return output
-      },
-      [onChange, onChangeAlpha, disableAlpha]
-    )
-
-    const handleHsvChange = useCallback(
-      (newHsv: HSVA) => {
-        const safeHsv = disableAlpha ? { ...newHsv, a: 1 } : { ...newHsv, a: clampAlpha(newHsv.a) }
-        setHsv(safeHsv)
-        updateExternal(safeHsv)
-
-        const displayHex =
-          safeHsv.a === 1
-            ? hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
-            : hsvToHex8(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a)
-        setHexInput(displayHex)
-        setRgbInput(hsvToRgb(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a))
-      },
-      [updateExternal, disableAlpha]
-    )
-
-    const svRef = useRef<HTMLDivElement>(null)
-    const [isDraggingSV, setIsDraggingSV] = useState(false)
-
-    const updateSV = useCallback(
-      (clientX: number, clientY: number) => {
-        if (!svRef.current) return
-        const rect = svRef.current.getBoundingClientRect()
-        const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-        const y = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
-        handleHsvChange({ ...hsv, s: x, v: 1 - y })
-      },
-      [hsv, handleHsvChange]
-    )
-
-    useEffect(() => {
-      const onMove = (e: PointerEvent) => {
-        if (isDraggingSV) updateSV(e.clientX, e.clientY)
-      }
-      const onUp = () => setIsDraggingSV(false)
-      if (isDraggingSV) {
-        window.addEventListener('pointermove', onMove)
-        window.addEventListener('pointerup', onUp)
-        window.addEventListener('pointercancel', onUp)
-      }
-      return () => {
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', onUp)
-        window.removeEventListener('pointercancel', onUp)
-      }
-    }, [isDraggingSV, updateSV])
-
-    const handleSvKeyDown = useCallback(
-      (e: React.KeyboardEvent) => {
-        const result = handleSvArrowKey(e.key, e.shiftKey, hsv.s, hsv.v)
-        if (result) {
-          e.preventDefault()
-          handleHsvChange({ ...hsv, ...result })
-        }
-      },
-      [hsv, handleHsvChange]
-    )
-
-    const handleEyedropper = async () => {
-      if (!window.EyeDropper) return
-      try {
-        const dropper = new window.EyeDropper()
-        const result = await dropper.open()
-        handleHsvChange(parseColorToHsv(result.sRGBHex))
-      } catch (error) {
-        // AbortError is expected when user cancels the eyedropper
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          logger.error('ColorPicker: EyeDropper error', error)
-        }
-      }
-    }
-
-    const handleCopy = async () => {
-      try {
-        await navigator.clipboard.writeText(value)
-      } catch (error) {
-        logger.error('ColorPicker: Clipboard write failed', error)
-      }
-    }
-
-    const palette = generatePalette(hsv.h, hsv.s, hsv.v)
-    const saturationBrightnessBackground = hsvToHex(hsv.h, 1, 1)
+    const {
+      hsv,
+      mode,
+      setMode,
+      history,
+      isOpen,
+      initialColor,
+      hexInput,
+      setHexInput,
+      rgbInput,
+      setRgbInput,
+      svRef,
+      setIsDraggingSV,
+      palette,
+      saturationBrightnessBackground,
+      handleOpenChange,
+      handleHsvChange,
+      handleSvKeyDown,
+      updateSV,
+      handleEyedropper,
+      handleCopy,
+    } = useColorPickerState({ value, onChange, alpha, onChangeAlpha, disableAlpha })
 
     return (
       <div className={`flex items-center gap-2 ${className}`}>

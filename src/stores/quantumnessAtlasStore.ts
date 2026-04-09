@@ -76,28 +76,33 @@ export interface AtlasSweepProgress {
 
 // ── Accumulators ─────────────────────────────────────────────────────────────
 
-/** Running mean/variance accumulator for streaming diagnostics. */
+/**
+ * Running mean/variance accumulator using Welford's online algorithm.
+ * Numerically stable and uses Bessel-corrected sample variance.
+ */
 interface SampleAccumulator {
   n: number
-  sum: number
-  sumSq: number
+  mean: number
+  /** Sum of squared deviations from the running mean (Welford's M2). */
+  m2: number
 }
 
 function emptyAccumulator(): SampleAccumulator {
-  return { n: 0, sum: 0, sumSq: 0 }
+  return { n: 0, mean: 0, m2: 0 }
 }
 
 function pushSample(acc: SampleAccumulator, x: number): void {
   acc.n++
-  acc.sum += x
-  acc.sumSq += x * x
+  const delta = x - acc.mean
+  acc.mean += delta / acc.n
+  const delta2 = x - acc.mean
+  acc.m2 += delta * delta2
 }
 
 function meanVariance(acc: SampleAccumulator): { mean: number; variance: number } {
   if (acc.n === 0) return { mean: NaN, variance: NaN }
-  const mean = acc.sum / acc.n
-  const variance = acc.n > 1 ? acc.sumSq / acc.n - mean * mean : 0
-  return { mean, variance: Math.max(variance, 0) }
+  const variance = acc.n > 1 ? acc.m2 / (acc.n - 1) : 0
+  return { mean: acc.mean, variance }
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────

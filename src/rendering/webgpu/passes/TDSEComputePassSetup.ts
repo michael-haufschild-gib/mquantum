@@ -10,7 +10,6 @@ import {
   tdseComplexUnpackShaderBlock,
   tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import {
   tdseDiagNormFinalizeBlock,
   tdseDiagNormReduceBlock,
@@ -31,6 +30,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { tdseWriteGridBlock } from '../shaders/schroedinger/compute/tdseWriteGrid.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 import type { ObsGSPipelineResult } from './TDSEObservablesGSPipelines'
 import { buildObsGSPipelines } from './TDSEObservablesGSPipelines'
@@ -272,7 +272,11 @@ export function buildTdsePipelines(
   ])
   const packPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl, 'tdse-pack'),
+    helpers.createShaderModule(
+      device,
+      assembleShaderBlocks([tdsePackUniformsShaderBlock, tdseComplexPackShaderBlock]).wgsl,
+      'tdse-pack'
+    ),
     [packBGL],
     'tdse-pack'
   )

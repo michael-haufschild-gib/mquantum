@@ -9,7 +9,6 @@
  */
 
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
-import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import {
   flattenPresetForUniforms,
   generateQuantumPreset,
@@ -17,6 +16,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 
 import type { WebGPURenderContext } from '../core/types'
 import {

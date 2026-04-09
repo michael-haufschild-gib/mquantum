@@ -64,13 +64,11 @@ type TdseActions = Pick<
   | 'setTdseAnharmonicLambda'
   | 'setTdseDisorderStrength'
   | 'setTdseDisorderSeed'
+  | 'setTdseDisorderDistribution'
   | 'setTdseDriveEnabled'
   | 'setTdseDriveWaveform'
   | 'setTdseDriveFrequency'
   | 'setTdseDriveAmplitude'
-  | 'setTdseDisorderStrength'
-  | 'setTdseDisorderSeed'
-  | 'setTdseDisorderDistribution'
   | 'setTdseAbsorberEnabled'
   | 'setTdseAbsorberWidth'
   | 'setTdsePmlTargetReflection'
@@ -373,7 +371,6 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       | 'setTdseDriveWaveform'
       | 'setTdseDriveFrequency'
       | 'setTdseDriveAmplitude'
-      | 'setTdseDisorderStrength'
     >),
     // UI, diagnostic, absorber, and disorder setters (extracted to tdseUiSetters.ts)
     ...createTdseUiSetters(ctx),
