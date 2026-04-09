@@ -33,11 +33,20 @@ import { clampDtWithCfl } from './sliceSetterUtils'
 // Per-mode session cache for shared rendering settings
 // ---------------------------------------------------------------------------
 
-/** Shared rendering settings that bleed across quantum modes on SchroedingerConfig. */
+/**
+ * Shared rendering settings that are saved/restored per quantum mode.
+ *
+ * These fields live on SchroedingerConfig but have mode-dependent optimal
+ * values. Without per-mode caching they "bleed" across mode switches —
+ * e.g. isosurface enabled in HO persists into TDSE where the density
+ * range is different, causing nothing to render.
+ */
 interface ModeRenderingSnapshot {
   densityGain: number
   densityContrast: number
   autoScaleMaxGain: number
+  isoEnabled: boolean
+  isoThreshold: number
 }
 
 /**
@@ -65,8 +74,20 @@ export function resetModeSessionCaches(): void {
 const MODE_RENDERING_DEFAULTS: Partial<
   Record<SchroedingerConfig['quantumMode'], ModeRenderingSnapshot>
 > = {
-  freeScalarField: { densityGain: 5.0, densityContrast: 2.5, autoScaleMaxGain: 20 },
-  becDynamics: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
+  freeScalarField: {
+    densityGain: 5.0,
+    densityContrast: 2.5,
+    autoScaleMaxGain: 20,
+    isoEnabled: false,
+    isoThreshold: -3.0,
+  },
+  becDynamics: {
+    densityGain: 0.1,
+    densityContrast: 1.0,
+    autoScaleMaxGain: 10,
+    isoEnabled: false,
+    isoThreshold: -3.0,
+  },
 }
 
 function getDefaultRenderingSettings(
@@ -77,6 +98,8 @@ function getDefaultRenderingSettings(
       densityGain: DEFAULT_SCHROEDINGER_CONFIG.densityGain,
       densityContrast: DEFAULT_SCHROEDINGER_CONFIG.densityContrast,
       autoScaleMaxGain: DEFAULT_SCHROEDINGER_CONFIG.autoScaleMaxGain,
+      isoEnabled: DEFAULT_SCHROEDINGER_CONFIG.isoEnabled,
+      isoThreshold: DEFAULT_SCHROEDINGER_CONFIG.isoThreshold,
     }
   )
 }
@@ -86,6 +109,8 @@ function snapshotRenderingSettings(state: SchroedingerConfig): ModeRenderingSnap
     densityGain: state.densityGain,
     densityContrast: state.densityContrast,
     autoScaleMaxGain: state.autoScaleMaxGain,
+    isoEnabled: state.isoEnabled,
+    isoThreshold: state.isoThreshold,
   }
 }
 

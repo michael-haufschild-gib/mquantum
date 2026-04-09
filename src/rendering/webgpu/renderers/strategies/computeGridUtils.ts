@@ -70,7 +70,7 @@ export function applySharedPml<
 ): T {
   return {
     ...config,
-    absorberEnabled: (schroedinger?.absorberEnabled ?? true) && (config.absorberEnabled ?? true),
+    absorberEnabled: schroedinger?.absorberEnabled ?? config.absorberEnabled ?? true,
     absorberWidth: schroedinger?.absorberWidth ?? config.absorberWidth,
     pmlTargetReflection: schroedinger?.pmlTargetReflection ?? config.pmlTargetReflection,
   }

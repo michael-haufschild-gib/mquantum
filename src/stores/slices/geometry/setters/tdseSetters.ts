@@ -10,6 +10,7 @@
 import { DEFAULT_TDSE_CONFIG, type TdseConfig } from '@/lib/geometry/extended/types'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { clampKKState } from '@/lib/physics/compactification'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
@@ -472,10 +473,12 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
           return {
             schroedinger: {
               ...state.schroedinger,
+              ...preset.renderingOverrides,
               tdse: { ...base, ...resized, potentialType, needsReset: true },
             },
           }
         })
+        useDiagnosticsStore.getState().resetTdse()
       })
     },
     resetTdseField: () => {

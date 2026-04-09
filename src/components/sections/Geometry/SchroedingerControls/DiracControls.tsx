@@ -8,7 +8,7 @@
  * @module components/sections/Geometry/SchroedingerControls/DiracControls
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useMemo } from 'react'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
@@ -105,16 +105,9 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
   }, [dirac.gridSize, dirac.spacing, latticeDim])
 
   const potentialType = dirac.potentialType ?? 'none'
-  const overlayInapplicable =
-    potentialType === 'none' || dirac.fieldView === 'particleAntiparticleSplit'
+  const potentialEnabled = dirac.showPotential
 
-  useEffect(() => {
-    if (overlayInapplicable && dirac.showPotential) {
-      actions.setShowPotential(false)
-    }
-  }, [overlayInapplicable, dirac.showPotential, actions])
-
-  const showPotentialParams = potentialType !== 'none'
+  const showPotentialParams = potentialEnabled && potentialType !== 'none'
   const showBarrierWidth = potentialType === 'barrier' || potentialType === 'well'
   const showHarmonicOmega = potentialType === 'harmonicTrap'
   const showCoulombZ = potentialType === 'coulomb'
@@ -151,13 +144,6 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
           options={FIELD_VIEW_OPTIONS}
           onChange={(v) => actions.setFieldView(v as DiracFieldView)}
         />
-        <Switch
-          label="Show Potential Overlay"
-          tooltip="Overlay the electromagnetic potential on the spinor density visualization. Disabled when potential is 'none' or field view is upper/lower split."
-          checked={dirac.showPotential}
-          onCheckedChange={actions.setShowPotential}
-          disabled={overlayInapplicable}
-        />
       </ControlGroup>
 
       <ControlGroup
@@ -166,12 +152,19 @@ export const DiracControls = React.memo(({ config, dimension, actions }: DiracCo
         defaultOpen
         data-testid="control-group-dirac-potential"
       >
+        <Switch
+          label="Enable Potential"
+          tooltip="Activate the external potential in the Dirac simulation and show it as an overlay on the density visualization. When off, the spinor evolves as a free particle regardless of the configured potential type."
+          checked={potentialEnabled}
+          onCheckedChange={actions.setShowPotential}
+        />
         <Select
           label="Potential"
           tooltip="External electromagnetic potential acting on the Dirac spinor field."
           value={potentialType}
           options={POTENTIAL_TYPE_OPTIONS}
           onChange={(v) => actions.setPotentialType(v as DiracPotentialType)}
+          disabled={!potentialEnabled}
         />
         {showPotentialParams && (
           <>

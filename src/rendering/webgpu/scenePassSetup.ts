@@ -171,6 +171,14 @@ export async function warmSwapSchrodingerPasses(
       })
     : null
 
+  // Adopt compute state from the old renderer BEFORE initialization.
+  // This preserves simulation state (coin buffers, density textures) across
+  // pipeline rebuilds triggered by non-structural changes (e.g. color algorithm).
+  const existingPass = graph.getPass('schroedinger')
+  if (newRenderer && existingPass) {
+    newRenderer.adoptFrom(existingPass)
+  }
+
   try {
     if (newRenderer) {
       await newRenderer.initialize(setupCtx)

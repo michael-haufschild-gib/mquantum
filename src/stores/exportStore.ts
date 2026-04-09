@@ -87,6 +87,9 @@ export interface ExportSettings {
   /** Video rotation metadata for vertical/portrait video (0, 90, 180, 270 degrees) */
   rotation: 0 | 90 | 180 | 270
 
+  /** When true, reset the wavefunction/evolution to initial state before recording starts. */
+  resetEvolution: boolean
+
   // New Features
   textOverlay: TextOverlaySettings
   crop: CropSettings
@@ -160,6 +163,7 @@ const DEFAULT_SETTINGS: ExportSettings = {
   hardwareAcceleration: 'prefer-software',
   warmupFrames: 5,
   rotation: 0,
+  resetEvolution: false,
 
   textOverlay: {
     enabled: false,
@@ -305,6 +309,8 @@ const sanitizeHydratedSettings = (
         ? Math.max(0, Math.round(merged.warmupFrames))
         : d.warmupFrames,
     rotation: resolveEnum(merged.rotation, d.rotation, isRotation),
+    resetEvolution:
+      typeof merged.resetEvolution === 'boolean' ? merged.resetEvolution : d.resetEvolution,
     textOverlay: sanitizeHydratedTextOverlay(persistedSettings.textOverlay),
     crop: sanitizeHydratedCrop(persistedSettings.crop),
   }

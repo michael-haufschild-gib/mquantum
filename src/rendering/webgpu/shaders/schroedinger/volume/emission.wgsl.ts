@@ -11,7 +11,6 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/emission.wgsl
  */
 
-
 /**
  * Generate emission pre-block WGSL with only the helpers needed by the active algorithm.
  *
@@ -208,9 +207,16 @@ const ALGO_BRANCH: Record<number, string> = {
 
   5: /* wgsl */ `
     // 5: Blackbody (Heat)
+    // Map normalized log-density to temperature. Low density → cold, high → hot.
     let temp = normalized * 12000.0;
-    if (temp < 500.0) { return vec3f(0.0); } // Cold is black
-    col = blackbody(temp);`,
+    // Smooth fade-out below 1500 K instead of hard cutoff at 500 K.
+    // The hard cutoff created zero-emission regions that still accumulated
+    // opacity in the raymarcher, producing dark opaque blobs for wide
+    // wavepackets (where much of the volume has moderate density).
+    // Clamp temp ≥ 1000 K for blackbody() (Tanner-Helland approximation
+    // is only valid above ~1000 K and produces spurious bright red below).
+    let coldFade = smoothstep(0.0, 1500.0, temp);
+    col = blackbody(max(temp, 1000.0)) * coldFade;`,
 
   6: /* wgsl */ `
     // 6: Perceptually uniform cyclic phase map (phase-only)

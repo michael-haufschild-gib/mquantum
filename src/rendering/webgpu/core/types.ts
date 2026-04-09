@@ -226,6 +226,15 @@ export interface WebGPURenderPass {
    * Returns null if the pass doesn't track draw stats.
    */
   getDrawStats?(): WebGPUPassDrawStats | null
+
+  /**
+   * Transfer reusable state from a predecessor pass of the same type.
+   * Called by the render graph during warm swap before the predecessor is disposed.
+   * The default implementation does nothing. Renderers override this to preserve
+   * compute simulation state (coin buffers, density textures) across pipeline rebuilds
+   * triggered by non-structural config changes (e.g. color algorithm).
+   */
+  adoptFrom?(predecessor: WebGPURenderPass): void
 }
 
 // =============================================================================

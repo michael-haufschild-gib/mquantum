@@ -36,6 +36,17 @@ function propagateDimensionToStores(dimension: number): void {
   useAnimationStore.getState().setDimension(dimension)
   useRotationStore.getState().setDimension(dimension)
   useTransformStore.getState().setDimension(dimension)
+
+  // Sync compute-mode lattice dimensions so they don't desync from the global dimension.
+  // Without this, changing dimension while in a compute mode leaves latticeDim stale,
+  // causing bounding radius mismatches and broken rendering.
+  const ext = useExtendedObjectStore.getState()
+  const mode = ext.schroedinger?.quantumMode
+  if (mode === 'tdseDynamics') {
+    ext.setTdseLatticeDim(dimension)
+  } else if (mode === 'freeScalarField') {
+    ext.setFreeScalarLatticeDim(dimension)
+  }
 }
 
 /**

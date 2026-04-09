@@ -16,8 +16,25 @@ import { DECOHERENCE_PRESETS } from './decoherencePresets'
 /** Subset of TdseConfig fields that a scenario preset can override. */
 export type TdsePresetOverride = Partial<Omit<TdseConfig, 'needsReset' | 'slicePositions'>>
 
+/** Parent-level SchroedingerConfig rendering fields that a TDSE preset can override. */
+export interface TdseRenderingOverrides {
+  densityGain?: number
+  densityContrast?: number
+  autoScaleMaxGain?: number
+}
+
+/** Default rendering overrides applied to every TDSE preset unless explicitly overridden. */
+const TDSE_DEFAULT_RENDERING: TdseRenderingOverrides = {
+  densityGain: 2.0,
+  densityContrast: 1.8,
+  autoScaleMaxGain: 20,
+}
+
 /** A named TDSE scenario preset with config overrides applied on selection. */
-export type TdseScenarioPreset = ScenarioPreset<TdsePresetOverride>
+export interface TdseScenarioPreset extends ScenarioPreset<TdsePresetOverride> {
+  /** Parent-level rendering overrides applied alongside TdseConfig overrides. */
+  renderingOverrides?: TdseRenderingOverrides
+}
 
 /**
  * Curated TDSE scenario presets.
@@ -383,7 +400,12 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   ...DECOHERENCE_PRESETS,
 ]
 
-/** Lookup a preset by its id */
+/** Lookup a preset by its id, merging default rendering overrides. */
 export function getTdsePreset(id: string): TdseScenarioPreset | undefined {
-  return TDSE_SCENARIO_PRESETS.find((p) => p.id === id)
+  const preset = TDSE_SCENARIO_PRESETS.find((p) => p.id === id)
+  if (!preset) return undefined
+  return {
+    ...preset,
+    renderingOverrides: { ...TDSE_DEFAULT_RENDERING, ...preset.renderingOverrides },
+  }
 }

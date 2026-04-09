@@ -39,9 +39,11 @@ export class PauliStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    this.pauliPass?.dispose()
-    this.pauliPass = new PauliComputePass()
-    this.pauliPass.initializeDensityTexture(ctx.device)
+    // If compute state was already adopted from a predecessor, reuse it.
+    if (!this.pauliPass) {
+      this.pauliPass = new PauliComputePass()
+      this.pauliPass.initializeDensityTexture(ctx.device)
+    }
 
     const bindings = createDensityTextureBindings(
       ctx.device,
@@ -108,6 +110,14 @@ export class PauliStrategy implements QuantumModeStrategy {
     }
 
     handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])
+  }
+
+  adoptComputeState(source: QuantumModeStrategy): boolean {
+    if (!(source instanceof PauliStrategy) || !source.pauliPass) return false
+    this.pauliPass?.dispose()
+    this.pauliPass = source.pauliPass
+    source.pauliPass = null
+    return true
   }
 
   getDensityTextureView(): GPUTextureView | null {

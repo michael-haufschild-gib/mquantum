@@ -404,6 +404,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const shiftU32 = new Uint32Array(shiftData)
     shiftU32[0] = this.totalSites
     shiftU32[1] = config.latticeDim
+    shiftU32[2] = config.absorberEnabled ? 1 : 0
     const strides = computeStrides(config.gridSize.slice(0, config.latticeDim))
     for (let d = 0; d < config.latticeDim; d++) {
       shiftU32[4 + d] = config.gridSize[d] ?? 64

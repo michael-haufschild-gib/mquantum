@@ -76,9 +76,11 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    this.tdsePass?.dispose()
-    this.tdsePass = new TDSEComputePass()
-    this.tdsePass.initializeDensityTexture(ctx.device)
+    // If compute state was already adopted from a predecessor, reuse it.
+    if (!this.tdsePass) {
+      this.tdsePass = new TDSEComputePass()
+      this.tdsePass.initializeDensityTexture(ctx.device)
+    }
     logger.log(
       `[TdseBecStrategy] setup densityView=${this.tdsePass.getDensityTextureView()?.label ?? 'null'}`
     )
@@ -666,6 +668,14 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         this.entanglementInFlight = false
       }
     )
+  }
+
+  adoptComputeState(source: QuantumModeStrategy): boolean {
+    if (!(source instanceof TdseBecStrategy) || !source.tdsePass) return false
+    this.tdsePass?.dispose()
+    this.tdsePass = source.tdsePass
+    source.tdsePass = null
+    return true
   }
 
   getDensityTextureView(): GPUTextureView | null {

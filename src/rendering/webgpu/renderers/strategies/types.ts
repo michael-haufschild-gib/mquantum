@@ -235,6 +235,14 @@ export interface QuantumModeStrategy {
   getDensityTextureView?(): GPUTextureView | null
 
   /**
+   * Transfer compute pass ownership from a source strategy of the same type.
+   * Used to preserve simulation state (coin buffers, density textures) across
+   * pipeline rebuilds triggered by non-structural config changes (e.g. color algorithm).
+   * Returns true if the transfer succeeded and the source's compute pass was adopted.
+   */
+  adoptComputeState?(source: QuantumModeStrategy): boolean
+
+  /**
    * Release all mode-specific GPU resources and state.
    */
   dispose(): void
