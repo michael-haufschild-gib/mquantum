@@ -41,9 +41,11 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    this.qwPass?.dispose()
-    this.qwPass = new QuantumWalkComputePass()
-    this.qwPass.initializeDensityTexture(ctx.device)
+    // If compute state was already adopted from a predecessor, reuse it.
+    if (!this.qwPass) {
+      this.qwPass = new QuantumWalkComputePass()
+      this.qwPass.initializeDensityTexture(ctx.device)
+    }
 
     const bindings = createDensityTextureBindings(
       ctx.device,
@@ -98,6 +100,15 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     }
 
     handleSimulationStateIO(ctx, qwPass, ['quantumWalk'])
+  }
+
+  adoptComputeState(source: QuantumModeStrategy): boolean {
+    if (!(source instanceof QuantumWalkStrategy) || !source.qwPass) return false
+    // Steal the compute pass — the source becomes empty (dispose is a no-op).
+    this.qwPass?.dispose()
+    this.qwPass = source.qwPass
+    source.qwPass = null
+    return true
   }
 
   getDensityTextureView(): GPUTextureView | null {

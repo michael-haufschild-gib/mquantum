@@ -16,7 +16,7 @@ import { logger } from '@/lib/logger'
 import { CarpetSliceComputePass } from '@/rendering/webgpu/passes/CarpetSliceComputePass'
 import { useCarpetStore } from '@/stores/carpetStore'
 
-import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
+import type { WebGPURenderContext, WebGPURenderPass, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type {
   QuantumModeForShader,
@@ -186,9 +186,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.vertexBuffer?.destroy()
     this.indexBuffer?.destroy()
 
-    // Recreate mode strategy and get mode setup
+    // Recreate mode strategy and get mode setup.
+    // If a predecessor strategy was stashed (via adoptFrom), transfer its compute
+    // state to the new strategy before setup, preserving simulation state.
     this.strategy.dispose()
     this.strategy = createModeStrategy(this.rendererConfig)
+    if (this.predecessorStrategy) {
+      this.strategy.adoptComputeState?.(this.predecessorStrategy)
+      this.predecessorStrategy = null
+    }
     const modeSetup = this.strategy.setup(ctx, this.rendererConfig)
 
     const resources = await createSchrodingerPipeline(
@@ -477,9 +483,39 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     return this.strategy.getDensityTextureView?.() ?? null
   }
 
+  /** Strategy from a predecessor renderer whose compute state should be adopted. */
+  private predecessorStrategy: QuantumModeStrategy | null = null
+
+  /**
+   * Transfer compute simulation state from a predecessor renderer.
+   * Preserves coin buffers, density textures, and evolution state across
+   * pipeline rebuilds triggered by non-structural changes (e.g. color algorithm).
+   * Only transfers if both renderers use the same quantum mode.
+   *
+   * Must be called BEFORE initialize() — the state is consumed during createPipeline().
+   * Safe to call multiple times (e.g. rapid config changes); any previously stashed
+   * predecessor strategy is disposed before accepting the new one.
+   */
+  adoptFrom(predecessor: WebGPURenderPass): void {
+    if (!(predecessor instanceof WebGPUSchrodingerRenderer)) return
+    if (predecessor.rendererConfig.quantumMode !== this.rendererConfig.quantumMode) return
+    // Dispose any previously stashed predecessor to avoid leaking its compute state.
+    if (this.predecessorStrategy) {
+      logger.warn(
+        '[SchrodingerRenderer] adoptFrom called again before createPipeline — disposing previous predecessor'
+      )
+      this.predecessorStrategy.dispose()
+    }
+    this.predecessorStrategy = predecessor.strategy
+  }
+
   dispose(): void {
     this.carpetSlicePass?.dispose()
     this.carpetSlicePass = null
+    // If predecessorStrategy was never consumed by createPipeline, dispose it
+    // to avoid leaking its compute state (buffers, textures).
+    this.predecessorStrategy?.dispose()
+    this.predecessorStrategy = null
     this.strategy.dispose()
 
     this.vertexBuffer?.destroy()

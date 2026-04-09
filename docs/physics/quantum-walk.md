@@ -77,10 +77,17 @@ The conditional shift moves amplitude based on coin state:
 - Coin state j = 2d: shift +1 along axis d
 - Coin state j = 2d+1: shift -1 along axis d
 
-Periodic boundary conditions are used. The implementation reads from the source
-site that would have contributed to each destination, avoiding write conflicts.
+Two boundary modes are supported:
 
-**Code**: `quantumWalkShift.wgsl.ts:36–69`.
+- **Periodic** (default, absorber off): Toroidal wrapping via modular arithmetic.
+- **Open** (absorber on): Out-of-bounds source sites contribute zero. Amplitude
+  that would leave the domain is discarded. Combined with PML damping in the
+  absorber layer, this strongly suppresses reflections at domain boundaries.
+
+The implementation reads from the source site that would have contributed to
+each destination, avoiding write conflicts.
+
+**Code**: `quantumWalkShift.wgsl.ts`.
 
 ## 4. Konno Limit Distribution
 

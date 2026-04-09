@@ -40,9 +40,11 @@ export class DiracStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    this.diracPass?.dispose()
-    this.diracPass = new DiracComputePass()
-    this.diracPass.initializeDensityTexture(ctx.device)
+    // If compute state was already adopted from a predecessor, reuse it.
+    if (!this.diracPass) {
+      this.diracPass = new DiracComputePass()
+      this.diracPass.initializeDensityTexture(ctx.device)
+    }
 
     const bindings = createDensityTextureBindings(
       ctx.device,
@@ -87,9 +89,15 @@ export class DiracStrategy implements QuantumModeStrategy {
     const diracFieldView =
       algo === 'particleAntiparticle' ? 'particleAntiparticleSplit' : diracConfig.fieldView
 
+    // When showPotential is false, override potentialType to 'none' so the
+    // potential half-step becomes a physics no-op (V=0 everywhere).
+    // This makes the toggle gate both the visual overlay AND the simulation.
+    const potentialOverride = diracConfig.showPotential ? {} : { potentialType: 'none' as const }
+
     const diracWithSharedPml = {
       ...applySharedPml(diracConfig, schroedinger),
       fieldView: diracFieldView,
+      ...potentialOverride,
     } as DiracConfig
 
     diracPass.executeDirac(
@@ -108,6 +116,14 @@ export class DiracStrategy implements QuantumModeStrategy {
     }
 
     handleSimulationStateIO(ctx, diracPass, ['diracEquation'])
+  }
+
+  adoptComputeState(source: QuantumModeStrategy): boolean {
+    if (!(source instanceof DiracStrategy) || !source.diracPass) return false
+    this.diracPass?.dispose()
+    this.diracPass = source.diracPass
+    source.diracPass = null
+    return true
   }
 
   getDensityTextureView(): GPUTextureView | null {

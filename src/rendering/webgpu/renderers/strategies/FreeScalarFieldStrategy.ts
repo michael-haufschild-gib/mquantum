@@ -46,9 +46,11 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
-    this.freeScalarFieldPass?.dispose()
-    this.freeScalarFieldPass = new FreeScalarFieldComputePass()
-    this.freeScalarFieldPass.initializeDensityTexture(ctx.device)
+    // If compute state was already adopted from a predecessor, reuse it.
+    if (!this.freeScalarFieldPass) {
+      this.freeScalarFieldPass = new FreeScalarFieldComputePass()
+      this.freeScalarFieldPass.initializeDensityTexture(ctx.device)
+    }
 
     const densityTextureView = this.freeScalarFieldPass.getDensityTextureView() ?? null
     const bindings = createDensityTextureBindings(ctx.device, densityTextureView)
@@ -165,6 +167,14 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
         }
       }
     }
+  }
+
+  adoptComputeState(source: QuantumModeStrategy): boolean {
+    if (!(source instanceof FreeScalarFieldStrategy) || !source.freeScalarFieldPass) return false
+    this.freeScalarFieldPass?.dispose()
+    this.freeScalarFieldPass = source.freeScalarFieldPass
+    source.freeScalarFieldPass = null
+    return true
   }
 
   getDensityTextureView(): GPUTextureView | null {

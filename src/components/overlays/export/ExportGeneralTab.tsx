@@ -240,6 +240,38 @@ export const ExportGeneralTab = () => {
           </Button>
         </div>
       </div>
+      {/* Reset Evolution Toggle */}
+      <div
+        className={`
+                    flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
+                    ${settings.resetEvolution ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
+                `}
+        onClick={() => updateSettings({ resetEvolution: !settings.resetEvolution })}
+      >
+        <div className="flex items-center gap-4">
+          <div
+            className={`p-2 rounded-lg ${settings.resetEvolution ? 'bg-accent text-black' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}
+          >
+            <Icon name="reset" className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-sm font-bold text-text-primary">Reset Evolution</div>
+            <div className="text-xs text-text-secondary uppercase tracking-wider">
+              {settings.resetEvolution
+                ? 'Wavefunction resets before recording'
+                : 'Recording from current state'}
+            </div>
+          </div>
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()}>
+          <Switch
+            checked={settings.resetEvolution}
+            onCheckedChange={(c) => updateSettings({ resetEvolution: c })}
+            tooltip="Reset the wavefunction and evolution to initial state before recording starts. Same as the timeline reset button."
+          />
+        </div>
+      </div>
     </div>
   )
 }

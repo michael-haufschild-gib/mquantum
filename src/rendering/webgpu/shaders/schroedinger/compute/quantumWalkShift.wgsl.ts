@@ -2,7 +2,12 @@
  * Quantum Walk Conditional Shift Compute Shader
  *
  * Applies the position-dependent shift operator: moves amplitude in direction ±d
- * based on coin state index. Uses periodic boundary conditions.
+ * based on coin state index. Supports periodic or open boundary conditions.
+ *
+ * When `openBoundary` is set (absorber enabled), out-of-bounds source sites
+ * contribute zero — amplitude that would leave the domain is discarded.
+ * The PML absorber provides smooth damping before the hard edge.
+ * When `openBoundary` is unset, periodic (toroidal) wrapping is used.
  *
  * Coin state mapping:
  *   j = 2d   → shift +1 along axis d
@@ -22,8 +27,8 @@ export const quantumWalkShiftBlock = /* wgsl */ `
 struct QWShiftUniforms {
   totalSites: u32,
   latticeDim: u32,
+  openBoundary: u32,
   _pad0: u32,
-  _pad1: u32,
   gridSize: array<u32, 12>,
   strides: array<u32, 12>,
 }
@@ -49,22 +54,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
     // Source site: shift backwards from destination
     // If this coin state shifts +1, the source was at coord-1 (and vice versa)
-    var srcCoords = destCoords;
+    var srcCoord: i32;
     if (isPositive) {
-      // Coin state shifts +1 → source was at coord-1
-      let srcCoord = i32(destCoords[dim]) - 1;
-      srcCoords[dim] = u32((srcCoord + i32(params.gridSize[dim])) % i32(params.gridSize[dim]));
+      srcCoord = i32(destCoords[dim]) - 1;
     } else {
-      // Coin state shifts -1 → source was at coord+1
-      let srcCoord = i32(destCoords[dim]) + 1;
-      srcCoords[dim] = u32(srcCoord % i32(params.gridSize[dim]));
+      srcCoord = i32(destCoords[dim]) + 1;
     }
 
-    let srcSite = ndToLinear(srcCoords, params.strides, params.latticeDim);
-    let srcBase = srcSite * numCoinStates * 2u + cs * 2u;
+    // Open boundary: out-of-bounds sources contribute zero (amplitude leaves the domain).
+    // Periodic boundary: wrap via modular arithmetic (default when absorber is off).
+    if (params.openBoundary != 0u && (srcCoord < 0 || srcCoord >= i32(params.gridSize[dim]))) {
+      coinOut[destBase + cs * 2u] = 0.0;
+      coinOut[destBase + cs * 2u + 1u] = 0.0;
+    } else {
+      var srcCoords = destCoords;
+      srcCoords[dim] = u32((srcCoord + i32(params.gridSize[dim])) % i32(params.gridSize[dim]));
 
-    coinOut[destBase + cs * 2u] = coinIn[srcBase];
-    coinOut[destBase + cs * 2u + 1u] = coinIn[srcBase + 1u];
+      let srcSite = ndToLinear(srcCoords, params.strides, params.latticeDim);
+      let srcBase = srcSite * numCoinStates * 2u + cs * 2u;
+
+      coinOut[destBase + cs * 2u] = coinIn[srcBase];
+      coinOut[destBase + cs * 2u + 1u] = coinIn[srcBase + 1u];
+    }
   }
 }
 `

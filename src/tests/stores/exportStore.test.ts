@@ -294,6 +294,7 @@ describe('exportStore (invariants)', () => {
               customWidth: 100000.9,
               customHeight: 1.2,
               warmupFrames: 7.8,
+              resetEvolution: 'yes',
               textOverlay: {
                 enabled: 'true',
                 color: 42,
@@ -330,6 +331,7 @@ describe('exportStore (invariants)', () => {
       expect(settings.customWidth).toBe(8192)
       expect(settings.customHeight).toBe(2)
       expect(settings.warmupFrames).toBe(8)
+      expect(settings.resetEvolution).toBe(defaults.resetEvolution)
 
       expect(settings.textOverlay.enabled).toBe(defaults.textOverlay.enabled)
       expect(settings.textOverlay.color).toBe(defaults.textOverlay.color)

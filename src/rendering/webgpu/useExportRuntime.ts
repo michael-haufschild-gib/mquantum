@@ -15,7 +15,10 @@ import {
   ensureEvenDimensions,
   resolveExportDimensions,
 } from '@/lib/export/videoExportPlanning'
+import { getConfigStoreKey } from '@/lib/geometry/registry'
 import { useExportStore } from '@/stores/exportStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 
 import {
@@ -89,6 +92,59 @@ function configureExportCanvas(
     cameraRef.current.setAspect(runtime.originalCameraAspect)
   } else {
     cameraRef.current.setAspect(renderDimensions.width / renderDimensions.height)
+  }
+}
+
+// ============================================================================
+// Wave evolution reset (mirrors TimelineControls handleReset)
+// ============================================================================
+
+/**
+ * Reset the wavefunction/evolution to its initial state.
+ *
+ * Dispatches the same reset actions as the timeline reset button,
+ * reading the current object type and quantum mode imperatively.
+ */
+function resetWaveEvolution(): void {
+  const { objectType } = useGeometryStore.getState()
+  const configStoreKey = getConfigStoreKey(objectType)
+  const state = useExtendedObjectStore.getState()
+
+  if (configStoreKey === 'pauliSpinor') {
+    state.resetPauliField()
+    return
+  }
+
+  if (configStoreKey !== 'schroedinger') return
+
+  const { quantumMode } = state.schroedinger
+
+  switch (quantumMode) {
+    case 'harmonicOscillator':
+    case 'hydrogenND':
+    case 'hydrogenNDCoupled':
+      state.resetSchroedingerParameters()
+      state.requestOpenQuantumStateReset()
+      break
+    case 'freeScalarField':
+      state.resetFreeScalarField()
+      break
+    case 'tdseDynamics':
+      state.resetTdseField()
+      break
+    case 'becDynamics':
+      state.resetBecField()
+      break
+    case 'diracEquation':
+      state.setDiracNeedsReset()
+      break
+    case 'quantumWalk':
+      state.resetQuantumWalk()
+      break
+    default: {
+      const _exhaustive: never = quantumMode
+      void _exhaustive
+    }
   }
 }
 
@@ -329,6 +385,10 @@ export function useExportRuntime({
         restoreRuntimeState()
         resetExportRuntime()
         return
+      }
+
+      if (settings.resetEvolution) {
+        resetWaveEvolution()
       }
 
       const totalFrames = Math.max(1, Math.ceil(settings.duration * settings.fps))

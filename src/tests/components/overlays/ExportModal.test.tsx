@@ -59,6 +59,7 @@ describe('ExportModal', () => {
         hardwareAcceleration: 'prefer-software',
         warmupFrames: 5,
         rotation: 0,
+        resetEvolution: false,
         textOverlay: {
           enabled: false,
           text: 'mquantum',
