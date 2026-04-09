@@ -78,11 +78,7 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
       const parsed: unknown = JSON.parse(stored)
       return sanitizeColorHistory(parsed)
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-        logger.warn('ColorPicker: localStorage quota exceeded')
-      } else {
-        logger.error('ColorPicker: failed to load color history', error)
-      }
+      logger.warn('ColorPicker: failed to load color history', error)
       return []
     }
   })

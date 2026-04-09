@@ -179,15 +179,18 @@ describe('Object Type Registry', () => {
 describe('Quantum Type Registry (Flat Model)', () => {
   describe('Registry Structure', () => {
     it('contains all expected quantum type entries', () => {
-      const keys = Array.from(QUANTUM_TYPE_REGISTRY.keys())
-      expect(keys).toContain('harmonicOscillator')
-      expect(keys).toContain('hydrogenND')
-      expect(keys).toContain('freeScalarField')
-      expect(keys).toContain('tdseDynamics')
-      expect(keys).toContain('becDynamics')
-      expect(keys).toContain('diracEquation')
-      expect(keys).toContain('quantumWalk')
-      expect(keys).toContain('pauliSpinor')
+      const keys = Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort()
+      expect(keys).toEqual([
+        'becDynamics',
+        'diracEquation',
+        'freeScalarField',
+        'harmonicOscillator',
+        'hydrogenND',
+        'hydrogenNDCoupled',
+        'pauliSpinor',
+        'quantumWalk',
+        'tdseDynamics',
+      ])
     })
 
     it('every entry has a valid internal bridge', () => {
@@ -266,9 +269,11 @@ describe('Quantum Type Registry (Flat Model)', () => {
 
   describe('QUANTUM_MODES_3D_ONLY', () => {
     it('includes all compute modes', () => {
-      expect(QUANTUM_MODES_3D_ONLY.has('freeScalarField')).toBe(true)
-      expect(QUANTUM_MODES_3D_ONLY.has('tdseDynamics')).toBe(true)
-      expect(QUANTUM_MODES_3D_ONLY.has('pauliSpinor')).toBe(true)
+      for (const [key] of QUANTUM_TYPE_REGISTRY) {
+        if (isComputeQuantumType(key)) {
+          expect(QUANTUM_MODES_3D_ONLY.has(key), `${key} should be marked 3D-only`).toBe(true)
+        }
+      }
     })
 
     it('excludes analytic modes with min=2', () => {

@@ -173,8 +173,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const vertexModule = this.createShaderModule(device, vertexShader, 'skybox-vertex')
     const fragmentModule = this.createShaderModule(device, fragmentShader, 'skybox-fragment')
 
-    // Destroy old GPU resources before creating replacements
-    this.uniformBuffer?.destroy()
+    // Hold reference to old buffer — destroyed after successful replacement
+    const oldUniformBuffer = this.uniformBuffer
 
     // Create bind group layouts
     // Group 0: Uniforms (skybox params + vertex uniforms)
@@ -259,6 +259,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     // Create bind groups (will be recreated when textures change)
     this.recreateBindGroups(device)
+
+    // Safe to destroy old buffer now that new resources are wired up
+    oldUniformBuffer?.destroy()
   }
 
   /**

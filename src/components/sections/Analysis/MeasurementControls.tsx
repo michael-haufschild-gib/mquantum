@@ -22,20 +22,26 @@ import { useMeasurementStore } from '@/stores/measurementStore'
 
 const DIM_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 
-/** Reactive hook for the half-extent of the TDSE lattice grid (world units). */
+/** Compute the half-extent from a lattice config's gridSize and spacing. */
+function computeLatticeHalfExtent(lattice: { gridSize: number[]; spacing: number[] }): number {
+  if (!lattice.gridSize[0] || !lattice.spacing[0]) return 0
+  return lattice.gridSize[0] * lattice.spacing[0] * 0.5
+}
+
+/** Reactive hook for the half-extent of the active lattice grid (TDSE or BEC). */
 function useLatticeHalfExtent(): number {
   return useExtendedObjectStore((s) => {
-    const tdse = s.schroedinger.tdse
-    if (!tdse.gridSize[0] || !tdse.spacing[0]) return 0
-    return tdse.gridSize[0] * tdse.spacing[0] * 0.5
+    const sch = s.schroedinger
+    const lattice = sch.tdse ?? sch.bec
+    return computeLatticeHalfExtent(lattice)
   })
 }
 
 /** Compute the half-extent imperatively (for callbacks where subscription is not needed). */
 function getLatticeHalfExtent(): number {
-  const tdse = useExtendedObjectStore.getState().schroedinger.tdse
-  if (!tdse.gridSize[0] || !tdse.spacing[0]) return 0
-  return tdse.gridSize[0] * tdse.spacing[0] * 0.5
+  const sch = useExtendedObjectStore.getState().schroedinger
+  const lattice = sch.tdse ?? sch.bec
+  return computeLatticeHalfExtent(lattice)
 }
 
 /**
