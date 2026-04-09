@@ -106,10 +106,12 @@ export function useColorPickerState(args: UseColorPickerStateArgs): ColorPickerS
 
   useEffect(() => {
     if (value === lastEmittedRef.current) {
-      if (alpha !== undefined && alpha !== hsv.a) {
+      const needsAlphaSync =
+        (disableAlpha && hsv.a !== 1) || (alpha !== undefined && alpha !== hsv.a)
+      if (needsAlphaSync) {
         const alphaSyncTimer = window.setTimeout(() => {
           setHsv((prev) => {
-            const next = { ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }
+            const next = { ...prev, a: disableAlpha ? 1 : clampAlpha(alpha ?? prev.a) }
             setHexInput(
               next.a === 1
                 ? hsvToHex(next.h, next.s, next.v)
