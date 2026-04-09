@@ -493,18 +493,29 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
    * Only transfers if both renderers use the same quantum mode.
    *
    * Must be called BEFORE initialize() — the state is consumed during createPipeline().
+   * Safe to call multiple times (e.g. rapid config changes); any previously stashed
+   * predecessor strategy is disposed before accepting the new one.
    */
   adoptFrom(predecessor: WebGPURenderPass): void {
     if (!(predecessor instanceof WebGPUSchrodingerRenderer)) return
     if (predecessor.rendererConfig.quantumMode !== this.rendererConfig.quantumMode) return
-    // Stash the predecessor's strategy for adoption in createPipeline.
+    // Dispose any previously stashed predecessor to avoid leaking its compute state.
+    if (this.predecessorStrategy) {
+      logger.warn(
+        '[SchrodingerRenderer] adoptFrom called again before createPipeline — disposing previous predecessor'
+      )
+      this.predecessorStrategy.dispose()
+    }
     this.predecessorStrategy = predecessor.strategy
   }
 
   dispose(): void {
     this.carpetSlicePass?.dispose()
     this.carpetSlicePass = null
-    this.predecessorStrategy = null // drop ref (state already transferred or not needed)
+    // If predecessorStrategy was never consumed by createPipeline, dispose it
+    // to avoid leaking its compute state (buffers, textures).
+    this.predecessorStrategy?.dispose()
+    this.predecessorStrategy = null
     this.strategy.dispose()
 
     this.vertexBuffer?.destroy()

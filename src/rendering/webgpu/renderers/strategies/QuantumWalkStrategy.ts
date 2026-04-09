@@ -30,11 +30,6 @@ import type {
   SchroedingerSnapshot,
 } from './types'
 
-/** Type guard for QuantumWalkStrategy instances. */
-function isQuantumWalkStrategy(s: QuantumModeStrategy): s is QuantumWalkStrategy {
-  return s instanceof QuantumWalkStrategy
-}
-
 /** Strategy for discrete-time quantum walk using coin + shift compute dispatch. */
 export class QuantumWalkStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
@@ -108,7 +103,7 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
   }
 
   adoptComputeState(source: QuantumModeStrategy): boolean {
-    if (!isQuantumWalkStrategy(source) || !source.qwPass) return false
+    if (!(source instanceof QuantumWalkStrategy) || !source.qwPass) return false
     // Steal the compute pass — the source becomes empty (dispose is a no-op).
     this.qwPass?.dispose()
     this.qwPass = source.qwPass

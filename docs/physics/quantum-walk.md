@@ -82,7 +82,7 @@ Two boundary modes are supported:
 - **Periodic** (default, absorber off): Toroidal wrapping via modular arithmetic.
 - **Open** (absorber on): Out-of-bounds source sites contribute zero. Amplitude
   that would leave the domain is discarded. Combined with PML damping in the
-  absorber layer, this gives smooth absorption without reflections.
+  absorber layer, this strongly suppresses reflections at domain boundaries.
 
 The implementation reads from the source site that would have contributed to
 each destination, avoiding write conflicts.
