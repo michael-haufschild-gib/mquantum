@@ -99,51 +99,65 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
 }
 
 // ============================================================================
-// Cosmological Background (Mukhanov-Sasaki bridge)
+// Cosmological Background (canonical δφ integrator)
 // ============================================================================
 
 /**
- * Cosmological FLRW background sub-config for the Mukhanov-Sasaki bridge.
+ * Cosmological FLRW background sub-config for the Free Scalar Field pass.
  *
- * When `enabled = true`, the Free Scalar Field pass reinterprets `(phi, pi)`
- * as the conformal Mukhanov-Sasaki variable `v = a^((n-2)/2) * δφ` and its
- * derivative `v' = dv/dη`. The Klein-Gordon update rule picks up a
- * time-dependent effective mass
+ * When `enabled = true`, the simulation remains in the canonical perturbation
+ * variables already used by the Minkowski path: `(phi, pi)` store the scalar
+ * field perturbation `δφ` and its conjugate momentum `π_δφ`. The integrator
+ * picks up three time-dependent coefficients derived from the selected
+ * `preset`:
  *
- *     M²_eff(η) = a²(η) * m² - z''(η)/z(η)
+ *     drift: dδφ/dη = aKinetic · π_δφ                          (a^(−(n−2)))
+ *     kick:  dπ_δφ/dη = aPotential · ∇²δφ − m²·aFull·δφ − aFull·V'(δφ)
  *
- * driven by the selected `preset` and evaluated on the fly from the current
- * simulation time `eta`. See `docs/plans/cosmological-background-scalar-field.md`
- * and the `src/lib/physics/cosmology/` module for the full derivation.
+ * with `aKinetic = a^(−(n−2))`, `aPotential = a^(n−2)`, `aFull = a^n`. These
+ * collapse to `(1, 1, 1)` under Minkowski, so the cosmology path is
+ * bit-identical to the disabled path in the trivial regime.
+ *
+ * **No Mukhanov-Sasaki variable.** Earlier drafts re-expressed the state as
+ * `v = a^((n−2)/2)·δφ` with an effective mass `M²_eff(η) = a²m² − z''/z`.
+ * The shipped integrator does NOT do that — UI labels, analysis panels, and
+ * tooling should treat `(phi, pi)` as the bare `(δφ, π_δφ)` variables under
+ * every preset. See `docs/adr/010-fsf-cosmology-late-time-integrator.md` and
+ * `src/lib/physics/cosmology/` for the derivation of the `(aKinetic,
+ * aPotential, aFull)` coefficients.
  *
  * ## Invariants enforced by the store + UI
  *
- * 1. **Spacetime-dim window.** The bridge is physically defined only for
+ * 1. **Spacetime-dim window.** The background is physically defined only for
  *    `n_spacetime ∈ [3, 7]`, i.e. `latticeDim ∈ [2, 6]`. Going outside this
  *    window force-disables cosmology with a logger warning (see
  *    `reconcileCosmologyInvariants`).
  *
- * 2. **Mutual exclusion with self-interaction.** The linear Mukhanov-Sasaki
- *    equivalence is exact only for the free field. Enabling cosmology
- *    forces `selfInteractionEnabled = false`; enabling self-interaction
- *    forces `cosmology.enabled = false`. The mutex is lifted in v2 via
- *    the classical-statistical approximation (see plan doc).
+ * 2. **Mutual exclusion with self-interaction.** Cosmology is modelled only
+ *    for the free-field path in v1. Enabling cosmology forces
+ *    `selfInteractionEnabled = false`; enabling self-interaction forces
+ *    `cosmology.enabled = false`. The mutex is lifted in v2 once the kink/
+ *    φ⁴ nonlinearities have been re-validated under the δφ integrator.
  *
- * 3. **Non-zero `eta0`.** The Mukhanov-Sasaki effective mass diverges at
- *    `η = 0`, so `eta0 ≠ 0` is required. The store setter rejects zero
- *    silently; the runtime additionally clamps `|simEta| ≥ 1e-3` so the
- *    cosmological clock never crosses the singularity.
+ * 3. **Non-zero `eta0`.** The power-law scale factor `a(η) = A·|η|^q`
+ *    diverges at `η = 0` for every non-Minkowski preset, so `eta0 ≠ 0` is
+ *    required. The store setter rejects zero silently; the runtime clamps
+ *    `|simEta| ≥ COSMOLOGY_ETA_FLOOR` so the cosmological clock never
+ *    crosses the singularity.
  *
- * 4. **Sub-horizon `eta0`.** Bunch–Davies adiabaticity requires every
- *    lattice mode to be sub-horizon at `η₀`. The store setter and the
- *    `reconcileCosmologyInvariants` helper auto-clamp `|η₀|` so that
- *    `k_min² · η₀² ≥ 4 · |β(β-1)|` (see `clampEta0`).
+ * 4. **Safe `eta0` heuristic.** `clampEta0` raises user-provided `|η₀|`
+ *    above `DEFAULT_SAFE_ETA0` to stop the simulation from starting
+ *    trivially close to the singularity. Under the δφ formulation the
+ *    adiabatic vacuum is well-defined at any non-zero `η₀`, so this is a
+ *    UX guardrail, not a physical constraint.
  *
- * 5. **Variable identity under cosmology.** The lattice stores the
- *    conformal field `v = a^((n-2)/2) · δφ`, *not* the bare scalar `δφ`.
- *    The analysis panel and field-view labels rename `phi → v`,
- *    `pi → π_v`, `energyDensity → E_v` accordingly when this flag is
- *    enabled.
+ * 5. **Canonical variable contract.** The lattice always stores the bare
+ *    `(δφ, π_δφ)` variables — there is no re-interpretation under
+ *    cosmology. Field-view labels read `δφ`, `π`, and `ε` (proper energy
+ *    density `ρ = H_canonical / a^n`) in both Minkowski and non-Minkowski
+ *    regimes. The `reconcileCosmologyInvariants` helper will soft-disable
+ *    cosmology if the preset parameters become invalid (`isValidPreset`
+ *    false) or `clampEta0` throws.
  */
 export interface CosmologyConfig {
   /** Master toggle. When false, the FSF pass runs in Minkowski mode. */

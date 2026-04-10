@@ -8,7 +8,12 @@
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
  * (see src/lib/physics/freeScalar/vacuumSpectrum.ts).
+ *
+ * Exports both raw template literals (legacy string-concat consumers) and
+ * `ShaderBlock` wrappers for `assembleShaderBlocks()` composition.
  */
+
+import type { ShaderBlock } from '../../shared/compose-helpers'
 
 /**
  * Uniform struct for free scalar field parameters.
@@ -180,3 +185,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   pi[idx] = piVal;
 }
 `
+
+// ─── ShaderBlock wrappers for assembleShaderBlocks() composition ────────────
+
+/** `FreeScalarUniforms` struct as a ShaderBlock. */
+export const freeScalarUniformsShaderBlock: ShaderBlock = {
+  name: 'free-scalar-uniforms',
+  content: freeScalarUniformsBlock,
+}
+
+/** Init compute entry point as a ShaderBlock. */
+export const freeScalarInitShaderBlock: ShaderBlock = {
+  name: 'free-scalar-init',
+  content: freeScalarInitBlock,
+}

@@ -68,7 +68,7 @@ Pure CFL-based sub-stepping is necessary but not sufficient.
 Even with numerics fully under control, the `energyDensity` view
 displayed the *canonical Hamiltonian density*
 
-```
+```text
 H_can(x) = ½ aKinetic π² + ½ aPotential (∇δφ)² + ½ m²·aFull δφ² + aFull V(δφ)
 ```
 
@@ -142,7 +142,7 @@ floor:
 Divide `fieldValue` by `aFull` in the `energyDensity` branch of
 `freeScalarWriteGrid.wgsl.ts`. The physical derivation:
 
-```
+```text
 ρ_proper = T_{μν} u^μ u^ν      where u^μ = (1/a, 0, ..., 0) is the
                                  comoving observer's 4-velocity
          = T_{00} / a²
@@ -152,7 +152,7 @@ Divide `fieldValue` by `aFull` in the `energyDensity` branch of
 After substituting the canonical momentum `π = a^{n-2} · δφ'`, every
 term of `H_can` scales uniformly by `1/a^n`, so
 
-```
+```text
 ρ_proper = H_can / a^n = H_can / aFull
 ```
 

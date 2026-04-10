@@ -229,8 +229,10 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
             </div>
 
             <div className="text-xs text-text-tertiary italic">
-              Evolved field is v = a^((n−2)/2)·δφ (Mukhanov–Sasaki variable). Output labels reflect
-              this substitution when cosmology is active.
+              Evolved field is the canonical perturbation δφ with conjugate momentum π, advanced by
+              a time-dependent integrator whose coefficients (aKinetic, aPotential, aFull) come from
+              the selected background. Output labels refer to these canonical variables — the
+              Mukhanov–Sasaki rescaling v = a^((n−2)/2)·δφ is not applied to the stored state.
             </div>
           </>
         )}

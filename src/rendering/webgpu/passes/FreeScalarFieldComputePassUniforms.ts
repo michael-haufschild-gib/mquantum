@@ -85,14 +85,24 @@ export function computeFsfConfigHash(config: FreeScalarConfig): string {
 /**
  * Hash config fields that require field reinitialization without buffer rebuild.
  * Covers physics params that change the initial condition but not the grid shape.
+ *
+ * Cosmology participates in the hash because the initial vacuum sample
+ * (η₀, preset, steepness, hubble) and the runtime clock depend on it — a
+ * cosmology-only change would otherwise leave the compute pass reusing
+ * stale buffers even when `needsReset` isn't explicitly flipped.
+ *
  * @param config - Free scalar field configuration
  */
 export function computeFsfInitHash(config: FreeScalarConfig): string {
   const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
+  const cosmo = config.cosmology
+  const cosmoHash = cosmo.enabled
+    ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}`
+    : '_cosmo0'
   if (config.selfInteractionEnabled) {
-    return `${base}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
+    return `${base}${cosmoHash}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
   }
-  return base
+  return `${base}${cosmoHash}`
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -144,10 +154,7 @@ export function __resetFsfCosmologyWarnDedupForTests(): void {
  * @param simEta - Current conformal time (must be finite and non-zero under cosmology)
  * @returns `{ aKinetic, aPotential, aFull }`
  */
-export function computeFsfCosmologyCoefs(
-  config: FreeScalarConfig,
-  simEta: number
-): CosmologyCoefs {
+export function computeFsfCosmologyCoefs(config: FreeScalarConfig, simEta: number): CosmologyCoefs {
   const cosmo = config.cosmology
   if (!cosmo.enabled || cosmo.preset === 'minkowski') return FSF_IDENTITY_COSMO_COEFS
   try {

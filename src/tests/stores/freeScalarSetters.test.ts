@@ -151,6 +151,79 @@ describe('free scalar field setters', () => {
       expect(fsAfter.needsReset).toBe(true)
     })
 
+    it('refuses to enable cosmology when the current preset params are invalid', () => {
+      // Regression: previously setFreeScalarCosmologyEnabled would flip the
+      // flag to true even when `clampEta0` threw — leaving the compute pass
+      // to crash on the next reset. Put the store into a state where the
+      // de Sitter preset is selected but the `hubble` would make it fail
+      // `isValidPreset` by setting hubble out of the valid range via the
+      // setter first (which clamps), so we simulate an invalid state by
+      // directly constructing an ekpyrotic preset with sub-critical steepness.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      // ekpyrotic at steepness = sc is exactly on the boundary → invalid.
+      // The preset setter auto-bumps steepness above sc, so we need to bypass
+      // by setting preset to ekpyrotic first (which bumps), then driving
+      // steepness back down — the steepness setter clamps to sMin = sc*1.0001
+      // which is still valid. That means the only reachable "invalid" user
+      // state is the de Sitter hubble=0 case. Simulate the crash path by
+      // mocking the store cosmology slice into an invalid ekpyrotic state.
+      s.setFreeScalarCosmologyPreset('ekpyrotic')
+      // Drive cosmology into an invalid state by reaching into the store
+      // directly (mirrors what a corrupted preset load could do).
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              enabled: false,
+              preset: 'ekpyrotic' as const,
+              steepness: 0.5, // < s_c(4) ≈ 3.464 — invalid
+            },
+          },
+        },
+      }))
+
+      // Calling the setter must refuse to enable.
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(false)
+    })
+
+    it('soft-disables cosmology when reconcile hits an invalid preset combo', () => {
+      // Regression: reconcileCosmologyInvariants previously returned {} when
+      // `isValidPreset` was false, leaving cosmology enabled in a state that
+      // would crash the compute pass on reset.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(true)
+
+      // Corrupt hubble to a value isValidPreset will reject, then trigger
+      // reconcile via a lattice change.
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              hubble: 0, // invalid for deSitter
+            },
+          },
+        },
+      }))
+
+      // Triggering reconcile via a setter that calls it.
+      s.setFreeScalarLatticeDim(4)
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
     it('re-clamps eta0 when gridSize change raises the safe threshold', () => {
       // Finding 3: safeEta0 scales with L = N·a, so shrinking the grid
       // (smaller L → larger k_min → actually smaller safeEta0...). Use

@@ -196,10 +196,14 @@ export function sampleAdiabaticVacuum(
   seed: number
 ): { phi: Float32Array; pi: Float32Array } {
   // Minkowski short-circuit: aPotential = 1, nothing to rescale. Route
-  // through the explicit-mass dispatch so the Minkowski preset remains
-  // bit-identical to the disabled-cosmology path when mass > M_FLOOR.
+  // through the same `'kgFloor'` dispersion path used by the disabled-
+  // cosmology FSF sampler so the Minkowski preset remains bit-identical
+  // to that path for all masses, including mass <= M_FLOOR (where the
+  // zero-mode regularization kicks in). `resolveVacuumAutoScale` in the
+  // uniforms module mirrors this by also short-circuiting Minkowski to
+  // `'kgFloor'`, keeping sampler and auto-scale estimators in lockstep.
   if (params.preset === 'minkowski') {
-    return sampleVacuumSpectrum(config, seed, config.mass * config.mass)
+    return sampleVacuumSpectrum(config, seed, 'kgFloor')
   }
 
   const snap = computeCosmologyAt(eta0, params)

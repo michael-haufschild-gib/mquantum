@@ -17,11 +17,13 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DEFAULT_COSMOLOGY_CONFIG, DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import {
+  DEFAULT_COSMOLOGY_CONFIG,
+  DEFAULT_FREE_SCALAR_CONFIG,
+} from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
-import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { computeCosmologyAt } from '@/lib/physics/cosmology/background'
 import { M_FLOOR, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import {
@@ -95,7 +97,12 @@ describe('Minkowski cosmology preset is bit-identical to disabled FSF', () => {
     }
 
     const disabledDiag = computeFsfDiagnostics(phi, pi, cfg, FSF_IDENTITY_COSMO_COEFS)
-    const cosmoDiag = computeFsfDiagnostics(phi, pi, cfgCosmo, computeFsfCosmologyCoefs(cfgCosmo, -10))
+    const cosmoDiag = computeFsfDiagnostics(
+      phi,
+      pi,
+      cfgCosmo,
+      computeFsfCosmologyCoefs(cfgCosmo, -10)
+    )
 
     // Every numeric field of the diagnostics snapshot must agree to f32
     // precision — they're computed from the same buffers with the same mass.
@@ -344,6 +351,3 @@ describe('cosmology adiabatic vacuum integration with diagnostics', () => {
     expect(snapshot.variancePhi).toBeGreaterThanOrEqual(0)
   })
 })
-
-// Silence unused-import lint
-void ({ CosmologyCoefs: null as unknown as CosmologyCoefs })

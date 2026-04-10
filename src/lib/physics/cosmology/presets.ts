@@ -223,18 +223,33 @@ export function validateSpacetimeDim(spacetimeDim: number): void {
 }
 
 /**
- * True iff the given `(preset, spacetimeDim, steepness)` combination is
- * physically admissible for the Mukhanov-Sasaki bridge. Used by the store
- * setters and URL deserializer to reject invalid inputs gracefully.
+ * True iff the given `(preset, spacetimeDim, steepness, hubble)` combination is
+ * physically admissible AND evaluatable by `computeCosmologyAt`. Covers the
+ * preset-specific requirements that `qExponent` does not touch:
+ *
+ * - **de Sitter:** requires finite `hubble > 0` (enforced by
+ *   `scaleFactorAmplitude` — see `background.ts`). Without this check the
+ *   compute pass could crash at reset time despite `isValidPreset` returning
+ *   `true`, because `qExponent` only consults `spacetimeDim` for de Sitter.
+ * - **ekpyrotic:** covered by `qExponent` (requires `steepness > s_c(n)`).
+ * - **kasner / minkowski:** no extra parameters.
+ *
+ * Used by the store setters and URL deserializer as an evaluatability
+ * signal — a `true` return guarantees `computeCosmologyAt` will not throw
+ * for the same params.
  *
  * @param params - Preset parameters
- * @returns `true` if `qExponent(params)` would succeed
+ * @returns `true` if every downstream consumer would accept these params
  */
 export function isValidPreset(params: CosmologyPresetParams): boolean {
   try {
     qExponent(params)
-    return true
   } catch {
     return false
   }
+  if (params.preset === 'deSitter') {
+    const h = params.hubble
+    if (typeof h !== 'number' || !Number.isFinite(h) || h <= 0) return false
+  }
+  return true
 }

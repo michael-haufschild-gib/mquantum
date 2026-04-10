@@ -172,12 +172,14 @@ async function readFsfConfigSnapshot(page: Page) {
 
 /**
  * Sample the canvas pixel brightness by reading a central 32x32 region. Fast
- * bucket: min / mean / max / stdev across RGB channels. Exposes "flash"
- * events as sudden spikes in the `meanBrightness` series.
+ * bucket: min / mean / max across RGB channels. Exposes "flash" events as
+ * sudden spikes in the `meanBrightness` series. `ImageData.data` is a
+ * `Uint8ClampedArray` so every byte is already a finite integer in [0, 255]
+ * — no NaN guard is needed.
  */
 async function probeCanvasBrightness(
   page: Page
-): Promise<{ min: number; mean: number; max: number; hasNan: boolean } | null> {
+): Promise<{ min: number; mean: number; max: number } | null> {
   return page.evaluate(() => {
     const canvas = document.querySelector(
       '[data-testid="webgpu-canvas"]'
@@ -203,22 +205,17 @@ async function probeCanvasBrightness(
     let min = 255
     let max = 0
     let sum = 0
-    let hasNan = false
     for (let i = 0; i < img.length; i += 4) {
       const r = img[i]!
       const g = img[i + 1]!
       const b = img[i + 2]!
-      if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) {
-        hasNan = true
-        continue
-      }
       const v = (r + g + b) / 3
       if (v < min) min = v
       if (v > max) max = v
       sum += v
     }
     const mean = sum / (img.length / 4)
-    return { min, mean, max, hasNan }
+    return { min, mean, max }
   })
 }
 
@@ -227,7 +224,6 @@ interface BrightnessSample {
   min: number
   mean: number
   max: number
-  hasNan: boolean
 }
 
 interface FlashEvent {

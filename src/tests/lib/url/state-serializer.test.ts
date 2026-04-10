@@ -636,13 +636,13 @@ describe('state-serializer', () => {
       expect(parsed.cosmologyHubble).toBeUndefined()
     })
 
-    it('rejects de Sitter when cos_h is out of range', () => {
+    it('clamps cos_h and accepts de Sitter when cos_h is out of range', () => {
       const raw =
         'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=deSitter&cos_h=999&cos_eta0=-5'
       const parsed = deserializeState(raw)
-      // parseFloatParam clamps to [0.01, 100] — 999 becomes 100, still valid
-      // for the rejection rule but not rejected. The rejection only fires
-      // when cos_h is completely absent or non-numeric.
+      // parseFloatParam clamps to [0.01, 100], so cos_h=999 becomes 100 and
+      // deSitter is accepted. Rejection only fires when cos_h is absent or
+      // non-numeric — see the "rejects de Sitter when cos_h is missing" test.
       expect(parsed.cosmologyEnabled).toBe(true)
       expect(parsed.cosmologyHubble).toBe(100)
     })

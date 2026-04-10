@@ -75,7 +75,22 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
     steepness: fs.cosmology.steepness,
     hubble: fs.cosmology.hubble,
   }
-  if (!isValidPreset(params)) return {}
+  // Invalid preset combo (e.g. ekpyrotic with steepness ≤ s_c after a lattice
+  // bump pushed s_c past the current value, or de Sitter with non-positive
+  // hubble) would let `sampleAdiabaticVacuum` / `computeCosmologyAt` throw at
+  // reset time. Soft-disable cosmology and mark for reset so the next frame
+  // falls through to the ordinary Minkowski vacuum path instead of crashing.
+  if (!isValidPreset(params)) {
+    logger.warn(
+      `[reconcileCosmologyInvariants] Disabling cosmology: preset=${fs.cosmology.preset} ` +
+        `params invalid (steepness=${fs.cosmology.steepness}, hubble=${fs.cosmology.hubble}, ` +
+        `spacetimeDim=${spacetimeDim}) after lattice change.`
+    )
+    return {
+      cosmology: { ...fs.cosmology, enabled: false },
+      needsReset: true,
+    }
+  }
 
   // Re-clamp eta0 to the new safe threshold. If the threshold moved, the
   // clamp raises |eta0| and marks needsReset so the adiabatic vacuum is
@@ -91,13 +106,17 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
   } catch (e) {
     // clampEta0 throws on zero / non-finite eta0. The dimension-change path
     // never receives user input here — it's a pure-state reconcile — so a
-    // throw indicates a corrupted store state from earlier writes. Surface
-    // it via logger.warn so the bug is visible in dev consoles instead of
-    // silently swallowed.
+    // throw indicates a corrupted store state from earlier writes. Soft-
+    // disable cosmology so the compute pass cannot crash on the next reset,
+    // and log the underlying error so the bug is visible in dev consoles.
     logger.warn(
-      `[reconcileCosmologyInvariants] clampEta0 failed for eta0=${fs.cosmology.eta0}: ` +
-        `${e instanceof Error ? e.message : String(e)}`
+      `[reconcileCosmologyInvariants] Disabling cosmology: clampEta0 failed for ` +
+        `eta0=${fs.cosmology.eta0}: ${e instanceof Error ? e.message : String(e)}`
     )
+    return {
+      cosmology: { ...fs.cosmology, enabled: false },
+      needsReset: true,
+    }
   }
   return {}
 }
@@ -127,26 +146,40 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
         // Enabling cosmology forces self-interaction off (v1 mutex).
         const selfInteractionEnabled = enabled ? false : fs.selfInteractionEnabled
         // On enable, clamp eta0 to the safe threshold for the current lattice.
+        // If the preset params are invalid or clampEta0 throws, we refuse to
+        // flip the flag: letting `enabled=true` stand with bad params causes
+        // `sampleAdiabaticVacuum` / `computeCosmologyAt` to throw at reset
+        // time, which breaks the compute pass mid-frame. Silently staying
+        // disabled is the safest fallback — the user can fix the preset and
+        // try again.
+        let nextEnabled = enabled
         let { eta0 } = fs.cosmology
         if (enabled) {
-          try {
-            const clamped = clampEta0(
-              eta0,
-              {
-                preset: fs.cosmology.preset,
-                spacetimeDim: fs.latticeDim + 1,
-                steepness: fs.cosmology.steepness,
-                hubble: fs.cosmology.hubble,
-              },
-              fs.gridSize,
-              fs.spacing,
-              fs.latticeDim
+          const params = {
+            preset: fs.cosmology.preset,
+            spacetimeDim: fs.latticeDim + 1,
+            steepness: fs.cosmology.steepness,
+            hubble: fs.cosmology.hubble,
+          }
+          if (!isValidPreset(params)) {
+            logger.warn(
+              `[setFreeScalarCosmologyEnabled] Refusing to enable cosmology: ` +
+                `preset=${fs.cosmology.preset} params invalid (steepness=${fs.cosmology.steepness}, ` +
+                `hubble=${fs.cosmology.hubble}, spacetimeDim=${fs.latticeDim + 1}).`
             )
-            eta0 = clamped.eta0
-          } catch {
-            // Invalid preset combo — keep enable flag but leave eta0 untouched;
-            // the compute pass path will fall back to the Minkowski dispersion
-            // until the user picks a valid preset.
+            nextEnabled = false
+          } else {
+            try {
+              const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+              eta0 = clamped.eta0
+            } catch (e) {
+              logger.warn(
+                `[setFreeScalarCosmologyEnabled] Refusing to enable cosmology: ` +
+                  `clampEta0 failed for eta0=${eta0}: ` +
+                  `${e instanceof Error ? e.message : String(e)}`
+              )
+              nextEnabled = false
+            }
           }
         }
         return {
@@ -155,7 +188,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
             freeScalar: {
               ...fs,
               selfInteractionEnabled,
-              cosmology: { ...fs.cosmology, enabled, eta0 },
+              cosmology: { ...fs.cosmology, enabled: nextEnabled, eta0 },
               needsReset: true,
             },
           },
@@ -173,20 +206,31 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           const sc = sCritical(spacetimeDim)
           if (steepness <= sc) steepness = sc * 1.5
         }
-        // Re-clamp eta0 for the new regime.
+        // Re-clamp eta0 for the new regime. If the params are invalid (e.g.
+        // de Sitter with hubble=0) or clampEta0 throws, soft-disable cosmology
+        // so the next reset can't crash inside the compute pass.
         let { eta0 } = fs.cosmology
-        if (fs.cosmology.enabled) {
-          try {
-            const clamped = clampEta0(
-              eta0,
-              { preset, spacetimeDim, steepness, hubble: fs.cosmology.hubble },
-              fs.gridSize,
-              fs.spacing,
-              fs.latticeDim
+        let enabled = fs.cosmology.enabled
+        if (enabled) {
+          const params = { preset, spacetimeDim, steepness, hubble: fs.cosmology.hubble }
+          if (!isValidPreset(params)) {
+            logger.warn(
+              `[setFreeScalarCosmologyPreset] Disabling cosmology: preset=${preset} ` +
+                `params invalid after switch (steepness=${steepness}, ` +
+                `hubble=${fs.cosmology.hubble}, spacetimeDim=${spacetimeDim}).`
             )
-            eta0 = clamped.eta0
-          } catch {
-            // ignore — kept from previous
+            enabled = false
+          } else {
+            try {
+              const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+              eta0 = clamped.eta0
+            } catch (e) {
+              logger.warn(
+                `[setFreeScalarCosmologyPreset] Disabling cosmology: clampEta0 failed for ` +
+                  `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+              )
+              enabled = false
+            }
           }
         }
         return {
@@ -194,7 +238,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
             ...state.schroedinger,
             freeScalar: {
               ...fs,
-              cosmology: { ...fs.cosmology, preset, steepness, eta0 },
+              cosmology: { ...fs.cosmology, preset, steepness, eta0, enabled },
               needsReset: true,
             },
           },
@@ -217,19 +261,30 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
         const clamped = Math.max(sMin, Math.min(sMax, s))
         let { eta0 } = fs.cosmology
         if (fs.cosmology.enabled && fs.cosmology.preset === 'ekpyrotic') {
-          const result = clampEta0(
-            eta0,
-            {
-              preset: 'ekpyrotic',
-              spacetimeDim,
-              steepness: clamped,
-              hubble: fs.cosmology.hubble,
-            },
-            fs.gridSize,
-            fs.spacing,
-            fs.latticeDim
-          )
-          eta0 = result.eta0
+          try {
+            const result = clampEta0(
+              eta0,
+              {
+                preset: 'ekpyrotic',
+                spacetimeDim,
+                steepness: clamped,
+                hubble: fs.cosmology.hubble,
+              },
+              fs.gridSize,
+              fs.spacing,
+              fs.latticeDim
+            )
+            eta0 = result.eta0
+          } catch (e) {
+            // Match the enabled/preset setters: a bad lattice/spacing state
+            // shouldn't block a steepness edit. Leave eta0 untouched; the
+            // next preset/enable cycle (or reconcileCosmologyInvariants) will
+            // soft-disable if the state stays corrupt.
+            logger.warn(
+              `[setFreeScalarCosmologySteepness] clampEta0 failed for ` +
+                `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+            )
+          }
         }
         return {
           schroedinger: {

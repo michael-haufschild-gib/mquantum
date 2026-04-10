@@ -246,14 +246,27 @@ describe('clampEta0', () => {
 
 describe('sampleAdiabaticVacuum', () => {
   it('reduces to the existing Minkowski sampler for the trivial preset', () => {
-    // Since mEffSq = mass² for Minkowski but `sampleAdiabaticVacuum` always
-    // routes through the explicit-mass dispatch, while the bare KG sampler
-    // applies the M_FLOOR clamp, the two outputs are NOT byte-equal in
-    // general (they only coincide when mass > M_FLOOR). Use mass=0.3 above
-    // M_FLOOR=0.01 so the floor is inactive.
+    // The Minkowski branch routes through `'kgFloor'` dispersion, so the two
+    // outputs are bit-identical for any mass — including mass < M_FLOOR where
+    // the regularization kicks in. Use mass=0.3 above M_FLOOR=0.01 here; the
+    // low-mass case is covered by the next test.
     const cfg = makeConfig({ mass: 0.3 })
     const minkowski = sampleVacuumSpectrum(cfg, 7, 'kgFloor')
     const adiabatic = sampleAdiabaticVacuum(cfg, { preset: 'minkowski', spacetimeDim: 4 }, -5, 7)
+    expect(adiabatic.phi).toEqual(minkowski.phi)
+    expect(adiabatic.pi).toEqual(minkowski.pi)
+  })
+
+  it('matches the disabled-cosmology path bit-identically when mass < M_FLOOR', () => {
+    // Regression: a previous revision routed the Minkowski cosmology branch
+    // through the explicit-mass dispatch with `mass * mass`, which diverged
+    // from the bare KG sampler (which applies `max(mass, M_FLOOR)`) whenever
+    // the physical mass fell below the floor. The auto-scale estimator kept
+    // using `'kgFloor'`, so initialization and normalization disagreed for
+    // light/massless fields. Lock the equivalence to prevent the drift.
+    const cfg = makeConfig({ mass: 0.005 }) // below M_FLOOR = 0.01
+    const minkowski = sampleVacuumSpectrum(cfg, 11, 'kgFloor')
+    const adiabatic = sampleAdiabaticVacuum(cfg, { preset: 'minkowski', spacetimeDim: 4 }, -5, 11)
     expect(adiabatic.phi).toEqual(minkowski.phi)
     expect(adiabatic.pi).toEqual(minkowski.pi)
   })

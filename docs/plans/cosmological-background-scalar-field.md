@@ -1,8 +1,10 @@
 # Cosmological Background for Free Scalar Field — Plan
 
-**Status**: Proposed (v1 approved 2026-04-10)
-**Scope**: Extend `freeScalarField` with a time-dependent FLRW background, enabling quantum-perturbation evolution on de Sitter, ekpyrotic, and Kasner spacetimes via the Mukhanov–Sasaki equation.
+**Status**: Shipped (v1 merged 2026-04-10, canonical-δφ integrator revision 2026-04-11)
+**Scope**: Extend `freeScalarField` with a time-dependent FLRW background, enabling quantum-perturbation evolution on de Sitter, ekpyrotic, and Kasner spacetimes using the canonical perturbation variables `(δφ, π_δφ)` with a time-dependent coefficient-based integrator.
 **Motivation**: Beyer, Garfinkle, Isenberg, Oliynyk — *Big Bang Stability and Isotropisation for the Einstein–Scalar Field Equations in the Ekpyrotic Regime* (arXiv:2604.00297, 31 Mar 2026). The paper proves nonlinear stability of the ekpyrotic FLRW background under the Einstein–scalar system. This plan rides on top of that classical background with quantum perturbations of a minimally coupled free scalar, which is the standard textbook mechanism by which inflationary/ekpyrotic models produce primordial spectra.
+
+> **Implementation note (2026-04-11).** The original draft of this plan (see "v1 draft math contract" at the bottom) used the Mukhanov-Sasaki rescaled variable `v = a^((n−2)/2)·δφ` and a uniform `M²_eff(η) = a²m² − z''/z`. During implementation, the `z''/z` term proved to be the source of catastrophic late-time instability in de Sitter (`|z''/z| ∝ 1/η² → ∞` as `η → 0`). The shipped integrator works directly in canonical `(δφ, π_δφ)` variables with three time-dependent coefficients `(aKinetic, aPotential, aFull)` and does not rescale the lattice state. See `docs/adr/010-fsf-cosmology-late-time-integrator.md` for the decision record.
 
 ---
 
@@ -22,17 +24,30 @@
 
 ---
 
-## Math contract
+## Math contract (shipped — canonical δφ integrator)
 
-For a minimally coupled free real scalar `δφ(η,x)` on a spatially-flat FLRW metric `g = a²(η)·(−dη² + dx²)` with scale factor `a(η)` in conformal time, define the conformal field `v = a^((n−2)/2)·δφ` (Mukhanov–Sasaki variable). Then `v` satisfies
+For a minimally coupled free real scalar `δφ(η,x)` on a spatially-flat FLRW metric `g = a²(η)·(−dη² + dx²)` with scale factor `a(η)` in conformal time, the canonical action is
 
-    v'' − ∇²v + M²_eff(η)·v = 0
-    M²_eff(η) = a²(η)·m² − z''(η)/z(η)
-    z(η) := a^((n−2)/2)(η)
+    S = ∫dη d^(n−1)x · a^(n−2) · [½ (δφ')² − ½ (∇δφ)² − ½ m² a² δφ² − a² V(δφ)]
 
-Structurally identical to the existing Klein–Gordon lattice update — **only `m²` becomes time-dependent**.
+from which the conjugate momentum `π_δφ = a^(n−2) · δφ'` and the canonical Hamiltonian
 
-For all v1 presets `a(η) = A·|η|^q` is a power law, so `z''/z = β(β−1)/η²` with `β = (n−2)·q/2`.
+    H_can = ∫ d^(n−1)x [½ a^(−(n−2)) π_δφ² + ½ a^(n−2) (∇δφ)² + ½ m² a^n δφ² + a^n V(δφ)]
+
+yield the three coefficients
+
+    aKinetic   = a^(−(n−2))     (drift coefficient)
+    aPotential = a^(n−2)        (gradient / stress coefficient)
+    aFull      = a^n            (volume-form coefficient for mass + V terms)
+
+The leapfrog update reads
+
+    δφ' = aKinetic · π_δφ                                           (drift)
+    π_δφ' = aPotential · ∇²δφ − m²·aFull · δφ − aFull · V'(δφ)      (kick)
+
+collapsing to the ordinary Klein-Gordon leapfrog when `a = 1` (Minkowski). **Only the three coefficients become time-dependent;** the lattice always stores canonical `(δφ, π_δφ)`.
+
+For all v1 presets `a(η) = A·|η|^q` is a power law, so the coefficients are closed-form: `aKinetic = (A|η|^q)^(−(n−2))`, `aPotential = (A|η|^q)^(n−2)`, `aFull = (A|η|^q)^n`. See `src/lib/physics/cosmology/background.ts` for the unified evaluator and `docs/adr/010-fsf-cosmology-late-time-integrator.md` for the rationale behind dropping the Mukhanov-Sasaki rescaling.
 
 ### Preset table
 
@@ -45,15 +60,20 @@ For all v1 presets `a(η) = A·|η|^q` is a power law, so `z''/z = β(β−1)/η
 
 Background ODE (paper 1.16): `x' = (n−1)·(s/s_c − x)·(1 − x²)` with fixed points `x₁ = s/s_c`, `x₂ = 1`, `x₃ = −1` and effective equation of state `w = 2x² − 1`. Integrated once on CPU for the analysis readout; the closed-form `q` bypasses the ODE for the shader hot path.
 
-### Initial condition — Bunch–Davies adiabatic vacuum
+### Initial condition — Bunch–Davies adiabatic vacuum (canonical basis)
 
-At `η = η₀` (deep past, sub-horizon limit for all simulated `k`), each mode `k` is seeded with
+At `η = η₀` the canonical quadratic Hamiltonian is
 
-    |v_k(η₀)|² = 1 / (2·ω_k(η₀))
-    |(dv_k/dη)(η₀)|² = ω_k(η₀) / 2
-    ω_k²(η₀) = k² + M²_eff(η₀)
+    H_k(η₀) = ½ A(η₀) |π_{δφ,k}|² + ½ (B(η₀)·k_lat² + m²·B_full(η₀)) |δφ_k|²
+    A = a^(−(n−2)),   B = a^(n−2),   B_full = a^n
 
-Safety clamp: auto-enforce `k_max²·η₀² ≥ 4·|z''/z|(η₀)` so no sub-horizon mode is tachyonic at `η₀`. Clamped `η₀` is surfaced in the UI.
+Treating this as an instantaneous harmonic oscillator with effective mass `μ = B`, physical dispersion `ω_k² = k_lat² + m²·a²(η₀)`, and Bunch-Davies vacuum variances
+
+    ⟨|δφ_k|²⟩ = 1 / (2 B ω_k),   ⟨|π_{δφ,k}|²⟩ = B ω_k / 2.
+
+These are obtained by drawing a Minkowski-style sample with dispersion `ω_k² = k_lat² + m²·a²(η₀)` from the existing lattice sampler, then rescaling by `√B = a^((n−2)/2)`. The `M_FLOOR` zero-mode regularization flows through unchanged.
+
+Safety: under canonical δφ the effective squared mass is `m²·a²` ≥ 0, so the vacuum is well-defined at any non-zero `η₀`. `safeEta0` now returns a constant UX floor (`DEFAULT_SAFE_ETA0 = 0.1`) that catches `η₀ = 0` and trivially-close values; the previous dimension-dependent `k_max²·η₀² ≥ 4·|z''/z|` derivation is obsolete (the `z''/z` term no longer appears in the integrator).
 
 ---
 
@@ -68,19 +88,20 @@ Safety clamp: auto-enforce `k_max²·η₀² ≥ 4·|z''/z|(η₀)` so no sub-ho
 
 ### File-level change list
 
-**Modify (small, surgical):**
+**Modify (small, surgical) — as shipped:**
 
 | File | Change |
 |---|---|
-| `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl.ts` | Replace `params.mass*params.mass` → `params.mEffSq` |
-| `src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts` (FreeScalarUniforms block) | Add `mEffSq, aScale, hubble, eta` at padding slots 504–519 |
-| `src/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.ts` | Populate new uniform fields; fall back to `mass²` when cosmology disabled |
-| `src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts` | Track `simEta`; compute cosmology scalars per frame; advance `eta += dt·stepsPerFrame` when playing |
-| `src/lib/geometry/extended/freeScalar.ts` | Add `cosmology` sub-config + defaults |
-| `src/lib/physics/freeScalar/vacuumSpectrum.ts` | Accept optional `omegaK(k)` callback for Bunch–Davies dispersion |
-| `src/stores/extendedObjectStore.ts` | `setCosmology{Enabled,Preset,Steepness,Eta0}` setters |
-| `src/lib/url/state-serializer.ts` | New params: `cos`, `cos_bg`, `cos_s`, `cos_n`, `cos_eta0` with validation/clamp |
-| `src/components/sections/Geometry/SchroedingerControls/index.tsx` | Mount new cosmology sub-section inside FSF controls |
+| `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl.ts` | Multiply drift by `params.aKinetic` |
+| `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl.ts` | Multiply Laplacian by `params.aPotential`; mass/self-interaction terms by `params.aFull` |
+| `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl.ts` | FreeScalarUniforms gains `aKinetic/aPotential/aFull` at offsets 504/508/512 (total struct 528 bytes) |
+| `src/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms.ts` | `computeFsfCosmologyCoefs` per-substep resolver; partial-write slot for the three coefs; estimators rescale by `(aPotential, aFull)` for energy-density view |
+| `src/rendering/webgpu/passes/FreeScalarFieldComputePass.ts` | Track `simEta`; resolve `(aKinetic, aPotential, aFull)` once per substep; re-upload the 12-byte cosmology slot per sub-step via `writeCosmologyCoefsSlot` |
+| `src/lib/geometry/extended/freeScalar.ts` | Add `cosmology` sub-config + defaults (`DEFAULT_COSMOLOGY_CONFIG`) |
+| `src/lib/physics/freeScalar/vacuumSpectrum.ts` | Accept `VacuumDispersion = 'kgFloor' \| number` dispatch so the adiabatic vacuum sampler can inject `m²·a²(η₀)` |
+| `src/stores/slices/geometry/setters/freeScalarCosmologySetters.ts` | `setFreeScalarCosmology{Enabled,Preset,Steepness,Hubble,Eta0}` setters; `reconcileCosmologyInvariants` helper soft-disables on invalid preset combos |
+| `src/lib/url/state-serializer.ts` | New params: `cos`, `cos_bg`, `cos_s`, `cos_h`, `cos_eta0` with validation/clamp |
+| `src/components/sections/Geometry/SchroedingerControls/index.tsx` | Mount `CosmologyControls` inside FSF controls |
 | `src/components/sections/Analysis/FSFAnalysisSection.tsx` | Readout panel: `w(η), ℋ(η), a(η), k_horizon` |
 
 **New (isolated, pure logic):**
@@ -99,8 +120,10 @@ Safety clamp: auto-enforce `k_max²·η₀² ≥ 4·|z''/z|(η₀)` so no sub-ho
 | `cos` | 0/1 | Cosmology enabled |
 | `cos_bg` | enum | `minkowski`, `deSitter`, `ekpyrotic`, `kasner` |
 | `cos_s` | float | Steepness `s` (ekpyrotic only; must be > `s_c`) |
-| `cos_n` | int 3–7 | Spacetime dim (derived from `latticeDim + 1`, validated on import) |
-| `cos_eta0` | float | Initial conformal time (negative; auto-clamped) |
+| `cos_h` | float | Hubble rate `H` (de Sitter only; required, `[0.01, 100]`) |
+| `cos_eta0` | float | Initial conformal time (negative; auto-clamped above `DEFAULT_SAFE_ETA0`) |
+
+Spacetime dim is derived from `latticeDim + 1` (validated on import); there is no separate `cos_n` param.
 
 ---
 

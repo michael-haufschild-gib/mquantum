@@ -312,10 +312,23 @@ describe('validateSpacetimeDim', () => {
 })
 
 describe('isValidPreset', () => {
-  it('accepts every Minkowski, de Sitter, and Kasner configuration', () => {
+  it('accepts Minkowski and Kasner without extra parameters', () => {
     expect(isValidPreset({ preset: 'minkowski', spacetimeDim: 4 })).toBe(true)
-    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4 })).toBe(true)
     expect(isValidPreset({ preset: 'kasner', spacetimeDim: 4 })).toBe(true)
+  })
+
+  it('requires a finite positive hubble for de Sitter', () => {
+    // Regression: previously isValidPreset only consulted qExponent, which
+    // ignores the hubble requirement. The compute pass's scaleFactorAmplitude
+    // then threw at reset time despite isValidPreset having returned true.
+    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4, hubble: 1 })).toBe(true)
+    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4 })).toBe(false)
+    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4, hubble: 0 })).toBe(false)
+    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4, hubble: -1 })).toBe(false)
+    expect(isValidPreset({ preset: 'deSitter', spacetimeDim: 4, hubble: Number.NaN })).toBe(false)
+    expect(
+      isValidPreset({ preset: 'deSitter', spacetimeDim: 4, hubble: Number.POSITIVE_INFINITY })
+    ).toBe(false)
   })
 
   it('accepts admissible ekpyrotic and rejects invalid steepness', () => {

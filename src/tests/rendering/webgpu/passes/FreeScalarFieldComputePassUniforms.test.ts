@@ -78,6 +78,71 @@ describe('computeFsfInitHash', () => {
     )
     expect(hash).not.toContain('_si')
   })
+
+  it('changes when cosmology is enabled vs disabled', () => {
+    const base = createConfig()
+    const off = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, enabled: false },
+    })
+    const on = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, enabled: true },
+    })
+    expect(off).not.toBe(on)
+    expect(off).toContain('_cosmo0')
+    expect(on).toContain('_cosmo1_')
+  })
+
+  it('changes when any cosmology parameter changes', () => {
+    const base = createConfig({
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 2,
+        hubble: 1,
+        eta0: -1,
+      },
+    })
+    const h = computeFsfInitHash(base)
+    const hPreset = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, preset: 'ekpyrotic' },
+    })
+    const hSteep = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, steepness: 3 },
+    })
+    const hHubble = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, hubble: 2 },
+    })
+    const hEta = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, eta0: -2 },
+    })
+    // All four must differ from each other and from the base.
+    const all = [h, hPreset, hSteep, hHubble, hEta]
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  it('combines cosmology and self-interaction in the hash', () => {
+    const base = createConfig({
+      selfInteractionEnabled: true,
+      selfInteractionLambda: 0.1,
+      selfInteractionVev: 1.0,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 2,
+        hubble: 1,
+        eta0: -1,
+      },
+    })
+    const hash = computeFsfInitHash(base)
+    expect(hash).toContain('_cosmo1_deSitter')
+    expect(hash).toContain('_si0.1')
+  })
 })
 
 describe('computeStridesPadded (used by FSF uniform packing)', () => {
@@ -117,7 +182,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, mockBuffer, uniformData, {
       config,
       totalSites,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -141,7 +207,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config,
       totalSites: 16 * 32 * 64,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -161,7 +228,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config,
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const f32 = new Float32Array(uniformData)
@@ -178,7 +246,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config: createConfig({ initialCondition: 'vacuumNoise' }),
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(0)
   })
@@ -190,7 +259,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config: createConfig({ initialCondition: 'gaussianPacket' }),
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(2)
   })
@@ -202,7 +272,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config: createConfig({ fieldView: 'energyDensity' }),
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
     // energyDensity → 2
     expect(new Uint32Array(uniformData)[41]).toBe(2)
@@ -217,7 +288,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, mockBuffer, uniformData, {
       config: createConfig(),
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
@@ -235,7 +307,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config,
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -257,7 +330,8 @@ describe('writeFsfUniforms', () => {
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
       config,
       totalSites: 32768,
-      maxFieldValue: 1.0, simEta: 0,
+      maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     expect(new Uint32Array(uniformData)[120]).toBe(0)

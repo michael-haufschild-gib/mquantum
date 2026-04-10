@@ -11,14 +11,19 @@
 
 import { freeScalarAbsorberBlock } from '../shaders/schroedinger/compute/freeScalarAbsorber.wgsl'
 import {
-  freeScalarInitBlock,
+  freeScalarInitShaderBlock,
   freeScalarUniformsBlock,
+  freeScalarUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/freeScalarInit.wgsl'
-import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
+import {
+  freeScalarNDIndexBlock,
+  freeScalarNDIndexShaderBlock,
+} from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -90,14 +95,23 @@ export function buildFsfPipelines(device: GPUDevice, helpers: FsfPassHelpers): F
   const uniformsAndIndex = freeScalarUniformsBlock + freeScalarNDIndexBlock
 
   // === Init pipeline (phi + pi read_write) ===
+  // Composed via `assembleShaderBlocks()` per the shader styleguide. The
+  // sibling free-scalar compute pipelines (absorber, update phi/pi, write
+  // grid) still use the legacy raw-string concatenation below; migrating
+  // them is out of scope for this PR and tracked as a follow-up.
   const initBGL = createComputeBGL(device, 'free-scalar-init-bgl', [
     'uniform',
     'storage',
     'storage',
   ])
+  const initWgsl = assembleShaderBlocks([
+    freeScalarUniformsShaderBlock,
+    freeScalarNDIndexShaderBlock,
+    freeScalarInitShaderBlock,
+  ]).wgsl
   const initPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, uniformsAndIndex + freeScalarInitBlock, 'free-scalar-init'),
+    helpers.createShaderModule(device, initWgsl, 'free-scalar-init'),
     [initBGL],
     'free-scalar-init'
   )

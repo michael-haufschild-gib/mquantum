@@ -458,14 +458,14 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Field view"
             tooltip={
               fs.cosmology.enabled
-                ? 'Displayed field quantity. Under cosmology these are the Mukhanov-Sasaki variable v = a^((n−2)/2)·δφ and its conjugate π_v.'
+                ? 'Displayed field quantity: δφ (scalar field perturbation), π (conjugate momentum), or ε (proper energy density per comoving observer).'
                 : 'Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density).'
             }
             data-testid="field-view-selector"
           />
           {fs.cosmology.enabled && (
             <div className="text-xs text-text-tertiary italic">
-              Cosmology active: φ → v, π → π_v, ε → E_v
+              Cosmology active: displaying canonical δφ, π, and proper ε.
             </div>
           )}
         </ControlGroup>

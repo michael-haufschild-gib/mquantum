@@ -437,9 +437,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       logger.log(`[FSF] Injected loaded field state (${elementCount} sites)`)
     } else if (config.initialCondition === 'vacuumNoise') {
       // When cosmology is active, sample the Bunch-Davies adiabatic vacuum
-      // at eta0 using the Mukhanov-Sasaki effective mass. Otherwise use the
-      // ordinary Minkowski vacuum sampler. Both paths return (phi, pi) in
-      // the same shape, so the downstream GPU upload is unchanged.
+      // at `this.simEta` (not `config.cosmology.eta0`). The caller already
+      // resolved the runtime clock from either `pendingLoadedSimEta` or
+      // `config.cosmology.eta0`, so reusing the resolved value keeps the
+      // sampled initial state in lockstep with the shader uniforms —
+      // otherwise a save-resume would initialize at `eta0` while the
+      // uniforms report the saved `simEta`. The canonical δφ sampler uses
+      // the physical dispersion `ω² = k_lat² + m²·a²(η)` internally and
+      // then rescales the result by `B = a^(n−2) = aPotential(η)` so the
+      // sampled `(δφ, π_δφ)` sit on the canonical-variance Hamiltonian —
+      // there is no Mukhanov-Sasaki `v = z·δφ` substitution anywhere in
+      // this path. Cosmology-disabled configs fall through to the ordinary
+      // Minkowski vacuum sampler. Both paths return `(phi, pi)` in the
+      // same shape.
       const { phi, pi } = config.cosmology.enabled
         ? sampleAdiabaticVacuum(
             config,
@@ -449,7 +459,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               steepness: config.cosmology.steepness,
               hubble: config.cosmology.hubble,
             },
-            config.cosmology.eta0,
+            this.simEta,
             config.vacuumSeed
           )
         : sampleVacuumSpectrum(config, config.vacuumSeed, 'kgFloor')
