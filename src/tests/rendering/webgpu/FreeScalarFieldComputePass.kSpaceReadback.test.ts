@@ -170,4 +170,29 @@ describe('FsfKSpaceManager readback', () => {
     expect(mgr.pendingKSpaceData).toBeNull()
     expect(buildKSpaceDisplayTexturesMock).not.toHaveBeenCalled()
   })
+
+  it('invalidateReadbacks clears any already-queued pending k-space data', () => {
+    // L7 audit regression: a worker result that landed on the pending queue
+    // *before* a cosmology reset must not be uploaded into the texture on
+    // the next frame. The previous form only bumped the epoch, leaving any
+    // pendingKSpaceData in place — causing one frame of stale k-space pixels
+    // after every reset.
+    const mgr = new FsfKSpaceManager() as unknown as {
+      kSpaceReadbackEpoch: number
+      pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null
+      invalidateReadbacks(): void
+    }
+
+    mgr.kSpaceReadbackEpoch = 0
+    mgr.pendingKSpaceData = {
+      density: new Uint16Array([1, 2, 3, 4]),
+      analysis: new Uint16Array([5, 6, 7, 8]),
+    }
+
+    mgr.invalidateReadbacks()
+
+    expect(mgr.pendingKSpaceData).toBeNull()
+    // And the epoch is bumped so any in-flight async resolution is dropped.
+    expect(mgr.kSpaceReadbackEpoch).toBe(1)
+  })
 })

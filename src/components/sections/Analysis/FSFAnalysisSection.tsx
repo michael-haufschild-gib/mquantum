@@ -45,9 +45,10 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
     }))
   )
 
-  // Effective squared mass at `η₀` — matches the M²_eff the shader uses on
-  // the first frame after reset. Used by the dispersion diagram under
-  // cosmology; defaults to `mass²` when disabled or parameters invalid.
+  // Physical "effective mass squared" at `η₀` — the canonical δφ
+  // integrator uses `ω² = k² + mass² · a²(η₀)` so the dispersion diagram
+  // shows `m²·a²` as its mass term. Under Minkowski this collapses to
+  // `mass²` bit-identically.
   const effectiveMassSq = useMemo(() => {
     if (!fsf.cosmology.enabled) return fsf.mass * fsf.mass
     const spacetimeDim = fsf.latticeDim + 1
@@ -59,7 +60,8 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
     }
     if (!isValidPreset(params)) return fsf.mass * fsf.mass
     try {
-      return computeCosmologyAt(fsf.cosmology.eta0, params, fsf.mass).mEffSq
+      const snap = computeCosmologyAt(fsf.cosmology.eta0, params)
+      return fsf.mass * fsf.mass * snap.a * snap.a
     } catch {
       return fsf.mass * fsf.mass
     }
@@ -417,7 +419,8 @@ const CosmologyReadout: React.FC<{
     }
     if (!isValidPreset(params)) return undefined
     try {
-      const snap = computeCosmologyAt(cosmology.eta0, params, mass)
+      const snap = computeCosmologyAt(cosmology.eta0, params)
+      const mSqASq = mass * mass * snap.a * snap.a
       // Effective equation-of-state parameter per paper eq. (1.20):
       //   Ekpyrotic fixed point: x₁ = s/s_c(n), so w = 2(s/s_c)² − 1 > 1
       //   Kasner fixed point:    x = ±1 → w = 1 (stiff fluid)
@@ -433,7 +436,7 @@ const CosmologyReadout: React.FC<{
         w = -1
       }
       const horizonK = 1 / Math.abs(cosmology.eta0)
-      return { snap, w, horizonK }
+      return { snap, w, horizonK, mSqASq }
     } catch {
       return undefined
     }
@@ -451,7 +454,7 @@ const CosmologyReadout: React.FC<{
     )
   }
 
-  const { snap, w, horizonK } = snapshot
+  const { snap, w, horizonK, mSqASq } = snapshot
 
   return (
     <ControlGroup
@@ -470,12 +473,14 @@ const CosmologyReadout: React.FC<{
         <MetricRow label="ℋ(η₀)" value={snap.hubble} digits={4} />
         <MetricRow label="w (EoS)" value={w} digits={3} />
         <div className="border-t border-panel-border my-1" />
-        <MetricRow label="z''/z" value={snap.zppOverZ} digits={4} />
-        <MetricRow label="M²_eff" value={snap.mEffSq} digits={4} />
+        <MetricRow label="m²·a²" value={mSqASq} digits={4} />
+        <MetricRow label="A = a^(−(n−2))" value={snap.aKinetic} digits={4} />
+        <MetricRow label="B = a^(n−2)" value={snap.aPotential} digits={4} />
         <MetricRow label="k_horizon" value={horizonK} digits={4} />
       </div>
       <div className="text-xs text-text-tertiary italic px-1">
-        Snapshot at η = η₀ (initial time). Live-η tracking deferred to v2.
+        Snapshot at η = η₀ (initial time). Canonical δφ variables — the
+        physical dispersion is ω² = k² + m²·a².
       </div>
     </ControlGroup>
   )

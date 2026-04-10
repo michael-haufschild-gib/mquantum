@@ -68,9 +68,22 @@ describe('sCritical', () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 describe('qExponent', () => {
-  it('returns 0 for Minkowski regardless of other parameters', () => {
+  it('returns 0 for Minkowski with admissible spacetime dim', () => {
     expect(qExponent({ preset: 'minkowski', spacetimeDim: 4 })).toBe(0)
     expect(qExponent({ preset: 'minkowski', spacetimeDim: 7, steepness: 1 })).toBe(0)
+  })
+
+  it('rejects an out-of-range spacetimeDim for every preset', () => {
+    // L7 audit: the previous form skipped validation in the Minkowski and
+    // de Sitter branches, allowing nonsense `n` values to pass silently.
+    // The Mukhanov-Sasaki bridge is physically defined only for `n ∈ [3, 7]`.
+    expect(() => qExponent({ preset: 'minkowski', spacetimeDim: -5 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'minkowski', spacetimeDim: 2 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'minkowski', spacetimeDim: 99 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'deSitter', spacetimeDim: 2 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'deSitter', spacetimeDim: 11 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'kasner', spacetimeDim: 2 })).toThrow(RangeError)
+    expect(() => qExponent({ preset: 'kasner', spacetimeDim: Number.NaN })).toThrow(RangeError)
   })
 
   it('returns −1 for de Sitter', () => {

@@ -123,15 +123,20 @@ export interface CosmologyPresetParams {
 export function qExponent(params: CosmologyPresetParams): number {
   const { preset, spacetimeDim } = params
 
+  // Always validate spacetimeDim, regardless of preset. The previous form
+  // skipped validation for Minkowski and de Sitter, allowing nonsense
+  // values like `n = -5` to pass silently. The Mukhanov-Sasaki bridge is
+  // physically defined only for `n ∈ [3, 7]`, so a single guard at the
+  // top of `qExponent` is the simplest contract.
+  validateSpacetimeDim(spacetimeDim)
+
   if (preset === 'minkowski') return 0
   if (preset === 'deSitter') return -1
   if (preset === 'kasner') {
-    validateSpacetimeDim(spacetimeDim)
     return 1 / (spacetimeDim - 2)
   }
 
   // ekpyrotic
-  validateSpacetimeDim(spacetimeDim)
   const s = params.steepness
   if (typeof s !== 'number' || !Number.isFinite(s)) {
     throw new RangeError(`ekpyrotic preset requires a finite steepness, got ${s}`)
@@ -171,6 +176,9 @@ export function qExponent(params: CosmologyPresetParams): number {
  * @returns `β·(β − 1)` for the chosen preset
  */
 export function zppOverZCoefficient(params: CosmologyPresetParams): number {
+  // Always validate dimensionality, even in the Minkowski short-circuit, so
+  // bad params surface as a RangeError instead of silently returning 0.
+  validateSpacetimeDim(params.spacetimeDim)
   if (params.preset === 'minkowski') return 0
   const q = qExponent(params)
   const beta = (q * (params.spacetimeDim - 2)) / 2
@@ -185,6 +193,7 @@ export function zppOverZCoefficient(params: CosmologyPresetParams): number {
  * @returns `β`
  */
 export function betaExponent(params: CosmologyPresetParams): number {
+  validateSpacetimeDim(params.spacetimeDim)
   if (params.preset === 'minkowski') return 0
   const q = qExponent(params)
   return (q * (params.spacetimeDim - 2)) / 2

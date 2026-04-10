@@ -88,9 +88,16 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
         needsReset: true,
       }
     }
-  } catch {
-    // clampEta0 throws on zero / non-finite eta0 — preserve prior behaviour
-    // and let the user-facing setters surface the error separately.
+  } catch (e) {
+    // clampEta0 throws on zero / non-finite eta0. The dimension-change path
+    // never receives user input here — it's a pure-state reconcile — so a
+    // throw indicates a corrupted store state from earlier writes. Surface
+    // it via logger.warn so the bug is visible in dev consoles instead of
+    // silently swallowed.
+    logger.warn(
+      `[reconcileCosmologyInvariants] clampEta0 failed for eta0=${fs.cosmology.eta0}: ` +
+        `${e instanceof Error ? e.message : String(e)}`
+    )
   }
   return {}
 }

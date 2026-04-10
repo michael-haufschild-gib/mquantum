@@ -113,24 +113,24 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         const { deserializeSimulationState } = await import('@/lib/export/simulationState')
         const result = await deserializeSimulationState(data)
 
-        // Apply config immediately so mode/grid changes trigger pipeline rebuild
-        // before the strategy checks pendingLoadData for wavefunction injection.
-        // Force needsReset on the mode sub-config so the compute pass reinitializes
-        // with the loaded grid parameters.
-        const loadedConfig = result.config as Record<string, unknown>
+        // Build a fresh config for the store push WITHOUT mutating
+        // `result.config` (which is also stashed on `pendingLoadData` and
+        // exposed to consumers). The previous form did `delete` and
+        // assignment on the raw deserializer return value, which violated
+        // the immutability contract of `pendingLoadData.config`.
+        const sourceConfig = result.config
+        const { _runtimeMeta: rawMeta, ...restConfig } = sourceConfig as Record<
+          string,
+          unknown
+        > & { _runtimeMeta?: unknown }
 
-        // Extract and strip mode-agnostic runtime state BEFORE the config is
-        // pushed into the schroedinger store — otherwise `_runtimeMeta`
-        // would be spread into the state as a stray field.
-        const rawMeta = loadedConfig._runtimeMeta
-        delete loadedConfig._runtimeMeta
         const runtimeMeta: RuntimeMeta | undefined =
           typeof rawMeta === 'object' && rawMeta !== null ? (rawMeta as RuntimeMeta) : undefined
 
         if (result.quantumMode === 'pauliSpinor') {
-          // Pauli is a separate object type — switch objectType and apply pauli config
+          // Pauli is a separate object type — switch objectType and apply pauli config.
           useGeometryStore.getState().setObjectType('pauliSpinor')
-          const pauliConfig = (loadedConfig.pauli ?? loadedConfig) as Partial<PauliConfig>
+          const pauliConfig = (restConfig.pauli ?? restConfig) as Partial<PauliConfig>
           useExtendedObjectStore.getState().setPauliConfig({
             ...pauliConfig,
             needsReset: true,
@@ -141,8 +141,9 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
           // `needsReset: true` at the top level does not propagate into the
           // sub-config the compute pass actually checks, so the field
           // buffers keep whatever vacuum data the previous reinit sampled
-          // and the loaded wavefunction is silently dropped. Force the
-          // reset flag onto the correct sub-config for each compute mode.
+          // and the loaded wavefunction is silently dropped. Build a new
+          // config object with the reset flag forced into the correct
+          // sub-config for each compute mode.
           const MODE_TO_SUBCONFIG_KEY: Record<string, string> = {
             freeScalarField: 'freeScalar',
             tdseDynamics: 'tdse',
@@ -151,18 +152,18 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
             quantumWalk: 'quantumWalk',
           }
           const subKey = MODE_TO_SUBCONFIG_KEY[result.quantumMode]
-          if (subKey && typeof loadedConfig[subKey] === 'object' && loadedConfig[subKey] !== null) {
-            loadedConfig[subKey] = {
-              ...(loadedConfig[subKey] as Record<string, unknown>),
-              needsReset: true,
-            }
-          }
-          // Preserve the top-level flag too for analytic modes that read it.
-          loadedConfig.needsReset = true
-          useExtendedObjectStore.getState().setSchroedingerConfig({
+          const subConfig =
+            subKey && typeof restConfig[subKey] === 'object' && restConfig[subKey] !== null
+              ? { ...(restConfig[subKey] as Record<string, unknown>), needsReset: true }
+              : undefined
+          const pushed: Record<string, unknown> = {
+            ...restConfig,
             quantumMode: result.quantumMode,
-            ...loadedConfig,
-          })
+            // Preserve the top-level flag too for analytic modes that read it.
+            needsReset: true,
+            ...(subKey && subConfig ? { [subKey]: subConfig } : {}),
+          }
+          useExtendedObjectStore.getState().setSchroedingerConfig(pushed)
         }
 
         set({
@@ -171,7 +172,9 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
             latticeDim: result.latticeDim,
             gridSize: result.gridSize,
             totalSites: result.totalSites,
-            config: result.config,
+            // Expose the deserializer's untouched config so consumers see
+            // exactly what was on disk, including `_runtimeMeta`.
+            config: sourceConfig,
             psiRe: result.psiRe,
             psiIm: result.psiIm,
             runtimeMeta,

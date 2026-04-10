@@ -1013,7 +1013,7 @@ describe('free scalar vacuum: statistical sampling', () => {
         dt: 0.01,
         stepsPerFrame: 1,
       }
-      const { phi } = sampleVacuumSpectrum(config, seed)
+      const { phi } = sampleVacuumSpectrum(config, seed, 'kgFloor')
       // Compute variance of phi across all sites
       let sum = 0
       let sum2 = 0

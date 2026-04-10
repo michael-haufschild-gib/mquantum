@@ -23,13 +23,11 @@ import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import {
   clampEta0,
-  DEFAULT_ETA0_SAFETY_FACTOR,
   DEFAULT_SAFE_ETA0,
   minLatticeMomentum,
   safeEta0,
   sampleAdiabaticVacuum,
 } from '@/lib/physics/cosmology/adiabaticVacuum'
-import { zppOverZCoefficient } from '@/lib/physics/cosmology/presets'
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -117,24 +115,61 @@ describe('safeEta0', () => {
     }
   })
 
-  it('computes |η₀|_min = (L/2π)·√(safety·|β(β−1)|) for de Sitter', () => {
+  it('returns the default for ekpyrotic just above s_c (regime boundary)', () => {
+    // L7 audit: explicit boundary case. The store-side clamp uses
+    // `s_c * 1.0001` as the lower bound; safeEta0 should still pass through
+    // DEFAULT_SAFE_ETA0 at that boundary because β(β−1) is still ≤ 0.
+    // (β → 1/2 in the limit, so β(β−1) → −1/4.)
     const cfg = makeConfig()
-    const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
-    const zpp = zppOverZCoefficient(params) // = 2 in 4D
-    const kMin = minLatticeMomentum(cfg.gridSize, cfg.spacing, cfg.latticeDim)
-    const expected = Math.sqrt((DEFAULT_ETA0_SAFETY_FACTOR * zpp) / (kMin * kMin))
-    expect(safeEta0(params, cfg.gridSize, cfg.spacing, cfg.latticeDim)).toBeCloseTo(expected, 12)
+    const sc = Math.sqrt((8 * (4 - 1)) / (4 - 2)) // s_c(n=4) = √12
+    expect(
+      safeEta0(
+        { preset: 'ekpyrotic', spacetimeDim: 4, steepness: sc * 1.0001 },
+        cfg.gridSize,
+        cfg.spacing,
+        cfg.latticeDim
+      )
+    ).toBe(DEFAULT_SAFE_ETA0)
   })
 
-  it('scales linearly with box size L for de Sitter', () => {
-    // |η₀|_min ∝ L_max because k_min ∝ 1/L_max.
+  it('clampEta0 with eta0 exactly at the threshold reports clamped=false', () => {
+    // Border-case regression: clampEta0 should treat values *at* the
+    // threshold as already-safe (use `>=`, not `>`). A bug here would
+    // pump |eta0| upward by 1 ULP every time the user opens the panel.
+    const cfg = makeConfig()
+    const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
+    const min = safeEta0(params, cfg.gridSize, cfg.spacing, cfg.latticeDim)
+    const { eta0, clamped } = clampEta0(-min, params, cfg.gridSize, cfg.spacing, cfg.latticeDim)
+    expect(clamped).toBe(false)
+    expect(eta0).toBe(-min)
+  })
+
+  it('returns the default for de Sitter (no physical constraint in δφ variables)', () => {
+    // Under the canonical δφ formulation the adiabatic vacuum at η₀ has
+    // the non-negative dispersion ω² = k² + m²·a², well-defined for any
+    // real mass and any non-zero η₀. The tachyonic β(β−1)/η² term that
+    // made the old Mukhanov-Sasaki bridge unstable is gone entirely, so
+    // safeEta0 is purely a user-facing heuristic floor — same constant
+    // for every preset and lattice geometry.
+    const cfg = makeConfig()
+    const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
+    expect(safeEta0(params, cfg.gridSize, cfg.spacing, cfg.latticeDim)).toBe(DEFAULT_SAFE_ETA0)
+  })
+
+  it('is independent of box size for de Sitter', () => {
+    // |η₀|_min no longer scales with k_min · √(β(β−1)) — the δφ formulation
+    // removes the tachyonic coupling entirely, leaving a bare constant.
     const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
     const small = safeEta0(params, [8, 8, 8], [0.1, 0.1, 0.1], 3)
     const big = safeEta0(params, [8, 8, 8], [0.2, 0.2, 0.2], 3)
-    expect(big).toBeCloseTo(2 * small, 10)
+    expect(small).toBe(DEFAULT_SAFE_ETA0)
+    expect(big).toBe(DEFAULT_SAFE_ETA0)
   })
 
-  it('grows with spacetime dimension for de Sitter (β(β−1) = n(n−2)/4)', () => {
+  it('is independent of spacetime dimension for de Sitter', () => {
+    // Same rationale: the old derivation |η₀|_min ∝ √(n·(n−2)/4) was
+    // tied to the Mukhanov-Sasaki bridge, which is now retired. Pin the
+    // constant directly.
     const cfg = makeConfig()
     const eta4 = safeEta0(
       { preset: 'deSitter', spacetimeDim: 4, hubble: 1 },
@@ -148,8 +183,8 @@ describe('safeEta0', () => {
       cfg.spacing,
       cfg.latticeDim
     )
-    // β(β−1) grows from 2 (n=4) to 6 (n=6), so |η₀|_min grows by √3.
-    expect(eta6 / eta4).toBeCloseTo(Math.sqrt(3), 6)
+    expect(eta4).toBe(DEFAULT_SAFE_ETA0)
+    expect(eta6).toBe(DEFAULT_SAFE_ETA0)
   })
 })
 
@@ -211,11 +246,13 @@ describe('clampEta0', () => {
 
 describe('sampleAdiabaticVacuum', () => {
   it('reduces to the existing Minkowski sampler for the trivial preset', () => {
-    // Since mEffSq = mass² for Minkowski and the shape of the dispersion is
-    // unchanged, the output must match the bare sampleVacuumSpectrum byte
-    // for byte at the same seed.
+    // Since mEffSq = mass² for Minkowski but `sampleAdiabaticVacuum` always
+    // routes through the explicit-mass dispatch, while the bare KG sampler
+    // applies the M_FLOOR clamp, the two outputs are NOT byte-equal in
+    // general (they only coincide when mass > M_FLOOR). Use mass=0.3 above
+    // M_FLOOR=0.01 so the floor is inactive.
     const cfg = makeConfig({ mass: 0.3 })
-    const minkowski = sampleVacuumSpectrum(cfg, 7)
+    const minkowski = sampleVacuumSpectrum(cfg, 7, 'kgFloor')
     const adiabatic = sampleAdiabaticVacuum(cfg, { preset: 'minkowski', spacetimeDim: 4 }, -5, 7)
     expect(adiabatic.phi).toEqual(minkowski.phi)
     expect(adiabatic.pi).toEqual(minkowski.pi)
@@ -264,45 +301,51 @@ describe('sampleAdiabaticVacuum', () => {
     expect(anyDiff).toBe(true)
   })
 
-  it('rejects super-horizon tachyonic configurations at shallow η₀', () => {
-    // Force an unsafe η₀ for de Sitter: the rejection message protects
-    // downstream code from a non-positive-definite dispersion.
+  it('produces finite real-valued δφ fields for de Sitter at any shallow η₀', () => {
+    // Under the canonical δφ formulation the adiabatic vacuum is well-
+    // defined at any non-zero η₀ because the physical dispersion
+    // ω² = k² + m²·a² is always non-negative. Even at a "shallow" η₀
+    // where the old Mukhanov-Sasaki path rejected the sampler, the new
+    // path returns a finite, well-defined field — the only effect of
+    // shallow η₀ is a large scale factor a(η₀), which rescales δφ
+    // amplitudes but never produces NaN or imaginary outputs.
     const cfg = makeConfig({ mass: 0 })
     const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
-    // Use an η₀ far shallower than safeEta0. At |η| ≪ L/(2π)·√2 the lowest
-    // lattice modes have ω_k² < 0.
-    const unsafe = -0.01
-    expect(() => sampleAdiabaticVacuum(cfg, params, unsafe, 0)).toThrow(RangeError)
+    const shallow = -0.5
+    const { phi, pi } = sampleAdiabaticVacuum(cfg, params, shallow, 0)
+    for (let i = 0; i < phi.length; i++) {
+      expect(Number.isFinite(phi[i]!)).toBe(true)
+      expect(Number.isFinite(pi[i]!)).toBe(true)
+    }
   })
 
-  it('injects the full signed mEffSq — not a zero fallback — for tachyonic de Sitter', () => {
-    // Finding 4: for de Sitter at a safe η₀ the mEffSq is negative, but
-    // kMin² + mEffSq > 0. The old sampler substituted effectiveMass=0
-    // (which then went through `max(mass, M_FLOOR)` — a double wrong).
-    // The new sampler passes mEffSq through as `omegaSqMassTerm`, so the
-    // resulting pi-variance per site scales as `<π²> ∝ sum_k ω_k / 2`
-    // with `ω_k² = k_lat² + mEffSq`. Comparing against a dispersion that
-    // ignores the mass (`ω_k² = k_lat²`) should show a measurable shift.
+  it('rescales δφ amplitudes by 1/√aPotential vs the bare Minkowski sampler', () => {
+    // The canonical variance ⟨|δφ|²⟩ = 1/(2·B·ω_k) with B = a^(n−2), vs
+    // the Minkowski-sampler variance 1/(2·ω_k). The δφ sampler applies a
+    // per-site rescale of 1/√B on top of the Minkowski draw, so the
+    // parity between the two paths is deterministic — pin it explicitly.
+    //
+    // Under de Sitter with H=1, eta0=-2 → a=0.5, B=a²=0.25, √B=0.5. The
+    // δφ samples should be bit-exactly 2× the corresponding Minkowski
+    // samples (same seed, same injected mass²·a²).
     const cfg = makeConfig({ mass: 0 })
     const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
-    const min = safeEta0(params, cfg.gridSize, cfg.spacing, cfg.latticeDim)
-    const eta0 = -(min * 2)
+    const eta0 = -2
 
-    const result = sampleAdiabaticVacuum(cfg, params, eta0, 101)
+    const adiabatic = sampleAdiabaticVacuum(cfg, params, eta0, 101)
+    // Injected mass term: m²·a²(η₀) = 0 · (0.5)² = 0. Draw the Minkowski
+    // reference with the same seed and the same injected dispersion.
+    const reference = sampleVacuumSpectrum(cfg, 101, 0)
 
-    // Reference: run the same sampler with zero mass contribution.
-    // Expected: the two distributions differ — mEffSq is non-zero
-    // (tachyonic) at the chosen eta0, so any path that injects 0 is wrong.
-    const referenceZero = sampleVacuumSpectrum({ ...cfg, mass: 0 }, 101)
-
-    // The pi variance scales with ω_k, which differs between the two.
-    // At least some sites should disagree by more than float-rounding.
-    let disagreements = 0
-    for (let i = 0; i < result.pi.length; i++) {
-      if (Math.abs(result.pi[i]! - referenceZero.pi[i]!) > 1e-6) disagreements++
+    // Expected scale: sqrt(1/B) = sqrt(1/0.25) = 2 for phi, sqrt(B) = 0.5
+    // for pi. Allow a tiny tolerance against the f32 round-trip.
+    for (let i = 0; i < adiabatic.phi.length; i++) {
+      if (Math.abs(reference.phi[i]!) > 1e-6) {
+        expect(adiabatic.phi[i]! / reference.phi[i]!).toBeCloseTo(2, 4)
+      }
+      if (Math.abs(reference.pi[i]!) > 1e-6) {
+        expect(adiabatic.pi[i]! / reference.pi[i]!).toBeCloseTo(0.5, 4)
+      }
     }
-    // Require that a majority of sites differ — otherwise the "fix" is
-    // just a bitwise no-op and doesn't actually change the sampled state.
-    expect(disagreements).toBeGreaterThan(result.pi.length * 0.5)
   })
 })

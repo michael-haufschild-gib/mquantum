@@ -26,7 +26,7 @@ import {
   backgroundRhs,
   classifyAttractor,
   computeCosmologyAt,
-  effectiveMassSquared,
+  computeCosmologyCoefs,
   equationOfState,
   fixedPoints,
   integrateBackground,
@@ -189,15 +189,14 @@ describe('scaleFactorAmplitude', () => {
 // ───────────────────────────────────────────────────────────────────────────
 
 describe('computeCosmologyAt — Minkowski', () => {
-  it('produces bit-identical trivial snapshot for any eta and mass', () => {
+  it('produces bit-identical identity snapshot for any eta', () => {
     for (const eta of [-10, -1, 1, 10, Number.EPSILON, -Number.EPSILON]) {
-      for (const mass of [0, 0.5, 1, 3]) {
-        const snap = computeCosmologyAt(eta, { preset: 'minkowski', spacetimeDim: 4 }, mass)
-        expect(snap.a).toBe(1)
-        expect(snap.hubble).toBe(0)
-        expect(snap.zppOverZ).toBe(0)
-        expect(snap.mEffSq).toBe(mass * mass)
-      }
+      const snap = computeCosmologyAt(eta, { preset: 'minkowski', spacetimeDim: 4 })
+      expect(snap.a).toBe(1)
+      expect(snap.hubble).toBe(0)
+      expect(snap.aKinetic).toBe(1)
+      expect(snap.aPotential).toBe(1)
+      expect(snap.aFull).toBe(1)
     }
   })
 })
@@ -206,33 +205,31 @@ describe('computeCosmologyAt — de Sitter', () => {
   it('reproduces a(η) = −1/(Hη) for η < 0', () => {
     const H = 1.5
     const eta = -3
-    const snap = computeCosmologyAt(eta, { preset: 'deSitter', spacetimeDim: 4, hubble: H }, 0)
+    const snap = computeCosmologyAt(eta, { preset: 'deSitter', spacetimeDim: 4, hubble: H })
     // a(η) = (1/H) · |η|^(−1) = 1/(H·|η|)
     expect(snap.a).toBeCloseTo(1 / (H * Math.abs(eta)), 12)
   })
 
   it('gives conformal Hubble ℋ = −1/η (positive for η < 0)', () => {
-    const snap = computeCosmologyAt(-2, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 }, 0)
+    const snap = computeCosmologyAt(-2, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 })
     // ℋ = q/η = (−1)/(−2) = 0.5
     expect(snap.hubble).toBeCloseTo(0.5, 12)
     expect(snap.hubble).toBeGreaterThan(0) // expansion
   })
 
-  it("gives z''/z = 2/η² in 4D", () => {
+  it('gives aPotential = a^(n−2) = a² in 4D', () => {
     const eta = -5
-    const snap = computeCosmologyAt(eta, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 }, 0)
-    expect(snap.zppOverZ).toBeCloseTo(2 / (eta * eta), 12)
-  })
-
-  it('produces negative mEffSq for massless (tachyonic — drives spectrum)', () => {
-    const snap = computeCosmologyAt(-1, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 }, 0)
-    expect(snap.mEffSq).toBeCloseTo(-2, 12)
-    expect(snap.mEffSq).toBeLessThan(0)
+    const H = 1
+    const snap = computeCosmologyAt(eta, { preset: 'deSitter', spacetimeDim: 4, hubble: H })
+    // a = 1/(H|η|) = 0.2 → a² = 0.04
+    expect(snap.aPotential).toBeCloseTo(0.04, 12)
+    expect(snap.aKinetic).toBeCloseTo(1 / 0.04, 10)
+    expect(snap.aFull).toBeCloseTo(Math.pow(0.2, 4), 12)
   })
 
   it('rejects eta = 0', () => {
     expect(() =>
-      computeCosmologyAt(0, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 }, 0)
+      computeCosmologyAt(0, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 })
     ).toThrow(RangeError)
   })
 })
@@ -241,7 +238,7 @@ describe('computeCosmologyAt — Kasner', () => {
   it('reproduces a(η) = |η|^(1/(n−2))', () => {
     for (const n of [3, 4, 5, 6]) {
       const eta = -4
-      const snap = computeCosmologyAt(eta, { preset: 'kasner', spacetimeDim: n }, 0)
+      const snap = computeCosmologyAt(eta, { preset: 'kasner', spacetimeDim: n })
       const expected = Math.pow(Math.abs(eta), 1 / (n - 2))
       expect(snap.a).toBeCloseTo(expected, 12)
     }
@@ -250,16 +247,16 @@ describe('computeCosmologyAt — Kasner', () => {
   it('gives conformal Hubble ℋ = 1/((n−2)·η) (negative for η < 0 — contracting)', () => {
     const n = 4
     const eta = -3
-    const snap = computeCosmologyAt(eta, { preset: 'kasner', spacetimeDim: n }, 0)
+    const snap = computeCosmologyAt(eta, { preset: 'kasner', spacetimeDim: n })
     expect(snap.hubble).toBeCloseTo(1 / ((n - 2) * eta), 12)
     expect(snap.hubble).toBeLessThan(0) // contraction
   })
 
-  it('produces positive mEffSq for massless (mass-like, non-tachyonic)', () => {
-    const snap = computeCosmologyAt(-2, { preset: 'kasner', spacetimeDim: 4 }, 0)
-    // mEffSq = −z''/z = −(−1/(4η²)) = 1/(4η²) = 1/16
-    expect(snap.mEffSq).toBeCloseTo(1 / 16, 12)
-    expect(snap.mEffSq).toBeGreaterThan(0)
+  it('gives aPotential · aKinetic = 1 (inverse pair)', () => {
+    for (const n of [3, 4, 5, 6]) {
+      const snap = computeCosmologyAt(-2, { preset: 'kasner', spacetimeDim: n })
+      expect(snap.aPotential * snap.aKinetic).toBeCloseTo(1, 12)
+    }
   })
 })
 
@@ -270,53 +267,63 @@ describe('computeCosmologyAt — ekpyrotic', () => {
     const s = 2 * sc
     const eta = -7
     const q = qExponent({ preset: 'ekpyrotic', spacetimeDim: n, steepness: s })
-    const snap = computeCosmologyAt(eta, { preset: 'ekpyrotic', spacetimeDim: n, steepness: s }, 0)
+    const snap = computeCosmologyAt(eta, { preset: 'ekpyrotic', spacetimeDim: n, steepness: s })
     expect(snap.a).toBeCloseTo(Math.pow(Math.abs(eta), q), 12)
   })
 
-  it('produces non-negative mEffSq for massless across the regime', () => {
-    // Because β(β−1) ∈ [−1/4, 0] for ekpyrotic, mEffSq = −z''/z ∈ [0, 1/(4η²)].
-    // Non-tachyonic — the distinguishing feature from de Sitter.
+  it('computes aFull = aPotential · a² (identity from a^n / a^(n−2) = a²)', () => {
+    // For every non-degenerate preset, aFull ≡ aPotential · a². This is
+    // the invariant the shader relies on to reconstruct m² · a² as the
+    // mass-term contribution to the physical dispersion.
     const n = 4
     const sc = sCritical(n)
-    for (const mult of [1.1, 2, 5, 100]) {
+    for (const mult of [1.1, 2, 5]) {
       const snap = computeCosmologyAt(
         -3,
-        { preset: 'ekpyrotic', spacetimeDim: n, steepness: sc * mult },
-        0
+        { preset: 'ekpyrotic', spacetimeDim: n, steepness: sc * mult }
       )
-      expect(snap.mEffSq).toBeGreaterThanOrEqual(0)
+      expect(snap.aFull).toBeCloseTo(snap.aPotential * snap.a * snap.a, 10)
     }
-  })
-
-  it('includes the mass term a²·m² additively', () => {
-    const n = 4
-    const sc = sCritical(n)
-    const s = 2 * sc
-    const eta = -3
-    const mass = 0.5
-    const snap = computeCosmologyAt(
-      eta,
-      { preset: 'ekpyrotic', spacetimeDim: n, steepness: s },
-      mass
-    )
-    const snap0 = computeCosmologyAt(eta, { preset: 'ekpyrotic', spacetimeDim: n, steepness: s }, 0)
-    expect(snap.mEffSq - snap0.mEffSq).toBeCloseTo(snap.a * snap.a * mass * mass, 10)
   })
 })
 
 // ───────────────────────────────────────────────────────────────────────────
-// effectiveMassSquared wrapper
+// computeCosmologyCoefs — hot-path helper for the per-substep uniform upload
 // ───────────────────────────────────────────────────────────────────────────
 
-describe('effectiveMassSquared', () => {
-  it('agrees with the full snapshot', () => {
+describe('computeCosmologyCoefs', () => {
+  it('returns identity coefs for the Minkowski preset', () => {
+    const coefs = computeCosmologyCoefs(-10, { preset: 'minkowski', spacetimeDim: 4 })
+    expect(coefs.aKinetic).toBe(1)
+    expect(coefs.aPotential).toBe(1)
+    expect(coefs.aFull).toBe(1)
+  })
+
+  it('matches the three-field projection of computeCosmologyAt for de Sitter', () => {
     const params = { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 }
-    const mass = 0.7
     for (const eta of [-10, -2.5, -0.5]) {
-      expect(effectiveMassSquared(eta, params, mass)).toBe(
-        computeCosmologyAt(eta, params, mass).mEffSq
-      )
+      const snap = computeCosmologyAt(eta, params)
+      const coefs = computeCosmologyCoefs(eta, params)
+      expect(coefs.aKinetic).toBe(snap.aKinetic)
+      expect(coefs.aPotential).toBe(snap.aPotential)
+      expect(coefs.aFull).toBe(snap.aFull)
+    }
+  })
+
+  it('realizes the physical dispersion m²·a² via aFull / aPotential', () => {
+    // The shader reconstructs m²·a² = mass² · (aFull / aPotential). Pin
+    // the identity a² = aFull / aPotential across every non-Minkowski
+    // preset so an alignment regression in the uniform packing path
+    // would surface here first.
+    const cases = [
+      { preset: 'deSitter' as const, spacetimeDim: 4, hubble: 1 },
+      { preset: 'kasner' as const, spacetimeDim: 4 },
+      { preset: 'ekpyrotic' as const, spacetimeDim: 4, steepness: 2 * sCritical(4) },
+    ]
+    for (const params of cases) {
+      const coefs = computeCosmologyCoefs(-3, params)
+      const snap = computeCosmologyAt(-3, params)
+      expect(coefs.aFull / coefs.aPotential).toBeCloseTo(snap.a * snap.a, 10)
     }
   })
 })

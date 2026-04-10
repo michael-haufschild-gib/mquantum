@@ -166,6 +166,84 @@ describe('simulationStateStore', () => {
       expect(pushed.freeScalar.needsReset).toBe(true)
     })
 
+    it('loadFromFile extracts simEta from _runtimeMeta into pendingLoadData.runtimeMeta', async () => {
+      // L7 audit regression: the cosmological FSF save format carries
+      // `simEta` in a sibling `_runtimeMeta` record so the compute pass can
+      // restore the cosmological clock without polluting the schroedinger
+      // store. Verify that:
+      //  1. `pendingLoadData.runtimeMeta.simEta` matches what was on disk.
+      //  2. `setSchroedingerConfig` is invoked WITHOUT a `_runtimeMeta` field
+      //     (otherwise zustand spreads it as a stray top-level state key).
+      //  3. The deserializer's untouched config is still exposed via
+      //     `pendingLoadData.config` so consumers see the on-disk record.
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'freeScalarField' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [8, 8, 8],
+        totalSites: 512,
+        config: {
+          quantumMode: 'freeScalarField',
+          freeScalar: { dt: 0.005, needsReset: false },
+          _runtimeMeta: { simEta: -7.25 },
+        },
+        psiRe: new Float32Array(512),
+        psiIm: new Float32Array(512),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'fsf_cosmo.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as Record<string, unknown>
+      // The store push must NOT carry _runtimeMeta into the schroedinger
+      // state — that field has nowhere to land and would pollute the store.
+      expect(pushed).not.toHaveProperty('_runtimeMeta')
+      // The sub-config still gets needsReset forced on.
+      expect((pushed.freeScalar as { needsReset: boolean }).needsReset).toBe(true)
+
+      // The pending load record carries the runtime meta for the compute
+      // pass to consume via setLoadedRuntimeSimEta.
+      const pending = useSimulationStateStore.getState().pendingLoadData
+      expect(pending?.runtimeMeta?.simEta).toBe(-7.25)
+      // And the on-disk config is exposed verbatim — including _runtimeMeta.
+      expect(pending?.config).toMatchObject({ _runtimeMeta: { simEta: -7.25 } })
+    })
+
+    it('loadFromFile leaves runtimeMeta undefined when the save predates cosmology', async () => {
+      // Files saved before the cosmology feature have no _runtimeMeta. The
+      // store must default to `runtimeMeta: undefined` so the compute pass
+      // falls back to `config.cosmology.eta0` for the start of the clock.
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'freeScalarField' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [8, 8, 8],
+        totalSites: 512,
+        config: {
+          quantumMode: 'freeScalarField',
+          freeScalar: { dt: 0.005 },
+        },
+        psiRe: new Float32Array(512),
+        psiIm: new Float32Array(512),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'legacy_fsf.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pending = useSimulationStateStore.getState().pendingLoadData
+      expect(pending?.runtimeMeta).toBeUndefined()
+    })
+
     it('loadFromFile forces tdse.needsReset on the TDSE sub-config', async () => {
       deserializeMock.mockImplementationOnce(async () => ({
         quantumMode: 'tdseDynamics' as const,

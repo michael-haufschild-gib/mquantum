@@ -162,6 +162,43 @@ function validateVacuumConfig(
 }
 
 /**
+ * Mass-term dispatch for the vacuum sampler and the auto-scale estimators.
+ *
+ * - `'kgFloor'` selects the ordinary Klein-Gordon path with the
+ *   `max(mass, M_FLOOR)` regularization (used when cosmology is disabled).
+ * - A finite `number` selects the Mukhanov-Sasaki path with `ω_k² = k_lat² + value`,
+ *   using the supplied (possibly negative) effective mass squared directly.
+ *
+ * Callers must pick one — there is no implicit fallback. The previous
+ * implementation accepted `omegaSqMassTerm?: number` and silently fell
+ * through to the KG floor when omitted, which masked bugs at every call
+ * site that forgot to thread the cosmology-aware mass through.
+ */
+export type VacuumDispersion = 'kgFloor' | number
+
+/**
+ * Resolve a dispersion choice into a concrete `omega_k` evaluator. Closes
+ * over the lattice geometry once so the per-site loop can call into a
+ * monomorphic function pointer.
+ */
+function resolveOmegaEvaluator(
+  config: FreeScalarConfig,
+  dispersion: VacuumDispersion
+): (coords: readonly number[], dims: readonly number[]) => number {
+  const { spacing, mass, latticeDim } = config
+  if (dispersion === 'kgFloor') {
+    return (coords, dims) => computeOmegaK(coords, dims, spacing, mass, latticeDim)
+  }
+  if (!Number.isFinite(dispersion)) {
+    throw new RangeError(
+      `vacuum sampler dispersion must be 'kgFloor' or a finite number, got ${dispersion}`
+    )
+  }
+  return (coords, dims) =>
+    computeOmegaKFromMassSq(coords, dims, spacing, dispersion, latticeDim)
+}
+
+/**
  * Samples the exact free-field vacuum state on a periodic lattice.
  *
  * For each independent k-mode, draws phi_k and pi_k from Gaussians with
@@ -174,16 +211,14 @@ function validateVacuumConfig(
  *
  * @param config - Free scalar field configuration
  * @param seed - Integer seed for the PRNG
- * @param omegaSqMassTerm - Optional override replacing the default `m²`
- *                          contribution to `ω_k² = k_lat² + m²`. Used by the
- *                          Mukhanov-Sasaki adiabatic vacuum to inject a
- *                          signed `M²_eff(η)` (possibly tachyonic). When
- *                          omitted, uses `max(mass, M_FLOOR)²` as before.
+ * @param dispersion - Mass-term dispatch. `'kgFloor'` for the Klein-Gordon
+ *                     path; a finite number for the Mukhanov-Sasaki path
+ *                     with the supplied signed effective squared mass.
  * @returns Object with `phi` and `pi` as `Float32Array` in row-major order matching GPU buffer layout
  *
  * @example
  * ```ts
- * const { phi, pi } = sampleVacuumSpectrum(config, 42)
+ * const { phi, pi } = sampleVacuumSpectrum(config, 42, 'kgFloor')
  * device.queue.writeBuffer(phiBuffer, 0, phi)
  * device.queue.writeBuffer(piBuffer, 0, pi)
  * ```
@@ -191,7 +226,7 @@ function validateVacuumConfig(
 export function sampleVacuumSpectrum(
   config: FreeScalarConfig,
   seed: number,
-  omegaSqMassTerm?: number
+  dispersion: VacuumDispersion
 ): { phi: Float32Array; pi: Float32Array } {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
@@ -209,7 +244,7 @@ export function sampleVacuumSpectrum(
   // Track visited modes to enforce Hermitian symmetry
   const visited = new Uint8Array(totalSites)
 
-  const useMassOverride = typeof omegaSqMassTerm === 'number' && Number.isFinite(omegaSqMassTerm)
+  const omegaOf = resolveOmegaEvaluator(config, dispersion)
 
   for (let idx = 0; idx < totalSites; idx++) {
     if (visited[idx]) continue
@@ -223,9 +258,7 @@ export function sampleVacuumSpectrum(
     }
     const cidx = ndToLinearIdx(conjCoords, strides)
 
-    const omega = useMassOverride
-      ? computeOmegaKFromMassSq(coords, dims, spacing, omegaSqMassTerm!, latticeDim)
-      : computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    const omega = omegaOf(coords, dims)
 
     // Variances in k-space (compensating for IFFT 1/N normalization):
     // After IFFT, phi_x = (1/N) * sum_k phi_k * exp(+ikx)
@@ -296,23 +329,32 @@ export function sampleVacuumSpectrum(
  * Supports N-dimensional lattices.
  *
  * @param config - Free scalar field configuration
+ * @param dispersion - Mass-term dispatch (see `VacuumDispersion`). Pass
+ *                     `'kgFloor'` for the Klein-Gordon path with the
+ *                     `max(mass, M_FLOOR)` regularization, or a finite
+ *                     number for the Mukhanov-Sasaki path with the supplied
+ *                     signed effective squared mass.
  * @returns Estimated maximum phi value (positive)
  *
  * @example
  * ```ts
- * const maxPhi = estimateVacuumMaxPhi(config)
+ * const maxPhi = estimateVacuumMaxPhi(config, 'kgFloor')
  * ```
  */
-export function estimateVacuumMaxPhi(config: FreeScalarConfig): number {
+export function estimateVacuumMaxPhi(
+  config: FreeScalarConfig,
+  dispersion: VacuumDispersion
+): number {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
+  const omegaOf = resolveOmegaEvaluator(config, dispersion)
 
   let varianceSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
     const coords = linearToNDCoords(idx, dims)
-    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    const omega = omegaOf(coords, dims)
     varianceSum += 1 / (2 * omega)
   }
 
@@ -330,18 +372,23 @@ export function estimateVacuumMaxPhi(config: FreeScalarConfig): number {
  * bound, which over-estimates by ~50% in high dimensions.
  *
  * @param config - Free scalar field configuration
+ * @param dispersion - Mass-term dispatch; see `estimateVacuumMaxPhi`.
  * @returns Estimated maximum pi value (positive)
  */
-export function estimateVacuumMaxPi(config: FreeScalarConfig): number {
+export function estimateVacuumMaxPi(
+  config: FreeScalarConfig,
+  dispersion: VacuumDispersion
+): number {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
+  const omegaOf = resolveOmegaEvaluator(config, dispersion)
 
   let varianceSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
     const coords = linearToNDCoords(idx, dims)
-    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    const omega = omegaOf(coords, dims)
     varianceSum += omega / 2
   }
 
@@ -359,18 +406,23 @@ export function estimateVacuumMaxPi(config: FreeScalarConfig): number {
  * `var(E) ~ (1/N) * sum_k omega_k` and the 3-sigma peak is `4.5 * <omega>`.
  *
  * @param config - Free scalar field configuration
+ * @param dispersion - Mass-term dispatch; see `estimateVacuumMaxPhi`.
  * @returns Estimated maximum energy density (positive)
  */
-export function estimateVacuumMaxEnergy(config: FreeScalarConfig): number {
+export function estimateVacuumMaxEnergy(
+  config: FreeScalarConfig,
+  dispersion: VacuumDispersion
+): number {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
+  const omegaOf = resolveOmegaEvaluator(config, dispersion)
 
   let omegaSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
     const coords = linearToNDCoords(idx, dims)
-    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    const omega = omegaOf(coords, dims)
     omegaSum += omega
   }
 

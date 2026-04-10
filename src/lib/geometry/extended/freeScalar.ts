@@ -116,10 +116,34 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
  * simulation time `eta`. See `docs/plans/cosmological-background-scalar-field.md`
  * and the `src/lib/physics/cosmology/` module for the full derivation.
  *
- * **Mutually exclusive with `selfInteractionEnabled`** in v1: the linear
- * Mukhanov-Sasaki equivalence is exact only for the free field. Enabling
- * cosmology forces `selfInteractionEnabled = false`. This restriction is
- * lifted in v2 via the classical-statistical approximation.
+ * ## Invariants enforced by the store + UI
+ *
+ * 1. **Spacetime-dim window.** The bridge is physically defined only for
+ *    `n_spacetime ∈ [3, 7]`, i.e. `latticeDim ∈ [2, 6]`. Going outside this
+ *    window force-disables cosmology with a logger warning (see
+ *    `reconcileCosmologyInvariants`).
+ *
+ * 2. **Mutual exclusion with self-interaction.** The linear Mukhanov-Sasaki
+ *    equivalence is exact only for the free field. Enabling cosmology
+ *    forces `selfInteractionEnabled = false`; enabling self-interaction
+ *    forces `cosmology.enabled = false`. The mutex is lifted in v2 via
+ *    the classical-statistical approximation (see plan doc).
+ *
+ * 3. **Non-zero `eta0`.** The Mukhanov-Sasaki effective mass diverges at
+ *    `η = 0`, so `eta0 ≠ 0` is required. The store setter rejects zero
+ *    silently; the runtime additionally clamps `|simEta| ≥ 1e-3` so the
+ *    cosmological clock never crosses the singularity.
+ *
+ * 4. **Sub-horizon `eta0`.** Bunch–Davies adiabaticity requires every
+ *    lattice mode to be sub-horizon at `η₀`. The store setter and the
+ *    `reconcileCosmologyInvariants` helper auto-clamp `|η₀|` so that
+ *    `k_min² · η₀² ≥ 4 · |β(β-1)|` (see `clampEta0`).
+ *
+ * 5. **Variable identity under cosmology.** The lattice stores the
+ *    conformal field `v = a^((n-2)/2) · δφ`, *not* the bare scalar `δφ`.
+ *    The analysis panel and field-view labels rename `phi → v`,
+ *    `pi → π_v`, `energyDensity → E_v` accordingly when this flag is
+ *    enabled.
  */
 export interface CosmologyConfig {
   /** Master toggle. When false, the FSF pass runs in Minkowski mode. */

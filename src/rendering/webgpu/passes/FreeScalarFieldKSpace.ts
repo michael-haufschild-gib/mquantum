@@ -10,6 +10,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { computeFsfDiagnostics } from './FreeScalarFieldComputePassUniforms'
@@ -75,11 +76,17 @@ export class FsfKSpaceManager {
 
   /**
    * Invalidate all in-flight async readback jobs without destroying buffers.
-   * Called on field reinitialization to prevent stale readbacks from corrupting
-   * the diagnostics store's initialEnergy baseline.
+   * Called on field reinitialization to prevent stale readbacks from
+   * corrupting the diagnostics store's initialEnergy baseline.
+   *
+   * Also drops `pendingKSpaceData` — without this, a worker result that
+   * was already pushed onto the pending queue *before* the reset would be
+   * uploaded into the texture on the next frame, painting one frame of
+   * stale k-space pixels after every cosmology reset.
    */
   invalidateReadbacks(): void {
     this.kSpaceReadbackEpoch++
+    this.pendingKSpaceData = null
   }
 
   /** Destroy staging buffers and invalidate in-flight jobs. */
@@ -147,12 +154,12 @@ export class FsfKSpaceManager {
   /**
    * Attempt diagnostics readback if conditions are met.
    *
-   * @param mEffSqSnapshot - Effective squared mass `M²_eff(η)` at the time
-   *                         the readback is requested. Propagated through
-   *                         to `computeFsfDiagnostics` so the reported mass
-   *                         energy matches the Mukhanov-Sasaki Hamiltonian
-   *                         under cosmology. Pass `undefined` when cosmology
-   *                         is disabled to use the Klein-Gordon `mass²`.
+   * @param coefs - Cosmology coefficients `(aKinetic, aPotential, aFull)`
+   *                at the time the readback is requested. Caller obtains
+   *                them from `computeFsfCosmologyCoefs(config, simEta)`,
+   *                which collapses to identity under Minkowski. Propagated
+   *                through to `computeFsfDiagnostics` so the reported
+   *                Hamiltonian energy matches the canonical δφ integrator.
    */
   maybeStartDiagnosticsReadback(
     device: GPUDevice,
@@ -161,7 +168,7 @@ export class FsfKSpaceManager {
     piBuffer: GPUBuffer,
     totalSites: number,
     config: FreeScalarConfig,
-    mEffSqSnapshot?: number
+    coefs: CosmologyCoefs
   ): void {
     if (
       !config.diagnosticsEnabled ||
@@ -179,7 +186,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.diagPhiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.diagPiReadbackBuffer, 0, bufferSize)
-    void this.readbackDiagnostics(device, config, mEffSqSnapshot)
+    void this.readbackDiagnostics(device, config, coefs)
   }
 
   /** Get or create the k-space Web Worker. */
@@ -268,7 +275,7 @@ export class FsfKSpaceManager {
   private async readbackDiagnostics(
     device: GPUDevice,
     config: FreeScalarConfig,
-    mEffSqSnapshot?: number
+    coefs: CosmologyCoefs
   ): Promise<void> {
     const phiBuf = this.diagPhiReadbackBuffer
     const piBuf = this.diagPiReadbackBuffer
@@ -287,12 +294,30 @@ export class FsfKSpaceManager {
       await phiBuf.mapAsync(GPUMapMode.READ)
       await piBuf.mapAsync(GPUMapMode.READ)
 
+      // Post-map epoch re-check: a reset can land while mapAsync is awaiting,
+      // which invalidates these mapped ranges logically even though WebGPU
+      // lets us read them. Bail out before computing a stale snapshot.
+      if (epoch !== this.kSpaceReadbackEpoch) {
+        phiBuf.unmap()
+        piBuf.unmap()
+        this.diagMappingInFlight = false
+        return
+      }
+
       const phi = new Float32Array(phiBuf.getMappedRange())
       const pi = new Float32Array(piBuf.getMappedRange())
-      const snapshot = computeFsfDiagnostics(phi, pi, config, mEffSqSnapshot)
+      const snapshot = computeFsfDiagnostics(phi, pi, config, coefs)
 
       phiBuf.unmap()
       piBuf.unmap()
+
+      // Final epoch check just before pushing so a reset that lands between
+      // the compute above and this store write cannot repopulate a
+      // freshly-cleared diagnostics store with stale field data.
+      if (epoch !== this.kSpaceReadbackEpoch) {
+        this.diagMappingInFlight = false
+        return
+      }
 
       useDiagnosticsStore.getState().pushFsfSnapshot(snapshot)
       this.diagMappingInFlight = false

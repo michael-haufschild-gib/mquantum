@@ -250,18 +250,53 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let wdDiff = wdPhi2 - wdV2;
     fieldValue = params.selfInteractionLambda * wdDiff * wdDiff;
   } else {
-    // Use the cosmology-aware effective mass so the on-screen energy view
-    // matches the Hamiltonian the solver is actually integrating. When
-    // cosmology is disabled the CPU writes mEffSq = mass² and this
-    // degenerates to the ordinary Klein-Gordon energy density.
-    fieldValue = 0.5 * (nnPiVal * nnPiVal + params.mEffSq * nnPhiVal * nnPhiVal + gradEnergy);
-    // Self-interaction potential energy: V(phi) = lambda*(phi^2 - v^2)^2
+    // Physical Hamiltonian energy density in the canonical δφ variables:
+    //   H_can(x) = ½ aKinetic π² + ½ aPotential (∇δφ)² + ½ mass²·aFull δφ²
+    //            + aFull · V(δφ)
+    // This is the integrand of the canonical Hamiltonian in conformal time,
+    // per unit comoving volume. It is NOT what a local physical observer
+    // would measure: the coordinate factors aKinetic = a^(-(n-2)),
+    // aPotential = a^(n-2), aFull = a^n are action-level weights tied
+    // to the sqrt(-g) volume form, and they artificially amplify the mass
+    // term as a -> infinity in de Sitter even while the physical field
+    // amplitude |δφ| is decaying. Displaying H_can directly produced the
+    // "reappearing bright cube" at late times in the de Sitter repro —
+    // visually alarming but physically meaningless.
+    //
+    // The proper energy density measured by a comoving observer with
+    // 4-velocity u^μ = (1/a, 0, ..., 0) is
+    //   ρ_proper = T_{μν} u^μ u^ν = T_00 / a²
+    //            = ½ (δφ')²/a² + ½ (∇δφ)²/a² + ½ mass² δφ²
+    // which, after substituting the canonical momentum π = a^(n-2)·δφ',
+    // reduces to the clean identity
+    //   ρ_proper = H_can / a^n = H_can / aFull
+    // Every term scales uniformly by 1/aFull, so the division commutes
+    // past the kinetic, gradient, mass, and self-interaction pieces — we
+    // build the canonical sum then divide once at the end. Under the
+    // Minkowski preset aFull = 1 and this degenerates bit-identically
+    // to the bare Klein-Gordon energy density; under cosmology it removes
+    // the coordinate-factor inflation and shows the physically meaningful
+    // quantity that actually decays as the de Sitter universe dilutes.
+    let massCoef = params.mass * params.mass * params.aFull;
+    var canonicalH = 0.5 * (
+      params.aKinetic * nnPiVal * nnPiVal
+      + params.aPotential * gradEnergy
+      + massCoef * nnPhiVal * nnPhiVal
+    );
+    // Self-interaction: canonical contribution is aFull · V(δφ) from the
+    // ∫ sqrt(-g) · V(φ) term in the action. Dividing by aFull below
+    // collapses this to the bare potential V(δφ) — the local observer's
+    // measurement.
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
       let siPhi2 = nnPhiVal * nnPhiVal;
       let siDiff = siPhi2 - siV2;
-      fieldValue += params.selfInteractionLambda * siDiff * siDiff;
+      canonicalH += params.aFull * params.selfInteractionLambda * siDiff * siDiff;
     }
+    // Convert canonical → proper. Guard against zero aFull from an identity
+    // fallback or a degenerate preset; in that case treat the output as
+    // already in its Minkowski form.
+    fieldValue = select(canonicalH / params.aFull, canonicalH, params.aFull <= 0.0);
   }
 
   let rho = abs(fieldValue);
@@ -273,15 +308,24 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Analysis texture output (educational color modes)
   if (params.analysisMode == 1u) {
-    let K = 0.5 * nnPiVal * nnPiVal;
-    let G = 0.5 * gradEnergy;
-    // Mukhanov-Sasaki effective mass under cosmology, mass² otherwise.
-    var V = 0.5 * params.mEffSq * nnPhiVal * nnPhiVal;
+    // Proper-frame Hamiltonian density decomposition (K, G, V, E).
+    // The canonical triple (½ aKinetic π², ½ aPotential (∇φ)², ½ m²·aFull φ²)
+    // is the integrand of the conformal-time Hamiltonian; to match the
+    // proper-density convention used by the energyDensity view above,
+    // every term is divided by aFull = a^n to convert from "per unit
+    // comoving volume (conformal time)" to "per unit proper volume
+    // (comoving observer)". Under Minkowski aFull = 1 and this is
+    // bit-identical to the canonical KG decomposition.
+    let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
+    let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
+    let G = 0.5 * params.aPotential * gradEnergy * invAFull;
+    let massCoef = params.mass * params.mass * params.aFull;
+    var V = 0.5 * massCoef * nnPhiVal * nnPhiVal * invAFull;
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
       let siPhi2 = nnPhiVal * nnPhiVal;
       let siDiff = siPhi2 - siV2;
-      V += params.selfInteractionLambda * siDiff * siDiff;
+      V += params.aFull * params.selfInteractionLambda * siDiff * siDiff * invAFull;
     }
     let E = K + G + V;
     textureStore(analysisTex, gid, vec4f(K, G, V, E));

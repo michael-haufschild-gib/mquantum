@@ -163,6 +163,107 @@ describe('mergeExtendedObjectStateForType — schroedinger', () => {
   })
 })
 
+describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
+  it('soft-disables cosmology when the loaded latticeDim is out of the supported range', () => {
+    // L7 audit: scenes saved with cosmology enabled at latticeDim ∈ [2,6]
+    // and loaded onto an unsupported lattice (e.g. 1D after a manual edit)
+    // must NOT propagate the cosmology flag through. Without the
+    // normalization, the next vacuumNoise reset would feed `n=2`
+    // (`spacetimeDim=2`) into computeCosmologyAt and either throw or fall
+    // back silently to mass². The reconcile helper soft-disables and
+    // forces needsReset.
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 1,
+          gridSize: [8],
+          spacing: [0.25],
+          mass: 0,
+          cosmology: { enabled: true, preset: 'deSitter', hubble: 1, eta0: -10, steepness: 5 },
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const cosmo = fs.cosmology as { enabled: boolean }
+    expect(cosmo.enabled).toBe(false)
+    expect(fs.needsReset).toBe(true)
+  })
+
+  it('raises eta0 only when the loaded value is below the bare cosmetic floor', () => {
+    // Under the canonical δφ formulation the adiabatic vacuum is well-
+    // defined at any non-zero η₀ — the old Mukhanov-Sasaki `β(β−1)/η²`
+    // tachyonic bound is gone. The reconcile helper still runs clampEta0
+    // against the cosmetic `DEFAULT_SAFE_ETA0` constant (0.1), so a
+    // loaded `eta0` below that gets raised and `needsReset` fires; a
+    // loaded `eta0` in the normal `-10 … -0.5` range is passed through
+    // untouched regardless of lattice geometry.
+    const loadedUnsafe = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          // eta0 = -0.01 sits below the 0.1 cosmetic floor — clamp raises
+          // |eta0| to 0.1 and marks needsReset.
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          spacing: [1, 1, 1],
+          mass: 0,
+          cosmology: { enabled: true, preset: 'deSitter', hubble: 1, eta0: -0.01, steepness: 5 },
+        },
+      },
+    }
+    const mergedUnsafe = mergeExtendedObjectStateForType(loadedUnsafe, 'schroedinger')
+    const fsUnsafe = (mergedUnsafe.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const cosmoUnsafe = fsUnsafe.cosmology as { enabled: boolean; eta0: number }
+    expect(cosmoUnsafe.enabled).toBe(true)
+    expect(Math.abs(cosmoUnsafe.eta0)).toBeGreaterThanOrEqual(0.1)
+    expect(fsUnsafe.needsReset).toBe(true)
+
+    // Symmetric no-clamp path: a user-loaded eta0 well inside the safe
+    // range flows through regardless of the lattice geometry.
+    const loadedSafe = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [32, 32, 32],
+          spacing: [1, 1, 1],
+          mass: 0,
+          cosmology: { enabled: true, preset: 'deSitter', hubble: 1, eta0: -1, steepness: 5 },
+        },
+      },
+    }
+    const mergedSafe = mergeExtendedObjectStateForType(loadedSafe, 'schroedinger')
+    const fsSafe = (mergedSafe.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const cosmoSafe = fsSafe.cosmology as { enabled: boolean; eta0: number }
+    expect(cosmoSafe.enabled).toBe(true)
+    expect(cosmoSafe.eta0).toBe(-1)
+  })
+
+  it('leaves cosmology untouched when the loaded eta0 is already safe', () => {
+    // No-op path: a perfectly valid cosmology config survives normalization
+    // unchanged.
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'freeScalarField',
+        freeScalar: {
+          latticeDim: 3,
+          gridSize: [8, 8, 8],
+          spacing: [0.25, 0.25, 0.25],
+          mass: 0,
+          cosmology: { enabled: true, preset: 'deSitter', hubble: 1, eta0: -10, steepness: 5 },
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const fs = (merged.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const cosmo = fs.cosmology as { enabled: boolean; eta0: number }
+    expect(cosmo.enabled).toBe(true)
+    expect(cosmo.eta0).toBe(-10)
+  })
+})
+
 describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
   it('fills missing Pauli fields with defaults', () => {
     const loaded = {
