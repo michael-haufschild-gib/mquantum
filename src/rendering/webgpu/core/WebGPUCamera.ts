@@ -428,8 +428,25 @@ export class WebGPUCamera {
     dz *= clampedFactor
 
     // Enforce minimum distance to prevent degenerate matrices and NaN in orbit
-    const newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
-    if (newDistance < MIN_CAMERA_DISTANCE) return
+    let newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    // Degenerate seed: raw offset was (near) zero because `state.position`
+    // and `state.target` had coincided. Simply returning would permanently
+    // wedge the camera — the user can never escape the degenerate state.
+    // Re-seed the offset direction from `getSafeTarget()`, which is
+    // guaranteed to be at least MIN_CAMERA_DISTANCE away from position,
+    // then apply the same clampedFactor so the visible zoom gesture still
+    // lands in the right relative magnitude.
+    if (newDistance < MIN_CAMERA_DISTANCE) {
+      const [stx, sty, stz] = this.getSafeTarget()
+      dx = (px - stx) * clampedFactor
+      dy = (py - sty) * clampedFactor
+      dz = (pz - stz) * clampedFactor
+      newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      // Even the safe seed can undershoot when clampedFactor < 1 —
+      // refuse the gesture only in that unrecoverable case.
+      if (newDistance < MIN_CAMERA_DISTANCE) return
+    }
 
     this.state.position = [tx + dx, ty + dy, tz + dz]
     this.dirty = true

@@ -364,15 +364,21 @@ export function SecondQuantizationSection({
 
 /**
  * Find the index of the largest entry in `distribution`. Returns 0 when all
- * entries are non-finite or non-positive.
+ * entries are non-finite or non-positive — probabilities cannot be negative
+ * and a sea of zeros has no meaningful peak, so defaulting the window to
+ * start at n=0 is the right visual fallback.
  *
  * @internal
  */
 function argmax(distribution: number[]): number {
   let bestIdx = 0
-  let bestVal = -Infinity
+  let bestVal = 0
   for (let i = 0; i < distribution.length; i++) {
     const v = distribution[i] ?? 0
+    // Require strictly positive *and* finite so an all-zero (or all-
+    // negative, all-NaN) distribution keeps bestIdx === 0 rather than
+    // latching onto whichever index happened to have the least-negative
+    // garbage value.
     if (Number.isFinite(v) && v > bestVal) {
       bestVal = v
       bestIdx = i

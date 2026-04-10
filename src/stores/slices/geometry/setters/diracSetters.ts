@@ -68,6 +68,37 @@ type DiracActions = Pick<
 const MIN_ALIGNED_TOTAL_SITES = 64
 
 /**
+ * Minimum Dirac timestep. Any desired dt below this is raised — anything
+ * smaller is unproductive for visualization (thousands of steps per frame
+ * without visible evolution) and risks float underflow in the integrator.
+ */
+const MIN_DIRAC_DT = 0.0001
+
+/**
+ * CFL safety margin applied to `maxStableDt`. The lattice Dirac leapfrog is
+ * marginally stable at the exact CFL limit, so we shrink it by 10% to give
+ * the integrator a small amount of headroom against numerical noise.
+ */
+const DIRAC_DT_CFL_SAFETY = 0.9
+
+/**
+ * Clamp a desired Dirac timestep against the lattice CFL limit. Every call
+ * site that writes `dirac.dt` flows through this helper so the floor
+ * (`MIN_DIRAC_DT`), the CFL margin (`DIRAC_DT_CFL_SAFETY`), and the order
+ * of operations stay in lock-step. Previously the same four-term expression
+ * was duplicated at five sites, which meant any future change to the CFL
+ * margin would have to be mirrored in every copy.
+ *
+ * @param spacing - Per-dimension lattice spacing
+ * @param speedOfLight - Effective c for the lattice (sets the CFL ceiling)
+ * @param desiredDt - Candidate dt from user input, preset, or current state
+ */
+function clampDiracDt(spacing: number[], speedOfLight: number, desiredDt: number): number {
+  const dtMax = maxStableDt(spacing, speedOfLight)
+  return Math.max(MIN_DIRAC_DT, Math.min(dtMax * DIRAC_DT_CFL_SAFETY, desiredDt))
+}
+
+/**
  * Minimum per-dimension grid size for Dirac that satisfies WebGPU
  * buffer offset alignment (256 bytes). Returns a power of 2.
  */
@@ -104,8 +135,7 @@ export const resizeDiracArrays = (prev: DiracConfig, newDim: number): Partial<Di
   const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
     i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
   )
-  const dtMax = maxStableDt(spacing, prev.speedOfLight)
-  const newDt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
+  const newDt = clampDiracDt(spacing, prev.speedOfLight, prev.dt)
   return {
     latticeDim: newDim,
     gridSize,
@@ -139,8 +169,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       const clamped = Math.max(0.01, Math.min(10, speedOfLight))
       setWithVersion((state) => {
         const prev = state.schroedinger.dirac
-        const dtMax = maxStableDt(prev.spacing, clamped)
-        const dt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
+        const dt = clampDiracDt(prev.spacing, clamped, prev.dt)
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -157,8 +186,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       }
       setWithVersion((state) => {
         const { spacing, speedOfLight } = state.schroedinger.dirac
-        const dtMax = maxStableDt(spacing, speedOfLight)
-        const clamped = Math.max(0.0001, Math.min(dtMax * 0.9, dt))
+        const clamped = clampDiracDt(spacing, speedOfLight, dt)
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -271,8 +299,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         })
         // Decreasing min(spacing) shrinks the Dirac CFL ceiling, so re-clamp
         // dt to keep the lattice stable after the user tightens the grid.
-        const dtMax = maxStableDt(clamped, prevDirac.speedOfLight)
-        const dt = Math.max(0.0001, Math.min(dtMax * 0.9, prevDirac.dt))
+        const dt = clampDiracDt(clamped, prevDirac.speedOfLight, prevDirac.dt)
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -414,8 +441,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
             merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
 
-            const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)
-            merged.dt = Math.max(0.0001, Math.min(dtMax * 0.9, merged.dt))
+            merged.dt = clampDiracDt(merged.spacing, merged.speedOfLight, merged.dt)
 
             return {
               schroedinger: {
