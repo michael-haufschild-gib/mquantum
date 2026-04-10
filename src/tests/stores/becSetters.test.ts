@@ -5,7 +5,7 @@
  * CFL-limited dt adjustment, and vortex/soliton constraints.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -133,5 +133,39 @@ describe('BEC setters', () => {
     expect(dtAfter).toBeLessThanOrEqual(0.05)
     // Verify dtAfter is a finite positive number (not NaN/Infinity)
     expect(Number.isFinite(dtAfter)).toBe(true)
+  })
+
+  describe('applyBecPreset — stale rendering field regression', () => {
+    // Regression: BEC presets had heterogeneous renderingOverrides keys. Some
+    // set autoScaleMaxGain=10, others omitted it. Switching from the first to
+    // the second left the stale 10 on schroedinger.autoScaleMaxGain. Defaults
+    // merge via getBecPreset now ensures every switch rebuilds all fields.
+    it('resets autoScaleMaxGain when switching to a preset without it', async () => {
+      const s = useExtendedObjectStore.getState()
+      // groundState → autoScaleMaxGain = 10.
+      // applyBecPreset is async (dynamic import); `vi.waitFor` polls until
+      // the expected state appears, instead of racing a fixed 10ms sleep.
+      s.applyBecPreset('groundState')
+      await vi.waitFor(() => {
+        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(10)
+      })
+
+      // singleVortex does NOT declare autoScaleMaxGain — should fall back to
+      // BEC_DEFAULT_RENDERING (20), not carry the stale 10 from groundState.
+      s.applyBecPreset('singleVortex')
+      await vi.waitFor(() => {
+        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
+      })
+    })
+
+    it('resets densityGain and densityContrast to preset values', async () => {
+      const s = useExtendedObjectStore.getState()
+      s.applyBecPreset('singleVortex')
+      await vi.waitFor(() => {
+        const sc = useExtendedObjectStore.getState().schroedinger
+        expect(sc.densityGain).toBe(0.2)
+        expect(sc.densityContrast).toBe(2.6)
+      })
+    })
   })
 })

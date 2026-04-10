@@ -5,8 +5,10 @@
  * Provides viridis, inferno, magma, and plasma — the standard
  * perceptually uniform sequential colormaps (Matplotlib 2.0+).
  *
- * Each colormap is defined by 256 control points in sRGB [0,1].
- * Interpolation between control points produces smooth gradients.
+ * Each built-in colormap is defined by 11 sampled control points in sRGB [0,1],
+ * taken at uniform positions along [0,1] from the matplotlib reference tables.
+ * These are expanded at runtime into a 256-entry LUT via linear interpolation
+ * to produce smooth gradients at lookup time.
  *
  * @module lib/physics/colormaps
  */
@@ -15,11 +17,11 @@
 export type CarpetColormap = 'viridis' | 'inferno' | 'magma' | 'plasma'
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COLORMAP DATA — 32 control points each, interpolated to 256 entries
+// COLORMAP DATA — 11 control points each, interpolated to 256 entries
 // Sampled from matplotlib reference tables at uniform intervals
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** [r, g, b] triplets at 32 uniform positions along [0,1] */
+/** [r, g, b] triplets at uniform positions along [0,1] (11 per built-in colormap) */
 type ColormapControlPoints = readonly (readonly [number, number, number])[]
 
 const VIRIDIS_CONTROL: ColormapControlPoints = [

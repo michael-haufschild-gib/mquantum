@@ -206,5 +206,8 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   sliceAmplitude: 0.3,
 
   needsReset: true,
-  slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // 0-indexed for extra dims (positions[0] drives dim 3). Sized dynamically
+  // by initializePauliForDimension to `max(0, latticeDim - 3)` — empty at the
+  // default 3D config so there are no unused slots leaking into the uniform.
+  slicePositions: [],
 }

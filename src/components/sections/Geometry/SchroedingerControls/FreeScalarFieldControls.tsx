@@ -81,12 +81,12 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     // Field view options
     const fieldViewOptions = useMemo(() => {
       const opts = [
-        { value: 'phi', label: '\u03C6' },
-        { value: 'pi', label: '\u03C0' },
-        { value: 'energyDensity', label: '\u03B5' },
+        { value: 'phi', label: 'φ' },
+        { value: 'pi', label: 'π' },
+        { value: 'energyDensity', label: 'ε' },
       ]
       if (fs.selfInteractionEnabled) {
-        opts.push({ value: 'wallDensity', label: 'V(\u03C6)' })
+        opts.push({ value: 'wallDensity', label: 'V(φ)' })
       }
       return opts
     }, [fs.selfInteractionEnabled])
@@ -396,7 +396,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           {fs.initialCondition === 'gaussianPacket' && (
             <div className="space-y-2">
               <Slider
-                label="Packet Width (\u03C3)"
+                label="Packet Width (σ)"
                 tooltip="Gaussian envelope width in lattice units. Narrower packets have broader momentum spread (Heisenberg uncertainty)."
                 min={0.05}
                 max={2.0}

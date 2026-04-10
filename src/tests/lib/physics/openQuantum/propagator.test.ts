@@ -163,6 +163,65 @@ describe('evolvePropagatorStep', () => {
     expect(maxHermiticityError(rho)).toBeLessThan(1e-12)
   })
 
+  it('preserves trace and Hermiticity with complex Lindblad amplitudes', () => {
+    // Verifies that non-zero imaginary parts in Lindblad channel amplitudes
+    // are actually used. Pure-real assertions (trace/Hermiticity, ground
+    // population > 0.5) would all pass even if the propagator silently
+    // ignored `amplitudeIm`, so the key check is a differential comparison
+    // against an identically-configured control that has `amplitudeIm = 0`.
+    const K = 2
+    const energies = new Float64Array([-1, -0.25])
+
+    const complexChannels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0.15 }, // |α|² = 0.0325
+    ]
+    const realOnlyChannels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0 }, // |α|² = 0.01
+    ]
+
+    const Lcomplex = buildLiouvillian(energies, complexChannels, K)
+    const Lreal = buildLiouvillian(energies, realOnlyChannels, K)
+    const Pcomplex = computePropagator(Lcomplex, 0.01, K)
+    const Preal = computePropagator(Lreal, 0.01, K)
+
+    const rhoComplex = superpositionDM(K)
+    const rhoReal = superpositionDM(K)
+
+    for (let step = 0; step < 100; step++) {
+      evolvePropagatorStep(Pcomplex, rhoComplex)
+      evolvePropagatorStep(Preal, rhoReal)
+    }
+
+    expect(trace(rhoComplex)).toBeCloseTo(1.0, 6)
+    expect(maxHermiticityError(rhoComplex)).toBeLessThan(1e-12)
+    expect(rhoComplex.elements[0]!).toBeGreaterThan(0.5)
+
+    // Differential check: the larger |α|² from the complex channel must
+    // dissipate excited-state population faster, leaving a measurably
+    // higher ground-state population than the real-only control. A
+    // propagator that ignored `amplitudeIm` would make these values equal.
+    expect(rhoComplex.elements[0]!).toBeGreaterThan(rhoReal.elements[0]! + 1e-3)
+  })
+
+  it('handles K=1 degenerate case without errors', () => {
+    // A single-state system has a 1x1 density matrix that is always ρ = [[1]].
+    // No transitions are possible. The propagator should be the 1x1 identity.
+    const K = 1
+    const energies = new Float64Array([-1])
+    const L = buildLiouvillian(energies, [], K)
+    const P = computePropagator(L, 0.01, K)
+
+    const rho = groundStateDM(K)
+
+    for (let step = 0; step < 10; step++) {
+      evolvePropagatorStep(P, rho)
+    }
+
+    expect(trace(rho)).toBeCloseTo(1.0, 10)
+    expect(rho.elements[0]).toBeCloseTo(1.0, 10)
+    expect(rho.elements[1]).toBeCloseTo(0.0, 10)
+  })
+
   it('drives population toward ground state under emission-only dissipation', () => {
     // Bug caught: dissipation drives population in wrong direction
     // (e.g., emission channel with swapped row/col pumps excited state).

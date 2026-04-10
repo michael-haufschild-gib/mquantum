@@ -223,9 +223,10 @@ describe('Multi-store reset consistency', () => {
 
     const animPlanes = useAnimationStore.getState().animatingPlanes
     for (const plane of animPlanes) {
-      // All animating planes must be valid for current dimension
+      // All animating planes must be valid for current dimension.
+      // Axis names mirror constants/dimension.ts AXIS_LABELS (uppercased).
       const validPlanes = new Set<string>()
-      const axes = ['X', 'Y', 'Z', 'W', 'V', 'U', 'A6', 'A7', 'A8', 'A9', 'A10']
+      const axes = ['X', 'Y', 'Z', 'W', 'V', 'U', 'T', 'S', 'R', 'Q', 'P']
       for (let i = 0; i < dim; i++) {
         for (let j = i + 1; j < dim; j++) {
           validPlanes.add(axes[i]! + axes[j]!)

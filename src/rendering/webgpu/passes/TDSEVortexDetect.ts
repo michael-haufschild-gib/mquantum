@@ -32,6 +32,16 @@ export interface VortexDetectState {
   stagingBuffer: GPUBuffer | null
   mappingInFlight: boolean
   numWorkgroups: number
+  /**
+   * Monotonic generation counter incremented on every rebuild/dispose. The
+   * async readback closure captures the value at dispatch time and skips
+   * its work if it no longer matches the current generation, so a
+   * stale-from-the-old-buffer .then() cannot stomp on `mappingInFlight`
+   * while a fresh dispatch is in flight on the new buffer (which would
+   * otherwise let two concurrent mapAsync calls collide on the same
+   * staging buffer the next time around).
+   */
+  generation: number
   /** Latest readback result: [totalPlaquettes, positiveCharge, negativeCharge] */
   lastResult: [number, number, number]
 }
@@ -52,6 +62,7 @@ export function createVortexDetectState(): VortexDetectState {
     stagingBuffer: null,
     mappingInFlight: false,
     numWorkgroups: 0,
+    generation: 0,
     lastResult: [0, 0, 0],
   }
 }
@@ -243,36 +254,70 @@ export function dispatchAndReadbackVortexDetect(
   encoder.copyBufferToBuffer(state.resultBuffer, 0, state.stagingBuffer, 0, 16)
   state.mappingInFlight = true
   const staging = state.stagingBuffer
+  const dispatchGen = state.generation
+
+  // Helper: clear `mappingInFlight` only if we are still the current
+  // dispatch. After a rebuild, our `generation` no longer matches and we
+  // must NOT touch the flag — the new dispatch owns it.
+  const clearIfCurrent = (): void => {
+    if (state.generation === dispatchGen) {
+      state.mappingInFlight = false
+    }
+  }
 
   // Wait for GPU to finish the copy before mapping
   device.queue
     .onSubmittedWorkDone()
     .then(() => {
-      if (!staging || staging.mapState !== 'unmapped') {
-        state.mappingInFlight = false
+      // Bail out if a rebuild swapped the staging buffer or destroyed it
+      // entirely while we were waiting on the GPU.
+      if (
+        state.generation !== dispatchGen ||
+        state.stagingBuffer !== staging ||
+        staging.mapState !== 'unmapped'
+      ) {
+        clearIfCurrent()
         return
       }
       staging
         .mapAsync(GPUMapMode.READ)
         .then(() => {
+          // Re-check after the async hop — a rebuild can land between
+          // mapAsync resolving and us reading the mapped range.
+          if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
+            try {
+              staging.unmap()
+            } catch {
+              // Buffer may already be destroyed; ignore.
+            }
+            clearIfCurrent()
+            return
+          }
           const mapped = new Uint32Array(staging.getMappedRange().slice(0))
           state.lastResult = [mapped[0] ?? 0, mapped[1] ?? 0, mapped[2] ?? 0]
           staging.unmap()
-          state.mappingInFlight = false
+          clearIfCurrent()
         })
         .catch(() => {
-          state.mappingInFlight = false
+          clearIfCurrent()
         })
     })
     .catch(() => {
-      state.mappingInFlight = false
+      clearIfCurrent()
     })
 }
 
 /**
  * Dispose vortex detection GPU resources.
+ *
+ * Bumping `generation` invalidates any in-flight async readback closure so
+ * its `.then()` and `.catch()` paths cannot stomp on the new state's
+ * `mappingInFlight` flag (which would otherwise let two parallel mapAsync
+ * calls collide on the next dispatch's staging buffer).
  */
 export function disposeVortexDetect(state: VortexDetectState): void {
+  state.generation++
+  state.mappingInFlight = false
   state.uniformBuffer?.destroy()
   state.partialCountsBuffer?.destroy()
   state.partialPosBuffer?.destroy()

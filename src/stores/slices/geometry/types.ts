@@ -124,13 +124,6 @@ export interface SchroedingerSliceActions {
   // Raymarching Quality
   setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => void
 
-  // SSS Settings
-  setSchroedingerSssEnabled: (enabled: boolean) => void
-  setSchroedingerSssIntensity: (intensity: number) => void
-  setSchroedingerSssColor: (color: string) => void
-  setSchroedingerSssThickness: (thickness: number) => void
-  setSchroedingerSssJitter: (jitter: number) => void
-
   // Quantum Effects
   setSchroedingerNodalEnabled: (enabled: boolean) => void
   setSchroedingerNodalColor: (color: string) => void
@@ -433,6 +426,7 @@ export interface SchroedingerSliceActions {
   setQwAbsorberEnabled: (enabled: boolean) => void
   setQwAbsorberWidth: (width: number) => void
   setQwPmlTargetReflection: (r: number) => void
+  setQwSlicePosition: (dimIndex: number, value: number) => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void
@@ -456,6 +450,14 @@ export interface SchroedingerSliceActions {
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void
   initializeSchroedingerForDimension: (dimension: number) => void
+  /**
+   * Lightweight, synchronous lattice-dim sync for the active compute mode.
+   * Called from geometryStore.setDimension so every compute mode (TDSE, BEC,
+   * Dirac, QW, FSF) sees the new global dimension on the same microtask as
+   * the geometry state update, without waiting for the React
+   * `useObjectTypeInitialization` hook to fire.
+   */
+  syncActiveComputeModeLatticeDim: (dimension: number) => void
   getSchroedingerConfig: () => SchroedingerConfig
 }
 

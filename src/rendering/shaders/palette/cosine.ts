@@ -28,7 +28,12 @@ export function calculateCosineColor(
   c: [number, number, number],
   d: [number, number, number]
 ): { r: number; g: number; b: number } {
-  const TAU = 6.28318
+  // 2π — kept in sync with the WGSL `TAU` constant in
+  // shaders/shared/core/constants.wgsl.ts. Use the JS exact value rather
+  // than a 5-digit truncation so the UI preview matches the GPU swatch
+  // (the previous 6.28318 drifted by ~3e-6 / radian, visible at high
+  // brightness amplitudes).
+  const TAU = Math.PI * 2
   return {
     r: Math.max(0, Math.min(1, a[0] + b[0] * Math.cos(TAU * (c[0] * t + d[0])))),
     g: Math.max(0, Math.min(1, a[1] + b[1] * Math.cos(TAU * (c[1] * t + d[1])))),

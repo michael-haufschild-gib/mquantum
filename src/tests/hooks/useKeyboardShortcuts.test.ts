@@ -170,35 +170,33 @@ describe('SHORTCUTS', () => {
     expect(downShortcut).toEqual(expect.objectContaining({ key: 'ArrowDown' }))
   })
 
-  it('should have WASD shortcuts for camera movement', () => {
-    const wShortcut = SHORTCUTS.find((s) => s.key === 'w' && !s.shift)
-    const aShortcut = SHORTCUTS.find((s) => s.key === 'a' && !s.shift)
-    const sShortcut = SHORTCUTS.find((s) => s.key === 's' && !s.ctrl && !s.shift)
-    const dShortcut = SHORTCUTS.find((s) => s.key === 'd' && !s.shift)
+  it('does not list WASD camera shortcuts (unimplemented — see SHORTCUTS comment)', () => {
+    // Regression: WASD camera movement / Shift+WASD camera rotation entries
+    // were declared without a handler. "Light: Move mode" entries (also "w"/
+    // "d") and the Ctrl+S export shortcut still exist because they DO have
+    // handlers, so we filter them out. This covers all four keys (w/a/s/d)
+    // in both plain and shift form so that re-introducing *any* unimplemented
+    // WASD variant would fail the check.
+    const findNonLightCameraEntry = (key: string, shift = false) =>
+      SHORTCUTS.find(
+        (s) =>
+          s.key === key &&
+          Boolean(s.shift) === shift &&
+          !s.ctrl &&
+          !s.alt &&
+          !s.description.startsWith('Light:')
+      )
 
-    expect(wShortcut).toMatchObject({ description: expect.stringContaining('forward') })
-    expect(aShortcut).toMatchObject({ description: expect.stringContaining('left') })
-    expect(sShortcut).toMatchObject({ description: expect.stringContaining('backward') })
-    expect(dShortcut).toMatchObject({ description: expect.stringContaining('right') })
+    for (const key of ['w', 'a', 's', 'd']) {
+      expect(findNonLightCameraEntry(key)).toBeUndefined()
+      expect(findNonLightCameraEntry(key, true)).toBeUndefined()
+    }
   })
 
-  it('should have Shift+WASD shortcuts for camera rotation', () => {
-    const wShiftShortcut = SHORTCUTS.find((s) => s.key === 'w' && s.shift)
-    const aShiftShortcut = SHORTCUTS.find((s) => s.key === 'a' && s.shift)
-    const sShiftShortcut = SHORTCUTS.find((s) => s.key === 's' && s.shift)
-    const dShiftShortcut = SHORTCUTS.find((s) => s.key === 'd' && s.shift)
-
-    expect(wShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
-    expect(aShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
-    expect(sShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
-    expect(dShiftShortcut).toMatchObject({ description: expect.stringContaining('Rotate') })
-  })
-
-  it('should have 0 and Shift+0 shortcuts for camera origin', () => {
+  it('does not list 0 / Shift+0 camera-origin shortcuts (unimplemented)', () => {
     const moveToOrigin = SHORTCUTS.find((s) => s.key === '0' && !s.shift)
     const lookAtOrigin = SHORTCUTS.find((s) => s.key === '0' && s.shift)
-
-    expect(moveToOrigin).toMatchObject({ description: expect.stringContaining('origin') })
-    expect(lookAtOrigin).toMatchObject({ description: expect.stringContaining('origin') })
+    expect(moveToOrigin).toBeUndefined()
+    expect(lookAtOrigin).toBeUndefined()
   })
 })

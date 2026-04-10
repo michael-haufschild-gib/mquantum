@@ -406,4 +406,20 @@ export function installWebGPUMock(): void {
       WRITE: 0x0002,
     }
   }
+  if (!('GPUShaderStage' in globalThis)) {
+    ;(globalThis as Record<string, unknown>).GPUShaderStage = {
+      VERTEX: 0x1,
+      FRAGMENT: 0x2,
+      COMPUTE: 0x4,
+    }
+  }
+  if (!('GPUColorWrite' in globalThis)) {
+    ;(globalThis as Record<string, unknown>).GPUColorWrite = {
+      RED: 0x1,
+      GREEN: 0x2,
+      BLUE: 0x4,
+      ALPHA: 0x8,
+      ALL: 0xf,
+    }
+  }
 }

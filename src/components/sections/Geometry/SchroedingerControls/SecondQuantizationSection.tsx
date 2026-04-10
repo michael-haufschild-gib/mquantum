@@ -18,10 +18,19 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { generateQuantumPreset, getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import type { SecondQuantizationMode } from '@/lib/geometry/extended/types'
 import { computeSecondQuantMetrics, type SecondQuantParams } from '@/lib/math/secondQuantization'
 
 import type { SecondQuantizationSectionProps } from './types'
+
+/**
+ * Display window length for the |c_n|² bar chart. Independent of the
+ * underlying distribution width: we always render at most this many bars,
+ * but slide the visible window to track the distribution peak so the chart
+ * stays informative for large |alpha| / large r.
+ */
+const FOCK_DISPLAY_WINDOW = 8
 
 /**
  * SecondQuantizationSection — Educational layer for HO second-quantization interpretation.
@@ -53,6 +62,56 @@ export function SecondQuantizationSection({
     sqLayerSqueezeTheta,
   } = config
 
+  // Resolve the per-dimension HO frequency for the currently selected mode
+  // index. The Schroedinger renderer uses these same frequencies (generated
+  // from seed/preset/spread), so reading them here keeps the educational
+  // metrics consistent with what is actually being rendered. Without this,
+  // the "Mode index (k)" slider was decorative — the energy display stayed
+  // at E = (n + 1/2)·ℏω with omega hardcoded to 1, no matter which mode the
+  // user selected.
+  //
+  // Both the clamped `activeModeIndex` and `modeOmega` are returned from the
+  // same memo so every consumer (table label, slider value, metric call)
+  // reads from the *same* index. Using the raw `sqLayerSelectedModeIndex`
+  // in one place and the clamped index in another meant the table would
+  // briefly show "Mode k=4" while the metrics were computed from `k=2`
+  // whenever dimension or preset size shrank.
+  const { activeModeIndex, modeOmega } = useMemo(() => {
+    if (!sqLayerEnabled) return { activeModeIndex: 0, modeOmega: 1.0 }
+    const preset =
+      config.presetName === 'custom'
+        ? generateQuantumPreset(
+            config.seed,
+            dimension,
+            config.termCount,
+            config.maxQuantumNumber,
+            config.frequencySpread
+          )
+        : (getNamedPreset(config.presetName, dimension) ??
+          generateQuantumPreset(
+            config.seed,
+            dimension,
+            config.termCount,
+            config.maxQuantumNumber,
+            config.frequencySpread
+          ))
+    const clampedIdx = Math.max(0, Math.min(sqLayerSelectedModeIndex, preset.omega.length - 1))
+    const omega = preset.omega[clampedIdx]
+    return {
+      activeModeIndex: clampedIdx,
+      modeOmega: Number.isFinite(omega) && omega! > 0 ? omega! : 1.0,
+    }
+  }, [
+    sqLayerEnabled,
+    sqLayerSelectedModeIndex,
+    dimension,
+    config.presetName,
+    config.seed,
+    config.termCount,
+    config.maxQuantumNumber,
+    config.frequencySpread,
+  ])
+
   // Build params for the selected dimension mode
   const params: SecondQuantParams = useMemo(
     () => ({
@@ -61,7 +120,7 @@ export function SecondQuantizationSection({
       alphaIm: sqLayerCoherentAlphaIm,
       squeezeR: sqLayerSqueezeR,
       squeezeTheta: sqLayerSqueezeTheta,
-      omega: 1.0,
+      omega: modeOmega,
     }),
     [
       sqLayerFockQuantumNumber,
@@ -69,13 +128,24 @@ export function SecondQuantizationSection({
       sqLayerCoherentAlphaIm,
       sqLayerSqueezeR,
       sqLayerSqueezeTheta,
+      modeOmega,
     ]
   )
 
-  // Compute metrics only when enabled
+  // Compute metrics only when enabled. `computeSecondQuantMetrics` throws a
+  // `RangeError` for exact Fock states past `FOCK_MAX_SAFE_LENGTH` — the UI
+  // slider is clamped to `[0, 10]`, so this is only reachable via malformed
+  // preset imports. Swallow *only* that specific error and render a
+  // placeholder, so other bugs still surface instead of being hidden by a
+  // blanket catch.
   const metrics = useMemo(() => {
     if (!sqLayerEnabled) return null
-    return computeSecondQuantMetrics(sqLayerMode, params)
+    try {
+      return computeSecondQuantMetrics(sqLayerMode, params)
+    } catch (error) {
+      if (error instanceof RangeError) return null
+      throw error
+    }
   }, [sqLayerEnabled, sqLayerMode, params])
 
   return (
@@ -116,7 +186,7 @@ export function SecondQuantizationSection({
               min={0}
               max={Math.max(dimension - 1, 0)}
               step={1}
-              value={sqLayerSelectedModeIndex}
+              value={activeModeIndex}
               onChange={actions.setSelectedModeIndex}
               showValue
               data-testid="sq-layer-mode-index"
@@ -258,7 +328,8 @@ export function SecondQuantizationSection({
                 {sqLayerShowOccupation && (
                   <FockOccupationTable
                     mode={sqLayerMode}
-                    modeIndex={sqLayerSelectedModeIndex}
+                    modeIndex={activeModeIndex}
+                    modeOmega={modeOmega}
                     occupation={metrics.occupation}
                     energy={metrics.energy}
                     fockDistribution={metrics.fockDistribution}
@@ -292,39 +363,108 @@ export function SecondQuantizationSection({
 // ============================================================================
 
 /**
+ * Find the index of the largest entry in `distribution`. Returns 0 when all
+ * entries are non-finite or non-positive — probabilities cannot be negative
+ * and a sea of zeros has no meaningful peak, so defaulting the window to
+ * start at n=0 is the right visual fallback.
+ *
+ * @internal
+ */
+function argmax(distribution: number[]): number {
+  let bestIdx = 0
+  let bestVal = 0
+  for (let i = 0; i < distribution.length; i++) {
+    const v = distribution[i] ?? 0
+    // Require strictly positive *and* finite so an all-zero (or all-
+    // negative, all-NaN) distribution keeps bestIdx === 0 rather than
+    // latching onto whichever index happened to have the least-negative
+    // garbage value.
+    if (Number.isFinite(v) && v > bestVal) {
+      bestVal = v
+      bestIdx = i
+    }
+  }
+  return bestIdx
+}
+
+/**
+ * Pick a centered window of `width` indices around the distribution peak,
+ * clamped so the window stays inside `[0, distribution.length)`. For
+ * narrow distributions (peak near zero) this returns `[0, width)` exactly,
+ * which keeps the visual stable for the small-occupation case.
+ *
+ * @internal
+ */
+function selectDisplayWindow(
+  distribution: number[],
+  width: number
+): { start: number; end: number } {
+  const len = distribution.length
+  if (len <= width) return { start: 0, end: len }
+  const peak = argmax(distribution)
+  const half = Math.floor(width / 2)
+  let start = Math.max(0, peak - half)
+  let end = start + width
+  if (end > len) {
+    end = len
+    start = end - width
+  }
+  return { start, end }
+}
+
+/**
  * Displays Fock-space occupation metrics for a single mode.
  */
 function FockOccupationTable({
   mode,
   modeIndex,
+  modeOmega,
   occupation,
   energy,
   fockDistribution,
 }: {
   mode: SecondQuantizationMode
   modeIndex: number
+  modeOmega: number
   occupation: number
   energy: number
   fockDistribution: number[]
 }) {
+  const { start, end } = selectDisplayWindow(fockDistribution, FOCK_DISPLAY_WINDOW)
+  const omegaLabel = Number.isFinite(modeOmega) ? modeOmega.toFixed(3) : '—'
   return (
     <div
       className="rounded-md border border-panel-border p-2 text-xs"
       data-testid="sq-occupation-table"
     >
       <div className="font-medium text-text-primary mb-1">
-        Mode k={modeIndex} — {mode}
+        Mode k={modeIndex} — {mode}{' '}
+        <span className="text-text-tertiary font-normal">(ω={omegaLabel})</span>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-text-secondary">
         <span>⟨n̂⟩ =</span>
         <span className="text-text-primary">{occupation.toFixed(3)}</span>
         <span>E =</span>
-        <span className="text-text-primary">{energy.toFixed(3)} ℏω</span>
+        {/* `energy` = ω·(⟨n̂⟩ + ½). Displaying it as multiples of ℏω requires
+            dividing by ω so the reported coefficient matches the ℏω label. */}
+        <span className="text-text-primary">
+          {modeOmega > 0 ? (energy / modeOmega).toFixed(3) : '—'} ℏω
+        </span>
       </div>
-      {/* Fock distribution bar chart */}
+      {/* Fock distribution bar chart — windowed around the distribution peak
+          so large alpha / r still produce a meaningful display instead of a
+          column of empty bars. */}
       <div className="mt-2 space-y-0.5">
-        <div className="text-text-tertiary mb-0.5">P(n) distribution:</div>
-        {fockDistribution.slice(0, 8).map((prob, n) => {
+        <div className="text-text-tertiary mb-0.5">
+          P(n) distribution{' '}
+          {start > 0 && (
+            <span className="text-text-tertiary/70">
+              (n = {start}…{end - 1})
+            </span>
+          )}
+        </div>
+        {fockDistribution.slice(start, end).map((prob, offset) => {
+          const n = start + offset
           const rawPercent = prob * 100
           const percent = Number.isFinite(rawPercent) ? Math.max(0, Math.min(rawPercent, 100)) : 0
 

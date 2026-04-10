@@ -17,6 +17,17 @@ export interface BecRenderingOverrides {
   autoScaleMaxGain?: number
 }
 
+/**
+ * Default rendering overrides applied to every BEC preset via `getBecPreset`.
+ * Ensures preset switches fully reset the parent SchroedingerConfig rendering state
+ * instead of inheriting stale values (e.g. `autoScaleMaxGain`) from a prior preset.
+ */
+const BEC_DEFAULT_RENDERING: Required<BecRenderingOverrides> = {
+  densityGain: 0.2,
+  densityContrast: 2.0,
+  autoScaleMaxGain: 20,
+}
+
 /** A named BEC scenario preset. */
 export interface BecScenarioPreset extends ScenarioPreset<Partial<BecConfig>> {
   /** Minimum spatial dimension required for this preset (default: 2). */
@@ -210,3 +221,19 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
     renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
 ]
+
+/**
+ * Lookup a BEC preset by id, merging default rendering overrides so preset
+ * switches reset ALL parent-level rendering fields (not just the ones the
+ * preset explicitly sets). Without this merge, switching between presets with
+ * heterogeneous override keys — e.g. one sets `autoScaleMaxGain`, another
+ * doesn't — leaks stale values from the prior preset onto the schroedinger state.
+ */
+export function getBecPreset(id: string): BecScenarioPreset | undefined {
+  const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === id)
+  if (!preset) return undefined
+  return {
+    ...preset,
+    renderingOverrides: { ...BEC_DEFAULT_RENDERING, ...preset.renderingOverrides },
+  }
+}

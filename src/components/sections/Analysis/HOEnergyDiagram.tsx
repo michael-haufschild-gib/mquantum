@@ -64,13 +64,29 @@ export const HOEnergyDiagram: React.FC = React.memo(() => {
       (presetName !== 'custom' && getNamedPreset(presetName, dimension)) ||
       generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
 
-    // ── Energy diagram data ──
+    // The diagram is intentionally a *1D marginal* of the multi-dimensional
+    // HO state, restricted to dimension 0. Mixing total multi-D term energies
+    // (Σ_j ω_j (n_kj + 1/2)) with a 1D ladder ω_0 (n + 1/2) on the same axis
+    // — which is what this component used to do — produces a misleading
+    // picture: a 3D term (0,2,3) with all ω=1 was drawn at y(6.5) on a
+    // ladder spaced by ω_0, inviting the reader to interpret it as "n=6"
+    // even though the underlying 1D quantum number is 0. Below, every
+    // ladder rung *and* every active-term line is computed in dim-0 units
+    // so the chart is self-consistent.
+    const DISPLAY_DIM = 0
     const weights = preset.coefficients.map(([re, im]) => re * re + im * im)
-    const maxWeight = Math.max(...weights, 1e-10)
-    const omega0 = preset.omega[0] ?? 1
-    const maxE = Math.max(...preset.energies, 1)
-    const maxN = Math.ceil(maxE / omega0 + 0.5)
-    const displayMaxN = Math.min(maxN + 1, 12)
+    const omega0 = preset.omega[DISPLAY_DIM] ?? 1
+
+    // Highest 1D quantum number that any active term carries in this
+    // dimension. The previous code used maxE/omega0 of the multi-D
+    // energies, which inflated the ladder height for high-dimensional
+    // presets where most of the energy lives in other dimensions.
+    let maxDimQN = 0
+    for (let i = 0; i < preset.quantumNumbers.length; i++) {
+      const n = preset.quantumNumbers[i]?.[DISPLAY_DIM] ?? 0
+      if (n > maxDimQN) maxDimQN = n
+    }
+    const displayMaxN = Math.min(maxDimQN + 2, 12)
 
     const levels: { n: number; energy: number }[] = []
     for (let n = 0; n <= displayMaxN; n++) {
@@ -81,21 +97,34 @@ export const HOEnergyDiagram: React.FC = React.memo(() => {
     const eMax = levels[levels.length - 1]!.energy * 1.1
     const toEnergyY = (e: number) => PY + (1 - (e - eMin) / (eMax - eMin)) * PH
 
-    const activeTerms = preset.energies.map((e, i) => ({
-      energy: e,
-      weight: weights[i]! / maxWeight,
+    // Active-term lines: each superposition term contributes ω₀(n_k0 + 1/2)
+    // to the dim-0 marginal energy. Several terms can share the same n_k0,
+    // so we deduplicate and combine their weights for visual clarity (a
+    // single line with the summed weight, instead of overlapping lines).
+    const dimWeightMap = new Map<number, number>()
+    for (let i = 0; i < preset.quantumNumbers.length; i++) {
+      const dimQN = preset.quantumNumbers[i]?.[DISPLAY_DIM] ?? 0
+      const w = weights[i] ?? 0
+      dimWeightMap.set(dimQN, (dimWeightMap.get(dimQN) ?? 0) + w)
+    }
+    const dimMaxWeight = Math.max(...Array.from(dimWeightMap.values()), 1e-10)
+    const activeTerms = Array.from(dimWeightMap.entries()).map(([dimQN, w]) => ({
+      energy: omega0 * (dimQN + 0.5),
+      weight: w / dimMaxWeight,
     }))
 
     // ── Wavefunction data ──
-    let dominantIdx = 0
-    let maxW = 0
-    for (let i = 0; i < weights.length; i++) {
-      if (weights[i]! > maxW) {
-        maxW = weights[i]!
-        dominantIdx = i
+    // Pick the dim-0 quantum number with the largest combined weight so the
+    // displayed |ψ_n(x)|² matches the most prominent active-term line.
+    let dominantDimQN = 0
+    let dominantWeight = -1
+    for (const [dimQN, w] of dimWeightMap) {
+      if (w > dominantWeight) {
+        dominantWeight = w
+        dominantDimQN = dimQN
       }
     }
-    const qn = preset.quantumNumbers[dominantIdx]?.[0] ?? 0
+    const qn = dominantDimQN
     const classicalR = Math.sqrt(2 * qn + 1)
     const xMax = Math.max(classicalR * 1.8, 3)
     const nSamples = 120
@@ -144,7 +173,13 @@ export const HOEnergyDiagram: React.FC = React.memo(() => {
   return (
     <div data-testid="ho-energy-diagram">
       <p className="text-xs text-text-secondary mb-1">
-        Energy Levels & Wavefunction |ψ<sub>n</sub>(x)|²
+        Energy Levels & Wavefunction |ψ<sub>n</sub>(x)|²{' '}
+        {dimension > 1 && (
+          <span className="text-text-tertiary">
+            <span aria-hidden="true"> · </span>
+            dim 1 marginal
+          </span>
+        )}
       </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">

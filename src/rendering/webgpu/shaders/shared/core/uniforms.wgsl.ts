@@ -1,16 +1,25 @@
 /**
  * WGSL Shared Uniforms Block
  *
- * Common uniform structures used across all shaders.
+ * Common uniform structures used across all shaders. Each struct is defined
+ * in its own named `ShaderBlock` and the exported `uniformsBlock` string is
+ * produced by `assembleShaderBlocks()` so composition matches the repo rule
+ * in `.claude/rules/shaders.md` ("composed via `assembleShaderBlocks()`").
  *
  * @module rendering/webgpu/shaders/shared/core/uniforms.wgsl
  */
 
-export const uniformsBlock = /* wgsl */ `
-// ============================================
-// Camera Uniform Buffer
-// ============================================
+import { assembleShaderBlocks, type ShaderBlock } from '../compose-helpers'
 
+/**
+ * Canonical CameraUniforms struct definition.
+ *
+ * Single source of truth for the host-shareable camera uniform buffer layout.
+ * Imported by both `uniformsBlock` (composed into fragment shaders alongside
+ * other shared structs) and the standalone vertex shaders in
+ * `schroedinger/vertex.wgsl.ts`. Any layout change must happen here.
+ */
+export const CAMERA_UNIFORMS_STRUCT = /* wgsl */ `
 struct CameraUniforms {
   viewMatrix: mat4x4f,
   projectionMatrix: mat4x4f,
@@ -34,11 +43,9 @@ struct CameraUniforms {
   bayerOffset: vec2f,            // Bayer pattern offset [0,0], [1,1], [1,0], [0,1]
   _padding: vec2f,               // Padding for 16-byte alignment
 }
+`
 
-// ============================================
-// Light Structures
-// ============================================
-
+const LIGHTING_STRUCTS = /* wgsl */ `
 struct LightData {
   position: vec4f,      // xyz = position, w = type
   direction: vec4f,     // xyz = direction (for directional/spot), w = range
@@ -53,11 +60,9 @@ struct LightingUniforms {
   lightCount: i32,
   _padding: vec3f,
 }
+`
 
-// ============================================
-// Material Uniform Buffer
-// ============================================
-
+const MATERIAL_UNIFORMS_STRUCT = /* wgsl */ `
 struct MaterialUniforms {
   // NOTE: This struct is host-shareable and follows WGSL alignment rules.
   // vec3f has 16-byte alignment, so some sequences introduce padding gaps.
@@ -96,11 +101,9 @@ struct MaterialUniforms {
   specularIntensity: f32,
   specularColor: vec3f,
 }
+`
 
-// ============================================
-// N-Dimensional Transform Uniforms
-// ============================================
-
+const ND_TRANSFORM_UNIFORMS_STRUCT = /* wgsl */ `
 struct NDTransformUniforms {
   // Basis vectors for 3D slice in D-space (max 11D)
   // Each vec4f holds first 4 components, extended arrays for higher dims
@@ -119,11 +122,9 @@ struct NDTransformUniforms {
 
   _padding: vec2f,
 }
+`
 
-// ============================================
-// Post-Processing Uniforms
-// ============================================
-
+const POST_PROCESS_UNIFORMS_STRUCT = /* wgsl */ `
 struct PostProcessUniforms {
   // Bloom
   bloomGain: f32,
@@ -149,11 +150,9 @@ struct PostProcessUniforms {
 
   _padding: vec3f,
 }
+`
 
-// ============================================
-// Quality Uniforms
-// ============================================
-
+const QUALITY_UNIFORMS_STRUCT = /* wgsl */ `
 struct QualityUniforms {
   // SDF raymarching quality
   sdfMaxIterations: i32,
@@ -172,11 +171,9 @@ struct QualityUniforms {
 
   _reservedDebug: i32,
 }
+`
 
-// ============================================
-// Bind Group Layouts
-// ============================================
-
+const BIND_GROUP_LAYOUT_COMMENTS = /* wgsl */ `
 // Group 0: Camera and time-varying uniforms (updated every frame)
 // @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
@@ -186,9 +183,21 @@ struct QualityUniforms {
 // Group 2: Material uniforms (per-object)
 // @group(2) @binding(0) var<uniform> material: MaterialUniforms;
 
-// Group 3: Object-specific uniforms (Mandelbulb, Julia, etc.)
+// Group 3: Object-specific uniforms (schroedinger / pauliSpinor)
 // Layout varies by object type
 `
+
+const UNIFORM_BLOCKS: ShaderBlock[] = [
+  { name: 'Camera Uniform Buffer', content: CAMERA_UNIFORMS_STRUCT },
+  { name: 'Light Structures', content: LIGHTING_STRUCTS },
+  { name: 'Material Uniform Buffer', content: MATERIAL_UNIFORMS_STRUCT },
+  { name: 'N-Dimensional Transform Uniforms', content: ND_TRANSFORM_UNIFORMS_STRUCT },
+  { name: 'Post-Processing Uniforms', content: POST_PROCESS_UNIFORMS_STRUCT },
+  { name: 'Quality Uniforms', content: QUALITY_UNIFORMS_STRUCT },
+  { name: 'Bind Group Layouts', content: BIND_GROUP_LAYOUT_COMMENTS },
+]
+
+export const uniformsBlock: string = assembleShaderBlocks(UNIFORM_BLOCKS).wgsl
 
 /**
  * Generate bind group layout code for a specific group.

@@ -42,7 +42,9 @@ const TDSE_PARAMS: Record<string, TdseParamDef> = {
   setTdseRadialWellTilt: { field: 'radialWellTilt', min: -2, max: 2 },
   setTdseAnharmonicLambda: { field: 'anharmonicLambda', min: 0, max: 100 },
   setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
-  setTdseDisorderSeed: { field: 'disorderSeed', min: 0, max: 999999 },
+  // setTdseDisorderSeed lives in tdseUiSetters.ts (integer floor + lower-bound only)
+  // — intentionally NOT in this float-clamp table because the seed needs Math.floor
+  // and has no upper bound.
   setTdseDriveFrequency: { field: 'driveFrequency', min: 0, max: 50 },
   setTdseDriveAmplitude: { field: 'driveAmplitude', min: 0, max: 100 },
 }

@@ -120,6 +120,21 @@ export const useMonitoringSweepStore = create<MonitoringSweepState>((set, get) =
       return null
     }
 
+    // Detect a simTime regression (the user manually reset the TDSE field
+    // mid-step, e.g. by toggling a setting or clicking the timeline reset).
+    // Without this guard, pre-reset and post-reset IPR samples get folded
+    // into the same time-average and the sweep silently produces a
+    // corrupted point. Discard accumulated samples and re-anchor the
+    // current step from the new simTime.
+    if (simTime < state.stepStartTime) {
+      set({
+        stepStartTime: simTime > 0 ? simTime : 0,
+        iprAccumulator: simTime > 0 ? [ipr] : [],
+        normDriftAccumulator: simTime > 0 ? [normDrift] : [],
+      })
+      return null
+    }
+
     // Accumulate samples for time-averaging
     const iprSamples = [...state.iprAccumulator, ipr]
     const ndSamples = [...state.normDriftAccumulator, normDrift]

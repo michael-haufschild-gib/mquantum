@@ -18,6 +18,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AXIS_LABELS } from '@/constants/dimension'
 import {
   deserializeState,
   type ParsedShareableState,
@@ -285,7 +286,11 @@ describe('animation plane filter consistency through dimension changes', () => {
   })
 
   it('animation planes are filtered when dimension decreases', () => {
-    const AXES = ['X', 'Y', 'Z', 'W', 'V', 'U', 'A6', 'A7', 'A8', 'A9', 'A10']
+    // Axis names mirror constants/dimension.ts AXIS_LABELS (uppercased) —
+    // unified with the rotation file in the orphan-naming cleanup so the
+    // rotation buttons match the slice-position UI labels. Deriving from
+    // AXIS_LABELS keeps the test in lock-step with any future rename.
+    const AXES = AXIS_LABELS.map((label) => label.toUpperCase())
 
     useGeometryStore.getState().setDimension(8)
     useAnimationStore.getState().animateAll(8)
@@ -299,19 +304,11 @@ describe('animation plane filter consistency through dimension changes', () => {
     const planesAfter = useAnimationStore.getState().animatingPlanes
     expect(planesAfter.size).toBeLessThanOrEqual(6) // C(4,2) = 6
 
-    // Verify every remaining plane references only axes 0-3
+    // Verify every remaining plane references only axes 0-3.
+    // All axis names are single characters now (no more `A6`/`A7` two-char form).
     for (const plane of planesAfter) {
-      for (let i = 0; i < plane.length; ) {
-        // Parse axis name from plane string
-        let axisName: string
-        if (plane[i] === 'A') {
-          // Multi-char axis like A6, A7
-          axisName = plane.substring(i, i + 2)
-          i += 2
-        } else {
-          axisName = plane[i]!
-          i += 1
-        }
+      for (let i = 0; i < plane.length; i++) {
+        const axisName = plane[i]!
         const axisIdx = AXES.indexOf(axisName)
         expect(axisIdx).toBeLessThan(4)
         expect(axisIdx).toBeGreaterThanOrEqual(0)

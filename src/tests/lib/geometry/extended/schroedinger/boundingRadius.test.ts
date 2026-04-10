@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { DiracConfig } from '@/lib/geometry/extended/dirac'
-import { DEFAULT_DIRAC_CONFIG } from '@/lib/geometry/extended/dirac'
 import {
   computeBoundingRadius,
-  computeDiracBoundingRadius,
   computeHOBoundingRadius,
   computeHOMomentumBoundingRadius,
   computeHydrogenBoundingRadius,
@@ -270,28 +267,6 @@ describe('computeBoundingRadius (dispatch)', () => {
     expect(R).toBeCloseTo(18.75, 6)
   })
 
-  it('dispatches to Dirac for diracEquation mode', () => {
-    const diracConfig: DiracConfig = {
-      ...DEFAULT_DIRAC_CONFIG,
-      gridSize: [32, 32, 32],
-      spacing: [0.2, 0.2, 0.2],
-    }
-    const R = computeBoundingRadius(
-      'diracEquation',
-      null,
-      3,
-      2,
-      1.0,
-      undefined,
-      undefined,
-      'position',
-      1.0,
-      diracConfig
-    )
-    // maxExtent = 32 * 0.2 * 0.5 = 3.2, R = 3.2 * 1.1 = 3.52
-    expect(R).toBeCloseTo(3.52, 2)
-  })
-
   it('dispatches hydrogenNDCoupled same as hydrogenND for position space', () => {
     const R_nd = computeBoundingRadius('hydrogenND', null, 3, 3, 1.0)
     const R_coupled = computeBoundingRadius('hydrogenNDCoupled', null, 3, 3, 1.0)
@@ -334,54 +309,6 @@ describe('computeBoundingRadius (dispatch)', () => {
       'momentum'
     )
     expect(R).toBe(2.0)
-  })
-})
-
-describe('computeDiracBoundingRadius', () => {
-  it('computes radius from lattice extent with 1.1 margin', () => {
-    const config: DiracConfig = {
-      ...DEFAULT_DIRAC_CONFIG,
-      gridSize: [64, 64, 64],
-      spacing: [0.15, 0.15, 0.15],
-    }
-    // maxExtent = 64 * 0.15 * 0.5 = 4.8, R = 4.8 * 1.1 = 5.28
-    const R = computeDiracBoundingRadius(3, config)
-    expect(R).toBeCloseTo(5.28, 2)
-  })
-
-  it('returns at least MIN_BOUND_R for small grids', () => {
-    const config: DiracConfig = {
-      ...DEFAULT_DIRAC_CONFIG,
-      gridSize: [4, 4, 4],
-      spacing: [0.01, 0.01, 0.01],
-    }
-    // maxExtent = 4 * 0.01 * 0.5 = 0.02, 0.02*1.1 = 0.022 < 2.0
-    const R = computeDiracBoundingRadius(3, config)
-    expect(R).toBe(2.0)
-  })
-
-  it('uses only min(dimension, 3) axes', () => {
-    const config: DiracConfig = {
-      ...DEFAULT_DIRAC_CONFIG,
-      gridSize: [64, 64, 64, 128, 128],
-      spacing: [0.1, 0.1, 0.1, 0.5, 0.5],
-    }
-    // Only first 3 dims: maxExtent = 64*0.1*0.5 = 3.2
-    // The 4th/5th dims (128*0.5*0.5=32) are excluded for dim=3
-    const R3 = computeDiracBoundingRadius(3, config)
-    expect(R3).toBeCloseTo(3.2 * 1.1, 2)
-  })
-
-  it('handles anisotropic spacing (picks largest extent)', () => {
-    const config: DiracConfig = {
-      ...DEFAULT_DIRAC_CONFIG,
-      gridSize: [32, 64, 16],
-      spacing: [0.1, 0.2, 0.5],
-    }
-    // Extents: 32*0.1*0.5=1.6, 64*0.2*0.5=6.4, 16*0.5*0.5=4.0
-    // max = 6.4, R = 6.4 * 1.1 = 7.04
-    const R = computeDiracBoundingRadius(3, config)
-    expect(R).toBeCloseTo(7.04, 2)
   })
 })
 

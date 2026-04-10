@@ -90,12 +90,7 @@ export function createVisualEffectSetters(
       }))
     },
 
-    // SSS
-    setSchroedingerSssEnabled: valueSetter('sssEnabled'),
-    setSchroedingerSssIntensity: clampedSetter('sssIntensity', 0.0, 2.0),
-    setSchroedingerSssColor: valueSetter('sssColor'),
-    setSchroedingerSssThickness: clampedSetter('sssThickness', 0.1, 5.0),
-    setSchroedingerSssJitter: clampedSetter('sssJitter', 0.0, 1.0),
+    // SSS state lives on the appearance store; no schroedinger-scoped duplicates.
 
     // Nodal surfaces
     setSchroedingerNodalEnabled: valueSetter('nodalEnabled'),

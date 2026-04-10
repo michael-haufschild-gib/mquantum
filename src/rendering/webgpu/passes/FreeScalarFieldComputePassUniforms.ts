@@ -381,7 +381,15 @@ export function computeFsfDiagnostics(
 
   const totalEnergy = kineticEnergy + gradEnergy + massEnergy + potentialEnergy
   const meanPhi = sumPhi / N
-  const variancePhi = sumPhi2 / N - meanPhi * meanPhi
+  // The two-sum variance formula sumPhi²/N − ⟨φ⟩² is numerically unstable
+  // for nearly-uniform fields (e.g. early frames of a kink profile or any
+  // ground-state-like configuration where φ is close to a constant). Float
+  // cancellation between the two large nearly-equal terms produces a small
+  // negative result, which then renders in the FSF analysis panel as
+  // "Var(φ) = -0.000003" — visually broken for a quantity that is
+  // mathematically non-negative. Clamp at zero so displayed and exported
+  // diagnostics stay physically meaningful.
+  const variancePhi = Math.max(0, sumPhi2 / N - meanPhi * meanPhi)
 
   return {
     totalEnergy,

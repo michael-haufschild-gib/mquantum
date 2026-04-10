@@ -150,6 +150,11 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
         <Section title="Slice Positions" defaultOpen={false}>
           <div className="space-y-3">
             {Array.from({ length: latticeDim - 3 }, (_, i) => {
+              // pauli.slicePositions is 0-indexed for extra dims to match the
+              // writer in PauliComputePassBuffers: positions[0] drives dim 3,
+              // positions[1] drives dim 4, etc. Previous code keyed the
+              // sliders by the full dim index `d = i + 3`, so user drags never
+              // reached the shader (the writer was reading different slots).
               const d = i + 3
               return (
                 <Slider
@@ -159,8 +164,8 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
                   min={-1}
                   max={1}
                   step={0.01}
-                  value={pauli.slicePositions[d] ?? 0}
-                  onChange={(v) => actions.setPauliSlicePosition(d, v)}
+                  value={pauli.slicePositions[i] ?? 0}
+                  onChange={(v) => actions.setPauliSlicePosition(i, v)}
                   showValue
                 />
               )

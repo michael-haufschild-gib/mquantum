@@ -11,7 +11,19 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
-/** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
+/**
+ * TDSEUniforms struct size in bytes.
+ *
+ * Last documented offsets in `tdseUniforms.wgsl.ts`:
+ *   - compactDimsMask:    u32 @ 736
+ *   - branchingEnabled:   u32 @ 740
+ *   - branchPlanePosition: f32 @ 744
+ *
+ * Total = 744 + 4 = 748. Update both this constant and the WGSL struct
+ * if you add new fields, and keep this comment in sync — the previous
+ * "740 = 736 + 4" annotation drifted when stochastic-decoherence
+ * branching was added and silently misled readers about the layout.
+ */
 const UNIFORM_SIZE = 748
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256

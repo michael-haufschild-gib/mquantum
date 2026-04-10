@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useAppearanceStore } from '@/stores/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   DEFAULT_DIMENSION,
   DEFAULT_OBJECT_TYPE,
@@ -26,6 +27,7 @@ describe('geometryStore', () => {
     useAnimationStore.getState().reset()
     useRotationStore.getState().setDimension(DEFAULT_DIMENSION)
     useAppearanceStore.getState().reset()
+    useExtendedObjectStore.getState().reset()
     useTransformStore.getState().reset()
   })
 
@@ -120,6 +122,45 @@ describe('geometryStore', () => {
 
       useGeometryStore.getState().setDimension(5)
       expect(useGeometryStore.getState().objectType).toBe('pauliSpinor')
+    })
+
+    // Regression: commit 3338b95e added synchronous latticeDim sync for TDSE/FSF
+    // in propagateDimensionToStores to close a render-tick gap where the renderer
+    // could sample a stale bounding radius. That fix was incomplete — BEC, Dirac,
+    // and Quantum Walk were also affected. This test runs through every compute
+    // mode and verifies that setDimension propagates synchronously to the
+    // mode's latticeDim, without relying on the React initialization hook.
+    it('synchronously propagates dimension to every compute mode latticeDim', () => {
+      type Mode =
+        | 'tdseDynamics'
+        | 'becDynamics'
+        | 'diracEquation'
+        | 'quantumWalk'
+        | 'freeScalarField'
+      const modes: Mode[] = [
+        'tdseDynamics',
+        'becDynamics',
+        'diracEquation',
+        'quantumWalk',
+        'freeScalarField',
+      ]
+      for (const mode of modes) {
+        useExtendedObjectStore.getState().setSchroedingerQuantumMode(mode)
+        useGeometryStore.getState().setDimension(3)
+        useGeometryStore.getState().setDimension(4)
+        const s = useExtendedObjectStore.getState().schroedinger
+        const sub =
+          mode === 'tdseDynamics'
+            ? s.tdse
+            : mode === 'becDynamics'
+              ? s.bec
+              : mode === 'diracEquation'
+                ? s.dirac
+                : mode === 'quantumWalk'
+                  ? s.quantumWalk
+                  : s.freeScalar
+        expect(sub.latticeDim, `${mode}: latticeDim synced`).toBe(4)
+      }
     })
   })
 

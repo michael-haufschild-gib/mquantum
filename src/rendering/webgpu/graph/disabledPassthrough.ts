@@ -14,6 +14,14 @@ import type { WebGPURenderPass } from '../core/types'
 import type { WebGPUResourcePool } from '../core/WebGPUResourcePool'
 
 /**
+ * Seen mismatch signatures for passthrough warnings. A stable mismatch would
+ * otherwise log once per frame from a hot render loop — flooding the console
+ * and affecting observability. Keyed by `pass:input→output:format:width×height`
+ * so genuinely new mismatches still surface, while steady-state spam is muted.
+ */
+const warnedPassthroughMismatch = new Set<string>()
+
+/**
  * Maintains the resource chain for a disabled pass by either aliasing or
  * copying its first input to its first output.
  *
@@ -80,6 +88,22 @@ export function handleDisabledPassthrough(
             { width: inputTexture.width, height: inputTexture.height }
           )
         } else {
+          // Format/size mismatch: cannot copy. Fall back to aliasing, which means
+          // downstream passes will read the input texture as if it were the output.
+          // If the downstream bind group declares a different sampleType than the
+          // input format provides, the bind group write will silently sample wrong
+          // values. Log a warning so the renderer author can mark the pass with
+          // skipPassthrough=true (intentional alias) or fix the format mismatch.
+          const warnKey =
+            `${passId}:${inputId}→${outputId}:` +
+            `${inputTexture.format}:${inputTexture.width}×${inputTexture.height}→` +
+            `${outputTexture.format}:${outputTexture.width}×${outputTexture.height}`
+          if (!warnedPassthroughMismatch.has(warnKey)) {
+            warnedPassthroughMismatch.add(warnKey)
+            logger.warn(
+              `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${inputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
+            )
+          }
           resourceAliases.set(outputId, inputId)
         }
       }

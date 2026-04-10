@@ -89,8 +89,13 @@ export class WebGPUCanvasCapture {
     height: number,
     bytesPerRow: number,
     format: CanvasCaptureTextureFormat
-  ): Uint8ClampedArray {
-    const out = new Uint8ClampedArray(width * height * BYTES_PER_PIXEL)
+  ): Uint8ClampedArray<ArrayBuffer> {
+    // Constructed with a numeric length so the underlying buffer is a
+    // plain ArrayBuffer, not SharedArrayBuffer. This narrower type is
+    // required by ImageData() which rejects ArrayBufferLike.
+    const out = new Uint8ClampedArray(
+      width * height * BYTES_PER_PIXEL
+    ) as Uint8ClampedArray<ArrayBuffer>
     const bgraInput = isBGRAFormat(format)
 
     for (let y = 0; y < height; y++) {
@@ -124,7 +129,11 @@ export class WebGPUCanvasCapture {
     return out
   }
 
-  private pixelsToDataUrl(pixels: Uint8ClampedArray, width: number, height: number): string {
+  private pixelsToDataUrl(
+    pixels: Uint8ClampedArray<ArrayBuffer>,
+    width: number,
+    height: number
+  ): string {
     const canvas = document.createElement('canvas')
     canvas.width = width
     canvas.height = height
@@ -134,9 +143,13 @@ export class WebGPUCanvasCapture {
       throw new Error('Failed to create 2D canvas context for screenshot export')
     }
 
-    const imageDataPixels = new Uint8ClampedArray(width * height * BYTES_PER_PIXEL)
-    imageDataPixels.set(pixels)
-    const imageData = new ImageData(imageDataPixels, width, height)
+    // ImageData accepts a Uint8ClampedArray directly — we don't need to
+    // clone the pixel buffer first. The previous defensive clone allocated
+    // an extra width*height*4 bytes (~32 MB on a 4K screenshot) for no
+    // observable benefit; ImageData stores a reference rather than
+    // transferring ownership, and `pixels` is local to the readback path
+    // and never reused after this call.
+    const imageData = new ImageData(pixels, width, height)
     ctx.putImageData(imageData, 0, 0)
     return canvas.toDataURL('image/png')
   }

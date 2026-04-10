@@ -509,6 +509,34 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.predecessorStrategy = predecessor.strategy
   }
 
+  /**
+   * Revert adopted compute state back to a predecessor renderer after an aborted warm swap.
+   *
+   * When `adoptFrom()` + `initialize()` have already run, this renderer's strategy owns
+   * the predecessor's compute pass (coin buffers, density texture, etc.). If the warm
+   * swap is then aborted and this renderer is disposed, `strategy.dispose()` would
+   * destroy that GPU state even though the predecessor is still active in the graph
+   * and its bind groups reference the (now-destroyed) texture.
+   *
+   * Call this BEFORE `dispose()` on an aborted warm-swap path so the predecessor
+   * reclaims its compute state. A no-op if adoption never happened (e.g. different
+   * quantum modes, or `initialize()` hadn't yet reached `adoptComputeState`).
+   */
+  revertComputeStateTo(predecessor: WebGPURenderPass): void {
+    if (!(predecessor instanceof WebGPUSchrodingerRenderer)) return
+    if (predecessor.rendererConfig.quantumMode !== this.rendererConfig.quantumMode) return
+    // If the stashed predecessorStrategy is still set, init never reached
+    // adoptComputeState; nothing to revert.
+    if (this.predecessorStrategy) {
+      this.predecessorStrategy = null
+      return
+    }
+    // Reverse the transfer: predecessor reclaims the compute pass from this.strategy.
+    // After this returns, this.strategy's compute pass is null (source.X = null inside
+    // adoptComputeState) so our upcoming dispose() is a no-op on that state.
+    predecessor.strategy.adoptComputeState?.(this.strategy)
+  }
+
   dispose(): void {
     this.carpetSlicePass?.dispose()
     this.carpetSlicePass = null

@@ -16,14 +16,24 @@ import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
-/** Mapping from URL state key → TDSE setter name on the extended object store. */
+/**
+ * Mapping from URL state key → TDSE setter name on the extended object store.
+ *
+ * NOTE: `absorberEnabled` is intentionally NOT in this list. PML is shared
+ * across all dynamic compute modes via `state.schroedinger.absorberEnabled`
+ * (the top-level field that `applySharedPml` reads). Routing the URL param
+ * through `setTdseAbsorberEnabled` would write to the per-mode TDSE field,
+ * which is then *shadowed* by the top-level shared default `true` — meaning
+ * `?abs=0` had no effect on actual rendering. The shared setter is dispatched
+ * separately in `applyUrlStateParams` below.
+ */
 const TDSE_PARAM_MAP: ReadonlyArray<
   readonly [keyof ParsedShareableState, keyof ReturnType<typeof useExtendedObjectStore.getState>]
 > = [
   ['potentialType', 'setTdsePotentialType'],
-  ['absorberEnabled', 'setTdseAbsorberEnabled'],
   ['diagnosticsEnabled', 'setTdseDiagnosticsEnabled'],
   ['observablesEnabled', 'setTdseObservablesEnabled'],
   ['imaginaryTimeEnabled', 'setTdseImaginaryTimeEnabled'],
@@ -94,22 +104,63 @@ function applyEntanglementParams(urlState: ParsedShareableState): void {
 }
 
 /**
+ * Apply core identity (dimension → objectType → quantumMode) then synchronously
+ * rerun the dimension-derived initializer that `useObjectTypeInitialization`
+ * would normally handle. The init-hook's deps-changed effect is skipped during
+ * URL load (see `isLoadingScene` gate below) so we run it here to get the
+ * dimension-derived defaults before URL overrides layer on top.
+ */
+function applyCoreIdentityAndInit(urlState: ParsedShareableState): void {
+  const geo = useGeometryStore.getState()
+  const ext = useExtendedObjectStore.getState()
+
+  if (urlState.dimension !== undefined) geo.setDimension(urlState.dimension)
+  if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
+  if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
+
+  // Read post-mutation state: setDimension() clamps to the supported range, and
+  // setObjectType() may auto-adjust the dimension. Initializing with the raw URL
+  // values would mis-size arrays relative to the store's actual dimension.
+  const currentGeo = useGeometryStore.getState()
+  const { dimension: dim, objectType } = currentGeo
+  const extStore = useExtendedObjectStore.getState()
+  if (objectType === 'schroedinger') {
+    extStore.initializeSchroedingerForDimension(dim)
+  } else if (objectType === 'pauliSpinor') {
+    extStore.initializePauliForDimension(dim)
+  }
+}
+
+/** Clear the isLoadingScene guard after the next RAF tick. */
+function scheduleClearLoadingFlag(): void {
+  const clearFlag = () => usePerformanceStore.getState().setIsLoadingScene(false)
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(clearFlag)
+  } else {
+    setTimeout(clearFlag, 0)
+  }
+}
+
+/**
  * Apply individual URL state parameters to stores.
  *
  * Exported for integration testing — this is the single source of truth for
  * URL param → store wiring. Tests should import this instead of duplicating it.
  *
+ * Guards the batched mutations behind `isLoadingScene=true` so the follow-up
+ * render doesn't retrigger `useObjectTypeInitialization` with the new dimension
+ * and clobber URL-set fields like `densityGain` / `parameterValues` / `extent`.
+ * Mirrors the scheme `loadScene` uses in `presetManagerStore.ts`. The flag is
+ * cleared after one RAF so the init hook's deps-changed effect has fired with
+ * the guard still set, then normal operation resumes.
+ *
  * @param urlState - Parsed URL state to apply
  */
 export function applyUrlStateParams(urlState: ParsedShareableState): void {
+  usePerformanceStore.getState().setIsLoadingScene(true)
   try {
-    const geo = useGeometryStore.getState()
+    applyCoreIdentityAndInit(urlState)
     const ext = useExtendedObjectStore.getState()
-
-    // ── Core identity (order matters: dimension → objectType → quantumMode) ──
-    if (urlState.dimension !== undefined) geo.setDimension(urlState.dimension)
-    if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
-    if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
 
     // ── Rendering ────────────────────────────────────────────────────────────
     if (urlState.representation !== undefined)
@@ -131,6 +182,14 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     if (urlState.hydrogenM !== undefined)
       ext.setSchroedingerMagneticQuantumNumber(urlState.hydrogenM)
 
+    // ── Shared PML absorbing boundary ────────────────────────────────────────
+    // PML is universal across all dynamic compute modes — see
+    // computeGridUtils.applySharedPml. Must write to the top-level shared
+    // field, not the per-mode TDSE one (which gets shadowed).
+    if (urlState.absorberEnabled !== undefined) {
+      ext.setSchroedingerAbsorberEnabled(urlState.absorberEnabled)
+    }
+
     // ── TDSE config ──────────────────────────────────────────────────────────
     applyTdseParams(urlState, ext)
 
@@ -140,6 +199,8 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyEntanglementParams(urlState)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
+  } finally {
+    scheduleClearLoadingFlag()
   }
 }
 

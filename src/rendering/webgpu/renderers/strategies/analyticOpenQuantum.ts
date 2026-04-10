@@ -56,6 +56,14 @@ export class AnalyticOpenQuantumExecutor {
   private resetTokenSeen = -1
   private updateTick = 0
   private lastSchroedingerVersion = -1
+  /**
+   * Tracks whether the previous frame saw `oqConfig.enabled === false` so we
+   * can detect a disable→re-enable transition and flush stale diagnostics
+   * history. Initialised to `true` so the very first execute() call after
+   * construction (or after a real reset) does not erroneously trigger an
+   * extra diagnostics reset on top of the one already issued by reset().
+   */
+  private wasDisabled = true
 
   // HO caches
   private hoCacheKey = ''
@@ -82,8 +90,26 @@ export class AnalyticOpenQuantumExecutor {
   ): void {
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const oqConfig = extended?.schroedinger?.openQuantum
-    if (!oqConfig?.enabled) return
+    if (!oqConfig?.enabled) {
+      // Mark for full reset on next enable so the diagnostics sparkline does
+      // not splice the old curve onto a fresh evolution. Skipping this would
+      // leave HISTORY_LENGTH (~120) stale samples visible for several seconds
+      // after the user re-enables open quantum.
+      this.wasDisabled = true
+      return
+    }
     if (!shared.cachedPreset) return
+
+    if (this.wasDisabled) {
+      // Disable→re-enable transition: clear in-memory caches and stale
+      // diagnostics history before the new evolution starts publishing.
+      // reset() re-arms wasDisabled to true (so a manual reset() while
+      // running still triggers a clean restart), so we explicitly clear
+      // the flag here AFTER the reset to avoid an infinite reset loop on
+      // every subsequent enabled frame.
+      this.reset()
+      this.wasDisabled = false
+    }
 
     const resetToken = oqConfig.resetToken ?? 0
     let forceUpdate = schroedingerVersion !== this.lastSchroedingerVersion
@@ -373,6 +399,20 @@ export class AnalyticOpenQuantumExecutor {
     return Math.min(baseSize, 32)
   }
 
+  /**
+   * Drop all in-memory caches *and* clear the open quantum diagnostics
+   * channel.
+   *
+   * This is called from `AnalyticModeStrategy.setup()` (pipeline rebuild,
+   * which intentionally restarts the density-matrix evolution from t=0),
+   * from `AnalyticModeStrategy.dispose()`, from `resetOpenQuantumState()`
+   * (preset / quantum-number change), and from `execute()` itself on a
+   * disable→re-enable transition. In every one of those cases the prior
+   * sparkline curve no longer corresponds to the live state, so flushing
+   * the diagnostics history here keeps the UI consistent with the in-memory
+   * density matrix instead of stitching a new evolution onto an unrelated
+   * historical tail.
+   */
   reset(): void {
     this.state = null
     this.initialized = false
@@ -392,5 +432,12 @@ export class AnalyticOpenQuantumExecutor {
     this.hydrogenBasisLabels = []
     this.hoPopulationLabels = null
     this.hydrogenOQConfigHash = ''
+    // Re-arm the disable→re-enable detector. Without this, an explicit
+    // reset() called while the executor is in the "enabled" state would
+    // cause the *next* execute() call to skip the disable→re-enable
+    // branch even though our internal state has been wiped, leaving
+    // forceUpdate at false until the schroedingerVersion bumps.
+    this.wasDisabled = true
+    useDiagnosticsStore.getState().resetOpenQuantum()
   }
 }

@@ -326,6 +326,93 @@ export function computeUncertainties(
 }
 
 /**
+ * Default minimum length for the Fock distribution array. Larger occupation
+ * numbers (large |alpha| or r) automatically extend this so the displayed
+ * distribution captures the bulk and not just the leading tail.
+ */
+const FOCK_BASELINE_LENGTH = 12
+
+/**
+ * Hard cap on the Fock distribution length for coherent/squeezed states
+ * (non-exact bases). Sized so that the upper-end UI sliders (squeezed r=2,
+ * |α|=5+5i) still normalise to within ~1% — past r ≈ 2.5 the distribution
+ * is well into the classical limit and Fock decomposition stops being
+ * illuminating.
+ */
+const FOCK_MAX_LENGTH = 160
+
+/**
+ * Safety ceiling on `n` for exact Fock states `|n⟩`. The math function is
+ * `O(n)` in allocation (a single `1` in an otherwise-zero probability
+ * vector), so an adversarial input like `n = 1_000_000` would lock the tab
+ * during array construction. 4096 leaves plenty of headroom for any
+ * physically interesting truncation of a harmonic oscillator spectrum
+ * while keeping the allocation bounded at a few tens of KB.
+ */
+export const FOCK_MAX_SAFE_LENGTH = 4096
+
+/**
+ * Choose how many Fock basis terms to compute so the |c_n|² distribution
+ * captures the bulk of the wavefunction.
+ *
+ * The right window depends on the mode:
+ *
+ * - **Coherent states** |α⟩ have a Poisson photon-number distribution
+ *   with mean ⟨n⟩=|α|² and variance equal to the mean. ⟨n⟩+6√⟨n⟩+4 is
+ *   safely past the upper tail.
+ *
+ * - **Squeezed vacuum** S(r,θ)|0⟩ has mean sinh²(r) but the variance is
+ *   2·sinh²(r)·cosh²(r), much larger than Poisson — this is the
+ *   number-fluctuation enhancement that makes squeezed light super-Poissonian.
+ *   We compute σ explicitly and project ⟨n⟩+6σ+4 from there. Without this
+ *   the capture rate falls below 95% by r ≈ 1.5 (`tanh(r)→1`) and the
+ *   bar chart silently misrepresents the state.
+ *
+ * - **Fock states** are sharp (variance 0); only the constant baseline +
+ *   the requested n matters.
+ *
+ * @internal
+ */
+function chooseFockLength(mode: SecondQuantizationMode, params: SecondQuantParams): number {
+  switch (mode) {
+    case 'fock': {
+      // Exact basis state |n⟩: length must be > n so the occupation bin
+      // exists. `FOCK_MAX_LENGTH` (160) does not apply — hard *display*
+      // limits belong in the UI windowing layer — but `FOCK_MAX_SAFE_LENGTH`
+      // still does, to fail fast instead of allocating O(n) for adversarial
+      // inputs like `n = 1_000_000` that would hang the tab before any UI
+      // windowing can intervene.
+      const n = normalizeFockQuantumNumber(params.n)
+      if (n > FOCK_MAX_SAFE_LENGTH) {
+        throw new RangeError(
+          `Exact Fock distribution for n=${n} exceeds safe limit ${FOCK_MAX_SAFE_LENGTH}`
+        )
+      }
+      return Math.max(FOCK_BASELINE_LENGTH, n + 4)
+    }
+    case 'coherent': {
+      const meanN = params.alphaRe * params.alphaRe + params.alphaIm * params.alphaIm
+      if (!Number.isFinite(meanN) || meanN <= 0) return FOCK_BASELINE_LENGTH
+      const sigma = Math.sqrt(meanN)
+      const window = Math.ceil(meanN + 6 * sigma) + 4
+      return Math.min(FOCK_MAX_LENGTH, Math.max(FOCK_BASELINE_LENGTH, window))
+    }
+    case 'squeezed': {
+      const r = params.squeezeR
+      if (!Number.isFinite(r) || r <= 0) return FOCK_BASELINE_LENGTH
+      const sinhR = Math.sinh(r)
+      const coshR = Math.cosh(r)
+      const meanN = sinhR * sinhR
+      // Var(n) for squeezed vacuum = 2·sinh²·cosh², not the Poisson value.
+      const variance = 2 * meanN * coshR * coshR
+      const sigma = Math.sqrt(variance)
+      const window = Math.ceil(meanN + 6 * sigma) + 4
+      return Math.min(FOCK_MAX_LENGTH, Math.max(FOCK_BASELINE_LENGTH, window))
+    }
+  }
+}
+
+/**
  * Compute the full second-quantization metrics bundle for display.
  *
  * @param mode - Interpretation mode (fock, coherent, squeezed)
@@ -350,26 +437,32 @@ export function computeSecondQuantMetrics(
   const energy = computeEnergy(occupation, params.omega)
   const uncertainty = computeUncertainties(mode, params)
 
-  // Fock distribution: compute |c_k|^2 for display
-  const maxN = 12
+  // Fock distribution length adapts to the state's mean occupation so the
+  // displayed |c_n|² distribution always captures the bulk, not just the
+  // n=0 tail. With the previous hardcoded maxN=12, the distribution chart
+  // went visually flat for |alpha| ≳ 3 or r ≳ 1.5 because the Poisson /
+  // squeezed-vacuum bulk had migrated past n=11 and only zero-amplitude
+  // leading-edge bars were visible.
   let fockDistribution: number[]
+
+  const fockLen = chooseFockLength(mode, params)
 
   switch (mode) {
     case 'fock': {
       const n = normalizeFockQuantumNumber(params.n)
-      fockDistribution = new Array(maxN).fill(0)
-      if (n < maxN) {
+      fockDistribution = new Array(fockLen).fill(0)
+      if (n < fockLen) {
         fockDistribution[n] = 1
       }
       break
     }
     case 'coherent': {
-      const coeffs = coherentFockCoefficients(params.alphaRe, params.alphaIm, maxN)
+      const coeffs = coherentFockCoefficients(params.alphaRe, params.alphaIm, fockLen)
       fockDistribution = coeffs.map((c) => c.re * c.re + c.im * c.im)
       break
     }
     case 'squeezed': {
-      const coeffs = squeezedFockCoefficients(params.squeezeR, params.squeezeTheta, maxN)
+      const coeffs = squeezedFockCoefficients(params.squeezeR, params.squeezeTheta, fockLen)
       fockDistribution = coeffs.map((c) => c.re * c.re + c.im * c.im)
       break
     }

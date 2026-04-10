@@ -38,13 +38,13 @@ export interface UseScreenshotCaptureResult {
  * @throws Error if capture times out or fails
  */
 async function captureWithSubscription(): Promise<string> {
+  // Reuse an in-flight capture if one is already running — this is what
+  // makes concurrent callers (e.g. an export button + a hotkey hit at the
+  // same moment) collapse into a single GPU readback. Otherwise we kick
+  // off a fresh capture; `requestCapture()` bumps the requestId, clears
+  // any stale 'ready' image, and moves the store to 'capturing'.
   const store = useScreenshotCaptureStore.getState()
   const requestId = store.status === 'capturing' ? store.requestId : store.requestCapture()
-
-  // If already capturing, wait for current capture to complete
-  if (store.status === 'capturing') {
-    // Fall through to subscription below
-  }
 
   return new Promise((resolve, reject) => {
     let resolved = false

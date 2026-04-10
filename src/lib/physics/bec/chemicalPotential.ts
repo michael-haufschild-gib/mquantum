@@ -17,7 +17,7 @@
  *
  * @example
  * ```ts
- * thomasFermiMu3D(500, 1.0) // ≈ 7.53
+ * thomasFermiMu3D(500, 1.0) // ≈ 6.4463
  * ```
  */
 export function thomasFermiMu3D(g: number, omega: number): number {
@@ -45,8 +45,8 @@ export function thomasFermiMu3D(g: number, omega: number): number {
  *
  * @example
  * ```ts
- * thomasFermiMuND(3, 500, 1.0) // ≈ 7.53 (same as thomasFermiMu3D)
- * thomasFermiMuND(2, 500, 1.0) // ≈ 12.62
+ * thomasFermiMuND(3, 500, 1.0) // ≈ 6.4463 (same as thomasFermiMu3D)
+ * thomasFermiMuND(2, 500, 1.0) // ≈ 12.6157
  * ```
  */
 export function thomasFermiMuND(D: number, g: number, omega: number): number {
@@ -91,7 +91,8 @@ function gammaHalf(D: number): number {
  *
  * @example
  * ```ts
- * thomasFermiRadius(7.53, 1.0, 1.0) // ≈ 3.88
+ * // For g=500, ω=1 the TF μ ≈ 6.4463:
+ * thomasFermiRadius(6.4463, 1.0, 1.0) // ≈ 3.590
  * ```
  */
 export function thomasFermiRadius(mu: number, mass: number, omega: number): number {

@@ -865,11 +865,7 @@ export default [
 
   // Allow console.* in error boundaries (must log in production) and the logger itself
   {
-    files: [
-      'src/lib/logger.ts',
-      'src/components/ui/ErrorBoundary.tsx',
-      'src/components/canvas/CanvasErrorBoundary.tsx',
-    ],
+    files: ['src/lib/logger.ts', 'src/components/ui/ErrorBoundary.tsx'],
     rules: {
       'no-console': 'off',
     },
@@ -1019,7 +1015,6 @@ export default [
   // Allowed via negation patterns:
   //   - Diagnostic stores (*DiagnosticsStore) — write-direction: passes push metrics to UI
   //   - simulationStateStore — TDSE compute pass manages simulation lifecycle
-  //   - performanceStore — TemporalDepthCapturePass reads temporal reprojection flag
   //   - extendedObjectStore — async getMetadata callbacks (state save) lack ctx access
   //   - Store defaults — static config, no runtime coupling
   //   - Type-only imports (allowTypeImports: true)

@@ -494,6 +494,7 @@ export const createSchroedingerSlice: StateCreator<
           const base = {
             ...DEFAULT_QUANTUM_WALK_CONFIG,
             ...preset.overrides,
+            slicePositions: state.schroedinger.quantumWalk.slicePositions,
             steps: 0,
             needsReset: true,
           }
@@ -563,6 +564,24 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setQwSlicePosition: (dimIndex: number, value: number) => {
+      if (!isFinite(value)) return
+      setWithVersion((state) => {
+        const qw = state.schroedinger.quantumWalk
+        const slicePositions = [...qw.slicePositions]
+        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
+          const halfExtent =
+            (qw.gridSize[dimIndex + 3] ?? 1) * (qw.spacing[dimIndex + 3] ?? 0.1) * 0.5
+          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            quantumWalk: { ...qw, slicePositions },
+          },
+        }
+      })
+    },
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
@@ -599,6 +618,25 @@ export const createSchroedingerSlice: StateCreator<
             Math.max(0, dimension - 1)
           ),
           ...hydrogenUpdate,
+          ...applyModeResizeUpdates(state.schroedinger, modeResizeUpdates),
+        },
+      }))
+    },
+
+    syncActiveComputeModeLatticeDim: (dimension) => {
+      // Lightweight counterpart to initializeSchroedingerForDimension that only
+      // resizes the active compute mode's lattice arrays. Does NOT touch
+      // parameterValues / center / densityGain — those are handled by the React
+      // hook (useObjectTypeInitialization). Called synchronously from
+      // geometryStore.propagateDimensionToStores so compute-mode render paths
+      // never see a stale latticeDim between setDimension and the next React tick.
+      const currentState = get().schroedinger
+      const modeResizeUpdates = buildModeResizeUpdates(currentState, dimension)
+      // Nothing to update if the active mode is analytic or already at the target dim
+      if (Object.keys(modeResizeUpdates).length === 0) return
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
           ...applyModeResizeUpdates(state.schroedinger, modeResizeUpdates),
         },
       }))

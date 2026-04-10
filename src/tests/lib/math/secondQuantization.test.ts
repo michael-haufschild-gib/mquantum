@@ -344,7 +344,7 @@ describe('computeSecondQuantMetrics', () => {
     expect(m.fockDistribution[2]).toBeGreaterThan(0)
   })
 
-  it('coherent state with large |α| = 5 remains finite under truncation', () => {
+  it('coherent state with large |α| = 5 adapts Fock length to capture the bulk', () => {
     const m = computeSecondQuantMetrics('coherent', {
       n: 0,
       alphaRe: 5,
@@ -353,14 +353,80 @@ describe('computeSecondQuantMetrics', () => {
       squeezeTheta: 0,
       omega: 1,
     })
-    // |alpha|² = 25, 12 Fock terms is insufficient for normalization
-    // but the normalization check tests whether the computation doesn't diverge
+    // |alpha|² = 25 → Poisson mean 25, std dev 5. computeSecondQuantMetrics
+    // now lengthens the distribution adaptively (mean + 6*sigma + 4 ≈ 59),
+    // so the normalization should be essentially exact rather than the
+    // pre-fix ~e-22 leakage that happened with the hardcoded maxN=12.
     expect(m.occupation).toBeCloseTo(25, 8)
     expect(m.energy).toBeCloseTo(25.5, 8)
-    // Fock distribution truncated at 12 terms: won't sum to 1 but should be positive
+    expect(m.fockDistribution.length).toBeGreaterThan(40)
     const totalProb = m.fockDistribution.reduce((s, p) => s + p, 0)
-    expect(totalProb).toBeGreaterThan(0)
-    expect(totalProb).toBeLessThanOrEqual(1.001)
+    expect(totalProb).toBeCloseTo(1, 4)
+    // The Poisson peak lives near n=25 — the previous hardcoded maxN=12
+    // truncated the distribution before the peak entirely. Confirm the
+    // peak is now inside the returned array.
+    let peakIdx = 0
+    let peakVal = 0
+    for (let i = 0; i < m.fockDistribution.length; i++) {
+      const v = m.fockDistribution[i] ?? 0
+      if (v > peakVal) {
+        peakVal = v
+        peakIdx = i
+      }
+    }
+    expect(peakIdx).toBeGreaterThan(15)
+    expect(peakVal).toBeGreaterThan(0.05)
+  })
+
+  it('squeezed state with large r=2 captures the bulk in the adaptive Fock window', () => {
+    const m = computeSecondQuantMetrics('squeezed', {
+      n: 0,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 2,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    // ⟨n⟩ = sinh²(2) ≈ 13.15, but the squeezed-vacuum number-distribution
+    // is super-Poissonian: Var(n) = 2·sinh²·cosh² ≈ 372. The adaptive
+    // length now uses *that* variance instead of √⟨n⟩, so capture
+    // climbs from ~67% (old hardcoded maxN=12) to ≥99%. Two decimal
+    // places is the right ceiling at this slider value — we hit the
+    // FOCK_MAX_LENGTH cap before fully converging the heavy tail.
+    expect(m.fockDistribution.length).toBeGreaterThan(30)
+    const totalProb = m.fockDistribution.reduce((s, p) => s + p, 0)
+    expect(totalProb).toBeGreaterThan(0.99)
+    expect(totalProb).toBeLessThanOrEqual(1.0001)
+    // Squeezed vacuum has only even-n components.
+    for (let i = 1; i < m.fockDistribution.length; i += 2) {
+      expect(m.fockDistribution[i]).toBeCloseTo(0, 10)
+    }
+  })
+
+  it('Fock distribution length stays bounded even at the slider limits', () => {
+    // Drive both alpha and r to the UI maximums (alpha=5+5i, r=3) to make
+    // sure the adaptive length never explodes past FOCK_MAX_LENGTH.
+    const bigCoherent = computeSecondQuantMetrics('coherent', {
+      n: 0,
+      alphaRe: 5,
+      alphaIm: 5,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(bigCoherent.fockDistribution.length).toBeLessThanOrEqual(160)
+    expect(bigCoherent.fockDistribution.every((p) => Number.isFinite(p) && p >= 0)).toBe(true)
+
+    const bigSqueezed = computeSecondQuantMetrics('squeezed', {
+      n: 0,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 3,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(bigSqueezed.fockDistribution.length).toBeLessThanOrEqual(160)
+    expect(bigSqueezed.fockDistribution.every((p) => Number.isFinite(p) && p >= 0)).toBe(true)
   })
 
   it('squeezed state with large r=2 remains finite and physical', () => {
@@ -446,5 +512,44 @@ describe('computeSecondQuantMetrics', () => {
     expect(fractional.occupation).toBe(2)
     expect(fractional.energy).toBeCloseTo(2.5, 10)
     expect(fractional.fockDistribution[2]).toBe(1)
+  })
+
+  it('exact Fock state with n past the soft display cap still populates its bin', () => {
+    // Regression: `chooseFockLength` used to clamp all modes (including
+    // exact Fock) at FOCK_MAX_LENGTH=160, so `n = 200` produced an
+    // all-zero `fockDistribution` even though the state |200⟩ is
+    // perfectly well-defined. The math function no longer soft-caps for
+    // mode='fock'; any display-side window cap must happen in the UI.
+    const large = computeSecondQuantMetrics('fock', {
+      n: 200,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(large.occupation).toBe(200)
+    expect(large.energy).toBeCloseTo(200.5, 10)
+    expect(large.fockDistribution[200]).toBe(1)
+    // Length must be large enough to include the occupied index.
+    expect(large.fockDistribution.length).toBeGreaterThan(200)
+  })
+
+  it('throws a RangeError for exact Fock n past FOCK_MAX_SAFE_LENGTH', () => {
+    // Safety guardrail: without this cap, `n = 1_000_000` would try to
+    // allocate a million-entry probability vector and lock the tab before
+    // the UI windowing layer could intervene. The math function fails
+    // fast so the UI can display an "out of range" state instead of
+    // silently triggering memory pressure.
+    expect(() =>
+      computeSecondQuantMetrics('fock', {
+        n: 1_000_000,
+        alphaRe: 0,
+        alphaIm: 0,
+        squeezeR: 0,
+        squeezeTheta: 0,
+        omega: 1,
+      })
+    ).toThrow(RangeError)
   })
 })

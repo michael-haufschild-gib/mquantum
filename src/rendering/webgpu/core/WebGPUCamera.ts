@@ -155,6 +155,9 @@ function writePerspectiveMatrix(
   out[15] = 0
 }
 
+/** Minimum distance from camera to target, preventing NaN in orbit and degenerate matrices. */
+const MIN_CAMERA_DISTANCE = 0.01
+
 // ============================================================================
 // Camera Class
 // ============================================================================
@@ -190,7 +193,7 @@ export class WebGPUCamera {
       inverseProjectionMatrix: new Float32Array(16),
       cameraPosition: { x: 0, y: 0, z: 0 },
       cameraNear: 0.1,
-      cameraFar: 1000,
+      cameraFar: 10000,
       fov: 60,
     }
 
@@ -267,14 +270,82 @@ export class WebGPUCamera {
   }
 
   /**
+   * Nudge the target away from position so |target − position| ≥
+   * MIN_CAMERA_DISTANCE. Returns a safe target vector without mutating
+   * `this.state.target` — external code that set the target still sees its
+   * own value. Called from `updateMatrices()` to ensure `writeLookAtMatrix`
+   * never produces a zero-basis (non-invertible) view matrix regardless of
+   * how `initialState`, `setPosition()`, or `setTarget()` were called.
+   */
+  private getSafeTarget(): [number, number, number] {
+    const [px, py, pz] = this.state.position
+    const [tx, ty, tz] = this.state.target
+    const dx = tx - px
+    const dy = ty - py
+    const dz = tz - pz
+    const distSq = dx * dx + dy * dy + dz * dz
+    if (distSq >= MIN_CAMERA_DISTANCE * MIN_CAMERA_DISTANCE) {
+      return this.state.target
+    }
+    // Degenerate or near-degenerate separation. Re-project the target along
+    // the existing offset direction if we have one, otherwise fall back to
+    // world −Z so lookAt has a deterministic forward axis.
+    const dist = Math.sqrt(distSq)
+    if (dist > 0) {
+      const scale = MIN_CAMERA_DISTANCE / dist
+      return [px + dx * scale, py + dy * scale, pz + dz * scale]
+    }
+    return [px, py, pz - MIN_CAMERA_DISTANCE]
+  }
+
+  /**
+   * Pick an up-axis that is not collinear with forward. Needed because
+   * `writeLookAtMatrix` computes `right = cross(forward, up)`, which is
+   * zero-length whenever forward ∥ up and produces a singular view matrix.
+   * A caller can legally set `state.up=[0,1,0]` and look straight down the
+   * Y axis, so we must swap to a fallback axis without mutating `state.up`.
+   */
+  private getSafeUp(safeTarget: [number, number, number]): [number, number, number] {
+    const [px, py, pz] = this.state.position
+    let fx = safeTarget[0] - px
+    let fy = safeTarget[1] - py
+    let fz = safeTarget[2] - pz
+    const fLen = Math.hypot(fx, fy, fz) || 1
+    fx /= fLen
+    fy /= fLen
+    fz /= fLen
+
+    // A zero-length (or near-zero) `state.up` cannot be used as-is: the
+    // collinearity check below would normalise by 0 → a garbage cosTheta,
+    // and `writeLookAtMatrix` would cross a zero vector into the right
+    // axis. Force a valid world axis before any further reasoning.
+    const [ux, uy, uz] = this.state.up
+    const upLen = Math.hypot(ux, uy, uz)
+    const EPSILON = 1e-6
+    if (upLen < EPSILON) {
+      return Math.abs(fy) < 0.9 ? [0, 1, 0] : [1, 0, 0]
+    }
+
+    const cosTheta = (fx * ux + fy * uy + fz * uz) / upLen
+    if (Math.abs(cosTheta) <= 0.999) {
+      return this.state.up
+    }
+    // Forward is (nearly) parallel to the configured up. Pick a world axis
+    // that is provably non-collinear with forward: if forward is dominated
+    // by the X component, fall back to world +Z, otherwise world +X.
+    return Math.abs(fx) < 0.9 ? [1, 0, 0] : [0, 0, 1]
+  }
+
+  /**
    * Recompute all matrices from current state.
    */
   private updateMatrices(): void {
+    const safeTarget = this.getSafeTarget()
     writeLookAtMatrix(
       this.matrices.viewMatrix,
       this.state.position,
-      this.state.target,
-      this.state.up
+      safeTarget,
+      this.getSafeUp(safeTarget)
     )
     writePerspectiveMatrix(
       this.matrices.projectionMatrix,
@@ -316,9 +387,9 @@ export class WebGPUCamera {
     let dz = pz - tz
 
     // Current distance and angles
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    const distance = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), MIN_CAMERA_DISTANCE)
     let azimuth = Math.atan2(dx, dz)
-    let elevation = Math.asin(dy / distance)
+    let elevation = Math.asin(Math.max(-1, Math.min(1, dy / distance)))
 
     // Apply deltas
     azimuth += deltaAzimuth
@@ -346,18 +417,38 @@ export class WebGPUCamera {
     const [px, py, pz] = this.state.position
     const [tx, ty, tz] = this.state.target
 
-    const dx = px - tx
-    const dy = py - ty
-    const dz = pz - tz
+    let dx = px - tx
+    let dy = py - ty
+    let dz = pz - tz
 
     // Clamp factor to reasonable range
     const clampedFactor = Math.max(0.1, Math.min(10, factor))
+    dx *= clampedFactor
+    dy *= clampedFactor
+    dz *= clampedFactor
 
-    this.state.position = [
-      tx + dx * clampedFactor,
-      ty + dy * clampedFactor,
-      tz + dz * clampedFactor,
-    ]
+    // Enforce minimum distance to prevent degenerate matrices and NaN in orbit
+    let newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    // Degenerate seed: raw offset was (near) zero because `state.position`
+    // and `state.target` had coincided. Simply returning would permanently
+    // wedge the camera — the user can never escape the degenerate state.
+    // Re-seed the offset direction from `getSafeTarget()`, which is
+    // guaranteed to be at least MIN_CAMERA_DISTANCE away from position,
+    // then apply the same clampedFactor so the visible zoom gesture still
+    // lands in the right relative magnitude.
+    if (newDistance < MIN_CAMERA_DISTANCE) {
+      const [stx, sty, stz] = this.getSafeTarget()
+      dx = (px - stx) * clampedFactor
+      dy = (py - sty) * clampedFactor
+      dz = (pz - stz) * clampedFactor
+      newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      // Even the safe seed can undershoot when clampedFactor < 1 —
+      // refuse the gesture only in that unrecoverable case.
+      if (newDistance < MIN_CAMERA_DISTANCE) return
+    }
+
+    this.state.position = [tx + dx, ty + dy, tz + dz]
     this.dirty = true
   }
 
@@ -367,7 +458,10 @@ export class WebGPUCamera {
    * @param deltaY - Vertical movement in world units
    */
   pan(deltaX: number, deltaY: number): void {
-    // Get camera's right and up vectors from view matrix
+    // Ensure matrices are up-to-date before reading basis vectors.
+    // Without this, orbit/zoom since the last getMatrices() would leave
+    // the view matrix stale, causing pan to move in the wrong direction.
+    if (this.dirty) this.updateMatrices()
     const vm = this.matrices.viewMatrix
 
     // Right vector is column 0 of inverse view matrix (or row 0 of view matrix)

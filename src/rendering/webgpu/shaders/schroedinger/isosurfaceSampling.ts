@@ -122,7 +122,7 @@ export function generateColorSample(useDensityGrid: boolean): string {
     let gridColor = sampleDensityFromGrid(p, schroedinger);
     rhoSurface = gridColor.r * isoGain;
     if (IS_DUAL_CHANNEL) {
-      dualSecondary = gridColor.g;
+      dualSecondary = gridColor.g * isoGain;
     }
     phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
   } else {

@@ -237,6 +237,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           applyBecPreset(value)
           break
         case 'diracEquation':
+          // applyDiracPreset internally syncs color algorithm for fieldViews like
+          // 'particleAntiparticleSplit' that require a specific color algo.
           applyDiracPreset(value)
           break
         case 'freeScalarField':

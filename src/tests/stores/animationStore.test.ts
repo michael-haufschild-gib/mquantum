@@ -223,11 +223,12 @@ describe('animationStore', () => {
 
   describe('setDimension', () => {
     it('should filter out invalid planes when dimension decreases', () => {
-      // Simulate the bug: animate 10D planes, then switch to 6D
+      // Axis names for 10D: X Y Z W V U T S R Q (axes 0..9), matching the
+      // uppercased AXIS_LABELS used by the rotation file.
       useAnimationStore.getState().animateAll(10)
       const planesBefore = useAnimationStore.getState().animatingPlanes
-      expect(planesBefore.has('XA6')).toBe(true) // Valid in 10D
-      expect(planesBefore.has('XA7')).toBe(true)
+      expect(planesBefore.has('XT')).toBe(true) // axis 0 ↔ axis 6 (T) — valid in 10D
+      expect(planesBefore.has('XS')).toBe(true) // axis 0 ↔ axis 7 (S)
       expect(planesBefore.size).toBe((10 * 9) / 2) // 10D has 45 rotation planes
 
       // Switch to 6D - should filter out invalid planes
@@ -238,8 +239,8 @@ describe('animationStore', () => {
       expect(planesAfter.size).toBe((6 * 5) / 2)
       expect(planesAfter.has('XY')).toBe(true)
       expect(planesAfter.has('XU')).toBe(true) // U is axis 5, valid in 6D
-      expect(planesAfter.has('XA6')).toBe(false) // A6 is axis 6, invalid in 6D
-      expect(planesAfter.has('XA7')).toBe(false)
+      expect(planesAfter.has('XT')).toBe(false) // T is axis 6, invalid in 6D
+      expect(planesAfter.has('XS')).toBe(false) // S is axis 7
     })
 
     it('should keep valid planes when dimension decreases', () => {

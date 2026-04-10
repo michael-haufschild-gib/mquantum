@@ -1,28 +1,15 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import type { WebGPUSetupContext } from '@/rendering/webgpu/core/types'
 import { CubemapCapturePass } from '@/rendering/webgpu/passes/CubemapCapturePass'
-
-function ensureGpuConstants(): void {
-  if (!('GPUShaderStage' in globalThis)) {
-    ;(globalThis as unknown as { GPUShaderStage: Record<string, number> }).GPUShaderStage = {
-      VERTEX: 1 << 0,
-      FRAGMENT: 1 << 1,
-      COMPUTE: 1 << 2,
-    }
-  }
-
-  if (!('GPUColorWrite' in globalThis)) {
-    ;(globalThis as unknown as { GPUColorWrite: Record<string, number> }).GPUColorWrite = {
-      ALL: 0xf,
-    }
-  }
-}
+import { installWebGPUMock } from '@/tests/__mocks__/webgpu'
 
 describe('CubemapCapturePass', () => {
-  it('creates a cubemap pipeline that matches the cubemap render target format', async () => {
-    ensureGpuConstants()
+  beforeAll(() => {
+    installWebGPUMock()
+  })
 
+  it('creates a cubemap pipeline that matches the cubemap render target format', async () => {
     const createRenderPipeline = vi.fn((descriptor: GPURenderPipelineDescriptor) => {
       return { descriptor } as unknown as GPURenderPipeline
     })
