@@ -5,6 +5,7 @@
  * Renders Schroedinger quantum wavefunctions using WebGPU.
  */
 
+import { Analytics } from '@vercel/analytics/react'
 import { domMax, LazyMotion, MotionConfig } from 'motion/react'
 import React, { Suspense, useCallback, useMemo, useState } from 'react'
 
@@ -282,6 +283,7 @@ function App() {
           <AppContent />
         </ToastProvider>
       </MotionConfig>
+      <Analytics />
     </LazyMotion>
   )
 }

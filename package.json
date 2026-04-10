@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@vercel/analytics": "^2.0.1",
     "detect-gpu": "^5.0.70",
     "fzstd": "^0.1.1",
     "mediabunny": "^1.27.4",
