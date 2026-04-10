@@ -88,6 +88,11 @@ export const PAULI_SCENARIO_PRESETS: PauliScenarioPreset[] = [
       fieldType: 'quadrupole',
       fieldStrength: 2.0,
       fieldDirection: [0, 0],
+      // Quadrupole shader reads `gradientStrength` (g) for the B = g(x ẑ + z x̂)
+      // coupling. Without an explicit override the preset would inherit whatever
+      // the user had set previously — including 0 if they came from a `uniform`
+      // or `rotating` config — silently producing a zero field.
+      gradientStrength: 3.0,
       initialSpinDirection: [Math.PI / 2, Math.PI / 4],
       initialCondition: 'gaussianSuperposition',
       potentialType: 'none',

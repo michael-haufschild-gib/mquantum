@@ -116,28 +116,18 @@ export interface UseRotationUpdatesResult {
  *
  * @example
  * ```tsx
- * const { getBasisVectors, getOrigin } = useRotationUpdates({
- *   dimension,
- *   parameterValues,
- * });
+ * const rotation = useRotationUpdates({ dimension, parameterValues });
  *
- * useFrame(() => {
- *   const { basisX, basisY, basisZ, changed } = getBasisVectors(rotationsChanged);
- *
- *   if (changed) {
- *     material.uniforms.uBasisX.value.set(basisX);
- *     material.uniforms.uBasisY.value.set(basisY);
- *     material.uniforms.uBasisZ.value.set(basisZ);
- *   }
- *
- *   // Compute origin with extra dimension values
- *   const originValues = new Array(MAX_DIMENSION).fill(0);
- *   for (let i = 3; i < dimension; i++) {
- *     originValues[i] = parameterValues[i - 3] ?? 0;
- *   }
- *   const { origin } = getOrigin(originValues);
- *   material.uniforms.uOrigin.value.set(origin);
- * }, FRAME_PRIORITY.RENDERER_UNIFORMS);
+ * // Inside the WebGPU frame callback (see useSceneFrameCallbacks):
+ * const { basisX, basisY, basisZ, changed } = rotation.getBasisVectors(rotationsChanged);
+ * if (changed) {
+ *   // basisX/Y/Z are Float32Arrays of length MAX_DIMENSION — copy into the
+ *   // SchroedingerUniforms struct (or matching pass-specific uniform buffer)
+ *   // and queue a writeBuffer on the next encoder.
+ *   schroedingerBasisCacheRef.current.basisX.set(basisX)
+ *   schroedingerBasisCacheRef.current.basisY.set(basisY)
+ *   schroedingerBasisCacheRef.current.basisZ.set(basisZ)
+ * }
  * ```
  */
 export function useRotationUpdates(options: UseRotationUpdatesOptions): UseRotationUpdatesResult {

@@ -142,13 +142,38 @@ export function pauliFieldViewForColorAlgorithm(algo: string): string {
   }
 }
 
+/**
+ * Map a Pauli field view to its matching color algorithm. Matches the
+ * inverse PAULI_FIELD_VIEW_TO_COLOR_ALGO map exported from
+ * `rendering/shaders/palette/types.ts`. Kept inline so this module has
+ * no cross-module dependency on that file's symbol layout.
+ *
+ * @internal
+ */
+function colorAlgoForPauliFieldView(
+  pauliFieldView: string | undefined
+): PaletteColorAlgorithm | null {
+  switch (pauliFieldView) {
+    case 'spinDensity':
+      return 'pauliSpinDensity'
+    case 'spinExpectation':
+      return 'pauliSpinExpectation'
+    case 'coherence':
+      return 'pauliCoherence'
+    case 'totalDensity':
+      return 'blackbody'
+    default:
+      return null
+  }
+}
+
 /** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */
 export function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
   colorAlgorithm: PaletteColorAlgorithm,
   openQuantumEnabled: boolean = false,
   diracFieldView?: string,
-  _pauliFieldView?: string,
+  pauliFieldView?: string,
   objectType: string = 'schroedinger'
 ): PaletteColorAlgorithm {
   if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
@@ -161,7 +186,18 @@ export function normalizeColorAlgorithmForQuantumMode(
   if (isAvailable) return colorAlgorithm
 
   if (openQuantumEnabled) return 'purityMap'
-  if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
+  if (objectType === 'pauliSpinor') {
+    // Pauli is symmetric to Dirac's particleAntiparticleSplit handling above:
+    // when a preset (or stale store state) carries a pauliFieldView that
+    // expects a specific color algorithm, return THAT algorithm instead of
+    // the catch-all 'pauliSpinDensity'. Without this, importing a preset
+    // that set pauliFieldView='spinExpectation' under a stale colorAlgorithm
+    // would silently downgrade the rendering to spinDensity even though the
+    // density grid is encoding spin-expectation channels.
+    const matched = colorAlgoForPauliFieldView(pauliFieldView)
+    if (matched) return matched
+    return 'pauliSpinDensity'
+  }
   // Quantum Walk: default to phase-only coloring (constant brightness from Oklab L=0.72).
   // Density-based algorithms use the standard log-compressed brightness path.
   if (quantumMode === 'quantumWalk') return 'phaseCyclicUniform'

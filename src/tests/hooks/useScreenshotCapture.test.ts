@@ -46,4 +46,49 @@ describe('captureScreenshotAsync', () => {
     expect(useScreenshotCaptureStore.getState().status).toBe('error')
     expect(useScreenshotCaptureStore.getState().error).toBe('Screenshot capture timeout')
   })
+
+  it('returns fresh data when invoked while a prior capture is already "ready"', async () => {
+    // Pre-seed the store with the result of a previous capture so we can
+    // verify the new request bumps requestId, clears the stale image, and
+    // resolves with the new payload — not the old one. Pinning this
+    // behaviour explicitly because it is the path the export → modal
+    // flow takes after a user clicks Save → Capture again.
+    useScreenshotCaptureStore.setState({
+      status: 'ready',
+      capturedImage: 'data:image/png;base64,STALE',
+      error: null,
+      requestId: 7,
+    })
+
+    const promise = captureScreenshotAsync()
+
+    // requestCapture() must have bumped the id and cleared the stale image
+    // *synchronously* before we resolve the new image.
+    const midState = useScreenshotCaptureStore.getState()
+    expect(midState.status).toBe('capturing')
+    expect(midState.capturedImage).toBeNull()
+    expect(midState.requestId).toBe(8)
+
+    useScreenshotCaptureStore.getState().setCapturedImage('data:image/png;base64,FRESH', 8)
+
+    await expect(promise).resolves.toBe('data:image/png;base64,FRESH')
+  })
+
+  it('ignores stale completions targeting an older requestId', async () => {
+    const promise = captureScreenshotAsync()
+    const requestId = useScreenshotCaptureStore.getState().requestId
+
+    // Simulate a stale completion from a prior in-flight capture: the
+    // store-side requestId filter must reject it as a no-op so the new
+    // promise does not resolve with someone else's image.
+    useScreenshotCaptureStore
+      .getState()
+      .setCapturedImage('data:image/png;base64,WRONG', requestId - 1)
+    expect(useScreenshotCaptureStore.getState().status).toBe('capturing')
+    expect(useScreenshotCaptureStore.getState().capturedImage).toBeNull()
+
+    // The genuine completion (matching id) finally resolves the promise.
+    useScreenshotCaptureStore.getState().setCapturedImage('data:image/png;base64,RIGHT', requestId)
+    await expect(promise).resolves.toBe('data:image/png;base64,RIGHT')
+  })
 })

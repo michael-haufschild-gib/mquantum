@@ -114,6 +114,45 @@ describe('useMonitoringSweepStore', () => {
       expect(state.results[0]!.normDrift).toBeCloseTo(0.015)
     })
 
+    it('discards stale samples and re-anchors when simTime regresses mid-step', () => {
+      // Simulate the user manually resetting the TDSE field while a sweep
+      // step is in progress (e.g., toggling a setting that calls
+      // resetTdseField). Without the regression guard the accumulator
+      // would silently fold pre-reset and post-reset IPR samples into the
+      // same time-average and produce a corrupted result.
+      const cfg: MonitoringSweepConfig = {
+        gammaMin: 0.1,
+        gammaMax: 2.0,
+        steps: 3,
+        timePerStep: 1.0,
+      }
+      useMonitoringSweepStore.getState().startSweep(cfg)
+
+      // Anchor the step at simTime=1.0 with a "wrong-state" IPR sample.
+      useMonitoringSweepStore.getState().tick(1.0, 0.99, 0.5) // first-tick anchor
+      useMonitoringSweepStore.getState().tick(1.4, 0.95, 0.4)
+      // External reset: simTime regresses to 0.
+      useMonitoringSweepStore.getState().tick(0.0, 0.0, 0.0)
+
+      // Verify the accumulator was wiped and the step is awaiting a fresh
+      // first tick rather than treating the pre-reset samples as valid.
+      let state = useMonitoringSweepStore.getState()
+      expect(state.iprAccumulator).toEqual([])
+      expect(state.normDriftAccumulator).toEqual([])
+      expect(state.stepStartTime).toBe(0)
+      expect(state.currentStep).toBe(0)
+
+      // Replay the same step with clean post-reset samples.
+      useMonitoringSweepStore.getState().tick(0.5, 0.1, 0.001) // first-tick after reset
+      const advance = useMonitoringSweepStore.getState().tick(1.6, 0.2, 0.002)
+      expect(advance).toBeCloseTo(gammaForStep(cfg, 1))
+      state = useMonitoringSweepStore.getState()
+      // The recorded result must reflect ONLY post-reset samples, not the
+      // 0.99 / 0.95 garbage from the pre-reset window.
+      expect(state.results[0]!.ipr).toBeCloseTo(0.15) // (0.10 + 0.20) / 2
+      expect(state.results[0]!.normDrift).toBeCloseTo(0.0015)
+    })
+
     it('completes sweep at last step', () => {
       useMonitoringSweepStore.getState().startSweep(config)
 

@@ -263,7 +263,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showDoubleWellControls && (
             <>
               <Slider
-                label="Coupling (\u03BB)"
+                label="Coupling (λ)"
                 tooltip="Quartic coupling strength. Larger values deepen the two minima of the double well."
                 min={0.1}
                 max={100}
@@ -285,7 +285,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 data-testid="tdse-double-well-separation"
               />
               <Slider
-                label="Asymmetry (\u03B5)"
+                label="Asymmetry (ε)"
                 tooltip="Linear tilt breaking the symmetry between wells. Non-zero values localize the ground state."
                 min={0}
                 max={50}
@@ -301,7 +301,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showRadialDoubleWellControls && (
             <>
               <Slider
-                label="Inner Radius (r\u2081)"
+                label="Inner Radius (r₁)"
                 tooltip="Inner boundary of the radial annular well."
                 min={0.01}
                 max={5}
@@ -312,7 +312,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 data-testid="tdse-radial-well-inner"
               />
               <Slider
-                label="Outer Radius (r\u2082)"
+                label="Outer Radius (r₂)"
                 tooltip="Outer boundary of the radial annular well."
                 min={0.01}
                 max={10}
@@ -323,7 +323,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 data-testid="tdse-radial-well-outer"
               />
               <Slider
-                label="Well Depth (\u03BB)"
+                label="Well Depth (λ)"
                 tooltip="Depth of the radial annular potential well in energy units."
                 min={0.1}
                 max={500}
@@ -334,7 +334,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 data-testid="tdse-radial-well-depth"
               />
               <Slider
-                label="Tilt (\u03B5)"
+                label="Tilt (ε)"
                 tooltip="Linear potential tilt that breaks radial symmetry, favoring one side of the annulus."
                 min={0}
                 max={50}
@@ -404,8 +404,8 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 data-testid="tdse-anharmonic-omega"
               />
               <Slider
-                label="Coupling (\u03BB)"
-                tooltip="Cross-dimensional coupling strength in V = \u00BDΣ\u03C9\u00B2x\u00B2 + \u03BBΣx_i\u00B2x_j\u00B2. Higher values increase classical chaos."
+                label="Coupling (λ)"
+                tooltip="Cross-dimensional coupling strength in V = ½Σω²x² + λΣx_i²x_j². Higher values increase classical chaos."
                 min={0}
                 max={100}
                 step={0.1}
@@ -422,7 +422,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
             <>
               <Slider
                 label="Disorder (W)"
-                tooltip="Uniform random on-site disorder strength. Adds V_noise \u2208 [-W/2, +W/2] to the potential at each lattice site. Non-zero values enable Anderson localization physics."
+                tooltip="Uniform random on-site disorder strength. Adds V_noise ∈ [-W/2, +W/2] to the potential at each lattice site. Non-zero values enable Anderson localization physics."
                 min={0}
                 max={100}
                 step={0.1}

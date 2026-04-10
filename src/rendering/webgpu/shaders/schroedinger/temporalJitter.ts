@@ -37,7 +37,6 @@ export function generateBayerJitterSection(bayerJitter: boolean): string {
   // NO DISCARD — all quarter-res pixels must render for proper accumulation.
 
   let jitterOffset = camera.bayerOffset - vec2f(0.5);
-  let viewDirJitter = normalize(input.vPosition - camera.cameraPosition);
   let dist = length(input.vPosition - camera.cameraPosition);
   let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
   let pixelSizeX = 2.0 * dist * tan(camera.fov * 0.5) * camera.aspectRatio /

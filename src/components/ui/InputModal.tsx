@@ -69,12 +69,10 @@ export const InputModal: React.FC<InputModalProps> = React.memo(
         e.stopPropagation()
 
         if (e.key === 'Enter') {
-          if (!allowEmpty && !value.trim()) return
-          onConfirm(value)
-          onClose()
+          handleConfirm()
         }
       },
-      [allowEmpty, value, onConfirm, onClose]
+      [handleConfirm]
     )
 
     const handleChange = useCallback(

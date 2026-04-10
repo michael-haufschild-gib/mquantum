@@ -127,7 +127,27 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
 
   return {
     setDiracMass: nestedClampedSetter(ctx, D, 'mass', 0.01, 10),
-    setDiracSpeedOfLight: nestedClampedSetter(ctx, D, 'speedOfLight', 0.01, 10),
+    // Increasing c shrinks the Dirac CFL limit (dtMax = min(Δx)/(c·√N)) so
+    // we must re-clamp dt against the new ceiling, otherwise the user can
+    // raise c with a stale dt and silently push the lattice past stability.
+    setDiracSpeedOfLight: (speedOfLight) => {
+      if (!isFinite(speedOfLight)) {
+        warnNonFinite('dirac.speedOfLight', speedOfLight)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(10, speedOfLight))
+      setWithVersion((state) => {
+        const prev = state.schroedinger.dirac
+        const dtMax = maxStableDt(prev.spacing, clamped)
+        const dt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...prev, speedOfLight: clamped, dt },
+          },
+        }
+      })
+    },
     setDiracHbar: nestedClampedSetter(ctx, D, 'hbar', 0.01, 10),
     setDiracDt: (dt) => {
       if (!isFinite(dt)) {
@@ -248,6 +268,10 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           const kMax = Math.PI / (clamped[d] ?? 0.15)
           return Math.max(-kMax, Math.min(kMax, v))
         })
+        // Decreasing min(spacing) shrinks the Dirac CFL ceiling, so re-clamp
+        // dt to keep the lattice stable after the user tightens the grid.
+        const dtMax = maxStableDt(clamped, prevDirac.speedOfLight)
+        const dt = Math.max(0.0001, Math.min(dtMax * 0.9, prevDirac.dt))
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -256,6 +280,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
               spacing: clamped,
               packetCenter,
               packetMomentum,
+              dt,
               needsReset: true,
             },
           },
@@ -397,6 +422,17 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             },
           }
         })
+
+        // Sync the color algorithm to match the preset's fieldView. The renderer's
+        // normalize logic forces 'particleAntiparticle' for the dual-channel split,
+        // so the UI selector must reflect that to avoid showing a stale algorithm.
+        // Imported lazily to avoid pulling appearanceStore into the store-bootstrap
+        // module dependency graph.
+        if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
+          void import('@/stores/appearanceStore').then(({ useAppearanceStore }) => {
+            useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+          })
+        }
       })
     },
   }

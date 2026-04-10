@@ -6,6 +6,8 @@
  * @module rendering/webgpu/shaders/schroedinger/vertex.wgsl
  */
 
+import { CAMERA_UNIFORMS_STRUCT } from '../shared/core/uniforms.wgsl'
+
 /**
  * Create vertex shader for 3D Schrödinger rendering.
  *
@@ -19,28 +21,7 @@ export function composeSchroedingerVertexShader(): string {
   return /* wgsl */ `
 // Schrödinger Vertex Shader
 // Transforms vertices for volume raymarching
-
-struct CameraUniforms {
-  viewMatrix: mat4x4f,
-  projectionMatrix: mat4x4f,
-  viewProjectionMatrix: mat4x4f,
-  inverseViewMatrix: mat4x4f,
-  inverseProjectionMatrix: mat4x4f,
-  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
-  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
-  cameraPosition: vec3f,
-  cameraNear: f32,
-  cameraFar: f32,
-  fov: f32,
-  resolution: vec2f,
-  aspectRatio: f32,
-  time: f32,
-  deltaTime: f32,
-  frameNumber: u32,
-  bayerOffset: vec2f,            // Temporal accumulation Bayer pattern offset
-  _padding: vec2f,
-}
-
+${CAMERA_UNIFORMS_STRUCT}
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
 struct VertexInput {
@@ -81,28 +62,7 @@ export function composeSchroedingerVertexShader2D(): string {
   return /* wgsl */ `
 // Schrödinger 2D Vertex Shader
 // Fullscreen triangle — no vertex buffer input
-
-struct CameraUniforms {
-  viewMatrix: mat4x4f,
-  projectionMatrix: mat4x4f,
-  viewProjectionMatrix: mat4x4f,
-  inverseViewMatrix: mat4x4f,
-  inverseProjectionMatrix: mat4x4f,
-  modelMatrix: mat4x4f,
-  inverseModelMatrix: mat4x4f,
-  cameraPosition: vec3f,
-  cameraNear: f32,
-  cameraFar: f32,
-  fov: f32,
-  resolution: vec2f,
-  aspectRatio: f32,
-  time: f32,
-  deltaTime: f32,
-  frameNumber: u32,
-  bayerOffset: vec2f,
-  _padding: vec2f,
-}
-
+${CAMERA_UNIFORMS_STRUCT}
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
 struct VertexOutput {

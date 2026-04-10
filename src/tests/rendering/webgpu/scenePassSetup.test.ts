@@ -310,7 +310,7 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
     expect(result).toBe('purityMap')
   })
 
-  it('falls back to pauliSpinDensity for pauliSpinor object type', () => {
+  it('falls back to pauliSpinDensity for pauliSpinor object type with no field view hint', () => {
     const result = normalizeColorAlgorithmForQuantumMode(
       'harmonicOscillator',
       'invalid-algo' as never,
@@ -320,6 +320,45 @@ describe('normalizeColorAlgorithmForQuantumMode', () => {
       'pauliSpinor'
     )
     expect(result).toBe('pauliSpinDensity')
+  })
+
+  it('honors pauli fieldView when normalising a stale color algorithm', () => {
+    // Regression: previously the function ignored pauliFieldView entirely
+    // and always returned 'pauliSpinDensity' as the Pauli fallback. A
+    // preset that set pauliFieldView='spinExpectation' under a stale
+    // colorAlgorithm would silently downgrade to spinDensity even though
+    // the density grid carries spin-expectation channels. The function
+    // now mirrors the Dirac particleAntiparticleSplit handling.
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'harmonicOscillator',
+        'invalid-algo' as never,
+        false,
+        undefined,
+        'spinExpectation',
+        'pauliSpinor'
+      )
+    ).toBe('pauliSpinExpectation')
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'harmonicOscillator',
+        'invalid-algo' as never,
+        false,
+        undefined,
+        'coherence',
+        'pauliSpinor'
+      )
+    ).toBe('pauliCoherence')
+    expect(
+      normalizeColorAlgorithmForQuantumMode(
+        'harmonicOscillator',
+        'invalid-algo' as never,
+        false,
+        undefined,
+        'totalDensity',
+        'pauliSpinor'
+      )
+    ).toBe('blackbody')
   })
 
   it('returns particleAntiparticle for dirac with split field view', () => {

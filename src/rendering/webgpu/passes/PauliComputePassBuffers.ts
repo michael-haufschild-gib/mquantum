@@ -452,19 +452,22 @@ export function writePauliUniforms(
   for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.spacing[d] ?? 0.1
 
   // Slice positions (offset 136*4 = 544)
-  // Apply slice animation for dims >= 3 when enabled (4D+ only)
+  // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3).
+  // config.slicePositions is 0-indexed for extra dims: [0] = dim 3, [1] = dim 4, etc.
+  // Write at WGSL index (i + 3) to match the shader's access pattern.
   o = 136
-  for (let d = 0; d < MAX_DIM; d++) {
-    let pos = config.slicePositions[d] ?? 0
-    if (config.sliceAnimationEnabled && d >= 3 && d < config.latticeDim) {
+  // Indices 0-2 (visible dims): always 0 — shader only reads d >= 3
+  for (let i = 0; i < config.slicePositions.length; i++) {
+    const d = i + 3 // physical dimension index
+    let pos = config.slicePositions[i] ?? 0
+    if (config.sliceAnimationEnabled && d < config.latticeDim) {
       const PHI = 1.618033988749895
-      const extraDimIndex = d - 3
-      const phase = extraDimIndex * PHI
+      const phase = i * PHI
       const t1 = simTime * config.sliceSpeed * 2 * Math.PI + phase
       const t2 = simTime * config.sliceSpeed * 1.3 * 2 * Math.PI + phase * 1.5
       pos += config.sliceAmplitude * (0.7 * Math.sin(t1) + 0.3 * Math.sin(t2))
     }
-    f32[o++] = pos
+    f32[o + d] = pos
   }
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)

@@ -10,9 +10,11 @@
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { AXIS_LABELS } from '@/constants/dimension'
 import {
   type QuantumWalkCoinInitial,
   type QuantumWalkCoinType,
@@ -54,10 +56,11 @@ const GRID_SIZE_OPTIONS = [
  */
 export const QuantumWalkControls: React.FC = React.memo(() => {
   const dimension = useGeometryStore((s) => s.dimension)
-  const { qw, setConfig } = useExtendedObjectStore(
+  const { qw, setConfig, setQwSlicePosition } = useExtendedObjectStore(
     useShallow((s) => ({
       qw: s.schroedinger.quantumWalk,
       setConfig: s.setSchroedingerConfig,
+      setQwSlicePosition: s.setQwSlicePosition,
     }))
   )
 
@@ -163,6 +166,36 @@ export const QuantumWalkControls: React.FC = React.memo(() => {
         tooltip="Displayed quantity: P(x) shows position probability, Phase shows complex phase, Coin shows the internal coin state."
         data-testid="qw-field-view"
       />
+
+      {/* Slice positions for dims > 3 */}
+      {dimension > 3 && (
+        <ControlGroup
+          title="Slice Positions"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-qw-slices"
+        >
+          {Array.from({ length: dimension - 3 }, (_, i) => {
+            const dimIdx = i + 3
+            const halfExtent =
+              ((qw.gridSize[dimIdx] ?? 64) * (qw.spacing[dimIdx] ?? qw.spacing[0] ?? 0.1)) / 2
+            return (
+              <Slider
+                key={`slice-${dimIdx}`}
+                label={`Slice ${AXIS_LABELS[dimIdx]}`}
+                tooltip="Cross-section position for this extra dimension. View different slices of the higher-dimensional quantum walk."
+                min={-halfExtent}
+                max={halfExtent}
+                step={halfExtent / 20}
+                value={qw.slicePositions[i] ?? 0}
+                onChange={(v) => setQwSlicePosition(i, v)}
+                showValue
+                data-testid={`qw-slice-${dimIdx}`}
+              />
+            )
+          })}
+        </ControlGroup>
+      )}
 
       {/* Info */}
       <div className="text-xs text-text-tertiary">

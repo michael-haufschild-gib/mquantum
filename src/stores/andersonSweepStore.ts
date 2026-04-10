@@ -128,6 +128,16 @@ export const useAndersonSweepStore = create<AndersonSweepState>((set, get) => ({
       return null
     }
 
+    // Detect a simTime regression caused by an external TDSE reset (user
+    // toggled a setting, clicked the timeline reset, etc.) and re-anchor
+    // the current step. Without this, the elapsed condition stays false
+    // until simTime climbs back past stepStartTime + timePerStep, which
+    // can effectively freeze a sweep until the user notices.
+    if (simTime < state.stepStartTime) {
+      set({ stepStartTime: simTime > 0 ? simTime : 0 })
+      return null
+    }
+
     // Check if enough simulation time has elapsed for this realization
     const elapsed = simTime - state.stepStartTime
     if (elapsed < state.config.timePerStep) return null

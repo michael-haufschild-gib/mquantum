@@ -151,6 +151,50 @@ describe('pauliSpinorSlice', () => {
     expect(state.needsReset).toBe(true)
   })
 
+  it('initializePauliForDimension sizes slicePositions to max(0, dim - 3)', () => {
+    const { initializePauliForDimension } = useExtendedObjectStore.getState()
+
+    initializePauliForDimension(3)
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions).toHaveLength(0)
+
+    initializePauliForDimension(5)
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions).toHaveLength(2)
+
+    initializePauliForDimension(11)
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions).toHaveLength(8)
+  })
+
+  it('initializePauliForDimension preserves slice values at 0-indexed extra-dim slots', () => {
+    const { initializePauliForDimension, setPauliSlicePosition } = useExtendedObjectStore.getState()
+    initializePauliForDimension(5) // 2 slice slots (dim 3, dim 4)
+    setPauliSlicePosition(0, 0.4) // dim 3
+    setPauliSlicePosition(1, -0.7) // dim 4
+
+    initializePauliForDimension(6) // 3 slots; existing two must carry over
+    const sp = useExtendedObjectStore.getState().pauliSpinor.slicePositions
+    expect(sp).toHaveLength(3)
+    expect(sp[0]).toBe(0.4)
+    expect(sp[1]).toBe(-0.7)
+    expect(sp[2]).toBe(0)
+  })
+
+  it('setPauliSlicePosition writes to the 0-indexed extra-dim slot and clamps [-1, 1]', () => {
+    // Regression: the UI used to pass `d = i + 3` (full dim index) as the
+    // slot, so drags never reached the WGSL slicePositions[d >= 3] array
+    // the shader actually reads — extra-dim sliders were silently no-ops.
+    const { initializePauliForDimension, setPauliSlicePosition } = useExtendedObjectStore.getState()
+    initializePauliForDimension(6) // 3 extra dims (3, 4, 5)
+
+    setPauliSlicePosition(0, 0.5)
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions[0]).toBe(0.5)
+
+    setPauliSlicePosition(1, 2) // out of range — clamps to 1
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions[1]).toBe(1)
+
+    setPauliSlicePosition(2, -3) // clamps to -1
+    expect(useExtendedObjectStore.getState().pauliSpinor.slicePositions[2]).toBe(-1)
+  })
+
   it('setPauliConfig applies partial overrides', () => {
     const { setPauliConfig } = useExtendedObjectStore.getState()
     setPauliConfig({ fieldStrength: 7.5, potentialType: 'barrier' })

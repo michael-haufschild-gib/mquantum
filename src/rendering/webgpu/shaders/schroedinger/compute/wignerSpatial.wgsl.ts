@@ -164,8 +164,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   textureStore(diagOut, gid.xy, vec4f(Wdiag, abs(Wdiag), 0.0, 1.0));
 
   // ---- CROSS-TERM SPATIAL PATTERNS ----
-  // Only for HO mode with cross terms enabled and multiple terms
-  if (QUANTUM_MODE_DEFAULT != QUANTUM_MODE_HYDROGEN_ND &&
+  // Only for HO mode (mode 0). Cross-Wigner functions use HO basis functions,
+  // which are wrong for hydrogen radial wavefunctions. The Phase 2 reconstruction
+  // pass skips cross terms for hydrogen modes anyway (takes the hydrogen branch).
+  if (QUANTUM_MODE_DEFAULT < QUANTUM_MODE_HYDROGEN_ND &&
       schroedinger.wignerCrossTermsEnabled != 0u) {
     let omega = getOmega(schroedinger, dimIdx);
     let numLayers = spatialParams.numLayers;

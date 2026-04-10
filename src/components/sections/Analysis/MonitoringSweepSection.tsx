@@ -63,6 +63,20 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
   const [timePerStep, setTimePerStep] = useState(1.0)
 
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Snapshot of the user's pre-sweep TDSE state. The sweep forces diagnostics
+  // on + cycles stochasticGamma; without restoration the user's original γ is
+  // permanently replaced by the sweep's last step. Same pattern as the Atlas
+  // and CoordinateEntanglement sweep controllers.
+  const preSweepRef = useRef<{ diagnosticsEnabled: boolean; stochasticGamma: number } | null>(null)
+
+  const restorePreSweepState = useCallback(() => {
+    const snap = preSweepRef.current
+    if (!snap) return
+    preSweepRef.current = null
+    const store = useExtendedObjectStore.getState()
+    store.setTdseDiagnosticsEnabled(snap.diagnosticsEnabled)
+    store.setTdseStochasticGamma(snap.stochasticGamma)
+  }, [])
 
   // Force diagnostics to stay enabled while sweep is running
   useEffect(() => {
@@ -84,8 +98,13 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
       steps,
       timePerStep,
     }
-    // Force diagnostics on before starting
+    // Capture the user's pre-sweep TDSE state so Abort/Clear can put it back.
     const store = useExtendedObjectStore.getState()
+    preSweepRef.current = {
+      diagnosticsEnabled: store.schroedinger.tdse.diagnosticsEnabled,
+      stochasticGamma: store.schroedinger.tdse.stochasticGamma,
+    }
+    // Force diagnostics on before starting
     store.setTdseDiagnosticsEnabled(true)
     // Set initial γ and trigger reset so step 0 starts deterministically
     const initialGamma = gammaForStep(cfg, 0)
@@ -93,6 +112,16 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
     store.resetTdseField()
     startSweep(cfg)
   }, [gammaMin, gammaMax, steps, timePerStep, startSweep])
+
+  const handleAbort = useCallback(() => {
+    abort()
+    restorePreSweepState()
+  }, [abort, restorePreSweepState])
+
+  const handleClear = useCallback(() => {
+    reset()
+    restorePreSweepState()
+  }, [reset, restorePreSweepState])
 
   // Drive the sweep state machine by polling diagnostics
   useEffect(() => {
@@ -239,12 +268,12 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
           </Button>
         )}
         {isRunning && (
-          <Button size="sm" variant="primary" onClick={abort}>
+          <Button size="sm" variant="primary" onClick={handleAbort}>
             Abort
           </Button>
         )}
         {isComplete && (
-          <Button size="sm" variant="primary" onClick={reset}>
+          <Button size="sm" variant="primary" onClick={handleClear}>
             Clear
           </Button>
         )}

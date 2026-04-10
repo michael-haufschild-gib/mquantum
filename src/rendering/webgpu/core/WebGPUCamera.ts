@@ -155,6 +155,9 @@ function writePerspectiveMatrix(
   out[15] = 0
 }
 
+/** Minimum distance from camera to target, preventing NaN in orbit and degenerate matrices. */
+const MIN_CAMERA_DISTANCE = 0.01
+
 // ============================================================================
 // Camera Class
 // ============================================================================
@@ -190,7 +193,7 @@ export class WebGPUCamera {
       inverseProjectionMatrix: new Float32Array(16),
       cameraPosition: { x: 0, y: 0, z: 0 },
       cameraNear: 0.1,
-      cameraFar: 1000,
+      cameraFar: 10000,
       fov: 60,
     }
 
@@ -316,9 +319,9 @@ export class WebGPUCamera {
     let dz = pz - tz
 
     // Current distance and angles
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    const distance = Math.max(Math.sqrt(dx * dx + dy * dy + dz * dz), MIN_CAMERA_DISTANCE)
     let azimuth = Math.atan2(dx, dz)
-    let elevation = Math.asin(dy / distance)
+    let elevation = Math.asin(Math.max(-1, Math.min(1, dy / distance)))
 
     // Apply deltas
     azimuth += deltaAzimuth
@@ -346,18 +349,21 @@ export class WebGPUCamera {
     const [px, py, pz] = this.state.position
     const [tx, ty, tz] = this.state.target
 
-    const dx = px - tx
-    const dy = py - ty
-    const dz = pz - tz
+    let dx = px - tx
+    let dy = py - ty
+    let dz = pz - tz
 
     // Clamp factor to reasonable range
     const clampedFactor = Math.max(0.1, Math.min(10, factor))
+    dx *= clampedFactor
+    dy *= clampedFactor
+    dz *= clampedFactor
 
-    this.state.position = [
-      tx + dx * clampedFactor,
-      ty + dy * clampedFactor,
-      tz + dz * clampedFactor,
-    ]
+    // Enforce minimum distance to prevent degenerate matrices and NaN in orbit
+    const newDistance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (newDistance < MIN_CAMERA_DISTANCE) return
+
+    this.state.position = [tx + dx, ty + dy, tz + dz]
     this.dirty = true
   }
 
@@ -367,7 +373,10 @@ export class WebGPUCamera {
    * @param deltaY - Vertical movement in world units
    */
   pan(deltaX: number, deltaY: number): void {
-    // Get camera's right and up vectors from view matrix
+    // Ensure matrices are up-to-date before reading basis vectors.
+    // Without this, orbit/zoom since the last getMatrices() would leave
+    // the view matrix stale, causing pan to move in the wrong direction.
+    if (this.dirty) this.updateMatrices()
     const vm = this.matrices.viewMatrix
 
     // Right vector is column 0 of inverse view matrix (or row 0 of view matrix)

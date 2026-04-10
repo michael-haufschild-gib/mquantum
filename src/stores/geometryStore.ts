@@ -18,7 +18,6 @@ import {
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
-import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/utils/temporalDepthRegistry'
 
 import { useAnimationStore } from './animationStore'
 import { useExtendedObjectStore } from './extendedObjectStore'
@@ -37,16 +36,12 @@ function propagateDimensionToStores(dimension: number): void {
   useRotationStore.getState().setDimension(dimension)
   useTransformStore.getState().setDimension(dimension)
 
-  // Sync compute-mode lattice dimensions so they don't desync from the global dimension.
-  // Without this, changing dimension while in a compute mode leaves latticeDim stale,
-  // causing bounding radius mismatches and broken rendering.
-  const ext = useExtendedObjectStore.getState()
-  const mode = ext.schroedinger?.quantumMode
-  if (mode === 'tdseDynamics') {
-    ext.setTdseLatticeDim(dimension)
-  } else if (mode === 'freeScalarField') {
-    ext.setFreeScalarLatticeDim(dimension)
-  }
+  // Sync compute-mode lattice dimensions so they don't desync from the global
+  // dimension. Without this, changing dimension while in a compute mode leaves
+  // latticeDim stale, causing bounding radius mismatches and broken rendering.
+  // Covers all compute modes (TDSE, BEC, Dirac, FSF, QW) via the central resize
+  // map in the schroedinger slice. Analytic modes are a no-op.
+  useExtendedObjectStore.getState().syncActiveComputeModeLatticeDim(dimension)
 }
 
 /**
@@ -205,9 +200,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     // Check if current object type is still valid for new dimension
     const newType = getFallbackObjectType(currentType, clampedDimension)
 
-    // Invalidate temporal depth data - dimensions change depth completely
-    invalidateAllTemporalDepthWebGPU()
-
     // All store updates execute synchronously and are batched by React 18's automatic batching
     // Trigger progressive refinement: start at low quality during dimension switch
     usePerformanceStore.getState().setSceneTransitioning(true)
@@ -246,7 +238,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
         logger.log(
           `[geometryStore] Auto-adjusting dimension ${currentDimension} → ${targetDim} for ${type} (range ${constraints.min}-${constraints.max})`
         )
-        invalidateAllTemporalDepthWebGPU()
         propagateDimensionToStores(targetDim)
         set({ dimension: targetDim, objectType: type })
         usePerformanceStore.getState().setSceneTransitioning(true)
@@ -264,9 +255,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     if (type === currentType) {
       return
     }
-
-    // Invalidate temporal data - object types have completely different depth/accumulation values
-    invalidateAllTemporalDepthWebGPU()
 
     // Check if this object type has a recommended dimension (from registry)
     const recommendedDimension = getRecommendedDimension(type)
@@ -324,9 +312,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     if (clampedDimension === currentDimension && objectType === currentType) {
       return
     }
-
-    // Invalidate temporal depth data
-    invalidateAllTemporalDepthWebGPU()
 
     // Update dimension-dependent stores for new dimension
     if (clampedDimension !== currentDimension) {

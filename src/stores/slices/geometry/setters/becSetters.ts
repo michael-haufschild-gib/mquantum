@@ -427,8 +427,8 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     applyBecPreset: (presetId) => {
-      void import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
-        const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === presetId)
+      void import('@/lib/physics/bec/presets').then(({ getBecPreset }) => {
+        const preset = getBecPreset(presetId)
         if (!preset) return
         setWithVersion((state) => {
           const globalDim = useGeometryStore.getState().dimension
@@ -440,7 +440,12 @@ export function createBecSetters(ctx: SetterContext): BecActions {
             slicePositions: _presetSlice,
             ...safeOverrides
           } = preset.overrides
-          const merged = { ...DEFAULT_BEC_CONFIG, ...safeOverrides, needsReset: true }
+          const merged = {
+            ...DEFAULT_BEC_CONFIG,
+            ...safeOverrides,
+            slicePositions: state.schroedinger.bec.slicePositions,
+            needsReset: true,
+          }
           const resized = resizeBecArrays(merged, globalDim)
           return {
             schroedinger: {

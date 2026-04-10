@@ -173,6 +173,36 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
   // Ref to track the sweep's effect on the TDSE config
   const sweepTickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Snapshot of the user's pre-sweep TDSE config so we can restore on
+  // abort or "New Sweep". Without this, the user's W, seed, absorber, and
+  // diagnostics toggles got silently overwritten by the sweep parameters.
+  const savedTdseRef = useRef<{
+    disorderStrength: number
+    disorderSeed: number
+    absorberEnabled: boolean
+    diagnosticsEnabled: boolean
+  } | null>(null)
+
+  const restoreTdseFields = useCallback(() => {
+    const saved = savedTdseRef.current
+    if (!saved) return
+    const { schroedinger } = useExtendedObjectStore.getState()
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...schroedinger,
+        tdse: {
+          ...schroedinger.tdse,
+          needsReset: true,
+          disorderStrength: saved.disorderStrength,
+          disorderSeed: saved.disorderSeed,
+          absorberEnabled: saved.absorberEnabled,
+          diagnosticsEnabled: saved.diagnosticsEnabled,
+        },
+      },
+    })
+    savedTdseRef.current = null
+  }, [])
+
   const handleStart = useCallback(() => {
     const sweepConfig: SweepConfig = {
       wMin,
@@ -188,6 +218,13 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
     const firstW = wForStep(sweepConfig, 0)
     const firstSeed = seedForStep(0)
     const { schroedinger } = useExtendedObjectStore.getState()
+    // Capture pre-sweep values so handleAbort / handleReset can restore them.
+    savedTdseRef.current = {
+      disorderStrength: schroedinger.tdse.disorderStrength,
+      disorderSeed: schroedinger.tdse.disorderSeed,
+      absorberEnabled: schroedinger.tdse.absorberEnabled,
+      diagnosticsEnabled: schroedinger.tdse.diagnosticsEnabled,
+    }
     useExtendedObjectStore.setState({
       schroedinger: {
         ...schroedinger,
@@ -198,6 +235,9 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
           disorderSeed: firstSeed,
           diagnosticsEnabled: true,
           potentialType: 'andersonDisorder',
+          // Sweep measures IPR — absorbers would bias localization toward
+          // smaller values by removing wavefunction at boundaries before it
+          // can fully delocalize. We restore on completion.
           absorberEnabled: false,
         },
       },
@@ -206,13 +246,15 @@ export const AndersonSweepSection: React.FC = React.memo(() => {
     useAndersonSweepStore.getState().startSweep(sweepConfig)
   }, [wMin, wMax, steps, timePerStep])
 
-  const handleAbort = () => {
+  const handleAbort = useCallback(() => {
     useAndersonSweepStore.getState().abort()
-  }
+    restoreTdseFields()
+  }, [restoreTdseFields])
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     useAndersonSweepStore.getState().reset()
-  }
+    restoreTdseFields()
+  }, [restoreTdseFields])
 
   // Tick the sweep state machine when diagnostics update
   useEffect(() => {

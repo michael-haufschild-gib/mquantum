@@ -149,14 +149,14 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
 
         {showFormulas && (
           <div className="mt-2 space-y-1 text-xs text-text-tertiary font-mono leading-relaxed">
-            <p>Purity = Tr(\u03C1\u00B2) \u2208 [1/K, 1]</p>
-            <p>Linear Entropy = 1 \u2212 Tr(\u03C1\u00B2)</p>
-            <p>von Neumann S = \u2212Tr(\u03C1 ln \u03C1)</p>
+            <p>Purity = Tr(ρ²) ∈ [1/K, 1]</p>
+            <p>Linear Entropy = 1 − Tr(ρ²)</p>
+            <p>von Neumann S = −Tr(ρ ln ρ)</p>
             <p>
-              Coherence = \u03A3<sub>k\u2260l</sub> |\u03C1<sub>kl</sub>|
+              Coherence = Σ<sub>k≠l</sub> |ρ<sub>kl</sub>|
             </p>
             <p>
-              Ground Pop. = Re(\u03C1<sub>00</sub>)
+              Ground Pop. = Re(ρ<sub>00</sub>)
             </p>
           </div>
         )}

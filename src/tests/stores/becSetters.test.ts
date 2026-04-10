@@ -134,4 +134,34 @@ describe('BEC setters', () => {
     // Verify dtAfter is a finite positive number (not NaN/Infinity)
     expect(Number.isFinite(dtAfter)).toBe(true)
   })
+
+  describe('applyBecPreset — stale rendering field regression', () => {
+    // Regression: BEC presets had heterogeneous renderingOverrides keys. Some
+    // set autoScaleMaxGain=10, others omitted it. Switching from the first to
+    // the second left the stale 10 on schroedinger.autoScaleMaxGain. Defaults
+    // merge via getBecPreset now ensures every switch rebuilds all fields.
+    it('resets autoScaleMaxGain when switching to a preset without it', async () => {
+      const s = useExtendedObjectStore.getState()
+      // groundState → autoScaleMaxGain = 10
+      s.applyBecPreset('groundState')
+      // applyBecPreset is async (dynamic import); wait a microtask
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(10)
+
+      // singleVortex does NOT declare autoScaleMaxGain — should fall back to
+      // BEC_DEFAULT_RENDERING (20), not carry the stale 10 from groundState.
+      s.applyBecPreset('singleVortex')
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
+    })
+
+    it('resets densityGain and densityContrast to preset values', async () => {
+      const s = useExtendedObjectStore.getState()
+      s.applyBecPreset('singleVortex')
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      const sc = useExtendedObjectStore.getState().schroedinger
+      expect(sc.densityGain).toBe(0.2)
+      expect(sc.densityContrast).toBe(2.6)
+    })
+  })
 })

@@ -52,13 +52,9 @@ export default defineConfig({
         'src/rendering/webgpu/passes/WignerCacheComputePass.ts',
         'src/rendering/webgpu/passes/WignerCacheComputePassSetup.ts',
         'src/rendering/webgpu/passes/PaperTexturePass.ts',
-        'src/rendering/webgpu/passes/TemporalCloudPass.ts',
-        'src/rendering/webgpu/passes/TemporalCloudDepthPass.ts',
         'src/rendering/webgpu/passes/SMAAPass.ts',
         'src/rendering/webgpu/passes/FrameBlendingPass.ts',
-        'src/rendering/webgpu/passes/CompositePass.ts',
         'src/rendering/webgpu/passes/FXAAPass.ts',
-        'src/rendering/webgpu/passes/DepthPass.ts',
         // gizmoGround.ts — removed: pure geometry math, no GPU calls, testable
         'src/rendering/webgpu/renderers/WebGPUSkyboxRenderer.ts',
         // skyboxVertexData.ts — removed: mostly pure functions, testable

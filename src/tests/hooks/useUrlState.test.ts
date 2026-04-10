@@ -104,6 +104,49 @@ describe('useUrlState', () => {
     })
   })
 
+  it('?abs=0 disables PML at the rendering level by writing the SHARED schroedinger field', async () => {
+    // Regression: routing absorberEnabled through setTdseAbsorberEnabled (the
+    // pre-fix wiring) wrote to state.schroedinger.tdse.absorberEnabled, which
+    // is shadowed by state.schroedinger.absorberEnabled (default true) inside
+    // applySharedPml. The url param had no observable effect — sharing a link
+    // with PML disabled left PML enabled. The fix routes it to the top-level
+    // shared setter so applySharedPml actually sees the false.
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      absorberEnabled: false,
+    }
+
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      // The SHARED field — what applySharedPml actually consumes — must be false.
+      expect(useExtendedObjectStore.getState().schroedinger.absorberEnabled).toBe(false)
+    })
+  })
+
+  it('?abs=1 re-enables PML via the shared field', async () => {
+    // Start with PML disabled so we can prove the URL parameter actually
+    // toggles the shared field rather than relying on its default.
+    useExtendedObjectStore.getState().setSchroedingerAbsorberEnabled(false)
+
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      absorberEnabled: true,
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useExtendedObjectStore.getState().schroedinger.absorberEnabled).toBe(true)
+    })
+  })
+
   it('loads scene examples when scene parameter is present', async () => {
     const hasHydratedSpy = vi
       .spyOn(usePresetManagerStore.persist, 'hasHydrated')

@@ -66,7 +66,15 @@ import {
   updateObservablesResources as obsUpdate,
 } from './TDSEObservablesDispatch'
 
-/** TDSEUniforms struct size in bytes (740 = 736 + 4 compactDimsMask) */
+/**
+ * TDSEUniforms struct size in bytes.
+ *
+ * Mirrors the layout in `tdseUniforms.wgsl.ts` — the trailing fields are
+ * compactDimsMask (u32 @ 736), branchingEnabled (u32 @ 740), and
+ * branchPlanePosition (f32 @ 744). Total = 744 + 4 = 748. Update both
+ * this constant and the WGSL struct when adding new fields; the prior
+ * "740 = 736 + 4" comment was stale and misled readers.
+ */
 const UNIFORM_SIZE = 748
 
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'

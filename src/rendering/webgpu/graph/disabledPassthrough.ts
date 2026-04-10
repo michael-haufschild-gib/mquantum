@@ -80,6 +80,15 @@ export function handleDisabledPassthrough(
             { width: inputTexture.width, height: inputTexture.height }
           )
         } else {
+          // Format/size mismatch: cannot copy. Fall back to aliasing, which means
+          // downstream passes will read the input texture as if it were the output.
+          // If the downstream bind group declares a different sampleType than the
+          // input format provides, the bind group write will silently sample wrong
+          // values. Log a warning so the renderer author can mark the pass with
+          // skipPassthrough=true (intentional alias) or fix the format mismatch.
+          logger.warn(
+            `[WebGPU RenderGraph] Disabled pass '${passId}' falling back to alias because ${inputId} (${inputTexture.format} ${inputTexture.width}×${inputTexture.height}) does not match ${outputId} (${outputTexture.format} ${outputTexture.width}×${outputTexture.height}). Add skipPassthrough=true to the pass config if aliasing is intentional.`
+          )
           resourceAliases.set(outputId, inputId)
         }
       }

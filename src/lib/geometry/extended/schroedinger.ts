@@ -288,17 +288,9 @@ export interface SchroedingerConfig {
   /** Unified raymarching quality preset (affects sample count) */
   raymarchQuality: RaymarchQuality
 
-  // === Subsurface Scattering (SSS) ===
-  /** Enable subsurface scattering approximation */
-  sssEnabled: boolean
-  /** SSS intensity (0.0-2.0) */
-  sssIntensity: number
-  /** SSS tint color (hex string) */
-  sssColor: string
-  /** Thickness factor for SSS attenuation (0.1-5.0) */
-  sssThickness: number
-  /** Jitter/Noise amount for SSS (0.0-1.0) */
-  sssJitter: number
+  // SSS state lives on the appearance store (`sssEnabled`, `sssIntensity`,
+  // `sssColor`, `sssThickness`, `sssJitter`). The renderer reads from there
+  // exclusively — no schroedinger-scoped duplicates.
 
   // === Quantum Effects ===
   /** Enable nodal surface highlighting */
@@ -607,13 +599,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Raymarching Quality
   raymarchQuality: 'balanced',
-
-  // SSS
-  sssEnabled: false,
-  sssIntensity: 1.0,
-  sssColor: '#ff8844', // Warm orange default
-  sssThickness: 1.0,
-  sssJitter: 0.2,
 
   // Quantum Effects
   nodalEnabled: false,

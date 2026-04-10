@@ -396,7 +396,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           {fs.initialCondition === 'gaussianPacket' && (
             <div className="space-y-2">
               <Slider
-                label="Packet Width (\u03C3)"
+                label="Packet Width (σ)"
                 tooltip="Gaussian envelope width in lattice units. Narrower packets have broader momentum spread (Heisenberg uncertainty)."
                 min={0.05}
                 max={2.0}

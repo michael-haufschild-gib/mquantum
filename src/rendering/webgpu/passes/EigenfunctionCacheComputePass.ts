@@ -15,20 +15,24 @@
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import { SCHROEDINGER_LAYOUT } from '../renderers/schroedingerLayout'
 import { composeEigenfunctionCacheComputeShader } from '../shaders/schroedinger/compute/composeEigenCache'
 import {
   EIGEN_CACHE_SAMPLES,
   MAX_EIGEN_FUNCS,
 } from '../shaders/schroedinger/quantum/eigenfunctionCache.wgsl'
 
-// SchroedingerUniforms byte offsets (must match uniforms.wgsl.ts and renderer)
-const OFFSET_TERM_COUNT = 4 // i32 at byte 4
-const OFFSET_OMEGA = 16 // array<vec4f, 3> at byte 16 (11 f32 values)
-const OFFSET_QUANTUM = 64 // array<vec4<i32>, 22> at byte 64 (88 i32 values)
+// SchroedingerUniforms byte offsets — pulled from the declarative struct
+// layout so a future field reorder doesn't silently drift these into the
+// wrong slots and produce a garbage eigen cache. Validated at test time
+// against the parsed WGSL template literal.
+const OFFSET_TERM_COUNT = SCHROEDINGER_LAYOUT.byteOffset.termCount
+const OFFSET_OMEGA = SCHROEDINGER_LAYOUT.byteOffset.omega
+const OFFSET_QUANTUM = SCHROEDINGER_LAYOUT.byteOffset.quantum
 
 // Hydrogen ND extra dimension offsets
-const OFFSET_EXTRA_DIM_N = 608 // array<vec4<i32>, 2> at byte 608 (8 i32 values)
-const OFFSET_EXTRA_DIM_OMEGA = 640 // array<vec4f, 2> at byte 640 (8 f32 values)
+const OFFSET_EXTRA_DIM_N = SCHROEDINGER_LAYOUT.byteOffset.extraDimN
+const OFFSET_EXTRA_DIM_OMEGA = SCHROEDINGER_LAYOUT.byteOffset.extraDimOmega
 
 const MAX_TERMS = 8
 const MAX_DIM = 11

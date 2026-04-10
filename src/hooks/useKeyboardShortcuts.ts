@@ -30,26 +30,25 @@ export interface UseKeyboardShortcutsOptions {
   enabled?: boolean
 }
 
-/** Shortcut configuration for display (grouped by category) */
+/**
+ * Shortcut configuration for display (grouped by category).
+ *
+ * INVARIANT: every entry must have a corresponding handler in `useKeyboardShortcuts`
+ * — the help overlay (`ShortcutsOverlay.tsx`) reads this list verbatim, so a
+ * documented-but-unimplemented entry would teach the user that a key does
+ * something it does not. Previously this list contained WASD camera movement,
+ * Shift+WASD camera rotation, and `0`/`Shift+0` camera-to-origin entries that
+ * were never wired up — `WebGPUCamera` exposes orbit/zoom/pan but no
+ * forward/strafe/translate-to-origin primitives. Those entries were removed.
+ * If you re-add a shortcut here, also implement it in the keydown handler below.
+ */
 export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
   // UI Navigation
   { key: 'k', ctrl: true, description: 'Open command palette' },
   { key: '?', description: 'Show keyboard shortcuts' },
   { key: '\\', description: 'Toggle right sidebar' },
   { key: '\\', shift: true, description: 'Toggle left sidebar' },
-  // Camera Movement
-  { key: 'w', description: 'Move camera forward' },
-  { key: 'a', description: 'Strafe camera left' },
-  { key: 's', description: 'Move camera backward' },
-  { key: 'd', description: 'Strafe camera right' },
-  // Camera Rotation (Shift + WASD)
-  { key: 'w', shift: true, description: 'Rotate camera up' },
-  { key: 'a', shift: true, description: 'Rotate camera left' },
-  { key: 's', shift: true, description: 'Rotate camera down' },
-  { key: 'd', shift: true, description: 'Rotate camera right' },
-  // Camera Origin & Reset
-  { key: '0', description: 'Move camera to origin' },
-  { key: '0', shift: true, description: 'Look at origin' },
+  // Camera Reset
   { key: 'r', description: 'Reset camera view' },
   // Geometry
   { key: 'ArrowUp', description: 'Increase dimension' },

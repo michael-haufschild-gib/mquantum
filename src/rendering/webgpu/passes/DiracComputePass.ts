@@ -573,7 +573,12 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         this.simTime += config.dt
 
         // Periodic renormalization: counteract f32 norm drift.
-        if (step === stepsThisFrame - 1 && bg.renormalizeBG) {
+        // Skipped under PML — see TDSEComputePassEvolution for the long
+        // explanation. Short version: with absorberEnabled the user is
+        // watching physical wave-packet decay at boundaries, and the
+        // renorm pass would scale ψ back up to its initial norm and
+        // visually cancel every step's absorption.
+        if (step === stepsThisFrame - 1 && bg.renormalizeBG && !config.absorberEnabled) {
           const rPass = ctx.beginComputePass({ label: `dirac-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,

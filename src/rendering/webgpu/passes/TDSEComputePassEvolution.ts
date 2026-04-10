@@ -101,7 +101,11 @@ export function runStrangEvolution(
   // Pass bounding radius so centers concentrate near the wavepacket.
   if (res.stochasticState && stepsThisFrame > 0) {
     prepareStochasticStaging(
-      ctx.device, config, res.stochasticState, stepsThisFrame, res.boundingRadius
+      ctx.device,
+      config,
+      res.stochasticState,
+      stepsThisFrame,
+      res.boundingRadius
     )
   }
 
@@ -172,12 +176,19 @@ export function runStrangEvolution(
     //     discretization's Itô drift causes systematic norm bias per step;
     //     without per-step renorm, high γ causes amplitude swings that destroy
     //     the wavepacket structure before localization can bias one branch)
-    //   - Once per frame otherwise (f32 drift correction)
+    //   - Once per frame otherwise (f32 drift correction), UNLESS the PML
+    //     absorber is enabled. With PML, the user is intentionally watching
+    //     the wave packet decay at boundaries — renormalising back to the
+    //     initial norm cancels the visible absorption (the renorm scale
+    //     factor exactly compensates the absorber's damping). The user
+    //     reads the unchanged total density and concludes "PML doesn't
+    //     work". Imaginary-time / stochastic modes still renormalise even
+    //     under PML because their non-unitary mechanics mandate it.
     const isImaginaryTime = config.imaginaryTimeEnabled
     const needsPerStepRenorm =
-      isImaginaryTime ||
-      (config.stochasticEnabled && config.stochasticGamma > 0)
-    if (needsPerStepRenorm || step === stepsThisFrame - 1) {
+      isImaginaryTime || (config.stochasticEnabled && config.stochasticGamma > 0)
+    const needsFrameRenorm = !config.absorberEnabled && step === stepsThisFrame - 1
+    if (needsPerStepRenorm || needsFrameRenorm) {
       const rPass = ctx.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
       dc(rPass, pl.diagReducePipeline, [bg.diagReduceBG], res.diagNumWorkgroups)
       rPass.end()

@@ -86,7 +86,11 @@ export function packWriteGridUniforms(
     f32[68 + d] = basisZ?.[d] ?? (d === 2 ? 1 : 0)
   }
 
-  // slicePositions (offset 320, 12 f32) — all 0 for now
+  // slicePositions (offset 320, 12 f32)
+  // Store array is 0-indexed (i=0 -> dim 3), WGSL reads slicePositions[d] where d >= 3
+  for (let i = 0; i < config.slicePositions.length; i++) {
+    f32[80 + 3 + i] = config.slicePositions[i] ?? 0
+  }
 
   return buf
 }

@@ -179,16 +179,29 @@ export async function warmSwapSchrodingerPasses(
   // state transfer happens during createPipeline() inside initialize(). Between these
   // two points the old renderer keeps rendering with its strategy intact. If init
   // aborts or throws, dispose() on the new renderer cleans up the stashed reference.
+  //
+  // If initialize() completes (or throws partway through createPipeline), compute state
+  // has already transferred from predecessor → newRenderer. On any abort/error path we
+  // must reclaim it via revertComputeStateTo(predecessor) BEFORE disposing newRenderer,
+  // otherwise strategy.dispose() destroys GPU state the predecessor is still using.
   const existingPass = graph.getPass('schroedinger')
   if (newRenderer && existingPass) {
     newRenderer.adoptFrom(existingPass)
+  }
+
+  const disposeNewRendererSafely = () => {
+    if (!newRenderer) return
+    if (existingPass) {
+      newRenderer.revertComputeStateTo(existingPass)
+    }
+    newRenderer.dispose()
   }
 
   try {
     if (newRenderer) {
       await newRenderer.initialize(setupCtx)
       if (shouldAbort?.()) {
-        newRenderer.dispose()
+        disposeNewRendererSafely()
         newTemporalPass?.dispose()
         return
       }
@@ -196,14 +209,14 @@ export async function warmSwapSchrodingerPasses(
     if (newTemporalPass) {
       await newTemporalPass.initialize(setupCtx)
       if (shouldAbort?.()) {
-        newRenderer?.dispose()
+        disposeNewRendererSafely()
         newTemporalPass.dispose()
         return
       }
     }
   } catch (err) {
     logger.error('[WebGPU warmSwap] Pass pre-initialization failed:', err)
-    newRenderer?.dispose()
+    disposeNewRendererSafely()
     newTemporalPass?.dispose()
     throw err
   }

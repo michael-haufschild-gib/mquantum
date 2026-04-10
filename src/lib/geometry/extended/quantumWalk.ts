@@ -49,6 +49,8 @@ export interface QuantumWalkConfig {
   absorberWidth: number
   /** Per-step damping target at outer edge (e.g. 1e-6) */
   pmlTargetReflection: number
+  /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
+  slicePositions: number[]
 }
 
 /** Default quantum walk configuration. */
@@ -68,6 +70,7 @@ export const DEFAULT_QUANTUM_WALK_CONFIG: QuantumWalkConfig = {
   absorberEnabled: true,
   absorberWidth: 0.2,
   pmlTargetReflection: 1e-6,
+  slicePositions: [],
 }
 
 /** Maximum total lattice sites for quantum walk (matches MAX_LINEAR_DISPATCH_SITES) */
@@ -106,11 +109,15 @@ export function resizeQuantumWalkArrays(
     i < prev.spacing.length ? prev.spacing[i]! : 0.1
   )
   const initialPosition = gridSize.map((s) => Math.floor(s / 2))
+  const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+    i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+  )
   return {
     latticeDim: newDim,
     gridSize,
     spacing,
     initialPosition,
+    slicePositions,
     steps: 0,
     needsReset: true,
   }

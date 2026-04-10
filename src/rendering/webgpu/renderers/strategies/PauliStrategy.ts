@@ -4,10 +4,11 @@
  * @module rendering/webgpu/renderers/strategies/PauliStrategy
  */
 
-import type { PauliConfig } from '@/lib/geometry/extended/types'
+import type { PauliConfig, PauliFieldView } from '@/lib/geometry/extended/types'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { PauliComputePass } from '../../passes/PauliComputePass'
+import { pauliFieldViewForColorAlgorithm } from '../../scenePassConfig'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
@@ -77,17 +78,13 @@ export class PauliStrategy implements QuantumModeStrategy {
     if (!pauliConfig) return
 
     const schroedinger = extended?.schroedinger
-    // Derive fieldView from the color algorithm
+    // Derive fieldView from the color algorithm. Single source of truth lives
+    // in scenePassConfig#pauliFieldViewForColorAlgorithm so the per-frame
+    // strategy override and the UI's ColorAlgorithmSelector → store sync stay
+    // consistent (an inline ternary used to live here and could drift).
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     const algo = appearance?.colorAlgorithm ?? 'pauliSpinDensity'
-    const pauliFieldView =
-      algo === 'pauliSpinDensity'
-        ? 'spinDensity'
-        : algo === 'pauliSpinExpectation'
-          ? 'spinExpectation'
-          : algo === 'pauliCoherence'
-            ? 'coherence'
-            : 'totalDensity'
+    const pauliFieldView = pauliFieldViewForColorAlgorithm(algo) as PauliFieldView
 
     const effectiveConfig = applySharedPml(
       { ...pauliConfig, fieldView: pauliFieldView },

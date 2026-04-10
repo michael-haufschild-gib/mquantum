@@ -274,6 +274,83 @@ describe('Dirac setters', () => {
     })
   })
 
+  it('syncs color algorithm to particleAntiparticle when preset uses split fieldView', async () => {
+    const { useAppearanceStore } = await import('@/stores/appearanceStore')
+    useAppearanceStore.getState().setColorAlgorithm('blackbody')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+
+    const s = useExtendedObjectStore.getState()
+    // kleinParadox preset sets fieldView='particleAntiparticleSplit' which requires
+    // the matching color algorithm so the renderer reads R/G as upper/lower spinor.
+    s.applyDiracPreset('kleinParadox')
+
+    await vi.waitFor(() => {
+      expect(getDirac().fieldView).toBe('particleAntiparticleSplit')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('particleAntiparticle')
+    })
+  })
+
+  it('does not change color algorithm for presets without split fieldView', async () => {
+    const { useAppearanceStore } = await import('@/stores/appearanceStore')
+    useAppearanceStore.getState().setColorAlgorithm('viridis')
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('viridis')
+
+    const s = useExtendedObjectStore.getState()
+    // diracBarrierTunneling preset uses fieldView='totalDensity' — no algo override needed
+    s.applyDiracPreset('diracBarrierTunneling')
+
+    await vi.waitFor(() => {
+      expect(getDirac().fieldView).toBe('totalDensity')
+    })
+    // viridis preserved — preset application should NOT clobber unrelated color choices
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('viridis')
+  })
+
+  it('re-clamps dt when speedOfLight rises above the new CFL ceiling', () => {
+    // CFL: dtMax = min(Δx) / (c · √N). Increasing c shrinks dtMax.
+    // Bug regression: setDiracSpeedOfLight used to be a plain clamped setter
+    // and left a stale dt in place, pushing the lattice past stability.
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.15, 0.15, 0.15])
+    s.setDiracDt(0.05) // safe at c=1: dtMax≈0.0866 → clamps to ~0.078
+    const dtBefore = getDirac().dt
+    expect(dtBefore).toBeGreaterThan(0.04)
+
+    // Raise c by 5×: new dtMax≈0.01732 → dt must drop below the new ceiling
+    s.setDiracSpeedOfLight(5)
+    const dtAfter = getDirac().dt
+    const newCflCeiling = 0.15 / (5 * Math.sqrt(3))
+    expect(dtAfter).toBeLessThanOrEqual(newCflCeiling * 0.9 + 1e-9)
+    expect(dtAfter).toBeGreaterThan(0)
+    expect(getDirac().speedOfLight).toBe(5)
+  })
+
+  it('leaves dt untouched when speedOfLight drops (looser CFL keeps dt valid)', () => {
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.15, 0.15, 0.15])
+    s.setDiracSpeedOfLight(5)
+    s.setDiracDt(0.01)
+    const dtBefore = getDirac().dt
+
+    s.setDiracSpeedOfLight(0.5) // looser CFL — dt is well within bounds
+    expect(getDirac().dt).toBe(dtBefore)
+  })
+
+  it('re-clamps dt when spacing tightens past the CFL ceiling', () => {
+    // dtMax shrinks linearly with min(spacing), so a 5× tighter grid forces dt down.
+    const s = useExtendedObjectStore.getState()
+    s.setDiracSpacing([0.5, 0.5, 0.5])
+    s.setDiracDt(0.2)
+    const dtBefore = getDirac().dt
+    expect(dtBefore).toBeGreaterThan(0.1)
+
+    s.setDiracSpacing([0.05, 0.05, 0.05])
+    const dtAfter = getDirac().dt
+    const newCflCeiling = 0.05 / (1 * Math.sqrt(3))
+    expect(dtAfter).toBeLessThanOrEqual(newCflCeiling * 0.9 + 1e-9)
+    expect(dtAfter).toBeGreaterThan(0)
+  })
+
   it('rejects NaN for clamped numeric setters', () => {
     const s = useExtendedObjectStore.getState()
     const beforeWidth = getDirac().potentialWidth

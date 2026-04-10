@@ -6,11 +6,15 @@
  * @module rendering/webgpu/shaders/shared/core/uniforms.wgsl
  */
 
-export const uniformsBlock = /* wgsl */ `
-// ============================================
-// Camera Uniform Buffer
-// ============================================
-
+/**
+ * Canonical CameraUniforms struct definition.
+ *
+ * Single source of truth for the host-shareable camera uniform buffer layout.
+ * Imported by both `uniformsBlock` (composed into fragment shaders alongside
+ * other shared structs) and the standalone vertex shaders in
+ * `schroedinger/vertex.wgsl.ts`. Any layout change must happen here.
+ */
+export const CAMERA_UNIFORMS_STRUCT = /* wgsl */ `
 struct CameraUniforms {
   viewMatrix: mat4x4f,
   projectionMatrix: mat4x4f,
@@ -34,6 +38,13 @@ struct CameraUniforms {
   bayerOffset: vec2f,            // Bayer pattern offset [0,0], [1,1], [1,0], [0,1]
   _padding: vec2f,               // Padding for 16-byte alignment
 }
+`
+
+export const uniformsBlock = /* wgsl */ `
+// ============================================
+// Camera Uniform Buffer
+// ============================================
+${CAMERA_UNIFORMS_STRUCT}
 
 // ============================================
 // Light Structures

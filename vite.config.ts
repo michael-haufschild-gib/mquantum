@@ -43,7 +43,6 @@ const SOURCE_CHUNKS: [string, string][] = [
   // Leaf chunk — shared utils imported by both stores and physics.
   ['/lib/logger', 'core-utils'],
   ['/constants/', 'core-utils'],
-  ['temporalDepthRegistry', 'core-utils'],
   // Shaders — non-webgpu rendering modules (palette types, light types)
   ['/rendering/lights/', 'shaders'],
   // Schroedinger shaders (must precede generic /webgpu/shaders/ rule)

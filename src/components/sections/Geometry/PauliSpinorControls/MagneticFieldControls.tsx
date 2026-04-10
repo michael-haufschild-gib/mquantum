@@ -92,10 +92,14 @@ export const MagneticFieldControls: React.FC<MagneticFieldControlsProps> = React
           step={0.01}
         />
 
-        {fieldType === 'gradient' && (
+        {(fieldType === 'gradient' || fieldType === 'quadrupole') && (
           <Slider
-            label="Gradient Strength b'"
-            tooltip="Spatial gradient dB/dz of the magnetic field. Creates position-dependent Zeeman splitting for Stern-Gerlach separation."
+            label={fieldType === 'quadrupole' ? 'Quadrupole Strength g' : "Gradient Strength b'"}
+            tooltip={
+              fieldType === 'quadrupole'
+                ? 'Quadrupole coupling g for B = g(x ẑ + z x̂). Creates a saddle-point field used in magnetic traps and Stern-Gerlach geometries.'
+                : 'Spatial gradient dB/dz of the magnetic field. Creates position-dependent Zeeman splitting for Stern-Gerlach separation.'
+            }
             value={gradientStrength}
             onChange={onGradientStrengthChange}
             min={0}

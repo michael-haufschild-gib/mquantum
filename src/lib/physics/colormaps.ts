@@ -15,11 +15,11 @@
 export type CarpetColormap = 'viridis' | 'inferno' | 'magma' | 'plasma'
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COLORMAP DATA — 32 control points each, interpolated to 256 entries
+// COLORMAP DATA — 11 control points each, interpolated to 256 entries
 // Sampled from matplotlib reference tables at uniform intervals
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** [r, g, b] triplets at 32 uniform positions along [0,1] */
+/** [r, g, b] triplets at uniform positions along [0,1] (11 per built-in colormap) */
 type ColormapControlPoints = readonly (readonly [number, number, number])[]
 
 const VIRIDIS_CONTROL: ColormapControlPoints = [

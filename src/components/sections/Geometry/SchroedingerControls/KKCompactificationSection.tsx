@@ -245,7 +245,7 @@ const KKEnergyDiagram: React.FC<KKEnergyDiagramProps> = React.memo(
     return (
       <div className="border-t border-border-subtle pt-2">
         <p className="text-xs text-text-tertiary mb-1">
-          KK Energy Spectrum — E<sub>n</sub> = (n\u210F)\u00B2 / (2mR\u00B2)
+          KK Energy Spectrum — E<sub>n</sub> = (nℏ)² / (2mR²)
         </p>
         <svg
           width={WIDTH}

@@ -113,4 +113,16 @@ describe('PAULI_SCENARIO_PRESETS', () => {
     expect(free.overrides.fieldStrength).toBe(0)
     expect(free.overrides.fieldView).toBe('totalDensity')
   })
+
+  it('spinCoherence sets gradientStrength explicitly so its quadrupole field is non-zero', () => {
+    // Regression: applyPauliPresetById spreads `preset.overrides` onto the
+    // current PauliConfig (no defaults reset). The spinCoherence preset uses
+    // `fieldType: 'quadrupole'`, which the WGSL shader (`pauliPotentialHalf.wgsl`)
+    // computes as `B = g(x ẑ + z x̂)` reading `params.gradientStrength`. If the
+    // preset omits gradientStrength, switching from a uniform/rotating preset
+    // (gradientStrength = 0) leaves the field silently zero.
+    const sc = PAULI_SCENARIO_PRESETS.find((p) => p.id === 'spinCoherence')!
+    expect(sc.overrides.fieldType).toBe('quadrupole')
+    expect(sc.overrides.gradientStrength).toBeGreaterThan(0)
+  })
 })

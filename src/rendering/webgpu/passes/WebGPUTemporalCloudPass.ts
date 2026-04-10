@@ -282,6 +282,12 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     const writeAccumulationTexture =
       this.frameIndex % 2 === 0 ? this.accumulationTextureB! : this.accumulationTextureA!
 
+    // Capture camera-change state BEFORE updateTemporalUniforms — that call
+    // overwrites this.prevViewProjectionMatrix with the current frame's
+    // matrix, after which any post-update comparison would always read
+    // current === current and report no change.
+    const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)
+
     this.updateTemporalUniforms(
       this.device,
       width,
@@ -372,11 +378,12 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       )
     }
 
-    // Static scene detection: freeze Bayer cycling when nothing changes
+    // Static scene detection: freeze Bayer cycling when nothing changes.
+    // cameraChanged was captured above, before updateTemporalUniforms()
+    // overwrote prevViewProjectionMatrix with the current frame's matrix.
     const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     const animTimeChanged = currentAnimTime !== this.prevAnimationTime
-    const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)
     const sceneChanged = animTimeChanged || cameraChanged
 
     if (sceneChanged) {

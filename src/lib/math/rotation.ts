@@ -5,6 +5,7 @@
  * Uses WASM acceleration when available for improved performance.
  */
 
+import { AXIS_LABELS } from '@/constants/dimension'
 import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
 
 import { copyMatrix, createIdentityMatrix, multiplyMatricesInto } from './matrix'
@@ -12,9 +13,16 @@ import { fcos, fsin } from './trig'
 import type { MatrixND, RotationPlane } from './types'
 
 /**
- * Axis naming convention for display
+ * Axis naming convention for rotation plane display.
+ *
+ * Mirrors `AXIS_LABELS` from `@/constants/dimension` (uppercased) so that
+ * rotation plane buttons (e.g. "XT", "WS") use the same axis letters as the
+ * slice-position sliders. Previously this was a private 6-entry array
+ * (X..U) plus an `A${index}` fallback, which produced inconsistent labels
+ * like "XA6" / "WA7" for ≥7D rotations while the slice UI still showed
+ * "Slice T" / "Slice S" for the same axes.
  */
-const AXIS_NAMES = ['X', 'Y', 'Z', 'W', 'V', 'U']
+const AXIS_NAMES = AXIS_LABELS.map((label) => label.toUpperCase())
 
 function assertRotationDimension(dimension: number): void {
   if (!Number.isInteger(dimension) || dimension < 2) {

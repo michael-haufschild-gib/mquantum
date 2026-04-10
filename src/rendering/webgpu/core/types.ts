@@ -235,6 +235,14 @@ export interface WebGPURenderPass {
    * triggered by non-structural config changes (e.g. color algorithm).
    */
   adoptFrom?(predecessor: WebGPURenderPass): void
+
+  /**
+   * Reverse `adoptFrom`: transfer any adopted compute state back to the predecessor.
+   * Called on warm-swap abort/error paths BEFORE disposing this pass, so the predecessor
+   * (which is still active in the graph) reclaims its GPU state instead of having it
+   * destroyed. No-op if this pass never adopted anything.
+   */
+  revertComputeStateTo?(predecessor: WebGPURenderPass): void
 }
 
 // =============================================================================

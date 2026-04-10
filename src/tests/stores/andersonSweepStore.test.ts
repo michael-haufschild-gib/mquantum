@@ -89,6 +89,30 @@ describe('andersonSweepStore', () => {
       const result = useAndersonSweepStore.getState().tick(1.0, 0.01, 0.0001)
       expect(result).toBeNull()
     })
+
+    it('re-anchors stepStartTime when simTime regresses (external TDSE reset)', () => {
+      // Without the regression guard, an external resetTdseField mid-step
+      // would leave stepStartTime > simTime forever and the elapsed
+      // condition would never become true — the sweep would visibly hang
+      // until the user intervened.
+      useAndersonSweepStore.getState().startSweep(testConfig)
+      // Anchor at simTime=2.0
+      useAndersonSweepStore.getState().tick(2.0, 0.01, 0.0001)
+      expect(useAndersonSweepStore.getState().stepStartTime).toBe(2.0)
+      // External reset: simTime jumps back to 0.5 (mid-evolution after a
+      // partial reset, e.g. user toggled diagnostics rather than zero).
+      useAndersonSweepStore.getState().tick(0.5, 0.01, 0.0001)
+      expect(useAndersonSweepStore.getState().stepStartTime).toBe(0.5)
+      // Now the elapsed window proceeds from the new anchor. Asserting
+      // the exact returned W value (not just "non-null") locks in that
+      // the regression branch correctly advanced to step 1 — the same
+      // value the existing "completes the sweep" test relies on.
+      const advanceResult = useAndersonSweepStore
+        .getState()
+        .tick(0.5 + testConfig.timePerStep + 0.01, 0.02, 0.0002)
+      expect(advanceResult).toBeCloseTo(wForStep(testConfig, 1))
+      expect(useAndersonSweepStore.getState().currentStep).toBe(1)
+    })
   })
 
   describe('abort', () => {

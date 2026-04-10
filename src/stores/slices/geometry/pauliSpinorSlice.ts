@@ -185,6 +185,12 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
         const spacing = Array.from({ length: dim }, () => 0.15)
         const packetCenter = Array.from({ length: 11 }, () => 0)
         const packetMomentum = Array.from({ length: 11 }, () => 0)
+        // Resize slicePositions to match the number of extra dims (dim - 3).
+        // Preserve any existing values at the matching 0-indexed extra-dim slots.
+        const prevSlice = state.pauliSpinor.slicePositions
+        const slicePositions = Array.from({ length: Math.max(0, dim - 3) }, (_, i) =>
+          i < prevSlice.length ? (prevSlice[i] ?? 0) : 0
+        )
         return {
           pauliSpinor: {
             ...state.pauliSpinor,
@@ -193,6 +199,7 @@ export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], P
             spacing,
             packetCenter,
             packetMomentum,
+            slicePositions,
             needsReset: true,
           },
         }

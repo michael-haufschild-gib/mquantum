@@ -493,7 +493,12 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         this.simTime += config.dt
 
         // 8. Periodic renormalization: counteract f32 norm drift.
-        if (step === stepsThisFrame - 1) {
+        //    Skipped under PML — see TDSEComputePassEvolution for the long
+        //    explanation. Short version: with absorberEnabled the user is
+        //    watching physical wave-packet decay at boundaries, and the
+        //    renorm pass would scale ψ back up to its initial norm and
+        //    visually cancel every step's absorption.
+        if (step === stepsThisFrame - 1 && !config.absorberEnabled) {
           const rPass = ctx.beginComputePass({ label: `pauli-renorm-reduce-${step}` })
           this.dispatchCompute(
             rPass,

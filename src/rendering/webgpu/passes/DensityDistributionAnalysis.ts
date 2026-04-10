@@ -223,12 +223,24 @@ export class DensityDistributionAnalyzer {
     this.logRhoThreshold = Math.log(rhoAtTarget)
   }
 
-  /** Release all cached distribution data. */
+  /**
+   * Release all cached distribution data and clear the density diagnostics
+   * channel.
+   *
+   * Called from `DensityGridComputePass.dispose()` (pipeline rebuild,
+   * analytic→compute mode switch). Resetting the diagnostics store here
+   * prevents stale wavefunction slice data from a previous analytic session
+   * leaking into the next mode — the AnalysisSection's "Export Wavefunction
+   * Slices" button gates on `density.sliceX !== null && density.sliceGridSize
+   * > 0`, so without this reset the button would stay enabled showing slices
+   * captured under the previous quantum mode / dimension / world bound.
+   */
   reset(): void {
     this.sortedRhoValues = null
     this.prefixMass = null
     this.totalMass = 0
     this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
     this.distributionScratch = null
+    useDiagnosticsStore.getState().resetDensity()
   }
 }

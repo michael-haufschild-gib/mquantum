@@ -150,6 +150,13 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
         quantumMode: config.quantumMode as 'harmonicOscillator' | 'hydrogenND',
         termCount: config.termCount,
       })
+      // Reset stale resolution tracker. The new pass starts at the constructor
+      // default (256), but the strategy instance is reused across pipeline
+      // rebuilds, so a previously-cached value (e.g. 512 from a prior rebuild)
+      // would make syncWignerCacheResolution short-circuit and silently leave
+      // the user's chosen resolution unapplied — the cache would render at 256
+      // even though the Cache Resolution dropdown still showed 512.
+      this.lastWignerCacheResolution = NaN
       initPromises.push(
         this.wignerCachePass.initialize(ctx).then(() => {
           this.wignerCacheInitialized = true

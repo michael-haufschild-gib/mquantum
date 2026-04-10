@@ -136,17 +136,6 @@ fn computePBRSpecular(N: vec3f, V: vec3f, L: vec3f, roughness: f32, F0: vec3f) -
 }
 
 /**
- * Compute F0 (base reflectivity) from IOR.
- *
- * @param ior Index of refraction
- * @return F0 value
- */
-fn iorToF0(ior: f32) -> f32 {
-  let r = (ior - 1.0) / (ior + 1.0);
-  return r * r;
-}
-
-/**
  * Compute F0 (Fresnel reflectance at normal incidence).
  * Uses Filament convention: F0 = 0.16 * reflectance^2 for dielectrics.
  * Metals use base color directly as F0.

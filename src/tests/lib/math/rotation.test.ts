@@ -358,11 +358,15 @@ describe('Rotation Operations', () => {
     it('produces correct planes for 11D (maximum dimension)', () => {
       const planes = getRotationPlanes(11)
       expect(planes).toHaveLength((11 * 10) / 2) // 55
-      // Check high-dimension plane names
+      // Check high-dimension plane names. Axes 0..10 use the same letters as
+      // AXIS_LABELS (uppercased): X Y Z W V U T S R Q P. Previously this
+      // produced "XA6"/"A6A7"/"A9A10" because the rotation file kept its
+      // own truncated 6-entry name table — that has been unified with
+      // AXIS_LABELS so the rotation buttons match the slice-position UI.
       const names = planes.map((p) => p.name)
-      expect(names).toContain('XA6')
-      expect(names).toContain('A6A7')
-      expect(names).toContain('A9A10')
+      expect(names).toContain('XT') // axis 0 ↔ axis 6
+      expect(names).toContain('TS') // axis 6 ↔ axis 7
+      expect(names).toContain('QP') // axis 9 ↔ axis 10
     })
   })
 

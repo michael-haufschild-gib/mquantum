@@ -8,7 +8,10 @@ import React, { useCallback, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
+import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
+import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
 import { type ColorAlgorithm, getAvailableColorAlgorithms } from '@/rendering/shaders/palette'
+import { pauliFieldViewForColorAlgorithm } from '@/rendering/webgpu/scenePassConfig'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -97,9 +100,41 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
 
     const handleChange = useCallback(
       (v: string) => {
-        setColorAlgorithm(v as ColorAlgorithm)
+        const algo = v as ColorAlgorithm
+        setColorAlgorithm(algo)
+
+        // Keep the mode's fieldView in sync with the selected color algorithm.
+        // Without this, the renderer would derive fieldView from the algorithm (Pauli)
+        // or keep the legacy fieldView (Dirac) and the UI ToggleGroup would show a
+        // stale value that no longer matches what's encoded in the density grid.
+        const extStore = useExtendedObjectStore.getState()
+        if (objectType === 'pauliSpinor') {
+          const nextFieldView = pauliFieldViewForColorAlgorithm(algo) as PauliFieldView
+          if (extStore.pauliSpinor.fieldView !== nextFieldView) {
+            extStore.setPauliFieldView(nextFieldView)
+          }
+        } else if (quantumMode === 'diracEquation') {
+          // 'particleAntiparticle' color algo requires the dual-channel split
+          // fieldView (R=upper spinor, G=lower spinor); every other Dirac color
+          // algo expects single-channel total density. We must sync BOTH
+          // directions: setting the split when picking particleAntiparticle AND
+          // resetting to totalDensity when switching away. Without the reset,
+          // diracConfig.fieldView stays at 'particleAntiparticleSplit' (from a
+          // prior particleAntiparticle pick OR from a preset like kleinParadox)
+          // and the density grid keeps the dual-channel encoding, so subsequent
+          // single-channel color algos read R as particle-only instead of total
+          // and produce visually wrong colors.
+          const currentFieldView = extStore.schroedinger.dirac?.fieldView
+          if (algo === 'particleAntiparticle') {
+            if (currentFieldView !== 'particleAntiparticleSplit') {
+              extStore.setDiracFieldView('particleAntiparticleSplit' as DiracFieldView)
+            }
+          } else if (currentFieldView === 'particleAntiparticleSplit') {
+            extStore.setDiracFieldView('totalDensity' as DiracFieldView)
+          }
+        }
       },
-      [setColorAlgorithm]
+      [setColorAlgorithm, objectType, quantumMode]
     )
 
     const isBranchColored = quantumMode === 'tdseDynamics' && branchingEnabled

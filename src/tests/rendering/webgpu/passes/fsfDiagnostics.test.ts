@@ -206,6 +206,61 @@ describe('computeFsfDiagnostics with self-interaction', () => {
   })
 })
 
+describe('computeFsfDiagnostics variance numerical stability', () => {
+  it('reports variancePhi >= 0 for nearly-uniform fields where the two-sum formula is unstable', () => {
+    // Build a "ground state at the false vacuum" — nearly-zero φ everywhere
+    // with f32-precision noise. The unguarded variance formula
+    // sumPhi²/N − ⟨φ⟩² produces a small *negative* number from cancellation
+    // that then renders in the FSF analysis panel as a confusingly-signed
+    // "Var(φ) = -0.000003".
+    const N = 64 ** 3
+    const phi = new Float32Array(N)
+    const pi = new Float32Array(N)
+    // Constant non-zero offset reproduces the cancellation reliably:
+    // Σφ²/N − ⟨φ⟩² should be 0 exactly but f32 rounding makes it slightly off.
+    const offset = 12345.6789
+    for (let i = 0; i < N; i++) phi[i] = offset
+
+    const config = createConfig({
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.1, 0.1, 0.1],
+      mass: 0,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+    })
+
+    const result = computeFsfDiagnostics(phi, pi, config)
+    expect(result.variancePhi).toBeGreaterThanOrEqual(0)
+    expect(result.variancePhi).toBeLessThan(1e-3)
+    // meanPhi must round to ≈ offset (sanity check that the test setup
+    // actually reaches the cancellation regime).
+    expect(result.meanPhi).toBeCloseTo(offset, 1)
+  })
+
+  it('reports the correct variance for a φ field with known second moment', () => {
+    // Sanity check: the clamp must NOT swallow legitimate variance.
+    const N = 1000
+    const phi = new Float32Array(N)
+    const pi = new Float32Array(N)
+    // Alternating ±1 → mean=0, variance=1.
+    for (let i = 0; i < N; i++) phi[i] = i % 2 === 0 ? 1 : -1
+
+    const config = createConfig({
+      latticeDim: 1,
+      gridSize: [N],
+      spacing: [0.1],
+      mass: 0,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+    })
+
+    const result = computeFsfDiagnostics(phi, pi, config)
+    expect(result.variancePhi).toBeCloseTo(1, 6)
+    expect(result.meanPhi).toBeCloseTo(0, 6)
+  })
+})
+
 describe('computeFsfDiagnostics 3D self-interaction', () => {
   it('computes correct potential energy for uniform 3D field at false vacuum', () => {
     const N = 8

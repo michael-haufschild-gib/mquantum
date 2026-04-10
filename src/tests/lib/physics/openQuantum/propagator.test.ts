@@ -163,6 +163,50 @@ describe('evolvePropagatorStep', () => {
     expect(maxHermiticityError(rho)).toBeLessThan(1e-12)
   })
 
+  it('preserves trace and Hermiticity with complex Lindblad amplitudes', () => {
+    // Verifies that non-zero imaginary parts in Lindblad channel amplitudes
+    // are handled correctly. Pure-real tests would pass even if imag terms are ignored.
+    const K = 2
+    const energies = new Float64Array([-1, -0.25])
+    const channels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0.15 }, // complex emission
+    ]
+
+    const L = buildLiouvillian(energies, channels, K)
+    const P = computePropagator(L, 0.01, K)
+
+    const rho = superpositionDM(K)
+
+    for (let step = 0; step < 100; step++) {
+      evolvePropagatorStep(P, rho)
+    }
+
+    expect(trace(rho)).toBeCloseTo(1.0, 6)
+    expect(maxHermiticityError(rho)).toBeLessThan(1e-12)
+    // With |α|² = 0.01 + 0.0225 = 0.0325, dissipation rate is higher than
+    // the pure-real α=0.1 case (|α|²=0.01). Ground state should gain population.
+    expect(rho.elements[0]!).toBeGreaterThan(0.5)
+  })
+
+  it('handles K=1 degenerate case without errors', () => {
+    // A single-state system has a 1x1 density matrix that is always ρ = [[1]].
+    // No transitions are possible. The propagator should be the 1x1 identity.
+    const K = 1
+    const energies = new Float64Array([-1])
+    const L = buildLiouvillian(energies, [], K)
+    const P = computePropagator(L, 0.01, K)
+
+    const rho = groundStateDM(K)
+
+    for (let step = 0; step < 10; step++) {
+      evolvePropagatorStep(P, rho)
+    }
+
+    expect(trace(rho)).toBeCloseTo(1.0, 10)
+    expect(rho.elements[0]).toBeCloseTo(1.0, 10)
+    expect(rho.elements[1]).toBeCloseTo(0.0, 10)
+  })
+
   it('drives population toward ground state under emission-only dissipation', () => {
     // Bug caught: dissipation drives population in wrong direction
     // (e.g., emission channel with swapped row/col pumps excited state).
