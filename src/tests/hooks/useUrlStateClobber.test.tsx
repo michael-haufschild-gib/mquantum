@@ -9,7 +9,7 @@
  * avoided this via the `isLoadingScene` gate; URL loading now matches.
  */
 
-import { render } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
@@ -18,6 +18,7 @@ import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 vi.mock('@/lib/url/state-serializer', async () => {
   const actual = await vi.importActual<typeof import('@/lib/url/state-serializer')>(
@@ -58,6 +59,17 @@ describe('useUrlState + useObjectTypeInitialization effect race', () => {
     useExtendedObjectStore.getState().reset()
   })
 
+  /**
+   * Wait until `useUrlState` has finished applying URL params: the hook sets
+   * `isLoadingScene=true` under the try-finally and clears it on the next
+   * requestAnimationFrame. Polling this observable condition replaces the
+   * previous hardcoded 30ms sleep, which could race on slow CI machines.
+   */
+  const waitForUrlStateApplied = () =>
+    waitFor(() => {
+      expect(usePerformanceStore.getState().isLoadingScene).toBe(false)
+    })
+
   it('preserves URL-set densityGain after dim-change init effect re-runs', async () => {
     const parsedState: Partial<ShareableState> = {
       dimension: 5,
@@ -67,9 +79,7 @@ describe('useUrlState + useObjectTypeInitialization effect race', () => {
     mockedParseCurrentUrl.mockReturnValue(parsedState)
 
     render(<TestApp />)
-
-    // Let the effect queue drain (RAF-scheduled flag cleanup fires)
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    await waitForUrlStateApplied()
 
     // Final state: URL-set densityGain survives the init effect's re-run.
     const state = useExtendedObjectStore.getState().schroedinger
@@ -85,7 +95,7 @@ describe('useUrlState + useObjectTypeInitialization effect race', () => {
     mockedParseCurrentUrl.mockReturnValue(parsedState)
 
     render(<TestApp />)
-    await new Promise((resolve) => setTimeout(resolve, 30))
+    await waitForUrlStateApplied()
 
     // No dg URL param → init effect's default formula applies.
     // D=5 → baseDensityGain=2.0, dimensionBoost=1.4 → densityGain=2.8

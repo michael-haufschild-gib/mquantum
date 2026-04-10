@@ -86,9 +86,14 @@ export function packWriteGridUniforms(
     f32[68 + d] = basisZ?.[d] ?? (d === 2 ? 1 : 0)
   }
 
-  // slicePositions (offset 320, 12 f32)
-  // Store array is 0-indexed (i=0 -> dim 3), WGSL reads slicePositions[d] where d >= 3
-  for (let i = 0; i < config.slicePositions.length; i++) {
+  // slicePositions (offset 320, array<f32, 12>). Store array is 0-indexed
+  // (i=0 → dim 3); WGSL reads slicePositions[d] where d ≥ 3. The 12-slot
+  // region leaves 9 usable slots (80+3..80+11) for extra dims 3..11, so we
+  // cap the loop at 9 regardless of how much state an oversized hydrated
+  // preset carries — otherwise writes would bleed past the struct region.
+  const QW_SLICE_POSITIONS_CAPACITY = 9
+  const sliceWriteCount = Math.min(config.slicePositions.length, QW_SLICE_POSITIONS_CAPACITY)
+  for (let i = 0; i < sliceWriteCount; i++) {
     f32[80 + 3 + i] = config.slicePositions[i] ?? 0
   }
 

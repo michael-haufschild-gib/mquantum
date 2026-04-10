@@ -27,6 +27,7 @@ describe('geometryStore', () => {
     useAnimationStore.getState().reset()
     useRotationStore.getState().setDimension(DEFAULT_DIMENSION)
     useAppearanceStore.getState().reset()
+    useExtendedObjectStore.getState().reset()
     useTransformStore.getState().reset()
   })
 

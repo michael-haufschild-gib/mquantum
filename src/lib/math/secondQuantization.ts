@@ -365,8 +365,11 @@ const FOCK_MAX_LENGTH = 160
 function chooseFockLength(mode: SecondQuantizationMode, params: SecondQuantParams): number {
   switch (mode) {
     case 'fock': {
+      // Exact basis state |n⟩: length must be > n so the occupation bin exists.
+      // No FOCK_MAX_LENGTH cap — hard display limits belong in the UI windowing
+      // layer, not here, so the math result stays faithful for arbitrary n.
       const n = normalizeFockQuantumNumber(params.n)
-      return Math.min(FOCK_MAX_LENGTH, Math.max(FOCK_BASELINE_LENGTH, n + 4))
+      return Math.max(FOCK_BASELINE_LENGTH, n + 4)
     }
     case 'coherent': {
       const meanN = params.alphaRe * params.alphaRe + params.alphaIm * params.alphaIm

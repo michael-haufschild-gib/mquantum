@@ -171,15 +171,26 @@ describe('SHORTCUTS', () => {
   })
 
   it('does not list WASD camera shortcuts (unimplemented — see SHORTCUTS comment)', () => {
-    // Regression: these were declared without a handler. The "Light: Move mode"
-    // entries (also "w"/"d") are still listed because they DO have handlers
-    // gated on a selected light, so we filter to non-light descriptions.
-    const wCameraShortcut = SHORTCUTS.find(
-      (s) => s.key === 'w' && !s.shift && !s.description.startsWith('Light:')
-    )
-    const aCameraShortcut = SHORTCUTS.find((s) => s.key === 'a' && !s.shift)
-    expect(wCameraShortcut).toBeUndefined()
-    expect(aCameraShortcut).toBeUndefined()
+    // Regression: WASD camera movement / Shift+WASD camera rotation entries
+    // were declared without a handler. "Light: Move mode" entries (also "w"/
+    // "d") and the Ctrl+S export shortcut still exist because they DO have
+    // handlers, so we filter them out. This covers all four keys (w/a/s/d)
+    // in both plain and shift form so that re-introducing *any* unimplemented
+    // WASD variant would fail the check.
+    const findNonLightCameraEntry = (key: string, shift = false) =>
+      SHORTCUTS.find(
+        (s) =>
+          s.key === key &&
+          Boolean(s.shift) === shift &&
+          !s.ctrl &&
+          !s.alt &&
+          !s.description.startsWith('Light:')
+      )
+
+    for (const key of ['w', 'a', 's', 'd']) {
+      expect(findNonLightCameraEntry(key)).toBeUndefined()
+      expect(findNonLightCameraEntry(key, true)).toBeUndefined()
+    }
   })
 
   it('does not list 0 / Shift+0 camera-origin shortcuts (unimplemented)', () => {

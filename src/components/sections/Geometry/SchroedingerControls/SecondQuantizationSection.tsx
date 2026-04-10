@@ -419,7 +419,11 @@ function FockOccupationTable({
         <span>⟨n̂⟩ =</span>
         <span className="text-text-primary">{occupation.toFixed(3)}</span>
         <span>E =</span>
-        <span className="text-text-primary">{energy.toFixed(3)} ℏω</span>
+        {/* `energy` = ω·(⟨n̂⟩ + ½). Displaying it as multiples of ℏω requires
+            dividing by ω so the reported coefficient matches the ℏω label. */}
+        <span className="text-text-primary">
+          {modeOmega > 0 ? (energy / modeOmega).toFixed(3) : '—'} ℏω
+        </span>
       </div>
       {/* Fock distribution bar chart — windowed around the distribution peak
           so large alpha / r still produce a meaningful display instead of a

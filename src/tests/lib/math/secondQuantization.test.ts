@@ -513,4 +513,25 @@ describe('computeSecondQuantMetrics', () => {
     expect(fractional.energy).toBeCloseTo(2.5, 10)
     expect(fractional.fockDistribution[2]).toBe(1)
   })
+
+  it('exact Fock state with n past the soft display cap still populates its bin', () => {
+    // Regression: `chooseFockLength` used to clamp all modes (including
+    // exact Fock) at FOCK_MAX_LENGTH=160, so `n = 200` produced an
+    // all-zero `fockDistribution` even though the state |200⟩ is
+    // perfectly well-defined. The math function no longer caps for
+    // mode='fock'; any display-side window cap must happen in the UI.
+    const large = computeSecondQuantMetrics('fock', {
+      n: 200,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(large.occupation).toBe(200)
+    expect(large.energy).toBeCloseTo(200.5, 10)
+    expect(large.fockDistribution[200]).toBe(1)
+    // Length must be large enough to include the occupied index.
+    expect(large.fockDistribution.length).toBeGreaterThan(200)
+  })
 })

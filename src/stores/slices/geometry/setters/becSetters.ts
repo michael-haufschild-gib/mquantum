@@ -8,6 +8,7 @@
  */
 
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { clampKKState } from '@/lib/physics/compactification'
@@ -427,36 +428,44 @@ export function createBecSetters(ctx: SetterContext): BecActions {
       })
     },
     applyBecPreset: (presetId) => {
-      void import('@/lib/physics/bec/presets').then(({ getBecPreset }) => {
-        const preset = getBecPreset(presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const globalDim = useGeometryStore.getState().dimension
-          const {
-            latticeDim: _presetDim,
-            gridSize: _presetGrid,
-            spacing: _presetSpacing,
-            trapAnisotropy: _presetAniso,
-            slicePositions: _presetSlice,
-            ...safeOverrides
-          } = preset.overrides
-          const merged = {
-            ...DEFAULT_BEC_CONFIG,
-            ...safeOverrides,
-            slicePositions: state.schroedinger.bec.slicePositions,
-            needsReset: true,
-          }
-          const resized = resizeBecArrays(merged, globalDim)
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              ...preset.renderingOverrides,
-              bec: { ...merged, ...resized, needsReset: true },
-            },
-          }
+      void import('@/lib/physics/bec/presets')
+        .then(({ getBecPreset }) => {
+          const preset = getBecPreset(presetId)
+          if (!preset) return
+          setWithVersion((state) => {
+            const globalDim = useGeometryStore.getState().dimension
+            const {
+              latticeDim: _presetDim,
+              gridSize: _presetGrid,
+              spacing: _presetSpacing,
+              trapAnisotropy: _presetAniso,
+              slicePositions: _presetSlice,
+              ...safeOverrides
+            } = preset.overrides
+            const merged = {
+              ...DEFAULT_BEC_CONFIG,
+              ...safeOverrides,
+              slicePositions: state.schroedinger.bec.slicePositions,
+              needsReset: true,
+            }
+            const resized = resizeBecArrays(merged, globalDim)
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                ...preset.renderingOverrides,
+                bec: { ...merged, ...resized, needsReset: true },
+              },
+            }
+          })
+          useDiagnosticsStore.getState().resetBec()
         })
-        useDiagnosticsStore.getState().resetBec()
-      })
+        .catch((error) => {
+          // Dynamic import can fail (network error, chunk mismatch). Without a
+          // catch, the unhandled rejection would surface as a noisy console
+          // error with no context. Log and leave state untouched so the user
+          // keeps whatever config they had before the failed preset load.
+          logger.warn(`[becSetters] Failed to load BEC presets for '${presetId}':`, error)
+        })
     },
     resetBecField: () => {
       useDiagnosticsStore.getState().resetBec()

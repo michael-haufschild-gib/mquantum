@@ -174,10 +174,12 @@ export const HOEnergyDiagram: React.FC = React.memo(() => {
     <div data-testid="ho-energy-diagram">
       <p className="text-xs text-text-secondary mb-1">
         Energy Levels & Wavefunction |ψ<sub>n</sub>(x)|²{' '}
-        <span className="text-text-tertiary">
-          <span aria-hidden="true"> · </span>
-          dim 1 marginal
-        </span>
+        {dimension > 1 && (
+          <span className="text-text-tertiary">
+            <span aria-hidden="true"> · </span>
+            dim 1 marginal
+          </span>
+        )}
       </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">

@@ -5,7 +5,7 @@
  * CFL-limited dt adjustment, and vortex/soliton constraints.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -142,26 +142,30 @@ describe('BEC setters', () => {
     // merge via getBecPreset now ensures every switch rebuilds all fields.
     it('resets autoScaleMaxGain when switching to a preset without it', async () => {
       const s = useExtendedObjectStore.getState()
-      // groundState → autoScaleMaxGain = 10
+      // groundState → autoScaleMaxGain = 10.
+      // applyBecPreset is async (dynamic import); `vi.waitFor` polls until
+      // the expected state appears, instead of racing a fixed 10ms sleep.
       s.applyBecPreset('groundState')
-      // applyBecPreset is async (dynamic import); wait a microtask
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(10)
+      await vi.waitFor(() => {
+        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(10)
+      })
 
       // singleVortex does NOT declare autoScaleMaxGain — should fall back to
       // BEC_DEFAULT_RENDERING (20), not carry the stale 10 from groundState.
       s.applyBecPreset('singleVortex')
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
+      await vi.waitFor(() => {
+        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
+      })
     })
 
     it('resets densityGain and densityContrast to preset values', async () => {
       const s = useExtendedObjectStore.getState()
       s.applyBecPreset('singleVortex')
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      const sc = useExtendedObjectStore.getState().schroedinger
-      expect(sc.densityGain).toBe(0.2)
-      expect(sc.densityContrast).toBe(2.6)
+      await vi.waitFor(() => {
+        const sc = useExtendedObjectStore.getState().schroedinger
+        expect(sc.densityGain).toBe(0.2)
+        expect(sc.densityContrast).toBe(2.6)
+      })
     })
   })
 })

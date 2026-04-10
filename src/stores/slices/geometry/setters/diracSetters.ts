@@ -430,7 +430,14 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         // module dependency graph.
         if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
           void import('@/stores/appearanceStore').then(({ useAppearanceStore }) => {
-            useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+            // Guard against a newer applyDiracPreset() arriving between this
+            // lazy import and its resolution. If the store has already moved
+            // on to a non-split fieldView, leave the color algorithm alone —
+            // otherwise this stale write would silently override the newer
+            // preset's intended color algorithm.
+            if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
+              useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+            }
           })
         }
       })

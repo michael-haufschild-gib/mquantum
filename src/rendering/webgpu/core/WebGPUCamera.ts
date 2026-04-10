@@ -270,13 +270,42 @@ export class WebGPUCamera {
   }
 
   /**
+   * Nudge the target away from position so |target − position| ≥
+   * MIN_CAMERA_DISTANCE. Returns a safe target vector without mutating
+   * `this.state.target` — external code that set the target still sees its
+   * own value. Called from `updateMatrices()` to ensure `writeLookAtMatrix`
+   * never produces a zero-basis (non-invertible) view matrix regardless of
+   * how `initialState`, `setPosition()`, or `setTarget()` were called.
+   */
+  private getSafeTarget(): [number, number, number] {
+    const [px, py, pz] = this.state.position
+    const [tx, ty, tz] = this.state.target
+    const dx = tx - px
+    const dy = ty - py
+    const dz = tz - pz
+    const distSq = dx * dx + dy * dy + dz * dz
+    if (distSq >= MIN_CAMERA_DISTANCE * MIN_CAMERA_DISTANCE) {
+      return this.state.target
+    }
+    // Degenerate or near-degenerate separation. Re-project the target along
+    // the existing offset direction if we have one, otherwise fall back to
+    // world −Z so lookAt has a deterministic forward axis.
+    const dist = Math.sqrt(distSq)
+    if (dist > 0) {
+      const scale = MIN_CAMERA_DISTANCE / dist
+      return [px + dx * scale, py + dy * scale, pz + dz * scale]
+    }
+    return [px, py, pz - MIN_CAMERA_DISTANCE]
+  }
+
+  /**
    * Recompute all matrices from current state.
    */
   private updateMatrices(): void {
     writeLookAtMatrix(
       this.matrices.viewMatrix,
       this.state.position,
-      this.state.target,
+      this.getSafeTarget(),
       this.state.up
     )
     writePerspectiveMatrix(

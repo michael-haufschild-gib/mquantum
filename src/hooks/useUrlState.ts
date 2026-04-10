@@ -118,9 +118,11 @@ function applyCoreIdentityAndInit(urlState: ParsedShareableState): void {
   if (urlState.objectType !== undefined) geo.setObjectType(urlState.objectType)
   if (urlState.quantumMode !== undefined) ext.setSchroedingerQuantumMode(urlState.quantumMode)
 
+  // Read post-mutation state: setDimension() clamps to the supported range, and
+  // setObjectType() may auto-adjust the dimension. Initializing with the raw URL
+  // values would mis-size arrays relative to the store's actual dimension.
   const currentGeo = useGeometryStore.getState()
-  const dim = urlState.dimension ?? currentGeo.dimension
-  const objectType = urlState.objectType ?? currentGeo.objectType
+  const { dimension: dim, objectType } = currentGeo
   const extStore = useExtendedObjectStore.getState()
   if (objectType === 'schroedinger') {
     extStore.initializeSchroedingerForDimension(dim)

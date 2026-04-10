@@ -18,6 +18,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AXIS_LABELS } from '@/constants/dimension'
 import {
   deserializeState,
   type ParsedShareableState,
@@ -287,8 +288,9 @@ describe('animation plane filter consistency through dimension changes', () => {
   it('animation planes are filtered when dimension decreases', () => {
     // Axis names mirror constants/dimension.ts AXIS_LABELS (uppercased) —
     // unified with the rotation file in the orphan-naming cleanup so the
-    // rotation buttons match the slice-position UI labels.
-    const AXES = ['X', 'Y', 'Z', 'W', 'V', 'U', 'T', 'S', 'R', 'Q', 'P']
+    // rotation buttons match the slice-position UI labels. Deriving from
+    // AXIS_LABELS keeps the test in lock-step with any future rename.
+    const AXES = AXIS_LABELS.map((label) => label.toUpperCase())
 
     useGeometryStore.getState().setDimension(8)
     useAnimationStore.getState().animateAll(8)

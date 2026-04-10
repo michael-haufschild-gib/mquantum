@@ -9,6 +9,11 @@
  * lines at the multi-D total energy Σ_j ω_j(n_kj+½) on a ladder spaced by
  * ω_0(n+½), which made any line for a state like |0,2,3⟩ visually appear
  * "at n=6" even though the dim-0 quantum number is 0.
+ *
+ * Dimension terminology note: physics/store indexing is 0-based (dim 0 is
+ * the first spatial dimension), but the diagram caption displays labels
+ * *1-indexed* for human readers (e.g. internal dim 0 is rendered as
+ * "dim 1"). Assertions in this file match the 1-indexed display text.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -48,11 +53,12 @@ describe('HOEnergyDiagram', () => {
     render(<HOEnergyDiagram />)
 
     // Ladder rungs are labelled with the integer n via SVG <text> nodes.
-    // The n=0 rung is always present because displayMaxN is at least
-    // max(dim-0 n) + 2. testing-library's getAllByText returns matching
-    // nodes anywhere inside the rendered tree without traversing the DOM
-    // by hand.
-    const zeroLabels = screen.getAllByText((_, element) => element?.textContent === '0')
+    // Scoping the query to `<text>` prevents unrelated DOM nodes (buttons,
+    // counters, form inputs) from matching the '0' literal and giving a
+    // false positive — only the ladder label should count toward the check.
+    const zeroLabels = screen.getAllByText(
+      (_, element) => element?.tagName === 'text' && element.textContent === '0'
+    )
     expect(zeroLabels.length).toBeGreaterThan(0)
   })
 

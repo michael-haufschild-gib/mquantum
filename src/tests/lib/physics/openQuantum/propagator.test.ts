@@ -165,27 +165,42 @@ describe('evolvePropagatorStep', () => {
 
   it('preserves trace and Hermiticity with complex Lindblad amplitudes', () => {
     // Verifies that non-zero imaginary parts in Lindblad channel amplitudes
-    // are handled correctly. Pure-real tests would pass even if imag terms are ignored.
+    // are actually used. Pure-real assertions (trace/Hermiticity, ground
+    // population > 0.5) would all pass even if the propagator silently
+    // ignored `amplitudeIm`, so the key check is a differential comparison
+    // against an identically-configured control that has `amplitudeIm = 0`.
     const K = 2
     const energies = new Float64Array([-1, -0.25])
-    const channels: LindbladChannel[] = [
-      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0.15 }, // complex emission
+
+    const complexChannels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0.15 }, // |α|² = 0.0325
+    ]
+    const realOnlyChannels: LindbladChannel[] = [
+      { row: 0, col: 1, amplitudeRe: 0.1, amplitudeIm: 0 }, // |α|² = 0.01
     ]
 
-    const L = buildLiouvillian(energies, channels, K)
-    const P = computePropagator(L, 0.01, K)
+    const Lcomplex = buildLiouvillian(energies, complexChannels, K)
+    const Lreal = buildLiouvillian(energies, realOnlyChannels, K)
+    const Pcomplex = computePropagator(Lcomplex, 0.01, K)
+    const Preal = computePropagator(Lreal, 0.01, K)
 
-    const rho = superpositionDM(K)
+    const rhoComplex = superpositionDM(K)
+    const rhoReal = superpositionDM(K)
 
     for (let step = 0; step < 100; step++) {
-      evolvePropagatorStep(P, rho)
+      evolvePropagatorStep(Pcomplex, rhoComplex)
+      evolvePropagatorStep(Preal, rhoReal)
     }
 
-    expect(trace(rho)).toBeCloseTo(1.0, 6)
-    expect(maxHermiticityError(rho)).toBeLessThan(1e-12)
-    // With |α|² = 0.01 + 0.0225 = 0.0325, dissipation rate is higher than
-    // the pure-real α=0.1 case (|α|²=0.01). Ground state should gain population.
-    expect(rho.elements[0]!).toBeGreaterThan(0.5)
+    expect(trace(rhoComplex)).toBeCloseTo(1.0, 6)
+    expect(maxHermiticityError(rhoComplex)).toBeLessThan(1e-12)
+    expect(rhoComplex.elements[0]!).toBeGreaterThan(0.5)
+
+    // Differential check: the larger |α|² from the complex channel must
+    // dissipate excited-state population faster, leaving a measurably
+    // higher ground-state population than the real-only control. A
+    // propagator that ignored `amplitudeIm` would make these values equal.
+    expect(rhoComplex.elements[0]!).toBeGreaterThan(rhoReal.elements[0]! + 1e-3)
   })
 
   it('handles K=1 degenerate case without errors', () => {

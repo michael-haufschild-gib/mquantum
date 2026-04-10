@@ -5,8 +5,10 @@
  * Provides viridis, inferno, magma, and plasma — the standard
  * perceptually uniform sequential colormaps (Matplotlib 2.0+).
  *
- * Each colormap is defined by 256 control points in sRGB [0,1].
- * Interpolation between control points produces smooth gradients.
+ * Each built-in colormap is defined by 11 sampled control points in sRGB [0,1],
+ * taken at uniform positions along [0,1] from the matplotlib reference tables.
+ * These are expanded at runtime into a 256-entry LUT via linear interpolation
+ * to produce smooth gradients at lookup time.
  *
  * @module lib/physics/colormaps
  */

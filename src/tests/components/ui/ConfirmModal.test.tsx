@@ -37,12 +37,14 @@ describe('ConfirmModal', () => {
       />
     )
 
-    // Native dialog element exists in DOM but should not be in the open state.
-    // Confirm button is in the DOM but not actionable when dialog is closed.
+    // Native dialog element exists in DOM but its content should be excluded
+    // from the normal accessibility tree. The button is only reachable with
+    // `{ hidden: true }`, which proves the dialog never called `showModal()`.
     const confirmBtn = screen.getByRole('button', { name: 'Confirm', hidden: true })
     expect(confirmBtn).toBeInTheDocument()
-    // When isOpen=false, the dialog never calls showModal(), so its content
-    // is not visible to the accessibility tree in the normal flow.
+    // Normal (non-hidden) a11y query must NOT find the button — a regression
+    // that accidentally opened the dialog when isOpen=false would surface here.
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument()
   })
 
   it('calls onConfirm and onClose when confirm is clicked', async () => {
@@ -105,7 +107,7 @@ describe('ConfirmModal', () => {
   })
 
   it('uses danger variant for destructive actions', () => {
-    render(
+    const { rerender } = render(
       <ConfirmModal
         isOpen={true}
         onClose={() => {}}
@@ -118,10 +120,28 @@ describe('ConfirmModal', () => {
       />
     )
 
-    const confirmBtn = screen.getByTestId('delete-modal-confirm')
-    // The danger variant should apply a distinct visual treatment
-    // (we check the button renders with the correct testid and text)
-    expect(confirmBtn).toHaveTextContent('Delete')
+    const destructiveBtn = screen.getByTestId('delete-modal-confirm')
+    expect(destructiveBtn).toHaveTextContent('Delete')
+    // Stable variant marker: Button.tsx applies `bg-[var(--bg-danger)]` for
+    // `variant="danger"`. Checking the class name makes the test fail if the
+    // destructive variant silently regresses to primary.
+    expect(destructiveBtn).toHaveClass('bg-[var(--bg-danger)]')
+
+    // Negative control: the primary variant must NOT carry the danger class.
+    rerender(
+      <ConfirmModal
+        isOpen={true}
+        onClose={() => {}}
+        onConfirm={() => {}}
+        title="Delete"
+        message="Permanently delete?"
+        isDestructive={false}
+        confirmText="Delete"
+        data-testid="delete-modal"
+      />
+    )
+    const primaryBtn = screen.getByTestId('delete-modal-confirm')
+    expect(primaryBtn).not.toHaveClass('bg-[var(--bg-danger)]')
   })
 
   it('renders JSX content in message prop', () => {

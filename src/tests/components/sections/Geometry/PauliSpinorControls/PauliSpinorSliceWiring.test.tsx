@@ -24,6 +24,10 @@ describe('PauliSpinorControls — slice position wiring', () => {
   beforeEach(() => {
     useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
     useExtendedObjectStore.getState().initializePauliForDimension(5)
+    // `Section` persists its open/closed state in localStorage. Without this
+    // reset, the first test's click-to-expand leaks into subsequent tests,
+    // so the `{ expanded: false }` header query returns nothing.
+    localStorage.clear()
   })
 
   it('slice slider for dim 3 writes positions[0] (0-indexed extra dim)', () => {
@@ -51,9 +55,11 @@ describe('PauliSpinorControls — slice position wiring', () => {
     render(<PauliSpinorControls />)
     const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
     const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
-    if (sliceHeader) fireEvent.click(sliceHeader)
+    if (!sliceHeader) throw new Error('Slice Positions section header not found')
+    fireEvent.click(sliceHeader)
 
     const sliders = screen.getAllByRole('slider', { name: /Dim 4/i })
+    expect(sliders).toHaveLength(1)
     fireEvent.change(sliders[0]!, { target: { value: '-0.25' } })
 
     const slicePositions = useExtendedObjectStore.getState().pauliSpinor.slicePositions
@@ -64,7 +70,8 @@ describe('PauliSpinorControls — slice position wiring', () => {
     render(<PauliSpinorControls />)
     const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
     const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
-    if (sliceHeader) fireEvent.click(sliceHeader)
+    if (!sliceHeader) throw new Error('Slice Positions section header not found')
+    fireEvent.click(sliceHeader)
 
     // 5D → extra dims = 2 (dim 3, dim 4)
     const sliders = screen.getAllByRole('slider')
