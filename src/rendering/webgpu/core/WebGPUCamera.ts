@@ -315,8 +315,17 @@ export class WebGPUCamera {
     fy /= fLen
     fz /= fLen
 
+    // A zero-length (or near-zero) `state.up` cannot be used as-is: the
+    // collinearity check below would normalise by 0 → a garbage cosTheta,
+    // and `writeLookAtMatrix` would cross a zero vector into the right
+    // axis. Force a valid world axis before any further reasoning.
     const [ux, uy, uz] = this.state.up
-    const upLen = Math.hypot(ux, uy, uz) || 1
+    const upLen = Math.hypot(ux, uy, uz)
+    const EPSILON = 1e-6
+    if (upLen < EPSILON) {
+      return Math.abs(fy) < 0.9 ? [0, 1, 0] : [1, 0, 0]
+    }
+
     const cosTheta = (fx * ux + fy * uy + fz * uz) / upLen
     if (Math.abs(cosTheta) <= 0.999) {
       return this.state.up

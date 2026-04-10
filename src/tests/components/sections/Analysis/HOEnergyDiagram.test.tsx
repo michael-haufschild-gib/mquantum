@@ -69,16 +69,23 @@ describe('HOEnergyDiagram', () => {
     ext.setSchroedingerPresetName('nodalStructure') // single highly-excited term, maxN=6
     render(<HOEnergyDiagram />)
 
-    // Reject any rung labelled with n > 12. Scope the query to the diagram
-    // subtree and to SVG `<text>` nodes only — otherwise an unrelated node
-    // somewhere in the wider render tree could fail this test even when
-    // the ladder cap is correct.
+    // Reject any ladder rung labelled with n > 12 regardless of value.
+    // Scope to SVG `<text>` nodes within the diagram subtree so unrelated
+    // DOM can't interfere, and parse the content as an integer so a
+    // regression that displays n=17 (or any value above the cap) fails
+    // loudly instead of slipping past a hardcoded ['13'..'16'] list.
     const diagram = screen.getByTestId('ho-energy-diagram')
-    for (const tooHigh of ['13', '14', '15', '16']) {
-      const found = within(diagram).queryAllByText(
-        (_, element) => element?.tagName === 'text' && element.textContent === tooHigh
-      )
-      expect(found).toEqual([])
+    const rungLabels = within(diagram).queryAllByText((_, element) => {
+      if (element?.tagName !== 'text') return false
+      const text = element.textContent?.trim() ?? ''
+      return /^\d+$/.test(text)
+    })
+    for (const node of rungLabels) {
+      const n = Number.parseInt(node.textContent ?? '', 10)
+      expect(n).toBeLessThanOrEqual(12)
     }
+    // Sanity-check: the ladder always renders at least one rung, so an
+    // empty selection would mean the query is broken (silent pass).
+    expect(rungLabels.length).toBeGreaterThan(0)
   })
 })

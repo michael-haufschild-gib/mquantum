@@ -135,14 +135,16 @@ export function SecondQuantizationSection({
   // Compute metrics only when enabled. `computeSecondQuantMetrics` throws a
   // `RangeError` for exact Fock states past `FOCK_MAX_SAFE_LENGTH` — the UI
   // slider is clamped to `[0, 10]`, so this is only reachable via malformed
-  // preset imports. Swallow the error and render a placeholder instead of
-  // tearing down the entire sidebar.
+  // preset imports. Swallow *only* that specific error and render a
+  // placeholder, so other bugs still surface instead of being hidden by a
+  // blanket catch.
   const metrics = useMemo(() => {
     if (!sqLayerEnabled) return null
     try {
       return computeSecondQuantMetrics(sqLayerMode, params)
-    } catch {
-      return null
+    } catch (error) {
+      if (error instanceof RangeError) return null
+      throw error
     }
   }, [sqLayerEnabled, sqLayerMode, params])
 

@@ -374,84 +374,92 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
       })
     },
     applyDiracPreset: (presetId) => {
-      void import('@/lib/physics/dirac/presets').then(({ DIRAC_SCENARIO_PRESETS }) => {
-        const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const prev = state.schroedinger.dirac
-          const dim = prev.latticeDim
+      void import('@/lib/physics/dirac/presets')
+        .then(({ DIRAC_SCENARIO_PRESETS }) => {
+          const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
+          if (!preset) return
+          setWithVersion((state) => {
+            const prev = state.schroedinger.dirac
+            const dim = prev.latticeDim
 
-          const { latticeDim: _ld, gridSize: _gs, ...safeOverrides } = preset.overrides
-          const merged = { ...prev, ...safeOverrides, needsReset: true }
+            const { latticeDim: _ld, gridSize: _gs, ...safeOverrides } = preset.overrides
+            const merged = { ...prev, ...safeOverrides, needsReset: true }
 
-          if (safeOverrides.spacing) {
-            const srcSpacing = safeOverrides.spacing
-            merged.spacing = Array.from({ length: dim }, (_, i) =>
-              i < srcSpacing.length ? srcSpacing[i]! : srcSpacing[0]!
-            )
-          }
+            if (safeOverrides.spacing) {
+              const srcSpacing = safeOverrides.spacing
+              merged.spacing = Array.from({ length: dim }, (_, i) =>
+                i < srcSpacing.length ? srcSpacing[i]! : srcSpacing[0]!
+              )
+            }
 
-          const gs = merged.gridSize
-          const sp = merged.spacing
-          if (safeOverrides.packetCenter) {
-            const src = safeOverrides.packetCenter
-            merged.packetCenter = Array.from({ length: dim }, (_, i) => {
-              const raw = i < src.length ? src[i]! : 0
-              const limit = (gs[i] ?? 4) * (sp[i] ?? 0.15) * 0.5 * 0.9
-              return Math.max(-limit, Math.min(limit, raw))
-            })
-          }
-          if (safeOverrides.packetMomentum) {
-            const src = safeOverrides.packetMomentum
-            merged.packetMomentum = Array.from({ length: dim }, (_, i) => {
-              const raw = i < src.length ? src[i]! : 0
-              const kMax = Math.PI / (sp[i] ?? 0.15)
-              return Math.max(-kMax, Math.min(kMax, raw))
-            })
-          }
+            const gs = merged.gridSize
+            const sp = merged.spacing
+            if (safeOverrides.packetCenter) {
+              const src = safeOverrides.packetCenter
+              merged.packetCenter = Array.from({ length: dim }, (_, i) => {
+                const raw = i < src.length ? src[i]! : 0
+                const limit = (gs[i] ?? 4) * (sp[i] ?? 0.15) * 0.5 * 0.9
+                return Math.max(-limit, Math.min(limit, raw))
+              })
+            }
+            if (safeOverrides.packetMomentum) {
+              const src = safeOverrides.packetMomentum
+              merged.packetMomentum = Array.from({ length: dim }, (_, i) => {
+                const raw = i < src.length ? src[i]! : 0
+                const kMax = Math.PI / (sp[i] ?? 0.15)
+                return Math.max(-kMax, Math.min(kMax, raw))
+              })
+            }
 
-          const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
-          merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
+            const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
+            merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
 
-          const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)
-          merged.dt = Math.max(0.0001, Math.min(dtMax * 0.9, merged.dt))
+            const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)
+            merged.dt = Math.max(0.0001, Math.min(dtMax * 0.9, merged.dt))
 
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              dirac: merged,
-            },
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                dirac: merged,
+              },
+            }
+          })
+
+          // Sync the color algorithm to match the preset's fieldView. The renderer's
+          // normalize logic forces 'particleAntiparticle' for the dual-channel split,
+          // so the UI selector must reflect that to avoid showing a stale algorithm.
+          // Imported lazily to avoid pulling appearanceStore into the store-bootstrap
+          // module dependency graph.
+          if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
+            void import('@/stores/appearanceStore')
+              .then(({ useAppearanceStore }) => {
+                // Guard against a newer applyDiracPreset() arriving between
+                // this lazy import and its resolution. If the store has moved
+                // on to a non-split fieldView, leave the color algorithm alone
+                // — otherwise this stale write would silently override the
+                // newer preset's intended color algorithm.
+                if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
+                  useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+                }
+              })
+              .catch((error) => {
+                // Chunk-load failure is non-fatal — the Dirac state has already
+                // been written; only the color-algorithm sync couldn't run.
+                // Keep the existing appearance settings.
+                logger.warn(
+                  `[diracSetters] Failed to load appearanceStore for color sync on '${presetId}':`,
+                  error
+                )
+              })
           }
         })
-
-        // Sync the color algorithm to match the preset's fieldView. The renderer's
-        // normalize logic forces 'particleAntiparticle' for the dual-channel split,
-        // so the UI selector must reflect that to avoid showing a stale algorithm.
-        // Imported lazily to avoid pulling appearanceStore into the store-bootstrap
-        // module dependency graph.
-        if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
-          void import('@/stores/appearanceStore')
-            .then(({ useAppearanceStore }) => {
-              // Guard against a newer applyDiracPreset() arriving between
-              // this lazy import and its resolution. If the store has moved
-              // on to a non-split fieldView, leave the color algorithm alone
-              // — otherwise this stale write would silently override the
-              // newer preset's intended color algorithm.
-              if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
-                useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
-              }
-            })
-            .catch((error) => {
-              // Chunk-load failure is non-fatal — the Dirac state has already
-              // been written; only the color-algorithm sync couldn't run.
-              // Keep the existing appearance settings.
-              logger.warn(
-                `[diracSetters] Failed to load appearanceStore for color sync on '${presetId}':`,
-                error
-              )
-            })
-        }
-      })
+        .catch((error) => {
+          // Preset chunk failed to load (network error, chunk mismatch).
+          // Without a catch, the unhandled rejection would surface as a
+          // noisy console error with no context. Log and leave state as-is
+          // so the user keeps whatever config they had before the switch.
+          logger.warn(`[diracSetters] Failed to load Dirac presets for '${presetId}':`, error)
+        })
     },
   }
 }
