@@ -5,9 +5,10 @@
  * initial condition configuration, and absorber parameter clamping.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('free scalar field setters', () => {
   beforeEach(() => {
@@ -84,5 +85,94 @@ describe('free scalar field setters', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarLatticeDim(5)
     expect(getFSF().slicePositions).toHaveLength(2) // 5 - 3 = 2
+  })
+
+  describe('cosmology invariants (Finding 3)', () => {
+    it('soft-disables cosmology when latticeDim change takes spacetimeDim out of [3, 7]', () => {
+      // Finding 3: changing latticeDim to an out-of-range value (e.g. 1)
+      // leaves spacetimeDim=2, which is outside the cosmology bridge's
+      // [3, 7] support window. The step path would then silently fall
+      // back to mass² while the reset path would throw; reconcile helper
+      // must force-disable cosmology and mark the field for reset.
+      const s = useExtendedObjectStore.getState()
+      // Enable cosmology at a supported latticeDim=3 first
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(true)
+
+      // Change to latticeDim=1 — spacetimeDim=2, out of range
+      s.setFreeScalarLatticeDim(1)
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('cosmology preset enables cosmology sub-config when applied at supported dim', async () => {
+      // The de Sitter Bunch–Davies preset enables deSitter cosmology.
+      // Loading it while globalDim is in the supported range must leave
+      // `cosmology.enabled=true` with the preset's hubble and eta0.
+      const s = useExtendedObjectStore.getState()
+      s.applyFreeScalarPreset('deSitterVacuum')
+      // applyFreeScalarPreset does a dynamic import → wait for it to settle.
+      await vi.waitFor(() => {
+        expect(getFSF().cosmology.enabled).toBe(true)
+      })
+      const fs = getFSF()
+      expect(fs.cosmology.preset).toBe('deSitter')
+      expect(fs.cosmology.hubble).toBe(1.0)
+      expect(fs.initialCondition).toBe('vacuumNoise')
+      expect(fs.needsReset).toBe(true)
+    })
+
+    it('re-clamps cosmology.eta0 when global dimension changes via the dimension slider', () => {
+      // The user-facing dimension slider goes through geometryStore and the
+      // compute-mode sync path (syncActiveComputeModeLatticeDim), NOT the
+      // freeScalar-specific setter. Regression guard: dimension changes must
+      // still run reconcileCosmologyInvariants so eta0 stays clamped to the
+      // per-lattice safe threshold and spacetimeDim is kept in bounds.
+      const ext = useExtendedObjectStore.getState()
+      ext.setSchroedingerQuantumMode('freeScalarField')
+      useGeometryStore.getState().setDimension(6)
+      useExtendedObjectStore.getState().setFreeScalarCosmologyPreset('deSitter')
+      useExtendedObjectStore.getState().setFreeScalarCosmologyEnabled(true)
+      const eta0AtDim6 = getFSF().cosmology.eta0
+
+      // Switch to dimension=3 via the geometry store. This triggers the
+      // compute-mode sync path; without the reconcile fix, eta0 would stay
+      // at its dim=6 value even though safeEta0 at dim=3 is larger (bigger
+      // default grid → larger L → smaller k_min → larger safeEta0).
+      useGeometryStore.getState().setDimension(3)
+      const fsAfter = getFSF()
+      expect(fsAfter.latticeDim).toBe(3)
+      // Cosmology stays enabled because dim=3 is still in [3, 7].
+      expect(fsAfter.cosmology.enabled).toBe(true)
+      // |eta0| must be at least as large as it was at dim=6 — safeEta0 grew.
+      expect(Math.abs(fsAfter.cosmology.eta0)).toBeGreaterThanOrEqual(Math.abs(eta0AtDim6) - 1e-9)
+      // The sync path sets needsReset on the freeScalar sub-config.
+      expect(fsAfter.needsReset).toBe(true)
+    })
+
+    it('re-clamps eta0 when gridSize change raises the safe threshold', () => {
+      // Finding 3: safeEta0 scales with L = N·a, so shrinking the grid
+      // (smaller L → larger k_min → actually smaller safeEta0...). Use
+      // an opposite case: enable cosmology at a small box where the safe
+      // threshold is some value, then double the spacing so L doubles and
+      // the safe threshold doubles too. If the stored eta0 is below the
+      // new floor, it must be re-clamped.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyEnabled(true)
+      // Push eta0 to the current safe threshold at default spacing
+      const baseline = getFSF().cosmology.eta0
+
+      // Double the spacing — safeEta0 doubles, so eta0 should be re-clamped
+      const fs = getFSF()
+      s.setFreeScalarSpacing(fs.spacing.map((a) => a * 2))
+      const reclamped = getFSF().cosmology.eta0
+      // |eta0| should be at least as large as before, and possibly larger
+      // (re-clamped). needsReset should be set.
+      expect(Math.abs(reclamped)).toBeGreaterThanOrEqual(Math.abs(baseline) - 1e-9)
+      expect(getFSF().needsReset).toBe(true)
+    })
   })
 })

@@ -144,6 +144,12 @@ export function createDensityTextureBindings(
 export interface StateSaveLoadPass {
   requestStateSave(ctx: WebGPURenderContext): void
   setLoadedWavefunction(re: Float32Array, im: Float32Array): void
+  /**
+   * Optional: restore mode-specific runtime scalars (e.g. the Free Scalar
+   * Field cosmological simulation time `simEta`) from a loaded save file.
+   * Passes that don't need runtime state should leave this undefined.
+   */
+  setLoadedRuntimeSimEta?(eta: number): void
 }
 
 /**
@@ -173,6 +179,15 @@ export function handleSimulationStateIO(
     const loadData = simState.pendingLoadData
     if (acceptedModes.includes(loadData.quantumMode)) {
       pass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
+      // Restore mode-specific runtime state (currently just FSF simEta).
+      const savedSimEta = loadData.runtimeMeta?.simEta
+      if (
+        typeof savedSimEta === 'number' &&
+        Number.isFinite(savedSimEta) &&
+        pass.setLoadedRuntimeSimEta
+      ) {
+        pass.setLoadedRuntimeSimEta(savedSimEta)
+      }
       simState.clearLoadData()
     }
   }

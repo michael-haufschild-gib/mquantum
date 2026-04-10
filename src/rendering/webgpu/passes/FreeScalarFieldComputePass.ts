@@ -16,6 +16,8 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
+import { computeCosmologyAt } from '@/lib/physics/cosmology/background'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
@@ -39,6 +41,7 @@ import {
   computeFsfConfigHash,
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
+  computeMEffSq,
   estimateFsfMaxFieldValue,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
@@ -49,6 +52,17 @@ import { requestStateSave as genericStateSave } from './stateSave'
 const UNIFORM_SIZE = 512
 /** Byte offset of the `dt` field in the uniform buffer */
 const DT_BYTE_OFFSET = 12
+/** Byte offset of the `mEffSq` field — in sync with `freeScalarInit.wgsl.ts` uniform layout. */
+const MEFF_SQ_BYTE_OFFSET = 504
+
+/**
+ * Numerical floor on `|η|` during cosmological evolution. Stops the clock
+ * short of the `η = 0` singularity so the power-law `a(η) = A·|η|^q` and the
+ * Mukhanov-Sasaki term `z''/z = β(β−1)/η²` never overflow the shader's f32.
+ * Chosen well below the typical initial `|η₀|` (≈10) so evolution can
+ * cross the comoving horizon (`k·|η| ≪ 1`) without hitting the floor early.
+ */
+const COSMOLOGY_ETA_FLOOR = 1e-3
 
 /**
  * Compute pass for free scalar field simulation on a lattice.
@@ -86,9 +100,23 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private maxPhiEstimate = 1.0
   private pendingStagingBuffers: GPUBuffer[] = []
 
+  /**
+   * Current simulation conformal time `η`. Only meaningful when
+   * `config.cosmology.enabled` is true. Advances by `dt·stepsPerFrame` per
+   * playing frame, starting from `config.cosmology.eta0` on reset.
+   */
+  private simEta = 0
+
   // Save/load state
   private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
   private saveMappingInFlight = false
+  /**
+   * Optional `simEta` provided by a load-from-file operation. When non-null,
+   * it overrides `config.cosmology.eta0` as the starting time for the
+   * resumed simulation so the cosmological clock resumes where the user
+   * saved it.
+   */
+  private pendingLoadedSimEta: number | null = null
 
   // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -182,6 +210,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
+   * Set loaded cosmological sim time from a save file. Consumed once on the
+   * next reinitialization — after which `config.cosmology.eta0` is again the
+   * source of truth for subsequent resets.
+   *
+   * @param eta - Saved `simEta` to restore
+   */
+  setLoadedRuntimeSimEta(eta: number): void {
+    if (!Number.isFinite(eta) || eta === 0) return
+    this.pendingLoadedSimEta = eta
+  }
+
+  /**
    * Initiate async save of the current field state.
    * Copies phi/pi buffers to staging within the current command encoder,
    * then maps async after GPU submit.
@@ -193,6 +233,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const byteSize = this.totalSites * 4
 
     this.saveMappingInFlight = true
+    // Capture simEta synchronously at the save-request site so it lines up
+    // with the phi/pi buffers being copied on the same command encoder.
+    // (The async getMetadata resolves later, by which time simEta may have
+    // advanced by a few frames — use this closure value, not a read.)
+    const simEtaAtSave = this.simEta
     genericStateSave(ctx, {
       source: { layout: 'separate', reBuffer: this.phiBuffer, imBuffer: this.piBuffer, byteSize },
       totalSites: this.totalSites,
@@ -201,10 +246,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         const fsfConfig = useExtendedObjectStore.getState().schroedinger.freeScalar
         return {
           quantumMode: 'freeScalarField',
-          config: { quantumMode: 'freeScalarField', freeScalar: fsfConfig } as Record<
-            string,
-            unknown
-          >,
+          config: {
+            quantumMode: 'freeScalarField',
+            freeScalar: fsfConfig,
+            _runtimeMeta: { simEta: simEtaAtSave },
+          } as Record<string, unknown>,
           gridSize: fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64],
           componentCount: 1,
         }
@@ -346,7 +392,23 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.pendingInjection = null
       logger.log(`[FSF] Injected loaded field state (${elementCount} sites)`)
     } else if (config.initialCondition === 'vacuumNoise') {
-      const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
+      // When cosmology is active, sample the Bunch-Davies adiabatic vacuum
+      // at eta0 using the Mukhanov-Sasaki effective mass. Otherwise use the
+      // ordinary Minkowski vacuum sampler. Both paths return (phi, pi) in
+      // the same shape, so the downstream GPU upload is unchanged.
+      const { phi, pi } = config.cosmology.enabled
+        ? sampleAdiabaticVacuum(
+            config,
+            {
+              preset: config.cosmology.preset,
+              spacetimeDim: config.latticeDim + 1,
+              steepness: config.cosmology.steepness,
+              hubble: config.cosmology.hubble,
+            },
+            config.cosmology.eta0,
+            config.vacuumSeed
+          )
+        : sampleVacuumSpectrum(config, config.vacuumSeed)
       device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
       device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
     } else if (this.pl && this.bg) {
@@ -405,6 +467,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /**
    * Write the uniform buffer with current config values.
    * Delegates to the standalone writeFsfUniforms function.
+   *
+   * When cosmology is enabled the current `simEta` is forwarded so the
+   * shader sees the time-evolving Mukhanov-Sasaki effective mass.
    */
   updateUniforms(
     device: GPUDevice,
@@ -427,7 +492,103 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       basisZ,
       boundingRadius,
       colorAlgorithm,
+      simEta: config.cosmology.enabled ? this.simEta : undefined,
     })
+  }
+
+  /** Current simulation conformal time η — exposed for analysis readouts. */
+  getSimEta(): number {
+    return this.simEta
+  }
+
+  /**
+   * Evaluate the Mukhanov-Sasaki effective mass squared at a given conformal
+   * time. Returns `mass²` when cosmology is disabled, matches the shader
+   * uniform fallback. Catches invalid parameter combinations so the runtime
+   * never propagates a throw from the step loop.
+   *
+   * @param config - Current free scalar config
+   * @param eta - Conformal time at which to evaluate
+   * @returns `M²_eff(η)` or `mass²` on fallback
+   */
+  private mEffSqAt(config: FreeScalarConfig, eta: number): number {
+    const cosmo = config.cosmology
+    if (!cosmo.enabled) return config.mass * config.mass
+    try {
+      const snap = computeCosmologyAt(
+        eta,
+        {
+          preset: cosmo.preset,
+          spacetimeDim: config.latticeDim + 1,
+          steepness: cosmo.steepness,
+          hubble: cosmo.hubble,
+        },
+        config.mass
+      )
+      return snap.mEffSq
+    } catch {
+      return config.mass * config.mass
+    }
+  }
+
+  /**
+   * Overwrite only the 4-byte `mEffSq` slot in the uniform buffer, avoiding
+   * the full 512-byte re-upload that `writeFsfUniforms` performs. Used inside
+   * the leapfrog substep loop when cosmology is active so every pi-update
+   * consumes a fresh `M²_eff(η)` matching the current `simEta`.
+   *
+   * @param device - GPU device
+   * @param mEffSq - Value to write at offset 504
+   */
+  private writeMEffSqSlot(device: GPUDevice, mEffSq: number): void {
+    if (!this.uniformBuffer) return
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      MEFF_SQ_BYTE_OFFSET,
+      Float32Array.of(mEffSq).buffer,
+      0,
+      4
+    )
+  }
+
+  /**
+   * Advance `simEta` by one leapfrog step, clamping at `±COSMOLOGY_ETA_FLOOR`
+   * so the cosmological clock never crosses the `η = 0` singularity. Both
+   * branches move toward zero: for `eta0 < 0` (deep past, the usual
+   * inflationary convention) we add `+dt`; for `eta0 > 0` (unusual but
+   * allowed by the store) we subtract `dt`. In every case `|simEta|`
+   * decreases monotonically until it hits the floor.
+   *
+   * @param dt - Leapfrog time step
+   * @returns New `simEta` (with clamp applied)
+   */
+  private advanceSimEta(dt: number): number {
+    const originalSign = this.simEta < 0 ? -1 : 1
+    // Move toward η = 0: opposite direction from the current branch's sign.
+    const direction = -originalSign
+    const proposed = this.simEta + direction * dt
+    // Crossed or exactly reached the singularity — clamp to the floor with
+    // the original sign so subsequent steps keep using the same branch.
+    if (proposed === 0 || Math.sign(proposed) !== originalSign) {
+      this.simEta = originalSign * COSMOLOGY_ETA_FLOOR
+      return this.simEta
+    }
+    if (Math.abs(proposed) < COSMOLOGY_ETA_FLOOR) {
+      this.simEta = originalSign * COSMOLOGY_ETA_FLOOR
+      return this.simEta
+    }
+    this.simEta = proposed
+    return this.simEta
+  }
+
+  /**
+   * Test-only shim exposing `advanceSimEta` so unit tests can exercise the
+   * cosmological-clock direction and clamp logic without spinning up a GPU.
+   * Not used at runtime.
+   */
+  _testAdvanceSimEta(currentSimEta: number, dt: number): number {
+    this.simEta = currentSimEta
+    return this.advanceSimEta(dt)
   }
 
   /**
@@ -461,9 +622,29 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.maxPhiEstimate = computeFsfMaxPhiEstimate(config)
     }
 
+    // Reset simEta BEFORE writing uniforms so the first post-reset frame
+    // sees the correct mEffSq(eta0). initializeField will subsequently
+    // sample the adiabatic vacuum at this same eta0, keeping the evolution
+    // self-consistent from the start.
+    //
+    // When resuming from a saved state (pendingLoadedSimEta set by the
+    // load path), the saved sim time overrides `config.cosmology.eta0`
+    // so the cosmological clock picks up where the user left off.
+    const willReinitialize = !this.initialized || config.needsReset
+    if (willReinitialize) {
+      if (config.cosmology.enabled) {
+        this.simEta =
+          this.pendingLoadedSimEta !== null ? this.pendingLoadedSimEta : config.cosmology.eta0
+        this.pendingLoadedSimEta = null
+      } else {
+        this.simEta = 0
+        this.pendingLoadedSimEta = null
+      }
+    }
+
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius, colorAlgorithm)
 
-    if (!this.initialized || config.needsReset) {
+    if (willReinitialize) {
       this.initializeField(ctx, config)
     }
 
@@ -475,6 +656,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.stepAccumulator -= stepsThisFrame
 
       const linearWorkgroups = Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
+      const cosmologyActive = config.cosmology.enabled
 
       for (let step = 0; step < stepsThisFrame; step++) {
         const phiPass = ctx.beginComputePass({ label: `free-scalar-update-phi-${step}` })
@@ -485,6 +667,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           linearWorkgroups
         )
         phiPass.end()
+
+        // Advance the cosmological clock AFTER the phi update and BEFORE
+        // the pi update so the time-dependent `M²_eff(η)` used by the pi
+        // dispatch matches the (now-advanced) phi time slice. When cosmology
+        // is disabled, increment `simEta` for analysis-panel parity but skip
+        // the per-step uniform rewrite (mEffSq = mass² is already in the
+        // buffer from `updateUniforms`).
+        if (cosmologyActive) {
+          const newEta = this.advanceSimEta(config.dt)
+          const mEffSqNow = this.mEffSqAt(config, newEta)
+          this.writeMEffSqSlot(device, mEffSqNow)
+        } else {
+          this.simEta += config.dt
+        }
 
         const piPass = ctx.beginComputePass({ label: `free-scalar-update-pi-${step}` })
         this.dispatchCompute(
@@ -573,13 +769,21 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         config,
         analysisMode
       )
+      // Snapshot M²_eff(η) at the exact moment the readback is requested so
+      // the diagnostics mass-energy term matches the (time-dependent) mass
+      // that was used in the pi-update for this frame's buffers. Under
+      // Minkowski this is just mass² and matches pre-cosmology behaviour.
+      const mEffSqSnapshot = config.cosmology.enabled
+        ? computeMEffSq(config, this.simEta)
+        : undefined
       this.kSpace.maybeStartDiagnosticsReadback(
         device,
         encoder,
         this.phiBuffer,
         this.piBuffer,
         this.totalSites,
-        config
+        config,
+        mEffSqSnapshot
       )
     }
   }

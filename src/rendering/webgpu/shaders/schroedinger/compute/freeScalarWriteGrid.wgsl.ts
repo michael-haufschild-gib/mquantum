@@ -250,7 +250,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let wdDiff = wdPhi2 - wdV2;
     fieldValue = params.selfInteractionLambda * wdDiff * wdDiff;
   } else {
-    fieldValue = 0.5 * (nnPiVal * nnPiVal + params.mass * params.mass * nnPhiVal * nnPhiVal + gradEnergy);
+    // Use the cosmology-aware effective mass so the on-screen energy view
+    // matches the Hamiltonian the solver is actually integrating. When
+    // cosmology is disabled the CPU writes mEffSq = mass² and this
+    // degenerates to the ordinary Klein-Gordon energy density.
+    fieldValue = 0.5 * (nnPiVal * nnPiVal + params.mEffSq * nnPhiVal * nnPhiVal + gradEnergy);
     // Self-interaction potential energy: V(phi) = lambda*(phi^2 - v^2)^2
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
@@ -271,7 +275,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (params.analysisMode == 1u) {
     let K = 0.5 * nnPiVal * nnPiVal;
     let G = 0.5 * gradEnergy;
-    var V = 0.5 * params.mass * params.mass * nnPhiVal * nnPhiVal;
+    // Mukhanov-Sasaki effective mass under cosmology, mass² otherwise.
+    var V = 0.5 * params.mEffSq * nnPhiVal * nnPhiVal;
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
       let siPhi2 = nnPhiVal * nnPhiVal;

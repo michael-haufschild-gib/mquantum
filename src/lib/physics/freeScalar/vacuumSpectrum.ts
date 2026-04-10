@@ -67,6 +67,49 @@ export function computeOmegaK(
 }
 
 /**
+ * Variant of `computeOmegaK` that accepts an explicit (possibly negative)
+ * squared mass term and applies a zero-mode floor `M_FLOOR²` on the final
+ * `ω_k²`. Used by the Mukhanov-Sasaki adiabatic vacuum sampler to implement
+ * `ω_k² = k_lat² + M²_eff(η)` without the unconditional `max(mass, M_FLOOR)`
+ * regularisation that the Klein-Gordon `computeOmegaK` applies.
+ *
+ * The final clamp `max(ω², M_FLOOR²)` regularises the zero mode (`k_lat = 0`)
+ * when `M²_eff ≤ 0`, which is undefined in the strict Bunch-Davies sense.
+ * The safety check `kMin² + M²_eff > 0` must already be enforced by the
+ * caller; otherwise non-zero modes would also be tachyonic.
+ *
+ * @param nIndices - Mode index in each dimension
+ * @param gridSize - Number of grid points per dimension
+ * @param spacing - Lattice spacing per dimension
+ * @param massSq - Effective squared mass term to add to `k_lat²` (can be < 0)
+ * @param latticeDim - Number of active spatial dimensions (1-11)
+ * @returns ω_k (always positive)
+ */
+export function computeOmegaKFromMassSq(
+  nIndices: readonly number[],
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  massSq: number,
+  latticeDim: number
+): number {
+  let omegaSq = massSq
+
+  for (let d = 0; d < latticeDim; d++) {
+    const N = gridSize[d]!
+    const a = spacing[d]!
+    if (N <= 1) continue
+    const sinVal = Math.sin((Math.PI * nIndices[d]!) / N)
+    const kLat = (2 * sinVal) / a
+    omegaSq += kLat * kLat
+  }
+
+  // Zero-mode floor — keeps ω_k > 0 for the k = 0 mode even when massSq ≤ 0.
+  const floorSq = M_FLOOR * M_FLOOR
+  if (omegaSq < floorSq) omegaSq = floorSq
+  return Math.sqrt(omegaSq)
+}
+
+/**
  * Checks whether a given power-of-2 is valid.
  *
  * @param n - Value to check
@@ -131,6 +174,11 @@ function validateVacuumConfig(
  *
  * @param config - Free scalar field configuration
  * @param seed - Integer seed for the PRNG
+ * @param omegaSqMassTerm - Optional override replacing the default `m²`
+ *                          contribution to `ω_k² = k_lat² + m²`. Used by the
+ *                          Mukhanov-Sasaki adiabatic vacuum to inject a
+ *                          signed `M²_eff(η)` (possibly tachyonic). When
+ *                          omitted, uses `max(mass, M_FLOOR)²` as before.
  * @returns Object with `phi` and `pi` as `Float32Array` in row-major order matching GPU buffer layout
  *
  * @example
@@ -142,7 +190,8 @@ function validateVacuumConfig(
  */
 export function sampleVacuumSpectrum(
   config: FreeScalarConfig,
-  seed: number
+  seed: number,
+  omegaSqMassTerm?: number
 ): { phi: Float32Array; pi: Float32Array } {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
@@ -160,6 +209,8 @@ export function sampleVacuumSpectrum(
   // Track visited modes to enforce Hermitian symmetry
   const visited = new Uint8Array(totalSites)
 
+  const useMassOverride = typeof omegaSqMassTerm === 'number' && Number.isFinite(omegaSqMassTerm)
+
   for (let idx = 0; idx < totalSites; idx++) {
     if (visited[idx]) continue
 
@@ -172,7 +223,9 @@ export function sampleVacuumSpectrum(
     }
     const cidx = ndToLinearIdx(conjCoords, strides)
 
-    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    const omega = useMassOverride
+      ? computeOmegaKFromMassSq(coords, dims, spacing, omegaSqMassTerm!, latticeDim)
+      : computeOmegaK(coords, dims, spacing, mass, latticeDim)
 
     // Variances in k-space (compensating for IFFT 1/N normalization):
     // After IFFT, phi_x = (1/N) * sum_k phi_k * exp(+ikx)

@@ -1,8 +1,14 @@
 /**
  * Free Scalar Field — Leapfrog Pi-Update Compute Shader
  *
- * Updates conjugate momentum pi using the Klein-Gordon equation of motion:
- *   pi[n] += dt * (laplacian(phi)[n] - m^2 * phi[n])
+ * Updates conjugate momentum pi using the Klein-Gordon equation of motion
+ * on a (possibly time-dependent) cosmological background:
+ *   pi[n] += dt * (laplacian(phi)[n] - M²_eff(η) * phi[n])
+ *
+ * The effective mass `M²_eff(η) = a²(η)·m² − z''(η)/z(η)` comes from the
+ * Mukhanov-Sasaki bridge (see src/lib/physics/cosmology/). When cosmology
+ * is disabled the CPU writes `mEffSq = mass²`, recovering the ordinary
+ * Klein-Gordon equation bit-identically.
  *
  * The discrete Laplacian uses periodic boundary conditions and loops over
  * 0..latticeDim for N-D support:
@@ -38,9 +44,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     laplacian += (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
   }
 
-  // Klein-Gordon equation: d²phi/dt² = laplacian(phi) - m² * phi - dV/dphi
-  // In Hamiltonian form: dpi/dt = laplacian(phi) - m² * phi - dV/dphi
-  var force = laplacian - params.mass * params.mass * phiCenter;
+  // Klein-Gordon equation with Mukhanov-Sasaki effective mass:
+  //   dpi/dt = laplacian(phi) - M²_eff(η) * phi - dV/dphi
+  // When cosmology is disabled, mEffSq = mass² and this degenerates to the
+  // ordinary Klein-Gordon evolution.
+  var force = laplacian - params.mEffSq * phiCenter;
 
   // Self-interaction: V(phi) = lambda*(phi²-v²)², dV/dphi = 4*lambda*phi*(phi²-v²)
   if (params.selfInteractionEnabled != 0u) {

@@ -87,6 +87,35 @@ function applyStochasticParams(
     ext.setTdseStochasticNumSites(urlState.stochasticNumSites)
 }
 
+/**
+ * Apply cosmological-background URL state params. Sets preset/steepness/hubble
+ * BEFORE eta0 and enable so the setter chain sees a consistent preset state
+ * at each step (setFreeScalarCosmologyPreset re-clamps eta0, setEnabled
+ * re-clamps again against the new invariants).
+ */
+function applyCosmologyParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.cosmologyEnabled === undefined) return
+
+  if (urlState.cosmologyPreset !== undefined) {
+    ext.setFreeScalarCosmologyPreset(urlState.cosmologyPreset)
+  }
+  if (urlState.cosmologySteepness !== undefined) {
+    ext.setFreeScalarCosmologySteepness(urlState.cosmologySteepness)
+  }
+  if (urlState.cosmologyHubble !== undefined) {
+    ext.setFreeScalarCosmologyHubble(urlState.cosmologyHubble)
+  }
+  if (urlState.cosmologyEta0 !== undefined) {
+    ext.setFreeScalarCosmologyEta0(urlState.cosmologyEta0)
+  }
+  // Enable last: the enable setter re-clamps eta0 against the final preset
+  // state, so earlier setters' intermediate values don't matter.
+  ext.setFreeScalarCosmologyEnabled(urlState.cosmologyEnabled)
+}
+
 /** Apply coordinate entanglement URL state params (lazy import). */
 function applyEntanglementParams(urlState: ParsedShareableState): void {
   if (urlState.entanglementEnabled === undefined) return
@@ -197,6 +226,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyOpenQuantumParams(urlState, ext)
     applyStochasticParams(urlState, ext)
     applyEntanglementParams(urlState)
+    applyCosmologyParams(urlState, ext)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

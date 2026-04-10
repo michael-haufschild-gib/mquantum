@@ -18,6 +18,9 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
+import type { CosmologyConfig } from '@/lib/geometry/extended/freeScalar'
+import { computeCosmologyAt, equationOfState } from '@/lib/physics/cosmology/background'
+import { isValidPreset, sCritical } from '@/lib/physics/cosmology/presets'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -42,13 +45,39 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
     }))
   )
 
+  // Effective squared mass at `η₀` — matches the M²_eff the shader uses on
+  // the first frame after reset. Used by the dispersion diagram under
+  // cosmology; defaults to `mass²` when disabled or parameters invalid.
+  const effectiveMassSq = useMemo(() => {
+    if (!fsf.cosmology.enabled) return fsf.mass * fsf.mass
+    const spacetimeDim = fsf.latticeDim + 1
+    const params = {
+      preset: fsf.cosmology.preset,
+      spacetimeDim,
+      steepness: fsf.cosmology.steepness,
+      hubble: fsf.cosmology.hubble,
+    }
+    if (!isValidPreset(params)) return fsf.mass * fsf.mass
+    try {
+      return computeCosmologyAt(fsf.cosmology.eta0, params, fsf.mass).mEffSq
+    } catch {
+      return fsf.mass * fsf.mass
+    }
+  }, [fsf.cosmology, fsf.latticeDim, fsf.mass])
+
   return (
     <>
       {/* Sparkline charts at the top */}
       <SparklineCharts />
 
-      {/* Klein-Gordon dispersion relation */}
-      <KGDispersionDiagram mass={fsf.mass} />
+      {/* Cosmology readout (only when cosmology is enabled) */}
+      <CosmologyReadout cosmology={fsf.cosmology} latticeDim={fsf.latticeDim} mass={fsf.mass} />
+
+      {/* Dispersion relation — uses M²_eff(η₀) under cosmology, mass² otherwise */}
+      <KGDispersionDiagram
+        effectiveMassSq={effectiveMassSq}
+        cosmologyEnabled={fsf.cosmology.enabled}
+      />
 
       <Slider
         label="Diagnostics Interval (frames)"
@@ -62,7 +91,7 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
       />
 
       {/* Field observables table */}
-      <MetricsDisplay />
+      <MetricsDisplay cosmologyEnabled={fsf.cosmology.enabled} />
     </>
   )
 })
@@ -120,37 +149,66 @@ const KG_PW = KG_WIDTH - 2 * KG_PX
 const KG_PH = KG_HEIGHT - 2 * KG_PY
 
 /**
- * Inline SVG showing the Klein-Gordon dispersion ω(k) = √(k² + m²).
- * Shows the mass gap at ω = m with a dashed horizontal line.
+ * Inline SVG showing the dispersion ω(k) = √(k² + M²_eff), where M²_eff is
+ * either `mass²` (Klein-Gordon) or the Mukhanov-Sasaki effective mass
+ * squared under cosmology. For tachyonic `M²_eff < 0` the real branch is
+ * clipped at the mode crossing `|k| = √|M²_eff|`, below which ω is purely
+ * imaginary (super-horizon growing mode).
  *
- * @param mass - Klein-Gordon mass parameter m
+ * @param props.effectiveMassSq - M²_eff to plot (signed; can be negative)
+ * @param props.cosmologyEnabled - Whether cosmology mode is active (affects labels)
  */
-const KGDispersionDiagram: React.FC<{ mass: number }> = React.memo(({ mass }) => {
+const KGDispersionDiagram: React.FC<{
+  effectiveMassSq: number
+  cosmologyEnabled: boolean
+}> = React.memo(({ effectiveMassSq, cosmologyEnabled }) => {
   const curvePoints = useMemo(() => {
     const nSamples = 80
-    const kMax = Math.max(4 * mass, 4) // ensure visible range even at small mass
-    const wMax = Math.sqrt(kMax * kMax + mass * mass) * 1.1
+    // |M_eff| for axis scaling; fall back to 1 when M² ≈ 0
+    const massScale = Math.sqrt(Math.abs(effectiveMassSq))
+    const kMax = Math.max(4 * massScale, 4)
+    const wMaxSq = kMax * kMax + Math.max(effectiveMassSq, 0)
+    const wMax = Math.sqrt(wMaxSq) * 1.1
 
     const toX = (k: number) => KG_PX + ((k + kMax) / (2 * kMax)) * KG_PW
     const toY = (w: number) => KG_PY + (1 - w / wMax) * KG_PH
 
+    // For each sampled k, compute ω² = k² + M²_eff. Clip the real branch
+    // at zero when ω² < 0 (tachyonic sub-horizon modes).
     const pts: string[] = []
     for (let i = 0; i < nSamples; i++) {
       const k = -kMax + (2 * kMax * i) / (nSamples - 1)
-      const w = Math.sqrt(k * k + mass * mass)
+      const wSq = k * k + effectiveMassSq
+      if (wSq < 0) continue
+      const w = Math.sqrt(wSq)
       pts.push(`${toX(k).toFixed(1)},${toY(w).toFixed(1)}`)
     }
+
+    // Dashed horizontal line marker: under KG it's the mass gap ω = m;
+    // under cosmology with M² > 0 it's the effective mass gap ω = √M²;
+    // under tachyonic M² < 0 there is no real mass gap, suppress the line.
+    const markerY = effectiveMassSq > 0 ? toY(Math.sqrt(effectiveMassSq)) : undefined
+
+    // Tachyonic mode boundary: |k| = √|M²_eff|
+    const tachyonicK = effectiveMassSq < 0 ? Math.sqrt(-effectiveMassSq) : undefined
+
     return {
       points: pts.join(' '),
-      massGapY: toY(mass),
+      markerY,
       zeroY: toY(0),
       midX: toX(0),
+      tachyonicLeftX: tachyonicK !== undefined ? toX(-tachyonicK) : undefined,
+      tachyonicRightX: tachyonicK !== undefined ? toX(tachyonicK) : undefined,
     }
-  }, [mass])
+  }, [effectiveMassSq])
+
+  const title = cosmologyEnabled
+    ? 'Dispersion ω(k) = √(k² + M²_eff(η₀))'
+    : 'Klein-Gordon Dispersion ω(k) = √(k² + m²)'
 
   return (
     <div data-testid="kg-dispersion">
-      <p className="text-xs text-text-secondary mb-1">Klein-Gordon Dispersion ω(k) = √(k² + m²)</p>
+      <p className="text-xs text-text-secondary mb-1">{title}</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${KG_WIDTH} ${KG_HEIGHT}`} className="block">
           {/* Zero line */}
@@ -164,29 +222,60 @@ const KGDispersionDiagram: React.FC<{ mass: number }> = React.memo(({ mass }) =>
             strokeDasharray="2,2"
           />
 
-          {/* Mass gap line ω = m */}
-          <line
-            x1={KG_PX}
-            y1={curvePoints.massGapY}
-            x2={KG_PX + KG_PW}
-            y2={curvePoints.massGapY}
-            stroke="var(--theme-accent)"
-            strokeWidth={0.5}
-            strokeDasharray="3,3"
-            opacity={0.5}
-          />
-          <text
-            x={KG_PX + KG_PW + 2}
-            y={curvePoints.massGapY + 3}
-            fill="var(--theme-accent)"
-            fontSize={7}
-            fontFamily="monospace"
-            opacity={0.7}
-          >
-            m
-          </text>
+          {/* Mass gap line ω = √M²_eff (hidden for tachyonic M² < 0) */}
+          {curvePoints.markerY !== undefined && (
+            <>
+              <line
+                x1={KG_PX}
+                y1={curvePoints.markerY}
+                x2={KG_PX + KG_PW}
+                y2={curvePoints.markerY}
+                stroke="var(--theme-accent)"
+                strokeWidth={0.5}
+                strokeDasharray="3,3"
+                opacity={0.5}
+              />
+              <text
+                x={KG_PX + KG_PW + 2}
+                y={curvePoints.markerY + 3}
+                fill="var(--theme-accent)"
+                fontSize={7}
+                fontFamily="monospace"
+                opacity={0.7}
+              >
+                m
+              </text>
+            </>
+          )}
 
-          {/* Dispersion curve */}
+          {/* Tachyonic mode boundaries: |k| = √|M²_eff| (cosmology only) */}
+          {curvePoints.tachyonicLeftX !== undefined &&
+            curvePoints.tachyonicRightX !== undefined && (
+              <>
+                <line
+                  x1={curvePoints.tachyonicLeftX}
+                  y1={KG_PY}
+                  x2={curvePoints.tachyonicLeftX}
+                  y2={KG_PY + KG_PH}
+                  stroke="var(--theme-accent)"
+                  strokeWidth={0.5}
+                  strokeDasharray="1,2"
+                  opacity={0.4}
+                />
+                <line
+                  x1={curvePoints.tachyonicRightX}
+                  y1={KG_PY}
+                  x2={curvePoints.tachyonicRightX}
+                  y2={KG_PY + KG_PH}
+                  stroke="var(--theme-accent)"
+                  strokeWidth={0.5}
+                  strokeDasharray="1,2"
+                  opacity={0.4}
+                />
+              </>
+            )}
+
+          {/* Dispersion curve — clipped to real branch when tachyonic */}
           <polyline
             points={curvePoints.points}
             fill="none"
@@ -239,43 +328,157 @@ KGDispersionDiagram.displayName = 'KGDispersionDiagram'
 /*  Field observables table (isolated store subscription)         */
 /* ────────────────────────────────────────────────────────────── */
 
-const MetricsDisplay: React.FC = React.memo(() => {
-  const { hasData, totalEnergy, totalNorm, maxPhi, maxPi, energyDrift, meanPhi, variancePhi } =
-    useDiagnosticsStore(
-      useShallow((s) => ({
-        hasData: s.fsf.hasData,
-        totalEnergy: s.fsf.totalEnergy,
-        totalNorm: s.fsf.totalNorm,
-        maxPhi: s.fsf.maxPhi,
-        maxPi: s.fsf.maxPi,
-        energyDrift: s.fsf.energyDrift,
-        meanPhi: s.fsf.meanPhi,
-        variancePhi: s.fsf.variancePhi,
-      }))
-    )
+const MetricsDisplay: React.FC<{ cosmologyEnabled: boolean }> = React.memo(
+  ({ cosmologyEnabled }) => {
+    const { hasData, totalEnergy, totalNorm, maxPhi, maxPi, energyDrift, meanPhi, variancePhi } =
+      useDiagnosticsStore(
+        useShallow((s) => ({
+          hasData: s.fsf.hasData,
+          totalEnergy: s.fsf.totalEnergy,
+          totalNorm: s.fsf.totalNorm,
+          maxPhi: s.fsf.maxPhi,
+          maxPi: s.fsf.maxPi,
+          energyDrift: s.fsf.energyDrift,
+          meanPhi: s.fsf.meanPhi,
+          variancePhi: s.fsf.variancePhi,
+        }))
+      )
 
-  if (!hasData) return null
+    if (!hasData) return null
+
+    // Under cosmology the evolved variable is v = a^((n−2)/2)·δφ with a
+    // time-dependent effective mass; energy is NOT conserved (no drift
+    // metric applies) and the labels refer to v / π_v, not φ / π.
+    const energyLabel = cosmologyEnabled ? 'Pseudo-energy' : 'Total Energy'
+    const normLabel = cosmologyEnabled ? '∫v² dV' : '∫φ² dV (norm)'
+    const maxPhiLabel = cosmologyEnabled ? 'max |v|' : 'max |φ|'
+    const maxPiLabel = cosmologyEnabled ? 'max |π_v|' : 'max |π|'
+    const meanLabel = cosmologyEnabled ? '⟨v⟩' : '⟨φ⟩'
+    const varianceLabel = cosmologyEnabled ? 'Var(v)' : 'Var(φ)'
+
+    return (
+      <ControlGroup
+        title="Field Observables"
+        collapsible
+        defaultOpen
+        data-testid="control-group-field-observables"
+      >
+        <div className="space-y-0.5 px-1">
+          <MetricRow label={energyLabel} value={totalEnergy} digits={6} />
+          {!cosmologyEnabled && (
+            <MetricRow label="Energy Drift" value={energyDrift * 100} digits={4} unit="%" />
+          )}
+          <div className="border-t border-panel-border my-1" />
+          <MetricRow label={normLabel} value={totalNorm} digits={4} />
+          <MetricRow label={maxPhiLabel} value={maxPhi} digits={4} />
+          <MetricRow label={maxPiLabel} value={maxPi} digits={4} />
+          <div className="border-t border-panel-border my-1" />
+          <MetricRow label={meanLabel} value={meanPhi} digits={6} />
+          <MetricRow label={varianceLabel} value={variancePhi} digits={6} />
+        </div>
+      </ControlGroup>
+    )
+  }
+)
+
+MetricsDisplay.displayName = 'MetricsDisplay'
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Cosmology readout (Mukhanov-Sasaki bridge)                    */
+/* ────────────────────────────────────────────────────────────── */
+
+/**
+ * Cosmological quantities evaluated at the current `eta0` — effective
+ * background state at which the adiabatic vacuum is prepared. Shows
+ *
+ *   a(η), ℋ(η), w, z''/z, M²_eff, horizon-crossing scale k·|η|=1
+ *
+ * Live evolution (`η` advancing toward 0) is not plumbed through to
+ * the store in v1 — see the v2 backlog entry in
+ * `docs/plans/cosmological-background-scalar-field.md`.
+ *
+ * @param props.cosmology - Cosmology sub-config
+ * @param props.latticeDim - Active lattice dimension (drives n = latticeDim+1)
+ * @param props.mass - Klein-Gordon mass parameter
+ */
+const CosmologyReadout: React.FC<{
+  cosmology: CosmologyConfig
+  latticeDim: number
+  mass: number
+}> = React.memo(({ cosmology, latticeDim, mass }) => {
+  const snapshot = useMemo(() => {
+    if (!cosmology.enabled) return undefined
+    const spacetimeDim = latticeDim + 1
+    const params = {
+      preset: cosmology.preset,
+      spacetimeDim,
+      steepness: cosmology.steepness,
+      hubble: cosmology.hubble,
+    }
+    if (!isValidPreset(params)) return undefined
+    try {
+      const snap = computeCosmologyAt(cosmology.eta0, params, mass)
+      // Effective equation-of-state parameter per paper eq. (1.20):
+      //   Ekpyrotic fixed point: x₁ = s/s_c(n), so w = 2(s/s_c)² − 1 > 1
+      //   Kasner fixed point:    x = ±1 → w = 1 (stiff fluid)
+      //   de Sitter:             w = −1 (cosmological-constant-like)
+      //   Minkowski:             w = 0 (trivially)
+      let w = 0
+      if (cosmology.preset === 'ekpyrotic') {
+        const x1 = cosmology.steepness / sCritical(spacetimeDim)
+        w = equationOfState(x1)
+      } else if (cosmology.preset === 'kasner') {
+        w = 1
+      } else if (cosmology.preset === 'deSitter') {
+        w = -1
+      }
+      const horizonK = 1 / Math.abs(cosmology.eta0)
+      return { snap, w, horizonK }
+    } catch {
+      return undefined
+    }
+  }, [cosmology, latticeDim, mass])
+
+  if (!cosmology.enabled) return null
+
+  if (!snapshot) {
+    return (
+      <ControlGroup title="Cosmology (η₀ snapshot)" collapsible defaultOpen={false}>
+        <div className="text-xs text-text-tertiary italic">
+          Invalid cosmology parameters — readout unavailable.
+        </div>
+      </ControlGroup>
+    )
+  }
+
+  const { snap, w, horizonK } = snapshot
 
   return (
     <ControlGroup
-      title="Field Observables"
+      title="Cosmology (η₀ snapshot)"
       collapsible
       defaultOpen
-      data-testid="control-group-field-observables"
+      data-testid="control-group-cosmology-readout"
     >
       <div className="space-y-0.5 px-1">
-        <MetricRow label="Total Energy" value={totalEnergy} digits={6} />
-        <MetricRow label="Energy Drift" value={energyDrift * 100} digits={4} unit="%" />
+        <div className="flex items-center justify-between py-0.5">
+          <span className="text-xs text-text-tertiary">Preset</span>
+          <span className="text-xs font-mono text-text-secondary">{cosmology.preset}</span>
+        </div>
+        <MetricRow label="η₀" value={cosmology.eta0} digits={3} />
+        <MetricRow label="a(η₀)" value={snap.a} digits={4} />
+        <MetricRow label="ℋ(η₀)" value={snap.hubble} digits={4} />
+        <MetricRow label="w (EoS)" value={w} digits={3} />
         <div className="border-t border-panel-border my-1" />
-        <MetricRow label="∫φ² dV (norm)" value={totalNorm} digits={4} />
-        <MetricRow label="max |φ|" value={maxPhi} digits={4} />
-        <MetricRow label="max |π|" value={maxPi} digits={4} />
-        <div className="border-t border-panel-border my-1" />
-        <MetricRow label="⟨φ⟩" value={meanPhi} digits={6} />
-        <MetricRow label="Var(φ)" value={variancePhi} digits={6} />
+        <MetricRow label="z''/z" value={snap.zppOverZ} digits={4} />
+        <MetricRow label="M²_eff" value={snap.mEffSq} digits={4} />
+        <MetricRow label="k_horizon" value={horizonK} digits={4} />
+      </div>
+      <div className="text-xs text-text-tertiary italic px-1">
+        Snapshot at η = η₀ (initial time). Live-η tracking deferred to v2.
       </div>
     </ControlGroup>
   )
 })
 
-MetricsDisplay.displayName = 'MetricsDisplay'
+CosmologyReadout.displayName = 'CosmologyReadout'

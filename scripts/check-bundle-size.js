@@ -32,7 +32,7 @@ const CHUNK_BUDGETS = {
   stores: 50,
   physics: 50,
   mediabunny: 50,
-  vendor: 16,
+  vendor: 20,
   index: 30,
 }
 

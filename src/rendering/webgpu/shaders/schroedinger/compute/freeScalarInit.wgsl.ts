@@ -54,11 +54,12 @@ struct FreeScalarUniforms {
   selfInteractionVev: f32,      // offset 488
   absorberEnabled: u32,         // offset 492 (was _padSI)
 
-  // PML absorber parameters (16 bytes)
+  // PML absorber parameters + cosmology (16 bytes)
   absorberWidth: f32,           // offset 496
   absorberStrength: f32,        // offset 500 (σ_max, auto-computed from R_target)
-  _padPML0: u32,                // offset 504 (pad to 16-byte boundary)
-  _padPML1: u32,                // offset 508
+  mEffSq: f32,                  // offset 504 — M²_eff(η) for Mukhanov-Sasaki bridge
+                                //              (falls back to mass² when cosmology disabled)
+  _padMS0: u32,                 // offset 508 (pad to 16-byte boundary)
 }
 `
 
@@ -97,8 +98,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (params.initCondition == 1u) {
     // Single mode: phi = A * cos(k . x), pi = A * omega * sin(k . x)
     // Physical wave vector: k_phys_d = 2*pi*n_d / L_d
+    // Use the cosmology-aware M²_eff(η) so the initial pi matches the
+    // Mukhanov-Sasaki dispersion the pi-update uses from frame one. The
+    // CPU writes mEffSq = mass² when cosmology is disabled.
     var phase: f32 = 0.0;
-    var omegaSq: f32 = params.mass * params.mass;
+    var omegaSq: f32 = params.mEffSq;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let latticeL = f32(params.gridSize[d]) * params.spacing[d];
@@ -112,7 +116,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       omegaSq += sk * sk;
     }
 
-    let omega = sqrt(omegaSq);
+    // Guard against tachyonic super-horizon modes where mEffSq may drive
+    // the sum negative; the solver still integrates, but omega used here
+    // for the initial pi kick stays real.
+    let omega = sqrt(max(omegaSq, 0.0));
     phiVal = params.packetAmplitude * cos(phase);
     piVal = params.packetAmplitude * omega * sin(phase);
   } else if (params.initCondition == 2u) {
@@ -120,7 +127,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     //                  pi  = A * omega * exp(...) * sin(k . x)  (traveling wave)
     var r2: f32 = 0.0;
     var phase: f32 = 0.0;
-    var omegaSq: f32 = params.mass * params.mass;
+    // Cosmology-aware effective mass; falls back to mass² otherwise.
+    var omegaSq: f32 = params.mEffSq;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let dx = worldPos[d] - params.packetCenter[d];
@@ -137,7 +145,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
 
-    let omega = sqrt(omegaSq);
+    let omega = sqrt(max(omegaSq, 0.0));
     let sigma2 = params.packetWidth * params.packetWidth;
     let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
     phiVal = envelope * cos(phase);

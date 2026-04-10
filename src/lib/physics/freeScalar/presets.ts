@@ -200,4 +200,136 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
     },
     renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cosmology scenarios (Mukhanov-Sasaki bridge)
+  //
+  // Each preset enables the cosmological background sub-config so the free
+  // Klein-Gordon field is reinterpreted as a quantum perturbation `δφ` on a
+  // prescribed classical FLRW spacetime, evolved in the Mukhanov-Sasaki
+  // variable `v = a^((n−2)/2)·δφ`. All are linear and free (v1 mutex with
+  // self-interaction) so the Bunch-Davies adiabatic vacuum is exact.
+  //
+  // Naming is deliberately conservative: we simulate the quantum
+  // perturbation on a fixed classical background, not the full inflationary
+  // or big-bang phenomenology. Titles reflect the background geometry, not
+  // the cosmology it is meant to evoke.
+  //
+  // Visualization uses the same `energyDensity` / densityGain 0.2 setup as
+  // the baseline `vacuumFluctuations` preset — the same view is known to
+  // render cleanly on the default 32³ lattice.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  {
+    id: 'deSitterVacuum',
+    name: 'de Sitter — Bunch–Davies Vacuum',
+    description:
+      'Free scalar vacuum on de Sitter background (a(η) = −1/(Hη)). Adiabatic Bunch–Davies state; the tachyonic z″/z term squeezes super-horizon modes.',
+    overrides: {
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 2026,
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: false,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 1.0,
+        eta0: -10,
+      },
+    },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+  },
+
+  {
+    id: 'deSitterPlaneWave',
+    name: 'de Sitter — Plane-Wave Mode',
+    description:
+      'Single lattice mode k=(3,0,0) on de Sitter. Pedagogical view of one perturbation as its effective dispersion ω² = k² + M²_eff(η) evolves.',
+    overrides: {
+      initialCondition: 'singleMode',
+      modeK: [3, 0, 0],
+      packetAmplitude: 1.0,
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: false,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 2.0,
+        eta0: -8,
+      },
+    },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+  },
+
+  {
+    id: 'ekpyroticBackground',
+    name: 'Ekpyrotic Background (stiff fluid)',
+    description:
+      'Contracting FLRW with w > 1 — Beyer–Garfinkle–Isenberg–Oliynyk (2026) ekpyrotic regime at s ≈ 2·s_c(4). Quantum perturbations on a prescribed stiff-fluid background.',
+    overrides: {
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 131,
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: false,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      cosmology: {
+        enabled: true,
+        preset: 'ekpyrotic',
+        // s ≈ 2·s_c(n=4) ≈ 6.93 — squarely in the paper's ekpyrotic basin
+        // (x₁ = s/s_c ≈ 2 > 1), non-degenerate, stiff-fluid regime.
+        steepness: 7,
+        hubble: 1.0,
+        eta0: -10,
+      },
+    },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+  },
+
+  {
+    id: 'kasnerBackground',
+    name: 'Kasner Background (w = 1)',
+    description:
+      'Isotropic Kasner FLRW (a(η) = |η|^(1/(n−2)), stiff-fluid limit). Quantum fluctuations on a rigid power-law contraction; the runtime η-floor prevents singularity crossing.',
+    overrides: {
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 7,
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: false,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      cosmology: {
+        enabled: true,
+        preset: 'kasner',
+        steepness: 5,
+        hubble: 1.0,
+        eta0: -10,
+      },
+    },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+  },
 ]

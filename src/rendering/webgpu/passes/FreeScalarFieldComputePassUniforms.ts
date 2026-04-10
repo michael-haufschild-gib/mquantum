@@ -7,6 +7,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { computeCosmologyAt } from '@/lib/physics/cosmology/background'
 import {
   estimateVacuumMaxEnergy,
   estimateVacuumMaxPhi,
@@ -43,6 +44,53 @@ export function computeFsfInitHash(config: FreeScalarConfig): string {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Cosmological effective mass
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the effective squared mass for the current frame.
+ *
+ * When `config.cosmology.enabled` is false (or the cosmology parameters are
+ * invalid, e.g. an uninitialised preset) the return value is simply
+ * `mass²`, giving bit-identical behaviour to the pre-cosmology pipeline.
+ *
+ * When cosmology is active the Mukhanov-Sasaki effective mass
+ * `M²_eff(η) = a²(η)·m² − z''(η)/z(η)` is evaluated at `simEta` via
+ * `computeCosmologyAt`. The shader consumes this scalar directly in the
+ * Klein-Gordon pi-update.
+ *
+ * Exported so analysis / diagnostics code can reproduce the same value
+ * at the same `simEta` snapshot without duplicating the fallback logic.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current conformal time (optional; defaults to `eta0`)
+ * @returns `M²_eff(η)`
+ */
+export function computeMEffSq(config: FreeScalarConfig, simEta: number | undefined): number {
+  const cosmo = config.cosmology
+  if (!cosmo.enabled) return config.mass * config.mass
+  const eta = typeof simEta === 'number' ? simEta : cosmo.eta0
+  try {
+    const snap = computeCosmologyAt(
+      eta,
+      {
+        preset: cosmo.preset,
+        spacetimeDim: config.latticeDim + 1,
+        steepness: cosmo.steepness,
+        hubble: cosmo.hubble,
+      },
+      config.mass
+    )
+    return snap.mEffSq
+  } catch {
+    // Invalid preset inputs — fall back to ordinary Klein-Gordon so the
+    // pipeline never crashes on a bad parameter state. The UI layer is
+    // responsible for preventing such states from reaching production.
+    return config.mass * config.mass
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // Uniform writing
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -72,6 +120,12 @@ export interface FsfUniformParams {
   basisZ?: Float32Array
   boundingRadius?: number
   colorAlgorithm?: number
+  /**
+   * Current simulation conformal time `η`. Consumed only when
+   * `config.cosmology.enabled` is true; otherwise ignored and the shader
+   * sees `mEffSq = mass²` for bit-identical behaviour.
+   */
+  simEta?: number
 }
 
 /**
@@ -203,7 +257,11 @@ export function writeFsfUniforms(
         config.latticeDim
       )
     : 0
-  u32[126] = 0 // offset 504 (padding)
+
+  // mEffSq (offset 504) — Mukhanov-Sasaki effective mass squared at the
+  // current conformal time. Falls back to mass² when cosmology is disabled
+  // or inputs are invalid, preserving the ordinary Klein-Gordon update.
+  f32[126] = computeMEffSq(config, params.simEta)
   u32[127] = 0 // offset 508 (padding)
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
@@ -309,12 +367,19 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
  * @param phi - Mapped phi field data
  * @param pi - Mapped pi (conjugate momentum) field data
  * @param config - Free scalar field configuration
+ * @param mEffSqOverride - Optional effective squared mass at the readback
+ *                         time. When provided (cosmology on), replaces
+ *                         `config.mass²` in the mass-energy term so the
+ *                         reported pseudo-energy matches the Mukhanov-Sasaki
+ *                         Hamiltonian at that `η`. When omitted, uses
+ *                         `config.mass²` for bit-identical KG behaviour.
  * @returns Diagnostics snapshot for the store
  */
 export function computeFsfDiagnostics(
   phi: Float32Array,
   pi: Float32Array,
-  config: FreeScalarConfig
+  config: FreeScalarConfig,
+  mEffSqOverride?: number
 ): FsfDiagnosticsSnapshot {
   const N = phi.length
 
@@ -366,7 +431,13 @@ export function computeFsfDiagnostics(
 
   const totalNorm = sumPhi2 * dV
   const kineticEnergy = 0.5 * sumPi2 * dV
-  const massEnergy = 0.5 * config.mass * config.mass * sumPhi2 * dV
+  // Under cosmology the mass term in the Hamiltonian is the full
+  // `M²_eff(η)` — see `docs/plans/cosmological-background-scalar-field.md`.
+  const massSqTerm =
+    typeof mEffSqOverride === 'number' && Number.isFinite(mEffSqOverride)
+      ? mEffSqOverride
+      : config.mass * config.mass
+  const massEnergy = 0.5 * massSqTerm * sumPhi2 * dV
   let potentialEnergy = 0
   if (config.selfInteractionEnabled) {
     const lambda = config.selfInteractionLambda

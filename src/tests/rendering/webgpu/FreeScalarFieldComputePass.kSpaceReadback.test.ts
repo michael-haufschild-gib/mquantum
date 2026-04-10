@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { DEFAULT_COSMOLOGY_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 
 const { computeRawKSpaceDataMock, buildKSpaceDisplayTexturesMock } = vi.hoisted(() => ({
@@ -70,6 +71,7 @@ function makeConfig(): FreeScalarConfig {
       broadeningSigma: 1,
       radialBinCount: 64,
     },
+    cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
   }
 }
 

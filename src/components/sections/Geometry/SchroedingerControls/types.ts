@@ -150,6 +150,11 @@ export interface FreeScalarFieldActions {
   setSelfInteractionEnabled: ExtendedObjectState['setFreeScalarSelfInteractionEnabled']
   setSelfInteractionLambda: ExtendedObjectState['setFreeScalarSelfInteractionLambda']
   setSelfInteractionVev: ExtendedObjectState['setFreeScalarSelfInteractionVev']
+  setCosmologyEnabled: ExtendedObjectState['setFreeScalarCosmologyEnabled']
+  setCosmologyPreset: ExtendedObjectState['setFreeScalarCosmologyPreset']
+  setCosmologySteepness: ExtendedObjectState['setFreeScalarCosmologySteepness']
+  setCosmologyHubble: ExtendedObjectState['setFreeScalarCosmologyHubble']
+  setCosmologyEta0: ExtendedObjectState['setFreeScalarCosmologyEta0']
 }
 
 /**

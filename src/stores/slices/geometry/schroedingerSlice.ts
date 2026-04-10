@@ -23,6 +23,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
+import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySetters'
 import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
 import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 import { createQuantumModeSetters } from './setters/quantumModeSetters'
@@ -76,7 +77,15 @@ function resizeFreeScalarForDim(
   const resized = resizeFreeScalarArrays(prev, dimension)
   const newSpacing = resized.spacing ?? prev.spacing
   const newDt = clampDtWithCfl(prev.dt, newSpacing, dimension, prev.mass)
-  return { ...resized, dt: newDt, needsReset: true }
+  // Stage the post-resize config so the cosmology invariant check sees the
+  // new latticeDim / gridSize / spacing. Without this, dimension changes via
+  // the global dimension slider (syncActiveComputeModeLatticeDim) or the
+  // React initialization hook (initializeSchroedingerForDimension) bypass
+  // the reconcile, leaving cosmology enabled at unsupported spacetime dims
+  // or with an eta0 below the new safe threshold.
+  const staged: FreeScalarConfig = { ...prev, ...resized, dt: newDt, needsReset: true }
+  const reconciled = reconcileCosmologyInvariants(staged)
+  return { ...resized, dt: newDt, needsReset: true, ...reconciled }
 }
 
 function resizeTdseForDim(

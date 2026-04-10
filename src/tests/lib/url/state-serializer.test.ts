@@ -512,4 +512,159 @@ describe('state-serializer', () => {
       globalThis.window = originalWindow
     })
   })
+
+  describe('cosmological background (Mukhanov-Sasaki bridge)', () => {
+    it('round-trips an ekpyrotic preset with steepness and eta0', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'ekpyrotic',
+        cosmologySteepness: 6,
+        cosmologyEta0: -8,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('cos=1')
+      expect(serialized).toContain('cos_bg=ekpyrotic')
+      expect(serialized).toContain('cos_s=6.00')
+      expect(serialized).toContain('cos_eta0=-8.00')
+
+      const round = deserializeState(serialized)
+      expect(round.cosmologyEnabled).toBe(true)
+      expect(round.cosmologyPreset).toBe('ekpyrotic')
+      expect(round.cosmologySteepness).toBeCloseTo(6, 6)
+      expect(round.cosmologyEta0).toBeCloseTo(-8, 6)
+    })
+
+    it('round-trips a de Sitter preset with hubble', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'deSitter',
+        cosmologyHubble: 2,
+        cosmologyEta0: -5,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('cos_bg=deSitter')
+      expect(serialized).toContain('cos_h=2.00')
+      expect(serialized).not.toContain('cos_s=') // steepness not emitted for de Sitter
+
+      const round = deserializeState(serialized)
+      expect(round.cosmologyPreset).toBe('deSitter')
+      expect(round.cosmologyHubble).toBeCloseTo(2, 6)
+    })
+
+    it('omits cosmology block entirely when disabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: false,
+        cosmologyPreset: 'ekpyrotic',
+        cosmologySteepness: 6,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).not.toContain('cos=')
+      expect(serialized).not.toContain('cos_bg=')
+      expect(serialized).not.toContain('cos_s=')
+    })
+
+    it('rejects ekpyrotic steepness at or below s_c(n) during deserialize', () => {
+      // For d=3 (spatial) → n=4 spacetime, s_c(4) = √12 ≈ 3.4641.
+      // Set cos_s = 3.0 (sub-critical) — the whole cosmology block should
+      // be silently dropped, not coerced.
+      const raw =
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=ekpyrotic&cos_s=3&cos_eta0=-10'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+      expect(parsed.cosmologyPreset).toBeUndefined()
+      expect(parsed.cosmologySteepness).toBeUndefined()
+    })
+
+    it('accepts a valid ekpyrotic steepness strictly above s_c(n)', () => {
+      // s_c(4) ≈ 3.4641. Set cos_s = 4 (admissible).
+      const raw =
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=ekpyrotic&cos_s=4&cos_eta0=-10'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBe(true)
+      expect(parsed.cosmologySteepness).toBeCloseTo(4, 6)
+    })
+
+    it('rejects unknown preset strings', () => {
+      const raw = 'd=3&t=schroedinger&cos=1&cos_bg=bouncing&cos_eta0=-10'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+    })
+
+    it('rejects cos_eta0 = 0', () => {
+      const raw = 'd=3&t=schroedinger&cos=1&cos_bg=kasner&cos_eta0=0'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+    })
+
+    it('drops cosmology when cos=0 even if sub-params are present', () => {
+      const raw = 'd=3&t=schroedinger&cos=0&cos_bg=deSitter&cos_h=1&cos_eta0=-5'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+      expect(parsed.cosmologyPreset).toBeUndefined()
+    })
+
+    it('keeps app defaults when cos flag is absent entirely', () => {
+      const raw = 'd=3&t=schroedinger&qm=freeScalarField'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+    })
+
+    it('accepts minkowski preset without steepness or hubble', () => {
+      const raw = 'd=3&t=schroedinger&cos=1&cos_bg=minkowski&cos_eta0=-5'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBe(true)
+      expect(parsed.cosmologyPreset).toBe('minkowski')
+    })
+
+    it('rejects de Sitter when cos_h is missing', () => {
+      // Finding 5: shared URLs with cos=1&cos_bg=deSitter but no cos_h
+      // must not activate cosmology — the runtime either falls back to
+      // mass² (step path) or throws on reset (init path), both wrong.
+      const raw = 'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=deSitter&cos_eta0=-5'
+      const parsed = deserializeState(raw)
+      expect(parsed.cosmologyEnabled).toBeUndefined()
+      expect(parsed.cosmologyPreset).toBeUndefined()
+      expect(parsed.cosmologyHubble).toBeUndefined()
+    })
+
+    it('rejects de Sitter when cos_h is out of range', () => {
+      const raw =
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=deSitter&cos_h=999&cos_eta0=-5'
+      const parsed = deserializeState(raw)
+      // parseFloatParam clamps to [0.01, 100] — 999 becomes 100, still valid
+      // for the rejection rule but not rejected. The rejection only fires
+      // when cos_h is completely absent or non-numeric.
+      expect(parsed.cosmologyEnabled).toBe(true)
+      expect(parsed.cosmologyHubble).toBe(100)
+    })
+
+    it('round-trips ekpyrotic steepness just above s_c with 4-decimal precision', () => {
+      // Finding 8: s_c(n=4) ≈ 3.4641, so a valid s = 3.4645 must survive
+      // the round-trip. At 2-decimal precision (the default) 3.4645 →
+      // 3.46 → rejected because 3.46 < 3.4641... Use 4-decimal precision.
+      const state: ShareableState = {
+        dimension: 3, // n = 4
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'ekpyrotic',
+        cosmologySteepness: 3.4645,
+        cosmologyEta0: -10,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('cos_s=3.4645')
+      const round = deserializeState(serialized)
+      expect(round.cosmologyEnabled).toBe(true)
+      expect(round.cosmologySteepness).toBeCloseTo(3.4645, 4)
+    })
+  })
 })

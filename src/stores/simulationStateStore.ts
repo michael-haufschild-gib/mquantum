@@ -20,6 +20,20 @@ import { useGeometryStore } from '@/stores/geometryStore'
 /** Status of save/load operations */
 export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'error'
 
+/**
+ * Mode-agnostic runtime state carried alongside the wavefunction buffers.
+ *
+ * Modes can serialize auxiliary scalars (e.g. the Free Scalar Field's
+ * cosmological simulation time `simEta`) into a sibling `_runtimeMeta`
+ * record on the save blob. The deserializer extracts it into
+ * `PendingLoadData.runtimeMeta` so compute passes can consume it without
+ * routing through `setSchroedingerConfig` (which would pollute the store).
+ */
+export interface RuntimeMeta {
+  /** Free Scalar Field cosmological sim time at save time. */
+  simEta?: number
+}
+
 /** Loaded wavefunction data pending injection into GPU buffers */
 export interface PendingLoadData {
   quantumMode: SaveableQuantumMode
@@ -29,6 +43,8 @@ export interface PendingLoadData {
   config: Record<string, unknown>
   psiRe: Float32Array
   psiIm: Float32Array
+  /** Optional mode-agnostic runtime state extracted from the save blob. */
+  runtimeMeta?: RuntimeMeta
 }
 
 interface SimulationStateState {
@@ -103,6 +119,14 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         // with the loaded grid parameters.
         const loadedConfig = result.config as Record<string, unknown>
 
+        // Extract and strip mode-agnostic runtime state BEFORE the config is
+        // pushed into the schroedinger store — otherwise `_runtimeMeta`
+        // would be spread into the state as a stray field.
+        const rawMeta = loadedConfig._runtimeMeta
+        delete loadedConfig._runtimeMeta
+        const runtimeMeta: RuntimeMeta | undefined =
+          typeof rawMeta === 'object' && rawMeta !== null ? (rawMeta as RuntimeMeta) : undefined
+
         if (result.quantumMode === 'pauliSpinor') {
           // Pauli is a separate object type — switch objectType and apply pauli config
           useGeometryStore.getState().setObjectType('pauliSpinor')
@@ -112,9 +136,29 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
             needsReset: true,
           })
         } else {
-          if ('needsReset' in loadedConfig || result.quantumMode) {
-            loadedConfig.needsReset = true
+          // Compute-mode sub-configs live on `schroedinger.<mode>`, and
+          // `setSchroedingerConfig` does a SHALLOW merge. Setting
+          // `needsReset: true` at the top level does not propagate into the
+          // sub-config the compute pass actually checks, so the field
+          // buffers keep whatever vacuum data the previous reinit sampled
+          // and the loaded wavefunction is silently dropped. Force the
+          // reset flag onto the correct sub-config for each compute mode.
+          const MODE_TO_SUBCONFIG_KEY: Record<string, string> = {
+            freeScalarField: 'freeScalar',
+            tdseDynamics: 'tdse',
+            becDynamics: 'bec',
+            diracEquation: 'dirac',
+            quantumWalk: 'quantumWalk',
           }
+          const subKey = MODE_TO_SUBCONFIG_KEY[result.quantumMode]
+          if (subKey && typeof loadedConfig[subKey] === 'object' && loadedConfig[subKey] !== null) {
+            loadedConfig[subKey] = {
+              ...(loadedConfig[subKey] as Record<string, unknown>),
+              needsReset: true,
+            }
+          }
+          // Preserve the top-level flag too for analytic modes that read it.
+          loadedConfig.needsReset = true
           useExtendedObjectStore.getState().setSchroedingerConfig({
             quantumMode: result.quantumMode,
             ...loadedConfig,
@@ -130,6 +174,7 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
             config: result.config,
             psiRe: result.psiRe,
             psiIm: result.psiIm,
+            runtimeMeta,
           },
         })
       })

@@ -13,6 +13,10 @@ import { useGeometryStore } from '@/stores/geometryStore'
 
 import type { SchroedingerSliceActions } from '../types'
 import {
+  createFreeScalarCosmologySetters,
+  reconcileCosmologyInvariants,
+} from './freeScalarCosmologySetters'
+import {
   clampDtWithCfl,
   defaultGridPerDim,
   MAX_TOTAL_SITES,
@@ -59,6 +63,11 @@ type FreeScalarActions = Pick<
   | 'setFreeScalarKSpaceBroadeningRadius'
   | 'setFreeScalarKSpaceBroadeningSigma'
   | 'setFreeScalarKSpaceRadialBinCount'
+  | 'setFreeScalarCosmologyEnabled'
+  | 'setFreeScalarCosmologyPreset'
+  | 'setFreeScalarCosmologySteepness'
+  | 'setFreeScalarCosmologyHubble'
+  | 'setFreeScalarCosmologyEta0'
   | 'applyFreeScalarPreset'
 >
 
@@ -108,10 +117,12 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         const resized = resizeFreeScalarArrays(prev, clamped)
         const newSpacing = resized.spacing ?? prev.spacing
         const newDt = clampDtWithCfl(prev.dt, newSpacing, clamped, prev.mass)
+        const staged = { ...prev, ...resized, dt: newDt, needsReset: true }
+        const reconciled = reconcileCosmologyInvariants(staged)
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...prev, ...resized, dt: newDt, needsReset: true },
+            freeScalar: { ...staged, ...reconciled },
           },
         }
       })
@@ -122,7 +133,8 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         return
       }
       setWithVersion((state) => {
-        const { latticeDim, initialCondition } = state.schroedinger.freeScalar
+        const fs = state.schroedinger.freeScalar
+        const { latticeDim, initialCondition } = fs
         const needsPow2 = initialCondition === 'vacuumNoise'
         const maxPerDim = defaultGridPerDim(latticeDim)
         const snap = (v: number, min: number, max: number) => {
@@ -143,10 +155,12 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           if (clamped[maxIdx]! <= 2) break
           clamped[maxIdx] = needsPow2 ? clamped[maxIdx]! / 2 : Math.max(2, clamped[maxIdx]! - 1)
         }
+        const staged = { ...fs, gridSize: clamped, needsReset: true }
+        const reconciled = reconcileCosmologyInvariants(staged)
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...state.schroedinger.freeScalar, gridSize: clamped, needsReset: true },
+            freeScalar: { ...staged, ...reconciled },
           },
         }
       })
@@ -162,10 +176,12 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
         )
         const newDt = clampDtWithCfl(fs.dt, clamped, fs.latticeDim, fs.mass)
+        const staged = { ...fs, spacing: clamped, dt: newDt, needsReset: true }
+        const reconciled = reconcileCosmologyInvariants(staged)
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...fs, spacing: clamped, dt: newDt, needsReset: true },
+            freeScalar: { ...staged, ...reconciled },
           },
         }
       })
@@ -219,10 +235,12 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
           })
         }
 
+        const staged = { ...fs, initialCondition: condition, gridSize, needsReset: true }
+        const reconciled = reconcileCosmologyInvariants(staged)
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...fs, initialCondition: condition, gridSize, needsReset: true },
+            freeScalar: { ...staged, ...reconciled },
           },
         }
       })
@@ -299,7 +317,24 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         },
       }))
     },
-    setFreeScalarSelfInteractionEnabled: nestedValueSetter(ctx, D, 'selfInteractionEnabled'),
+    setFreeScalarSelfInteractionEnabled: (enabled) => {
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        // Enabling self-interaction forces cosmology off (v1 mutex).
+        const cosmology = enabled ? { ...fs.cosmology, enabled: false } : fs.cosmology
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              selfInteractionEnabled: enabled,
+              cosmology,
+              needsReset: true,
+            },
+          },
+        }
+      })
+    },
     setFreeScalarSelfInteractionLambda: nestedClampedSetter(
       ctx,
       D,
@@ -509,6 +544,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         },
       }))
     },
+    ...createFreeScalarCosmologySetters(ctx),
     applyFreeScalarPreset: (presetId) => {
       void import('@/lib/physics/freeScalar/presets').then(({ FREE_SCALAR_PRESETS }) => {
         const preset = FREE_SCALAR_PRESETS.find((p) => p.id === presetId)
@@ -523,11 +559,22 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
             needsReset: true,
           }
           const resized = resizeFreeScalarArrays(base, globalDim)
+          // The global dimension may fall outside the cosmology-supported
+          // range [2, 6] (spacetimeDim ∈ [3, 7]). Even when it's in range,
+          // the preset's eta0 may be below the safe threshold at the
+          // resized lattice shape. Reconcile so presets either run cleanly
+          // or soft-disable cosmology with a logger warning.
+          const staged: FreeScalarConfig = {
+            ...base,
+            ...resized,
+            needsReset: true,
+          }
+          const reconciled = reconcileCosmologyInvariants(staged)
           return {
             schroedinger: {
               ...state.schroedinger,
               ...preset.renderingOverrides,
-              freeScalar: { ...base, ...resized, needsReset: true },
+              freeScalar: { ...staged, ...reconciled },
             },
           }
         })

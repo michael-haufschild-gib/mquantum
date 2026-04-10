@@ -5,6 +5,8 @@
  * for the real scalar field lattice simulation.
  */
 
+import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
+
 // ============================================================================
 // Field View & Initial Conditions
 // ============================================================================
@@ -97,6 +99,65 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
 }
 
 // ============================================================================
+// Cosmological Background (Mukhanov-Sasaki bridge)
+// ============================================================================
+
+/**
+ * Cosmological FLRW background sub-config for the Mukhanov-Sasaki bridge.
+ *
+ * When `enabled = true`, the Free Scalar Field pass reinterprets `(phi, pi)`
+ * as the conformal Mukhanov-Sasaki variable `v = a^((n-2)/2) * δφ` and its
+ * derivative `v' = dv/dη`. The Klein-Gordon update rule picks up a
+ * time-dependent effective mass
+ *
+ *     M²_eff(η) = a²(η) * m² - z''(η)/z(η)
+ *
+ * driven by the selected `preset` and evaluated on the fly from the current
+ * simulation time `eta`. See `docs/plans/cosmological-background-scalar-field.md`
+ * and the `src/lib/physics/cosmology/` module for the full derivation.
+ *
+ * **Mutually exclusive with `selfInteractionEnabled`** in v1: the linear
+ * Mukhanov-Sasaki equivalence is exact only for the free field. Enabling
+ * cosmology forces `selfInteractionEnabled = false`. This restriction is
+ * lifted in v2 via the classical-statistical approximation.
+ */
+export interface CosmologyConfig {
+  /** Master toggle. When false, the FSF pass runs in Minkowski mode. */
+  enabled: boolean
+  /** Which FLRW background regime to evolve on. */
+  preset: CosmologyPreset
+  /**
+   * Paper's potential steepness `s`. Only consulted for the ekpyrotic preset;
+   * must satisfy `s > s_c(n)` where `s_c(n) = √(8(n-1)/(n-2))`.
+   */
+  steepness: number
+  /**
+   * Hubble rate `H` for the de Sitter preset. Sets `a(η) = -1/(Hη)`.
+   * Must be strictly positive.
+   */
+  hubble: number
+  /**
+   * Initial conformal time `η₀` at which the adiabatic Bunch-Davies vacuum
+   * is sampled. Use `η < 0` (deep past). Subject to an auto-clamp so that
+   * `|η₀|² · k_min² ≥ safety · |z''/z|(η₀)` — the clamped value is what the
+   * FSF pass actually uses.
+   */
+  eta0: number
+}
+
+/**
+ * Default cosmology sub-config: disabled, with sensible defaults for each
+ * preset so that flipping the toggle yields an immediately runnable state.
+ */
+export const DEFAULT_COSMOLOGY_CONFIG: CosmologyConfig = {
+  enabled: false,
+  preset: 'deSitter',
+  steepness: 5, // > s_c(4) ≈ 3.464 — valid ekpyrotic default
+  hubble: 1,
+  eta0: -10,
+}
+
+// ============================================================================
 // Free Scalar Config
 // ============================================================================
 
@@ -165,6 +226,15 @@ export interface FreeScalarConfig {
   diagnosticsEnabled: boolean
   /** Diagnostic computation interval in frames */
   diagnosticsInterval: number
+
+  // === Cosmological Background (Mukhanov-Sasaki) ===
+  /**
+   * FLRW background sub-config. When `cosmology.enabled` is true, the field
+   * is evolved on a time-dependent background with effective mass
+   * `M²_eff(η) = a²(η)·m² − z''(η)/z(η)`. Mutually exclusive with
+   * `selfInteractionEnabled` in v1.
+   */
+  cosmology: CosmologyConfig
 }
 
 /**
@@ -198,4 +268,5 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   pmlTargetReflection: 1e-6,
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
+  cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
 }

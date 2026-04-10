@@ -15,24 +15,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type PendingLoadData, useSimulationStateStore } from '@/stores/simulationStateStore'
 
+// Mock target — mutated per test to exercise different quantum modes.
+const { deserializeMock, setSchroedingerConfigSpy, setPauliConfigSpy, setObjectTypeSpy } =
+  vi.hoisted(() => ({
+    deserializeMock: vi.fn(),
+    setSchroedingerConfigSpy: vi.fn(),
+    setPauliConfigSpy: vi.fn(),
+    setObjectTypeSpy: vi.fn(),
+  }))
+
 // Mock the dynamic imports used by loadFromFile
 vi.mock('@/lib/export/simulationState', () => ({
-  deserializeSimulationState: vi.fn(async () => ({
-    quantumMode: 'tdseDynamics' as const,
-    latticeDim: 1,
-    componentCount: 1,
-    gridSize: [32],
-    totalSites: 32,
-    config: { quantumMode: 'tdseDynamics', tdse: { dt: 0.001 } },
-    psiRe: new Float32Array(32),
-    psiIm: new Float32Array(32),
-  })),
+  deserializeSimulationState: deserializeMock,
 }))
 
 vi.mock('@/stores/extendedObjectStore', () => ({
   useExtendedObjectStore: {
     getState: () => ({
-      setSchroedingerConfig: vi.fn(),
+      setSchroedingerConfig: setSchroedingerConfigSpy,
+      setPauliConfig: setPauliConfigSpy,
+    }),
+  },
+}))
+
+vi.mock('@/stores/geometryStore', () => ({
+  useGeometryStore: {
+    getState: () => ({
+      setObjectType: setObjectTypeSpy,
     }),
   },
 }))
@@ -40,6 +49,20 @@ vi.mock('@/stores/extendedObjectStore', () => ({
 describe('simulationStateStore', () => {
   beforeEach(() => {
     useSimulationStateStore.getState().reset()
+    setSchroedingerConfigSpy.mockClear()
+    setPauliConfigSpy.mockClear()
+    setObjectTypeSpy.mockClear()
+    // Default mock — individual tests override.
+    deserializeMock.mockImplementation(async () => ({
+      quantumMode: 'tdseDynamics' as const,
+      latticeDim: 1,
+      componentCount: 1,
+      gridSize: [32],
+      totalSites: 32,
+      config: { quantumMode: 'tdseDynamics', tdse: { dt: 0.001 } },
+      psiRe: new Float32Array(32),
+      psiIm: new Float32Array(32),
+    }))
   })
 
   describe('save flow', () => {
@@ -107,6 +130,68 @@ describe('simulationStateStore', () => {
       const state = useSimulationStateStore.getState()
       expect(state.status).toBe('done')
       expect(state.pendingLoadData).toBeNull()
+    })
+
+    it('loadFromFile forces freeScalar.needsReset on the FSF sub-config', async () => {
+      // setSchroedingerConfig does a SHALLOW merge; writing `needsReset: true`
+      // at the top level does NOT propagate to `freeScalar.needsReset`, which
+      // is what the compute pass actually checks. The store must write the
+      // reset flag into the sub-config for the loaded quantum mode.
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'freeScalarField' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [8, 8, 8],
+        totalSites: 512,
+        config: {
+          quantumMode: 'freeScalarField',
+          // Simulate a saved config whose freeScalar.needsReset was false —
+          // the normal live state.
+          freeScalar: { dt: 0.01, needsReset: false },
+        },
+        psiRe: new Float32Array(512),
+        psiIm: new Float32Array(512),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'fsf.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as {
+        freeScalar: { needsReset: boolean }
+      }
+      expect(pushed.freeScalar.needsReset).toBe(true)
+    })
+
+    it('loadFromFile forces tdse.needsReset on the TDSE sub-config', async () => {
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'tdseDynamics' as const,
+        latticeDim: 2,
+        componentCount: 1,
+        gridSize: [32, 32],
+        totalSites: 1024,
+        config: {
+          quantumMode: 'tdseDynamics',
+          tdse: { dt: 0.001, needsReset: false },
+        },
+        psiRe: new Float32Array(1024),
+        psiIm: new Float32Array(1024),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'tdse.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+      const pushed = setSchroedingerConfigSpy.mock.calls[0]![0] as {
+        tdse: { needsReset: boolean }
+      }
+      expect(pushed.tdse.needsReset).toBe(true)
     })
 
     it('setLoadError transitions to error and clears pendingLoadData', () => {

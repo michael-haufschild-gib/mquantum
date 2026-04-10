@@ -146,6 +146,13 @@ export class FsfKSpaceManager {
 
   /**
    * Attempt diagnostics readback if conditions are met.
+   *
+   * @param mEffSqSnapshot - Effective squared mass `M²_eff(η)` at the time
+   *                         the readback is requested. Propagated through
+   *                         to `computeFsfDiagnostics` so the reported mass
+   *                         energy matches the Mukhanov-Sasaki Hamiltonian
+   *                         under cosmology. Pass `undefined` when cosmology
+   *                         is disabled to use the Klein-Gordon `mass²`.
    */
   maybeStartDiagnosticsReadback(
     device: GPUDevice,
@@ -153,7 +160,8 @@ export class FsfKSpaceManager {
     phiBuffer: GPUBuffer,
     piBuffer: GPUBuffer,
     totalSites: number,
-    config: FreeScalarConfig
+    config: FreeScalarConfig,
+    mEffSqSnapshot?: number
   ): void {
     if (
       !config.diagnosticsEnabled ||
@@ -171,7 +179,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.diagPhiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.diagPiReadbackBuffer, 0, bufferSize)
-    void this.readbackDiagnostics(device, config)
+    void this.readbackDiagnostics(device, config, mEffSqSnapshot)
   }
 
   /** Get or create the k-space Web Worker. */
@@ -257,7 +265,11 @@ export class FsfKSpaceManager {
     }
   }
 
-  private async readbackDiagnostics(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
+  private async readbackDiagnostics(
+    device: GPUDevice,
+    config: FreeScalarConfig,
+    mEffSqSnapshot?: number
+  ): Promise<void> {
     const phiBuf = this.diagPhiReadbackBuffer
     const piBuf = this.diagPiReadbackBuffer
     if (!phiBuf || !piBuf) return
@@ -277,7 +289,7 @@ export class FsfKSpaceManager {
 
       const phi = new Float32Array(phiBuf.getMappedRange())
       const pi = new Float32Array(piBuf.getMappedRange())
-      const snapshot = computeFsfDiagnostics(phi, pi, config)
+      const snapshot = computeFsfDiagnostics(phi, pi, config, mEffSqSnapshot)
 
       phiBuf.unmap()
       piBuf.unmap()
