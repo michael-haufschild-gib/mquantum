@@ -142,3 +142,43 @@ export function createDensityTexture(
       extraUsage,
   })
 }
+
+/**
+ * FSF requires TWO 3D textures: the main density grid (written to by the
+ * write-grid pass, consumed by the raymarcher) and a secondary "analysis"
+ * grid used for k-space display + Hamiltonian decomposition. Returns the
+ * pair plus their 3D views in a single call so the compute pass can
+ * assign them atomically.
+ */
+export function createFsfDensityAndAnalysisTextures(device: GPUDevice): {
+  densityTexture: GPUTexture
+  densityTextureView: GPUTextureView
+  analysisTexture: GPUTexture
+  analysisTextureView: GPUTextureView
+} {
+  const densityTexture = createDensityTexture(device, 'free-scalar', GPUTextureUsage.COPY_DST)
+  const densityTextureView = densityTexture.createView({
+    label: 'free-scalar-density-view',
+    dimension: '3d',
+  })
+  const analysisTexture = device.createTexture({
+    label: 'free-scalar-analysis-grid',
+    size: {
+      width: DENSITY_GRID_SIZE,
+      height: DENSITY_GRID_SIZE,
+      depthOrArrayLayers: DENSITY_GRID_SIZE,
+    },
+    format: 'rgba16float',
+    dimension: '3d',
+    usage:
+      GPUTextureUsage.STORAGE_BINDING |
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_SRC |
+      GPUTextureUsage.COPY_DST,
+  })
+  const analysisTextureView = analysisTexture.createView({
+    label: 'free-scalar-analysis-view',
+    dimension: '3d',
+  })
+  return { densityTexture, densityTextureView, analysisTexture, analysisTextureView }
+}

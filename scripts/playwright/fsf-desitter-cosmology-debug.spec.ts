@@ -315,7 +315,10 @@ test.describe('FSF de Sitter cosmology debug trace', () => {
     //    within ~200ms at 60fps). If everything is NaN by the end, the
     //    diagnostics readback likely went invalid.
     const lastWithDiag = [...samples].reverse().find((s) => s.diagMaxPhi > 0)
-    expect(lastWithDiag, 'expected at least one frame with non-zero diag maxPhi').toBeTruthy()
+    expect(
+      lastWithDiag?.diagMaxPhi ?? 0,
+      'expected at least one frame with non-zero diag maxPhi'
+    ).toBeGreaterThan(0)
 
     // 5. Field amplitudes should not collapse to exactly zero — "quick
     //    flash then nothing" would manifest as maxPhi → 0 after the

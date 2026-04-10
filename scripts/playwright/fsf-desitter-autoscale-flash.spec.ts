@@ -179,7 +179,9 @@ async function probeCanvasBrightness(
   page: Page
 ): Promise<{ min: number; mean: number; max: number; hasNan: boolean } | null> {
   return page.evaluate(() => {
-    const canvas = document.querySelector('[data-testid="webgpu-canvas"]') as HTMLCanvasElement | null
+    const canvas = document.querySelector(
+      '[data-testid="webgpu-canvas"]'
+    ) as HTMLCanvasElement | null
     if (!canvas) return null
     const w = canvas.width
     const h = canvas.height
@@ -228,6 +230,134 @@ interface BrightnessSample {
   hasNan: boolean
 }
 
+interface FlashEvent {
+  t: number
+  deltaMean: number
+  mean: number
+}
+
+async function pollScreenshotAndBrightness(
+  page: Page,
+  canvas: ReturnType<Page['locator']>,
+  shotDir: string,
+  totalDurationMs: number,
+  pollIntervalMs: number
+): Promise<BrightnessSample[]> {
+  const series: BrightnessSample[] = []
+  const startPoll = Date.now()
+  while (Date.now() - startPoll < totalDurationMs) {
+    await page.waitForTimeout(pollIntervalMs)
+    const elapsed = Math.round(Date.now() - startPoll)
+    const path = join(shotDir, `t${String(elapsed).padStart(5, '0')}ms.png`)
+    try {
+      await canvas.screenshot({ path })
+    } catch {
+      /* ignore canvas screenshot failures (rare, mid-reset) */
+    }
+    const probe = await probeCanvasBrightness(page)
+    if (probe) {
+      series.push({ t: elapsed, ...probe })
+    }
+  }
+  return series
+}
+
+function findClosestByTime<T extends { t: number }>(items: T[], target: number): T | undefined {
+  if (items.length === 0) return undefined
+  let best = items[0]
+  let bestErr = Number.POSITIVE_INFINITY
+  for (const item of items) {
+    const err = Math.abs(item.t - target)
+    if (err < bestErr) {
+      best = item
+      bestErr = err
+    }
+  }
+  return best
+}
+
+function formatSampleRow(
+  sample: FsfCosmoDebugSample,
+  firstT: number,
+  brightness: BrightnessSample | undefined
+): string {
+  return `${String(sample.frame).padStart(5)}  |  ${(sample.t - firstT).toFixed(0).padStart(5)}  |  ${sample.simEta.toExponential(3).padStart(11)}  |  ${sample.a.toExponential(3).padStart(11)}  |  ${sample.aKinetic.toExponential(3).padStart(11)}  |  ${sample.aPotential.toExponential(3).padStart(11)}  |  ${sample.aFull.toExponential(3).padStart(11)}  |  ${String(sample.nSub).padStart(4)} |  ${sample.diagTotalEnergy.toExponential(3).padStart(11)}  |  ${sample.diagMaxPhi.toExponential(3).padStart(11)}  |  ${sample.diagMaxPi.toExponential(3).padStart(11)}  |  ${(brightness?.mean ?? -1).toFixed(1).padStart(7)}  |  ${(brightness?.max ?? -1).toFixed(1).padStart(6)}`
+}
+
+function buildSummary(
+  samples: FsfCosmoDebugSample[],
+  brightnessSeries: BrightnessSample[]
+): string {
+  const firstT = samples[0]?.t ?? 0
+  const checkpoints = [
+    0, 1000, 3000, 5000, 10_000, 15_000, 20_000, 25_000, 30_000, 35_000, 40_000, 45_000,
+  ]
+  const lines: string[] = [
+    `frame  |  t(ms)  |  simEta      |  a          |  aKinetic   |  aPotential |  aFull      |  nSub |  E          |  maxPhi     |  maxPi      |  px.mean  |  px.max`,
+  ]
+  for (const dt of checkpoints) {
+    const best = findClosestByTime(samples, firstT + dt)
+    if (!best) continue
+    const brightness = findClosestByTime(brightnessSeries, dt)
+    lines.push(formatSampleRow(best, firstT, brightness))
+  }
+  return lines.join('\n')
+}
+
+function detectFlashes(series: BrightnessSample[]): FlashEvent[] {
+  // "Flash" := meanBrightness jumps > 20 between consecutive samples.
+  const flashes: FlashEvent[] = []
+  for (let i = 1; i < series.length; i++) {
+    const prev = series[i - 1]!
+    const cur = series[i]!
+    const delta = cur.mean - prev.mean
+    if (Math.abs(delta) > 20) {
+      flashes.push({ t: cur.t, deltaMean: delta, mean: cur.mean })
+    }
+  }
+  return flashes
+}
+
+function writeTraceArtifacts(
+  slug: string,
+  configSnapshot: unknown,
+  samples: FsfCosmoDebugSample[],
+  brightnessSeries: BrightnessSample[],
+  flashes: FlashEvent[],
+  summary: string
+): { jsonPath: string; txtPath: string } {
+  mkdirSync(OUTPUT_DIR, { recursive: true })
+  const jsonPath = join(OUTPUT_DIR, `${slug}.json`)
+  const txtPath = join(OUTPUT_DIR, `${slug}.txt`)
+  writeFileSync(
+    jsonPath,
+    JSON.stringify({ config: configSnapshot, samples, brightnessSeries, flashes }, null, 2)
+  )
+  const flashLines =
+    flashes.length > 0
+      ? [
+          `flash timestamps: ${flashes
+            .map((f) => `t=${f.t}ms Δ=${f.deltaMean.toFixed(1)} mean=${f.mean.toFixed(1)}`)
+            .join(', ')}`,
+        ]
+      : []
+  writeFileSync(
+    txtPath,
+    [
+      `FSF de Sitter cosmology autoScale flash trace`,
+      `config: ${JSON.stringify(configSnapshot, null, 2)}`,
+      ``,
+      `samples captured: ${samples.length}`,
+      `brightness samples: ${brightnessSeries.length}`,
+      `flash events (|ΔmeanBrightness| > 20): ${flashes.length}`,
+      ...flashLines,
+      ``,
+      summary,
+    ].join('\n')
+  )
+  return { jsonPath, txtPath }
+}
+
 test.describe('FSF de Sitter cosmology — autoScale flash repro', () => {
   test('records 45s trace with autoScale forced true, screenshots + brightness probe', async ({
     page,
@@ -246,114 +376,28 @@ test.describe('FSF de Sitter cosmology — autoScale flash repro', () => {
     // Let reset propagate and the first adiabatic-vacuum frame land.
     await waitForSimulationFrames(page, 10)
 
-    const totalDurationMs = 45_000
-    const pollIntervalMs = 500
-    const startPoll = Date.now()
     const canvas = page.locator('[data-testid="webgpu-canvas"]')
     const shotDir = join(OUTPUT_DIR, 'fsf-desitter-autoscale-shots')
     mkdirSync(shotDir, { recursive: true })
 
-    const brightnessSeries: BrightnessSample[] = []
-
-    while (Date.now() - startPoll < totalDurationMs) {
-      await page.waitForTimeout(pollIntervalMs)
-      const elapsed = Math.round(Date.now() - startPoll)
-      const path = join(shotDir, `t${String(elapsed).padStart(5, '0')}ms.png`)
-      try {
-        await canvas.screenshot({ path })
-      } catch {
-        /* ignore canvas screenshot failures (rare, mid-reset) */
-      }
-      const probe = await probeCanvasBrightness(page)
-      if (probe) {
-        brightnessSeries.push({ t: elapsed, ...probe })
-      }
-    }
+    const brightnessSeries = await pollScreenshotAndBrightness(page, canvas, shotDir, 45_000, 500)
 
     const samples = await readDebugBuffer(page)
+    const summary = buildSummary(samples, brightnessSeries)
+    const flashes = detectFlashes(brightnessSeries)
 
-    // ─── Build a compact summary: checkpoints at 0, 1, 3, 5, 10, 15, 20, 25,
-    // 30, 35, 40, 45 seconds. Include brightness alongside cosmology data.
-    const firstT = samples[0]?.t ?? 0
-    const checkpoints = [0, 1000, 3000, 5000, 10_000, 15_000, 20_000, 25_000, 30_000, 35_000, 40_000, 45_000]
-    const lines: string[] = []
-    lines.push(
-      `frame  |  t(ms)  |  simEta      |  a          |  aKinetic   |  aPotential |  aFull      |  nSub |  E          |  maxPhi     |  maxPi      |  px.mean  |  px.max`
-    )
-    for (const dt of checkpoints) {
-      let best = samples[0]
-      let bestErr = Number.POSITIVE_INFINITY
-      for (const s of samples) {
-        const err = Math.abs(s.t - (firstT + dt))
-        if (err < bestErr) {
-          best = s
-          bestErr = err
-        }
-      }
-      if (!best) continue
-      // Align brightness sample
-      let brightness: BrightnessSample | undefined = brightnessSeries[0]
-      let bErr = Number.POSITIVE_INFINITY
-      for (const b of brightnessSeries) {
-        const err = Math.abs(b.t - dt)
-        if (err < bErr) {
-          brightness = b
-          bErr = err
-        }
-      }
-      lines.push(
-        `${String(best.frame).padStart(5)}  |  ${(best.t - firstT).toFixed(0).padStart(5)}  |  ${best.simEta.toExponential(3).padStart(11)}  |  ${best.a.toExponential(3).padStart(11)}  |  ${best.aKinetic.toExponential(3).padStart(11)}  |  ${best.aPotential.toExponential(3).padStart(11)}  |  ${best.aFull.toExponential(3).padStart(11)}  |  ${String(best.nSub).padStart(4)} |  ${best.diagTotalEnergy.toExponential(3).padStart(11)}  |  ${best.diagMaxPhi.toExponential(3).padStart(11)}  |  ${best.diagMaxPi.toExponential(3).padStart(11)}  |  ${(brightness?.mean ?? -1).toFixed(1).padStart(7)}  |  ${(brightness?.max ?? -1).toFixed(1).padStart(6)}`
-      )
-    }
-    const summary = lines.join('\n')
-
-    // Count brightness "events" — frames where mean jumps >20 from one sample
-    // to the next (flash detection).
-    const flashes: { t: number; deltaMean: number; mean: number }[] = []
-    for (let i = 1; i < brightnessSeries.length; i++) {
-      const prev = brightnessSeries[i - 1]!
-      const cur = brightnessSeries[i]!
-      const delta = cur.mean - prev.mean
-      if (Math.abs(delta) > 20) {
-        flashes.push({ t: cur.t, deltaMean: delta, mean: cur.mean })
-      }
-    }
-
-    mkdirSync(OUTPUT_DIR, { recursive: true })
     const slug = 'fsf-desitter-autoscale-flash'
-    writeFileSync(
-      join(OUTPUT_DIR, `${slug}.json`),
-      JSON.stringify(
-        { config: configSnapshot, samples, brightnessSeries, flashes },
-        null,
-        2
-      )
-    )
-    writeFileSync(
-      join(OUTPUT_DIR, `${slug}.txt`),
-      [
-        `FSF de Sitter cosmology autoScale flash trace`,
-        `config: ${JSON.stringify(configSnapshot, null, 2)}`,
-        ``,
-        `samples captured: ${samples.length}`,
-        `brightness samples: ${brightnessSeries.length}`,
-        `flash events (|ΔmeanBrightness| > 20): ${flashes.length}`,
-        ...(flashes.length > 0
-          ? [`flash timestamps: ${flashes.map((f) => `t=${f.t}ms Δ=${f.deltaMean.toFixed(1)} mean=${f.mean.toFixed(1)}`).join(', ')}`]
-          : []),
-        ``,
-        summary,
-      ].join('\n')
+    const { jsonPath, txtPath } = writeTraceArtifacts(
+      slug,
+      configSnapshot,
+      samples,
+      brightnessSeries,
+      flashes,
+      summary
     )
 
-    await testInfo.attach(`${slug}.json`, {
-      path: join(OUTPUT_DIR, `${slug}.json`),
-      contentType: 'application/json',
-    })
-    await testInfo.attach(`${slug}.txt`, {
-      path: join(OUTPUT_DIR, `${slug}.txt`),
-      contentType: 'text/plain',
-    })
+    await testInfo.attach(`${slug}.json`, { path: jsonPath, contentType: 'application/json' })
+    await testInfo.attach(`${slug}.txt`, { path: txtPath, contentType: 'text/plain' })
 
     // Soft asserts: instrumentation wired up and config is what we expected.
     expect(samples.length, 'expected at least 500 cosmology debug samples').toBeGreaterThan(500)

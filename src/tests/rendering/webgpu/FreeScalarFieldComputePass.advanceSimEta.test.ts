@@ -13,11 +13,11 @@ vi.mock('@/lib/physics/freeScalar/vacuumSpectrum', () => ({
   sampleVacuumSpectrum: vi.fn(() => ({ phi: new Float32Array(0), pi: new Float32Array(0) })),
 }))
 
+import { FreeScalarFieldComputePass } from '@/rendering/webgpu/passes/FreeScalarFieldComputePass'
 import {
   computeAdiabaticSubsteps,
-  FreeScalarFieldComputePass,
   projectSimEta,
-} from '@/rendering/webgpu/passes/FreeScalarFieldComputePass'
+} from '@/rendering/webgpu/passes/fsfCosmologyStepping'
 
 describe('FreeScalarFieldComputePass.advanceSimEta (cosmology clock direction)', () => {
   it('advances η toward 0⁻ by ADDING dt on the η < 0 branch', () => {

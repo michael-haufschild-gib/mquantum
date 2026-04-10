@@ -25,7 +25,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
-  createDensityTexture,
+  createFsfDensityAndAnalysisTextures,
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
@@ -42,14 +42,19 @@ import {
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
-  FSF_COSMO_COEFS_BYTE_OFFSET,
-  FSF_COSMO_COEFS_BYTE_SIZE,
   FSF_COSMO_COEFS_F32_COUNT,
   FSF_DT_BYTE_OFFSET,
   FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
+import { captureFsfCosmoDebugSample, getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
+import {
+  computeAdiabaticSubsteps,
+  computeFsfCflSubsteps,
+  projectSimEta,
+  writeFsfCosmologyCoefsSlot,
+} from './fsfCosmologyStepping'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 /**
@@ -60,232 +65,22 @@ import { requestStateSave as genericStateSave } from './stateSave'
  */
 const UNIFORM_SIZE = FSF_UNIFORM_SIZE
 const DT_BYTE_OFFSET = FSF_DT_BYTE_OFFSET
-const COSMO_COEFS_BYTE_OFFSET = FSF_COSMO_COEFS_BYTE_OFFSET
-const COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_BYTE_SIZE
 
 /**
- * Numerical floor on `|η|` during cosmological evolution. The canonical δφ
- * integrator is CFL-stable on its own — `ω² = k² + m²·a²` is bounded at
- * finite `a` — but the discontinuous clamp of `simEta` to this floor
- * drives a non-adiabatic jump in the cosmology coefficients `(A, B, C)`
- * over a single outer leapfrog step. Near the floor, `a(η) ∝ 1/|η|` in
- * de Sitter so a step from `η = −0.005` to `η = 0` (clamped to `−floor`)
- * multiplies `a` by `1/(H·floor)/200 ≈ 5×` *per step*. The leapfrog
- * pumps mode energy violently during that non-adiabatic transition and
- * `π` overshoots to `≫ 10⁶×` its previous value before any sub-step can
- * absorb the change — eventually overflowing float32 and producing NaN.
- *
- * Pick the floor at `|η| = 0.01` — deep enough in the late-time regime
- * that every lattice mode is well super-horizon (`k_min·|η| = 2π/(N·Δ)·η
- * ≪ 1` for the 64³/Δ=0.1 defaults), so the physics is already frozen
- * and further evolution toward `η → 0⁻` would add nothing, while the
- * coefficient jump at the clamp stays modest enough for the adaptive
- * CFL sub-stepper to handle without pumping the mode oscillators into
- * overflow. From `η₀ = −10` this still gives 1000× scale-factor growth
- * — plenty of dynamic range for the visualization.
- *
- * See `scripts/playwright-output/fsf-desitter-autoscale-flash.json` for
- * the captured trace that drove the floor increase.
+ * Create a 4-byte COPY_SRC staging buffer pre-populated with a single f32
+ * `dt` value. Used by the leapfrog kickstart to stage `dt/2` and `dt` into
+ * the uniform buffer's DT slot via `encoder.copyBufferToBuffer`.
  */
-const COSMOLOGY_ETA_FLOOR = 1e-2
-
-/**
- * Leapfrog CFL safety ceiling for the adaptive sub-stepping loop. The
- * physical dispersion at the current `η` is `ω² = k_max² + m²·a²`; a full
- * `dt·ω` exceeding this threshold triggers sub-stepping of the pi/phi
- * updates. The theoretical leapfrog limit is `dt·ω < 2`, where the
- * amplification factors sit exactly on the complex unit circle — *marginally*
- * stable, not strictly stable. At that edge, float32 roundoff and the
- * discontinuous jump in the cosmology coefficients when `simEta` is
- * clamped to the ETA floor push individual cells into the overflow regime
- * before the transient dies out, eventually producing NaN via the
- * Laplacian stencil (see `scripts/playwright-output/fsf-desitter-
- * autoscale-flash.json` for the captured trace that led here).
- *
- * We pick `1.0`, giving the sub-stepper a factor-of-2 margin on `dt·ω`
- * and `h²ω² ≤ 1` so the leapfrog eigenvalues sit well inside the stable
- * disk. The extra sub-steps are ~2× more work only at the deepest
- * late-time regime; everywhere else `ω·dt ≪ 1` already and nothing
- * changes.
- */
-const COSMOLOGY_CFL_SAFETY = 1.0
-
-/**
- * Hard cap on the number of cosmology sub-steps per outer leapfrog step.
- * Beyond this the user has driven the simulation so deep toward the
- * singularity (massive de Sitter at tiny |η|, Kasner/ekpyrotic near the
- * Big Bang) that further sub-stepping would stall the renderer. When
- * hit, we clamp and emit a deduplicated warning — honest "the integrator
- * can't keep up" rather than a silent numerical blow-up.
- */
-const COSMOLOGY_MAX_SUBSTEPS = 32
-
-/**
- * Adiabatic sub-stepping ceiling. The leapfrog is CFL-stable as long as
- * `dt·ω < CFL_SAFETY`, but CFL alone does not guarantee that the slowly-
- * varying cosmological background stays *adiabatic* relative to the mode
- * oscillator — i.e. that the relative change in the zero-mode frequency
- * `ω₀ ≈ m·a` per sub-step satisfies `|Δω/ω| ≪ 1`. If it doesn't, the
- * leapfrog pumps the mode oscillator out of its instantaneous ground
- * state and the canonical amplitudes overshoot by orders of magnitude
- * (captured as the 92× energy jump at the floor crossing in
- * `scripts/playwright-output/fsf-desitter-autoscale-flash.json`).
- *
- * We require per sub-step `|Δω₀/ω_avg| < 0.1` — i.e. the scale factor
- * changes by no more than ~10% of its mean over one sub-step. Combined
- * with the CFL ceiling via `nSub = max(nSub_cfl, nSub_adiab)`, this
- * keeps the numerical integrator tracking the analytical mode functions
- * without excitations. Under Minkowski `a(η) ≡ 1` and the adiabatic
- * check returns 1, so nothing changes for the flat-background path.
- */
-const COSMOLOGY_ADIABATIC_SAFETY = 0.1
-
-/**
- * Pure, non-mutating projection of `simEta` after advancing by `dt`. Mirrors
- * the clamp/floor logic of `FreeScalarFieldComputePass.advanceSimEta`:
- * every proposal whose absolute value falls below `COSMOLOGY_ETA_FLOOR` —
- * including the `proposed === 0` and sign-flip cases — is snapped to
- * `±COSMOLOGY_ETA_FLOOR` with the original sign preserved.
- *
- * Exists so the CFL preview in the leapfrog loop can see the end-of-step
- * `simEta` *without* mutating the state. In de Sitter, `a(η) ∝ 1/|η|` grows
- * monotonically toward the singularity, so a CFL check evaluated only at
- * the start of the outer step misses the discontinuous jump to the floor
- * and the pi update at the end of the step runs above the leapfrog
- * stability limit. Projecting forward and computing CFL at both endpoints
- * fixes that; see `executeField` for the call site.
- *
- * The runtime instance method `advanceSimEta` delegates to this helper so
- * the clamp math lives in exactly one place.
- *
- * @param currentEta - Current conformal time (must be non-zero for cosmology)
- * @param dt - Leapfrog time step (positive)
- * @returns The projected `simEta` with the floor/sign clamp applied
- */
-export function projectSimEta(currentEta: number, dt: number): number {
-  const originalSign = currentEta < 0 ? -1 : 1
-  // Move toward η = 0: opposite direction from the current branch's sign.
-  const proposed = currentEta - originalSign * dt
-  // Single check: floor OR sign flip (Math.sign(0) === 0 ≠ originalSign,
-  // so the explicit `proposed === 0` clause is already covered).
-  const crossedSingularity = Math.sign(proposed) !== originalSign
-  if (crossedSingularity || Math.abs(proposed) < COSMOLOGY_ETA_FLOOR) {
-    return originalSign * COSMOLOGY_ETA_FLOOR
-  }
-  return proposed
-}
-
-/**
- * Adiabatic-safety substep count for a single outer leapfrog step.
- *
- * Returns the minimum `nSub` such that the relative change in the
- * zero-mode frequency `ω₀ ≈ m·a` over a single sub-step stays below
- * `COSMOLOGY_ADIABATIC_SAFETY`. With `a² = aFull / aPotential` from
- * the cosmology coefficient ratio (by construction, aFull = a^n and
- * aPotential = a^(n-2), so their ratio is `a²` for any spatial
- * dimension), we compute `a_start` and `a_end` directly and use the
- * scalar fractional change `|a_end − a_start| / a_avg` — for
- * mass-dominated modes `ω₀ ∝ a`, so the fractional change in `ω₀`
- * equals the fractional change in `a`. For sub-horizon modes
- * `ω_k ≈ k_lat` doesn't depend on `a` at all, so this over-estimates
- * the adiabatic pressure — that's conservative (safer), never unsafe.
- *
- * Under Minkowski or the identity fallback, `a_start = a_end = 1` and
- * this returns 1 — no substepping pressure — so the flat-background
- * path is bit-identical to the previous behaviour.
- *
- * @param coefsStart - Cosmology coefficients at the start of the outer step
- * @param coefsEnd - Cosmology coefficients at the projected end of the outer step
- * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
- */
-export function computeAdiabaticSubsteps(
-  coefsStart: { aFull: number; aPotential: number },
-  coefsEnd: { aFull: number; aPotential: number }
-): number {
-  const aSqStart = coefsStart.aPotential > 0 ? coefsStart.aFull / coefsStart.aPotential : 1
-  const aSqEnd = coefsEnd.aPotential > 0 ? coefsEnd.aFull / coefsEnd.aPotential : 1
-  const aStart = Math.sqrt(Math.max(aSqStart, 0))
-  const aEnd = Math.sqrt(Math.max(aSqEnd, 0))
-  const aAvg = 0.5 * (aStart + aEnd)
-  if (!(aAvg > 0)) return 1
-  const relativeChange = Math.abs(aEnd - aStart) / aAvg
-  if (!(relativeChange > COSMOLOGY_ADIABATIC_SAFETY)) return 1
-  const ideal = Math.ceil(relativeChange / COSMOLOGY_ADIABATIC_SAFETY)
-  return ideal <= COSMOLOGY_MAX_SUBSTEPS ? ideal : COSMOLOGY_MAX_SUBSTEPS
-}
-
-// ───────────────────────────────────────────────────────────────────────────
-// Debug trace (dev-only cosmology instrumentation)
-// ───────────────────────────────────────────────────────────────────────────
-
-/**
- * Single cosmology snapshot captured by the debug ring buffer. Wire-compatible
- * with the playwright measurement spec — keep the shape flat and plain-f32
- * friendly so `page.evaluate` can read it without a deserialization layer.
- */
-export interface FsfCosmoDebugSample {
-  /** Frame ordinal since the last reset (monotonic, advances once per executeField). */
-  frame: number
-  /** `performance.now()` timestamp at the capture, ms since navigation. */
-  t: number
-  /** Sim conformal time `η` at the end of the frame's leapfrog loop. */
-  simEta: number
-  /** Scale factor `a(η)` reconstructed from aPotential and the latticeDim. */
-  a: number
-  /** Three cosmology coefs written to the uniform at the end of the frame. */
-  aKinetic: number
-  aPotential: number
-  aFull: number
-  /** Adaptive sub-step count chosen at the start of the frame (1 = no sub-stepping). */
-  nSub: number
-  /** Physical mass-term contribution `m²·a²` used for the CFL calculation. */
-  mSqAsq: number
-  /**
-   * Max frame energy read from the diagnostics store at the capture point.
-   * `NaN` if no diagnostics snapshot has landed yet (async readback pipeline).
-   */
-  diagTotalEnergy: number
-  diagMaxPhi: number
-  diagMaxPi: number
-}
-
-/**
- * Global ring buffer exposed on `window` when cosmology is active. The
- * playwright measurement spec polls this via `page.evaluate` to observe
- * the integrator without the async diagnostics readback latency masking
- * short-lived transients.
- *
- * Capacity is capped so long runs don't accumulate unbounded memory; the
- * buffer wraps around after `FSF_COSMO_DEBUG_CAPACITY` samples and exposes
- * `head` so the consumer can reconstruct the temporal order.
- */
-export interface FsfCosmoDebugBuffer {
-  samples: FsfCosmoDebugSample[]
-  capacity: number
-  head: number // index of next write — the oldest sample is at (head) mod capacity
-  enabled: boolean
-}
-
-const FSF_COSMO_DEBUG_CAPACITY = 2048
-
-/**
- * Lazily-initialized shared debug buffer. Single instance per page — we
- * currently have only one FSF compute pass per app. The `enabled` flag is
- * toggled by the playwright spec before kicking off the measurement
- * (`window.__fsfCosmoDebug.enabled = true`) so normal runs pay nothing.
- */
-function getOrCreateFsfCosmoDebugBuffer(): FsfCosmoDebugBuffer | null {
-  if (typeof globalThis === 'undefined') return null
-  const g = globalThis as unknown as { __fsfCosmoDebug?: FsfCosmoDebugBuffer }
-  if (!g.__fsfCosmoDebug) {
-    g.__fsfCosmoDebug = {
-      samples: [],
-      capacity: FSF_COSMO_DEBUG_CAPACITY,
-      head: 0,
-      enabled: false,
-    }
-  }
-  return g.__fsfCosmoDebug
+function createDtStagingBuffer(device: GPUDevice, label: 'half' | 'full', dt: number): GPUBuffer {
+  const staging = device.createBuffer({
+    label: `free-scalar-${label}-dt-staging`,
+    size: 4,
+    usage: GPUBufferUsage.COPY_SRC,
+    mappedAtCreation: true,
+  })
+  new Float32Array(staging.getMappedRange()).set([dt])
+  staging.unmap()
+  return staging
 }
 
 /**
@@ -402,34 +197,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-
-    this.densityTexture = createDensityTexture(device, 'free-scalar', GPUTextureUsage.COPY_DST)
-
-    this.densityTextureView = this.densityTexture.createView({
-      label: 'free-scalar-density-view',
-      dimension: '3d',
-    })
-
-    this.analysisTexture = device.createTexture({
-      label: 'free-scalar-analysis-grid',
-      size: {
-        width: DENSITY_GRID_SIZE,
-        height: DENSITY_GRID_SIZE,
-        depthOrArrayLayers: DENSITY_GRID_SIZE,
-      },
-      format: 'rgba16float',
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC |
-        GPUTextureUsage.COPY_DST,
-    })
-
-    this.analysisTextureView = this.analysisTexture.createView({
-      label: 'free-scalar-analysis-view',
-      dimension: '3d',
-    })
+    const textures = createFsfDensityAndAnalysisTextures(device)
+    this.densityTexture = textures.densityTexture
+    this.densityTextureView = textures.densityTextureView
+    this.analysisTexture = textures.analysisTexture
+    this.analysisTextureView = textures.analysisTextureView
   }
 
   /** Get the density texture view for binding into the raymarching pipeline. */
@@ -698,14 +470,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Skipped when we injected a saved state — the saved pi is already on
     // the half-offset grid, and a second kick would full-step it ahead of phi.
     if (!injectedFromSave && this.pl && this.bg && this.uniformBuffer) {
-      const halfDtStaging = device.createBuffer({
-        label: 'free-scalar-half-dt-staging',
-        size: 4,
-        usage: GPUBufferUsage.COPY_SRC,
-        mappedAtCreation: true,
-      })
-      new Float32Array(halfDtStaging.getMappedRange()).set([config.dt * 0.5])
-      halfDtStaging.unmap()
+      const halfDtStaging = createDtStagingBuffer(device, 'half', config.dt * 0.5)
       encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
 
       const kickPass = ctx.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
@@ -717,14 +482,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       kickPass.end()
 
-      const fullDtStaging = device.createBuffer({
-        label: 'free-scalar-full-dt-staging',
-        size: 4,
-        usage: GPUBufferUsage.COPY_SRC,
-        mappedAtCreation: true,
-      })
-      new Float32Array(fullDtStaging.getMappedRange()).set([config.dt])
-      fullDtStaging.unmap()
+      const fullDtStaging = createDtStagingBuffer(device, 'full', config.dt)
       encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
       this.pendingStagingBuffers.push(halfDtStaging, fullDtStaging)
     }
@@ -787,100 +545,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /** Current simulation conformal time η — exposed for analysis readouts. */
   getSimEta(): number {
     return this.simEta
-  }
-
-  /**
-   * Overwrite the contiguous 12-byte cosmology coefficients slot
-   * `(aKinetic, aPotential, aFull)` in the uniform buffer, avoiding the
-   * full 528-byte re-upload that `writeFsfUniforms` performs. Called from
-   * the leapfrog substep loop when cosmology is active so every
-   * drift + kick pair consumes fresh coefficients evaluated at the current
-   * `simEta`.
-   *
-   * Allocates nothing per call — the values are staged through the
-   * pre-allocated `cosmoCoefsScratch` buffer.
-   *
-   * @param device - GPU device
-   * @param aKinetic - a^(−(n−2)) at current η
-   * @param aPotential - a^(n−2) at current η
-   * @param aFull - a^n at current η
-   */
-  private writeCosmologyCoefsSlot(
-    device: GPUDevice,
-    aKinetic: number,
-    aPotential: number,
-    aFull: number
-  ): void {
-    if (!this.uniformBuffer) return
-    this.cosmoCoefsScratch[0] = aKinetic
-    this.cosmoCoefsScratch[1] = aPotential
-    this.cosmoCoefsScratch[2] = aFull
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      COSMO_COEFS_BYTE_OFFSET,
-      this.cosmoCoefsScratch.buffer,
-      this.cosmoCoefsScratch.byteOffset,
-      COSMO_COEFS_BYTE_SIZE
-    )
-  }
-
-  /**
-   * Adaptive CFL sub-step count for the canonical δφ leapfrog. The
-   * physical dispersion `ω² = k_max² + m²·a²` is bounded as long as `a`
-   * is bounded, but massive modes in de Sitter (or any late-time limit
-   * where `a → ∞`) drive `m·a·dt` above the leapfrog stability ceiling.
-   * When that happens we subdivide the outer step and take several
-   * smaller leapfrog sub-steps with frozen coefs, preserving second-order
-   * accuracy within the sub-step window.
-   *
-   * Uses the maximum over active dimensions of `k_max_d = π/spacing[d]`
-   * (Nyquist) as the effective cutoff — close enough to the discrete
-   * Laplacian spectrum that the safety factor absorbs the difference.
-   *
-   * @param config - Free scalar field configuration
-   * @param aFull - a^n at the current η (source of the time-varying mass term)
-   * @param aPotential - a^(n−2) at the current η
-   * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
-   */
-  private computeAdaptiveSubsteps(
-    config: FreeScalarConfig,
-    aFull: number,
-    aPotential: number
-  ): number {
-    // Physical dispersion uses m²·a² = m²·(aFull/aPotential).
-    const aSq = aPotential > 0 ? aFull / aPotential : 1
-    const massSq = config.mass * config.mass * aSq
-
-    let kMaxSq = 0
-    for (let d = 0; d < config.latticeDim; d++) {
-      const spacing = config.spacing[d]!
-      if (!(spacing > 0) || config.gridSize[d]! <= 1) continue
-      // Nyquist: k_max_d = π/a_d, contributing (π/a)² per dimension to k².
-      const kmax = Math.PI / spacing
-      kMaxSq += kmax * kmax
-    }
-
-    const omega = Math.sqrt(Math.max(kMaxSq + massSq, 0))
-    const cflRatio = config.dt * omega
-    if (!(cflRatio > COSMOLOGY_CFL_SAFETY)) return 1
-
-    const ideal = Math.ceil(cflRatio / COSMOLOGY_CFL_SAFETY)
-    if (ideal <= COSMOLOGY_MAX_SUBSTEPS) return ideal
-
-    // Cap reached: emit a dedupe-by-preset warning so the user learns
-    // once that the integrator is saturated.
-    const cosmo = config.cosmology
-    const key = `${cosmo.preset}|d=${config.latticeDim}|m=${config.mass}|dt=${config.dt}`
-    if (!this.cflCapWarnedKeys.has(key)) {
-      this.cflCapWarnedKeys.add(key)
-      logger.warn(
-        `[FSF-COMPUTE] cosmology sub-step cap reached (preset=${cosmo.preset}, ` +
-          `ω·dt=${cflRatio.toFixed(3)}, ideal=${ideal}, cap=${COSMOLOGY_MAX_SUBSTEPS}). ` +
-          `Evolution continues but with reduced stability — increase stepsPerFrame, ` +
-          `reduce dt, or step back from the singularity.`
-      )
-    }
-    return COSMOLOGY_MAX_SUBSTEPS
   }
 
   /**
@@ -1029,15 +693,17 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           const coefsStart = computeFsfCosmologyCoefs(config, this.simEta)
           const endSimEta = projectSimEta(this.simEta, dtFull)
           const coefsEnd = computeFsfCosmologyCoefs(config, endSimEta)
-          const nSubStart = this.computeAdaptiveSubsteps(
+          const nSubStart = computeFsfCflSubsteps(
             config,
             coefsStart.aFull,
-            coefsStart.aPotential
+            coefsStart.aPotential,
+            this.cflCapWarnedKeys
           )
-          const nSubEnd = this.computeAdaptiveSubsteps(
+          const nSubEnd = computeFsfCflSubsteps(
             config,
             coefsEnd.aFull,
-            coefsEnd.aPotential
+            coefsEnd.aPotential,
+            this.cflCapWarnedKeys
           )
           const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
           const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)
@@ -1081,7 +747,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
             const subDt = nSub === 1 ? dtFull : dtFull / nSub
             const newEta = this.advanceSimEta(subDt)
             const coefs = computeFsfCosmologyCoefs(config, newEta)
-            this.writeCosmologyCoefsSlot(device, coefs.aKinetic, coefs.aPotential, coefs.aFull)
+            if (this.uniformBuffer) {
+              writeFsfCosmologyCoefsSlot(
+                device,
+                this.uniformBuffer,
+                this.cosmoCoefsScratch,
+                coefs.aKinetic,
+                coefs.aPotential,
+                coefs.aFull
+              )
+            }
           }
 
           const piPass = ctx.beginComputePass({
@@ -1216,72 +891,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       // the flag on before driving the preset and reads the ring buffer
       // afterward via `page.evaluate`.
       if (config.cosmology.enabled) {
-        this.captureCosmoDebugSample(config, coefs, isPlaying ? this.debugFrameIndexTick() : this.debugFrameIndex)
+        if (isPlaying) this.debugFrameIndex += 1
+        captureFsfCosmoDebugSample(
+          config,
+          coefs,
+          this.simEta,
+          this.lastDebugNSub,
+          this.debugFrameIndex
+        )
       }
-    }
-  }
-
-  /**
-   * Advance the debug frame counter and return the new value. Extracted so
-   * the capture call site stays a single expression.
-   */
-  private debugFrameIndexTick(): number {
-    this.debugFrameIndex += 1
-    return this.debugFrameIndex
-  }
-
-  /**
-   * Push one cosmology debug snapshot into the ring buffer if it's enabled.
-   * Samples the live diagnostics store so the trace carries both the
-   * current cosmology coefs (pinned to the frame's `simEta`) and the
-   * most recent async readback of field statistics (`maxPhi`, `maxPi`,
-   * `totalEnergy`). Early-out cost is a single property read.
-   */
-  private captureCosmoDebugSample(
-    config: FreeScalarConfig,
-    coefs: { aKinetic: number; aPotential: number; aFull: number },
-    frameIndex: number
-  ): void {
-    const buf = getOrCreateFsfCosmoDebugBuffer()
-    if (!buf || !buf.enabled) return
-
-    // Reconstruct `a` from the cosmology coefs so the trace has a single
-    // source of truth that matches what the shader saw. aPotential = a^(n−2)
-    // so a = aPotential^(1/(n−2)); for latticeDim=1 (n=2) aPotential ≡ 1
-    // and we fall back to the raw power-law evaluation.
-    const n = config.latticeDim + 1
-    let a = 1
-    if (n > 2 && coefs.aPotential > 0) {
-      a = Math.pow(coefs.aPotential, 1 / (n - 2))
-    }
-    const mSqAsq = config.mass * config.mass * a * a
-
-    // Sample the diagnostics store at the capture instant. The store holds
-    // the most recent async readback, which may lag the current frame by
-    // `diagnosticsInterval` frames. We mark it with the frame index so the
-    // consumer can cross-reference.
-    const diagState = useDiagnosticsStore.getState().fsf
-    const sample: FsfCosmoDebugSample = {
-      frame: frameIndex,
-      t: typeof performance !== 'undefined' ? performance.now() : 0,
-      simEta: this.simEta,
-      a,
-      aKinetic: coefs.aKinetic,
-      aPotential: coefs.aPotential,
-      aFull: coefs.aFull,
-      nSub: this.lastDebugNSub,
-      mSqAsq,
-      diagTotalEnergy: diagState.totalEnergy,
-      diagMaxPhi: diagState.maxPhi,
-      diagMaxPi: diagState.maxPi,
-    }
-
-    if (buf.samples.length < buf.capacity) {
-      buf.samples.push(sample)
-      buf.head = buf.samples.length
-    } else {
-      buf.samples[buf.head % buf.capacity] = sample
-      buf.head += 1
     }
   }
 
