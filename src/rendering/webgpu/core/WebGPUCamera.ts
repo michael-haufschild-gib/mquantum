@@ -299,14 +299,44 @@ export class WebGPUCamera {
   }
 
   /**
+   * Pick an up-axis that is not collinear with forward. Needed because
+   * `writeLookAtMatrix` computes `right = cross(forward, up)`, which is
+   * zero-length whenever forward ∥ up and produces a singular view matrix.
+   * A caller can legally set `state.up=[0,1,0]` and look straight down the
+   * Y axis, so we must swap to a fallback axis without mutating `state.up`.
+   */
+  private getSafeUp(safeTarget: [number, number, number]): [number, number, number] {
+    const [px, py, pz] = this.state.position
+    let fx = safeTarget[0] - px
+    let fy = safeTarget[1] - py
+    let fz = safeTarget[2] - pz
+    const fLen = Math.hypot(fx, fy, fz) || 1
+    fx /= fLen
+    fy /= fLen
+    fz /= fLen
+
+    const [ux, uy, uz] = this.state.up
+    const upLen = Math.hypot(ux, uy, uz) || 1
+    const cosTheta = (fx * ux + fy * uy + fz * uz) / upLen
+    if (Math.abs(cosTheta) <= 0.999) {
+      return this.state.up
+    }
+    // Forward is (nearly) parallel to the configured up. Pick a world axis
+    // that is provably non-collinear with forward: if forward is dominated
+    // by the X component, fall back to world +Z, otherwise world +X.
+    return Math.abs(fx) < 0.9 ? [1, 0, 0] : [0, 0, 1]
+  }
+
+  /**
    * Recompute all matrices from current state.
    */
   private updateMatrices(): void {
+    const safeTarget = this.getSafeTarget()
     writeLookAtMatrix(
       this.matrices.viewMatrix,
       this.state.position,
-      this.getSafeTarget(),
-      this.state.up
+      safeTarget,
+      this.getSafeUp(safeTarget)
     )
     writePerspectiveMatrix(
       this.matrices.projectionMatrix,

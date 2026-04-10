@@ -69,8 +69,15 @@ export function SecondQuantizationSection({
   // the "Mode index (k)" slider was decorative — the energy display stayed
   // at E = (n + 1/2)·ℏω with omega hardcoded to 1, no matter which mode the
   // user selected.
-  const modeOmega = useMemo(() => {
-    if (!sqLayerEnabled) return 1.0
+  //
+  // Both the clamped `activeModeIndex` and `modeOmega` are returned from the
+  // same memo so every consumer (table label, slider value, metric call)
+  // reads from the *same* index. Using the raw `sqLayerSelectedModeIndex`
+  // in one place and the clamped index in another meant the table would
+  // briefly show "Mode k=4" while the metrics were computed from `k=2`
+  // whenever dimension or preset size shrank.
+  const { activeModeIndex, modeOmega } = useMemo(() => {
+    if (!sqLayerEnabled) return { activeModeIndex: 0, modeOmega: 1.0 }
     const preset =
       config.presetName === 'custom'
         ? generateQuantumPreset(
@@ -88,9 +95,12 @@ export function SecondQuantizationSection({
             config.maxQuantumNumber,
             config.frequencySpread
           ))
-    const idx = Math.max(0, Math.min(sqLayerSelectedModeIndex, preset.omega.length - 1))
-    const omega = preset.omega[idx]
-    return Number.isFinite(omega) && omega! > 0 ? omega! : 1.0
+    const clampedIdx = Math.max(0, Math.min(sqLayerSelectedModeIndex, preset.omega.length - 1))
+    const omega = preset.omega[clampedIdx]
+    return {
+      activeModeIndex: clampedIdx,
+      modeOmega: Number.isFinite(omega) && omega! > 0 ? omega! : 1.0,
+    }
   }, [
     sqLayerEnabled,
     sqLayerSelectedModeIndex,
@@ -122,10 +132,18 @@ export function SecondQuantizationSection({
     ]
   )
 
-  // Compute metrics only when enabled
+  // Compute metrics only when enabled. `computeSecondQuantMetrics` throws a
+  // `RangeError` for exact Fock states past `FOCK_MAX_SAFE_LENGTH` — the UI
+  // slider is clamped to `[0, 10]`, so this is only reachable via malformed
+  // preset imports. Swallow the error and render a placeholder instead of
+  // tearing down the entire sidebar.
   const metrics = useMemo(() => {
     if (!sqLayerEnabled) return null
-    return computeSecondQuantMetrics(sqLayerMode, params)
+    try {
+      return computeSecondQuantMetrics(sqLayerMode, params)
+    } catch {
+      return null
+    }
   }, [sqLayerEnabled, sqLayerMode, params])
 
   return (
@@ -166,7 +184,7 @@ export function SecondQuantizationSection({
               min={0}
               max={Math.max(dimension - 1, 0)}
               step={1}
-              value={sqLayerSelectedModeIndex}
+              value={activeModeIndex}
               onChange={actions.setSelectedModeIndex}
               showValue
               data-testid="sq-layer-mode-index"
@@ -308,7 +326,7 @@ export function SecondQuantizationSection({
                 {sqLayerShowOccupation && (
                   <FockOccupationTable
                     mode={sqLayerMode}
-                    modeIndex={sqLayerSelectedModeIndex}
+                    modeIndex={activeModeIndex}
                     modeOmega={modeOmega}
                     occupation={metrics.occupation}
                     energy={metrics.energy}

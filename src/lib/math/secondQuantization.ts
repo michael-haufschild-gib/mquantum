@@ -333,12 +333,23 @@ export function computeUncertainties(
 const FOCK_BASELINE_LENGTH = 12
 
 /**
- * Hard cap on the Fock distribution length to keep the chart bounded.
- * Sized so that the upper-end UI sliders (squeezed r=2, |α|=5+5i) still
- * normalise to within ~1% — past r ≈ 2.5 the distribution is well into
- * the classical limit and Fock decomposition stops being illuminating.
+ * Hard cap on the Fock distribution length for coherent/squeezed states
+ * (non-exact bases). Sized so that the upper-end UI sliders (squeezed r=2,
+ * |α|=5+5i) still normalise to within ~1% — past r ≈ 2.5 the distribution
+ * is well into the classical limit and Fock decomposition stops being
+ * illuminating.
  */
 const FOCK_MAX_LENGTH = 160
+
+/**
+ * Safety ceiling on `n` for exact Fock states `|n⟩`. The math function is
+ * `O(n)` in allocation (a single `1` in an otherwise-zero probability
+ * vector), so an adversarial input like `n = 1_000_000` would lock the tab
+ * during array construction. 4096 leaves plenty of headroom for any
+ * physically interesting truncation of a harmonic oscillator spectrum
+ * while keeping the allocation bounded at a few tens of KB.
+ */
+export const FOCK_MAX_SAFE_LENGTH = 4096
 
 /**
  * Choose how many Fock basis terms to compute so the |c_n|² distribution
@@ -365,10 +376,18 @@ const FOCK_MAX_LENGTH = 160
 function chooseFockLength(mode: SecondQuantizationMode, params: SecondQuantParams): number {
   switch (mode) {
     case 'fock': {
-      // Exact basis state |n⟩: length must be > n so the occupation bin exists.
-      // No FOCK_MAX_LENGTH cap — hard display limits belong in the UI windowing
-      // layer, not here, so the math result stays faithful for arbitrary n.
+      // Exact basis state |n⟩: length must be > n so the occupation bin
+      // exists. `FOCK_MAX_LENGTH` (160) does not apply — hard *display*
+      // limits belong in the UI windowing layer — but `FOCK_MAX_SAFE_LENGTH`
+      // still does, to fail fast instead of allocating O(n) for adversarial
+      // inputs like `n = 1_000_000` that would hang the tab before any UI
+      // windowing can intervene.
       const n = normalizeFockQuantumNumber(params.n)
+      if (n > FOCK_MAX_SAFE_LENGTH) {
+        throw new RangeError(
+          `Exact Fock distribution for n=${n} exceeds safe limit ${FOCK_MAX_SAFE_LENGTH}`
+        )
+      }
       return Math.max(FOCK_BASELINE_LENGTH, n + 4)
     }
     case 'coherent': {

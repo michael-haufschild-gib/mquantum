@@ -16,7 +16,7 @@
  * "dim 1"). Assertions in this file match the 1-indexed display text.
  */
 
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { HOEnergyDiagram } from '@/components/sections/Analysis/HOEnergyDiagram'
@@ -69,11 +69,15 @@ describe('HOEnergyDiagram', () => {
     ext.setSchroedingerPresetName('nodalStructure') // single highly-excited term, maxN=6
     render(<HOEnergyDiagram />)
 
-    // Reject any rung labelled with n > 12. Iterate possible high values
-    // via queryAllByText (returns [] when not present) so the test fails
-    // loudly if the displayMaxN cap regresses.
+    // Reject any rung labelled with n > 12. Scope the query to the diagram
+    // subtree and to SVG `<text>` nodes only — otherwise an unrelated node
+    // somewhere in the wider render tree could fail this test even when
+    // the ladder cap is correct.
+    const diagram = screen.getByTestId('ho-energy-diagram')
     for (const tooHigh of ['13', '14', '15', '16']) {
-      const found = screen.queryAllByText((_, element) => element?.textContent === tooHigh)
+      const found = within(diagram).queryAllByText(
+        (_, element) => element?.tagName === 'text' && element.textContent === tooHigh
+      )
       expect(found).toEqual([])
     }
   })

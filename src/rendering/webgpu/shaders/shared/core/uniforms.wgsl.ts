@@ -183,7 +183,7 @@ const BIND_GROUP_LAYOUT_COMMENTS = /* wgsl */ `
 // Group 2: Material uniforms (per-object)
 // @group(2) @binding(0) var<uniform> material: MaterialUniforms;
 
-// Group 3: Object-specific uniforms (Mandelbulb, Julia, etc.)
+// Group 3: Object-specific uniforms (schroedinger / pauliSpinor)
 // Layout varies by object type
 `
 

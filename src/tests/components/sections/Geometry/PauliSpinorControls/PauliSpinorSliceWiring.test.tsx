@@ -21,6 +21,19 @@ import { PauliSpinorControls } from '@/components/sections/Geometry/PauliSpinorC
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 describe('PauliSpinorControls — slice position wiring', () => {
+  /**
+   * Click the collapsed "Slice Positions" section header so its child
+   * sliders mount. Reused across every test — if this helper silently
+   * skipped when the header is missing, tests using `localStorage`
+   * persistence could pick up stale open state from each other.
+   */
+  const openSlicePositionsSection = () => {
+    const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
+    const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
+    if (!sliceHeader) throw new Error('Slice Positions section header not found')
+    fireEvent.click(sliceHeader)
+  }
+
   beforeEach(() => {
     useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
     useExtendedObjectStore.getState().initializePauliForDimension(5)
@@ -32,11 +45,7 @@ describe('PauliSpinorControls — slice position wiring', () => {
 
   it('slice slider for dim 3 writes positions[0] (0-indexed extra dim)', () => {
     render(<PauliSpinorControls />)
-    // Open the Slice Positions section — defaultOpen={false}, click its header.
-    const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
-    const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
-    if (!sliceHeader) throw new Error('Slice Positions section header not found')
-    fireEvent.click(sliceHeader)
+    openSlicePositionsSection()
 
     const sliders = screen.getAllByRole('slider', { name: /Dim 3/i })
     expect(sliders).toHaveLength(1)
@@ -53,10 +62,7 @@ describe('PauliSpinorControls — slice position wiring', () => {
 
   it('slice slider for dim 4 writes positions[1]', () => {
     render(<PauliSpinorControls />)
-    const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
-    const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
-    if (!sliceHeader) throw new Error('Slice Positions section header not found')
-    fireEvent.click(sliceHeader)
+    openSlicePositionsSection()
 
     const sliders = screen.getAllByRole('slider', { name: /Dim 4/i })
     expect(sliders).toHaveLength(1)
@@ -68,10 +74,7 @@ describe('PauliSpinorControls — slice position wiring', () => {
 
   it('renders exactly (latticeDim - 3) slice sliders', () => {
     render(<PauliSpinorControls />)
-    const sliceSectionHeaders = screen.getAllByRole('button', { expanded: false })
-    const sliceHeader = sliceSectionHeaders.find((el) => el.textContent?.includes('Slice'))
-    if (!sliceHeader) throw new Error('Slice Positions section header not found')
-    fireEvent.click(sliceHeader)
+    openSlicePositionsSection()
 
     // 5D → extra dims = 2 (dim 3, dim 4)
     const sliders = screen.getAllByRole('slider')

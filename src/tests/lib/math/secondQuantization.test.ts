@@ -518,7 +518,7 @@ describe('computeSecondQuantMetrics', () => {
     // Regression: `chooseFockLength` used to clamp all modes (including
     // exact Fock) at FOCK_MAX_LENGTH=160, so `n = 200` produced an
     // all-zero `fockDistribution` even though the state |200⟩ is
-    // perfectly well-defined. The math function no longer caps for
+    // perfectly well-defined. The math function no longer soft-caps for
     // mode='fock'; any display-side window cap must happen in the UI.
     const large = computeSecondQuantMetrics('fock', {
       n: 200,
@@ -533,5 +533,23 @@ describe('computeSecondQuantMetrics', () => {
     expect(large.fockDistribution[200]).toBe(1)
     // Length must be large enough to include the occupied index.
     expect(large.fockDistribution.length).toBeGreaterThan(200)
+  })
+
+  it('throws a RangeError for exact Fock n past FOCK_MAX_SAFE_LENGTH', () => {
+    // Safety guardrail: without this cap, `n = 1_000_000` would try to
+    // allocate a million-entry probability vector and lock the tab before
+    // the UI windowing layer could intervene. The math function fails
+    // fast so the UI can display an "out of range" state instead of
+    // silently triggering memory pressure.
+    expect(() =>
+      computeSecondQuantMetrics('fock', {
+        n: 1_000_000,
+        alphaRe: 0,
+        alphaIm: 0,
+        squeezeR: 0,
+        squeezeTheta: 0,
+        omega: 1,
+      })
+    ).toThrow(RangeError)
   })
 })

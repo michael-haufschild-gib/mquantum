@@ -8,6 +8,7 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { maxStableDt } from '@/lib/physics/dirac/scales'
 
@@ -429,16 +430,26 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
         // Imported lazily to avoid pulling appearanceStore into the store-bootstrap
         // module dependency graph.
         if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
-          void import('@/stores/appearanceStore').then(({ useAppearanceStore }) => {
-            // Guard against a newer applyDiracPreset() arriving between this
-            // lazy import and its resolution. If the store has already moved
-            // on to a non-split fieldView, leave the color algorithm alone —
-            // otherwise this stale write would silently override the newer
-            // preset's intended color algorithm.
-            if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
-              useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
-            }
-          })
+          void import('@/stores/appearanceStore')
+            .then(({ useAppearanceStore }) => {
+              // Guard against a newer applyDiracPreset() arriving between
+              // this lazy import and its resolution. If the store has moved
+              // on to a non-split fieldView, leave the color algorithm alone
+              // — otherwise this stale write would silently override the
+              // newer preset's intended color algorithm.
+              if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
+                useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+              }
+            })
+            .catch((error) => {
+              // Chunk-load failure is non-fatal — the Dirac state has already
+              // been written; only the color-algorithm sync couldn't run.
+              // Keep the existing appearance settings.
+              logger.warn(
+                `[diracSetters] Failed to load appearanceStore for color sync on '${presetId}':`,
+                error
+              )
+            })
         }
       })
     },

@@ -60,15 +60,27 @@ describe('useUrlState + useObjectTypeInitialization effect race', () => {
   })
 
   /**
-   * Wait until `useUrlState` has finished applying URL params: the hook sets
-   * `isLoadingScene=true` under the try-finally and clears it on the next
-   * requestAnimationFrame. Polling this observable condition replaces the
-   * previous hardcoded 30ms sleep, which could race on slow CI machines.
+   * Wait until `useUrlState` has finished applying URL params. Two-phase to
+   * avoid a race: `isLoadingScene` defaults to `false`, so polling only for
+   * that flag can resolve at t=0 (before the hook's effect even fires).
+   *
+   *   1. Wait for a URL-derived store mutation we can observe — the URL
+   *      always sets `dimension: 5`, which diverges from the default (3),
+   *      so observing that value in the geometry store proves the hook
+   *      actually ran.
+   *   2. Then wait for `isLoadingScene` to drop back to `false` — the hook
+   *      flips it on under a try/finally and clears it via the
+   *      requestAnimationFrame cleanup, so this confirms the init-hook
+   *      re-run has finished and the guard has been released.
    */
-  const waitForUrlStateApplied = () =>
-    waitFor(() => {
+  const waitForUrlStateApplied = async () => {
+    await waitFor(() => {
+      expect(useGeometryStore.getState().dimension).toBe(5)
+    })
+    await waitFor(() => {
       expect(usePerformanceStore.getState().isLoadingScene).toBe(false)
     })
+  }
 
   it('preserves URL-set densityGain after dim-change init effect re-runs', async () => {
     const parsedState: Partial<ShareableState> = {
