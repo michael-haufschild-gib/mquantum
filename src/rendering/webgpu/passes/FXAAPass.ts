@@ -83,20 +83,27 @@ export class FXAAPass extends WebGPUBasePass {
       return
     }
 
-    // Must match WGSL struct layout (48 bytes):
-    // vec2f(8) + f32(4) + f32(4) + f32(4) + vec3f(12) + trailing padding(8)
+    // Must match FXAAUniforms struct layout (48 bytes total):
+    //   offset  0: resolution (vec2f, 8 bytes)
+    //   offset  8: subpixelQuality   (f32, 4 bytes)
+    //   offset 12: edgeThreshold     (f32, 4 bytes)
+    //   offset 16: edgeThresholdMin  (f32, 4 bytes)
+    //   offset 20: IMPLICIT PADDING  (12 bytes — vec3f has 16-byte alignment)
+    //   offset 32: _padding          (vec3f, 12 bytes)
+    //   offset 44: TRAILING PADDING  (4 bytes — struct rounds up to 16-byte alignment)
+    // → indices 0..11 of this Float32Array cover all 48 bytes.
     this.uniformData[0] = width
     this.uniformData[1] = height
     this.uniformData[2] = this.subpixelQuality
     this.uniformData[3] = this.edgeThreshold
     this.uniformData[4] = this.edgeThresholdMin
-    this.uniformData[5] = 0
-    this.uniformData[6] = 0
-    this.uniformData[7] = 0
-    this.uniformData[8] = 0
-    this.uniformData[9] = 0
-    this.uniformData[10] = 0
-    this.uniformData[11] = 0
+    this.uniformData[5] = 0 // implicit pad
+    this.uniformData[6] = 0 // implicit pad
+    this.uniformData[7] = 0 // implicit pad
+    this.uniformData[8] = 0 // _padding.x
+    this.uniformData[9] = 0 // _padding.y
+    this.uniformData[10] = 0 // _padding.z
+    this.uniformData[11] = 0 // trailing pad
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
 
@@ -122,8 +129,10 @@ export class FXAAPass extends WebGPUBasePass {
       ],
     })
 
-    // Create uniform buffer (48 bytes - WGSL struct with vec3f padding aligns to 16)
-    // Layout: vec2f(8) + f32(4) + f32(4) + f32(4) + pad(12) + vec3f(12) = 44, rounded to 48
+    // Create uniform buffer (48 bytes) — see `updateUniforms` for the full
+    // byte-offset layout. The 48-byte size is driven by the trailing `vec3f`
+    // member's 16-byte alignment: 20 bytes of real data + 12 bytes implicit
+    // padding + 12 bytes vec3f + 4 bytes trailing struct-alignment pad.
     this.uniformBuffer = this.createUniformBuffer(device, 48, 'fxaa-uniforms')
 
     // Create sampler
