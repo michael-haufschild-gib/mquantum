@@ -145,17 +145,12 @@ export function useSceneStoreWiring(deps: SceneStoreWiringDeps): void {
     graph.setStoreGetter('geometry', () => useGeometryStore.getState())
     graph.setStoreGetter('measurement', () => useMeasurementStore.getState())
 
-    // Buffer preview: maps UI toggle flags to pass configuration
+    // Buffer preview: active when the UI toggle is on (temporal ray-distance only)
     graph.setStoreGetter('bufferPreview', () => {
       const ui = useUIStore.getState()
-      if (ui.showDepthBuffer)
-        return {
-          bufferType: 'depth' as const,
-          bufferInput: 'depth-buffer',
-          depthMode: 'linear' as const,
-        }
-      if (ui.showTemporalDepthBuffer)
-        return { bufferType: 'temporalDepth' as const, bufferInput: 'quarter-position' }
+      if (ui.showTemporalDepthBuffer) {
+        return { bufferInput: 'quarter-position' }
+      }
       return null
     })
   }, [graph, objectType, cameraRef, schroedingerBasisCacheRef])

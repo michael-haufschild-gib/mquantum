@@ -13,8 +13,18 @@ import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
 import { computeFsfDiagnostics } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
+
+/**
+ * Identity cosmology coefficients — `computeFsfDiagnostics` receives them
+ * instead of the deprecated `mEffSq` scalar. Under the Minkowski preset
+ * (or cosmology disabled) all three collapse to 1, so passing these into
+ * the diagnostics function reproduces the flat-space Klein-Gordon
+ * Hamiltonian bit-identically.
+ */
+const IDENTITY_COEFS: CosmologyCoefs = { aKinetic: 1, aPotential: 1, aFull: 1 }
 
 /** Minimal config factory. */
 function createConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig {
@@ -125,14 +135,14 @@ describe('computeFsfDiagnostics with self-interaction', () => {
   const { phi, pi } = buildKinkField(N, a, v, width)
 
   it('computes total energy matching hand-calculated discrete values', () => {
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
     const expected = expectedKinkEnergy(phi, config)
 
     expect(result.totalEnergy).toBeCloseTo(expected.totalEnergy, 8)
   })
 
   it('includes positive potential energy from self-interaction', () => {
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
 
     // V(φ) = λ(φ²−v²)² ≥ 0 everywhere, and > 0 away from φ=±v
     // A tanh kink passes through φ=0 where V = λv⁴ > 0
@@ -145,8 +155,8 @@ describe('computeFsfDiagnostics with self-interaction', () => {
       selfInteractionEnabled: false,
     })
 
-    const withSI = computeFsfDiagnostics(phi, pi, config)
-    const withoutSI = computeFsfDiagnostics(phi, pi, noSIConfig)
+    const withSI = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
+    const withoutSI = computeFsfDiagnostics(phi, pi, noSIConfig, IDENTITY_COEFS)
 
     // Without SI, total energy is only gradient + mass (no potential)
     // With SI, total energy includes potential → must be larger
@@ -154,7 +164,7 @@ describe('computeFsfDiagnostics with self-interaction', () => {
   })
 
   it('computes meanPhi ≈ 0 for a symmetric kink centered at origin', () => {
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
 
     // tanh is odd → mean over symmetric domain ≈ 0
     // Not exactly 0 due to discrete sampling and boundary effects
@@ -162,7 +172,7 @@ describe('computeFsfDiagnostics with self-interaction', () => {
   })
 
   it('reports maxPhi ≈ v for a kink approaching ±v at boundaries', () => {
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
 
     // tanh(x/w) → ±1 as x → ±∞, so max|φ| → v
     // On a finite lattice, the outermost sites have |φ| < v but close
@@ -171,7 +181,7 @@ describe('computeFsfDiagnostics with self-interaction', () => {
   })
 
   it('reports maxPi = 0 and zero kinetic energy for static kink', () => {
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
 
     expect(result.maxPi).toBe(0)
     // kineticEnergy = 0.5 * sumPi2 * dV = 0 when pi is all zeros
@@ -184,7 +194,7 @@ describe('computeFsfDiagnostics with self-interaction', () => {
     const uniformPhi = new Float32Array(N).fill(v)
     const uniformPi = new Float32Array(N)
 
-    const result = computeFsfDiagnostics(uniformPhi, uniformPi, config)
+    const result = computeFsfDiagnostics(uniformPhi, uniformPi, config, IDENTITY_COEFS)
 
     // At φ = v: V(v) = λ(v²−v²)² = 0, gradient = 0
     // Total energy should be 0 (massless + at vacuum + no kinetic)
@@ -197,7 +207,7 @@ describe('computeFsfDiagnostics with self-interaction', () => {
     const zeroPhi = new Float32Array(N)
     const zeroPi = new Float32Array(N)
 
-    const result = computeFsfDiagnostics(zeroPhi, zeroPi, config)
+    const result = computeFsfDiagnostics(zeroPhi, zeroPi, config, IDENTITY_COEFS)
 
     // At φ = 0: V(0) = λ(0−v²)² = λv⁴ per site
     // Total potential = N * λv⁴ * dV
@@ -230,7 +240,7 @@ describe('computeFsfDiagnostics variance numerical stability', () => {
       absorberEnabled: false,
     })
 
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
     expect(result.variancePhi).toBeGreaterThanOrEqual(0)
     expect(result.variancePhi).toBeLessThan(1e-3)
     // meanPhi must round to ≈ offset (sanity check that the test setup
@@ -255,7 +265,7 @@ describe('computeFsfDiagnostics variance numerical stability', () => {
       absorberEnabled: false,
     })
 
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
     expect(result.variancePhi).toBeCloseTo(1, 6)
     expect(result.meanPhi).toBeCloseTo(0, 6)
   })
@@ -283,7 +293,7 @@ describe('computeFsfDiagnostics 3D self-interaction', () => {
     // φ = 0 everywhere → V(0) = λv⁴ per site
     const phi = new Float32Array(totalSites)
     const pi = new Float32Array(totalSites)
-    const result = computeFsfDiagnostics(phi, pi, config)
+    const result = computeFsfDiagnostics(phi, pi, config, IDENTITY_COEFS)
 
     const dV = a * a * a
     const expectedPotential = totalSites * lambda * Math.pow(v, 4) * dV

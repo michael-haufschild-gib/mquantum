@@ -14,6 +14,7 @@ dist-ssr
 
 # Claude Code
 .claude/scheduled_tasks.lock
+.claude/commands/
 claude.sh
 claude-mcp.sh
 
@@ -65,4 +66,5 @@ docs/reports/
 screenshots/
 scripts/playwright/videos/
 scripts/playwright/screenshots/
+scripts/playwright-output/
 .vercel

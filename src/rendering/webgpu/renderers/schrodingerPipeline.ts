@@ -348,21 +348,6 @@ async function createSchrodingerPipelineImpl(
         topology: 'triangle-list' as const,
         cullMode: pipelineIs2D ? ('none' as const) : ('front' as const),
       },
-      depthStencil: pipelineIs2D
-        ? undefined
-        : rendererConfig.temporal
-          ? undefined
-          : {
-              format: 'depth24plus' as GPUTextureFormat,
-              // Depth writes disabled: the bounding cube geometry depth is
-              // meaningless (it's the cube face distance, not the isosurface
-              // hit distance). Enabling writes causes artifacts when the camera
-              // is inside the cube — early depth test on some GPUs writes depth
-              // before the fragment shader discards (no isosurface hit), which
-              // blocks later overlapping triangles that DO have valid hits.
-              depthWriteEnabled: false,
-              depthCompare: 'always' as GPUCompareFunction,
-            },
     })
   }
 

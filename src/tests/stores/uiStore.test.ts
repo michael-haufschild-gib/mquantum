@@ -19,41 +19,16 @@ describe('uiStore.bufferVisualization', () => {
     useUIStore.setState(UI_INITIAL_STATE)
   })
 
-  describe('Mutual Exclusivity', () => {
-    it('enabling showDepthBuffer should disable other buffer visualizations', () => {
-      // First enable temporal depth preview.
+  describe('Temporal Buffer Toggle', () => {
+    it('enables the temporal buffer preview when toggled on', () => {
       useUIStore.getState().setShowTemporalDepthBuffer(true)
       expect(useUIStore.getState().showTemporalDepthBuffer).toBe(true)
-
-      // Enable depth buffer - should disable temporal depth preview.
-      useUIStore.getState().setShowDepthBuffer(true)
-      const state = useUIStore.getState()
-      expect(state.showDepthBuffer).toBe(true)
-      expect(state.showTemporalDepthBuffer).toBe(false)
     })
 
-    it('enabling showTemporalDepthBuffer should disable other buffer visualizations', () => {
-      // First enable depth buffer
-      useUIStore.getState().setShowDepthBuffer(true)
-      expect(useUIStore.getState().showDepthBuffer).toBe(true)
-
-      // Enable temporal depth - should disable depth buffer.
+    it('disables the temporal buffer preview when toggled off', () => {
       useUIStore.getState().setShowTemporalDepthBuffer(true)
-      const state = useUIStore.getState()
-      expect(state.showDepthBuffer).toBe(false)
-      expect(state.showTemporalDepthBuffer).toBe(true)
-    })
-
-    it('disabling a buffer should not affect other buffers', () => {
-      // Enable depth buffer
-      useUIStore.getState().setShowDepthBuffer(true)
-      expect(useUIStore.getState().showDepthBuffer).toBe(true)
-
-      // Disable depth buffer - others should remain false
-      useUIStore.getState().setShowDepthBuffer(false)
-      const state = useUIStore.getState()
-      expect(state.showDepthBuffer).toBe(false)
-      expect(state.showTemporalDepthBuffer).toBe(false)
+      useUIStore.getState().setShowTemporalDepthBuffer(false)
+      expect(useUIStore.getState().showTemporalDepthBuffer).toBe(false)
     })
   })
 

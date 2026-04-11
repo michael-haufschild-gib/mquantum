@@ -3,8 +3,13 @@
  * Provides conversion between linear buffer indices and N-D lattice coordinates
  * using stride tables and loops over 0..latticeDim.
  *
+ * Exports both a raw template literal (legacy string-concat consumers) and
+ * a `ShaderBlock` wrapper for `assembleShaderBlocks()` composition.
+ *
  * @module
  */
+
+import type { ShaderBlock } from '../../shared/compose-helpers'
 
 export const freeScalarNDIndexBlock = /* wgsl */ `
 // Convert N-D lattice coordinates to linear buffer index using stride table
@@ -31,3 +36,9 @@ fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: 
 }
 
 `
+
+/** N-D indexing helpers as a ShaderBlock. */
+export const freeScalarNDIndexShaderBlock: ShaderBlock = {
+  name: 'free-scalar-nd-index',
+  content: freeScalarNDIndexBlock,
+}

@@ -8,12 +8,17 @@
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
  * (see src/lib/physics/freeScalar/vacuumSpectrum.ts).
+ *
+ * Exports both raw template literals (legacy string-concat consumers) and
+ * `ShaderBlock` wrappers for `assembleShaderBlocks()` composition.
  */
+
+import type { ShaderBlock } from '../../shared/compose-helpers'
 
 /**
  * Uniform struct for free scalar field parameters.
  * N-D capable layout with per-dimension arrays of 12 elements each.
- * WGSL alignment: total 512 bytes.
+ * WGSL alignment: total 528 bytes.
  */
 export const freeScalarUniformsBlock = /* wgsl */ `
 struct FreeScalarUniforms {
@@ -52,13 +57,23 @@ struct FreeScalarUniforms {
   selfInteractionEnabled: u32,  // offset 480
   selfInteractionLambda: f32,   // offset 484
   selfInteractionVev: f32,      // offset 488
-  absorberEnabled: u32,         // offset 492 (was _padSI)
+  absorberEnabled: u32,         // offset 492
 
-  // PML absorber parameters (16 bytes)
+  // PML absorber + cosmology A/B coefficients (16 bytes)
   absorberWidth: f32,           // offset 496
   absorberStrength: f32,        // offset 500 (σ_max, auto-computed from R_target)
-  _padPML0: u32,                // offset 504 (pad to 16-byte boundary)
-  _padPML1: u32,                // offset 508
+  aKinetic: f32,                // offset 504 — a^(−(n−2)), drift coefficient for
+                                //              δφ' = aKinetic · π. 1.0 under Minkowski.
+  aPotential: f32,              // offset 508 — a^(n−2), gradient (stress) coefficient for
+                                //              π' ⊃ aPotential · ∇²δφ. 1.0 under Minkowski.
+
+  // Remaining cosmology coefficient + padding (16 bytes)
+  aFull: f32,                   // offset 512 — a^n, volume-form coefficient for the
+                                //              mass term (mass²·aFull·δφ) and the
+                                //              self-interaction V'. 1.0 under Minkowski.
+  _padCosmo0: u32,              // offset 516
+  _padCosmo1: u32,              // offset 520
+  _padCosmo2: u32,              // offset 524
 }
 `
 
@@ -94,11 +109,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var phiVal: f32 = 0.0;
   var piVal: f32 = 0.0;
 
+  // Cosmology-aware physical dispersion for the initial conjugate-momentum
+  // kick. The canonical δφ Hamiltonian has ω² = k_lat² + mass²·a². We get
+  // a² from aFull/aPotential (a^n / a^(n−2) = a²), valid for every preset
+  // including the Minkowski trivial case where both coefs are 1. Under a
+  // degenerate config (aPotential = 0), the fallback keeps ω² real and the
+  // integrator can recover on the first full step.
+  let aSq = select(1.0, params.aFull / params.aPotential, params.aPotential > 0.0);
+  let massTerm = params.mass * params.mass * aSq;
+
   if (params.initCondition == 1u) {
-    // Single mode: phi = A * cos(k . x), pi = A * omega * sin(k . x)
-    // Physical wave vector: k_phys_d = 2*pi*n_d / L_d
+    // Single mode: δφ = A * cos(k . x), π_δφ = a^(n−2) · δφ'
+    //                  = aPotential · A · ω · sin(k . x)
+    // Physical wave vector: k_phys_d = 2*pi*n_d / L_d.
     var phase: f32 = 0.0;
-    var omegaSq: f32 = params.mass * params.mass;
+    var omegaSq: f32 = massTerm;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let latticeL = f32(params.gridSize[d]) * params.spacing[d];
@@ -112,15 +137,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       omegaSq += sk * sk;
     }
 
-    let omega = sqrt(omegaSq);
+    // ω² = k_lat² + m²·a² is non-negative for real mass; the max() is a
+    // belt-and-braces guard against pathological configs (aFull/aPotential
+    // overflow on underflow in extreme de Sitter futures).
+    let omega = sqrt(max(omegaSq, 0.0));
     phiVal = params.packetAmplitude * cos(phase);
-    piVal = params.packetAmplitude * omega * sin(phase);
+    piVal = params.aPotential * params.packetAmplitude * omega * sin(phase);
   } else if (params.initCondition == 2u) {
-    // Gaussian packet: phi = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
-    //                  pi  = A * omega * exp(...) * sin(k . x)  (traveling wave)
+    // Gaussian packet: δφ = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
+    //                  π_δφ = aPotential · A · ω · exp(...) * sin(k . x)
     var r2: f32 = 0.0;
     var phase: f32 = 0.0;
-    var omegaSq: f32 = params.mass * params.mass;
+    var omegaSq: f32 = massTerm;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let dx = worldPos[d] - params.packetCenter[d];
@@ -137,11 +165,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
 
-    let omega = sqrt(omegaSq);
+    let omega = sqrt(max(omegaSq, 0.0));
     let sigma2 = params.packetWidth * params.packetWidth;
     let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
     phiVal = envelope * cos(phase);
-    piVal = envelope * omega * sin(phase);
+    piVal = params.aPotential * envelope * omega * sin(phase);
   } else if (params.initCondition == 3u) {
     // Kink profile: phi = v * tanh((x0 - center0) / width), pi = 0
     // Domain wall interpolating between -v and +v along axis 0
@@ -157,3 +185,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   pi[idx] = piVal;
 }
 `
+
+// ─── ShaderBlock wrappers for assembleShaderBlocks() composition ────────────
+
+/** `FreeScalarUniforms` struct as a ShaderBlock. */
+export const freeScalarUniformsShaderBlock: ShaderBlock = {
+  name: 'free-scalar-uniforms',
+  content: freeScalarUniformsBlock,
+}
+
+/** Init compute entry point as a ShaderBlock. */
+export const freeScalarInitShaderBlock: ShaderBlock = {
+  name: 'free-scalar-init',
+  content: freeScalarInitBlock,
+}

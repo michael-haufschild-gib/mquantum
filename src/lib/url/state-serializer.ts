@@ -20,6 +20,7 @@ import type { TdsePotentialType } from '@/lib/geometry/extended/tdse'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
+import { type CosmologyPreset, isValidPreset, sCritical } from '@/lib/physics/cosmology/presets'
 
 // ─── Validation Sets ─────────────────────────────────────────────────────────
 
@@ -35,6 +36,8 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
 ]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
+
+const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = ['minkowski', 'deSitter', 'ekpyrotic', 'kasner']
 
 const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'free',
@@ -140,6 +143,18 @@ export interface ShareableObjectState {
   entanglementPairwiseMI?: boolean
   /** Bipartition entropy computation enabled */
   entanglementBipartitions?: boolean
+
+  // ── Cosmological Background (Mukhanov-Sasaki bridge) ───────────────────
+  /** Cosmological background enabled (FSF Mukhanov-Sasaki mode) */
+  cosmologyEnabled?: boolean
+  /** Cosmological background preset */
+  cosmologyPreset?: CosmologyPreset
+  /** Steepness `s` for the ekpyrotic preset (must satisfy `s > s_c(n)`) */
+  cosmologySteepness?: number
+  /** Hubble rate `H` for the de Sitter preset */
+  cosmologyHubble?: number
+  /** Initial conformal time `η₀` (strictly non-zero) */
+  cosmologyEta0?: number
 }
 
 /**
@@ -221,9 +236,10 @@ function setFloatParam(
   params: URLSearchParams,
   key: string,
   value: number | undefined,
-  omitZero = false
+  omitZero = false,
+  precision = 2
 ): void {
-  if (value !== undefined && !(omitZero && value === 0)) params.set(key, value.toFixed(2))
+  if (value !== undefined && !(omitZero && value === 0)) params.set(key, value.toFixed(precision))
 }
 
 function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
@@ -232,6 +248,26 @@ function setIntParam(params: URLSearchParams, key: string, value: number | undef
 
 function setStringParam(params: URLSearchParams, key: string, value: string | undefined): void {
   if (value !== undefined) params.set(key, value)
+}
+
+/**
+ * Emit the cosmology sub-block. Extracted to keep `serializeState` below
+ * the cognitive-complexity budget.
+ */
+function serializeCosmology(params: URLSearchParams, state: ShareableObjectState): void {
+  if (!state.cosmologyEnabled) return
+  params.set('cos', '1')
+  setStringParam(params, 'cos_bg', state.cosmologyPreset)
+  if (state.cosmologyPreset === 'ekpyrotic') {
+    // Ekpyrotic steepness lives in a narrow valid window just above `s_c(n)`.
+    // 2-decimal precision (the default) rounds valid values like `s_c+0.001`
+    // to something ≤ s_c on re-parse. Emit 4 decimals so the round-trip
+    // survives the lower clamp check in `resolveCosmologyPresetParams`.
+    setFloatParam(params, 'cos_s', state.cosmologySteepness, true, 4)
+  } else if (state.cosmologyPreset === 'deSitter') {
+    setFloatParam(params, 'cos_h', state.cosmologyHubble, true)
+  }
+  setFloatParam(params, 'cos_eta0', state.cosmologyEta0, true)
 }
 
 // ─── Serialize ───────────────────────────────────────────────────────────────
@@ -312,6 +348,9 @@ export function serializeState(state: ShareableState): string {
   setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
   setBoolParam(params, 'ent_bi', state.entanglementBipartitions)
 
+  // Cosmological background — only emit the sub-params when enabled
+  serializeCosmology(params, state)
+
   return params.toString()
 }
 
@@ -332,6 +371,73 @@ function deserializePotentialParams(params: URLSearchParams, state: ParsedSharea
     const dd = params.get('dis_d')
     if (dd === 'uniform' || dd === 'gaussian') state.disorderDistribution = dd
   }
+}
+
+/**
+ * Resolve preset-specific optional params (steepness for ekpyrotic, hubble
+ * for de Sitter). Returns `undefined` if the required param is missing or
+ * invalid. Extracted to keep `deserializeCosmologyParams` under the cognitive
+ * complexity budget.
+ */
+function resolveCosmologyPresetParams(
+  params: URLSearchParams,
+  preset: CosmologyPreset,
+  spacetimeDim: number
+): { steepness?: number; hubble?: number } | undefined {
+  if (preset === 'ekpyrotic') {
+    const raw = parseFloatParam(params, 'cos_s', 0, 100)
+    if (raw === undefined) return undefined
+    if (raw <= sCritical(spacetimeDim)) return undefined
+    return { steepness: raw }
+  }
+  if (preset === 'deSitter') {
+    // De Sitter REQUIRES cos_h: without it the downstream shader path falls
+    // back to `mass²` while the reset path throws inside `scaleFactorAmplitude`.
+    // Reject the whole cosmology block if cos_h is missing or out of range.
+    const hubble = parseFloatParam(params, 'cos_h', 0.01, 100)
+    if (hubble === undefined) return undefined
+    return { hubble }
+  }
+  return {}
+}
+
+/**
+ * Parse cosmological-background URL params into state, validating the
+ * preset/steepness combination so invalid states never reach the store.
+ *
+ * Rejection rules (any failure ⟹ drop the whole cosmology block and
+ * leave app defaults):
+ *
+ * - `cos=1` is required to activate cosmology — otherwise ignore `cos_*`.
+ * - `cos_bg` must be one of the known presets.
+ * - For ekpyrotic: `cos_s` must satisfy `s > s_c(n)` where `n` is derived
+ *   from the app's current dimension. If no dimension is present in the
+ *   URL, assume `n = 4`.
+ * - `cos_eta0` must be finite and strictly non-zero.
+ *
+ * @param params - URL params
+ * @param state - Mutable parsed state (cosmology fields added in-place)
+ */
+function deserializeCosmologyParams(params: URLSearchParams, state: ParsedShareableState): void {
+  if (!parseBoolParam(params, 'cos')) return
+
+  const preset = parseEnumParam(params, 'cos_bg', VALID_COSMOLOGY_PRESETS)
+  if (!preset) return
+
+  const spacetimeDim = (typeof state.dimension === 'number' ? state.dimension : 3) + 1
+  const presetParams = resolveCosmologyPresetParams(params, preset, spacetimeDim)
+  if (presetParams === undefined) return
+
+  const eta0 = parseFloatParam(params, 'cos_eta0', -10000, 10000)
+  if (eta0 === undefined || eta0 === 0) return
+
+  if (!isValidPreset({ preset, spacetimeDim, ...presetParams })) return
+
+  state.cosmologyEnabled = true
+  state.cosmologyPreset = preset
+  if (presetParams.steepness !== undefined) state.cosmologySteepness = presetParams.steepness
+  if (presetParams.hubble !== undefined) state.cosmologyHubble = presetParams.hubble
+  state.cosmologyEta0 = eta0
 }
 
 /** Parse open quantum and stochastic feature params into state. */
@@ -408,6 +514,10 @@ export function deserializeState(searchParams: string): ParsedShareableState {
 
   // Features
   deserializeFeatureParams(params, state)
+
+  // Cosmological background (must come AFTER dimension parsing so `d` is
+  // available for the s_c(n) check).
+  deserializeCosmologyParams(params, state)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

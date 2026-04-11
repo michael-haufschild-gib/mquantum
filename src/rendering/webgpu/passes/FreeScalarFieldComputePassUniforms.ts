@@ -6,11 +6,64 @@
  * physics-based field value estimation, and CPU-side diagnostics.
  */
 
+// ───────────────────────────────────────────────────────────────────────────
+// Uniform layout — single source of truth for FreeScalarUniforms struct
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Total size of the FreeScalarUniforms struct in bytes. Must match the
+ * struct definition in
+ * `src/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl.ts`.
+ *
+ * Canonical δφ layout: the last 32 bytes hold the three cosmology
+ * coefficients `(aKinetic, aPotential, aFull)` plus three words of
+ * alignment padding.
+ */
+export const FSF_UNIFORM_SIZE = 528
+
+/**
+ * Byte offset of the `dt` field in FreeScalarUniforms. Used by the per-step
+ * leapfrog kickstart to overwrite only the dt slot without re-uploading the
+ * full struct.
+ */
+export const FSF_DT_BYTE_OFFSET = 12
+
+/**
+ * Byte offset of the `aKinetic` field in FreeScalarUniforms. The three
+ * cosmology coefficients `(aKinetic, aPotential, aFull)` are contiguous
+ * starting here — `FreeScalarFieldComputePass.writeCosmologyCoefsSlot`
+ * writes a 12-byte span at this offset per substep.
+ */
+export const FSF_COSMO_COEFS_BYTE_OFFSET = 504
+
+/** Number of f32 entries in the cosmology coefficients slot (aKinetic/aPotential/aFull). */
+export const FSF_COSMO_COEFS_F32_COUNT = 3
+
+/** Byte size of the contiguous cosmology coefficients slot. */
+export const FSF_COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_F32_COUNT * 4
+
+/**
+ * Index of the `aKinetic` field in the Float32Array view of the uniform
+ * buffer (i.e. `FSF_COSMO_COEFS_BYTE_OFFSET / 4`). Derived once so the byte
+ * and f32 offsets cannot drift.
+ */
+export const FSF_COSMO_COEFS_F32_INDEX = FSF_COSMO_COEFS_BYTE_OFFSET / 4
+
+if (!Number.isInteger(FSF_COSMO_COEFS_F32_INDEX)) {
+  throw new Error(
+    `FSF_COSMO_COEFS_BYTE_OFFSET (${FSF_COSMO_COEFS_BYTE_OFFSET}) must be a multiple of 4 to fit a Float32Array index`
+  )
+}
+
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { logger } from '@/lib/logger'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import { computeCosmologyCoefs } from '@/lib/physics/cosmology/background'
 import {
   estimateVacuumMaxEnergy,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
+  type VacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
@@ -32,14 +85,98 @@ export function computeFsfConfigHash(config: FreeScalarConfig): string {
 /**
  * Hash config fields that require field reinitialization without buffer rebuild.
  * Covers physics params that change the initial condition but not the grid shape.
+ *
+ * Cosmology participates in the hash because the initial vacuum sample
+ * (η₀, preset, steepness, hubble) and the runtime clock depend on it — a
+ * cosmology-only change would otherwise leave the compute pass reusing
+ * stale buffers even when `needsReset` isn't explicitly flipped.
+ *
  * @param config - Free scalar field configuration
  */
 export function computeFsfInitHash(config: FreeScalarConfig): string {
   const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
+  const cosmo = config.cosmology
+  const cosmoHash = cosmo.enabled
+    ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}`
+    : '_cosmo0'
   if (config.selfInteractionEnabled) {
-    return `${base}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
+    return `${base}${cosmoHash}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
   }
-  return base
+  return `${base}${cosmoHash}`
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Cosmological integrator coefficients
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Identity coefficients `(1, 1, 1)` returned under Minkowski and fallback paths. */
+export const FSF_IDENTITY_COSMO_COEFS: CosmologyCoefs = {
+  aKinetic: 1,
+  aPotential: 1,
+  aFull: 1,
+}
+
+/**
+ * Per-key dedup set for `computeFsfCosmologyCoefs` fallback warnings. The
+ * leapfrog substep loop would otherwise spam the dev console at
+ * 60fps × stepsPerFrame if the cosmology config ever entered an invalid
+ * state. Production strips `logger.warn` entirely, so this only affects
+ * dev ergonomics.
+ *
+ * Cleared by `__resetFsfCosmologyWarnDedupForTests` so unit tests stay
+ * isolated.
+ */
+const fsfCosmologyWarnedKeys = new Set<string>()
+
+/**
+ * Test-only helper to reset the warn-once dedup state. Production code
+ * never imports this; vitest does.
+ */
+export function __resetFsfCosmologyWarnDedupForTests(): void {
+  fsfCosmologyWarnedKeys.clear()
+}
+
+/**
+ * Resolve the three cosmology coefficients `(aKinetic, aPotential, aFull)`
+ * for the current frame. These drive the canonical δφ integrator:
+ *
+ *     drift: dδφ/dη = aKinetic · π
+ *     kick:  dπ/dη  = aPotential · ∇²δφ − m²·aFull · δφ − aFull · V'(δφ)
+ *
+ * Minkowski or cosmology-disabled configs collapse to identity coefs, so a
+ * single call site covers both branches without a conditional in the
+ * caller. Invalid cosmology params (the UI is responsible for preventing
+ * this) fall back to identity AND log a *deduplicated* warning — each
+ * unique `(preset, spacetimeDim, error.message)` triple logs at most once
+ * per session.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current conformal time (must be finite and non-zero under cosmology)
+ * @returns `{ aKinetic, aPotential, aFull }`
+ */
+export function computeFsfCosmologyCoefs(config: FreeScalarConfig, simEta: number): CosmologyCoefs {
+  const cosmo = config.cosmology
+  if (!cosmo.enabled || cosmo.preset === 'minkowski') return FSF_IDENTITY_COSMO_COEFS
+  try {
+    return computeCosmologyCoefs(simEta, {
+      preset: cosmo.preset,
+      spacetimeDim: config.latticeDim + 1,
+      steepness: cosmo.steepness,
+      hubble: cosmo.hubble,
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    const key = `${cosmo.preset}|${config.latticeDim + 1}|${message}`
+    if (!fsfCosmologyWarnedKeys.has(key)) {
+      fsfCosmologyWarnedKeys.add(key)
+      logger.warn(
+        `[computeFsfCosmologyCoefs] cosmology parameters invalid ` +
+          `(preset=${cosmo.preset}, η=${simEta}); falling back to identity. ` +
+          `This message is logged once per unique error: ${message}`
+      )
+    }
+    return FSF_IDENTITY_COSMO_COEFS
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -72,6 +209,14 @@ export interface FsfUniformParams {
   basisZ?: Float32Array
   boundingRadius?: number
   colorAlgorithm?: number
+  /**
+   * Current simulation conformal time `η`. Required — the compute pass
+   * tracks `simEta` regardless of whether cosmology is enabled (it stays
+   * at zero when disabled), so callers always have a value to pass. The
+   * uniform writer forwards it to `computeMEffSq`, which short-circuits
+   * to `mass²` when cosmology is off.
+   */
+  simEta: number
 }
 
 /**
@@ -203,8 +348,19 @@ export function writeFsfUniforms(
         config.latticeDim
       )
     : 0
-  u32[126] = 0 // offset 504 (padding)
-  u32[127] = 0 // offset 508 (padding)
+
+  // Cosmology coefficients at the current conformal time. Under Minkowski
+  // or cosmology-disabled configs these collapse to (1, 1, 1), so the
+  // shader's canonical-variable leapfrog degenerates to flat-space
+  // Klein-Gordon bit-identically. The offsets match the per-substep
+  // partial write in `FreeScalarFieldComputePass.writeCosmologyCoefsSlot`.
+  const coefs = computeFsfCosmologyCoefs(config, params.simEta)
+  f32[FSF_COSMO_COEFS_F32_INDEX] = coefs.aKinetic // offset 504
+  f32[FSF_COSMO_COEFS_F32_INDEX + 1] = coefs.aPotential // offset 508
+  f32[FSF_COSMO_COEFS_F32_INDEX + 2] = coefs.aFull // offset 512
+  u32[FSF_COSMO_COEFS_F32_INDEX + 3] = 0 // offset 516 (pad)
+  u32[FSF_COSMO_COEFS_F32_INDEX + 4] = 0 // offset 520 (pad)
+  u32[FSF_COSMO_COEFS_F32_INDEX + 5] = 0 // offset 524 (pad)
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 
@@ -212,16 +368,67 @@ export function writeFsfUniforms(
 }
 
 /**
+ * Choice of dispersion + rescale for the vacuum auto-scale estimators.
+ *
+ * Under the canonical δφ formulation the adiabatic vacuum at `η₀` is drawn
+ * from a Minkowski-style sampler with the injected dispersion
+ * `ω_k² = k_lat² + m²·a²(η₀)`, then rescaled by `B = a^(n−2)` so the
+ * sample has canonical variances `⟨|δφ_k|²⟩ = 1/(2 B ω_k)`,
+ * `⟨|π_δφ,k|²⟩ = B ω_k / 2`. The auto-scale estimators need to know both
+ * pieces: the numeric `massSq` to forward to the raw sampler, and the
+ * `aPotential = B` to apply the per-amplitude rescale on top.
+ *
+ * Minkowski and the cosmology-disabled path collapse to
+ * `{ dispersion: 'kgFloor', aPotential: 1 }`, recovering the bare
+ * Klein-Gordon auto-scale bit-identically (for `mass > M_FLOOR`).
+ */
+interface VacuumAutoScale {
+  dispersion: VacuumDispersion
+  aPotential: number
+  aFull: number
+}
+
+function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
+  const cosmo = config.cosmology
+  if (!cosmo.enabled || cosmo.preset === 'minkowski') {
+    return { dispersion: 'kgFloor', aPotential: 1, aFull: 1 }
+  }
+  const coefs = computeFsfCosmologyCoefs(config, cosmo.eta0)
+  // Guard against the identity-fallback path where coefs may carry the
+  // Minkowski sentinels — treat those as "no rescale" and let the call
+  // sites operate in the flat-space branch.
+  const aPotential = coefs.aPotential > 0 ? coefs.aPotential : 1
+  const aFull = coefs.aFull > 0 ? coefs.aFull : 1
+  const aSq = aFull / aPotential // a^n / a^(n−2) = a²
+  return {
+    dispersion: config.mass * config.mass * aSq,
+    aPotential,
+    aFull,
+  }
+}
+
+/**
  * Compute the maxPhiEstimate for the given config.
  * Returns the estimated peak amplitude of the phi field based on the
  * initial condition type and autoScale setting.
+ *
+ * Under cosmology the vacuum branch draws from `ω_k² = k_lat² + m²·a²(η₀)`
+ * and then rescales by `B = a^(n−2)` so the δφ field has variance
+ * `1/(2 B ω_k)` per mode. We apply the raw Minkowski estimator with the
+ * injected `massSq` and divide by `√B` to get the canonical δφ amplitude
+ * estimate. Using bare `mass²` would under- or over-estimate the on-screen
+ * density floor whenever `a(η₀) ≠ 1`.
  *
  * @param config - Free scalar field configuration
  * @returns Estimated peak phi amplitude
  */
 export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
   if (!config.autoScale) return 1.0
-  if (config.initialCondition === 'vacuumNoise') return estimateVacuumMaxPhi(config)
+  if (config.initialCondition === 'vacuumNoise') {
+    const { dispersion, aPotential } = resolveVacuumAutoScale(config)
+    const rawMaxPhi = estimateVacuumMaxPhi(config, dispersion)
+    return rawMaxPhi / Math.sqrt(aPotential)
+  }
   if (config.initialCondition === 'kinkProfile') return config.selfInteractionVev
   return config.packetAmplitude
 }
@@ -229,6 +436,20 @@ export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
 /**
  * Estimate maxFieldValue for auto-scale normalization, accounting for
  * initial condition type and current field view.
+ *
+ * Under cosmology the vacuum branch forwards `m²·a²(η₀)` to the Minkowski
+ * estimator and then applies the `B = a^(n−2)` rescale so the estimate
+ * lines up with the canonical δφ variance. The non-vacuum branches use
+ * the physical dispersion `ω² = k_lat² + m²·a²(η₀)` and apply the same
+ * `aPotential` weight to the `π_δφ = aPotential·δφ·ω` initial kick.
+ *
+ * For the `energyDensity` view the shader renders the *proper* energy
+ * density `ρ = T_{μν} u^μ u^ν = H_canonical / a^n` (a comoving observer's
+ * local measurement), not the raw canonical Hamiltonian density. The
+ * estimator mirrors that convention by dividing the canonical estimate
+ * by `aFull(η₀)` — under Minkowski `aFull = 1` and this is a bit-identical
+ * no-op; under cosmology it rescales the calibration to match the
+ * shader's proper-density output so `normRho ≈ 1` at the initial time.
  *
  * @param config - Free scalar field configuration
  * @param maxPhiEstimate - Current estimate of maximum phi amplitude
@@ -243,7 +464,13 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return phi0
   }
 
-  // wallDensity: V(phi) = lambda * (phi^2 - v^2)^2, max at phi=0 -> lambda * v^4
+  const { dispersion, aPotential, aFull } = resolveVacuumAutoScale(config)
+
+  // wallDensity: V(phi) = lambda * (phi^2 - v^2)^2, max at phi=0 -> lambda * v^4.
+  // The shader renders the bare potential `V(φ)` (no aFull weight — it
+  // implicitly lives in the proper frame), so the estimator returns the
+  // bare `λ·v⁴` without the `aFull` multiplication that an earlier
+  // revision wrongly applied.
   if (config.fieldView === 'wallDensity') {
     if (config.selfInteractionEnabled) {
       const v = config.selfInteractionVev
@@ -252,26 +479,35 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return 1.0
   }
 
+  // `aFull` guard used by every energyDensity branch below. Under Minkowski
+  // or the identity fallback `aFull = 1`, so the division is a no-op and
+  // every existing non-cosmology test continues to land at the bit-identical
+  // canonical formula.
+  const properEnergyScale = aFull > 0 ? aFull : 1
+
   // For vacuum noise, use exact k-space sums instead of the conservative omega_max
-  // bound. omega_max over-estimates by ~50% in high dimensions because it treats all
-  // modes as if they oscillate at the Nyquist frequency, while most modes have
-  // omega << omega_max. The exact sums give tight 3-sigma bounds.
+  // bound. The exact sums give tight 3-sigma bounds.
   if (config.initialCondition === 'vacuumNoise') {
     if (config.fieldView === 'pi') {
-      return estimateVacuumMaxPi(config)
+      // π_δφ variance = B · ω_k/2; π_M variance = ω_k/2; rescale by √B.
+      const rawMaxPi = estimateVacuumMaxPi(config, dispersion)
+      return rawMaxPi * Math.sqrt(aPotential)
     }
-    // energyDensity: exact k-space sum + optional self-interaction potential
-    let energy = estimateVacuumMaxEnergy(config)
+    // energyDensity (proper, per comoving observer): the canonical per-mode
+    // ground-state energy is `ω_k/2`, giving a canonical density peak of
+    // `4.5·⟨ω⟩` from the Gaussian-field 3-sigma bound. Divide by `aFull(η₀)`
+    // to convert to proper density, matching the shader's output.
+    let canonicalEnergy = estimateVacuumMaxEnergy(config, dispersion)
     if (config.selfInteractionEnabled) {
       const v = config.selfInteractionVev
-      energy += config.selfInteractionLambda * v * v * v * v
+      canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v
     }
-    return energy
+    return canonicalEnergy / properEnergyScale
   }
 
   // Non-vacuum modes (singleMode, gaussianPacket, kinkProfile):
-  // Use the actual mode wavevector for accurate per-mode omega estimation.
-  let omegaSq = config.mass * config.mass
+  // physical dispersion ω² = k_lat² + m²·a².
+  let omegaSq = dispersion === 'kgFloor' ? config.mass * config.mass : dispersion
   for (let d = 0; d < config.latticeDim; d++) {
     const N = config.gridSize[d]!
     const a = config.spacing[d]!
@@ -281,19 +517,26 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
     omegaSq += sk * sk
   }
-  const omega = Math.sqrt(omegaSq)
+  const omega = Math.sqrt(Math.max(omegaSq, 0))
 
   if (config.fieldView === 'pi') {
-    return phi0 * omega
+    // π_δφ = aPotential · δφ · ω for the singleMode/gaussianPacket init
+    // kick (matches the shader). Without cosmology aPotential = 1.
+    return phi0 * omega * aPotential
   }
 
-  // energyDensity: E ~ 0.5 * (pi^2 + (grad phi)^2 + m^2 phi^2) + V(phi)
-  let energy = phi0 * phi0 * omegaSq * 0.5
+  // energyDensity (proper, per comoving observer): for an envelope of peak
+  // amplitude φ₀ oscillating with frequency ω, the canonical Hamiltonian
+  // density is ½·φ₀²·ω². Divide by `aFull(η₀)` to land in the proper frame
+  // — no-op under Minkowski, correctly rescales under cosmology. Self-
+  // interaction carries the `aFull` weight from the action term before the
+  // same uniform division, which collapses it to the bare potential.
+  let canonicalEnergy = phi0 * phi0 * omegaSq * 0.5
   if (config.selfInteractionEnabled) {
     const v = config.selfInteractionVev
-    energy += config.selfInteractionLambda * v * v * v * v
+    canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v
   }
-  return energy
+  return canonicalEnergy / properEnergyScale
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -306,15 +549,32 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
  * Pure CPU function operating on Float32Array views from mapped staging
  * buffers. The caller is responsible for mapping/unmapping.
  *
+ * **Total energy** is the canonical Hamiltonian in the δφ variables:
+ *
+ *     H = ∫ d^d x [½ aKinetic π² + ½ aPotential (∇δφ)²
+ *                  + ½ mass²·aFull δφ² + aFull V(δφ)]
+ *
+ * Under the Minkowski preset (or cosmology disabled) the three coefs
+ * collapse to 1 and this recovers the bare Klein-Gordon energy. Under
+ * non-Minkowski cosmology the energy is NOT conserved — the time-dependent
+ * background does work on the field — so the `energyDrift` field loses
+ * its Minkowski interpretation, but each individual snapshot still
+ * reports the physically meaningful instantaneous total.
+ *
  * @param phi - Mapped phi field data
- * @param pi - Mapped pi (conjugate momentum) field data
+ * @param pi - Mapped pi (canonical conjugate momentum) field data
  * @param config - Free scalar field configuration
+ * @param coefs - Cosmology coefficients at the readback time. Caller
+ *                obtains them via `computeFsfCosmologyCoefs(config, simEta)`,
+ *                which collapses to identity under Minkowski so both
+ *                branches go through a single code path.
  * @returns Diagnostics snapshot for the store
  */
 export function computeFsfDiagnostics(
   phi: Float32Array,
   pi: Float32Array,
-  config: FreeScalarConfig
+  config: FreeScalarConfig,
+  coefs: CosmologyCoefs
 ): FsfDiagnosticsSnapshot {
   const N = phi.length
 
@@ -362,11 +622,14 @@ export function computeFsfDiagnostics(
       }
     }
   }
-  gradEnergy *= 0.5 * dV
+  gradEnergy *= 0.5 * dV * coefs.aPotential
 
   const totalNorm = sumPhi2 * dV
-  const kineticEnergy = 0.5 * sumPi2 * dV
-  const massEnergy = 0.5 * config.mass * config.mass * sumPhi2 * dV
+  const kineticEnergy = 0.5 * coefs.aKinetic * sumPi2 * dV
+  // Canonical mass-term energy: ½ · m² · a^n · Σφ² · dV. Under Minkowski
+  // coefs.aFull = 1 and this reduces to ½ · m² · Σφ² · dV, bit-identical
+  // to the pre-cosmology pipeline.
+  const massEnergy = 0.5 * config.mass * config.mass * coefs.aFull * sumPhi2 * dV
   let potentialEnergy = 0
   if (config.selfInteractionEnabled) {
     const lambda = config.selfInteractionLambda
@@ -376,7 +639,9 @@ export function computeFsfDiagnostics(
       const diff = p * p - v2
       potentialEnergy += lambda * diff * diff
     }
-    potentialEnergy *= dV
+    // V(δφ) contribution to the Hamiltonian action carries the full
+    // volume form a^n = coefs.aFull.
+    potentialEnergy *= dV * coefs.aFull
   }
 
   const totalEnergy = kineticEnergy + gradEnergy + massEnergy + potentialEnergy

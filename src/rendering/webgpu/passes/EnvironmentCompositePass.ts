@@ -1,9 +1,10 @@
 /**
  * WebGPU Environment Composite Pass
  *
- * Composites the lensed environment layer behind the main object layer.
- * Uses premultiplied alpha over operation: the main object texture contains
- * premultiplied RGB (from hardware src-alpha blending onto clear black).
+ * Composites the premultiplied main-object layer over the background layer.
+ * The object buffer contains premultiplied RGB produced by hardware src-alpha
+ * blending onto clear black, so we apply the standard premultiplied "over"
+ * operator: `out = obj + bg * (1 - obj.a)`.
  *
  * @module rendering/webgpu/passes/EnvironmentCompositePass
  */
@@ -16,12 +17,10 @@ import { WebGPUBasePass } from '../core/WebGPUBasePass'
  * Environment composite pass configuration.
  */
 export interface EnvironmentCompositePassConfig {
-  /** Lensed environment input resource ID */
-  lensedEnvironmentInput: string
-  /** Main object input resource ID */
+  /** Background input resource ID (skybox or clear color + measurement cloud) */
+  backgroundInput: string
+  /** Main object input resource ID (premultiplied) */
   mainObjectInput: string
-  /** Main object depth input resource ID */
-  mainObjectDepthInput: string
   /** Output resource ID */
   outputResource: string
 }
@@ -29,14 +28,12 @@ export interface EnvironmentCompositePassConfig {
 /**
  * WGSL Environment Composite Fragment Shader
  *
- * Composites premultiplied main object over the environment background.
- * Uses textureLoad for depth (texture_depth_2d cannot use textureSample).
+ * Composites premultiplied main object over the background.
  */
 const ENVIRONMENT_COMPOSITE_SHADER = /* wgsl */ `
 @group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var tLensedEnvironment: texture_2d<f32>;
+@group(0) @binding(1) var tBackground: texture_2d<f32>;
 @group(0) @binding(2) var tMainObject: texture_2d<f32>;
-@group(0) @binding(3) var tMainObjectDepth: texture_depth_2d;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -47,22 +44,13 @@ struct VertexOutput {
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Sample color textures with filtering sampler
-  let envColor = textureSample(tLensedEnvironment, texSampler, uv);
+  let bgColor = textureSample(tBackground, texSampler, uv);
   let objColor = textureSample(tMainObject, texSampler, uv);
 
-  // Use textureLoad for depth (texture_depth_2d can't use textureSample)
-  let texDims = textureDimensions(tMainObjectDepth);
-  let depthCoord = vec2i(uv * vec2f(texDims));
-  let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0);
-
-  // Branchless object/environment compositing
-  // objColor.rgb is premultiplied (hardware src-alpha blend onto clear black)
-  let noObject = objDepth >= 0.9999 && objColor.a < 0.01;
-  let blendedColor = objColor.rgb + envColor.rgb * (1.0 - objColor.a);
-  let blendedAlpha = max(envColor.a, objColor.a);
-  let finalColor = select(blendedColor, envColor.rgb, noObject);
-  let finalAlpha = select(blendedAlpha, envColor.a, noObject);
+  // Premultiplied "over": objColor.rgb is already alpha-premultiplied
+  // (hardware src-alpha blend onto clear black).
+  let finalColor = objColor.rgb + bgColor.rgb * (1.0 - objColor.a);
+  let finalAlpha = max(bgColor.a, objColor.a);
 
   return vec4f(finalColor, finalAlpha);
 }
@@ -71,7 +59,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 /**
  * WebGPU Environment Composite Pass.
  *
- * Composites the lensed environment behind the main object layer.
+ * Composites the main-object layer over the background layer into the HDR buffer.
  */
 export class EnvironmentCompositePass extends WebGPUBasePass {
   private rendererConfig: EnvironmentCompositePassConfig
@@ -91,9 +79,8 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
       id: 'environment-composite',
       priority: 200,
       inputs: [
-        { resourceId: config.lensedEnvironmentInput, access: 'read' as const, binding: 0 },
+        { resourceId: config.backgroundInput, access: 'read' as const, binding: 0 },
         { resourceId: config.mainObjectInput, access: 'read' as const, binding: 1 },
-        { resourceId: config.mainObjectDepthInput, access: 'read' as const, binding: 2 },
       ],
       outputs: [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }],
     })
@@ -126,11 +113,6 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
           binding: 2,
           visibility: GPUShaderStage.FRAGMENT,
           texture: { sampleType: 'float' as const },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'depth' as const },
         },
       ],
     })
@@ -171,11 +153,10 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     }
 
     // Get input textures
-    const lensedEnvView = ctx.getTextureView(this.rendererConfig.lensedEnvironmentInput)
+    const backgroundView = ctx.getTextureView(this.rendererConfig.backgroundInput)
     const mainObjectView = ctx.getTextureView(this.rendererConfig.mainObjectInput)
-    const mainObjectDepthView = ctx.getTextureView(this.rendererConfig.mainObjectDepthInput)
 
-    if (!lensedEnvView || !mainObjectView || !mainObjectDepthView) {
+    if (!backgroundView || !mainObjectView) {
       return
     }
 
@@ -183,15 +164,14 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.rendererConfig.outputResource)
     if (!outputView) return
 
-    const bindGroup = this.bgCache.get([lensedEnvView, mainObjectView, mainObjectDepthView], () =>
+    const bindGroup = this.bgCache.get([backgroundView, mainObjectView], () =>
       this.device!.createBindGroup({
         label: 'environment-composite-bg',
         layout: this.passBindGroupLayout!,
         entries: [
           { binding: 0, resource: this.sampler! },
-          { binding: 1, resource: lensedEnvView },
+          { binding: 1, resource: backgroundView },
           { binding: 2, resource: mainObjectView },
-          { binding: 3, resource: mainObjectDepthView },
         ],
       })
     )

@@ -5,7 +5,9 @@ import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,
+  estimateVacuumMaxEnergy,
   estimateVacuumMaxPhi,
+  estimateVacuumMaxPi,
   sampleVacuumSpectrum,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
@@ -47,16 +49,16 @@ describe('computeOmegaK', () => {
 describe('sampleVacuumSpectrum', () => {
   it('is deterministic: same seed produces same output', () => {
     const config = makeConfig()
-    const result1 = sampleVacuumSpectrum(config, 42)
-    const result2 = sampleVacuumSpectrum(config, 42)
+    const result1 = sampleVacuumSpectrum(config, 42, 'kgFloor')
+    const result2 = sampleVacuumSpectrum(config, 42, 'kgFloor')
     expect(result1.phi).toEqual(result2.phi)
     expect(result1.pi).toEqual(result2.pi)
   })
 
   it('different seeds produce different output', () => {
     const config = makeConfig()
-    const result1 = sampleVacuumSpectrum(config, 42)
-    const result2 = sampleVacuumSpectrum(config, 99)
+    const result1 = sampleVacuumSpectrum(config, 42, 'kgFloor')
+    const result2 = sampleVacuumSpectrum(config, 99, 'kgFloor')
     // Should differ (astronomically unlikely to match)
     let differs = false
     for (let i = 0; i < result1.phi.length; i++) {
@@ -70,7 +72,7 @@ describe('sampleVacuumSpectrum', () => {
 
   it('produces finite, non-NaN values', () => {
     const config = makeConfig()
-    const { phi, pi } = sampleVacuumSpectrum(config, 42)
+    const { phi, pi } = sampleVacuumSpectrum(config, 42, 'kgFloor')
     for (let i = 0; i < phi.length; i++) {
       expect(Number.isFinite(phi[i])).toBe(true)
       expect(Number.isFinite(pi[i])).toBe(true)
@@ -82,7 +84,7 @@ describe('sampleVacuumSpectrum', () => {
     // But we can verify Hermitian symmetry by doing a forward FFT on the output
     // and checking that phi_{-k} = conj(phi_k).
     const config = makeConfig({ gridSize: [8, 8, 8] })
-    const { phi } = sampleVacuumSpectrum(config, 42)
+    const { phi } = sampleVacuumSpectrum(config, 42, 'kgFloor')
 
     const nx = 8,
       ny = 8,
@@ -124,7 +126,7 @@ describe('sampleVacuumSpectrum', () => {
 
   it('handles zero mass with m_floor regularization (no NaN/Inf)', () => {
     const config = makeConfig({ mass: 0.0 })
-    const { phi, pi } = sampleVacuumSpectrum(config, 42)
+    const { phi, pi } = sampleVacuumSpectrum(config, 42, 'kgFloor')
     for (let i = 0; i < phi.length; i++) {
       expect(Number.isFinite(phi[i])).toBe(true)
       expect(Number.isFinite(pi[i])).toBe(true)
@@ -133,12 +135,12 @@ describe('sampleVacuumSpectrum', () => {
 
   it('throws on non-power-of-2 grid sizes', () => {
     const config = makeConfig({ gridSize: [12, 8, 8] })
-    expect(() => sampleVacuumSpectrum(config, 42)).toThrow('power-of-2')
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('power-of-2')
   })
 
   it('throws on non-integer grid sizes', () => {
     const config = makeConfig({ gridSize: [8.5, 8, 8] as [number, number, number] })
-    expect(() => sampleVacuumSpectrum(config, 42)).toThrow('power-of-2')
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('power-of-2')
   })
 
   it('throws when spacing does not cover all active dimensions', () => {
@@ -147,17 +149,17 @@ describe('sampleVacuumSpectrum', () => {
       gridSize: [8, 8, 8],
       spacing: [0.1, 0.1] as number[],
     })
-    expect(() => sampleVacuumSpectrum(config, 42)).toThrow('spacing')
+    expect(() => sampleVacuumSpectrum(config, 42, 'kgFloor')).toThrow('spacing')
   })
 
   it('works with 1D and 2D lattice dimensions', () => {
     const config1d = makeConfig({ latticeDim: 1, gridSize: [16, 1, 1] })
-    const result1d = sampleVacuumSpectrum(config1d, 42)
+    const result1d = sampleVacuumSpectrum(config1d, 42, 'kgFloor')
     expect(result1d.phi.length).toBe(16)
     expect(Number.isFinite(result1d.phi[0])).toBe(true)
 
     const config2d = makeConfig({ latticeDim: 2, gridSize: [8, 8, 1] })
-    const result2d = sampleVacuumSpectrum(config2d, 42)
+    const result2d = sampleVacuumSpectrum(config2d, 42, 'kgFloor')
     expect(result2d.phi.length).toBe(64)
     expect(Number.isFinite(result2d.phi[0])).toBe(true)
   })
@@ -177,7 +179,7 @@ describe('sampleVacuumSpectrum', () => {
     const piKSqSum = new Float64Array(total)
 
     for (let s = 0; s < nSeeds; s++) {
-      const { phi, pi } = sampleVacuumSpectrum(config, s * 7919 + 13)
+      const { phi, pi } = sampleVacuumSpectrum(config, s * 7919 + 13, 'kgFloor')
 
       // Forward 3D FFT
       const phiData = new Float64Array(2 * total)
@@ -257,7 +259,7 @@ describe('vacuum two-point correlations', () => {
     let phiSqSum = 0
     let piSqSum = 0
     for (let seed = 1; seed <= numSeeds; seed++) {
-      const { phi, pi } = sampleVacuumSpectrum(config, seed)
+      const { phi, pi } = sampleVacuumSpectrum(config, seed, 'kgFloor')
       for (let i = 0; i < total; i++) {
         phiSqSum += phi[i]! * phi[i]!
         piSqSum += pi[i]! * pi[i]!
@@ -301,7 +303,7 @@ describe('vacuum two-point correlations', () => {
 
     let totalEnergySum = 0
     for (let seed = 1; seed <= numSeeds; seed++) {
-      const { phi, pi } = sampleVacuumSpectrum(config, seed)
+      const { phi, pi } = sampleVacuumSpectrum(config, seed, 'kgFloor')
       // E = Σᵢ [½ π² + ½ m² φ² + ½ (∂φ/∂x)²]
       let E = 0
       for (let i = 0; i < N; i++) {
@@ -332,7 +334,7 @@ describe('vacuum two-point correlations', () => {
 describe('estimateVacuumMaxPhi', () => {
   it('returns a finite positive value', () => {
     const config = makeConfig()
-    const maxPhi = estimateVacuumMaxPhi(config)
+    const maxPhi = estimateVacuumMaxPhi(config, 'kgFloor')
     expect(maxPhi).toBeGreaterThan(0)
     expect(Number.isFinite(maxPhi)).toBe(true)
   })
@@ -340,7 +342,62 @@ describe('estimateVacuumMaxPhi', () => {
   it('is larger for smaller mass (more fluctuations)', () => {
     const configHeavy = makeConfig({ mass: 5.0 })
     const configLight = makeConfig({ mass: 0.1 })
-    expect(estimateVacuumMaxPhi(configLight)).toBeGreaterThan(estimateVacuumMaxPhi(configHeavy))
+    expect(estimateVacuumMaxPhi(configLight, 'kgFloor')).toBeGreaterThan(
+      estimateVacuumMaxPhi(configHeavy, 'kgFloor')
+    )
+  })
+
+  // L7 audit: cosmology fix — the auto-scale estimators must consume
+  // M²_eff(η) explicitly so the on-screen density floor matches the
+  // dispersion the sampler actually drew from. The dispatch tag forces
+  // the caller to choose: 'kgFloor' for the bare KG path with M_FLOOR,
+  // or a number for the Mukhanov-Sasaki effective mass. The previous
+  // optional-parameter form silently dispatched to the wrong branch
+  // whenever a caller forgot to thread mEffSq through.
+  describe('cosmology dispersion dispatch', () => {
+    it('produces a different phi estimate for kgFloor vs explicit mEffSq', () => {
+      // Use a small lattice with mass=0 so the kgFloor path collapses to
+      // the M_FLOOR regularization. Supplying mEffSq=2 (de Sitter 4D)
+      // makes the estimator visit a strictly different dispersion at every k.
+      const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
+      const bare = estimateVacuumMaxPhi(config, 'kgFloor')
+      const cosmo = estimateVacuumMaxPhi(config, 2)
+      expect(bare).not.toBeCloseTo(cosmo, 6)
+      // Higher m_eff² → smaller phi variance → smaller maxPhi.
+      expect(cosmo).toBeLessThan(bare)
+    })
+
+    it('handles tachyonic mEffSq (negative) without producing NaN', () => {
+      // De Sitter at the safe horizon: kMin² + mEffSq > 0 but mEffSq < 0.
+      // The estimator must still return a finite positive value (the M_FLOOR
+      // clamp inside computeOmegaKFromMassSq guarantees ω > 0 for the zero
+      // mode and the safe-eta0 clamp guarantees it for non-zero modes).
+      const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
+      const result = estimateVacuumMaxPhi(config, -0.5)
+      expect(Number.isFinite(result)).toBe(true)
+      expect(result).toBeGreaterThan(0)
+    })
+
+    it('estimateVacuumMaxPi shifts with the dispatch tag too', () => {
+      const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
+      const bare = estimateVacuumMaxPi(config, 'kgFloor')
+      const cosmo = estimateVacuumMaxPi(config, 4)
+      // Higher m² → larger ω → larger pi variance, opposite of phi.
+      expect(cosmo).toBeGreaterThan(bare)
+    })
+
+    it('estimateVacuumMaxEnergy shifts with the dispatch tag too', () => {
+      const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
+      const bare = estimateVacuumMaxEnergy(config, 'kgFloor')
+      const cosmo = estimateVacuumMaxEnergy(config, 4)
+      expect(cosmo).toBeGreaterThan(bare)
+    })
+
+    it('rejects non-finite numeric dispersion', () => {
+      const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
+      expect(() => estimateVacuumMaxPhi(config, Number.NaN)).toThrow(RangeError)
+      expect(() => estimateVacuumMaxPhi(config, Number.POSITIVE_INFINITY)).toThrow(RangeError)
+    })
   })
 })
 

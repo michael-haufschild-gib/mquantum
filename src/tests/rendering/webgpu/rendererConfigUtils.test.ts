@@ -167,11 +167,10 @@ describe('buildPipelineOutputs', () => {
     expect(outputs[1]?.resourceId).toBe('quarter-position')
   })
 
-  it('outputs object-color + depth for standard 3D', () => {
+  it('outputs object-color for standard 3D', () => {
     const outputs = buildPipelineOutputs(BASE_CONFIG)
-    expect(outputs).toHaveLength(2)
+    expect(outputs).toHaveLength(1)
     expect(outputs[0]?.resourceId).toBe('object-color')
-    expect(outputs[1]?.resourceId).toBe('depth-buffer')
   })
 })
 

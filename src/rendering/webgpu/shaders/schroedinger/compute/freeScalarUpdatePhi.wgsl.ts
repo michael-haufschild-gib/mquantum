@@ -1,10 +1,13 @@
 /**
  * Free Scalar Field — Leapfrog Phi-Update Compute Shader
  *
- * Updates field amplitude phi using the conjugate momentum:
- *   phi[n] += dt * pi[n]
+ * Updates the physical field amplitude δφ from the canonical conjugate
+ * momentum via Hamilton's drift equation:
  *
- * This is the second half of the symplectic leapfrog integrator.
+ *   dδφ/dη = aKinetic · π       with  aKinetic = a^(−(n−2))
+ *
+ * Under the Minkowski preset aKinetic = 1 and this reduces to the
+ * flat-space drift `φ += dt · π`.
  *
  * Requires freeScalarUniformsBlock to be prepended for struct definition.
  */
@@ -19,7 +22,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= params.totalSites) { return; }
 
-  // Hamilton's equation: dphi/dt = pi
-  phi[idx] = phi[idx] + params.dt * pi[idx];
+  // Hamilton's drift: dδφ/dη = aKinetic · π
+  phi[idx] = phi[idx] + params.dt * params.aKinetic * pi[idx];
 }
 `

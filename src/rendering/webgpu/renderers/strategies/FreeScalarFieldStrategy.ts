@@ -116,6 +116,14 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     const schroedinger = extended?.schroedinger
     const fsWithSharedPml = applySharedPml(freeScalarConfig, schroedinger)
 
+    // Queue save/load BEFORE executeField so pendingInjection and
+    // pendingLoadedSimEta are in place when the pass checks needsReset and
+    // runs initializeField. Running IO after executeField leaves the loaded
+    // buffers on the pass with no reset flag to consume them on the next
+    // frame — the field silently keeps whatever vacuum data the reinit
+    // sampled. See freeScalarField.md cosmology notes.
+    handleSimulationStateIO(ctx, freeScalarPass, ['freeScalarField'])
+
     freeScalarPass.executeField(
       ctx,
       fsWithSharedPml,
@@ -132,8 +140,6 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     if (freeScalarConfig.needsReset) {
       extended?.clearFreeScalarNeedsReset?.()
     }
-
-    handleSimulationStateIO(ctx, freeScalarPass, ['freeScalarField'])
 
     // FSF diagnostic: log state changes once per second (dev only)
     if (import.meta.env.DEV) {

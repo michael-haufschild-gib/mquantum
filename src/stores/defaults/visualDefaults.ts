@@ -349,7 +349,6 @@ export const DEFAULT_SHADER_SETTINGS = {
 
 export const DEFAULT_SHOW_AXIS_HELPER = false
 export const DEFAULT_SHOW_PERF_MONITOR = true
-export const DEFAULT_SHOW_DEPTH_BUFFER = false
 export const DEFAULT_SHOW_TEMPORAL_DEPTH_BUFFER = false
 export const DEFAULT_ANIMATION_BIAS = 0
 export const MIN_ANIMATION_BIAS = 0

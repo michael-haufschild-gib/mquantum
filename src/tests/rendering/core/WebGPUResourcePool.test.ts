@@ -132,20 +132,6 @@ describe('WebGPUResourcePool', () => {
     expect(pool.getResource('test')).toBe(null)
   })
 
-  it('creates depth texture for depthStencil type', () => {
-    pool.addResource({
-      id: 'depth',
-      type: 'depthStencil',
-      size: { mode: 'screen' },
-      depthFormat: 'depth24plus',
-    })
-    const resource = pool.getResource('depth')
-
-    // depthTexture and depthView are GPU objects created by the mock
-    expect(resource!.depthTexture).toHaveProperty('destroy')
-    expect(resource!.depthView).toHaveProperty('label')
-  })
-
   it('getAllResourceDimensions returns correct map', () => {
     pool.addResource({ id: 'a', ...screenConfig })
     pool.addResource({

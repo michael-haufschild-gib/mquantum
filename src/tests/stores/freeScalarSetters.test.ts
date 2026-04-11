@@ -5,9 +5,10 @@
  * initial condition configuration, and absorber parameter clamping.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 describe('free scalar field setters', () => {
   beforeEach(() => {
@@ -84,5 +85,212 @@ describe('free scalar field setters', () => {
     const s = useExtendedObjectStore.getState()
     s.setFreeScalarLatticeDim(5)
     expect(getFSF().slicePositions).toHaveLength(2) // 5 - 3 = 2
+  })
+
+  describe('cosmology invariants (Finding 3)', () => {
+    it('soft-disables cosmology when latticeDim change takes spacetimeDim out of [3, 7]', () => {
+      // Finding 3: changing latticeDim to an out-of-range value (e.g. 1)
+      // leaves spacetimeDim=2, which is outside the cosmology bridge's
+      // [3, 7] support window. The step path would then silently fall
+      // back to mass² while the reset path would throw; reconcile helper
+      // must force-disable cosmology and mark the field for reset.
+      const s = useExtendedObjectStore.getState()
+      // Enable cosmology at a supported latticeDim=3 first
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(true)
+
+      // Change to latticeDim=1 — spacetimeDim=2, out of range
+      s.setFreeScalarLatticeDim(1)
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('cosmology preset enables cosmology sub-config when applied at supported dim', async () => {
+      // The de Sitter Bunch–Davies preset enables deSitter cosmology.
+      // Loading it while globalDim is in the supported range must leave
+      // `cosmology.enabled=true` with the preset's hubble and eta0.
+      const s = useExtendedObjectStore.getState()
+      s.applyFreeScalarPreset('deSitterVacuum')
+      // applyFreeScalarPreset does a dynamic import → wait for it to settle.
+      await vi.waitFor(() => {
+        expect(getFSF().cosmology.enabled).toBe(true)
+      })
+      const fs = getFSF()
+      expect(fs.cosmology.preset).toBe('deSitter')
+      expect(fs.cosmology.hubble).toBe(1.0)
+      expect(fs.initialCondition).toBe('vacuumNoise')
+      expect(fs.needsReset).toBe(true)
+    })
+
+    it('re-clamps cosmology.eta0 when global dimension changes via the dimension slider', () => {
+      // The user-facing dimension slider goes through geometryStore and the
+      // compute-mode sync path (syncActiveComputeModeLatticeDim), NOT the
+      // freeScalar-specific setter. Regression guard: dimension changes must
+      // still run reconcileCosmologyInvariants so eta0 stays clamped to the
+      // per-lattice safe threshold and spacetimeDim is kept in bounds.
+      const ext = useExtendedObjectStore.getState()
+      ext.setSchroedingerQuantumMode('freeScalarField')
+      useGeometryStore.getState().setDimension(6)
+      useExtendedObjectStore.getState().setFreeScalarCosmologyPreset('deSitter')
+      useExtendedObjectStore.getState().setFreeScalarCosmologyEnabled(true)
+      const eta0AtDim6 = getFSF().cosmology.eta0
+
+      // Switch to dimension=3 via the geometry store. This triggers the
+      // compute-mode sync path; without the reconcile fix, eta0 would stay
+      // at its dim=6 value even though safeEta0 at dim=3 is larger (bigger
+      // default grid → larger L → smaller k_min → larger safeEta0).
+      useGeometryStore.getState().setDimension(3)
+      const fsAfter = getFSF()
+      expect(fsAfter.latticeDim).toBe(3)
+      // Cosmology stays enabled because dim=3 is still in [3, 7].
+      expect(fsAfter.cosmology.enabled).toBe(true)
+      // |eta0| must be at least as large as it was at dim=6 — safeEta0 grew.
+      expect(Math.abs(fsAfter.cosmology.eta0)).toBeGreaterThanOrEqual(Math.abs(eta0AtDim6) - 1e-9)
+      // The sync path sets needsReset on the freeScalar sub-config.
+      expect(fsAfter.needsReset).toBe(true)
+    })
+
+    it('refuses to enable cosmology when the current preset params are invalid', () => {
+      // Regression: previously setFreeScalarCosmologyEnabled would flip the
+      // flag to true even when `clampEta0` threw — leaving the compute pass
+      // to crash on the next reset. Put the store into a state where the
+      // de Sitter preset is selected but the `hubble` would make it fail
+      // `isValidPreset` by setting hubble out of the valid range via the
+      // setter first (which clamps), so we simulate an invalid state by
+      // directly constructing an ekpyrotic preset with sub-critical steepness.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      // ekpyrotic at steepness = sc is exactly on the boundary → invalid.
+      // The preset setter auto-bumps steepness above sc, so we need to bypass
+      // by setting preset to ekpyrotic first (which bumps), then driving
+      // steepness back down — the steepness setter clamps to sMin = sc*1.0001
+      // which is still valid. That means the only reachable "invalid" user
+      // state is the de Sitter hubble=0 case. Simulate the crash path by
+      // mocking the store cosmology slice into an invalid ekpyrotic state.
+      s.setFreeScalarCosmologyPreset('ekpyrotic')
+      // Drive cosmology into an invalid state by reaching into the store
+      // directly (mirrors what a corrupted preset load could do).
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              enabled: false,
+              preset: 'ekpyrotic' as const,
+              steepness: 0.5, // < s_c(4) ≈ 3.464 — invalid
+            },
+          },
+        },
+      }))
+
+      // Calling the setter must refuse to enable.
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(false)
+    })
+
+    it('does not throw from setFreeScalarCosmologySteepness on a 1D lattice', () => {
+      // Regression: the steepness setter used to call sCritical(latticeDim+1)
+      // unconditionally. On a 1D lattice (spacetimeDim = 2), sCritical
+      // throws because its formula √(8·(n−1)/(n−2)) divides by zero. The
+      // setter must soft-fail like the other cosmology setters — store the
+      // value verbatim and let the next lattice reconcile revalidate.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(1)
+      expect(() => s.setFreeScalarCosmologySteepness(5)).not.toThrow()
+      expect(getFSF().cosmology.steepness).toBe(5)
+    })
+
+    it('preserves self-interaction state when enable is refused', () => {
+      // Regression: the v1 mutex (cosmology on ⟹ self-interaction off) used
+      // to derive its new value from the *raw* enable flag, so a refused
+      // toggle still cleared self-interaction as a silent side effect. Must
+      // key off the validated nextEnabled instead.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      // Turn self-interaction on first so we can observe whether the
+      // refused toggle clobbers it.
+      s.setFreeScalarSelfInteractionEnabled(true)
+      expect(getFSF().selfInteractionEnabled).toBe(true)
+      // Corrupt cosmology state into an invalid ekpyrotic config that will
+      // be rejected by isValidPreset.
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              enabled: false,
+              preset: 'ekpyrotic' as const,
+              steepness: 0.5, // < s_c(4)
+            },
+          },
+        },
+      }))
+
+      s.setFreeScalarCosmologyEnabled(true)
+      // Refused — cosmology stays off AND self-interaction is untouched.
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().selfInteractionEnabled).toBe(true)
+    })
+
+    it('soft-disables cosmology when reconcile hits an invalid preset combo', () => {
+      // Regression: reconcileCosmologyInvariants previously returned {} when
+      // `isValidPreset` was false, leaving cosmology enabled in a state that
+      // would crash the compute pass on reset.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyEnabled(true)
+      expect(getFSF().cosmology.enabled).toBe(true)
+
+      // Corrupt hubble to a value isValidPreset will reject, then trigger
+      // reconcile via a lattice change.
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              hubble: 0, // invalid for deSitter
+            },
+          },
+        },
+      }))
+
+      // Triggering reconcile via a setter that calls it.
+      s.setFreeScalarLatticeDim(4)
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().needsReset).toBe(true)
+    })
+
+    it('marks needsReset when a spacing change triggers reconcile', () => {
+      // `safeEta0` is now a constant (`DEFAULT_SAFE_ETA0 = 0.1`), so lattice
+      // geometry changes no longer move the clamp floor. What this test
+      // actually verifies is that `setFreeScalarSpacing` triggers
+      // `reconcileCosmologyInvariants`, which calls `clampEta0` again and
+      // marks `needsReset: true` on any lattice-affecting edit — even when
+      // the clamp is a no-op and `eta0` comes back unchanged.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyEnabled(true)
+      const baseline = getFSF().cosmology.eta0
+
+      const fs = getFSF()
+      s.setFreeScalarSpacing(fs.spacing.map((a) => a * 2))
+      const reclamped = getFSF().cosmology.eta0
+      // The clamp floor is constant, so eta0 should come back equal within
+      // floating-point tolerance — not strictly greater.
+      expect(reclamped).toBeCloseTo(baseline, 12)
+      expect(getFSF().needsReset).toBe(true)
+    })
   })
 })

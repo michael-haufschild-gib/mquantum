@@ -10,10 +10,15 @@
  * for the missing parameters.
  */
 
-import { DEFAULT_PAULI_CONFIG, DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import {
+  DEFAULT_PAULI_CONFIG,
+  DEFAULT_SCHROEDINGER_CONFIG,
+  type FreeScalarConfig,
+} from '@/lib/geometry/extended/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 
+import { reconcileCosmologyInvariants } from '../slices/geometry/setters/freeScalarCosmologySetters'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -150,6 +155,22 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   if (normalized.quantumMode === 'hydrogenOrbital') {
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
+
+  // Reconcile cosmology invariants for the freeScalar sub-config. A scene
+  // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller
+  // grid (e.g. 8⁶ at d=6, smaller safe η₀) will have an `eta0` that the
+  // user-facing setters would have clamped — but the loader path bypasses
+  // those setters via direct `setState`. Without this normalisation step,
+  // the next vacuumNoise reset would feed an out-of-range `eta0` into
+  // `sampleAdiabaticVacuum` and either throw or fall back silently.
+  const fs = normalized.freeScalar
+  if (fs && typeof fs === 'object') {
+    const reconciled = reconcileCosmologyInvariants(fs as FreeScalarConfig)
+    if (Object.keys(reconciled).length > 0) {
+      normalized = { ...normalized, freeScalar: { ...(fs as object), ...reconciled } }
+    }
+  }
+
   return normalized as T
 }
 

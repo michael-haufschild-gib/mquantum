@@ -17,15 +17,8 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
   const objectType = useGeometryStore((s) => s.objectType)
   const temporalReprojectionEnabled = usePerformanceStore((s) => s.temporalReprojectionEnabled)
 
-  const {
-    showDepthBuffer,
-    setShowDepthBuffer,
-    showTemporalDepthBuffer,
-    setShowTemporalDepthBuffer,
-  } = useUIStore(
+  const { showTemporalDepthBuffer, setShowTemporalDepthBuffer } = useUIStore(
     useShallow((s) => ({
-      showDepthBuffer: s.showDepthBuffer,
-      setShowDepthBuffer: s.setShowDepthBuffer,
       showTemporalDepthBuffer: s.showTemporalDepthBuffer,
       setShowTemporalDepthBuffer: s.setShowTemporalDepthBuffer,
     }))
@@ -76,12 +69,6 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
             baseW={bufferStats.screen.width}
           />
           <BufferRow
-            label="Depth"
-            w={bufferStats.depth.width}
-            h={bufferStats.depth.height}
-            baseW={bufferStats.screen.width}
-          />
-          <BufferRow
             label="Temporal"
             w={bufferStats.temporal.width}
             h={bufferStats.temporal.height}
@@ -92,12 +79,7 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
       )}
       <div className="space-y-3 pt-3 border-t border-border-subtle">
         <SectionHeader icon={<Icons.Monitor />} label="Debug View" />
-        <div className="grid grid-cols-2 gap-2">
-          <DebugToggle
-            label="Depth"
-            active={showDepthBuffer}
-            onClick={() => setShowDepthBuffer(!showDepthBuffer)}
-          />
+        <div className="grid grid-cols-1 gap-2">
           <DebugToggle
             label="Temporal"
             active={showTemporalDepthBuffer}

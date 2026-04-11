@@ -7,7 +7,7 @@
  * private bgCache = new BindGroupCache()
  *
  * // In execute():
- * const bg = this.bgCache.get([colorView, depthView], () =>
+ * const bg = this.bgCache.get([colorView, normalView], () =>
  *   device.createBindGroup({ layout, entries: [...] })
  * )
  *

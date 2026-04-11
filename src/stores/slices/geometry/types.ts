@@ -259,6 +259,15 @@ export interface SchroedingerSliceActions {
   setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
   setFreeScalarDiagnosticsInterval: (interval: number) => void
 
+  // Cosmological Background (Mukhanov-Sasaki bridge)
+  setFreeScalarCosmologyEnabled: (enabled: boolean) => void
+  setFreeScalarCosmologyPreset: (
+    preset: import('@/lib/physics/cosmology/presets').CosmologyPreset
+  ) => void
+  setFreeScalarCosmologySteepness: (s: number) => void
+  setFreeScalarCosmologyHubble: (h: number) => void
+  setFreeScalarCosmologyEta0: (eta0: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (
     mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode

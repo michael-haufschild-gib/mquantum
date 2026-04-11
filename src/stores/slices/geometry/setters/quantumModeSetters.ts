@@ -12,6 +12,7 @@ import { resizeQuantumWalkArrays } from '@/lib/geometry/extended/quantumWalk'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
+  type FreeScalarConfig,
   type HydrogenNDPresetName,
   type SchroedingerConfig,
 } from '@/lib/geometry/extended/types'
@@ -24,8 +25,10 @@ import type { QuantumTypeKey } from '@/lib/geometry/registry/types'
 import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 import type { ExtendedObjectSlice } from '../types'
+import { reconcileCosmologyInvariants } from './freeScalarCosmologySetters'
 import type { SetterContext } from './sliceSetterUtils'
 import { clampDtWithCfl } from './sliceSetterUtils'
 
@@ -187,7 +190,15 @@ function resizeFreeScalar(
   const resized = resizers.resizeFreeScalarArrays(prev, dim)
   const newSpacing = resized.spacing ?? prev.spacing
   const newDt = clampDtWithCfl(prev.dt, newSpacing, dim, prev.mass)
-  return { freeScalar: { ...prev, ...resized, dt: newDt, needsReset: true } }
+  // Stage the full post-resize config so reconcileCosmologyInvariants sees
+  // the new latticeDim / gridSize / spacing. Without this, re-entering FSF
+  // after an external dimension change could leave cosmology enabled at an
+  // out-of-range spacetimeDim or with eta0 below the new safe threshold —
+  // the next vacuumNoise reset would then feed a stale state into
+  // sampleAdiabaticVacuum(). Mirror schroedingerSlice.resizeFreeScalarForDim.
+  const staged: FreeScalarConfig = { ...prev, ...resized, dt: newDt, needsReset: true }
+  const reconciled = reconcileCosmologyInvariants(staged)
+  return { freeScalar: { ...staged, ...reconciled } }
 }
 
 function resizeTdse(
@@ -353,12 +364,23 @@ export function createQuantumModeSetters(ctx: SetterContext, resizers: ModeResiz
 
       // Auto-apply first dimension-compatible preset on first visit to a mode.
       // Subsequent visits preserve the user's custom state.
+      //
+      // During URL loading / scene loading (`isLoadingScene=true`) the caller
+      // is layering explicit values on top of the newly-selected mode, and
+      // the preset apply actions above run through an async dynamic import.
+      // Letting the async preset resolve would then silently overwrite the
+      // URL/scene values — e.g. cosmology params set on first visit to
+      // `freeScalarField` disappearing when FREE_SCALAR_PRESETS finishes
+      // importing. Still mark the mode visited so a later manual switch
+      // away-and-back preserves the URL/scene-loaded state as authoritative.
       if (currentMode !== mode && !visitedModes.has(mode)) {
         visitedModes.add(mode)
-        const dim = useGeometryStore.getState().dimension
-        const presetId = getFirstPresetId(mode, dim)
-        if (presetId) {
-          applyFirstPreset(mode, presetId, get)
+        if (!usePerformanceStore.getState().isLoadingScene) {
+          const dim = useGeometryStore.getState().dimension
+          const presetId = getFirstPresetId(mode, dim)
+          if (presetId) {
+            applyFirstPreset(mode, presetId, get)
+          }
         }
       }
     },

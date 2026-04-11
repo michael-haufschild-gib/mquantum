@@ -49,7 +49,6 @@ export interface BufferDimensions {
 
 /** Metadata for a named GPU buffer resource. */
 export interface BufferStats {
-  depth: BufferDimensions
   temporal: BufferDimensions
   screen: BufferDimensions
 }
@@ -118,7 +117,6 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
   vram: { geometries: 0, textures: 0, total: 0 },
   viewport: { width: 0, height: 0, dpr: 1 },
   buffers: {
-    depth: { ...DEFAULT_BUFFER_DIMENSIONS },
     temporal: { ...DEFAULT_BUFFER_DIMENSIONS },
     screen: { ...DEFAULT_BUFFER_DIMENSIONS },
   },

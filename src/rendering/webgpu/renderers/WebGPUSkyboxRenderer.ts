@@ -108,10 +108,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       id: 'skybox',
       priority: 50, // Render before main objects
       inputs: [],
-      outputs: [
-        { resourceId: 'scene-render', access: 'write', binding: 0 },
-        { resourceId: 'depth-buffer', access: 'write', binding: 1 },
-      ],
+      outputs: [{ resourceId: 'scene-render', access: 'write', binding: 0 }],
     })
 
     this.skyboxConfig = {
@@ -155,7 +152,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   /**
    * Create pipeline for specific skybox mode.
    * Uses rgba16float format to match scene-render resource.
-   * Uses depth24plus to match depth-buffer resource.
    * @param device
    * @param mode
    */
@@ -223,7 +219,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     // Create render pipeline
     // Format: rgba16float to match scene-render resource
-    // Depth: depth24plus to match depth-buffer resource
     this.renderPipeline = device.createRenderPipeline({
       label: 'skybox-pipeline',
       layout: pipelineLayout,
@@ -245,11 +240,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       primitive: {
         topology: 'triangle-list',
         cullMode: 'front', // Cull front faces since we're inside the skybox
-      },
-      depthStencil: {
-        format: 'depth24plus',
-        depthWriteEnabled: false,
-        depthCompare: 'greater-equal', // Skybox renders at far plane (reverse-Z: far = 0)
       },
     })
 
@@ -671,7 +661,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     // Get render targets
     const colorView = ctx.getWriteTarget('scene-render')
-    const depthView = ctx.getWriteTarget('depth-buffer')
 
     if (!colorView) return
 
@@ -686,14 +675,6 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
         },
       ],
-      depthStencilAttachment: depthView
-        ? {
-            view: depthView,
-            depthLoadOp: 'clear',
-            depthStoreOp: 'store',
-            depthClearValue: 0.0,
-          }
-        : undefined,
     })
 
     passEncoder.setPipeline(this.renderPipeline)

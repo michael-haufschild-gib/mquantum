@@ -20,7 +20,6 @@ function resetMetricsStore(): void {
     vram: { geometries: 0, textures: 0, total: 0 },
     viewport: { width: 0, height: 0, dpr: 1 },
     buffers: {
-      depth: { width: 0, height: 0 },
       temporal: { width: 0, height: 0 },
       screen: { width: 0, height: 0 },
     },
@@ -60,7 +59,6 @@ function createGraphMock() {
     getResourceDimensions: vi.fn(
       () =>
         new Map<string, { width: number; height: number }>([
-          ['depth-buffer', { width: 1280, height: 720 }],
           ['quarter-position', { width: 640, height: 360 }],
         ])
     ),
@@ -169,7 +167,6 @@ describe('WebGPUStatsCollector', () => {
       uniqueVertices: 900,
     })
     expect(metrics.buffers).toEqual({
-      depth: { width: 1280, height: 720 },
       temporal: { width: 640, height: 360 },
       screen: { width: 1920, height: 1080 },
     })

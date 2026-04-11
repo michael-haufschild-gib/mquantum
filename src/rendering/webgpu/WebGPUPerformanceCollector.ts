@@ -326,7 +326,6 @@ export class WebGPUStatsCollector {
     if (this.measurementTier === TIER_FULL_STATS) {
       const resourceDims = graph.getResourceDimensions()
       const bufferStats: BufferStats = {
-        depth: resourceDims.get('depth-buffer') ?? { width: 0, height: 0 },
         temporal: resourceDims.get('quarter-position') ?? { width: 0, height: 0 },
         screen: { width: size.width, height: size.height },
       }

@@ -80,17 +80,10 @@ function encode3DRenderPass(
     ? ctx.getWriteTarget('quarter-color')
     : ctx.getWriteTarget('object-color')
 
-  const depthView = isTemporal ? null : ctx.getWriteTarget('depth-buffer')
-
   if (!colorView) {
     logger.warn(
       `[WebGPU Schrödinger] Missing color render target (temporal=${isTemporal}, target=${isTemporal ? 'quarter-color' : 'object-color'})`
     )
-    return null
-  }
-
-  if (!isTemporal && !depthView) {
-    logger.warn('[WebGPU Schrödinger] Missing depth buffer for non-temporal mode')
     return null
   }
 
@@ -123,14 +116,6 @@ function encode3DRenderPass(
   const passEncoder = ctx.beginRenderPass({
     label: 'schroedinger-render',
     colorAttachments,
-    depthStencilAttachment: depthView
-      ? {
-          view: depthView,
-          depthLoadOp: 'clear' as const,
-          depthStoreOp: 'store' as const,
-          depthClearValue: 0.0,
-        }
-      : undefined,
   })
 
   passEncoder.setPipeline(resources.renderPipeline)

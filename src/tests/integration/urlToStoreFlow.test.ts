@@ -122,6 +122,84 @@ describe('URL params -> store state integration', () => {
     expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('tdseDynamics')
   })
 
+  describe('cosmology URL → store flow (Mukhanov-Sasaki bridge)', () => {
+    it('applies a deSitter cosmology URL fragment end-to-end', () => {
+      // L7 audit: this is the only test that exercises applyCosmologyParams
+      // through the real applyUrlStateParams entry point. The URL must
+      // activate cosmology, set the preset/Hubble/eta0, and leave the FSF
+      // mode in a consistent state ready for the compute pass.
+      applyUrlStateToStores(
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=deSitter&cos_h=2.50&cos_eta0=-12'
+      )
+
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('freeScalarField')
+      expect(fs.cosmology.enabled).toBe(true)
+      expect(fs.cosmology.preset).toBe('deSitter')
+      expect(fs.cosmology.hubble).toBeCloseTo(2.5)
+      // The eta0 setter clamps to safeEta0 — at the default 32³ grid the
+      // clamp is well below 12, so the URL value survives untouched.
+      expect(fs.cosmology.eta0).toBe(-12)
+      // Mutex with self-interaction holds.
+      expect(fs.selfInteractionEnabled).toBe(false)
+      // Reset flag is propagated for the compute pass.
+      expect(fs.needsReset).toBe(true)
+    })
+
+    it('applies an ekpyrotic cosmology URL fragment with steepness clamp', () => {
+      applyUrlStateToStores(
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=ekpyrotic&cos_s=7&cos_eta0=-15'
+      )
+
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.cosmology.enabled).toBe(true)
+      expect(fs.cosmology.preset).toBe('ekpyrotic')
+      // Setter clamps to (s_c, 100]; s_c(4)≈3.46, so s=7 survives.
+      expect(fs.cosmology.steepness).toBeCloseTo(7)
+      expect(fs.cosmology.eta0).toBe(-15)
+    })
+
+    it('drops the cosmology block when cos_eta0 = 0 (singularity)', () => {
+      // The deserializer rejects cos_eta0=0 — the cosmology block is dropped.
+      applyUrlStateToStores(
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=deSitter&cos_h=1&cos_eta0=0'
+      )
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.cosmology.enabled).toBe(false)
+    })
+
+    it('drops the cosmology block when ekpyrotic steepness is below s_c', () => {
+      // s_c(n=4) = √12 ≈ 3.46. cos_s=2 is sub-critical → block dropped.
+      applyUrlStateToStores(
+        'd=3&t=schroedinger&qm=freeScalarField&cos=1&cos_bg=ekpyrotic&cos_s=2&cos_eta0=-10'
+      )
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.cosmology.enabled).toBe(false)
+    })
+
+    it('cosmology URL roundtrips for de Sitter', () => {
+      const serialized = serializeState({
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'freeScalarField',
+        cosmologyEnabled: true,
+        cosmologyPreset: 'deSitter',
+        cosmologyHubble: 1.5,
+        cosmologyEta0: -8,
+      })
+
+      useGeometryStore.getState().reset()
+      useExtendedObjectStore.getState().reset()
+      applyUrlStateToStores(serialized)
+
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.cosmology.enabled).toBe(true)
+      expect(fs.cosmology.preset).toBe('deSitter')
+      expect(fs.cosmology.hubble).toBeCloseTo(1.5)
+      expect(fs.cosmology.eta0).toBe(-8)
+    })
+  })
+
   it('full serialize -> deserialize -> apply roundtrip preserves state', () => {
     // Set up a specific state
     useGeometryStore.getState().setDimension(6)

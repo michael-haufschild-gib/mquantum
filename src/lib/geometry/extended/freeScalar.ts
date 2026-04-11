@@ -5,6 +5,8 @@
  * for the real scalar field lattice simulation.
  */
 
+import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
+
 // ============================================================================
 // Field View & Initial Conditions
 // ============================================================================
@@ -97,6 +99,103 @@ export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
 }
 
 // ============================================================================
+// Cosmological Background (canonical δφ integrator)
+// ============================================================================
+
+/**
+ * Cosmological FLRW background sub-config for the Free Scalar Field pass.
+ *
+ * When `enabled = true`, the simulation remains in the canonical perturbation
+ * variables already used by the Minkowski path: `(phi, pi)` store the scalar
+ * field perturbation `δφ` and its conjugate momentum `π_δφ`. The integrator
+ * picks up three time-dependent coefficients derived from the selected
+ * `preset`:
+ *
+ *     drift: dδφ/dη = aKinetic · π_δφ                          (a^(−(n−2)))
+ *     kick:  dπ_δφ/dη = aPotential · ∇²δφ − m²·aFull·δφ − aFull·V'(δφ)
+ *
+ * with `aKinetic = a^(−(n−2))`, `aPotential = a^(n−2)`, `aFull = a^n`. These
+ * collapse to `(1, 1, 1)` under Minkowski, so the cosmology path is
+ * bit-identical to the disabled path in the trivial regime.
+ *
+ * **No Mukhanov-Sasaki variable.** Earlier drafts re-expressed the state as
+ * `v = a^((n−2)/2)·δφ` with an effective mass `M²_eff(η) = a²m² − z''/z`.
+ * The shipped integrator does NOT do that — UI labels, analysis panels, and
+ * tooling should treat `(phi, pi)` as the bare `(δφ, π_δφ)` variables under
+ * every preset. See `docs/adr/010-fsf-cosmology-late-time-integrator.md` and
+ * `src/lib/physics/cosmology/` for the derivation of the `(aKinetic,
+ * aPotential, aFull)` coefficients.
+ *
+ * ## Invariants enforced by the store + UI
+ *
+ * 1. **Spacetime-dim window.** The background is physically defined only for
+ *    `n_spacetime ∈ [3, 7]`, i.e. `latticeDim ∈ [2, 6]`. Going outside this
+ *    window force-disables cosmology with a logger warning (see
+ *    `reconcileCosmologyInvariants`).
+ *
+ * 2. **Mutual exclusion with self-interaction.** Cosmology is modelled only
+ *    for the free-field path in v1. Enabling cosmology forces
+ *    `selfInteractionEnabled = false`; enabling self-interaction forces
+ *    `cosmology.enabled = false`. The mutex is lifted in v2 once the kink/
+ *    φ⁴ nonlinearities have been re-validated under the δφ integrator.
+ *
+ * 3. **Non-zero `eta0`.** The power-law scale factor `a(η) = A·|η|^q`
+ *    diverges at `η = 0` for every non-Minkowski preset, so `eta0 ≠ 0` is
+ *    required. The store setter rejects zero silently; the runtime clamps
+ *    `|simEta| ≥ COSMOLOGY_ETA_FLOOR` so the cosmological clock never
+ *    crosses the singularity.
+ *
+ * 4. **Safe `eta0` heuristic.** `clampEta0` raises user-provided `|η₀|`
+ *    above `DEFAULT_SAFE_ETA0` to stop the simulation from starting
+ *    trivially close to the singularity. Under the δφ formulation the
+ *    adiabatic vacuum is well-defined at any non-zero `η₀`, so this is a
+ *    UX guardrail, not a physical constraint.
+ *
+ * 5. **Canonical variable contract.** The lattice always stores the bare
+ *    `(δφ, π_δφ)` variables — there is no re-interpretation under
+ *    cosmology. Field-view labels read `δφ`, `π`, and `ε` (proper energy
+ *    density `ρ = H_canonical / a^n`) in both Minkowski and non-Minkowski
+ *    regimes. The `reconcileCosmologyInvariants` helper will soft-disable
+ *    cosmology if the preset parameters become invalid (`isValidPreset`
+ *    false) or `clampEta0` throws.
+ */
+export interface CosmologyConfig {
+  /** Master toggle. When false, the FSF pass runs in Minkowski mode. */
+  enabled: boolean
+  /** Which FLRW background regime to evolve on. */
+  preset: CosmologyPreset
+  /**
+   * Paper's potential steepness `s`. Only consulted for the ekpyrotic preset;
+   * must satisfy `s > s_c(n)` where `s_c(n) = √(8(n-1)/(n-2))`.
+   */
+  steepness: number
+  /**
+   * Hubble rate `H` for the de Sitter preset. Sets `a(η) = -1/(Hη)`.
+   * Must be strictly positive.
+   */
+  hubble: number
+  /**
+   * Initial conformal time `η₀` at which the adiabatic Bunch-Davies vacuum
+   * is sampled. Use `η < 0` (deep past). Subject to an auto-clamp so that
+   * `|η₀|² · k_min² ≥ safety · |z''/z|(η₀)` — the clamped value is what the
+   * FSF pass actually uses.
+   */
+  eta0: number
+}
+
+/**
+ * Default cosmology sub-config: disabled, with sensible defaults for each
+ * preset so that flipping the toggle yields an immediately runnable state.
+ */
+export const DEFAULT_COSMOLOGY_CONFIG: CosmologyConfig = {
+  enabled: false,
+  preset: 'deSitter',
+  steepness: 5, // > s_c(4) ≈ 3.464 — valid ekpyrotic default
+  hubble: 1,
+  eta0: -10,
+}
+
+// ============================================================================
 // Free Scalar Config
 // ============================================================================
 
@@ -165,6 +264,15 @@ export interface FreeScalarConfig {
   diagnosticsEnabled: boolean
   /** Diagnostic computation interval in frames */
   diagnosticsInterval: number
+
+  // === Cosmological Background (Mukhanov-Sasaki) ===
+  /**
+   * FLRW background sub-config. When `cosmology.enabled` is true, the field
+   * is evolved on a time-dependent background with effective mass
+   * `M²_eff(η) = a²(η)·m² − z''(η)/z(η)`. Mutually exclusive with
+   * `selfInteractionEnabled` in v1.
+   */
+  cosmology: CosmologyConfig
 }
 
 /**
@@ -198,4 +306,5 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   pmlTargetReflection: 1e-6,
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
+  cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
 }

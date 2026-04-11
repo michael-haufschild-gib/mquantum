@@ -20,6 +20,7 @@ import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type { FreeScalarFieldView, FreeScalarInitialCondition } from '@/lib/geometry/extended/types'
 import { MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
+import { CosmologyControls } from './CosmologyControls'
 import type { FreeScalarFieldControlsProps } from './types'
 
 /**
@@ -435,6 +436,15 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           )}
         </ControlGroup>
 
+        <CosmologyControls
+          cosmology={fs.cosmology}
+          latticeDim={latticeDim}
+          gridSize={fs.gridSize}
+          spacing={fs.spacing}
+          selfInteractionEnabled={fs.selfInteractionEnabled}
+          actions={actions}
+        />
+
         <ControlGroup
           title="Field View"
           collapsible
@@ -446,9 +456,18 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             value={fs.fieldView}
             onChange={handleFieldView}
             ariaLabel="Field view"
-            tooltip="Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density)."
+            tooltip={
+              fs.cosmology.enabled
+                ? 'Displayed field quantity: δφ (scalar field perturbation), π (conjugate momentum), or ε (proper energy density per comoving observer).'
+                : 'Displayed field quantity: φ (field value), π (conjugate momentum ∂φ/∂t), or ε (energy density).'
+            }
             data-testid="field-view-selector"
           />
+          {fs.cosmology.enabled && (
+            <div className="text-xs text-text-tertiary italic">
+              Cosmology active: displaying canonical δφ, π, and proper ε.
+            </div>
+          )}
         </ControlGroup>
       </div>
     )

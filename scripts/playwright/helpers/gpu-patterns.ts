@@ -21,4 +21,9 @@ export const BENIGN_GPU_PATTERNS: RegExp[] = [
   /is destroyed[\s\S]*While calling[\s\S]*MapAsync/i,
   // Dirac algebra bridge disposed during async gamma matrix generation.
   /DiracAlgebraBridge disposed/i,
+  // Vercel Analytics script blocked by dev CSP — unrelated to app functionality.
+  // The analytics bootstrap tries to load `va.vercel-scripts.com/v1/script.debug.js`
+  // which the dev server's `script-src 'self' 'wasm-unsafe-eval'` directive
+  // rejects. This is expected in local dev and never surfaces in prod.
+  /va\.vercel-scripts\.com.*violates the following Content Security Policy/i,
 ]

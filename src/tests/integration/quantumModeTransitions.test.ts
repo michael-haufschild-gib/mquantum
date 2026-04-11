@@ -8,11 +8,12 @@
  * in the application and the most likely source of state corruption.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 const ALL_MODES: SchroedingerQuantumMode[] = [
   'harmonicOscillator',
@@ -262,6 +263,80 @@ describe('quantum mode state machine transitions', () => {
       const config = useExtendedObjectStore.getState().schroedinger
       expect(config.termCount).toBe(5)
       expect(config.seed).toBe(42)
+    })
+  })
+
+  describe('FSF cosmology invariants across mode switches', () => {
+    it('preserves cosmology eta0 across dimension changes under the δφ integrator', () => {
+      // Under the canonical δφ formulation the adiabatic vacuum is well-
+      // defined at any non-zero η₀ — there is no dim-dependent safety
+      // threshold anymore. The reconcile helper still runs on the post-
+      // resize config but only enforces the cosmetic `DEFAULT_SAFE_ETA0`
+      // constant (0.1), so a user-chosen `eta0 = -1` passes through both
+      // a small-grid and a large-grid branch untouched.
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      useGeometryStore.getState().setDimension(6)
+      useExtendedObjectStore.getState().setFreeScalarCosmologyEnabled(true)
+      useExtendedObjectStore.getState().setFreeScalarCosmologyEta0(-1)
+      const eta0AtDim6 = useExtendedObjectStore.getState().schroedinger.freeScalar.cosmology.eta0
+      expect(eta0AtDim6).toBe(-1)
+
+      // Leave FSF, change global dimension, return to FSF. The mode-switch
+      // resize path runs through reconcileCosmologyInvariants but finds
+      // nothing to clamp — eta0 stays at -1.
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      useGeometryStore.getState().setDimension(3)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.latticeDim).toBe(3)
+      expect(fs.cosmology.enabled).toBe(true)
+      expect(fs.cosmology.eta0).toBe(-1)
+    })
+  })
+
+  describe('URL/scene loading guard (isLoadingScene)', () => {
+    afterEach(() => {
+      usePerformanceStore.getState().setIsLoadingScene(false)
+    })
+
+    it('first-visit preset apply is suppressed during scene loading so URL overrides stick', async () => {
+      // Round 4 regression: when URL loading flips the mode for the first
+      // time, the async dynamic import of FREE_SCALAR_PRESETS would later
+      // resolve and rebuild `freeScalar` from DEFAULT_FREE_SCALAR_CONFIG +
+      // preset.overrides, silently wiping the cosmology / modeK / dt / etc
+      // values that applyUrlStateParams set synchronously moments before.
+      // Gating applyFirstPreset on !isLoadingScene prevents the async
+      // import from firing in the first place.
+      //
+      // Pre-load the presets module so that, absent the guard, the async
+      // import in applyFreeScalarPreset would resolve on the next
+      // microtask — otherwise a buggy variant would coincidentally pass
+      // this test by virtue of the module not finishing loading yet.
+      await import('@/lib/physics/freeScalar/presets')
+
+      usePerformanceStore.getState().setIsLoadingScene(true)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      // Drain any outstanding microtasks / timers so a buggy (unguarded)
+      // implementation has time to resolve its dynamic import and clobber
+      // the store. 25ms is a large multiple of the typical microtask delay
+      // for an already-cached module import.
+      await new Promise((r) => setTimeout(r, 25))
+
+      const afterSwitch = useExtendedObjectStore.getState().schroedinger.freeScalar
+      // Discriminator: the first FSF preset (gaussianPacket) sets
+      // modeK[0]=3, while DEFAULT_FREE_SCALAR_CONFIG has modeK[0]=1. If
+      // the async preset apply ran, modeK[0] would be 3.
+      expect(afterSwitch.modeK[0]).toBe(1)
+
+      // Mode is marked as visited: flipping away and back without clearing
+      // isLoadingScene must still not apply a preset.
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('harmonicOscillator')
+      usePerformanceStore.getState().setIsLoadingScene(false)
+      useExtendedObjectStore.getState().setSchroedingerQuantumMode('freeScalarField')
+      await new Promise((r) => setTimeout(r, 25))
+      const afterRoundTrip = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(afterRoundTrip.modeK[0]).toBe(1)
     })
   })
 

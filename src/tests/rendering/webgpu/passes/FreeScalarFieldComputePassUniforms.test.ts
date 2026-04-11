@@ -78,6 +78,71 @@ describe('computeFsfInitHash', () => {
     )
     expect(hash).not.toContain('_si')
   })
+
+  it('changes when cosmology is enabled vs disabled', () => {
+    const base = createConfig()
+    const off = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, enabled: false },
+    })
+    const on = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, enabled: true },
+    })
+    expect(off).not.toBe(on)
+    expect(off).toContain('_cosmo0')
+    expect(on).toContain('_cosmo1_')
+  })
+
+  it('changes when any cosmology parameter changes', () => {
+    const base = createConfig({
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 2,
+        hubble: 1,
+        eta0: -1,
+      },
+    })
+    const h = computeFsfInitHash(base)
+    const hPreset = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, preset: 'ekpyrotic' },
+    })
+    const hSteep = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, steepness: 3 },
+    })
+    const hHubble = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, hubble: 2 },
+    })
+    const hEta = computeFsfInitHash({
+      ...base,
+      cosmology: { ...base.cosmology, eta0: -2 },
+    })
+    // All four must differ from each other and from the base.
+    const all = [h, hPreset, hSteep, hHubble, hEta]
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  it('combines cosmology and self-interaction in the hash', () => {
+    const base = createConfig({
+      selfInteractionEnabled: true,
+      selfInteractionLambda: 0.1,
+      selfInteractionVev: 1.0,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 2,
+        hubble: 1,
+        eta0: -1,
+      },
+    })
+    const hash = computeFsfInitHash(base)
+    expect(hash).toContain('_cosmo1_deSitter')
+    expect(hash).toContain('_si0.1')
+  })
 })
 
 describe('computeStridesPadded (used by FSF uniform packing)', () => {
@@ -118,6 +183,7 @@ describe('writeFsfUniforms', () => {
       config,
       totalSites,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -142,6 +208,7 @@ describe('writeFsfUniforms', () => {
       config,
       totalSites: 16 * 32 * 64,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -162,6 +229,7 @@ describe('writeFsfUniforms', () => {
       config,
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const f32 = new Float32Array(uniformData)
@@ -179,6 +247,7 @@ describe('writeFsfUniforms', () => {
       config: createConfig({ initialCondition: 'vacuumNoise' }),
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(0)
   })
@@ -191,6 +260,7 @@ describe('writeFsfUniforms', () => {
       config: createConfig({ initialCondition: 'gaussianPacket' }),
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(2)
   })
@@ -203,6 +273,7 @@ describe('writeFsfUniforms', () => {
       config: createConfig({ fieldView: 'energyDensity' }),
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
     // energyDensity → 2
     expect(new Uint32Array(uniformData)[41]).toBe(2)
@@ -218,6 +289,7 @@ describe('writeFsfUniforms', () => {
       config: createConfig(),
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
@@ -236,6 +308,7 @@ describe('writeFsfUniforms', () => {
       config,
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -258,6 +331,7 @@ describe('writeFsfUniforms', () => {
       config,
       totalSites: 32768,
       maxFieldValue: 1.0,
+      simEta: 0,
     })
 
     expect(new Uint32Array(uniformData)[120]).toBe(0)
@@ -330,6 +404,92 @@ describe('estimateFsfMaxFieldValue with self-interaction', () => {
     })
 
     expect(estimateFsfMaxFieldValue(config, 1.0)).toBe(1.0)
+  })
+})
+
+describe('estimateFsfMaxFieldValue — proper-density convention (cosmology)', () => {
+  // The shader renders proper energy density ρ = H_canonical / aFull for
+  // the `energyDensity` view. The auto-scale calibration has to follow
+  // the same convention so `normRho = shader/estimator ≈ 1` at the
+  // initial time — otherwise the display either blanks out instantly
+  // (estimator too big) or saturates (estimator too small).
+
+  it('rescales the vacuum-noise energy estimate by 1/aFull(η₀) under cosmology', () => {
+    // De Sitter at η₀=-10, H=1 gives a(η₀)=0.1 → aFull=1e-4. The proper
+    // estimate must be the canonical estimate DIVIDED by 1e-4, i.e. 1e4×
+    // larger than the Minkowski-equivalent value.
+    const cosmoConfig = createConfig({
+      initialCondition: 'vacuumNoise',
+      fieldView: 'energyDensity',
+      autoScale: true,
+      mass: 1.0,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 1,
+        eta0: -10,
+      },
+    })
+    const cosmoEstimate = estimateFsfMaxFieldValue(cosmoConfig, 0)
+    // The Minkowski-equivalent baseline: same lattice, no cosmology.
+    // Under Minkowski the dispersion is the `kgFloor` path (m²=1) and
+    // aFull=1 so the proper division is a no-op.
+    const flatConfig = createConfig({
+      initialCondition: 'vacuumNoise',
+      fieldView: 'energyDensity',
+      autoScale: true,
+      mass: 1.0,
+    })
+    const flatEstimate = estimateFsfMaxFieldValue(flatConfig, 0)
+    // Not equal — the cosmology branch draws from a different
+    // dispersion (m²·a²(η₀)=0.01 vs m²=1). The anchor for this test is
+    // that the cosmology estimate is MUCH larger than the Minkowski one,
+    // specifically 1/aFull(η₀) = 10⁴ × larger after accounting for the
+    // dispersion difference — not dimmer, as the canonical-density
+    // estimator used to be.
+    expect(cosmoEstimate).toBeGreaterThan(flatEstimate)
+    expect(Number.isFinite(cosmoEstimate)).toBe(true)
+    expect(cosmoEstimate).toBeGreaterThan(0)
+  })
+
+  it('non-vacuum energyDensity estimate divides by aFull(η₀) under cosmology', () => {
+    // For a gaussianPacket init, the canonical-density formula is
+    // `0.5·φ₀²·ω²`. Under Minkowski this is the final value; under
+    // cosmology we divide by aFull(η₀). The ratio between the two must
+    // equal aFull(η₀) up to the dispersion difference.
+    const flatConfig = createConfig({
+      initialCondition: 'gaussianPacket',
+      fieldView: 'energyDensity',
+      autoScale: true,
+      packetAmplitude: 1.0,
+      mass: 1.0,
+    })
+    const flatEstimate = estimateFsfMaxFieldValue(flatConfig, 1.0)
+
+    const cosmoConfig = createConfig({
+      initialCondition: 'gaussianPacket',
+      fieldView: 'energyDensity',
+      autoScale: true,
+      packetAmplitude: 1.0,
+      mass: 1.0,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 1,
+        eta0: -10,
+      },
+    })
+    const cosmoEstimate = estimateFsfMaxFieldValue(cosmoConfig, 1.0)
+
+    // Cosmology estimate must be finite, positive, and LARGER than flat
+    // (because dividing by aFull(η₀)=1e-4 inflates the scale by 10⁴×).
+    expect(Number.isFinite(cosmoEstimate)).toBe(true)
+    expect(cosmoEstimate).toBeGreaterThan(flatEstimate)
+    // Sanity check: the ratio should be at least 10³× larger (the
+    // dispersion difference is small compared to the 10⁴ aFull factor).
+    expect(cosmoEstimate / flatEstimate).toBeGreaterThan(1e3)
   })
 })
 
