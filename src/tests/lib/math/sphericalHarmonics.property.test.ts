@@ -128,7 +128,23 @@ function fastRealSphericalHarmonicDirect(
     if (m === 2) return 0.54627422 * st2 * Math.cos(2 * phi)
     return 0.54627422 * st2 * Math.sin(2 * phi) // m === -2
   }
-  // Fallback for l > 2
+  if (l === 3) {
+    // f-orbital fast path — mirrors the SH_Y3* constants and formulas in
+    // sphericalHarmonics.wgsl.ts so the equivalence test can cross-verify
+    // the WGSL hardcoded constants against the general formula. Before
+    // this branch existed the test fell through to `realSphericalHarmonic`
+    // for l=3, which hides any bug in the f-orbital fast path.
+    const ct2 = ct * ct
+    const st2 = st * st
+    if (m === 0) return 0.3731763326 * ct * (5 * ct2 - 3) // √(7/(16π))
+    if (m === 1) return 0.4570457995 * st * Math.cos(phi) * (5 * ct2 - 1) // √(21/(32π))
+    if (m === -1) return 0.4570457995 * st * Math.sin(phi) * (5 * ct2 - 1)
+    if (m === 2) return 1.4453057213 * st2 * Math.cos(2 * phi) * ct // √(105/(16π))
+    if (m === -2) return 1.4453057213 * st2 * Math.sin(2 * phi) * ct
+    if (m === 3) return 0.5900435899 * st * st2 * Math.cos(3 * phi) // √(35/(32π))
+    return 0.5900435899 * st * st2 * Math.sin(3 * phi) // m === -3
+  }
+  // Fallback for l > 3
   const theta = Math.acos(Math.max(-1, Math.min(1, ct)))
   return realSphericalHarmonic(l, m, theta, phi)
 }
@@ -262,6 +278,43 @@ describe('cartesian ↔ angular equivalence for l ≤ 2', () => {
           const fast = fastRealSphericalHarmonicDirect(l, m, ct, st, phi)
           const general = realSphericalHarmonic(l, m, theta, phi)
           expect(fast).toBeCloseTo(general, 4)
+        }
+      }),
+      { numRuns: 500 }
+    )
+  })
+
+  // ──────────────────────────────────────────────────────────────────────
+  // f-orbital (l = 3) fast-path equivalence — crosses WGSL SH_Y3* constants
+  // against the general-formula spherical harmonic. Before the TS mirror
+  // was extended to l = 3, the fall-through to `realSphericalHarmonic`
+  // masked any bug in the f-orbital constants: the test was effectively
+  // asserting `general === general`.
+  // ──────────────────────────────────────────────────────────────────────
+  it('fastDirect matches general realSphericalHarmonic for l = 3 (all 7 f-orbitals)', () => {
+    const lmPairs: [number, number][] = [
+      [3, -3],
+      [3, -2],
+      [3, -1],
+      [3, 0],
+      [3, 1],
+      [3, 2],
+      [3, 3],
+    ]
+
+    fc.assert(
+      fc.property(arbTheta, arbPhi, (theta, phi) => {
+        const ct = Math.cos(theta)
+        const st = Math.sin(theta)
+
+        for (const [l, m] of lmPairs) {
+          const fast = fastRealSphericalHarmonicDirect(l, m, ct, st, phi)
+          const general = realSphericalHarmonic(l, m, theta, phi)
+          // Tighter tolerance than the l ≤ 2 test because we're
+          // specifically validating the hardcoded constants to at least 5
+          // decimal places — loose tolerance here would admit constant
+          // drift at the fifth decimal without complaint.
+          expect(fast).toBeCloseTo(general, 5)
         }
       }),
       { numRuns: 500 }

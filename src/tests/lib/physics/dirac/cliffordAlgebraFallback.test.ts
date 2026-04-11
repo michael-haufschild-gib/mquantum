@@ -194,3 +194,127 @@ describe('generateDiracMatricesFallback', () => {
     })
   }
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Physical property: H² = E²·I for the Dirac free Hamiltonian.
+//
+//   H_free = Σⱼ αⱼ·kⱼ + β·m
+//   E²     = Σⱼ kⱼ² + m²
+//
+// If any αᵢ anticommutation relation is subtly wrong (e.g., a permutation
+// error that preserves individual αᵢ² = I but breaks cross-anticommutation),
+// the direct checks above can still pass while H²≠E²I. This is the
+// higher-level physical invariant the Dirac compute pass actually relies on.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Dirac free Hamiltonian: H² = E²·I', () => {
+  /** Complex S×S identity matrix. */
+  function complexIdentity(s: number): Float32Array {
+    const m = new Float32Array(s * s * 2)
+    for (let i = 0; i < s; i++) m[(i * s + i) * 2] = 1.0
+    return m
+  }
+
+  /** Get complex entry (row, col) from an S×S matrix. */
+  function getEntry(m: Float32Array, s: number, r: number, c: number): [number, number] {
+    const idx = (r * s + c) * 2
+    return [m[idx]!, m[idx + 1]!]
+  }
+
+  /** Extract complex S×S matrix from packed buffer at given offset. */
+  function extractMatrix(buf: Float32Array, s: number, offset: number): Float32Array {
+    return buf.slice(offset, offset + s * s * 2)
+  }
+
+  /** Complex matrix multiply C = A · B. */
+  function matMul(a: Float32Array, b: Float32Array, s: number): Float32Array {
+    const c = new Float32Array(s * s * 2)
+    for (let i = 0; i < s; i++) {
+      for (let j = 0; j < s; j++) {
+        let re = 0
+        let im = 0
+        for (let k = 0; k < s; k++) {
+          const [aR, aI] = getEntry(a, s, i, k)
+          const [bR, bI] = getEntry(b, s, k, j)
+          re += aR * bR - aI * bI
+          im += aR * bI + aI * bR
+        }
+        c[(i * s + j) * 2] = re
+        c[(i * s + j) * 2 + 1] = im
+      }
+    }
+    return c
+  }
+
+  /** Add two complex matrices: C = A + B. */
+  function matAdd(a: Float32Array, b: Float32Array): Float32Array {
+    const c = new Float32Array(a.length)
+    for (let i = 0; i < a.length; i++) c[i] = a[i]! + b[i]!
+    return c
+  }
+
+  /** Scale a complex matrix by a real scalar. */
+  function matScale(m: Float32Array, scalar: number): Float32Array {
+    const c = new Float32Array(m.length)
+    for (let i = 0; i < m.length; i++) c[i] = m[i]! * scalar
+    return c
+  }
+
+  const cases: { dim: number; k: number[]; m: number }[] = [
+    { dim: 1, k: [1.0], m: 1.0 },
+    { dim: 2, k: [1.0, 0.5], m: 1.0 },
+    { dim: 3, k: [1.0, 0.5, -0.3], m: 1.0 },
+    { dim: 3, k: [0, 0, 0], m: 2.0 }, // pure mass, zero momentum
+    { dim: 4, k: [0.7, -0.2, 0.4, 0.1], m: 0.5 },
+    { dim: 5, k: [0.3, -0.5, 0.2, 0.8, -0.1], m: 1.0 },
+    { dim: 6, k: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6], m: 0.3 },
+    { dim: 7, k: [0.5, -0.3, 0.1, 0.2, -0.4, 0.6, -0.2], m: 1.0 },
+  ]
+
+  for (const { dim, k, m } of cases) {
+    it(`dim=${dim}, m=${m}, k=[${k.map((x) => x.toFixed(1)).join(',')}]`, () => {
+      const s = spinorSize(dim)
+      const { gammaData } = generateDiracMatricesFallback(dim)
+      const matSize = s * s * 2
+
+      const alphas: Float32Array[] = []
+      for (let i = 0; i < dim; i++) {
+        alphas.push(extractMatrix(gammaData, s, 1 + i * matSize))
+      }
+      const beta = extractMatrix(gammaData, s, 1 + dim * matSize)
+
+      // Build H = Σ αⱼ·kⱼ + β·m
+      let H = matScale(beta, m)
+      for (let j = 0; j < dim; j++) {
+        H = matAdd(H, matScale(alphas[j]!, k[j]!))
+      }
+
+      const H2 = matMul(H, H, s)
+      const k2 = k.reduce((acc, ki) => acc + ki * ki, 0)
+      const expected = matScale(complexIdentity(s), k2 + m * m)
+
+      // f32 error accumulates with S — looser bound for S>8.
+      const tol = s <= 8 ? 1e-3 : 0.05
+      for (let i = 0; i < expected.length; i++) {
+        expect(Math.abs(H2[i]! - expected[i]!)).toBeLessThan(tol)
+      }
+    })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Test-env sanity: the vitest mock of `mdimension-core` re-implements
+// `dirac_spinor_size_wasm` in JS. Regressions in the mock (off-by-one in the
+// `max(2, 1 << floor((N+1)/2))` formula) would go unnoticed because the real
+// Clifford generation path falls back to the JS `cliffordAlgebraFallback`.
+// This assertion keeps the mock honest.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('test mock: dirac_spinor_size_wasm matches fallback', () => {
+  it('agrees for dims 1..=11', async () => {
+    const mock = await import('@/tests/__mocks__/mdimension-core')
+    for (let dim = 1; dim <= 11; dim++) {
+      expect(mock.dirac_spinor_size_wasm(dim)).toBe(spinorSize(dim))
+    }
+  })
+})
