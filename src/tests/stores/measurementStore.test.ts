@@ -159,15 +159,37 @@ describe('measurementStore', () => {
     })
   })
 
-  describe('addMeasurement (legacy)', () => {
-    it('caps at MAX_MEASUREMENTS (1000)', () => {
+  describe('addMeasurement (test-only seam)', () => {
+    // `addMeasurement` bypasses the collapse state machine so tests can
+    // seed records without running a real GPU readback. Not "legacy" —
+    // the production collapse path (`completeMeasurement`) and the test
+    // seam coexist deliberately. See the `@internal` docblock on the store.
+    it('caps at MAX_MEASUREMENTS (1000) while keeping cumulative totalCount', () => {
       const store = useMeasurementStore.getState()
       for (let i = 0; i < 1005; i++) {
         store.addMeasurement([i], 0.01)
       }
       const state = useMeasurementStore.getState()
-      expect(state.measurements.length).toBeLessThanOrEqual(1000)
+      expect(state.measurements.length).toBe(1000)
+      // Sliced buffer should retain the *most recent* 1000 entries, not the
+      // first 1000. Guard against an off-by-one that would rotate the
+      // wrong side of the ring out.
+      expect(state.measurements[0]!.position[0]).toBe(5)
+      expect(state.measurements[999]!.position[0]).toBe(1004)
       expect(state.totalCount).toBe(1005)
+    })
+
+    it('does not mutate isCollapsing or cooldownFrames', () => {
+      // Regression guard: this is the defining property that separates
+      // `addMeasurement` from `completeMeasurement`. If this invariant
+      // breaks, e2e tests that pre-seed records will start fighting the
+      // state machine (cooldown blocks further clicks, isCollapsing
+      // blocks UI).
+      useMeasurementStore.setState({ isCollapsing: true, cooldownFrames: 7 })
+      useMeasurementStore.getState().addMeasurement([1, 2, 3], 0.5)
+      const state = useMeasurementStore.getState()
+      expect(state.isCollapsing).toBe(true)
+      expect(state.cooldownFrames).toBe(7)
     })
   })
 })

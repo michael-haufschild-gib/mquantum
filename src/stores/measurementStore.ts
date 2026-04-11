@@ -65,6 +65,18 @@ interface MeasurementState {
   startCollapse: () => void
   completeMeasurement: (position: number[], density: number, measuredAxis: number | null) => void
   tickCooldown: () => void
+  /**
+   * @internal Test-only seam for seeding measurement records without the
+   * GPU readback → sample → inject → completeMeasurement pipeline.
+   *
+   * Unlike {@link completeMeasurement}, this does NOT touch the collapse
+   * state machine (`isCollapsing`, `cooldownFrames`) — tests that need to
+   * inspect stats, point-cloud rendering, or the clear button without
+   * waiting for a real GPU measurement use this to pre-populate records.
+   * Production code paths should use `completeMeasurement`; calling
+   * `addMeasurement` from a live frame loop would bypass the cooldown and
+   * leave the state machine inconsistent.
+   */
   addMeasurement: (position: number[], density: number) => void
   clearMeasurements: () => void
 }
