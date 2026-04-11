@@ -17,6 +17,9 @@ import { WIGNER_SPATIAL_PARAMS_SIZE } from '../shaders/schroedinger/compute/wign
 import {
   BASIS_UNIFORM_SIZE,
   type CrossPairInfo,
+  MAX_WIGNER_CROSS_LAYERS,
+  MAX_WIGNER_CROSS_PAIRS,
+  MAX_WIGNER_TERM_COUNT,
   SCHROEDINGER_UNIFORM_SIZE,
 } from './wignerCacheTypes'
 
@@ -460,6 +463,26 @@ export function uploadWignerSpatialParams(
   crossPairs: CrossPairInfo[],
   numCrossLayers: number
 ): void {
+  if (numCrossLayers > MAX_WIGNER_CROSS_LAYERS) {
+    // Writes past byte 239 of the 240-byte `ArrayBuffer` backing the
+    // `WignerSpatialParams` struct are silent no-ops (Int32Array writes
+    // beyond the buffer do nothing), and the shader's `array<vec4i, 14>`
+    // clamps reads to index 13 — so an oversized termCount would produce
+    // duplicate, wrong cross pairs in the Wigner visualization with zero
+    // runtime signal. Fail loudly and point at the WGSL capacity.
+    throw new Error(
+      `uploadWignerSpatialParams: numCrossLayers=${numCrossLayers} exceeds ` +
+        `MAX_WIGNER_CROSS_LAYERS=${MAX_WIGNER_CROSS_LAYERS}. This means termCount > ` +
+        `MAX_WIGNER_TERM_COUNT=${MAX_WIGNER_TERM_COUNT}, which is unsupported by the ` +
+        `current WGSL struct layout (wignerSpatial.wgsl.ts: array<vec4i, 14>).`
+    )
+  }
+  if (crossPairs.length > MAX_WIGNER_CROSS_PAIRS) {
+    throw new Error(
+      `uploadWignerSpatialParams: crossPairs.length=${crossPairs.length} exceeds ` +
+        `MAX_WIGNER_CROSS_PAIRS=${MAX_WIGNER_CROSS_PAIRS}.`
+    )
+  }
   const data = new ArrayBuffer(WIGNER_SPATIAL_PARAMS_SIZE)
   const u32View = new Uint32Array(data)
   const i32View = new Int32Array(data)
