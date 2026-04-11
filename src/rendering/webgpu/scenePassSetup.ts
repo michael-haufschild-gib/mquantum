@@ -96,12 +96,6 @@ export function setupSharedResources(graph: WebGPURenderGraph, config: PassConfi
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   })
 
-  graph.addResource('depth-buffer', {
-    type: 'texture',
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
   graph.addResource('ldr-color', {
     type: 'texture',
     format: 'rgba8unorm',
@@ -320,6 +314,7 @@ export function cleanupSchrodingerPasses(graph: WebGPURenderGraph, config: PassC
     config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
   if (!useTemporalCloud) {
     if (graph.getPass('temporal-cloud')) graph.removePass('temporal-cloud')
+    if (graph.getPass('bufferPreview')) graph.removePass('bufferPreview')
   }
 }
 

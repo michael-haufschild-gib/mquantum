@@ -45,7 +45,6 @@ export const TRANSIENT_FIELDS = new Set([
   'maxFps',
 
   // UI - debug buffer visualizations (developer tools, not scene/style config)
-  'showDepthBuffer',
   'showTemporalDepthBuffer',
 
   // Version counters - internal dirty-flag optimization state

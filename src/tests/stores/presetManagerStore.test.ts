@@ -970,7 +970,6 @@ describe('presetManagerStore (invariants)', () => {
       expect(ui.showPerfMonitor).toBe(false)
       expect(ui.perfMonitorExpanded).toBe(true)
       expect(ui.perfMonitorTab).toBe('shader')
-      expect(ui.showDepthBuffer).toBe(false)
       expect(ui.showTemporalDepthBuffer).toBe(false)
       expect((ui as unknown as Record<string, unknown>).mysteryFlag).toBeUndefined()
     })
@@ -1332,7 +1331,6 @@ describe('presetManagerStore (invariants)', () => {
       // Set device-specific UI state that should NOT be saved
       // Note: maxFps is now in performanceStore, not uiStore
       useUIStore.setState({
-        showDepthBuffer: true,
         showTemporalDepthBuffer: true,
       })
 
@@ -1340,7 +1338,6 @@ describe('presetManagerStore (invariants)', () => {
       const [saved] = usePresetManagerStore.getState().savedScenes
 
       // Device-specific settings should be excluded from ui data
-      expect(saved!.data.ui.showDepthBuffer).toBeUndefined()
       expect(saved!.data.ui.showTemporalDepthBuffer).toBeUndefined()
     })
   })

@@ -319,7 +319,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(outputResourceIds).toEqual(['quarter-color', 'quarter-position'])
   })
 
-  it('uses full-resolution color + depth outputs for isosurface without temporal', async () => {
+  it('uses full-resolution color output for isosurface without temporal', async () => {
     const { createObjectRenderer } = await import('@/rendering/webgpu/scenePassSetup')
     const renderer = createObjectRenderer(
       'schroedinger',
@@ -334,7 +334,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     }
 
     const outputResourceIds = renderer.config.outputs.map((output) => output.resourceId)
-    expect(outputResourceIds).toEqual(['object-color', 'depth-buffer'])
+    expect(outputResourceIds).toEqual(['object-color'])
   })
 
   it('adds quarter-res resources and temporal cloud pass when temporal reprojection is enabled', async () => {

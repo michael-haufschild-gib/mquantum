@@ -85,12 +85,7 @@ export interface ResourceSize {
 /**
  * Resource type enumeration.
  */
-export type WebGPUResourceType =
-  | 'texture'
-  | 'renderTarget'
-  | 'depthStencil'
-  | 'storageTexture'
-  | 'cubemap'
+export type WebGPUResourceType = 'texture' | 'renderTarget' | 'storageTexture' | 'cubemap'
 
 /**
  * Configuration for a WebGPU render resource.
@@ -104,8 +99,6 @@ export interface WebGPURenderResourceConfig {
   size: ResourceSize
   /** Texture format (default: rgba16float for HDR) */
   format?: GPUTextureFormat
-  /** Depth format for depthStencil resources */
-  depthFormat?: GPUTextureFormat
   /** Usage flags */
   usage?: GPUTextureUsageFlags
   /** Sample count for MSAA (1 for no MSAA) */
@@ -125,9 +118,6 @@ export interface WebGPUResource {
   config: WebGPURenderResourceConfig
   texture: GPUTexture
   view: GPUTextureView
-  /** Depth texture (if depthStencil) */
-  depthTexture?: GPUTexture
-  depthView?: GPUTextureView
   /** Sampler for texture reads */
   sampler: GPUSampler
   /** Resolved dimensions */

@@ -258,11 +258,7 @@ export class WebGPUResourcePool {
     const countResource = (r: WebGPUResource): number => {
       const bytesPerPixel = this.getBytesPerPixel(r.config.format ?? 'rgba16float')
       const layers = r.config.arrayLayerCount ?? 1
-      let size = r.width * r.height * bytesPerPixel * layers
-      if (r.depthTexture) {
-        size += r.width * r.height * 4 // Assume 4 bytes for depth
-      }
-      return size
+      return r.width * r.height * bytesPerPixel * layers
     }
 
     for (const resource of this.resources.values()) {
@@ -350,22 +346,6 @@ export class WebGPUResourcePool {
       dimension: config.type === 'cubemap' ? 'cube' : '2d',
     })
 
-    // Create depth texture if needed
-    let depthTexture: GPUTexture | undefined
-    let depthView: GPUTextureView | undefined
-
-    if (config.type === 'depthStencil' || config.depthFormat) {
-      const depthFormat = config.depthFormat ?? 'depth24plus'
-      depthTexture = this.device.createTexture({
-        label: `pool-${config.id}-depth`,
-        size: { width, height, depthOrArrayLayers: 1 },
-        format: depthFormat,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-        sampleCount: config.sampleCount ?? 1,
-      })
-      depthView = depthTexture.createView()
-    }
-
     // Use appropriate sampler
     const sampler = this.linearSampler!
 
@@ -374,8 +354,6 @@ export class WebGPUResourcePool {
       config,
       texture,
       view,
-      depthTexture,
-      depthView,
       sampler,
       width,
       height,
@@ -403,7 +381,6 @@ export class WebGPUResourcePool {
 
   private disposeResource(resource: WebGPUResource): void {
     resource.texture.destroy()
-    resource.depthTexture?.destroy()
     this.vramUsageDirty = true
   }
 

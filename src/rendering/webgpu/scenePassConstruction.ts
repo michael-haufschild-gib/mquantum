@@ -58,7 +58,6 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
       ? new WebGPUSkyboxRenderer({ mode: config.skyboxMode, sun: false, vignette: false })
       : new ScenePass({
           outputResource: 'scene-render',
-          depthResource: 'depth-buffer',
           mode: 'clear',
           clearColor: {
             r: backgroundLinear[0],
@@ -81,9 +80,8 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
   // Environment composite
   passes.push({
     pass: new EnvironmentCompositePass({
-      lensedEnvironmentInput: 'scene-render',
+      backgroundInput: 'scene-render',
       mainObjectInput: 'object-color',
-      mainObjectDepthInput: 'depth-buffer',
       outputResource: 'hdr-color',
     }),
     label: 'environment-composite',
@@ -171,18 +169,15 @@ export function constructPPPasses(config: PassConfig): LabeledPass[] {
     resource: null,
   })
 
-  // Buffer preview
-  const additionalInputs = useTemporalCloud ? ['quarter-position'] : undefined
-  passes.push({
-    pass: new BufferPreviewPass({
-      bufferInput: 'depth-buffer',
-      additionalInputs,
-      bufferType: 'depth',
-      depthMode: 'linear',
-    }),
-    label: 'buffer-preview',
-    resource: null,
-  })
+  // Buffer preview (temporal ray-distance visualization; only meaningful when
+  // temporal cloud accumulation is active, since the source texture is quarter-position)
+  if (useTemporalCloud) {
+    passes.push({
+      pass: new BufferPreviewPass({ bufferInput: 'quarter-position' }),
+      label: 'buffer-preview',
+      resource: null,
+    })
+  }
 
   // Light gizmo + debug overlay
   passes.push({

@@ -39,9 +39,6 @@ export interface ScenePassConfig {
   /** Output resource ID for scene color */
   outputResource: string
 
-  /** Optional depth output resource ID */
-  depthResource?: string
-
   /** Optional normal output resource ID */
   normalResource?: string
 
@@ -134,9 +131,6 @@ export class ScenePass extends WebGPUBasePass {
     // Build outputs
     const outputs = [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }]
 
-    if (config.depthResource) {
-      outputs.push({ resourceId: config.depthResource, access: 'write' as const, binding: 1 })
-    }
     if (config.normalResource) {
       outputs.push({ resourceId: config.normalResource, access: 'write' as const, binding: 2 })
     }
@@ -294,20 +288,6 @@ export class ScenePass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
 
-    // Check if depth clearing is needed
-    let depthStencilAttachment: GPURenderPassDepthStencilAttachment | undefined
-    if (this.passConfig.depthResource) {
-      const depthView = ctx.getWriteTarget(this.passConfig.depthResource)
-      if (depthView) {
-        depthStencilAttachment = {
-          view: depthView,
-          depthLoadOp: 'clear' as const,
-          depthStoreOp: 'store' as const,
-          depthClearValue: 0.0,
-        }
-      }
-    }
-
     const passEncoder = ctx.beginRenderPass({
       label: 'scene-clear',
       colorAttachments: [
@@ -318,7 +298,6 @@ export class ScenePass extends WebGPUBasePass {
           clearValue: this.clearColor,
         },
       ],
-      depthStencilAttachment,
     })
 
     // End immediately - we just wanted to clear

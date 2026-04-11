@@ -277,7 +277,6 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
    * @param colorFormat
    * @param options
    * @param options.label
-   * @param options.depthStencilFormat
    * @param options.blendState
    */
   protected createFullscreenPipeline(
@@ -287,7 +286,6 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
     colorFormat: GPUTextureFormat,
     options?: {
       label?: string
-      depthStencilFormat?: GPUTextureFormat
       blendState?: GPUBlendState
     }
   ): GPURenderPipeline {
@@ -328,13 +326,6 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
       primitive: {
         topology: 'triangle-list',
       },
-      depthStencil: options?.depthStencilFormat
-        ? {
-            format: options.depthStencilFormat,
-            depthWriteEnabled: false,
-            depthCompare: 'always',
-          }
-        : undefined,
     })
   }
 

@@ -212,7 +212,7 @@ export function buildShaderConfig(
  * Determine the render pass output resources based on the renderer config.
  * - 2D: single object-color
  * - Temporal 3D: quarter-color + quarter-position
- * - Standard 3D: object-color + depth-buffer
+ * - Standard 3D: object-color only
  */
 export function buildPipelineOutputs(
   config?: SchrodingerRendererConfig
@@ -231,10 +231,7 @@ export function buildPipelineOutputs(
       { resourceId: 'quarter-position', access: 'write', binding: 1 },
     ]
   }
-  return [
-    { resourceId: 'object-color', access: 'write', binding: 0 },
-    { resourceId: 'depth-buffer', access: 'write', binding: 1 },
-  ]
+  return [{ resourceId: 'object-color', access: 'write', binding: 0 }]
 }
 
 // ---------------------------------------------------------------------------
