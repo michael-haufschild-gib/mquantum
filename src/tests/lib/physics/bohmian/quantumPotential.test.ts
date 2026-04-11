@@ -183,7 +183,7 @@ describe('computeQuantumPotentialCpu — near-vacuum cutoff gate', () => {
     for (let k = 0; k < N; k++) {
       for (let j = 0; j < N; j++) {
         for (let i = 0; i < N; i++) {
-          const x = -BOUND + ((i + 0.5) * (2 * BOUND)) / N
+          const x = voxelWorld(i, N, BOUND)
           rho[indexGrid(i, j, k, N)] = x < 0 ? Math.exp(-(x * x)) : 1e-20
         }
       }
@@ -193,7 +193,7 @@ describe('computeQuantumPotentialCpu — near-vacuum cutoff gate', () => {
     for (let k = 0; k < N; k++) {
       for (let j = 0; j < N; j++) {
         for (let i = 0; i < N; i++) {
-          const x = -BOUND + ((i + 0.5) * (2 * BOUND)) / N
+          const x = voxelWorld(i, N, BOUND)
           const q = Q[indexGrid(i, j, k, N)]!
           if (x >= 0) {
             expect(q).toBe(0)

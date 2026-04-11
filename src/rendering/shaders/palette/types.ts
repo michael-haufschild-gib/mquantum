@@ -6,6 +6,7 @@
  *
  */
 
+import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
 import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
 import type { ObjectType } from '@/lib/geometry/types'
@@ -300,7 +301,7 @@ export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
   objectType: ObjectType = 'schroedinger',
-  freeScalarInitialCondition?: string,
+  freeScalarInitialCondition?: FreeScalarInitialCondition,
   availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per

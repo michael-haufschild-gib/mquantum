@@ -8,6 +8,7 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
+import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import { QUANTUM_TYPE_REGISTRY } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import {
@@ -61,6 +62,17 @@ export interface PassConfig {
   colorAlgorithm: PaletteColorAlgorithm
   diracFieldView?: string
   pauliFieldView?: string
+  /**
+   * Initial condition for the free scalar field mode. Threaded into the
+   * normalization path so presets that carry a stale `kSpaceOccupation` under
+   * `freeScalarField + vacuumNoise` (where the exact vacuum has n_k = 0 and
+   * `getAvailableColorAlgorithms` intentionally hides that algorithm) are
+   * corrected at runtime instead of landing on a blank map.
+   *
+   * Undefined for any non-freeScalarField mode; callers may also leave it
+   * undefined for legacy tests that don't exercise the vacuumNoise path.
+   */
+  freeScalarInitialCondition?: FreeScalarInitialCondition
   representation: 'position' | 'momentum' | 'wigner'
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
@@ -176,17 +188,22 @@ export function normalizeColorAlgorithmForQuantumMode(
   diracFieldView?: string,
   pauliFieldView?: string,
   objectType: ObjectType = 'schroedinger',
-  availabilityOptions?: ColorAlgorithmAvailabilityOptions
+  availabilityOptions?: ColorAlgorithmAvailabilityOptions,
+  freeScalarInitialCondition?: FreeScalarInitialCondition
 ): PaletteColorAlgorithm {
   if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
     return 'particleAntiparticle'
   }
 
+  // Pass freeScalarInitialCondition through so `freeScalarField + vacuumNoise`
+  // hides the (correctly blank) `kSpaceOccupation` map here too — otherwise
+  // presets could carry it through normalization unchanged and the runtime
+  // would land on an intentionally-hidden visualization.
   const isAvailable = getAvailableColorAlgorithms(
     quantumMode,
     openQuantumEnabled,
     objectType,
-    undefined,
+    freeScalarInitialCondition,
     availabilityOptions
   ).some((option) => option.value === colorAlgorithm)
   if (isAvailable) return colorAlgorithm
@@ -261,7 +278,8 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
         dimension: effectiveDimension,
         isosurface: config.isosurface,
         representation: config.representation,
-      }
+      },
+      config.freeScalarInitialCondition
     ),
     isosurface: config.isosurface,
     representation: isCompute ? 'position' : config.representation,
@@ -378,7 +396,8 @@ export function resolveColorAlgorithmInt(config: PassConfig): number | undefined
       dimension: config.dimension,
       isosurface: config.isosurface,
       representation: config.representation,
-    }
+    },
+    config.freeScalarInitialCondition
   )
   return COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm]
 }
