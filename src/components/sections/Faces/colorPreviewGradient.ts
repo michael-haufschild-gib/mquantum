@@ -329,9 +329,36 @@ function computeColormapColor(
   return null
 }
 
+/**
+ * Preview for the Bohmian quantum potential Q(x) = -½ ∇²R / R.
+ * Diverging gradient mirroring the WGSL palette:
+ *   t=0 → maximally negative Q (cyan, concentration),
+ *   t=0.5 → Q = 0 (dim neutral),
+ *   t=1 → maximally positive Q (red, quantum pressure).
+ */
+function computeQuantumPotentialPreviewColor(t: number): [number, number, number] {
+  const qSigned = 2 * t - 1
+  const strength = Math.sqrt(Math.abs(qSigned))
+  const hue = qSigned >= 0 ? 0.02 : 0.5
+  return hslToRgb(hue, 0.35 + 0.6 * strength, 0.45 + 0.25 * strength)
+}
+
+/**
+ * Preview for the vortex density (topological charge) algorithm. Mirrors the
+ * WGSL palette in `ALGO_BRANCH[28]`: t ramps linearly from 0 (no defect) to 1
+ * (maximum vortex strength), hue is pinned at 0.02, saturation and lightness
+ * scale with t.
+ */
+function computeVortexDensityPreviewColor(t: number): [number, number, number] {
+  const strength = Math.max(0, Math.min(1, t))
+  return hslToRgb(0.02, 0.2 + 0.75 * strength, 0.05 + 0.6 * strength)
+}
+
 /** Compute a single gradient color sample for a given algorithm and parameter t in [0,1]. */
 function computeGradientColor(t: number, p: GradientParams): [number, number, number] {
   const alg = p.colorAlgorithm
+  if (alg === 'quantumPotential') return computeQuantumPotentialPreviewColor(t)
+  if (alg === 'vortexDensity') return computeVortexDensityPreviewColor(t)
   return (
     computePhaseColor(alg, t, p) ??
     computeDivergingColor(alg, t, p) ??

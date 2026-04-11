@@ -35,4 +35,6 @@ export const COLOR_ALG_NAMES: Record<number, string> = {
   24: 'Pauli Spin Density',
   25: 'Pauli Spin Expectation',
   26: 'Pauli Coherence',
+  27: 'Quantum Potential Q(x) (Bohmian)',
+  28: 'Vortex Density (topological charge)',
 }

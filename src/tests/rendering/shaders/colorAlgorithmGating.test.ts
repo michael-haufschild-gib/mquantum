@@ -200,3 +200,84 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     expect(values).toContain('coherenceMap')
   })
 })
+
+describe('getAvailableColorAlgorithms — density-grid availability for analytic modes', () => {
+  // Round 1 review fix: quantumPotential and vortexDensity require a bound
+  // density grid texture. AnalyticModeStrategy binds one for HO / hydrogenND
+  // whenever dimension >= 3, isosurface is off, and representation is not
+  // Wigner. The selector must expose the algorithms in that configuration and
+  // hide them otherwise.
+
+  it('exposes quantumPotential for 3D volumetric harmonicOscillator', () => {
+    const algos = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'schroedinger',
+      undefined,
+      { dimension: 3, isosurface: false, representation: 'position' }
+    )
+    const values = algos.map((a) => a.value)
+    expect(values).toContain('quantumPotential')
+    expect(values).toContain('vortexDensity')
+  })
+
+  it('exposes quantumPotential for 5D volumetric hydrogenND', () => {
+    const algos = getAvailableColorAlgorithms('hydrogenND', false, 'schroedinger', undefined, {
+      dimension: 5,
+      isosurface: false,
+      representation: 'position',
+    })
+    const values = algos.map((a) => a.value)
+    expect(values).toContain('quantumPotential')
+    expect(values).toContain('vortexDensity')
+  })
+
+  it('hides quantumPotential for 2D harmonicOscillator', () => {
+    const algos = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'schroedinger',
+      undefined,
+      { dimension: 2, isosurface: false, representation: 'position' }
+    )
+    const values = algos.map((a) => a.value)
+    expect(values).not.toContain('quantumPotential')
+    expect(values).not.toContain('vortexDensity')
+  })
+
+  it('hides quantumPotential when isosurface rendering is on (HO)', () => {
+    const algos = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'schroedinger',
+      undefined,
+      { dimension: 3, isosurface: true, representation: 'position' }
+    )
+    const values = algos.map((a) => a.value)
+    expect(values).not.toContain('quantumPotential')
+    expect(values).not.toContain('vortexDensity')
+  })
+
+  it('hides quantumPotential for Wigner phase-space representation', () => {
+    const algos = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'schroedinger',
+      undefined,
+      { dimension: 3, isosurface: false, representation: 'wigner' }
+    )
+    const values = algos.map((a) => a.value)
+    expect(values).not.toContain('quantumPotential')
+    expect(values).not.toContain('vortexDensity')
+  })
+
+  it('defaults (no availability options) behave like 3D volumetric — exposes quantumPotential', () => {
+    // Callers that have not yet been upgraded to pass availability options get
+    // the most permissive behaviour (3D volumetric non-Wigner) so the feature
+    // is visible wherever it could reasonably work.
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', false)
+    const values = algos.map((a) => a.value)
+    expect(values).toContain('quantumPotential')
+    expect(values).toContain('vortexDensity')
+  })
+})

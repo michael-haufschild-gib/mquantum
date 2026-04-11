@@ -167,6 +167,13 @@ function colorAlgoForPauliFieldView(
   }
 }
 
+/** Pipeline-shape hints matching ColorAlgorithmAvailabilityOptions for density-grid gating. */
+interface NormalizeAvailabilityOptions {
+  dimension?: number
+  isosurface?: boolean
+  representation?: string
+}
+
 /** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */
 export function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
@@ -174,15 +181,20 @@ export function normalizeColorAlgorithmForQuantumMode(
   openQuantumEnabled: boolean = false,
   diracFieldView?: string,
   pauliFieldView?: string,
-  objectType: string = 'schroedinger'
+  objectType: string = 'schroedinger',
+  availabilityOptions?: NormalizeAvailabilityOptions
 ): PaletteColorAlgorithm {
   if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
     return 'particleAntiparticle'
   }
 
-  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled, objectType).some(
-    (option) => option.value === colorAlgorithm
-  )
+  const isAvailable = getAvailableColorAlgorithms(
+    quantumMode,
+    openQuantumEnabled,
+    objectType,
+    undefined,
+    availabilityOptions
+  ).some((option) => option.value === colorAlgorithm)
   if (isAvailable) return colorAlgorithm
 
   if (openQuantumEnabled) return 'purityMap'
@@ -250,7 +262,12 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
       config.openQuantumEnabled,
       config.diracFieldView,
       isPauli ? config.pauliFieldView : undefined,
-      config.objectType
+      config.objectType,
+      {
+        dimension: effectiveDimension,
+        isosurface: config.isosurface,
+        representation: config.representation,
+      }
     ),
     isosurface: config.isosurface,
     representation: isCompute ? 'position' : config.representation,
@@ -362,7 +379,12 @@ export function resolveColorAlgorithmInt(config: PassConfig): number | undefined
     config.openQuantumEnabled,
     config.diracFieldView,
     config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
-    config.objectType
+    config.objectType,
+    {
+      dimension: config.dimension,
+      isosurface: config.isosurface,
+      representation: config.representation,
+    }
   )
   return COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm]
 }

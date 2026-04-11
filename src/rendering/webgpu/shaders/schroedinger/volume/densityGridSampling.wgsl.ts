@@ -223,4 +223,186 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
     return gradRho / max(rho + 1e-8, 1e-8);
   }
 }
+
+/**
+ * Compute the Bohmian quantum potential Q(x) = -½·∇²R(x)/R(x), where R = sqrt(ρ),
+ * via a 7-point second-order central-difference Laplacian on the density grid.
+ *
+ * World half-step h = 2·boundingRadius / DENSITY_GRID_SIZE (one texel). The
+ * Laplacian denominator is h·h. For any stationary state of H = -½∇² + V the
+ * identity Q + V = E holds where R is numerically well-defined. Voxels where
+ * any neighbour is outside the grid, or where R_c is too small, return 0 so
+ * the colour-mode branch paints them as neutral grey.
+ *
+ * The helper reads ρ from the R channel exclusively. The Dirac strategy forces
+ * fieldView=totalDensity and Pauli mode hides quantumPotential from the selector
+ * when this algorithm is active, so the R channel is guaranteed to hold total
+ * density (not a dual-channel spinor split or a non-density scalar like spin /
+ * current / phase). Summing r + g on a dual-channel grid would be physically
+ * wrong for anything other than particleAntiparticleSplit anyway, so the helper
+ * does not attempt to do so.
+ *
+ * @param pos World-space position (model space during raymarching)
+ * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @return Q at pos as f32
+ */
+fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
+  let bound = uniforms.boundingRadius;
+  let invDiameter = uniforms.invBoundingRadius * 0.5;
+
+  // Single-texel step in UVW space — gives higher spatial resolution than
+  // the 2-texel stencil used by computeGradientFromGrid.
+  let uvwStep = 1.0 / DENSITY_GRID_SIZE;
+  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+
+  // If the centre itself falls outside the grid, the voxel is meaningless.
+  if (any(baseUVW < vec3f(0.0)) || any(baseUVW > vec3f(1.0))) {
+    return 0.0;
+  }
+
+  let uxp = baseUVW + vec3f(uvwStep, 0.0, 0.0);
+  let uxn = baseUVW - vec3f(uvwStep, 0.0, 0.0);
+  let uyp = baseUVW + vec3f(0.0, uvwStep, 0.0);
+  let uyn = baseUVW - vec3f(0.0, uvwStep, 0.0);
+  let uzp = baseUVW + vec3f(0.0, 0.0, uvwStep);
+  let uzn = baseUVW - vec3f(0.0, 0.0, uvwStep);
+
+  let sc  = textureSampleLevel(densityGridTexture, densityGridSampler, baseUVW, 0.0);
+  let sxp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxp, 0.0), all(uxp >= vec3f(0.0)) && all(uxp <= vec3f(1.0)));
+  let sxn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uxn, 0.0), all(uxn >= vec3f(0.0)) && all(uxn <= vec3f(1.0)));
+  let syp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyp, 0.0), all(uyp >= vec3f(0.0)) && all(uyp <= vec3f(1.0)));
+  let syn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uyn, 0.0), all(uyn >= vec3f(0.0)) && all(uyn <= vec3f(1.0)));
+  let szp = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzp, 0.0), all(uzp >= vec3f(0.0)) && all(uzp <= vec3f(1.0)));
+  let szn = select(vec4f(0.0), textureSampleLevel(densityGridTexture, densityGridSampler, uzn, 0.0), all(uzn >= vec3f(0.0)) && all(uzn <= vec3f(1.0)));
+
+  let rhoC  = sc.r;
+  let rhoXp = sxp.r;
+  let rhoXn = sxn.r;
+  let rhoYp = syp.r;
+  let rhoYn = syn.r;
+  let rhoZp = szp.r;
+  let rhoZn = szn.r;
+
+  let Rc  = sqrt(max(rhoC,  1e-8));
+  if (Rc < 1e-6) {
+    return 0.0;
+  }
+
+  let Rxp = sqrt(max(rhoXp, 1e-8));
+  let Rxn = sqrt(max(rhoXn, 1e-8));
+  let Ryp = sqrt(max(rhoYp, 1e-8));
+  let Ryn = sqrt(max(rhoYn, 1e-8));
+  let Rzp = sqrt(max(rhoZp, 1e-8));
+  let Rzn = sqrt(max(rhoZn, 1e-8));
+
+  // World half-step h = 2·bound / DENSITY_GRID_SIZE (one texel).
+  let h = (2.0 * bound) / DENSITY_GRID_SIZE;
+  let hSq = h * h;
+  let laplR = (Rxp + Rxn + Ryp + Ryn + Rzp + Rzn - 6.0 * Rc) / hSq;
+  return (-0.5 * laplR) / max(Rc, 1e-4);
+}
+
+// ------------------------------------------------------------------
+// Vortex density — plaquette line integral of ∇θ · dl
+// ------------------------------------------------------------------
+//
+// Topological charge per voxel: sum the wrapped phase winding of the three
+// coordinate-plane plaquettes anchored at the voxel corner,
+//
+//     nu(x) = (|W_xy| + |W_yz| + |W_zx|) / (2*pi)
+//
+// where W is the sum of four wrapped edge phase differences around a unit
+// plaquette. Smooth regions produce nu ≈ 0; vortex cores quantize to multiples
+// of 1. Phase is read from the density grid's B channel — only rgba16float
+// density grids carry it, so r16float fallbacks shortcut to 0.
+
+/**
+ * Wrap a raw phase difference into the principal branch (-pi, pi].
+ * Classic shortest-arc formula: dTheta - 2*pi * round(dTheta / (2*pi)).
+ */
+fn wrapPhase(dTheta: f32) -> f32 {
+  return dTheta - TAU * round(dTheta * INV_TAU);
+}
+
+/**
+ * True when all four corners of a plaquette lie inside the density grid
+ * (UVW in [0, 1]^3). Used to discard boundary plaquettes whose winding is
+ * ambiguous.
+ */
+fn allInBounds4(a: vec3f, b: vec3f, c: vec3f, d: vec3f) -> bool {
+  return all(a >= vec3f(0.0)) && all(a <= vec3f(1.0)) &&
+         all(b >= vec3f(0.0)) && all(b <= vec3f(1.0)) &&
+         all(c >= vec3f(0.0)) && all(c <= vec3f(1.0)) &&
+         all(d >= vec3f(0.0)) && all(d <= vec3f(1.0));
+}
+
+/**
+ * Fetch the spatial phase stored in the density grid's B channel at UVW.
+ * Returns 0 for out-of-grid positions. r16float grids always return 0 because
+ * their B channel is a constant-zero swizzle.
+ */
+fn samplePhaseOrZero(uvw: vec3f) -> f32 {
+  if (any(uvw < vec3f(0.0)) || any(uvw > vec3f(1.0))) { return 0.0; }
+  let s = textureSampleLevel(densityGridTexture, densityGridSampler, uvw, 0.0);
+  return s.b;
+}
+
+/**
+ * Compute the discrete line integral of ∇theta around a single four-corner
+ * plaquette using wrapped edge differences. Returns 0 if any corner falls
+ * outside the density grid.
+ *
+ * Corners traverse the loop c00 → c10 → c11 → c01 → c00. Sign depends on the
+ * traversal direction and the defect orientation, but the caller only uses
+ * |W| so sign is irrelevant.
+ */
+fn plaquetteWinding(c00: vec3f, c10: vec3f, c11: vec3f, c01: vec3f) -> f32 {
+  let p00 = samplePhaseOrZero(c00);
+  let p10 = samplePhaseOrZero(c10);
+  let p11 = samplePhaseOrZero(c11);
+  let p01 = samplePhaseOrZero(c01);
+  if (!allInBounds4(c00, c10, c11, c01)) { return 0.0; }
+  let d0 = wrapPhase(p10 - p00);
+  let d1 = wrapPhase(p11 - p10);
+  let d2 = wrapPhase(p01 - p11);
+  let d3 = wrapPhase(p00 - p01);
+  return d0 + d1 + d2 + d3;
+}
+
+/**
+ * Compute the per-voxel topological-charge magnitude by summing the wrapped
+ * plaquette windings across the three coordinate planes anchored at pos.
+ * Returns 0 for density grids that carry no phase (r16float fallback).
+ */
+fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
+  if (!DENSITY_GRID_HAS_PHASE) { return 0.0; }
+
+  let bound = uniforms.boundingRadius;
+  let invDiameter = uniforms.invBoundingRadius * 0.5;
+  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+  let step = 1.0 / DENSITY_GRID_SIZE;
+
+  // xy plaquette at fixed z — corners offset in x and y.
+  let xy00 = baseUVW;
+  let xy10 = baseUVW + vec3f(step, 0.0, 0.0);
+  let xy11 = baseUVW + vec3f(step, step, 0.0);
+  let xy01 = baseUVW + vec3f(0.0, step, 0.0);
+  let w_xy = plaquetteWinding(xy00, xy10, xy11, xy01);
+
+  // yz plaquette at fixed x — corners offset in y and z.
+  let yz00 = baseUVW;
+  let yz10 = baseUVW + vec3f(0.0, step, 0.0);
+  let yz11 = baseUVW + vec3f(0.0, step, step);
+  let yz01 = baseUVW + vec3f(0.0, 0.0, step);
+  let w_yz = plaquetteWinding(yz00, yz10, yz11, yz01);
+
+  // zx plaquette at fixed y — corners offset in z and x.
+  let zx00 = baseUVW;
+  let zx10 = baseUVW + vec3f(0.0, 0.0, step);
+  let zx11 = baseUVW + vec3f(step, 0.0, step);
+  let zx01 = baseUVW + vec3f(step, 0.0, 0.0);
+  let w_zx = plaquetteWinding(zx00, zx10, zx11, zx01);
+
+  return (abs(w_xy) + abs(w_yz) + abs(w_zx)) * INV_TAU;
+}
 `

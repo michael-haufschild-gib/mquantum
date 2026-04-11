@@ -85,6 +85,8 @@ export const COLOR_ALGORITHM_MAP: Record<string, number> = {
   pauliSpinDensity: 24,
   pauliSpinExpectation: 25,
   pauliCoherence: 26,
+  quantumPotential: 27,
+  vortexDensity: 28,
 }
 
 /**

@@ -55,6 +55,8 @@ export type ColorAlgorithm =
   | 'pauliSpinDensity'
   | 'pauliSpinExpectation'
   | 'pauliCoherence'
+  | 'quantumPotential'
+  | 'vortexDensity'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -87,6 +89,8 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'pauliSpinDensity' as const, label: 'Spin Density (↑ Cyan / ↓ Magenta)' },
   { value: 'pauliSpinExpectation' as const, label: 'Spin Expectation ⟨σ_z⟩' },
   { value: 'pauliCoherence' as const, label: 'Spinor Coherence' },
+  { value: 'quantumPotential' as const, label: 'Quantum Potential Q(x) (Bohmian)' },
+  { value: 'vortexDensity' as const, label: 'Vortex Density (topological charge)' },
 ] as const
 
 /**
@@ -120,6 +124,8 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   pauliSpinDensity: 24,
   pauliSpinExpectation: 25,
   pauliCoherence: 26,
+  quantumPotential: 27,
+  vortexDensity: 28,
 }
 
 /**
@@ -252,6 +258,28 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
 export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 
 /**
+ * Pipeline-shape hints used by `getAvailableColorAlgorithms` to decide whether
+ * density-grid-only color algorithms (e.g. Bohmian `quantumPotential` or
+ * plaquette `vortexDensity`) can actually run. The fragment shader reads those
+ * helpers from a bound density grid texture; the grid is only populated in 3D+
+ * non-isosurface non-Wigner volumetric rendering for analytic HO / hydrogenND
+ * modes. When `isosurface` is on, `representation === 'wigner'`, or dimension
+ * is 2, the grid is absent and the helper returns 0 everywhere — so the
+ * dropdown must hide those algorithms.
+ *
+ * Defaults match the common 3D volumetric path so existing call sites keep
+ * their prior behaviour.
+ */
+export interface ColorAlgorithmAvailabilityOptions {
+  /** Current dimension (2-11). Density grid requires dim >= 3. */
+  dimension?: number
+  /** Isosurface rendering toggle. Isosurface analytic modes skip the grid. */
+  isosurface?: boolean
+  /** Current representation. 'wigner' uses a 2D phase-space path with no grid. */
+  representation?: string
+}
+
+/**
  * Returns the color algorithm options available for the given quantum mode.
  *
  * The 'relativePhase' algorithm requires a reference wavefunction
@@ -266,7 +294,8 @@ export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
   objectType: string = 'schroedinger',
-  freeScalarInitialCondition?: string
+  freeScalarInitialCondition?: string,
+  availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per
   // field view. Expose the Pauli-specific algorithms (which match the grid layout)
@@ -292,6 +321,10 @@ export function getAvailableColorAlgorithms(
     'kSpaceOccupation',
   ])
 
+  // Density-grid-only algorithms — require a compute-mode density grid texture.
+  // Not meaningful for analytical HO / hydrogenND paths (no texture bound → stub 0).
+  const densityGridOnlyAlgos = new Set<string>(['quantumPotential', 'vortexDensity'])
+
   // Open quantum algorithms — only available when density matrix mode is active
   const openQuantumAlgos = new Set<string>(['purityMap', 'entropyMap', 'coherenceMap'])
 
@@ -312,6 +345,8 @@ export function getAvailableColorAlgorithms(
       'viridis', // R (density) → perceptually uniform scientific ramp
       'inferno', // R (density) → high-contrast scientific ramp
       'densityContours', // R (density) → viridis + isodensity contour lines
+      'quantumPotential', // Bohmian Q(x) = -½·∇²R/R from density grid
+      'vortexDensity', // Topological charge from plaquette phase winding
     ])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => qwValidAlgos.has(opt.value))
   }
@@ -327,6 +362,8 @@ export function getAvailableColorAlgorithms(
       'inferno', // R (density) → high-contrast scientific ramp
       'densityContours', // R (density) → viridis + isodensity contour lines
       'phaseDensity', // R+B (density + phase) → hue=phase, brightness=density
+      'quantumPotential', // Bohmian Q(x) = -½·∇²R/R from density grid
+      'vortexDensity', // Topological charge from plaquette phase winding
     ])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
@@ -345,6 +382,8 @@ export function getAvailableColorAlgorithms(
       'densityContours',
       'phaseDensity',
       'particleAntiparticle',
+      'quantumPotential', // Bohmian Q(x) = -½·∇²R/R from dual-channel density grid
+      'vortexDensity', // Topological charge from dual-channel plaquette phase winding
     ])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
@@ -363,6 +402,8 @@ export function getAvailableColorAlgorithms(
       'modeCharacter',
       'energyFlux',
       'kSpaceOccupation',
+      'quantumPotential', // Bohmian Q(x) = -½·∇²R/R from density grid
+      'vortexDensity', // Topological charge from plaquette phase winding
     ])
     // Exact vacuum has n_k = 0 for all modes (zero-point subtracted), so the
     // k-space occupation map is correctly but unhelpfully blank.
@@ -395,13 +436,27 @@ export function getAvailableColorAlgorithms(
     'pauliCoherence',
   ])
 
-  // Non-freeScalar modes: exclude educational analysis algorithms, Dirac-only, and
-  // conditionally include/exclude open quantum and phase-dependent algorithms
+  // Density-grid-only algos (quantumPotential, vortexDensity) need a bound
+  // density grid texture. For analytic HO / hydrogenND the grid is populated
+  // by DensityGridComputePass when dimension >= 3, isosurface is off, and the
+  // representation is not Wigner (Wigner uses a 2D phase-space path). In that
+  // configuration the shader helper reads real density values and the feature
+  // is physically meaningful. Otherwise the dropdown hides them because the
+  // fallback stub returns 0 everywhere.
+  const dim = availabilityOptions?.dimension ?? 3
+  const isosurface = availabilityOptions?.isosurface ?? false
+  const representation = availabilityOptions?.representation
+  const analyticHasDensityGrid = dim >= 3 && !isosurface && representation !== 'wigner'
+
+  // Non-freeScalar modes: exclude educational analysis algorithms, Dirac-only,
+  // density-grid-only (unless a density grid is actually bound), and conditionally
+  // include/exclude open quantum and phase-dependent algorithms
   return COLOR_ALGORITHM_OPTIONS.filter(
     (opt) =>
       !educationalAlgos.has(opt.value) &&
       !diracOnlyAlgos.has(opt.value) &&
       !pauliOnlyAlgos.has(opt.value) &&
+      (!densityGridOnlyAlgos.has(opt.value) || analyticHasDensityGrid) &&
       (!openQuantumAlgos.has(opt.value) || openQuantumEnabled) &&
       (!phaseDependentAlgos.has(opt.value) || !openQuantumEnabled)
   )
