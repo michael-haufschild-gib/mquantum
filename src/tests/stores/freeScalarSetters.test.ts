@@ -192,6 +192,53 @@ describe('free scalar field setters', () => {
       expect(getFSF().cosmology.enabled).toBe(false)
     })
 
+    it('does not throw from setFreeScalarCosmologySteepness on a 1D lattice', () => {
+      // Regression: the steepness setter used to call sCritical(latticeDim+1)
+      // unconditionally. On a 1D lattice (spacetimeDim = 2), sCritical
+      // throws because its formula √(8·(n−1)/(n−2)) divides by zero. The
+      // setter must soft-fail like the other cosmology setters — store the
+      // value verbatim and let the next lattice reconcile revalidate.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(1)
+      expect(() => s.setFreeScalarCosmologySteepness(5)).not.toThrow()
+      expect(getFSF().cosmology.steepness).toBe(5)
+    })
+
+    it('preserves self-interaction state when enable is refused', () => {
+      // Regression: the v1 mutex (cosmology on ⟹ self-interaction off) used
+      // to derive its new value from the *raw* enable flag, so a refused
+      // toggle still cleared self-interaction as a silent side effect. Must
+      // key off the validated nextEnabled instead.
+      const s = useExtendedObjectStore.getState()
+      s.setFreeScalarLatticeDim(3)
+      // Turn self-interaction on first so we can observe whether the
+      // refused toggle clobbers it.
+      s.setFreeScalarSelfInteractionEnabled(true)
+      expect(getFSF().selfInteractionEnabled).toBe(true)
+      // Corrupt cosmology state into an invalid ekpyrotic config that will
+      // be rejected by isValidPreset.
+      useExtendedObjectStore.setState((state) => ({
+        ...state,
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: {
+            ...state.schroedinger.freeScalar,
+            cosmology: {
+              ...state.schroedinger.freeScalar.cosmology,
+              enabled: false,
+              preset: 'ekpyrotic' as const,
+              steepness: 0.5, // < s_c(4)
+            },
+          },
+        },
+      }))
+
+      s.setFreeScalarCosmologyEnabled(true)
+      // Refused — cosmology stays off AND self-interaction is untouched.
+      expect(getFSF().cosmology.enabled).toBe(false)
+      expect(getFSF().selfInteractionEnabled).toBe(true)
+    })
+
     it('soft-disables cosmology when reconcile hits an invalid preset combo', () => {
       // Regression: reconcileCosmologyInvariants previously returned {} when
       // `isValidPreset` was false, leaving cosmology enabled in a state that

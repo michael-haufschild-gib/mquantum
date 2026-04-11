@@ -130,9 +130,14 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
 
     const etaAbs = Math.abs(cosmology.eta0)
     const safeDisplay = safeAbs !== undefined ? safeAbs.toFixed(2) : '—'
+    // `cosmology.eta0` is the already-clamped value stored in state, so we
+    // can only detect the narrow case where `safeAbs` has increased since
+    // the value was written (e.g. the lattice shrank and `safeEta0` grew).
+    // When that happens, tell the user what the clamp target will be on
+    // the next reset, not a spurious "from X" number.
     const clampedHint =
       safeAbs !== undefined && etaAbs < safeAbs - 1e-9
-        ? ` (auto-clamped from ${cosmology.eta0.toFixed(2)})`
+        ? ` (will be clamped to ${(-safeAbs).toFixed(2)} on reset)`
         : ''
 
     return (

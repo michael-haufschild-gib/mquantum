@@ -264,25 +264,30 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const byteSize = this.totalSites * 4
 
     this.saveMappingInFlight = true
-    // Capture simEta synchronously at the save-request site so it lines up
-    // with the phi/pi buffers being copied on the same command encoder.
-    // (The async getMetadata resolves later, by which time simEta may have
-    // advanced by a few frames — use this closure value, not a read.)
+    // Capture simEta AND the full FSF config synchronously at the save-
+    // request site so every piece of metadata matches the phi/pi buffers
+    // being copied on this command encoder. The async getMetadata resolves
+    // later, by which time the user may have changed lattice dim, grid
+    // size, or cosmology — reading the store inside getMetadata would pair
+    // those new settings with stale buffers and corrupt the saved file.
     const simEtaAtSave = this.simEta
+    const fsfConfigAtSave = useExtendedObjectStore.getState().schroedinger.freeScalar
+    const gridSizeAtSave = fsfConfigAtSave.gridSize?.slice(0, fsfConfigAtSave.latticeDim ?? 3) ?? [
+      64,
+    ]
     genericStateSave(ctx, {
       source: { layout: 'separate', reBuffer: this.phiBuffer, imBuffer: this.piBuffer, byteSize },
       totalSites: this.totalSites,
       label: 'fsf',
       getMetadata: async () => {
-        const fsfConfig = useExtendedObjectStore.getState().schroedinger.freeScalar
         return {
           quantumMode: 'freeScalarField',
           config: {
             quantumMode: 'freeScalarField',
-            freeScalar: fsfConfig,
+            freeScalar: fsfConfigAtSave,
             _runtimeMeta: { simEta: simEtaAtSave },
           } as Record<string, unknown>,
-          gridSize: fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64],
+          gridSize: gridSizeAtSave,
           componentCount: 1,
         }
       },

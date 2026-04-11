@@ -143,8 +143,6 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
     setFreeScalarCosmologyEnabled: (enabled) => {
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
-        // Enabling cosmology forces self-interaction off (v1 mutex).
-        const selfInteractionEnabled = enabled ? false : fs.selfInteractionEnabled
         // On enable, clamp eta0 to the safe threshold for the current lattice.
         // If the preset params are invalid or clampEta0 throws, we refuse to
         // flip the flag: letting `enabled=true` stand with bad params causes
@@ -182,6 +180,11 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
             }
           }
         }
+        // The v1 mutex (cosmology enabled ⟹ self-interaction off) must key
+        // off the *validated* `nextEnabled`, not the raw request. Otherwise
+        // a refused enable would still clear the user's self-interaction
+        // setting as a side effect of a no-op toggle.
+        const selfInteractionEnabled = nextEnabled ? false : fs.selfInteractionEnabled
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -253,6 +256,24 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const spacetimeDim = fs.latticeDim + 1
+        // Guard: sCritical throws for spacetimeDim < 3, and steepness is
+        // only meaningful for the supported cosmology window. Mirror the
+        // soft-fail behavior of reconcileCosmologyInvariants /
+        // setFreeScalarCosmologyEta0: store the raw value verbatim and let
+        // the next lattice reconcile re-validate. This prevents a 1D
+        // lattice (spacetimeDim = 2) from crashing the store path.
+        if (spacetimeDim < MIN_SPACETIME_DIM || spacetimeDim > MAX_SPACETIME_DIM) {
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              freeScalar: {
+                ...fs,
+                cosmology: { ...fs.cosmology, steepness: s },
+                needsReset: fs.cosmology.preset === 'ekpyrotic' || fs.needsReset,
+              },
+            },
+          }
+        }
         const sc = sCritical(spacetimeDim)
         // Clamp to (s_c, +∞). Use a tiny epsilon above s_c so the denominator
         // (n-1)s²-s_c² stays strictly positive and q is finite.

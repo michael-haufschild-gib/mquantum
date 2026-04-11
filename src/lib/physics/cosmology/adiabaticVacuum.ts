@@ -217,10 +217,15 @@ export function sampleAdiabaticVacuum(
   }
 
   // Draw the Minkowski-style ground state with the physical dispersion
-  // ω_k² = k_lat² + m²·a². `sampleVacuumSpectrum` with a numeric dispatch
-  // plumbs the mass-term through as the `omegaSq` base without any
-  // `max(mass, M_FLOOR)` regularization, so the rescale below exactly
-  // tracks the per-mode amplitude calibration.
+  // ω_k² = k_lat² + m²·a². Numeric dispatches through `sampleVacuumSpectrum`
+  // route via `computeOmegaKFromMassSq`, which applies a zero-mode floor
+  // `omegaSq := max(omegaSq, M_FLOOR²)` after adding the lattice-k² term —
+  // so the `k_lat = 0` mode with `mass = 0` is regularized downstream to
+  // `ω = M_FLOOR`, keeping the vacuum variance `1/(2·ω_0)` finite. We do
+  // NOT pre-clamp `massSq` here: doing so would perturb the mass term for
+  // every non-zero lattice mode and break the exact identity that a
+  // `mass = 0`, deSitter adiabatic sample is `1/√B` times the bare
+  // Minkowski sample (pinned by the "rescales δφ amplitudes …" test).
   const { phi: phiM, pi: piM } = sampleVacuumSpectrum(config, seed, massSq)
 
   // Rescale into the canonical basis δφ = φ_M · B^(−1/2),

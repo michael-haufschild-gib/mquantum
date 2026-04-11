@@ -73,17 +73,24 @@ interface FsfCosmoDebugBuffer {
   enabled: boolean
 }
 
+// Must match `FSF_COSMO_DEBUG_CAPACITY` in
+// `src/rendering/webgpu/passes/fsfCosmoDebug.ts`. The constant isn't exported
+// from the source module, and the spec's page.evaluate closures can't import
+// from @/ at Node time, so the value is duplicated with this comment as a
+// single-source pointer.
+const FSF_COSMO_DEBUG_CAPACITY = 2048
+
 async function enableDebugBuffer(page: Page): Promise<void> {
-  await page.evaluate(() => {
+  await page.evaluate((capacity) => {
     const g = globalThis as unknown as { __fsfCosmoDebug?: FsfCosmoDebugBuffer }
     if (!g.__fsfCosmoDebug) {
-      g.__fsfCosmoDebug = { samples: [], capacity: 4096, head: 0, enabled: false }
+      g.__fsfCosmoDebug = { samples: [], capacity, head: 0, enabled: false }
     }
     g.__fsfCosmoDebug.enabled = true
     g.__fsfCosmoDebug.samples = []
     g.__fsfCosmoDebug.head = 0
-    g.__fsfCosmoDebug.capacity = 4096
-  })
+    g.__fsfCosmoDebug.capacity = capacity
+  }, FSF_COSMO_DEBUG_CAPACITY)
 }
 
 async function readDebugBuffer(page: Page): Promise<FsfCosmoDebugSample[]> {
@@ -91,7 +98,12 @@ async function readDebugBuffer(page: Page): Promise<FsfCosmoDebugSample[]> {
     const g = globalThis as unknown as { __fsfCosmoDebug?: FsfCosmoDebugBuffer }
     const buf = g.__fsfCosmoDebug
     if (!buf || buf.samples.length === 0) return []
-    if (buf.head <= buf.capacity) return [...buf.samples]
+    // Non-wrapped case: head strictly less than capacity. When
+    // head === capacity the buffer just filled; taking the "wrapped"
+    // branch produces the same output since start = 0, but using the
+    // strict comparison matches the source semantics
+    // (buf.samples.length < buf.capacity) exactly.
+    if (buf.head < buf.capacity) return [...buf.samples]
     const out: FsfCosmoDebugSample[] = []
     const start = buf.head % buf.capacity
     for (let i = 0; i < buf.capacity; i++) {

@@ -5,14 +5,16 @@
  * Assertions answer:
  *
  * - Does `minLatticeMomentum` return `2π/L_max` correctly?
- * - Does `safeEta0` return `DEFAULT_SAFE_ETA0` for non-tachyonic regimes
- *   (Minkowski, Kasner, ekpyrotic in all their modes — β(β−1) ≤ 0)?
- * - Does `safeEta0` for de Sitter scale as `|η₀| ∝ L·√|β(β−1)|`?
+ * - Does `safeEta0` return the constant `DEFAULT_SAFE_ETA0` for every
+ *   preset? Under the canonical δφ formulation the adiabatic vacuum is
+ *   well-defined at any non-zero `η₀`, so the dimension-dependent
+ *   `|η₀| ∝ L·√|β(β−1)|` bound from the earlier Mukhanov-Sasaki draft is
+ *   no longer a physical constraint — `safeEta0` is now a UX heuristic.
  * - Does `clampEta0` raise sub-safe values and leave admissible values alone?
  * - Does `sampleAdiabaticVacuum` reduce to the existing Minkowski sampler
  *   when `preset = 'minkowski'` (bit-identical output for a fixed seed)?
- * - Does the sampled state satisfy the adiabatic identity `|v_k|²·ω_k ≈ 1/2`
- *   within the expected statistical error for a large enough ensemble?
+ * - Does the sampled state satisfy the canonical variance identity
+ *   `⟨|δφ_k|²⟩ = 1/(2·B·ω_k)` within the expected statistical error?
  *
  * @module
  */
@@ -28,6 +30,7 @@ import {
   safeEta0,
   sampleAdiabaticVacuum,
 } from '@/lib/physics/cosmology/adiabaticVacuum'
+import type { CosmologyPresetParams } from '@/lib/physics/cosmology/presets'
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -286,6 +289,35 @@ describe('sampleAdiabaticVacuum', () => {
     for (let i = 0; i < phi.length; i++) {
       expect(Number.isFinite(phi[i]!)).toBe(true)
       expect(Number.isFinite(pi[i]!)).toBe(true)
+    }
+  })
+
+  it('regularizes the massless zero mode for every non-Minkowski preset', () => {
+    // Critical invariant: with mass=0, the k=0 lattice mode has
+    // `ω² = k_lat² + m²·a² = 0`. Without regularization the vacuum variance
+    // `1/(2·ω_0)` diverges and seeds Inf/NaN into phi/pi. The sampler's
+    // downstream `computeOmegaKFromMassSq` applies the zero-mode floor
+    // `ω² := max(ω², M_FLOOR²)`, keeping the variance finite. Pin this
+    // behaviour across every non-Minkowski preset so any future refactor
+    // that moves the regularization breaks a test instead of silently
+    // corrupting initialization.
+    const cfg = makeConfig({ mass: 0 })
+    const sc = 5 // > s_c(4) ≈ 3.464, valid ekpyrotic
+    const cases: Array<{ label: string; params: CosmologyPresetParams }> = [
+      { label: 'deSitter', params: { preset: 'deSitter', spacetimeDim: 4, hubble: 1 } },
+      { label: 'kasner', params: { preset: 'kasner', spacetimeDim: 4 } },
+      { label: 'ekpyrotic', params: { preset: 'ekpyrotic', spacetimeDim: 4, steepness: sc } },
+    ]
+    for (const { label, params } of cases) {
+      const { phi, pi } = sampleAdiabaticVacuum(cfg, params, -5, 77)
+      for (let i = 0; i < phi.length; i++) {
+        expect(Number.isFinite(phi[i]!), `${label} phi[${i}]`).toBe(true)
+        expect(Number.isFinite(pi[i]!), `${label} pi[${i}]`).toBe(true)
+      }
+      // Sanity: at least one site should be non-zero (i.e. the sampler
+      // actually drew a random state rather than zeroing out).
+      const anyNonZero = phi.some((v) => v !== 0) || pi.some((v) => v !== 0)
+      expect(anyNonZero, `${label} produced all zeros`).toBe(true)
     }
   })
 
