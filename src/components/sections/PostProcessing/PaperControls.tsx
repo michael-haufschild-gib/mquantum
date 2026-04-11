@@ -15,16 +15,12 @@ import { Slider } from '@/components/ui/Slider'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
 import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
 
+import { PostProcessingSectionHeader as SectionHeader } from './SectionHeader'
+
 /** Props for the paper texture overlay controls. */
 export interface PaperControlsProps {
   className?: string
 }
-
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider pt-2 pb-1 border-t border-panel-border mt-2 first:mt-0 first:border-t-0 first:pt-0">
-    {title}
-  </div>
-)
 
 const CollapsibleSection: React.FC<{
   title: string

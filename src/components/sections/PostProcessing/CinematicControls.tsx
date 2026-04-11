@@ -13,16 +13,12 @@ import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/rendering/sha
 import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
 import { type PostProcessingSlice, usePostProcessingStore } from '@/stores/postProcessingStore'
 
+import { PostProcessingSectionHeader as SectionHeader } from './SectionHeader'
+
 /** Props for cinematic effects (vignette, grain, aberration). */
 export interface CinematicControlsProps {
   className?: string
 }
-
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider pt-2 pb-1 border-t border-panel-border mt-2 first:mt-0 first:border-t-0 first:pt-0">
-    {title}
-  </div>
-)
 
 export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
   ({ className = '' }) => {
