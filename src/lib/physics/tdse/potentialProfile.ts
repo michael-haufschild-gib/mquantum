@@ -251,7 +251,14 @@ export function getPotentialPlotScale(config: TdseConfig): number {
       // an abs() so even the gravitational case never produces a negative
       // bound. Good enough for a plot y-bound and cheap enough to avoid a
       // 15k-Newton-call runtime scan.
-      const M = Math.max(config.bhMass, 1e-4)
+      //
+      // `Math.max(bhMass, 1e-4)` is NOT NaN-safe — `Math.max(NaN, x) =
+      // NaN` — so a loaded config carrying a garbage bhMass would still
+      // poison the plot scale and propagate into the energy-diagram HUD.
+      // Validate first and fall back to 1.0 (dimensionful units of M)
+      // when the input is unusable.
+      const M =
+        Number.isFinite(config.bhMass) && config.bhMass > 0 ? Math.max(config.bhMass, 1e-4) : 1.0
       const ell = config.bhMultipoleL
       const s = config.bhSpin
       const MSq = M * M

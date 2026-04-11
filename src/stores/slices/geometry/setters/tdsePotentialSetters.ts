@@ -163,9 +163,15 @@ export function createTdsePotentialSetters(
     setWithVersion((state) => {
       const prev = state.schroedinger.tdse
       const spin = clampInt(value, 0, 2) as 0 | 1 | 2
-      // Raising spin above the current ℓ would leave a non-physical
-      // combination; promote ℓ to preserve ℓ ≥ s.
-      const ell = Math.max(prev.bhMultipoleL, spin)
+      // Re-enforce the full `[spin, 6]` integer invariant on ℓ — not just
+      // `ℓ ≥ s`. A bare `Math.max(prev.bhMultipoleL, spin)` would let a
+      // pre-existing `prev.bhMultipoleL = 7` (from a legacy preset migration
+      // or direct state mutation) slip through unchanged, violating the
+      // upper cap and rounding rules the dedicated `setTdseBhMultipoleL`
+      // setter enforces. Round into the canonical band so the spin edit
+      // always leaves `(spin, ℓ)` in a state the ℓ setter could itself
+      // produce.
+      const ell = clampInt(prev.bhMultipoleL, spin, 6)
       const changed = spin !== prev.bhSpin || ell !== prev.bhMultipoleL
       const nextNeedsReset = isBhActive(prev) && changed ? true : prev.needsReset
       return {

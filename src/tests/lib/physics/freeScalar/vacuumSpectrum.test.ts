@@ -5,7 +5,7 @@ import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,
-  estimateVacuumMaxEnergy,
+  estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
   sampleVacuumSpectrum,
@@ -386,10 +386,10 @@ describe('estimateVacuumMaxPhi', () => {
       expect(cosmo).toBeGreaterThan(bare)
     })
 
-    it('estimateVacuumMaxEnergy shifts with the dispatch tag too', () => {
+    it('estimateVacuumEnergyVisualScale shifts with the dispatch tag too', () => {
       const config = makeConfig({ mass: 0, gridSize: [8, 8, 8], spacing: [0.25, 0.25, 0.25] })
-      const bare = estimateVacuumMaxEnergy(config, 'kgFloor')
-      const cosmo = estimateVacuumMaxEnergy(config, 4)
+      const bare = estimateVacuumEnergyVisualScale(config, 'kgFloor')
+      const cosmo = estimateVacuumEnergyVisualScale(config, 4)
       expect(cosmo).toBeGreaterThan(bare)
     })
 

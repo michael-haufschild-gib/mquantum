@@ -6,7 +6,7 @@
  * dispatch bookkeeping.
  */
 
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 
 /**
  * Runtime scalars captured at the save-request site. The three fields must
@@ -15,6 +15,16 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
  * mid-save and pair stale clocks with mismatched field data.
  */
 export interface FsfSaveRuntime {
+  /**
+   * Live FSF configuration snapshot. The caller (the compute pass at the
+   * save-request site) is responsible for severing the reference from the
+   * Zustand store BEFORE invoking this helper — typically via
+   * `structuredClone(useExtendedObjectStore.getState().schroedinger.freeScalar)`.
+   * Making the snapshot an explicit input rather than an implicit store
+   * read inside this function removes the last place an async race could
+   * pair saved field buffers with a newer config.
+   */
+  freeScalar: FreeScalarConfig
   /** Cosmological sim time at save. */
   simEta: number
   /** Preheating drive reference time captured at the most recent reset. */
@@ -25,9 +35,14 @@ export interface FsfSaveRuntime {
 
 /**
  * Compose the Free Scalar Field save metadata record that downstream
- * `genericStateSave` serializes into the `.mqstate` blob. Reads the current
- * FSF config from the extended-object store and packages it alongside the
- * captured runtime scalars into the shape the deserializer expects.
+ * `genericStateSave` serializes into the `.mqstate` blob. Packages the
+ * caller-provided config snapshot alongside the captured runtime scalars
+ * into the shape the deserializer expects.
+ *
+ * This function is pure — it does not read any Zustand store. The caller
+ * must pass a freshly-cloned `freeScalar` snapshot (see `FsfSaveRuntime`
+ * doc), so metadata composition can execute anywhere in the async save
+ * pipeline without racing a mid-save config mutation.
  *
  * The `_runtimeMeta` record carries `simEta` and the preheating drive
  * clocks so reload can resume both the cosmological clock and the Mathieu
@@ -41,13 +56,7 @@ export function composeFsfSaveMetadata(runtime: FsfSaveRuntime): {
   gridSize: number[]
   componentCount: number
 } {
-  // Deep-clone the live FSF config immediately so downstream async
-  // serialization cannot race a user edit that mutates the Zustand object
-  // mid-save. structuredClone severs every reference into the store and
-  // preserves the nested objects (cosmology, preheating, initialCondition).
-  const fsfConfigSnapshot = structuredClone(
-    useExtendedObjectStore.getState().schroedinger.freeScalar
-  )
+  const fsfConfigSnapshot = runtime.freeScalar
   const gridSize = fsfConfigSnapshot.gridSize?.slice(0, fsfConfigSnapshot.latticeDim ?? 3) ?? [64]
   return {
     quantumMode: 'freeScalarField',

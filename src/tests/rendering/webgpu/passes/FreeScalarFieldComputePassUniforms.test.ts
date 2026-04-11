@@ -184,6 +184,8 @@ describe('writeFsfUniforms', () => {
       totalSites,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -209,6 +211,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 16 * 32 * 64,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -230,6 +234,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     const f32 = new Float32Array(uniformData)
@@ -248,6 +254,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(0)
   })
@@ -261,6 +269,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
     expect(new Uint32Array(uniformData)[40]).toBe(2)
   })
@@ -274,6 +284,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
     // energyDensity → 2
     expect(new Uint32Array(uniformData)[41]).toBe(2)
@@ -290,6 +302,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     expect(writeBuffer).toHaveBeenCalledWith(mockBuffer, 0, uniformData)
@@ -309,6 +323,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     const u32 = new Uint32Array(uniformData)
@@ -332,6 +348,8 @@ describe('writeFsfUniforms', () => {
       totalSites: 32768,
       maxFieldValue: 1.0,
       simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
     })
 
     expect(new Uint32Array(uniformData)[120]).toBe(0)

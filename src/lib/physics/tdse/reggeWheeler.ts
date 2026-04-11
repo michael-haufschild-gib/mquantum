@@ -127,11 +127,19 @@ export function reggeWheelerPotentialFromR(
  *
  * Inverts r*(r) via Newton iteration, then applies the radial formula.
  *
+ * Non-finite or non-positive `M` poisons the Newton inversion (every
+ * intermediate derivative becomes NaN / divides by zero) and propagates
+ * into the diagnostics HUD as a silent wall of NaNs. The setter
+ * `setTdseBhMass` already clamps to `[0.1, 5]`, but a config loaded
+ * from disk or migrated from a legacy preset can still carry a garbage
+ * value. Clamp at the entry point so the helper is safe to call from
+ * any CPU code path without pre-validation.
+ *
  * @param rStar - Tortoise coordinate
- * @param M - Black-hole mass
+ * @param M - Black-hole mass (clamped to ≥ 1e-4 on non-finite/non-positive input)
  * @param ell - Multipole index ℓ
  * @param spin - Perturbation spin s ∈ {0, 1, 2}
- * @returns V_ℓ^s(r*)
+ * @returns V_ℓ^s(r*), or 0 when `rStar` itself is non-finite
  */
 export function computeReggeWheelerPotential(
   rStar: number,
@@ -139,8 +147,10 @@ export function computeReggeWheelerPotential(
   ell: number,
   spin: number
 ): number {
-  const r = tortoiseToRadial(rStar, M)
-  return reggeWheelerPotentialFromR(r, M, ell, spin)
+  if (!Number.isFinite(rStar)) return 0
+  const safeM = Number.isFinite(M) && M > 0 ? M : 1e-4
+  const r = tortoiseToRadial(rStar, safeM)
+  return reggeWheelerPotentialFromR(r, safeM, ell, spin)
 }
 
 /** Peak location and value of the Regge–Wheeler barrier. */

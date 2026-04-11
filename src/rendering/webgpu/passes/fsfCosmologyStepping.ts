@@ -101,6 +101,29 @@ export const COSMOLOGY_MAX_SUBSTEPS = 32
 export const COSMOLOGY_ADIABATIC_SAFETY = 0.1
 
 /**
+ * Preheating drive phase-advance ceiling. The parametric-resonance
+ * Mathieu drive `1 + A·sin(Ω·(t−ref))` is evaluated once per leapfrog
+ * substep with the coefficient held frozen across the drift+kick pair. If
+ * `Ω·subDt` exceeds this bound, the sinusoid advances through many
+ * radians between substeps and the numerical integrator effectively
+ * samples the drive on a coarse stroboscope — aliasing the resonance
+ * tongues and either missing amplification entirely or introducing
+ * spurious growth.
+ *
+ * The CFL-driven substep count (which sizes dispersion against the peak
+ * `1 + |A|` mass term) does NOT see `Ω` at all: a high-Ω / small-A run
+ * can stay well within the CFL ceiling yet alias the drive. Combining
+ * `nSub = max(nSub_cfl, nSub_phase)` guarantees both the leapfrog
+ * stability limit AND a sufficiently-resolved Mathieu coefficient.
+ *
+ * We require `Ω·subDt < 0.5` — roughly twelve substeps per drive
+ * period at the boundary, matching the canonical "ten to twenty samples
+ * per oscillator period" rule for explicit Runge-Kutta-like schemes.
+ * Preheating-off collapses this check to a no-op (returns 1).
+ */
+export const PREHEATING_PHASE_SAFETY = 0.5
+
+/**
  * Pure, non-mutating projection of `simEta` after advancing by `dt`. Mirrors
  * the clamp/floor logic of `FreeScalarFieldComputePass.advanceSimEta`:
  * every proposal whose absolute value falls below `COSMOLOGY_ETA_FLOOR` —
@@ -420,13 +443,20 @@ export function computeFsfOuterStepSubsteps(
   // to the original cosmology-only dispersion bound.
   const preheatingActive = config.preheating.enabled
   const massSquaredScaleMax = preheatingActive ? 1 + Math.abs(config.preheating.amplitude) : 1
+  // Drive phase bound: require Ω·subDt < PREHEATING_PHASE_SAFETY so the
+  // frozen-coef leapfrog substep never advances the sinusoid by more than
+  // ~0.5 rad between kicks. Preheating-off collapses this to 1.
+  const nSubPhase = preheatingActive
+    ? computePreheatingPhaseSubsteps(config.preheating.frequency, dtFull)
+    : 1
 
   if (!cosmologyActive) {
     if (!preheatingActive) return 1
     // Minkowski + preheating: CFL is driven purely by the oscillating mass
     // term. Use identity cosmology coefs (aFull = aPotential = 1) and let
     // massSquaredScaleMax bump the mass dispersion.
-    return computeFsfCflSubsteps(config, 1, 1, cflCapWarnedKeys, massSquaredScaleMax)
+    const nSubCfl = computeFsfCflSubsteps(config, 1, 1, cflCapWarnedKeys, massSquaredScaleMax)
+    return nSubCfl > nSubPhase ? nSubCfl : nSubPhase
   }
 
   const coefsStart = computeFsfCosmologyCoefs(config, simEta)
@@ -447,7 +477,35 @@ export function computeFsfOuterStepSubsteps(
   )
   const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
   const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)
-  return nSubCfl > nSubAdiab ? nSubCfl : nSubAdiab
+  // max across CFL, adiabatic, and preheating phase — each safeguard may
+  // dominate in a different regime and the largest always wins.
+  let nSub = nSubCfl > nSubAdiab ? nSubCfl : nSubAdiab
+  if (nSubPhase > nSub) nSub = nSubPhase
+  return nSub
+}
+
+/**
+ * Preheating drive phase-advance substep count. Independent of cosmology
+ * and lattice dispersion — bounds the substep size purely by the
+ * requirement that `Ω·subDt < PREHEATING_PHASE_SAFETY` so the drive
+ * sinusoid is sampled densely enough to resolve the Mathieu tongues.
+ *
+ * Returns 1 when the full-step phase advance is already below the
+ * ceiling (the common case for typical defaults). Caps at
+ * `COSMOLOGY_MAX_SUBSTEPS` to match the leapfrog subdivision ceiling and
+ * avoid open-ended stalls on extreme frequency inputs.
+ *
+ * @param frequency - Angular frequency `Ω` of the drive (radians / η)
+ * @param dtFull - Outer leapfrog step
+ * @returns Integer substep count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
+ */
+export function computePreheatingPhaseSubsteps(frequency: number, dtFull: number): number {
+  const omega = Math.abs(frequency)
+  if (!(omega > 0) || !(dtFull > 0)) return 1
+  const phaseFull = omega * dtFull
+  if (!(phaseFull > PREHEATING_PHASE_SAFETY)) return 1
+  const ideal = Math.ceil(phaseFull / PREHEATING_PHASE_SAFETY)
+  return ideal <= COSMOLOGY_MAX_SUBSTEPS ? ideal : COSMOLOGY_MAX_SUBSTEPS
 }
 
 /**

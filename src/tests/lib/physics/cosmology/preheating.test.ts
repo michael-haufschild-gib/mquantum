@@ -58,7 +58,7 @@ describe('computeMassSquaredScale', () => {
 })
 
 describe('integrateMathieu1D — drive off', () => {
-  it('amplitude stays bounded and trajectory matches a bare KG leapfrog to within 1e-8', () => {
+  it('matches a staggered KG leapfrog bit-identically to 1e-12', () => {
     const mass = 1
     const k = 0
     const dt = 0.01
@@ -76,23 +76,33 @@ describe('integrateMathieu1D — drive off', () => {
       pi0,
     })
 
-    // Reference: bare Klein-Gordon leapfrog with `massCoef = m² · 1 · 1`,
-    // drift-then-kick substep ordering, matching the shader.
-    let pRef = phi0
-    let qRef = pi0
+    // Reference: bare Klein-Gordon staggered leapfrog with the same
+    // dt/2 kickstart and integer-time π resync the production
+    // integrator uses. `massCoef = m² · 1 · 1` collapses the preheating
+    // factorization exactly. The drift-then-kick ordering mirrors the
+    // shader's `FreeScalarFieldComputePass.initializeField` → per-substep
+    // `updatePhi` → `updatePi` path.
     const massCoef = mass * mass * 1 * 1
     const kSq = k * k
+    const omegaSq = kSq + massCoef
+    let pRef = phi0
+    // Kickstart: put π on the half-offset grid at t = dt/2.
+    let qRef = pi0 - 0.5 * dt * omegaSq * pRef
     for (let n = 0; n < nSteps; n++) {
       pRef = pRef + dt * qRef
-      qRef = qRef - dt * (kSq + massCoef) * pRef
+      qRef = qRef - dt * omegaSq * pRef
     }
+    // Resync the final π back to the integer-time grid — matches the
+    // production integrator's sample-time rewind.
+    const qRefIntegerTime = qRef + 0.5 * dt * omegaSq * pRef
 
-    expect(Math.abs(traj.phi[nSteps]! - pRef)).toBeLessThan(1e-8)
-    expect(Math.abs(traj.pi[nSteps]! - qRef)).toBeLessThan(1e-8)
+    expect(Math.abs(traj.phi[nSteps]! - pRef)).toBeLessThan(1e-12)
+    expect(Math.abs(traj.pi[nSteps]! - qRefIntegerTime)).toBeLessThan(1e-12)
 
-    // Amplitude is bounded by the symplectic-Euler modified Hamiltonian.
-    // Use the energy envelope — conserved to O(dt²) — instead of raw
-    // amplitude, which oscillates within its dt² band.
+    // Staggered leapfrog conserves a modified Hamiltonian to O(dt²),
+    // so the reported energy envelope sits on a much tighter band
+    // than symplectic Euler — raw energy wobbles at ~dt²/2 = 5e−5 per
+    // cycle. 0.5% gives a comfortable margin.
     const omega = 1
     let maxE = 0
     let minE = Infinity
@@ -101,11 +111,7 @@ describe('integrateMathieu1D — drive off', () => {
       if (e > maxE) maxE = e
       if (e < minE) minE = e
     }
-    // No exponential drift: max/min stays near unity. Symplectic Euler
-    // conserves a modified Hamiltonian to O(dt), so raw energy wobbles at
-    // ~dt/2 = 0.5% per cycle — well below any Mathieu instability
-    // fingerprint but non-zero. 2% gives a comfortable margin.
-    expect(maxE / minE - 1).toBeLessThan(2e-2)
+    expect(maxE / minE - 1).toBeLessThan(5e-3)
   })
 })
 
@@ -202,27 +208,33 @@ describe('commutativity — preheating off reduces to bare Klein-Gordon', () => 
     expect(scale).toBe(1)
     expect(massCoef).toBe(mass * mass)
 
-    // End-to-end: integrator trajectory with preheating off and integrator
+    // End-to-end: integrator trajectory with preheating off and
     // trajectory advanced manually with `massCoef = m²` produce identical
-    // state arrays (IEEE 754 `x · 1 === x`).
+    // state arrays (IEEE 754 `x · 1 === x`). The reference mirrors the
+    // staggered-leapfrog kickstart + integer-time resync the production
+    // integrator applies; `scale = 1` collapses every drive factor.
     const dt = 0.005
     const nSteps = 500
+    const phi0 = 0.7
+    const pi0 = 0.1
     const traj = integrateMathieu1D({
       mass,
       k: 0,
       dt,
       nSteps,
       preheating: OFF,
-      phi0: 0.7,
-      pi0: 0.1,
+      phi0,
+      pi0,
     })
-    let pRef = 0.7
-    let qRef = 0.1
+    const omegaSq = mass * mass
+    let pRef = phi0
+    let qRef = pi0 - 0.5 * dt * omegaSq * pRef
     for (let n = 0; n < nSteps; n++) {
       pRef = pRef + dt * qRef
-      qRef = qRef - dt * (mass * mass) * pRef
+      qRef = qRef - dt * omegaSq * pRef
     }
+    const qRefIntegerTime = qRef + 0.5 * dt * omegaSq * pRef
     expect(traj.phi[nSteps]!).toBe(pRef)
-    expect(traj.pi[nSteps]!).toBe(qRef)
+    expect(traj.pi[nSteps]!).toBe(qRefIntegerTime)
   })
 })

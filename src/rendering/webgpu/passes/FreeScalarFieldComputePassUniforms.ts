@@ -65,6 +65,7 @@ if (!Number.isInteger(FSF_COSMO_COEFS_F32_INDEX)) {
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
 import {
   __resetFsfCosmologyWarnDedupForTests,
   computeFsfCosmologyCoefs,
@@ -73,7 +74,7 @@ import {
   FSF_IDENTITY_COSMO_COEFS,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
 import {
-  estimateVacuumMaxEnergy,
+  estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
   type VacuumDispersion,
@@ -174,6 +175,26 @@ export interface FsfUniformParams {
    * to `mass²` when cosmology is off.
    */
   simEta: number
+  /**
+   * Minkowski-path preheating clock counter. Forwarded alongside
+   * `preheatingReferenceEta` so the full uniform upload can stage the
+   * *live* drive phase into the `massSquaredScale` slot instead of the
+   * pessimistic `1.0` identity. Without this, a paused-and-resumed or
+   * loaded-from-save preheating run would have its initial half-step
+   * kickstart (and any non-playing frame that re-uploads the uniform
+   * buffer) see the unperturbed mass term — desynchronising the
+   * Mathieu drive from the saved field buffers on frame 1. Ignored when
+   * preheating is disabled; in cosmology-active configs it is unused
+   * because the drive clock is `simEta` (which this function already
+   * receives).
+   */
+  preheatingTime: number
+  /**
+   * Reference `η` captured at the most recent reset, used as the phase
+   * anchor for `sin(Ω·(clock − ref))`. Must match what the compute pass
+   * last recorded — the uniforms writer does not recompute it.
+   */
+  preheatingReferenceEta: number
 }
 
 /**
@@ -315,12 +336,22 @@ export function writeFsfUniforms(
   f32[FSF_COSMO_COEFS_F32_INDEX] = coefs.aKinetic // offset 504
   f32[FSF_COSMO_COEFS_F32_INDEX + 1] = coefs.aPotential // offset 508
   f32[FSF_COSMO_COEFS_F32_INDEX + 2] = coefs.aFull // offset 512
-  // massSquaredScale — safe default 1.0 so the pi-update's
-  // `massCoef = m² · aFull · massSquaredScale` factorization reduces to
-  // the bare KG term until the per-substep upload overrides this slot with
-  // the time-dependent preheating drive. Writing 0 here would silently
-  // zero the mass term and break every non-preheating FSF path.
-  f32[FSF_COSMO_COEFS_F32_INDEX + 3] = 1.0 // offset 516 (massSquaredScale)
+  // massSquaredScale — evaluate the *live* drive phase so a paused run,
+  // a load-from-save, or the initial half-step kickstart all see the
+  // correct `1 + A·sin(Ω·(clock − ref))` rather than the identity. The
+  // clock is `simEta` under cosmology and `preheatingTime` under
+  // Minkowski; computeMassSquaredScale returns `1` when the drive is
+  // disabled, so the shader's `massCoef = m² · aFull · massSquaredScale`
+  // factorization reduces to the bare KG term bit-identically on the
+  // no-preheating path. The per-substep upload in the leapfrog loop
+  // continues to refresh this slot while playing.
+  const preheatingClock = config.cosmology.enabled ? params.simEta : params.preheatingTime
+  const liveMassSquaredScale = computeMassSquaredScale(
+    preheatingClock,
+    config.preheating,
+    params.preheatingReferenceEta
+  )
+  f32[FSF_COSMO_COEFS_F32_INDEX + 3] = liveMassSquaredScale // offset 516 (massSquaredScale)
   u32[FSF_COSMO_COEFS_F32_INDEX + 4] = 0 // offset 520 (pad)
   u32[FSF_COSMO_COEFS_F32_INDEX + 5] = 0 // offset 524 (pad)
 
@@ -457,13 +488,13 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     }
     // energyDensity (proper, per comoving observer): the spatial mean of the
     // canonical Hamiltonian density is `⟨E⟩ = meanOmega/2`. We normalize to
-    // `2·⟨E⟩ = meanOmega` (returned by `estimateVacuumMaxEnergy`) so the
+    // `2·⟨E⟩ = meanOmega` (returned by `estimateVacuumEnergyVisualScale`) so the
     // typical voxel lands near `normRho ≈ 0.5` — unlike an extreme-peak
     // divisor, which would leave almost the entire cube at ~5% brightness
     // because the one-sided chi-squared-like ε distribution has peaks
     // ~13× its spatial mean. Divide by `aFull(η₀)` to convert to proper
     // density, matching the shader's output.
-    let canonicalEnergy = estimateVacuumMaxEnergy(config, dispersion)
+    let canonicalEnergy = estimateVacuumEnergyVisualScale(config, dispersion)
     if (config.selfInteractionEnabled) {
       const v = config.selfInteractionVev
       canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v

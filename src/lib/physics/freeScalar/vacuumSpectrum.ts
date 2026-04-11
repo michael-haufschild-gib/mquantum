@@ -419,7 +419,7 @@ export function estimateVacuumMaxPi(
  * @param dispersion - Mass-term dispatch; see `estimateVacuumMaxPhi`.
  * @returns Visual-scale energy density (positive): `2·⟨E(x)⟩ = meanOmega`
  */
-export function estimateVacuumMaxEnergy(
+export function estimateVacuumEnergyVisualScale(
   config: FreeScalarConfig,
   dispersion: VacuumDispersion
 ): number {

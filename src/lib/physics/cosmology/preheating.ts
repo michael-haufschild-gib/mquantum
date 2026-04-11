@@ -61,17 +61,27 @@ export function computeMassSquaredScale(
  * Input parameters for the CPU Mathieu-equation integrator.
  *
  * The integrator advances one mode at wavevector `k` of the canonical
- * δφ field through a first-order symplectic Euler leapfrog whose substep
- * ordering mirrors the WGSL shader's per-substep path:
+ * δφ field through a second-order Störmer-Verlet (staggered leapfrog)
+ * whose substep ordering mirrors the WGSL shader's per-substep path and
+ * the `FreeScalarFieldComputePass.initializeField` half-step kickstart:
  *
- *   1. `phi += dt · pi`                (drift)
- *   2. `t   += dt`                     (advance clock)
- *   3. `omegaSq = k² + m² · scale(t)`  (evaluate coefs at new time)
- *   4. `pi  -= dt · omegaSq · phi`     (kick at new position)
+ *   0. `pi -= (dt/2) · ω²(0) · phi`  (kickstart: stagger pi by half-step)
+ *   1. `phi += dt · pi`              (drift)
+ *   2. `t   += dt`                   (advance clock)
+ *   3. `omegaSq = k² + m² · scale(t)`(evaluate coefs at new time)
+ *   4. `pi  -= dt · omegaSq · phi`   (kick at new position)
+ *
+ * The half-step kickstart puts `pi` on the canonical leapfrog half-offset
+ * grid before the first drift, matching exactly what
+ * `FreeScalarFieldComputePass.initializeField` does with the `updatePi`
+ * pipeline dispatched at `dt/2`. Without it the scheme collapses to
+ * first-order symplectic Euler — still valid physics but no longer
+ * numerically equivalent to the GPU integrator being validated.
  *
  * Under preheating-off and cosmology-off this reduces identically to the
- * bare Klein-Gordon leapfrog the shipped shader already implements, so the
- * test-anchored growth rates are a valid surrogate for on-GPU behaviour.
+ * bare Klein-Gordon staggered leapfrog the shipped shader implements, so
+ * the test-anchored growth rates are a valid surrogate for on-GPU
+ * behaviour.
  */
 export interface MathieuIntegratorParams {
   /** Klein-Gordon mass `m₀`. */
@@ -104,14 +114,25 @@ export interface MathieuTrajectory {
 
 /**
  * CPU Mathieu-equation integrator. Advances a single Fourier mode of the
- * canonical δφ field through `nSteps` leapfrog substeps, returning the full
- * trajectory so tests can measure growth rates, stability, and the Mathieu
- * resonance tongues.
+ * canonical δφ field through `nSteps` staggered-leapfrog substeps,
+ * returning the full trajectory so tests can measure growth rates,
+ * stability, and the Mathieu resonance tongues.
  *
- * The drift-kick ordering is deliberately matched to the compute shader:
- * `phi += dt·pi`, then `t += dt`, then `pi -= dt·(k²+m²·scale(t))·phi`.
- * This ensures test (c)'s measured growth rate is a valid numerical surrogate
- * for the on-GPU first-tongue amplification observed in the scenario preset.
+ * The integrator is a second-order Störmer-Verlet matched to the compute
+ * shader's `FreeScalarFieldComputePass.initializeField` → per-substep
+ * drift/kick path: first a `dt/2` kick at `t = 0` (the GPU's kickstart
+ * dispatch), then repeated `phi += dt·pi ; t += dt ; pi -= dt·ω²(t)·phi`.
+ * The half-step kickstart is what puts `pi` onto the canonical leapfrog
+ * half-offset grid — without it the scheme is only first-order accurate
+ * and does not match the GPU step-for-step, which is the whole point of
+ * having a CPU mirror in the first place.
+ *
+ * The stored `pi[]` array is NOT the half-offset grid value; it is
+ * synchronised back to the integer-time grid at every sample by adding
+ * back a half-step kick. Tests that read `pi[i]` therefore see the
+ * canonical-momentum value at `t_i = i·dt`, not at `t_i + dt/2`, so the
+ * energy envelope `½(π² + ω²φ²)` is well-defined for growth-rate
+ * regression.
  *
  * @param params - Mathieu integrator parameters
  * @returns Time, δφ and π_δφ arrays of length `nSteps + 1`
@@ -128,31 +149,45 @@ export function integrateMathieu1D(params: MathieuIntegratorParams): MathieuTraj
 
   let t = 0
   let p = phi0
-  let q = pi0
   const kSq = k * k
   const mSq = mass * mass
 
   time[0] = 0
   phi[0] = p
-  pi[0] = q
+  pi[0] = pi0
+
+  // Leapfrog kickstart — mirror of `FreeScalarFieldComputePass.initializeField`
+  // which dispatches the `updatePi` pipeline at `dt/2` right after the
+  // initial field sample. Uses ω²(t=0), i.e. the unperturbed mass term
+  // because `sin(0) = 0` under every supported drive configuration. `q`
+  // leaves this block on the half-offset grid `t = dt/2`.
+  const scaleStart = computeMassSquaredScale(0, preheating, refEta)
+  const omegaSqStart = kSq + mSq * scaleStart
+  let q = pi0 - 0.5 * dt * omegaSqStart * p
 
   for (let n = 0; n < nSteps; n++) {
-    // Drift: δφ advances by dt · π.
+    // Drift: δφ advances from `t_n` to `t_{n+1}` using the half-offset π.
     p = p + dt * q
     // Advance the preheating clock by one substep so the mass-term kick
     // below evaluates at the new conformal time — mirrors the shader's
     // per-substep `this.advanceSimEta(subDt)` before the pi dispatch.
     t = t + dt
     // Kick: physical dispersion ω² = k² + m²·massSquaredScale(t) times δφ,
-    // subtracted from π. The multiplicative 1 when preheating is disabled
-    // makes this bit-identical to the bare Klein-Gordon step.
+    // subtracted from π. Advances `q` from `t_n + dt/2` to `t_{n+1} + dt/2`.
+    // Scale reduces to 1 when the drive is disabled so the bare
+    // Klein-Gordon leapfrog is recovered bit-identically.
     const scale = computeMassSquaredScale(t, preheating, refEta)
     const omegaSq = kSq + mSq * scale
     q = q - dt * omegaSq * p
 
     time[n + 1] = t
     phi[n + 1] = p
-    pi[n + 1] = q
+    // Synchronise the stored π back to the integer-time grid `t_{n+1}`
+    // by subtracting the half-step kick that put `q` on the half-offset
+    // grid. The running `q` is left on the half-offset grid so the next
+    // drift uses the correct leapfrog value — only the reported sample
+    // is rewound.
+    pi[n + 1] = q + 0.5 * dt * omegaSq * p
   }
 
   return { time, phi, pi }

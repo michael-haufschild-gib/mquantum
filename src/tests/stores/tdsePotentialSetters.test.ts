@@ -162,5 +162,63 @@ describe('TDSE potential setters', () => {
       s.setTdseBhMass(3.0)
       expect(getTdse().needsReset).toBe(false)
     })
+
+    it('preserves needsReset on idempotent BH writes while BH is active', () => {
+      // The `changed` guard in the BH setters must keep `needsReset`
+      // false when the setter is invoked with the already-stored value
+      // (or a value that clamps to the stored value). Without this
+      // guard, repeated slider events at a cap — or programmatic
+      // assignment of the same value — would restart the wavepacket
+      // mid-evolution.
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('blackHoleRingdown')
+      s.setTdseBhMass(2.0)
+      s.setTdseBhSpin(1)
+      s.setTdseBhMultipoleL(3)
+      s.clearTdseNeedsReset()
+      expect(getTdse().needsReset).toBe(false)
+
+      // Same-value reassignment → no reset.
+      s.setTdseBhMass(2.0)
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhMultipoleL(3)
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhSpin(1)
+      expect(getTdse().needsReset).toBe(false)
+
+      // Slider-cap-hit idempotence: repeated writes at the clamp edge
+      // produce the same clamped value and must not fire a reset.
+      s.setTdseBhMass(1000) // clamps to 5
+      expect(getTdse().bhMass).toBe(5)
+      expect(getTdse().needsReset).toBe(true)
+      s.clearTdseNeedsReset()
+      s.setTdseBhMass(1000) // still clamps to 5 — now idempotent
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhMass(2e6) // different raw input, same clamped output
+      expect(getTdse().needsReset).toBe(false)
+    })
+
+    it('setTdseBhSpin re-clamps bhMultipoleL into [spin, 6] on every write', () => {
+      // Defensive invariant: if a loaded or migrated config somehow
+      // leaves `bhMultipoleL = 7` (above the slider cap) or anything
+      // outside `[spin, 6]`, the spin setter must round ℓ back into the
+      // canonical band rather than preserving the invalid value. This
+      // guards against `Math.max(prev.bhMultipoleL, spin)` letting a
+      // pre-existing bad ℓ through unchanged.
+      const s = useExtendedObjectStore.getState()
+      // Poke an out-of-range value through the raw store to simulate a
+      // legacy-preset migration path. The setter itself would reject
+      // this, so bypass it.
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, bhMultipoleL: 9, bhSpin: 0 },
+        },
+      }))
+      s.setTdseBhSpin(2)
+      // ℓ must be clamped down to 6 (the slider cap) — NOT left at 9.
+      expect(getTdse().bhMultipoleL).toBe(6)
+      expect(getTdse().bhSpin).toBe(2)
+    })
   })
 })

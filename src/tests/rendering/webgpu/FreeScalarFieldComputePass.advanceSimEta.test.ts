@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/physics/freeScalar/vacuumSpectrum', () => ({
-  estimateVacuumMaxEnergy: vi.fn(() => 1),
+  estimateVacuumEnergyVisualScale: vi.fn(() => 1),
   estimateVacuumMaxPhi: vi.fn(() => 1),
   estimateVacuumMaxPi: vi.fn(() => 1),
   sampleVacuumSpectrum: vi.fn(() => ({ phi: new Float32Array(0), pi: new Float32Array(0) })),

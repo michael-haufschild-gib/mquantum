@@ -20,6 +20,7 @@ import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -299,10 +300,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return
     const byteSize = this.totalSites * 4
     this.saveMappingInFlight = true
-    // Snapshot runtime scalars synchronously so the async `getMetadata`
-    // callback cannot race a mid-save config change and pair stale clocks
-    // with mismatched field data.
+    // Snapshot runtime scalars AND the live FSF config synchronously so
+    // the async `getMetadata` callback cannot race a mid-save config
+    // change and pair stale clocks with mismatched field data.
+    // structuredClone severs every reference into Zustand so downstream
+    // serialization sees a frozen payload regardless of user edits.
+    const freeScalarSnapshot = structuredClone(
+      useExtendedObjectStore.getState().schroedinger.freeScalar
+    )
     const metadata = composeFsfSaveMetadata({
+      freeScalar: freeScalarSnapshot,
       simEta: this.simEta,
       preheatingReferenceEta: this.preheatingReferenceEta,
       preheatingTime: this.preheatingTime,
@@ -575,6 +582,13 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       boundingRadius,
       colorAlgorithm,
       simEta: this.simEta,
+      // Live preheating drive phase. On the first frame after a load the
+      // pass has already staged `preheatingTime` / `preheatingReferenceEta`
+      // from the save blob in executeField, so the uniforms see the
+      // correct `1 + A·sin(Ω·(clock−ref))` at kickstart time instead of
+      // the identity. On fresh resets both are 0, matching `sin(0) = 0`.
+      preheatingTime: this.preheatingTime,
+      preheatingReferenceEta: this.preheatingReferenceEta,
     })
   }
 
