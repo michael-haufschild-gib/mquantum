@@ -21,8 +21,14 @@ function voxelWorld(i: number, gridSize: number, bound: number): number {
 
 /**
  * Test-local 1D Laplacian mirror: Q1D(x) = -½·R''/R using the same 3-point
- * stencil, same ρ floor, same R denominator floor, and same R-zero cutoff as
- * the 3D CPU routine. Kept in the test file (not exported) per PRD.
+ * stencil, same ρ floor, same R denominator floor, and same RAW-density zero
+ * cutoff as the 3D CPU routine. Kept in the test file (not exported) per PRD.
+ *
+ * Cutoff order must mirror `computeQuantumPotentialCpu` exactly: compare the
+ * unfloored rhoC against RHO_ZERO_CUTOFF first, THEN apply the ρ floor. The
+ * earlier version compared `sqrt(max(rhoC, 1e-8))` against a 1e-6 R-space
+ * cutoff — a vacuous check (sqrt(max(·, 1e-8)) ≥ 1e-4) that masked regressions
+ * in the cutoff path.
  */
 function computeQuantumPotential1DCpu(
   densityGrid: Float32Array,
@@ -34,7 +40,8 @@ function computeQuantumPotential1DCpu(
   const out = new Float32Array(gridSize)
   const RHO_FLOOR = 1e-8
   const R_DENOM_FLOOR = 1e-4
-  const R_ZERO_CUTOFF = 1e-6
+  // Mirrors RHO_ZERO_CUTOFF in `computeQuantumPotentialCpu` (= R_ZERO_CUTOFF²).
+  const RHO_ZERO_CUTOFF = 1e-12
 
   for (let i = 0; i < gridSize; i++) {
     if (i === 0 || i === gridSize - 1) {
@@ -42,11 +49,11 @@ function computeQuantumPotential1DCpu(
       continue
     }
     const rhoC = densityGrid[i]!
-    const Rc = Math.sqrt(Math.max(rhoC, RHO_FLOOR))
-    if (Rc < R_ZERO_CUTOFF) {
+    if (rhoC < RHO_ZERO_CUTOFF) {
       out[i] = 0
       continue
     }
+    const Rc = Math.sqrt(Math.max(rhoC, RHO_FLOOR))
     const Rp = Math.sqrt(Math.max(densityGrid[i + 1]!, RHO_FLOOR))
     const Rn = Math.sqrt(Math.max(densityGrid[i - 1]!, RHO_FLOOR))
     const laplR = (Rp + Rn - 2 * Rc) / hSq

@@ -7,6 +7,8 @@
  */
 
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
+import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
+import type { ObjectType } from '@/lib/geometry/types'
 
 // ============================================================================
 // Color Algorithm System
@@ -275,8 +277,12 @@ export interface ColorAlgorithmAvailabilityOptions {
   dimension?: number
   /** Isosurface rendering toggle. Isosurface analytic modes skip the grid. */
   isosurface?: boolean
-  /** Current representation. 'wigner' uses a 2D phase-space path with no grid. */
-  representation?: string
+  /**
+   * Current representation. 'wigner' uses a 2D phase-space path with no grid.
+   * Narrowed from `string` so typos (e.g. `'Wigner'`) cannot silently bypass
+   * the `analyticHasDensityGrid` check.
+   */
+  representation?: SchroedingerRepresentation
 }
 
 /**
@@ -293,7 +299,7 @@ export interface ColorAlgorithmAvailabilityOptions {
 export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
-  objectType: string = 'schroedinger',
+  objectType: ObjectType = 'schroedinger',
   freeScalarInitialCondition?: string,
   availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {

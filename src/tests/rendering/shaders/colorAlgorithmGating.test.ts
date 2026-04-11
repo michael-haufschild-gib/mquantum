@@ -303,13 +303,25 @@ describe('getAvailableColorAlgorithms — density-grid availability for analytic
     expect(values).not.toContain('vortexDensity')
   })
 
-  it('defaults (no availability options) behave like 3D volumetric — exposes quantumPotential', () => {
-    // Callers that have not yet been upgraded to pass availability options get
-    // the most permissive behaviour (3D volumetric non-Wigner) so the feature
-    // is visible wherever it could reasonably work.
-    const algos = getAvailableColorAlgorithms('harmonicOscillator', false)
-    const values = algos.map((a) => a.value)
-    expect(values).toContain('quantumPotential')
-    expect(values).toContain('vortexDensity')
+  it('omitted availability options are equivalent to explicit 3D volumetric non-Wigner options', () => {
+    // The `ColorAlgorithmAvailabilityOptions` defaults (dimension=3,
+    // isosurface=false, representation=undefined) MUST match the most common
+    // analytic volumetric pipeline shape so legacy call sites that have not
+    // yet been upgraded to pass options keep their prior behaviour. Instead of
+    // spot-checking `quantumPotential` presence (which couples the test to a
+    // density-grid-only algorithm set that may change), assert the full
+    // equivalence so any drift between the defaults and 3D volumetric is
+    // caught at test time rather than as silent selector divergence in the UI.
+    const withDefaults = getAvailableColorAlgorithms('harmonicOscillator', false).map(
+      (a) => a.value
+    )
+    const withExplicit = getAvailableColorAlgorithms(
+      'harmonicOscillator',
+      false,
+      'schroedinger',
+      undefined,
+      { dimension: 3, isosurface: false, representation: 'position' }
+    ).map((a) => a.value)
+    expect(withDefaults).toEqual(withExplicit)
   })
 })

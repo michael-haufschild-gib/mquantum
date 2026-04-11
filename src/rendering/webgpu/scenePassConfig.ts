@@ -175,7 +175,7 @@ export function normalizeColorAlgorithmForQuantumMode(
   openQuantumEnabled: boolean = false,
   diracFieldView?: string,
   pauliFieldView?: string,
-  objectType: string = 'schroedinger',
+  objectType: ObjectType = 'schroedinger',
   availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): PaletteColorAlgorithm {
   if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
