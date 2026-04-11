@@ -10,6 +10,7 @@
  * for the missing parameters.
  */
 
+import { DEFAULT_PREHEATING_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import {
   DEFAULT_PAULI_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
@@ -163,11 +164,28 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // those setters via direct `setState`. Without this normalisation step,
   // the next vacuumNoise reset would feed an out-of-range `eta0` into
   // `sampleAdiabaticVacuum` and either throw or fall back silently.
+  //
+  // Also back-fill the `preheating` sub-config from its default whenever a
+  // scene saved before the parametric-resonance feature shipped is loaded.
+  // The GPU pass reads `config.preheating.enabled` every substep, so an
+  // undefined value would crash the leapfrog loop on the first frame.
   const fs = normalized.freeScalar
   if (fs && typeof fs === 'object') {
-    const reconciled = reconcileCosmologyInvariants(fs as FreeScalarConfig)
+    const fsRecord = fs as Record<string, unknown>
+    if (!fsRecord.preheating || typeof fsRecord.preheating !== 'object') {
+      normalized = {
+        ...normalized,
+        freeScalar: { ...fsRecord, preheating: { ...DEFAULT_PREHEATING_CONFIG } },
+      }
+    }
+    const reconciled = reconcileCosmologyInvariants(
+      (normalized.freeScalar as FreeScalarConfig) ?? (fs as FreeScalarConfig)
+    )
     if (Object.keys(reconciled).length > 0) {
-      normalized = { ...normalized, freeScalar: { ...(fs as object), ...reconciled } }
+      normalized = {
+        ...normalized,
+        freeScalar: { ...(normalized.freeScalar as object), ...reconciled },
+      }
     }
   }
 

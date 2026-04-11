@@ -29,17 +29,25 @@ export const FSF_UNIFORM_SIZE = 528
 export const FSF_DT_BYTE_OFFSET = 12
 
 /**
- * Byte offset of the `aKinetic` field in FreeScalarUniforms. The three
- * cosmology coefficients `(aKinetic, aPotential, aFull)` are contiguous
- * starting here — `FreeScalarFieldComputePass.writeCosmologyCoefsSlot`
- * writes a 12-byte span at this offset per substep.
+ * Byte offset of the `aKinetic` field in FreeScalarUniforms. The four
+ * per-substep scalars `(aKinetic, aPotential, aFull, massSquaredScale)`
+ * are contiguous starting here — `FreeScalarFieldComputePass.
+ * writeCosmologyCoefsSlot` writes a 16-byte span at this offset per
+ * substep whenever cosmology or preheating is active. The first three
+ * carry the FLRW background coefficients; the fourth carries the
+ * parametric-resonance drive factor `1 + A·sin(Ω·(η−η_ref))`.
  */
 export const FSF_COSMO_COEFS_BYTE_OFFSET = 504
 
-/** Number of f32 entries in the cosmology coefficients slot (aKinetic/aPotential/aFull). */
-export const FSF_COSMO_COEFS_F32_COUNT = 3
+/**
+ * Number of f32 entries in the per-substep coefficient slot
+ * `(aKinetic, aPotential, aFull, massSquaredScale)`. Four, not three —
+ * the preheating drive repurposes the former `_padCosmo0` word at offset
+ * 516 as `massSquaredScale`, keeping the total struct size at 528 bytes.
+ */
+export const FSF_COSMO_COEFS_F32_COUNT = 4
 
-/** Byte size of the contiguous cosmology coefficients slot. */
+/** Byte size of the contiguous per-substep coefficient slot. */
 export const FSF_COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_F32_COUNT * 4
 
 /**
@@ -307,7 +315,12 @@ export function writeFsfUniforms(
   f32[FSF_COSMO_COEFS_F32_INDEX] = coefs.aKinetic // offset 504
   f32[FSF_COSMO_COEFS_F32_INDEX + 1] = coefs.aPotential // offset 508
   f32[FSF_COSMO_COEFS_F32_INDEX + 2] = coefs.aFull // offset 512
-  u32[FSF_COSMO_COEFS_F32_INDEX + 3] = 0 // offset 516 (pad)
+  // massSquaredScale — safe default 1.0 so the pi-update's
+  // `massCoef = m² · aFull · massSquaredScale` factorization reduces to
+  // the bare KG term until the per-substep upload overrides this slot with
+  // the time-dependent preheating drive. Writing 0 here would silently
+  // zero the mass term and break every non-preheating FSF path.
+  f32[FSF_COSMO_COEFS_F32_INDEX + 3] = 1.0 // offset 516 (massSquaredScale)
   u32[FSF_COSMO_COEFS_F32_INDEX + 4] = 0 // offset 520 (pad)
   u32[FSF_COSMO_COEFS_F32_INDEX + 5] = 0 // offset 524 (pad)
 

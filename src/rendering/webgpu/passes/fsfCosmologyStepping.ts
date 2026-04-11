@@ -12,6 +12,8 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
 
 import {
   FSF_COSMO_COEFS_BYTE_OFFSET,
@@ -236,15 +238,130 @@ export function computeFsfCflSubsteps(
 }
 
 /**
- * Overwrite the contiguous 12-byte cosmology coefficients slot
- * `(aKinetic, aPotential, aFull)` in the uniform buffer, avoiding the
- * full 528-byte re-upload that `writeFsfUniforms` performs. Called from
- * the leapfrog substep loop when cosmology is active so every
- * drift + kick pair consumes fresh coefficients evaluated at the current
- * `simEta`.
+ * Per-substep coefficient bundle produced by {@link resolveFsfSubstepCoefs}.
+ *
+ * The compute pass streams this bundle into the GPU uniform buffer via
+ * {@link writeFsfCosmologyCoefsSlot} every drift→kick pair whenever either
+ * cosmology or preheating is active, so the pi-update shader reads fresh
+ * values for the time-dependent FLRW coefficients and the parametric
+ * resonance drive.
+ */
+export interface FsfSubstepCoefs {
+  /** FLRW kinetic coefficient `a^(−(n−2))` — 1 under Minkowski. */
+  aKinetic: number
+  /** FLRW potential coefficient `a^(n−2)` — 1 under Minkowski. */
+  aPotential: number
+  /** FLRW volume-form coefficient `a^n` — 1 under Minkowski. */
+  aFull: number
+  /** Preheating drive scalar `1 + A·sin(Ω·(t−ref))` — 1 when disabled. */
+  massSquaredScale: number
+}
+
+/**
+ * Runtime state exposed by the compute pass to {@link resolveFsfSubstepCoefs}.
+ * Encapsulates just enough of the pass-instance fields to keep the helper
+ * pure (no GPU dependency) while still letting it advance both the
+ * cosmological clock and the Minkowski-path preheating counter in a single
+ * call.
+ */
+export interface FsfSubstepClock {
+  /** Advance `simEta` by one substep and return the clamped new value. */
+  advanceSimEta: (subDt: number) => number
+  /** Current Minkowski-path preheating time (mutated in place when needed). */
+  preheatingTime: number
+  /** Reference time captured at the most recent reset. */
+  preheatingReferenceEta: number
+}
+
+/**
+ * Compute the per-substep coefficient bundle to upload to the GPU uniform
+ * buffer during one drift→kick leapfrog substep.
+ *
+ * Advances the relevant clock (`simEta` when cosmology is on, a separate
+ * Minkowski counter otherwise) and returns both the updated coefficients
+ * and the new `preheatingTime` so the caller can assign it back to the
+ * pass instance. Keeps all cosmology+preheating composition logic in one
+ * place so the compute pass stays focused on GPU dispatch bookkeeping.
+ *
+ * @param config - Free scalar field configuration
+ * @param subDt - Size of this leapfrog substep
+ * @param cosmologyActive - Whether cosmology is enabled
+ * @param preheatingActive - Whether the preheating drive is enabled
+ * @param clock - Pass runtime state (simEta advance + preheating clock)
+ * @param evaluateCosmologyCoefs - Closure resolving `(aKinetic, aPotential,
+ *                                 aFull)` at a given `η` — kept as a
+ *                                 parameter so this helper stays free of
+ *                                 the `computeFsfCosmologyCoefs` dependency.
+ * @returns `{ coefs, preheatingTime }` — upload these and assign the
+ *          returned counter back onto the pass instance.
+ */
+export function resolveFsfSubstepCoefs(
+  config: FreeScalarConfig,
+  subDt: number,
+  cosmologyActive: boolean,
+  preheatingActive: boolean,
+  clock: FsfSubstepClock,
+  evaluateCosmologyCoefs: (eta: number) => CosmologyCoefs
+): { coefs: FsfSubstepCoefs; preheatingTime: number } {
+  let aKinetic = 1
+  let aPotential = 1
+  let aFull = 1
+  let preheatingClock: number
+  let nextPreheatingTime = clock.preheatingTime
+
+  if (cosmologyActive) {
+    const newEta = clock.advanceSimEta(subDt)
+    const coefs = evaluateCosmologyCoefs(newEta)
+    aKinetic = coefs.aKinetic
+    aPotential = coefs.aPotential
+    aFull = coefs.aFull
+    // Cosmology + preheating composition: the drive reads the
+    // cosmological clock directly, so `preheatingReferenceEta` was
+    // captured as the reset `simEta` and the drive fires at phase 0 from
+    // the instant the lattice was initialised.
+    preheatingClock = newEta
+  } else {
+    // Minkowski + preheating: advance the separate counter so
+    // `sin(Ω·(t−ref))` produces the Mathieu equation of motion tied to
+    // real physical time, not conformal time.
+    nextPreheatingTime = clock.preheatingTime + subDt
+    preheatingClock = nextPreheatingTime
+  }
+
+  const massSquaredScale = preheatingActive
+    ? computeMassSquaredScale(preheatingClock, config.preheating, clock.preheatingReferenceEta)
+    : 1
+
+  return {
+    coefs: { aKinetic, aPotential, aFull, massSquaredScale },
+    preheatingTime: nextPreheatingTime,
+  }
+}
+
+/**
+ * Overwrite the contiguous 16-byte per-substep coefficient slot
+ * `(aKinetic, aPotential, aFull, massSquaredScale)` in the uniform buffer,
+ * avoiding the full 528-byte re-upload that `writeFsfUniforms` performs.
+ * Called from the leapfrog substep loop whenever cosmology or preheating
+ * is active so every drift + kick pair consumes fresh coefficients
+ * evaluated at the current conformal time.
+ *
+ * The fourth slot (`massSquaredScale`) carries the post-inflation
+ * preheating drive `1 + A·sin(Ω·(η−η_ref))`. Passing `1.0` makes this a
+ * pure cosmology write — the pi-update's `massCoef = m²·aFull·scale`
+ * factorization reduces to the bare canonical mass term, preserving
+ * bit-identical behaviour for callers that don't need the drive.
  *
  * Allocates nothing per call — the values are staged through the
- * caller-owned `scratch` buffer (typically a 3-f32 Float32Array).
+ * caller-owned `scratch` buffer (a 4-f32 Float32Array).
+ *
+ * @param device - GPU device
+ * @param uniformBuffer - FSF uniform buffer
+ * @param scratch - 4-element Float32Array scratch, reused across substeps
+ * @param aKinetic - FLRW kinetic coefficient `a^(−(n−2))`
+ * @param aPotential - FLRW potential coefficient `a^(n−2)`
+ * @param aFull - FLRW volume-form coefficient `a^n`
+ * @param massSquaredScale - Preheating drive scalar (1.0 when disabled)
  */
 export function writeFsfCosmologyCoefsSlot(
   device: GPUDevice,
@@ -252,11 +369,13 @@ export function writeFsfCosmologyCoefsSlot(
   scratch: Float32Array,
   aKinetic: number,
   aPotential: number,
-  aFull: number
+  aFull: number,
+  massSquaredScale: number
 ): void {
   scratch[0] = aKinetic
   scratch[1] = aPotential
   scratch[2] = aFull
+  scratch[3] = massSquaredScale
   device.queue.writeBuffer(
     uniformBuffer,
     FSF_COSMO_COEFS_BYTE_OFFSET,

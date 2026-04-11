@@ -53,6 +53,7 @@ import {
   computeAdiabaticSubsteps,
   computeFsfCflSubsteps,
   projectSimEta,
+  resolveFsfSubstepCoefs,
   writeFsfCosmologyCoefsSlot,
 } from './fsfCosmologyStepping'
 import { requestStateSave as genericStateSave } from './stateSave'
@@ -144,6 +145,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * playing frame, starting from `config.cosmology.eta0` on reset.
    */
   private simEta = 0
+
+  /**
+   * Preheating drive state. `preheatingReferenceEta` is captured at reset
+   * so `sin(Ω·(clock−ref)) = 0` at the initial time. Under cosmology the
+   * clock is `simEta`; under Minkowski it's `preheatingTime`, which
+   * advances by `subDt` per substep. See `resolveFsfSubstepCoefs` in
+   * `fsfCosmologyStepping.ts` for the per-substep composition.
+   */
+  private preheatingReferenceEta = 0
+  private preheatingTime = 0
 
   // Save/load state
   private pendingInjection: { re: Float32Array; im: Float32Array } | null = null
@@ -633,14 +644,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // so the cosmological clock picks up where the user left off.
     const willReinitialize = !this.initialized || config.needsReset
     if (willReinitialize) {
-      if (config.cosmology.enabled) {
-        this.simEta =
-          this.pendingLoadedSimEta !== null ? this.pendingLoadedSimEta : config.cosmology.eta0
-        this.pendingLoadedSimEta = null
-      } else {
-        this.simEta = 0
-        this.pendingLoadedSimEta = null
-      }
+      const cosmoOn = config.cosmology.enabled
+      this.simEta = cosmoOn ? (this.pendingLoadedSimEta ?? config.cosmology.eta0) : 0
+      this.pendingLoadedSimEta = null
+      // Anchor preheating at phase 0 for the reset time (sin(0) = 0).
+      this.preheatingReferenceEta = cosmoOn ? this.simEta : 0
+      this.preheatingTime = 0
     }
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius, colorAlgorithm)
@@ -658,6 +667,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
       const linearWorkgroups = Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
       const cosmologyActive = config.cosmology.enabled
+      const preheatingActive = config.preheating.enabled
+      const coefUploadActive = cosmologyActive || preheatingActive
 
       // Cache the original dt — when adaptive sub-stepping kicks in we
       // overwrite the uniform slot with `dt/nSub` and must restore it
@@ -757,21 +768,33 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           // canonical leapfrog time ordering extended to time-dependent
           // Hamiltonians — first-order accurate in the coefficient time,
           // second-order in the (p, q) update. When cosmology is disabled
-          // there is no clock to advance.
-          if (cosmologyActive) {
-            const subDt = nSub === 1 ? dtFull : dtFull / nSub
-            const newEta = this.advanceSimEta(subDt)
-            const coefs = computeFsfCosmologyCoefs(config, newEta)
-            if (this.uniformBuffer) {
-              writeFsfCosmologyCoefsSlot(
-                device,
-                this.uniformBuffer,
-                this.cosmoCoefsScratch,
-                coefs.aKinetic,
-                coefs.aPotential,
-                coefs.aFull
-              )
-            }
+          // there is no cosmological clock, but the preheating drive still
+          // runs on a separate `preheatingTime` counter and fires the same
+          // coef-slot upload path — composing the Mathieu-equation drive
+          // with the flat-background free field.
+          if (coefUploadActive && this.uniformBuffer) {
+            const r = resolveFsfSubstepCoefs(
+              config,
+              nSub === 1 ? dtFull : dtFull / nSub,
+              cosmologyActive,
+              preheatingActive,
+              {
+                advanceSimEta: (dt: number) => this.advanceSimEta(dt),
+                preheatingTime: this.preheatingTime,
+                preheatingReferenceEta: this.preheatingReferenceEta,
+              },
+              (eta: number) => computeFsfCosmologyCoefs(config, eta)
+            )
+            this.preheatingTime = r.preheatingTime
+            writeFsfCosmologyCoefsSlot(
+              device,
+              this.uniformBuffer,
+              this.cosmoCoefsScratch,
+              r.coefs.aKinetic,
+              r.coefs.aPotential,
+              r.coefs.aFull,
+              r.coefs.massSquaredScale
+            )
           }
 
           const piPass = ctx.beginComputePass({

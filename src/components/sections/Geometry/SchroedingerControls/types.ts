@@ -155,6 +155,9 @@ export interface FreeScalarFieldActions {
   setCosmologySteepness: ExtendedObjectState['setFreeScalarCosmologySteepness']
   setCosmologyHubble: ExtendedObjectState['setFreeScalarCosmologyHubble']
   setCosmologyEta0: ExtendedObjectState['setFreeScalarCosmologyEta0']
+  setPreheatingEnabled: ExtendedObjectState['setFreeScalarPreheatingEnabled']
+  setPreheatingAmplitude: ExtendedObjectState['setFreeScalarPreheatingAmplitude']
+  setPreheatingFrequency: ExtendedObjectState['setFreeScalarPreheatingFrequency']
 }
 
 /**

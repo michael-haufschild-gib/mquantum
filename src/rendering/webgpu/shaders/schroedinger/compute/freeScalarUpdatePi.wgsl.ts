@@ -53,11 +53,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Hamilton kick equation in the canonical delta-phi variables:
   //   d(pi)/d(eta) = aPotential * laplacian(phi)
-  //                - mass^2 * aFull * phi
+  //                - mass^2 * aFull * massSquaredScale(eta) * phi
   //                - aFull * V'(phi)
-  // Under the Minkowski preset aPotential = aFull = 1 and this degenerates
-  // to the bare KG force (laplacian - mass^2 * phi - V'(phi)) bit-identically.
-  let massCoef = params.mass * params.mass * params.aFull;
+  // Under the Minkowski preset aPotential = aFull = 1 and preheating
+  // disabled (massSquaredScale = 1), this degenerates to the bare KG force
+  // (laplacian - mass^2 * phi - V'(phi)) bit-identically. The
+  // massSquaredScale factor implements the post-inflation preheating drive
+  // (1 + A*sin(Omega*(eta - eta_ref))), turning each lattice mode into the
+  // Mathieu equation and enabling exponential parametric amplification
+  // inside the Floquet instability tongues.
+  let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
   var force = params.aPotential * laplacian - massCoef * phiCenter;
 
   // Self-interaction: V(phi) = lambda*(phi^2 - v^2)^2,

@@ -102,6 +102,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setFreeScalarCosmologySteepness: state.setFreeScalarCosmologySteepness,
     setFreeScalarCosmologyHubble: state.setFreeScalarCosmologyHubble,
     setFreeScalarCosmologyEta0: state.setFreeScalarCosmologyEta0,
+    setFreeScalarPreheatingEnabled: state.setFreeScalarPreheatingEnabled,
+    setFreeScalarPreheatingAmplitude: state.setFreeScalarPreheatingAmplitude,
+    setFreeScalarPreheatingFrequency: state.setFreeScalarPreheatingFrequency,
     // TDSE dynamics actions
     setTdseLatticeDim: state.setTdseLatticeDim,
     setTdseGridSize: state.setTdseGridSize,
@@ -278,6 +281,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setCosmologySteepness: s.setFreeScalarCosmologySteepness,
     setCosmologyHubble: s.setFreeScalarCosmologyHubble,
     setCosmologyEta0: s.setFreeScalarCosmologyEta0,
+    setPreheatingEnabled: s.setFreeScalarPreheatingEnabled,
+    setPreheatingAmplitude: s.setFreeScalarPreheatingAmplitude,
+    setPreheatingFrequency: s.setFreeScalarPreheatingFrequency,
   }
 
   const tdseActions: TdseActions = {

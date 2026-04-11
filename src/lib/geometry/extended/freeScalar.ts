@@ -204,6 +204,63 @@ export const DEFAULT_COSMOLOGY_CONFIG: CosmologyConfig = {
 }
 
 // ============================================================================
+// Parametric Resonance (Post-Inflation Preheating)
+// ============================================================================
+
+/**
+ * Time-periodic effective-mass drive for the Free Scalar Field, implementing
+ * the canonical post-inflation preheating mechanism:
+ *
+ *     m²_eff(η) = m₀² · (1 + A · sin(Ω · (η − η_ref)))
+ *
+ * Under this drive each lattice mode evolves according to the Mathieu
+ * equation  δφ̈_k + (k² + m₀²(1 + A sin Ωη))·δφ_k = 0, exhibiting exponential
+ * parametric amplification inside the Floquet instability tongues. The first
+ * tongue sits at `Ω = 2·ω_k` with growth exponent `μ_k ≈ A·m₀²/(4·ω_k)` —
+ * the mechanism by which an inflaton condensate dumps its energy into light
+ * matter fields after inflation ends.
+ *
+ * Mechanically the drive is a single `f32` multiplicative factor
+ * (`massSquaredScale`) injected into the pi-update shader's `massCoef`
+ * calculation: `massCoef = m² · aFull · massSquaredScale`. With
+ * `massSquaredScale ≡ 1` this is a no-op, so the preheating path composes
+ * multiplicatively with every other branch (cosmology on/off,
+ * self-interaction, Minkowski) without a mutex.
+ *
+ * See `@/lib/physics/cosmology/preheating` for the CPU reference
+ * implementation and the tests that anchor the first- and second-tongue
+ * growth-rate measurements.
+ */
+export interface PreheatingConfig {
+  /** Master toggle. When false, the pi-update uses the bare mass term. */
+  enabled: boolean
+  /**
+   * Drive amplitude `A ∈ [0, 1]`. Larger values push the system further into
+   * the non-linear regime of the first instability tongue and eventually
+   * into backreaction-dominated resonance broadening.
+   */
+  amplitude: number
+  /**
+   * Drive angular frequency `Ω ∈ [0.1, 10]`. Resonance condition for the
+   * first tongue at wavenumber `k` is `Ω = 2·√(k² + m₀²)`, i.e. `Ω = 2·m₀`
+   * for the `k = 0` mode.
+   */
+  frequency: number
+}
+
+/**
+ * Default preheating sub-config: disabled, with an amplitude and drive
+ * frequency that land on the first instability tongue for the default
+ * `mass = 1.0` so the user can flip the master toggle and immediately
+ * observe parametric amplification of the zero mode.
+ */
+export const DEFAULT_PREHEATING_CONFIG: PreheatingConfig = {
+  enabled: false,
+  amplitude: 0.3,
+  frequency: 2.0,
+}
+
+// ============================================================================
 // Free Scalar Config
 // ============================================================================
 
@@ -292,6 +349,17 @@ export interface FreeScalarConfig {
    * Mutually exclusive with `selfInteractionEnabled` in v1.
    */
   cosmology: CosmologyConfig
+
+  // === Parametric Resonance (Post-Inflation Preheating) ===
+  /**
+   * Time-periodic effective-mass drive. When enabled the pi-update injects
+   * a `massSquaredScale(η) = 1 + A·sin(Ω·(η−η_ref))` factor on the mass
+   * term, turning each mode's equation into the Mathieu equation and
+   * enabling exponential parametric amplification inside the Floquet
+   * instability tongues. Composes multiplicatively with cosmology and
+   * self-interaction — no mutex.
+   */
+  preheating: PreheatingConfig
 }
 
 /**
@@ -326,4 +394,5 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
   cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
+  preheating: { ...DEFAULT_PREHEATING_CONFIG },
 }

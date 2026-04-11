@@ -305,6 +305,45 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
     renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
   },
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Post-Inflation Preheating (Parametric Resonance)
+  //
+  // A time-periodic modulation of the effective Klein-Gordon mass turns
+  // each lattice mode's evolution into the Mathieu equation and enables
+  // exponential parametric amplification inside the Floquet instability
+  // tongues. The canonical first tongue sits at `Ω = 2·√(k² + m²)` with
+  // growth exponent μ ≈ A·m²/(4·ω). This is the mechanism by which an
+  // inflaton condensate dumps its energy into light matter fields at the
+  // end of inflation — a direct quantum-to-cosmology bridge, realised on
+  // the same 3D lattice that renders the free scalar vacuum.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  {
+    id: 'preheatingFirstTongue',
+    name: 'Preheating: First Tongue (k=0)',
+    description:
+      'Post-inflation parametric resonance: effective mass m²(η) = m²·(1 + 0.3·sin(2η)) drives the Mathieu first tongue at Ω = 2·m. Vacuum noise on Minkowski background — the k=0 mode amplifies exponentially over a few seconds, visible as a bright central shell in k-space.',
+    overrides: {
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 17,
+      mass: 1.0,
+      dt: 0.01,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      autoScale: true,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      preheating: {
+        enabled: true,
+        amplitude: 0.3,
+        frequency: 2.0,
+      },
+    },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+  },
+
   {
     id: 'kasnerBackground',
     name: 'Kasner Background (w = 1)',

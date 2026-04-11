@@ -559,5 +559,10 @@ function makeKSpaceFsfConfig(): FreeScalarConfig {
       hubble: 1,
       eta0: -10,
     },
+    preheating: {
+      enabled: false,
+      amplitude: 0.3,
+      frequency: 2.0,
+    },
   }
 }

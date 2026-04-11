@@ -268,6 +268,11 @@ export interface SchroedingerSliceActions {
   setFreeScalarCosmologyHubble: (h: number) => void
   setFreeScalarCosmologyEta0: (eta0: number) => void
 
+  // Parametric Resonance / Preheating
+  setFreeScalarPreheatingEnabled: (enabled: boolean) => void
+  setFreeScalarPreheatingAmplitude: (amplitude: number) => void
+  setFreeScalarPreheatingFrequency: (frequency: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (
     mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
