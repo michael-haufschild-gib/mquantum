@@ -242,7 +242,11 @@ export class FsfKSpaceManager {
       this.kSpaceWorker.onmessage = (e: MessageEvent) => {
         const msg = e.data
         if (msg.type === 'result' && msg.epoch === this.kSpaceReadbackEpoch) {
-          const totalParticles = typeof msg.totalParticles === 'number' ? msg.totalParticles : 0
+          // Number.isFinite (not `typeof === 'number'`) so a NaN or
+          // ±Infinity from a worker-side numerical failure falls back
+          // cleanly to 0 instead of poisoning `pendingKSpaceData` and
+          // the diagnostics ring buffer.
+          const totalParticles = Number.isFinite(msg.totalParticles) ? msg.totalParticles : 0
           this.pendingKSpaceData = {
             density: msg.density,
             analysis: msg.analysis,

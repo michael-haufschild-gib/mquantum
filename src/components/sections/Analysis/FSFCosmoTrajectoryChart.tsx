@@ -20,6 +20,56 @@ const TRAJ_PY = 14
 const TRAJ_PW = TRAJ_WIDTH - 2 * TRAJ_PX
 const TRAJ_PH = TRAJ_HEIGHT - 2 * TRAJ_PY
 
+/** Normalised trajectory data after the defensive filter pass. */
+interface FilteredTrajectory {
+  xs: number[]
+  ys: number[]
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+}
+
+/**
+ * Build `(log|η|, S)` arrays from a trajectory and compute their
+ * bounding box, dropping any sample with `η === 0`, non-finite η,
+ * or non-finite entropy. A shorter `entropies` array than `etas`
+ * is also handled (the tail is ignored). Returns `null` when no
+ * valid samples survive so the caller can bail cleanly instead
+ * of feeding `NaN` / `Infinity` into the SVG geometry.
+ *
+ * @param etas - η values from the sweep
+ * @param entropies - Matching entropies in nats
+ * @returns Filtered arrays + bounding box, or null when empty
+ */
+function filterTrajectorySamples(
+  etas: readonly number[],
+  entropies: readonly number[]
+): FilteredTrajectory | null {
+  const sampleCount = Math.min(etas.length, entropies.length)
+  if (sampleCount === 0) return null
+  const xs: number[] = []
+  const ys: number[] = []
+  let xMin = Number.POSITIVE_INFINITY
+  let xMax = Number.NEGATIVE_INFINITY
+  let yMin = Number.POSITIVE_INFINITY
+  let yMax = Number.NEGATIVE_INFINITY
+  for (let i = 0; i < sampleCount; i++) {
+    const eta = etas[i]!
+    const y = entropies[i]!
+    if (!Number.isFinite(eta) || eta === 0 || !Number.isFinite(y)) continue
+    const x = Math.log(Math.abs(eta))
+    xs.push(x)
+    ys.push(y)
+    if (x < xMin) xMin = x
+    if (x > xMax) xMax = x
+    if (y < yMin) yMin = y
+    if (y > yMax) yMax = y
+  }
+  if (xs.length === 0) return null
+  return { xs, ys, xMin, xMax, yMin, yMax }
+}
+
 /**
  * Props for {@link FSFCosmoTrajectoryChart}.
  */
@@ -51,22 +101,13 @@ export interface FSFCosmoTrajectoryChartProps {
 export const FSFCosmoTrajectoryChart: React.FC<FSFCosmoTrajectoryChartProps> = React.memo(
   ({ trajectory, currentEta }) => {
     const chart = useMemo(() => {
-      const { etas, entropies } = trajectory
-      if (etas.length === 0) return null
-      let xMin = Number.POSITIVE_INFINITY
-      let xMax = Number.NEGATIVE_INFINITY
-      let yMin = Number.POSITIVE_INFINITY
-      let yMax = Number.NEGATIVE_INFINITY
-      const xs: number[] = []
-      for (let i = 0; i < etas.length; i++) {
-        const x = Math.log(Math.abs(etas[i]!))
-        xs.push(x)
-        if (x < xMin) xMin = x
-        if (x > xMax) xMax = x
-        const y = entropies[i]!
-        if (y < yMin) yMin = y
-        if (y > yMax) yMax = y
-      }
+      // Defensive filter: one η === 0, non-finite η, non-finite entropy,
+      // or a shorter `entropies` array than `etas` would otherwise feed
+      // NaN / Infinity into the geometry. Extracted into a helper so
+      // this useMemo body stays under the cognitive-complexity budget.
+      const filtered = filterTrajectorySamples(trajectory.etas, trajectory.entropies)
+      if (!filtered) return null
+      const { xs, ys, xMin, xMax, yMin, yMax } = filtered
       const xRange = Math.max(xMax - xMin, 1e-6)
       const yPad = Math.max((yMax - yMin) * 0.08, 0.01)
       const yLo = yMin - yPad
@@ -75,9 +116,7 @@ export const FSFCosmoTrajectoryChart: React.FC<FSFCosmoTrajectoryChartProps> = R
       const toX = (x: number): number => TRAJ_PX + ((x - xMin) / xRange) * TRAJ_PW
       const toY = (y: number): number => TRAJ_PY + (1 - (y - yLo) / yRange) * TRAJ_PH
 
-      const pts = xs
-        .map((x, i) => `${toX(x).toFixed(1)},${toY(entropies[i]!).toFixed(1)}`)
-        .join(' ')
+      const pts = xs.map((x, i) => `${toX(x).toFixed(1)},${toY(ys[i]!).toFixed(1)}`).join(' ')
 
       let markerX: number | null = null
       if (Number.isFinite(currentEta) && currentEta !== 0) {

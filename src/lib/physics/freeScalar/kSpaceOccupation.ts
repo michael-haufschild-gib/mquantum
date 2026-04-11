@@ -154,6 +154,31 @@ export interface KSpaceBasisCoefs {
 const MINKOWSKI_BASIS_COEFS: KSpaceBasisCoefs = { aKinetic: 1, aPotential: 1 }
 
 /**
+ * Validate the `dispersion` and `basisCoefs` inputs common to every
+ * public entry point in this module. `dispersion` must be either the
+ * sentinel `'kgFloor'` or a finite number; each basis coefficient must
+ * be finite and strictly positive. A `NaN`/`Infinity` dispersion or a
+ * non-positive coefficient would silently propagate corrupted `ω_k`
+ * and `n_k` values into the thermometer pipeline — throw at the API
+ * boundary instead of lying in the output.
+ *
+ * @param dispersion - Mass-term dispatch (validated)
+ * @param basisCoefs - Canonical-basis rescale coefficients (validated)
+ */
+function validateVacuumInputs(dispersion: VacuumDispersion, basisCoefs: KSpaceBasisCoefs): void {
+  if (dispersion !== 'kgFloor' && !Number.isFinite(dispersion)) {
+    throw new Error(`dispersion must be 'kgFloor' or a finite number, got ${String(dispersion)}`)
+  }
+  const { aKinetic, aPotential } = basisCoefs
+  if (!Number.isFinite(aKinetic) || aKinetic <= 0) {
+    throw new Error(`basisCoefs.aKinetic must be a finite positive number, got ${aKinetic}`)
+  }
+  if (!Number.isFinite(aPotential) || aPotential <= 0) {
+    throw new Error(`basisCoefs.aPotential must be a finite positive number, got ${aPotential}`)
+  }
+}
+
+/**
  * Compute raw k-space occupation data from real-space phi and pi fields.
  * This is the physics stage — FFT + n_k computation with no display transforms.
  *
@@ -195,6 +220,7 @@ export function computeRawKSpaceData(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
+  validateVacuumInputs(dispersion, basisCoefs)
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
   }
@@ -284,6 +310,7 @@ export function computeRawKSpaceDataFromComplex(
   dispersion: VacuumDispersion = 'kgFloor',
   basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
+  validateVacuumInputs(dispersion, basisCoefs)
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
   }

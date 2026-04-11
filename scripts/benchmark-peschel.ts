@@ -54,7 +54,10 @@
 
 import { performance } from 'node:perf_hooks'
 
-import { runPeschelCompute } from '../src/lib/physics/entanglement/peschelWorker'
+import {
+  resetPeschelCacheForTests,
+  runPeschelCompute,
+} from '../src/lib/physics/entanglement/peschelWorker'
 
 interface BenchResult {
   label: string
@@ -69,15 +72,20 @@ interface BenchResult {
  */
 function warmUp(): void {
   for (let i = 0; i < 3; i++) {
+    resetPeschelCacheForTests()
     runPeschelCompute({
       type: 'compute',
       epoch: 0,
-      gridSize: 32,
-      spacing: 1,
+      gridSize: [32],
+      spacing: [1],
+      latticeDim: 1,
       massSq: 0,
       subsystemLength: 8,
     })
   }
+  // Leave the cache empty so the first timed iteration measures a
+  // full cold sweep, not a warm-up cache hit.
+  resetPeschelCacheForTests()
 }
 
 /**
@@ -96,12 +104,18 @@ function benchOne(label: string, n: number, runs: number): BenchResult {
   const beforeHeap = process.memoryUsage().heapUsed
   const samples: number[] = []
   for (let i = 0; i < runs; i++) {
+    // Drop any prior sweep cache so every iteration measures the full
+    // O(N⁴/4) correlator scan, not the cache-hit fast path that would
+    // collapse runs 2..K to a few microseconds and skew the reported
+    // median / scaling ratio below.
+    resetPeschelCacheForTests()
     const t0 = performance.now()
     runPeschelCompute({
       type: 'compute',
       epoch: i,
-      gridSize: n,
-      spacing: 1,
+      gridSize: [n],
+      spacing: [1],
+      latticeDim: 1,
       massSq: 0,
       subsystemLength: Math.floor(n / 4),
     })
