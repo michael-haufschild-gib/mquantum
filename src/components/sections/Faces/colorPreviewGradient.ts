@@ -335,12 +335,16 @@ function computeColormapColor(
  *   t=0 → maximally negative Q (cyan, concentration),
  *   t=0.5 → Q = 0 (dim neutral),
  *   t=1 → maximally positive Q (red, quantum pressure).
+ *
+ * Both saturation and lightness scale with strength from a dim-gray baseline
+ * so t=0.5 is visually neutral. Must stay in lockstep with ALGO_BRANCH[27] in
+ * `emission.wgsl.ts`.
  */
 function computeQuantumPotentialPreviewColor(t: number): [number, number, number] {
   const qSigned = 2 * t - 1
   const strength = Math.sqrt(Math.abs(qSigned))
   const hue = qSigned >= 0 ? 0.02 : 0.5
-  return hslToRgb(hue, 0.35 + 0.6 * strength, 0.45 + 0.25 * strength)
+  return hslToRgb(hue, 0.85 * strength, 0.18 + 0.52 * strength)
 }
 
 /**

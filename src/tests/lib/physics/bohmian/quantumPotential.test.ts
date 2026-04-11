@@ -87,10 +87,6 @@ describe('computeQuantumPotentialCpu — 3D Gaussian ground-state identity', () 
     const qCenter = Q[indexGrid(ci, cj, ck, N)]!
     const vCenter = computeHarmonicPotentialV(x, y, z)
     const sum = qCenter + vCenter
-    console.info(
-      `[Bohmian test (a)] centre voxel (${ci},${cj},${ck}) at (${x}, ${y}, ${z}): ` +
-        `Q = ${qCenter.toFixed(6)}, V = ${vCenter.toFixed(6)}, Q+V = ${sum.toFixed(6)}`
-    )
     expect(Math.abs(sum - 1.5)).toBeLessThan(0.05)
   })
 
@@ -123,9 +119,6 @@ describe('computeQuantumPotentialCpu — 3D Gaussian ground-state identity', () 
     // Sanity: the density-supported interior must be non-trivial (hundreds+).
     expect(considered).toBeGreaterThan(500)
     const ratio = passed / considered
-    console.info(
-      `[Bohmian test (a)] density-supported interior: ${passed}/${considered} pass (${(ratio * 100).toFixed(1)}%)`
-    )
     expect(ratio).toBeGreaterThanOrEqual(0.9)
   })
 
@@ -150,6 +143,60 @@ describe('computeQuantumPotentialCpu — constant density', () => {
         }
       }
     }
+  })
+})
+
+describe('computeQuantumPotentialCpu — near-vacuum cutoff gate', () => {
+  // Regression: the raw-density gate must actually trigger for numerically-zero
+  // density regions so the colour mode paints them as neutral grey instead of
+  // whatever the stencil produces on ρ ≈ 0. The pre-fix implementation floored
+  // ρ to RHO_FLOOR (1e-8) before comparing R_c against the 1e-6 cutoff —
+  // making the check vacuous — so Q was computed on the noise floor everywhere
+  // and the gate was a dead branch.
+  it('(e) ρ ≡ 1e-20 (below RHO_ZERO_CUTOFF) ⇒ Q = 0 exactly at every voxel', () => {
+    const N = 12
+    const BOUND = 1
+    const N3 = N * N * N
+    const rho = new Float32Array(N3).fill(1e-20)
+    const Q = computeQuantumPotentialCpu(rho, N, BOUND)
+    for (let idx = 0; idx < N3; idx++) {
+      expect(Q[idx]).toBe(0)
+    }
+  })
+
+  it('(e) hybrid grid: vacuum voxels return 0 while dense voxels return nonzero Q', () => {
+    // Fill a 1D slab with ρ = exp(-x²) on one half and ρ = 1e-20 on the other.
+    // The vacuum half must be all zeros; the dense half must contain at least
+    // one nonzero Q sample. Without the fix the vacuum half contains stencil
+    // noise from the 1e-8 floor, so every voxel is nonzero.
+    const N = 16
+    const BOUND = 2
+    const N3 = N * N * N
+    const rho = new Float32Array(N3)
+    for (let k = 0; k < N; k++) {
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          const x = -BOUND + ((i + 0.5) * (2 * BOUND)) / N
+          rho[indexGrid(i, j, k, N)] = x < 0 ? Math.exp(-(x * x)) : 1e-20
+        }
+      }
+    }
+    const Q = computeQuantumPotentialCpu(rho, N, BOUND)
+    let denseHasNonzero = false
+    for (let k = 0; k < N; k++) {
+      for (let j = 0; j < N; j++) {
+        for (let i = 0; i < N; i++) {
+          const x = -BOUND + ((i + 0.5) * (2 * BOUND)) / N
+          const q = Q[indexGrid(i, j, k, N)]!
+          if (x >= 0) {
+            expect(q).toBe(0)
+          } else if (Math.abs(q) > 0) {
+            denseHasNonzero = true
+          }
+        }
+      }
+    }
+    expect(denseHasNonzero).toBe(true)
   })
 })
 

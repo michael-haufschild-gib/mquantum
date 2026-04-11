@@ -199,6 +199,38 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     expect(values).toContain('entropyMap')
     expect(values).toContain('coherenceMap')
   })
+
+  it('excludes vortexDensity in open-quantum mode (B channel stores coherenceFraction, not phase)', () => {
+    // Regression: the analytic open-quantum density-grid shader writes
+    // coherenceFraction into the B channel, not a continuous spatial phase.
+    // vortexDensity reads B as phase for plaquette winding, so leaving it
+    // available in OQ would compute winding on coherence values and produce
+    // a visually misleading "topological charge" map.
+    const hoOq = getAvailableColorAlgorithms('harmonicOscillator', true).map((a) => a.value)
+    const hydOq = getAvailableColorAlgorithms('hydrogenND', true).map((a) => a.value)
+    expect(hoOq).not.toContain('vortexDensity')
+    expect(hydOq).not.toContain('vortexDensity')
+    // quantumPotential only reads R (density), which IS valid in OQ mode, so
+    // it stays available — verify we didn't accidentally overexclude.
+    expect(hoOq).toContain('quantumPotential')
+    expect(hydOq).toContain('quantumPotential')
+  })
+
+  it('excludes quantumPotential and vortexDensity from freeScalarField', () => {
+    // Free scalar is a classical field theory with no wavefunction ψ. The
+    // write shader puts the selected fieldView's scalar into R (phi, pi,
+    // energyDensity, wallDensity) rather than a density, and stores only a
+    // sign proxy (0 or π) in the phase channel. Neither the Bohmian quantum
+    // potential nor plaquette U(1) winding is physically meaningful here, so
+    // both must be hidden from the dropdown.
+    const algos = getAvailableColorAlgorithms('freeScalarField', false).map((a) => a.value)
+    expect(algos).not.toContain('quantumPotential')
+    expect(algos).not.toContain('vortexDensity')
+    // Sanity: the educational analysis algorithms that ARE meaningful here
+    // are still present.
+    expect(algos).toContain('hamiltonianDecomposition')
+    expect(algos).toContain('energyFlux')
+  })
 })
 
 describe('getAvailableColorAlgorithms — density-grid availability for analytic modes', () => {

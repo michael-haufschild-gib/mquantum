@@ -230,8 +230,12 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
  *
  * World half-step h = 2·boundingRadius / DENSITY_GRID_SIZE (one texel). The
  * Laplacian denominator is h·h. For any stationary state of H = -½∇² + V the
- * identity Q + V = E holds where R is numerically well-defined. Voxels where
- * any neighbour is outside the grid, or where R_c is too small, return 0 so
+ * identity Q + V = E holds where R is numerically well-defined. Boundary
+ * handling: voxels whose CENTRE falls outside the grid return 0 up front;
+ * individual neighbours that fall outside the grid are treated as rho=0
+ * samples via select(vec4f(0.0), ..., inBounds) and still contribute to the
+ * stencil (matching the CPU mirror). Voxels where the raw density is below
+ * the near-vacuum cutoff (rho < 1e-12 which is R < 1e-6) also return 0 so
  * the colour-mode branch paints them as neutral grey.
  *
  * The helper reads ρ from the R channel exclusively. The Dirac strategy forces
@@ -283,10 +287,14 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   let rhoZp = szp.r;
   let rhoZn = szn.r;
 
-  let Rc  = sqrt(max(rhoC,  1e-8));
-  if (Rc < 1e-6) {
+  // Raw-density cutoff: compare unfloored rhoC against R_ZERO_CUTOFF² = 1e-12.
+  // Applying the 1e-8 floor first would make sqrt(max(·,1e-8)) ≥ 1e-4 > 1e-6,
+  // so the near-vacuum gate would never trigger and the caller would see
+  // stencil noise on numerically-zero density regions instead of a zeroed Q.
+  if (rhoC < 1e-12) {
     return 0.0;
   }
+  let Rc  = sqrt(max(rhoC,  1e-8));
 
   let Rxp = sqrt(max(rhoXp, 1e-8));
   let Rxn = sqrt(max(rhoXn, 1e-8));
@@ -355,13 +363,18 @@ fn samplePhaseOrZero(uvw: vec3f) -> f32 {
  * Corners traverse the loop c00 → c10 → c11 → c01 → c00. Sign depends on the
  * traversal direction and the defect orientation, but the caller only uses
  * |W| so sign is irrelevant.
+ *
+ * The bounds check runs BEFORE the four texture fetches so out-of-grid
+ * plaquettes incur zero texture bandwidth. All four corners are sampled in
+ * uniform control flow (WGSL textureSample requirement is satisfied by
+ * textureSampleLevel here regardless).
  */
 fn plaquetteWinding(c00: vec3f, c10: vec3f, c11: vec3f, c01: vec3f) -> f32 {
+  if (!allInBounds4(c00, c10, c11, c01)) { return 0.0; }
   let p00 = samplePhaseOrZero(c00);
   let p10 = samplePhaseOrZero(c10);
   let p11 = samplePhaseOrZero(c11);
   let p01 = samplePhaseOrZero(c01);
-  if (!allInBounds4(c00, c10, c11, c01)) { return 0.0; }
   let d0 = wrapPhase(p10 - p00);
   let d1 = wrapPhase(p11 - p10);
   let d2 = wrapPhase(p01 - p11);

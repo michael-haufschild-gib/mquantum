@@ -525,12 +525,14 @@ const ALGO_BRANCH: Record<number, string> = {
 
   // 27: Bohmian quantum potential Q(x) = -½ ∇²R / R. Q + V = E for any stationary
   // state. Hue encodes sign (red=positive/pressure, cyan=negative/concentration);
-  // sqrt-compressed |Q|/8 drives saturation+lightness for legibility at small Q.
+  // sqrt-compressed |Q|/8 drives saturation+lightness from a dim-gray baseline so
+  // Q ≈ 0 voxels render as visually neutral. Must stay in lockstep with
+  // `computeQuantumPotentialPreviewColor` in colorPreviewGradient.ts.
   27: /* wgsl */ `
     let qClamped = clamp(computeQuantumPotentialFromGrid(pos, uniforms), -16.0, 16.0);
     let qStrength = sqrt(clamp(abs(qClamped) / 8.0, 0.0, 1.0));
     let qHue = select(0.50, 0.02, qClamped >= 0.0);
-    col = hsl2rgb(qHue, 0.35 + 0.60 * qStrength, 0.45 + 0.25 * qStrength);`,
+    col = hsl2rgb(qHue, 0.85 * qStrength, 0.18 + 0.52 * qStrength);`,
 
   // 28: Vortex Density — per-voxel topological charge from plaquette phase winding.
   // nu(x) = (|W_xy| + |W_yz| + |W_zx|) / (2*pi). Brightness and saturation ramp with

@@ -321,8 +321,14 @@ export function getAvailableColorAlgorithms(
     'kSpaceOccupation',
   ])
 
-  // Density-grid-only algorithms — require a compute-mode density grid texture.
-  // Not meaningful for analytical HO / hydrogenND paths (no texture bound → stub 0).
+  // Density-grid-only algorithms — require a bound/populated density grid
+  // texture. The grid is provided by compute modes (tdseDynamics, becDynamics,
+  // diracEquation, freeScalarField, quantumWalk) unconditionally, and by
+  // AnalyticModeStrategy (harmonicOscillator, hydrogenND) whenever
+  // `dim >= 3 && !isosurface && representation !== 'wigner'`. In any other
+  // analytic configuration no texture is bound and the WGSL helper returns 0
+  // everywhere, so the dropdown hides these algorithms via `analyticHasDensityGrid`
+  // below.
   const densityGridOnlyAlgos = new Set<string>(['quantumPotential', 'vortexDensity'])
 
   // Open quantum algorithms — only available when density matrix mode is active
@@ -391,6 +397,16 @@ export function getAvailableColorAlgorithms(
   if (quantumMode === 'freeScalarField') {
     // Free scalar has sign-proxy phase (0 or π) — exclude continuous-phase algorithms.
     // Also include educational analysis algorithms unique to this mode.
+    //
+    // Note: quantumPotential and vortexDensity are intentionally excluded here.
+    // Free scalar field is a CLASSICAL field theory with no wavefunction ψ, so
+    // the Bohmian quantum potential Q = -½·∇²√ρ/√ρ has no physical meaning in
+    // this mode. The write-grid shader also populates the R channel from the
+    // selected fieldView (phi, pi, energyDensity, wallDensity) rather than a
+    // density, and stores a sign-proxy (0 or π) in the phase channel, so the
+    // plaquette vortex-winding helper cannot recover U(1) topological charges
+    // even in principle. Availability for these algorithms is restricted to
+    // genuine quantum modes (TDSE, BEC, Dirac, QW, analytic HO / hydrogen).
     const computeValidAlgos = new Set<string>([
       'blackbody',
       'phaseDiverging',
@@ -402,8 +418,6 @@ export function getAvailableColorAlgorithms(
       'modeCharacter',
       'energyFlux',
       'kSpaceOccupation',
-      'quantumPotential', // Bohmian Q(x) = -½·∇²R/R from density grid
-      'vortexDensity', // Topological charge from plaquette phase winding
     ])
     // Exact vacuum has n_k = 0 for all modes (zero-point subtracted), so the
     // k-space occupation map is correctly but unhelpfully blank.
@@ -416,6 +430,12 @@ export function getAvailableColorAlgorithms(
   // Phase-dependent algorithms — meaningless in density matrix mode because the
   // grid's B channel stores coherenceFraction (0-1), not complex phase (0-2π).
   // Interpreting coherenceFraction as phase produces misleading colors.
+  //
+  // vortexDensity also belongs here: the plaquette phase-winding helper reads
+  // the B channel expecting a continuous spatial phase. In the analytic open-
+  // quantum path the B channel stores coherenceFraction, so the wrapped-phase
+  // differences around each plaquette become coherence differences and the
+  // resulting "topological charge" is physically meaningless.
   const phaseDependentAlgos = new Set<string>([
     'phase',
     'mixed',
@@ -424,6 +444,7 @@ export function getAvailableColorAlgorithms(
     'domainColoringPsi',
     'diverging',
     'relativePhase',
+    'vortexDensity',
   ])
 
   // Dirac-only algorithms — require spinor field data not present in other modes

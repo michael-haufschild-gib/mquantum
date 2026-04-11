@@ -13,6 +13,7 @@ import type { ObjectType } from '@/lib/geometry/types'
 import {
   COLOR_ALGORITHM_TO_INT,
   type ColorAlgorithm as PaletteColorAlgorithm,
+  type ColorAlgorithmAvailabilityOptions,
   getAvailableColorAlgorithms,
 } from '@/rendering/shaders/palette/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
@@ -167,13 +168,6 @@ function colorAlgoForPauliFieldView(
   }
 }
 
-/** Pipeline-shape hints matching ColorAlgorithmAvailabilityOptions for density-grid gating. */
-interface NormalizeAvailabilityOptions {
-  dimension?: number
-  isosurface?: boolean
-  representation?: string
-}
-
 /** @returns Color algorithm valid for the given quantum mode, falling back to a sensible default. */
 export function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
@@ -182,7 +176,7 @@ export function normalizeColorAlgorithmForQuantumMode(
   diracFieldView?: string,
   pauliFieldView?: string,
   objectType: string = 'schroedinger',
-  availabilityOptions?: NormalizeAvailabilityOptions
+  availabilityOptions?: ColorAlgorithmAvailabilityOptions
 ): PaletteColorAlgorithm {
   if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
     return 'particleAntiparticle'

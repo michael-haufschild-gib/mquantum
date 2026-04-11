@@ -14,6 +14,7 @@ import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/co
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
   type AnimationState,
+  type AppearanceStoreState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
@@ -80,8 +81,21 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
 
     if (!qwConfig) return
 
+    // quantumPotential computes Q = -½·∇²R/R assuming the density grid's R
+    // channel holds √ρ. The QW write-grid shader only puts the probability
+    // there when fieldView='probability'; phase and coinState views write
+    // scaled phase / chirality into R instead, so Q would be computed on the
+    // wrong field and render an empty / garbage scene. Force probability when
+    // the user picks this algorithm — mirrors the DiracStrategy and
+    // TdseBecStrategy guardrails for the same algorithm.
+    let effectiveQwConfig = qwConfig
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+    if (appearance?.colorAlgorithm === 'quantumPotential' && qwConfig.fieldView !== 'probability') {
+      effectiveQwConfig = { ...qwConfig, fieldView: 'probability' }
+    }
+
     const schroedinger = extended?.schroedinger
-    const qwWithSharedPml = applySharedPml(qwConfig, schroedinger)
+    const qwWithSharedPml = applySharedPml(effectiveQwConfig, schroedinger)
 
     qwPass.executeQuantumWalk(
       ctx,

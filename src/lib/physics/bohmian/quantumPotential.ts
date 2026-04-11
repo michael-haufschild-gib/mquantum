@@ -29,8 +29,17 @@ const RHO_FLOOR = 1e-8
 /** R-safe denominator floor — mirrors the WGSL `max(R_c, 1e-4)`. */
 const R_DENOM_FLOOR = 1e-4
 
-/** Below this R_c, the voxel's Q is forced to 0 (mirrors WGSL gate + PRD spec). */
-const R_ZERO_CUTOFF = 1e-6
+/**
+ * Raw-density cutoff below which a voxel's Q is forced to 0 (mirrors the WGSL
+ * gate + PRD spec). We compare `rhoC < RHO_ZERO_CUTOFF` where
+ * `RHO_ZERO_CUTOFF = R_ZERO_CUTOFF²` so the check is on the RAW density.
+ *
+ * Historical bug: comparing `sqrt(max(rhoC, RHO_FLOOR)) < 1e-6` is vacuous —
+ * `sqrt(max(·, 1e-8)) ≥ 1e-4`, which is always larger than 1e-6, so the
+ * near-vacuum zeroing never triggered. The fix is to compare the raw
+ * (unfloored) density against the equivalent ρ-space cutoff.
+ */
+const RHO_ZERO_CUTOFF = 1e-12
 
 /**
  * Linear-index helper: voxel (i, j, k) → `i + size·(j + size·k)`.
@@ -73,9 +82,11 @@ export function computeHarmonicPotentialV(x: number, y: number, z: number): numb
  * forced to 0 at the boundary — the Laplacian is computed with floor-level R
  * values for OOB neighbours.
  *
- * Numerical guard: R_c = sqrt(max(ρ_c, 1e-8)); if R_c < 1e-6 the voxel returns 0
- * so the colour-mode branch in `emission.wgsl.ts` paints it as neutral grey via
- * its density gate. Otherwise the division uses max(R_c, 1e-4) in the denominator.
+ * Numerical guard: the raw density ρ_c is compared against RHO_ZERO_CUTOFF =
+ * 1e-12 (= R_ZERO_CUTOFF² with R_ZERO_CUTOFF = 1e-6); below it the voxel returns
+ * 0 so the colour-mode branch in `emission.wgsl.ts` paints it as neutral grey
+ * via its density gate. Otherwise R_c = sqrt(max(ρ_c, 1e-8)) and the division
+ * uses max(R_c, 1e-4) in the denominator.
  *
  * @param densityGrid Float32Array of size gridSize³ containing ρ values in
  *   row-major `i + size·(j + size·k)` layout.
@@ -112,11 +123,14 @@ export function computeQuantumPotentialCpu(
         const idx = indexGrid(i, j, k, gridSize)
 
         const rhoC = densityGrid[idx]!
-        const Rc = Math.sqrt(Math.max(rhoC, RHO_FLOOR))
-        if (Rc < R_ZERO_CUTOFF) {
+        // Raw-density gate: compare unfloored rhoC against RHO_ZERO_CUTOFF
+        // (= R_ZERO_CUTOFF²). Applying RHO_FLOOR first would make this check
+        // vacuous — see RHO_ZERO_CUTOFF docstring.
+        if (rhoC < RHO_ZERO_CUTOFF) {
           out[idx] = 0
           continue
         }
+        const Rc = Math.sqrt(Math.max(rhoC, RHO_FLOOR))
 
         // Boundary: OOB neighbours clamp to rho=0, matching WGSL select(vec4f(0.0), ..., inBounds).
         const rhoXp = i + 1 < gridSize ? densityGrid[indexGrid(i + 1, j, k, gridSize)]! : 0

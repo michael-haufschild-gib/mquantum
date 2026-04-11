@@ -29,6 +29,7 @@ import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/co
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import {
   type AnimationState,
+  type AppearanceStoreState,
   type ExtendedStoreSnapshot,
   getStoreSnapshot,
 } from '../schrodingerRendererTypes'
@@ -56,6 +57,16 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
 
   private tdsePass: TDSEComputePass | null = null
+  /**
+   * True once this strategy's compute pass has been moved to a successor via
+   * `adoptComputeState`. The warm-swap flow (see `scenePassSetup.warmSwap...`)
+   * leaves the predecessor renderer in the graph for a few frames while the
+   * new pipeline finishes compiling asynchronously. During that window the
+   * predecessor's `executeFrame` would otherwise hit `tdsePass=null`, warn, and
+   * skip silently. This flag tells it to skip without warning and tells
+   * `dispose` that the GPU resources have already been handed off.
+   */
+  private transferredOut = false
   /** Counter for throttling spectrum computation (every SPECTRUM_INTERVAL diag cycles). */
   private spectrumCounter = 0
   /** Guard to prevent overlapping spectrum readbacks. */
@@ -77,6 +88,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
     // If compute state was already adopted from a predecessor, reuse it.
+    this.transferredOut = false
+    this.warnedTdsePassNull = false
+    this.warnedDensityNull = false
     if (!this.tdsePass) {
       this.tdsePass = new TDSEComputePass()
       this.tdsePass.initializeDensityTexture(ctx.device)
@@ -117,6 +131,14 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const tdsePass = this.tdsePass
     if (!tdsePass) {
+      // Silent skip during the warm-swap window: adoptComputeState has moved
+      // our compute pass to a successor strategy that's compiling its pipeline
+      // asynchronously. The graph still calls us because this renderer hasn't
+      // been swapped out yet — our objectBindGroup still references the (now
+      // adopted) density texture, so the render-pass draw in the outer
+      // renderer uses valid data. Returning here just skips the redundant
+      // compute dispatch.
+      if (this.transferredOut) return
       if (!this.warnedTdsePassNull) {
         logger.warn(`[TdseBecStrategy] executeFrame: tdsePass is NULL`)
         this.warnedTdsePassNull = true
@@ -152,6 +174,21 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // onto the nested TdseConfig. BEC mode already maps this in buildBecConfig.
     if (!isBecMode && schroedinger?.autoScaleMaxGain !== undefined) {
       tdseConfig = { ...tdseConfig, autoScaleMaxGain: schroedinger.autoScaleMaxGain }
+    }
+
+    // quantumPotential computes Q = -½·∇²R/R treating the density grid's R
+    // channel as √ρ_total. The TDSE/BEC write-grid shader only puts true
+    // density in R when fieldView='density'; other views (phase, current,
+    // superfluidVelocity, healing, potential) write the view's scalar instead,
+    // so Q would be computed on the wrong field and produce a physically
+    // meaningless (and visually empty) scene. Presets like BEC vortexDipole
+    // default to fieldView='phase', so without this override a user picking
+    // quantumPotential on the vortex-antivortex scenario would see nothing.
+    // Override fieldView at frame time — mirrors the DiracStrategy guardrail
+    // for the same algorithm.
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+    if (appearance?.colorAlgorithm === 'quantumPotential' && tdseConfig.fieldView !== 'density') {
+      tdseConfig = { ...tdseConfig, fieldView: 'density' }
     }
 
     const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)
@@ -675,6 +712,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.tdsePass?.dispose()
     this.tdsePass = source.tdsePass
     source.tdsePass = null
+    source.transferredOut = true
+    this.transferredOut = false
     return true
   }
 
