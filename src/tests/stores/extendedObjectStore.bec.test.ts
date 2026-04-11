@@ -308,11 +308,20 @@ describe('BEC setters', () => {
 
   describe('setBecSlicePosition', () => {
     it('sets slice position for valid index', () => {
-      const len = bec().slicePositions.length
-      if (len > 0) {
-        store().setBecSlicePosition(0, 0.5)
-        expect(bec().slicePositions[0]).toBe(0.5)
-      }
+      // Seed a 4-D BEC config so `slicePositions` has a single extra-dim
+      // slot (dim 3 → index 0). The default `latticeDim=3` has zero extra
+      // dims, so the previous form of this test (`if (len > 0)`) silently
+      // skipped the assertion body — a classic silent-pass pattern that
+      // passes even if `setBecSlicePosition` is completely broken. The
+      // seeded state guarantees the assertion actually runs.
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, latticeDim: 4, slicePositions: [0] },
+        },
+      }))
+      store().setBecSlicePosition(0, 0.5)
+      expect(bec().slicePositions[0]).toBe(0.5)
     })
 
     it('rejects non-finite values', () => {

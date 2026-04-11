@@ -34,6 +34,24 @@ export { DENSITY_GRID_SIZE }
 /** Maximum supported dimensions */
 export const MAX_DIM = 12
 
+/**
+ * Maximum number of slice-position entries safe to write from the store's
+ * 0-indexed `slicePositions` array into a uniform's 12-slot slicePositions
+ * region. The WGSL contract is `array<f32, 12>` with the shader reading
+ * `slicePositions[d]` only when `d >= 3`, and the TS writer maps store
+ * index `i` → WGSL index `(i + 3)`. That permits `i ∈ [0, 8]` before the
+ * write falls off the end of the 12-slot region and starts corrupting the
+ * next uniform field (basisX in every compute pass laid out this way).
+ *
+ * All compute-pass uniform writers must clamp their `slicePositions` loop
+ * to this constant: `const n = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)`.
+ * In normal operation the store's array is bounded to `latticeDim - 3` by
+ * its dimension setters (max = 8), but preset migration, deserialization,
+ * and buggy defaults can deliver longer arrays — so the clamp is the
+ * authoritative defense against overflow corruption.
+ */
+export const MAX_SLICE_POSITIONS_WRITE_COUNT = 9
+
 /** FFTStageUniforms struct size (32 bytes) */
 export const FFT_UNIFORM_SIZE = 32
 

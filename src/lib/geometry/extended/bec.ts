@@ -163,5 +163,14 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   diagnosticsInterval: 5,
   observablesEnabled: false,
   needsReset: true,
-  slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // Empty by convention: BEC uses the TDSE pipeline, and TDSE's dimension
+  // setter builds `slicePositions` as `Array.from({ length: max(0, latticeDim - 3) })`.
+  // For default `latticeDim: 3` this is 0 entries. Seeding with 12 zeros
+  // mismatched the setter convention AND would overflow the 12-slot WGSL
+  // slicePositions region on the first writeTdseUniforms call (the write
+  // loop maps store[i] → f32[88+3+i], so store[9..11] land in the basisX
+  // region at f32[100..102]). Enforcement now lives in the uniform writer
+  // via `MAX_SLICE_POSITIONS_WRITE_COUNT`, but consistent defaults prevent
+  // the transient mismatch on app startup.
+  slicePositions: [],
 }

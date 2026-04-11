@@ -82,7 +82,7 @@ import {
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
-import { computeStridesPadded, MAX_DIM } from './computePassUtils'
+import { computeStridesPadded, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
 // Re-export the shared cosmology helpers so external call sites (tests,
 // other passes) can continue importing from this pass file if they want.
@@ -276,7 +276,10 @@ export function writeFsfUniforms(
   // Store slicePositions[i] maps to extra dims i=0,1,... (dim 3,4,...).
   // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3),
   // so write at index 72 + 3 + i to align with WGSL array indexing.
-  for (let i = 0; i < config.slicePositions.length; i++) {
+  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
+  // cannot overflow past the slicePositions region into basisX at f32[84+].
+  const fsfSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < fsfSliceN; i++) {
     f32[72 + 3 + i] = config.slicePositions[i]!
   }
 

@@ -8,7 +8,7 @@
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 
-import { FFT_UNIFORM_SIZE, MAX_DIM } from './computePassUtils'
+import { FFT_UNIFORM_SIZE, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
 /** Parameters for writing DiracUniforms to a GPU buffer. */
 export interface DiracUniformParams {
@@ -128,9 +128,13 @@ export function writeDiracUniforms(
       )
     : 0
 
-  // slicePositions (offset 328, indices 82-93)
-  // Store array is 0-indexed (i=0 -> dim 3), WGSL reads slicePositions[d] where d >= 3
-  for (let i = 0; i < config.slicePositions.length; i++) f32[82 + 3 + i] = config.slicePositions[i]!
+  // slicePositions (offset 328, indices 82-93, WGSL array<f32, 12>)
+  // Store array is 0-indexed (i=0 -> dim 3), WGSL reads slicePositions[d]
+  // where d >= 3. Clamp to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized
+  // store array (e.g. a stale default or migrated preset) cannot overflow
+  // into basisX at f32[94..96]. See computePassUtils.ts for the contract.
+  const diracSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < diracSliceN; i++) f32[82 + 3 + i] = config.slicePositions[i]!
 
   // Basis vectors (offset 376, indices 94-105, 106-117, 118-129)
   const writeBasis = (offset: number, b?: Float32Array) => {

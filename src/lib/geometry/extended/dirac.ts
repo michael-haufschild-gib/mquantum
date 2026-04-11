@@ -174,5 +174,14 @@ export const DEFAULT_DIRAC_CONFIG: DiracConfig = {
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   needsReset: true,
-  slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  // Empty by convention: the store's dimension setter builds this as
+  // `Array.from({ length: max(0, latticeDim - 3) })`, so for the default
+  // `latticeDim: 3` the correct starting length is 0. Previously seeded
+  // with 12 entries, which mismatched the setter convention AND would
+  // overflow the 12-slot `array<f32, 12>` slicePositions uniform region
+  // when fed to `writeDiracUniforms` — the guard is now enforced by
+  // `MAX_SLICE_POSITIONS_WRITE_COUNT` in the writer, but keeping the
+  // default consistent prevents surprise on the next `diracSetters`
+  // dimension-change call.
+  slicePositions: [],
 }

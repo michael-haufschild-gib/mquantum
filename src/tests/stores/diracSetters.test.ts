@@ -249,6 +249,20 @@ describe('Dirac setters', () => {
   })
 
   it('sets slice position per axis', () => {
+    // Set up a 5-D Dirac config so `slicePositions` has 2 extra-dim slots
+    // (dim 3 → index 0, dim 4 → index 1). The default `latticeDim=3` has
+    // zero extra dims and zero slicePositions entries by the store
+    // convention `max(0, latticeDim - 3)` — a `setDiracSlicePosition(1, ...)`
+    // call in that state is a no-op because the setter refuses writes to
+    // indices outside the current array length. The pre-fix test passed
+    // only because the old default bogus-seeded 12 zeros into the array,
+    // letting writes succeed at dims that didn't actually exist.
+    useExtendedObjectStore.setState((state) => ({
+      schroedinger: {
+        ...state.schroedinger,
+        dirac: { ...state.schroedinger.dirac, latticeDim: 5, slicePositions: [0, 0] },
+      },
+    }))
     const s = useExtendedObjectStore.getState()
     s.setDiracSlicePosition(1, 0.7)
     expect(getDirac().slicePositions[1]).toBe(0.7)
