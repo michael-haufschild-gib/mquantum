@@ -1015,6 +1015,7 @@ export default [
   // Allowed via negation patterns:
   //   - Diagnostic stores (*DiagnosticsStore) — write-direction: passes push metrics to UI
   //   - simulationStateStore — TDSE compute pass manages simulation lifecycle
+  //   - hellerSpectrometerStore — write-direction: TDSE pass publishes ring-buffer handle and sample count
   //   - extendedObjectStore — async getMetadata callbacks (state save) lack ctx access
   //   - Store defaults — static config, no runtime coupling
   //   - Type-only imports (allowTypeImports: true)
@@ -1029,11 +1030,12 @@ export default [
             '!@/stores/defaults/*',
             '!@/stores/*DiagnosticsStore',
             '!@/stores/simulationStateStore',
+            '!@/stores/hellerSpectrometerStore',
             '!@/stores/performanceStore',
             '!@/stores/extendedObjectStore',
           ],
           allowTypeImports: true,
-          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, performanceStore, and defaults/* are exempt.',
+          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, and defaults/* are exempt.',
         }],
       }],
     },

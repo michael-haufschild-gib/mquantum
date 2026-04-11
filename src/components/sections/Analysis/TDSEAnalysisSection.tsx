@@ -15,6 +15,7 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { AndersonSweepSection } from '@/components/sections/Analysis/AndersonSweepSection'
+import { TDSESpectrometerPanel } from '@/components/sections/Analysis/TDSESpectrometerPanel'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Sparkline } from '@/components/ui/Sparkline'
@@ -86,6 +87,9 @@ export const TDSEAnalysisContent: React.FC = React.memo(() => {
 
       {/* Anderson disorder sweep (only for andersonDisorder potential) */}
       {tdse.potentialType === 'andersonDisorder' && <AndersonSweepSection />}
+
+      {/* Heller wavepacket spectrometer — reads eigenvalue spectrum out of C(t) */}
+      <TDSESpectrometerPanel tdse={tdse} />
     </>
   )
 })
