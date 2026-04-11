@@ -463,3 +463,110 @@ describe('computeJointReducedDensityMatrix', () => {
     expect(restSum).toBeLessThan(1e-6)
   })
 })
+
+// ─── Hermitian Jacobi non-convergence throws loudly ─────────────────────────
+
+describe('hermitianEigenvalues — non-convergence throws loudly', () => {
+  // Regression guard for the silent-fallthrough bug in the JS fallback
+  // Jacobi path. The old implementation would exit the sweep loop when
+  // `maxSweeps` was exhausted and return whatever sat on the diagonal
+  // as "eigenvalues", feeding the downstream von Neumann entropy / CE
+  // pipelines plausible-looking but incorrect numbers.
+  //
+  // We force the JS fallback path by passing a non-default `maxSweeps`:
+  // the `hermitianEigenvalues` wrapper skips the WASM fast path when
+  // the caller supplies a custom sweep cap, since the WASM binding
+  // does not accept one.
+
+  it('throws with a useful residual when maxSweeps = 0 cannot reduce the off-diagonal', () => {
+    // Non-diagonal 4×4 Hermitian matrix. With `maxSweeps = 0` the solver
+    // cannot zero any off-diagonal and the post-loop residual check
+    // must fire.
+    const M = 4
+    const re = new Float64Array(M * M)
+    const im = new Float64Array(M * M)
+    // Diagonal plus strong complex off-diagonal pair (Hermitian).
+    re[0] = 0.5
+    re[5] = 0.3
+    re[10] = 0.15
+    re[15] = 0.05
+    re[1] = 0.4
+    re[4] = 0.4
+    im[2] = 0.2
+    im[8] = -0.2
+
+    expect(() => hermitianEigenvalues(re, im, M, 0)).toThrow(/failed to converge within 0 sweeps/)
+  })
+
+  it('error message reports residual, tolerance, and matrix size', () => {
+    const M = 3
+    const re = new Float64Array([1, 0.5, 0, 0.5, 2, 0, 0, 0, 3])
+    const im = new Float64Array(M * M)
+    try {
+      hermitianEigenvalues(re, im, M, 0)
+      throw new Error('unreachable: expected throw from hermitianEigenvalues')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      expect(message).toMatch(/failed to converge within 0 sweeps/)
+      expect(message).toMatch(/M=3/)
+      expect(message).toMatch(/residual=/)
+      expect(message).toMatch(/tolerance=/)
+    }
+  })
+
+  it('already-diagonal input is accepted even with maxSweeps = 0', () => {
+    // Residual scan sees zero off-diagonal magnitude and must accept
+    // the input as converged regardless of the sweep budget. This is
+    // the counterpart to the throw test and confirms the fix does not
+    // over-shoot into rejecting trivial cases.
+    const M = 4
+    const re = new Float64Array(M * M)
+    const im = new Float64Array(M * M)
+    re[0] = 0.7
+    re[5] = 0.2
+    re[10] = 0.08
+    re[15] = 0.02
+    const eigs = hermitianEigenvalues(re, im, M, 0)
+    expect(eigs.length).toBe(M)
+    // Sorted descending.
+    expect(eigs[0]!).toBeCloseTo(0.7, 12)
+    expect(eigs[1]!).toBeCloseTo(0.2, 12)
+    expect(eigs[2]!).toBeCloseTo(0.08, 12)
+    expect(eigs[3]!).toBeCloseTo(0.02, 12)
+  })
+
+  it('default maxSweeps (100) is sufficient for a modest random Hermitian', () => {
+    // Happy path: the default budget covers every well-conditioned
+    // input we care about. Deterministic seed so the test is stable.
+    const M = 8
+    const re = new Float64Array(M * M)
+    const im = new Float64Array(M * M)
+    let state = 0xdeadbeef
+    const next = (): number => {
+      state = (state * 1103515245 + 12345) >>> 0
+      return state / 0xffffffff
+    }
+    for (let i = 0; i < M; i++) {
+      re[i * M + i] = 2 + next() // shift diagonal up for PD condition
+      for (let j = i + 1; j < M; j++) {
+        const r = 2 * next() - 1
+        const im2 = 2 * next() - 1
+        re[i * M + j] = r
+        re[j * M + i] = r
+        im[i * M + j] = im2
+        im[j * M + i] = -im2
+      }
+    }
+    // No explicit maxSweeps → default 100 → must not throw.
+    const eigs = hermitianEigenvalues(re, im, M)
+    expect(eigs.length).toBe(M)
+    // Trace invariant.
+    let eigSum = 0
+    let traceRe = 0
+    for (let i = 0; i < M; i++) {
+      eigSum += eigs[i]!
+      traceRe += re[i * M + i]!
+    }
+    expect(eigSum).toBeCloseTo(traceRe, 9)
+  })
+})
