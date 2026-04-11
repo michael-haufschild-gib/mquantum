@@ -85,6 +85,8 @@ export const COLOR_ALGORITHM_MAP: Record<string, number> = {
   pauliSpinDensity: 24,
   pauliSpinExpectation: 25,
   pauliCoherence: 26,
+  quantumPotential: 27,
+  vortexDensity: 28,
 }
 
 /**
@@ -218,7 +220,7 @@ export interface SchrodingerRendererConfig {
   isosurface?: boolean
   quantumMode?: SchroedingerQuantumMode
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Compile-time color module selection (0-26) */
+  /** Compile-time color module selection (0-28) */
   colorAlgorithm?: number
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean

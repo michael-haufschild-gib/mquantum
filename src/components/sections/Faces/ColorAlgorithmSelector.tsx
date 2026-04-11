@@ -23,7 +23,9 @@ export interface ColorAlgorithmSelectorProps {
 
 export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = React.memo(
   ({ className = '' }) => {
-    const objectType = useGeometryStore((s) => s.objectType)
+    const { objectType, dimension } = useGeometryStore(
+      useShallow((s) => ({ objectType: s.objectType, dimension: s.dimension }))
+    )
 
     const { colorAlgorithm, setColorAlgorithm } = useAppearanceStore(
       useShallow((state: AppearanceSlice) => ({
@@ -38,6 +40,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       openQuantumEnabled,
       freeScalarInitialCondition,
       branchingEnabled,
+      isosurfaceEnabled,
     } = useExtendedObjectStore(
       useShallow((s) => ({
         quantumMode: s.schroedinger.quantumMode,
@@ -46,6 +49,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
         freeScalarInitialCondition: s.schroedinger.freeScalar.initialCondition,
         branchingEnabled:
           s.schroedinger.tdse?.stochasticEnabled && s.schroedinger.tdse?.branchingEnabled,
+        isosurfaceEnabled: s.schroedinger.isoEnabled ?? false,
       }))
     )
     const effectiveOpenQuantumEnabled =
@@ -61,9 +65,22 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
           quantumMode,
           effectiveOpenQuantumEnabled,
           objectType,
-          quantumMode === 'freeScalarField' ? freeScalarInitialCondition : undefined
+          quantumMode === 'freeScalarField' ? freeScalarInitialCondition : undefined,
+          {
+            dimension,
+            isosurface: isosurfaceEnabled,
+            representation,
+          }
         ),
-      [quantumMode, effectiveOpenQuantumEnabled, objectType, freeScalarInitialCondition]
+      [
+        quantumMode,
+        effectiveOpenQuantumEnabled,
+        objectType,
+        freeScalarInitialCondition,
+        dimension,
+        isosurfaceEnabled,
+        representation,
+      ]
     )
 
     const selectOptions = useMemo(
@@ -114,20 +131,27 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
             extStore.setPauliFieldView(nextFieldView)
           }
         } else if (quantumMode === 'diracEquation') {
-          // 'particleAntiparticle' color algo requires the dual-channel split
-          // fieldView (R=upper spinor, G=lower spinor); every other Dirac color
-          // algo expects single-channel total density. We must sync BOTH
-          // directions: setting the split when picking particleAntiparticle AND
-          // resetting to totalDensity when switching away. Without the reset,
-          // diracConfig.fieldView stays at 'particleAntiparticleSplit' (from a
-          // prior particleAntiparticle pick OR from a preset like kleinParadox)
-          // and the density grid keeps the dual-channel encoding, so subsequent
-          // single-channel color algos read R as particle-only instead of total
-          // and produce visually wrong colors.
+          // Keep Dirac's fieldView in sync with the color algorithm so the
+          // density grid encoding matches what the fragment shader will read
+          // and the UI ToggleGroup reflects the real state.
+          //
+          //  - 'particleAntiparticle' needs the dual-channel split
+          //    (R=upper, G=lower).
+          //  - 'quantumPotential' requires single-channel total density because
+          //    Q = -½·∇²R/R is only meaningful on R = √ρ_total; non-total
+          //    fieldViews (spinDensity, currentDensity, phase, particle/anti
+          //    split) write a different scalar into R and yield wrong Q.
+          //  - Switching away from particleAntiparticle resets to totalDensity
+          //    so stale split state from a prior pick or a preset like
+          //    kleinParadox doesn't leak into single-channel algos.
           const currentFieldView = extStore.schroedinger.dirac?.fieldView
           if (algo === 'particleAntiparticle') {
             if (currentFieldView !== 'particleAntiparticleSplit') {
               extStore.setDiracFieldView('particleAntiparticleSplit' as DiracFieldView)
+            }
+          } else if (algo === 'quantumPotential') {
+            if (currentFieldView !== 'totalDensity') {
+              extStore.setDiracFieldView('totalDensity' as DiracFieldView)
             }
           } else if (currentFieldView === 'particleAntiparticleSplit') {
             extStore.setDiracFieldView('totalDensity' as DiracFieldView)

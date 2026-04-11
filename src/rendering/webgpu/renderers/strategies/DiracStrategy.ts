@@ -82,12 +82,26 @@ export class DiracStrategy implements QuantumModeStrategy {
     const schroedinger = extended?.schroedinger
 
     // Derive fieldView from the color algorithm so the density grid encoding
-    // matches the fragment shader's IS_DUAL_CHANNEL expectation.
-    // Mirrors PauliStrategy's fieldView derivation pattern.
+    // matches what the fragment shader expects.
+    //
+    //  - 'particleAntiparticle' needs the dual-channel split (R=upper, G=lower),
+    //    mirroring PauliStrategy's fieldView derivation pattern.
+    //  - 'quantumPotential' computes Q = -½·∇²R/R treating R = √ρ_total; any
+    //    non-total-density fieldView (spinDensity, currentDensity, phase, or
+    //    particle/antiparticle split) writes a different scalar into the R
+    //    channel and would produce physically meaningless Q. Force totalDensity.
+    //  - Every other color algorithm keeps the user-selected fieldView so
+    //    legacy combinations (e.g. blackbody on spinDensity) still work.
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     const algo = appearance?.colorAlgorithm ?? 'totalDensity'
-    const diracFieldView =
-      algo === 'particleAntiparticle' ? 'particleAntiparticleSplit' : diracConfig.fieldView
+    let diracFieldView: typeof diracConfig.fieldView
+    if (algo === 'particleAntiparticle') {
+      diracFieldView = 'particleAntiparticleSplit'
+    } else if (algo === 'quantumPotential') {
+      diracFieldView = 'totalDensity'
+    } else {
+      diracFieldView = diracConfig.fieldView
+    }
 
     // When showPotential is false, override potentialType to 'none' so the
     // potential half-step becomes a physics no-op (V=0 everywhere).

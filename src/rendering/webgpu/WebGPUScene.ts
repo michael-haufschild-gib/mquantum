@@ -123,6 +123,12 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
     diracFieldView:
       quantumMode === 'diracEquation' ? (s?.dirac?.fieldView ?? 'totalDensity') : undefined,
     pauliFieldView: state.pauliSpinor?.fieldView ?? 'spinDensity',
+    // Expose freeScalar.initialCondition so the normalization path can hide
+    // kSpaceOccupation for `freeScalarField + vacuumNoise` (exact vacuum has
+    // n_k = 0 everywhere → blank map). Without this, preset or stale state
+    // carrying kSpaceOccupation would leak past normalization and render.
+    freeScalarInitialCondition:
+      quantumMode === 'freeScalarField' ? s?.freeScalar?.initialCondition : undefined,
   }
 }
 
@@ -346,6 +352,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         objectType === 'pauliSpinor'
           ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
           : schroedingerCompile.pauliFieldView,
+      freeScalarInitialCondition: schroedingerCompile.freeScalarInitialCondition,
       representation: schroedingerCompile.representation,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
@@ -514,6 +521,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.probabilityCurrentEnabled,
     schroedingerCompile.diracFieldView,
     schroedingerCompile.pauliFieldView,
+    schroedingerCompile.freeScalarInitialCondition,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,

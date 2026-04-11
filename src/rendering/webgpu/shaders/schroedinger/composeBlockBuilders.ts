@@ -457,6 +457,8 @@ export function buildVolumeBlocks(opts: {
             '// WGSL requires symbol resolution in dead branches even behind if (USE_DENSITY_GRID) guards.',
             'fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
             'fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+            'fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
+            'fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
           ].join('\n'),
     },
     {

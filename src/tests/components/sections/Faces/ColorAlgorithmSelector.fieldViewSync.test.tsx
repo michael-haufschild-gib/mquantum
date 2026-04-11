@@ -127,4 +127,38 @@ describe('ColorAlgorithmSelector — Dirac fieldView sync', () => {
     // Both algos are single-channel; fieldView stays at totalDensity.
     expect(useExtendedObjectStore.getState().schroedinger.dirac?.fieldView).toBe('totalDensity')
   })
+
+  it('forces dirac.fieldView to totalDensity when selecting quantumPotential from spinDensity', async () => {
+    // Regression: quantumPotential computes Q = -½·∇²R/R assuming R = √ρ_total.
+    // Non-total Dirac fieldViews (spinDensity, currentDensity, phase) write a
+    // different scalar into the R channel — so without this sync, Q would be
+    // computed on spin / current / phase magnitudes and produce physically
+    // wrong output. The strategy also overrides fieldView at frame time as a
+    // belt-and-braces guardrail; this test asserts the UI-side reset that
+    // keeps the DiracControls ToggleGroup in sync with the actual encoding.
+    const user = userEvent.setup()
+    useExtendedObjectStore.getState().setDiracFieldView('spinDensity')
+    useAppearanceStore.getState().setColorAlgorithm('blackbody')
+
+    render(<ColorAlgorithmSelector />)
+
+    const select = screen.getByRole('combobox', { name: /color algorithm/i })
+    await user.selectOptions(select, 'quantumPotential')
+
+    expect(useAppearanceStore.getState().colorAlgorithm).toBe('quantumPotential')
+    expect(useExtendedObjectStore.getState().schroedinger.dirac?.fieldView).toBe('totalDensity')
+  })
+
+  it('forces dirac.fieldView to totalDensity when selecting quantumPotential from particleAntiparticleSplit', async () => {
+    const user = userEvent.setup()
+    useExtendedObjectStore.getState().setDiracFieldView('particleAntiparticleSplit')
+    useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+
+    render(<ColorAlgorithmSelector />)
+
+    const select = screen.getByRole('combobox', { name: /color algorithm/i })
+    await user.selectOptions(select, 'quantumPotential')
+
+    expect(useExtendedObjectStore.getState().schroedinger.dirac?.fieldView).toBe('totalDensity')
+  })
 })
