@@ -18,13 +18,18 @@ import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
-import type { CosmologyConfig } from '@/lib/geometry/extended/freeScalar'
-import { computeCosmologyAt, equationOfState } from '@/lib/physics/cosmology/background'
-import { isValidPreset, sCritical } from '@/lib/physics/cosmology/presets'
+import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { equationOfState } from '@/lib/physics/cosmology/background'
+import { sCritical } from '@/lib/physics/cosmology/presets'
+import {
+  computeFsfCosmologySnapshot,
+  computeFsfVacuumDispersion,
+} from '@/lib/physics/freeScalar/vacuumDispersion'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import { MetricRow, SparklineRow } from './AnalysisPrimitives'
+import { FSFEntanglementProbe } from './FSFEntanglementProbe'
 
 /**
  * Analysis content for freeScalarField mode.
@@ -46,26 +51,16 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
   )
 
   // Physical "effective mass squared" at `η₀` — the canonical δφ
-  // integrator uses `ω² = k² + mass² · a²(η₀)` so the dispersion diagram
-  // shows `m²·a²` as its mass term. Under Minkowski this collapses to
-  // `mass²` bit-identically.
+  // integrator uses `ω² = k² + mass² · a²(η₀)`, so the dispersion diagram
+  // shows `m²·a²` as its mass term. Under Minkowski / cosmology-disabled /
+  // invalid-preset paths this collapses to `mass²` via the shared
+  // `computeFsfVacuumDispersion` helper, whose `'kgFloor'` fallback tag
+  // we unpack into the bare squared mass so the dispersion diagram has a
+  // numeric input.
   const effectiveMassSq = useMemo(() => {
-    if (!fsf.cosmology.enabled) return fsf.mass * fsf.mass
-    const spacetimeDim = fsf.latticeDim + 1
-    const params = {
-      preset: fsf.cosmology.preset,
-      spacetimeDim,
-      steepness: fsf.cosmology.steepness,
-      hubble: fsf.cosmology.hubble,
-    }
-    if (!isValidPreset(params)) return fsf.mass * fsf.mass
-    try {
-      const snap = computeCosmologyAt(fsf.cosmology.eta0, params)
-      return fsf.mass * fsf.mass * snap.a * snap.a
-    } catch {
-      return fsf.mass * fsf.mass
-    }
-  }, [fsf.cosmology, fsf.latticeDim, fsf.mass])
+    const dispersion = computeFsfVacuumDispersion(fsf, fsf.cosmology.eta0)
+    return dispersion === 'kgFloor' ? fsf.mass * fsf.mass : dispersion
+  }, [fsf])
 
   return (
     <>
@@ -73,7 +68,7 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
       <SparklineCharts />
 
       {/* Cosmology readout (only when cosmology is enabled) */}
-      <CosmologyReadout cosmology={fsf.cosmology} latticeDim={fsf.latticeDim} mass={fsf.mass} />
+      <CosmologyReadout config={fsf} />
 
       {/* Dispersion relation — uses M²_eff(η₀) under cosmology, mass² otherwise */}
       <KGDispersionDiagram
@@ -94,6 +89,9 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
 
       {/* Field observables table */}
       <MetricsDisplay cosmologyEnabled={fsf.cosmology.enabled} />
+
+      {/* Peschel entanglement entropy probe (toggleable, expensive) */}
+      <FSFEntanglementProbe />
     </>
   )
 })
@@ -105,17 +103,40 @@ FSFAnalysisContent.displayName = 'FSFAnalysisContent'
 /* ────────────────────────────────────────────────────────────── */
 
 const SparklineCharts: React.FC = React.memo(() => {
-  const { hasData, historyEnergy, historyNorm, historyHead, historyCount } = useDiagnosticsStore(
+  const {
+    hasData,
+    historyEnergy,
+    historyNorm,
+    historyHead,
+    historyCount,
+    historyParticles,
+    historyParticlesHead,
+    historyParticlesCount,
+  } = useDiagnosticsStore(
     useShallow((s) => ({
       hasData: s.fsf.hasData,
       historyEnergy: s.fsf.historyEnergy,
       historyNorm: s.fsf.historyNorm,
       historyHead: s.fsf.historyHead,
       historyCount: s.fsf.historyCount,
+      historyParticles: s.fsf.historyParticles,
+      historyParticlesHead: s.fsf.historyParticlesHead,
+      historyParticlesCount: s.fsf.historyParticlesCount,
     }))
   )
 
-  if (!hasData) {
+  // Energy and norm sparklines are fed by the diagnostics readback,
+  // which is gated on `config.diagnosticsEnabled`. The particle N(η)
+  // sparkline is fed by the *k-space* readback, which runs
+  // unconditionally (see `FsfKSpaceManager.maybeStartKSpaceReadback`).
+  // Render each row independently so that e.g. a run with
+  // `diagnosticsEnabled = false` still shows the particle thermometer
+  // once the first FFT lands. The outer "Waiting…" placeholder only
+  // appears when *neither* channel has any samples yet.
+  const hasEnergyData = hasData && historyCount > 0
+  const hasParticleData = historyParticlesCount > 0
+
+  if (!hasEnergyData && !hasParticleData) {
     return (
       <div className="px-1 py-3 text-center">
         <p className="text-xs text-text-tertiary italic">Waiting for first readback...</p>
@@ -125,14 +146,32 @@ const SparklineCharts: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-2 px-1">
-      <SparklineRow label="Energy" data={historyEnergy} head={historyHead} count={historyCount} />
-      <SparklineRow
-        label="Norm"
-        data={historyNorm}
-        head={historyHead}
-        count={historyCount}
-        min={0}
-      />
+      {hasEnergyData && (
+        <>
+          <SparklineRow
+            label="Energy"
+            data={historyEnergy}
+            head={historyHead}
+            count={historyCount}
+          />
+          <SparklineRow
+            label="Norm"
+            data={historyNorm}
+            head={historyHead}
+            count={historyCount}
+            min={0}
+          />
+        </>
+      )}
+      {hasParticleData && (
+        <SparklineRow
+          label="Particles N(η)"
+          data={historyParticles}
+          head={historyParticlesHead}
+          count={historyParticlesCount}
+          min={0}
+        />
+      )}
     </div>
   )
 })
@@ -320,6 +359,11 @@ const KGDispersionDiagram: React.FC<{
           </text>
         </svg>
       </div>
+      {cosmologyEnabled && (
+        <p className="text-[10px] text-text-tertiary italic mt-0.5 px-1">
+          n_k measured vs adiabatic vacuum at η₀
+        </p>
+      )}
     </div>
   )
 })
@@ -332,31 +376,57 @@ KGDispersionDiagram.displayName = 'KGDispersionDiagram'
 
 const MetricsDisplay: React.FC<{ cosmologyEnabled: boolean }> = React.memo(
   ({ cosmologyEnabled }) => {
-    const { hasData, totalEnergy, totalNorm, maxPhi, maxPi, energyDrift, meanPhi, variancePhi } =
-      useDiagnosticsStore(
-        useShallow((s) => ({
-          hasData: s.fsf.hasData,
-          totalEnergy: s.fsf.totalEnergy,
-          totalNorm: s.fsf.totalNorm,
-          maxPhi: s.fsf.maxPhi,
-          maxPi: s.fsf.maxPi,
-          energyDrift: s.fsf.energyDrift,
-          meanPhi: s.fsf.meanPhi,
-          variancePhi: s.fsf.variancePhi,
-        }))
-      )
+    const {
+      hasData,
+      totalEnergy,
+      totalNorm,
+      maxPhi,
+      maxPi,
+      energyDrift,
+      meanPhi,
+      variancePhi,
+      totalParticles,
+      historyParticlesCount,
+    } = useDiagnosticsStore(
+      useShallow((s) => ({
+        hasData: s.fsf.hasData,
+        totalEnergy: s.fsf.totalEnergy,
+        totalNorm: s.fsf.totalNorm,
+        maxPhi: s.fsf.maxPhi,
+        maxPi: s.fsf.maxPi,
+        energyDrift: s.fsf.energyDrift,
+        meanPhi: s.fsf.meanPhi,
+        variancePhi: s.fsf.variancePhi,
+        totalParticles: s.fsf.totalParticles,
+        historyParticlesCount: s.fsf.historyParticlesCount,
+      }))
+    )
 
-    if (!hasData) return null
+    // `hasData` only flips on the first energy/norm diagnostics readback
+    // — which is gated by `config.diagnosticsEnabled`. The particle
+    // thermometer runs on the (unconditional) k-space readback path, so
+    // we need to render the observables control group whenever *either*
+    // channel has landed. Without this, default configs with
+    // `diagnosticsEnabled = false` would hide the "Total particles"
+    // metric even after N(η) samples have flowed, which was the
+    // round-2 "high" review finding.
+    if (!hasData && historyParticlesCount === 0) return null
 
-    // Under cosmology the evolved variable is v = a^((n−2)/2)·δφ with a
-    // time-dependent effective mass; energy is NOT conserved (no drift
-    // metric applies) and the labels refer to v / π_v, not φ / π.
-    const energyLabel = cosmologyEnabled ? 'Pseudo-energy' : 'Total Energy'
-    const normLabel = cosmologyEnabled ? '∫v² dV' : '∫φ² dV (norm)'
-    const maxPhiLabel = cosmologyEnabled ? 'max |v|' : 'max |φ|'
-    const maxPiLabel = cosmologyEnabled ? 'max |π_v|' : 'max |π|'
-    const meanLabel = cosmologyEnabled ? '⟨v⟩' : '⟨φ⟩'
-    const varianceLabel = cosmologyEnabled ? 'Var(v)' : 'Var(φ)'
+    // Cosmology mode evolves the physical perturbation δφ directly via the
+    // canonical integrator (not the Mukhanov-Sasaki `v = a^((n−2)/2)·δφ`
+    // variable — that formulation was abandoned when the z''/z pole broke
+    // the leapfrog CFL condition at late times; see
+    // `@/lib/physics/cosmology/background` for the derivation). The
+    // Hamiltonian H = ½aK·π² + ½aP·(∇δφ)² + ½m²·aF·δφ² is time-dependent
+    // through the coefficients, so energy is NOT conserved and the drift
+    // metric does not apply. The labels mirror the shader's canonical
+    // variables δφ, π_δφ.
+    const energyLabel = cosmologyEnabled ? 'Hamiltonian (η-dep.)' : 'Total Energy'
+    const normLabel = cosmologyEnabled ? '∫(δφ)² dV' : '∫φ² dV (norm)'
+    const maxPhiLabel = cosmologyEnabled ? 'max |δφ|' : 'max |φ|'
+    const maxPiLabel = cosmologyEnabled ? 'max |π_δφ|' : 'max |π|'
+    const meanLabel = cosmologyEnabled ? '⟨δφ⟩' : '⟨φ⟩'
+    const varianceLabel = cosmologyEnabled ? 'Var(δφ)' : 'Var(φ)'
 
     return (
       <ControlGroup
@@ -366,17 +436,27 @@ const MetricsDisplay: React.FC<{ cosmologyEnabled: boolean }> = React.memo(
         data-testid="control-group-field-observables"
       >
         <div className="space-y-0.5 px-1">
-          <MetricRow label={energyLabel} value={totalEnergy} digits={6} />
-          {!cosmologyEnabled && (
-            <MetricRow label="Energy Drift" value={energyDrift * 100} digits={4} unit="%" />
+          {hasData && (
+            <>
+              <MetricRow label={energyLabel} value={totalEnergy} digits={6} />
+              {!cosmologyEnabled && (
+                <MetricRow label="Energy Drift" value={energyDrift * 100} digits={4} unit="%" />
+              )}
+              <div className="border-t border-panel-border my-1" />
+              <MetricRow label={normLabel} value={totalNorm} digits={4} />
+              <MetricRow label={maxPhiLabel} value={maxPhi} digits={4} />
+              <MetricRow label={maxPiLabel} value={maxPi} digits={4} />
+              <div className="border-t border-panel-border my-1" />
+              <MetricRow label={meanLabel} value={meanPhi} digits={6} />
+              <MetricRow label={varianceLabel} value={variancePhi} digits={6} />
+            </>
           )}
-          <div className="border-t border-panel-border my-1" />
-          <MetricRow label={normLabel} value={totalNorm} digits={4} />
-          <MetricRow label={maxPhiLabel} value={maxPhi} digits={4} />
-          <MetricRow label={maxPiLabel} value={maxPi} digits={4} />
-          <div className="border-t border-panel-border my-1" />
-          <MetricRow label={meanLabel} value={meanPhi} digits={6} />
-          <MetricRow label={varianceLabel} value={variancePhi} digits={6} />
+          {historyParticlesCount > 0 && (
+            <>
+              {hasData && <div className="border-t border-panel-border my-1" />}
+              <MetricRow label="Total particles" value={totalParticles} digits={4} />
+            </>
+          )}
         </div>
       </ControlGroup>
     )
@@ -393,54 +473,51 @@ MetricsDisplay.displayName = 'MetricsDisplay'
  * Cosmological quantities evaluated at the current `eta0` — effective
  * background state at which the adiabatic vacuum is prepared. Shows
  *
- *   a(η), ℋ(η), w, z''/z, M²_eff, horizon-crossing scale k·|η|=1
+ *   a(η), ℋ(η), w, A, B, M²_eff, horizon-crossing scale k·|η|=1
+ *
+ * Under the canonical δφ integrator the reported quantities describe the
+ * physical dispersion `ω² = k² + m²·a²`; the abandoned Mukhanov-Sasaki
+ * `z''/z` term is not part of this readout.
  *
  * Live evolution (`η` advancing toward 0) is not plumbed through to
  * the store in v1 — see the v2 backlog entry in
  * `docs/plans/cosmological-background-scalar-field.md`.
  *
- * @param props.cosmology - Cosmology sub-config
- * @param props.latticeDim - Active lattice dimension (drives n = latticeDim+1)
- * @param props.mass - Klein-Gordon mass parameter
+ * The cosmology snapshot is resolved through the shared
+ * `computeFsfCosmologySnapshot` helper so the same deduplicated invalid-
+ * preset warning path is hit as the compute pass and the k-space
+ * thermometer — one source of truth for "is this cosmology evaluable".
+ *
+ * @param props.config - The full free-scalar-field configuration
  */
 const CosmologyReadout: React.FC<{
-  cosmology: CosmologyConfig
-  latticeDim: number
-  mass: number
-}> = React.memo(({ cosmology, latticeDim, mass }) => {
+  config: FreeScalarConfig
+}> = React.memo(({ config }) => {
+  const { cosmology, latticeDim, mass } = config
   const snapshot = useMemo(() => {
-    if (!cosmology.enabled) return undefined
+    const snap = computeFsfCosmologySnapshot(config, cosmology.eta0)
+    if (snap === undefined) return undefined
     const spacetimeDim = latticeDim + 1
-    const params = {
-      preset: cosmology.preset,
-      spacetimeDim,
-      steepness: cosmology.steepness,
-      hubble: cosmology.hubble,
+    const mSqASq = mass * mass * snap.a * snap.a
+    // Effective equation-of-state parameter per paper eq. (1.20):
+    //   Ekpyrotic fixed point: x₁ = s/s_c(n), so w = 2(s/s_c)² − 1 > 1
+    //   Kasner fixed point:    x = ±1 → w = 1 (stiff fluid)
+    //   de Sitter:             w = −1 (cosmological-constant-like)
+    //   Minkowski:             w = 0 (trivially, but this branch is
+    //                          guarded above because computeFsf… returns
+    //                          `undefined` for Minkowski)
+    let w = 0
+    if (cosmology.preset === 'ekpyrotic') {
+      const x1 = cosmology.steepness / sCritical(spacetimeDim)
+      w = equationOfState(x1)
+    } else if (cosmology.preset === 'kasner') {
+      w = 1
+    } else if (cosmology.preset === 'deSitter') {
+      w = -1
     }
-    if (!isValidPreset(params)) return undefined
-    try {
-      const snap = computeCosmologyAt(cosmology.eta0, params)
-      const mSqASq = mass * mass * snap.a * snap.a
-      // Effective equation-of-state parameter per paper eq. (1.20):
-      //   Ekpyrotic fixed point: x₁ = s/s_c(n), so w = 2(s/s_c)² − 1 > 1
-      //   Kasner fixed point:    x = ±1 → w = 1 (stiff fluid)
-      //   de Sitter:             w = −1 (cosmological-constant-like)
-      //   Minkowski:             w = 0 (trivially)
-      let w = 0
-      if (cosmology.preset === 'ekpyrotic') {
-        const x1 = cosmology.steepness / sCritical(spacetimeDim)
-        w = equationOfState(x1)
-      } else if (cosmology.preset === 'kasner') {
-        w = 1
-      } else if (cosmology.preset === 'deSitter') {
-        w = -1
-      }
-      const horizonK = 1 / Math.abs(cosmology.eta0)
-      return { snap, w, horizonK, mSqASq }
-    } catch {
-      return undefined
-    }
-  }, [cosmology, latticeDim, mass])
+    const horizonK = 1 / Math.abs(cosmology.eta0)
+    return { snap, w, horizonK, mSqASq }
+  }, [config, cosmology, latticeDim, mass])
 
   if (!cosmology.enabled) return null
 
@@ -479,8 +556,8 @@ const CosmologyReadout: React.FC<{
         <MetricRow label="k_horizon" value={horizonK} digits={4} />
       </div>
       <div className="text-xs text-text-tertiary italic px-1">
-        Snapshot at η = η₀ (initial time). Canonical δφ variables — the
-        physical dispersion is ω² = k² + m²·a².
+        Snapshot at η = η₀ (initial time). Canonical δφ variables — the physical dispersion is ω² =
+        k² + m²·a².
       </div>
     </ControlGroup>
   )

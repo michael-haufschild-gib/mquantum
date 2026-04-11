@@ -104,6 +104,7 @@ interface DiagnosticsState {
 
   // FSF actions
   pushFsfSnapshot: (snapshot: FsfDiagnosticsSnapshot) => void
+  pushFsfParticleNumber: (value: number) => void
   resetFsf: () => void
 
   // Pauli actions
@@ -317,6 +318,22 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
     })
   },
 
+  pushFsfParticleNumber: (value) => {
+    set((state) => {
+      const ch = state.fsf
+      const head = ch.historyParticlesHead
+      ch.historyParticles[head] = value
+      return {
+        fsf: {
+          ...ch,
+          totalParticles: value,
+          historyParticlesHead: (head + 1) % HISTORY_LENGTH,
+          historyParticlesCount: Math.min(ch.historyParticlesCount + 1, HISTORY_LENGTH),
+        },
+      }
+    })
+  },
+
   resetFsf: () => {
     set((state) => ({
       fsf: {
@@ -324,6 +341,9 @@ export const useDiagnosticsStore = create<DiagnosticsState>((set, get) => ({
         readbackGeneration: state.fsf.readbackGeneration,
         historyEnergy: new Float32Array(HISTORY_LENGTH),
         historyNorm: new Float32Array(HISTORY_LENGTH),
+        historyParticles: new Float32Array(HISTORY_LENGTH),
+        historyParticlesHead: 0,
+        historyParticlesCount: 0,
       },
     }))
   },

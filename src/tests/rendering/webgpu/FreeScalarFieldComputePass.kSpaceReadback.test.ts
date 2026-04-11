@@ -3,11 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_COSMOLOGY_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 
-const { computeRawKSpaceDataMock, buildKSpaceDisplayTexturesMock } = vi.hoisted(() => ({
+const {
+  computeRawKSpaceDataMock,
+  buildKSpaceDisplayTexturesMock,
+  computeFsfVacuumDispersionMock,
+  computeFsfCosmologyCoefsMock,
+} = vi.hoisted(() => ({
   computeRawKSpaceDataMock: vi.fn(() => ({ mock: true })),
   buildKSpaceDisplayTexturesMock: vi.fn(() => ({
     density: new Uint16Array([1, 2, 3, 4]),
     analysis: new Uint16Array([5, 6, 7, 8]),
+  })),
+  computeFsfVacuumDispersionMock: vi.fn((_cfg: unknown, _eta: number) => 0.25),
+  computeFsfCosmologyCoefsMock: vi.fn((_cfg: unknown, _eta: number) => ({
+    aKinetic: 1,
+    aPotential: 1,
+    aFull: 1,
   })),
 }))
 
@@ -23,6 +34,16 @@ vi.mock('@/lib/physics/freeScalar/kSpaceDisplayTransforms', () => ({
 vi.mock('@/lib/physics/freeScalar/vacuumSpectrum', () => ({
   estimateVacuumMaxPhi: vi.fn(() => 1),
   sampleVacuumSpectrum: vi.fn(() => ({ phi: new Float32Array(0), pi: new Float32Array(0) })),
+}))
+
+// Mock the shared cosmology helpers so we can capture the `eta`
+// argument each one is called with. The production manager routes
+// every call through these two functions, so asserting the eta
+// argument gives a direct witness that the live `simEta` (not
+// `config.cosmology.eta0`) was threaded all the way through.
+vi.mock('@/lib/physics/freeScalar/vacuumDispersion', () => ({
+  computeFsfVacuumDispersion: computeFsfVacuumDispersionMock,
+  computeFsfCosmologyCoefs: computeFsfCosmologyCoefsMock,
 }))
 
 import { FsfKSpaceManager } from '@/rendering/webgpu/passes/FreeScalarFieldKSpace'
@@ -105,7 +126,8 @@ describe('FsfKSpaceManager readback', () => {
       piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       readbackAndComputeKSpace: (
         device: { queue: { onSubmittedWorkDone: () => Promise<void> } },
-        config: FreeScalarConfig
+        config: FreeScalarConfig,
+        simEta: number
       ) => Promise<void>
     }
 
@@ -124,7 +146,7 @@ describe('FsfKSpaceManager readback', () => {
       },
     }
 
-    const task = mgr.readbackAndComputeKSpace(device, makeConfig())
+    const task = mgr.readbackAndComputeKSpace(device, makeConfig(), -10)
     mgr.phiReadbackBuffer = newPhi
     mgr.piReadbackBuffer = newPi
     gate.resolve()
@@ -145,7 +167,8 @@ describe('FsfKSpaceManager readback', () => {
       piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       readbackAndComputeKSpace: (
         device: { queue: { onSubmittedWorkDone: () => Promise<void> } },
-        config: FreeScalarConfig
+        config: FreeScalarConfig,
+        simEta: number
       ) => Promise<void>
     }
 
@@ -162,13 +185,74 @@ describe('FsfKSpaceManager readback', () => {
       },
     }
 
-    const task = mgr.readbackAndComputeKSpace(device, makeConfig())
+    const task = mgr.readbackAndComputeKSpace(device, makeConfig(), -10)
     mgr.kSpaceReadbackEpoch += 1
     gate.resolve()
     await task
 
     expect(mgr.pendingKSpaceData).toBeNull()
     expect(buildKSpaceDisplayTexturesMock).not.toHaveBeenCalled()
+  })
+
+  it('threads the live simEta (not config.cosmology.eta0) into dispersion and basis coefs', async () => {
+    // Round-2 review regression: the adiabatic-vacuum N(η) thermometer
+    // must be evaluated at the current conformal time the compute pass
+    // is sitting at, not at the *initial* η₀ the cosmology sub-config
+    // stores. Keying the dispersion off `config.cosmology.eta0` makes
+    // the reference vacuum static and turns the particle number into a
+    // meaningless constant as soon as the simulation starts evolving.
+    //
+    // This test mocks the two shared helpers (`computeFsfVacuumDispersion`
+    // and `computeFsfCosmologyCoefs`) so we can capture the exact `η`
+    // each call receives. Passing a `simEta` value that is *distinct*
+    // from `config.cosmology.eta0` lets us distinguish the two paths: a
+    // buggy implementation that re-reads `eta0` internally would fail
+    // this assertion.
+    const mgr = new FsfKSpaceManager() as unknown as {
+      phiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
+      piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
+      readbackAndComputeKSpace: (
+        device: { queue: { onSubmittedWorkDone: () => Promise<void> } },
+        config: FreeScalarConfig,
+        simEta: number
+      ) => Promise<void>
+    }
+
+    mgr.phiReadbackBuffer = makeReadbackBuffer([1, 2, 3, 4])
+    mgr.piReadbackBuffer = makeReadbackBuffer([5, 6, 7, 8])
+
+    const gate = makeDeferred<void>()
+    const device = {
+      queue: {
+        onSubmittedWorkDone: vi.fn(() => gate.promise),
+      },
+    }
+
+    // eta0 = -10 (the default) but we pass simEta = -3.25: the
+    // simulation has evolved away from the initial vacuum.
+    const config = makeConfig()
+    expect(config.cosmology.eta0).toBe(-10)
+    const LIVE_SIM_ETA = -3.25
+
+    computeFsfVacuumDispersionMock.mockClear()
+    computeFsfCosmologyCoefsMock.mockClear()
+
+    const task = mgr.readbackAndComputeKSpace(device, config, LIVE_SIM_ETA)
+    gate.resolve()
+    await task
+
+    // Both helpers were invoked on the readback path.
+    expect(computeFsfVacuumDispersionMock).toHaveBeenCalledTimes(1)
+    expect(computeFsfCosmologyCoefsMock).toHaveBeenCalledTimes(1)
+
+    // Each was invoked with the **live** simEta, not eta0.
+    const dispersionEta = computeFsfVacuumDispersionMock.mock.calls[0]?.[1]
+    const coefsEta = computeFsfCosmologyCoefsMock.mock.calls[0]?.[1]
+    expect(dispersionEta).toBe(LIVE_SIM_ETA)
+    expect(coefsEta).toBe(LIVE_SIM_ETA)
+    // And definitely not the static η₀ from the config.
+    expect(dispersionEta).not.toBe(config.cosmology.eta0)
+    expect(coefsEta).not.toBe(config.cosmology.eta0)
   })
 
   it('invalidateReadbacks clears any already-queued pending k-space data', () => {

@@ -130,6 +130,24 @@ export interface FsfChannelData extends FsfDiagnosticsSnapshot, RingBufferMeta {
   initialEnergy: number
   historyEnergy: Float32Array
   historyNorm: Float32Array
+  /**
+   * Latest total particle number `N(η) = Σ_k max(n_k, 0)` measured against
+   * the instantaneous adiabatic vacuum. Cosmological particle creation is
+   * strictly non-negative, so values cluster near zero for Minkowski ground
+   * states and grow with expansion on FLRW backgrounds.
+   */
+  totalParticles: number
+  /**
+   * Ring buffer history of `totalParticles`. Runs on the k-space readback
+   * cadence (independent from `historyEnergy`, which is driven by the
+   * diagnostics readback cadence), so this channel has its own head and
+   * count counters.
+   */
+  historyParticles: Float32Array
+  /** Write head for `historyParticles` (independent from `historyHead`). */
+  historyParticlesHead: number
+  /** Valid-sample count for `historyParticles` (up to `HISTORY_LENGTH`). */
+  historyParticlesCount: number
 }
 
 // ─── Pauli Channel ───────────────────────────────────────────────────────────

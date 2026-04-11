@@ -117,6 +117,10 @@ export const FSF_INITIAL: FsfChannelData = {
   historyNorm: new Float32Array(HISTORY_LENGTH),
   historyHead: 0,
   historyCount: 0,
+  totalParticles: 0,
+  historyParticles: new Float32Array(HISTORY_LENGTH),
+  historyParticlesHead: 0,
+  historyParticlesCount: 0,
 }
 
 // ─── Pauli ───────────────────────────────────────────────────────────────────

@@ -317,7 +317,35 @@ fn eigenvalues_2x2(re: &[f64], im: &[f64]) -> Vec<f64> {
 /// * `re` - Real part of Hermitian matrix (row-major, M×M)
 /// * `im` - Imaginary part of Hermitian matrix (row-major, M×M)
 /// * `n` - Matrix dimension
+///
+/// # Panics
+/// Panics if the Jacobi iteration fails to converge within `MAX_SWEEPS`
+/// sweeps. Non-converged diagonal entries are not eigenvalues; returning
+/// them silently would feed downstream consumers (von Neumann entropy,
+/// coordinate entanglement) plausible-looking but incorrect numbers.
+/// Under WASM the panic surfaces as a JavaScript exception via
+/// `console_error_panic_hook` installed in the module `start` fn.
 pub fn hermitian_eigenvalues(re: &[f64], im: &[f64], n: usize) -> Vec<f64> {
+    hermitian_eigenvalues_bounded(re, im, n, MAX_SWEEPS)
+}
+
+/// Same as [`hermitian_eigenvalues`] but with an explicit sweep cap.
+///
+/// Exposed separately so tests can deterministically force the
+/// non-convergence path (e.g. `max_sweeps = 0` on a non-diagonal input).
+/// Internal callers and the WASM binding should continue to use
+/// [`hermitian_eigenvalues`] with the module-level `MAX_SWEEPS`.
+///
+/// # Panics
+/// Panics if the off-diagonal Frobenius norm is not brought below
+/// `JACOBI_TOLERANCE` within `max_sweeps`. The panic message carries
+/// the residual and the tolerance for diagnostics.
+pub fn hermitian_eigenvalues_bounded(
+    re: &[f64],
+    im: &[f64],
+    n: usize,
+    max_sweeps: usize,
+) -> Vec<f64> {
     // Trivial cases
     if n == 0 {
         return Vec::new();
@@ -333,7 +361,8 @@ pub fn hermitian_eigenvalues(re: &[f64], im: &[f64], n: usize) -> Vec<f64> {
     let mut work_re = re.to_vec();
     let mut work_im = im.to_vec();
 
-    for _sweep in 0..MAX_SWEEPS {
+    let mut converged = false;
+    for _sweep in 0..max_sweeps {
         let mut sweep_max_off_diag: f64 = 0.0;
 
         for pi in 0..n - 1 {
@@ -438,8 +467,33 @@ pub fn hermitian_eigenvalues(re: &[f64], im: &[f64], n: usize) -> Vec<f64> {
         }
 
         if sweep_max_off_diag < JACOBI_TOLERANCE {
+            converged = true;
             break;
         }
+    }
+
+    // Post-loop residual check. Scan the current off-diagonal max directly
+    // rather than trusting the last `sweep_max_off_diag` — this also gives
+    // a correct residual when `max_sweeps == 0` and the sweep loop never
+    // executed. A matrix that was already within tolerance on entry is
+    // accepted as converged regardless of the sweep budget.
+    if !converged {
+        let mut residual: f64 = 0.0;
+        for i in 0..n - 1 {
+            for j in (i + 1)..n {
+                let r = work_re[i * n + j];
+                let im_val = work_im[i * n + j];
+                let mag = (r * r + im_val * im_val).sqrt();
+                if mag > residual {
+                    residual = mag;
+                }
+            }
+        }
+        assert!(
+            residual < JACOBI_TOLERANCE,
+            "hermitian_eigenvalues: failed to converge within {max_sweeps} sweeps \
+             (n={n}, residual={residual:.3e}, tolerance={JACOBI_TOLERANCE:.3e})"
+        );
     }
 
     // Extract eigenvalues from diagonal
@@ -826,6 +880,51 @@ mod tests {
         let eigs = hermitian_eigenvalues(&[3.14], &[0.0], 1);
         assert_eq!(eigs.len(), 1);
         assert!((eigs[0] - 3.14).abs() < TOL);
+    }
+
+    #[test]
+    #[should_panic(expected = "failed to converge within 0 sweeps")]
+    fn test_hermitian_eigenvalues_bounded_panics_on_non_convergence() {
+        // A non-diagonal 4×4 Hermitian matrix with zero sweep budget —
+        // the solver cannot zero any off-diagonal and must therefore
+        // panic in the post-loop residual check. This is the regression
+        // guard for the silent-fallthrough bug: the old implementation
+        // would have returned `[0.5, 0.3, 0.15, 0.05]` as "eigenvalues"
+        // even though the matrix is nowhere close to diagonal.
+        let m = 4;
+        let mut re = vec![0.0f64; m * m];
+        let im = vec![0.0f64; m * m];
+        // Diagonal + a strong off-diagonal pair — far from diagonal.
+        re[0] = 0.5;
+        re[5] = 0.3;
+        re[10] = 0.15;
+        re[15] = 0.05;
+        re[1] = 0.4;
+        re[4] = 0.4;
+        re[11] = 0.2;
+        re[14] = 0.2;
+        let _ = hermitian_eigenvalues_bounded(&re, &im, m, 0);
+    }
+
+    #[test]
+    fn test_hermitian_eigenvalues_bounded_accepts_diagonal_with_zero_budget() {
+        // A matrix that is already diagonal on entry has residual 0 and
+        // must be accepted even with `max_sweeps = 0`. This confirms the
+        // residual-check branch distinguishes "never ran" from "ran but
+        // failed to converge".
+        let m = 4;
+        let mut re = vec![0.0f64; m * m];
+        let im = vec![0.0f64; m * m];
+        re[0] = 0.7;
+        re[5] = 0.2;
+        re[10] = 0.08;
+        re[15] = 0.02;
+        let eigs = hermitian_eigenvalues_bounded(&re, &im, m, 0);
+        assert_eq!(eigs.len(), m);
+        assert!((eigs[0] - 0.7).abs() < TOL);
+        assert!((eigs[1] - 0.2).abs() < TOL);
+        assert!((eigs[2] - 0.08).abs() < TOL);
+        assert!((eigs[3] - 0.02).abs() < TOL);
     }
 
     // ── Von Neumann entropy tests ───────────────────────────────────────

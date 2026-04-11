@@ -11,7 +11,12 @@
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import { buildKSpaceDisplayTextures } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
-import { computeRawKSpaceDataFromComplex } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import {
+  computeRawKSpaceDataFromComplex,
+  computeTotalParticleNumber,
+  type KSpaceBasisCoefs,
+} from '@/lib/physics/freeScalar/kSpaceOccupation'
+import type { VacuumDispersion } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /** Inbound message to the k-space web worker requesting a texture computation. */
 export interface KSpaceWorkerRequest {
@@ -24,6 +29,21 @@ export interface KSpaceWorkerRequest {
   mass: number
   latticeDim: number
   kSpaceViz: KSpaceVizConfig
+  /**
+   * Mass-term dispatch for the vacuum reference state used to measure `n_k`.
+   * Omitting (or passing `'kgFloor'`) yields the static Klein-Gordon vacuum.
+   * Passing a finite signed squared mass yields the instantaneous adiabatic
+   * vacuum with `ω_k² = k_lat² + dispersion`, which on FLRW is `m²·a²(η)`.
+   */
+  dispersion?: VacuumDispersion
+  /**
+   * Canonical-basis rescale coefficients for the `n_k` kernel. Omitting
+   * defaults to the Minkowski identity `(1, 1)`. Under cosmology, pass
+   * `{aKinetic: 1/B, aPotential: B}` with `B = a^(n−2)` so that the
+   * adiabatic vacuum reads back as zero particles (see
+   * `computeRawKSpaceData` for the derivation).
+   */
+  basisCoefs?: KSpaceBasisCoefs
 }
 
 /** Outbound result from the k-space web worker with computed display textures. */
@@ -32,6 +52,8 @@ export interface KSpaceWorkerResponse {
   epoch: number
   density: Uint16Array
   analysis: Uint16Array
+  /** Total particle number `N(η) = Σ_k max(n_k, 0)` at the current vacuum reference. */
+  totalParticles: number
 }
 
 self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
@@ -44,17 +66,21 @@ self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
     msg.gridSize,
     msg.spacing,
     msg.mass,
-    msg.latticeDim
+    msg.latticeDim,
+    msg.dispersion ?? 'kgFloor',
+    msg.basisCoefs
   )
 
   // nkOnly=true: k-space occupation only reads analysis.r
   const { density, analysis } = buildKSpaceDisplayTextures(raw, msg.kSpaceViz, true)
+  const totalParticles = computeTotalParticleNumber(raw)
 
   const response: KSpaceWorkerResponse = {
     type: 'result',
     epoch: msg.epoch,
     density,
     analysis,
+    totalParticles,
   }
 
   // Transfer ownership of the typed array buffers back to main thread

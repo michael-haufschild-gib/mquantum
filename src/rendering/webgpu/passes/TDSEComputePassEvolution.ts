@@ -29,6 +29,7 @@ import { dispatchDiagnostics as extDispatchDiagnostics } from './TDSEComputePass
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { dispatchGramSchmidt as gsDispatch, type GramSchmidtState } from './TDSEGramSchmidt'
+import { type HellerReadbackState, tickHellerStep } from './TDSEHellerReadback'
 import type { ObservablesState } from './TDSEObservablesDispatch'
 import {
   computeCSLSubsteps,
@@ -56,6 +57,14 @@ export interface EvolutionResources {
   stochasticState: StochasticLocState | null
   /** Dynamic bounding radius of the quantum state (used to concentrate CSL centers). */
   boundingRadius: number
+  /**
+   * Heller wavepacket spectrometer readback state. The loop calls
+   * {@link tickHellerStep} after each Strang step so captures land on a
+   * perfectly uniform `simTime` grid, independent of frame-rate jitter,
+   * fractional `stepsPerFrame * speed`, or paused-resume cycles. Pass
+   * `null` if Heller is not wired up.
+   */
+  hellerState: HellerReadbackState | null
   /** Dispatch a compute pass. */
   dc: (
     pe: GPUComputePassEncoder,
@@ -212,6 +221,17 @@ export function runStrangEvolution(
           diagNumWorkgroups: res.diagNumWorkgroups,
         })
       }
+    }
+
+    // Heller wavepacket spectrometer — sample ψ at the END of this
+    // Strang step. `state.simTime` has already been advanced by
+    // `config.dt`, and any per-step renormalization has already run,
+    // so `tickHellerStep` sees ψ in its stable post-step form. Sampling
+    // by step count (not frame count) guarantees perfectly uniform
+    // spacing on the simTime axis regardless of frame rate jitter,
+    // fractional `stepsPerFrame * speed`, or back-pressure drops.
+    if (res.hellerState) {
+      tickHellerStep(ctx.device, ctx.encoder, res.hellerState, state.simTime)
     }
   }
 }

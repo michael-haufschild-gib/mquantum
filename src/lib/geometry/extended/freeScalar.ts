@@ -176,9 +176,17 @@ export interface CosmologyConfig {
   hubble: number
   /**
    * Initial conformal time `η₀` at which the adiabatic Bunch-Davies vacuum
-   * is sampled. Use `η < 0` (deep past). Subject to an auto-clamp so that
-   * `|η₀|² · k_min² ≥ safety · |z''/z|(η₀)` — the clamped value is what the
-   * FSF pass actually uses.
+   * is sampled. Use `η < 0` (deep past). The only hard requirement is
+   * `η₀ ≠ 0` — the power-law scale factor `a(η) = A·|η|^q` is singular
+   * there. Under the canonical δφ integrator the adiabatic vacuum is
+   * well-defined at any non-zero `η₀` since `m²·a²` is always non-negative
+   * for real `m`, so the old Mukhanov-Sasaki `|η₀|² · k_min² ≥ safety ·
+   * |z''/z|(η₀)` super-horizon-tachyon guard is gone.
+   *
+   * The store still runs the user's value through `clampEta0` on every
+   * cosmology/lattice edit, but `clampEta0` now just raises `|η₀|` above a
+   * fixed `DEFAULT_SAFE_ETA0` UX floor — it does not encode any physical
+   * rejection.
    */
   eta0: number
 }
@@ -265,12 +273,23 @@ export interface FreeScalarConfig {
   /** Diagnostic computation interval in frames */
   diagnosticsInterval: number
 
-  // === Cosmological Background (Mukhanov-Sasaki) ===
+  // === Cosmological Background (canonical δφ integrator on FLRW) ===
   /**
-   * FLRW background sub-config. When `cosmology.enabled` is true, the field
-   * is evolved on a time-dependent background with effective mass
-   * `M²_eff(η) = a²(η)·m² − z''(η)/z(η)`. Mutually exclusive with
-   * `selfInteractionEnabled` in v1.
+   * FLRW background sub-config. When `cosmology.enabled` is true, the
+   * physical perturbation `δφ` is evolved directly via the canonical
+   * Hamiltonian
+   *
+   *     H = ½ aKinetic · π² + ½ aPotential · |∇δφ|² + ½ m² · aFull · δφ²
+   *
+   * with time-dependent coefficients `(aKinetic, aPotential, aFull) =
+   * (a^(-(n-2)), a^(n-2), a^n)` and the physical dispersion
+   * `ω² = k² + m²·a²` (bounded as η → 0⁻ for any finite mass). The
+   * abandoned Mukhanov-Sasaki bridge, which carried a coordinate pole
+   * `z''/z = β(β−1)/η²` that drove the leapfrog CFL condition unstable
+   * at late times, is no longer used — see
+   * `@/lib/physics/cosmology/background` for the derivation.
+   *
+   * Mutually exclusive with `selfInteractionEnabled` in v1.
    */
   cosmology: CosmologyConfig
 }

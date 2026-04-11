@@ -333,6 +333,11 @@ export function computeJointReducedDensityMatrix(
 
 // ─── Jacobi Eigendecomposition ──────────────────────────────────────────────
 
+/** Default sweep cap on the Jacobi iteration. Typical convergence in 3-10 sweeps. */
+const HERMITIAN_JACOBI_MAX_SWEEPS = 100
+/** Off-diagonal magnitude tolerance for convergence. */
+const HERMITIAN_JACOBI_TOLERANCE = 1e-14
+
 /**
  * Jacobi eigendecomposition for an M×M Hermitian matrix stored as
  * separate re/im Float64Arrays (row-major).
@@ -348,14 +353,36 @@ export function computeJointReducedDensityMatrix(
  * Complexity: O(M³) per sweep, typically 3-10 sweeps for convergence.
  * For M ≤ 64, total time is < 1ms.
  *
+ * **Non-convergence behaviour**: if the off-diagonal norm is not brought
+ * below `HERMITIAN_JACOBI_TOLERANCE` within `maxSweeps`, this function
+ * throws instead of silently returning whatever happens to sit on the
+ * diagonal. Non-converged diagonal entries are *not* eigenvalues and
+ * would feed downstream consumers (von Neumann entropy, coordinate
+ * entanglement) plausible-looking but incorrect numbers.
+ *
  * @param re - Real part of Hermitian matrix (row-major, M×M)
  * @param im - Imaginary part of Hermitian matrix (row-major, M×M)
  * @param M - Matrix dimension
- * @returns Eigenvalues sorted descending
+ * @param maxSweeps - Optional override for the hard sweep cap (defaults to
+ *                    `HERMITIAN_JACOBI_MAX_SWEEPS = 100`). Exposed primarily
+ *                    so tests can deterministically trigger the throw path.
+ * @returns Eigenvalues sorted descending.
+ * @throws {Error} If the solver fails to converge within `maxSweeps`.
  */
-export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: number): Float64Array {
+export function hermitianEigenvalues(
+  re: Float64Array,
+  im: Float64Array,
+  M: number,
+  maxSweeps: number = HERMITIAN_JACOBI_MAX_SWEEPS
+): Float64Array {
   // ── WASM fast path ──────────────────────────────────────────────────
-  if (isAnimationWasmReady()) {
+  // The WASM solver now also throws on non-convergence (see
+  // `hermitian_eigenvalues_wasm` in entanglement.rs), so any throw here
+  // propagates straight out. The size-mismatch fallback remains as a
+  // guard against WASM binding bugs; it does not swallow solver errors.
+  // Skip the fast path when a non-default `maxSweeps` was requested —
+  // the WASM binding is fixed at the Rust-side cap.
+  if (maxSweeps === HERMITIAN_JACOBI_MAX_SWEEPS && isAnimationWasmReady()) {
     const wasmResult = hermitianEigenvaluesWasm(re, im, M)
     if (wasmResult && wasmResult.length === M) {
       return wasmResult
@@ -367,8 +394,8 @@ export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: numb
   const workRe = new Float64Array(re)
   const workIm = new Float64Array(im)
 
-  const maxSweeps = 100
-  const tolerance = 1e-14
+  const tolerance = HERMITIAN_JACOBI_TOLERANCE
+  let converged = false
 
   for (let sweep = 0; sweep < maxSweeps; sweep++) {
     // ── Cyclic Jacobi sweep: visit every upper-triangular pair (i,j) ──
@@ -473,7 +500,34 @@ export function hermitianEigenvalues(re: Float64Array, im: Float64Array, M: numb
     }
 
     // Converged when largest off-diagonal element across the full sweep is below tolerance
-    if (sweepMaxOffDiag < tolerance) break
+    if (sweepMaxOffDiag < tolerance) {
+      converged = true
+      break
+    }
+  }
+
+  if (!converged) {
+    // Scan the current off-diagonal max so the error message carries a
+    // meaningful residual. Measuring here (rather than reusing the last
+    // `sweepMaxOffDiag`) also produces a correct residual when
+    // `maxSweeps = 0`, where the sweep loop never ran. If the matrix
+    // was already within tolerance on entry (trivial case: M ≤ 1 or a
+    // diagonal input with zero sweep budget), accept it as converged.
+    let residual = 0
+    for (let i = 0; i < M - 1; i++) {
+      for (let j = i + 1; j < M; j++) {
+        const r = workRe[i * M + j]!
+        const im2 = workIm[i * M + j]!
+        const mag = Math.sqrt(r * r + im2 * im2)
+        if (mag > residual) residual = mag
+      }
+    }
+    if (residual >= tolerance) {
+      throw new Error(
+        `hermitianEigenvalues: failed to converge within ${maxSweeps} sweeps ` +
+          `(M=${M}, residual=${residual.toExponential(3)}, tolerance=${tolerance.toExponential(3)})`
+      )
+    }
   }
 
   // Extract eigenvalues from diagonal

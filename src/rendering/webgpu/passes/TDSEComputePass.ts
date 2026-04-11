@@ -26,6 +26,7 @@ import {
   TdseDiagnosticsHistory,
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
+import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -101,6 +102,13 @@ import {
   type GramSchmidtState,
   storeCurrentEigenstate as gsStoreEigenstate,
 } from './TDSEGramSchmidt'
+import {
+  createHellerReadbackState,
+  disposeHellerStagingBuffers,
+  type HellerReadbackState,
+  prepareHellerFrame,
+  resetHellerCapture,
+} from './TDSEHellerReadback'
 import { requestMeasurementReadback as extRequestMeasurementReadback } from './TDSEMeasurementReadback'
 import {
   requestSliceCapture as slRequestSlice,
@@ -213,6 +221,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   // Vortex detection state
   private readonly _vdState: VortexDetectState = createVortexDetectState()
 
+  // Heller wavepacket spectrometer state (shared mutable object).
+  private readonly _hellerState: HellerReadbackState = createHellerReadbackState()
+  /** Last UI-requested Heller reset token handled by this pass. */
+  private _hellerLastResetToken = 0
+
   // State
   private initialized = false
   private lastConfigHash = ''
@@ -253,6 +266,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [LINEAR_WG, 1, 1],
     })
+    // Publish the Heller ring buffer reference to the spectrometer store so
+    // that the UI can read samples on demand (see TDSESpectrometerPanel).
+    useHellerSpectrometerStore.getState().setBufferRef(this._hellerState.buffer)
   }
 
   /** Create density texture eagerly for renderer bind group creation. */
@@ -333,6 +349,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     } = this
     Object.assign(this._gsState, { psiReBuffer: re, psiImBuffer: im, totalSites: n, pl })
     Object.assign(this._slState, { psiReBuffer: re, psiImBuffer: im, totalSites: n })
+    Object.assign(this._hellerState, { psiReBuffer: re, psiImBuffer: im, totalSites: n })
     Object.assign(this._obsState, {
       psiReBuffer: re,
       psiImBuffer: im,
@@ -369,6 +386,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
     this.initializeDensityTexture(device)
     this.lastConfigHash = computeConfigHash(config.gridSize, config.latticeDim)
+    // Heller capture references the live psi buffers; on a rebuild the
+    // previous ψ(0) snapshot is no longer meaningful — reset and let the
+    // next enabled capture re-anchor from fresh.
+    resetHellerCapture(this._hellerState)
+    useHellerSpectrometerStore.getState().bumpResetVersion()
     rebuildVortexDetect(
       device,
       this._vdState,
@@ -591,6 +613,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const { pl, bg } = this
     if (!pl || !bg) return
 
+    // Heller wavepacket spectrometer — sync store → readback state
+    // BEFORE the evolution loop so that the per-Strang-step tick inside
+    // `runStrangEvolution` sees the current `enabled` / `sampleInterval`
+    // values for this frame. See `prepareHellerFrame` for the
+    // time-dependent Hamiltonian guard and reset-token handling.
+    this._hellerLastResetToken = prepareHellerFrame(
+      this._hellerState,
+      config,
+      this._hellerLastResetToken
+    )
+
     if (isPlaying) {
       const evoState: EvolutionFrameState = {
         simTime: this.simTime,
@@ -605,6 +638,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         gsState: this._gsState,
         stochasticState: this._stochasticState,
         boundingRadius: boundingRadius ?? 2.0,
+        hellerState: this._hellerState,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
       })
@@ -636,6 +670,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     disposeVortexDetect(this._vdState)
     disposeDisorder(this._disorderState)
     disposeStochasticLoc(this._stochasticState)
+    // Invalidate any in-flight Heller readback and drop psi0 snapshot.
+    // `resetHellerCapture` bumps the generation counter, which causes the
+    // async mapAsync handler to bail out before touching the staging
+    // buffers we are about to destroy. Order matters: bump first, then
+    // release the pool.
+    resetHellerCapture(this._hellerState)
+    disposeHellerStagingBuffers(this._hellerState)
+    this._hellerState.psiReBuffer = null
+    this._hellerState.psiImBuffer = null
+    this._hellerState.totalSites = 0
+    useHellerSpectrometerStore.getState().setBufferRef(null)
     const gpu: TdseGpuFields = {
       psiReBuffer: this.psiReBuffer,
       psiImBuffer: this.psiImBuffer,
