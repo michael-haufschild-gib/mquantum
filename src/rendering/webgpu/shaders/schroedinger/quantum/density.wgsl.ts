@@ -300,38 +300,4 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   return array<vec3f, 2>(vec3f(rho, s, phaseForColor), vec3f(psi.x, psi.y, 0.0));
 }
 
-// Sample density at a given position (lightweight path for tetrahedral gradient).
-fn sampleDensityAtPos(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
-  let xND = mapPosToND(pos, uniforms);
-  let psi = evalPsi(xND, t, uniforms);
-  var rho = rhoFromPsi(psi);
-
-  if (QUANTUM_MODE_DEFAULT >= QUANTUM_MODE_HYDROGEN_ND) {
-    rho *= uniforms.hydrogenNDBoost;
-  }
-
-  return rho;
-}
 `
-
-/**
- * Legacy combined block - kept for backwards compatibility
- * Uses generic loop-based mapping with global basis uniform
- */
-export const densityBlock =
-  densityPreMapBlock +
-  /* wgsl */ `
-// Fallback: generic loop-based mapping using basis uniform
-fn mapPosToND(pos: vec3f, uniforms: SchroedingerUniforms) -> array<f32, 11> {
-  var xND: array<f32, 11>;
-  for (var j = 0; j < 11; j++) {
-    let bx = getBasisComponent(basis.basisX, j);
-    let by = getBasisComponent(basis.basisY, j);
-    let bz = getBasisComponent(basis.basisZ, j);
-    let o = getBasisComponent(basis.origin, j);
-    xND[j] = (o + pos.x * bx + pos.y * by + pos.z * bz) * uniforms.fieldScale;
-  }
-  return xND;
-}
-` +
-  densityPostMapBlock

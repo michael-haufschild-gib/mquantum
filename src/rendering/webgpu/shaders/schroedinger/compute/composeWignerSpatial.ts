@@ -66,10 +66,10 @@ export function composeWignerSpatialComputeShader(config: WignerSpatialComputeCo
   const defines: string[] = []
   const features: string[] = []
 
-  // Compile-time dimension (Wigner is always ND, min 3)
+  // Compile-time dimension (Wigner is always ND, min 3). Only ACTUAL_DIM
+  // is emitted — see composeWignerCache.ts for the rationale.
   const actualDim = Math.min(Math.max(dimension, 3), 11)
 
-  defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Wigner Spatial`)
 

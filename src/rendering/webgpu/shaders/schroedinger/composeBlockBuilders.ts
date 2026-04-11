@@ -197,7 +197,6 @@ export function buildQuantumMathBlocks(opts: {
           'fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
           'fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
           'fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> { return array<vec3f, 2>(vec3f(0.0), pos); }',
-          'fn sampleDensityAtPos(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 { return 0.0; }',
           'fn densityPair(psi: vec2f) -> vec2f { return vec2f(0.0); }',
           'fn applyUncertaintyBoundaryEmphasis(rho: f32, logRho: f32, uniforms: SchroedingerUniforms) -> f32 { return rho; }',
           'fn gradientNoise(p: vec3f) -> f32 { return 0.0; }',
@@ -430,7 +429,6 @@ export function buildVolumeBlocks(opts: {
             'const TETRA_V3: vec3f = vec3f(-0.5773503, -0.5773503, -0.5773503);',
             'fn sampleWithTetrahedralGradient(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
             'fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
-            'fn computeGradientTetrahedralAtPos(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
           ].join('\n')
         : volumeGradientBlock,
       condition: !opts.is2D,

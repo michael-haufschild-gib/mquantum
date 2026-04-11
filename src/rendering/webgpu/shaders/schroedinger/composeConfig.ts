@@ -208,7 +208,11 @@ export function buildShaderDefinesAndFeatures(flags: {
   const defines: string[] = []
   const features: string[] = []
 
-  defines.push(`const DIMENSION: i32 = ${flags.dimension};`)
+  // Only ACTUAL_DIM (clamped) is emitted — the previously-emitted
+  // un-clamped `const DIMENSION` was never read by any WGSL shader.
+  // Dropped to avoid misleading readers about which dimension the
+  // shaders actually use. See compose.ts / composeWignerCache.ts for
+  // the same note in the sibling composers.
   defines.push(`const ACTUAL_DIM: i32 = ${flags.actualDim};`)
   defines.push(`const IS_2D: bool = ${flags.is2D};`)
   defines.push(`const IS_WIGNER: bool = ${flags.isWigner};`)

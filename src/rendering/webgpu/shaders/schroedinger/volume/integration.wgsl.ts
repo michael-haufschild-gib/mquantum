@@ -76,17 +76,6 @@ fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: Schroedi
   return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
 }
 
-/**
- * Tetrahedral gradient sampling of log-density at a position.
- */
-fn computeGradientTetrahedralAtPos(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  let s0 = sFromRho(sampleDensityAtPos(pos + TETRA_V0 * delta, t, uniforms));
-  let s1 = sFromRho(sampleDensityAtPos(pos + TETRA_V1 * delta, t, uniforms));
-  let s2 = sFromRho(sampleDensityAtPos(pos + TETRA_V2 * delta, t, uniforms));
-  let s3 = sFromRho(sampleDensityAtPos(pos + TETRA_V3 * delta, t, uniforms));
-
-  return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
-}
 `
 
 /**

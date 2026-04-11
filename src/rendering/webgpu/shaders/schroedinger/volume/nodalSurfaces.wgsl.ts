@@ -340,10 +340,10 @@ fn computePhysicalNodalFieldWithGradient(pos: vec3f, t: f32, uniforms: Schroedin
 
     // For hydrogen family filter, density gradient needs separate samples
     // (hydrogen factors don't directly give us density at offset positions)
-    let sd0 = sFromRho(sampleDensityAtPos(pos + TETRA_V0 * delta, t, uniforms));
-    let sd1 = sFromRho(sampleDensityAtPos(pos + TETRA_V1 * delta, t, uniforms));
-    let sd2 = sFromRho(sampleDensityAtPos(pos + TETRA_V2 * delta, t, uniforms));
-    let sd3 = sFromRho(sampleDensityAtPos(pos + TETRA_V3 * delta, t, uniforms));
+    let sd0 = sFromRho(sampleDensity(pos + TETRA_V0 * delta, t, uniforms));
+    let sd1 = sFromRho(sampleDensity(pos + TETRA_V1 * delta, t, uniforms));
+    let sd2 = sFromRho(sampleDensity(pos + TETRA_V2 * delta, t, uniforms));
+    let sd3 = sFromRho(sampleDensity(pos + TETRA_V3 * delta, t, uniforms));
     densityGrad = (TETRA_V0 * sd0 + TETRA_V1 * sd1 + TETRA_V2 * sd2 + TETRA_V3 * sd3) * (0.75 / delta);
     avgS = (sd0 + sd1 + sd2 + sd3) * 0.25;
   } else {
