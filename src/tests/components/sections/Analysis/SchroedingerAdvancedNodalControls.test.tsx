@@ -1,5 +1,4 @@
-import { within } from '@testing-library/react'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Analysis/SchroedingerQuantumEffectsSection'
@@ -88,6 +87,13 @@ describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
 
     render(<SchroedingerQuantumEffectsSection />)
 
+    // With lobe coloring OFF, the section renders THREE color pickers in
+    // the non-lobe branch: the |ψ| colour plus the independent Re and Im
+    // colours. The earlier version of this test only asserted two of the
+    // three, so a regression that accidentally dropped `-color-abs` would
+    // pass silently. All three are asserted now, and all sign-based lobe
+    // pickers must be absent.
+    expect(screen.getByTestId('schroedinger-nodal-color-abs')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-real')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-imag')).toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-nodal-color-positive')).not.toBeInTheDocument()
@@ -96,6 +102,10 @@ describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
     fireEvent.click(screen.getByTestId('schroedinger-nodal-lobe-toggle'))
 
     expect(useExtendedObjectStore.getState().schroedinger.nodalLobeColoringEnabled).toBe(true)
+    // With lobe coloring ON, ALL three of the non-lobe pickers must be
+    // unmounted — a regression that left one of them stuck in the DOM
+    // would mislead the user about which configuration is active.
+    expect(screen.queryByTestId('schroedinger-nodal-color-abs')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-nodal-color-real')).not.toBeInTheDocument()
     expect(screen.queryByTestId('schroedinger-nodal-color-imag')).not.toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-positive')).toBeInTheDocument()

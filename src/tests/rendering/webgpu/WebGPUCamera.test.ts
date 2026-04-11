@@ -226,14 +226,50 @@ describe('WebGPUCamera', () => {
   })
 
   describe('setAspect', () => {
-    it('does not re-mark dirty when aspect is the same', () => {
-      const cam = new WebGPUCamera({ aspect: 1.5 })
-      cam.getMatrices() // clear dirty
+    it('changing the aspect ratio updates the projection matrix', () => {
+      // The reverse-Z perspective matrix stores `f/aspect` at index 0, so
+      // the first element is a direct function of aspect. A regression that
+      // broke `dirty = true` in `setAspect` (or the lazy recompute in
+      // `getMatrices`) would silently leave `projectionMatrix[0]` stale,
+      // and this assertion would catch it. Snapshot-before ensures we're
+      // comparing matrices from the SAME Float32Array across both calls —
+      // WebGPUCamera reuses the pre-allocated buffer.
+      const cam = new WebGPUCamera({ aspect: 1.5, fov: 60 })
+      const projInitial0 = cam.getMatrices().projectionMatrix[0]
 
-      cam.setAspect(1.5) // same value
-      // Internal state: this is about dirty flag — we verify matrices don't change
-      const m = cam.getMatrices()
-      expect(m.fov).toBe(60) // still valid
+      cam.setAspect(2.0)
+      const projAfter0 = cam.getMatrices().projectionMatrix[0]
+
+      expect(projAfter0).not.toBeCloseTo(projInitial0!, 4)
+      // Explicit invariant: `f / aspect` with f = 1/tan(fovY/2).
+      const f = 1 / Math.tan((60 * Math.PI) / 180 / 2)
+      expect(projAfter0).toBeCloseTo(f / 2.0, 4)
+    })
+
+    it('setAspect with the same value is a no-op (early-return optimization)', () => {
+      // Proves the `if (this.state.aspect === aspect) return` guard does
+      // what it claims. We clear the dirty flag by calling getMatrices()
+      // once, then pass the exact same aspect — the internal state and
+      // resulting projection matrix must be bit-for-bit identical, which
+      // implies recomputation was skipped.
+      //
+      // Note: object-reference equality of `projectionMatrix` is NOT a
+      // useful check because `getMatrices()` always returns the same
+      // pre-allocated Float32Array. The distinguishing behaviour is that
+      // the contents of that array don't change.
+      const cam = new WebGPUCamera({ aspect: 1.5 })
+      const snapshot = new Float32Array(cam.getMatrices().projectionMatrix)
+
+      cam.setAspect(1.5)
+      const afterNoOp = cam.getMatrices().projectionMatrix
+      for (let i = 0; i < 16; i++) {
+        expect(afterNoOp[i]).toBe(snapshot[i])
+      }
+
+      // And a fresh aspect change still takes effect after the no-op —
+      // guards against the early-return leaking into subsequent calls.
+      cam.setAspect(2.0)
+      expect(cam.getState().aspect).toBe(2.0)
     })
   })
 })

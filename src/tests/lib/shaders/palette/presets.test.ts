@@ -14,58 +14,11 @@ import {
 } from '@/rendering/shaders/palette/presets'
 
 describe('COSINE_PRESETS', () => {
-  it('should have all preset keys defined', () => {
-    const expectedKeys: PresetKey[] = [
-      // Pastels
-      'powderBlue',
-      'dustyRose',
-      'softLavender',
-      'palePeach',
-      // Desaturated Blues
-      'steelBlue',
-      'stormCloud',
-      'deepSea',
-      'slate',
-      'fog',
-      // Desaturated Reds/Pinks
-      'crimsonFade',
-      'driedRose',
-      'terracotta',
-      'clay',
-      'burgundyMist',
-      'mauve',
-      // Earthy/Neutral
-      'stone',
-      'driftwood',
-      'charcoal',
-      'espresso',
-      // Two-color blends
-      'roseSteel',
-      'dustyTwilight',
-      'warmFog',
-      'coolEmber',
-      // Experimental
-      'electric',
-      'plasma',
-      'nebula',
-      'prism',
-      // Wild/Unconventional
-      'glitch',
-      'infrared',
-      'acidWash',
-      'voidPulse',
-      'solarFlare',
-      'deepFry',
-      'ghostwave',
-      'toxicSpill',
-      'binaryFade',
-      'chromaticShift',
-    ]
-
-    for (const key of expectedKeys) {
-      expect(COSINE_PRESETS[key]).toHaveProperty('a')
-    }
-  })
+  // `COSINE_PRESETS` is declared as `Record<PresetKey, CosineCoefficients>`,
+  // so TypeScript already guarantees every `PresetKey` maps to an entry —
+  // there is no point in hardcoding the 36 preset names into an assertion
+  // list that must be maintained alongside the source. The earlier test here
+  // was redundant with the type system and added maintenance burden.
 
   it('should have valid coefficient structure for all presets', () => {
     for (const [_key, coeffs] of Object.entries(COSINE_PRESETS)) {
@@ -113,13 +66,32 @@ describe('COSINE_PRESETS', () => {
 })
 
 describe('COSINE_PRESET_OPTIONS', () => {
-  it('should have matching entries for all COSINE_PRESETS', () => {
-    const presetKeys = Object.keys(COSINE_PRESETS)
+  it('should include an entry for every COSINE_PRESETS key', () => {
+    // Regression guard for the preset → option mapping. The options array
+    // is hand-maintained (not derived from the PresetKey type), so adding
+    // a new preset to `cosinePresetData.ts` without updating this list
+    // would silently drop it from the UI dropdown. The reverse direction
+    // (every option value maps to a real preset) is covered by the next
+    // test. Both directions matter — TypeScript only enforces one.
+    const presetKeys = Object.keys(COSINE_PRESETS) as PresetKey[]
+    const optionValues = new Set(COSINE_PRESET_OPTIONS.map((o) => o.value))
+    const missing = presetKeys.filter((k) => !optionValues.has(k))
+    expect(missing, `COSINE_PRESET_OPTIONS is missing: ${missing.join(', ')}`).toEqual([])
 
-    for (const key of presetKeys) {
-      const option = COSINE_PRESET_OPTIONS.find((o) => o.value === key)
-      expect(option).toHaveProperty('value', key)
-      expect(option!.coefficients).toBe(COSINE_PRESETS[key as PresetKey])
+    // And the option count must equal the preset count — catches a
+    // duplicate option entry that would otherwise let the missing-check
+    // pass while a preset is still effectively shadowed.
+    expect(COSINE_PRESET_OPTIONS).toHaveLength(presetKeys.length)
+  })
+
+  it('every option value maps to a real COSINE_PRESETS entry', () => {
+    // Reverse direction: if someone typos an option value (`powderrBlue`),
+    // the dropdown would offer a selection that crashes the consumer when
+    // it tries to look up the coefficients.
+    const presetKeys = new Set(Object.keys(COSINE_PRESETS))
+    for (const option of COSINE_PRESET_OPTIONS) {
+      expect(presetKeys.has(option.value), `orphan option: ${option.value}`).toBe(true)
+      expect(option.coefficients).toBe(COSINE_PRESETS[option.value as PresetKey])
     }
   })
 

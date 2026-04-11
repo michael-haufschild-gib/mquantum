@@ -86,7 +86,7 @@ describe('CrossSectionAnalysisContent controls', () => {
     ['hydrogenNDCoupled', 'hydrogen-energy-diagram'],
     ['hydrogenND', 'control-group-radial-probability'],
     ['hydrogenNDCoupled', 'control-group-radial-probability'],
-  ] as const)('renders %s mode with %s element', (quantumMode, testId) => {
+  ] as const)('%s mode shows %s', (quantumMode, testId) => {
     useExtendedObjectStore.setState({
       schroedinger: {
         ...useExtendedObjectStore.getState().schroedinger,
@@ -96,4 +96,66 @@ describe('CrossSectionAnalysisContent controls', () => {
     render(<CrossSectionAnalysisContent />)
     expect(screen.getByTestId(testId)).toBeInTheDocument()
   })
+
+  // ────────────────────────────────────────────────────────────────────
+  // Negative-path mode gating
+  // ────────────────────────────────────────────────────────────────────
+  //
+  // The positive cases above only check that hydrogen modes render their
+  // hydrogen-specific elements. Without these symmetric negative tests, a
+  // regression that makes `<HydrogenEnergyDiagram />` or the
+  // Radial Probability `ControlGroup` unconditional (or gates them on the
+  // wrong `quantumMode` comparison) would slip past the existing suite:
+  // the hydrogen-positive cases still pass, and HO mode would silently grow
+  // controls that only work for hydrogen eigenstates.
+
+  it('harmonicOscillator mode does NOT render the hydrogen-energy-diagram', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'harmonicOscillator',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.queryByTestId('hydrogen-energy-diagram')).not.toBeInTheDocument()
+  })
+
+  it('harmonicOscillator mode does NOT render the radial-probability control group', () => {
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'harmonicOscillator',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.queryByTestId('control-group-radial-probability')).not.toBeInTheDocument()
+  })
+
+  it('harmonicOscillator mode renders the HO energy diagram (positive symmetry)', () => {
+    // Balances the hydrogen-positive cases above so the HO branch has an
+    // explicit positive test too. Without this, a future "ho-energy-diagram
+    // gone missing" regression would still pass the negative-only HO tests.
+    useExtendedObjectStore.setState({
+      schroedinger: {
+        ...useExtendedObjectStore.getState().schroedinger,
+        quantumMode: 'harmonicOscillator',
+      },
+    })
+    render(<CrossSectionAnalysisContent />)
+    expect(screen.getByTestId('ho-energy-diagram')).toBeInTheDocument()
+  })
+
+  it.each([['hydrogenND'], ['hydrogenNDCoupled']] as const)(
+    '%s mode does NOT render the HO energy diagram',
+    (quantumMode) => {
+      useExtendedObjectStore.setState({
+        schroedinger: {
+          ...useExtendedObjectStore.getState().schroedinger,
+          quantumMode,
+        },
+      })
+      render(<CrossSectionAnalysisContent />)
+      expect(screen.queryByTestId('ho-energy-diagram')).not.toBeInTheDocument()
+    }
+  )
 })
