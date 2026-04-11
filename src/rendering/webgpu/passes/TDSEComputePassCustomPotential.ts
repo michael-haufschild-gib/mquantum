@@ -23,52 +23,70 @@ import { evaluatePotentialGrid } from '@/lib/physics/potentialGridEvaluator'
  * @returns Hash string for comparison
  */
 export function computePotentialHash(config: TdseConfig, simTime: number): string {
-  const isDriven = config.potentialType === 'driven' && config.driveEnabled
-  const base = isDriven
-    ? `driven_${simTime}`
-    : [
-        config.potentialType,
-        config.barrierHeight,
-        config.barrierWidth,
-        config.barrierCenter,
-        config.harmonicOmega,
-        config.wellDepth,
-        config.wellWidth,
-        config.stepHeight,
-        config.mass,
-        config.interactionStrength,
-        config.slitSeparation,
-        config.slitWidth,
-        config.wallThickness,
-        config.wallHeight,
-        config.latticeDepth,
-        config.latticePeriod,
-        config.doubleWellLambda,
-        config.doubleWellSeparation,
-        config.doubleWellAsymmetry,
-        config.radialWellInner,
-        config.radialWellOuter,
-        config.radialWellDepth,
-        config.radialWellTilt,
-        config.anharmonicLambda,
-        config.bhMass,
-        config.bhMultipoleL,
-        config.bhSpin,
-        (config.trapAnisotropy ?? []).join(','),
-        config.spacing.join(','),
-        (config.compactDims ?? []).map(Number).join(','),
-        (config.compactRadii ?? []).join(','),
-        config.disorderStrength,
-        config.disorderSeed,
-      ].join('|')
-  const custom = config.potentialType === 'custom' ? config.customPotentialExpression : ''
-  // Anderson hash includes hbar because t_eff = ℏ²/(2m·dx²) scales the disorder.
-  // spacing and mass are already in the base hash.
+  // Always include the full set of V(x)-shaping parameters. This matters even
+  // when the potential type is time-dependent: if the user pauses playback
+  // (`simTime` frozen) and edits, say, `barrierHeight` or `driveAmplitude`,
+  // the hash must still change so the potential buffer is rebuilt. The
+  // previous `isDriven ? 'driven_${simTime}' : fullList` fast-path dropped
+  // every base parameter and introduced a silent stale-V bug on pause-edit.
+  const base = [
+    config.potentialType,
+    config.barrierHeight,
+    config.barrierWidth,
+    config.barrierCenter,
+    config.harmonicOmega,
+    config.wellDepth,
+    config.wellWidth,
+    config.stepHeight,
+    config.mass,
+    config.interactionStrength,
+    config.slitSeparation,
+    config.slitWidth,
+    config.wallThickness,
+    config.wallHeight,
+    config.latticeDepth,
+    config.latticePeriod,
+    config.doubleWellLambda,
+    config.doubleWellSeparation,
+    config.doubleWellAsymmetry,
+    config.radialWellInner,
+    config.radialWellOuter,
+    config.radialWellDepth,
+    config.radialWellTilt,
+    config.anharmonicLambda,
+    config.bhMass,
+    config.bhMultipoleL,
+    config.bhSpin,
+    (config.trapAnisotropy ?? []).join(','),
+    config.spacing.join(','),
+    (config.compactDims ?? []).map(Number).join(','),
+    (config.compactRadii ?? []).join(','),
+    config.disorderStrength,
+    config.disorderSeed,
+  ].join('|')
+
+  // Driven-mode suffix: drive params AND the advancing `simTime` appear only
+  // when the driven slab barrier is actually time-modulated. This drives the
+  // per-frame rebuild while the sim is playing and still lets pause-edit flow
+  // through `base` above.
+  const driven =
+    config.potentialType === 'driven' && config.driveEnabled
+      ? `|drive|${config.driveWaveform}|${config.driveFrequency}|${config.driveAmplitude}|${simTime}`
+      : ''
+
+  const custom =
+    config.potentialType === 'custom' ? `|custom|${config.customPotentialExpression}` : ''
+
+  // Anderson hash includes `hbar` because `t_eff = ℏ²/(2m·dx²)` scales the
+  // disorder strength (see uploadAndersonDisorderBuffer). `mass`, `spacing`,
+  // `disorderStrength`, `disorderSeed` are already in `base` — only the
+  // disorder distribution and hbar need appending here.
   const anderson =
     config.potentialType === 'andersonDisorder'
-      ? `${config.disorderStrength}|${config.disorderSeed}|${config.disorderDistribution}|${config.hbar}`
+      ? `|anderson|${config.disorderDistribution}|${config.hbar}`
       : ''
-  return `${base}|${custom}|${anderson}`
+
+  return `${base}${driven}${custom}${anderson}`
 }
 
 /**
@@ -158,7 +176,12 @@ export function uploadAndersonDisorderBuffer(
     config.disorderDistribution
   )
 
-  device.queue.writeBuffer(potentialBuffer, 0, potential.buffer)
+  // Pass the typed array itself (not `.buffer`) so WebGPU respects its
+  // `byteOffset` / `byteLength`. Identical behaviour today because
+  // `generateDisorderPotential` returns a full-buffer `new Float32Array`,
+  // but robust to any future refactor that hands out a pooled subview —
+  // a raw `.buffer` upload would silently ship the wrong bytes from offset 0.
+  device.queue.writeBuffer(potentialBuffer, 0, potential)
 
   // Compute max|V| for display normalization
   let maxAbsV = 0
