@@ -150,6 +150,13 @@ export interface StateSaveLoadPass {
    * Passes that don't need runtime state should leave this undefined.
    */
   setLoadedRuntimeSimEta?(eta: number): void
+  /**
+   * Optional: restore mode-specific preheating drive state (the reference
+   * time anchor and the Minkowski-path clock counter) from a loaded save
+   * file. Consumed alongside `setLoadedRuntimeSimEta` so the time-dependent
+   * Hamiltonian resumes in phase with the saved phi/pi buffers.
+   */
+  setLoadedRuntimePreheatingState?(referenceEta: number, time: number): void
 }
 
 /**
@@ -179,7 +186,8 @@ export function handleSimulationStateIO(
     const loadData = simState.pendingLoadData
     if (acceptedModes.includes(loadData.quantumMode)) {
       pass.setLoadedWavefunction(loadData.psiRe, loadData.psiIm)
-      // Restore mode-specific runtime state (currently just FSF simEta).
+      // Restore mode-specific runtime state (currently just FSF: simEta +
+      // preheating drive clocks).
       const savedSimEta = loadData.runtimeMeta?.simEta
       if (
         typeof savedSimEta === 'number' &&
@@ -187,6 +195,21 @@ export function handleSimulationStateIO(
         pass.setLoadedRuntimeSimEta
       ) {
         pass.setLoadedRuntimeSimEta(savedSimEta)
+      }
+      // Restore the preheating drive state so the Mathieu modulation
+      // `1 + A·sin(Ω·(clock − ref))` resumes at the exact phase the save
+      // was taken. Pre-preheating saves lack both fields, in which case
+      // the pass falls back to its reset-time phase-0 anchor.
+      const savedRefEta = loadData.runtimeMeta?.preheatingReferenceEta
+      const savedPreheatingTime = loadData.runtimeMeta?.preheatingTime
+      if (
+        typeof savedRefEta === 'number' &&
+        typeof savedPreheatingTime === 'number' &&
+        Number.isFinite(savedRefEta) &&
+        Number.isFinite(savedPreheatingTime) &&
+        pass.setLoadedRuntimePreheatingState
+      ) {
+        pass.setLoadedRuntimePreheatingState(savedRefEta, savedPreheatingTime)
       }
       simState.clearLoadData()
     }

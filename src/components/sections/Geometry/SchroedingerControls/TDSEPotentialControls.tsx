@@ -11,20 +11,16 @@ import React, { useMemo } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import type {
   TdseConfig,
   TdseDisorderDistribution,
-  TdseDriveWaveform,
   TdsePotentialType,
 } from '@/lib/geometry/extended/types'
 
+import { BlackHoleRingdownControls } from './BlackHoleRingdownControls'
 import { CustomExpressionInput } from './CustomExpressionInput'
-import {
-  ALL_POTENTIAL_TYPE_OPTIONS,
-  DISORDER_DISTRIBUTION_OPTIONS,
-  DRIVE_WAVEFORM_OPTIONS,
-} from './tdseControlsConstants'
+import { ALL_POTENTIAL_TYPE_OPTIONS, DISORDER_DISTRIBUTION_OPTIONS } from './tdseControlsConstants'
+import { TDSEDriveControls } from './TDSEDriveControls'
 import type { TdseActions } from './types'
 
 /** Props for TDSEPotentialControls. */
@@ -59,6 +55,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
     const showRadialDoubleWellControls = td.potentialType === 'radialDoubleWell'
     const showDisorderControls = td.potentialType === 'andersonDisorder'
     const showCoupledAnharmonicControls = td.potentialType === 'coupledAnharmonic'
+    const showBlackHoleControls = td.potentialType === 'blackHoleRingdown'
 
     return (
       <>
@@ -417,6 +414,8 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
             </>
           )}
 
+          {showBlackHoleControls && <BlackHoleRingdownControls td={td} actions={actions} />}
+
           {/* Disorder overlay (available for any potential except andersonDisorder which has its own) */}
           {!showDisorderControls && (
             <>
@@ -448,52 +447,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           )}
         </div>
 
-        {/* Drive (only for driven potential) */}
-        {showDriveControls && (
-          <div className="border-t border-border-subtle pt-3 space-y-3">
-            <Switch
-              label="Drive"
-              tooltip="Enable a time-dependent oscillating force on the potential barrier."
-              checked={td.driveEnabled}
-              onCheckedChange={actions.setDriveEnabled}
-              data-testid="tdse-drive-enabled"
-            />
-            {td.driveEnabled && (
-              <>
-                <Select
-                  label="Waveform"
-                  tooltip="Shape of the driving oscillation: sinusoidal, square, or sawtooth."
-                  options={DRIVE_WAVEFORM_OPTIONS}
-                  value={td.driveWaveform}
-                  onChange={(v) => actions.setDriveWaveform(v as TdseDriveWaveform)}
-                  data-testid="tdse-drive-waveform"
-                />
-                <Slider
-                  label="Frequency"
-                  tooltip="Angular frequency of the driving force. Resonances occur at natural transition frequencies."
-                  min={0.01}
-                  max={10}
-                  step={0.01}
-                  value={td.driveFrequency}
-                  onChange={actions.setDriveFrequency}
-                  showValue
-                  data-testid="tdse-drive-frequency"
-                />
-                <Slider
-                  label="Amplitude"
-                  tooltip="Peak strength of the driving perturbation in energy units."
-                  min={0}
-                  max={50}
-                  step={0.1}
-                  value={td.driveAmplitude}
-                  onChange={actions.setDriveAmplitude}
-                  showValue
-                  data-testid="tdse-drive-amplitude"
-                />
-              </>
-            )}
-          </div>
-        )}
+        {showDriveControls && <TDSEDriveControls td={td} actions={actions} />}
       </>
     )
   }

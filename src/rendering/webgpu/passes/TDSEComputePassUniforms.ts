@@ -58,6 +58,7 @@ const POT_MAP: Record<string, number> = {
   custom: 11, // GPU potential shader skipped; buffer filled from JS
   andersonDisorder: 12, // GPU potential shader skipped; buffer filled from JS with random disorder
   coupledAnharmonic: 13,
+  blackHoleRingdown: 14,
 }
 
 /** Enum maps for TDSE field view modes. */
@@ -275,6 +276,12 @@ export function writeTdseUniforms(
   // SchroedingerUniforms.
   u32[185] = 0
   f32[186] = config.branchPlanePosition ?? 0.0
+
+  // Black-hole Regge–Wheeler ringdown parameters (offsets 748-756, indices 187-189)
+  f32[187] = config.bhMass ?? 1.0
+  f32[188] = config.bhMultipoleL ?? 2
+  f32[189] = config.bhSpin ?? 2
+  // Indices 190 (offset 760) and 191 (offset 764) are pad — zero-filled above by u32.fill(0).
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

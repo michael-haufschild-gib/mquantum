@@ -67,11 +67,19 @@ struct FreeScalarUniforms {
   aPotential: f32,              // offset 508 — a^(n−2), gradient (stress) coefficient for
                                 //              π' ⊃ aPotential · ∇²δφ. 1.0 under Minkowski.
 
-  // Remaining cosmology coefficient + padding (16 bytes)
+  // Remaining cosmology coefficient + preheating scale + padding (16 bytes)
   aFull: f32,                   // offset 512 — a^n, volume-form coefficient for the
                                 //              mass term (mass²·aFull·δφ) and the
                                 //              self-interaction V'. 1.0 under Minkowski.
-  _padCosmo0: u32,              // offset 516
+  massSquaredScale: f32,        // offset 516 — post-inflation preheating drive. The
+                                //              pi-update multiplies the mass term by
+                                //              (1 + A·sin(Ω·(η−η_ref))), turning each
+                                //              mode's evolution into the Mathieu
+                                //              equation and enabling exponential
+                                //              parametric amplification inside the
+                                //              Floquet instability tongues. 1.0 when
+                                //              the drive is disabled — a multiplicative
+                                //              no-op composing with every other branch.
   _padCosmo1: u32,              // offset 520
   _padCosmo2: u32,              // offset 524
 }

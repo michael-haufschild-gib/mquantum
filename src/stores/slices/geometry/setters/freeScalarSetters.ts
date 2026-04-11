@@ -16,6 +16,7 @@ import {
   createFreeScalarCosmologySetters,
   reconcileCosmologyInvariants,
 } from './freeScalarCosmologySetters'
+import { createFreeScalarPreheatingSetters } from './freeScalarPreheatingSetters'
 import {
   clampDtWithCfl,
   defaultGridPerDim,
@@ -68,6 +69,9 @@ type FreeScalarActions = Pick<
   | 'setFreeScalarCosmologySteepness'
   | 'setFreeScalarCosmologyHubble'
   | 'setFreeScalarCosmologyEta0'
+  | 'setFreeScalarPreheatingEnabled'
+  | 'setFreeScalarPreheatingAmplitude'
+  | 'setFreeScalarPreheatingFrequency'
   | 'applyFreeScalarPreset'
 >
 
@@ -544,6 +548,7 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
         },
       }))
     },
+    ...createFreeScalarPreheatingSetters(ctx),
     ...createFreeScalarCosmologySetters(ctx),
     applyFreeScalarPreset: (presetId) => {
       void import('@/lib/physics/freeScalar/presets').then(({ FREE_SCALAR_PRESETS }) => {

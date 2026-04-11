@@ -288,20 +288,32 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   let rhoZn = szn.r;
 
   // Raw-density cutoff: compare unfloored rhoC against R_ZERO_CUTOFF² = 1e-12.
-  // Applying the 1e-8 floor first would make sqrt(max(·,1e-8)) ≥ 1e-4 > 1e-6,
+  // Applying a 1e-8 floor first would make sqrt(max(·,1e-8)) ≥ 1e-4 > 1e-6,
   // so the near-vacuum gate would never trigger and the caller would see
   // stencil noise on numerically-zero density regions instead of a zeroed Q.
   if (rhoC < 1e-12) {
     return 0.0;
   }
-  let Rc  = sqrt(max(rhoC,  1e-8));
 
-  let Rxp = sqrt(max(rhoXp, 1e-8));
-  let Rxn = sqrt(max(rhoXn, 1e-8));
-  let Ryp = sqrt(max(rhoYp, 1e-8));
-  let Ryn = sqrt(max(rhoYn, 1e-8));
-  let Rzp = sqrt(max(rhoZp, 1e-8));
-  let Rzn = sqrt(max(rhoZn, 1e-8));
+  // Neighbor amplitudes: allow R = 0 for out-of-bounds or vacuum cells
+  // so the stencil preserves the zero-outside boundary convention the
+  // grid-clamp select(..., vec4f(0.0), ...) block above set up. Lifting
+  // these to sqrt(1e-8) ~= 3.16e-4 the way the center amplitude is
+  // clamped would inject spurious curvature into the Laplacian anywhere
+  // within a texel of vacuum -- visible as a thin highlighted rim on
+  // the Bohmian quantum-potential visualisation. max(v, 0.0) still
+  // guards the sqrt from float noise producing a tiny negative input.
+  let Rxp = sqrt(max(rhoXp, 0.0));
+  let Rxn = sqrt(max(rhoXn, 0.0));
+  let Ryp = sqrt(max(rhoYp, 0.0));
+  let Ryn = sqrt(max(rhoYn, 0.0));
+  let Rzp = sqrt(max(rhoZp, 0.0));
+  let Rzn = sqrt(max(rhoZn, 0.0));
+  // Center amplitude is the denominator of Q = -0.5 * laplacian(R) / R,
+  // so keep the 1e-8 floor there: dividing by a pure zero would yield
+  // Inf and the rhoC < 1e-12 gate already bypasses the full expression
+  // for numerically-vacuum voxels.
+  let Rc  = sqrt(max(rhoC,  1e-8));
 
   // World half-step h = 2·bound / DENSITY_GRID_SIZE (one texel).
   let h = (2.0 * bound) / DENSITY_GRID_SIZE;
@@ -333,48 +345,32 @@ fn wrapPhase(dTheta: f32) -> f32 {
 }
 
 /**
- * True when all four corners of a plaquette lie inside the density grid
- * (UVW in [0, 1]^3). Used to discard boundary plaquettes whose winding is
- * ambiguous.
+ * Fetch the spatial phase stored in the density grid's B channel at a
+ * discrete texel index. Returns 0 for out-of-grid texels. r16float grids
+ * always return 0 because their B channel is a constant-zero swizzle.
+ *
+ * Uses textureLoad (nearest-texel fetch) rather than textureSampleLevel
+ * because linear filtering interpolates across the ±pi branch cut, which
+ * corrupts wrapped edge differences and the quantised plaquette winding.
+ * The plaquette winding formula is only topologically well-defined when the
+ * four corner phases come from discrete texel centres.
  */
-fn allInBounds4(a: vec3f, b: vec3f, c: vec3f, d: vec3f) -> bool {
-  return all(a >= vec3f(0.0)) && all(a <= vec3f(1.0)) &&
-         all(b >= vec3f(0.0)) && all(b <= vec3f(1.0)) &&
-         all(c >= vec3f(0.0)) && all(c <= vec3f(1.0)) &&
-         all(d >= vec3f(0.0)) && all(d <= vec3f(1.0));
-}
-
-/**
- * Fetch the spatial phase stored in the density grid's B channel at UVW.
- * Returns 0 for out-of-grid positions. r16float grids always return 0 because
- * their B channel is a constant-zero swizzle.
- */
-fn samplePhaseOrZero(uvw: vec3f) -> f32 {
-  if (any(uvw < vec3f(0.0)) || any(uvw > vec3f(1.0))) { return 0.0; }
-  let s = textureSampleLevel(densityGridTexture, densityGridSampler, uvw, 0.0);
+fn samplePhaseOrZero(ti: vec3i) -> f32 {
+  let N = i32(DENSITY_GRID_SIZE);
+  if (any(ti < vec3i(0)) || any(ti >= vec3i(N))) { return 0.0; }
+  let s = textureLoad(densityGridTexture, ti, 0);
   return s.b;
 }
 
 /**
- * Compute the discrete line integral of ∇theta around a single four-corner
- * plaquette using wrapped edge differences. Returns 0 if any corner falls
- * outside the density grid.
- *
- * Corners traverse the loop c00 → c10 → c11 → c01 → c00. Sign depends on the
- * traversal direction and the defect orientation, but the caller only uses
- * |W| so sign is irrelevant.
- *
- * The bounds check runs BEFORE the four texture fetches so out-of-grid
- * plaquettes incur zero texture bandwidth. All four corners are sampled in
- * uniform control flow (WGSL textureSample requirement is satisfied by
- * textureSampleLevel here regardless).
+ * Winding of a pre-sampled plaquette: four wrapped edge differences
+ * around the loop c00 -> c10 -> c11 -> c01 -> c00. Takes phase values at
+ * the corners directly so the caller can share texel loads across
+ * multiple plaquettes that reuse the same corner set. Callers MUST have
+ * already verified that every corner falls inside the grid -- this
+ * helper does not re-check bounds.
  */
-fn plaquetteWinding(c00: vec3f, c10: vec3f, c11: vec3f, c01: vec3f) -> f32 {
-  if (!allInBounds4(c00, c10, c11, c01)) { return 0.0; }
-  let p00 = samplePhaseOrZero(c00);
-  let p10 = samplePhaseOrZero(c10);
-  let p11 = samplePhaseOrZero(c11);
-  let p01 = samplePhaseOrZero(c01);
+fn plaquetteWindingFromPhases(p00: f32, p10: f32, p11: f32, p01: f32) -> f32 {
   let d0 = wrapPhase(p10 - p00);
   let d1 = wrapPhase(p11 - p10);
   let d2 = wrapPhase(p01 - p11);
@@ -386,6 +382,12 @@ fn plaquetteWinding(c00: vec3f, c10: vec3f, c11: vec3f, c01: vec3f) -> f32 {
  * Compute the per-voxel topological-charge magnitude by summing the wrapped
  * plaquette windings across the three coordinate planes anchored at pos.
  * Returns 0 for density grids that carry no phase (r16float fallback).
+ *
+ * The three plaquettes span the 2x2x2 texel cube anchored at baseTi but
+ * only touch 7 of the 8 corners (the far +x+y+z corner is unused). We
+ * pre-fetch those 7 phases once -- a single bounds gate up front
+ * replaces per-plaquette bounds checks, saving 5 redundant textureLoads
+ * per raymarch sample.
  */
 fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   if (!DENSITY_GRID_HAS_PHASE) { return 0.0; }
@@ -393,28 +395,40 @@ fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f
   let bound = uniforms.boundingRadius;
   let invDiameter = uniforms.invBoundingRadius * 0.5;
   let baseUVW = (pos + vec3f(bound)) * invDiameter;
-  let step = 1.0 / DENSITY_GRID_SIZE;
 
-  // xy plaquette at fixed z — corners offset in x and y.
-  let xy00 = baseUVW;
-  let xy10 = baseUVW + vec3f(step, 0.0, 0.0);
-  let xy11 = baseUVW + vec3f(step, step, 0.0);
-  let xy01 = baseUVW + vec3f(0.0, step, 0.0);
-  let w_xy = plaquetteWinding(xy00, xy10, xy11, xy01);
+  // Quantise to the nearest texel corner. Phase must be read from discrete
+  // texel centres via textureLoad (see samplePhaseOrZero); linear filtering
+  // across the ±pi branch cut would corrupt the winding. floor() anchors
+  // the plaquette to the bottom-left corner of the enclosing texel cube,
+  // and negative out-of-grid positions produce negative texel indices that
+  // the bounds gate below will reject.
+  let baseTi = vec3i(floor(baseUVW * DENSITY_GRID_SIZE));
 
-  // yz plaquette at fixed x — corners offset in y and z.
-  let yz00 = baseUVW;
-  let yz10 = baseUVW + vec3f(0.0, step, 0.0);
-  let yz11 = baseUVW + vec3f(0.0, step, step);
-  let yz01 = baseUVW + vec3f(0.0, 0.0, step);
-  let w_yz = plaquetteWinding(yz00, yz10, yz11, yz01);
+  // Early-out if the furthest unique corner baseTi + (1,1,1) is already
+  // outside the grid -- one cheap bounds check covers every texel the
+  // three plaquettes will read.
+  let N = i32(DENSITY_GRID_SIZE);
+  let farTi = baseTi + vec3i(1, 1, 1);
+  if (any(baseTi < vec3i(0)) || any(farTi >= vec3i(N))) {
+    return 0.0;
+  }
 
-  // zx plaquette at fixed y — corners offset in z and x.
-  let zx00 = baseUVW;
-  let zx10 = baseUVW + vec3f(0.0, 0.0, step);
-  let zx11 = baseUVW + vec3f(step, 0.0, step);
-  let zx01 = baseUVW + vec3f(step, 0.0, 0.0);
-  let w_zx = plaquetteWinding(zx00, zx10, zx11, zx01);
+  // Seven unique corner phases — the 2×2×2 cube minus its far +x+y+z
+  // corner (never referenced by any of the three plaquettes below).
+  let p000 = samplePhaseOrZero(baseTi);                       // origin
+  let p100 = samplePhaseOrZero(baseTi + vec3i(1, 0, 0));      // +x
+  let p010 = samplePhaseOrZero(baseTi + vec3i(0, 1, 0));      // +y
+  let p001 = samplePhaseOrZero(baseTi + vec3i(0, 0, 1));      // +z
+  let p110 = samplePhaseOrZero(baseTi + vec3i(1, 1, 0));      // +x+y
+  let p011 = samplePhaseOrZero(baseTi + vec3i(0, 1, 1));      // +y+z
+  let p101 = samplePhaseOrZero(baseTi + vec3i(1, 0, 1));      // +x+z
+
+  // xy plaquette at fixed z = baseTi.z — corners: origin, +x, +x+y, +y.
+  let w_xy = plaquetteWindingFromPhases(p000, p100, p110, p010);
+  // yz plaquette at fixed x = baseTi.x — corners: origin, +y, +y+z, +z.
+  let w_yz = plaquetteWindingFromPhases(p000, p010, p011, p001);
+  // zx plaquette at fixed y = baseTi.y — corners: origin, +z, +x+z, +x.
+  let w_zx = plaquetteWindingFromPhases(p000, p001, p101, p100);
 
   return (abs(w_xy) + abs(w_yz) + abs(w_zx)) * INV_TAU;
 }

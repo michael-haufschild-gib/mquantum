@@ -21,6 +21,7 @@ import type { FreeScalarFieldView, FreeScalarInitialCondition } from '@/lib/geom
 import { MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
 import { CosmologyControls } from './CosmologyControls'
+import { PreheatingControls } from './PreheatingControls'
 import type { FreeScalarFieldControlsProps } from './types'
 
 /**
@@ -444,6 +445,8 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           selfInteractionEnabled={fs.selfInteractionEnabled}
           actions={actions}
         />
+
+        <PreheatingControls preheating={fs.preheating} mass={fs.mass} actions={actions} />
 
         <ControlGroup
           title="Field View"

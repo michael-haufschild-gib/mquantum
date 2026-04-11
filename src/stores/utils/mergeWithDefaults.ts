@@ -10,6 +10,7 @@
  * for the missing parameters.
  */
 
+import { DEFAULT_PREHEATING_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import {
   DEFAULT_PAULI_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
@@ -156,6 +157,31 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
 
+  // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
+  // legacy scenes. The BH setters promote ℓ whenever the user raises s, but
+  // scene loading writes `tdse` directly via setState and bypasses the setter
+  // path — so a pre-constraint scene with (bhSpin=2, bhMultipoleL=0) would slip
+  // through. The UI `BlackHoleRingdownControls` slider uses `min={td.bhSpin}`,
+  // and an out-of-range value would render the thumb outside the track until
+  // the next user interaction. Clamp here so the invariant always holds in
+  // memory regardless of how state was written.
+  const tdse = normalized.tdse
+  if (tdse && typeof tdse === 'object') {
+    const tdseRecord = tdse as Record<string, unknown>
+    const rawSpin = tdseRecord.bhSpin
+    const rawEll = tdseRecord.bhMultipoleL
+    if (typeof rawSpin === 'number' && typeof rawEll === 'number') {
+      const spin = Math.max(0, Math.min(2, Math.floor(rawSpin)))
+      const ell = Math.max(spin, Math.min(6, Math.floor(rawEll)))
+      if (spin !== rawSpin || ell !== rawEll) {
+        normalized = {
+          ...normalized,
+          tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell },
+        }
+      }
+    }
+  }
+
   // Reconcile cosmology invariants for the freeScalar sub-config. A scene
   // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller
   // grid (e.g. 8⁶ at d=6, smaller safe η₀) will have an `eta0` that the
@@ -163,11 +189,28 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // those setters via direct `setState`. Without this normalisation step,
   // the next vacuumNoise reset would feed an out-of-range `eta0` into
   // `sampleAdiabaticVacuum` and either throw or fall back silently.
+  //
+  // Also back-fill the `preheating` sub-config from its default whenever a
+  // scene saved before the parametric-resonance feature shipped is loaded.
+  // The GPU pass reads `config.preheating.enabled` every substep, so an
+  // undefined value would crash the leapfrog loop on the first frame.
   const fs = normalized.freeScalar
   if (fs && typeof fs === 'object') {
-    const reconciled = reconcileCosmologyInvariants(fs as FreeScalarConfig)
+    const fsRecord = fs as Record<string, unknown>
+    if (!fsRecord.preheating || typeof fsRecord.preheating !== 'object') {
+      normalized = {
+        ...normalized,
+        freeScalar: { ...fsRecord, preheating: { ...DEFAULT_PREHEATING_CONFIG } },
+      }
+    }
+    const reconciled = reconcileCosmologyInvariants(
+      (normalized.freeScalar as FreeScalarConfig) ?? (fs as FreeScalarConfig)
+    )
     if (Object.keys(reconciled).length > 0) {
-      normalized = { ...normalized, freeScalar: { ...(fs as object), ...reconciled } }
+      normalized = {
+        ...normalized,
+        freeScalar: { ...(normalized.freeScalar as object), ...reconciled },
+      }
     }
   }
 

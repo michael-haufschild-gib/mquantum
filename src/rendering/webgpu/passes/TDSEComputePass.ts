@@ -42,6 +42,7 @@ import {
   applyBufferResult,
   collectOldBuffers,
   rebuildTdseBuffers,
+  TDSE_UNIFORM_SIZE,
   type TdsePassBufferFields,
 } from './TDSEComputePassBuffers'
 import {
@@ -70,13 +71,15 @@ import {
 /**
  * TDSEUniforms struct size in bytes.
  *
- * Mirrors the layout in `tdseUniforms.wgsl.ts` — the trailing fields are
- * compactDimsMask (u32 @ 736), branchingEnabled (u32 @ 740), and
- * branchPlanePosition (f32 @ 744). Total = 744 + 4 = 748. Update both
- * this constant and the WGSL struct when adding new fields; the prior
- * "740 = 736 + 4" comment was stale and misled readers.
+ * Mirrors the layout in `tdseUniforms.wgsl.ts`. Trailing fields:
+ *   ... branchingEnabled (u32 @ 740), branchPlanePosition (f32 @ 744),
+ *   bhMass (f32 @ 748), bhMultipoleL (f32 @ 752), bhSpin (f32 @ 756),
+ *   _padBh0 (u32 @ 760), _padBh1 (u32 @ 764).
+ * Total = 768 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
+ * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
+ * struct together when adding new fields.
  */
-const UNIFORM_SIZE = 748
+const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 

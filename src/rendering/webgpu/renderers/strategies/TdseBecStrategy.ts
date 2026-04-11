@@ -8,7 +8,11 @@
  */
 
 import type { BecConfig } from '@/lib/geometry/extended/bec'
-import type { TdseConfig, TdseInitialCondition } from '@/lib/geometry/extended/tdse'
+import {
+  DEFAULT_TDSE_CONFIG,
+  type TdseConfig,
+  type TdseInitialCondition,
+} from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
@@ -87,7 +91,25 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    // If compute state was already adopted from a predecessor, reuse it.
+    // Dormancy guard: if this strategy was previously the source of a
+    // warm-swap transfer (adoptComputeState set `transferredOut = true` and
+    // nulled out `tdsePass`), we must not silently allocate a brand-new
+    // compute pass here. The successor owns the adopted state; resurrecting
+    // this instance would run a parallel integrator with a duplicate density
+    // texture and every downstream consumer would race over which view is
+    // live. Re-assert the dormant flag so `executeFrame` keeps its silent
+    // skip, clear the warning latches so a future re-use starts fresh, and
+    // return an empty bindings set — there is no texture view to hand to
+    // the render graph because we relinquished it.
+    if (this.transferredOut && !this.tdsePass) {
+      this.warnedTdsePassNull = false
+      this.warnedDensityNull = false
+      logger.log('[TdseBecStrategy] setup skipped: strategy is transferred-out (dormant)')
+      const emptyBindings = createDensityTextureBindings(ctx.device, null)
+      return { initPromises: [], ...emptyBindings }
+    }
+
+    // Normal fresh-setup or resume-after-adoption path.
     this.transferredOut = false
     this.warnedTdsePassNull = false
     this.warnedDensityNull = false
@@ -434,21 +456,31 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     const { mappedInit, mom } = TdseBecStrategy.prepareBecInitCondition(bec, g, latDim)
 
+    // Seed every field from the canonical TDSE defaults so BEC inherits any
+    // future additions to TdseConfig (including the BH Regge–Wheeler block,
+    // drive parameters, stochastic decoherence knobs, etc.) without every
+    // strategy having to track the schema. Then override only what BEC
+    // actually needs to differ on (`potentialType = 'becTrap'`, the BEC
+    // initial-condition mapping, absorber wiring from the store, autoScale
+    // and diagnostics). Any field not explicitly overridden below is the
+    // TDSE default — centralized in DEFAULT_TDSE_CONFIG.
     return {
       config: {
+        ...DEFAULT_TDSE_CONFIG,
         latticeDim: latDim,
         gridSize: bec.gridSize ?? new Array(latDim).fill(8),
         spacing: bec.spacing ?? new Array(latDim).fill(0.15),
-        mass: bec.mass ?? 1.0,
-        hbar: bec.hbar ?? 1.0,
+        mass: bec.mass ?? DEFAULT_TDSE_CONFIG.mass,
+        hbar: bec.hbar ?? DEFAULT_TDSE_CONFIG.hbar,
         dt: bec.dt ?? 0.002,
-        stepsPerFrame: bec.stepsPerFrame ?? 4,
+        stepsPerFrame: bec.stepsPerFrame ?? DEFAULT_TDSE_CONFIG.stepsPerFrame,
         initialCondition: mappedInit as TdseInitialCondition,
         packetCenter: new Array(latDim).fill(0),
         packetWidth: 1.0,
         packetAmplitude: mu,
         packetMomentum: mom,
         potentialType: 'becTrap',
+        // Zero out every potential term — BEC uses its own trap exclusively.
         barrierHeight: 0,
         barrierWidth: 0,
         barrierCenter: 0,
@@ -466,18 +498,15 @@ export class TdseBecStrategy implements QuantumModeStrategy {
         doubleWellLambda: 0,
         doubleWellSeparation: 1,
         doubleWellAsymmetry: 0,
-        radialWellInner: 0.6,
-        radialWellOuter: 1.8,
-        radialWellDepth: 50,
-        radialWellTilt: 0.5,
         anharmonicLambda: 0,
         disorderStrength: 0,
-        disorderSeed: 42,
-        disorderDistribution: 'uniform' as const,
         driveEnabled: false,
-        driveWaveform: 'sine',
         driveFrequency: 0,
         driveAmplitude: 0,
+        // Do NOT override bhMass / bhMultipoleL / bhSpin — BEC mode never
+        // activates `blackHoleRingdown` and the canonical TDSE defaults
+        // already provide a physically-valid (ℓ ≥ s) triple. Duplicating
+        // them here would invite silent drift on schema changes.
         trapAnisotropy: anisotropy,
         absorberEnabled: schroedinger?.absorberEnabled ?? false,
         absorberWidth: schroedinger?.absorberWidth ?? 0.2,

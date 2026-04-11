@@ -155,6 +155,9 @@ export interface FreeScalarFieldActions {
   setCosmologySteepness: ExtendedObjectState['setFreeScalarCosmologySteepness']
   setCosmologyHubble: ExtendedObjectState['setFreeScalarCosmologyHubble']
   setCosmologyEta0: ExtendedObjectState['setFreeScalarCosmologyEta0']
+  setPreheatingEnabled: ExtendedObjectState['setFreeScalarPreheatingEnabled']
+  setPreheatingAmplitude: ExtendedObjectState['setFreeScalarPreheatingAmplitude']
+  setPreheatingFrequency: ExtendedObjectState['setFreeScalarPreheatingFrequency']
 }
 
 /**
@@ -204,6 +207,9 @@ export interface TdseActions {
   setRadialWellDepth: ExtendedObjectState['setTdseRadialWellDepth']
   setRadialWellTilt: ExtendedObjectState['setTdseRadialWellTilt']
   setAnharmonicLambda: ExtendedObjectState['setTdseAnharmonicLambda']
+  setBhMass: ExtendedObjectState['setTdseBhMass']
+  setBhMultipoleL: ExtendedObjectState['setTdseBhMultipoleL']
+  setBhSpin: ExtendedObjectState['setTdseBhSpin']
   setDisorderStrength: ExtendedObjectState['setTdseDisorderStrength']
   setDisorderSeed: ExtendedObjectState['setTdseDisorderSeed']
   setDriveEnabled: ExtendedObjectState['setTdseDriveEnabled']

@@ -70,6 +70,7 @@ export type TdsePotentialType =
   | 'custom'
   | 'andersonDisorder'
   | 'coupledAnharmonic'
+  | 'blackHoleRingdown'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -176,6 +177,14 @@ export interface TdseConfig {
   // === Coupled Anharmonic Configuration (when potentialType === 'coupledAnharmonic') ===
   /** Coupling strength λ in V = ½Σω²x² + λΣ_{i<j} x_i²x_j² */
   anharmonicLambda: number
+
+  // === Black-Hole Ringdown Configuration (when potentialType === 'blackHoleRingdown') ===
+  /** Schwarzschild mass M in geometrized units — sets the barrier scale */
+  bhMass: number
+  /** Multipole index ℓ ∈ {0,1,2,3,4,5,6} — ℓ=2 is the dominant gravitational mode */
+  bhMultipoleL: number
+  /** Perturbation spin s ∈ {0, 1, 2} — scalar / electromagnetic / gravitational */
+  bhSpin: 0 | 1 | 2
 
   // === Disorder Configuration (andersonDisorder type + generic overlay) ===
   /** Disorder strength W: V_disorder ∈ [-W/2, +W/2] (uniform) or σ = W (gaussian) */
@@ -333,6 +342,10 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   radialWellTilt: 0.5,
 
   anharmonicLambda: 1.0,
+
+  bhMass: 1.0,
+  bhMultipoleL: 2,
+  bhSpin: 2,
 
   disorderStrength: 0,
   disorderSeed: 42,

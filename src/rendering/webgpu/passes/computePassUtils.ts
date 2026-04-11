@@ -182,3 +182,70 @@ export function createFsfDensityAndAnalysisTextures(device: GPUDevice): {
   })
   return { densityTexture, densityTextureView, analysisTexture, analysisTextureView }
 }
+
+/**
+ * Module-level cache for the FSF texture zero-fill buffer.
+ *
+ * Keyed on the full byte length rather than `DENSITY_GRID_SIZE` so a future
+ * resize (or a test that mounts different grid sizes in one process) still
+ * reuses the buffer when possible without silently serving a wrong-sized
+ * allocation. The buffer is only ever read by `writeTexture`, so freezing a
+ * single zeros instance across mode switches is safe — no caller mutates it.
+ *
+ * Typed as `Uint8Array<ArrayBuffer>` (not the default `ArrayBufferLike`)
+ * so the WebGPU `writeTexture` overload that requires a non-shared
+ * `ArrayBufferView<ArrayBuffer>` accepts the reuse without a cast.
+ */
+let cachedTextureZeros: Uint8Array<ArrayBuffer> | null = null
+
+/**
+ * Zero-fill the FSF density + analysis 3D textures. Invoked on the
+ * position-space → k-space analysis-mode transition to avoid displaying
+ * stale position-space data while the k-space readback is still in
+ * flight (the FFT worker takes several frames to publish its first
+ * result, during which the raymarcher would otherwise show whatever
+ * the write-grid pass last wrote).
+ *
+ * Reuses a module-level zero-fill scratch buffer across calls. Mode
+ * transitions happen on user-facing frames and allocating ~2 MB per
+ * transition (the 64^3 × 8 bytes default) produced measurable GC churn
+ * in the flamegraph during rapid toggling of the analysis mode.
+ *
+ * @param device - GPU device
+ * @param densityTexture - 3D density grid to clear
+ * @param analysisTexture - 3D analysis grid to clear
+ */
+export function clearFsfDensityAndAnalysisTextures(
+  device: GPUDevice,
+  densityTexture: GPUTexture,
+  analysisTexture: GPUTexture
+): void {
+  const bytesPerTexel = 8
+  const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
+  const rowsPerImage = DENSITY_GRID_SIZE
+  const byteLength = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
+  if (cachedTextureZeros === null || cachedTextureZeros.byteLength !== byteLength) {
+    // Explicit ArrayBuffer constructor (not ArrayBufferLike) so the resulting
+    // Uint8Array satisfies `Uint8Array<ArrayBuffer>` and can be fed directly
+    // into `writeTexture` without a SharedArrayBuffer vs ArrayBuffer cast.
+    cachedTextureZeros = new Uint8Array(new ArrayBuffer(byteLength))
+  }
+  const zeros = cachedTextureZeros
+  const texSize = {
+    width: DENSITY_GRID_SIZE,
+    height: DENSITY_GRID_SIZE,
+    depthOrArrayLayers: DENSITY_GRID_SIZE,
+  }
+  device.queue.writeTexture(
+    { texture: densityTexture },
+    zeros,
+    { bytesPerRow, rowsPerImage },
+    texSize
+  )
+  device.queue.writeTexture(
+    { texture: analysisTexture },
+    zeros,
+    { bytesPerRow, rowsPerImage },
+    texSize
+  )
+}

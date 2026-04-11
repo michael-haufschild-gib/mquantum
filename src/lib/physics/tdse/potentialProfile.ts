@@ -9,6 +9,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { parseExpression } from '@/lib/physics/expressionParser'
+import { computeReggeWheelerPotential } from '@/lib/physics/tdse/reggeWheeler'
 
 /**
  * Compute V(x) for the given potential type and config at position x along axis 0.
@@ -73,6 +74,11 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       // vanishes because all other coordinates are zero. The 1D profile
       // is indistinguishable from a pure harmonic trap.
       return 0.5 * config.mass * config.harmonicOmega * config.harmonicOmega * x * x
+
+    case 'blackHoleRingdown':
+      // x is interpreted as the tortoise coordinate r*. The Regge–Wheeler
+      // helper inverts r*(r) and evaluates V_ℓ^s(r*) on a Schwarzschild bg.
+      return computeReggeWheelerPotential(x, config.bhMass, config.bhMultipoleL, config.bhSpin)
 
     case 'custom': {
       const result = parseExpression(config.customPotentialExpression ?? '0')
@@ -230,6 +236,36 @@ export function getPotentialPlotScale(config: TdseConfig): number {
       // 1D slice is harmonic; use harmonic scale at quarter-domain
       const r = (config.gridSize[0] ?? 64) * (config.spacing[0] ?? 0.1) * 0.25
       return Math.max(0.5 * config.mass * config.harmonicOmega ** 2 * r ** 2, 1)
+    }
+    case 'blackHoleRingdown': {
+      // Closed-form leading-order Regge–Wheeler peak near the photon sphere
+      // r = 3M. The full RW barrier is
+      //   V_ℓ^s(r*) = (1 − 2M/r) · [ℓ(ℓ+1)/r² + (1 − s²)·(2M/r³)]
+      // Evaluated at r = 3M this gives
+      //   V_peak ≈ ℓ(ℓ+1)/(27M²) + (1 − s²)·2/(81M²)
+      // which adds a positive (1 − s²)·2/(81M²) contribution for scalar
+      // fields (s=0), vanishes for electromagnetic (s=1), and subtracts
+      // for gravitational (s=2). The spin-agnostic formula used previously
+      // under-estimated the scalar peak and could clip the QNM barrier in
+      // the plot y-axis; we keep the spin-aware leading-order estimate and
+      // an abs() so even the gravitational case never produces a negative
+      // bound. Good enough for a plot y-bound and cheap enough to avoid a
+      // 15k-Newton-call runtime scan.
+      //
+      // `Math.max(bhMass, 1e-4)` is NOT NaN-safe — `Math.max(NaN, x) =
+      // NaN` — so a loaded config carrying a garbage bhMass would still
+      // poison the plot scale and propagate into the energy-diagram HUD.
+      // Validate first and fall back to 1.0 (dimensionful units of M)
+      // when the input is unusable.
+      const M =
+        Number.isFinite(config.bhMass) && config.bhMass > 0 ? Math.max(config.bhMass, 1e-4) : 1.0
+      const ell = config.bhMultipoleL
+      const s = config.bhSpin
+      const MSq = M * M
+      const orbital = (ell * (ell + 1)) / (27 * MSq)
+      const spinCorrection = (2 * (1 - s * s)) / (81 * MSq)
+      const peak = Math.abs(orbital + spinCorrection)
+      return Math.max(peak, 0.02)
     }
     case 'custom': {
       // Sample the custom expression along axis 0 to find max|V|

@@ -14,6 +14,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 /**
@@ -95,7 +96,7 @@ export function getOrCreateFsfCosmoDebugBuffer(): FsfCosmoDebugBuffer | null {
  */
 export function captureFsfCosmoDebugSample(
   config: FreeScalarConfig,
-  coefs: { aKinetic: number; aPotential: number; aFull: number },
+  coefs: CosmologyCoefs,
   simEta: number,
   lastDebugNSub: number,
   frameIndex: number

@@ -277,7 +277,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // to the bare Klein-Gordon energy density; under cosmology it removes
     // the coordinate-factor inflation and shows the physically meaningful
     // quantity that actually decays as the de Sitter universe dilutes.
-    let massCoef = params.mass * params.mass * params.aFull;
+    //
+    // Preheating: when enabled, the effective mass squared picked up by
+    // the Hamiltonian is m² · massSquaredScale(η), matching the force
+    // used by freeScalarUpdatePi. Without this factor the energyDensity
+    // view would show the bare-mass Hamiltonian while the actual
+    // evolution obeys the time-dependent one — producing a physically
+    // inconsistent picture even when the dynamics themselves are
+    // correct. With preheating disabled massSquaredScale = 1 and the
+    // expression is bit-identical to the prior form.
+    let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
     var canonicalH = 0.5 * (
       params.aKinetic * nnPiVal * nnPiVal
       + params.aPotential * gradEnergy
@@ -319,7 +328,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let invAFull = select(1.0 / params.aFull, 1.0, params.aFull <= 0.0);
     let K = 0.5 * params.aKinetic * nnPiVal * nnPiVal * invAFull;
     let G = 0.5 * params.aPotential * gradEnergy * invAFull;
-    let massCoef = params.mass * params.mass * params.aFull;
+    // Preheating: apply the same time-dependent mass² factor used in
+    // freeScalarUpdatePi and the energyDensity view, so the K/G/V/E
+    // decomposition reflects the Hamiltonian actually being integrated.
+    let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
     var V = 0.5 * massCoef * nnPhiVal * nnPhiVal * invAFull;
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;

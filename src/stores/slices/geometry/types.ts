@@ -268,6 +268,11 @@ export interface SchroedingerSliceActions {
   setFreeScalarCosmologyHubble: (h: number) => void
   setFreeScalarCosmologyEta0: (eta0: number) => void
 
+  // Parametric Resonance / Preheating
+  setFreeScalarPreheatingEnabled: (enabled: boolean) => void
+  setFreeScalarPreheatingAmplitude: (amplitude: number) => void
+  setFreeScalarPreheatingFrequency: (frequency: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (
     mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
@@ -319,6 +324,9 @@ export interface SchroedingerSliceActions {
   setTdseRadialWellDepth: (depth: number) => void
   setTdseRadialWellTilt: (tilt: number) => void
   setTdseAnharmonicLambda: (lambda: number) => void
+  setTdseBhMass: (mass: number) => void
+  setTdseBhMultipoleL: (ell: number) => void
+  setTdseBhSpin: (spin: number) => void
   setTdseDisorderStrength: (strength: number) => void
   setTdseDisorderSeed: (seed: number) => void
   setTdseDriveEnabled: (enabled: boolean) => void

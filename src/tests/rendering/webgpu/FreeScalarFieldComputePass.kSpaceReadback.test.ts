@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { DEFAULT_COSMOLOGY_CONFIG } from '@/lib/geometry/extended/freeScalar'
+import {
+  DEFAULT_COSMOLOGY_CONFIG,
+  DEFAULT_PREHEATING_CONFIG,
+} from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 
 const {
@@ -93,6 +96,7 @@ function makeConfig(): FreeScalarConfig {
       radialBinCount: 64,
     },
     cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
+    preheating: { ...DEFAULT_PREHEATING_CONFIG },
   }
 }
 

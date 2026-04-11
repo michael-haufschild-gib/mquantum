@@ -88,4 +88,137 @@ describe('TDSE potential setters', () => {
     s.setTdseDoubleWellSeparation(0)
     expect(getTdse().doubleWellSeparation).toBe(0.1)
   })
+
+  describe('black-hole Regge–Wheeler setters', () => {
+    it('clamps bhMass to [0.1, 5]', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhMass(-1)
+      expect(getTdse().bhMass).toBe(0.1)
+      s.setTdseBhMass(100)
+      expect(getTdse().bhMass).toBe(5)
+      s.setTdseBhMass(1.5)
+      expect(getTdse().bhMass).toBe(1.5)
+    })
+
+    it('clamps bhMultipoleL into [bhSpin, 6] and floors to integer', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhSpin(0)
+      s.setTdseBhMultipoleL(-2)
+      expect(getTdse().bhMultipoleL).toBe(0)
+      s.setTdseBhMultipoleL(99)
+      expect(getTdse().bhMultipoleL).toBe(6)
+      // Floor semantics (via Math.floor in the setter): 3.9 → 3, not 4.
+      // Contract: ℓ is a non-negative integer and fractional slider values
+      // truncate toward zero so the displayed integer always lies at or
+      // below the raw drag position.
+      s.setTdseBhMultipoleL(3.9)
+      expect(getTdse().bhMultipoleL).toBe(3)
+    })
+
+    it('promotes bhMultipoleL when raising bhSpin above it', () => {
+      const s = useExtendedObjectStore.getState()
+      // Start non-physical: user has somehow arrived at ℓ=0 with s=0
+      s.setTdseBhSpin(0)
+      s.setTdseBhMultipoleL(0)
+      expect(getTdse().bhMultipoleL).toBe(0)
+      expect(getTdse().bhSpin).toBe(0)
+
+      // Raise spin to 2 — ℓ must be promoted to 2 to preserve ℓ ≥ s.
+      s.setTdseBhSpin(2)
+      expect(getTdse().bhSpin).toBe(2)
+      expect(getTdse().bhMultipoleL).toBe(2)
+    })
+
+    it('rejects bhMultipoleL below current bhSpin', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhSpin(2)
+      // ℓ floor is now 2 — attempting to set ℓ=1 must clamp back up to 2.
+      s.setTdseBhMultipoleL(1)
+      expect(getTdse().bhMultipoleL).toBe(2)
+    })
+
+    it('triggers needsReset when BH params change while BH potential is active', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('blackHoleRingdown')
+      s.clearTdseNeedsReset()
+      expect(getTdse().needsReset).toBe(false)
+
+      s.setTdseBhMass(2.5)
+      expect(getTdse().needsReset).toBe(true)
+
+      s.clearTdseNeedsReset()
+      s.setTdseBhMultipoleL(3)
+      expect(getTdse().needsReset).toBe(true)
+
+      s.clearTdseNeedsReset()
+      s.setTdseBhSpin(1)
+      expect(getTdse().needsReset).toBe(true)
+    })
+
+    it('does NOT trigger needsReset when BH params change under a non-BH potential', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('barrier')
+      s.clearTdseNeedsReset()
+      s.setTdseBhMass(3.0)
+      expect(getTdse().needsReset).toBe(false)
+    })
+
+    it('preserves needsReset on idempotent BH writes while BH is active', () => {
+      // The `changed` guard in the BH setters must keep `needsReset`
+      // false when the setter is invoked with the already-stored value
+      // (or a value that clamps to the stored value). Without this
+      // guard, repeated slider events at a cap — or programmatic
+      // assignment of the same value — would restart the wavepacket
+      // mid-evolution.
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('blackHoleRingdown')
+      s.setTdseBhMass(2.0)
+      s.setTdseBhSpin(1)
+      s.setTdseBhMultipoleL(3)
+      s.clearTdseNeedsReset()
+      expect(getTdse().needsReset).toBe(false)
+
+      // Same-value reassignment → no reset.
+      s.setTdseBhMass(2.0)
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhMultipoleL(3)
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhSpin(1)
+      expect(getTdse().needsReset).toBe(false)
+
+      // Slider-cap-hit idempotence: repeated writes at the clamp edge
+      // produce the same clamped value and must not fire a reset.
+      s.setTdseBhMass(1000) // clamps to 5
+      expect(getTdse().bhMass).toBe(5)
+      expect(getTdse().needsReset).toBe(true)
+      s.clearTdseNeedsReset()
+      s.setTdseBhMass(1000) // still clamps to 5 — now idempotent
+      expect(getTdse().needsReset).toBe(false)
+      s.setTdseBhMass(2e6) // different raw input, same clamped output
+      expect(getTdse().needsReset).toBe(false)
+    })
+
+    it('setTdseBhSpin re-clamps bhMultipoleL into [spin, 6] on every write', () => {
+      // Defensive invariant: if a loaded or migrated config somehow
+      // leaves `bhMultipoleL = 7` (above the slider cap) or anything
+      // outside `[spin, 6]`, the spin setter must round ℓ back into the
+      // canonical band rather than preserving the invalid value. This
+      // guards against `Math.max(prev.bhMultipoleL, spin)` letting a
+      // pre-existing bad ℓ through unchanged.
+      const s = useExtendedObjectStore.getState()
+      // Poke an out-of-range value through the raw store to simulate a
+      // legacy-preset migration path. The setter itself would reject
+      // this, so bypass it.
+      useExtendedObjectStore.setState((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, bhMultipoleL: 9, bhSpin: 0 },
+        },
+      }))
+      s.setTdseBhSpin(2)
+      // ℓ must be clamped down to 6 (the slider cap) — NOT left at 9.
+      expect(getTdse().bhMultipoleL).toBe(6)
+      expect(getTdse().bhSpin).toBe(2)
+    })
+  })
 })

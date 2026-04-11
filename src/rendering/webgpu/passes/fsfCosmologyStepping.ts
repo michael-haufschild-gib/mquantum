@@ -12,10 +12,15 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
+import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
+import { computeFsfCosmologyCoefs } from '@/lib/physics/freeScalar/vacuumDispersion'
 
+import type { FsfHamiltonianCoefs } from './FreeScalarFieldComputePassUniforms'
 import {
   FSF_COSMO_COEFS_BYTE_OFFSET,
   FSF_COSMO_COEFS_BYTE_SIZE,
+  FSF_DT_BYTE_OFFSET,
 } from './FreeScalarFieldComputePassUniforms'
 
 /**
@@ -96,6 +101,29 @@ export const COSMOLOGY_MAX_SUBSTEPS = 32
 export const COSMOLOGY_ADIABATIC_SAFETY = 0.1
 
 /**
+ * Preheating drive phase-advance ceiling. The parametric-resonance
+ * Mathieu drive `1 + A·sin(Ω·(t−ref))` is evaluated once per leapfrog
+ * substep with the coefficient held frozen across the drift+kick pair. If
+ * `Ω·subDt` exceeds this bound, the sinusoid advances through many
+ * radians between substeps and the numerical integrator effectively
+ * samples the drive on a coarse stroboscope — aliasing the resonance
+ * tongues and either missing amplification entirely or introducing
+ * spurious growth.
+ *
+ * The CFL-driven substep count (which sizes dispersion against the peak
+ * `1 + |A|` mass term) does NOT see `Ω` at all: a high-Ω / small-A run
+ * can stay well within the CFL ceiling yet alias the drive. Combining
+ * `nSub = max(nSub_cfl, nSub_phase)` guarantees both the leapfrog
+ * stability limit AND a sufficiently-resolved Mathieu coefficient.
+ *
+ * We require `Ω·subDt < 0.5` — roughly twelve substeps per drive
+ * period at the boundary, matching the canonical "ten to twenty samples
+ * per oscillator period" rule for explicit Runge-Kutta-like schemes.
+ * Preheating-off collapses this check to a no-op (returns 1).
+ */
+export const PREHEATING_PHASE_SAFETY = 0.5
+
+/**
  * Pure, non-mutating projection of `simEta` after advancing by `dt`. Mirrors
  * the clamp/floor logic of `FreeScalarFieldComputePass.advanceSimEta`:
  * every proposal whose absolute value falls below `COSMOLOGY_ETA_FLOOR` —
@@ -171,12 +199,20 @@ export function computeAdiabaticSubsteps(
 
 /**
  * Adaptive CFL sub-step count for the canonical δφ leapfrog. The
- * physical dispersion `ω² = k_max² + m²·a²` is bounded as long as `a`
- * is bounded, but massive modes in de Sitter (or any late-time limit
- * where `a → ∞`) drive `m·a·dt` above the leapfrog stability ceiling.
- * When that happens we subdivide the outer step and take several
- * smaller leapfrog sub-steps with frozen coefs, preserving second-order
- * accuracy within the sub-step window.
+ * physical dispersion `ω² = k_max² + m²·a²·massSquaredScale` is bounded
+ * as long as `a` and `massSquaredScale` are bounded, but massive modes
+ * in de Sitter (or any late-time limit where `a → ∞`) drive `m·a·dt`
+ * above the leapfrog stability ceiling. When that happens we subdivide
+ * the outer step and take several smaller leapfrog sub-steps with
+ * frozen coefs, preserving second-order accuracy within the sub-step
+ * window.
+ *
+ * When the parametric-resonance preheating drive is active, the caller
+ * must pass `massSquaredScaleMax = 1 + |A|` (the worst-case peak of
+ * `1 + A·sin(Ω·(η−η_ref))`) so the CFL check accounts for the
+ * time-dependent mass amplification even under Minkowski where the FLRW
+ * coefficients are all 1. Passing `1` is the cosmology-only path and
+ * leaves the bare Klein-Gordon dispersion in place.
  *
  * Uses the maximum over active dimensions of `k_max_d = π/spacing[d]`
  * (Nyquist) as the effective cutoff — close enough to the discrete
@@ -191,17 +227,21 @@ export function computeAdiabaticSubsteps(
  * @param aFull - a^n at the current η (source of the time-varying mass term)
  * @param aPotential - a^(n−2) at the current η
  * @param capWarnedKeys - Set used for dedupe of the sub-step cap warning
+ * @param massSquaredScaleMax - Worst-case preheating mass multiplier (≥ 1,
+ *                              defaults to 1 for no drive).
  * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
  */
 export function computeFsfCflSubsteps(
   config: FreeScalarConfig,
   aFull: number,
   aPotential: number,
-  capWarnedKeys: Set<string>
+  capWarnedKeys: Set<string>,
+  massSquaredScaleMax: number = 1
 ): number {
-  // Physical dispersion uses m²·a² = m²·(aFull/aPotential).
+  // Physical dispersion uses m²·a²·massSquaredScale = m²·(aFull/aPotential)·scale.
   const aSq = aPotential > 0 ? aFull / aPotential : 1
-  const massSq = config.mass * config.mass * aSq
+  const scale = massSquaredScaleMax > 1 ? massSquaredScaleMax : 1
+  const massSq = config.mass * config.mass * aSq * scale
 
   let kMaxSq = 0
   for (let d = 0; d < config.latticeDim; d++) {
@@ -236,15 +276,283 @@ export function computeFsfCflSubsteps(
 }
 
 /**
- * Overwrite the contiguous 12-byte cosmology coefficients slot
- * `(aKinetic, aPotential, aFull)` in the uniform buffer, avoiding the
- * full 528-byte re-upload that `writeFsfUniforms` performs. Called from
- * the leapfrog substep loop when cosmology is active so every
- * drift + kick pair consumes fresh coefficients evaluated at the current
- * `simEta`.
+ * Per-substep coefficient bundle produced by {@link resolveFsfSubstepCoefs}.
+ *
+ * The compute pass streams this bundle into the GPU uniform buffer via
+ * {@link writeFsfCosmologyCoefsSlot} every drift→kick pair whenever either
+ * cosmology or preheating is active, so the pi-update shader reads fresh
+ * values for the time-dependent FLRW coefficients and the parametric
+ * resonance drive.
+ */
+export interface FsfSubstepCoefs {
+  /** FLRW kinetic coefficient `a^(−(n−2))` — 1 under Minkowski. */
+  aKinetic: number
+  /** FLRW potential coefficient `a^(n−2)` — 1 under Minkowski. */
+  aPotential: number
+  /** FLRW volume-form coefficient `a^n` — 1 under Minkowski. */
+  aFull: number
+  /** Preheating drive scalar `1 + A·sin(Ω·(t−ref))` — 1 when disabled. */
+  massSquaredScale: number
+}
+
+/**
+ * Runtime state exposed by the compute pass to {@link resolveFsfSubstepCoefs}.
+ * Encapsulates just enough of the pass-instance fields to keep the helper
+ * pure (no GPU dependency) while still letting it advance both the
+ * cosmological clock and the Minkowski-path preheating counter in a single
+ * call.
+ */
+export interface FsfSubstepClock {
+  /** Advance `simEta` by one substep and return the clamped new value. */
+  advanceSimEta: (subDt: number) => number
+  /** Current Minkowski-path preheating time (mutated in place when needed). */
+  preheatingTime: number
+  /** Reference time captured at the most recent reset. */
+  preheatingReferenceEta: number
+}
+
+/**
+ * Compute the per-substep coefficient bundle to upload to the GPU uniform
+ * buffer during one drift→kick leapfrog substep.
+ *
+ * Advances the relevant clock (`simEta` when cosmology is on, a separate
+ * Minkowski counter otherwise) and returns both the updated coefficients
+ * and the new `preheatingTime` so the caller can assign it back to the
+ * pass instance. Keeps all cosmology+preheating composition logic in one
+ * place so the compute pass stays focused on GPU dispatch bookkeeping.
+ *
+ * @param config - Free scalar field configuration
+ * @param subDt - Size of this leapfrog substep
+ * @param cosmologyActive - Whether cosmology is enabled
+ * @param preheatingActive - Whether the preheating drive is enabled
+ * @param clock - Pass runtime state (simEta advance + preheating clock)
+ * @param evaluateCosmologyCoefs - Closure resolving `(aKinetic, aPotential,
+ *                                 aFull)` at a given `η` — kept as a
+ *                                 parameter so this helper stays free of
+ *                                 the `computeFsfCosmologyCoefs` dependency.
+ * @returns `{ coefs, preheatingTime }` — upload these and assign the
+ *          returned counter back onto the pass instance.
+ */
+export function resolveFsfSubstepCoefs(
+  config: FreeScalarConfig,
+  subDt: number,
+  cosmologyActive: boolean,
+  preheatingActive: boolean,
+  clock: FsfSubstepClock,
+  evaluateCosmologyCoefs: (eta: number) => CosmologyCoefs
+): { coefs: FsfSubstepCoefs; preheatingTime: number } {
+  let aKinetic = 1
+  let aPotential = 1
+  let aFull = 1
+  let preheatingClock: number
+  let nextPreheatingTime = clock.preheatingTime
+
+  if (cosmologyActive) {
+    const newEta = clock.advanceSimEta(subDt)
+    const coefs = evaluateCosmologyCoefs(newEta)
+    aKinetic = coefs.aKinetic
+    aPotential = coefs.aPotential
+    aFull = coefs.aFull
+    // Cosmology + preheating composition: the drive reads the
+    // cosmological clock directly, so `preheatingReferenceEta` was
+    // captured as the reset `simEta` and the drive fires at phase 0 from
+    // the instant the lattice was initialised.
+    preheatingClock = newEta
+  } else {
+    // Minkowski + preheating: advance the separate counter so
+    // `sin(Ω·(t−ref))` produces the Mathieu equation of motion tied to
+    // real physical time, not conformal time.
+    nextPreheatingTime = clock.preheatingTime + subDt
+    preheatingClock = nextPreheatingTime
+  }
+
+  const massSquaredScale = preheatingActive
+    ? computeMassSquaredScale(preheatingClock, config.preheating, clock.preheatingReferenceEta)
+    : 1
+
+  return {
+    coefs: { aKinetic, aPotential, aFull, massSquaredScale },
+    preheatingTime: nextPreheatingTime,
+  }
+}
+
+/**
+ * Snapshot the canonical-Hamiltonian coefficients used by the CPU
+ * diagnostics readback. Evaluates `computeFsfCosmologyCoefs` at the live
+ * `simEta` and `computeMassSquaredScale` on the same clock the pi-update
+ * last saw — `simEta` when cosmology is active, the Minkowski-path
+ * counter otherwise — so the diagnostics Hamiltonian matches the
+ * time-dependent terms the integrator is using. Under Minkowski +
+ * preheating disabled every field collapses to 1.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current cosmological conformal time
+ * @param preheatingTime - Current Minkowski-path preheating clock
+ * @param preheatingReferenceEta - Drive anchor from the last reset
+ */
+export function snapshotFsfHamiltonianCoefs(
+  config: FreeScalarConfig,
+  simEta: number,
+  preheatingTime: number,
+  preheatingReferenceEta: number
+): FsfHamiltonianCoefs {
+  const cosmoCoefs = computeFsfCosmologyCoefs(config, simEta)
+  const preheatingClock = config.cosmology.enabled ? simEta : preheatingTime
+  const massSquaredScale = computeMassSquaredScale(
+    preheatingClock,
+    config.preheating,
+    preheatingReferenceEta
+  )
+  return { ...cosmoCoefs, massSquaredScale }
+}
+
+/**
+ * Pick the outer-step substep count for one leapfrog iteration. Combines
+ * the CFL stability bound (evaluated at both endpoints so a discontinuous
+ * floor clamp in de Sitter can't slip past the start-of-step check) with
+ * the adiabatic `|Δω₀/ω_avg|` constraint, returning the max so both
+ * safeguards are satisfied.
+ *
+ * When the parametric-resonance preheating drive is active the effective
+ * mass term oscillates as `m²·(1 + A·sin(Ω·(η−η_ref)))`, so the CFL
+ * check uses the peak multiplier `1 + |A|` to bound the worst-case
+ * dispersion `ω² = k² + m²·a²·(1+|A|)` even when cosmology is disabled.
+ * That means Minkowski + preheating still gets a CFL-driven nSub,
+ * rather than falling through the cosmology-disabled fast path.
+ *
+ * Under cosmology disabled AND preheating disabled this returns 1 — no
+ * substepping pressure — so the bare Klein-Gordon path is bit-identical
+ * to the pre-cosmology, pre-preheating behaviour.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current cosmological conformal time
+ * @param dtFull - Full outer-step integrator dt
+ * @param cosmologyActive - Whether cosmology is enabled
+ * @param cflCapWarnedKeys - Dedupe set for the "sub-step cap reached" warning
+ * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
+ */
+export function computeFsfOuterStepSubsteps(
+  config: FreeScalarConfig,
+  simEta: number,
+  dtFull: number,
+  cosmologyActive: boolean,
+  cflCapWarnedKeys: Set<string>
+): number {
+  // Peak mass-squared multiplier for the preheating drive. When the drive is
+  // disabled this collapses to 1 and every computeFsfCflSubsteps call reduces
+  // to the original cosmology-only dispersion bound.
+  const preheatingActive = config.preheating.enabled
+  const massSquaredScaleMax = preheatingActive ? 1 + Math.abs(config.preheating.amplitude) : 1
+  // Drive phase bound: require Ω·subDt < PREHEATING_PHASE_SAFETY so the
+  // frozen-coef leapfrog substep never advances the sinusoid by more than
+  // ~0.5 rad between kicks. Preheating-off collapses this to 1.
+  const nSubPhase = preheatingActive
+    ? computePreheatingPhaseSubsteps(config.preheating.frequency, dtFull)
+    : 1
+
+  if (!cosmologyActive) {
+    if (!preheatingActive) return 1
+    // Minkowski + preheating: CFL is driven purely by the oscillating mass
+    // term. Use identity cosmology coefs (aFull = aPotential = 1) and let
+    // massSquaredScaleMax bump the mass dispersion.
+    const nSubCfl = computeFsfCflSubsteps(config, 1, 1, cflCapWarnedKeys, massSquaredScaleMax)
+    return nSubCfl > nSubPhase ? nSubCfl : nSubPhase
+  }
+
+  const coefsStart = computeFsfCosmologyCoefs(config, simEta)
+  const coefsEnd = computeFsfCosmologyCoefs(config, projectSimEta(simEta, dtFull))
+  const nSubStart = computeFsfCflSubsteps(
+    config,
+    coefsStart.aFull,
+    coefsStart.aPotential,
+    cflCapWarnedKeys,
+    massSquaredScaleMax
+  )
+  const nSubEnd = computeFsfCflSubsteps(
+    config,
+    coefsEnd.aFull,
+    coefsEnd.aPotential,
+    cflCapWarnedKeys,
+    massSquaredScaleMax
+  )
+  const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
+  const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)
+  // max across CFL, adiabatic, and preheating phase — each safeguard may
+  // dominate in a different regime and the largest always wins.
+  let nSub = nSubCfl > nSubAdiab ? nSubCfl : nSubAdiab
+  if (nSubPhase > nSub) nSub = nSubPhase
+  return nSub
+}
+
+/**
+ * Preheating drive phase-advance substep count. Independent of cosmology
+ * and lattice dispersion — bounds the substep size purely by the
+ * requirement that `Ω·subDt < PREHEATING_PHASE_SAFETY` so the drive
+ * sinusoid is sampled densely enough to resolve the Mathieu tongues.
+ *
+ * Returns 1 when the full-step phase advance is already below the
+ * ceiling (the common case for typical defaults). Caps at
+ * `COSMOLOGY_MAX_SUBSTEPS` to match the leapfrog subdivision ceiling and
+ * avoid open-ended stalls on extreme frequency inputs.
+ *
+ * @param frequency - Angular frequency `Ω` of the drive (radians / η)
+ * @param dtFull - Outer leapfrog step
+ * @returns Integer substep count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
+ */
+export function computePreheatingPhaseSubsteps(frequency: number, dtFull: number): number {
+  const omega = Math.abs(frequency)
+  if (!(omega > 0) || !(dtFull > 0)) return 1
+  const phaseFull = omega * dtFull
+  if (!(phaseFull > PREHEATING_PHASE_SAFETY)) return 1
+  const ideal = Math.ceil(phaseFull / PREHEATING_PHASE_SAFETY)
+  return ideal <= COSMOLOGY_MAX_SUBSTEPS ? ideal : COSMOLOGY_MAX_SUBSTEPS
+}
+
+/**
+ * Re-stage just the shader `dt` slot in the FSF uniform buffer. Used by
+ * the leapfrog loop to swap between full and sub-step dt during adaptive
+ * substepping without touching the other 527 bytes. Reuses the caller's
+ * scratch buffer so no allocation occurs per call.
+ *
+ * @param device - GPU device
+ * @param uniformBuffer - FSF uniform buffer
+ * @param scratch - Reusable Float32Array scratch (slot 0 is overwritten)
+ * @param dt - New integrator dt to write
+ */
+export function writeFsfDtSlot(
+  device: GPUDevice,
+  uniformBuffer: GPUBuffer,
+  scratch: Float32Array,
+  dt: number
+): void {
+  scratch[0] = dt
+  device.queue.writeBuffer(uniformBuffer, FSF_DT_BYTE_OFFSET, scratch.buffer, scratch.byteOffset, 4)
+}
+
+/**
+ * Overwrite the contiguous 16-byte per-substep coefficient slot
+ * `(aKinetic, aPotential, aFull, massSquaredScale)` in the uniform buffer,
+ * avoiding the full 528-byte re-upload that `writeFsfUniforms` performs.
+ * Called from the leapfrog substep loop whenever cosmology or preheating
+ * is active so every drift + kick pair consumes fresh coefficients
+ * evaluated at the current conformal time.
+ *
+ * The fourth slot (`massSquaredScale`) carries the post-inflation
+ * preheating drive `1 + A·sin(Ω·(η−η_ref))`. Passing `1.0` makes this a
+ * pure cosmology write — the pi-update's `massCoef = m²·aFull·scale`
+ * factorization reduces to the bare canonical mass term, preserving
+ * bit-identical behaviour for callers that don't need the drive.
  *
  * Allocates nothing per call — the values are staged through the
- * caller-owned `scratch` buffer (typically a 3-f32 Float32Array).
+ * caller-owned `scratch` buffer (a 4-f32 Float32Array).
+ *
+ * @param device - GPU device
+ * @param uniformBuffer - FSF uniform buffer
+ * @param scratch - 4-element Float32Array scratch, reused across substeps
+ * @param aKinetic - FLRW kinetic coefficient `a^(−(n−2))`
+ * @param aPotential - FLRW potential coefficient `a^(n−2)`
+ * @param aFull - FLRW volume-form coefficient `a^n`
+ * @param massSquaredScale - Preheating drive scalar (1.0 when disabled)
  */
 export function writeFsfCosmologyCoefsSlot(
   device: GPUDevice,
@@ -252,11 +560,13 @@ export function writeFsfCosmologyCoefsSlot(
   scratch: Float32Array,
   aKinetic: number,
   aPotential: number,
-  aFull: number
+  aFull: number,
+  massSquaredScale: number
 ): void {
   scratch[0] = aKinetic
   scratch[1] = aPotential
   scratch[2] = aFull
+  scratch[3] = massSquaredScale
   device.queue.writeBuffer(
     uniformBuffer,
     FSF_COSMO_COEFS_BYTE_OFFSET,

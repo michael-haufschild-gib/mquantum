@@ -102,6 +102,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setFreeScalarCosmologySteepness: state.setFreeScalarCosmologySteepness,
     setFreeScalarCosmologyHubble: state.setFreeScalarCosmologyHubble,
     setFreeScalarCosmologyEta0: state.setFreeScalarCosmologyEta0,
+    setFreeScalarPreheatingEnabled: state.setFreeScalarPreheatingEnabled,
+    setFreeScalarPreheatingAmplitude: state.setFreeScalarPreheatingAmplitude,
+    setFreeScalarPreheatingFrequency: state.setFreeScalarPreheatingFrequency,
     // TDSE dynamics actions
     setTdseLatticeDim: state.setTdseLatticeDim,
     setTdseGridSize: state.setTdseGridSize,
@@ -137,6 +140,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setTdseRadialWellDepth: state.setTdseRadialWellDepth,
     setTdseRadialWellTilt: state.setTdseRadialWellTilt,
     setTdseAnharmonicLambda: state.setTdseAnharmonicLambda,
+    setTdseBhMass: state.setTdseBhMass,
+    setTdseBhMultipoleL: state.setTdseBhMultipoleL,
+    setTdseBhSpin: state.setTdseBhSpin,
     setTdseDisorderStrength: state.setTdseDisorderStrength,
     setTdseDisorderSeed: state.setTdseDisorderSeed,
     setTdseDriveEnabled: state.setTdseDriveEnabled,
@@ -278,6 +284,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setCosmologySteepness: s.setFreeScalarCosmologySteepness,
     setCosmologyHubble: s.setFreeScalarCosmologyHubble,
     setCosmologyEta0: s.setFreeScalarCosmologyEta0,
+    setPreheatingEnabled: s.setFreeScalarPreheatingEnabled,
+    setPreheatingAmplitude: s.setFreeScalarPreheatingAmplitude,
+    setPreheatingFrequency: s.setFreeScalarPreheatingFrequency,
   }
 
   const tdseActions: TdseActions = {
@@ -315,6 +324,9 @@ export function useSchroedingerActions(): SchroedingerActionsResult {
     setRadialWellDepth: s.setTdseRadialWellDepth,
     setRadialWellTilt: s.setTdseRadialWellTilt,
     setAnharmonicLambda: s.setTdseAnharmonicLambda,
+    setBhMass: s.setTdseBhMass,
+    setBhMultipoleL: s.setTdseBhMultipoleL,
+    setBhSpin: s.setTdseBhSpin,
     setDisorderStrength: s.setTdseDisorderStrength,
     setDisorderSeed: s.setTdseDisorderSeed,
     setDriveEnabled: s.setTdseDriveEnabled,

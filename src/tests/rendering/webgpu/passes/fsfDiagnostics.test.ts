@@ -13,18 +13,20 @@ import { describe, expect, it } from 'vitest'
 
 import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
-import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { computeStridesPadded } from '@/rendering/webgpu/passes/computePassUtils'
-import { computeFsfDiagnostics } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
+import {
+  computeFsfDiagnostics,
+  FSF_IDENTITY_HAMILTONIAN_COEFS,
+} from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
 /**
- * Identity cosmology coefficients — `computeFsfDiagnostics` receives them
- * instead of the deprecated `mEffSq` scalar. Under the Minkowski preset
- * (or cosmology disabled) all three collapse to 1, so passing these into
- * the diagnostics function reproduces the flat-space Klein-Gordon
- * Hamiltonian bit-identically.
+ * Identity Hamiltonian coefficients — `computeFsfDiagnostics` receives the
+ * cosmology triple (aKinetic, aPotential, aFull) plus the preheating drive
+ * scalar (`massSquaredScale`). Under the Minkowski preset with preheating
+ * disabled all four collapse to 1, so passing these into the diagnostics
+ * function reproduces the flat-space Klein-Gordon Hamiltonian bit-identically.
  */
-const IDENTITY_COEFS: CosmologyCoefs = { aKinetic: 1, aPotential: 1, aFull: 1 }
+const IDENTITY_COEFS = FSF_IDENTITY_HAMILTONIAN_COEFS
 
 /** Minimal config factory. */
 function createConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig {

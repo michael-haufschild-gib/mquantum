@@ -32,6 +32,21 @@ export type SimulationStateStatus = 'idle' | 'saving' | 'loading' | 'done' | 'er
 export interface RuntimeMeta {
   /** Free Scalar Field cosmological sim time at save time. */
   simEta?: number
+  /**
+   * Free Scalar Field preheating drive reference time captured at the most
+   * recent reset. Required so resuming a save resumes at the same phase of
+   * the `1 + A·sin(Ω·(clock − ref))` modulation the saved phi/pi buffers
+   * were evolved under — otherwise reload re-anchors to phase 0 and the
+   * time-dependent Hamiltonian diverges from the field state.
+   */
+  preheatingReferenceEta?: number
+  /**
+   * Free Scalar Field Minkowski-path preheating clock at save time. Under
+   * cosmology the drive reads `simEta` directly, but with cosmology off the
+   * pass advances a separate `preheatingTime` counter; this field carries
+   * that counter across save/reload so the Mathieu drive resumes in phase.
+   */
+  preheatingTime?: number
 }
 
 /** Loaded wavefunction data pending injection into GPU buffers */
@@ -119,10 +134,9 @@ export const useSimulationStateStore = create<SimulationStateState>((set) => ({
         // assignment on the raw deserializer return value, which violated
         // the immutability contract of `pendingLoadData.config`.
         const sourceConfig = result.config
-        const { _runtimeMeta: rawMeta, ...restConfig } = sourceConfig as Record<
-          string,
-          unknown
-        > & { _runtimeMeta?: unknown }
+        const { _runtimeMeta: rawMeta, ...restConfig } = sourceConfig as Record<string, unknown> & {
+          _runtimeMeta?: unknown
+        }
 
         const runtimeMeta: RuntimeMeta | undefined =
           typeof rawMeta === 'object' && rawMeta !== null ? (rawMeta as RuntimeMeta) : undefined

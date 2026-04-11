@@ -29,17 +29,25 @@ export const FSF_UNIFORM_SIZE = 528
 export const FSF_DT_BYTE_OFFSET = 12
 
 /**
- * Byte offset of the `aKinetic` field in FreeScalarUniforms. The three
- * cosmology coefficients `(aKinetic, aPotential, aFull)` are contiguous
- * starting here — `FreeScalarFieldComputePass.writeCosmologyCoefsSlot`
- * writes a 12-byte span at this offset per substep.
+ * Byte offset of the `aKinetic` field in FreeScalarUniforms. The four
+ * per-substep scalars `(aKinetic, aPotential, aFull, massSquaredScale)`
+ * are contiguous starting here — `FreeScalarFieldComputePass.
+ * writeCosmologyCoefsSlot` writes a 16-byte span at this offset per
+ * substep whenever cosmology or preheating is active. The first three
+ * carry the FLRW background coefficients; the fourth carries the
+ * parametric-resonance drive factor `1 + A·sin(Ω·(η−η_ref))`.
  */
 export const FSF_COSMO_COEFS_BYTE_OFFSET = 504
 
-/** Number of f32 entries in the cosmology coefficients slot (aKinetic/aPotential/aFull). */
-export const FSF_COSMO_COEFS_F32_COUNT = 3
+/**
+ * Number of f32 entries in the per-substep coefficient slot
+ * `(aKinetic, aPotential, aFull, massSquaredScale)`. Four, not three —
+ * the preheating drive repurposes the former `_padCosmo0` word at offset
+ * 516 as `massSquaredScale`, keeping the total struct size at 528 bytes.
+ */
+export const FSF_COSMO_COEFS_F32_COUNT = 4
 
-/** Byte size of the contiguous cosmology coefficients slot. */
+/** Byte size of the contiguous per-substep coefficient slot. */
 export const FSF_COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_F32_COUNT * 4
 
 /**
@@ -57,6 +65,7 @@ if (!Number.isInteger(FSF_COSMO_COEFS_F32_INDEX)) {
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
 import {
   __resetFsfCosmologyWarnDedupForTests,
   computeFsfCosmologyCoefs,
@@ -65,7 +74,7 @@ import {
   FSF_IDENTITY_COSMO_COEFS,
 } from '@/lib/physics/freeScalar/vacuumDispersion'
 import {
-  estimateVacuumMaxEnergy,
+  estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
   type VacuumDispersion,
@@ -166,6 +175,26 @@ export interface FsfUniformParams {
    * to `mass²` when cosmology is off.
    */
   simEta: number
+  /**
+   * Minkowski-path preheating clock counter. Forwarded alongside
+   * `preheatingReferenceEta` so the full uniform upload can stage the
+   * *live* drive phase into the `massSquaredScale` slot instead of the
+   * pessimistic `1.0` identity. Without this, a paused-and-resumed or
+   * loaded-from-save preheating run would have its initial half-step
+   * kickstart (and any non-playing frame that re-uploads the uniform
+   * buffer) see the unperturbed mass term — desynchronising the
+   * Mathieu drive from the saved field buffers on frame 1. Ignored when
+   * preheating is disabled; in cosmology-active configs it is unused
+   * because the drive clock is `simEta` (which this function already
+   * receives).
+   */
+  preheatingTime: number
+  /**
+   * Reference `η` captured at the most recent reset, used as the phase
+   * anchor for `sin(Ω·(clock − ref))`. Must match what the compute pass
+   * last recorded — the uniforms writer does not recompute it.
+   */
+  preheatingReferenceEta: number
 }
 
 /**
@@ -307,7 +336,22 @@ export function writeFsfUniforms(
   f32[FSF_COSMO_COEFS_F32_INDEX] = coefs.aKinetic // offset 504
   f32[FSF_COSMO_COEFS_F32_INDEX + 1] = coefs.aPotential // offset 508
   f32[FSF_COSMO_COEFS_F32_INDEX + 2] = coefs.aFull // offset 512
-  u32[FSF_COSMO_COEFS_F32_INDEX + 3] = 0 // offset 516 (pad)
+  // massSquaredScale — evaluate the *live* drive phase so a paused run,
+  // a load-from-save, or the initial half-step kickstart all see the
+  // correct `1 + A·sin(Ω·(clock − ref))` rather than the identity. The
+  // clock is `simEta` under cosmology and `preheatingTime` under
+  // Minkowski; computeMassSquaredScale returns `1` when the drive is
+  // disabled, so the shader's `massCoef = m² · aFull · massSquaredScale`
+  // factorization reduces to the bare KG term bit-identically on the
+  // no-preheating path. The per-substep upload in the leapfrog loop
+  // continues to refresh this slot while playing.
+  const preheatingClock = config.cosmology.enabled ? params.simEta : params.preheatingTime
+  const liveMassSquaredScale = computeMassSquaredScale(
+    preheatingClock,
+    config.preheating,
+    params.preheatingReferenceEta
+  )
+  f32[FSF_COSMO_COEFS_F32_INDEX + 3] = liveMassSquaredScale // offset 516 (massSquaredScale)
   u32[FSF_COSMO_COEFS_F32_INDEX + 4] = 0 // offset 520 (pad)
   u32[FSF_COSMO_COEFS_F32_INDEX + 5] = 0 // offset 524 (pad)
 
@@ -442,11 +486,15 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
       const rawMaxPi = estimateVacuumMaxPi(config, dispersion)
       return rawMaxPi * Math.sqrt(aPotential)
     }
-    // energyDensity (proper, per comoving observer): the canonical per-mode
-    // ground-state energy is `ω_k/2`, giving a canonical density peak of
-    // `4.5·⟨ω⟩` from the Gaussian-field 3-sigma bound. Divide by `aFull(η₀)`
-    // to convert to proper density, matching the shader's output.
-    let canonicalEnergy = estimateVacuumMaxEnergy(config, dispersion)
+    // energyDensity (proper, per comoving observer): the spatial mean of the
+    // canonical Hamiltonian density is `⟨E⟩ = meanOmega/2`. We normalize to
+    // `2·⟨E⟩ = meanOmega` (returned by `estimateVacuumEnergyVisualScale`) so the
+    // typical voxel lands near `normRho ≈ 0.5` — unlike an extreme-peak
+    // divisor, which would leave almost the entire cube at ~5% brightness
+    // because the one-sided chi-squared-like ε distribution has peaks
+    // ~13× its spatial mean. Divide by `aFull(η₀)` to convert to proper
+    // density, matching the shader's output.
+    let canonicalEnergy = estimateVacuumEnergyVisualScale(config, dispersion)
     if (config.selfInteractionEnabled) {
       const v = config.selfInteractionVev
       canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v
@@ -493,37 +541,73 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
 // ───────────────────────────────────────────────────────────────────────────
 
 /**
+ * Coefficient bundle used by the CPU diagnostics Hamiltonian. Extends the
+ * cosmology triple `(aKinetic, aPotential, aFull)` with the preheating drive
+ * scalar `massSquaredScale = 1 + A·sin(Ω·(t−ref))` so the reported total
+ * energy matches the time-dependent Hamiltonian the GPU pi-update is
+ * actually integrating. Under cosmology-off and preheating-off all four
+ * fields are `1` and the expression collapses to the bare Klein-Gordon
+ * Hamiltonian bit-identically.
+ */
+export interface FsfHamiltonianCoefs extends CosmologyCoefs {
+  /** Preheating drive scalar `1 + A·sin(Ω·(t−ref))`; `1` when disabled. */
+  massSquaredScale: number
+}
+
+/**
+ * Identity Hamiltonian coefficients `(1, 1, 1, 1)` returned under Minkowski
+ * + preheating disabled. Distinct from {@link FSF_IDENTITY_COSMO_COEFS}
+ * (the 3-field cosmology-only identity) so tests and diagnostics call sites
+ * pick the right shape without ad-hoc spreads. Using a shared constant
+ * keeps reference equality stable across the hot-path callers so downstream
+ * memos cache correctly.
+ */
+export const FSF_IDENTITY_HAMILTONIAN_COEFS: FsfHamiltonianCoefs = {
+  aKinetic: 1,
+  aPotential: 1,
+  aFull: 1,
+  massSquaredScale: 1,
+}
+
+/**
  * Compute field statistics from mapped readback data.
  *
  * Pure CPU function operating on Float32Array views from mapped staging
  * buffers. The caller is responsible for mapping/unmapping.
  *
- * **Total energy** is the canonical Hamiltonian in the δφ variables:
+ * **Total energy** is the canonical Hamiltonian in the δφ variables with
+ * the time-dependent preheating drive applied to the mass term:
  *
  *     H = ∫ d^d x [½ aKinetic π² + ½ aPotential (∇δφ)²
- *                  + ½ mass²·aFull δφ² + aFull V(δφ)]
+ *                  + ½ mass²·aFull·massSquaredScale δφ² + aFull V(δφ)]
  *
- * Under the Minkowski preset (or cosmology disabled) the three coefs
- * collapse to 1 and this recovers the bare Klein-Gordon energy. Under
- * non-Minkowski cosmology the energy is NOT conserved — the time-dependent
- * background does work on the field — so the `energyDrift` field loses
- * its Minkowski interpretation, but each individual snapshot still
- * reports the physically meaningful instantaneous total.
+ * Under the Minkowski preset (cosmology disabled) and with preheating off
+ * the four coefs collapse to 1 and this recovers the bare Klein-Gordon
+ * energy. Under non-Minkowski cosmology the energy is NOT conserved —
+ * the time-dependent background does work on the field — so the
+ * `energyDrift` field loses its Minkowski interpretation, but each
+ * individual snapshot still reports the physically meaningful instantaneous
+ * total. The `massSquaredScale` factor must match what the GPU
+ * `freeScalarUpdatePi` shader used at the readback time; otherwise the
+ * diagnostics Hamiltonian is computed with a different effective mass
+ * than the integrator is evolving with.
  *
  * @param phi - Mapped phi field data
  * @param pi - Mapped pi (canonical conjugate momentum) field data
  * @param config - Free scalar field configuration
- * @param coefs - Cosmology coefficients at the readback time. Caller
- *                obtains them via `computeFsfCosmologyCoefs(config, simEta)`,
- *                which collapses to identity under Minkowski so both
- *                branches go through a single code path.
+ * @param coefs - Cosmology + preheating coefficients at the readback time.
+ *                Caller obtains the cosmology triple from
+ *                `computeFsfCosmologyCoefs(config, simEta)` and the
+ *                `massSquaredScale` from `computeMassSquaredScale` at the
+ *                same clock value the pi-update last saw. Under Minkowski
+ *                with preheating off all four fields collapse to `1`.
  * @returns Diagnostics snapshot for the store
  */
 export function computeFsfDiagnostics(
   phi: Float32Array,
   pi: Float32Array,
   config: FreeScalarConfig,
-  coefs: CosmologyCoefs
+  coefs: FsfHamiltonianCoefs
 ): FsfDiagnosticsSnapshot {
   const N = phi.length
 
@@ -575,10 +659,17 @@ export function computeFsfDiagnostics(
 
   const totalNorm = sumPhi2 * dV
   const kineticEnergy = 0.5 * coefs.aKinetic * sumPi2 * dV
-  // Canonical mass-term energy: ½ · m² · a^n · Σφ² · dV. Under Minkowski
-  // coefs.aFull = 1 and this reduces to ½ · m² · Σφ² · dV, bit-identical
-  // to the pre-cosmology pipeline.
-  const massEnergy = 0.5 * config.mass * config.mass * coefs.aFull * sumPhi2 * dV
+  // Canonical mass-term energy:
+  //   ½ · m² · a^n · massSquaredScale(η) · Σφ² · dV
+  // The `massSquaredScale` factor mirrors the GPU pi-update's
+  // `massCoef = m²·aFull·massSquaredScale`, so the diagnostics
+  // Hamiltonian is evaluated with the same time-dependent effective
+  // mass the integrator is using. Under Minkowski coefs.aFull = 1 and
+  // with preheating disabled coefs.massSquaredScale = 1, so this
+  // reduces to ½ · m² · Σφ² · dV — bit-identical to the pre-cosmology,
+  // pre-preheating pipeline.
+  const massEnergy =
+    0.5 * config.mass * config.mass * coefs.aFull * coefs.massSquaredScale * sumPhi2 * dV
   let potentialEnergy = 0
   if (config.selfInteractionEnabled) {
     const lambda = config.selfInteractionLambda
