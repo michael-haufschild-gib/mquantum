@@ -7,11 +7,12 @@
  * config stayed on whatever the last sweep step left behind.
  */
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MonitoringSweepSection } from '@/components/sections/Analysis/MonitoringSweepSection'
+import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useMonitoringSweepStore } from '@/stores/monitoringSweepStore'
 
@@ -76,5 +77,79 @@ describe('MonitoringSweepSection — snapshot and restore', () => {
     expect(useMonitoringSweepStore.getState().status).toBe('idle')
     expect(getTdse().diagnosticsEnabled).toBe(false)
     expect(getTdse().stochasticGamma).toBe(PRE_SWEEP_GAMMA)
+  })
+})
+
+describe('MonitoringSweepSection — sweep tick dedup by readbackGeneration', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.setState(useExtendedObjectStore.getInitialState())
+    useMonitoringSweepStore.getState().reset()
+    useDiagnosticsStore.getState().resetTdse()
+    setupPreSweepTdse()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /**
+   * Push a synthetic TDSE diagnostic snapshot. Each call bumps
+   * `readbackGeneration` by one and moves the ring-buffer head forward.
+   */
+  function pushSnapshot(simTime: number, ipr: number, normDrift = 0.0): void {
+    useDiagnosticsStore.getState().pushTdseSnapshot({
+      simTime,
+      totalNorm: 1.0,
+      maxDensity: 1.0,
+      normDrift,
+      normLeft: 0.5,
+      normRight: 0.5,
+      R: 0.5,
+      T: 0.5,
+      ipr,
+    })
+  }
+
+  it('skips duplicate ticks when readbackGeneration has not advanced', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<MonitoringSweepSection />)
+    await user.click(screen.getByRole('button', { name: /^Start Sweep$/i }))
+    expect(useMonitoringSweepStore.getState().status).toBe('running')
+
+    // First snapshot arrives before any tick runs — only one `iprAccumulator`
+    // entry should land per unique snapshot even if the polling loop fires
+    // multiple times between GPU readbacks.
+    pushSnapshot(1.0, 0.5)
+
+    // Fire four 200 ms ticks. Without the dedup guard, each tick would call
+    // `monitoringSweepStore.tick(...)` with the same (simTime, ipr) triple
+    // and the first-tick anchor / accumulator would record duplicates.
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+
+    // First tick anchors the step: stepStartTime=1.0, accumulator=[0.5].
+    // Subsequent ticks hit the readbackGeneration dedup guard and bail out
+    // before touching the store, so the accumulator stays at one entry.
+    const state = useMonitoringSweepStore.getState()
+    expect(state.stepStartTime).toBe(1.0)
+    expect(state.iprAccumulator).toEqual([0.5])
+
+    // A fresh diagnostic (new generation) adds exactly one more sample.
+    pushSnapshot(1.4, 0.6)
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    expect(useMonitoringSweepStore.getState().iprAccumulator).toEqual([0.5, 0.6])
   })
 })

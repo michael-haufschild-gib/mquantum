@@ -167,9 +167,19 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
 
 OpenQuantumDiagnosticsSection.displayName = 'OpenQuantumDiagnosticsSection'
 
-/** Per-state population bar with label and percentage */
+/**
+ * Per-state population bar with label and percentage.
+ *
+ * `value` comes from a GPU readback of a density matrix diagonal; a
+ * transient NaN (e.g. an early frame before the first valid readback,
+ * or a numerical blow-up) would otherwise render as `width: NaN%`
+ * (invalid CSS, silently dropped by the browser) and `NaN%` text. The
+ * explicit `Number.isFinite` guard normalises both to 0 so the UI never
+ * shows a broken bar.
+ */
 function PopulationBar({ label, value }: { label: string; value: number }) {
-  const pct = Math.max(0, Math.min(100, value * 100))
+  const safeValue = Number.isFinite(value) ? value : 0
+  const pct = Math.max(0, Math.min(100, safeValue * 100))
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-text-secondary font-mono w-8 shrink-0">{label}</span>
@@ -180,7 +190,7 @@ function PopulationBar({ label, value }: { label: string; value: number }) {
         />
       </div>
       <span className="text-xs text-text-tertiary font-mono tabular-nums w-10 text-end">
-        {(value * 100).toFixed(1)}%
+        {pct.toFixed(1)}%
       </span>
     </div>
   )
