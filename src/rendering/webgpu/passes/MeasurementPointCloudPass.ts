@@ -35,7 +35,6 @@ interface MeasurementSnapshot {
   measurements: MeasurementRecord[]
 }
 
-
 /**
  * Render pass for measurement point cloud visualization.
  * Uses additive blending to render glowing dots at measured positions.
@@ -146,9 +145,17 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     const positions = mState.measurements
     this.pointCount = Math.min(positions.length, MAX_POINTS)
 
+    // `measurements[]` is append-ordered — index 0 is the oldest record,
+    // index (pointCount-1) the newest. The vertex shader's uniform
+    // contract is `0=newest, 1=oldest` and the fragment shader applies
+    // `fade = 1 - age*0.7` (so older → dimmer). We therefore invert the
+    // index-to-age mapping here; the original `i / (pointCount-1)` made
+    // the newest measurement the *dimmest* and the oldest the *brightest*,
+    // which is the opposite of what a "fading trail" visualization wants.
+    const denom = Math.max(this.pointCount - 1, 1)
     for (let i = 0; i < this.pointCount; i++) {
       const pos = positions[i]!.position
-      const age = i / Math.max(this.pointCount - 1, 1)
+      const age = (this.pointCount - 1 - i) / denom
       this.uploadData[i * 4] = pos[0] ?? 0
       this.uploadData[i * 4 + 1] = pos[1] ?? 0
       this.uploadData[i * 4 + 2] = pos[2] ?? 0

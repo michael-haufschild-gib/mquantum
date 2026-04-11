@@ -88,7 +88,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private lastHeight = 0
 
   // Configuration
-  private historyWeight: number
+  private readonly historyWeight: number
   private static readonly CAMERA_CUT_THRESHOLD_SQ = 4.0
 
   /** Helper callbacks bridging base-class protected methods to setup functions. */
@@ -410,27 +410,6 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       if (a[i] !== b[i]) return false
     }
     return true
-  }
-
-  /** Get current Bayer offset for external use. */
-  getBayerOffset(): [number, number] {
-    return BAYER_OFFSETS[this.frameIndex % 4]!
-  }
-
-  /** Get frame index for external use. */
-  getFrameIndex(): number {
-    return this.frameIndex
-  }
-
-  /** Reset temporal history (e.g., on camera cut). */
-  resetHistory(): void {
-    this.hasValidHistory = false
-    this.completedFullCycle = false
-  }
-
-  /** Set history weight. */
-  setHistoryWeight(weight: number): void {
-    this.historyWeight = Math.max(0, Math.min(1, weight))
   }
 
   override releaseInternalResources(): void {

@@ -76,12 +76,16 @@ export interface SchroedingerVersions {
  * Returns `false` when only the time field needs a partial update.
  */
 export function isSchroedingerDirty(tracker: VersionTracker, v: SchroedingerVersions): boolean {
+  // A fresh tracker starts at `lastSchroedingerVersion === -1`. Zustand
+  // version counters start at 0, so a first-frame check with any real
+  // incoming version already returns dirty via the first comparison
+  // (`0 !== -1`). No explicit "fresh tracker" branch needed — the
+  // `-1` sentinel is strictly less than every real version.
   return (
     v.schroedingerVersion !== tracker.lastSchroedingerVersion ||
     v.appearanceVersion !== tracker.lastSchroedingerAppearanceVersion ||
     v.pbrVersion !== tracker.lastSchroedingerPbrVersion ||
-    v.pauliSpinorVersion !== tracker.lastPauliSpinorVersion ||
-    tracker.lastSchroedingerVersion === -1
+    v.pauliSpinorVersion !== tracker.lastPauliSpinorVersion
   )
 }
 
