@@ -194,8 +194,7 @@ function resolveOmegaEvaluator(
       `vacuum sampler dispersion must be 'kgFloor' or a finite number, got ${dispersion}`
     )
   }
-  return (coords, dims) =>
-    computeOmegaKFromMassSq(coords, dims, spacing, dispersion, latticeDim)
+  return (coords, dims) => computeOmegaKFromMassSq(coords, dims, spacing, dispersion, latticeDim)
 }
 
 /**
@@ -397,17 +396,28 @@ export function estimateVacuumMaxPi(
 }
 
 /**
- * Estimates the maximum local energy density for auto-scale normalization.
+ * Estimates the visual-scale energy density for auto-scale normalization of
+ * vacuum states.
  *
  * For a free Gaussian field, the local energy density is:
  * `E(x) = 0.5 * pi^2 + 0.5 * m^2 * phi^2 + 0.5 * sum_d (grad_d phi)^2`
  *
- * Since `omega_k^2 = m^2 + sum_d k_d^2`, the total variance simplifies to:
- * `var(E) ~ (1/N) * sum_k omega_k` and the 3-sigma peak is `4.5 * <omega>`.
+ * By Wick's theorem its spatial mean is `⟨E⟩ = (1/2N) sum_k omega_k =
+ * meanOmega/2`. Unlike the symmetric `phi` view (zero mean, 3-sigma = a few
+ * times sigma), the vacuum ε distribution is one-sided chi-squared-like:
+ * extreme peaks across `N = latticeDim³` sites sit ~13x above the spatial
+ * mean, while ~99% of voxels are near the mean. Dividing by that extreme
+ * peak would leave almost the entire cube at `normRho ≈ 0.05`, which
+ * Beer-Lambert then composites to a near-empty scene.
+ *
+ * Instead we return `meanOmega = 2·⟨E⟩` — twice the spatial average, which
+ * puts the typical voxel at `normRho ≈ 0.5` so the raymarcher sees the full
+ * vacuum texture, and extreme peaks saturate to a few × the divisor
+ * (downstream clamp `min(rho, 10)` keeps the Beer-Lambert exponent bounded).
  *
  * @param config - Free scalar field configuration
  * @param dispersion - Mass-term dispatch; see `estimateVacuumMaxPhi`.
- * @returns Estimated maximum energy density (positive)
+ * @returns Visual-scale energy density (positive): `2·⟨E(x)⟩ = meanOmega`
  */
 export function estimateVacuumMaxEnergy(
   config: FreeScalarConfig,
@@ -427,5 +437,5 @@ export function estimateVacuumMaxEnergy(
   }
 
   const meanOmega = omegaSum / totalSites
-  return 4.5 * meanOmega
+  return meanOmega
 }

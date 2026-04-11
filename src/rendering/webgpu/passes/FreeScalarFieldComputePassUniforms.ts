@@ -455,10 +455,14 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
       const rawMaxPi = estimateVacuumMaxPi(config, dispersion)
       return rawMaxPi * Math.sqrt(aPotential)
     }
-    // energyDensity (proper, per comoving observer): the canonical per-mode
-    // ground-state energy is `ω_k/2`, giving a canonical density peak of
-    // `4.5·⟨ω⟩` from the Gaussian-field 3-sigma bound. Divide by `aFull(η₀)`
-    // to convert to proper density, matching the shader's output.
+    // energyDensity (proper, per comoving observer): the spatial mean of the
+    // canonical Hamiltonian density is `⟨E⟩ = meanOmega/2`. We normalize to
+    // `2·⟨E⟩ = meanOmega` (returned by `estimateVacuumMaxEnergy`) so the
+    // typical voxel lands near `normRho ≈ 0.5` — unlike an extreme-peak
+    // divisor, which would leave almost the entire cube at ~5% brightness
+    // because the one-sided chi-squared-like ε distribution has peaks
+    // ~13× its spatial mean. Divide by `aFull(η₀)` to convert to proper
+    // density, matching the shader's output.
     let canonicalEnergy = estimateVacuumMaxEnergy(config, dispersion)
     if (config.selfInteractionEnabled) {
       const v = config.selfInteractionVev
