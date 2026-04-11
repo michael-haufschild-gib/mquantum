@@ -182,3 +182,43 @@ export function createFsfDensityAndAnalysisTextures(device: GPUDevice): {
   })
   return { densityTexture, densityTextureView, analysisTexture, analysisTextureView }
 }
+
+/**
+ * Zero-fill the FSF density + analysis 3D textures. Invoked on the
+ * position-space → k-space analysis-mode transition to avoid displaying
+ * stale position-space data while the k-space readback is still in
+ * flight (the FFT worker takes several frames to publish its first
+ * result, during which the raymarcher would otherwise show whatever
+ * the write-grid pass last wrote).
+ *
+ * @param device - GPU device
+ * @param densityTexture - 3D density grid to clear
+ * @param analysisTexture - 3D analysis grid to clear
+ */
+export function clearFsfDensityAndAnalysisTextures(
+  device: GPUDevice,
+  densityTexture: GPUTexture,
+  analysisTexture: GPUTexture
+): void {
+  const bytesPerTexel = 8
+  const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
+  const rowsPerImage = DENSITY_GRID_SIZE
+  const zeros = new Uint8Array(bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE)
+  const texSize = {
+    width: DENSITY_GRID_SIZE,
+    height: DENSITY_GRID_SIZE,
+    depthOrArrayLayers: DENSITY_GRID_SIZE,
+  }
+  device.queue.writeTexture(
+    { texture: densityTexture },
+    zeros,
+    { bytesPerRow, rowsPerImage },
+    texSize
+  )
+  device.queue.writeTexture(
+    { texture: analysisTexture },
+    zeros,
+    { bytesPerRow, rowsPerImage },
+    texSize
+  )
+}

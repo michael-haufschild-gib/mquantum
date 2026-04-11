@@ -14,10 +14,13 @@ import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import { computeMassSquaredScale } from '@/lib/physics/cosmology/preheating'
+import { computeFsfCosmologyCoefs } from '@/lib/physics/freeScalar/vacuumDispersion'
 
+import type { FsfHamiltonianCoefs } from './FreeScalarFieldComputePassUniforms'
 import {
   FSF_COSMO_COEFS_BYTE_OFFSET,
   FSF_COSMO_COEFS_BYTE_SIZE,
+  FSF_DT_BYTE_OFFSET,
 } from './FreeScalarFieldComputePassUniforms'
 
 /**
@@ -336,6 +339,100 @@ export function resolveFsfSubstepCoefs(
     coefs: { aKinetic, aPotential, aFull, massSquaredScale },
     preheatingTime: nextPreheatingTime,
   }
+}
+
+/**
+ * Snapshot the canonical-Hamiltonian coefficients used by the CPU
+ * diagnostics readback. Evaluates `computeFsfCosmologyCoefs` at the live
+ * `simEta` and `computeMassSquaredScale` on the same clock the pi-update
+ * last saw — `simEta` when cosmology is active, the Minkowski-path
+ * counter otherwise — so the diagnostics Hamiltonian matches the
+ * time-dependent terms the integrator is using. Under Minkowski +
+ * preheating disabled every field collapses to 1.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current cosmological conformal time
+ * @param preheatingTime - Current Minkowski-path preheating clock
+ * @param preheatingReferenceEta - Drive anchor from the last reset
+ */
+export function snapshotFsfHamiltonianCoefs(
+  config: FreeScalarConfig,
+  simEta: number,
+  preheatingTime: number,
+  preheatingReferenceEta: number
+): FsfHamiltonianCoefs {
+  const cosmoCoefs = computeFsfCosmologyCoefs(config, simEta)
+  const preheatingClock = config.cosmology.enabled ? simEta : preheatingTime
+  const massSquaredScale = computeMassSquaredScale(
+    preheatingClock,
+    config.preheating,
+    preheatingReferenceEta
+  )
+  return { ...cosmoCoefs, massSquaredScale }
+}
+
+/**
+ * Pick the outer-step substep count for one leapfrog iteration. Combines
+ * the CFL stability bound (evaluated at both endpoints so a discontinuous
+ * floor clamp in de Sitter can't slip past the start-of-step check) with
+ * the adiabatic `|Δω₀/ω_avg|` constraint, returning the max so both
+ * safeguards are satisfied. Under Minkowski / cosmology disabled this
+ * returns 1 — no substepping pressure — so the flat-background path is
+ * bit-identical to the pre-cosmology behaviour.
+ *
+ * @param config - Free scalar field configuration
+ * @param simEta - Current cosmological conformal time
+ * @param dtFull - Full outer-step integrator dt
+ * @param cosmologyActive - Whether cosmology is enabled
+ * @param cflCapWarnedKeys - Dedupe set for the "sub-step cap reached" warning
+ * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
+ */
+export function computeFsfOuterStepSubsteps(
+  config: FreeScalarConfig,
+  simEta: number,
+  dtFull: number,
+  cosmologyActive: boolean,
+  cflCapWarnedKeys: Set<string>
+): number {
+  if (!cosmologyActive) return 1
+  const coefsStart = computeFsfCosmologyCoefs(config, simEta)
+  const coefsEnd = computeFsfCosmologyCoefs(config, projectSimEta(simEta, dtFull))
+  const nSubStart = computeFsfCflSubsteps(
+    config,
+    coefsStart.aFull,
+    coefsStart.aPotential,
+    cflCapWarnedKeys
+  )
+  const nSubEnd = computeFsfCflSubsteps(
+    config,
+    coefsEnd.aFull,
+    coefsEnd.aPotential,
+    cflCapWarnedKeys
+  )
+  const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
+  const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)
+  return nSubCfl > nSubAdiab ? nSubCfl : nSubAdiab
+}
+
+/**
+ * Re-stage just the shader `dt` slot in the FSF uniform buffer. Used by
+ * the leapfrog loop to swap between full and sub-step dt during adaptive
+ * substepping without touching the other 527 bytes. Reuses the caller's
+ * scratch buffer so no allocation occurs per call.
+ *
+ * @param device - GPU device
+ * @param uniformBuffer - FSF uniform buffer
+ * @param scratch - Reusable Float32Array scratch (slot 0 is overwritten)
+ * @param dt - New integrator dt to write
+ */
+export function writeFsfDtSlot(
+  device: GPUDevice,
+  uniformBuffer: GPUBuffer,
+  scratch: Float32Array,
+  dt: number
+): void {
+  scratch[0] = dt
+  device.queue.writeBuffer(uniformBuffer, FSF_DT_BYTE_OFFSET, scratch.buffer, scratch.byteOffset, 4)
 }
 
 /**

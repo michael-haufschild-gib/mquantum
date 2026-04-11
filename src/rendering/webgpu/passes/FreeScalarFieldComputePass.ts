@@ -20,11 +20,11 @@ import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import {
+  clearFsfDensityAndAnalysisTextures,
   createFsfDensityAndAnalysisTextures,
   DENSITY_GRID_SIZE,
   GRID_WG as GRID_WORKGROUP_SIZE,
@@ -50,12 +50,14 @@ import {
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 import { captureFsfCosmoDebugSample, getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
 import {
-  computeAdiabaticSubsteps,
-  computeFsfCflSubsteps,
+  computeFsfOuterStepSubsteps,
   projectSimEta,
   resolveFsfSubstepCoefs,
+  snapshotFsfHamiltonianCoefs,
   writeFsfCosmologyCoefsSlot,
+  writeFsfDtSlot,
 } from './fsfCosmologyStepping'
+import { composeFsfSaveMetadata } from './fsfStateIO'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 /**
@@ -166,6 +168,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * saved it.
    */
   private pendingLoadedSimEta: number | null = null
+  /**
+   * Optional preheating `(ref, time)` pair provided by a load-from-file
+   * operation. Consumed once on reinit to resume the Mathieu drive in phase
+   * with the saved phi/pi buffers; `null` on fresh resets.
+   */
+  private pendingLoadedPreheating: { ref: number; time: number } | null = null
 
   // Pre-allocated uniform data (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -255,12 +263,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * Set loaded cosmological sim time from a save file. Consumed once on the
    * next reinitialization — after which `config.cosmology.eta0` is again the
    * source of truth for subsequent resets.
-   *
-   * @param eta - Saved `simEta` to restore
    */
   setLoadedRuntimeSimEta(eta: number): void {
-    if (!Number.isFinite(eta) || eta === 0) return
-    this.pendingLoadedSimEta = eta
+    if (Number.isFinite(eta) && eta !== 0) this.pendingLoadedSimEta = eta
+  }
+
+  /**
+   * Set loaded preheating drive `(ref, time)` from a save file. Consumed
+   * once on the next reinitialization so the Mathieu modulation
+   * `1 + A·sin(Ω·(clock − ref))` resumes in phase with the saved buffers.
+   * Non-finite args leave the pending slot null so a partially-corrupt blob
+   * falls through to the fresh-reset phase-0 anchor.
+   */
+  setLoadedRuntimePreheatingState(ref: number, time: number): void {
+    if (Number.isFinite(ref) && Number.isFinite(time)) this.pendingLoadedPreheating = { ref, time }
   }
 
   /**
@@ -273,35 +289,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   requestStateSave(ctx: WebGPURenderContext): void {
     if (!this.phiBuffer || !this.piBuffer || this.saveMappingInFlight) return
     const byteSize = this.totalSites * 4
-
     this.saveMappingInFlight = true
-    // Capture simEta AND the full FSF config synchronously at the save-
-    // request site so every piece of metadata matches the phi/pi buffers
-    // being copied on this command encoder. The async getMetadata resolves
-    // later, by which time the user may have changed lattice dim, grid
-    // size, or cosmology — reading the store inside getMetadata would pair
-    // those new settings with stale buffers and corrupt the saved file.
-    const simEtaAtSave = this.simEta
-    const fsfConfigAtSave = useExtendedObjectStore.getState().schroedinger.freeScalar
-    const gridSizeAtSave = fsfConfigAtSave.gridSize?.slice(0, fsfConfigAtSave.latticeDim ?? 3) ?? [
-      64,
-    ]
+    // Snapshot runtime scalars synchronously so the async `getMetadata`
+    // callback cannot race a mid-save config change and pair stale clocks
+    // with mismatched field data.
+    const metadata = composeFsfSaveMetadata({
+      simEta: this.simEta,
+      preheatingReferenceEta: this.preheatingReferenceEta,
+      preheatingTime: this.preheatingTime,
+    })
     genericStateSave(ctx, {
       source: { layout: 'separate', reBuffer: this.phiBuffer, imBuffer: this.piBuffer, byteSize },
       totalSites: this.totalSites,
       label: 'fsf',
-      getMetadata: async () => {
-        return {
-          quantumMode: 'freeScalarField',
-          config: {
-            quantumMode: 'freeScalarField',
-            freeScalar: fsfConfigAtSave,
-            _runtimeMeta: { simEta: simEtaAtSave },
-          } as Record<string, unknown>,
-          gridSize: gridSizeAtSave,
-          componentCount: 1,
-        }
-      },
+      getMetadata: async () => metadata,
       onFinished: () => {
         this.saveMappingInFlight = false
       },
@@ -647,9 +648,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       const cosmoOn = config.cosmology.enabled
       this.simEta = cosmoOn ? (this.pendingLoadedSimEta ?? config.cosmology.eta0) : 0
       this.pendingLoadedSimEta = null
-      // Anchor preheating at phase 0 for the reset time (sin(0) = 0).
-      this.preheatingReferenceEta = cosmoOn ? this.simEta : 0
-      this.preheatingTime = 0
+      // Preheating phase: restore from save if present, else anchor at
+      // phase 0 for the current clock (sin(0) = 0 at the start).
+      const pre = this.pendingLoadedPreheating
+      this.preheatingReferenceEta = pre?.ref ?? (cosmoOn ? this.simEta : 0)
+      this.preheatingTime = pre?.time ?? 0
+      this.pendingLoadedPreheating = null
     }
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius, colorAlgorithm)
@@ -680,74 +684,23 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       let maxNSubThisFrame = 1
 
       for (let step = 0; step < stepsThisFrame; step++) {
-        // Adaptive sub-stepping combines TWO independent requirements:
-        //
-        // 1. CFL stability — `dt·ω < COSMOLOGY_CFL_SAFETY` where
-        //    `ω² = k_max² + m²·a²`. This keeps the leapfrog's
-        //    characteristic eigenvalues inside the stable disk so the
-        //    integrator doesn't blow up. Evaluated at BOTH endpoints of
-        //    the outer step (the current `simEta` AND the projected
-        //    end-of-step `simEta`); in de Sitter `a(η) ∝ 1/|η|` grows
-        //    monotonically toward the singularity, so a check at only
-        //    the start would miss the discontinuous jump to the
-        //    `COSMOLOGY_ETA_FLOOR` and the pi dispatch at the end of
-        //    the step would run with the larger post-jump frequency but
-        //    the stale nSub=1 interval — which detonates the leapfrog
-        //    in a single step (captured in
-        //    `scripts/playwright-output/fsf-desitter-autoscale-flash.json`).
-        //
-        // 2. Adiabaticity — `|Δω₀/ω_avg| < COSMOLOGY_ADIABATIC_SAFETY`
-        //    per sub-step where `ω₀ ≈ m·a` is the zero-mode frequency.
-        //    CFL alone is not sufficient: even with the leapfrog well
-        //    inside its stable disk, a discontinuous jump in the
-        //    cosmology coefficients across one outer step will *pump*
-        //    the mode oscillators out of their instantaneous ground
-        //    state, producing canonical amplitudes that overshoot by
-        //    orders of magnitude before settling. Requiring the scale
-        //    factor to change by no more than ~10% per sub-step keeps
-        //    the numerical integrator tracking the analytical mode
-        //    functions without excitations.
-        //
-        // Final `nSub = max(nSub_cfl, nSub_adiab)`. For Kasner/ekpyrotic
-        // `a(η)` shrinks toward the big bang so the CFL at the start is
-        // the tighter bound and adiabaticity there is mild; for de
-        // Sitter it's the reverse. Taking the max over both constraints
-        // at both endpoints handles every preset without a preset-
-        // specific branch.
-        let nSub = 1
-        if (cosmologyActive) {
-          const coefsStart = computeFsfCosmologyCoefs(config, this.simEta)
-          const endSimEta = projectSimEta(this.simEta, dtFull)
-          const coefsEnd = computeFsfCosmologyCoefs(config, endSimEta)
-          const nSubStart = computeFsfCflSubsteps(
-            config,
-            coefsStart.aFull,
-            coefsStart.aPotential,
-            this.cflCapWarnedKeys
-          )
-          const nSubEnd = computeFsfCflSubsteps(
-            config,
-            coefsEnd.aFull,
-            coefsEnd.aPotential,
-            this.cflCapWarnedKeys
-          )
-          const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
-          const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)
-          nSub = nSubCfl > nSubAdiab ? nSubCfl : nSubAdiab
-          if (nSub > maxNSubThisFrame) maxNSubThisFrame = nSub
-          if (nSub !== 1) {
-            // Re-stage the shader dt to the sub-step size for the duration
-            // of this outer step. Restored at the end of the outer step.
-            const subDt = dtFull / nSub
-            this.cosmoCoefsScratch[0] = subDt
-            device.queue.writeBuffer(
-              this.uniformBuffer!,
-              DT_BYTE_OFFSET,
-              this.cosmoCoefsScratch.buffer,
-              this.cosmoCoefsScratch.byteOffset,
-              4
-            )
-          }
+        // Adaptive sub-stepping enforces CFL stability AND adiabaticity
+        // at BOTH endpoints of the outer step (see
+        // `computeFsfOuterStepSubsteps` for the full rationale — de
+        // Sitter and Kasner both have failure modes that a start-only
+        // check would miss). Under cosmology disabled the helper returns
+        // 1 — no substepping pressure — so the flat-background path is
+        // bit-identical to the pre-cosmology behaviour.
+        const nSub = computeFsfOuterStepSubsteps(
+          config,
+          this.simEta,
+          dtFull,
+          cosmologyActive,
+          this.cflCapWarnedKeys
+        )
+        if (nSub > maxNSubThisFrame) maxNSubThisFrame = nSub
+        if (nSub !== 1 && this.uniformBuffer) {
+          writeFsfDtSlot(device, this.uniformBuffer, this.cosmoCoefsScratch, dtFull / nSub)
         }
 
         for (let sub = 0; sub < nSub; sub++) {
@@ -825,15 +778,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         // Restore the full dt in the uniform slot so the next outer step's
         // pre-flight CFL check (and any non-cosmology downstream reader)
         // sees the user-configured integrator step.
-        if (nSub !== 1) {
-          this.cosmoCoefsScratch[0] = dtFull
-          device.queue.writeBuffer(
-            this.uniformBuffer!,
-            DT_BYTE_OFFSET,
-            this.cosmoCoefsScratch.buffer,
-            this.cosmoCoefsScratch.byteOffset,
-            4
-          )
+        if (nSub !== 1 && this.uniformBuffer) {
+          writeFsfDtSlot(device, this.uniformBuffer, this.cosmoCoefsScratch, dtFull)
         }
       }
 
@@ -864,35 +810,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // k-Space occupation: async CPU readback → FFT → texture upload
     const analysisMode = this.uniformU32[47]!
 
-    // Clear textures on transition into k-space mode to avoid showing stale position-space data
+    // Clear textures on transition into k-space mode to avoid showing
+    // stale position-space data while the async FFT readback is in flight.
     if (
       analysisMode === 3 &&
       this.lastAnalysisMode !== 3 &&
       this.densityTexture &&
       this.analysisTexture
     ) {
-      const bytesPerTexel = 8
-      const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
-      const rowsPerImage = DENSITY_GRID_SIZE
-      const totalBytes = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
-      const zeros = new Uint8Array(totalBytes)
-      const texSize = {
-        width: DENSITY_GRID_SIZE,
-        height: DENSITY_GRID_SIZE,
-        depthOrArrayLayers: DENSITY_GRID_SIZE,
-      }
-      device.queue.writeTexture(
-        { texture: this.densityTexture },
-        zeros,
-        { bytesPerRow, rowsPerImage },
-        texSize
-      )
-      device.queue.writeTexture(
-        { texture: this.analysisTexture },
-        zeros,
-        { bytesPerRow, rowsPerImage },
-        texSize
-      )
+      clearFsfDensityAndAnalysisTextures(device, this.densityTexture, this.analysisTexture)
     }
     this.lastAnalysisMode = analysisMode
 
@@ -914,13 +840,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         config,
         this.simEta
       )
-      // Snapshot the cosmology coefficients at the exact moment the readback
-      // is requested so the diagnostics Hamiltonian term matches the
-      // time-dependent coefs that were used in the pi-update for this
-      // frame's buffers. `computeFsfCosmologyCoefs` collapses to identity
-      // under Minkowski, so the same call covers both branches without a
-      // conditional.
-      const coefs = computeFsfCosmologyCoefs(config, this.simEta)
+      // Snapshot cosmology + preheating coefs at the readback instant so
+      // the diagnostics Hamiltonian matches the time-dependent terms the
+      // pi-update just used.
+      const coefs = snapshotFsfHamiltonianCoefs(
+        config,
+        this.simEta,
+        this.preheatingTime,
+        this.preheatingReferenceEta
+      )
       this.kSpace.maybeStartDiagnosticsReadback(
         device,
         encoder,

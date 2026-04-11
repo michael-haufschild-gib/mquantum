@@ -31,6 +31,7 @@ import {
   computeFsfCosmologyCoefs,
   computeFsfDiagnostics,
   FSF_IDENTITY_COSMO_COEFS,
+  FSF_IDENTITY_HAMILTONIAN_COEFS,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
 /** Build a small power-of-2 lattice config that's fast to sample. */
@@ -96,13 +97,11 @@ describe('Minkowski cosmology preset is bit-identical to disabled FSF', () => {
       cosmology: { ...DEFAULT_COSMOLOGY_CONFIG, enabled: true, preset: 'minkowski', eta0: -10 },
     }
 
-    const disabledDiag = computeFsfDiagnostics(phi, pi, cfg, FSF_IDENTITY_COSMO_COEFS)
-    const cosmoDiag = computeFsfDiagnostics(
-      phi,
-      pi,
-      cfgCosmo,
-      computeFsfCosmologyCoefs(cfgCosmo, -10)
-    )
+    const disabledDiag = computeFsfDiagnostics(phi, pi, cfg, FSF_IDENTITY_HAMILTONIAN_COEFS)
+    const cosmoDiag = computeFsfDiagnostics(phi, pi, cfgCosmo, {
+      ...computeFsfCosmologyCoefs(cfgCosmo, -10),
+      massSquaredScale: 1,
+    })
 
     // Every numeric field of the diagnostics snapshot must agree to f32
     // precision — they're computed from the same buffers with the same mass.
@@ -339,7 +338,7 @@ describe('cosmology adiabatic vacuum integration with diagnostics', () => {
       cfg.vacuumSeed
     )
     const coefs = computeFsfCosmologyCoefs(cfg, cfg.cosmology.eta0)
-    const snapshot = computeFsfDiagnostics(phi, pi, cfg, coefs)
+    const snapshot = computeFsfDiagnostics(phi, pi, cfg, { ...coefs, massSquaredScale: 1 })
 
     expect(Number.isFinite(snapshot.totalEnergy)).toBe(true)
     expect(Number.isFinite(snapshot.totalNorm)).toBe(true)

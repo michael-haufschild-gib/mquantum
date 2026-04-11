@@ -260,3 +260,51 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimeSimEta', () => {
     expect(internal.pendingLoadedSimEta).toBeNull()
   })
 })
+
+describe('FreeScalarFieldComputePass.setLoadedRuntimePreheatingState', () => {
+  // Preheating-drive save/reload: the time-dependent Hamiltonian
+  //   m²_eff(t) = m₀² · (1 + A · sin(Ω·(clock − ref)))
+  // is only consistent with the saved phi/pi field if the drive phase
+  // at reload equals the phase at save. These tests cover the staging
+  // half of that contract — the load path fills a pending slot that the
+  // next `willReinitialize` pass consumes.
+  type PreheatingSlot = { ref: number; time: number } | null
+  const getSlot = (pass: FreeScalarFieldComputePass): PreheatingSlot =>
+    (pass as unknown as { pendingLoadedPreheating: PreheatingSlot }).pendingLoadedPreheating
+
+  it('stores finite preheating (ref, time) pair for the resume path', () => {
+    const pass = new FreeScalarFieldComputePass()
+    expect(getSlot(pass)).toBeNull()
+
+    pass.setLoadedRuntimePreheatingState(-5, 12.75)
+    expect(getSlot(pass)).toEqual({ ref: -5, time: 12.75 })
+  })
+
+  it('accepts an explicit zero ref (fresh-start anchor)', () => {
+    // 0 is a valid drive anchor under Minkowski — the drive starts at
+    // phase `sin(0) = 0` and grows from there. The zero-rejection rule
+    // used by `setLoadedRuntimeSimEta` (η=0 is the singularity) does
+    // NOT apply here.
+    const pass = new FreeScalarFieldComputePass()
+    pass.setLoadedRuntimePreheatingState(0, 0)
+    expect(getSlot(pass)).toEqual({ ref: 0, time: 0 })
+  })
+
+  it('ignores inputs if either field is non-finite', () => {
+    // Validation guard: a corrupt save with a NaN scalar must not poison
+    // the drive state. Either value being non-finite leaves the pending
+    // slot untouched so the pass falls back to the fresh-reset phase-0
+    // anchor on the next reinit.
+    const pass = new FreeScalarFieldComputePass()
+
+    pass.setLoadedRuntimePreheatingState(Number.NaN, 3.5)
+    expect(getSlot(pass)).toBeNull()
+
+    pass.setLoadedRuntimePreheatingState(-2.5, Number.POSITIVE_INFINITY)
+    expect(getSlot(pass)).toBeNull()
+
+    // A fully-valid pair still lands.
+    pass.setLoadedRuntimePreheatingState(-1, 2)
+    expect(getSlot(pass)).toEqual({ ref: -1, time: 2 })
+  })
+})

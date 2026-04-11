@@ -10,7 +10,6 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
 import type { KSpaceBasisCoefs } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   computeFsfCosmologyCoefs,
@@ -18,7 +17,10 @@ import {
 } from '@/lib/physics/freeScalar/vacuumDispersion'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-import { computeFsfDiagnostics } from './FreeScalarFieldComputePassUniforms'
+import {
+  computeFsfDiagnostics,
+  type FsfHamiltonianCoefs,
+} from './FreeScalarFieldComputePassUniforms'
 
 /**
  * Derive the canonical-basis rescale for the k-space `n_k` kernel from
@@ -197,12 +199,17 @@ export class FsfKSpaceManager {
   /**
    * Attempt diagnostics readback if conditions are met.
    *
-   * @param coefs - Cosmology coefficients `(aKinetic, aPotential, aFull)`
-   *                at the time the readback is requested. Caller obtains
-   *                them from `computeFsfCosmologyCoefs(config, simEta)`,
-   *                which collapses to identity under Minkowski. Propagated
+   * @param coefs - Cosmology + preheating coefficients
+   *                `(aKinetic, aPotential, aFull, massSquaredScale)` at the
+   *                time the readback is requested. Caller obtains the
+   *                cosmology triple from `computeFsfCosmologyCoefs(config,
+   *                simEta)` and `massSquaredScale` from
+   *                `computeMassSquaredScale` evaluated at the same clock
+   *                the pi-update last saw — both collapse to identity
+   *                under Minkowski + preheating disabled. Propagated
    *                through to `computeFsfDiagnostics` so the reported
-   *                Hamiltonian energy matches the canonical δφ integrator.
+   *                Hamiltonian energy matches the canonical δφ integrator
+   *                even while the time-dependent drive is active.
    */
   maybeStartDiagnosticsReadback(
     device: GPUDevice,
@@ -211,7 +218,7 @@ export class FsfKSpaceManager {
     piBuffer: GPUBuffer,
     totalSites: number,
     config: FreeScalarConfig,
-    coefs: CosmologyCoefs
+    coefs: FsfHamiltonianCoefs
   ): void {
     if (
       !config.diagnosticsEnabled ||
@@ -342,7 +349,7 @@ export class FsfKSpaceManager {
   private async readbackDiagnostics(
     device: GPUDevice,
     config: FreeScalarConfig,
-    coefs: CosmologyCoefs
+    coefs: FsfHamiltonianCoefs
   ): Promise<void> {
     const phiBuf = this.diagPhiReadbackBuffer
     const piBuf = this.diagPiReadbackBuffer

@@ -214,6 +214,47 @@ describe('simulationStateStore', () => {
       expect(pending?.config).toMatchObject({ _runtimeMeta: { simEta: -7.25 } })
     })
 
+    it('loadFromFile extracts preheating drive state from _runtimeMeta', async () => {
+      // Preheating-drive save/reload regression: the saved phi/pi field was
+      // evolved under the time-dependent Hamiltonian `m² · (1 + A·sin(Ω·(clock
+      // − ref)))`, so the load path must carry `preheatingReferenceEta` and
+      // `preheatingTime` through `pendingLoadData.runtimeMeta` to keep the
+      // Mathieu modulation in phase with the resumed buffers. Missing either
+      // field would re-anchor the drive to phase 0 and produce a physically
+      // inconsistent evolution on resume.
+      deserializeMock.mockImplementationOnce(async () => ({
+        quantumMode: 'freeScalarField' as const,
+        latticeDim: 3,
+        componentCount: 1,
+        gridSize: [8, 8, 8],
+        totalSites: 512,
+        config: {
+          quantumMode: 'freeScalarField',
+          freeScalar: { dt: 0.005, needsReset: false },
+          _runtimeMeta: {
+            simEta: -4.5,
+            preheatingReferenceEta: -10,
+            preheatingTime: 5.5,
+          },
+        },
+        psiRe: new Float32Array(512),
+        psiIm: new Float32Array(512),
+      }))
+
+      const file = new File([new ArrayBuffer(128)], 'fsf_preheating.mqstate', {
+        type: 'application/octet-stream',
+      })
+      useSimulationStateStore.getState().loadFromFile(file)
+      await vi.waitFor(() => {
+        expect(setSchroedingerConfigSpy).toHaveBeenCalledTimes(1)
+      })
+
+      const pending = useSimulationStateStore.getState().pendingLoadData
+      expect(pending?.runtimeMeta?.simEta).toBe(-4.5)
+      expect(pending?.runtimeMeta?.preheatingReferenceEta).toBe(-10)
+      expect(pending?.runtimeMeta?.preheatingTime).toBe(5.5)
+    })
+
     it('loadFromFile leaves runtimeMeta undefined when the save predates cosmology', async () => {
       // Files saved before the cosmology feature have no _runtimeMeta. The
       // store must default to `runtimeMeta: undefined` so the compute pass
