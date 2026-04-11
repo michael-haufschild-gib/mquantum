@@ -572,20 +572,31 @@ describe('hermitianEigendecompose', () => {
     }
   })
 
-  it('reconstruction V·Λ·V† recovers original matrix within Jacobi precision', () => {
+  it('reconstruction V·Λ·V† recovers complex-Hermitian matrix to machine precision', () => {
     // [[0.6, 0.2+0.1i], [0.2-0.1i, 0.4]] — a valid density matrix
+    //
+    // Historical note: before the Jacobi sign fix in `hermitianEigendecompose`
+    // (tau was `(ajj - aii)/(2|aij|)` instead of `(aii - ajj)/(2|aij|)`), this
+    // test passed only at `toBeLessThan(0.02)` — a 2% reconstruction error
+    // that the previous tolerance quietly accepted and documented as a
+    // property of "one-element-at-a-time Jacobi." The actual root cause was a
+    // non-convergent rotation direction that bounced around the true
+    // eigenvalues instead of reaching them. The current sign converges in a
+    // single sweep to machine precision, so this test now enforces 1e-14.
     const rho = makeDensityMatrix(2, [0.6, 0, 0.2, 0.1, 0.2, -0.1, 0.4, 0])
     const evals = new Float64Array(MAX_K)
     const evecs = new Float64Array(MAX_K * MAX_K * 2)
 
     hermitianEigendecompose(rho, evals, evecs)
 
-    // Verify eigenvalues: trace=1.0, det=0.24-0.05=0.19
-    // λ = (1 ± √0.24)/2 ≈ 0.7449, 0.2551
+    // Verify eigenvalues: trace=1.0, det = 0.6*0.4 - (0.2² + 0.1²) = 0.24 - 0.05 = 0.19
+    // λ = (trace ± √(trace² - 4·det))/2 = (1 ± √0.24)/2 exactly.
+    const expectedLow = (1 - Math.sqrt(0.24)) / 2
+    const expectedHigh = (1 + Math.sqrt(0.24)) / 2
     const sorted = [evals[0]!, evals[1]!].sort((a, b) => a - b)
-    expect(sorted[0]).toBeCloseTo(0.2551, 2)
-    expect(sorted[1]).toBeCloseTo(0.7449, 2)
-    expect(sorted[0]! + sorted[1]!).toBeCloseTo(1.0, 4)
+    expect(sorted[0]).toBeCloseTo(expectedLow, 12)
+    expect(sorted[1]).toBeCloseTo(expectedHigh, 12)
+    expect(sorted[0]! + sorted[1]!).toBeCloseTo(1.0, 12)
 
     // Reconstruct: ρ_reconstructed = Σ_k λ_k |v_k⟩⟨v_k|
     const K = 2
@@ -610,10 +621,31 @@ describe('hermitianEigendecompose', () => {
         maxError = Math.max(maxError, Math.abs(sumIm - rho.elements[idx + 1]!))
       }
     }
-    // Jacobi one-element-at-a-time method has limited reconstruction precision
-    // for Hermitian matrices with complex off-diagonals (phase factor accumulation).
-    // The eigenvalueFloor use case (clamp + reconstruct) tolerates ~2% error.
-    expect(maxError).toBeLessThan(0.02)
+    expect(maxError).toBeLessThan(1e-14)
+  })
+
+  it('converges on a real 2×2 with distinct diagonal (regression guard for tau sign bug)', () => {
+    // [[1, 2], [2, 3]] — eigenvalues 2 ± √5 ≈ 4.2361 and −0.2361.
+    //
+    // With the old `tau = (ajj - aii)/(2|aij|)` sign, the Jacobi sweep did
+    // NOT zero the off-diagonal in one step and instead bounced around the
+    // fixed point for all 50 maxSweeps (numerical trace shows off-diagonal
+    // oscillating between 0.035 and 2.236 with no monotone convergence).
+    // That regression slipped past the existing test suite because every
+    // other test case either (a) had `aii == ajj` (tau=0, sign-agnostic)
+    // or (b) was already diagonal and early-exited. This test exercises
+    // the exact shape the bug was latent under.
+    const rho = makeDensityMatrix(2, [1, 0, 2, 0, 2, 0, 3, 0])
+    const evals = new Float64Array(MAX_K)
+    const evecs = new Float64Array(MAX_K * MAX_K * 2)
+    hermitianEigendecompose(rho, evals, evecs)
+
+    const sorted = [evals[0]!, evals[1]!].sort((a, b) => a - b)
+    // 2 - √5 and 2 + √5
+    expect(sorted[0]).toBeCloseTo(2 - Math.sqrt(5), 12)
+    expect(sorted[1]).toBeCloseTo(2 + Math.sqrt(5), 12)
+    // Trace preservation (sanity)
+    expect(sorted[0]! + sorted[1]!).toBeCloseTo(4, 12)
   })
 })
 
