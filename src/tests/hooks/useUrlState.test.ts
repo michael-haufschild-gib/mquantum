@@ -147,6 +147,53 @@ describe('useUrlState', () => {
     })
   })
 
+  it('brc+brc_p URL params route into tdse branching state', async () => {
+    // Regression guard for the branching URL pipeline: `brc` and `brc_p`
+    // must land on `schroedinger.tdse.branchingEnabled` /
+    // `branchPlanePosition` so the TDSE diagnostics dispatcher can choose
+    // the branch plane over the default `barrierCenter`. Without this
+    // wiring, the branch visualization is unreachable from a shared URL.
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      branchingEnabled: true,
+      branchPlanePosition: 0.42,
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const tdse = useExtendedObjectStore.getState().schroedinger.tdse
+      expect(tdse.branchingEnabled).toBe(true)
+      expect(tdse.branchPlanePosition).toBeCloseTo(0.42, 4)
+    })
+  })
+
+  it('brc_p without brc does nothing (guard against stray param)', async () => {
+    // `applyBranchingParams` short-circuits when `branchingEnabled` is
+    // undefined, so a lone `brc_p` must not mutate the store. Verifies the
+    // guard in applyBranchingParams matches the deserializer, which only
+    // sets branchPlanePosition when `brc` is present.
+    const initialPos = useExtendedObjectStore.getState().schroedinger.tdse.branchPlanePosition
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'tdseDynamics',
+      branchPlanePosition: 0.8,
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.branchPlanePosition).toBe(
+        initialPos
+      )
+    })
+  })
+
   it('loads scene examples when scene parameter is present', async () => {
     const hasHydratedSpy = vi
       .spyOn(usePresetManagerStore.persist, 'hasHydrated')

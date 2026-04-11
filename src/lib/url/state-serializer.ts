@@ -135,6 +135,16 @@ export interface ShareableObjectState {
   stochasticSigma?: number
   /** Collapse sites per step */
   stochasticNumSites?: number
+  /**
+   * Branch visualization enabled. Controls whether the TDSE diagnostic
+   * partition (normLeft / normRight) uses `branchPlanePosition` instead of
+   * `barrierCenter`, and whether the raymarcher color-codes left/right
+   * branches. Physics-visible — not a pure visual preference — because it
+   * changes the diagnostic output that downstream tests and analyses read.
+   */
+  branchingEnabled?: boolean
+  /** Normalized branch plane position along axis 0 (-1 to 1, 0 = origin). */
+  branchPlanePosition?: number
 
   // ── Coordinate Entanglement ────────────────────────────────────────────
   /** Coordinate entanglement tracking enabled */
@@ -343,6 +353,15 @@ export function serializeState(state: ShareableState): string {
     setIntParam(params, 'sloc_n', state.stochasticNumSites)
   }
 
+  // Branching visualization (TDSE diagnostic partition + branch coloring).
+  // Independent from `sloc` because the partition diagnostic is meaningful
+  // even without stochastic localization (e.g., to measure left/right
+  // populations under a static double-well potential).
+  if (state.branchingEnabled) {
+    params.set('brc', '1')
+    setFloatParam(params, 'brc_p', state.branchPlanePosition, true)
+  }
+
   // Coordinate entanglement
   setBoolParam(params, 'ent', state.entanglementEnabled)
   setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
@@ -456,6 +475,13 @@ function deserializeFeatureParams(params: URLSearchParams, state: ParsedShareabl
     state.stochasticGamma = parseFloatParam(params, 'sloc_g', 0, 10)
     state.stochasticSigma = parseFloatParam(params, 'sloc_s', 0.5, 5)
     state.stochasticNumSites = parseIntParam(params, 'sloc_n', 1, 32)
+  }
+
+  const brc = parseBoolParam(params, 'brc')
+  if (brc !== undefined) {
+    state.branchingEnabled = brc
+    // Matches the store's setTdseBranchPlanePosition clamp [-1, 1].
+    state.branchPlanePosition = parseFloatParam(params, 'brc_p', -1, 1)
   }
 
   state.entanglementEnabled = parseBoolParam(params, 'ent')

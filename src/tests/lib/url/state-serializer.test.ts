@@ -456,6 +456,73 @@ describe('state-serializer', () => {
     })
   })
 
+  describe('branching visualization', () => {
+    it('serializes branching state when enabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        branchingEnabled: true,
+        branchPlanePosition: 0.5,
+      }
+      const result = serializeState(state)
+      expect(result).toContain('brc=1')
+      expect(result).toContain('brc_p=0.50')
+    })
+
+    it('omits branching params when disabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        branchingEnabled: false,
+        branchPlanePosition: 0.5,
+      }
+      const result = serializeState(state)
+      expect(result).not.toContain('brc')
+    })
+
+    it('omits brc_p when the position is exactly zero', () => {
+      // Zero is the default; emitting `brc_p=0.00` just bloats the URL.
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        branchingEnabled: true,
+        branchPlanePosition: 0,
+      }
+      const result = serializeState(state)
+      expect(result).toContain('brc=1')
+      expect(result).not.toContain('brc_p')
+    })
+
+    it('roundtrips branching state', () => {
+      const original: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        branchingEnabled: true,
+        branchPlanePosition: -0.75,
+      }
+      const deserialized = deserializeState(serializeState(original))
+      expect(deserialized.branchingEnabled).toBe(true)
+      expect(deserialized.branchPlanePosition).toBeCloseTo(-0.75, 2)
+    })
+
+    it('clamps branchPlanePosition to [-1, 1]', () => {
+      const d = deserializeState('brc=1&brc_p=5')
+      expect(d.branchingEnabled).toBe(true)
+      expect(d.branchPlanePosition).toBe(1)
+
+      const d2 = deserializeState('brc=1&brc_p=-9')
+      expect(d2.branchPlanePosition).toBe(-1)
+    })
+
+    it('branching is independent from stochastic localization', () => {
+      // Regression guard: branching must serialize on its own, since
+      // partition-based diagnostics are meaningful even with CSL off.
+      const d = deserializeState('brc=1&brc_p=0.3')
+      expect(d.branchingEnabled).toBe(true)
+      expect(d.stochasticEnabled).toBeUndefined()
+    })
+  })
+
   describe('custom potential expression', () => {
     it('roundtrips custom potential expression', () => {
       const state: ShareableState = {
