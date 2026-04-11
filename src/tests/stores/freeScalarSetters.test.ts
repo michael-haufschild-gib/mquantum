@@ -271,27 +271,25 @@ describe('free scalar field setters', () => {
       expect(getFSF().needsReset).toBe(true)
     })
 
-    it('re-clamps eta0 when gridSize change raises the safe threshold', () => {
-      // Finding 3: safeEta0 scales with L = N·a, so shrinking the grid
-      // (smaller L → larger k_min → actually smaller safeEta0...). Use
-      // an opposite case: enable cosmology at a small box where the safe
-      // threshold is some value, then double the spacing so L doubles and
-      // the safe threshold doubles too. If the stored eta0 is below the
-      // new floor, it must be re-clamped.
+    it('marks needsReset when a spacing change triggers reconcile', () => {
+      // `safeEta0` is now a constant (`DEFAULT_SAFE_ETA0 = 0.1`), so lattice
+      // geometry changes no longer move the clamp floor. What this test
+      // actually verifies is that `setFreeScalarSpacing` triggers
+      // `reconcileCosmologyInvariants`, which calls `clampEta0` again and
+      // marks `needsReset: true` on any lattice-affecting edit — even when
+      // the clamp is a no-op and `eta0` comes back unchanged.
       const s = useExtendedObjectStore.getState()
       s.setFreeScalarLatticeDim(3)
       s.setFreeScalarCosmologyPreset('deSitter')
       s.setFreeScalarCosmologyEnabled(true)
-      // Push eta0 to the current safe threshold at default spacing
       const baseline = getFSF().cosmology.eta0
 
-      // Double the spacing — safeEta0 doubles, so eta0 should be re-clamped
       const fs = getFSF()
       s.setFreeScalarSpacing(fs.spacing.map((a) => a * 2))
       const reclamped = getFSF().cosmology.eta0
-      // |eta0| should be at least as large as before, and possibly larger
-      // (re-clamped). needsReset should be set.
-      expect(Math.abs(reclamped)).toBeGreaterThanOrEqual(Math.abs(baseline) - 1e-9)
+      // The clamp floor is constant, so eta0 should come back equal within
+      // floating-point tolerance — not strictly greater.
+      expect(reclamped).toBeCloseTo(baseline, 12)
       expect(getFSF().needsReset).toBe(true)
     })
   })

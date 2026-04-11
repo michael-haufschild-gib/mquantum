@@ -169,7 +169,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
     if (camera) {
       this.nearClip = camera.near ?? 0.1
-      this.farClip = camera.far ?? 100
+      this.farClip = camera.far ?? 10000.0
     }
 
     const inputView = ctx.getTextureView(this.bufferInputId)

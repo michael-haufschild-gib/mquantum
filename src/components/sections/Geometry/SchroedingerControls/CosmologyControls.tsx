@@ -135,9 +135,12 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
     // the value was written (e.g. the lattice shrank and `safeEta0` grew).
     // When that happens, tell the user what the clamp target will be on
     // the next reset, not a spurious "from X" number.
+    // `clampEta0` keeps the sign of the stored `eta0` and scales it up to
+    // `safeAbs`, so the hint must mirror that sign — a positive `eta0` is
+    // clamped to `+safeAbs`, a negative one to `-safeAbs`.
     const clampedHint =
       safeAbs !== undefined && etaAbs < safeAbs - 1e-9
-        ? ` (will be clamped to ${(-safeAbs).toFixed(2)} on reset)`
+        ? ` (will be clamped to ${(cosmology.eta0 < 0 ? -safeAbs : safeAbs).toFixed(2)} on reset)`
         : ''
 
     return (

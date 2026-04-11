@@ -365,8 +365,19 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           hubble: fs.cosmology.hubble,
         }
         if (isValidPreset(params)) {
-          const result = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
-          clampedEta0 = result.eta0
+          try {
+            const result = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+            clampedEta0 = result.eta0
+          } catch (e) {
+            // Match the other setters: a corrupted gridSize/spacing shouldn't
+            // block an eta0 edit. Store the user's value verbatim; the next
+            // reconcileCosmologyInvariants pass will soft-disable if the
+            // lattice state stays invalid.
+            logger.warn(
+              `[setFreeScalarCosmologyEta0] clampEta0 failed for ` +
+                `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+            )
+          }
         }
         return {
           schroedinger: {
