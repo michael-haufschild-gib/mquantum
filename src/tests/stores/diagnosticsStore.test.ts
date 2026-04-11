@@ -7,11 +7,12 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import type {
-  DensitySnapshot,
-  ObservablesSnapshot,
-  TdseSnapshot,
-  WavefunctionSliceData,
+import {
+  type DensitySnapshot,
+  HISTORY_LENGTH,
+  type ObservablesSnapshot,
+  type TdseSnapshot,
+  type WavefunctionSliceData,
 } from '@/stores/diagnostics/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
@@ -165,6 +166,130 @@ describe('diagnosticsStore', () => {
       })
       useDiagnosticsStore.getState().resetFsf()
       expect(useDiagnosticsStore.getState().fsf.hasData).toBe(false)
+    })
+
+    describe('pushFsfParticleNumber ring buffer', () => {
+      it('advances head/count independently from the diagnostics ring buffer', () => {
+        const s0 = useDiagnosticsStore.getState().fsf
+        expect(s0.historyParticlesHead).toBe(0)
+        expect(s0.historyParticlesCount).toBe(0)
+        expect(s0.historyHead).toBe(0)
+        expect(s0.historyCount).toBe(0)
+
+        // Push a diagnostics snapshot — must NOT advance the particles
+        // head/count. The two ring buffers have independent cadences.
+        useDiagnosticsStore.getState().pushFsfSnapshot({
+          totalEnergy: 5.0,
+          totalNorm: 1.0,
+          maxPhi: 0.1,
+          maxPi: 0.1,
+          energyDrift: 0,
+          meanPhi: 0,
+          variancePhi: 0,
+        })
+        const afterSnap = useDiagnosticsStore.getState().fsf
+        expect(afterSnap.historyHead).toBe(1)
+        expect(afterSnap.historyCount).toBe(1)
+        expect(afterSnap.historyParticlesHead).toBe(0)
+        expect(afterSnap.historyParticlesCount).toBe(0)
+
+        // Push a particle number — must advance ONLY the particles head
+        // and count, leaving the snapshot head/count untouched.
+        useDiagnosticsStore.getState().pushFsfParticleNumber(2.5)
+        const afterParticle = useDiagnosticsStore.getState().fsf
+        expect(afterParticle.historyParticlesHead).toBe(1)
+        expect(afterParticle.historyParticlesCount).toBe(1)
+        expect(afterParticle.historyHead).toBe(1) // unchanged
+        expect(afterParticle.historyCount).toBe(1) // unchanged
+        expect(afterParticle.totalParticles).toBe(2.5)
+        expect(afterParticle.historyParticles[0]).toBeCloseTo(2.5, 12)
+      })
+
+      it('writes the latest sample at the previous head index, then rolls the head', () => {
+        // Push four samples and confirm they land at slots 0..3 with head
+        // advanced to 4 and count = 4 (no wrap yet). Values are exact in
+        // Float32Array so we can assert without a fuzzy tolerance.
+        const values = [0.25, 0.5, 0.75, 1.0]
+        for (const v of values) {
+          useDiagnosticsStore.getState().pushFsfParticleNumber(v)
+        }
+        const ch = useDiagnosticsStore.getState().fsf
+        expect(ch.historyParticlesHead).toBe(4)
+        expect(ch.historyParticlesCount).toBe(4)
+        for (let i = 0; i < values.length; i++) {
+          expect(ch.historyParticles[i]).toBe(values[i]!)
+        }
+        // Slots past the head must still be zero (initial allocation).
+        expect(ch.historyParticles[4]).toBe(0)
+        // totalParticles is stored as a `number` (JS f64) so the exact
+        // last-pushed value must round-trip without precision loss.
+        expect(ch.totalParticles).toBe(1.0)
+      })
+
+      it('wraps the head modulo HISTORY_LENGTH and clamps count at HISTORY_LENGTH', () => {
+        // Push HISTORY_LENGTH + 5 samples so the head wraps past zero.
+        // Values are integers, so Float32Array round-trip is exact.
+        const total = HISTORY_LENGTH + 5
+        for (let i = 0; i < total; i++) {
+          useDiagnosticsStore.getState().pushFsfParticleNumber(i)
+        }
+        const ch = useDiagnosticsStore.getState().fsf
+        // head = total % HISTORY_LENGTH = 5
+        expect(ch.historyParticlesHead).toBe(5)
+        // count clamps at HISTORY_LENGTH
+        expect(ch.historyParticlesCount).toBe(HISTORY_LENGTH)
+        // Slots 0..4 now hold the final five writes:
+        //   slot 0 ← iteration HISTORY_LENGTH
+        //   slot 1 ← iteration HISTORY_LENGTH+1
+        //   ...
+        for (let k = 0; k < 5; k++) {
+          expect(ch.historyParticles[k]).toBe(HISTORY_LENGTH + k)
+        }
+        // Slot 5 (the current head) holds the oldest surviving entry —
+        // iteration 5, which was written before the wrap.
+        expect(ch.historyParticles[5]).toBe(5)
+        // Latest reported totalParticles is the final push.
+        expect(ch.totalParticles).toBe(total - 1)
+      })
+
+      it('is isolated from pushFsfSnapshot — interleaved pushes never interfere', () => {
+        // Interleave N snapshot pushes and M particle pushes and verify
+        // the two heads advance independently.
+        for (let i = 0; i < 10; i++) {
+          useDiagnosticsStore.getState().pushFsfSnapshot({
+            totalEnergy: 1 + i,
+            totalNorm: 1,
+            maxPhi: 0,
+            maxPi: 0,
+            energyDrift: 0,
+            meanPhi: 0,
+            variancePhi: 0,
+          })
+        }
+        for (let i = 0; i < 3; i++) {
+          useDiagnosticsStore.getState().pushFsfParticleNumber(100 + i)
+        }
+        const ch = useDiagnosticsStore.getState().fsf
+        expect(ch.historyHead).toBe(10)
+        expect(ch.historyCount).toBe(10)
+        expect(ch.historyParticlesHead).toBe(3)
+        expect(ch.historyParticlesCount).toBe(3)
+        expect(ch.historyParticles[0]).toBe(100)
+        expect(ch.historyParticles[2]).toBe(102)
+        expect(ch.totalParticles).toBe(102)
+      })
+
+      it('resetFsf zeros both ring buffers and their counters', () => {
+        useDiagnosticsStore.getState().pushFsfParticleNumber(42)
+        useDiagnosticsStore.getState().pushFsfParticleNumber(43)
+        useDiagnosticsStore.getState().resetFsf()
+        const ch = useDiagnosticsStore.getState().fsf
+        expect(ch.historyParticlesHead).toBe(0)
+        expect(ch.historyParticlesCount).toBe(0)
+        expect(ch.totalParticles).toBe(0)
+        expect(ch.historyParticles[0]).toBe(0)
+        expect(ch.historyParticles[1]).toBe(0)
+      })
     })
   })
 

@@ -317,7 +317,14 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   const qHigh = histogramPercentile(transformed, occupiedCount, pHigh)
 
   const range = qHigh - qLow
-  if (range < 1e-30) return // Degenerate — all values equal
+  // Degenerate percentile window — every occupied voxel sits at the same
+  // value. Leave them alone: downstream normalization in
+  // `buildKSpaceDisplayTextures` divides by `grid.nkMax`, which still
+  // reflects the physical max, so the packed textures land at 1.0 on
+  // the occupied voxels. This is load-bearing — see the
+  // "keeps original values when … percentile window is degenerate"
+  // test for the contract.
+  if (range < 1e-30) return
 
   const gamma = Number.isFinite(config.gamma) && config.gamma > 0 ? config.gamma : 1.0
   const invRange = 1.0 / range

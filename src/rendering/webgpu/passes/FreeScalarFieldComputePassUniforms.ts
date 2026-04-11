@@ -56,9 +56,14 @@ if (!Number.isInteger(FSF_COSMO_COEFS_F32_INDEX)) {
 }
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
-import { logger } from '@/lib/logger'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
-import { computeCosmologyCoefs } from '@/lib/physics/cosmology/background'
+import {
+  __resetFsfCosmologyWarnDedupForTests,
+  computeFsfCosmologyCoefs,
+  computeFsfCosmologySnapshot,
+  computeFsfVacuumDispersion,
+  FSF_IDENTITY_COSMO_COEFS,
+} from '@/lib/physics/freeScalar/vacuumDispersion'
 import {
   estimateVacuumMaxEnergy,
   estimateVacuumMaxPhi,
@@ -69,6 +74,18 @@ import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/pr
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
 import { computeStridesPadded, MAX_DIM } from './computePassUtils'
+
+// Re-export the shared cosmology helpers so external call sites (tests,
+// other passes) can continue importing from this pass file if they want.
+// The source of truth is `@/lib/physics/freeScalar/vacuumDispersion`; new
+// code should import from there directly.
+export {
+  __resetFsfCosmologyWarnDedupForTests,
+  computeFsfCosmologyCoefs,
+  computeFsfCosmologySnapshot,
+  computeFsfVacuumDispersion,
+  FSF_IDENTITY_COSMO_COEFS,
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Config hashing
@@ -106,78 +123,10 @@ export function computeFsfInitHash(config: FreeScalarConfig): string {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Cosmological integrator coefficients
+// Cosmological integrator coefficients — see
+// `@/lib/physics/freeScalar/vacuumDispersion` for the implementation.
+// The helpers are re-exported at the top of this file for backward compat.
 // ───────────────────────────────────────────────────────────────────────────
-
-/** Identity coefficients `(1, 1, 1)` returned under Minkowski and fallback paths. */
-export const FSF_IDENTITY_COSMO_COEFS: CosmologyCoefs = {
-  aKinetic: 1,
-  aPotential: 1,
-  aFull: 1,
-}
-
-/**
- * Per-key dedup set for `computeFsfCosmologyCoefs` fallback warnings. The
- * leapfrog substep loop would otherwise spam the dev console at
- * 60fps × stepsPerFrame if the cosmology config ever entered an invalid
- * state. Production strips `logger.warn` entirely, so this only affects
- * dev ergonomics.
- *
- * Cleared by `__resetFsfCosmologyWarnDedupForTests` so unit tests stay
- * isolated.
- */
-const fsfCosmologyWarnedKeys = new Set<string>()
-
-/**
- * Test-only helper to reset the warn-once dedup state. Production code
- * never imports this; vitest does.
- */
-export function __resetFsfCosmologyWarnDedupForTests(): void {
-  fsfCosmologyWarnedKeys.clear()
-}
-
-/**
- * Resolve the three cosmology coefficients `(aKinetic, aPotential, aFull)`
- * for the current frame. These drive the canonical δφ integrator:
- *
- *     drift: dδφ/dη = aKinetic · π
- *     kick:  dπ/dη  = aPotential · ∇²δφ − m²·aFull · δφ − aFull · V'(δφ)
- *
- * Minkowski or cosmology-disabled configs collapse to identity coefs, so a
- * single call site covers both branches without a conditional in the
- * caller. Invalid cosmology params (the UI is responsible for preventing
- * this) fall back to identity AND log a *deduplicated* warning — each
- * unique `(preset, spacetimeDim, error.message)` triple logs at most once
- * per session.
- *
- * @param config - Free scalar field configuration
- * @param simEta - Current conformal time (must be finite and non-zero under cosmology)
- * @returns `{ aKinetic, aPotential, aFull }`
- */
-export function computeFsfCosmologyCoefs(config: FreeScalarConfig, simEta: number): CosmologyCoefs {
-  const cosmo = config.cosmology
-  if (!cosmo.enabled || cosmo.preset === 'minkowski') return FSF_IDENTITY_COSMO_COEFS
-  try {
-    return computeCosmologyCoefs(simEta, {
-      preset: cosmo.preset,
-      spacetimeDim: config.latticeDim + 1,
-      steepness: cosmo.steepness,
-      hubble: cosmo.hubble,
-    })
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    const key = `${cosmo.preset}|${config.latticeDim + 1}|${message}`
-    if (!fsfCosmologyWarnedKeys.has(key)) {
-      fsfCosmologyWarnedKeys.add(key)
-      logger.warn(
-        `[computeFsfCosmologyCoefs] cosmology parameters invalid ` +
-          `(preset=${cosmo.preset}, η=${simEta}); falling back to identity. ` +
-          `This message is logged once per unique error: ${message}`
-      )
-    }
-    return FSF_IDENTITY_COSMO_COEFS
-  }
-}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Uniform writing

@@ -11,14 +11,45 @@
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import type { CosmologyCoefs } from '@/lib/physics/cosmology/background'
+import type { KSpaceBasisCoefs } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import {
+  computeFsfCosmologyCoefs,
+  computeFsfVacuumDispersion,
+} from '@/lib/physics/freeScalar/vacuumDispersion'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import { computeFsfDiagnostics } from './FreeScalarFieldComputePassUniforms'
 
-/** Pending k-space texture data computed async, uploaded synchronously next frame. */
+/**
+ * Derive the canonical-basis rescale for the k-space `n_k` kernel from
+ * the current FSF config's cosmology snapshot at the **live** conformal
+ * time `simEta`. Under Minkowski or cosmology-disabled the helper
+ * collapses to the identity pair, which makes the downstream kernel
+ * bit-identical to its pre-cosmology implementation. Under FLRW the
+ * pair is `(1/B, B)` where `B = a^(n−2)` is the per-frame `aPotential`
+ * coefficient evaluated **at `simEta`** — keying this off `η₀` freezes
+ * the thermometer at the initial vacuum once the sim starts evolving.
+ *
+ * @param config - Current FSF compute-pass config
+ * @param simEta - Live conformal time from the compute pass (NOT `η₀`)
+ * @returns `{aKinetic, aPotential}` to thread into the worker message
+ */
+function resolveKSpaceBasisCoefs(config: FreeScalarConfig, simEta: number): KSpaceBasisCoefs {
+  const coefs = computeFsfCosmologyCoefs(config, simEta)
+  return { aKinetic: coefs.aKinetic, aPotential: coefs.aPotential }
+}
+
+/**
+ * Pending k-space texture data computed async, uploaded synchronously next frame.
+ * Carries the total adiabatic-vacuum particle number `N(η)` alongside the
+ * density/analysis textures so a single worker result delivers both the
+ * visual and the thermometer readings.
+ */
 export interface PendingKSpaceData {
   density: Uint16Array
   analysis: Uint16Array
+  /** Total particle number `N(η) = Σ_k max(n_k, 0)` at the current vacuum reference. */
+  totalParticles: number
 }
 
 /**
@@ -118,7 +149,24 @@ export class FsfKSpaceManager {
 
   /**
    * Attempt k-space readback if conditions are met.
-   * Encodes copy commands on the encoder and starts async readback.
+   *
+   * Encodes copy commands on the encoder and starts an async FFT +
+   * particle-count readback. **Runs every `K_SPACE_UPDATE_INTERVAL`
+   * frames regardless of the active analysis view** — the adiabatic
+   * N(η) thermometer is a general FSF instrument that feeds the
+   * diagnostics store's particle-history ring buffer; the density /
+   * analysis textures produced as a side effect are only *sampled* by
+   * the raymarcher when the analysis panel sits in k-space view, but
+   * the thermometer itself must not be gated on that view or it
+   * silently stops reporting the moment the user flips to a different
+   * analysis mode.
+   *
+   * @param simEta - Live conformal time from the compute pass. Threaded
+   *                 through to `readbackAndComputeKSpace` so the
+   *                 dispersion and canonical-basis coefs are evaluated
+   *                 at the exact moment the (phi, pi) buffers were
+   *                 copied — **never** at `config.cosmology.eta0`,
+   *                 which would freeze N(η) at the initial vacuum.
    */
   maybeStartKSpaceReadback(
     device: GPUDevice,
@@ -127,13 +175,8 @@ export class FsfKSpaceManager {
     piBuffer: GPUBuffer,
     totalSites: number,
     config: FreeScalarConfig,
-    analysisMode: number
+    simEta: number
   ): void {
-    if (analysisMode !== 3) {
-      this.kSpaceFrameCounter = 0
-      return
-    }
-
     this.kSpaceFrameCounter++
     if (
       this.kSpacePending ||
@@ -148,7 +191,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-    void this.readbackAndComputeKSpace(device, config) // fire-and-forget async
+    void this.readbackAndComputeKSpace(device, config, simEta) // fire-and-forget async
   }
 
   /**
@@ -199,7 +242,17 @@ export class FsfKSpaceManager {
       this.kSpaceWorker.onmessage = (e: MessageEvent) => {
         const msg = e.data
         if (msg.type === 'result' && msg.epoch === this.kSpaceReadbackEpoch) {
-          this.pendingKSpaceData = { density: msg.density, analysis: msg.analysis }
+          const totalParticles = typeof msg.totalParticles === 'number' ? msg.totalParticles : 0
+          this.pendingKSpaceData = {
+            density: msg.density,
+            analysis: msg.analysis,
+            totalParticles,
+          }
+          // Feed the adiabatic-vacuum particle number into the diagnostics
+          // ring buffer. Gated on the epoch check above so a worker result
+          // that lands after a cosmology reset is dropped along with its
+          // density/analysis payload.
+          useDiagnosticsStore.getState().pushFsfParticleNumber(totalParticles)
         }
         this.kSpacePending = false
       }
@@ -213,7 +266,8 @@ export class FsfKSpaceManager {
 
   private async readbackAndComputeKSpace(
     device: GPUDevice,
-    config: FreeScalarConfig
+    config: FreeScalarConfig,
+    simEta: number
   ): Promise<void> {
     const phiReadbackBuffer = this.phiReadbackBuffer
     const piReadbackBuffer = this.piReadbackBuffer
@@ -249,8 +303,15 @@ export class FsfKSpaceManager {
         return
       }
 
+      // Use the live `simEta` captured when the copy was encoded — not
+      // `config.cosmology.eta0`, which would peg the vacuum reference
+      // at the initial state and turn the thermometer into a constant
+      // once the sim started evolving. See the round-2 review finding
+      // for the scientific rationale.
       const activeDims = config.gridSize.slice(0, config.latticeDim)
       const activeSpacing = config.spacing.slice(0, config.latticeDim)
+      const dispersion = computeFsfVacuumDispersion(config, simEta)
+      const basisCoefs = resolveKSpaceBasisCoefs(config, simEta)
       const worker = this.getKSpaceWorker()
       worker.postMessage(
         {
@@ -263,6 +324,8 @@ export class FsfKSpaceManager {
           mass: config.mass,
           latticeDim: config.latticeDim,
           kSpaceViz: config.kSpaceViz,
+          dispersion,
+          basisCoefs,
         },
         [phiComplex.buffer, piComplex.buffer]
       )

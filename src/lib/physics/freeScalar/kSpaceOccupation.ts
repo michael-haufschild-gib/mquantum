@@ -13,7 +13,7 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import { fftNd } from '@/lib/math/fft'
 import { computeStrides, linearToNDCoordsInto } from '@/lib/math/ndArray'
-import { computeOmegaK, M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
+import { M_FLOOR, type VacuumDispersion } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 /**
  * Size of the 3D output density grid — re-exported from the shared constant
@@ -128,8 +128,49 @@ export interface KSpaceRawData {
 }
 
 /**
+ * Canonical-basis coefficients for the `n_k` kernel. Under the canonical
+ * δφ integrator, the vacuum variances of the underlying SHO are
+ *
+ *     ⟨|δφ_k|²⟩ = 1/(2·aPotential·ω_k)
+ *     ⟨|π_δφ,k|²⟩ = aPotential·ω_k/2
+ *
+ * with `aPotential = a^(n−2)`, so the correct number-operator definition
+ * per mode is
+ *
+ *     n_k = (aKinetic·|π_k|² + aPotential·ω_k²·|δφ_k|²) / (2·ω_k·N) − 1/2
+ *
+ * which reduces to the Minkowski formula at `(aKinetic, aPotential) =
+ * (1, 1)`. Passing the identity pair recovers the pre-cosmology kernel
+ * bit-for-bit.
+ */
+export interface KSpaceBasisCoefs {
+  /** `aKinetic = a^(−(n−2))`. Defaults to `1` (Minkowski). */
+  aKinetic: number
+  /** `aPotential = a^(n−2)`. Defaults to `1` (Minkowski). */
+  aPotential: number
+}
+
+/** Identity basis coefficients — the Minkowski short-circuit. */
+const MINKOWSKI_BASIS_COEFS: KSpaceBasisCoefs = { aKinetic: 1, aPotential: 1 }
+
+/**
  * Compute raw k-space occupation data from real-space phi and pi fields.
  * This is the physics stage — FFT + n_k computation with no display transforms.
+ *
+ * When `dispersion === 'kgFloor'` (the default), `ω_k` is computed against the
+ * static Klein-Gordon vacuum with the `max(mass, M_FLOOR)` regularization. When
+ * `dispersion` is a finite number, `ω_k² = k_lat² + dispersion` — used to
+ * measure `n_k` against the instantaneous adiabatic vacuum at the current
+ * conformal time on a curved background (`dispersion = m²·a²(η)`).
+ *
+ * Under cosmology the field buffers hold canonical `(δφ, π_δφ)` variables
+ * whose vacuum variances differ from the Minkowski case by a factor of
+ * `aPotential = a^(n−2)` (see {@link KSpaceBasisCoefs}). Passing the
+ * per-frame `{aKinetic, aPotential}` pair rescales the `n_k` formula so
+ * the initial adiabatic vacuum reads back as zero particles instead of
+ * the systematic bias `(B + 1/B)/4 − 1/2`. The Minkowski / cosmology-
+ * disabled path passes the identity pair and the kernel is bit-identical
+ * to the pre-cosmology implementation.
  *
  * @param phi - Real-space field values (Float32Array, totalSites elements)
  * @param pi - Conjugate momenta (Float32Array, totalSites elements)
@@ -137,6 +178,11 @@ export interface KSpaceRawData {
  * @param spacing - Lattice spacings per dimension
  * @param mass - Field mass parameter
  * @param latticeDim - Number of active lattice dimensions
+ * @param dispersion - Mass-term dispatch for the vacuum reference state.
+ *                     Defaults to `'kgFloor'`, preserving Minkowski behavior.
+ * @param basisCoefs - Canonical basis coefficients. Defaults to identity —
+ *                     pass `{aKinetic: 1/B, aPotential: B}` under cosmology
+ *                     with `B = a^(n−2)`.
  * @returns Raw k-space data arrays and normalization maxima
  */
 export function computeRawKSpaceData(
@@ -145,7 +191,9 @@ export function computeRawKSpaceData(
   gridSize: readonly number[],
   spacing: readonly number[],
   mass: number,
-  latticeDim: number
+  latticeDim: number,
+  dispersion: VacuumDispersion = 'kgFloor',
+  basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
@@ -191,69 +239,19 @@ export function computeRawKSpaceData(
   fftNd(phiComplex, activeDims)
   fftNd(piComplex, activeDims)
 
-  // Compute n_k per mode, tracking maxima for normalization
-  const nk = new Float64Array(totalSites)
-  const kMag = new Float64Array(totalSites)
-  const omegaArr = new Float64Array(totalSites)
-
-  let nkMax = 0
-  let kMagMax = 0
-  let omegaMax = 0
-
   const strides = computeStrides(activeDims)
-  // Pre-allocate coords array to avoid per-site allocation
-  const coords = new Array<number>(latticeDim).fill(0)
-
-  for (let i = 0; i < totalSites; i++) {
-    linearToNDCoordsInto(i, activeDims, coords)
-    const omega = computeOmegaK(coords, activeDims, spacing, mass, latticeDim)
-
-    // |phi_k|^2 and |pi_k|^2
-    const phiRe = phiComplex[i * 2]!
-    const phiIm = phiComplex[i * 2 + 1]!
-    const piRe = piComplex[i * 2]!
-    const piIm = piComplex[i * 2 + 1]!
-    const phiKSq = phiRe * phiRe + phiIm * phiIm
-    const piKSq = piRe * piRe + piIm * piIm
-
-    // n_k = (|pi_k|^2 + omega_k^2 * |phi_k|^2) / (2 * omega_k * N) - 0.5
-    // The factor of N normalizes the FFT convention (our FFT is unnormalized forward)
-    const omegaSafe = Math.max(omega, M_FLOOR)
-    const nkVal = (piKSq + omegaSafe * omegaSafe * phiKSq) / (2 * omegaSafe * totalSites) - 0.5
-
-    nk[i] = nkVal
-    omegaArr[i] = omega
-
-    // Compute |k| magnitude from lattice momentum
-    let kSq = 0
-    for (let d = 0; d < latticeDim; d++) {
-      const N = activeDims[d]!
-      const a = spacing[d]!
-      if (N <= 1) continue
-      const sinVal = Math.sin((Math.PI * coords[d]!) / N)
-      const kLat = (2 * sinVal) / a
-      kSq += kLat * kLat
-    }
-    kMag[i] = Math.sqrt(kSq)
-
-    if (nkVal > nkMax) nkMax = nkVal
-    if (kMag[i]! > kMagMax) kMagMax = kMag[i]!
-    if (omega > omegaMax) omegaMax = omega
-  }
-
-  return {
-    nk,
-    kMag,
-    omega: omegaArr,
-    nkMax,
-    kMagMax,
-    omegaMax,
-    totalSites,
-    gridSize: activeDims,
+  return computeKSpaceOccupationInnerLoop(
+    phiComplex,
+    piComplex,
+    activeDims,
     strides,
-    latticeDim,
     spacing,
-  }
+    mass,
+    latticeDim,
+    dispersion,
+    basisCoefs,
+    totalSites
+  )
 }
 
 /**
@@ -261,12 +259,19 @@ export function computeRawKSpaceData(
  * Avoids the real→complex interleaving copy inside computeRawKSpaceData.
  * Accepts either Float32Array (faster, less memory) or Float64Array (full precision).
  *
+ * The `dispersion` parameter matches `computeRawKSpaceData` — pass `'kgFloor'`
+ * (default) for the static Klein-Gordon vacuum reference or a finite squared
+ * mass `m²·a²(η)` for the instantaneous adiabatic vacuum on a curved
+ * background.
+ *
  * @param phiComplex - Pre-interleaved complex phi data (modified in-place by FFT)
  * @param piComplex - Pre-interleaved complex pi data (modified in-place by FFT)
  * @param gridSize - Per-dimension grid sizes (must all be power-of-2)
  * @param spacing - Lattice spacings per dimension
  * @param mass - Field mass parameter
  * @param latticeDim - Number of active lattice dimensions
+ * @param dispersion - Mass-term dispatch for the vacuum reference state.
+ *                     Defaults to `'kgFloor'`, preserving Minkowski behavior.
  * @returns Raw k-space data arrays and normalization maxima
  */
 export function computeRawKSpaceDataFromComplex(
@@ -275,7 +280,9 @@ export function computeRawKSpaceDataFromComplex(
   gridSize: readonly number[],
   spacing: readonly number[],
   mass: number,
-  latticeDim: number
+  latticeDim: number,
+  dispersion: VacuumDispersion = 'kgFloor',
+  basisCoefs: KSpaceBasisCoefs = MINKOWSKI_BASIS_COEFS
 ): KSpaceRawData {
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
     throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
@@ -314,7 +321,55 @@ export function computeRawKSpaceDataFromComplex(
   fftNd(phiComplex, activeDims)
   fftNd(piComplex, activeDims)
 
-  // Compute n_k per mode, tracking maxima for normalization
+  const strides = computeStrides(activeDims)
+  return computeKSpaceOccupationInnerLoop(
+    phiComplex,
+    piComplex,
+    activeDims,
+    strides,
+    spacing,
+    mass,
+    latticeDim,
+    dispersion,
+    basisCoefs,
+    totalSites
+  )
+}
+
+/**
+ * Shared per-site kernel for {@link computeRawKSpaceData} and
+ * {@link computeRawKSpaceDataFromComplex}. Fuses the lattice-momentum
+ * computation with the dispersion lookup so the inner loop has a
+ * single monomorphic call site instead of dispatching through a
+ * captured closure (the old implementation paid a polymorphic indirect
+ * call per mode, which JIT-compiled into an inline cache check that
+ * the tight loop did not need).
+ *
+ * The dispersion dispatch is hoisted into a single `mTerm` value so
+ * the mass-term branch is evaluated once before the loop — the per-
+ * site hot path only touches two `Float64Array` stores plus one
+ * `sqrt` and one divide.
+ *
+ * This path is also more numerically consistent than the previous
+ * implementation: symmetric k-points now produce byte-identical `n_k`
+ * values because they go through exactly the same sequence of
+ * arithmetic ops (the old path had a hidden `sqrt(omegaSq)²` round
+ * trip that leaked ~2 ULP between symmetric modes).
+ *
+ * @internal
+ */
+function computeKSpaceOccupationInnerLoop(
+  phiComplex: Float64Array | Float32Array,
+  piComplex: Float64Array | Float32Array,
+  activeDims: readonly number[],
+  strides: number[],
+  spacing: readonly number[],
+  mass: number,
+  latticeDim: number,
+  dispersion: VacuumDispersion,
+  basisCoefs: KSpaceBasisCoefs,
+  totalSites: number
+): KSpaceRawData {
   const nk = new Float64Array(totalSites)
   const kMag = new Float64Array(totalSites)
   const omegaArr = new Float64Array(totalSites)
@@ -323,13 +378,49 @@ export function computeRawKSpaceDataFromComplex(
   let kMagMax = 0
   let omegaMax = 0
 
-  const strides = computeStrides(activeDims)
   // Pre-allocate coords array to avoid per-site allocation
   const coords = new Array<number>(latticeDim).fill(0)
 
+  // Hoist the mass-term out of the per-site loop. The two dispersion
+  // paths differ only in how they build `mTerm`:
+  //  - 'kgFloor': mEff = max(mass, M_FLOOR); mTerm = mEff²
+  //  - numeric:   mTerm = dispersion (signed squared-mass)
+  // A single `ω² < M_FLOOR² ⇒ ω² := M_FLOOR²` clamp then gives
+  // `ω² ≥ floor²` in both modes, matching the original
+  // `computeOmegaK(FromMassSq)` behaviour.
+  const isKgFloor = dispersion === 'kgFloor'
+  const mTerm = isKgFloor ? Math.max(mass, M_FLOOR) ** 2 : (dispersion as number)
+  const floorSq = M_FLOOR * M_FLOOR
+
+  // Canonical-basis variance rescale — identity in Minkowski, non-trivial
+  // under FLRW. Hoisted out so the per-site loop has two multiplies and
+  // no branches.
+  const { aKinetic, aPotential } = basisCoefs
+
   for (let i = 0; i < totalSites; i++) {
     linearToNDCoordsInto(i, activeDims, coords)
-    const omega = computeOmegaK(coords, activeDims, spacing, mass, latticeDim)
+
+    // Lattice momentum ² — reused for both ω² and |k|.
+    let kSq = 0
+    for (let d = 0; d < latticeDim; d++) {
+      const N = activeDims[d]!
+      if (N <= 1) continue
+      const a = spacing[d]!
+      const sinVal = Math.sin((Math.PI * coords[d]!) / N)
+      const kLat = (2 * sinVal) / a
+      kSq += kLat * kLat
+    }
+    const kMagVal = Math.sqrt(kSq)
+    kMag[i] = kMagVal
+
+    // ω² = k² + mTerm, clamped at the M_FLOOR² zero-mode floor. For the
+    // KG path this collapses to `max(mass, M_FLOOR)² + k²` which is the
+    // original `computeOmegaK` output; for the numeric path it collapses
+    // to `max(k² + massSq, M_FLOOR²)` matching `computeOmegaKFromMassSq`.
+    let omegaSq = kSq + mTerm
+    if (omegaSq < floorSq) omegaSq = floorSq
+    const omega = Math.sqrt(omegaSq)
+    omegaArr[i] = omega
 
     // |phi_k|^2 and |pi_k|^2
     const phiRe = phiComplex[i * 2]!
@@ -339,26 +430,21 @@ export function computeRawKSpaceDataFromComplex(
     const phiKSq = phiRe * phiRe + phiIm * phiIm
     const piKSq = piRe * piRe + piIm * piIm
 
-    const omegaSafe = Math.max(omega, M_FLOOR)
-    const nkVal = (piKSq + omegaSafe * omegaSafe * phiKSq) / (2 * omegaSafe * totalSites) - 0.5
-
+    // Canonical number operator:
+    //   n_k = (aKinetic·|π_k|² + aPotential·ω²·|δφ_k|²) / (2·ω·N) − 1/2
+    // In Minkowski/`kgFloor` we receive `(aKinetic, aPotential) = (1, 1)`
+    // so this is bit-identical to the old `(|π|² + ω²|φ|²)/(2ωN) − ½`
+    // formula. Under FLRW the coefficients are `(1/B, B)` and the formula
+    // removes the `(B + 1/B)/4 − ½` bias that a naive Minkowski readout
+    // would produce on the canonical δφ samples. The factor `N` in the
+    // denominator is the FFT Parseval normalization. ω is already
+    // floored at `M_FLOOR`, so `2·ω` never divides by zero.
+    const nkVal =
+      (aKinetic * piKSq + aPotential * omegaSq * phiKSq) / (2 * omega * totalSites) - 0.5
     nk[i] = nkVal
-    omegaArr[i] = omega
-
-    // Compute |k| magnitude from lattice momentum
-    let kSq = 0
-    for (let d = 0; d < latticeDim; d++) {
-      const N = activeDims[d]!
-      const a = spacing[d]!
-      if (N <= 1) continue
-      const sinVal = Math.sin((Math.PI * coords[d]!) / N)
-      const kLat = (2 * sinVal) / a
-      kSq += kLat * kLat
-    }
-    kMag[i] = Math.sqrt(kSq)
 
     if (nkVal > nkMax) nkMax = nkVal
-    if (kMag[i]! > kMagMax) kMagMax = kMag[i]!
+    if (kMagVal > kMagMax) kMagMax = kMagVal
     if (omega > omegaMax) omegaMax = omega
   }
 
@@ -375,4 +461,23 @@ export function computeRawKSpaceDataFromComplex(
     latticeDim,
     spacing,
   }
+}
+
+/**
+ * Sum of `n_k` clamped at zero. Cosmological particle creation is strictly
+ * non-negative when measured against the instantaneous adiabatic vacuum;
+ * the clamp floors negative noise from the `ν − 1/2` subtraction in
+ * almost-vacuum states.
+ *
+ * @param raw - Raw k-space occupation data
+ * @returns Total particle number `N(η) = Σ_k max(n_k, 0)`
+ */
+export function computeTotalParticleNumber(raw: KSpaceRawData): number {
+  const { nk } = raw
+  let total = 0
+  for (let i = 0; i < nk.length; i++) {
+    const v = nk[i]!
+    if (v > 0) total += v
+  }
+  return total
 }

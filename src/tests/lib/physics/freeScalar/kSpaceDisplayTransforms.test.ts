@@ -21,7 +21,25 @@ import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar
 // Helpers
 // ============================================================================
 
-/** Create raw data from a simple plane wave at k=(1,0,0) on an NxNxN grid. */
+/**
+ * Create raw data from a plane wave superposition at k=(1,0,0) and k=(2,0,0)
+ * with *different* amplitudes on an NxNxN grid.
+ *
+ * Using a single pure cosine produces two symmetric k-points (k=1 and k=N-1)
+ * with byte-identical `n_k` values on every well-conditioned code path.
+ * The downstream `applyExposureTransfer` percentile-window construction
+ * then sees a zero range (`qLow === qHigh`) and short-circuits to the
+ * "degenerate" branch, leaving values unchanged — see the dedicated
+ * degenerate-range test at the bottom of this describe block. That case
+ * is covered separately; this helper's job is to produce a fixture with
+ * a *non-degenerate* percentile window so the remap path is exercised.
+ *
+ * Superposing a second mode at k=2 with a smaller amplitude gives us
+ * four distinct positive `n_k` values (two pairs from the mirrored modes,
+ * with the two pairs at different magnitudes), which is the minimum
+ * asymmetry needed for the percentile histogram to produce a non-zero
+ * range.
+ */
 function makeTestRawData(N: number): KSpaceRawData {
   const gridSize = [N, N, N]
   const spacing = [1.0, 1.0, 1.0]
@@ -29,12 +47,13 @@ function makeTestRawData(N: number): KSpaceRawData {
   const phi = new Float32Array(totalSites)
   const pi = new Float32Array(totalSites)
 
-  const A = 1.0
+  const A1 = 1.0
+  const A2 = 0.35
   for (let iz = 0; iz < N; iz++) {
     for (let iy = 0; iy < N; iy++) {
       for (let ix = 0; ix < N; ix++) {
         const idx = (iz * N + iy) * N + ix
-        phi[idx] = A * Math.cos((2 * Math.PI * ix) / N)
+        phi[idx] = A1 * Math.cos((2 * Math.PI * ix) / N) + A2 * Math.cos((2 * Math.PI * 2 * ix) / N)
       }
     }
   }

@@ -873,7 +873,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
     this.lastAnalysisMode = analysisMode
 
-    // Delegate k-space and diagnostics readback to the manager
+    // Delegate k-space and diagnostics readback to the manager.
+    //
+    // The k-space readback owns the adiabatic-vacuum N(η) thermometer
+    // feed into the diagnostics store and runs **unconditionally** at
+    // its own interval — it is NOT gated on the analysis-mode switch
+    // the way it used to be. Threading `this.simEta` (not
+    // `config.cosmology.eta0`) into the manager is what keeps the
+    // thermometer physically meaningful once the sim starts evolving.
     if (this.initialized && this.phiBuffer && this.piBuffer) {
       this.kSpace.maybeStartKSpaceReadback(
         device,
@@ -882,7 +889,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.piBuffer,
         this.totalSites,
         config,
-        analysisMode
+        this.simEta
       )
       // Snapshot the cosmology coefficients at the exact moment the readback
       // is requested so the diagnostics Hamiltonian term matches the
