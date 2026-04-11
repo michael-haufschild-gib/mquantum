@@ -1,10 +1,22 @@
 /**
  * TDSE Heller Readback
  *
- * Sidecar GPU readback that captures the wavefunction at decimated
- * frame intervals, computes the autocorrelation C(t) = ⟨ψ(0)|ψ(t)⟩
- * against a cached t=0 snapshot, and pushes the result into a
- * Heller ring buffer for FFT-based spectroscopy.
+ * Sidecar GPU readback that captures the wavefunction at regular
+ * Strang-step boundaries, computes the autocorrelation
+ * C(t) = ⟨ψ(0)|ψ(t)⟩ against a cached t=0 snapshot, and pushes the
+ * result into a Heller ring buffer for FFT-based spectroscopy.
+ *
+ * Cadence model — CRITICAL for FFT correctness:
+ *   The sample cadence is tied to the **Strang step counter**, not the
+ *   frame counter. Each Strang step advances `simTime` by exactly
+ *   `config.dt`, so sampling every `sampleInterval` steps places
+ *   samples at perfectly uniform points on the `simTime` axis
+ *   regardless of frame rate, the fractional `stepsPerFrame * speed`
+ *   accumulator in `runStrangEvolution`, GPU back-pressure, or
+ *   paused-resume cycles. The previous implementation sampled every
+ *   `sampleInterval` frames, which silently broke every time
+ *   `stepsPerFrame * speed` was non-integer (i.e. the default
+ *   `DEFAULT_SPEED = 0.4` with any `stepsPerFrame`).
  *
  * Concurrency / lifecycle:
  *  - At most one readback is in flight at a time (`readbackInFlight`).
@@ -21,6 +33,13 @@
  *    sim time, so `buffer.times[0] === 0` by construction.
  *  - Pushes with `simTime <= lastTime` are skipped (paused simulation
  *    protection), keeping `dt > 0` for the downstream FFT.
+ *  - When a sample boundary is reached while a readback is in flight
+ *    (GPU back-pressure), the slot is dropped and the step counter
+ *    reset so the next attempt is exactly `sampleInterval` steps away.
+ *    Dropped gaps are therefore guaranteed to be exact integer
+ *    multiples of the nominal period, which the downstream
+ *    `computeHellerSpectrum` handles via linear interpolation onto a
+ *    uniform grid.
  *
  * @module rendering/webgpu/passes/TDSEHellerReadback
  */
@@ -41,10 +60,17 @@ import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 export interface HellerReadbackState {
   /** Capture toggle, synchronised from the store each frame. */
   enabled: boolean
-  /** Frames between samples, synchronised from the store each frame. */
+  /**
+   * Strang steps between samples, synchronised from the store each
+   * frame. One step advances `simTime` by exactly `config.dt`, so this
+   * also equals the target sampling period in units of `dt`.
+   */
   sampleInterval: number
-  /** Counts ticks since the last successful capture schedule. */
-  frameCounter: number
+  /**
+   * Counts Strang steps completed since the last successful capture
+   * schedule. Bumped by {@link tickHellerStep}.
+   */
+  stepCounter: number
   /** Cached ψ(0) real components (length `totalSites`). */
   psi0Re: Float32Array | null
   /** Cached ψ(0) imaginary components (length `totalSites`). */
@@ -97,7 +123,7 @@ export function createHellerReadbackState(): HellerReadbackState {
   return {
     enabled: false,
     sampleInterval: 2,
-    frameCounter: 0,
+    stepCounter: 0,
     psi0Re: null,
     psi0Im: null,
     readbackInFlight: false,
@@ -227,22 +253,54 @@ function ensureStagingBuffers(
 }
 
 /**
- * Schedule a single autocorrelation readback. A no-op if disabled,
- * missing psi buffers, already in flight, or below the decimation
- * threshold. The staging buffers are drawn from the persistent pool on
- * `state` — nothing is allocated on the hot path once the pool is warm.
+ * Tick the Heller readback cadence by one Strang step.
  *
- * Scheduling invariants (critical for FFT correctness):
- *  - `frameCounter` ticks every frame while enabled, independent of the
- *    in-flight flag. If we froze the counter during back-pressure, slow
- *    readbacks would silently stretch the next sample gap and break the
- *    uniform-sampling assumption that `computeHellerSpectrum` relies on.
- *  - When the counter reaches `sampleInterval` but a prior readback is
- *    still in flight, this slot is DROPPED and the counter reset to 0.
- *    This keeps all surviving sample gaps as integer multiples of
- *    `sampleInterval` frames — if the frame dt is stable, that preserves
- *    a uniform time grid; if some slots are missed, the downstream
- *    uniformity check in `computeHellerSpectrum` rejects the trace.
+ * Called by the TDSE evolution loop after each `simTime += config.dt`
+ * increment. Increments `stepCounter`, and when the counter reaches
+ * `sampleInterval`, schedules a readback via {@link submitHellerCopy}
+ * and resets the counter. Under back-pressure (`readbackInFlight`), the
+ * slot is dropped and the counter still resets so the next attempt is
+ * exactly `sampleInterval` steps away — dropped gaps are therefore
+ * guaranteed to be exact integer multiples of the nominal period, which
+ * the downstream `computeHellerSpectrum` handles via interpolation onto
+ * the uniform grid.
+ *
+ * @param device - WebGPU device
+ * @param encoder - Current command encoder
+ * @param state - Mutable readback state (updated in place)
+ * @param simTime - TDSE simulation time at the end of the step that
+ *                  just completed
+ */
+export function tickHellerStep(
+  device: GPUDevice,
+  encoder: GPUCommandEncoder,
+  state: HellerReadbackState,
+  simTime: number
+): void {
+  if (!state.enabled || !state.psiReBuffer || !state.psiImBuffer || state.totalSites <= 0) return
+
+  state.stepCounter++
+  if (state.stepCounter < Math.max(1, state.sampleInterval)) return
+
+  if (state.readbackInFlight) {
+    // Back-pressure: skip this sample slot cleanly. Reset the counter
+    // so the next attempt is a full `sampleInterval` steps away — this
+    // forces dropped gaps to be exact integer multiples of the nominal
+    // period.
+    state.stepCounter = 0
+    return
+  }
+  state.stepCounter = 0
+
+  submitHellerCopy(device, encoder, state, simTime)
+}
+
+/**
+ * Direct schedule of a single autocorrelation readback (bypasses the
+ * step-cadence gate). Exposed for compatibility with existing tests
+ * that drive the pipeline one sample at a time and for any rare caller
+ * that needs to force a capture outside the Strang loop. Most call sites
+ * should prefer {@link tickHellerStep}.
  *
  * @param device - WebGPU device
  * @param encoder - Current command encoder
@@ -256,24 +314,31 @@ export function scheduleHellerReadback(
   simTime: number
 ): void {
   if (!state.enabled || !state.psiReBuffer || !state.psiImBuffer || state.totalSites <= 0) return
+  if (state.readbackInFlight) return
+  submitHellerCopy(device, encoder, state, simTime)
+}
 
-  // Always tick — do NOT gate this behind `readbackInFlight`, or slow
-  // GPU readbacks will stretch the next sample gap and create a shifted
-  // ω axis in the spectrum.
-  state.frameCounter++
-  if (state.frameCounter < Math.max(1, state.sampleInterval)) return
-
-  if (state.readbackInFlight) {
-    // Back-pressure: skip this sample slot cleanly. Reset the counter
-    // so the next attempt is a full `sampleInterval` frames away — this
-    // forces dropped gaps to be exact integer multiples of the nominal
-    // period rather than shorter "catch-up" gaps that would leak into
-    // the FFT as a phase-wrapped peak.
-    state.frameCounter = 0
-    return
-  }
-  state.frameCounter = 0
-
+/**
+ * Inner primitive that actually issues the GPU copy + async map. Assumes
+ * the caller has already verified `enabled`, psi buffer presence,
+ * `totalSites > 0`, and that no readback is currently in flight, but
+ * re-narrows the psi buffers locally so TypeScript can track
+ * non-nullness into the subsequent `copyBufferToBuffer` calls.
+ *
+ * @param device - WebGPU device
+ * @param encoder - Current command encoder
+ * @param state - Mutable readback state (updated in place)
+ * @param simTime - Timestamp to attach to the scheduled sample
+ */
+function submitHellerCopy(
+  device: GPUDevice,
+  encoder: GPUCommandEncoder,
+  state: HellerReadbackState,
+  simTime: number
+): void {
+  const psiReBuffer = state.psiReBuffer
+  const psiImBuffer = state.psiImBuffer
+  if (!psiReBuffer || !psiImBuffer) return
   const byteSize = state.totalSites * 4
   ensureStagingBuffers(device, state, byteSize)
   // After ensureStagingBuffers the pool is guaranteed populated, but TS
@@ -282,8 +347,8 @@ export function scheduleHellerReadback(
   const stagingIm = state.stagingIm
   if (!stagingRe || !stagingIm) return
 
-  encoder.copyBufferToBuffer(state.psiReBuffer, 0, stagingRe, 0, byteSize)
-  encoder.copyBufferToBuffer(state.psiImBuffer, 0, stagingIm, 0, byteSize)
+  encoder.copyBufferToBuffer(psiReBuffer, 0, stagingRe, 0, byteSize)
+  encoder.copyBufferToBuffer(psiImBuffer, 0, stagingIm, 0, byteSize)
 
   state.readbackInFlight = true
   const capturedGeneration = state.generation
@@ -390,10 +455,14 @@ export function scheduleHellerReadback(
 }
 
 /**
- * Per-frame entry point used by `TDSEComputePass`. Handles the store
- * ↔ state synchronisation, the time-dependent Hamiltonian guard, the
- * UI reset token, and the actual schedule call in one place so the
- * compute pass body stays small.
+ * Per-frame state synchronisation entry point used by `TDSEComputePass`.
+ * Handles the store ↔ state sync, the time-dependent Hamiltonian guard,
+ * the static-H fingerprint guard, and the UI reset token. **Does NOT
+ * schedule a readback** — that is the job of {@link tickHellerStep},
+ * which is called inside the Strang step loop so samples land at exact
+ * integer multiples of `config.dt`. `prepareHellerFrame` must therefore
+ * be called **before** `runStrangEvolution` each frame so the
+ * per-step ticks see the current `enabled` and `sampleInterval` values.
  *
  * Time-dependent Hamiltonian guard: Heller's theorem assumes a
  * stationary H so that ψ(t) can be expanded in a fixed eigenbasis. A
@@ -405,22 +474,16 @@ export function scheduleHellerReadback(
  * with an explanatory banner) and hold `state.enabled` to false for
  * the duration.
  *
- * @param device - WebGPU device
- * @param encoder - Current command encoder
  * @param state - Mutable readback state (updated in place)
  * @param config - Active TDSE config (used only to detect driven H(t))
- * @param simTime - Current TDSE simulation time
  * @param lastHandledResetToken - The reset token this pass consumed on
  *   the previous frame; any mismatch with the store's current
  *   `pendingResetToken` triggers a capture reset.
  * @returns Updated reset token for the pass to cache.
  */
-export function applyHellerPerFrame(
-  device: GPUDevice,
-  encoder: GPUCommandEncoder,
+export function prepareHellerFrame(
   state: HellerReadbackState,
   config: TdseConfig,
-  simTime: number,
   lastHandledResetToken: number
 ): number {
   const hellerStore = useHellerSpectrometerStore.getState()
@@ -469,7 +532,28 @@ export function applyHellerPerFrame(
   }
   state.enabled = hellerStore.enabled && !hamiltonianIsTimeDependent
   state.sampleInterval = hellerStore.sampleInterval
-  scheduleHellerReadback(device, encoder, state, simTime)
+  return nextToken
+}
+
+/**
+ * @deprecated Use {@link prepareHellerFrame} + {@link tickHellerStep}.
+ * Kept as a back-compat wrapper that does both the per-frame sync and a
+ * one-shot readback, for callers that have not migrated yet and for
+ * direct unit tests. Prefer the split API.
+ */
+export function applyHellerPerFrame(
+  device: GPUDevice,
+  encoder: GPUCommandEncoder,
+  state: HellerReadbackState,
+  config: TdseConfig,
+  simTime: number,
+  lastHandledResetToken: number
+): number {
+  const nextToken = prepareHellerFrame(state, config, lastHandledResetToken)
+  // Legacy single-shot semantics: treat each frame as one Strang step.
+  // This preserves the previous behaviour for tests that call
+  // `applyHellerPerFrame` directly without driving the evolution loop.
+  tickHellerStep(device, encoder, state, simTime)
   return nextToken
 }
 
@@ -484,9 +568,9 @@ export function resetHellerCapture(state: HellerReadbackState): void {
   state.psi0Re = null
   state.psi0Im = null
   state.baseSimTime = null
-  state.frameCounter = 0
+  state.stepCounter = 0
   resetHellerBuffer(state.buffer)
-  // Clear the fingerprint too: the next `applyHellerPerFrame` will
+  // Clear the fingerprint too: the next `prepareHellerFrame` will
   // re-anchor it against the current config. Leaving the old value in
   // place would either falsely mask a legitimate change (if the config
   // happens to match again) or, worse, cause a second redundant reset

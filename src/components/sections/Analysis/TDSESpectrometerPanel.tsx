@@ -31,7 +31,7 @@
  * @module components/sections/Analysis/TDSESpectrometerPanel
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Button } from '@/components/ui/Button'
@@ -45,6 +45,7 @@ import {
   HELLER_DEFAULT_MIN_SAMPLES,
   type HellerSpectrum,
 } from '@/lib/physics/tdse/heller'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import {
   HELLER_MAX_SAMPLE_INTERVAL,
   HELLER_MIN_SAMPLE_INTERVAL,
@@ -57,6 +58,7 @@ import {
   deriveCaptureTiming,
   derivePotentialExpectationHint,
   deriveStatusMessage,
+  isHellerCompatiblePotential,
 } from './spectrometerHelpers'
 import { SpectrometerPlot } from './SpectrometerPlot'
 
@@ -92,15 +94,6 @@ function runHellerCompute(): HellerSpectrum | null {
 }
 
 /**
- * Ask the TDSE pass to clear ψ(0), the ring buffer, and any in-flight
- * readback on the next frame. Also bumps `resetVersion` so the panel's
- * displayed spectrum is dropped synchronously.
- */
-function requestHellerRestart(): void {
-  useHellerSpectrometerStore.getState().requestReset()
-}
-
-/**
  * Heller Wavepacket Spectrometer panel for TDSE mode.
  *
  * @param props - Panel props
@@ -117,6 +110,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
       bufferRef,
       setEnabled,
       setSampleInterval,
+      requestReset,
     } = useHellerSpectrometerStore(
       useShallow((s) => ({
         enabled: s.enabled,
@@ -127,8 +121,42 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
         bufferRef: s.bufferRef,
         setEnabled: s.setEnabled,
         setSampleInterval: s.setSampleInterval,
+        requestReset: s.requestReset,
       }))
     )
+
+    // Couple Start / Restart with the same wavefunction reset the
+    // timeline "Reset" button performs. Without this, users have to
+    // manually click timeline-reset in addition to pressing Start, and
+    // forgetting either one anchors ψ₀ against a stale wavepacket that
+    // had already evolved arbitrarily far from its initial state.
+    const resetTdseField = useExtendedObjectStore((s) => s.resetTdseField)
+
+    /**
+     * Start-or-stop toggle handler. On turn-on, also reinitialise the
+     * wavefunction (needsReset=true on the TDSE config) so ψ(0) — the
+     * anchor for the autocorrelation — is the mode's true initial
+     * state, not whatever ψ happens to be at the moment the user
+     * clicked.
+     */
+    const handleEnabledChange = useCallback(
+      (next: boolean): void => {
+        if (next) resetTdseField()
+        setEnabled(next)
+      },
+      [resetTdseField, setEnabled]
+    )
+
+    /**
+     * Restart button handler. Clears the ring buffer + ψ₀ AND resets
+     * the wavefunction — the two have to happen together or the next
+     * anchor will be taken against the drift-evolved state and the
+     * spectrum will silently be wrong.
+     */
+    const handleRestart = useCallback((): void => {
+      resetTdseField()
+      requestReset()
+    }, [resetTdseField, requestReset])
 
     const bufferCapacity = bufferRef?.capacity ?? HELLER_DEFAULT_CAPACITY
 
@@ -230,6 +258,11 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
       [bufferRef, sampleCount]
     )
 
+    const potentialIncompatible = useMemo(
+      () => !isHellerCompatiblePotential(potentialType),
+      [potentialType]
+    )
+
     const statusMessage = useMemo(
       () =>
         deriveStatusMessage({
@@ -240,8 +273,17 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
           minSamples: HELLER_DEFAULT_MIN_SAMPLES,
           computeAttempted,
           spectrumEmpty: spectrum !== null && spectrum.nUsed === 0,
+          potentialIncompatible,
         }),
-      [enabled, hamiltonianTimeDependent, sampleCount, captureFull, computeAttempted, spectrum]
+      [
+        enabled,
+        hamiltonianTimeDependent,
+        sampleCount,
+        captureFull,
+        computeAttempted,
+        spectrum,
+        potentialIncompatible,
+      ]
     )
 
     const expectationHint = useMemo(
@@ -287,9 +329,9 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
           <Switch
             label={enabled ? 'Capturing ψ(t)' : 'Start measuring'}
             checked={enabled}
-            onCheckedChange={setEnabled}
+            onCheckedChange={handleEnabledChange}
             disabled={hamiltonianTimeDependent}
-            tooltip="Enable GPU readback of ⟨ψ(0)|ψ(t)⟩ at decimated frames."
+            tooltip="Start the Heller capture. Also resets the wavefunction so ψ(0) is the mode's true initial state — no need to hit the timeline Reset button separately."
             data-testid="heller-capture-toggle"
           />
 
@@ -342,8 +384,8 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
             <Button
               variant="secondary"
               size="sm"
-              onClick={requestHellerRestart}
-              tooltip="Clear the captured buffer and snapshot ψ(0) again on the next frame."
+              onClick={handleRestart}
+              tooltip="Reset the wavefunction and start a fresh capture. Equivalent to the timeline Reset button followed by toggling capture off and on."
               data-testid="heller-reset-button"
             >
               Restart capture
@@ -408,7 +450,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
             </summary>
             <div className="mt-2">
               <Slider
-                label="Sample interval (frames)"
+                label="Sample interval (Strang steps)"
                 min={HELLER_MIN_SAMPLE_INTERVAL}
                 max={HELLER_MAX_SAMPLE_INTERVAL}
                 step={1}
@@ -416,7 +458,7 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
                 onChange={setPendingInterval}
                 showValue
                 disabled={hamiltonianTimeDependent}
-                tooltip="Frames between captures. Lower = finer time resolution, higher = less GPU bandwidth. Changing this restarts capture."
+                tooltip="Simulation steps between captures. Each step advances time by dt, so N steps = N·dt of simTime between samples. Lower = finer ω resolution, higher = less GPU bandwidth. Changing this restarts capture."
                 data-testid="heller-sample-interval"
               />
             </div>

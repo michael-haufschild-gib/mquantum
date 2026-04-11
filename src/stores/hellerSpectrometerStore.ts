@@ -21,10 +21,10 @@ import { create } from 'zustand'
 
 import type { HellerRingBuffer } from '@/lib/physics/tdse/heller'
 
-/** Default frames between autocorrelation samples. */
+/** Default Strang steps between autocorrelation samples. */
 export const HELLER_DEFAULT_SAMPLE_INTERVAL = 2
 
-/** Minimum and maximum slider bounds for `sampleInterval`. */
+/** Minimum and maximum slider bounds for `sampleInterval` (Strang steps). */
 export const HELLER_MIN_SAMPLE_INTERVAL = 1
 export const HELLER_MAX_SAMPLE_INTERVAL = 30
 
@@ -32,7 +32,13 @@ export const HELLER_MAX_SAMPLE_INTERVAL = 30
 export interface HellerSpectrometerState {
   /** Whether the pass should capture autocorrelation samples. */
   enabled: boolean
-  /** Frames between successive captures. */
+  /**
+   * Strang steps between successive captures. Sampling by step count
+   * (not frame count) makes the spacing immune to frame-rate jitter,
+   * fractional `stepsPerFrame * speed`, pause/resume cycles, and GPU
+   * back-pressure. A single step advances `simTime` by exactly
+   * `config.dt`, so N steps = N·dt of simulation time between samples.
+   */
   sampleInterval: number
   /** Number of samples currently stored in the ring buffer. */
   sampleCount: number
@@ -117,6 +123,11 @@ export const useHellerSpectrometerStore = create<HellerSpectrometerState>((set) 
     }),
   setSampleInterval: (v) =>
     set((s) => {
+      // Reject NaN/Infinity up-front — `Math.round(NaN)` is NaN and
+      // `Math.min/max` propagate it, so without this guard a bad
+      // slider binding could publish an invalid `sampleInterval` and
+      // break the per-step readback scheduler.
+      if (!Number.isFinite(v)) return {}
       const clamped = Math.max(
         HELLER_MIN_SAMPLE_INTERVAL,
         Math.min(HELLER_MAX_SAMPLE_INTERVAL, Math.round(v))

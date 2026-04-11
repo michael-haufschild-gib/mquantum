@@ -34,6 +34,7 @@ import {
   type HellerReadbackState,
   resetHellerCapture,
   scheduleHellerReadback,
+  tickHellerStep,
 } from '@/rendering/webgpu/passes/TDSEHellerReadback'
 import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 import {
@@ -86,6 +87,8 @@ async function runOneSchedule(
     onSubmittedWorkDone: () => Promise<undefined>
   }
   queue.onSubmittedWorkDone = vi.fn().mockResolvedValue(undefined)
+  // Use the bypass primitive so this helper does exactly one capture
+  // regardless of the step-cadence gate.
   scheduleHellerReadback(device, encoder, state, simTime)
   // Wait two microtasks for onSubmittedWorkDone → mapAsync → push
   await Promise.resolve()
@@ -186,15 +189,13 @@ describe('Heller readback back-pressure scheduling', () => {
     })
   })
 
-  it('advances the frame counter every call even while a readback is in flight', () => {
-    // Regression for the "stretched sample gap" bug: before the fix,
-    // the early return on `readbackInFlight` also skipped the counter
-    // tick. That silently widened the time between successful captures
-    // by however many frames the prior mapAsync took to resolve, which
-    // shifted every peak on the ω axis when the whole trace was
-    // collapsed to a single average dt. The counter must now advance
-    // on every scheduled call — only the sample schedule itself is
-    // suppressed.
+  it('advances the step counter every tick even while a readback is in flight', () => {
+    // Regression for the "stretched sample gap" bug: the early return
+    // on `readbackInFlight` must not skip the step counter tick. If
+    // it did, slow readbacks would silently widen the time between
+    // successful captures and shift every peak on the ω axis. The
+    // counter must advance on every call — only the sample schedule
+    // itself is suppressed.
     const state = createHellerReadbackState()
     state.psiReBuffer = createMockBuffer('psi-re')
     state.psiImBuffer = createMockBuffer('psi-im')
@@ -206,29 +207,26 @@ describe('Heller readback back-pressure scheduling', () => {
     const device = mockWebGPU.device
     const encoder = createMockCommandEncoder()
 
-    // Three frames at interval=3, in-flight the whole time. The
-    // counter must increment every frame; on the third call it
-    // reaches the threshold and is reset to 0 after the in-flight
-    // drop. No readback should have been scheduled (still in-flight).
-    scheduleHellerReadback(device, encoder, state, 0.1)
-    expect(state.frameCounter).toBe(1)
-    scheduleHellerReadback(device, encoder, state, 0.2)
-    expect(state.frameCounter).toBe(2)
-    scheduleHellerReadback(device, encoder, state, 0.3)
+    // Three Strang steps at interval=3, in-flight the whole time.
+    tickHellerStep(device, encoder, state, 0.1)
+    expect(state.stepCounter).toBe(1)
+    tickHellerStep(device, encoder, state, 0.2)
+    expect(state.stepCounter).toBe(2)
+    tickHellerStep(device, encoder, state, 0.3)
     // At interval reached + in-flight, the counter resets so the next
-    // attempt is exactly `interval` frames later (keeps gaps as
-    // integer multiples of the nominal period).
-    expect(state.frameCounter).toBe(0)
-    // And no sample was recorded — the pool has not copied anything
+    // attempt is exactly `sampleInterval` steps later (keeps dropped
+    // gaps as exact integer multiples of the nominal period).
+    expect(state.stepCounter).toBe(0)
+    // No sample was recorded — the pool has not copied anything
     // into ψ₀.
     expect(state.psi0Re).toBeNull()
   })
 
   it('resumes scheduling promptly once the in-flight flag clears', async () => {
-    // After the scheduler drops a slot due to back-pressure, the next
-    // successful schedule should happen exactly `sampleInterval`
-    // frames later — NOT one frame later (which would stretch the
-    // effective period) and NOT starved indefinitely.
+    // After a dropped slot due to back-pressure, the next successful
+    // schedule should happen exactly `sampleInterval` steps later —
+    // not one step later (which would stretch the effective period)
+    // and not starved indefinitely.
     const state = createHellerReadbackState()
     state.psiReBuffer = createMockBuffer('psi-re')
     state.psiImBuffer = createMockBuffer('psi-im')
@@ -243,23 +241,81 @@ describe('Heller readback back-pressure scheduling', () => {
     }
     queue.onSubmittedWorkDone = vi.fn().mockResolvedValue(undefined)
 
-    // Drop slot: two frames with in-flight → counter resets.
-    scheduleHellerReadback(device, createMockCommandEncoder(), state, 0.1)
-    scheduleHellerReadback(device, createMockCommandEncoder(), state, 0.2)
-    expect(state.frameCounter).toBe(0)
+    // Drop slot: two steps with in-flight → counter resets.
+    tickHellerStep(device, createMockCommandEncoder(), state, 0.1)
+    tickHellerStep(device, createMockCommandEncoder(), state, 0.2)
+    expect(state.stepCounter).toBe(0)
 
-    // Clear the in-flight flag, run the next two frames. On the
-    // second frame the counter reaches the interval and a capture
+    // Clear the in-flight flag, run the next two steps. On the
+    // second step the counter reaches the interval and a capture
     // should actually be scheduled.
     state.readbackInFlight = false
-    scheduleHellerReadback(device, createMockCommandEncoder(), state, 0.3)
-    expect(state.frameCounter).toBe(1)
+    tickHellerStep(device, createMockCommandEncoder(), state, 0.3)
+    expect(state.stepCounter).toBe(1)
     expect(state.readbackInFlight).toBe(false)
 
-    scheduleHellerReadback(device, createMockCommandEncoder(), state, 0.4)
+    tickHellerStep(device, createMockCommandEncoder(), state, 0.4)
     // Counter reset AND a schedule was placed — readbackInFlight flips.
-    expect(state.frameCounter).toBe(0)
+    expect(state.stepCounter).toBe(0)
     expect(state.readbackInFlight).toBe(true)
+  })
+
+  it('samples at exact integer multiples of config.dt when the host loop jitters steps per frame', async () => {
+    // Simulates the fractional stepsPerFrame * speed accumulator that
+    // historically broke the frame-based scheduler. Even when the
+    // *frame* cadence is irregular, the *step* cadence — which is
+    // what `tickHellerStep` consumes — is perfectly regular, so the
+    // captured times must land on a uniform grid.
+    const state = createHellerReadbackState()
+    state.psiReBuffer = createMockBuffer('psi-re')
+    state.psiImBuffer = createMockBuffer('psi-im')
+    state.totalSites = 8
+    state.enabled = true
+    state.sampleInterval = 4
+
+    const device = mockWebGPU.device
+    const queue = device.queue as unknown as {
+      onSubmittedWorkDone: () => Promise<undefined>
+    }
+    queue.onSubmittedWorkDone = vi.fn().mockResolvedValue(undefined)
+
+    // Simulate 40 Strang steps of dt=0.05. Spread them across frames
+    // with irregular `stepsThisFrame` (2, 3, 1, 2, 4, ...). From the
+    // scheduler's point of view, what matters is that tickHellerStep
+    // is called 40 times with monotonically-increasing simTime at
+    // exact dt spacing.
+    const dt = 0.05
+    for (let k = 1; k <= 40; k++) {
+      tickHellerStep(device, createMockCommandEncoder(), state, k * dt)
+      // Microtask drain so the first few mapAsync resolutions can push
+      // samples before the next tick fires.
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+
+    // Every 4 Strang steps → one sample. 40/4 = 10 targets. Allow for
+    // the first being the ψ(0) anchor and possibly one in-flight drop.
+    const count = state.buffer.count
+    expect(count).toBeGreaterThanOrEqual(8)
+    expect(count).toBeLessThanOrEqual(10)
+
+    // Inter-sample times must be exact multiples of `sampleInterval *
+    // dt` — not approximate, because the scheduler never records any
+    // time that is not a step-boundary simTime.
+    const nominalGap = 4 * dt
+    const start = count === state.buffer.capacity ? state.buffer.head : 0
+    for (let i = 1; i < count; i++) {
+      const prev = state.buffer.times[(start + i - 1) % state.buffer.capacity]!
+      const curr = state.buffer.times[(start + i) % state.buffer.capacity]!
+      const gap = curr - prev
+      // The gap is either nominalGap (normal) or 2*nominalGap (one
+      // dropped slot). It is NEVER a non-integer multiple — that was
+      // the pre-fix failure mode.
+      const ratio = gap / nominalGap
+      expect(Math.abs(ratio - Math.round(ratio))).toBeLessThan(1e-9)
+      expect(Math.round(ratio)).toBeGreaterThanOrEqual(1)
+    }
   })
 })
 

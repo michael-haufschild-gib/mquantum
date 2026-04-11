@@ -103,10 +103,10 @@ import {
   storeCurrentEigenstate as gsStoreEigenstate,
 } from './TDSEGramSchmidt'
 import {
-  applyHellerPerFrame,
   createHellerReadbackState,
   disposeHellerStagingBuffers,
   type HellerReadbackState,
+  prepareHellerFrame,
   resetHellerCapture,
 } from './TDSEHellerReadback'
 import { requestMeasurementReadback as extRequestMeasurementReadback } from './TDSEMeasurementReadback'
@@ -613,6 +613,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     const { pl, bg } = this
     if (!pl || !bg) return
 
+    // Heller wavepacket spectrometer — sync store → readback state
+    // BEFORE the evolution loop so that the per-Strang-step tick inside
+    // `runStrangEvolution` sees the current `enabled` / `sampleInterval`
+    // values for this frame. See `prepareHellerFrame` for the
+    // time-dependent Hamiltonian guard and reset-token handling.
+    this._hellerLastResetToken = prepareHellerFrame(
+      this._hellerState,
+      config,
+      this._hellerLastResetToken
+    )
+
     if (isPlaying) {
       const evoState: EvolutionFrameState = {
         simTime: this.simTime,
@@ -627,6 +638,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         gsState: this._gsState,
         stochasticState: this._stochasticState,
         boundingRadius: boundingRadius ?? 2.0,
+        hellerState: this._hellerState,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
       })
@@ -648,18 +660,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       dispatchCompute: this.dc,
       dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
     })
-
-    // Heller wavepacket spectrometer sidecar readback — see
-    // `applyHellerPerFrame` for the time-dependent Hamiltonian guard,
-    // reset-token handling, and schedule call.
-    this._hellerLastResetToken = applyHellerPerFrame(
-      device,
-      ctx.encoder,
-      this._hellerState,
-      config,
-      this.simTime,
-      this._hellerLastResetToken
-    )
   }
 
   execute(_ctx: WebGPURenderContext): void {

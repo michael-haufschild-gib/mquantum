@@ -14,6 +14,7 @@ import {
   createHellerBuffer,
   extractSpectrumPeaks,
   hannWindow,
+  HELLER_MAX_INTERPOLATION_FRACTION,
   type HellerRingBuffer,
   pushAutocorrelationSample,
   resetHellerBuffer,
@@ -164,7 +165,10 @@ describe('computeHellerSpectrum', () => {
     fillMultitoneBuffer(buf, energies, 1024, 0.1)
 
     const spectrum = computeHellerSpectrum(buf)
+    // Clean capture → nUsed equals the raw sample count (grid length)
+    // and no interpolation was needed.
     expect(spectrum.nUsed).toBe(1024)
+    expect(spectrum.nInterpolated).toBe(0)
     expect(spectrum.dt).toBeCloseTo(0.1, 10)
     // Five distinct peaks expected; we asked for top 6 but only 5 exist.
     expect(spectrum.peaks.length).toBeGreaterThanOrEqual(5)
@@ -273,6 +277,7 @@ describe('computeHellerSpectrum', () => {
     for (let i = 0; i < 32; i++) pushAutocorrelationSample(buf, 1, 0, i * 0.1)
     const spectrum = computeHellerSpectrum(buf, 64)
     expect(spectrum.nUsed).toBe(0)
+    expect(spectrum.nInterpolated).toBe(0)
     expect(spectrum.omega).toHaveLength(0)
     expect(spectrum.power).toHaveLength(0)
     expect(spectrum.peaks).toEqual([])
@@ -297,12 +302,42 @@ describe('computeHellerSpectrum', () => {
     expect(spectrum.peaks).toEqual([])
   })
 
-  it('rejects a non-uniformly sampled trace (simulated back-pressure gap)', () => {
-    // Fill a clean single-tone trace, then corrupt one time entry so the
-    // gap before it is ~2× the nominal period (as if one sample slot was
-    // dropped due to a slow GPU readback). The uniformity check must
-    // reject the entire trace because collapsing two different dt values
-    // to the mean would shift every peak on the ω axis.
+  it('interpolates across a single dropped-slot integer-multiple gap', () => {
+    // Capture n-1 samples of a clean single-tone trace but skip one
+    // slot in the middle — simulating exactly one back-pressure drop.
+    // The surviving gap is 2·dt, an integer multiple of the nominal
+    // period. The robust `computeHellerSpectrum` must align everything
+    // onto a uniform grid, linearly interpolate the missing sample,
+    // and recover the tone peak at the correct frequency.
+    const n = 256
+    const dt = 0.1
+    const E = 2.0
+    const buf = createHellerBuffer(n)
+    const dropIdx = Math.floor(n / 2)
+    for (let i = 0; i < n - 1; i++) {
+      // Source index in the original uniform timeline: skip dropIdx.
+      const k = i < dropIdx ? i : i + 1
+      const t = k * dt
+      pushAutocorrelationSample(buf, Math.cos(-E * t), Math.sin(-E * t), t)
+    }
+    const spectrum = computeHellerSpectrum(buf)
+    // One slot was interpolated onto the n-point grid.
+    expect(spectrum.nUsed).toBe(n)
+    expect(spectrum.nInterpolated).toBe(1)
+    expect(spectrum.dt).toBeCloseTo(dt, 10)
+    // The tone peak must still land near E (within one Δω bin) because
+    // linear interpolation of a single slot is a tiny perturbation on
+    // the sinusoid and the FFT grid bin positions are unchanged.
+    const deltaOmega = (2 * Math.PI) / (n * dt)
+    const top = spectrum.peaks[0]!
+    expect(Math.abs(top.omega - E)).toBeLessThan(2 * deltaOmega)
+  })
+
+  it('rejects a non-integer-multiple anomaly (genuine cadence change)', () => {
+    // A trace whose gaps are neither `dt` nor an integer multiple of
+    // `dt` (e.g. a paused-then-nudged capture that landed at 1.5·dt)
+    // is real non-uniformity and must be rejected — interpolating
+    // would map energies onto a fictitious grid and shift peaks.
     const n = 256
     const dt = 0.1
     const E = 2.0
@@ -311,39 +346,66 @@ describe('computeHellerSpectrum', () => {
       const t = i * dt
       pushAutocorrelationSample(buf, Math.cos(-E * t), Math.sin(-E * t), t)
     }
-    // Introduce a 2*dt gap halfway through the trace.
+    // Offset the second half by a non-integer fraction of dt — 0.5 dt.
+    // This cannot be explained by any dropped slot pattern.
     const gapIdx = Math.floor(n / 2)
     for (let i = gapIdx; i < n; i++) {
-      buf.times[i] = buf.times[i]! + dt
+      buf.times[i] = buf.times[i]! + 0.5 * dt
     }
     const spectrum = computeHellerSpectrum(buf)
-    // Uniformity check must kick in — empty spectrum.
     expect(spectrum.nUsed).toBe(0)
     expect(spectrum.omega).toHaveLength(0)
-    expect(spectrum.power).toHaveLength(0)
     expect(spectrum.peaks).toEqual([])
   })
 
+  it(`rejects a trace with more than ${HELLER_MAX_INTERPOLATION_FRACTION * 100}% interpolated slots`, () => {
+    // Sanity cap on interpolation: if the capture is so sparse that
+    // most of the FFT grid is synthesised, the result biases toward
+    // zero and would lie to the user. The guard must reject.
+    //
+    // Pattern: pairs of samples at adjacent grid positions, but each
+    // pair is separated by a 6·dt gap. Minimum gap = dt, so the
+    // nominal grid spacing resolves to dt and the 5·dt gaps between
+    // pairs expand to 5 interpolated slots each. 64 samples → 32 pairs
+    // → grid length 0, 1, 6, 7, 12, 13, …, 187 → nGrid = 188,
+    // nInterpolated = 124 / 188 ≈ 66% >> 20%.
+    const pairs = 32
+    const dt = 0.1
+    const E = 2.0
+    const buf = createHellerBuffer(256)
+    for (let p = 0; p < pairs; p++) {
+      const k0 = 6 * p
+      const t0 = k0 * dt
+      const t1 = (k0 + 1) * dt
+      pushAutocorrelationSample(buf, Math.cos(-E * t0), Math.sin(-E * t0), t0)
+      pushAutocorrelationSample(buf, Math.cos(-E * t1), Math.sin(-E * t1), t1)
+    }
+    const spectrum = computeHellerSpectrum(buf)
+    expect(spectrum.nUsed).toBe(0)
+    expect(spectrum.nInterpolated).toBe(0)
+    expect(spectrum.omega).toHaveLength(0)
+  })
+
   it('accepts a near-uniform trace with small floating-point jitter', () => {
-    // Sanity check the other side of the uniformity tolerance: a trace
-    // whose inter-sample deltas fluctuate within 1% of the mean must
-    // still produce a valid spectrum. Without this test, a future
-    // tightening of the tolerance could silently break well-behaved
-    // captures that have ordinary floating-point noise.
+    // Sanity check the uniformity tolerance: a trace whose inter-sample
+    // deltas fluctuate by a tiny float64 roundoff still aligns onto the
+    // same integer grid with zero interpolation and produces a valid
+    // spectrum. 0.05% jitter is well inside HELLER_UNIFORMITY_TOLERANCE.
     const n = 256
     const dt = 0.1
     const E = 2.0
     const buf = createHellerBuffer(n)
-    // Use a fixed, deterministic jitter pattern (±0.5% of dt) so the
-    // test is reproducible. No PRNG — alternating signs produce the
-    // worst-case uniformity deviation we accept.
     for (let i = 0; i < n; i++) {
-      const jitter = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) * dt * 0.003
+      // Deterministic pattern — no PRNG. Amplitude small enough that
+      // every sample still rounds to the same integer multiple of
+      // dtNominal.
+      const jitter = i === 0 ? 0 : (i % 2 === 0 ? 1 : -1) * dt * 0.0003
       const t = i * dt + jitter
       pushAutocorrelationSample(buf, Math.cos(-E * t), Math.sin(-E * t), t)
     }
     const spectrum = computeHellerSpectrum(buf)
     expect(spectrum.nUsed).toBe(n)
+    expect(spectrum.nInterpolated).toBe(0)
     expect(spectrum.peaks.length).toBeGreaterThanOrEqual(1)
   })
 })

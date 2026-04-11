@@ -20,8 +20,14 @@ describe('hellerSpectrometerStore', () => {
 
   describe('setEnabled reset semantics', () => {
     it('bumps the pending reset token on off→on', () => {
+      // Preload a non-zero sampleCount so the `toBe(0)` assertion
+      // below genuinely verifies the setter clears prior samples; a
+      // regression that dropped that line would otherwise slip
+      // through because the fresh store starts at 0.
+      useHellerSpectrometerStore.setState({ sampleCount: 42 })
       const before = useHellerSpectrometerStore.getState()
       expect(before.enabled).toBe(false)
+      expect(before.sampleCount).toBe(42)
       const prevToken = before.pendingResetToken
       const prevVersion = before.resetVersion
 
@@ -70,7 +76,11 @@ describe('hellerSpectrometerStore', () => {
 
   describe('setSampleInterval reset semantics', () => {
     it('bumps the pending reset token when the interval changes', () => {
+      // Preload a non-zero sampleCount so the clear-on-cadence-change
+      // guarantee is actually exercised by the assertion.
+      useHellerSpectrometerStore.setState({ sampleCount: 17 })
       const before = useHellerSpectrometerStore.getState()
+      expect(before.sampleCount).toBe(17)
       const prevToken = before.pendingResetToken
       const prevVersion = before.resetVersion
       const prevInterval = before.sampleInterval
@@ -84,6 +94,27 @@ describe('hellerSpectrometerStore', () => {
       expect(after.pendingResetToken).toBe(prevToken + 1)
       expect(after.resetVersion).toBe(prevVersion + 1)
       expect(after.sampleCount).toBe(0)
+    })
+
+    it('ignores non-finite input without touching state', () => {
+      // NaN / Infinity must be rejected before `Math.round` gets a
+      // chance to propagate them into the store. Otherwise a bad
+      // slider binding could publish an invalid interval and break
+      // the per-step readback scheduler.
+      useHellerSpectrometerStore.setState({ sampleInterval: 3, sampleCount: 10 })
+      const before = useHellerSpectrometerStore.getState()
+      const prevToken = before.pendingResetToken
+      const prevVersion = before.resetVersion
+
+      useHellerSpectrometerStore.getState().setSampleInterval(Number.NaN)
+      useHellerSpectrometerStore.getState().setSampleInterval(Number.POSITIVE_INFINITY)
+      useHellerSpectrometerStore.getState().setSampleInterval(Number.NEGATIVE_INFINITY)
+
+      const after = useHellerSpectrometerStore.getState()
+      expect(after.sampleInterval).toBe(3)
+      expect(after.sampleCount).toBe(10)
+      expect(after.pendingResetToken).toBe(prevToken)
+      expect(after.resetVersion).toBe(prevVersion)
     })
 
     it('does not bump the reset token when the clamped value equals the current interval', () => {

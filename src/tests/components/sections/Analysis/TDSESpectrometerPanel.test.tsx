@@ -24,6 +24,7 @@ import {
   HELLER_DEFAULT_MIN_SAMPLES,
   pushAutocorrelationSample,
 } from '@/lib/physics/tdse/heller'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 
 /**
@@ -80,7 +81,9 @@ describe('TDSESpectrometerPanel', () => {
 
   describe('state machine copy', () => {
     it('shows the idle label when capture is off and no samples exist', () => {
-      render(<TDSESpectrometerPanel tdse={cfg()} />)
+      // Use a compatible potential so the status block renders the
+      // plain-idle copy rather than the "no bound states" warning.
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'harmonicTrap' })} />)
       openPanel()
       expect(screen.getByTestId('heller-status-label')).toHaveTextContent(/idle/i)
       expect(screen.getByTestId('heller-status-detail')).toHaveTextContent(/turn on capture/i)
@@ -248,6 +251,104 @@ describe('TDSESpectrometerPanel', () => {
       // plot placeholder.
       expect(screen.getByTestId('heller-status-block')).toBeInTheDocument()
       expect(screen.getByTestId('heller-status-label')).toBeInTheDocument()
+    })
+  })
+
+  describe('timeline-reset coupling', () => {
+    it('marks the TDSE field as needing reset when the user toggles capture on', () => {
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'harmonicTrap' })} />)
+      openPanel()
+
+      // Seed the config so `needsReset` starts false. We assert the
+      // concrete transition rather than "was called" so a regression
+      // that renames the action still trips this test.
+      act(() => {
+        useExtendedObjectStore.setState((s) => ({
+          schroedinger: {
+            ...s.schroedinger,
+            tdse: { ...s.schroedinger.tdse, needsReset: false },
+          },
+        }))
+      })
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
+
+      fireEvent.click(screen.getByTestId('heller-capture-toggle'))
+
+      // The toggle must flip the Heller enabled flag AND reset the
+      // wavefunction in the same click, so ψ₀ is anchored against the
+      // mode's true initial state rather than a drift-evolved
+      // wavepacket. Without the coupling, users had to click the
+      // timeline Reset button separately and forgetting either one
+      // silently corrupted the spectrum.
+      expect(useHellerSpectrometerStore.getState().enabled).toBe(true)
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(true)
+    })
+
+    it('does NOT reset the wavefunction when the user toggles capture off', () => {
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'harmonicTrap' })} />)
+      act(() => {
+        useHellerSpectrometerStore.setState({ enabled: true })
+        useExtendedObjectStore.setState((s) => ({
+          schroedinger: {
+            ...s.schroedinger,
+            tdse: { ...s.schroedinger.tdse, needsReset: false },
+          },
+        }))
+      })
+      openPanel()
+
+      fireEvent.click(screen.getByTestId('heller-capture-toggle'))
+
+      // Stopping a capture must preserve the ring buffer so the user
+      // can still compute a spectrum from what has been captured;
+      // it also must not interrupt the running simulation by forcing
+      // a reset.
+      expect(useHellerSpectrometerStore.getState().enabled).toBe(false)
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
+    })
+
+    it('resets the wavefunction when the user clicks Restart capture', () => {
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'harmonicTrap' })} />)
+      act(() => {
+        seedEnabledCapture(256)
+        useExtendedObjectStore.setState((s) => ({
+          schroedinger: {
+            ...s.schroedinger,
+            tdse: { ...s.schroedinger.tdse, needsReset: false },
+          },
+        }))
+      })
+      openPanel()
+      const tokenBefore = useHellerSpectrometerStore.getState().pendingResetToken
+
+      fireEvent.click(screen.getByTestId('heller-reset-button'))
+
+      // Restart must bump the Heller reset token AND mark the TDSE
+      // field for reinitialisation — both halves of the coupling.
+      expect(useHellerSpectrometerStore.getState().pendingResetToken).toBe(tokenBefore + 1)
+      expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(true)
+    })
+  })
+
+  describe('potential compatibility pedagogy', () => {
+    it('warns in the Idle label when the current potential has no bound states', () => {
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'barrier' })} />)
+      openPanel()
+      // The status label should tell the user up-front that barrier
+      // is a scattering potential, instead of waiting for them to
+      // collect 64 samples and hit Compute before discovering the
+      // spectrum is mostly noise.
+      expect(screen.getByTestId('heller-status-label')).toHaveTextContent(/no bound states/i)
+      expect(screen.getByTestId('heller-status-detail')).toHaveTextContent(
+        /harmonicTrap|finiteWell|doubleWell|periodicLattice/i
+      )
+    })
+
+    it('shows the neutral Idle copy when the current potential IS compatible', () => {
+      render(<TDSESpectrometerPanel tdse={cfg({ potentialType: 'harmonicTrap' })} />)
+      openPanel()
+      expect(screen.getByTestId('heller-status-label')).toHaveTextContent(/^Idle$/)
+      expect(screen.getByTestId('heller-status-label')).not.toHaveTextContent(/no bound states/i)
     })
   })
 })

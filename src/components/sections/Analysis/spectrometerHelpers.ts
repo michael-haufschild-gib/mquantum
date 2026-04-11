@@ -16,6 +16,36 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import type { HellerRingBuffer, HellerSpectrum } from '@/lib/physics/tdse/heller'
 
+/**
+ * Set of TDSE potential types for which Heller spectroscopy will
+ * produce a physically meaningful discrete-eigenvalue spectrum. Every
+ * other potential either lacks bound states (scattering), has a
+ * time-dependent Hamiltonian (driven), or produces such dense /
+ * pseudo-continuous structure that peak extraction is misleading.
+ */
+export const HELLER_COMPATIBLE_POTENTIALS: ReadonlySet<TdseConfig['potentialType']> = new Set([
+  'harmonicTrap',
+  'becTrap',
+  'finiteWell',
+  'doubleWell',
+  'periodicLattice',
+  'radialDoubleWell',
+  'coupledAnharmonic',
+])
+
+/**
+ * Does the current potential admit a discrete bound-state spectrum
+ * that Heller spectroscopy can usefully recover? Scattering potentials
+ * (barrier, step, free, doubleSlit) and driven Hamiltonians all return
+ * false so the UI can warn the user before they waste a capture cycle.
+ *
+ * @param potentialType - Current TDSE potential type
+ * @returns true if the potential has a usable bound-state spectrum
+ */
+export function isHellerCompatiblePotential(potentialType: TdseConfig['potentialType']): boolean {
+  return HELLER_COMPATIBLE_POTENTIALS.has(potentialType)
+}
+
 /** Number of harmonic-trap eigenlevels to draw as theoretical overlay. */
 export const HARMONIC_OVERLAY_LEVELS = 8
 
@@ -80,6 +110,13 @@ export interface StatusInputs {
   minSamples: number
   computeAttempted: boolean
   spectrumEmpty: boolean
+  /**
+   * True when the current potential is NOT a member of
+   * {@link HELLER_COMPATIBLE_POTENTIALS}. Used to show a non-blocking
+   * warning before the user burns a capture on a scattering setup
+   * that will never produce clean peaks.
+   */
+  potentialIncompatible: boolean
 }
 
 /**
@@ -99,6 +136,7 @@ export function deriveStatusMessage(inputs: StatusInputs): StatusMessage {
     minSamples,
     computeAttempted,
     spectrumEmpty,
+    potentialIncompatible,
   } = inputs
 
   if (hamiltonianTimeDependent) {
@@ -109,17 +147,26 @@ export function deriveStatusMessage(inputs: StatusInputs): StatusMessage {
     }
   }
   if (!enabled) {
+    if (potentialIncompatible) {
+      return {
+        label: 'Idle — no bound states in this potential',
+        detail:
+          'Heller needs a discrete spectrum. Switch to harmonicTrap, finiteWell, doubleWell, periodicLattice, radialDoubleWell, coupledAnharmonic, or becTrap to get clean peaks.',
+        dotClass: 'bg-[var(--color-warning)]',
+      }
+    }
     return {
       label: 'Idle',
-      detail: 'Turn on capture above to start collecting ψ(t) samples.',
+      detail:
+        'Turn on capture above — this also resets the wavefunction so ψ(0) is the initial state.',
       dotClass: 'bg-text-tertiary',
     }
   }
   if (computeAttempted && spectrumEmpty) {
     return {
-      label: 'Non-uniform samples — restart capture',
+      label: 'Capture corrupted — restart',
       detail:
-        'Sample times drifted (GPU back-pressure or simulation cadence change). Click Restart to try again.',
+        'Sample cadence changed mid-capture (parameter drift, pause/resume, or too many dropped frames). Click Restart to collect a fresh window.',
       dotClass: 'bg-[var(--color-warning)]',
     }
   }

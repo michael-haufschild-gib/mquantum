@@ -36,12 +36,24 @@ import { fft } from '@/lib/math/fft'
 export const HELLER_DEFAULT_CAPACITY = 1024
 
 /**
- * Maximum fractional deviation from the mean sample period allowed by
- * `computeHellerSpectrum`'s uniformity check. 5% matches "one frame of
- * drift at a 20-frame decimation" — tight enough to catch back-pressure
- * gaps, loose enough to tolerate the usual stepsPerFrame jitter.
+ * Maximum fractional deviation of any consecutive inter-sample gap
+ * from an integer multiple of the smallest observed gap, allowed when
+ * aligning samples onto the uniform FFT grid. 1% is tight enough to
+ * reject genuine cadence drift (mid-capture parameter change, paused
+ * then nudged simulation, fractional-dt anomaly) while being loose
+ * enough to absorb ordinary float64 round-off from repeated
+ * `simTime += config.dt` accumulation plus ±ε scheduler jitter.
  */
-export const HELLER_UNIFORMITY_TOLERANCE = 0.05
+export const HELLER_UNIFORMITY_TOLERANCE = 0.01
+
+/**
+ * Maximum fraction of the rebuilt FFT grid that may come from linear
+ * interpolation of dropped sample slots. Above this the trace is so
+ * lossy that the reconstructed spectrum biases toward zero and we reject
+ * it rather than lie to the user. 20% = up to 1 dropped slot every 5
+ * nominal samples.
+ */
+export const HELLER_MAX_INTERPOLATION_FRACTION = 0.2
 
 /**
  * Minimum sample count required before `computeHellerSpectrum` will
@@ -179,30 +191,51 @@ export interface HellerSpectrum {
   omega: Float64Array
   /** Power values `|P(ω_k)|²`. Same length as `omega`. */
   power: Float64Array
-  /** Mean sampling interval used for the transform (0 if unavailable). */
+  /** Sampling interval used for the transform (0 if unavailable). */
   dt: number
   /** Top peaks extracted from the positive-frequency half. */
   peaks: HellerSpectrumPeak[]
-  /** Number of samples used for the FFT (post-window, pre-pad). */
+  /**
+   * Number of grid points fed to the FFT (post-interpolation, pre-pad).
+   * When back-pressure drops sample slots, this counts both captured
+   * samples and the linearly-interpolated fillers.
+   */
   nUsed: number
+  /**
+   * Number of grid points that were linearly interpolated into existing
+   * gaps (0 when the capture was clean). Exposed so the UI can warn the
+   * user if a large fraction of the displayed spectrum is synthesised
+   * rather than measured.
+   */
+  nInterpolated: number
 }
 
 /**
  * Build a Heller power spectrum from the current ring buffer contents.
  *
  * Returns an empty spectrum (zero-length arrays, empty peaks) whenever
- * there are fewer than `minSamples` valid entries or the computed mean
- * sampling interval is non-positive.
+ * there are fewer than `minSamples` captured entries, the trace is
+ * degenerate in time, or gap reconstruction would need to interpolate
+ * more than {@link HELLER_MAX_INTERPOLATION_FRACTION} of the grid.
  *
  * Procedure:
  *   1. Extract samples in chronological order (oldest first).
- *   2. Estimate `dt` from the stored times: `(t_last − t_first)/(n−1)`.
- *   3. Apply Hann window.
- *   4. Negate imaginary parts (sign convention — see module header).
- *   5. Zero-pad to the next power of two.
- *   6. Run a 1-D forward FFT via `@/lib/math/fft`.
- *   7. Emit positive-frequency ω_k and `|P|²/N` for k ∈ [0, N/2].
- *   8. Run local-max peak detection and take the top `topN` peaks.
+ *   2. Choose `dt_nominal` as the smallest strictly positive inter-sample
+ *      gap — robust against a handful of back-pressure drops that
+ *      stretch individual gaps to integer multiples of `dt_nominal`.
+ *   3. Align each sample onto integer grid indices relative to the
+ *      first sample. Reject the trace if any sample's offset is not
+ *      within {@link HELLER_UNIFORMITY_TOLERANCE} of an integer
+ *      multiple of `dt_nominal` — that's real non-uniformity, not a
+ *      dropped slot.
+ *   4. Rebuild a uniform grid on those integer indices, filling gaps
+ *      with linear interpolation between the neighbouring captured
+ *      samples.
+ *   5. Apply Hann window.
+ *   6. Negate imaginary parts (sign convention — see module header).
+ *   7. Zero-pad to the next power of two and run a 1-D forward FFT.
+ *   8. Emit positive-frequency ω_k and `|P|²/N` for k ∈ [0, N/2].
+ *   9. Run local-max peak detection and take the top `topN` peaks.
  *
  * @param buf - Ring buffer with captured autocorrelation samples
  * @param minSamples - Minimum number of valid samples required
@@ -218,6 +251,7 @@ export function computeHellerSpectrum(
     dt: 0,
     peaks: [],
     nUsed: 0,
+    nInterpolated: 0,
   }
   const n = buf.count
   if (n < minSamples) return empty
@@ -235,33 +269,84 @@ export function computeHellerSpectrum(
     times[i] = buf.times[src]!
   }
 
-  const dt = (times[n - 1]! - times[0]!) / (n - 1)
-  if (!(dt > 0) || !Number.isFinite(dt)) return empty
+  const totalSpan = times[n - 1]! - times[0]!
+  if (!(totalSpan > 0) || !Number.isFinite(totalSpan)) return empty
 
-  // Uniformity guard. The FFT below assumes the samples sit on a
-  // uniform time grid with spacing `dt`. Under GPU back-pressure, the
-  // readback scheduler may drop samples (see `TDSEHellerReadback`),
-  // producing gaps that are integer multiples of the nominal period.
-  // Collapsing such a trace to the mean dt would shift peak locations
-  // on the ω axis, so we reject the whole trace here and let the user
-  // capture a fresh one.
-  const uniformityTol = HELLER_UNIFORMITY_TOLERANCE * dt
+  // Robust dt: the smallest strictly positive inter-sample gap. Using
+  // the MIN (not the mean) lets us tolerate integer-multiple gaps when
+  // back-pressure drops a slot, instead of collapsing the trace to a
+  // stretched average and shifting every peak on the ω axis.
+  let dtNominal = Infinity
   for (let i = 1; i < n; i++) {
-    const dti = times[i]! - times[i - 1]!
-    if (!(dti > 0) || Math.abs(dti - dt) > uniformityTol) return empty
+    const gi = times[i]! - times[i - 1]!
+    if (!(gi > 0) || !Number.isFinite(gi)) return empty
+    if (gi < dtNominal) dtNominal = gi
+  }
+  if (!(dtNominal > 0) || !Number.isFinite(dtNominal)) return empty
+
+  // Align samples onto an integer grid rooted at `times[0]`. We check
+  // each CONSECUTIVE gap against an integer multiple of `dtNominal`
+  // rather than absolute position, so random ±ε jitter on individual
+  // samples does not accumulate into a spurious rejection. An anomaly
+  // in a single gap still fails the check — that's the genuine
+  // non-uniformity we want to catch.
+  const uniformityTol = HELLER_UNIFORMITY_TOLERANCE * dtNominal
+  const indices = new Int32Array(n)
+  indices[0] = 0
+  for (let i = 1; i < n; i++) {
+    const gap = times[i]! - times[i - 1]!
+    const kGap = Math.round(gap / dtNominal)
+    if (kGap < 1) return empty
+    if (Math.abs(gap - kGap * dtNominal) > uniformityTol) return empty
+    indices[i] = indices[i - 1]! + kGap
   }
 
+  const nGrid = indices[n - 1]! + 1
+  // nGrid >= n by construction. Cap the interpolation budget so a
+  // pathologically sparse trace (user paused mid-capture etc.) cannot
+  // produce a near-zero spectrum that looks like a valid result.
+  const nInterpolated = nGrid - n
+  if (nInterpolated > HELLER_MAX_INTERPOLATION_FRACTION * nGrid) return empty
+
+  // Rebuild the uniform grid, filling gaps by linear interpolation
+  // between the two neighbouring captured samples.
+  const gridRe = new Float64Array(nGrid)
+  const gridIm = new Float64Array(nGrid)
+  for (let i = 0; i < n - 1; i++) {
+    const k0 = indices[i]!
+    const k1 = indices[i + 1]!
+    const re0 = cRe[i]!
+    const im0 = cIm[i]!
+    gridRe[k0] = re0
+    gridIm[k0] = im0
+    const span = k1 - k0
+    if (span > 1) {
+      const invSpan = 1 / span
+      const dRe = (cRe[i + 1]! - re0) * invSpan
+      const dIm = (cIm[i + 1]! - im0) * invSpan
+      for (let k = k0 + 1; k < k1; k++) {
+        const s = k - k0
+        gridRe[k] = re0 + dRe * s
+        gridIm[k] = im0 + dIm * s
+      }
+    }
+  }
+  gridRe[indices[n - 1]!] = cRe[n - 1]!
+  gridIm[indices[n - 1]!] = cIm[n - 1]!
+
+  const dt = dtNominal
+
   // Windowed, sign-corrected, zero-padded FFT input.
-  const w = hannWindow(n)
+  const w = hannWindow(nGrid)
   let nFft = 1
-  while (nFft < n) nFft *= 2
+  while (nFft < nGrid) nFft *= 2
   const fftBuf = new Float64Array(2 * nFft)
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < nGrid; i++) {
     const wi = w[i]!
-    fftBuf[2 * i] = cRe[i]! * wi
+    fftBuf[2 * i] = gridRe[i]! * wi
     // Conjugate convention: negate imaginary component before the
     // forward FFT so that positive eigenenergies appear in positive k.
-    fftBuf[2 * i + 1] = -cIm[i]! * wi
+    fftBuf[2 * i + 1] = -gridIm[i]! * wi
   }
   // Remaining entries already zero from Float64Array allocation.
 
@@ -281,7 +366,7 @@ export function computeHellerSpectrum(
   }
 
   const peaks = extractSpectrumPeaks(omega, power, DEFAULT_TOP_N, DEFAULT_NOISE_FLOOR)
-  return { omega, power, dt, peaks, nUsed: n }
+  return { omega, power, dt, peaks, nUsed: nGrid, nInterpolated }
 }
 
 /**
