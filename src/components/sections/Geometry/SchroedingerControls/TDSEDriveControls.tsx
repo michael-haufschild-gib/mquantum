@@ -43,7 +43,7 @@ export const TDSEDriveControls: React.FC<TDSEDriveControlsProps> = React.memo(({
         <>
           <Select
             label="Waveform"
-            tooltip="Shape of the driving oscillation: sinusoidal, square, or sawtooth."
+            tooltip="Shape of the driving oscillation: sine, Gaussian pulse, or linear chirp."
             options={DRIVE_WAVEFORM_OPTIONS}
             value={td.driveWaveform}
             onChange={(v) => actions.setDriveWaveform(v as TdseDriveWaveform)}
@@ -51,7 +51,7 @@ export const TDSEDriveControls: React.FC<TDSEDriveControlsProps> = React.memo(({
           />
           <Slider
             label="Frequency"
-            tooltip="Angular frequency of the driving force. Resonances occur at natural transition frequencies."
+            tooltip="Drive frequency f in cycles per unit simulation time — the shader evaluates sin(2π·f·t). Resonances occur at natural transition frequencies."
             min={0.01}
             max={10}
             step={0.01}

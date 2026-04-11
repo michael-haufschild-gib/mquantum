@@ -112,13 +112,19 @@ export function createTdsePotentialSetters(
     const clamped = Math.max(0.1, Math.min(5, value))
     setWithVersion((state) => {
       const prev = state.schroedinger.tdse
+      // Only force reset when BH is active AND the clamped value actually
+      // changed — a no-op reassignment must preserve the existing
+      // `needsReset` flag so repeated slider events don't restart the
+      // wavepacket mid-evolution.
+      const changed = clamped !== prev.bhMass
+      const nextNeedsReset = isBhActive(prev) && changed ? true : prev.needsReset
       return {
         schroedinger: {
           ...state.schroedinger,
           tdse: {
             ...prev,
             bhMass: clamped,
-            needsReset: isBhActive(prev) ? true : prev.needsReset,
+            needsReset: nextNeedsReset,
           },
         },
       }
@@ -134,13 +140,15 @@ export function createTdsePotentialSetters(
       const prev = state.schroedinger.tdse
       // ℓ floor = current spin; ℓ cap = 6.
       const ell = clampInt(value, prev.bhSpin, 6)
+      const changed = ell !== prev.bhMultipoleL
+      const nextNeedsReset = isBhActive(prev) && changed ? true : prev.needsReset
       return {
         schroedinger: {
           ...state.schroedinger,
           tdse: {
             ...prev,
             bhMultipoleL: ell,
-            needsReset: isBhActive(prev) ? true : prev.needsReset,
+            needsReset: nextNeedsReset,
           },
         },
       }
@@ -158,6 +166,8 @@ export function createTdsePotentialSetters(
       // Raising spin above the current ℓ would leave a non-physical
       // combination; promote ℓ to preserve ℓ ≥ s.
       const ell = Math.max(prev.bhMultipoleL, spin)
+      const changed = spin !== prev.bhSpin || ell !== prev.bhMultipoleL
+      const nextNeedsReset = isBhActive(prev) && changed ? true : prev.needsReset
       return {
         schroedinger: {
           ...state.schroedinger,
@@ -165,7 +175,7 @@ export function createTdsePotentialSetters(
             ...prev,
             bhSpin: spin,
             bhMultipoleL: ell,
-            needsReset: isBhActive(prev) ? true : prev.needsReset,
+            needsReset: nextNeedsReset,
           },
         },
       }

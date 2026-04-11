@@ -263,20 +263,29 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * Set loaded cosmological sim time from a save file. Consumed once on the
    * next reinitialization — after which `config.cosmology.eta0` is again the
    * source of truth for subsequent resets.
+   *
+   * Rejects non-finite inputs AND exactly zero (η = 0 is the Big Bang /
+   * horizon-crossing singularity for the power-law backgrounds supported
+   * here; `a(η) ∝ 1/|η|` is undefined there and `COSMOLOGY_ETA_FLOOR`
+   * normally prevents the running clock from reaching it). Invalid input
+   * clears any previously staged restore so a partially-corrupt blob
+   * cannot resurrect stale pending state from an earlier load attempt.
    */
   setLoadedRuntimeSimEta(eta: number): void {
-    if (Number.isFinite(eta) && eta !== 0) this.pendingLoadedSimEta = eta
+    this.pendingLoadedSimEta = Number.isFinite(eta) && eta !== 0 ? eta : null
   }
 
   /**
    * Set loaded preheating drive `(ref, time)` from a save file. Consumed
    * once on the next reinitialization so the Mathieu modulation
    * `1 + A·sin(Ω·(clock − ref))` resumes in phase with the saved buffers.
-   * Non-finite args leave the pending slot null so a partially-corrupt blob
-   * falls through to the fresh-reset phase-0 anchor.
+   * Non-finite args clear any previously staged restore so a partially-
+   * corrupt blob falls through to the fresh-reset phase-0 anchor rather
+   * than consuming stale pending state.
    */
   setLoadedRuntimePreheatingState(ref: number, time: number): void {
-    if (Number.isFinite(ref) && Number.isFinite(time)) this.pendingLoadedPreheating = { ref, time }
+    this.pendingLoadedPreheating =
+      Number.isFinite(ref) && Number.isFinite(time) ? { ref, time } : null
   }
 
   /**

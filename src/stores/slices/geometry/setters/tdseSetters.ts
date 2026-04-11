@@ -349,9 +349,13 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         // Switching to or from the Regge–Wheeler ringdown potential reshapes
         // V(x) so dramatically that any stale wavefunction is visually and
         // physically meaningless. Force a reset whenever the BH potential is
-        // on either side of the transition.
+        // on either side of the transition — but ONLY when the value actually
+        // changes. An idempotent reassignment (same type on both sides) must
+        // preserve the existing `needsReset` flag so unrelated clicks can't
+        // cause the wavefunction to snap back to the packet mid-evolution.
         const bhTransition =
-          prev.potentialType === 'blackHoleRingdown' || potentialType === 'blackHoleRingdown'
+          prev.potentialType !== potentialType &&
+          (prev.potentialType === 'blackHoleRingdown' || potentialType === 'blackHoleRingdown')
         return {
           schroedinger: {
             ...state.schroedinger,

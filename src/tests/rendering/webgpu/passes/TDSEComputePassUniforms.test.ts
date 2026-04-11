@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { FFT_UNIFORM_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
+import { TDSE_UNIFORM_SIZE } from '@/rendering/webgpu/passes/TDSEComputePassBuffers'
 import {
   buildTdseFFTStagingData,
   type TdseUniformParams,
@@ -40,7 +41,10 @@ function uniformParams(overrides: Partial<TdseUniformParams> = {}): TdseUniformP
 }
 
 describe('writeTdseUniforms', () => {
-  const UNIFORM_SIZE = 768 // matches TDSEUniforms total size (incl. BH ringdown tail)
+  // Import the canonical size constant instead of hardcoding a literal so
+  // any future struct extension (more BH fields, new drive waveforms, etc.)
+  // propagates here without drift.
+  const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
   it('packs latticeDim, totalSites, dt, hbar into correct offsets', () => {
     const config = createTdseConfig({ latticeDim: 3, dt: 0.005, hbar: 1.0 })

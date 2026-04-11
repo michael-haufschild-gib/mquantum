@@ -41,13 +41,19 @@ export function composeFsfSaveMetadata(runtime: FsfSaveRuntime): {
   gridSize: number[]
   componentCount: number
 } {
-  const fsfConfig = useExtendedObjectStore.getState().schroedinger.freeScalar
-  const gridSize = fsfConfig.gridSize?.slice(0, fsfConfig.latticeDim ?? 3) ?? [64]
+  // Deep-clone the live FSF config immediately so downstream async
+  // serialization cannot race a user edit that mutates the Zustand object
+  // mid-save. structuredClone severs every reference into the store and
+  // preserves the nested objects (cosmology, preheating, initialCondition).
+  const fsfConfigSnapshot = structuredClone(
+    useExtendedObjectStore.getState().schroedinger.freeScalar
+  )
+  const gridSize = fsfConfigSnapshot.gridSize?.slice(0, fsfConfigSnapshot.latticeDim ?? 3) ?? [64]
   return {
     quantumMode: 'freeScalarField',
     config: {
       quantumMode: 'freeScalarField',
-      freeScalar: fsfConfig,
+      freeScalar: fsfConfigSnapshot,
       _runtimeMeta: {
         simEta: runtime.simEta,
         preheatingReferenceEta: runtime.preheatingReferenceEta,

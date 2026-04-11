@@ -27,8 +27,13 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  * if you add new fields, and keep this comment in sync — the previous
  * "740 = 736 + 4" annotation drifted when stochastic-decoherence
  * branching was added and silently misled readers about the layout.
+ *
+ * Exported as `TDSE_UNIFORM_SIZE` so tests that validate struct packing
+ * offsets can import the canonical size instead of hardcoding a literal
+ * that silently drifts from the WGSL definition.
  */
-const UNIFORM_SIZE = 768
+export const TDSE_UNIFORM_SIZE = 768
+const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */

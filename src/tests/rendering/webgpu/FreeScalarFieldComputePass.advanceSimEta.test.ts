@@ -236,10 +236,12 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimeSimEta', () => {
     expect(internal.pendingLoadedSimEta).toBe(-3.25)
   })
 
-  it('rejects non-finite simEta inputs silently', () => {
+  it('rejects non-finite simEta inputs and clears any stale pending value', () => {
     // Validation guard: a corrupt save file with NaN/Infinity must not
-    // poison the cosmological clock. The setter is a no-op in that case
-    // so the resume path falls back to `config.cosmology.eta0`.
+    // poison the cosmological clock. Invalid input CLEARS any previously
+    // staged value so a partial mid-load blob cannot resurrect stale
+    // pending state from an earlier load attempt. The resume path then
+    // falls back to `config.cosmology.eta0`.
     const pass = new FreeScalarFieldComputePass()
     const internal = pass as unknown as { pendingLoadedSimEta: number | null }
 
@@ -247,15 +249,28 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimeSimEta', () => {
     expect(internal.pendingLoadedSimEta).toBeNull()
     pass.setLoadedRuntimeSimEta(Number.POSITIVE_INFINITY)
     expect(internal.pendingLoadedSimEta).toBeNull()
+
+    // Clear-stale: a previously-set valid value is wiped by subsequent
+    // invalid input rather than sticking around.
+    pass.setLoadedRuntimeSimEta(-4.0)
+    expect(internal.pendingLoadedSimEta).toBe(-4.0)
+    pass.setLoadedRuntimeSimEta(Number.NaN)
+    expect(internal.pendingLoadedSimEta).toBeNull()
   })
 
-  it('rejects exactly zero (the cosmological singularity)', () => {
+  it('rejects exactly zero (the cosmological singularity) and clears stale pending', () => {
     // η = 0 is the Big Bang / horizon-crossing singularity for power-law
     // backgrounds. Allowing it would let `computeCosmologyAt` throw on
-    // the very first frame after resume.
+    // the very first frame after resume. Zero is also treated as invalid
+    // for clear-stale purposes — a previously-staged value is wiped.
     const pass = new FreeScalarFieldComputePass()
     const internal = pass as unknown as { pendingLoadedSimEta: number | null }
 
+    pass.setLoadedRuntimeSimEta(0)
+    expect(internal.pendingLoadedSimEta).toBeNull()
+
+    pass.setLoadedRuntimeSimEta(-1.5)
+    expect(internal.pendingLoadedSimEta).toBe(-1.5)
     pass.setLoadedRuntimeSimEta(0)
     expect(internal.pendingLoadedSimEta).toBeNull()
   })
@@ -290,11 +305,12 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimePreheatingState', () => {
     expect(getSlot(pass)).toEqual({ ref: 0, time: 0 })
   })
 
-  it('ignores inputs if either field is non-finite', () => {
+  it('rejects inputs if either field is non-finite and clears stale pending', () => {
     // Validation guard: a corrupt save with a NaN scalar must not poison
-    // the drive state. Either value being non-finite leaves the pending
-    // slot untouched so the pass falls back to the fresh-reset phase-0
-    // anchor on the next reinit.
+    // the drive state. Either value being non-finite CLEARS the pending
+    // slot (rather than leaving a prior good value to be consumed on the
+    // next reinit) so the pass falls back to the fresh-reset phase-0
+    // anchor instead of replaying stale pending state.
     const pass = new FreeScalarFieldComputePass()
 
     pass.setLoadedRuntimePreheatingState(Number.NaN, 3.5)
@@ -306,5 +322,10 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimePreheatingState', () => {
     // A fully-valid pair still lands.
     pass.setLoadedRuntimePreheatingState(-1, 2)
     expect(getSlot(pass)).toEqual({ ref: -1, time: 2 })
+
+    // Clear-stale: a subsequent invalid pair wipes the previously-staged
+    // pair rather than leaving it behind.
+    pass.setLoadedRuntimePreheatingState(-1, Number.NaN)
+    expect(getSlot(pass)).toBeNull()
   })
 })

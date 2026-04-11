@@ -239,13 +239,26 @@ export function getPotentialPlotScale(config: TdseConfig): number {
     }
     case 'blackHoleRingdown': {
       // Closed-form leading-order Regge–Wheeler peak near the photon sphere
-      // r = 3M: V_peak ≈ ℓ(ℓ+1)/(27M²). This matches the literature value
-      // 0.154/M² for ℓ=2 (gives ≈ 0.222/M² — within ~45% of the exact peak
-      // which is tight enough for a plot y-axis bound and avoids a
-      // 15k-Newton-call scan on the render path).
+      // r = 3M. The full RW barrier is
+      //   V_ℓ^s(r*) = (1 − 2M/r) · [ℓ(ℓ+1)/r² + (1 − s²)·(2M/r³)]
+      // Evaluated at r = 3M this gives
+      //   V_peak ≈ ℓ(ℓ+1)/(27M²) + (1 − s²)·2/(81M²)
+      // which adds a positive (1 − s²)·2/(81M²) contribution for scalar
+      // fields (s=0), vanishes for electromagnetic (s=1), and subtracts
+      // for gravitational (s=2). The spin-agnostic formula used previously
+      // under-estimated the scalar peak and could clip the QNM barrier in
+      // the plot y-axis; we keep the spin-aware leading-order estimate and
+      // an abs() so even the gravitational case never produces a negative
+      // bound. Good enough for a plot y-bound and cheap enough to avoid a
+      // 15k-Newton-call runtime scan.
       const M = Math.max(config.bhMass, 1e-4)
       const ell = config.bhMultipoleL
-      return Math.max((ell * (ell + 1)) / (27 * M * M), 0.02)
+      const s = config.bhSpin
+      const MSq = M * M
+      const orbital = (ell * (ell + 1)) / (27 * MSq)
+      const spinCorrection = (2 * (1 - s * s)) / (81 * MSq)
+      const peak = Math.abs(orbital + spinCorrection)
+      return Math.max(peak, 0.02)
     }
     case 'custom': {
       // Sample the custom expression along axis 0 to find max|V|

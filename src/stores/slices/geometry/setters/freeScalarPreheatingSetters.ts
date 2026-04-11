@@ -52,6 +52,11 @@ export function createFreeScalarPreheatingSetters(ctx: SetterContext): Preheatin
 
   return {
     setFreeScalarPreheatingEnabled: (enabled) => {
+      // No-op guard: repeated clicks with the same toggle value must not
+      // kick the version counter or restart the field. Only a genuine edge
+      // re-anchors the drive and forces a reset.
+      const current = ctx.get().schroedinger.freeScalar.preheating.enabled
+      if (current === enabled) return
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         // Flipping the master toggle re-anchors the drive at phase 0, so
@@ -77,6 +82,11 @@ export function createFreeScalarPreheatingSetters(ctx: SetterContext): Preheatin
         return
       }
       const clamped = Math.max(0, Math.min(1, amplitude))
+      // No-op guard: if the clamped value equals the stored value, skip
+      // the setWithVersion call entirely — no store update, no version
+      // bump, no spurious re-render of subscribers that watch amplitude.
+      const currentAmp = ctx.get().schroedinger.freeScalar.preheating.amplitude
+      if (currentAmp === clamped) return
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         // Amplitude is continuously tunable — the drive envelope can
@@ -99,6 +109,12 @@ export function createFreeScalarPreheatingSetters(ctx: SetterContext): Preheatin
         return
       }
       const clamped = Math.max(0.1, Math.min(10, frequency))
+      // No-op guard: same clamped value → no reset, no version bump. The
+      // reset side-effect is intentionally gated behind an actual change
+      // so repeated slider events at the same value don't restart the
+      // drive phase mid-evolution.
+      const currentFreq = ctx.get().schroedinger.freeScalar.preheating.frequency
+      if (currentFreq === clamped) return
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         // Frequency edits change the phase reference for the drive; reset

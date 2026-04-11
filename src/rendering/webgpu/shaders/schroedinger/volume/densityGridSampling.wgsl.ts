@@ -333,43 +333,50 @@ fn wrapPhase(dTheta: f32) -> f32 {
 }
 
 /**
- * True when all four corners of a plaquette lie inside the density grid
- * (UVW in [0, 1]^3). Used to discard boundary plaquettes whose winding is
- * ambiguous.
+ * True when all four texel-indexed corners of a plaquette lie inside the
+ * density grid ([0, N-1]^3, where N = DENSITY_GRID_SIZE). Used to discard
+ * boundary plaquettes whose winding is ambiguous.
  */
-fn allInBounds4(a: vec3f, b: vec3f, c: vec3f, d: vec3f) -> bool {
-  return all(a >= vec3f(0.0)) && all(a <= vec3f(1.0)) &&
-         all(b >= vec3f(0.0)) && all(b <= vec3f(1.0)) &&
-         all(c >= vec3f(0.0)) && all(c <= vec3f(1.0)) &&
-         all(d >= vec3f(0.0)) && all(d <= vec3f(1.0));
+fn allInBounds4(a: vec3i, b: vec3i, c: vec3i, d: vec3i) -> bool {
+  let N = i32(DENSITY_GRID_SIZE);
+  return all(a >= vec3i(0)) && all(a < vec3i(N)) &&
+         all(b >= vec3i(0)) && all(b < vec3i(N)) &&
+         all(c >= vec3i(0)) && all(c < vec3i(N)) &&
+         all(d >= vec3i(0)) && all(d < vec3i(N));
 }
 
 /**
- * Fetch the spatial phase stored in the density grid's B channel at UVW.
- * Returns 0 for out-of-grid positions. r16float grids always return 0 because
- * their B channel is a constant-zero swizzle.
+ * Fetch the spatial phase stored in the density grid's B channel at a
+ * discrete texel index. Returns 0 for out-of-grid texels. r16float grids
+ * always return 0 because their B channel is a constant-zero swizzle.
+ *
+ * Uses textureLoad (nearest-texel fetch) rather than textureSampleLevel
+ * because linear filtering interpolates across the ±pi branch cut, which
+ * corrupts wrapped edge differences and the quantised plaquette winding.
+ * The plaquette winding formula is only topologically well-defined when the
+ * four corner phases come from discrete texel centres.
  */
-fn samplePhaseOrZero(uvw: vec3f) -> f32 {
-  if (any(uvw < vec3f(0.0)) || any(uvw > vec3f(1.0))) { return 0.0; }
-  let s = textureSampleLevel(densityGridTexture, densityGridSampler, uvw, 0.0);
+fn samplePhaseOrZero(ti: vec3i) -> f32 {
+  let N = i32(DENSITY_GRID_SIZE);
+  if (any(ti < vec3i(0)) || any(ti >= vec3i(N))) { return 0.0; }
+  let s = textureLoad(densityGridTexture, ti, 0);
   return s.b;
 }
 
 /**
  * Compute the discrete line integral of ∇theta around a single four-corner
- * plaquette using wrapped edge differences. Returns 0 if any corner falls
- * outside the density grid.
+ * unit-texel plaquette using wrapped edge differences between textureLoad
+ * samples at the corner texels. Returns 0 if any corner falls outside the
+ * density grid.
  *
  * Corners traverse the loop c00 → c10 → c11 → c01 → c00. Sign depends on the
  * traversal direction and the defect orientation, but the caller only uses
  * |W| so sign is irrelevant.
  *
  * The bounds check runs BEFORE the four texture fetches so out-of-grid
- * plaquettes incur zero texture bandwidth. All four corners are sampled in
- * uniform control flow (WGSL textureSample requirement is satisfied by
- * textureSampleLevel here regardless).
+ * plaquettes incur zero texture bandwidth.
  */
-fn plaquetteWinding(c00: vec3f, c10: vec3f, c11: vec3f, c01: vec3f) -> f32 {
+fn plaquetteWinding(c00: vec3i, c10: vec3i, c11: vec3i, c01: vec3i) -> f32 {
   if (!allInBounds4(c00, c10, c11, c01)) { return 0.0; }
   let p00 = samplePhaseOrZero(c00);
   let p10 = samplePhaseOrZero(c10);
@@ -393,27 +400,34 @@ fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f
   let bound = uniforms.boundingRadius;
   let invDiameter = uniforms.invBoundingRadius * 0.5;
   let baseUVW = (pos + vec3f(bound)) * invDiameter;
-  let step = 1.0 / DENSITY_GRID_SIZE;
+
+  // Quantise to the nearest texel corner. Phase must be read from discrete
+  // texel centres via textureLoad (see samplePhaseOrZero); linear filtering
+  // across the ±pi branch cut would corrupt the winding. floor() anchors
+  // the plaquette to the bottom-left corner of the enclosing texel cell,
+  // and negative out-of-grid positions produce negative texel indices that
+  // allInBounds4 will reject.
+  let baseTi = vec3i(floor(baseUVW * DENSITY_GRID_SIZE));
 
   // xy plaquette at fixed z — corners offset in x and y.
-  let xy00 = baseUVW;
-  let xy10 = baseUVW + vec3f(step, 0.0, 0.0);
-  let xy11 = baseUVW + vec3f(step, step, 0.0);
-  let xy01 = baseUVW + vec3f(0.0, step, 0.0);
+  let xy00 = baseTi;
+  let xy10 = baseTi + vec3i(1, 0, 0);
+  let xy11 = baseTi + vec3i(1, 1, 0);
+  let xy01 = baseTi + vec3i(0, 1, 0);
   let w_xy = plaquetteWinding(xy00, xy10, xy11, xy01);
 
   // yz plaquette at fixed x — corners offset in y and z.
-  let yz00 = baseUVW;
-  let yz10 = baseUVW + vec3f(0.0, step, 0.0);
-  let yz11 = baseUVW + vec3f(0.0, step, step);
-  let yz01 = baseUVW + vec3f(0.0, 0.0, step);
+  let yz00 = baseTi;
+  let yz10 = baseTi + vec3i(0, 1, 0);
+  let yz11 = baseTi + vec3i(0, 1, 1);
+  let yz01 = baseTi + vec3i(0, 0, 1);
   let w_yz = plaquetteWinding(yz00, yz10, yz11, yz01);
 
   // zx plaquette at fixed y — corners offset in z and x.
-  let zx00 = baseUVW;
-  let zx10 = baseUVW + vec3f(0.0, 0.0, step);
-  let zx11 = baseUVW + vec3f(step, 0.0, step);
-  let zx01 = baseUVW + vec3f(step, 0.0, 0.0);
+  let zx00 = baseTi;
+  let zx10 = baseTi + vec3i(0, 0, 1);
+  let zx11 = baseTi + vec3i(1, 0, 1);
+  let zx01 = baseTi + vec3i(1, 0, 0);
   let w_zx = plaquetteWinding(zx00, zx10, zx11, zx01);
 
   return (abs(w_xy) + abs(w_yz) + abs(w_zx)) * INV_TAU;

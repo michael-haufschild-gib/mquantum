@@ -176,12 +176,20 @@ export function computeAdiabaticSubsteps(
 
 /**
  * Adaptive CFL sub-step count for the canonical δφ leapfrog. The
- * physical dispersion `ω² = k_max² + m²·a²` is bounded as long as `a`
- * is bounded, but massive modes in de Sitter (or any late-time limit
- * where `a → ∞`) drive `m·a·dt` above the leapfrog stability ceiling.
- * When that happens we subdivide the outer step and take several
- * smaller leapfrog sub-steps with frozen coefs, preserving second-order
- * accuracy within the sub-step window.
+ * physical dispersion `ω² = k_max² + m²·a²·massSquaredScale` is bounded
+ * as long as `a` and `massSquaredScale` are bounded, but massive modes
+ * in de Sitter (or any late-time limit where `a → ∞`) drive `m·a·dt`
+ * above the leapfrog stability ceiling. When that happens we subdivide
+ * the outer step and take several smaller leapfrog sub-steps with
+ * frozen coefs, preserving second-order accuracy within the sub-step
+ * window.
+ *
+ * When the parametric-resonance preheating drive is active, the caller
+ * must pass `massSquaredScaleMax = 1 + |A|` (the worst-case peak of
+ * `1 + A·sin(Ω·(η−η_ref))`) so the CFL check accounts for the
+ * time-dependent mass amplification even under Minkowski where the FLRW
+ * coefficients are all 1. Passing `1` is the cosmology-only path and
+ * leaves the bare Klein-Gordon dispersion in place.
  *
  * Uses the maximum over active dimensions of `k_max_d = π/spacing[d]`
  * (Nyquist) as the effective cutoff — close enough to the discrete
@@ -196,17 +204,21 @@ export function computeAdiabaticSubsteps(
  * @param aFull - a^n at the current η (source of the time-varying mass term)
  * @param aPotential - a^(n−2) at the current η
  * @param capWarnedKeys - Set used for dedupe of the sub-step cap warning
+ * @param massSquaredScaleMax - Worst-case preheating mass multiplier (≥ 1,
+ *                              defaults to 1 for no drive).
  * @returns Integer sub-step count in `[1, COSMOLOGY_MAX_SUBSTEPS]`
  */
 export function computeFsfCflSubsteps(
   config: FreeScalarConfig,
   aFull: number,
   aPotential: number,
-  capWarnedKeys: Set<string>
+  capWarnedKeys: Set<string>,
+  massSquaredScaleMax: number = 1
 ): number {
-  // Physical dispersion uses m²·a² = m²·(aFull/aPotential).
+  // Physical dispersion uses m²·a²·massSquaredScale = m²·(aFull/aPotential)·scale.
   const aSq = aPotential > 0 ? aFull / aPotential : 1
-  const massSq = config.mass * config.mass * aSq
+  const scale = massSquaredScaleMax > 1 ? massSquaredScaleMax : 1
+  const massSq = config.mass * config.mass * aSq * scale
 
   let kMaxSq = 0
   for (let d = 0; d < config.latticeDim; d++) {
@@ -376,9 +388,18 @@ export function snapshotFsfHamiltonianCoefs(
  * the CFL stability bound (evaluated at both endpoints so a discontinuous
  * floor clamp in de Sitter can't slip past the start-of-step check) with
  * the adiabatic `|Δω₀/ω_avg|` constraint, returning the max so both
- * safeguards are satisfied. Under Minkowski / cosmology disabled this
- * returns 1 — no substepping pressure — so the flat-background path is
- * bit-identical to the pre-cosmology behaviour.
+ * safeguards are satisfied.
+ *
+ * When the parametric-resonance preheating drive is active the effective
+ * mass term oscillates as `m²·(1 + A·sin(Ω·(η−η_ref)))`, so the CFL
+ * check uses the peak multiplier `1 + |A|` to bound the worst-case
+ * dispersion `ω² = k² + m²·a²·(1+|A|)` even when cosmology is disabled.
+ * That means Minkowski + preheating still gets a CFL-driven nSub,
+ * rather than falling through the cosmology-disabled fast path.
+ *
+ * Under cosmology disabled AND preheating disabled this returns 1 — no
+ * substepping pressure — so the bare Klein-Gordon path is bit-identical
+ * to the pre-cosmology, pre-preheating behaviour.
  *
  * @param config - Free scalar field configuration
  * @param simEta - Current cosmological conformal time
@@ -394,20 +415,35 @@ export function computeFsfOuterStepSubsteps(
   cosmologyActive: boolean,
   cflCapWarnedKeys: Set<string>
 ): number {
-  if (!cosmologyActive) return 1
+  // Peak mass-squared multiplier for the preheating drive. When the drive is
+  // disabled this collapses to 1 and every computeFsfCflSubsteps call reduces
+  // to the original cosmology-only dispersion bound.
+  const preheatingActive = config.preheating.enabled
+  const massSquaredScaleMax = preheatingActive ? 1 + Math.abs(config.preheating.amplitude) : 1
+
+  if (!cosmologyActive) {
+    if (!preheatingActive) return 1
+    // Minkowski + preheating: CFL is driven purely by the oscillating mass
+    // term. Use identity cosmology coefs (aFull = aPotential = 1) and let
+    // massSquaredScaleMax bump the mass dispersion.
+    return computeFsfCflSubsteps(config, 1, 1, cflCapWarnedKeys, massSquaredScaleMax)
+  }
+
   const coefsStart = computeFsfCosmologyCoefs(config, simEta)
   const coefsEnd = computeFsfCosmologyCoefs(config, projectSimEta(simEta, dtFull))
   const nSubStart = computeFsfCflSubsteps(
     config,
     coefsStart.aFull,
     coefsStart.aPotential,
-    cflCapWarnedKeys
+    cflCapWarnedKeys,
+    massSquaredScaleMax
   )
   const nSubEnd = computeFsfCflSubsteps(
     config,
     coefsEnd.aFull,
     coefsEnd.aPotential,
-    cflCapWarnedKeys
+    cflCapWarnedKeys,
+    massSquaredScaleMax
   )
   const nSubCfl = nSubStart > nSubEnd ? nSubStart : nSubEnd
   const nSubAdiab = computeAdiabaticSubsteps(coefsStart, coefsEnd)

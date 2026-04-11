@@ -100,13 +100,17 @@ describe('TDSE potential setters', () => {
       expect(getTdse().bhMass).toBe(1.5)
     })
 
-    it('clamps bhMultipoleL into [bhSpin, 6] and rounds to integer', () => {
+    it('clamps bhMultipoleL into [bhSpin, 6] and floors to integer', () => {
       const s = useExtendedObjectStore.getState()
       s.setTdseBhSpin(0)
       s.setTdseBhMultipoleL(-2)
       expect(getTdse().bhMultipoleL).toBe(0)
       s.setTdseBhMultipoleL(99)
       expect(getTdse().bhMultipoleL).toBe(6)
+      // Floor semantics (via Math.floor in the setter): 3.9 → 3, not 4.
+      // Contract: ℓ is a non-negative integer and fractional slider values
+      // truncate toward zero so the displayed integer always lies at or
+      // below the raw drag position.
       s.setTdseBhMultipoleL(3.9)
       expect(getTdse().bhMultipoleL).toBe(3)
     })
