@@ -324,6 +324,9 @@ export interface SchroedingerSliceActions {
   setTdseRadialWellDepth: (depth: number) => void
   setTdseRadialWellTilt: (tilt: number) => void
   setTdseAnharmonicLambda: (lambda: number) => void
+  setTdseBhMass: (mass: number) => void
+  setTdseBhMultipoleL: (ell: number) => void
+  setTdseBhSpin: (spin: number) => void
   setTdseDisorderStrength: (strength: number) => void
   setTdseDisorderSeed: (seed: number) => void
   setTdseDriveEnabled: (enabled: boolean) => void

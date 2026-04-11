@@ -397,6 +397,65 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       autoScale: false,
     },
   },
+  {
+    id: 'blackHoleRingdown',
+    name: 'Black Hole Ringdown (s=2, ℓ=2, M=1)',
+    description:
+      'Regge–Wheeler barrier for gravitational perturbations of Schwarzschild. A Gaussian wavepacket incoming from the left scatters off the ringdown potential and rings at the QNM frequency.',
+    // Preset geometry is written in post-`resizeTdseArrays` form so the
+    // literal values in this file match what the simulation actually runs.
+    // `applyTdsePreset` reshapes any preset whose gridSize/spacing don't line
+    // up with `defaultTdseGridPerDim(globalDim) = 64` (for 3D); writing the
+    // final 64³ grid directly means the resize is a no-op.
+    //
+    // Physical layout on axis 0 (the tortoise r* axis):
+    //   gridSize[0] · spacing[0] = 64 · 0.8 = 51.2   (full axis)
+    //   half_extent[0]           = 25.6             (centered at 0)
+    //   PML width                = 0.10 · 64 · 0.8 = 5.12 per side
+    //   non-PML half             = 20.48
+    //   packet center            = −15  (3σ tail at −19.5, ≈1 M inside PML edge)
+    //   Regge–Wheeler peak       = +3.28  (s=2, ℓ=2, M=1)
+    // Transverse axes 1–2 are soft-wall confined; 0.3 spacing keeps the
+    // Gaussian packet's transverse width well-resolved.
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.8, 0.3, 0.3],
+      mass: 1.0,
+      dt: 0.01,
+      stepsPerFrame: 4,
+      potentialType: 'blackHoleRingdown',
+      bhMass: 1.0,
+      bhMultipoleL: 2,
+      bhSpin: 2,
+      initialCondition: 'gaussianPacket',
+      packetCenter: [-15, 0, 0],
+      // k₀ = 0.5 gives kinetic energy E = k²/(2m) ≈ 0.125, which is below
+      // V_peak ≈ 0.154/M². A sub-barrier packet produces clear partial
+      // reflection / partial tunneling + quasinormal-mode ringing in the
+      // scattered density. Higher k (> √(2·V_peak) ≈ 0.55) would let the
+      // packet stream over the barrier and wash out the QNM signal.
+      packetMomentum: [0.5, 0, 0],
+      packetWidth: 1.5,
+      packetAmplitude: 1.0,
+      absorberEnabled: true,
+      absorberWidth: 0.1,
+      pmlTargetReflection: 1e-6,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 5,
+      fieldView: 'density',
+      autoScale: false,
+      autoLoop: false,
+      showPotential: true,
+    },
+    // Scattered density in the Regge-Wheeler barrier is spatially dilute
+    // (most of the packet tunnels or reflects and the ringing tail is a
+    // few percent of the incident amplitude). The defaults (2.0 / 1.8)
+    // leave the ringdown oscillations almost invisible — the stronger
+    // gain + contrast here surfaces the QNM pattern against the dim
+    // backdrop without saturating the barrier region.
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
+  },
   ...DECOHERENCE_PRESETS,
 ]
 

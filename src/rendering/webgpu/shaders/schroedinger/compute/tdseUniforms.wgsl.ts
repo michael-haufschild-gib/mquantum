@@ -5,9 +5,10 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 740 bytes.
+ * Total size: 768 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
+ * Black-hole Regge–Wheeler fields at offsets 748-756.
  *
  * @module
  */
@@ -24,7 +25,7 @@ struct TDSEUniforms {
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
   initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton, 6=ndVortexPair)
-  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap, 10=radialDoubleWell, 11=custom)
+  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=finiteWell, 4=harmonicTrap, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap, 10=radialDoubleWell, 11=custom, 12=andersonDisorder, 13=coupledAnharmonic, 14=blackHoleRingdown)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 32
@@ -114,5 +115,12 @@ struct TDSEUniforms {
   // Stochastic decoherence branching (8 bytes)
   branchingEnabled: u32,     // offset 740 — 0=off, 1=on: encode branch fraction in alpha channel
   branchPlanePosition: f32,  // offset 744 — normalized partition position along axis 0 (-1..1)
+
+  // Black-hole Regge–Wheeler ringdown barrier (potentialType 14) — 20 bytes incl. pad
+  bhMass: f32,               // offset 748 — Schwarzschild mass M (geometrized units)
+  bhMultipoleL: f32,         // offset 752 — multipole index ℓ (stored as f32 for uniform layout)
+  bhSpin: f32,               // offset 756 — perturbation spin s ∈ {0, 1, 2} as f32
+  _padBh0: u32,              // offset 760 — pad to 16-byte alignment
+  _padBh1: u32,              // offset 764 — pad to 16-byte alignment (total size = 768)
 }
 `

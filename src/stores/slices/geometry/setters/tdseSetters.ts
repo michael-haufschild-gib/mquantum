@@ -19,7 +19,6 @@ import {
   defaultTdseGridPerDim,
   nestedClampedSetter,
   nestedIntSetter,
-  nestedValueSetter,
   type SetterContext,
   TDSE_MAX_TOTAL_SITES,
 } from './sliceSetterUtils'
@@ -63,6 +62,9 @@ type TdseActions = Pick<
   | 'setTdseRadialWellDepth'
   | 'setTdseRadialWellTilt'
   | 'setTdseAnharmonicLambda'
+  | 'setTdseBhMass'
+  | 'setTdseBhMultipoleL'
+  | 'setTdseBhSpin'
   | 'setTdseDisorderStrength'
   | 'setTdseDisorderSeed'
   | 'setTdseDisorderDistribution'
@@ -341,7 +343,27 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         },
       }))
     },
-    setTdsePotentialType: nestedValueSetter(ctx, D, 'potentialType'),
+    setTdsePotentialType: (potentialType) => {
+      setWithVersion((state) => {
+        const prev = state.schroedinger.tdse
+        // Switching to or from the Regge–Wheeler ringdown potential reshapes
+        // V(x) so dramatically that any stale wavefunction is visually and
+        // physically meaningless. Force a reset whenever the BH potential is
+        // on either side of the transition.
+        const bhTransition =
+          prev.potentialType === 'blackHoleRingdown' || potentialType === 'blackHoleRingdown'
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: {
+              ...prev,
+              potentialType,
+              needsReset: bhTransition ? true : prev.needsReset,
+            },
+          },
+        }
+      })
+    },
     // Potential and drive parameter setters (data-driven, extracted to tdsePotentialSetters.ts)
     ...(createTdsePotentialSetters(ctx) as unknown as Pick<
       TdseActions,
@@ -366,6 +388,9 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
       | 'setTdseRadialWellDepth'
       | 'setTdseRadialWellTilt'
       | 'setTdseAnharmonicLambda'
+      | 'setTdseBhMass'
+      | 'setTdseBhMultipoleL'
+      | 'setTdseBhSpin'
       | 'setTdseDisorderStrength'
       | 'setTdseDisorderSeed'
       | 'setTdseDriveEnabled'

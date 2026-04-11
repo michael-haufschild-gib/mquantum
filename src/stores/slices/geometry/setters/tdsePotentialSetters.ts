@@ -41,6 +41,9 @@ const TDSE_PARAMS: Record<string, TdseParamDef> = {
   setTdseRadialWellDepth: { field: 'radialWellDepth', min: 0, max: 200 },
   setTdseRadialWellTilt: { field: 'radialWellTilt', min: -2, max: 2 },
   setTdseAnharmonicLambda: { field: 'anharmonicLambda', min: 0, max: 100 },
+  // setTdseBhMass lives below in the custom section — it needs to trigger
+  // needsReset when the user sweeps M while in blackHoleRingdown mode, which
+  // the data-driven factory doesn't support.
   setTdseDisorderStrength: { field: 'disorderStrength', min: 0, max: 100 },
   // setTdseDisorderSeed lives in tdseUiSetters.ts (integer floor + lower-bound only)
   // — intentionally NOT in this float-clamp table because the seed needs Math.floor
@@ -75,6 +78,98 @@ export function createTdsePotentialSetters(
         },
       }))
     }
+  }
+
+  // Black-hole Regge–Wheeler setters.
+  //
+  // Changing M, ℓ, or s while already in `blackHoleRingdown` mode reshapes the
+  // barrier so dramatically (peak position ∝ M, peak height ∝ ℓ(ℓ+1)/M²) that
+  // the existing wavefunction — evolved against the old Hamiltonian — becomes
+  // physically meaningless. Trigger `needsReset` whenever these fields change
+  // AND the current potential is the BH ringdown barrier. When some other
+  // potential is active, the fields are just scratch state for a later switch,
+  // so no reset is required.
+  //
+  // Physical validity requires ℓ ≥ s for Schwarzschild perturbation modes:
+  //   • scalar (s=0): any ℓ ≥ 0
+  //   • electromagnetic (s=1): only ℓ ≥ 1 is a valid radiating mode
+  //   • gravitational (s=2): only ℓ ≥ 2 is a valid propagating mode
+  //
+  // We enforce this in the setter so the UI can never land on a non-physical
+  // combination such as (s=2, ℓ=0), which has no meaning in the linearized
+  // Schwarzschild sector even though the closed-form Regge–Wheeler expression
+  // would still evaluate to a number.
+  const clampInt = (value: number, lo: number, hi: number): number =>
+    Math.max(lo, Math.min(hi, Math.floor(value)))
+
+  const isBhActive = (cfg: TdseConfig): boolean => cfg.potentialType === 'blackHoleRingdown'
+
+  result.setTdseBhMass = (value: number) => {
+    if (!isFinite(value)) {
+      warnNonFinite('tdse.bhMass', value)
+      return
+    }
+    const clamped = Math.max(0.1, Math.min(5, value))
+    setWithVersion((state) => {
+      const prev = state.schroedinger.tdse
+      return {
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...prev,
+            bhMass: clamped,
+            needsReset: isBhActive(prev) ? true : prev.needsReset,
+          },
+        },
+      }
+    })
+  }
+
+  result.setTdseBhMultipoleL = (value: number) => {
+    if (!isFinite(value)) {
+      warnNonFinite('tdse.bhMultipoleL', value)
+      return
+    }
+    setWithVersion((state) => {
+      const prev = state.schroedinger.tdse
+      // ℓ floor = current spin; ℓ cap = 6.
+      const ell = clampInt(value, prev.bhSpin, 6)
+      return {
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...prev,
+            bhMultipoleL: ell,
+            needsReset: isBhActive(prev) ? true : prev.needsReset,
+          },
+        },
+      }
+    })
+  }
+
+  result.setTdseBhSpin = (value: number) => {
+    if (!isFinite(value)) {
+      warnNonFinite('tdse.bhSpin', value)
+      return
+    }
+    setWithVersion((state) => {
+      const prev = state.schroedinger.tdse
+      const spin = clampInt(value, 0, 2) as 0 | 1 | 2
+      // Raising spin above the current ℓ would leave a non-physical
+      // combination; promote ℓ to preserve ℓ ≥ s.
+      const ell = Math.max(prev.bhMultipoleL, spin)
+      return {
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...prev,
+            bhSpin: spin,
+            bhMultipoleL: ell,
+            needsReset: isBhActive(prev) ? true : prev.needsReset,
+          },
+        },
+      }
+    })
   }
 
   // Boolean/enum setters

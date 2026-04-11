@@ -157,6 +157,31 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
 
+  // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
+  // legacy scenes. The BH setters promote ℓ whenever the user raises s, but
+  // scene loading writes `tdse` directly via setState and bypasses the setter
+  // path — so a pre-constraint scene with (bhSpin=2, bhMultipoleL=0) would slip
+  // through. The UI `BlackHoleRingdownControls` slider uses `min={td.bhSpin}`,
+  // and an out-of-range value would render the thumb outside the track until
+  // the next user interaction. Clamp here so the invariant always holds in
+  // memory regardless of how state was written.
+  const tdse = normalized.tdse
+  if (tdse && typeof tdse === 'object') {
+    const tdseRecord = tdse as Record<string, unknown>
+    const rawSpin = tdseRecord.bhSpin
+    const rawEll = tdseRecord.bhMultipoleL
+    if (typeof rawSpin === 'number' && typeof rawEll === 'number') {
+      const spin = Math.max(0, Math.min(2, Math.floor(rawSpin)))
+      const ell = Math.max(spin, Math.min(6, Math.floor(rawEll)))
+      if (spin !== rawSpin || ell !== rawEll) {
+        normalized = {
+          ...normalized,
+          tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell },
+        }
+      }
+    }
+  }
+
   // Reconcile cosmology invariants for the freeScalar sub-config. A scene
   // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller
   // grid (e.g. 8⁶ at d=6, smaller safe η₀) will have an `eta0` that the

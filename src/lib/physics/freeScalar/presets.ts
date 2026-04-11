@@ -358,7 +358,13 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       selfInteractionEnabled: false,
       absorberEnabled: false,
       fieldView: 'energyDensity',
-      autoScale: true,
+      // Kasner's rigid contraction steadily pumps energy into the field, so
+      // the autoScale feedback loop would perpetually chase a rising floor
+      // and wash out the instantaneous contrast between modes. Fixed-gain
+      // renders the collapse dynamics more faithfully — the brightness
+      // growth is itself a feature of the simulation, not a display bug to
+      // auto-correct out.
+      autoScale: false,
       diagnosticsEnabled: true,
       diagnosticsInterval: 10,
       cosmology: {
@@ -369,6 +375,6 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
         eta0: -10,
       },
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+    renderingOverrides: { densityGain: 0.5, densityContrast: 1.4 },
   },
 ]

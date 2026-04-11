@@ -17,6 +17,7 @@
  *   9 = becTrap (anisotropic harmonic trap for BEC — radial)
  *  10 = radialDoubleWell (V(r) = λ(r−r₁)²(r−r₂)² − ε·r — bubble nucleation)
  *  13 = coupledAnharmonic (V = ½Σω²x² + λΣ_{i<j} x_i²x_j² — chaotic for most λ)
+ *  14 = blackHoleRingdown (Regge–Wheeler V_ℓ^s(r*) on Schwarzschild background)
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -167,6 +168,47 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       }
     }
     V = harmonic + params.anharmonicLambda * coupling;
+  } else if (params.potentialType == 14u) {
+    // Black-hole Regge–Wheeler ringdown barrier V_ℓ^s(r*) on a Schwarzschild
+    // background. The TDSE axis-0 position is interpreted as the tortoise
+    // coordinate r*; we invert r*(r) via Newton iteration in u = r − 2M
+    // coordinates so the (r → 2M) limit is numerically stable in f32.
+    //
+    // g(u)  = u + 2M·ln(u/2M) − (r* − 2M)
+    // g'(u) = 1 + 2M/u
+    // V(r) = (u/r) · [ℓ(ℓ+1)/r² + (1 − s²)·(2M/r³)]
+    //   where (u/r) replaces the subtractive (1 − 2M/r) form that would
+    //   cancel to 0 in f32 for u ≪ 2M.
+    let M = max(params.bhMass, 1e-4);
+    let ell = params.bhMultipoleL;
+    let s = params.bhSpin;
+    let twoM = 2.0 * M;
+    // f32 can only resolve u = r − 2M down to ~2e−6·M before log(u/2M)
+    // saturates; clamp to that floor. Below that u, V is ≲ 1e−6 regardless.
+    let uFloor = twoM * 1.0e-6;
+    let rStar = pos0;
+    let rStarMinusTwoM = rStar - twoM;
+
+    // Asymptotic initial guess: far-field u ≈ r* − 2M; near-horizon u ≈ 2M·exp((r* − 2M)/2M).
+    var u: f32 = rStarMinusTwoM;
+    if (rStar <= twoM) {
+      u = twoM * exp(rStarMinusTwoM / twoM);
+    }
+    if (u < uFloor) { u = uFloor; }
+
+    for (var it: u32 = 0u; it < 5u; it++) {
+      let g = u + twoM * log(u / twoM) - rStarMinusTwoM;
+      let gp = 1.0 + twoM / u;
+      u = u - g / gp;
+      if (u < uFloor) { u = uFloor; }
+    }
+
+    let r = twoM + u;
+    // (1 − 2M/r) = u/r, numerically stable at the horizon.
+    let oneMinusRs = u / r;
+    let centrifugal = ell * (ell + 1.0) / (r * r);
+    let spinTerm = (1.0 - s * s) * twoM / (r * r * r);
+    V = oneMinusRs * (centrifugal + spinTerm);
   }
 
   // Soft transverse confinement for directional (1D/2D) potentials.
@@ -175,12 +217,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // transverse axis: V_perp = A * ((|x/L| - onset) / (1 - onset))^4.
   // The inner 75% is completely free; the wall rises to A at the edge.
   // Applied only to potentials that don't already confine all dimensions:
-  // types 0-3, 5-8 (directional); skipped for 4, 9, 10, 13 (radial/all-dim).
+  // types 0-3, 5-8, 14 (directional); skipped for 4, 9, 10, 13 (radial/all-dim).
   let isDirectional = params.potentialType <= 3u
     || params.potentialType == 5u
     || params.potentialType == 6u
     || params.potentialType == 7u
-    || params.potentialType == 8u;
+    || params.potentialType == 8u
+    || params.potentialType == 14u;
   if (isDirectional && params.latticeDim >= 2u) {
     // Wall strength from the active potential type's own energy scale.
     var wallStrength: f32;
@@ -193,6 +236,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     } else if (params.potentialType == 8u) {
       let a2 = params.doubleWellSeparation * params.doubleWellSeparation;
       wallStrength = params.doubleWellLambda * a2 * a2;
+    } else if (params.potentialType == 14u) {
+      // Regge–Wheeler peak scales as ~ℓ(ℓ+1)/M² — use the centrifugal
+      // energy scale as a lower bound for transverse confinement so the
+      // soft wall doesn't dominate the physical ringdown barrier.
+      let Mbh = max(params.bhMass, 1e-4);
+      wallStrength = params.bhMultipoleL * (params.bhMultipoleL + 1.0) / (Mbh * Mbh);
     } else {
       // types 0, 1, 5, 6: barrier-family — use barrierHeight
       wallStrength = params.barrierHeight;

@@ -9,6 +9,7 @@
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { parseExpression } from '@/lib/physics/expressionParser'
+import { computeReggeWheelerPotential } from '@/lib/physics/tdse/reggeWheeler'
 
 /**
  * Compute V(x) for the given potential type and config at position x along axis 0.
@@ -73,6 +74,11 @@ export function evaluatePotential1D(x: number, config: TdseConfig): number {
       // vanishes because all other coordinates are zero. The 1D profile
       // is indistinguishable from a pure harmonic trap.
       return 0.5 * config.mass * config.harmonicOmega * config.harmonicOmega * x * x
+
+    case 'blackHoleRingdown':
+      // x is interpreted as the tortoise coordinate r*. The Regge–Wheeler
+      // helper inverts r*(r) and evaluates V_ℓ^s(r*) on a Schwarzschild bg.
+      return computeReggeWheelerPotential(x, config.bhMass, config.bhMultipoleL, config.bhSpin)
 
     case 'custom': {
       const result = parseExpression(config.customPotentialExpression ?? '0')
@@ -230,6 +236,16 @@ export function getPotentialPlotScale(config: TdseConfig): number {
       // 1D slice is harmonic; use harmonic scale at quarter-domain
       const r = (config.gridSize[0] ?? 64) * (config.spacing[0] ?? 0.1) * 0.25
       return Math.max(0.5 * config.mass * config.harmonicOmega ** 2 * r ** 2, 1)
+    }
+    case 'blackHoleRingdown': {
+      // Closed-form leading-order Regge–Wheeler peak near the photon sphere
+      // r = 3M: V_peak ≈ ℓ(ℓ+1)/(27M²). This matches the literature value
+      // 0.154/M² for ℓ=2 (gives ≈ 0.222/M² — within ~45% of the exact peak
+      // which is tight enough for a plot y-axis bound and avoids a
+      // 15k-Newton-call scan on the render path).
+      const M = Math.max(config.bhMass, 1e-4)
+      const ell = config.bhMultipoleL
+      return Math.max((ell * (ell + 1)) / (27 * M * M), 0.02)
     }
     case 'custom': {
       // Sample the custom expression along axis 0 to find max|V|

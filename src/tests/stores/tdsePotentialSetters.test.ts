@@ -88,4 +88,75 @@ describe('TDSE potential setters', () => {
     s.setTdseDoubleWellSeparation(0)
     expect(getTdse().doubleWellSeparation).toBe(0.1)
   })
+
+  describe('black-hole Regge–Wheeler setters', () => {
+    it('clamps bhMass to [0.1, 5]', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhMass(-1)
+      expect(getTdse().bhMass).toBe(0.1)
+      s.setTdseBhMass(100)
+      expect(getTdse().bhMass).toBe(5)
+      s.setTdseBhMass(1.5)
+      expect(getTdse().bhMass).toBe(1.5)
+    })
+
+    it('clamps bhMultipoleL into [bhSpin, 6] and rounds to integer', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhSpin(0)
+      s.setTdseBhMultipoleL(-2)
+      expect(getTdse().bhMultipoleL).toBe(0)
+      s.setTdseBhMultipoleL(99)
+      expect(getTdse().bhMultipoleL).toBe(6)
+      s.setTdseBhMultipoleL(3.9)
+      expect(getTdse().bhMultipoleL).toBe(3)
+    })
+
+    it('promotes bhMultipoleL when raising bhSpin above it', () => {
+      const s = useExtendedObjectStore.getState()
+      // Start non-physical: user has somehow arrived at ℓ=0 with s=0
+      s.setTdseBhSpin(0)
+      s.setTdseBhMultipoleL(0)
+      expect(getTdse().bhMultipoleL).toBe(0)
+      expect(getTdse().bhSpin).toBe(0)
+
+      // Raise spin to 2 — ℓ must be promoted to 2 to preserve ℓ ≥ s.
+      s.setTdseBhSpin(2)
+      expect(getTdse().bhSpin).toBe(2)
+      expect(getTdse().bhMultipoleL).toBe(2)
+    })
+
+    it('rejects bhMultipoleL below current bhSpin', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdseBhSpin(2)
+      // ℓ floor is now 2 — attempting to set ℓ=1 must clamp back up to 2.
+      s.setTdseBhMultipoleL(1)
+      expect(getTdse().bhMultipoleL).toBe(2)
+    })
+
+    it('triggers needsReset when BH params change while BH potential is active', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('blackHoleRingdown')
+      s.clearTdseNeedsReset()
+      expect(getTdse().needsReset).toBe(false)
+
+      s.setTdseBhMass(2.5)
+      expect(getTdse().needsReset).toBe(true)
+
+      s.clearTdseNeedsReset()
+      s.setTdseBhMultipoleL(3)
+      expect(getTdse().needsReset).toBe(true)
+
+      s.clearTdseNeedsReset()
+      s.setTdseBhSpin(1)
+      expect(getTdse().needsReset).toBe(true)
+    })
+
+    it('does NOT trigger needsReset when BH params change under a non-BH potential', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setTdsePotentialType('barrier')
+      s.clearTdseNeedsReset()
+      s.setTdseBhMass(3.0)
+      expect(getTdse().needsReset).toBe(false)
+    })
+  })
 })

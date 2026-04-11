@@ -62,6 +62,14 @@ fn getPotentialScale() -> f32 {
     // Scale by harmonic contribution at half-bounding-radius (same as becTrap)
     let r = params.boundingRadius * 0.5;
     return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
+  } else if (params.potentialType == 14u) {
+    // Regge–Wheeler ringdown: closed-form leading-order peak near the photon
+    // sphere r = 3M is V_peak ≈ ℓ(ℓ+1)/(27·M²). Mirrors
+    // getPotentialPlotScale() in src/lib/physics/tdse/potentialProfile.ts so
+    // the GPU overlay and the CPU-side energy plot share a y-axis scale.
+    let Mbh = max(params.bhMass, 1e-4);
+    let ell = params.bhMultipoleL;
+    return max(ell * (ell + 1.0) / (27.0 * Mbh * Mbh), 0.02);
   }
   return 1.0;
 }

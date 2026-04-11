@@ -18,13 +18,17 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  *   - compactDimsMask:    u32 @ 736
  *   - branchingEnabled:   u32 @ 740
  *   - branchPlanePosition: f32 @ 744
+ *   - bhMass:             f32 @ 748 (blackHoleRingdown / Regge-Wheeler)
+ *   - bhMultipoleL:       f32 @ 752
+ *   - bhSpin:             f32 @ 756
+ *   - _padBh0/_padBh1:    u32 @ 760/764 (16-byte align)
  *
- * Total = 744 + 4 = 748. Update both this constant and the WGSL struct
+ * Total = 764 + 4 = 768. Update both this constant and the WGSL struct
  * if you add new fields, and keep this comment in sync — the previous
  * "740 = 736 + 4" annotation drifted when stochastic-decoherence
  * branching was added and silently misled readers about the layout.
  */
-const UNIFORM_SIZE = 748
+const UNIFORM_SIZE = 768
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */

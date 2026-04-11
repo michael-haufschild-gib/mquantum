@@ -51,7 +51,7 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       fieldView: 'density',
       autoScale: true,
     },
-    renderingOverrides: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 10 },
+    renderingOverrides: { densityGain: 0.1, densityContrast: 1.0, autoScaleMaxGain: 15 },
   },
   {
     id: 'singleVortex',
@@ -78,8 +78,9 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       vortexLatticeCount: 2,
       vortexAlternateCharge: true,
       fieldView: 'phase',
+      autoScale: true,
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 2.6 },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0, autoScaleMaxGain: 20 },
   },
   {
     id: 'darkSoliton',
@@ -108,8 +109,9 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
       fieldView: 'phase',
       dt: 0.001,
       stepsPerFrame: 8,
+      autoScale: true,
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 2.6 },
+    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0, autoScaleMaxGain: 20 },
   },
   {
     id: 'breathingMode',

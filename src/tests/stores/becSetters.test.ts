@@ -137,21 +137,23 @@ describe('BEC setters', () => {
 
   describe('applyBecPreset — stale rendering field regression', () => {
     // Regression: BEC presets had heterogeneous renderingOverrides keys. Some
-    // set autoScaleMaxGain=10, others omitted it. Switching from the first to
-    // the second left the stale 10 on schroedinger.autoScaleMaxGain. Defaults
-    // merge via getBecPreset now ensures every switch rebuilds all fields.
+    // set autoScaleMaxGain explicitly, others omitted it. Switching from the
+    // first to the second left the stale value on schroedinger.autoScaleMaxGain.
+    // Defaults merge via getBecPreset now ensures every switch rebuilds all
+    // fields. groundState explicitly sets 15 and singleVortex omits it, so
+    // this pair exercises the explicit → default fallback.
     it('resets autoScaleMaxGain when switching to a preset without it', async () => {
       const s = useExtendedObjectStore.getState()
-      // groundState → autoScaleMaxGain = 10.
+      // groundState → autoScaleMaxGain = 15 (explicit in renderingOverrides).
       // applyBecPreset is async (dynamic import); `vi.waitFor` polls until
       // the expected state appears, instead of racing a fixed 10ms sleep.
       s.applyBecPreset('groundState')
       await vi.waitFor(() => {
-        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(10)
+        expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(15)
       })
 
       // singleVortex does NOT declare autoScaleMaxGain — should fall back to
-      // BEC_DEFAULT_RENDERING (20), not carry the stale 10 from groundState.
+      // BEC_DEFAULT_RENDERING (20), not carry the stale 15 from groundState.
       s.applyBecPreset('singleVortex')
       await vi.waitFor(() => {
         expect(useExtendedObjectStore.getState().schroedinger.autoScaleMaxGain).toBe(20)
