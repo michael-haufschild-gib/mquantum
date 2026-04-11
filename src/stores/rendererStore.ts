@@ -88,9 +88,6 @@ export interface RendererState {
   /** Set WebGPU support status */
   setWebGPUStatus: (status: WebGPUSupportStatus) => void
 
-  /** Set WebGPU capabilities after detection */
-  setWebGPUCapabilities: (capabilities: WebGPUCapabilityInfo) => void
-
   /** Mark detection as complete and apply mode */
   completeDetection: (capabilities: WebGPUCapabilityInfo) => void
 
@@ -111,7 +108,6 @@ export interface RendererState {
 const initialState: Omit<
   RendererState,
   | 'setWebGPUStatus'
-  | 'setWebGPUCapabilities'
   | 'completeDetection'
   | 'handleDeviceLost'
   | 'dismissFallbackNotification'
@@ -134,10 +130,6 @@ export const useRendererStore = create<RendererState>()(
 
     setWebGPUStatus: (status: WebGPUSupportStatus) => {
       set({ webgpuStatus: status })
-    },
-
-    setWebGPUCapabilities: (capabilities: WebGPUCapabilityInfo) => {
-      set({ webgpuCapabilities: capabilities })
     },
 
     completeDetection: (capabilities: WebGPUCapabilityInfo) => {
@@ -172,39 +164,3 @@ export const useRendererStore = create<RendererState>()(
     },
   }))
 )
-
-// ============================================================================
-// Selectors
-// ============================================================================
-
-/**
- * Select current renderer mode
- * @param state
- */
-export const selectRendererMode = (state: RendererState) => state.mode
-
-/**
- * Select whether WebGPU is available
- * @param state
- */
-export const selectWebGPUAvailable = (state: RendererState) =>
-  state.webgpuCapabilities?.supported ?? false
-
-/**
- * Select whether detection is complete
- * @param state
- */
-export const selectDetectionComplete = (state: RendererState) => state.detectionComplete
-
-/**
- * Select whether to show fallback notification
- * @param state
- */
-export const selectShowFallbackNotification = (state: RendererState) =>
-  state.showFallbackNotification
-
-/**
- * Select WebGPU capabilities
- * @param state
- */
-export const selectWebGPUCapabilities = (state: RendererState) => state.webgpuCapabilities
