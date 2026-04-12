@@ -356,6 +356,11 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
         const bhTransition =
           prev.potentialType !== potentialType &&
           (prev.potentialType === 'blackHoleRingdown' || potentialType === 'blackHoleRingdown')
+        // CSL decoherence is physically meaningless for the Regge–Wheeler
+        // equation (classical wave scattering, not quantum measurement).
+        // Disable stochastic + branching when entering BH ringdown so
+        // stale state doesn't block unrelated controls (e.g. color algorithm).
+        const disableCSL = potentialType === 'blackHoleRingdown'
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -363,6 +368,7 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
               ...prev,
               potentialType,
               needsReset: bhTransition ? true : prev.needsReset,
+              ...(disableCSL && { stochasticEnabled: false, branchingEnabled: false }),
             },
           },
         }

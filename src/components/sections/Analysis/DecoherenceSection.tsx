@@ -23,10 +23,21 @@ import { ControlGroup } from '../../ui/ControlGroup'
 
 /** Decoherence section — controls CSL localization and branch visualization. */
 export function DecoherenceSection() {
-  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+  const { quantumMode, potentialType } = useExtendedObjectStore(
+    useShallow((s) => ({
+      quantumMode: s.schroedinger.quantumMode,
+      potentialType: s.schroedinger.tdse?.potentialType,
+    }))
+  )
 
   if (quantumMode !== 'tdseDynamics') {
     return <UnavailableSection title="Decoherence" reason="Available in TDSE Dynamics mode" />
+  }
+
+  if (potentialType === 'blackHoleRingdown') {
+    return (
+      <UnavailableSection title="Decoherence" reason="Not applicable to Regge–Wheeler scattering" />
+    )
   }
 
   return <DecoherenceContent />
