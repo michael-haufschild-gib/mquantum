@@ -534,42 +534,31 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     const readbackBuf = this.maxDensityReadbackBuffer
     const epoch = this.readbackEpoch
 
-    ctx.device.queue
-      .onSubmittedWorkDone()
-      .then(() => {
+    // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+    // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
+    // map" state when queue.submit() fires later in the same synchronous block.
+    queueMicrotask(() => readbackBuf.mapAsync(GPUMapMode.READ).then(
+      () => {
         if (epoch !== this.readbackEpoch) {
+          try { readbackBuf.unmap() } catch { /* already unmapped */ }
           this.readbackPending = false
           return
         }
-        if (!readbackBuf || readbackBuf.mapState !== 'unmapped') {
-          this.readbackPending = false
-          return
-        }
-        readbackBuf.mapAsync(GPUMapMode.READ).then(
-          () => {
-            if (epoch !== this.readbackEpoch) {
-              this.readbackPending = false
-              return
-            }
-            const mapped = readbackBuf.getMappedRange()
-            // The shader stores bitcast<u32>(f32) via atomicMax.
-            // Reinterpret the u32 bytes as f32 to recover the peak density.
-            const peakDensity = new Float32Array(mapped.slice(0))[0]!
-            readbackBuf.unmap()
-            this.readbackPending = false
-
-            if (peakDensity > 0 && isFinite(peakDensity)) {
-              this.gpuMaxDensity = peakDensity
-            }
-          },
-          () => {
-            this.readbackPending = false
-          }
-        )
-      })
-      .catch(() => {
+        const mapped = readbackBuf.getMappedRange()
+        // The shader stores bitcast<u32>(f32) via atomicMax.
+        // Reinterpret the u32 bytes as f32 to recover the peak density.
+        const peakDensity = new Float32Array(mapped.slice(0))[0]!
+        readbackBuf.unmap()
         this.readbackPending = false
-      })
+
+        if (peakDensity > 0 && isFinite(peakDensity)) {
+          this.gpuMaxDensity = peakDensity
+        }
+      },
+      () => {
+        this.readbackPending = false
+      }
+    ))
   }
 
   execute(_ctx: WebGPURenderContext): void {

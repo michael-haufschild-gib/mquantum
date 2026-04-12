@@ -288,13 +288,16 @@ export class FsfKSpaceManager {
     this.kSpacePending = true
 
     try {
-      await device.queue.onSubmittedWorkDone()
+      // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+      // a pipeline stall. Yield via queueMicrotask so the buffer isn't in "pending
+      // map" state when queue.submit() fires later in the same synchronous block.
+      await new Promise<void>((r) => queueMicrotask(r))
+      await phiReadbackBuffer.mapAsync(GPUMapMode.READ)
       if (readbackEpoch !== this.kSpaceReadbackEpoch) {
+        phiReadbackBuffer.unmap()
         this.kSpacePending = false
         return
       }
-
-      await phiReadbackBuffer.mapAsync(GPUMapMode.READ)
       await piReadbackBuffer.mapAsync(GPUMapMode.READ)
 
       const phiMapped = new Float32Array(phiReadbackBuffer.getMappedRange())
@@ -359,13 +362,15 @@ export class FsfKSpaceManager {
     const epoch = this.kSpaceReadbackEpoch
 
     try {
-      await device.queue.onSubmittedWorkDone()
+      // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+      // a pipeline stall. Yield so the buffer isn't in "pending map" during submit.
+      await new Promise<void>((r) => queueMicrotask(r))
+      await phiBuf.mapAsync(GPUMapMode.READ)
       if (epoch !== this.kSpaceReadbackEpoch) {
+        phiBuf.unmap()
         this.diagMappingInFlight = false
         return
       }
-
-      await phiBuf.mapAsync(GPUMapMode.READ)
       await piBuf.mapAsync(GPUMapMode.READ)
 
       // Post-map epoch re-check: a reset can land while mapAsync is awaiting,

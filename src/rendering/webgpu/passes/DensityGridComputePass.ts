@@ -553,14 +553,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     const readbackBuffer = this.densityReadbackBuffer
     this.readbackPendingSubmit = false
 
-    this.device.queue
-      .onSubmittedWorkDone()
-      .then(() => {
-        if (this.densityReadbackBuffer !== readbackBuffer) {
-          return
-        }
-        return readbackBuffer.mapAsync(GPUMapMode.READ)
-      })
+    // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+    // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
+    // map" state when queue.submit() fires later in the same synchronous block.
+    queueMicrotask(() => readbackBuffer.mapAsync(GPUMapMode.READ)
       .then(() => {
         if (this.densityReadbackBuffer !== readbackBuffer) {
           return
@@ -582,7 +578,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       })
       .finally(() => {
         this.readbackInFlight = false
-      })
+      }))
   }
 
   /**

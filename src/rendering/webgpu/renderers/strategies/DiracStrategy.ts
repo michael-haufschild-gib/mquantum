@@ -103,15 +103,9 @@ export class DiracStrategy implements QuantumModeStrategy {
       diracFieldView = diracConfig.fieldView
     }
 
-    // When showPotential is false, override potentialType to 'none' so the
-    // potential half-step becomes a physics no-op (V=0 everywhere).
-    // This makes the toggle gate both the visual overlay AND the simulation.
-    const potentialOverride = diracConfig.showPotential ? {} : { potentialType: 'none' as const }
-
     const diracWithSharedPml = {
       ...applySharedPml(diracConfig, schroedinger),
       fieldView: diracFieldView,
-      ...potentialOverride,
     } as DiracConfig
 
     diracPass.executeDirac(

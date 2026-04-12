@@ -688,7 +688,11 @@ fn computeEmissionLit(
   // Pre-compute diffuse color factor (light-independent)
   let diffuseBase = surfaceColor / PI;
 
-  // Loop through lights using shared lighting system
+  // PERF: Pre-compute scattering state outside loop (uniform across all lights)
+  let hasScattering = abs(uniforms.scatteringAnisotropy) > 0.01;
+
+  // Loop through lights — inlined helper functions to avoid redundant
+  // lighting.lights[i] struct reads (was 4× per light, now 1×)
   for (var i = 0; i < 8; i++) {
     if (i >= lighting.lightCount) { break; }
 
@@ -697,25 +701,40 @@ fn computeEmissionLit(
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
 
-    let l = getEmissionLightDir(i, p);
-    var attenuation = lightIntensity;
-
     let lightType = i32(light.position.w);
-    if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-      let distance = length(light.position.xyz - p);
-      attenuation *= getEmissionLightAttenuation(i, distance);
+
+    // Inlined getEmissionLightDir
+    var l: vec3f;
+    if (lightType == LIGHT_TYPE_DIRECTIONAL) {
+      l = normalize(-light.direction.xyz);
+    } else {
+      l = normalize(light.position.xyz - p);
     }
 
-    if (lightType == LIGHT_TYPE_SPOT) {
-      let lightToFrag = normalize(p - light.position.xyz);
-      attenuation *= getEmissionSpotAttenuation(i, lightToFrag);
+    var attenuation = lightIntensity;
+
+    // Inlined getEmissionLightAttenuation + getEmissionSpotAttenuation
+    if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
+      let distance = length(light.position.xyz - p);
+      let lightRange = light.direction.w;
+      if (lightRange > 0.0) {
+        let d = max(distance, EPS_DIVISION);
+        let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
+        attenuation *= pow(rangeAttenuation, light.params.x);
+      }
+
+      if (lightType == LIGHT_TYPE_SPOT) {
+        let lightToFrag = normalize(p - light.position.xyz);
+        let cosAngle = dot(lightToFrag, normalize(light.direction.xyz));
+        attenuation *= smoothstep(light.params.z, light.params.y, cosAngle);
+      }
     }
 
     if (attenuation < 0.001) { continue; }
 
     // Anisotropic scattering
     var phaseFactor = 1.0;
-    if (abs(uniforms.scatteringAnisotropy) > 0.01) {
+    if (hasScattering) {
       let cosTheta = dot(-l, viewDir);
       phaseFactor = henyeyGreenstein(cosTheta, uniforms.scatteringAnisotropy);
       phaseFactor *= 4.0 * PI;

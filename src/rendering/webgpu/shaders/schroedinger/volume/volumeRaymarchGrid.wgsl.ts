@@ -82,19 +82,17 @@ fn volumeRaymarchGrid(
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
 
     // Empty-skip: jump ahead when density is negligible.
-    // 8× factor with 3-point validation catches features between probes while
-    // skipping ~2× more empty steps than the previous 4× / 2-probe scheme.
+    // Compute modes produce smoother density fields (grid-interpolated), so a
+    // 2-probe scheme at 10× step is safe and saves 1 texture fetch per skip.
     if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
-      let skipDistance = min(stepLen * 8.0, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
-        let probe1 = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.333), uniforms);
-        let probe2 = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.667), uniforms);
+        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
-        let p1HasPot = DENSITY_GRID_HAS_PHASE && probe1.a < -0.01;
-        let p2HasPot = DENSITY_GRID_HAS_PHASE && probe2.a < -0.01;
+        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
-        if (probe1.r < EMPTY_SKIP_THRESHOLD && probe2.r < EMPTY_SKIP_THRESHOLD
-            && probeFar.r < EMPTY_SKIP_THRESHOLD && !p1HasPot && !p2HasPot && !farHasPot) {
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD
+            && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
           t += skipDistance;
           continue;
         }

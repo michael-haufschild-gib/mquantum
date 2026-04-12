@@ -480,29 +480,29 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
             }
           })
 
-          // Sync the color algorithm to match the preset's fieldView. The renderer's
-          // normalize logic forces 'particleAntiparticle' for the dual-channel split,
-          // so the UI selector must reflect that to avoid showing a stale algorithm.
-          // Imported lazily to avoid pulling appearanceStore into the store-bootstrap
-          // module dependency graph.
-          if (preset.overrides.fieldView === 'particleAntiparticleSplit') {
-            void import('@/stores/appearanceStore')
-              .then(({ useAppearanceStore }) => {
-                // Guard against a newer applyDiracPreset() arriving between
-                // this lazy import and its resolution. If the store has moved
-                // on to a non-split fieldView, leave the color algorithm alone
-                // — otherwise this stale write would silently override the
-                // newer preset's intended color algorithm.
-                if (ctx.get().schroedinger.dirac.fieldView === 'particleAntiparticleSplit') {
-                  useAppearanceStore.getState().setColorAlgorithm('particleAntiparticle')
+          // Sync the color algorithm to match the preset's fieldView.
+          // Each Dirac fieldView has a preferred color algorithm (e.g.
+          // particleAntiparticleSplit → particleAntiparticle, totalDensity → blackbody).
+          // Without this sync, switching from a split-view preset to a single-channel
+          // preset leaves the stale 'particleAntiparticle' algorithm active, and
+          // DiracStrategy forces the fieldView back to split.
+          if (preset.overrides.fieldView) {
+            void import('@/rendering/shaders/palette/types')
+              .then(({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
+                const expectedView = preset.overrides.fieldView!
+                // Guard: if a newer preset arrived while this chunk loaded,
+                // the fieldView in the store won't match — skip the stale write.
+                if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
+                const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
+                if (algo) {
+                  void import('@/stores/appearanceStore').then(({ useAppearanceStore }) => {
+                    useAppearanceStore.getState().setColorAlgorithm(algo)
+                  })
                 }
               })
               .catch((error) => {
-                // Chunk-load failure is non-fatal — the Dirac state has already
-                // been written; only the color-algorithm sync couldn't run.
-                // Keep the existing appearance settings.
                 logger.warn(
-                  `[diracSetters] Failed to load appearanceStore for color sync on '${presetId}':`,
+                  `[diracSetters] Failed to load color algo map for '${presetId}':`,
                   error
                 )
               })

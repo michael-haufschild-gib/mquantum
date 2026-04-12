@@ -38,8 +38,8 @@ import {
   LINEAR_WG,
   sanitizeGridSizes,
 } from './computePassUtils'
-import type { DiagDispatchParams, FFTAxisParams } from './DiracComputePassDispatchers'
-import { dispatchDiagnostics, dispatchFFTAxis } from './DiracComputePassDispatchers'
+import type { DiagDispatchParams, FFTAxisSharedMemParams } from './DiracComputePassDispatchers'
+import { dispatchDiagnostics, dispatchFFTAxisSharedMem } from './DiracComputePassDispatchers'
 import {
   buildDiracPipelines,
   rebuildDiracBindGroups,
@@ -82,6 +82,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private uniformBuffer: GPUBuffer | null = null
   private fftUniformBuffer: GPUBuffer | null = null
   private fftStagingBuffer: GPUBuffer | null = null
+  private fftAxisUniformBuffer: GPUBuffer | null = null
+  private fftAxisStagingBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
   private packUniformBufferNoNorm: GPUBuffer | null = null
 
@@ -244,6 +246,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         uniformBuffer: this.uniformBuffer,
         fftUniformBuffer: this.fftUniformBuffer,
         fftStagingBuffer: this.fftStagingBuffer,
+        fftAxisUniformBuffer: this.fftAxisUniformBuffer,
+        fftAxisStagingBuffer: this.fftAxisStagingBuffer,
         packUniformBuffer: this.packUniformBuffer,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm,
         diagUniformBuffer: this.diagUniformBuffer,
@@ -268,6 +272,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.uniformBuffer = result.uniformBuffer
     this.fftUniformBuffer = result.fftUniformBuffer
     this.fftStagingBuffer = result.fftStagingBuffer
+    this.fftAxisUniformBuffer = result.fftAxisUniformBuffer
+    this.fftAxisStagingBuffer = result.fftAxisStagingBuffer
     this.packUniformBuffer = result.packUniformBuffer
     this.packUniformBufferNoNorm = result.packUniformBufferNoNorm
     this.diagUniformBuffer = result.diagUniformBuffer
@@ -329,6 +335,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         fftScratchA: this.fftScratchA!,
         fftScratchB: this.fftScratchB!,
         fftUniformBuffer: this.fftUniformBuffer!,
+        fftAxisUniformBuffer: this.fftAxisUniformBuffer!,
         packUniformBuffer: this.packUniformBuffer!,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm!,
         densityTextureView: this.densityTextureView,
@@ -441,23 +448,24 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     )
   }
 
+  /** Dispatch one FFT axis using shared-memory kernel (single dispatch per axis). */
   private dispatchFFTAxisDelegated(
     ctx: WebGPURenderContext,
     axisDim: number,
     slotOffset: number
   ): number {
-    if (!this.pl || !this.bg || !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
-    const params: FFTAxisParams = {
+    if (!this.pl || !this.bg || !this.fftAxisUniformBuffer || !this.fftAxisStagingBuffer) {
+      return slotOffset
+    }
+    const params: FFTAxisSharedMemParams = {
       pl: this.pl,
       bg: this.bg,
-      fftUniformBuffer: this.fftUniformBuffer,
-      fftStagingBuffer: this.fftStagingBuffer,
-      fftScratchA: this.fftScratchA!,
-      fftScratchB: this.fftScratchB!,
+      fftAxisUniformBuffer: this.fftAxisUniformBuffer,
+      fftAxisStagingBuffer: this.fftAxisStagingBuffer,
       totalSites: this.totalSites,
       dispatchCompute: (p, pl, bgs, x) => this.dispatchCompute(p, pl, bgs, x),
     }
-    return dispatchFFTAxis(ctx, axisDim, slotOffset, params)
+    return dispatchFFTAxisSharedMem(ctx, axisDim, slotOffset, params)
   }
 
   /** Execute the full Dirac compute pipeline. */
@@ -655,7 +663,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     const gpuBuffers: (GPUBuffer | null | undefined)[] = [
       this.spinorReBuffer, this.spinorImBuffer, this.potentialBuffer, this.gammaBuffer,
       this.fftScratchA, this.fftScratchB, this.uniformBuffer, this.fftUniformBuffer,
-      this.fftStagingBuffer, this.packUniformBuffer, this.packUniformBufferNoNorm,
+      this.fftStagingBuffer, this.fftAxisUniformBuffer, this.fftAxisStagingBuffer,
+      this.packUniformBuffer, this.packUniformBufferNoNorm,
       this.diagUniformBuffer, this.diagPartialNormBuffer, this.diagPartialMaxBuffer,
       this.diagPartialParticleBuffer, this.diagPartialAntiBuffer,
       this.diagResultBuffer, this.diagStagingBuffer, this.bg?.renormalizeUniformBuffer,
@@ -665,7 +674,8 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     this.spinorReBuffer = this.spinorImBuffer = this.potentialBuffer = this.gammaBuffer = null
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null
-    this.fftStagingBuffer = this.packUniformBuffer = this.packUniformBufferNoNorm = null
+    this.fftStagingBuffer = this.fftAxisUniformBuffer = this.fftAxisStagingBuffer = null
+    this.packUniformBuffer = this.packUniformBufferNoNorm = null
     this.diagUniformBuffer = this.diagPartialNormBuffer = this.diagPartialMaxBuffer = null
     this.diagPartialParticleBuffer = this.diagPartialAntiBuffer = null
     this.diagResultBuffer = this.diagStagingBuffer = null

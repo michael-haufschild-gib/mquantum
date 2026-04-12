@@ -6,6 +6,7 @@
  *
  */
 
+import type { DiracFieldView } from '@/lib/geometry/extended/dirac'
 import type { FreeScalarInitialCondition } from '@/lib/geometry/extended/freeScalar'
 import type { PauliFieldView } from '@/lib/geometry/extended/pauli'
 import type { SchroedingerRepresentation } from '@/lib/geometry/extended/schroedinger'
@@ -253,6 +254,17 @@ export const PAULI_FIELD_VIEW_TO_COLOR_ALGO: Record<PauliFieldView, ColorAlgorit
   totalDensity: 'blackbody',
   spinExpectation: 'pauliSpinExpectation',
   coherence: 'pauliCoherence',
+}
+
+/** Map Dirac field view to matching color algorithm for synchronized rendering. */
+export const DIRAC_FIELD_VIEW_TO_COLOR_ALGO: Record<DiracFieldView, ColorAlgorithm> = {
+  totalDensity: 'blackbody',
+  particleDensity: 'blackbody',
+  antiparticleDensity: 'blackbody',
+  particleAntiparticleSplit: 'particleAntiparticle',
+  spinDensity: 'blackbody',
+  currentDensity: 'blackbody',
+  phase: 'phaseCyclicUniform',
 }
 
 /**

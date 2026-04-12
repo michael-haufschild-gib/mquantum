@@ -49,12 +49,8 @@ fn shouldTerminateRay(transmittance: f32, densityGain: f32, remainingDist: f32) 
  * @param maxRemaining Maximum remaining distance (tFar - t)
  */
 fn computeAdaptiveStep(logDensity: f32, stepLen: f32, maxRemaining: f32) -> f32 {
-  var multiplier = 1.0;
-  if (logDensity < -12.0) {
-    multiplier = 4.0;
-  } else if (logDensity < -8.0) {
-    multiplier = 2.0;
-  }
+  // PERF: Branchless adaptive step via nested select — avoids warp divergence.
+  let multiplier = select(1.0, select(2.0, 4.0, logDensity < -12.0), logDensity < -8.0);
   return min(stepLen * multiplier, maxRemaining);
 }
 
