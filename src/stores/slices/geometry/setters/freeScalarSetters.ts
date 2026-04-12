@@ -605,6 +605,8 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
               ? {
                   absorberEnabled: preset.overrides.absorberEnabled,
                   absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                  pmlTargetReflection:
+                    preset.overrides.pmlTargetReflection ?? state.schroedinger.pmlTargetReflection,
                 }
               : {}
           return {

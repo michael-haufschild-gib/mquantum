@@ -504,6 +504,8 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
               ? {
                   absorberEnabled: preset.overrides.absorberEnabled,
                   absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                  pmlTargetReflection:
+                    preset.overrides.pmlTargetReflection ?? state.schroedinger.pmlTargetReflection,
                 }
               : {}
           return {

@@ -648,11 +648,20 @@ export function computeFsfDiagnostics(
     if (aq > maxPi) maxPi = aq
   }
 
-  // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
-  // All dimensions contribute to total energy (including slice dims d>=3)
+  // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * aPot_d * dV
+  // All dimensions contribute to total energy (including slice dims d>=3).
+  // For Bianchi-I Kasner the GPU integrator weights axes 1 and 2 by
+  // aPotentialRatio1/2; replicate that here so the CPU diagnostics
+  // Hamiltonian matches the GPU's anisotropic gradient term.
   let gradEnergy = 0
   const strides = computeStridesPadded(config.gridSize, config.latticeDim)
   for (let d = 0; d < config.latticeDim; d++) {
+    const axisPotential =
+      d === 1
+        ? coefs.aPotential * (coefs.aPotentialRatio1 ?? 1)
+        : d === 2
+          ? coefs.aPotential * (coefs.aPotentialRatio2 ?? 1)
+          : coefs.aPotential
     const stride = strides[d]!
     const Nd = config.gridSize[d]!
     const a = config.spacing[d]!
@@ -665,11 +674,11 @@ export function computeFsfDiagnostics(
         dimPos === Nd - 1 ? (config.absorberEnabled ? -1 : i - stride * (Nd - 1)) : iNext
       if (jNext >= 0 && jNext < N) {
         const diff = phi[jNext]! - phi[i]!
-        gradEnergy += diff * diff * invA2
+        gradEnergy += diff * diff * invA2 * axisPotential
       }
     }
   }
-  gradEnergy *= 0.5 * dV * coefs.aPotential
+  gradEnergy *= 0.5 * dV
 
   const totalNorm = sumPhi2 * dV
   const kineticEnergy = 0.5 * coefs.aKinetic * sumPi2 * dV

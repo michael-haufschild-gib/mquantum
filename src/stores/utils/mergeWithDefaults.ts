@@ -168,21 +168,26 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   const tdse = normalized.tdse
   if (tdse && typeof tdse === 'object') {
     const tdseRecord = tdse as Record<string, unknown>
+    // Replace NaN / non-finite BH params with safe defaults before clamping.
+    // `typeof NaN === 'number'` is true, so a corrupted scene could sneak
+    // NaN through a bare `typeof` guard. Default to the canonical TDSE
+    // defaults (bhMass=1, bhSpin=2, bhMultipoleL=2).
+    const rawMass = tdseRecord.bhMass
+    if (typeof rawMass === 'number' && !Number.isFinite(rawMass)) {
+      tdseRecord.bhMass = 1.0
+    }
     const rawSpin = tdseRecord.bhSpin
     const rawEll = tdseRecord.bhMultipoleL
-    if (
-      typeof rawSpin === 'number' &&
-      Number.isFinite(rawSpin) &&
-      typeof rawEll === 'number' &&
-      Number.isFinite(rawEll)
-    ) {
-      const spin = Math.max(0, Math.min(2, Math.floor(rawSpin)))
-      const ell = Math.max(spin, Math.min(6, Math.floor(rawEll)))
-      if (spin !== rawSpin || ell !== rawEll) {
-        normalized = {
-          ...normalized,
-          tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell },
-        }
+    const spinNum =
+      typeof rawSpin === 'number' && Number.isFinite(rawSpin) ? rawSpin : 2
+    const ellNum =
+      typeof rawEll === 'number' && Number.isFinite(rawEll) ? rawEll : 2
+    const spin = Math.max(0, Math.min(2, Math.floor(spinNum)))
+    const ell = Math.max(spin, Math.min(6, Math.floor(ellNum)))
+    if (spin !== rawSpin || ell !== rawEll) {
+      normalized = {
+        ...normalized,
+        tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell },
       }
     }
   }

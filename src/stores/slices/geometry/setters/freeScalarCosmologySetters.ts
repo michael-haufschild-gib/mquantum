@@ -96,27 +96,32 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
   // Re-clamp eta0 to the new safe threshold. If the threshold moved, the
   // clamp raises |eta0| and marks needsReset so the adiabatic vacuum is
   // re-sampled at the updated starting time.
-  try {
-    const result = clampEta0(fs.cosmology.eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
-    if (result.clamped) {
+  // Bianchi-I does not use the isotropic safe-η₀ heuristic — the runtime
+  // COSMOLOGY_ETA_FLOOR is the only guard needed. Matches the bypass in
+  // resolveEta0ForPresetSwitch and setFreeScalarCosmologyEnabled.
+  if (fs.cosmology.preset !== 'bianchiKasner') {
+    try {
+      const result = clampEta0(fs.cosmology.eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+      if (result.clamped) {
+        return {
+          cosmology: { ...fs.cosmology, eta0: result.eta0 },
+          needsReset: true,
+        }
+      }
+    } catch (e) {
+      // clampEta0 throws on zero / non-finite eta0. The dimension-change path
+      // never receives user input here — it's a pure-state reconcile — so a
+      // throw indicates a corrupted store state from earlier writes. Soft-
+      // disable cosmology so the compute pass cannot crash on the next reset,
+      // and log the underlying error so the bug is visible in dev consoles.
+      logger.warn(
+        `[reconcileCosmologyInvariants] Disabling cosmology: clampEta0 failed for ` +
+          `eta0=${fs.cosmology.eta0}: ${e instanceof Error ? e.message : String(e)}`
+      )
       return {
-        cosmology: { ...fs.cosmology, eta0: result.eta0 },
+        cosmology: { ...fs.cosmology, enabled: false },
         needsReset: true,
       }
-    }
-  } catch (e) {
-    // clampEta0 throws on zero / non-finite eta0. The dimension-change path
-    // never receives user input here — it's a pure-state reconcile — so a
-    // throw indicates a corrupted store state from earlier writes. Soft-
-    // disable cosmology so the compute pass cannot crash on the next reset,
-    // and log the underlying error so the bug is visible in dev consoles.
-    logger.warn(
-      `[reconcileCosmologyInvariants] Disabling cosmology: clampEta0 failed for ` +
-        `eta0=${fs.cosmology.eta0}: ${e instanceof Error ? e.message : String(e)}`
-    )
-    return {
-      cosmology: { ...fs.cosmology, enabled: false },
-      needsReset: true,
     }
   }
   return {}

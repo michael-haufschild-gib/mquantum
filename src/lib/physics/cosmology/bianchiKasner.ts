@@ -322,10 +322,9 @@ export function computeBianchiKasnerCoefs(
 
   const n = spacetimeDim
   const aFull = Math.pow(a, n) // ã^n
-  // aKinetic = ã^(−(n−2)). For n = 2 (1D lattice — never hit for Bianchi
-  // since we require spacetimeDim ≥ 3) we would need the identity 1.0, but
-  // the guard above rejects n < 3 first.
-  const aKinetic = n === 2 ? 1 : 1 / Math.pow(a, n - 2)
+  // aKinetic = ã^(−(n−2)). The guard above rejects spacetimeDim < 3,
+  // so n >= 3 and n - 2 >= 1 always.
+  const aKinetic = 1 / Math.pow(a, n - 2)
 
   const aPot0 = aFull / (a1 * a1)
   const aPot1 = aFull / (a2 * a2)

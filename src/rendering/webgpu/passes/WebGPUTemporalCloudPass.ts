@@ -114,7 +114,8 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
 
     super(passConfig)
     this.passConfig = config
-    this.historyWeight = Math.max(0, Math.min(1, config.historyWeight ?? 0.85))
+    const rawWeight = config.historyWeight ?? 0.85
+    this.historyWeight = Number.isFinite(rawWeight) ? Math.max(0, Math.min(1, rawWeight)) : 0.85
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {

@@ -405,6 +405,11 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   pmlTargetReflection: 1e-6,
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
-  cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
+  cosmology: {
+    ...DEFAULT_COSMOLOGY_CONFIG,
+    kasnerExponents: DEFAULT_COSMOLOGY_CONFIG.kasnerExponents
+      ? { ...DEFAULT_COSMOLOGY_CONFIG.kasnerExponents }
+      : undefined,
+  },
   preheating: { ...DEFAULT_PREHEATING_CONFIG },
 }

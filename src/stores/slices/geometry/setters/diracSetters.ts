@@ -468,8 +468,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
               preset.overrides.absorberEnabled !== undefined
                 ? {
                     absorberEnabled: preset.overrides.absorberEnabled,
-                    absorberWidth:
-                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                    absorberWidth: preset.overrides.absorberWidth ?? merged.absorberWidth,
                   }
                 : {}
             return {

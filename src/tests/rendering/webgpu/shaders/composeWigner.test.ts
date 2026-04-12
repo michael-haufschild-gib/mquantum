@@ -24,6 +24,7 @@ describe('composeWignerSpatialComputeShader', () => {
     })
 
     expect(wgsl).toContain('ACTUAL_DIM')
+    expect(wgsl).not.toContain('const DIMENSION: i32')
     expect(wgsl).toContain('@workgroup_size')
     expect(modules).toContain('Hermite Polynomials')
     expect(modules).toContain('Laguerre Polynomials')
@@ -43,6 +44,7 @@ describe('composeWignerSpatialComputeShader', () => {
     })
 
     expect(wgsl).toContain('ACTUAL_DIM')
+    expect(wgsl).not.toContain('const DIMENSION: i32')
     expect(wgsl).toContain('HYDROGEN_MODE_ENABLED: bool = true')
     expect(modules).toContain('Spherical Harmonics')
     expect(modules).toContain('Hydrogen Radial')
@@ -67,6 +69,7 @@ describe('composeWignerSpatialComputeShader', () => {
       quantumMode: 'harmonicOscillator',
     })
     expect(wgsl).toContain('ACTUAL_DIM: i32 = 11')
+    expect(wgsl).not.toContain('const DIMENSION: i32')
     expect(modules.length).toBeGreaterThan(5)
   })
 })
