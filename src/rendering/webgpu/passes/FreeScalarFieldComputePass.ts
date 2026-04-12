@@ -31,12 +31,12 @@ import {
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
 } from './computePassUtils'
+import { createGradientPipeline } from './DensityGridGradientSetup'
 import type {
   FsfBindGroupResult,
   FsfPassHelpers,
   FsfPipelineResult,
 } from './FreeScalarFieldComputePassSetup'
-import { createGradientPipeline } from './DensityGridGradientSetup'
 import { buildFsfPipelines, rebuildFsfBindGroups } from './FreeScalarFieldComputePassSetup'
 import {
   computeFsfConfigHash,
@@ -404,7 +404,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.pl = buildFsfPipelines(device, this.setupHelpers)
     // Build gradient normal pipeline (replaces 6 per-step fragment texture fetches with 1)
     if (this.densityTextureView && this.normalTextureView) {
-      createGradientPipeline(
+      void createGradientPipeline(
         device,
         this.densityTextureView,
         this.normalTextureView,
@@ -866,9 +866,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       gridPass.end()
 
-      // Dispatch gradient normal computation: reads density grid, writes
-      // pre-computed normals to rgba8snorm texture. Replaces 6 per-step
-      // texture fetches in the fragment shader with a single lookup.
+      // Dispatch pre-computed gradient normals (replaces 6 per-step texture fetches with 1)
       if (this.gradientPipeline && this.gradientBindGroup) {
         const gradWG = Math.ceil(DENSITY_GRID_SIZE / 8)
         const gradPass = ctx.beginComputePass({ label: 'free-scalar-gradient-grid-pass' })
@@ -968,12 +966,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.pendingStagingBuffers.length = 0
 
     this.phiBuffer = this.piBuffer = this.uniformBuffer = null
-    this.densityTexture = null
-    this.densityTextureView = null
-    this.analysisTexture = null
-    this.analysisTextureView = null
-    this.normalTexture = null
-    this.normalTextureView = null
+    this.densityTexture = this.analysisTexture = this.normalTexture = null
+    this.densityTextureView = this.analysisTextureView = this.normalTextureView = null
     this.gradientPipeline = null
     this.gradientBindGroup = null
     this.kSpace.dispose()
