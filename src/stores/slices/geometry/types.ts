@@ -280,6 +280,11 @@ export interface SchroedingerSliceActions {
   setFreeScalarPreheatingAmplitude: (amplitude: number) => void
   setFreeScalarPreheatingFrequency: (frequency: number) => void
 
+  // Parametric Resonance / Preheating
+  setFreeScalarPreheatingEnabled: (enabled: boolean) => void
+  setFreeScalarPreheatingAmplitude: (amplitude: number) => void
+  setFreeScalarPreheatingFrequency: (frequency: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (
     mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
