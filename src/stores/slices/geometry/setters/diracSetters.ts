@@ -443,9 +443,17 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
 
             merged.dt = clampDiracDt(merged.spacing, merged.speedOfLight, merged.dt)
 
+            const parentAbsorber =
+              preset.overrides.absorberEnabled !== undefined
+                ? {
+                    absorberEnabled: preset.overrides.absorberEnabled,
+                    absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                  }
+                : {}
             return {
               schroedinger: {
                 ...state.schroedinger,
+                ...parentAbsorber,
                 dirac: merged,
               },
             }

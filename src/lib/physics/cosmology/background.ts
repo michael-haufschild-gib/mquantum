@@ -40,6 +40,7 @@
  * @module
  */
 
+import { computeBianchiKasnerCoefs } from './bianchiKasner'
 import type { CosmologyPreset, CosmologyPresetParams } from './presets'
 import { qExponent, sCritical } from './presets'
 
@@ -229,13 +230,31 @@ export interface CosmologyCoefs {
   aPotential: number
   /** `a^n` — full volume-form coefficient for mass and self-interaction. */
   aFull: number
+  /**
+   * Optional per-axis potential ratio `aPot_1 / aPot_0` for the Bianchi-I
+   * Kasner preset. `1` for every isotropic preset (Minkowski, de Sitter,
+   * Kasner FLRW, ekpyrotic), so callers can default-substitute
+   * `aPotentialRatio1 ?? 1` and stay bit-identical on those paths.
+   */
+  aPotentialRatio1?: number
+  /**
+   * Optional per-axis potential ratio `aPot_2 / aPot_0` for the Bianchi-I
+   * Kasner preset. `1` under every isotropic preset.
+   */
+  aPotentialRatio2?: number
 }
 
 /** Scalar cosmology quantities evaluated at a single conformal time. */
 export interface CosmologySnapshot extends CosmologyCoefs {
-  /** Scale factor `a(η)`. */
+  /**
+   * Scale factor `a(η)`. Under Bianchi-I this is the geometric-mean gauge
+   * scalar `ã = (a_1·a_2·a_3)^(1/(n−1))`, not an axis-specific value.
+   */
   a: number
-  /** Conformal Hubble rate `ℋ(η) = a'/a = q/η`. Negative for contracting. */
+  /**
+   * Conformal Hubble rate `ℋ(η) = a'/a`. Under the isotropic FLRW presets
+   * this equals `q/η`. Under Bianchi-I it is computed from `ã`.
+   */
   hubble: number
 }
 
@@ -259,7 +278,46 @@ export function computeCosmologyAt(
   params: CosmologyPresetParams
 ): CosmologySnapshot {
   if (params.preset === 'minkowski') {
-    return { a: 1, hubble: 0, aKinetic: 1, aPotential: 1, aFull: 1 }
+    return {
+      a: 1,
+      hubble: 0,
+      aKinetic: 1,
+      aPotential: 1,
+      aFull: 1,
+      aPotentialRatio1: 1,
+      aPotentialRatio2: 1,
+    }
+  }
+
+  if (params.preset === 'bianchiKasner') {
+    const exp = params.kasnerExponents
+    if (!exp) {
+      throw new RangeError(
+        `computeCosmologyAt: bianchiKasner preset requires kasnerExponents to be set`
+      )
+    }
+    // η must be strictly positive for the Bianchi-I gauge convention
+    // `η = (3/2)·t^(2/3)`. computeBianchiKasnerCoefs throws on non-finite
+    // / non-positive η — the message matches the acceptance-bar behaviour.
+    const b = computeBianchiKasnerCoefs(eta, exp, params.spacetimeDim)
+    // Conformal Hubble rate `ℋ = ã'/ã` isn't a closed-form `q/η` here —
+    // we use the analytic form derived from `ã = t^(1/(n−1))` and
+    // `dη/dt = 1/ã` ⇒ `ã' = (1/(n−1))·t^(1/(n−1)−1)·dt/dη = ã²/((n−1)·t)`.
+    // Only consumed by the analysis readout, never by the integrator.
+    const n = params.spacetimeDim
+    const nm1 = n - 1
+    const nm2 = n - 2
+    const tProper = Math.pow((eta * nm2) / nm1, nm1 / nm2)
+    const hubble = tProper > 0 ? (b.a * b.a) / ((n - 1) * tProper) : 0
+    return {
+      a: b.a,
+      hubble,
+      aKinetic: b.aKinetic,
+      aPotential: b.aPotential,
+      aFull: b.aFull,
+      aPotentialRatio1: b.aPotentialRatio1,
+      aPotentialRatio2: b.aPotentialRatio2,
+    }
   }
 
   if (!Number.isFinite(eta) || eta === 0) {
@@ -280,7 +338,15 @@ export function computeCosmologyAt(
   const aKinetic = n === 2 ? 1 : 1 / aPotential
   const aFull = aPotential * a * a // a^n = a^(n−2) · a²
 
-  return { a, hubble, aKinetic, aPotential, aFull }
+  return {
+    a,
+    hubble,
+    aKinetic,
+    aPotential,
+    aFull,
+    aPotentialRatio1: 1,
+    aPotentialRatio2: 1,
+  }
 }
 
 /**
@@ -299,8 +365,14 @@ export function computeCosmologyCoefs(
   params: CosmologyPresetParams
 ): CosmologyCoefs {
   if (params.preset === 'minkowski') {
-    return { aKinetic: 1, aPotential: 1, aFull: 1 }
+    return { aKinetic: 1, aPotential: 1, aFull: 1, aPotentialRatio1: 1, aPotentialRatio2: 1 }
   }
   const snap = computeCosmologyAt(eta, params)
-  return { aKinetic: snap.aKinetic, aPotential: snap.aPotential, aFull: snap.aFull }
+  return {
+    aKinetic: snap.aKinetic,
+    aPotential: snap.aPotential,
+    aFull: snap.aFull,
+    aPotentialRatio1: snap.aPotentialRatio1 ?? 1,
+    aPotentialRatio2: snap.aPotentialRatio2 ?? 1,
+  }
 }

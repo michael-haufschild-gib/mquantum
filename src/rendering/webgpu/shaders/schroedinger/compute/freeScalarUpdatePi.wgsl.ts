@@ -2,15 +2,33 @@
  * Free Scalar Field — Leapfrog Pi-Update Compute Shader
  *
  * Updates the canonical conjugate momentum π = a^(n−2)·δφ' using the
- * Hamilton equation of motion on a (possibly time-dependent) cosmological
- * background:
+ * Hamilton equation of motion on a (possibly time-dependent, possibly
+ * anisotropic) cosmological background:
  *
- *   dπ/dη = aPotential · ∇²δφ − mass²·aFull · δφ − aFull · V'(δφ)
+ *   dπ/dη = Σ_d (aPot_d · ∂²_d δφ) − mass²·aFull · δφ − aFull · V'(δφ)
  *
- * where the three cosmology coefficients (`aKinetic`, `aPotential`, `aFull`)
- * come from `computeCosmologyCoefs(η)` and are written into the uniform
- * buffer before every pi dispatch. Under Minkowski they collapse to 1, so
- * this reduces bit-identically to the flat-space Klein-Gordon kick.
+ * On isotropic FLRW presets (Minkowski, de Sitter, ekpyrotic, Kasner stiff)
+ * every axis shares `aPot_d = aPotential` and the sum collapses to
+ * `aPotential · ∇²δφ`. Under the Bianchi-I vacuum Kasner preset the three
+ * spatial axes carry different coefficients `aPot_i = ã^n / a_i²`. The
+ * CPU uploads the axis-0 value into `params.aPotential` and the other two
+ * as **ratios** `aPotentialRatio1 = aPot_1/aPot_0`,
+ * `aPotentialRatio2 = aPot_2/aPot_0` so the 528-byte uniform struct stays
+ * intact.
+ *
+ * Bit-identity property: under every isotropic preset the CPU uploads
+ * `aPotentialRatio1 = aPotentialRatio2 = 1.0`. The shader expresses the
+ * anisotropic force as
+ *
+ *   force = aPotential · laplacian
+ *         + aPotential · (aPotentialRatio1 − 1) · axialLap_1
+ *         + aPotential · (aPotentialRatio2 − 1) · axialLap_2
+ *
+ * The two correction terms multiply by exactly `0.0` under ratios = 1 and
+ * contribute nothing to the sum — so the flat-background shader output is
+ * bit-identical to the pre-change single-coefficient form. Only axes 0..2
+ * participate in the anisotropy; axes d ≥ 3 (higher-dim lattices) always
+ * use the bare `aPotential` per the scope constraints of Bianchi-I.
  *
  * Physical dispersion (bounded — no 1/η² pole): ω² = k² + mass²·a². This is
  * the whole point of evolving the physical δφ instead of the old
@@ -37,6 +55,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
   let phiCenter = phi[idx];
   var laplacian: f32 = 0.0;
+  // Cache axis-1 and axis-2 contributions separately so the Bianchi-I
+  // correction terms can multiply them without re-traversing the stencil.
+  // Under isotropic presets the corrections evaluate to 0*axialLap = 0
+  // and the final force reduces bit-identically to the pre-change form
+  // aPotential * laplacian.
+  var axialLap1: f32 = 0.0;
+  var axialLap2: f32 = 0.0;
 
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     if (params.gridSize[d] <= 1u) { continue; }
@@ -48,22 +73,29 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
 
     let a2 = max(params.spacing[d] * params.spacing[d], 1e-12);
-    laplacian += (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
+    let axialLap = (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
+    laplacian += axialLap;
+    if (d == 1u) { axialLap1 = axialLap; }
+    else if (d == 2u) { axialLap2 = axialLap; }
   }
 
   // Hamilton kick equation in the canonical delta-phi variables:
   //   d(pi)/d(eta) = aPotential * laplacian(phi)
+  //                + aPotential * (aPotentialRatio1 − 1) * axialLap_1
+  //                + aPotential * (aPotentialRatio2 − 1) * axialLap_2
   //                - mass^2 * aFull * massSquaredScale(eta) * phi
   //                - aFull * V'(phi)
-  // Under the Minkowski preset aPotential = aFull = 1 and preheating
-  // disabled (massSquaredScale = 1), this degenerates to the bare KG force
-  // (laplacian - mass^2 * phi - V'(phi)) bit-identically. The
-  // massSquaredScale factor implements the post-inflation preheating drive
-  // (1 + A*sin(Omega*(eta - eta_ref))), turning each lattice mode into the
-  // Mathieu equation and enabling exponential parametric amplification
-  // inside the Floquet instability tongues.
+  // Under the Minkowski / de Sitter / Kasner / ekpyrotic presets the CPU
+  // uploads ratios = 1 and the two correction terms vanish exactly; the
+  // expression reduces bit-identically to the pre-Bianchi form
+  // aPotential * laplacian - massCoef * phi - Vprime. Under Bianchi-I
+  // vacuum Kasner the non-unity ratios drive each axis gradient
+  // contribution separately — the visible cigar distortion.
   let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
-  var force = params.aPotential * laplacian - massCoef * phiCenter;
+  var force = params.aPotential * laplacian
+            + params.aPotential * (params.aPotentialRatio1 - 1.0) * axialLap1
+            + params.aPotential * (params.aPotentialRatio2 - 1.0) * axialLap2
+            - massCoef * phiCenter;
 
   // Self-interaction: V(phi) = lambda*(phi^2 - v^2)^2,
   //                   V'(phi) = 4*lambda*phi*(phi^2 - v^2).

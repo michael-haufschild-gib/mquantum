@@ -69,6 +69,7 @@ type FreeScalarActions = Pick<
   | 'setFreeScalarCosmologySteepness'
   | 'setFreeScalarCosmologyHubble'
   | 'setFreeScalarCosmologyEta0'
+  | 'setFreeScalarCosmologyBianchiExponents'
   | 'setFreeScalarPreheatingEnabled'
   | 'setFreeScalarPreheatingAmplitude'
   | 'setFreeScalarPreheatingFrequency'
@@ -575,10 +576,21 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
             needsReset: true,
           }
           const reconciled = reconcileCosmologyInvariants(staged)
+          // Propagate absorber state to the parent SchroedingerConfig — the
+          // AbsorptionSection reads `schroedinger.absorberEnabled`, not the
+          // per-mode child field.
+          const parentAbsorber =
+            preset.overrides.absorberEnabled !== undefined
+              ? {
+                  absorberEnabled: preset.overrides.absorberEnabled,
+                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                }
+              : {}
           return {
             schroedinger: {
               ...state.schroedinger,
               ...preset.renderingOverrides,
+              ...parentAbsorber,
               freeScalar: { ...staged, ...reconciled },
             },
           }

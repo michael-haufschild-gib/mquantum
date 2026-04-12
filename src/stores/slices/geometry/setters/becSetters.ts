@@ -449,10 +449,18 @@ export function createBecSetters(ctx: SetterContext): BecActions {
               needsReset: true,
             }
             const resized = resizeBecArrays(merged, globalDim)
+            const parentAbsorber =
+              preset.overrides.absorberEnabled !== undefined
+                ? {
+                    absorberEnabled: preset.overrides.absorberEnabled,
+                    absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                  }
+                : {}
             return {
               schroedinger: {
                 ...state.schroedinger,
                 ...preset.renderingOverrides,
+                ...parentAbsorber,
                 bec: { ...merged, ...resized, needsReset: true },
               },
             }

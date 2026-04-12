@@ -74,6 +74,7 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
     spacetimeDim,
     steepness: fs.cosmology.steepness,
     hubble: fs.cosmology.hubble,
+    kasnerExponents: fs.cosmology.kasnerExponents,
   }
   // Invalid preset combo (e.g. ekpyrotic with steepness ≤ s_c after a lattice
   // bump pushed s_c past the current value, or de Sitter with non-positive
@@ -121,6 +122,87 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
   return {}
 }
 
+/**
+ * Validate + re-clamp `eta0` for the new preset during a preset switch.
+ * Encapsulates the fallthrough that soft-disables cosmology whenever the
+ * new params would be rejected by `isValidPreset` or `clampEta0` throws.
+ * Bianchi-I skips the clamp because the safe-η₀ heuristic is derived from
+ * the isotropic Mukhanov-Sasaki super-horizon bound.
+ *
+ * @param fs - Current free-scalar config (gridSize/spacing/latticeDim source)
+ * @param preset - Target cosmology preset
+ * @param staged - Already-resolved steepness/hubble/kasnerExponents and
+ *                 starting eta0 from {@link resolvePresetSwitchSubstate}
+ * @returns Final `(eta0, enabled)` to write into the cosmology sub-config
+ */
+function resolveEta0ForPresetSwitch(
+  fs: FreeScalarConfig,
+  preset: import('@/lib/physics/cosmology/presets').CosmologyPreset,
+  staged: {
+    spacetimeDim: number
+    steepness: number
+    hubble: number
+    kasnerExponents: NonNullable<FreeScalarConfig['cosmology']['kasnerExponents']>
+    eta0: number
+    enabled: boolean
+  }
+): { eta0: number; enabled: boolean } {
+  let { eta0, enabled } = staged
+  if (!enabled) return { eta0, enabled }
+  const params = {
+    preset,
+    spacetimeDim: staged.spacetimeDim,
+    steepness: staged.steepness,
+    hubble: staged.hubble,
+    kasnerExponents: staged.kasnerExponents,
+  }
+  if (!isValidPreset(params)) {
+    logger.warn(
+      `[setFreeScalarCosmologyPreset] Disabling cosmology: preset=${preset} ` +
+        `params invalid after switch (steepness=${staged.steepness}, ` +
+        `hubble=${staged.hubble}, spacetimeDim=${staged.spacetimeDim}).`
+    )
+    return { eta0, enabled: false }
+  }
+  if (preset === 'bianchiKasner') {
+    // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
+    // runtime COSMOLOGY_ETA_FLOOR is the only guard needed.
+    return { eta0, enabled }
+  }
+  try {
+    const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+    eta0 = clamped.eta0
+  } catch (e) {
+    logger.warn(
+      `[setFreeScalarCosmologyPreset] Disabling cosmology: clampEta0 failed for ` +
+        `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+    )
+    enabled = false
+  }
+  return { eta0, enabled }
+}
+
+/**
+ * Resolve the `(eta0, kasnerExponents)` pair when switching cosmology preset.
+ * Bianchi-I requires η > 0 and a populated exponent triple; flipping to or
+ * from that preset flips the sign of the stored `eta0`. Extracted so the
+ * main preset setter stays under the cognitive-complexity ceiling.
+ *
+ * @param fs - Current free-scalar config
+ * @param preset - Target cosmology preset
+ * @returns `(eta0, kasnerExponents)` to stage into the next state
+ */
+function resolvePresetSwitchSubstate(
+  fs: FreeScalarConfig,
+  preset: import('@/lib/physics/cosmology/presets').CosmologyPreset
+): { eta0: number; kasnerExponents: NonNullable<FreeScalarConfig['cosmology']['kasnerExponents']> } {
+  const kasnerExponents = fs.cosmology.kasnerExponents ?? { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
+  let eta0 = fs.cosmology.eta0
+  if (preset === 'bianchiKasner' && eta0 < 0) eta0 = -eta0
+  if (preset !== 'bianchiKasner' && eta0 > 0) eta0 = -eta0
+  return { eta0, kasnerExponents }
+}
+
 type CosmologyActions = Pick<
   SchroedingerSliceActions,
   | 'setFreeScalarCosmologyEnabled'
@@ -128,6 +210,7 @@ type CosmologyActions = Pick<
   | 'setFreeScalarCosmologySteepness'
   | 'setFreeScalarCosmologyHubble'
   | 'setFreeScalarCosmologyEta0'
+  | 'setFreeScalarCosmologyBianchiExponents'
 >
 
 /**
@@ -158,6 +241,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
             spacetimeDim: fs.latticeDim + 1,
             steepness: fs.cosmology.steepness,
             hubble: fs.cosmology.hubble,
+            kasnerExponents: fs.cosmology.kasnerExponents,
           }
           if (!isValidPreset(params)) {
             logger.warn(
@@ -209,40 +293,51 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           const sc = sCritical(spacetimeDim)
           if (steepness <= sc) steepness = sc * 1.5
         }
-        // Re-clamp eta0 for the new regime. If the params are invalid (e.g.
-        // de Sitter with hubble=0) or clampEta0 throws, soft-disable cosmology
-        // so the next reset can't crash inside the compute pass.
-        let { eta0 } = fs.cosmology
-        let enabled = fs.cosmology.enabled
-        if (enabled) {
-          const params = { preset, spacetimeDim, steepness, hubble: fs.cosmology.hubble }
-          if (!isValidPreset(params)) {
-            logger.warn(
-              `[setFreeScalarCosmologyPreset] Disabling cosmology: preset=${preset} ` +
-                `params invalid after switch (steepness=${steepness}, ` +
-                `hubble=${fs.cosmology.hubble}, spacetimeDim=${spacetimeDim}).`
-            )
-            enabled = false
-          } else {
-            try {
-              const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
-              eta0 = clamped.eta0
-            } catch (e) {
-              logger.warn(
-                `[setFreeScalarCosmologyPreset] Disabling cosmology: clampEta0 failed for ` +
-                  `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
-              )
-              enabled = false
-            }
-          }
-        }
+        const { eta0: presetEta0, kasnerExponents } = resolvePresetSwitchSubstate(fs, preset)
+        const resolved = resolveEta0ForPresetSwitch(fs, preset, {
+          spacetimeDim,
+          steepness,
+          hubble: fs.cosmology.hubble,
+          kasnerExponents,
+          eta0: presetEta0,
+          enabled: fs.cosmology.enabled,
+        })
         return {
           schroedinger: {
             ...state.schroedinger,
             freeScalar: {
               ...fs,
-              cosmology: { ...fs.cosmology, preset, steepness, eta0, enabled },
+              cosmology: {
+                ...fs.cosmology,
+                preset,
+                steepness,
+                eta0: resolved.eta0,
+                enabled: resolved.enabled,
+                kasnerExponents,
+              },
               needsReset: true,
+            },
+          },
+        }
+      })
+    },
+    setFreeScalarCosmologyBianchiExponents: (p1, p2, p3) => {
+      if (!isFinite(p1) || !isFinite(p2) || !isFinite(p3)) {
+        warnNonFinite('freeScalar.cosmology.kasnerExponents', [p1, p2, p3])
+        return
+      }
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              cosmology: {
+                ...fs.cosmology,
+                kasnerExponents: { p1, p2, p3 },
+              },
+              needsReset: fs.cosmology.preset === 'bianchiKasner' || fs.needsReset,
             },
           },
         }
@@ -363,6 +458,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           spacetimeDim,
           steepness: fs.cosmology.steepness,
           hubble: fs.cosmology.hubble,
+          kasnerExponents: fs.cosmology.kasnerExponents,
         }
         if (isValidPreset(params)) {
           try {

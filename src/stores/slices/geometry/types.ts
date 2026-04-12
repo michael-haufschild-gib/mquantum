@@ -267,6 +267,13 @@ export interface SchroedingerSliceActions {
   setFreeScalarCosmologySteepness: (s: number) => void
   setFreeScalarCosmologyHubble: (h: number) => void
   setFreeScalarCosmologyEta0: (eta0: number) => void
+  /**
+   * Set the Bianchi-I Kasner exponent triple `(p₁, p₂, p₃)`. Only
+   * consulted when `cosmology.preset === 'bianchiKasner'`; the other
+   * presets keep the stored value through serialization but do not read
+   * it. Non-finite inputs are rejected with a dev warning.
+   */
+  setFreeScalarCosmologyBianchiExponents: (p1: number, p2: number, p3: number) => void
 
   // Parametric Resonance / Preheating
   setFreeScalarPreheatingEnabled: (enabled: boolean) => void

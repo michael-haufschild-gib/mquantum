@@ -499,10 +499,18 @@ export function createTdseSetters(ctx: SetterContext): TdseActions {
             globalDim < 2 && base.potentialType === 'doubleSlit'
               ? ('barrier' as const)
               : base.potentialType
+          const parentAbsorber =
+            preset.overrides.absorberEnabled !== undefined
+              ? {
+                  absorberEnabled: preset.overrides.absorberEnabled,
+                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                }
+              : {}
           return {
             schroedinger: {
               ...state.schroedinger,
               ...preset.renderingOverrides,
+              ...parentAbsorber,
               tdse: { ...base, ...resized, potentialType, needsReset: true },
             },
           }

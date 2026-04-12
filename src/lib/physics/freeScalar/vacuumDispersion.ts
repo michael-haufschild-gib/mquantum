@@ -54,6 +54,8 @@ export const FSF_IDENTITY_COSMO_COEFS: CosmologyCoefs = {
   aKinetic: 1,
   aPotential: 1,
   aFull: 1,
+  aPotentialRatio1: 1,
+  aPotentialRatio2: 1,
 }
 
 /**
@@ -112,12 +114,14 @@ function asCosmologyParams(config: FreeScalarConfig): {
   spacetimeDim: number
   steepness: number
   hubble: number
+  kasnerExponents: FreeScalarConfig['cosmology']['kasnerExponents']
 } {
   return {
     preset: config.cosmology.preset,
     spacetimeDim: config.latticeDim + 1,
     steepness: config.cosmology.steepness,
     hubble: config.cosmology.hubble,
+    kasnerExponents: config.cosmology.kasnerExponents,
   }
 }
 

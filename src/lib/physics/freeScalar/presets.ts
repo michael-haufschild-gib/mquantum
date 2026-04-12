@@ -377,4 +377,50 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
     },
     renderingOverrides: { densityGain: 0.5, densityContrast: 1.4 },
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Bianchi-I vacuum Kasner — anisotropic background with three independent
+  // scale factors `a_i(t) = t^{p_i}`, Σp_i = 1, Σp_i² = 1. The canonical
+  // symmetric vacuum triple (−1/3, 2/3, 2/3) contracts axis 0 and dilates
+  // axes 1/2. Starting at η₀ = 1.5 (t = 1) the scale factors are all 1, so
+  // the initial spectrum is Minkowski-like; as η grows, the anisotropy
+  // builds into a visible "cigar" along the contracting axis.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  {
+    id: 'bianchiKasnerCigar',
+    name: 'Bianchi-I Kasner Cigar (vacuum)',
+    description:
+      'Anisotropic vacuum Kasner on the 3D lattice. p = (−1/3, 2/3, 2/3) — axis 0 contracts, axes 1/2 dilate. Starting at η₀ = 1.5 the scale factors are all 1; quantum fluctuations develop a cigar-shaped density along the contracting axis as η advances.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.15, 0.15, 0.15],
+      initialCondition: 'vacuumNoise',
+      vacuumSeed: 3141,
+      mass: 0.0, // massless — pure geometric squeezing, no mass oscillation
+      dt: 0.005,
+      stepsPerFrame: 4,
+      selfInteractionEnabled: false,
+      // This is a cosmology run, not scattering — no absorber.
+      absorberEnabled: false,
+      fieldView: 'energyDensity',
+      // Anisotropic scale growth makes the energy density floor track η;
+      // fixed-gain rendering preserves the dynamic-range signature.
+      autoScale: false,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 10,
+      cosmology: {
+        enabled: true,
+        preset: 'bianchiKasner',
+        steepness: 5,
+        hubble: 1.0,
+        // Bianchi-I lives on η > 0 — generalised conformal time growing
+        // away from the singularity. η₀ = 1.5 ⇒ t = 1 ⇒ a_i ≡ 1 at init.
+        eta0: 1.5,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    },
+    renderingOverrides: { densityGain: 0.1, densityContrast: 2.0 },
+  },
 ]
