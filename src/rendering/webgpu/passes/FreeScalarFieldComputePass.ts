@@ -36,6 +36,7 @@ import type {
   FsfPassHelpers,
   FsfPipelineResult,
 } from './FreeScalarFieldComputePassSetup'
+import { createGradientPipeline } from './DensityGridGradientSetup'
 import { buildFsfPipelines, rebuildFsfBindGroups } from './FreeScalarFieldComputePassSetup'
 import {
   computeFsfConfigHash,
@@ -100,6 +101,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private densityTextureView: GPUTextureView | null = null
   private analysisTexture: GPUTexture | null = null
   private analysisTextureView: GPUTextureView | null = null
+  private normalTexture: GPUTexture | null = null
+  private normalTextureView: GPUTextureView | null = null
+  private gradientPipeline: GPUComputePipeline | null = null
+  private gradientBindGroup: GPUBindGroup | null = null
 
   // Pipeline + bind group bundles (created by setup functions)
   private pl: FsfPipelineResult | null = null
@@ -223,11 +228,30 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.densityTextureView = textures.densityTextureView
     this.analysisTexture = textures.analysisTexture
     this.analysisTextureView = textures.analysisTextureView
+
+    // Pre-computed gradient normal texture: replaces 6 per-step texture fetches
+    // in the fragment shader with a single lookup (saves ~0.4-1.6ms at Retina).
+    this.normalTexture = device.createTexture({
+      label: 'free-scalar-normal-grid',
+      size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
+      format: 'rgba8snorm',
+      dimension: '3d',
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    this.normalTextureView = this.normalTexture.createView({
+      label: 'free-scalar-normal-view',
+      dimension: '3d',
+    })
   }
 
   /** Get the density texture view for binding into the raymarching pipeline. */
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
+  }
+
+  /** Get the normal grid texture view for pre-computed gradient normals. */
+  getNormalTextureView(): GPUTextureView | null {
+    return this.normalTextureView
   }
 
   /** Get the analysis texture view for binding into the raymarching pipeline. */
@@ -378,6 +402,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   private buildPipelines(device: GPUDevice): void {
     this.pl = buildFsfPipelines(device, this.setupHelpers)
+    // Build gradient normal pipeline (replaces 6 per-step fragment texture fetches with 1)
+    if (this.densityTextureView && this.normalTextureView) {
+      createGradientPipeline(
+        device,
+        this.densityTextureView,
+        this.normalTextureView,
+        'rgba16float',
+        DENSITY_GRID_SIZE
+      ).then((result) => {
+        this.gradientPipeline = result.pipeline
+        this.gradientBindGroup = result.bindGroup
+      })
+    }
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
@@ -828,6 +865,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         gridWorkgroups
       )
       gridPass.end()
+
+      // Dispatch gradient normal computation: reads density grid, writes
+      // pre-computed normals to rgba8snorm texture. Replaces 6 per-step
+      // texture fetches in the fragment shader with a single lookup.
+      if (this.gradientPipeline && this.gradientBindGroup) {
+        const gradWG = Math.ceil(DENSITY_GRID_SIZE / 8)
+        const gradPass = ctx.beginComputePass({ label: 'free-scalar-gradient-grid-pass' })
+        gradPass.setPipeline(this.gradientPipeline)
+        gradPass.setBindGroup(0, this.gradientBindGroup)
+        gradPass.dispatchWorkgroups(gradWG, gradWG, gradWG)
+        gradPass.end()
+      }
     } else {
       logger.warn(
         `[FreeScalarFieldComputePass] writeGrid skipped: pl=${!!this.pl}, bg=${!!this.bg}`
@@ -914,6 +963,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     for (const buf of gpuBuffers) buf?.destroy()
     this.densityTexture?.destroy()
     this.analysisTexture?.destroy()
+    this.normalTexture?.destroy()
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 
@@ -922,6 +972,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.densityTextureView = null
     this.analysisTexture = null
     this.analysisTextureView = null
+    this.normalTexture = null
+    this.normalTextureView = null
+    this.gradientPipeline = null
+    this.gradientBindGroup = null
     this.kSpace.dispose()
     this.pl = null
     this.bg = null

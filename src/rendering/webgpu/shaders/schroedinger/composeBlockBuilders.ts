@@ -496,7 +496,7 @@ export function buildVolumeBlocks(opts: {
       condition: !opts.is2D,
       content: opts.useDensityGrid
         ? opts.gridOnly
-          ? generateVolumeRaymarchGridSimpleBlock()
+          ? generateVolumeRaymarchGridSimpleBlock(opts.usePrecomputedNormals)
           : generateVolumeRaymarchGridBlock(opts.usePrecomputedNormals)
         : [
             '// Stub: grid raymarching unavailable',

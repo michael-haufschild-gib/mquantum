@@ -33,7 +33,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  // 3D fast path: decompose coords without linearToND (avoids 2 integer divides)
+  var coords: array<u32, 12>;
+  if (params.latticeDim == 3u) {
+    let s0 = params.strides[0];
+    let s1 = params.strides[1];
+    coords[0] = idx / s0;
+    let r0 = idx - coords[0] * s0;
+    coords[1] = r0 / s1;
+    coords[2] = r0 - coords[1] * s1;
+  } else {
+    coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  }
+
   let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
                               params.absorberWidth, params.absorberStrength, 0u);
 

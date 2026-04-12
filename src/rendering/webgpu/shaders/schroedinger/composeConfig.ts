@@ -63,6 +63,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useWignerCache?: boolean
   /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
   isFreeScalar?: boolean
+  /** Compute mode has a pre-computed normal grid texture at binding 7. */
+  hasPrecomputedNormals?: boolean
   /** Quantum walk mode — discrete lattice, density brightness uses linear rho. */
   isQuantumWalk?: boolean
   /** Pauli spinor mode — alpha encodes density, not potential. */
@@ -150,7 +152,10 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
   const isDualChannel = [23, 24, 25].includes(colorAlgorithm)
   const needsCosine = [1, 2].includes(colorAlgorithm)
   const needsOklab = [0, 6].includes(colorAlgorithm)
-  const usePrecomputedNormals = useDensityGrid && !isFreeScalar
+  // Pre-computed normal grid: available for analytical modes (always) and any
+  // compute mode that explicitly sets hasPrecomputedNormals (FSF has it).
+  const usePrecomputedNormals =
+    useDensityGrid && (!isFreeScalar || config.hasPrecomputedNormals === true)
   return {
     is2D,
     isHydrogenFamily,
