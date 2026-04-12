@@ -203,21 +203,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let f1 = fracs[1];
     let f2 = fracs[2];
 
+    // Use clamped deltas: at lattice boundaries coordsHi may equal coordsLo
+    // (worldToLatticeInterp clamps), so the stride offset must be 0 there —
+    // not the raw stride, which would read a wrong neighbor or go OOB.
+    let d0 = (coordsHi[0] - coordsLo[0]) * s0;
+    let d1 = (coordsHi[1] - coordsLo[1]) * s1;
+    let d2 = (coordsHi[2] - coordsLo[2]) * s2;
+
     // x=lo,y=lo: interpolate z
-    let phi00 = mix(phi[baseIdx], phi[baseIdx + s2], f2);
-    let pi00 = mix(pi[baseIdx], pi[baseIdx + s2], f2);
+    let phi00 = mix(phi[baseIdx], phi[baseIdx + d2], f2);
+    let pi00 = mix(pi[baseIdx], pi[baseIdx + d2], f2);
     // x=lo,y=hi
-    let phi01 = mix(phi[baseIdx + s1], phi[baseIdx + s1 + s2], f2);
-    let pi01 = mix(pi[baseIdx + s1], pi[baseIdx + s1 + s2], f2);
+    let phi01 = mix(phi[baseIdx + d1], phi[baseIdx + d1 + d2], f2);
+    let pi01 = mix(pi[baseIdx + d1], pi[baseIdx + d1 + d2], f2);
     // x=lo: interpolate y
     let phi0 = mix(phi00, phi01, f1);
     let pi0 = mix(pi00, pi01, f1);
     // x=hi,y=lo
-    let phi10 = mix(phi[baseIdx + s0], phi[baseIdx + s0 + s2], f2);
-    let pi10 = mix(pi[baseIdx + s0], pi[baseIdx + s0 + s2], f2);
+    let phi10 = mix(phi[baseIdx + d0], phi[baseIdx + d0 + d2], f2);
+    let pi10 = mix(pi[baseIdx + d0], pi[baseIdx + d0 + d2], f2);
     // x=hi,y=hi
-    let phi11 = mix(phi[baseIdx + s0 + s1], phi[baseIdx + s0 + s1 + s2], f2);
-    let pi11 = mix(pi[baseIdx + s0 + s1], pi[baseIdx + s0 + s1 + s2], f2);
+    let phi11 = mix(phi[baseIdx + d0 + d1], phi[baseIdx + d0 + d1 + d2], f2);
+    let pi11 = mix(pi[baseIdx + d0 + d1], pi[baseIdx + d0 + d1 + d2], f2);
     // x=hi: interpolate y
     let phi1 = mix(phi10, phi11, f1);
     let pi1 = mix(pi10, pi11, f1);
@@ -375,9 +382,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
 
   // Analysis texture output (educational color modes) — skip entirely when disabled
-  if (!hasAnalysis) {
-    // No-op: save ~884K textureStore calls per frame
-  } else if (params.analysisMode == 1u) {
+  if (params.analysisMode == 1u) {
     // Proper-frame Hamiltonian density decomposition (K, G, V, E).
     // The canonical triple (½ aKinetic π², ½ aPotential (∇φ)², ½ m²·aFull φ²)
     // is the integrand of the conformal-time Hamiltonian; to match the

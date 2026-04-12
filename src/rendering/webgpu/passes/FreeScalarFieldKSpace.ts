@@ -287,30 +287,36 @@ export class FsfKSpaceManager {
 
     this.kSpacePending = true
 
+    let phiMapped = false
+    let piMapped = false
     try {
       // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
       // a pipeline stall. Yield via queueMicrotask so the buffer isn't in "pending
       // map" state when queue.submit() fires later in the same synchronous block.
       await new Promise<void>((r) => queueMicrotask(r))
       await phiReadbackBuffer.mapAsync(GPUMapMode.READ)
+      phiMapped = true
       if (readbackEpoch !== this.kSpaceReadbackEpoch) {
         phiReadbackBuffer.unmap()
         this.kSpacePending = false
         return
       }
       await piReadbackBuffer.mapAsync(GPUMapMode.READ)
+      piMapped = true
 
-      const phiMapped = new Float32Array(phiReadbackBuffer.getMappedRange())
-      const piMapped = new Float32Array(piReadbackBuffer.getMappedRange())
-      const totalSites = phiMapped.length
+      const phiData = new Float32Array(phiReadbackBuffer.getMappedRange())
+      const piData = new Float32Array(piReadbackBuffer.getMappedRange())
+      const totalSites = phiData.length
       const phiComplex = new Float32Array(totalSites * 2)
       const piComplex = new Float32Array(totalSites * 2)
       for (let i = 0; i < totalSites; i++) {
-        phiComplex[i * 2] = phiMapped[i]!
-        piComplex[i * 2] = piMapped[i]!
+        phiComplex[i * 2] = phiData[i]!
+        piComplex[i * 2] = piData[i]!
       }
       phiReadbackBuffer.unmap()
+      phiMapped = false
       piReadbackBuffer.unmap()
+      piMapped = false
 
       if (readbackEpoch !== this.kSpaceReadbackEpoch) {
         this.kSpacePending = false
@@ -344,6 +350,19 @@ export class FsfKSpaceManager {
         [phiComplex.buffer, piComplex.buffer]
       )
     } catch (e) {
+      // Unmap any buffers left mapped after a partial failure
+      if (phiMapped)
+        try {
+          phiReadbackBuffer.unmap()
+        } catch {
+          /* already destroyed */
+        }
+      if (piMapped)
+        try {
+          piReadbackBuffer.unmap()
+        } catch {
+          /* already destroyed */
+        }
       logger.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
       this.kSpacePending = false
     }
@@ -360,18 +379,22 @@ export class FsfKSpaceManager {
 
     this.diagMappingInFlight = true
     const epoch = this.kSpaceReadbackEpoch
+    let phiMapped = false
+    let piMapped = false
 
     try {
       // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
       // a pipeline stall. Yield so the buffer isn't in "pending map" during submit.
       await new Promise<void>((r) => queueMicrotask(r))
       await phiBuf.mapAsync(GPUMapMode.READ)
+      phiMapped = true
       if (epoch !== this.kSpaceReadbackEpoch) {
         phiBuf.unmap()
         this.diagMappingInFlight = false
         return
       }
       await piBuf.mapAsync(GPUMapMode.READ)
+      piMapped = true
 
       // Post-map epoch re-check: a reset can land while mapAsync is awaiting,
       // which invalidates these mapped ranges logically even though WebGPU
@@ -388,7 +411,9 @@ export class FsfKSpaceManager {
       const snapshot = computeFsfDiagnostics(phi, pi, config, coefs)
 
       phiBuf.unmap()
+      phiMapped = false
       piBuf.unmap()
+      piMapped = false
 
       // Final epoch check just before pushing so a reset that lands between
       // the compute above and this store write cannot repopulate a
@@ -401,6 +426,19 @@ export class FsfKSpaceManager {
       useDiagnosticsStore.getState().pushFsfSnapshot(snapshot)
       this.diagMappingInFlight = false
     } catch (e) {
+      // Unmap any buffers left mapped after a partial failure
+      if (phiMapped)
+        try {
+          phiBuf.unmap()
+        } catch {
+          /* already destroyed */
+        }
+      if (piMapped)
+        try {
+          piBuf.unmap()
+        } catch {
+          /* already destroyed */
+        }
       // Buffer may be destroyed mid-readback during mode transitions.
       // Log in dev to surface unexpected failures.
       logger.warn('[FSF KSpace] Diagnostics readback failed:', e)

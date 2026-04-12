@@ -487,17 +487,16 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
           // preset leaves the stale 'particleAntiparticle' algorithm active, and
           // DiracStrategy forces the fieldView back to split.
           if (preset.overrides.fieldView) {
+            const expectedView = preset.overrides.fieldView
             void import('@/rendering/shaders/palette/types')
-              .then(({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
-                const expectedView = preset.overrides.fieldView!
+              .then(async ({ DIRAC_FIELD_VIEW_TO_COLOR_ALGO }) => {
                 // Guard: if a newer preset arrived while this chunk loaded,
                 // the fieldView in the store won't match — skip the stale write.
                 if (ctx.get().schroedinger.dirac.fieldView !== expectedView) return
                 const algo = DIRAC_FIELD_VIEW_TO_COLOR_ALGO[expectedView]
                 if (algo) {
-                  void import('@/stores/appearanceStore').then(({ useAppearanceStore }) => {
-                    useAppearanceStore.getState().setColorAlgorithm(algo)
-                  })
+                  const { useAppearanceStore } = await import('@/stores/appearanceStore')
+                  useAppearanceStore.getState().setColorAlgorithm(algo)
                 }
               })
               .catch((error) => {

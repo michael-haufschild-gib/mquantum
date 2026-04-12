@@ -113,78 +113,84 @@ export function dispatchDiagnostics(
     // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
     // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
     // map" state when queue.submit() fires later in the same synchronous block.
-    queueMicrotask(() => staging
-      .mapAsync(GPUMapMode.READ)
-      .then(() => {
-        if (capturedGen !== params.getDiagGeneration() || !staging) {
-          try { staging?.unmap() } catch { /* already unmapped */ }
+    queueMicrotask(() =>
+      staging
+        .mapAsync(GPUMapMode.READ)
+        .then(() => {
+          if (capturedGen !== params.getDiagGeneration() || !staging) {
+            try {
+              staging?.unmap()
+            } catch {
+              /* already unmapped */
+            }
+            onResult({
+              maxDensity: currentMaxDensity,
+              initialNorm: currentInitialNorm,
+              diagMappingInFlight: false,
+            })
+            return
+          }
+
+          const data = new Float32Array(staging.getMappedRange())
+          const totalNorm = data[0]!
+          const maxDens = data[1]!
+          const particleNorm = data[2]!
+          const antiNorm = data[3]!
+          staging.unmap()
+
+          // Asymmetric maxDensity smoothing
+          if (maxDens > 0) {
+            if (currentMaxDensity <= 0 || maxDens >= currentMaxDensity) {
+              currentMaxDensity = maxDens
+            } else {
+              currentMaxDensity += 0.4 * (maxDens - currentMaxDensity)
+            }
+          }
+
+          if (currentInitialNorm < 0) {
+            currentInitialNorm = totalNorm
+            if (renormBuf) {
+              device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
+            }
+          }
+
+          // Update diagnostics store
+          if (config.diagnosticsEnabled) {
+            const norm0 = currentInitialNorm > 0 ? currentInitialNorm : totalNorm
+            const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
+            const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
+            const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
+
+            useDiagnosticsStore.getState().updateDirac({
+              totalNorm,
+              normDrift,
+              maxDensity: maxDens,
+              particleFraction: pFrac,
+              antiparticleFraction: aFrac,
+              comptonWavelength: comptonWavelength(config.hbar, config.mass, config.speedOfLight),
+              zitterbewegungFreq: zitterbewegungFrequency(
+                config.mass,
+                config.speedOfLight,
+                config.hbar
+              ),
+              kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
+            })
+          }
+
           onResult({
             maxDensity: currentMaxDensity,
             initialNorm: currentInitialNorm,
             diagMappingInFlight: false,
           })
-          return
-        }
-
-        const data = new Float32Array(staging.getMappedRange())
-        const totalNorm = data[0]!
-        const maxDens = data[1]!
-        const particleNorm = data[2]!
-        const antiNorm = data[3]!
-        staging.unmap()
-
-        // Asymmetric maxDensity smoothing
-        if (maxDens > 0) {
-          if (currentMaxDensity <= 0 || maxDens >= currentMaxDensity) {
-            currentMaxDensity = maxDens
-          } else {
-            currentMaxDensity += 0.4 * (maxDens - currentMaxDensity)
-          }
-        }
-
-        if (currentInitialNorm < 0) {
-          currentInitialNorm = totalNorm
-          if (renormBuf) {
-            device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
-          }
-        }
-
-        // Update diagnostics store
-        if (config.diagnosticsEnabled) {
-          const norm0 = currentInitialNorm > 0 ? currentInitialNorm : totalNorm
-          const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
-          const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
-          const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
-
-          useDiagnosticsStore.getState().updateDirac({
-            totalNorm,
-            normDrift,
-            maxDensity: maxDens,
-            particleFraction: pFrac,
-            antiparticleFraction: aFrac,
-            comptonWavelength: comptonWavelength(config.hbar, config.mass, config.speedOfLight),
-            zitterbewegungFreq: zitterbewegungFrequency(
-              config.mass,
-              config.speedOfLight,
-              config.hbar
-            ),
-            kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
+        })
+        .catch(() => {
+          onResult({
+            maxDensity: currentMaxDensity,
+            initialNorm: currentInitialNorm,
+            diagMappingInFlight: false,
           })
-        }
-
-        onResult({
-          maxDensity: currentMaxDensity,
-          initialNorm: currentInitialNorm,
-          diagMappingInFlight: false,
         })
-      })
-      .catch(() => {
-        onResult({
-          maxDensity: currentMaxDensity,
-          initialNorm: currentInitialNorm,
-          diagMappingInFlight: false,
-        })
-      }))
+    )
   }
 }
 
@@ -198,10 +204,16 @@ export interface FFTAxisSharedMemParams {
   readonly dispatchCompute: FFTAxisParams['dispatchCompute']
 }
 
+/** Maximum axis dimension for the shared-memory FFT kernel (smemA/smemB are array<vec2f, 128>). */
+const SHARED_MEM_FFT_MAX_AXIS = 128
+
 /**
  * Dispatch shared-memory FFT for one axis: single dispatch completes all stages.
  * Each workgroup loads one 1D pencil into shared memory, runs all butterfly
  * stages with workgroupBarrier(), then writes back.
+ *
+ * Requires axisDim to be a power of 2 in [8, 128]. Larger axes would overflow
+ * the shared memory arrays; non-power-of-2 sizes break the butterfly decomposition.
  *
  * @returns The next slot offset for subsequent axis dispatches.
  */
@@ -211,6 +223,11 @@ export function dispatchFFTAxisSharedMem(
   slotOffset: number,
   p: FFTAxisSharedMemParams
 ): number {
+  if (axisDim > SHARED_MEM_FFT_MAX_AXIS || axisDim < 2 || (axisDim & (axisDim - 1)) !== 0) {
+    throw new Error(
+      `[Dirac FFT] axisDim=${axisDim} out of range for shared-memory FFT (must be power of 2, max ${SHARED_MEM_FFT_MAX_AXIS})`
+    )
+  }
   ctx.encoder.copyBufferToBuffer(
     p.fftAxisStagingBuffer,
     slotOffset * FFT_UNIFORM_SIZE,

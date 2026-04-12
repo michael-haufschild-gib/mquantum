@@ -105,7 +105,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private normalTextureView: GPUTextureView | null = null
   private gradientPipeline: GPUComputePipeline | null = null
   private gradientBindGroup: GPUBindGroup | null = null
-
+  /** Invalidates stale async gradient pipeline results after rebuild/dispose. */
+  private pipelineGeneration = 0
   // Pipeline + bind group bundles (created by setup functions)
   private pl: FsfPipelineResult | null = null
   private bg: FsfBindGroupResult | null = null
@@ -402,7 +403,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   private buildPipelines(device: GPUDevice): void {
     this.pl = buildFsfPipelines(device, this.setupHelpers)
-    // Build gradient normal pipeline (replaces 6 per-step fragment texture fetches with 1)
+    // Invalidate stale async gradient pipeline and rebuild
+    const gen = ++this.pipelineGeneration
+    this.gradientPipeline = null
+    this.gradientBindGroup = null
     if (this.densityTextureView && this.normalTextureView) {
       void createGradientPipeline(
         device,
@@ -410,9 +414,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.normalTextureView,
         'rgba16float',
         DENSITY_GRID_SIZE
-      ).then((result) => {
-        this.gradientPipeline = result.pipeline
-        this.gradientBindGroup = result.bindGroup
+      ).then((r) => {
+        if (gen !== this.pipelineGeneration) return
+        this.gradientPipeline = r.pipeline
+        this.gradientBindGroup = r.bindGroup
       })
     }
   }

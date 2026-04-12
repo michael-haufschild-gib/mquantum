@@ -203,6 +203,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   densityGridHasPhase: boolean
   densityGridSize: number
   isFreeScalar: boolean
+  usePrecomputedNormals: boolean
   isQuantumWalk: boolean
   isPauli: boolean
   useWignerCache: boolean
@@ -293,12 +294,9 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
   defines.push(`const IS_QUANTUM_WALK: bool = ${flags.isQuantumWalk};`)
   defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
-  // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen).
-  // Compute modes (TDSE/BEC/Dirac/FSF) don't yet have the gradient pass, so they fall
-  // back to inline 6-fetch central differences.
-  defines.push(
-    `const USE_PRECOMPUTED_NORMALS: bool = ${flags.useDensityGrid && !flags.isFreeScalar};`
-  )
+  // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen)
+  // and any compute mode that explicitly provides a normal grid (e.g. FSF).
+  defines.push(`const USE_PRECOMPUTED_NORMALS: bool = ${flags.usePrecomputedNormals};`)
 
   // Profiling strip flags — default false, dead-code-eliminated when not profiling
   const strip = flags.profilingStrip

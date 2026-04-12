@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
-const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100)
+const parsedPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100)
+const devServerPort = Number.isFinite(parsedPort) ? parsedPort : 3100
 
 export default defineConfig({
   testDir: './scripts/playwright',

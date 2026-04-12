@@ -54,8 +54,8 @@ export function generateMainBlockIsosurfaceTemporal(
 // Combines isosurface marching + PBR lighting with temporal reprojection.
 // Outputs MRT: color + world position (no normal buffer in temporal mode).
 
-// Light helpers: getEmissionLightDir, getEmissionLightAttenuation,
-// getEmissionSpotAttenuation from emission.wgsl.ts (included via emissionPostBlock)
+// Light helpers: getEmissionLightDir, getEmissionLightAttenuation
+// from emissionLit.wgsl.ts (included via emissionPostBlock)
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {

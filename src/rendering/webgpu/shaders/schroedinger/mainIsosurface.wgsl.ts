@@ -37,8 +37,8 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
 // ============================================
 // Main Fragment Shader - Isosurface Mode
 // ============================================
-// Light helpers: getEmissionLightDir, getEmissionLightAttenuation,
-// getEmissionSpotAttenuation from emission.wgsl.ts (included via emissionPostBlock)
+// Light helpers: getEmissionLightDir, getEmissionLightAttenuation
+// from emissionLit.wgsl.ts (included via emissionPostBlock)
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> FragmentOutput {

@@ -556,29 +556,38 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
     // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
     // map" state when queue.submit() fires later in the same synchronous block.
-    queueMicrotask(() => readbackBuffer.mapAsync(GPUMapMode.READ)
-      .then(() => {
-        if (this.densityReadbackBuffer !== readbackBuffer) {
-          return
-        }
-        const mapped = readbackBuffer.getMappedRange()
-        const halfView = new Uint16Array(mapped)
-        this.analyzer.buildDistribution(
-          halfView,
-          this.gridSize,
-          this.readbackBytesPerRow,
-          this.readbackBytesPerTexel,
-          this.readbackTexelStrideHalfs,
-          this.worldBound
-        )
-        readbackBuffer.unmap()
-      })
-      .catch(() => {
-        this.shouldRefreshDistribution = true
-      })
-      .finally(() => {
-        this.readbackInFlight = false
-      }))
+    queueMicrotask(() =>
+      readbackBuffer
+        .mapAsync(GPUMapMode.READ)
+        .then(() => {
+          if (this.densityReadbackBuffer !== readbackBuffer) {
+            // Stale buffer from a prior setup — unmap to avoid a permanently mapped buffer
+            try {
+              readbackBuffer.unmap()
+            } catch {
+              /* already destroyed */
+            }
+            return
+          }
+          const mapped = readbackBuffer.getMappedRange()
+          const halfView = new Uint16Array(mapped)
+          this.analyzer.buildDistribution(
+            halfView,
+            this.gridSize,
+            this.readbackBytesPerRow,
+            this.readbackBytesPerTexel,
+            this.readbackTexelStrideHalfs,
+            this.worldBound
+          )
+          readbackBuffer.unmap()
+        })
+        .catch(() => {
+          this.shouldRefreshDistribution = true
+        })
+        .finally(() => {
+          this.readbackInFlight = false
+        })
+    )
   }
 
   /**

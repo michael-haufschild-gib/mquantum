@@ -13,6 +13,29 @@
  * (full scene lighting with inlined attenuation helpers).
  */
 export const emissionPostBlock = /* wgsl */ `
+// Light helpers called by isosurface shaders (volumetric path inlines these
+// directly for fewer struct reads per light).
+
+fn getEmissionLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
+  let light = lighting.lights[lightIdx];
+  let lightType = i32(light.position.w);
+  if (lightType == LIGHT_TYPE_DIRECTIONAL) {
+    return normalize(-light.direction.xyz);
+  } else {
+    return normalize(light.position.xyz - pos);
+  }
+}
+
+fn getEmissionLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
+  let light = lighting.lights[lightIdx];
+  let lightRange = light.direction.w;
+  let decay = light.params.x;
+  if (lightRange <= 0.0) { return 1.0; }
+  let d = max(distance, EPS_DIVISION);
+  let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
+  return pow(rangeAttenuation, decay);
+}
+
 // Compute emission with ambient lighting only (for fast mode)
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
 fn computeEmission(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
@@ -39,9 +62,10 @@ fn computeEmissionLit(
   viewDir: vec3f,
   uniforms: SchroedingerUniforms
 ) -> vec3f {
-  // Early return if no lights
+  // No lights: ambient + HDR glow only (preserves emission glow on ambient-only scenes)
   if (lighting.lightCount == 0) {
-    return computeEmission(rho, s, phase, p, uniforms);
+    var ambientCol = computeEmission(rho, s, phase, p, uniforms);
+    return applyHDREmissionGlow(ambientCol, ambientCol, s, uniforms);
   }
 
   var surfaceColor = computeBaseColor(rho, s, phase, p, uniforms);
@@ -111,7 +135,7 @@ fn computeEmissionLit(
 
     var attenuation = lightIntensity;
 
-    // Inlined getEmissionLightAttenuation + getEmissionSpotAttenuation
+    // Inlined attenuation + spot falloff
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
       let distance = length(light.position.xyz - p);
       let lightRange = light.direction.w;

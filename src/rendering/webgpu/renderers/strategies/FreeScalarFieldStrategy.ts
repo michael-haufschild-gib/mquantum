@@ -69,15 +69,14 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
 
     // Pre-computed gradient normal texture (binding 7) — replaces 6 per-step
-    // fragment texture fetches with 1 lookup (saves ~0.4-1.6ms/frame at Retina)
-    const normalTextureView = this.freeScalarFieldPass.getNormalTextureView()
-    if (normalTextureView) {
-      bindings.additionalLayoutEntries.push({
-        binding: 7,
-        visibility: GPUShaderStage.FRAGMENT,
-        texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
-      })
-    }
+    // fragment texture fetches with 1 lookup (saves ~0.4-1.6ms/frame at Retina).
+    // Always declare in layout: getBindGroupEntries() always emits binding 7
+    // (falling back to densityTextureView when normals aren't ready yet).
+    bindings.additionalLayoutEntries.push({
+      binding: 7,
+      visibility: GPUShaderStage.FRAGMENT,
+      texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
+    })
 
     const fsfRef = this.freeScalarFieldPass
     const baseGetEntries = bindings.getBindGroupEntries
