@@ -408,17 +408,23 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.gradientPipeline = null
     this.gradientBindGroup = null
     if (this.densityTextureView && this.normalTextureView) {
-      void createGradientPipeline(
+      createGradientPipeline(
         device,
         this.densityTextureView,
         this.normalTextureView,
         'rgba16float',
         DENSITY_GRID_SIZE
-      ).then((r) => {
-        if (gen !== this.pipelineGeneration) return
-        this.gradientPipeline = r.pipeline
-        this.gradientBindGroup = r.bindGroup
-      })
+      )
+        .then((r) => {
+          if (gen !== this.pipelineGeneration) return
+          this.gradientPipeline = r.pipeline
+          this.gradientBindGroup = r.bindGroup
+        })
+        .catch((err) => {
+          if (gen === this.pipelineGeneration) {
+            logger.warn('[FSF] Gradient pipeline creation failed:', err)
+          }
+        })
     }
   }
 
@@ -962,6 +968,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Release all GPU resources. */
   dispose(): void {
+    // Invalidate in-flight async gradient pipeline results
+    this.pipelineGeneration++
     const gpuBuffers: (GPUBuffer | null)[] = [this.phiBuffer, this.piBuffer, this.uniformBuffer]
     for (const buf of gpuBuffers) buf?.destroy()
     this.densityTexture?.destroy()

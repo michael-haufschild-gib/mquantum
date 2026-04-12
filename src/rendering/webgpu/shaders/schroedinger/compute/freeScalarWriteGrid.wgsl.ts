@@ -245,17 +245,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     phiVal = blendedPhi;
     piVal = blendedPi;
-  } else {
-    phiVal = phi[nnIdx];
-    piVal = pi[nnIdx];
   }
 
-  // Cache NN field values (only when needed for energy density / analysis)
+  // Cache NN field values (only when needed for energy density / analysis).
+  // When !useTrilinear, phiVal/piVal also come from the NN sample — reuse
+  // a single load instead of reading phi[nnIdx]/pi[nnIdx] twice.
   var nnPhiVal: f32 = 0.0;
   var nnPiVal: f32 = 0.0;
   if (needNN) {
     nnPhiVal = phi[nnIdx];
     nnPiVal = pi[nnIdx];
+  }
+  if (!useTrilinear) {
+    phiVal = nnPhiVal;
+    piVal = nnPiVal;
   }
 
   var fieldValue: f32 = 0.0;

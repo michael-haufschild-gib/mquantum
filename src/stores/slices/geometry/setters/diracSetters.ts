@@ -501,7 +501,7 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
               })
               .catch((error) => {
                 logger.warn(
-                  `[diracSetters] Failed to load color algo map for '${presetId}':`,
+                  `[diracSetters] Failed to sync Dirac fieldView color algorithm for '${presetId}':`,
                   error
                 )
               })

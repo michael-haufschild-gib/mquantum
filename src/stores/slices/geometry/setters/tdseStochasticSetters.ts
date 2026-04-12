@@ -39,7 +39,18 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
   const D = 'tdse' as const
 
   return {
-    setTdseStochasticEnabled: nestedValueSetter(ctx, D, 'stochasticEnabled'),
+    setTdseStochasticEnabled: (enabled) => {
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...state.schroedinger.tdse,
+            stochasticEnabled:
+              state.schroedinger.tdse.potentialType === 'blackHoleRingdown' ? false : enabled,
+          },
+        },
+      }))
+    },
     setTdseStochasticGamma: nestedClampedSetter(ctx, D, 'stochasticGamma', 0, 10),
     setTdseStochasticSigma: nestedClampedSetter(ctx, D, 'stochasticSigma', 0.5, 5.0),
     setTdseStochasticNumSites: nestedIntSetter(
@@ -51,7 +62,18 @@ export function createTdseStochasticSetters(ctx: SetterContext): StochasticActio
       'floor'
     ),
     setTdseStochasticSeed: nestedIntSetter(ctx, D, 'stochasticSeed', 0, 999999, 'floor'),
-    setTdseBranchingEnabled: nestedValueSetter(ctx, D, 'branchingEnabled'),
+    setTdseBranchingEnabled: (enabled) => {
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...state.schroedinger.tdse,
+            branchingEnabled:
+              state.schroedinger.tdse.potentialType === 'blackHoleRingdown' ? false : enabled,
+          },
+        },
+      }))
+    },
     setTdseBranchPlanePosition: nestedClampedSetter(ctx, D, 'branchPlanePosition', -1.0, 1.0),
     setTdseBranchColorA: nestedValueSetter(ctx, D, 'branchColorA'),
     setTdseBranchColorB: nestedValueSetter(ctx, D, 'branchColorB'),

@@ -93,12 +93,13 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
           }
         }
         // Normal grid: use pre-computed normals if available, fall back to
-        // density view to avoid bind group layout/entry count mismatch
-        const normalView = fsfRef?.getNormalTextureView()
-        if (normalView) {
-          entries.push({ binding: 7, resource: normalView })
-        } else if (densityTextureView) {
-          entries.push({ binding: 7, resource: densityTextureView })
+        // density view to avoid bind group layout/entry count mismatch.
+        // Layout always declares binding 7, so we must always emit it.
+        const view7 = fsfRef?.getNormalTextureView() ?? densityTextureView
+        if (view7) {
+          entries.push({ binding: 7, resource: view7 })
+        } else {
+          logger.warn('[FreeScalarFieldStrategy] No texture view for binding 7 — layout mismatch')
         }
         return entries
       },
