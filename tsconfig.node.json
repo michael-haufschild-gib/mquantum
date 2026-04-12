@@ -23,6 +23,7 @@
     "vitest.config.ts",
     "vitest.config.stryker.ts",
     "playwright.config.ts",
+    "playwright.benchmark.config.ts",
     "scripts/benchmark-peschel.ts"
   ]
 }

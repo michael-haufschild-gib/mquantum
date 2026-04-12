@@ -83,11 +83,8 @@ import {
   generateDensityGridFragmentBindings,
   generateNormalGridFragmentBinding,
 } from './volume/densityGridSampling.wgsl'
-import {
-  emissionPostBlock,
-  generateComputeBaseColor,
-  generateEmissionPreBlock,
-} from './volume/emission.wgsl'
+import { generateComputeBaseColor, generateEmissionPreBlock } from './volume/emission.wgsl'
+import { emissionPostBlock } from './volume/emissionLit.wgsl'
 import {
   generateVolumeRaymarchGridBlock,
   generateVolumeRaymarchGridSimpleBlock,

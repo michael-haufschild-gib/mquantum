@@ -276,7 +276,7 @@ export class FsfKSpaceManager {
   }
 
   private async readbackAndComputeKSpace(
-    device: GPUDevice,
+    _device: GPUDevice,
     config: FreeScalarConfig,
     simEta: number
   ): Promise<void> {
@@ -350,7 +350,7 @@ export class FsfKSpaceManager {
   }
 
   private async readbackDiagnostics(
-    device: GPUDevice,
+    _device: GPUDevice,
     config: FreeScalarConfig,
     coefs: FsfHamiltonianCoefs
   ): Promise<void> {
