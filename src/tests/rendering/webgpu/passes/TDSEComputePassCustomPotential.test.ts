@@ -67,6 +67,13 @@ describe('computePotentialHash — base shape parameters', () => {
   // Each case edits a single field and asserts the hash changes. The
   // defaults are irrelevant — only the delta matters. A bug that drops
   // any one of these from the hash fails the corresponding case.
+  //
+  // NOTE: These tests intentionally mutate parameters without switching
+  // `potentialType` to match. The hash must be sensitive to ALL parameters
+  // regardless of the currently active type, because a user can change a
+  // slider value while in type A, then switch to type B — the cache must
+  // invalidate. Scoping hash sensitivity to the active type would create
+  // subtle stale-data bugs on type switches.
   const cases: { field: keyof TdseConfig; mutate: (c: TdseConfig) => TdseConfig }[] = [
     { field: 'barrierHeight', mutate: (c) => ({ ...c, barrierHeight: c.barrierHeight + 1 }) },
     { field: 'barrierWidth', mutate: (c) => ({ ...c, barrierWidth: c.barrierWidth + 0.1 }) },

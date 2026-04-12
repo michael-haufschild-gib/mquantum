@@ -150,7 +150,7 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     const startIdx = Math.max(0, positions.length - this.pointCount)
 
     // `measurements[]` is append-ordered — index 0 is the oldest record,
-    // index (pointCount-1) the newest. The vertex shader's uniform
+    // index (positions.length-1) the newest. The vertex shader's uniform
     // contract is `0=newest, 1=oldest` and the fragment shader applies
     // `fade = 1 - age*0.7` (so older → dimmer). We therefore invert the
     // index-to-age mapping here; the original `i / (pointCount-1)` made

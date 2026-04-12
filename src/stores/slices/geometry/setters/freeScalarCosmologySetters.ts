@@ -20,6 +20,7 @@
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { clampEta0 } from '@/lib/physics/cosmology/adiabaticVacuum'
+import { isKasnerVacuum } from '@/lib/physics/cosmology/bianchiKasner'
 import {
   isValidPreset,
   MAX_SPACETIME_DIM,
@@ -340,6 +341,11 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
       }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
+        // Only trigger a field reset when the exponents satisfy the vacuum
+        // Kasner conditions (Σpᵢ = 1, Σpᵢ² = 1). Non-vacuum triples are
+        // stored for UI display but won't reset the GPU field — the physics
+        // code (computeBianchiKasnerCoefs) would throw for invalid triples.
+        const vacuumValid = isKasnerVacuum({ p1, p2, p3 }, 1e-4)
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -349,7 +355,7 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
                 ...fs.cosmology,
                 kasnerExponents: { p1, p2, p3 },
               },
-              needsReset: fs.cosmology.preset === 'bianchiKasner' || fs.needsReset,
+              needsReset: (fs.cosmology.preset === 'bianchiKasner' && vacuumValid) || fs.needsReset,
             },
           },
         }

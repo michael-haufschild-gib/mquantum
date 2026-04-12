@@ -249,26 +249,22 @@ describe('WebGPUCamera', () => {
     it('setAspect with the same value is a no-op (early-return optimization)', () => {
       // Proves the `if (this.state.aspect === aspect) return` guard does
       // what it claims. We clear the dirty flag by calling getMatrices()
-      // once, then pass the exact same aspect — the internal state and
-      // resulting projection matrix must be bit-for-bit identical, which
-      // implies recomputation was skipped.
-      //
-      // Note: object-reference equality of `projectionMatrix` is NOT a
-      // useful check because `getMatrices()` always returns the same
-      // pre-allocated Float32Array. The distinguishing behaviour is that
-      // the contents of that array don't change.
+      // once, then pass the exact same aspect — the dirty flag must stay
+      // false, proving no recomputation was triggered.
       const cam = new WebGPUCamera({ aspect: 1.5 })
-      const snapshot = new Float32Array(cam.getMatrices().projectionMatrix)
+      cam.getMatrices() // clear dirty flag
 
       cam.setAspect(1.5)
-      const afterNoOp = cam.getMatrices().projectionMatrix
-      for (let i = 0; i < 16; i++) {
-        expect(afterNoOp[i]).toBe(snapshot[i])
-      }
+      // Access the private dirty flag to assert the early-return guard works.
+      // Matrix comparison alone is insufficient — identical inputs produce
+      // identical results even after a full recompute.
+      const internal = cam as unknown as { dirty: boolean }
+      expect(internal.dirty).toBe(false)
 
-      // And a fresh aspect change still takes effect after the no-op —
+      // A fresh aspect change still takes effect after the no-op —
       // guards against the early-return leaking into subsequent calls.
       cam.setAspect(2.0)
+      expect(internal.dirty).toBe(true)
       expect(cam.getState().aspect).toBe(2.0)
     })
   })

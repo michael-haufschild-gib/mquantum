@@ -8,7 +8,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -23,8 +23,26 @@ const TINY_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
 
 describe('ScreenshotModal', () => {
+  // Mock Image so `generateOutput`'s `new Image()` stays in-flight
+  // deterministically, regardless of DOM environment (happy-dom, jsdom, etc.).
+  let OriginalImage: typeof globalThis.Image
+
   beforeEach(() => {
     useScreenshotStore.setState(useScreenshotStore.getInitialState())
+    OriginalImage = globalThis.Image
+
+    globalThis.Image = class MockImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_: string) {
+        // Never fires onload — keeps the generateOutput promise pending
+      }
+    } as unknown as typeof globalThis.Image
+  })
+
+  afterEach(() => {
+    globalThis.Image = OriginalImage
+    vi.restoreAllMocks()
   })
 
   it('does not render modal content when isOpen=false', () => {
@@ -51,14 +69,10 @@ describe('ScreenshotModal', () => {
   })
 
   it('Save button enters loading state while generateOutput is in flight', async () => {
-    // generateOutput awaits Image.onload, which happy-dom does NOT fire.
-    // That actually works for us: the in-flight promise never settles, so
-    // the component stays in `isSaving=true` and we can observe the button's
-    // loading affordance (disabled attribute + aria-busy) as proof that
-    // `handleDownload` actually entered the try block. Before this test
-    // the file had a no-op click with a comment that admitted it asserted
-    // nothing — now a regression that short-circuits the handler or never
-    // flips `setIsSaving` will fail here.
+    // MockImage (see beforeEach) never fires onload, so the generateOutput
+    // promise stays pending. The component remains in `isSaving=true` and we
+    // observe the button's loading affordance (disabled attribute) as proof
+    // that `handleDownload` entered the try block.
     useScreenshotStore.setState({ isOpen: true, imageSrc: TINY_PNG })
     const user = userEvent.setup()
 

@@ -5,6 +5,72 @@ import {
   spinorSize,
 } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 
+// ── Shared complex-matrix test helpers ──────────────────────────────────
+
+/** Extract complex S×S matrix from packed buffer at given offset. */
+function extractMatrix(buf: Float32Array, s: number, offset: number): Float32Array {
+  return buf.slice(offset, offset + s * s * 2)
+}
+
+/** Get complex entry (row, col) from an S×S matrix. */
+function getEntry(m: Float32Array, s: number, r: number, c: number): [number, number] {
+  const idx = (r * s + c) * 2
+  return [m[idx]!, m[idx + 1]!]
+}
+
+/** Complex matrix multiply C = A · B for S×S matrices. */
+function matMul(a: Float32Array, b: Float32Array, s: number): Float32Array {
+  const c = new Float32Array(s * s * 2)
+  for (let i = 0; i < s; i++) {
+    for (let j = 0; j < s; j++) {
+      let re = 0,
+        im = 0
+      for (let k = 0; k < s; k++) {
+        const [aR, aI] = getEntry(a, s, i, k)
+        const [bR, bI] = getEntry(b, s, k, j)
+        re += aR * bR - aI * bI
+        im += aR * bI + aI * bR
+      }
+      c[(i * s + j) * 2] = re
+      c[(i * s + j) * 2 + 1] = im
+    }
+  }
+  return c
+}
+
+/** Add two complex matrices: C = A + B. */
+function matAdd(a: Float32Array, b: Float32Array): Float32Array {
+  const c = new Float32Array(a.length)
+  for (let i = 0; i < a.length; i++) c[i] = a[i]! + b[i]!
+  return c
+}
+
+/** Scale a complex matrix by a real scalar. */
+function matScale(m: Float32Array, scalar: number): Float32Array {
+  const c = new Float32Array(m.length)
+  for (let i = 0; i < m.length; i++) c[i] = m[i]! * scalar
+  return c
+}
+
+/** Check if matrix equals scaled identity (re · I). */
+function isScaledIdentity(m: Float32Array, s: number, expectedRe: number, tol: number): boolean {
+  for (let i = 0; i < s; i++) {
+    for (let j = 0; j < s; j++) {
+      const [re, im] = getEntry(m, s, i, j)
+      const expected = i === j ? expectedRe : 0
+      if (Math.abs(re - expected) > tol || Math.abs(im) > tol) return false
+    }
+  }
+  return true
+}
+
+/** Complex S×S identity matrix. */
+function complexIdentity(s: number): Float32Array {
+  const m = new Float32Array(s * s * 2)
+  for (let i = 0; i < s; i++) m[(i * s + i) * 2] = 1.0
+  return m
+}
+
 describe('spinorSize', () => {
   it('returns 2 for 1D', () => {
     expect(spinorSize(1)).toBe(2)
@@ -35,56 +101,6 @@ describe('spinorSize', () => {
 })
 
 describe('generateDiracMatricesFallback', () => {
-  // Helper: extract complex S×S matrix from packed buffer at given offset
-  function extractMatrix(buf: Float32Array, s: number, offset: number): Float32Array {
-    return buf.slice(offset, offset + s * s * 2)
-  }
-
-  // Helper: get complex entry (row, col) from S×S matrix
-  function getEntry(m: Float32Array, s: number, r: number, c: number): [number, number] {
-    const idx = (r * s + c) * 2
-    return [m[idx]!, m[idx + 1]!]
-  }
-
-  // Helper: complex matrix multiply C = A * B for S×S matrices
-  function matMul(a: Float32Array, b: Float32Array, s: number): Float32Array {
-    const c = new Float32Array(s * s * 2)
-    for (let i = 0; i < s; i++) {
-      for (let j = 0; j < s; j++) {
-        let re = 0,
-          im = 0
-        for (let k = 0; k < s; k++) {
-          const [aR, aI] = getEntry(a, s, i, k)
-          const [bR, bI] = getEntry(b, s, k, j)
-          re += aR * bR - aI * bI
-          im += aR * bI + aI * bR
-        }
-        c[(i * s + j) * 2] = re
-        c[(i * s + j) * 2 + 1] = im
-      }
-    }
-    return c
-  }
-
-  // Helper: matrix add
-  function matAdd(a: Float32Array, b: Float32Array): Float32Array {
-    const c = new Float32Array(a.length)
-    for (let i = 0; i < a.length; i++) c[i] = a[i]! + b[i]!
-    return c
-  }
-
-  // Helper: check if matrix equals scaled identity (re * I)
-  function isScaledIdentity(m: Float32Array, s: number, expectedRe: number, tol: number): boolean {
-    for (let i = 0; i < s; i++) {
-      for (let j = 0; j < s; j++) {
-        const [re, im] = getEntry(m, s, i, j)
-        const expected = i === j ? expectedRe : 0
-        if (Math.abs(re - expected) > tol || Math.abs(im) > tol) return false
-      }
-    }
-    return true
-  }
-
   it('packs spinor size as u32 bits in first element', () => {
     const { gammaData, spinorSize: s } = generateDiracMatricesFallback(3)
     const u32 = new Uint32Array(gammaData.buffer, 0, 1)
@@ -208,58 +224,6 @@ describe('generateDiracMatricesFallback', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('Dirac free Hamiltonian: H² = E²·I', () => {
-  /** Complex S×S identity matrix. */
-  function complexIdentity(s: number): Float32Array {
-    const m = new Float32Array(s * s * 2)
-    for (let i = 0; i < s; i++) m[(i * s + i) * 2] = 1.0
-    return m
-  }
-
-  /** Get complex entry (row, col) from an S×S matrix. */
-  function getEntry(m: Float32Array, s: number, r: number, c: number): [number, number] {
-    const idx = (r * s + c) * 2
-    return [m[idx]!, m[idx + 1]!]
-  }
-
-  /** Extract complex S×S matrix from packed buffer at given offset. */
-  function extractMatrix(buf: Float32Array, s: number, offset: number): Float32Array {
-    return buf.slice(offset, offset + s * s * 2)
-  }
-
-  /** Complex matrix multiply C = A · B. */
-  function matMul(a: Float32Array, b: Float32Array, s: number): Float32Array {
-    const c = new Float32Array(s * s * 2)
-    for (let i = 0; i < s; i++) {
-      for (let j = 0; j < s; j++) {
-        let re = 0
-        let im = 0
-        for (let k = 0; k < s; k++) {
-          const [aR, aI] = getEntry(a, s, i, k)
-          const [bR, bI] = getEntry(b, s, k, j)
-          re += aR * bR - aI * bI
-          im += aR * bI + aI * bR
-        }
-        c[(i * s + j) * 2] = re
-        c[(i * s + j) * 2 + 1] = im
-      }
-    }
-    return c
-  }
-
-  /** Add two complex matrices: C = A + B. */
-  function matAdd(a: Float32Array, b: Float32Array): Float32Array {
-    const c = new Float32Array(a.length)
-    for (let i = 0; i < a.length; i++) c[i] = a[i]! + b[i]!
-    return c
-  }
-
-  /** Scale a complex matrix by a real scalar. */
-  function matScale(m: Float32Array, scalar: number): Float32Array {
-    const c = new Float32Array(m.length)
-    for (let i = 0; i < m.length; i++) c[i] = m[i]! * scalar
-    return c
-  }
-
   const cases: { dim: number; k: number[]; m: number }[] = [
     { dim: 1, k: [1.0], m: 1.0 },
     { dim: 2, k: [1.0, 0.5], m: 1.0 },
@@ -293,9 +257,12 @@ describe('Dirac free Hamiltonian: H² = E²·I', () => {
       const k2 = k.reduce((acc, ki) => acc + ki * ki, 0)
       const expected = matScale(complexIdentity(s), k2 + m * m)
 
-      // f32 error accumulates with S — looser bound for S>8.
-      const tol = s <= 8 ? 1e-3 : 0.05
+      // f32 error accumulates with spinor size — use combined absolute +
+      // relative tolerance so large diagonal entries don't mask off-diagonal bugs.
+      const absTol = 1e-3
+      const relTol = s <= 8 ? 1e-3 : 5e-3
       for (let i = 0; i < expected.length; i++) {
+        const tol = absTol + relTol * Math.abs(expected[i]!)
         expect(Math.abs(H2[i]! - expected[i]!)).toBeLessThan(tol)
       }
     })
