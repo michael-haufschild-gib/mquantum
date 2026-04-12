@@ -53,6 +53,8 @@ export function rebuildDiracBuffers(
   old.uniformBuffer?.destroy()
   old.fftUniformBuffer?.destroy()
   old.fftStagingBuffer?.destroy()
+  old.fftAxisUniformBuffer?.destroy()
+  old.fftAxisStagingBuffer?.destroy()
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -123,12 +125,14 @@ export function rebuildDiracBuffers(
     'dirac-pack-uniforms'
   )
 
-  // FFT staging buffer
-  let fwdStageCount = 0
+  // FFT staging buffer (Stockham per-stage fallback — still allocated for diagnostics FFT)
+  let stockhamFwdStageCount = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    fwdStageCount += Math.log2(config.gridSize[d]!)
+    stockhamFwdStageCount += Math.log2(config.gridSize[d]!)
   }
-  const totalFFTStages = fwdStageCount * 2
+  const totalFFTStages = stockhamFwdStageCount * 2
+  // Shared-memory FFT: one slot per axis (used as inverse FFT offset)
+  const fwdStageCount = config.latticeDim
   const fftStagingBuffer = device.createBuffer({
     label: 'dirac-fft-staging',
     size: Math.max(FFT_UNIFORM_SIZE, totalFFTStages * FFT_UNIFORM_SIZE),
@@ -136,6 +140,21 @@ export function rebuildDiracBuffers(
   })
   const fftStagingData = buildFFTStagingData(config, totalSites)
   device.queue.writeBuffer(fftStagingBuffer, 0, fftStagingData)
+
+  // Shared-memory FFT: per-axis uniform buffer + staging buffer
+  const fftAxisUniformBuffer = helpers.createUniformBuffer(
+    device,
+    FFT_UNIFORM_SIZE,
+    'dirac-fft-axis-uniforms'
+  )
+  const axisSlotCount = config.latticeDim * 2 // forward + inverse
+  const fftAxisStagingBuffer = device.createBuffer({
+    label: 'dirac-fft-axis-staging',
+    size: Math.max(FFT_UNIFORM_SIZE, axisSlotCount * FFT_UNIFORM_SIZE),
+    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  })
+  const fftAxisStagingData = buildFFTAxisStagingData(config, totalSites)
+  device.queue.writeBuffer(fftAxisStagingBuffer, 0, fftAxisStagingData)
 
   // Pack uniforms (with 1/N normalization for inverse FFT unpack)
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
@@ -207,6 +226,8 @@ export function rebuildDiracBuffers(
     uniformBuffer,
     fftUniformBuffer,
     fftStagingBuffer,
+    fftAxisUniformBuffer,
+    fftAxisStagingBuffer,
     packUniformBuffer,
     packUniformBufferNoNorm,
     diagUniformBuffer,
@@ -221,4 +242,39 @@ export function rebuildDiracBuffers(
     fwdStageCount,
     diagNumWorkgroups,
   }
+}
+
+/**
+ * Build per-axis staging data for the shared-memory FFT.
+ * One 32-byte slot per axis per direction (forward + inverse).
+ * Identical layout to TDSE's `buildTdseFFTAxisStagingData`.
+ */
+function buildFFTAxisStagingData(config: DiracConfig, totalSites: number): ArrayBuffer {
+  const slotCount = config.latticeDim * 2 // forward + inverse
+  const data = new ArrayBuffer(slotCount * FFT_UNIFORM_SIZE)
+  let slotIdx = 0
+
+  for (const direction of [1.0, -1.0]) {
+    let axisStride = 1
+    for (let d = config.latticeDim - 1; d >= 0; d--) {
+      const axisDim = config.gridSize[d]!
+      const log2N = Math.round(Math.log2(axisDim))
+
+      const offset = slotIdx * FFT_UNIFORM_SIZE
+      const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
+      view.setUint32(0, axisDim, true) // axisDim
+      view.setFloat32(4, direction, true) // direction
+      view.setUint32(8, totalSites, true) // totalElements
+      view.setUint32(12, axisStride, true) // axisStride
+      view.setUint32(16, log2N, true) // log2N
+      view.setUint32(20, 0, true) // _pad0
+      view.setUint32(24, 0, true) // _pad1
+      view.setUint32(28, 0, true) // _pad2
+      slotIdx++
+
+      axisStride *= axisDim
+    }
+  }
+
+  return data
 }

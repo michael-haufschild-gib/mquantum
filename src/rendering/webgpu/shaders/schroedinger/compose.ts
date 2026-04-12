@@ -134,6 +134,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     densityGridHasPhase,
     densityGridSize,
     isFreeScalar,
+    usePrecomputedNormals,
     isQuantumWalk,
     isPauli,
     useWignerCache,

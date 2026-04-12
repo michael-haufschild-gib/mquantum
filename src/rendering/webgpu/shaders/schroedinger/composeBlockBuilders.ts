@@ -83,11 +83,8 @@ import {
   generateDensityGridFragmentBindings,
   generateNormalGridFragmentBinding,
 } from './volume/densityGridSampling.wgsl'
-import {
-  emissionPostBlock,
-  generateComputeBaseColor,
-  generateEmissionPreBlock,
-} from './volume/emission.wgsl'
+import { generateComputeBaseColor, generateEmissionPreBlock } from './volume/emission.wgsl'
+import { emissionPostBlock } from './volume/emissionLit.wgsl'
 import {
   generateVolumeRaymarchGridBlock,
   generateVolumeRaymarchGridSimpleBlock,
@@ -496,7 +493,7 @@ export function buildVolumeBlocks(opts: {
       condition: !opts.is2D,
       content: opts.useDensityGrid
         ? opts.gridOnly
-          ? generateVolumeRaymarchGridSimpleBlock()
+          ? generateVolumeRaymarchGridSimpleBlock(opts.usePrecomputedNormals)
           : generateVolumeRaymarchGridBlock(opts.usePrecomputedNormals)
         : [
             '// Stub: grid raymarching unavailable',

@@ -30,6 +30,10 @@ import {
   tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import {
+  fftAxisUniformsBlock,
+  tdseSharedMemFFTBlock,
+} from '../shaders/schroedinger/compute/tdseSharedMemFFT.wgsl'
+import {
   tdseFFTStageUniformsBlock,
   tdseStockhamFFTBlock,
 } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
@@ -191,6 +195,22 @@ export function buildDiracPipelines(
     'dirac-fft-stage'
   )
 
+  // Shared-memory FFT: one dispatch per axis (all stages in workgroup shared memory)
+  const fftSharedMemBGL = createComputeBGL(device, 'dirac-fft-shared-mem-bgl', [
+    'uniform',
+    'storage',
+  ])
+  const fftSharedMemPipeline = helpers.createComputePipeline(
+    device,
+    helpers.createShaderModule(
+      device,
+      fftAxisUniformsBlock + tdseSharedMemFFTBlock,
+      'dirac-fft-shared-mem'
+    ),
+    [fftSharedMemBGL],
+    'dirac-fft-shared-mem'
+  )
+
   // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read)
   const kineticBGL = createComputeBGL(device, 'dirac-kinetic-bgl', [
     'uniform',
@@ -270,6 +290,8 @@ export function buildDiracPipelines(
     unpackBGL,
     fftStagePipeline,
     fftStageBGL,
+    fftSharedMemPipeline,
+    fftSharedMemBGL,
     kineticPipeline,
     kineticBGL,
     writeGridPipeline,
@@ -369,6 +391,16 @@ export function rebuildDiracBindGroups(
       { binding: 0, resource: { buffer: fftUniformBuffer } },
       { binding: 1, resource: { buffer: fftScratchB } },
       { binding: 2, resource: { buffer: fftScratchA } },
+    ],
+  })
+
+  // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA)
+  const fftSharedMemBG = device.createBindGroup({
+    label: 'dirac-fft-shared-mem-bg',
+    layout: pipelines.fftSharedMemBGL,
+    entries: [
+      { binding: 0, resource: { buffer: inputs.fftAxisUniformBuffer } },
+      { binding: 1, resource: { buffer: fftScratchA } },
     ],
   })
 
@@ -502,6 +534,7 @@ export function rebuildDiracBindGroups(
     potentialHalfBG,
     fftStageABBG,
     fftStageBABG,
+    fftSharedMemBG,
     kineticBG,
     writeGridBG,
     diagReduceBG,

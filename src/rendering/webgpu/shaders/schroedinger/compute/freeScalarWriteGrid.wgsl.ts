@@ -103,28 +103,42 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // k-Space mode (analysisMode 3): CPU manages both textures — skip all GPU writes
   if (params.analysisMode == 3u) { return; }
 
+  let hasAnalysis = params.analysisMode > 0u;
+
   let bound = params.boundingRadius;
   if (bound <= 0.0) {
     textureStore(outputTex, gid, vec4f(0.0));
-    textureStore(analysisTex, gid, vec4f(0.0));
+    if (hasAnalysis) { textureStore(analysisTex, gid, vec4f(0.0)); }
     return;
   }
 
-  // Map texture voxel to model-space position [-bound, +bound]^3
-  let modelPos = vec3f(
-    (f32(gid.x) + 0.5) / f32(texDims.x) * 2.0 * bound - bound,
-    (f32(gid.y) + 0.5) / f32(texDims.y) * 2.0 * bound - bound,
-    (f32(gid.z) + 0.5) / f32(texDims.z) * 2.0 * bound - bound
-  );
+  // Map texture voxel to model-space position [-bound, +bound]^3.
+  // PERF: precompute inverse dimensions to replace 3 divisions with multiplies.
+  let invDims = 1.0 / vec3f(texDims);
+  let twoBound = 2.0 * bound;
+  let modelPos = (vec3f(gid) + 0.5) * invDims * twoBound - bound;
 
-  // Project model-space position into N-D lattice coordinates via basis vectors
+  // Project model-space position into N-D lattice coordinates via basis vectors.
+  // 3D fast path: three dot products (no loop, no branch on d >= 3).
   var ndWorldPos: array<f32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    ndWorldPos[d] = modelPos.x * params.basisX[d]
-                  + modelPos.y * params.basisY[d]
-                  + modelPos.z * params.basisZ[d];
-    if (d >= 3u) {
-      ndWorldPos[d] += params.slicePositions[d];
+  if (params.latticeDim == 3u) {
+    ndWorldPos[0] = modelPos.x * params.basisX[0]
+                  + modelPos.y * params.basisY[0]
+                  + modelPos.z * params.basisZ[0];
+    ndWorldPos[1] = modelPos.x * params.basisX[1]
+                  + modelPos.y * params.basisY[1]
+                  + modelPos.z * params.basisZ[1];
+    ndWorldPos[2] = modelPos.x * params.basisX[2]
+                  + modelPos.y * params.basisY[2]
+                  + modelPos.z * params.basisZ[2];
+  } else {
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      ndWorldPos[d] = modelPos.x * params.basisX[d]
+                    + modelPos.y * params.basisY[d]
+                    + modelPos.z * params.basisZ[d];
+      if (d >= 3u) {
+        ndWorldPos[d] += params.slicePositions[d];
+      }
     }
   }
 
@@ -136,7 +150,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let inBounds = worldToLatticeInterp(&ndWorldPos, &coordsLo, &coordsHi, &fracs);
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
-    textureStore(analysisTex, gid, vec4f(0.0));
+    if (hasAnalysis) { textureStore(analysisTex, gid, vec4f(0.0)); }
     return;
   }
 
@@ -156,24 +170,69 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let numCorners = 1u << min(params.latticeDim, 3u);
 
-  // Nearest-neighbor coords (for gradient-based modes and analysis)
-  var nnCoords: array<u32, 12>;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d];
-    nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
-  }
-  let nnIdx = ndToLinear(nnCoords, params.strides, params.latticeDim);
-
   // Trilinear interpolation for phi/pi (fieldView 0, 1)
-  // NN for energy density (fieldView 2) which needs gradient
+  // NN for energy density (fieldView 2+) and analysis modes
   let useTrilinear = params.fieldView <= 1u;
+  // NN coords and gradient are only needed for energy density (fieldView 2+) and analysis
+  let needNN = params.fieldView >= 2u || hasAnalysis;
 
   var phiVal: f32;
   var piVal: f32;
-  var idx: u32;
+  var nnIdx: u32 = 0u;
 
-  if (useTrilinear) {
+  // Nearest-neighbor coords (only computed when needed for gradient/analysis)
+  var nnCoords: array<u32, 12>;
+  if (needNN) {
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+      let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d];
+      nnCoords[d] = u32(clamp(i32(round(coordF)), 0, i32(params.gridSize[d]) - 1));
+    }
+    nnIdx = ndToLinear(nnCoords, params.strides, params.latticeDim);
+  }
+
+  if (useTrilinear && params.latticeDim == 3u) {
+    // Fast path: 3D trilinear interpolation using nested mix().
+    // Replaces 8 × (siteIndexForCorner + cornerWeight) loop calls with
+    // direct stride arithmetic and 7 mix() per field (14 total for phi+pi).
+    let s0 = params.strides[0];
+    let s1 = params.strides[1];
+    let s2 = params.strides[2];
+    let baseIdx = coordsLo[0] * s0 + coordsLo[1] * s1 + coordsLo[2] * s2;
+    let f0 = fracs[0];
+    let f1 = fracs[1];
+    let f2 = fracs[2];
+
+    // Use clamped deltas: at lattice boundaries coordsHi may equal coordsLo
+    // (worldToLatticeInterp clamps), so the stride offset must be 0 there —
+    // not the raw stride, which would read a wrong neighbor or go OOB.
+    let d0 = (coordsHi[0] - coordsLo[0]) * s0;
+    let d1 = (coordsHi[1] - coordsLo[1]) * s1;
+    let d2 = (coordsHi[2] - coordsLo[2]) * s2;
+
+    // x=lo,y=lo: interpolate z
+    let phi00 = mix(phi[baseIdx], phi[baseIdx + d2], f2);
+    let pi00 = mix(pi[baseIdx], pi[baseIdx + d2], f2);
+    // x=lo,y=hi
+    let phi01 = mix(phi[baseIdx + d1], phi[baseIdx + d1 + d2], f2);
+    let pi01 = mix(pi[baseIdx + d1], pi[baseIdx + d1 + d2], f2);
+    // x=lo: interpolate y
+    let phi0 = mix(phi00, phi01, f1);
+    let pi0 = mix(pi00, pi01, f1);
+    // x=hi,y=lo
+    let phi10 = mix(phi[baseIdx + d0], phi[baseIdx + d0 + d2], f2);
+    let pi10 = mix(pi[baseIdx + d0], pi[baseIdx + d0 + d2], f2);
+    // x=hi,y=hi
+    let phi11 = mix(phi[baseIdx + d0 + d1], phi[baseIdx + d0 + d1 + d2], f2);
+    let pi11 = mix(pi[baseIdx + d0 + d1], pi[baseIdx + d0 + d1 + d2], f2);
+    // x=hi: interpolate y
+    let phi1 = mix(phi10, phi11, f1);
+    let pi1 = mix(pi10, pi11, f1);
+    // Final: interpolate x
+    phiVal = mix(phi0, phi1, f0);
+    piVal = mix(pi0, pi1, f0);
+  } else if (useTrilinear) {
+    // Generic N-D path for latticeDim != 3
     var blendedPhi: f32 = 0.0;
     var blendedPi: f32 = 0.0;
     for (var corner: u32 = 0u; corner < numCorners; corner++) {
@@ -186,16 +245,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     phiVal = blendedPhi;
     piVal = blendedPi;
-    idx = nnIdx;
-  } else {
-    idx = nnIdx;
-    phiVal = phi[idx];
-    piVal = pi[idx];
   }
 
-  // Cache NN field values once (avoids redundant buffer reads across fieldView/analysis branches)
-  let nnPhiVal = phi[nnIdx];
-  let nnPiVal = pi[nnIdx];
+  // Cache NN field values (only when needed for energy density / analysis).
+  // When !useTrilinear, phiVal/piVal also come from the NN sample — reuse
+  // a single load instead of reading phi[nnIdx]/pi[nnIdx] twice.
+  var nnPhiVal: f32 = 0.0;
+  var nnPiVal: f32 = 0.0;
+  if (needNN) {
+    nnPhiVal = phi[nnIdx];
+    nnPiVal = pi[nnIdx];
+  }
+  if (!useTrilinear) {
+    phiVal = nnPhiVal;
+    piVal = nnPiVal;
+  }
 
   var fieldValue: f32 = 0.0;
 
@@ -203,7 +267,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var gradEnergy: f32 = 0.0;
   var gradPhi: array<f32, 12>;
 
-  let needGrad = params.fieldView == 2u || params.analysisMode > 0u;
+  let needGrad = params.fieldView == 2u || hasAnalysis;
   if (needGrad) {
     let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
@@ -320,7 +384,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   textureStore(outputTex, gid, vec4f(normRho, logRho, phase, normRho));
 
-  // Analysis texture output (educational color modes)
+  // Analysis texture output (educational color modes) — skip entirely when disabled
   if (params.analysisMode == 1u) {
     // Proper-frame Hamiltonian density decomposition (K, G, V, E).
     // The canonical triple (½ aKinetic π², ½ aPotential (∇φ)², ½ m²·aFull φ²)
@@ -357,7 +421,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     let Smag = sqrt(Sx * Sx + Sy * Sy + Sz * Sz);
     textureStore(analysisTex, gid, vec4f(Sx, Sy, Sz, Smag));
-  } else {
+  } else if (hasAnalysis) {
     textureStore(analysisTex, gid, vec4f(0.0));
   }
 }

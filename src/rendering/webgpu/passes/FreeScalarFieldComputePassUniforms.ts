@@ -88,6 +88,29 @@ import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
 import { computeStridesPadded, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
+// PERF: WeakMap-backed typed array view cache. Avoids creating 3 new
+// TypedArray views per frame (180/sec at 60 FPS). The views share the
+// underlying ArrayBuffer so caching is safe and GC-friendly.
+const _u32Cache = new WeakMap<ArrayBuffer, Uint32Array>()
+const _f32Cache = new WeakMap<ArrayBuffer, Float32Array>()
+const _i32Cache = new WeakMap<ArrayBuffer, Int32Array>()
+
+function _getCachedU32(buf: ArrayBuffer): Uint32Array {
+  let v = _u32Cache.get(buf)
+  if (!v) { v = new Uint32Array(buf); _u32Cache.set(buf, v) }
+  return v
+}
+function _getCachedF32(buf: ArrayBuffer): Float32Array {
+  let v = _f32Cache.get(buf)
+  if (!v) { v = new Float32Array(buf); _f32Cache.set(buf, v) }
+  return v
+}
+function _getCachedI32(buf: ArrayBuffer): Int32Array {
+  let v = _i32Cache.get(buf)
+  if (!v) { v = new Int32Array(buf); _i32Cache.set(buf, v) }
+  return v
+}
+
 // Re-export the shared cosmology helpers so external call sites (tests,
 // other passes) can continue importing from this pass file if they want.
 // The source of truth is `@/lib/physics/freeScalar/vacuumDispersion`; new
@@ -225,9 +248,13 @@ export function writeFsfUniforms(
 ): number {
   const { config, totalSites, basisX, basisY, basisZ, boundingRadius, colorAlgorithm } = params
 
-  const u32 = new Uint32Array(uniformData)
-  const f32 = new Float32Array(uniformData)
-  const i32 = new Int32Array(uniformData)
+  // PERF: Reuse cached typed array views instead of creating 3 new views per frame.
+  // TypedArray constructors are cheap (~100ns) but the GC pressure from ~180 views/sec
+  // at 60 FPS is measurable in CPU flame graphs. The views are backed by the same
+  // ArrayBuffer so they share the same memory — caching is safe.
+  const u32 = _getCachedU32(uniformData)
+  const f32 = _getCachedF32(uniformData)
+  const i32 = _getCachedI32(uniformData)
 
   // Zero out the entire buffer first (ensures unused array slots are 0)
   u32.fill(0)

@@ -54,8 +54,8 @@ export function generateMainBlockIsosurfaceTemporal(
 // Combines isosurface marching + PBR lighting with temporal reprojection.
 // Outputs MRT: color + world position (no normal buffer in temporal mode).
 
-// Light helpers: getEmissionLightDir, getEmissionLightAttenuation,
-// getEmissionSpotAttenuation from emission.wgsl.ts (included via emissionPostBlock)
+// Light helpers: getEmissionLightDir, getEmissionLightAttenuation
+// from emissionLit.wgsl.ts (included via emissionPostBlock)
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> TemporalFragmentOutput {
@@ -205,6 +205,20 @@ ${bayerJitterSection}
   // For dual-channel modes: s = secondary density from grid (not log-density).
   let sSurface = select(sFromRho(rhoSurface), dualSecondary, IS_DUAL_CHANNEL);
   var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
+
+  // Branch coloring: tint isosurface by branch plane position
+  if (schroedinger.quantumMode == 3 && schroedinger.branchSeparation > 0.5 && schroedinger.branchTransitionWidth > 0.0) {
+    let branchFrac = smoothstep(
+      schroedinger.branchPlaneThreshold - schroedinger.branchTransitionWidth,
+      schroedinger.branchPlaneThreshold + schroedinger.branchTransitionWidth,
+      p.x
+    );
+    let branchColorA = vec3f(schroedinger.branchColorA[0], schroedinger.branchColorA[1], schroedinger.branchColorA[2]);
+    let branchColorB = vec3f(schroedinger.branchColorB[0], schroedinger.branchColorB[1], schroedinger.branchColorB[2]);
+    let branchTint = mix(branchColorA, branchColorB, branchFrac);
+    let lum = dot(surfaceColor, vec3f(0.2126, 0.7152, 0.0722));
+    surfaceColor = branchTint * lum;
+  }
 
   // Phase materiality (shared helper)
   if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {

@@ -69,8 +69,10 @@ test.describe('render performance benchmark', () => {
       await waitForRendererReady(page)
       await waitForShaderCompilation(page)
 
-      // Enable performance monitor to activate timing collection
+      // Uncap FPS + enable performance monitor for timing collection
       await page.evaluate(async () => {
+        const perfStore = (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+        perfStore.getState().setMaxFps(0)
         const mod = await import('/src/stores/uiStore.ts')
         mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
       })
@@ -115,11 +117,11 @@ test.describe('render performance benchmark', () => {
         { timeout: 60_000 }
       )
 
-      // Wait for final stats to publish (fps history populated)
+      // Wait for final stats to publish (fps > 0 from the measurement window)
       await page.waitForFunction(
         async () => {
           const mod = await import('/src/stores/performanceMetricsStore.ts')
-          return mod.usePerformanceMetricsStore.getState().fpsHistory.length > 0
+          return mod.usePerformanceMetricsStore.getState().fps > 0
         },
         { timeout: 5_000 }
       )

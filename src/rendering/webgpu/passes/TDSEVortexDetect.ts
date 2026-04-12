@@ -265,46 +265,25 @@ export function dispatchAndReadbackVortexDetect(
     }
   }
 
-  // Wait for GPU to finish the copy before mapping
-  device.queue
-    .onSubmittedWorkDone()
+  // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+  // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
+  // map" state when queue.submit() fires later in the same synchronous block.
+  queueMicrotask(() => staging
+    .mapAsync(GPUMapMode.READ)
     .then(() => {
-      // Bail out if a rebuild swapped the staging buffer or destroyed it
-      // entirely while we were waiting on the GPU.
-      if (
-        state.generation !== dispatchGen ||
-        state.stagingBuffer !== staging ||
-        staging.mapState !== 'unmapped'
-      ) {
+      if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
+        try { staging.unmap() } catch { /* already destroyed */ }
         clearIfCurrent()
         return
       }
-      staging
-        .mapAsync(GPUMapMode.READ)
-        .then(() => {
-          // Re-check after the async hop — a rebuild can land between
-          // mapAsync resolving and us reading the mapped range.
-          if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
-            try {
-              staging.unmap()
-            } catch {
-              // Buffer may already be destroyed; ignore.
-            }
-            clearIfCurrent()
-            return
-          }
-          const mapped = new Uint32Array(staging.getMappedRange().slice(0))
-          state.lastResult = [mapped[0] ?? 0, mapped[1] ?? 0, mapped[2] ?? 0]
-          staging.unmap()
-          clearIfCurrent()
-        })
-        .catch(() => {
-          clearIfCurrent()
-        })
+      const mapped = new Uint32Array(staging.getMappedRange().slice(0))
+      state.lastResult = [mapped[0] ?? 0, mapped[1] ?? 0, mapped[2] ?? 0]
+      staging.unmap()
+      clearIfCurrent()
     })
     .catch(() => {
       clearIfCurrent()
-    })
+    }))
 }
 
 /**

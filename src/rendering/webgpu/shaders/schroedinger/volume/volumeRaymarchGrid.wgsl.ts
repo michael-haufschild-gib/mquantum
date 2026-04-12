@@ -32,15 +32,21 @@
  * full function triggers a Metal shader compiler bug on Apple Silicon that
  * causes sampleDensityFromGrid to return zero within the loop body.
  */
-export function generateVolumeRaymarchGridSimpleBlock(): string {
+export function generateVolumeRaymarchGridSimpleBlock(usePrecomputedNormals = false): string {
+  const gradientFetchFn = usePrecomputedNormals
+    ? `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  return sampleNormalFromGrid(pos, uniforms);
+}`
+    : `fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  return computeGradientFromGrid(pos, uniforms);
+}`
+
   return /* wgsl */ `
 // ============================================
 // Grid-Based Volume Raymarching (Simplified — compute modes only)
 // ============================================
 
-fn fetchGradient(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  return computeGradientFromGrid(pos, uniforms);
-}
+${gradientFetchFn}
 
 fn volumeRaymarchGrid(
   rayOrigin: vec3f,
@@ -75,15 +81,18 @@ fn volumeRaymarchGrid(
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
 
-    // Empty-skip: jump ahead when density is negligible
+    // Empty-skip: jump ahead when density is negligible.
+    // Compute modes produce smoother density fields (grid-interpolated), so a
+    // 2-probe scheme at 10× step is safe and saves 1 texture fetch per skip.
     if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
-      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD
+            && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
           t += skipDistance;
           continue;
         }

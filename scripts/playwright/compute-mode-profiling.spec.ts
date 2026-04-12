@@ -305,6 +305,279 @@ test.describe('Free Scalar Field profiling', () => {
   })
 })
 
+// ─── TDSE Non-Default Features ──────────────────────────────────────────────
+
+test.describe('TDSE non-default features', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('TDSE: Anderson disorder', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdsePotentialType('andersonDisorder')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: Anderson disorder', 'tdseDynamics', 'anderson')
+  })
+
+  test('TDSE: absorber + diagnostics', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdseAbsorberEnabled(true)
+      s.setTdseDiagnosticsEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: absorber + diagnostics', 'tdseDynamics', 'abs+diag')
+  })
+
+  test('TDSE: observables', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdseObservablesEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: observables', 'tdseDynamics', 'observables')
+  })
+
+  test('TDSE: stochastic localization (CSL)', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdseStochasticEnabled(true)
+      s.setTdseStochasticGamma(2.0)
+      s.setTdseStochasticSigma(1.5)
+      s.setTdseStochasticNumSites(8)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: stochastic localization (CSL)', 'tdseDynamics', 'csl')
+  })
+
+  test('TDSE: imaginary time (eigenstate finder)', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdsePotentialType('harmonicTrap')
+      s.setTdseImaginaryTimeEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: imaginary time', 'tdseDynamics', 'imagTime')
+  })
+
+  test('TDSE: all features combined', async ({ page }) => {
+    await gotoMode(page, 'tdseDynamics', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setTdseAbsorberEnabled(true)
+      s.setTdseDiagnosticsEnabled(true)
+      s.setTdseObservablesEnabled(true)
+      s.setTdseStochasticEnabled(true)
+      s.setTdseStochasticGamma(2.0)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'TDSE: ALL features', 'tdseDynamics', 'allFeatures')
+  })
+})
+
+// ─── FSF Cosmology & Preheating ─────────────────────────────────────────────
+
+test.describe('FSF cosmology & preheating', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('FSF: cosmology — de Sitter', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarCosmologyEnabled(true)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyHubble(1.0)
+      s.setFreeScalarCosmologyEta0(-10)
+      s.setFreeScalarInitialCondition('vacuumNoise')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'FSF: de Sitter cosmology', 'freeScalarField', 'deSitter')
+  })
+
+  test('FSF: cosmology — ekpyrotic', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarCosmologyEnabled(true)
+      s.setFreeScalarCosmologyPreset('ekpyrotic')
+      s.setFreeScalarCosmologySteepness(10)
+      s.setFreeScalarCosmologyEta0(-5)
+      s.setFreeScalarInitialCondition('vacuumNoise')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'FSF: ekpyrotic cosmology', 'freeScalarField', 'ekpyrotic')
+  })
+
+  test('FSF: cosmology — Kasner (Bianchi-I)', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarCosmologyEnabled(true)
+      s.setFreeScalarCosmologyPreset('kasner')
+      s.setFreeScalarCosmologyEta0(1.5)
+      s.setFreeScalarInitialCondition('vacuumNoise')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'FSF: Kasner (Bianchi-I)', 'freeScalarField', 'kasner')
+  })
+
+  test('FSF: preheating (Mathieu drive)', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarPreheatingEnabled(true)
+      s.setFreeScalarPreheatingAmplitude(0.5)
+      s.setFreeScalarPreheatingFrequency(5.0)
+      s.setFreeScalarInitialCondition('vacuumNoise')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'FSF: preheating (Mathieu)', 'freeScalarField', 'preheating')
+  })
+
+  test('FSF: cosmology + preheating', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarCosmologyEnabled(true)
+      s.setFreeScalarCosmologyPreset('deSitter')
+      s.setFreeScalarCosmologyHubble(1.0)
+      s.setFreeScalarCosmologyEta0(-10)
+      s.setFreeScalarPreheatingEnabled(true)
+      s.setFreeScalarPreheatingAmplitude(0.5)
+      s.setFreeScalarPreheatingFrequency(5.0)
+      s.setFreeScalarInitialCondition('vacuumNoise')
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(
+      page,
+      'FSF: de Sitter + preheating',
+      'freeScalarField',
+      'deSitter+preheating'
+    )
+  })
+
+  test('FSF: absorber', async ({ page }) => {
+    await gotoMode(page, 'freeScalarField', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setFreeScalarAbsorberEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'FSF: PML absorber', 'freeScalarField', 'absorber')
+  })
+})
+
+// ─── Quantum Walk & Dirac Non-Default ───────────────────────────────────────
+
+test.describe('QW & Dirac non-default features', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  test('Quantum Walk: absorber', async ({ page }) => {
+    await gotoMode(page, 'quantumWalk', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setQwAbsorberEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'QW: absorber', 'quantumWalk', 'absorber')
+  })
+
+  test('Dirac: absorber + diagnostics', async ({ page }) => {
+    await gotoMode(page, 'diracEquation', 3)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await page.evaluate(async () => {
+      const store =
+        window.__EXTENDED_OBJECT_STORE__ ??
+        (await import('/src/stores/extendedObjectStore.ts')).useExtendedObjectStore
+      const s = store.getState() as Record<string, (...a: unknown[]) => void>
+      s.setDiracAbsorberEnabled(true)
+      s.setDiracDiagnosticsEnabled(true)
+    })
+    await waitForShaderCompilation(page)
+    await profileScenario(page, 'Dirac: absorber + diagnostics', 'diracEquation', 'abs+diag')
+  })
+})
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 test.describe('summary', () => {

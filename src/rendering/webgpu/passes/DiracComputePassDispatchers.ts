@@ -110,97 +110,138 @@ export function dispatchDiagnostics(
     let currentMaxDensity = params.maxDensity
     let currentInitialNorm = params.initialNorm
 
-    device.queue
-      .onSubmittedWorkDone()
-      .then(() => {
-        // Discard stale readback if field was reinitialized since dispatch
-        if (capturedGen !== params.getDiagGeneration()) {
-          onResult({
-            maxDensity: currentMaxDensity,
-            initialNorm: currentInitialNorm,
-            diagMappingInFlight: false,
-          })
-          return
-        }
-        if (!staging || staging.mapState !== 'unmapped') {
-          onResult({
-            maxDensity: currentMaxDensity,
-            initialNorm: currentInitialNorm,
-            diagMappingInFlight: false,
-          })
-          return
-        }
-        staging
-          .mapAsync(GPUMapMode.READ)
-          .then(() => {
-            const data = new Float32Array(staging.getMappedRange())
-            const totalNorm = data[0]!
-            const maxDens = data[1]!
-            const particleNorm = data[2]!
-            const antiNorm = data[3]!
-            staging.unmap()
-
-            // Asymmetric maxDensity smoothing
-            if (maxDens > 0) {
-              if (currentMaxDensity <= 0 || maxDens >= currentMaxDensity) {
-                currentMaxDensity = maxDens
-              } else {
-                currentMaxDensity += 0.4 * (maxDens - currentMaxDensity)
-              }
+    // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
+    // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
+    // map" state when queue.submit() fires later in the same synchronous block.
+    queueMicrotask(() =>
+      staging
+        .mapAsync(GPUMapMode.READ)
+        .then(() => {
+          if (capturedGen !== params.getDiagGeneration() || !staging) {
+            try {
+              staging?.unmap()
+            } catch {
+              /* already unmapped */
             }
-
-            if (currentInitialNorm < 0) {
-              currentInitialNorm = totalNorm
-              if (renormBuf) {
-                device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
-              }
-            }
-
-            // Update diagnostics store
-            if (config.diagnosticsEnabled) {
-              const norm0 = currentInitialNorm > 0 ? currentInitialNorm : totalNorm
-              const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
-              const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
-              const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
-
-              useDiagnosticsStore.getState().updateDirac({
-                totalNorm,
-                normDrift,
-                maxDensity: maxDens,
-                particleFraction: pFrac,
-                antiparticleFraction: aFrac,
-                comptonWavelength: comptonWavelength(config.hbar, config.mass, config.speedOfLight),
-                zitterbewegungFreq: zitterbewegungFrequency(
-                  config.mass,
-                  config.speedOfLight,
-                  config.hbar
-                ),
-                kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
-              })
-            }
-
             onResult({
               maxDensity: currentMaxDensity,
               initialNorm: currentInitialNorm,
               diagMappingInFlight: false,
             })
-          })
-          .catch(() => {
-            onResult({
-              maxDensity: currentMaxDensity,
-              initialNorm: currentInitialNorm,
-              diagMappingInFlight: false,
+            return
+          }
+
+          const data = new Float32Array(staging.getMappedRange())
+          const totalNorm = data[0]!
+          const maxDens = data[1]!
+          const particleNorm = data[2]!
+          const antiNorm = data[3]!
+          staging.unmap()
+
+          // Asymmetric maxDensity smoothing
+          if (maxDens > 0) {
+            if (currentMaxDensity <= 0 || maxDens >= currentMaxDensity) {
+              currentMaxDensity = maxDens
+            } else {
+              currentMaxDensity += 0.4 * (maxDens - currentMaxDensity)
+            }
+          }
+
+          if (currentInitialNorm < 0) {
+            currentInitialNorm = totalNorm
+            if (renormBuf) {
+              device.queue.writeBuffer(renormBuf, 4, new Float32Array([totalNorm]))
+            }
+          }
+
+          // Update diagnostics store
+          if (config.diagnosticsEnabled) {
+            const norm0 = currentInitialNorm > 0 ? currentInitialNorm : totalNorm
+            const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
+            const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
+            const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
+
+            useDiagnosticsStore.getState().updateDirac({
+              totalNorm,
+              normDrift,
+              maxDensity: maxDens,
+              particleFraction: pFrac,
+              antiparticleFraction: aFrac,
+              comptonWavelength: comptonWavelength(config.hbar, config.mass, config.speedOfLight),
+              zitterbewegungFreq: zitterbewegungFrequency(
+                config.mass,
+                config.speedOfLight,
+                config.hbar
+              ),
+              kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
             })
+          }
+
+          onResult({
+            maxDensity: currentMaxDensity,
+            initialNorm: currentInitialNorm,
+            diagMappingInFlight: false,
           })
-      })
-      .catch(() => {
-        onResult({
-          maxDensity: currentMaxDensity,
-          initialNorm: currentInitialNorm,
-          diagMappingInFlight: false,
         })
-      })
+        .catch(() => {
+          onResult({
+            maxDensity: currentMaxDensity,
+            initialNorm: currentInitialNorm,
+            diagMappingInFlight: false,
+          })
+        })
+    )
   }
+}
+
+/** Parameters for shared-memory FFT axis dispatch. */
+export interface FFTAxisSharedMemParams {
+  readonly pl: DiracPipelineResult
+  readonly bg: DiracBindGroupResult
+  readonly fftAxisUniformBuffer: GPUBuffer
+  readonly fftAxisStagingBuffer: GPUBuffer
+  readonly totalSites: number
+  readonly dispatchCompute: FFTAxisParams['dispatchCompute']
+}
+
+/** Maximum axis dimension for the shared-memory FFT kernel (smemA/smemB are array<vec2f, 128>). */
+const SHARED_MEM_FFT_MAX_AXIS = 128
+
+/**
+ * Dispatch shared-memory FFT for one axis: single dispatch completes all stages.
+ * Each workgroup loads one 1D pencil into shared memory, runs all butterfly
+ * stages with workgroupBarrier(), then writes back.
+ *
+ * Requires axisDim to be a power of 2 in [8, 128]. Larger axes would overflow
+ * the shared memory arrays; non-power-of-2 sizes break the butterfly decomposition.
+ *
+ * @returns The next slot offset for subsequent axis dispatches.
+ */
+export function dispatchFFTAxisSharedMem(
+  ctx: WebGPURenderContext,
+  axisDim: number,
+  slotOffset: number,
+  p: FFTAxisSharedMemParams
+): number {
+  if (axisDim > SHARED_MEM_FFT_MAX_AXIS || axisDim < 2 || (axisDim & (axisDim - 1)) !== 0) {
+    throw new Error(
+      `[Dirac FFT] axisDim=${axisDim} out of range for shared-memory FFT (must be power of 2, max ${SHARED_MEM_FFT_MAX_AXIS})`
+    )
+  }
+  ctx.encoder.copyBufferToBuffer(
+    p.fftAxisStagingBuffer,
+    slotOffset * FFT_UNIFORM_SIZE,
+    p.fftAxisUniformBuffer,
+    0,
+    FFT_UNIFORM_SIZE
+  )
+
+  const pencilCount = p.totalSites / axisDim
+  const pass = ctx.beginComputePass({ label: `dirac-fft-shared-mem-axis-${slotOffset}` })
+  p.dispatchCompute(pass, p.pl.fftSharedMemPipeline, [p.bg.fftSharedMemBG!], pencilCount)
+  pass.end()
+
+  return slotOffset + 1
 }
 
 /** Parameters for dispatchFFTAxis */

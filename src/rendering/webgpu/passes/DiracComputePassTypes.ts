@@ -19,6 +19,8 @@ export interface DiracBufferResult {
   uniformBuffer: GPUBuffer
   fftUniformBuffer: GPUBuffer
   fftStagingBuffer: GPUBuffer
+  fftAxisUniformBuffer: GPUBuffer
+  fftAxisStagingBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -45,6 +47,8 @@ export interface DiracDestroyableBuffers {
   uniformBuffer: GPUBuffer | null
   fftUniformBuffer: GPUBuffer | null
   fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffer: GPUBuffer | null
+  fftAxisStagingBuffer: GPUBuffer | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -75,6 +79,8 @@ export interface DiracPipelineResult {
   unpackBGL: GPUBindGroupLayout
   fftStagePipeline: GPUComputePipeline
   fftStageBGL: GPUBindGroupLayout
+  fftSharedMemPipeline: GPUComputePipeline
+  fftSharedMemBGL: GPUBindGroupLayout
   kineticPipeline: GPUComputePipeline
   kineticBGL: GPUBindGroupLayout
   writeGridPipeline: GPUComputePipeline
@@ -94,6 +100,7 @@ export interface DiracBindGroupResult {
   potentialHalfBG: GPUBindGroup | null
   fftStageABBG: GPUBindGroup | null
   fftStageBABG: GPUBindGroup | null
+  fftSharedMemBG: GPUBindGroup | null
   kineticBG: GPUBindGroup | null
   writeGridBG: GPUBindGroup | null
   diagReduceBG: GPUBindGroup | null
@@ -115,6 +122,7 @@ export interface DiracBindGroupInputs {
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
   fftUniformBuffer: GPUBuffer
+  fftAxisUniformBuffer: GPUBuffer
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   densityTextureView: GPUTextureView
