@@ -45,7 +45,7 @@ const DEFAULT_TRIPLE = kasnerSymmetricVacuum()
  * @returns React component
  */
 export const BianchiKasnerControls: React.FC<BianchiKasnerControlsProps> = React.memo(
-  ({ kasnerExponents, latticeDim, setBianchiExponents }) => {
+  ({ kasnerExponents, setBianchiExponents }) => {
     const exp = kasnerExponents ?? DEFAULT_TRIPLE
 
     const sumP = exp.p1 + exp.p2 + exp.p3
@@ -149,8 +149,8 @@ export const BianchiKasnerControls: React.FC<BianchiKasnerControlsProps> = React
         </div>
 
         <div className="text-xs text-text-tertiary italic">
-          Only the first three spatial axes feel the anisotropy — higher-dim lattices stay
-          isotropic on the extra axes. Generalised conformal time η &gt; 0.
+          Only the first three spatial axes feel the anisotropy — higher-dim lattices stay isotropic
+          on the extra axes. Generalised conformal time η &gt; 0.
         </div>
       </ControlGroup>
     )
