@@ -8,7 +8,7 @@ N-dimensional quantum wavefunction visualizer. Physical accuracy is the primary 
 
 | Constraint | Rule |
 |-----------|------|
-| Quantum object types | `ObjectType = 'schroedinger' | 'pauliSpinor'`. No polytopes, fractals, black holes. |
+| Quantum object types | `ObjectType = 'schroedinger' | 'pauliSpinor'`. No polytopes or fractals. |
 | Renderer | Custom WebGPU on raw `GPUDevice` / `GPUCommandEncoder`. No WebGL, no Three.js. |
 | Shaders | WGSL only. Files: `.wgsl.ts` composed via `assembleShaderBlocks()`. |
 | Approach | Research before coding. Understand code purpose before changing it. No reactive patches. |

@@ -276,8 +276,27 @@ export function hermitianEigendecompose(
     const phaseRe = aijMag > 1e-30 ? aijRe / aijMag : 1
     const phaseIm = aijMag > 1e-30 ? -aijIm / aijMag : 0
 
-    // Now solve 2×2 real symmetric problem with diagonal (aii, ajj) and off-diag aijMag
-    const tau = (ajj - aii) / (2 * aijMag)
+    // Now solve 2×2 real symmetric problem with diagonal (aii, ajj) and off-diag aijMag.
+    //
+    // Jacobi rotation sign derivation
+    // ───────────────────────────────
+    // The code's rotation convention is `G = [[c, -s*e^{+iφ}], [s*e^{-iφ}, c]]`
+    // (applied right-hand on columns, then `G†` left-hand on rows — see below).
+    // For this G, the (i, j) element of `G† H G` is
+    //   |h_ij|*(c² − s²) + c·s·(h_jj − h_ii) = 0,
+    // which solves to `tan(2θ) = 2|h_ij| / (h_ii − h_jj)`. Using the standard
+    // Jacobi substitution `t = tan(θ)` and `τ = 1/tan(2θ) / 2`, we get
+    // `τ = (h_ii − h_jj) / (2|h_ij|)` — NOT `(h_jj − h_ii) / (2|h_ij|)`.
+    //
+    // An earlier revision of this file had the sign flipped. Numerical
+    // evidence: on real `[[1, 2], [2, 3]]` (expected eigenvalues 2 ± √5) the
+    // flipped-sign sweep wobbled around the eigenvalues for all 50 maxSweeps
+    // without converging (off-diagonal bouncing between 0.04 and 2.24). On the
+    // complex `[[0.6, 0.2+0.1i], [0.2−0.1i, 0.4]]` from the test suite the
+    // reconstruction error plateaued at ~2% — which the test had quietly
+    // relaxed to `toBeLessThan(0.02)`. With the correct sign both cases
+    // converge in a single Jacobi sweep to machine precision.
+    const tau = (aii - ajj) / (2 * aijMag)
     const t =
       tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
     const c = 1 / Math.sqrt(1 + t * t)

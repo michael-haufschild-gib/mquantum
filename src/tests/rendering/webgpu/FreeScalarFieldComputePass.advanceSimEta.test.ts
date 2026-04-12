@@ -28,10 +28,12 @@ describe('FreeScalarFieldComputePass.advanceSimEta (cosmology clock direction)',
     expect(next).toBeCloseTo(-4.9, 10)
   })
 
-  it('advances η toward 0⁺ by SUBTRACTING dt on the (unusual) η > 0 branch', () => {
+  it('advances η away from 0 by ADDING dt on the η > 0 branch (Bianchi-I)', () => {
     const pass = new FreeScalarFieldComputePass()
     const next = pass._testAdvanceSimEta(5, 0.1)
-    expect(next).toBeCloseTo(4.9, 10)
+    // Bianchi-I uses η > 0; conformal time increases with physical time,
+    // moving away from the singularity at η = 0.
+    expect(next).toBeCloseTo(5.1, 10)
   })
 
   it('monotonically reduces |η| across many steps on the η < 0 branch', () => {

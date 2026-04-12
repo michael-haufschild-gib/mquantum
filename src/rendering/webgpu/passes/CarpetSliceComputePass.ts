@@ -47,6 +47,50 @@ export type CarpetReadbackCallback = (
 ) => void
 
 /**
+ * Unpack a GPU staging buffer (with 256-byte row alignment padding) into a
+ * dense `gridSize × historyLength` Float32Array. Pure function so it can be
+ * unit-tested without a real GPUDevice.
+ *
+ * The staging buffer layout is `historyLength` rows, each with
+ * `paddedRowFloats` floats, where `paddedRowFloats = bytesPerRow / 4` and
+ * `bytesPerRow = ceil(gridSize * 4 / 256) * 256`. Only the first `gridSize`
+ * floats of each row carry real carpet data — the rest is row-alignment
+ * padding required by `copyTextureToBuffer`.
+ *
+ * @param src - Flat view over the mapped staging buffer
+ * @param gridSize - Number of valid floats per row
+ * @param historyLength - Number of rows
+ * @param paddedRowFloats - Float stride per row (includes alignment padding)
+ * @returns Dense `gridSize × historyLength` Float32Array in row-major order
+ */
+export function unpackCarpetStaging(
+  src: Float32Array,
+  gridSize: number,
+  historyLength: number,
+  paddedRowFloats: number
+): Float32Array {
+  const result = new Float32Array(gridSize * historyLength)
+  for (let row = 0; row < historyLength; row++) {
+    const srcOffset = row * paddedRowFloats
+    const dstOffset = row * gridSize
+    for (let col = 0; col < gridSize; col++) {
+      result[dstOffset + col] = src[srcOffset + col]!
+    }
+  }
+  return result
+}
+
+/**
+ * `bytesPerRow` for `copyTextureToBuffer` of a single-row-f32 carpet row,
+ * rounded up to the 256-byte alignment WebGPU requires. Shared by the
+ * staging-buffer allocation (`ensureTextures`) and the readback copy
+ * (`performReadback`) so the two sites can never drift.
+ */
+function alignedBytesPerRow(gridSize: number): number {
+  return Math.ceil((gridSize * 4) / 256) * 256
+}
+
+/**
  * GPU compute pass that extracts 1D spatial slices from a 3D density texture
  * and accumulates them into a rolling 2D carpet texture for spacetime diagrams.
  */
@@ -68,7 +112,8 @@ export class CarpetSliceComputePass {
   private stagingBuffer: GPUBuffer | null = null
   private readbackInFlight = false
   private framesSinceReadback = 0
-  /** Set by dispose/releaseTextures to guard in-flight readback callbacks. */
+  /** Set by `dispose()` to short-circuit in-flight readback callbacks so they
+   *  don't try to touch buffers the renderer just destroyed. */
   private disposed = false
 
   // Bind group cache
@@ -156,7 +201,7 @@ export class CarpetSliceComputePass {
     })
 
     // Staging buffer — row stride must be 256-byte aligned for copyTextureToBuffer
-    const bytesPerRow = Math.ceil((DENSITY_GRID_SIZE * 4) / 256) * 256
+    const bytesPerRow = alignedBytesPerRow(DENSITY_GRID_SIZE)
     this.stagingBuffer = this.device.createBuffer({
       label: 'carpet-staging',
       size: bytesPerRow * historyLength,
@@ -250,7 +295,7 @@ export class CarpetSliceComputePass {
   ): void {
     if (!this.device || !this.carpetTexture || !this.stagingBuffer) return
 
-    const bytesPerRow = Math.ceil((DENSITY_GRID_SIZE * 4) / 256) * 256
+    const bytesPerRow = alignedBytesPerRow(DENSITY_GRID_SIZE)
 
     encoder.copyTextureToBuffer(
       { texture: this.carpetTexture },
@@ -274,32 +319,32 @@ export class CarpetSliceComputePass {
         }
         staging.mapAsync(GPUMapMode.READ).then(
           () => {
-            if (this.disposed) {
-              try {
-                staging.unmap()
-              } catch {
-                // Buffer already destroyed — safe to ignore
+            // try/finally guarantees `readbackInFlight` is released even if the
+            // row-unpacking or the store callback throws. Without it, a throw
+            // anywhere in the success path would permanently wedge carpet
+            // readbacks: every subsequent `dispatch` hits the `!readbackInFlight`
+            // gate and skips, so the CPU-side carpet panel freezes on the last
+            // delivered frame with no runtime signal.
+            try {
+              if (this.disposed) {
+                try {
+                  staging.unmap()
+                } catch {
+                  // Buffer already destroyed — safe to ignore
+                }
+                return
               }
+
+              const mapped = staging.getMappedRange()
+              const src = new Float32Array(mapped)
+              const paddedRowFloats = bytesPerRow / 4
+              const result = unpackCarpetStaging(src, gridSize, hl, paddedRowFloats)
+
+              staging.unmap()
+              onReadback(result, gridSize, captureWriteHead, captureTotalFrames)
+            } finally {
               this.readbackInFlight = false
-              return
             }
-
-            const mapped = staging.getMappedRange()
-            const result = new Float32Array(gridSize * hl)
-            const src = new Float32Array(mapped)
-            const paddedRowFloats = bytesPerRow / 4
-
-            for (let row = 0; row < hl; row++) {
-              const srcOffset = row * paddedRowFloats
-              const dstOffset = row * gridSize
-              for (let col = 0; col < gridSize; col++) {
-                result[dstOffset + col] = src[srcOffset + col]!
-              }
-            }
-
-            staging.unmap()
-            onReadback(result, gridSize, captureWriteHead, captureTotalFrames)
-            this.readbackInFlight = false
           },
           () => {
             this.readbackInFlight = false
@@ -328,23 +373,6 @@ export class CarpetSliceComputePass {
     this.pipeline = null
     this.bindGroupLayout = null
     this.device = null
-    this.currentHistoryLength = 0
-    this.readbackInFlight = false
-  }
-
-  /**
-   * Release carpet textures without destroying the pipeline.
-   * Called when carpet is disabled for quick re-enable.
-   */
-  releaseTextures(): void {
-    this.disposed = true
-    this.carpetTexture?.destroy()
-    this.carpetTexture = null
-    this.carpetTextureView = null
-    this.stagingBuffer?.destroy()
-    this.stagingBuffer = null
-    this.bindGroup = null
-    this.lastDensityView = null
     this.currentHistoryLength = 0
     this.readbackInFlight = false
   }

@@ -1,18 +1,17 @@
 /**
- * Skybox constants for WGSL
+ * Skybox constants for WGSL.
+ *
+ * The `MODE_*` constants this block used to export (CLASSIC, AURORA,
+ * NEBULA, VOID, CRYSTALLINE, HORIZON, OCEAN, TWILIGHT, STARFIELD) were
+ * dead: `composeSkyboxFragmentShader` selects the active mode block via a
+ * TypeScript `switch` at compile time, so each generated skybox shader
+ * only ever contains its own mode's code and never dispatches on a
+ * uniform-valued mode. Nothing across the codebase referenced those
+ * constants. Removed to avoid giving readers the false impression that
+ * there is a runtime mode dispatch.
  */
 export const constantsBlock = `
 // --- Constants ---
 const PI: f32 = 3.14159265359;
 const TAU: f32 = 6.28318530718;
-
-const MODE_CLASSIC: f32 = 0.0;
-const MODE_AURORA: f32 = 1.0;
-const MODE_NEBULA: f32 = 2.0;
-const MODE_VOID: f32 = 3.0;
-const MODE_CRYSTALLINE: f32 = 4.0;
-const MODE_HORIZON: f32 = 5.0;
-const MODE_OCEAN: f32 = 6.0;
-const MODE_TWILIGHT: f32 = 7.0;
-const MODE_STARFIELD: f32 = 8.0;
 `

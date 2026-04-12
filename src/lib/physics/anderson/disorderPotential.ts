@@ -31,7 +31,7 @@ export function generateDisorderPotential(
   disorderStrength: number,
   seed: number,
   distribution: TdseDisorderDistribution
-): Float32Array {
+): Float32Array<ArrayBuffer> {
   let totalSites = 1
   for (let d = 0; d < latticeDim; d++) {
     totalSites *= gridSize[d]!

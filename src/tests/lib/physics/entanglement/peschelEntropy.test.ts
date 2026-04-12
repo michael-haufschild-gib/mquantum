@@ -18,6 +18,7 @@ import {
   computeCosmologicalEntropyTrajectory,
   computeEntanglementSpectrum,
   computeEntropySpectrum,
+  extractSubsystem,
   fitCentralCharge,
   fitEntanglementTemperature,
   peschelEntropy,
@@ -567,6 +568,159 @@ describe('buildLatticeSliceCorrelators — N-D slice of the free scalar vacuum',
         massSq: 0,
       })
     ).toThrow(/spacing\[0\] must be a positive finite number/)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+//  extractSubsystem — contiguous row-major submatrix extraction
+// ─────────────────────────────────────────────────────────────────────────
+//
+// extractSubsystem is the workhorse called by `computeEntropySpectrum` to
+// pull a contiguous L×L subsystem block out of the full N×N correlator.
+// Before these tests, its only coverage was indirect via the entropy
+// pipeline — which ALWAYS called it with `start = 0` and `length ≤ N/2`.
+// That left three blind spots any future refactor could fall into:
+//
+//   1. `start > 0` offset arithmetic — an accidental `i` instead of
+//      `start + i` on the source row index would silently return the
+//      top-left submatrix regardless of `start`. Every existing test
+//      still passes because they all pass `start = 0`.
+//   2. The full-matrix extraction case `start = 0, length = N` — the
+//      boundary of the `start + length > fullSize` guard. Flipping the
+//      strict inequality to `>=` would break this exact case and no
+//      existing test notices.
+//   3. The throw paths for invalid `fullSize`, `start`, `length`, and
+//      undersized input — all documented contracts but never
+//      exercised. A future "defensive simplification" could drop one of
+//      these checks and ship a silent NaN/undefined.
+//
+// The tests below explicitly exercise each of the three gaps.
+
+describe('extractSubsystem', () => {
+  /** Build an N×N row-major matrix where entry (i, j) encodes its row and col. */
+  function buildRowColMatrix(N: number): Float64Array {
+    const m = new Float64Array(N * N)
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        // 1000*i + j uniquely identifies (row, col) for N ≤ 1000.
+        m[i * N + j] = 1000 * i + j
+      }
+    }
+    return m
+  }
+
+  describe('happy path', () => {
+    it('start = 0, length = fullSize returns a bit-identical copy', () => {
+      const N = 4
+      const src = buildRowColMatrix(N)
+      const out = extractSubsystem(src, N, 0, N)
+      expect(out.length).toBe(N * N)
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          expect(out[i * N + j]).toBe(1000 * i + j)
+        }
+      }
+      // Must be a separate buffer — mutating `out` must not touch `src`.
+      out[0] = 999999
+      expect(src[0]).toBe(0)
+    })
+
+    it('start > 0 picks the contiguous slice at the correct offset (regression guard for start offset math)', () => {
+      // This test would have failed under any bug that treats `start`
+      // as a no-op — e.g., sourcing rows from `i * fullSize + 0` instead
+      // of `(start + i) * fullSize + start`.
+      const N = 6
+      const src = buildRowColMatrix(N)
+      const start = 2
+      const length = 3
+      const out = extractSubsystem(src, N, start, length)
+      expect(out.length).toBe(length * length)
+      for (let i = 0; i < length; i++) {
+        for (let j = 0; j < length; j++) {
+          // Output (i, j) must map to source (start + i, start + j).
+          expect(out[i * length + j]).toBe(1000 * (start + i) + (start + j))
+        }
+      }
+    })
+
+    it('start at the bottom-right corner extracts the 1x1 trailing submatrix', () => {
+      const N = 4
+      const src = buildRowColMatrix(N)
+      const out = extractSubsystem(src, N, N - 1, 1)
+      expect(out.length).toBe(1)
+      expect(out[0]).toBe(1000 * (N - 1) + (N - 1)) // (3, 3)
+    })
+
+    it('length = 0 returns an empty Float64Array without reading the source', () => {
+      // Edge case: zero-length extractions are used nowhere in the
+      // current code path, but the contract accepts them and the caller
+      // might loop through a variable length range. Missing this gap
+      // would have been a throw where a harmless no-op is expected.
+      const src = buildRowColMatrix(4)
+      const out = extractSubsystem(src, 4, 2, 0)
+      expect(out.length).toBe(0)
+    })
+
+    it('works on a non-trivial matrix with a non-symmetric stride check', () => {
+      // Build a matrix where A[i][j] != A[j][i] so we can detect an
+      // accidental i↔j swap in the row-major indexing (which the
+      // symmetric correlator tests can't catch).
+      const N = 5
+      const src = new Float64Array(N * N)
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          src[i * N + j] = 10 * i + j // asymmetric: A[1][2]=12, A[2][1]=21
+        }
+      }
+      const out = extractSubsystem(src, N, 1, 3)
+      // Expected: rows 1-3, cols 1-3 of src, relabelled 0-2.
+      expect(out[0 * 3 + 0]).toBe(11) // (1, 1)
+      expect(out[0 * 3 + 1]).toBe(12) // (1, 2)
+      expect(out[0 * 3 + 2]).toBe(13) // (1, 3)
+      expect(out[1 * 3 + 0]).toBe(21) // (2, 1)
+      expect(out[1 * 3 + 1]).toBe(22) // (2, 2)
+      expect(out[1 * 3 + 2]).toBe(23) // (2, 3)
+      expect(out[2 * 3 + 0]).toBe(31) // (3, 1)
+      expect(out[2 * 3 + 1]).toBe(32) // (3, 2)
+      expect(out[2 * 3 + 2]).toBe(33) // (3, 3)
+    })
+  })
+
+  describe('validation throws', () => {
+    it('throws when fullSize is negative', () => {
+      expect(() => extractSubsystem(new Float64Array(16), -1, 0, 1)).toThrow(/fullSize/)
+    })
+
+    it('throws when fullSize is non-integer', () => {
+      expect(() => extractSubsystem(new Float64Array(16), 3.5, 0, 1)).toThrow(/fullSize/)
+    })
+
+    it('throws when start is negative', () => {
+      expect(() => extractSubsystem(new Float64Array(16), 4, -1, 1)).toThrow(/start/)
+    })
+
+    it('throws when length is negative', () => {
+      expect(() => extractSubsystem(new Float64Array(16), 4, 0, -1)).toThrow(/length/)
+    })
+
+    it('throws when start + length > fullSize (boundary guard)', () => {
+      // start=2, length=3, fullSize=4 → 2+3=5 > 4.
+      expect(() => extractSubsystem(new Float64Array(16), 4, 2, 3)).toThrow(/exceeds/)
+    })
+
+    it('allows start + length === fullSize (must NOT throw at the boundary)', () => {
+      // Regression guard: a strict `>=` instead of `>` in the boundary
+      // check would flip this edge case from "allowed" to "throw" and no
+      // other test would catch it — every existing consumer calls with
+      // length ≤ N/2.
+      expect(() => extractSubsystem(new Float64Array(16), 4, 0, 4)).not.toThrow()
+      expect(() => extractSubsystem(new Float64Array(16), 4, 2, 2)).not.toThrow()
+    })
+
+    it('throws when matrix.length < fullSize² (undersized input)', () => {
+      // 4*4 = 16 entries required; supply only 15.
+      expect(() => extractSubsystem(new Float64Array(15), 4, 0, 2)).toThrow(/matrix length/)
+    })
   })
 })
 

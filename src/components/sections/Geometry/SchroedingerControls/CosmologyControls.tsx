@@ -30,6 +30,7 @@ import {
   sCritical,
 } from '@/lib/physics/cosmology/presets'
 
+import { BianchiKasnerControls } from './BianchiKasnerControls'
 import type { FreeScalarFieldActions } from './types'
 
 /** Props for the cosmology controls sub-panel. */
@@ -52,15 +53,17 @@ export interface CosmologyControlsProps {
     | 'setCosmologySteepness'
     | 'setCosmologyHubble'
     | 'setCosmologyEta0'
+    | 'setCosmologyBianchiExponents'
   >
 }
 
-/** UI labels for the four cosmology presets. */
+/** UI labels for the cosmology presets. */
 const PRESET_LABELS: Record<CosmologyPreset, string> = {
   minkowski: 'Minkowski (flat)',
   deSitter: 'de Sitter (inflation)',
   ekpyrotic: 'Ekpyrotic (paper)',
-  kasner: 'Kasner (stiff)',
+  kasner: 'Kasner (stiff FLRW)',
+  bianchiKasner: 'Bianchi-I (vacuum Kasner)',
 }
 
 /**
@@ -77,11 +80,13 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
 
     const presetOptions = useMemo(
       () =>
-        (['minkowski', 'deSitter', 'ekpyrotic', 'kasner'] as const).map((p) => ({
-          value: p,
-          label: PRESET_LABELS[p],
-        })),
-      []
+        (['minkowski', 'deSitter', 'ekpyrotic', 'kasner', 'bianchiKasner'] as const)
+          .filter((p) => (p === 'bianchiKasner' ? latticeDim >= 3 : true))
+          .map((p) => ({
+            value: p,
+            label: PRESET_LABELS[p],
+          })),
+      [latticeDim]
     )
 
     // s_c(n) for the current spacetime dim. Defined only when n ≥ 3.
@@ -105,6 +110,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
         spacetimeDim,
         steepness: cosmology.steepness,
         hubble: cosmology.hubble,
+        kasnerExponents: cosmology.kasnerExponents,
       }
       if (!isValidPreset(params)) return undefined
       try {
@@ -116,6 +122,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
       cosmology.preset,
       cosmology.steepness,
       cosmology.hubble,
+      cosmology.kasnerExponents,
       spacetimeDim,
       gridSize,
       spacing,
@@ -219,11 +226,19 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
               />
             )}
 
+            {cosmology.preset === 'bianchiKasner' && (
+              <BianchiKasnerControls
+                kasnerExponents={cosmology.kasnerExponents}
+                latticeDim={latticeDim}
+                setBianchiExponents={actions.setCosmologyBianchiExponents}
+              />
+            )}
+
             <Slider
               label="η₀ (initial)"
-              tooltip="Initial conformal time. Use η₀ < 0 (deep past). Auto-clamped so every lattice mode is sub-horizon at η₀, guaranteeing a well-defined adiabatic Bunch–Davies vacuum. Runtime floor |η| ≥ 1e-3 prevents singularity crossing."
-              min={-200}
-              max={-0.01}
+              tooltip="Initial conformal time. Isotropic FLRW presets use η < 0 (deep past). Bianchi-I Kasner uses η > 0 (conformal time increases away from the singularity). Runtime floor |η| ≥ 1e-3 prevents singularity crossing."
+              min={cosmology.preset === 'bianchiKasner' ? 0.01 : -200}
+              max={cosmology.preset === 'bianchiKasner' ? 200 : -0.01}
               step={0.01}
               value={cosmology.eta0}
               onChange={actions.setCosmologyEta0}

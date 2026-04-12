@@ -88,6 +88,24 @@ function applyStochasticParams(
 }
 
 /**
+ * Apply TDSE branching visualization URL state params.
+ *
+ * Independent from stochastic decoherence (see ShareableObjectState.branchingEnabled
+ * docstring) — the branch partition is a physics-visible diagnostic that is
+ * meaningful for any TDSE run, not just CSL-driven ones.
+ */
+function applyBranchingParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.branchingEnabled === undefined) return
+
+  ext.setTdseBranchingEnabled(urlState.branchingEnabled)
+  if (urlState.branchPlanePosition !== undefined)
+    ext.setTdseBranchPlanePosition(urlState.branchPlanePosition)
+}
+
+/**
  * Apply cosmological-background URL state params. Sets preset/steepness/hubble
  * BEFORE eta0 and enable so the setter chain sees a consistent preset state
  * at each step (setFreeScalarCosmologyPreset re-clamps eta0, setEnabled
@@ -225,6 +243,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     // ── Features ─────────────────────────────────────────────────────────────
     applyOpenQuantumParams(urlState, ext)
     applyStochasticParams(urlState, ext)
+    applyBranchingParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
   } catch (error) {

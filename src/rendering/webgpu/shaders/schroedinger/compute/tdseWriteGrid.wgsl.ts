@@ -69,7 +69,14 @@ fn getPotentialScale() -> f32 {
     // the GPU overlay and the CPU-side energy plot share a y-axis scale.
     let Mbh = max(params.bhMass, 1e-4);
     let ell = params.bhMultipoleL;
-    return max(ell * (ell + 1.0) / (27.0 * Mbh * Mbh), 0.02);
+    let s = params.bhSpin;
+    // Include the spin-dependent correction (1-s²)·2/(3M) at the photon
+    // sphere r=3M so the normalization reflects the actual peak height
+    // for all perturbation spins s ∈ {0, 1, 2}. abs() mirrors the CPU
+    // formula in potentialProfile.ts so the gravitational (s=2, ℓ=0)
+    // edge case doesn't collapse to the 0.02 floor.
+    let spinCorr = (1.0 - s * s) * 2.0 / 3.0;
+    return max(abs((ell * (ell + 1.0) + spinCorr) / (27.0 * Mbh * Mbh)), 0.02);
   }
   return 1.0;
 }

@@ -37,6 +37,25 @@ export interface WignerUpdateFlags {
   reconstruct: boolean
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// Capacity invariants — must stay in sync with the WGSL struct declarations
+// in wignerSpatial.wgsl.ts (`array<vec4i, 14>`) and wignerReconstruct.wgsl.ts
+// (`array<vec4f, 29>`). Any change here without updating the WGSL — or vice
+// versa — silently corrupts the cross-term Wigner reconstruction.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Maximum HO superposition term count. Matches the `termCount` setter clamp
+ *  in `schroedingerSlice.setSchroedingerTermCount` and the `TdseConfig.termCount`
+ *  `1 | 2 | 3 | 4 | 5 | 6 | 7 | 8` literal union. */
+export const MAX_WIGNER_TERM_COUNT = 8
+
+/** Maximum cross-pair count: C(MAX_WIGNER_TERM_COUNT, 2) = 28. */
+export const MAX_WIGNER_CROSS_PAIRS = (MAX_WIGNER_TERM_COUNT * (MAX_WIGNER_TERM_COUNT - 1)) / 2
+
+/** Maximum texture-array layer count: 2 pairs per layer → ceil(28/2) = 14.
+ *  Mirrors the `array<vec4i, 14>` in `WignerSpatialParams`. */
+export const MAX_WIGNER_CROSS_LAYERS = Math.ceil(MAX_WIGNER_CROSS_PAIRS / 2)
+
 /** Cross-pair info for CPU-side coefficient computation. */
 export interface CrossPairInfo {
   termJ: number
@@ -102,6 +121,21 @@ export function computeReconstructCoefficients(
   outF32: Float32Array,
   outU32: Uint32Array
 ): void {
+  if (crossPairs.length > MAX_WIGNER_CROSS_PAIRS) {
+    // The WGSL `WignerReconstructParams.pairData` is `array<vec4f, 29>` and
+    // the CPU-side `outF32` buffer (`WIGNER_RECONSTRUCT_PARAMS_SIZE = 480`
+    // bytes = 120 floats = 4-float header + 29 vec4f slots) is sized for
+    // exactly 29 pairs. Writing beyond MAX_WIGNER_CROSS_PAIRS silently
+    // truncates (Float32Array writes past byteLength are no-ops) and the
+    // GPU reads stale / zero bytes for the overflow pairs, corrupting the
+    // reconstructed Wigner function without any runtime signal. Fail loudly.
+    throw new Error(
+      `computeReconstructCoefficients: crossPairs.length=${crossPairs.length} exceeds ` +
+        `MAX_WIGNER_CROSS_PAIRS=${MAX_WIGNER_CROSS_PAIRS}. This means termCount > ` +
+        `MAX_WIGNER_TERM_COUNT=${MAX_WIGNER_TERM_COUNT}, which is unsupported by the ` +
+        `current WGSL struct layout (wignerReconstruct.wgsl.ts: array<vec4f, 29>).`
+    )
+  }
   const floatView = new Float32Array(schroedingerData)
   outF32.fill(0)
   outU32[0] = crossPairs.length

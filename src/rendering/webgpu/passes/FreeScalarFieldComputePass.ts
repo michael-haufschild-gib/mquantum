@@ -182,7 +182,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /**
    * Pre-allocated scratch for the per-leapfrog-step partial uniform upload
-   * of the three cosmology coefficients `(aKinetic, aPotential, aFull)`.
+   * of the six cosmology coefficients `(aKinetic, aPotential, aFull,
+   * massSquaredScale, aPotentialRatio1, aPotentialRatio2)`.
    * Reused across every substep to avoid GC pressure — a bare
    * `new Float32Array([...])` per call would allocate up to
    * `stepsPerFrame · substepCap` ArrayBuffers per frame under adaptive
@@ -491,6 +492,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               spacetimeDim: config.latticeDim + 1,
               steepness: config.cosmology.steepness,
               hubble: config.cosmology.hubble,
+              kasnerExponents: config.cosmology.kasnerExponents,
             },
             this.simEta,
             config.vacuumSeed
@@ -769,7 +771,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               r.coefs.aKinetic,
               r.coefs.aPotential,
               r.coefs.aFull,
-              r.coefs.massSquaredScale
+              r.coefs.massSquaredScale,
+              r.coefs.aPotentialRatio1,
+              r.coefs.aPotentialRatio2
             )
           }
 

@@ -151,6 +151,30 @@ function migrateLegacyShimmerFields<T>(loaded: T): T {
   return migrated as T
 }
 
+function normalizeTdseBhParams(normalized: Record<string, unknown>): Record<string, unknown> {
+  const tdse = normalized.tdse
+  if (!tdse || typeof tdse !== 'object') return normalized
+  const tdseRecord = tdse as Record<string, unknown>
+  // Replace NaN / non-finite BH params with safe defaults before clamping.
+  // `typeof NaN === 'number'` is true, so a corrupted scene could sneak
+  // NaN through a bare `typeof` guard. Default to the canonical TDSE
+  // defaults (bhMass=1, bhSpin=2, bhMultipoleL=2).
+  const rawMass = tdseRecord.bhMass
+  if (typeof rawMass === 'number' && !Number.isFinite(rawMass)) {
+    tdseRecord.bhMass = 1.0
+  }
+  const rawSpin = tdseRecord.bhSpin
+  const rawEll = tdseRecord.bhMultipoleL
+  const spinNum = typeof rawSpin === 'number' && Number.isFinite(rawSpin) ? rawSpin : 2
+  const ellNum = typeof rawEll === 'number' && Number.isFinite(rawEll) ? rawEll : 2
+  const spin = Math.max(0, Math.min(2, Math.floor(spinNum)))
+  const ell = Math.max(spin, Math.min(6, Math.floor(ellNum)))
+  if (spin !== rawSpin || ell !== rawEll) {
+    return { ...normalized, tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell } }
+  }
+  return normalized
+}
+
 function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
   let normalized = merged as unknown as Record<string, unknown>
   if (normalized.quantumMode === 'hydrogenOrbital') {
@@ -161,26 +185,8 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
   // legacy scenes. The BH setters promote ℓ whenever the user raises s, but
   // scene loading writes `tdse` directly via setState and bypasses the setter
   // path — so a pre-constraint scene with (bhSpin=2, bhMultipoleL=0) would slip
-  // through. The UI `BlackHoleRingdownControls` slider uses `min={td.bhSpin}`,
-  // and an out-of-range value would render the thumb outside the track until
-  // the next user interaction. Clamp here so the invariant always holds in
-  // memory regardless of how state was written.
-  const tdse = normalized.tdse
-  if (tdse && typeof tdse === 'object') {
-    const tdseRecord = tdse as Record<string, unknown>
-    const rawSpin = tdseRecord.bhSpin
-    const rawEll = tdseRecord.bhMultipoleL
-    if (typeof rawSpin === 'number' && typeof rawEll === 'number') {
-      const spin = Math.max(0, Math.min(2, Math.floor(rawSpin)))
-      const ell = Math.max(spin, Math.min(6, Math.floor(rawEll)))
-      if (spin !== rawSpin || ell !== rawEll) {
-        normalized = {
-          ...normalized,
-          tdse: { ...tdseRecord, bhSpin: spin, bhMultipoleL: ell },
-        }
-      }
-    }
-  }
+  // through. Clamp here so the invariant always holds in memory.
+  normalized = normalizeTdseBhParams(normalized)
 
   // Reconcile cosmology invariants for the freeScalar sub-config. A scene
   // saved at one grid (e.g. 32³ at d=3, large safe η₀) loaded onto a smaller

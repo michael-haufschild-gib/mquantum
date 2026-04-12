@@ -171,7 +171,7 @@ fn volumeRaymarch(
       } else if (USE_ANALYTICAL_GRADIENT) {
         gradient = computeAnalyticalGradient(pos, animTime, uniforms);
       } else {
-        gradient = computeGradientTetrahedralAtPos(pos, animTime, 0.05, uniforms);
+        gradient = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
       }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())

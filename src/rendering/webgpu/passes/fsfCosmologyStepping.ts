@@ -130,6 +130,10 @@ export const PREHEATING_PHASE_SAFETY = 0.5
  * including the `proposed === 0` and sign-flip cases — is snapped to
  * `±COSMOLOGY_ETA_FLOOR` with the original sign preserved.
  *
+ * Conformal time always increases with physical time:
+ * - FLRW presets (η < 0): from η₀ = −10 toward η → 0⁻
+ * - Bianchi-I (η > 0): from η₀ = +1.5 toward η → +∞
+ *
  * Exists so the CFL preview in the leapfrog loop can see the end-of-step
  * `simEta` *without* mutating the state. In de Sitter, `a(η) ∝ 1/|η|` grows
  * monotonically toward the singularity, so a CFL check evaluated only at
@@ -147,8 +151,10 @@ export const PREHEATING_PHASE_SAFETY = 0.5
  */
 export function projectSimEta(currentEta: number, dt: number): number {
   const originalSign = currentEta < 0 ? -1 : 1
-  // Move toward η = 0: opposite direction from the current branch's sign.
-  const proposed = currentEta - originalSign * dt
+  // Conformal time always increases with physical time:
+  //   η < 0 (FLRW): advances from −∞ toward 0⁻ (expansion / contraction)
+  //   η > 0 (Bianchi-I): advances from η₀ toward +∞ (away from singularity)
+  const proposed = currentEta + dt
   // Single check: floor OR sign flip (Math.sign(0) === 0 ≠ originalSign,
   // so the explicit `proposed === 0` clause is already covered).
   const crossedSingularity = Math.sign(proposed) !== originalSign
@@ -293,6 +299,14 @@ export interface FsfSubstepCoefs {
   aFull: number
   /** Preheating drive scalar `1 + A·sin(Ω·(t−ref))` — 1 when disabled. */
   massSquaredScale: number
+  /**
+   * Bianchi-I Kasner per-axis ratio `aPot_1/aPot_0`. `1` under every
+   * isotropic preset so the pi-update correction term vanishes and the
+   * shader output is bit-identical to the pre-Bianchi form.
+   */
+  aPotentialRatio1: number
+  /** Bianchi-I Kasner per-axis ratio `aPot_2/aPot_0`. `1` under isotropic presets. */
+  aPotentialRatio2: number
 }
 
 /**
@@ -344,6 +358,8 @@ export function resolveFsfSubstepCoefs(
   let aKinetic = 1
   let aPotential = 1
   let aFull = 1
+  let aPotentialRatio1 = 1
+  let aPotentialRatio2 = 1
   let preheatingClock: number
   let nextPreheatingTime = clock.preheatingTime
 
@@ -353,6 +369,8 @@ export function resolveFsfSubstepCoefs(
     aKinetic = coefs.aKinetic
     aPotential = coefs.aPotential
     aFull = coefs.aFull
+    aPotentialRatio1 = coefs.aPotentialRatio1 ?? 1
+    aPotentialRatio2 = coefs.aPotentialRatio2 ?? 1
     // Cosmology + preheating composition: the drive reads the
     // cosmological clock directly, so `preheatingReferenceEta` was
     // captured as the reset `simEta` and the drive fires at phase 0 from
@@ -371,7 +389,14 @@ export function resolveFsfSubstepCoefs(
     : 1
 
   return {
-    coefs: { aKinetic, aPotential, aFull, massSquaredScale },
+    coefs: {
+      aKinetic,
+      aPotential,
+      aFull,
+      massSquaredScale,
+      aPotentialRatio1,
+      aPotentialRatio2,
+    },
     preheatingTime: nextPreheatingTime,
   }
 }
@@ -441,7 +466,10 @@ export function computeFsfOuterStepSubsteps(
   // Peak mass-squared multiplier for the preheating drive. When the drive is
   // disabled this collapses to 1 and every computeFsfCflSubsteps call reduces
   // to the original cosmology-only dispersion bound.
-  const preheatingActive = config.preheating.enabled
+  // Treat zero-amplitude preheating as inactive: massSquaredScale ≡ 1 so the
+  // physics is the non-preheating path, and forcing phase substeps would be
+  // wasted work.
+  const preheatingActive = config.preheating.enabled && Math.abs(config.preheating.amplitude) > 0
   const massSquaredScaleMax = preheatingActive ? 1 + Math.abs(config.preheating.amplitude) : 1
   // Drive phase bound: require Ω·subDt < PREHEATING_PHASE_SAFETY so the
   // frozen-coef leapfrog substep never advances the sinusoid by more than
@@ -505,7 +533,20 @@ export function computePreheatingPhaseSubsteps(frequency: number, dtFull: number
   const phaseFull = omega * dtFull
   if (!(phaseFull > PREHEATING_PHASE_SAFETY)) return 1
   const ideal = Math.ceil(phaseFull / PREHEATING_PHASE_SAFETY)
-  return ideal <= COSMOLOGY_MAX_SUBSTEPS ? ideal : COSMOLOGY_MAX_SUBSTEPS
+  if (ideal <= COSMOLOGY_MAX_SUBSTEPS) return ideal
+
+  // Cap reached: the drive frequency is too high relative to the outer step
+  // for the substep ceiling to guarantee Ω·subDt < PREHEATING_PHASE_SAFETY.
+  // The simulation continues but may alias the drive sinusoid, producing
+  // spurious growth or missing resonance tongues. Mirror the CFL-cap
+  // warning so the user knows the integrator can't resolve the drive.
+  logger.warn(
+    `[FSF-COMPUTE] preheating phase sub-step cap reached ` +
+      `(Ω=${omega.toFixed(3)}, Ω·dt=${phaseFull.toFixed(3)}, ` +
+      `ideal=${ideal}, cap=${COSMOLOGY_MAX_SUBSTEPS}). ` +
+      `The drive sinusoid may be aliased — reduce Ω or dt.`
+  )
+  return COSMOLOGY_MAX_SUBSTEPS
 }
 
 /**
@@ -530,12 +571,13 @@ export function writeFsfDtSlot(
 }
 
 /**
- * Overwrite the contiguous 16-byte per-substep coefficient slot
- * `(aKinetic, aPotential, aFull, massSquaredScale)` in the uniform buffer,
- * avoiding the full 528-byte re-upload that `writeFsfUniforms` performs.
- * Called from the leapfrog substep loop whenever cosmology or preheating
- * is active so every drift + kick pair consumes fresh coefficients
- * evaluated at the current conformal time.
+ * Overwrite the contiguous 24-byte per-substep coefficient slot
+ * `(aKinetic, aPotential, aFull, massSquaredScale, aPotentialRatio1,
+ *   aPotentialRatio2)` in the uniform buffer, avoiding the full 528-byte
+ * re-upload that `writeFsfUniforms` performs. Called from the leapfrog
+ * substep loop whenever cosmology or preheating is active so every drift
+ * + kick pair consumes fresh coefficients evaluated at the current
+ * conformal time.
  *
  * The fourth slot (`massSquaredScale`) carries the post-inflation
  * preheating drive `1 + A·sin(Ω·(η−η_ref))`. Passing `1.0` makes this a
@@ -543,16 +585,24 @@ export function writeFsfDtSlot(
  * factorization reduces to the bare canonical mass term, preserving
  * bit-identical behaviour for callers that don't need the drive.
  *
+ * The last two slots carry the Bianchi-I Kasner per-axis kinetic ratios
+ * `aPot_1/aPot_0` and `aPot_2/aPot_0`. Passing `1.0, 1.0` recovers the
+ * isotropic single-coefficient form — the pi-update shader multiplies
+ * the two correction terms by `(ratio − 1) = 0` so the output is
+ * bit-identical to the pre-Bianchi shader.
+ *
  * Allocates nothing per call — the values are staged through the
- * caller-owned `scratch` buffer (a 4-f32 Float32Array).
+ * caller-owned `scratch` buffer (a 6-f32 Float32Array).
  *
  * @param device - GPU device
  * @param uniformBuffer - FSF uniform buffer
- * @param scratch - 4-element Float32Array scratch, reused across substeps
+ * @param scratch - 6-element Float32Array scratch, reused across substeps
  * @param aKinetic - FLRW kinetic coefficient `a^(−(n−2))`
- * @param aPotential - FLRW potential coefficient `a^(n−2)`
+ * @param aPotential - FLRW potential coefficient `a^(n−2)` (axis-0 under Bianchi)
  * @param aFull - FLRW volume-form coefficient `a^n`
  * @param massSquaredScale - Preheating drive scalar (1.0 when disabled)
+ * @param aPotentialRatio1 - Bianchi-I `aPot_1/aPot_0` ratio (1.0 when isotropic)
+ * @param aPotentialRatio2 - Bianchi-I `aPot_2/aPot_0` ratio (1.0 when isotropic)
  */
 export function writeFsfCosmologyCoefsSlot(
   device: GPUDevice,
@@ -561,12 +611,16 @@ export function writeFsfCosmologyCoefsSlot(
   aKinetic: number,
   aPotential: number,
   aFull: number,
-  massSquaredScale: number
+  massSquaredScale: number,
+  aPotentialRatio1: number,
+  aPotentialRatio2: number
 ): void {
   scratch[0] = aKinetic
   scratch[1] = aPotential
   scratch[2] = aFull
   scratch[3] = massSquaredScale
+  scratch[4] = aPotentialRatio1
+  scratch[5] = aPotentialRatio2
   device.queue.writeBuffer(
     uniformBuffer,
     FSF_COSMO_COEFS_BYTE_OFFSET,

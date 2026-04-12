@@ -29,23 +29,27 @@ export const FSF_UNIFORM_SIZE = 528
 export const FSF_DT_BYTE_OFFSET = 12
 
 /**
- * Byte offset of the `aKinetic` field in FreeScalarUniforms. The four
- * per-substep scalars `(aKinetic, aPotential, aFull, massSquaredScale)`
- * are contiguous starting here — `FreeScalarFieldComputePass.
- * writeCosmologyCoefsSlot` writes a 16-byte span at this offset per
- * substep whenever cosmology or preheating is active. The first three
- * carry the FLRW background coefficients; the fourth carries the
- * parametric-resonance drive factor `1 + A·sin(Ω·(η−η_ref))`.
+ * Byte offset of the `aKinetic` field in FreeScalarUniforms. The six
+ * per-substep scalars
+ * `(aKinetic, aPotential, aFull, massSquaredScale, aPotentialRatio1,
+ *   aPotentialRatio2)` are contiguous starting here — `FreeScalarField
+ * ComputePass.writeCosmologyCoefsSlot` writes a 24-byte span at this
+ * offset per substep whenever cosmology or preheating is active. The
+ * first three carry the FLRW background coefficients; the fourth
+ * carries the parametric-resonance drive factor
+ * `1 + A·sin(Ω·(η−η_ref))`; the last two carry the Bianchi-I anisotropy
+ * per-axis ratios `aPot_1/aPot_0` and `aPot_2/aPot_0`.
  */
 export const FSF_COSMO_COEFS_BYTE_OFFSET = 504
 
 /**
  * Number of f32 entries in the per-substep coefficient slot
- * `(aKinetic, aPotential, aFull, massSquaredScale)`. Four, not three —
- * the preheating drive repurposes the former `_padCosmo0` word at offset
- * 516 as `massSquaredScale`, keeping the total struct size at 528 bytes.
+ * `(aKinetic, aPotential, aFull, massSquaredScale, aPotentialRatio1,
+ *   aPotentialRatio2)`. Six — the Bianchi-I Kasner round repurposed the
+ * two trailing `_padCosmo1`/`_padCosmo2` words at offsets 520/524 as
+ * anisotropy ratios, keeping the total struct size at 528 bytes.
  */
-export const FSF_COSMO_COEFS_F32_COUNT = 4
+export const FSF_COSMO_COEFS_F32_COUNT = 6
 
 /** Byte size of the contiguous per-substep coefficient slot. */
 export const FSF_COSMO_COEFS_BYTE_SIZE = FSF_COSMO_COEFS_F32_COUNT * 4
@@ -82,7 +86,7 @@ import {
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
 
-import { computeStridesPadded, MAX_DIM } from './computePassUtils'
+import { computeStridesPadded, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
 // Re-export the shared cosmology helpers so external call sites (tests,
 // other passes) can continue importing from this pass file if they want.
@@ -122,8 +126,11 @@ export function computeFsfConfigHash(config: FreeScalarConfig): string {
 export function computeFsfInitHash(config: FreeScalarConfig): string {
   const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
   const cosmo = config.cosmology
+  const bk = cosmo.enabled && cosmo.preset === 'bianchiKasner' && cosmo.kasnerExponents
+    ? `_bk${cosmo.kasnerExponents.p1},${cosmo.kasnerExponents.p2},${cosmo.kasnerExponents.p3}`
+    : ''
   const cosmoHash = cosmo.enabled
-    ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}`
+    ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}${bk}`
     : '_cosmo0'
   if (config.selfInteractionEnabled) {
     return `${base}${cosmoHash}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
@@ -276,7 +283,10 @@ export function writeFsfUniforms(
   // Store slicePositions[i] maps to extra dims i=0,1,... (dim 3,4,...).
   // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3),
   // so write at index 72 + 3 + i to align with WGSL array indexing.
-  for (let i = 0; i < config.slicePositions.length; i++) {
+  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
+  // cannot overflow past the slicePositions region into basisX at f32[84+].
+  const fsfSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < fsfSliceN; i++) {
     f32[72 + 3 + i] = config.slicePositions[i]!
   }
 
@@ -352,8 +362,12 @@ export function writeFsfUniforms(
     params.preheatingReferenceEta
   )
   f32[FSF_COSMO_COEFS_F32_INDEX + 3] = liveMassSquaredScale // offset 516 (massSquaredScale)
-  u32[FSF_COSMO_COEFS_F32_INDEX + 4] = 0 // offset 520 (pad)
-  u32[FSF_COSMO_COEFS_F32_INDEX + 5] = 0 // offset 524 (pad)
+  // Bianchi-I per-axis kinetic ratios. Default to 1 for every isotropic
+  // preset — the pi-update shader's correction terms
+  // `(ratio − 1) · axialLap` evaluate to exactly 0 so the output reduces
+  // bit-identically to the pre-Bianchi single-coef form.
+  f32[FSF_COSMO_COEFS_F32_INDEX + 4] = coefs.aPotentialRatio1 ?? 1 // offset 520
+  f32[FSF_COSMO_COEFS_F32_INDEX + 5] = coefs.aPotentialRatio2 ?? 1 // offset 524
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 
@@ -634,11 +648,20 @@ export function computeFsfDiagnostics(
     if (aq > maxPi) maxPi = aq
   }
 
-  // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
-  // All dimensions contribute to total energy (including slice dims d>=3)
+  // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * aPot_d * dV
+  // All dimensions contribute to total energy (including slice dims d>=3).
+  // For Bianchi-I Kasner the GPU integrator weights axes 1 and 2 by
+  // aPotentialRatio1/2; replicate that here so the CPU diagnostics
+  // Hamiltonian matches the GPU's anisotropic gradient term.
   let gradEnergy = 0
   const strides = computeStridesPadded(config.gridSize, config.latticeDim)
   for (let d = 0; d < config.latticeDim; d++) {
+    const axisPotential =
+      d === 1
+        ? coefs.aPotential * (coefs.aPotentialRatio1 ?? 1)
+        : d === 2
+          ? coefs.aPotential * (coefs.aPotentialRatio2 ?? 1)
+          : coefs.aPotential
     const stride = strides[d]!
     const Nd = config.gridSize[d]!
     const a = config.spacing[d]!
@@ -651,11 +674,11 @@ export function computeFsfDiagnostics(
         dimPos === Nd - 1 ? (config.absorberEnabled ? -1 : i - stride * (Nd - 1)) : iNext
       if (jNext >= 0 && jNext < N) {
         const diff = phi[jNext]! - phi[i]!
-        gradEnergy += diff * diff * invA2
+        gradEnergy += diff * diff * invA2 * axisPotential
       }
     }
   }
-  gradEnergy *= 0.5 * dV * coefs.aPotential
+  gradEnergy *= 0.5 * dV
 
   const totalNorm = sumPhi2 * dV
   const kineticEnergy = 0.5 * coefs.aKinetic * sumPi2 * dV

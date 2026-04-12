@@ -11,6 +11,7 @@ import type { QuantumWalkConfig } from '@/lib/geometry/extended/quantumWalk'
 
 import { QW_ABSORBER_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/quantumWalkAbsorber.wgsl'
 import { QW_WRITE_GRID_UNIFORMS_SIZE } from '../shaders/schroedinger/compute/qwWriteGrid.wgsl'
+import { MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
 const FIELD_VIEW_MAP: Record<string, number> = { probability: 0, phase: 1, coinState: 2 }
 
@@ -89,10 +90,12 @@ export function packWriteGridUniforms(
   // slicePositions (offset 320, array<f32, 12>). Store array is 0-indexed
   // (i=0 → dim 3); WGSL reads slicePositions[d] where d ≥ 3. The 12-slot
   // region leaves 9 usable slots (80+3..80+11) for extra dims 3..11, so we
-  // cap the loop at 9 regardless of how much state an oversized hydrated
-  // preset carries — otherwise writes would bleed past the struct region.
-  const QW_SLICE_POSITIONS_CAPACITY = 9
-  const sliceWriteCount = Math.min(config.slicePositions.length, QW_SLICE_POSITIONS_CAPACITY)
+  // cap the loop at `MAX_SLICE_POSITIONS_WRITE_COUNT` regardless of how
+  // much state an oversized hydrated preset carries — otherwise writes
+  // would bleed past the struct region into the next uniform field. This
+  // constant is the single source of truth shared across TDSE/Dirac/
+  // Pauli/FSF/QW uniform writers (see `computePassUtils.ts`).
+  const sliceWriteCount = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
   for (let i = 0; i < sliceWriteCount; i++) {
     f32[80 + 3 + i] = config.slicePositions[i] ?? 0
   }

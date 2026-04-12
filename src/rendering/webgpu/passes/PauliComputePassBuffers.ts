@@ -9,7 +9,12 @@ import type { PauliConfig } from '@/lib/geometry/extended/types'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-import { FFT_UNIFORM_SIZE, MAX_DIM, PACK_UNIFORM_SIZE } from './computePassUtils'
+import {
+  FFT_UNIFORM_SIZE,
+  MAX_DIM,
+  MAX_SLICE_POSITIONS_WRITE_COUNT,
+  PACK_UNIFORM_SIZE,
+} from './computePassUtils'
 
 /** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
 const UNIFORM_SIZE = 592
@@ -451,13 +456,16 @@ export function writePauliUniforms(
   o = 124
   for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.spacing[d] ?? 0.1
 
-  // Slice positions (offset 136*4 = 544)
+  // Slice positions (offset 136*4 = 544, WGSL array<f32, 12>)
   // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3).
   // config.slicePositions is 0-indexed for extra dims: [0] = dim 3, [1] = dim 4, etc.
   // Write at WGSL index (i + 3) to match the shader's access pattern.
+  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
+  // cannot overflow past the 12-slot region into the next uniform field.
   o = 136
   // Indices 0-2 (visible dims): always 0 — shader only reads d >= 3
-  for (let i = 0; i < config.slicePositions.length; i++) {
+  const pauliSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < pauliSliceN; i++) {
     const d = i + 3 // physical dimension index
     let pos = config.slicePositions[i] ?? 0
     if (config.sliceAnimationEnabled && d < config.latticeDim) {

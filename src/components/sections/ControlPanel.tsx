@@ -83,12 +83,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
       return 'w-80 h-full'
     }, [isCollapsed, isSideBySide])
 
-    const inlineWidth = useMemo(
-      () => (isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined),
-      [isSideBySide, isCollapsed, sidebarWidth]
-    )
-
-    const asideStyle = useMemo(
+    // Single memo shared between the `<aside>` and its inner container.
+    // The previous code declared two identical `useMemo` hooks
+    // (`inlineWidth` and `asideStyle`) with the same computation, same
+    // dependency list, and same return value, then passed the result to
+    // both the outer aside and the inner div. Nothing about CSS behavior
+    // requires them to be different objects — one reference suffices —
+    // and halving the memo work removes the risk that a future edit
+    // updates one without the other.
+    const widthStyle = useMemo(
       () => (isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined),
       [isSideBySide, isCollapsed, sidebarWidth]
     )
@@ -97,7 +100,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
       <aside
         className={`${asideStyles} ${className}`}
         aria-label="Control Panel"
-        style={asideStyle}
+        style={widthStyle}
       >
         {/* Resize handle - only in side-by-side mode when expanded */}
         {isSideBySide && !isCollapsed && <ResizeHandle />}
@@ -105,7 +108,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = React.memo(
         {/* Floating Glass Card Container */}
         <div
           className={`${containerStyles} ${containerWidth}`}
-          style={inlineWidth}
+          style={widthStyle}
           data-testid="control-panel-container"
         >
           {/* Header */}

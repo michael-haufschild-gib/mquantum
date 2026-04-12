@@ -38,8 +38,15 @@
 // Types & constants
 // ───────────────────────────────────────────────────────────────────────────
 
+import type { KasnerExponents } from './bianchiKasner'
+
 /** Cosmological background preset identifier. */
-export type CosmologyPreset = 'minkowski' | 'deSitter' | 'ekpyrotic' | 'kasner'
+export type CosmologyPreset =
+  | 'minkowski'
+  | 'deSitter'
+  | 'ekpyrotic'
+  | 'kasner'
+  | 'bianchiKasner'
 
 /** All preset keys in a stable UI order. */
 export const COSMOLOGY_PRESETS: readonly CosmologyPreset[] = [
@@ -47,6 +54,7 @@ export const COSMOLOGY_PRESETS: readonly CosmologyPreset[] = [
   'deSitter',
   'ekpyrotic',
   'kasner',
+  'bianchiKasner',
 ] as const
 
 /** Minimum spacetime dimension supported (paper requires `n ≥ 3`). */
@@ -100,6 +108,14 @@ export interface CosmologyPresetParams {
   steepness?: number
   /** Hubble rate `H > 0` for de Sitter (sets the overall amplitude) */
   hubble?: number
+  /**
+   * Kasner exponent triple `(p₁, p₂, p₃)` for the `bianchiKasner` preset.
+   * Required under that preset; ignored for all others. The vacuum
+   * solution requires `Σp_i = 1 ∧ Σp_i² = 1` but the evaluator accepts
+   * any finite triple — the store may deliberately choose a non-vacuum
+   * Bianchi-I background.
+   */
+  kasnerExponents?: KasnerExponents
 }
 
 /**
@@ -134,6 +150,19 @@ export function qExponent(params: CosmologyPresetParams): number {
   if (preset === 'deSitter') return -1
   if (preset === 'kasner') {
     return 1 / (spacetimeDim - 2)
+  }
+  if (preset === 'bianchiKasner') {
+    // Bianchi-I vacuum Kasner is NOT a closed-form scalar-q FLRW preset —
+    // the scale factor is anisotropic `a_i(t) = t^{p_i}` and the three
+    // cosmology coefs come from `computeBianchiKasnerCoefs` (per axis).
+    // Callers that reach this branch are reaching for the wrong helper
+    // (e.g. the Mukhanov-Sasaki `β(β−1)/η²` coefficient), which is not
+    // defined here. `computeCosmologyAt` dispatches around this branch
+    // directly. We throw so mis-routed call sites are found at runtime
+    // rather than silently returning garbage.
+    throw new RangeError(
+      `qExponent is not defined for preset='bianchiKasner' — use computeBianchiKasnerCoefs directly.`
+    )
   }
 
   // ekpyrotic
@@ -242,6 +271,24 @@ export function validateSpacetimeDim(spacetimeDim: number): void {
  * @returns `true` if every downstream consumer would accept these params
  */
 export function isValidPreset(params: CosmologyPresetParams): boolean {
+  if (params.preset === 'bianchiKasner') {
+    // Bianchi-I is only physically defined on the first three spatial
+    // axes, so we need `spacetimeDim ≥ 4` (spatial dim ≥ 3). Exponents
+    // must be finite but we do NOT enforce the two vacuum constraints —
+    // the user may deliberately load a non-vacuum Bianchi-I background.
+    if (!Number.isInteger(params.spacetimeDim) || params.spacetimeDim < 4) return false
+    if (params.spacetimeDim > MAX_SPACETIME_DIM) return false
+    const exp = params.kasnerExponents
+    if (
+      !exp ||
+      !Number.isFinite(exp.p1) ||
+      !Number.isFinite(exp.p2) ||
+      !Number.isFinite(exp.p3)
+    ) {
+      return false
+    }
+    return true
+  }
   try {
     qExponent(params)
   } catch {

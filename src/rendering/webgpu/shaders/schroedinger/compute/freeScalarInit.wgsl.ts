@@ -67,7 +67,7 @@ struct FreeScalarUniforms {
   aPotential: f32,              // offset 508 — a^(n−2), gradient (stress) coefficient for
                                 //              π' ⊃ aPotential · ∇²δφ. 1.0 under Minkowski.
 
-  // Remaining cosmology coefficient + preheating scale + padding (16 bytes)
+  // Remaining cosmology coefficient + preheating scale + Bianchi-I anisotropy (16 bytes)
   aFull: f32,                   // offset 512 — a^n, volume-form coefficient for the
                                 //              mass term (mass²·aFull·δφ) and the
                                 //              self-interaction V'. 1.0 under Minkowski.
@@ -80,8 +80,17 @@ struct FreeScalarUniforms {
                                 //              Floquet instability tongues. 1.0 when
                                 //              the drive is disabled — a multiplicative
                                 //              no-op composing with every other branch.
-  _padCosmo1: u32,              // offset 520
-  _padCosmo2: u32,              // offset 524
+  aPotentialRatio1: f32,        // offset 520 — Bianchi-I Kasner per-axis ratio
+                                //              aPot_1/aPot_0 = (a_1/a_2)² for axis-1
+                                //              kinetic coefficient. 1.0 under every
+                                //              isotropic preset — the pi-update
+                                //              shader adds a correction term
+                                //              (ratio1−1)·axialLap_1 that evaluates
+                                //              to exactly 0 when ratio1 = 1, giving
+                                //              bit-identical output on the flat path.
+  aPotentialRatio2: f32,        // offset 524 — Bianchi-I Kasner per-axis ratio
+                                //              aPot_2/aPot_0 = (a_1/a_3)² for axis-2.
+                                //              Same bit-identity property.
 }
 `
 

@@ -226,14 +226,46 @@ describe('WebGPUCamera', () => {
   })
 
   describe('setAspect', () => {
-    it('does not re-mark dirty when aspect is the same', () => {
-      const cam = new WebGPUCamera({ aspect: 1.5 })
-      cam.getMatrices() // clear dirty
+    it('changing the aspect ratio updates the projection matrix', () => {
+      // The reverse-Z perspective matrix stores `f/aspect` at index 0, so
+      // the first element is a direct function of aspect. A regression that
+      // broke `dirty = true` in `setAspect` (or the lazy recompute in
+      // `getMatrices`) would silently leave `projectionMatrix[0]` stale,
+      // and this assertion would catch it. Snapshot-before ensures we're
+      // comparing matrices from the SAME Float32Array across both calls —
+      // WebGPUCamera reuses the pre-allocated buffer.
+      const cam = new WebGPUCamera({ aspect: 1.5, fov: 60 })
+      const projInitial0 = cam.getMatrices().projectionMatrix[0]
 
-      cam.setAspect(1.5) // same value
-      // Internal state: this is about dirty flag — we verify matrices don't change
-      const m = cam.getMatrices()
-      expect(m.fov).toBe(60) // still valid
+      cam.setAspect(2.0)
+      const projAfter0 = cam.getMatrices().projectionMatrix[0]
+
+      expect(projAfter0).not.toBeCloseTo(projInitial0!, 4)
+      // Explicit invariant: `f / aspect` with f = 1/tan(fovY/2).
+      const f = 1 / Math.tan((60 * Math.PI) / 180 / 2)
+      expect(projAfter0).toBeCloseTo(f / 2.0, 4)
+    })
+
+    it('setAspect with the same value is a no-op (early-return optimization)', () => {
+      // Proves the `if (this.state.aspect === aspect) return` guard does
+      // what it claims. We clear the dirty flag by calling getMatrices()
+      // once, then pass the exact same aspect — the dirty flag must stay
+      // false, proving no recomputation was triggered.
+      const cam = new WebGPUCamera({ aspect: 1.5 })
+      cam.getMatrices() // clear dirty flag
+
+      cam.setAspect(1.5)
+      // Access the private dirty flag to assert the early-return guard works.
+      // Matrix comparison alone is insufficient — identical inputs produce
+      // identical results even after a full recompute.
+      const internal = cam as unknown as { dirty: boolean }
+      expect(internal.dirty).toBe(false)
+
+      // A fresh aspect change still takes effect after the no-op —
+      // guards against the early-return leaking into subsequent calls.
+      cam.setAspect(2.0)
+      expect(internal.dirty).toBe(true)
+      expect(cam.getState().aspect).toBe(2.0)
     })
   })
 })

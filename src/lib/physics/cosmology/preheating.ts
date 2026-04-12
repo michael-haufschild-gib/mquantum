@@ -158,25 +158,28 @@ export function integrateMathieu1D(params: MathieuIntegratorParams): MathieuTraj
 
   // Leapfrog kickstart — mirror of `FreeScalarFieldComputePass.initializeField`
   // which dispatches the `updatePi` pipeline at `dt/2` right after the
-  // initial field sample. Uses ω²(t=0), i.e. the unperturbed mass term
-  // because `sin(0) = 0` under every supported drive configuration. `q`
-  // leaves this block on the half-offset grid `t = dt/2`.
-  const scaleStart = computeMassSquaredScale(0, preheating, refEta)
+  // initial field sample. The GPU field starts at conformal time η = refEta,
+  // where `sin(Ω·(refEta − refEta)) = sin(0) = 0`, so the initial state is
+  // sampled at the unperturbed mass. We pass `refEta` (not 0) as the current
+  // time to match the GPU's phase reference. `q` leaves this block on the
+  // half-offset grid.
+  const scaleStart = computeMassSquaredScale(refEta, preheating, refEta)
   const omegaSqStart = kSq + mSq * scaleStart
   let q = pi0 - 0.5 * dt * omegaSqStart * p
 
   for (let n = 0; n < nSteps; n++) {
     // Drift: δφ advances from `t_n` to `t_{n+1}` using the half-offset π.
     p = p + dt * q
-    // Advance the preheating clock by one substep so the mass-term kick
-    // below evaluates at the new conformal time — mirrors the shader's
-    // per-substep `this.advanceSimEta(subDt)` before the pi dispatch.
+    // Advance the local clock by one substep so the mass-term kick below
+    // evaluates at the new elapsed time — mirrors the shader's per-substep
+    // `this.advanceSimEta(subDt)` before the pi dispatch.
     t = t + dt
-    // Kick: physical dispersion ω² = k² + m²·massSquaredScale(t) times δφ,
-    // subtracted from π. Advances `q` from `t_n + dt/2` to `t_{n+1} + dt/2`.
-    // Scale reduces to 1 when the drive is disabled so the bare
-    // Klein-Gordon leapfrog is recovered bit-identically.
-    const scale = computeMassSquaredScale(t, preheating, refEta)
+    // Kick: physical dispersion ω² = k² + m²·massSquaredScale(η) times δφ,
+    // subtracted from π. The drive evaluates at `refEta + t` so the phase
+    // starts at 0 and advances as `Ω·t`, matching the GPU integrator where
+    // η starts at refEta. Scale reduces to 1 when the drive is disabled so
+    // the bare Klein-Gordon leapfrog is recovered bit-identically.
+    const scale = computeMassSquaredScale(refEta + t, preheating, refEta)
     const omegaSq = kSq + mSq * scale
     q = q - dt * omegaSq * p
 

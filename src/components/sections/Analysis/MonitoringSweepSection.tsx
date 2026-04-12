@@ -133,9 +133,24 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
       return
     }
 
+    // Skip ticks that see the same diagnostic snapshot we already sampled.
+    // The UI polls at 200 ms but `pushTdseSnapshot` only fires when the GPU
+    // readback completes — at low FPS or high `diagnosticsInterval` the
+    // store can go several polls without advancing. Without this dedup,
+    // identical `(simTime, ipr, normDrift)` triples get folded into the
+    // time-average multiple times, biasing it toward over-sampled values.
+    // `readbackGeneration` is the canonical monotonic counter for
+    // `diagnosticsStore.tdse` (bumped inside `pushTdseSnapshot`), and
+    // re-creating this closure on every sweep start resets it naturally.
+    // Seed from the current readback generation so any stale snapshot
+    // already in the diagnostics store is skipped. Starting from -1 would
+    // let a pre-reset snapshot through on the first tick.
+    let lastGen = useDiagnosticsStore.getState().tdse.readbackGeneration
+
     sweepTickRef.current = setInterval(() => {
       const diag = useDiagnosticsStore.getState().tdse
-      if (!diag.hasData) return
+      if (!diag.hasData || diag.readbackGeneration === lastGen) return
+      lastGen = diag.readbackGeneration
 
       // Ensure diagnostics stay enabled even if user closes the analysis panel
       const extState = useExtendedObjectStore.getState()

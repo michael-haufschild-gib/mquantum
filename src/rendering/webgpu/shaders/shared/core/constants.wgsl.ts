@@ -71,30 +71,6 @@ const MIN_DIST: f32 = 0.001;
 const BOUND_R: f32 = 2.0;
 
 // ============================================
-// Quality Mode Constants
-// ============================================
-
-// High quality mode (when idle)
-const MAX_MARCH_STEPS_HQ: i32 = 128;
-const MAX_ITER_HQ: i32 = 256;
-const SURF_DIST_HQ: f32 = 0.002;
-
-// Low quality mode (during animation)
-const MAX_MARCH_STEPS_LQ: i32 = 64;
-const MAX_ITER_LQ: i32 = 30;
-const SURF_DIST_LQ: f32 = 0.002;
-
-// ============================================
-// Palette Mode Constants
-// ============================================
-
-const PAL_MONO: i32 = 0;
-const PAL_ANALOG: i32 = 1;
-const PAL_COMP: i32 = 2;
-const PAL_TRIAD: i32 = 3;
-const PAL_SPLIT: i32 = 4;
-
-// ============================================
 // Light Type Constants
 // ============================================
 

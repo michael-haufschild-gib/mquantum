@@ -74,6 +74,46 @@ async function openSkyboxSection(page: import('@playwright/test').Page): Promise
 }
 
 test.describe('skybox: thumbnail grid', () => {
+  test('hardcoded ALL_SKYBOX_IDS matches the UI options', async ({ appPage: page }) => {
+    // Regression guard for the hardcoded `ALL_SKYBOX_IDS` array above.
+    // Without this test, adding a new skybox to `SkyboxControls.tsx` but
+    // forgetting to update the list would silently leave the new option
+    // with zero test coverage (the hardcoded iteration just wouldn't run
+    // for it). Conversely, removing a skybox without updating the list
+    // would fail `getByTestId` deeper in the suite with a cryptic error.
+    // This test surfaces the mismatch early with a clear symmetric diff.
+    await openSkyboxSection(page)
+
+    const uiIds = await page.$$eval('[data-testid^="skybox-option-"]', (els) =>
+      els
+        .map((el) => el.getAttribute('data-testid')?.replace(/^skybox-option-/, '') ?? null)
+        .filter((id): id is string => id !== null)
+    )
+    const uiSet = new Set(uiIds)
+    const listSet = new Set(ALL_SKYBOX_IDS)
+
+    // Duplicate UI IDs would produce a smaller Set than the source array,
+    // hiding a double-rendered skybox-option from the diff checks below.
+    expect(
+      uiIds.length,
+      `UI rendered ${uiIds.length} skybox options but only ${uiSet.size} unique — duplicates: ${uiIds.filter((id, i) => uiIds.indexOf(id) !== i).join(', ')}`
+    ).toBe(uiSet.size)
+
+    const missingFromList = uiIds.filter(
+      (id) => !listSet.has(id as (typeof ALL_SKYBOX_IDS)[number])
+    )
+    const missingFromUi = ALL_SKYBOX_IDS.filter((id) => !uiSet.has(id))
+
+    expect(
+      missingFromList,
+      `ALL_SKYBOX_IDS is missing UI options: ${missingFromList.join(', ')}`
+    ).toEqual([])
+    expect(
+      missingFromUi,
+      `ALL_SKYBOX_IDS has orphan entries not in UI: ${missingFromUi.join(', ')}`
+    ).toEqual([])
+  })
+
   test('all skybox option thumbnails are visible', async ({ appPage: page }) => {
     await openSkyboxSection(page)
 

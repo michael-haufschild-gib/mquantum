@@ -24,28 +24,19 @@ struct FXAAUniforms {
 @group(0) @binding(1) var tInput: texture_2d<f32>;
 @group(0) @binding(2) var linearSampler: sampler;
 
+// VertexOutput must match the layout produced by the base-class
+// FULLSCREEN_VERTEX_SHADER in WebGPUBasePass.ts. FXAAPass uses
+// createFullscreenPipeline(), which injects its own vertex stage with
+// entryPoint main and feeds this fragment entry from its own vertex
+// buffer — so no @vertex entry point is needed in THIS module. A
+// leftover fn vertexMain(...) was previously compiled but never
+// invoked; removed because (a) it violated the projects entry point
+// naming convention and (b) it was a maintenance trap for anyone
+// adapting this shader to a custom pipeline who would assume the
+// vertex entry was live.
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
-}
-
-@vertex
-fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
-  var pos = array<vec2f, 3>(
-    vec2f(-1.0, -1.0),
-    vec2f(3.0, -1.0),
-    vec2f(-1.0, 3.0)
-  );
-  var uvs = array<vec2f, 3>(
-    vec2f(0.0, 1.0),
-    vec2f(2.0, 1.0),
-    vec2f(0.0, -1.0)
-  );
-
-  var output: VertexOutput;
-  output.position = vec4f(pos[vertexIndex], 0.0, 1.0);
-  output.uv = uvs[vertexIndex];
-  return output;
 }
 
 fn luminance(color: vec3f) -> f32 {

@@ -508,9 +508,17 @@ export const createSchroedingerSlice: StateCreator<
             needsReset: true,
           }
           const resized = resizeQuantumWalkArrays(base, globalDim)
+          const parentAbsorber =
+            preset.overrides.absorberEnabled !== undefined
+              ? {
+                  absorberEnabled: preset.overrides.absorberEnabled,
+                  absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                }
+              : {}
           return {
             schroedinger: {
               ...state.schroedinger,
+              ...parentAbsorber,
               quantumWalk: { ...base, ...resized, needsReset: true },
             },
           }

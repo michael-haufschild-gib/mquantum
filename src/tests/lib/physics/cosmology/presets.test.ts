@@ -340,7 +340,13 @@ describe('isValidPreset', () => {
 })
 
 describe('COSMOLOGY_PRESETS catalogue', () => {
-  it('lists all four presets in a stable order', () => {
-    expect(COSMOLOGY_PRESETS).toEqual(['minkowski', 'deSitter', 'ekpyrotic', 'kasner'])
+  it('lists all five presets in a stable order', () => {
+    expect(COSMOLOGY_PRESETS).toEqual([
+      'minkowski',
+      'deSitter',
+      'ekpyrotic',
+      'kasner',
+      'bianchiKasner',
+    ])
   })
 })

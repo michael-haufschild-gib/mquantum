@@ -66,10 +66,14 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   const defines: string[] = []
   const features: string[] = []
 
-  // Compile-time dimension (Wigner is always ND, min 3)
+  // Compile-time dimension (Wigner is always ND, min 3).
+  // Only `ACTUAL_DIM` (clamped) is emitted — the previous `DIMENSION`
+  // const (un-clamped) was defined here and in 3 sibling composers but
+  // never referenced by any WGSL file; every shader read `ACTUAL_DIM`
+  // directly. Kept only the used constant to avoid confusion over which
+  // dimension value the shaders actually consume.
   const actualDim = Math.min(Math.max(dimension, 3), 11)
 
-  defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Wigner Cache`)
 

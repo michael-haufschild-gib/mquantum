@@ -126,9 +126,11 @@ function generateComputeDefines(config: DensityGridComputeConfig): ComputeShader
 
   const defines: string[] = []
   const features: string[] = []
+  // Only ACTUAL_DIM (clamped) is emitted — see composeWignerCache.ts for
+  // the rationale. The previously emitted un-clamped `const DIMENSION`
+  // was never read by any WGSL shader.
   const actualDim = Math.min(Math.max(dimension, 3), 11)
 
-  defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Quantum`)
 

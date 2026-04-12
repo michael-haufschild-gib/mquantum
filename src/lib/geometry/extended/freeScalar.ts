@@ -5,6 +5,7 @@
  * for the real scalar field lattice simulation.
  */
 
+import type { KasnerExponents } from '@/lib/physics/cosmology/bianchiKasner'
 import type { CosmologyPreset } from '@/lib/physics/cosmology/presets'
 
 // ============================================================================
@@ -176,12 +177,14 @@ export interface CosmologyConfig {
   hubble: number
   /**
    * Initial conformal time `η₀` at which the adiabatic Bunch-Davies vacuum
-   * is sampled. Use `η < 0` (deep past). The only hard requirement is
-   * `η₀ ≠ 0` — the power-law scale factor `a(η) = A·|η|^q` is singular
-   * there. Under the canonical δφ integrator the adiabatic vacuum is
-   * well-defined at any non-zero `η₀` since `m²·a²` is always non-negative
-   * for real `m`, so the old Mukhanov-Sasaki `|η₀|² · k_min² ≥ safety ·
-   * |z''/z|(η₀)` super-horizon-tachyon guard is gone.
+   * is sampled. Use `η < 0` (deep past) for the isotropic FLRW presets; the
+   * Bianchi-I vacuum Kasner preset uses `η > 0` (conformal time grows
+   * forward from the singularity). The only hard requirement is
+   * `η₀ ≠ 0` — the power-law scale factor is singular there. Under the
+   * canonical δφ integrator the adiabatic vacuum is well-defined at any
+   * non-zero `η₀` since `m²·a²` is always non-negative for real `m`, so
+   * the old Mukhanov-Sasaki `|η₀|² · k_min² ≥ safety · |z''/z|(η₀)`
+   * super-horizon-tachyon guard is gone.
    *
    * The store still runs the user's value through `clampEta0` on every
    * cosmology/lattice edit, but `clampEta0` now just raises `|η₀|` above a
@@ -189,6 +192,14 @@ export interface CosmologyConfig {
    * rejection.
    */
   eta0: number
+  /**
+   * Bianchi-I Kasner exponent triple `(p₁, p₂, p₃)`. Only consulted when
+   * `preset === 'bianchiKasner'`; ignored (but preserved through
+   * serialization) for every other preset. Default to the canonical
+   * symmetric vacuum `(−1/3, 2/3, 2/3)` on fresh scenes so the sliders
+   * land on a physically well-defined starting point.
+   */
+  kasnerExponents?: KasnerExponents
 }
 
 /**
@@ -201,6 +212,7 @@ export const DEFAULT_COSMOLOGY_CONFIG: CosmologyConfig = {
   steepness: 5, // > s_c(4) ≈ 3.464 — valid ekpyrotic default
   hubble: 1,
   eta0: -10,
+  kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
 }
 
 // ============================================================================
@@ -393,6 +405,11 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   pmlTargetReflection: 1e-6,
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
-  cosmology: { ...DEFAULT_COSMOLOGY_CONFIG },
+  cosmology: {
+    ...DEFAULT_COSMOLOGY_CONFIG,
+    kasnerExponents: DEFAULT_COSMOLOGY_CONFIG.kasnerExponents
+      ? { ...DEFAULT_COSMOLOGY_CONFIG.kasnerExponents }
+      : undefined,
+  },
   preheating: { ...DEFAULT_PREHEATING_CONFIG },
 }

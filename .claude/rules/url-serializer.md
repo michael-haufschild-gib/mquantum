@@ -26,6 +26,12 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `it` | 0/1 | Imaginary-time propagation |
 | `oq` | 0/1 | Open quantum |
 | `oq_dp`, `oq_rx`, `oq_th` | float | Open quantum rates |
+| `sloc` | 0/1 | TDSE stochastic localization (CSL) |
+| `sloc_g` | float 0-10 | CSL monitoring rate γ |
+| `sloc_s` | float 0.5-5 | CSL localization width σ |
+| `sloc_n` | int 1-32 | Collapse sites per step |
+| `brc` | 0/1 | TDSE branch visualization — moves diagnostic partition to the branch plane |
+| `brc_p` | float -1 to 1 | Normalized branch plane position along axis 0 |
 
 ## Rules
 

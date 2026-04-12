@@ -9,7 +9,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 
-import { FFT_UNIFORM_SIZE, MAX_DIM } from './computePassUtils'
+import { FFT_UNIFORM_SIZE, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
 /** Parameters for writing TDSEUniforms to a GPU buffer. */
 export interface TdseUniformParams {
@@ -188,8 +188,11 @@ export function writeTdseUniforms(
   const densityFloor = initialMaxDensity / Math.max(autoScaleMaxGain, 1)
   f32[87] = config.autoScale ? Math.max(maxDensity, densityFloor) : 1.0
 
-  // slicePositions (352, indices 88-99)
-  for (let i = 0; i < config.slicePositions.length; i++) f32[88 + 3 + i] = config.slicePositions[i]!
+  // slicePositions (offset 352, indices 88-99, WGSL array<f32, 12>).
+  // Clamped to MAX_SLICE_POSITIONS_WRITE_COUNT so an oversized store array
+  // cannot overflow past the slicePositions region into basisX at f32[100+].
+  const tdseSliceN = Math.min(config.slicePositions.length, MAX_SLICE_POSITIONS_WRITE_COUNT)
+  for (let i = 0; i < tdseSliceN; i++) f32[88 + 3 + i] = config.slicePositions[i]!
 
   // Basis vectors (400-543, indices 100-135)
   const writeBasis = (offset: number, b?: Float32Array) => {

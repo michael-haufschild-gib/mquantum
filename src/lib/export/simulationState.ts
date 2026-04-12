@@ -72,7 +72,10 @@ export async function serializeSimulationState(
   const configJSON = JSON.stringify(config)
   const configBytes = new TextEncoder().encode(configJSON)
 
-  // Interleave psiRe and psiIm into a single buffer
+  // Concatenate psiRe and psiIm into a single buffer: [psiRe..., psiIm...].
+  // Matches the header spec layout and the deserializer's `wavData.slice`
+  // split at `totalElements`. Previously labeled "Interleave" but the code
+  // has always written them as two contiguous spans, not r/i/r/i pairs.
   const totalFloats = wavefunction.re.length + wavefunction.im.length
   const wavData = new Float32Array(totalFloats)
   wavData.set(wavefunction.re, 0)
