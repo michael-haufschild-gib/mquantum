@@ -466,7 +466,10 @@ export function computeFsfOuterStepSubsteps(
   // Peak mass-squared multiplier for the preheating drive. When the drive is
   // disabled this collapses to 1 and every computeFsfCflSubsteps call reduces
   // to the original cosmology-only dispersion bound.
-  const preheatingActive = config.preheating.enabled
+  // Treat zero-amplitude preheating as inactive: massSquaredScale ≡ 1 so the
+  // physics is the non-preheating path, and forcing phase substeps would be
+  // wasted work.
+  const preheatingActive = config.preheating.enabled && Math.abs(config.preheating.amplitude) > 0
   const massSquaredScaleMax = preheatingActive ? 1 + Math.abs(config.preheating.amplitude) : 1
   // Drive phase bound: require Ω·subDt < PREHEATING_PHASE_SAFETY so the
   // frozen-coef leapfrog substep never advances the sinusoid by more than
@@ -530,7 +533,20 @@ export function computePreheatingPhaseSubsteps(frequency: number, dtFull: number
   const phaseFull = omega * dtFull
   if (!(phaseFull > PREHEATING_PHASE_SAFETY)) return 1
   const ideal = Math.ceil(phaseFull / PREHEATING_PHASE_SAFETY)
-  return ideal <= COSMOLOGY_MAX_SUBSTEPS ? ideal : COSMOLOGY_MAX_SUBSTEPS
+  if (ideal <= COSMOLOGY_MAX_SUBSTEPS) return ideal
+
+  // Cap reached: the drive frequency is too high relative to the outer step
+  // for the substep ceiling to guarantee Ω·subDt < PREHEATING_PHASE_SAFETY.
+  // The simulation continues but may alias the drive sinusoid, producing
+  // spurious growth or missing resonance tongues. Mirror the CFL-cap
+  // warning so the user knows the integrator can't resolve the drive.
+  logger.warn(
+    `[FSF-COMPUTE] preheating phase sub-step cap reached ` +
+      `(Ω=${omega.toFixed(3)}, Ω·dt=${phaseFull.toFixed(3)}, ` +
+      `ideal=${ideal}, cap=${COSMOLOGY_MAX_SUBSTEPS}). ` +
+      `The drive sinusoid may be aliased — reduce Ω or dt.`
+  )
+  return COSMOLOGY_MAX_SUBSTEPS
 }
 
 /**

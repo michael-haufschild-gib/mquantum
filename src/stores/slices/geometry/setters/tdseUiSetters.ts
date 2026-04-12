@@ -41,10 +41,29 @@ export function createTdseUiSetters(ctx: SetterContext) {
         },
       }))
     },
-    setTdseAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled') as (
-      enabled: boolean
-    ) => void,
-    setTdseAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setTdseAbsorberEnabled: (enabled: boolean) => {
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberEnabled: enabled,
+          [D]: { ...state.schroedinger[D], absorberEnabled: enabled },
+        },
+      }))
+    },
+    setTdseAbsorberWidth: (value: number) => {
+      if (!ctx.isFinite(value)) {
+        ctx.warnNonFinite(`${D}.absorberWidth`, value)
+        return
+      }
+      const clamped = Math.max(0.05, Math.min(0.5, value))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberWidth: clamped,
+          [D]: { ...state.schroedinger[D], absorberWidth: clamped },
+        },
+      }))
+    },
     setTdsePmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
     setTdseFieldView: nestedValueSetter(ctx, D, 'fieldView') as (view: TdseFieldView) => void,
     setTdseAutoScale: nestedValueSetter(ctx, D, 'autoScale') as (autoScale: boolean) => void,

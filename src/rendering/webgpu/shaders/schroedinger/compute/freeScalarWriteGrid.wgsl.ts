@@ -239,6 +239,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
+  // Driven mass coefficient: m²·a^n·massSquaredScale. Under Minkowski
+  // (aFull=1) and preheating off (massSquaredScale=1) this collapses to
+  // m². Shared by the energyDensity fieldView and the analysis K/G/V/E
+  // decomposition so the two output paths cannot drift apart.
+  let drivenMassCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
+
   if (params.fieldView == 0u) {
     fieldValue = phiVal;
   } else if (params.fieldView == 1u) {
@@ -286,11 +292,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // inconsistent picture even when the dynamics themselves are
     // correct. With preheating disabled massSquaredScale = 1 and the
     // expression is bit-identical to the prior form.
-    let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
     var canonicalH = 0.5 * (
       params.aKinetic * nnPiVal * nnPiVal
       + params.aPotential * gradEnergy
-      + massCoef * nnPhiVal * nnPhiVal
+      + drivenMassCoef * nnPhiVal * nnPhiVal
     );
     // Self-interaction: canonical contribution is aFull · V(δφ) from the
     // ∫ sqrt(-g) · V(φ) term in the action. Dividing by aFull below
@@ -331,8 +336,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Preheating: apply the same time-dependent mass² factor used in
     // freeScalarUpdatePi and the energyDensity view, so the K/G/V/E
     // decomposition reflects the Hamiltonian actually being integrated.
-    let massCoef = params.mass * params.mass * params.aFull * params.massSquaredScale;
-    var V = 0.5 * massCoef * nnPhiVal * nnPhiVal * invAFull;
+    var V = 0.5 * drivenMassCoef * nnPhiVal * nnPhiVal * invAFull;
     if (params.selfInteractionEnabled != 0u) {
       let siV2 = params.selfInteractionVev * params.selfInteractionVev;
       let siPhi2 = nnPhiVal * nnPhiVal;

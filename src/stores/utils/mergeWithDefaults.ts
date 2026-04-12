@@ -170,7 +170,12 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
     const tdseRecord = tdse as Record<string, unknown>
     const rawSpin = tdseRecord.bhSpin
     const rawEll = tdseRecord.bhMultipoleL
-    if (typeof rawSpin === 'number' && typeof rawEll === 'number') {
+    if (
+      typeof rawSpin === 'number' &&
+      Number.isFinite(rawSpin) &&
+      typeof rawEll === 'number' &&
+      Number.isFinite(rawEll)
+    ) {
       const spin = Math.max(0, Math.min(2, Math.floor(rawSpin)))
       const ell = Math.max(spin, Math.min(6, Math.floor(rawEll)))
       if (spin !== rawSpin || ell !== rawEll) {

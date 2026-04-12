@@ -92,6 +92,13 @@ test.describe('skybox: thumbnail grid', () => {
     const uiSet = new Set(uiIds)
     const listSet = new Set(ALL_SKYBOX_IDS)
 
+    // Duplicate UI IDs would produce a smaller Set than the source array,
+    // hiding a double-rendered skybox-option from the diff checks below.
+    expect(
+      uiIds.length,
+      `UI rendered ${uiIds.length} skybox options but only ${uiSet.size} unique — duplicates: ${uiIds.filter((id, i) => uiIds.indexOf(id) !== i).join(', ')}`
+    ).toBe(uiSet.size)
+
     const missingFromList = uiIds.filter(
       (id) => !listSet.has(id as (typeof ALL_SKYBOX_IDS)[number])
     )

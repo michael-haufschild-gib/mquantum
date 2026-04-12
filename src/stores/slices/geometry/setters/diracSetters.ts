@@ -240,8 +240,29 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
     setDiracFieldView: nestedValueSetter(ctx, D, 'fieldView'),
     setDiracAutoScale: nestedValueSetter(ctx, D, 'autoScale'),
     setDiracShowPotential: nestedValueSetter(ctx, D, 'showPotential'),
-    setDiracAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled'),
-    setDiracAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setDiracAbsorberEnabled: (enabled: boolean) => {
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberEnabled: enabled,
+          [D]: { ...state.schroedinger[D], absorberEnabled: enabled },
+        },
+      }))
+    },
+    setDiracAbsorberWidth: (value: number) => {
+      if (!ctx.isFinite(value)) {
+        ctx.warnNonFinite(`${D}.absorberWidth`, value)
+        return
+      }
+      const clamped = Math.max(0.05, Math.min(0.5, value))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberWidth: clamped,
+          [D]: { ...state.schroedinger[D], absorberWidth: clamped },
+        },
+      }))
+    },
     setDiracPmlTargetReflection: nestedClampedSetter(ctx, D, 'pmlTargetReflection', 1e-12, 0.999),
     setDiracGridSize: (size) => {
       if (!hasOnlyFinite(size)) {
@@ -447,7 +468,8 @@ export function createDiracSetters(ctx: SetterContext): DiracActions {
               preset.overrides.absorberEnabled !== undefined
                 ? {
                     absorberEnabled: preset.overrides.absorberEnabled,
-                    absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                    absorberWidth:
+                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
                   }
                 : {}
             return {

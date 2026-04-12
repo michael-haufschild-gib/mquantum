@@ -195,7 +195,10 @@ function resolveEta0ForPresetSwitch(
 function resolvePresetSwitchSubstate(
   fs: FreeScalarConfig,
   preset: import('@/lib/physics/cosmology/presets').CosmologyPreset
-): { eta0: number; kasnerExponents: NonNullable<FreeScalarConfig['cosmology']['kasnerExponents']> } {
+): {
+  eta0: number
+  kasnerExponents: NonNullable<FreeScalarConfig['cosmology']['kasnerExponents']>
+} {
   const kasnerExponents = fs.cosmology.kasnerExponents ?? { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
   let eta0 = fs.cosmology.eta0
   if (preset === 'bianchiKasner' && eta0 < 0) eta0 = -eta0
@@ -250,6 +253,10 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
                 `hubble=${fs.cosmology.hubble}, spacetimeDim=${fs.latticeDim + 1}).`
             )
             nextEnabled = false
+          } else if (fs.cosmology.preset === 'bianchiKasner') {
+            // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
+            // runtime COSMOLOGY_ETA_FLOOR is the only guard needed. Matches
+            // the bypass in resolveEta0ForPresetSwitch.
           } else {
             try {
               const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
@@ -461,18 +468,24 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           kasnerExponents: fs.cosmology.kasnerExponents,
         }
         if (isValidPreset(params)) {
-          try {
-            const result = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
-            clampedEta0 = result.eta0
-          } catch (e) {
-            // Match the other setters: a corrupted gridSize/spacing shouldn't
-            // block an eta0 edit. Store the user's value verbatim; the next
-            // reconcileCosmologyInvariants pass will soft-disable if the
-            // lattice state stays invalid.
-            logger.warn(
-              `[setFreeScalarCosmologyEta0] clampEta0 failed for ` +
-                `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
-            )
+          if (fs.cosmology.preset === 'bianchiKasner') {
+            // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
+            // runtime COSMOLOGY_ETA_FLOOR is the only guard needed.
+            clampedEta0 = eta0
+          } else {
+            try {
+              const result = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
+              clampedEta0 = result.eta0
+            } catch (e) {
+              // Match the other setters: a corrupted gridSize/spacing shouldn't
+              // block an eta0 edit. Store the user's value verbatim; the next
+              // reconcileCosmologyInvariants pass will soft-disable if the
+              // lattice state stays invalid.
+              logger.warn(
+                `[setFreeScalarCosmologyEta0] clampEta0 failed for ` +
+                  `eta0=${eta0}: ${e instanceof Error ? e.message : String(e)}`
+              )
+            }
           }
         }
         return {

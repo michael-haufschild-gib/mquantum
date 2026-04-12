@@ -348,8 +348,29 @@ export function createFreeScalarSetters(ctx: SetterContext): FreeScalarActions {
       10.0
     ),
     setFreeScalarSelfInteractionVev: nestedClampedSetter(ctx, D, 'selfInteractionVev', 0.1, 5.0),
-    setFreeScalarAbsorberEnabled: nestedValueSetter(ctx, D, 'absorberEnabled'),
-    setFreeScalarAbsorberWidth: nestedClampedSetter(ctx, D, 'absorberWidth', 0.05, 0.5),
+    setFreeScalarAbsorberEnabled: (enabled: boolean) => {
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberEnabled: enabled,
+          [D]: { ...state.schroedinger[D], absorberEnabled: enabled },
+        },
+      }))
+    },
+    setFreeScalarAbsorberWidth: (value: number) => {
+      if (!ctx.isFinite(value)) {
+        ctx.warnNonFinite(`${D}.absorberWidth`, value)
+        return
+      }
+      const clamped = Math.max(0.05, Math.min(0.5, value))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          absorberWidth: clamped,
+          [D]: { ...state.schroedinger[D], absorberWidth: clamped },
+        },
+      }))
+    },
     setFreeScalarPmlTargetReflection: nestedClampedSetter(
       ctx,
       D,

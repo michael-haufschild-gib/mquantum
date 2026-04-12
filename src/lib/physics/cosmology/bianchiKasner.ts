@@ -285,19 +285,30 @@ export function computeBianchiKasnerCoefs(
     )
   }
 
-  // General η↔t conversion for Bianchi-I with Σp_i = 1.
+  // General η↔t conversion for Bianchi-I with arbitrary Σp_i.
   //
-  // From dη = dt/ã with ã = t^(1/(n-1)), integrating gives
-  //   η = ((n-1)/(n-2)) · t^((n-2)/(n-1))
-  //   t = (η · (n-2)/(n-1))^((n-1)/(n-2))
+  // The geometric-mean gauge factor is ã = (a₁·a₂·a₃)^(1/(n-1)) = t^(Σp/(n-1)).
+  // From dη = dt/ã = dt · t^(−Σp/(n-1)), integrating gives:
   //
-  // For n = 4: t = (2η/3)^(3/2). For n = 5: t = (3η/4)^(4/3).
-  // Non-vacuum triples (Σp_i ≠ 1) modify the gauge relation but are still
-  // evaluated with this formula — the integrator ratios and scalars remain
-  // well-defined for any finite exponents.
+  //   η = [(n-1)/(n-1-Σp)] · t^((n-1-Σp)/(n-1))    when Σp ≠ n-1
+  //   t = [η · (n-1-Σp)/(n-1)]^((n-1)/(n-1-Σp))
+  //
+  // For vacuum (Σp=1, n=4): t = (2η/3)^(3/2) — matches the prior formula.
+  // For isotropic (Σp=1, any n): same as FLRW.
+  // Edge case Σp = n-1: ã = t, η = ln(t), t = exp(η). Physically
+  // unreachable for vacuum triples but handled for robustness.
   const nm1 = spacetimeDim - 1 // n - 1
-  const nm2 = spacetimeDim - 2 // n - 2
-  const t = Math.pow((eta * nm2) / nm1, nm1 / nm2)
+  const sumP = exp.p1 + exp.p2 + exp.p3
+  const alpha = nm1 - sumP // n - 1 - Σp
+
+  let t: number
+  if (Math.abs(alpha) < 1e-12) {
+    // Degenerate case Σp ≈ n-1: η = ln(t), t = exp(η)
+    t = Math.exp(eta)
+  } else {
+    // General case: t = (η · alpha / (n-1))^((n-1)/alpha)
+    t = Math.pow((eta * alpha) / nm1, nm1 / alpha)
+  }
 
   const a1 = Math.pow(t, exp.p1)
   const a2 = Math.pow(t, exp.p2)

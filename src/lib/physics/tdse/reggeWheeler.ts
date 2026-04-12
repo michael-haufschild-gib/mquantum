@@ -185,19 +185,24 @@ export interface ReggeWheelerPeak {
  * @internal
  */
 export function reggeWheelerPeakLocation(ell: number, spin: number, M: number): ReggeWheelerPeak {
+  // Guard invalid M: the scan loop uses dr = 0.002 * M, so M <= 0 or
+  // non-finite M would stall (dr = 0) or scan backwards (dr < 0).
+  // Clamp to the same floor used by computeReggeWheelerPotential.
+  const safeM = Number.isFinite(M) && M > 0 ? M : 1e-4
+
   let bestRStar = 0
-  let bestR = 3 * M
+  let bestR = 3 * safeM
   let bestV = -Infinity
 
   // Coarse scan window: the photon sphere is at r = 3M so all physical peaks
   // cluster between r ≈ 2M and r ≈ 5M, which maps to r* ∈ [−∞, +5M].
-  const rStarMin = -10 * M
-  const rStarMax = 20 * M
-  const dr = 0.002 * M
+  const rStarMin = -10 * safeM
+  const rStarMax = 20 * safeM
+  const dr = 0.002 * safeM
 
   for (let rs = rStarMin; rs <= rStarMax; rs += dr) {
-    const r = tortoiseToRadial(rs, M)
-    const v = reggeWheelerPotentialFromR(r, M, ell, spin)
+    const r = tortoiseToRadial(rs, safeM)
+    const v = reggeWheelerPotentialFromR(r, safeM, ell, spin)
     if (v > bestV) {
       bestV = v
       bestRStar = rs

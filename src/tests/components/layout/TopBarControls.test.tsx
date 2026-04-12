@@ -77,9 +77,12 @@ describe('TopBarControls', () => {
     // icon swap, not a style change.
     const momentumButton = screen.getByLabelText('Representation: Momentum')
     expect([...momentumButton.classList]).toEqual(initialClasses)
+    // Only one toggle exists at a time — the previous representation must be gone.
+    expect(screen.queryByLabelText('Representation: Position')).toBeNull()
 
     await user.click(momentumButton)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+    expect(screen.queryByLabelText('Representation: Momentum')).toBeNull()
 
     // Final advance — verifies the cycle reaches the third state. The
     // position-only leg (wigner → position) is covered by the desktop test.

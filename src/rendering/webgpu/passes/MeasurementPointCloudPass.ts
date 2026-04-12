@@ -145,6 +145,10 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     const positions = mState.measurements
     this.pointCount = Math.min(positions.length, MAX_POINTS)
 
+    // When measurements.length > MAX_POINTS, render the NEWEST entries
+    // (tail of the append-ordered array) rather than the oldest (head).
+    const startIdx = Math.max(0, positions.length - this.pointCount)
+
     // `measurements[]` is append-ordered — index 0 is the oldest record,
     // index (pointCount-1) the newest. The vertex shader's uniform
     // contract is `0=newest, 1=oldest` and the fragment shader applies
@@ -154,7 +158,7 @@ export class MeasurementPointCloudPass extends WebGPUBasePass {
     // which is the opposite of what a "fading trail" visualization wants.
     const denom = Math.max(this.pointCount - 1, 1)
     for (let i = 0; i < this.pointCount; i++) {
-      const pos = positions[i]!.position
+      const pos = positions[startIdx + i]!.position
       const age = (this.pointCount - 1 - i) / denom
       this.uploadData[i * 4] = pos[0] ?? 0
       this.uploadData[i * 4 + 1] = pos[1] ?? 0

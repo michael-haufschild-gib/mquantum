@@ -142,7 +142,10 @@ export const MonitoringSweepSection: React.FC = React.memo(() => {
     // `readbackGeneration` is the canonical monotonic counter for
     // `diagnosticsStore.tdse` (bumped inside `pushTdseSnapshot`), and
     // re-creating this closure on every sweep start resets it naturally.
-    let lastGen = -1
+    // Seed from the current readback generation so any stale snapshot
+    // already in the diagnostics store is skipped. Starting from -1 would
+    // let a pre-reset snapshot through on the first tick.
+    let lastGen = useDiagnosticsStore.getState().tdse.readbackGeneration
 
     sweepTickRef.current = setInterval(() => {
       const diag = useDiagnosticsStore.getState().tdse
