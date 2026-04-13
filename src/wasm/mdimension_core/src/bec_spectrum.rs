@@ -45,6 +45,12 @@ pub fn compute_incompressible_spectrum(
             return Vec::new();
         }
     }
+    // Reject non-radix-2 or too-small axes: fft_1d asserts power-of-2 >= 2.
+    for &n in grid_size {
+        if n < 2 || !n.is_power_of_two() || n.trailing_zeros() >= fft::MAX_LOG2 as u32 {
+            return Vec::new();
+        }
+    }
     let total_sites: usize = grid_size.iter().product();
     if total_sites == 0 || psi_re.len() != total_sites || psi_im.len() != total_sites {
         return Vec::new();
