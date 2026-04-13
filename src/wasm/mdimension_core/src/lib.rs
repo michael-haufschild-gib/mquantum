@@ -19,6 +19,7 @@ pub fn start() {
 }
 
 mod animation;
+mod bec_spectrum;
 mod clifford;
 mod complex_matrix;
 mod entanglement;
@@ -326,6 +327,44 @@ pub fn ifft_nd_wasm(data: &[f64], grid_size: &[u32]) -> Vec<f64> {
     let mut result = data.to_vec();
     fft::ifft_nd(&mut result, &gs);
     result
+}
+
+// ============================================================================
+// BEC Incompressible Kinetic-Energy Spectrum
+// ============================================================================
+
+/// Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
+///
+/// Velocity-field finite differences + N-D FFT (via `fft::fft_nd`) +
+/// Helmholtz projection + log-spaced shell binning of the Nore/Bradley
+/// superfluid decomposition.  All steps run entirely in Rust; the JS
+/// caller invokes this single WASM entry point and unpacks the result.
+///
+/// # Arguments
+/// * `psi_re` / `psi_im` — split wavefunction components (Float32,
+///   length = product(grid_size)).
+/// * `grid_size` — per-axis lattice sizes.
+/// * `spacing` — per-axis lattice spacing.
+/// * `hbar`, `mass` — physical constants.
+///
+/// # Returns
+/// Packed `Vec<f64>` of length `2 · NUM_SPECTRUM_BINS + 2`:
+///   - `[0..N)` = spectrum (Float32-precision signal, returned as f64)
+///   - `[N..2N)` = k-value bin centers
+///   - `[2N]` = total incompressible kinetic energy
+///   - `[2N+1]` = total compressible kinetic energy
+/// Empty vector on invalid input.
+#[wasm_bindgen]
+pub fn compute_incompressible_spectrum_wasm(
+    psi_re: &[f32],
+    psi_im: &[f32],
+    grid_size: &[u32],
+    spacing: &[f64],
+    hbar: f64,
+    mass: f64,
+) -> Vec<f64> {
+    let gs: Vec<usize> = grid_size.iter().map(|&s| s as usize).collect();
+    bec_spectrum::compute_incompressible_spectrum(psi_re, psi_im, &gs, spacing, hbar, mass)
 }
 
 // ============================================================================

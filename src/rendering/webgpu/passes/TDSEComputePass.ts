@@ -56,6 +56,7 @@ import {
   runPostStepDispatches,
   runStrangEvolution,
 } from './TDSEComputePassEvolution'
+import { dispatchFFTAxisExternal, dispatchFFTAxisInPassExternal } from './TDSEComputePassGradient'
 import type {
   TdseBindGroupInputs,
   TdseBindGroupResult,
@@ -90,10 +91,8 @@ import {
   disposeDisorder,
   maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
-import type { FFTAxisSharedMemParams } from './TDSEComputePassDispatchers'
-import { dispatchFFTAxisSharedMem as extDispatchFFTAxisSharedMem } from './TDSEComputePassDispatchers'
 import {
-  destroyPassBuffers,
+  destroyTdsePassGpu,
   disposeTdseResources,
   type TdseGpuFields,
 } from './TDSEComputePassDispose'
@@ -149,6 +148,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private fftStagingBuffer: GPUBuffer | null = null
   private fftAxisUniformBuffer: GPUBuffer | null = null
   private fftAxisStagingBuffer: GPUBuffer | null = null
+  /** Per-slot FFT axis uniform buffers (length = 2 × latticeDim). */
+  private fftAxisUniformBuffers: GPUBuffer[] | null = null
   private packUniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
@@ -440,6 +441,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           this._diagState.diagResultBuffer,
           this._diagState.diagStagingBuffer
         ),
+        fftAxisUniformBuffers: this.fftAxisUniformBuffers ?? [],
         densityTextureView: this.densityTextureView,
         totalSites: this.totalSites,
       } as TdseBindGroupInputs,
@@ -492,20 +494,25 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.customPotentialScale = ic.customPotentialScale
   }
 
-  /** Dispatch FFT for one axis using shared-memory kernel. */
+  /** Dispatch FFT for one axis (own compute pass). See helper for details. */
   private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
-    if (!this.pl || !this.bg || !this.fftAxisUniformBuffer || !this.fftAxisStagingBuffer) {
-      return slotOffset
-    }
-    const p: FFTAxisSharedMemParams = {
+    return dispatchFFTAxisExternal(ctx, axisDim, slotOffset, {
       pl: this.pl,
       bg: this.bg,
       fftAxisUniformBuffer: this.fftAxisUniformBuffer,
       fftAxisStagingBuffer: this.fftAxisStagingBuffer,
       totalSites: this.totalSites,
-      dispatchCompute: this.dc,
-    }
-    return extDispatchFFTAxisSharedMem(ctx, axisDim, slotOffset, p)
+      dc: this.dc,
+    })
+  }
+
+  /** PERF: dispatch one FFT axis inside an open compute pass. */
+  private dispatchFFTAxisInPass(
+    passEncoder: GPUComputePassEncoder,
+    axisDim: number,
+    slot: number
+  ): void {
+    dispatchFFTAxisInPassExternal(passEncoder, axisDim, slot, this.bg, this.totalSites)
   }
 
   /** Execute the full TDSE compute pipeline. */
@@ -637,13 +644,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         bg,
         totalSites: this.totalSites,
         diagNumWorkgroups: this.diagNumWorkgroups,
-        fwdStageCount: this.fwdAxisCount,
+        ifftSlotOffset: this.fwdAxisCount,
         gsState: this._gsState,
         stochasticState: this._stochasticState,
         boundingRadius: boundingRadius ?? 2.0,
         hellerState: this._hellerState,
         dc: this.dc,
         dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
+        dispatchFFTAxisInPass: (pass, axisDim, slot) =>
+          this.dispatchFFTAxisInPass(pass, axisDim, slot),
       })
       this.simTime = evoState.simTime
       this.stepAccumulator = evoState.stepAccumulator
@@ -695,10 +704,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       fftStagingBuffer: this.fftStagingBuffer,
       fftAxisUniformBuffer: this.fftAxisUniformBuffer,
       fftAxisStagingBuffer: this.fftAxisStagingBuffer,
+      fftAxisUniformBuffers: this.fftAxisUniformBuffers,
       packUniformBuffer: this.packUniformBuffer,
       omegaStagingBuffer: this.omegaStagingBuffer,
       densityTexture: this.densityTexture,
       densityTextureView: this.densityTextureView,
+      normalTexture: null,
+      normalTextureView: null,
       diagUniformBuffer: this.diagUniformBuffer,
       diagPartialSumsBuffer: this.diagPartialSumsBuffer,
       diagPartialMaxBuffer: this.diagPartialMaxBuffer,
@@ -710,7 +722,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       initialized: this.initialized,
       lastConfigHash: this.lastConfigHash,
     }
-    destroyPassBuffers(gpu)
+    destroyTdsePassGpu(gpu)
     Object.assign(this, gpu)
     disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)
     super.dispose()

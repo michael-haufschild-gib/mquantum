@@ -31,7 +31,6 @@ import {
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
 } from './computePassUtils'
-import { createGradientPipeline } from './DensityGridGradientSetup'
 import type {
   FsfBindGroupResult,
   FsfPassHelpers,
@@ -49,6 +48,11 @@ import {
   FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
+import {
+  buildFsfGradientPipeline,
+  createFsfNormalTexture,
+  dispatchFsfGradientNormals,
+} from './FreeScalarFieldGradient'
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
 import { captureFsfCosmoDebugSample, getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
 import {
@@ -230,19 +234,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.analysisTexture = textures.analysisTexture
     this.analysisTextureView = textures.analysisTextureView
 
-    // Pre-computed gradient normal texture: replaces 6 per-step texture fetches
-    // in the fragment shader with a single lookup (saves ~0.4-1.6ms at Retina).
-    this.normalTexture = device.createTexture({
-      label: 'free-scalar-normal-grid',
-      size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
-      format: 'rgba8snorm',
-      dimension: '3d',
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    this.normalTextureView = this.normalTexture.createView({
-      label: 'free-scalar-normal-view',
-      dimension: '3d',
-    })
+    // Pre-computed gradient normal texture (see FreeScalarFieldGradient.ts).
+    const normals = createFsfNormalTexture(device)
+    this.normalTexture = normals.normalTexture
+    this.normalTextureView = normals.normalTextureView
   }
 
   /** Get the density texture view for binding into the raymarching pipeline. */
@@ -408,23 +403,17 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.gradientPipeline = null
     this.gradientBindGroup = null
     if (this.densityTextureView && this.normalTextureView) {
-      createGradientPipeline(
+      buildFsfGradientPipeline(
         device,
         this.densityTextureView,
         this.normalTextureView,
-        'rgba16float',
-        DENSITY_GRID_SIZE
+        gen,
+        () => this.pipelineGeneration,
+        (pipeline, bindGroup) => {
+          this.gradientPipeline = pipeline
+          this.gradientBindGroup = bindGroup
+        }
       )
-        .then((r) => {
-          if (gen !== this.pipelineGeneration) return
-          this.gradientPipeline = r.pipeline
-          this.gradientBindGroup = r.bindGroup
-        })
-        .catch((err) => {
-          if (gen === this.pipelineGeneration) {
-            logger.warn('[FSF] Gradient pipeline creation failed:', err)
-          }
-        })
     }
   }
 
@@ -877,15 +866,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       gridPass.end()
 
-      // Dispatch pre-computed gradient normals (replaces 6 per-step texture fetches with 1)
-      if (this.gradientPipeline && this.gradientBindGroup) {
-        const gradWG = Math.ceil(DENSITY_GRID_SIZE / 8)
-        const gradPass = ctx.beginComputePass({ label: 'free-scalar-gradient-grid-pass' })
-        gradPass.setPipeline(this.gradientPipeline)
-        gradPass.setBindGroup(0, this.gradientBindGroup)
-        gradPass.dispatchWorkgroups(gradWG, gradWG, gradWG)
-        gradPass.end()
-      }
+      // Dispatch pre-computed gradient normals (1-fetch raymarcher path).
+      dispatchFsfGradientNormals(ctx, this.gradientPipeline, this.gradientBindGroup)
     } else {
       logger.warn(
         `[FreeScalarFieldComputePass] writeGrid skipped: pl=${!!this.pl}, bg=${!!this.bg}`

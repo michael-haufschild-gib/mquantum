@@ -15,7 +15,6 @@ import {
 } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
-import { computeIncompressibleSpectrum } from '@/lib/physics/bec/incompressibleSpectrum'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import type {
   EntanglementWorkerRequest,
@@ -43,6 +42,10 @@ import {
   createDensityTextureBindings,
   handleSimulationStateIO,
 } from './computeGridUtils'
+import {
+  createBecSpectrumWorkerState,
+  dispatchBecSpectrumComputation,
+} from './TdseBecSpectrumWorker'
 import type {
   ModeFrameContext,
   ModeSetupResult,
@@ -73,8 +76,6 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private transferredOut = false
   /** Counter for throttling spectrum computation (every SPECTRUM_INTERVAL diag cycles). */
   private spectrumCounter = 0
-  /** Guard to prevent overlapping spectrum readbacks. */
-  private spectrumInFlight = false
   /** Frame counter for entanglement readback decimation. */
   private entanglementFrameCounter = 0
   /** Guard to prevent overlapping entanglement readbacks. */
@@ -83,6 +84,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   private entanglementWorker: Worker | null = null
   /** Epoch counter for entanglement worker results ordering. */
   private entanglementEpoch = 0
+  /** BEC incompressible spectrum worker state (worker, epoch, in-flight, disposed). */
+  private readonly spectrumWorkerState = createBecSpectrumWorkerState()
   /** Set on dispose to prevent late async callbacks from resurrecting resources. */
   private disposed = false
 
@@ -601,7 +604,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
   /**
    * Trigger async incompressible E(k) spectrum computation at throttled intervals.
-   * Reads back psi from GPU, computes velocity field + Helmholtz decomposition on CPU.
+   * Reads back psi from GPU, then ships the data to a Web Worker for the
+   * velocity-field + Helmholtz decomposition (previously run on the main thread,
+   * where the 3× Float64 FFT + shell binning at 64³ could consume 5–30 ms and
+   * jitter rendering for BEC turbulence presets).
    */
   private maybeComputeSpectrum(
     ctx: WebGPURenderContext,
@@ -610,12 +616,12 @@ export class TdseBecStrategy implements QuantumModeStrategy {
   ): void {
     const bec = extended?.schroedinger?.bec
     const g = bec?.interactionStrength ?? 0
-    if (g <= 0 || !bec || this.spectrumInFlight) return
+    if (g <= 0 || !bec || this.spectrumWorkerState.inFlight) return
 
     this.spectrumCounter++
     if (this.spectrumCounter < SPECTRUM_INTERVAL) return
     this.spectrumCounter = 0
-    this.spectrumInFlight = true
+    this.spectrumWorkerState.inFlight = true
 
     const gridSize = bec.gridSize.slice(0, bec.latticeDim)
     const spacingArr = computeEffectiveSpacing(
@@ -627,34 +633,30 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     )
     const hbar = bec.hbar ?? 1.0
     const mass = bec.mass ?? 1.0
+    const epoch = ++this.spectrumWorkerState.epoch
 
     void tdsePass.requestMeasurementReadback(ctx).then(
       (result) => {
-        this.spectrumInFlight = false
-        if (!result) return
-        try {
-          const spec = computeIncompressibleSpectrum(
-            result.re,
-            result.im,
-            gridSize,
-            spacingArr,
-            hbar,
-            mass
-          )
-          useDiagnosticsStore
-            .getState()
-            .setBecIncompressibleSpectrum(
-              spec.spectrum,
-              spec.kValues,
-              spec.totalIncompressible,
-              spec.totalCompressible
-            )
-        } catch {
-          logger.warn('[BEC] Incompressible spectrum computation failed')
+        if (this.disposed || this.transferredOut) {
+          this.spectrumWorkerState.inFlight = false
+          return
         }
+        if (!result) {
+          this.spectrumWorkerState.inFlight = false
+          return
+        }
+        dispatchBecSpectrumComputation(
+          this.spectrumWorkerState,
+          result,
+          gridSize,
+          spacingArr,
+          hbar,
+          mass,
+          epoch
+        )
       },
       () => {
-        this.spectrumInFlight = false
+        this.spectrumWorkerState.inFlight = false
       }
     )
   }
@@ -756,5 +758,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.tdsePass = null
     this.entanglementWorker?.terminate()
     this.entanglementWorker = null
+    this.spectrumWorkerState.disposed = true
+    this.spectrumWorkerState.worker?.terminate()
+    this.spectrumWorkerState.worker = null
   }
 }

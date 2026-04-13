@@ -108,6 +108,8 @@ export interface TdseBindGroupResult {
   fftStageBABG: GPUBindGroup
   /** Shared-memory FFT bind group: axis uniforms + complexBuf(rw) */
   fftSharedMemBG: GPUBindGroup
+  /** PERF: per-slot FFT bind groups (length = 2 × latticeDim) for batched Strang dispatch. */
+  fftSharedMemBGs: GPUBindGroup[]
   kineticBG: GPUBindGroup
   writeGridBG: GPUBindGroup
   diagReduceBG: GPUBindGroup
@@ -125,8 +127,10 @@ export interface TdseBindGroupInputs {
   fftScratchA: GPUBuffer
   fftScratchB: GPUBuffer
   fftUniformBuffer: GPUBuffer
-  /** Per-axis uniform buffer for shared-memory FFT */
+  /** Per-axis uniform buffer for shared-memory FFT (legacy singular — used by observables path). */
   fftAxisUniformBuffer: GPUBuffer
+  /** PERF: per-slot axis uniforms (length = 2 × latticeDim) for batched Strang FFT. */
+  fftAxisUniformBuffers: GPUBuffer[]
   packUniformBuffer: GPUBuffer
   densityTextureView: GPUTextureView
   diagUniformBuffer: GPUBuffer

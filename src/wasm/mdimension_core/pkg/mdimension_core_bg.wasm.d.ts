@@ -4,6 +4,7 @@ export const memory: WebAssembly.Memory;
 export const complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
 export const compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
 export const compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
 export const compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;

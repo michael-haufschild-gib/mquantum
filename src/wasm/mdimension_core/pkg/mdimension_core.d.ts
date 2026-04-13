@@ -42,6 +42,32 @@ export function compose_rotations_indexed_wasm(dimension: number, plane_indices:
 export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array): Float64Array;
 
 /**
+ * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
+ *
+ * Velocity-field finite differences + Helmholtz projection + log-spaced
+ * shell binning of the Nore/Bradley superfluid decomposition. The three
+ * Float64 FFTs are still called from TypeScript via `fft_nd_wasm` before
+ * this function's input is assembled; this function covers the residual
+ * math that used to run in pure TypeScript in the worker.
+ *
+ * # Arguments
+ * * `psi_re` / `psi_im` — split wavefunction components (Float32,
+ *   length = product(grid_size)).
+ * * `grid_size` — per-axis lattice sizes.
+ * * `spacing` — per-axis lattice spacing.
+ * * `hbar`, `mass` — physical constants.
+ *
+ * # Returns
+ * Packed `Vec<f64>` of length `2 · NUM_SPECTRUM_BINS + 2`:
+ *   - `[0..N)` = spectrum (Float32-precision signal, returned as f64)
+ *   - `[N..2N)` = k-value bin centers
+ *   - `[2N]` = total incompressible kinetic energy
+ *   - `[2N+1]` = total compressible kinetic energy
+ * Empty vector on invalid input.
+ */
+export function compute_incompressible_spectrum_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, spacing: Float64Array, hbar: number, mass: number): Float64Array;
+
+/**
  * Compute the joint reduced density matrix for a set of dimensions.
  *
  * # Arguments
@@ -313,6 +339,7 @@ export interface InitOutput {
   readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
   readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
   readonly compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
   readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
