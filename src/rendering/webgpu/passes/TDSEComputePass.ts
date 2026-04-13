@@ -88,14 +88,9 @@ import {
   buildDisorderPipeline,
   createDisorderState,
   type DisorderState,
-  disposeDisorder,
   maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
-import {
-  destroyTdsePassGpu,
-  disposeTdseResources,
-  type TdseGpuFields,
-} from './TDSEComputePassDispose'
+import { disposeFullPass, type TdsePassGpuSnapshot } from './TDSEComputePassDispose'
 import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
@@ -106,7 +101,6 @@ import {
 } from './TDSEGramSchmidt'
 import {
   createHellerReadbackState,
-  disposeHellerStagingBuffers,
   type HellerReadbackState,
   prepareHellerFrame,
   resetHellerCapture,
@@ -120,7 +114,6 @@ import {
 import {
   buildStochasticLocPipeline,
   createStochasticLocState,
-  disposeStochasticLoc,
   EXPECT_WG,
   rebuildExpectationBindGroups,
   rebuildStochasticLocBindGroup,
@@ -128,7 +121,6 @@ import {
 } from './TDSEStochasticLocalization'
 import {
   createVortexDetectState,
-  disposeVortexDetect,
   rebuildVortexDetect,
   type VortexDetectState,
 } from './TDSEVortexDetect'
@@ -679,21 +671,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
-    disposeVortexDetect(this._vdState)
-    disposeDisorder(this._disorderState)
-    disposeStochasticLoc(this._stochasticState)
-    // Invalidate any in-flight Heller readback and drop psi0 snapshot.
-    // `resetHellerCapture` bumps the generation counter, which causes the
-    // async mapAsync handler to bail out before touching the staging
-    // buffers we are about to destroy. Order matters: bump first, then
-    // release the pool.
-    resetHellerCapture(this._hellerState)
-    disposeHellerStagingBuffers(this._hellerState)
-    this._hellerState.psiReBuffer = null
-    this._hellerState.psiImBuffer = null
-    this._hellerState.totalSites = 0
-    useHellerSpectrometerStore.getState().setBufferRef(null)
-    const gpu: TdseGpuFields = {
+    const gpu: TdsePassGpuSnapshot = {
       psiReBuffer: this.psiReBuffer,
       psiImBuffer: this.psiImBuffer,
       potentialBuffer: this.potentialBuffer,
@@ -709,8 +687,6 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       omegaStagingBuffer: this.omegaStagingBuffer,
       densityTexture: this.densityTexture,
       densityTextureView: this.densityTextureView,
-      normalTexture: null,
-      normalTextureView: null,
       diagUniformBuffer: this.diagUniformBuffer,
       diagPartialSumsBuffer: this.diagPartialSumsBuffer,
       diagPartialMaxBuffer: this.diagPartialMaxBuffer,
@@ -722,9 +698,18 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       initialized: this.initialized,
       lastConfigHash: this.lastConfigHash,
     }
-    destroyTdsePassGpu(gpu)
+    disposeFullPass(
+      gpu,
+      this._vdState,
+      this._disorderState,
+      this._stochasticState,
+      this._hellerState,
+      this._diagState,
+      this._gsState,
+      this._slState,
+      this._obsState
+    )
     Object.assign(this, gpu)
-    disposeTdseResources(this._diagState, this._gsState, this._slState, this._obsState)
     super.dispose()
   }
 }

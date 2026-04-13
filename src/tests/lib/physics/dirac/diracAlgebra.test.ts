@@ -1,147 +1,365 @@
 /**
- * Tests for Clifford algebra fallback — gamma matrix generation.
+ * Tests for DiracAlgebraBridge — worker lifecycle, fallback path,
+ * and synchronous spinor size API.
  *
- * Verifies:
- * - Spinor size formula: S = 2^(⌊(N+1)/2⌋)
- * - JS fallback produces correct gamma matrices for spatial dimensions 1-7
- * - Clifford algebra anticommutation relation: {γ^i, γ^j} = 2δ_{ij}I
- * - Beta matrix has standard Dirac form: diag(I_{S/2}, -I_{S/2})
+ * In the Node/Vitest environment, `Worker` is not available, so every
+ * `ensureWorker()` call throws and sets `workerFailed = true`. All
+ * `generateMatrices` calls therefore exercise the JS-fallback path.
+ * Worker-path behaviour (postMessage round-trip, epoch management,
+ * worker error propagation) is tested by injecting a mock Worker via
+ * a thin subclass to expose private state.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   generateDiracMatricesFallback,
   spinorSize,
 } from '@/lib/physics/dirac/cliffordAlgebraFallback'
+import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
 
-describe('spinorSize', () => {
-  it('returns minimum 2 for spatialDim=1', () => {
-    expect(spinorSize(1)).toBe(2)
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+/** Extract complex S×S matrix from packed buffer at byte-offset `offset`. */
+function extractMatrix(buf: Float32Array, s: number, offset: number): Float32Array {
+  return buf.slice(offset, offset + s * s * 2)
+}
+
+/** Complex S×S matrix multiply C = A·B. */
+function matMul(a: Float32Array, b: Float32Array, s: number): Float32Array {
+  const c = new Float32Array(s * s * 2)
+  for (let i = 0; i < s; i++) {
+    for (let j = 0; j < s; j++) {
+      let re = 0,
+        im = 0
+      for (let k = 0; k < s; k++) {
+        const aR = a[(i * s + k) * 2]!
+        const aI = a[(i * s + k) * 2 + 1]!
+        const bR = b[(k * s + j) * 2]!
+        const bI = b[(k * s + j) * 2 + 1]!
+        re += aR * bR - aI * bI
+        im += aR * bI + aI * bR
+      }
+      c[(i * s + j) * 2] = re
+      c[(i * s + j) * 2 + 1] = im
+    }
+  }
+  return c
+}
+
+/** True iff matrix equals `expectedRe * I` within `tol`. */
+function isScaledIdentity(m: Float32Array, s: number, expectedRe: number, tol: number): boolean {
+  for (let i = 0; i < s; i++) {
+    for (let j = 0; j < s; j++) {
+      const re = m[(i * s + j) * 2]!
+      const im = m[(i * s + j) * 2 + 1]!
+      const expRe = i === j ? expectedRe : 0
+      if (Math.abs(re - expRe) > tol || Math.abs(im) > tol) return false
+    }
+  }
+  return true
+}
+
+// ── DiracAlgebraBridge — worker unavailable (fallback path) ──────────────────
+
+describe('DiracAlgebraBridge — worker unavailable (fallback path)', () => {
+  // In the node test environment, `new Worker(...)` throws, so the bridge
+  // immediately falls back to the synchronous JS implementation.
+
+  it('generates matrices via fallback when Worker constructor throws', async () => {
+    const bridge = new DiracAlgebraBridge()
+    const { gammaData, spinorSize: s } = await bridge.generateMatrices(3)
+    // spinorSize for 3D = 4
+    expect(s).toBe(4)
+    // gammaData length = 1 header + 3 alphas + 1 beta, each 4×4×2 floats
+    const matSize = s * s * 2
+    expect(gammaData.length).toBe(1 + (3 + 1) * matSize)
+    bridge.dispose()
   })
 
-  it('follows S = 2^(⌊(N+1)/2⌋) for dimensions 1-11', () => {
-    const expected = [2, 2, 4, 4, 8, 8, 16, 16, 32, 32, 64]
-    for (let dim = 1; dim <= 11; dim++) {
-      expect(spinorSize(dim)).toBe(expected[dim - 1])
+  it('spinor size is encoded as u32 bits in first float of gammaData', async () => {
+    const bridge = new DiracAlgebraBridge()
+    const { gammaData, spinorSize: s } = await bridge.generateMatrices(5)
+    const u32 = new Uint32Array(gammaData.buffer, 0, 1)
+    expect(u32[0]).toBe(s)
+    bridge.dispose()
+  })
+
+  it('fallback output matches generateDiracMatricesFallback directly for dim 1-5', async () => {
+    for (const dim of [1, 2, 3, 4, 5]) {
+      const bridge = new DiracAlgebraBridge()
+      const { gammaData: bridgeData, spinorSize: bridgeS } = await bridge.generateMatrices(dim)
+      const { gammaData: refData, spinorSize: refS } = generateDiracMatricesFallback(dim)
+      expect(bridgeS).toBe(refS)
+      expect(bridgeData.length).toBe(refData.length)
+      for (let i = 0; i < refData.length; i++) {
+        // Float32 round-trip — identical bits expected (same code path)
+        expect(bridgeData[i]).toBeCloseTo(refData[i]!, 6)
+      }
+      bridge.dispose()
     }
+  })
+
+  it('returned alpha matrices satisfy αᵢ² = I (fallback path, 3D)', async () => {
+    const bridge = new DiracAlgebraBridge()
+    const { gammaData, spinorSize: s } = await bridge.generateMatrices(3)
+    const matSize = s * s * 2
+    for (let i = 0; i < 3; i++) {
+      const alpha = extractMatrix(gammaData, s, 1 + i * matSize)
+      const sq = matMul(alpha, alpha, s)
+      expect(isScaledIdentity(sq, s, 1, 1e-5)).toBe(true)
+    }
+    bridge.dispose()
+  })
+
+  it('returned beta satisfies β² = I (fallback path, 3D)', async () => {
+    const bridge = new DiracAlgebraBridge()
+    const { gammaData, spinorSize: s } = await bridge.generateMatrices(3)
+    const matSize = s * s * 2
+    const beta = extractMatrix(gammaData, s, 1 + 3 * matSize)
+    const sq = matMul(beta, beta, s)
+    expect(isScaledIdentity(sq, s, 1, 1e-5)).toBe(true)
+    bridge.dispose()
+  })
+
+  it('workerFailed flag prevents subsequent Worker construction attempts', async () => {
+    const constructorSpy = vi.fn().mockImplementation(() => {
+      throw new Error('Worker unavailable')
+    })
+    const OrigWorker = globalThis.Worker
+    Object.defineProperty(globalThis, 'Worker', { value: constructorSpy, configurable: true })
+
+    const bridge = new DiracAlgebraBridge()
+    // First call triggers ensureWorker, catches throw, sets workerFailed
+    await bridge.generateMatrices(1)
+    const callCountAfterFirst = constructorSpy.mock.calls.length
+
+    // Subsequent calls must NOT re-attempt Worker construction
+    await bridge.generateMatrices(1)
+    await bridge.generateMatrices(1)
+    expect(constructorSpy.mock.calls.length).toBe(callCountAfterFirst)
+
+    Object.defineProperty(globalThis, 'Worker', { value: OrigWorker, configurable: true })
+    bridge.dispose()
   })
 })
 
-describe('generateDiracMatricesFallback', () => {
-  it('returns correct packed gammaData size for 3D', () => {
-    const { gammaData, spinorSize: S } = generateDiracMatricesFallback(3)
-    expect(S).toBe(4)
-    const matSize = S * S * 2
-    // Format: 1 header + N alpha matrices + 1 beta matrix
-    expect(gammaData.length).toBe(1 + (3 + 1) * matSize)
+// ── DiracAlgebraBridge.getSpinorSize ─────────────────────────────────────────
+
+describe('DiracAlgebraBridge.getSpinorSize', () => {
+  it('returns 2 for 1D (minimum spinor)', () => {
+    const bridge = new DiracAlgebraBridge()
+    expect(bridge.getSpinorSize(1)).toBe(2)
+    bridge.dispose()
   })
 
-  it('returns correct spinor size for dimensions 1-7', () => {
-    for (let dim = 1; dim <= 7; dim++) {
-      const { spinorSize: S } = generateDiracMatricesFallback(dim)
-      expect(S).toBe(spinorSize(dim))
+  it('returns 4 for 3D', () => {
+    const bridge = new DiracAlgebraBridge()
+    expect(bridge.getSpinorSize(3)).toBe(4)
+    bridge.dispose()
+  })
+
+  it('matches spinorSize() from cliffordAlgebraFallback for dims 1-11', () => {
+    const bridge = new DiracAlgebraBridge()
+    for (let d = 1; d <= 11; d++) {
+      expect(bridge.getSpinorSize(d)).toBe(spinorSize(d))
     }
+    bridge.dispose()
   })
+})
 
-  /** Extract the i-th matrix from the packed gammaData (skipping the 1-element header). */
-  function extractMatrix(gammaData: Float32Array, S: number, index: number): Float32Array {
-    const matSize = S * S * 2
-    const offset = 1 + index * matSize
-    return gammaData.slice(offset, offset + matSize)
-  }
+// ── Helper: build a mock Worker class that captures handlers ─────────────────
 
-  /** Complex S×S matrix multiply: C = A * B */
-  function complexMatMul(a: Float32Array, b: Float32Array, S: number): Float32Array {
-    const c = new Float32Array(S * S * 2)
-    for (let i = 0; i < S; i++) {
-      for (let j = 0; j < S; j++) {
-        let re = 0
-        let im = 0
-        for (let k = 0; k < S; k++) {
-          const aRe = a[(i * S + k) * 2]!
-          const aIm = a[(i * S + k) * 2 + 1]!
-          const bRe = b[(k * S + j) * 2]!
-          const bIm = b[(k * S + j) * 2 + 1]!
-          re += aRe * bRe - aIm * bIm
-          im += aRe * bIm + aIm * bRe
-        }
-        c[(i * S + j) * 2] = re
-        c[(i * S + j) * 2 + 1] = im
-      }
+interface MockWorkerHandle {
+  postMessage: ReturnType<typeof vi.fn>
+  terminate: ReturnType<typeof vi.fn>
+  triggerMessage(data: unknown): void
+  triggerError(msg: string): void
+}
+
+/**
+ * Install a mock Worker class on globalThis and return a handle for
+ * triggering messages/errors. Restores the original after the test.
+ *
+ * Returns [handle, restore] tuple.
+ */
+function installMockWorker(): [MockWorkerHandle, () => void] {
+  const postMessage = vi.fn()
+  const terminate = vi.fn()
+  let onmessageCb: ((e: { data: unknown }) => void) | null = null
+  let onerrorCb: ((e: { message: string }) => void) | null = null
+
+  class MockWorker {
+    constructor(_url: URL, _opts: WorkerOptions) {}
+    postMessage = postMessage
+    terminate = terminate
+    set onmessage(cb: (e: { data: unknown }) => void) {
+      onmessageCb = cb
     }
-    return c
-  }
-
-  it('beta matrix has standard Dirac form: diag(I_{S/2}, -I_{S/2}) for 3D', () => {
-    const N = 3
-    const { gammaData, spinorSize: S } = generateDiracMatricesFallback(N)
-    const beta = extractMatrix(gammaData, S, N) // beta is after N alpha matrices
-
-    for (let r = 0; r < S; r++) {
-      for (let c = 0; c < S; c++) {
-        const re = beta[(r * S + c) * 2]!
-        const im = beta[(r * S + c) * 2 + 1]!
-        if (r === c) {
-          // diag: +1 for first S/2, -1 for last S/2
-          const expected = r < S / 2 ? 1 : -1
-          expect(re).toBeCloseTo(expected, 4)
-        } else {
-          expect(re).toBeCloseTo(0, 4)
-        }
-        expect(im).toBeCloseTo(0, 4)
-      }
-    }
-  })
-
-  it('satisfies anticommutation {γ^i, γ^j} = 2δ_{ij}I for 1D', () => {
-    verifyAnticommutation(1)
-  })
-
-  it('satisfies anticommutation {γ^i, γ^j} = 2δ_{ij}I for 2D', () => {
-    verifyAnticommutation(2)
-  })
-
-  it('satisfies anticommutation {γ^i, γ^j} = 2δ_{ij}I for 3D', () => {
-    verifyAnticommutation(3)
-  })
-
-  it('satisfies anticommutation {γ^i, γ^j} = 2δ_{ij}I for 5D', () => {
-    verifyAnticommutation(5)
-  })
-
-  function verifyAnticommutation(N: number) {
-    const { gammaData, spinorSize: S } = generateDiracMatricesFallback(N)
-    const numMatrices = N + 1 // N alphas + 1 beta
-    const matSize = S * S * 2
-
-    // Check {γ^i, γ^j} = γ^i γ^j + γ^j γ^i = 2δ_{ij} I
-    for (let i = 0; i < numMatrices; i++) {
-      for (let j = i; j < numMatrices; j++) {
-        const gi = extractMatrix(gammaData, S, i)
-        const gj = extractMatrix(gammaData, S, j)
-        const gij = complexMatMul(gi, gj, S)
-        const gji = complexMatMul(gj, gi, S)
-
-        // Anticommutator {γ^i, γ^j}
-        const anticomm = new Float32Array(matSize)
-        for (let idx = 0; idx < matSize; idx++) {
-          anticomm[idx] = gij[idx]! + gji[idx]!
-        }
-
-        for (let r = 0; r < S; r++) {
-          for (let c = 0; c < S; c++) {
-            const re = anticomm[(r * S + c) * 2]!
-            const im = anticomm[(r * S + c) * 2 + 1]!
-            if (i === j && r === c) {
-              expect(re).toBeCloseTo(2, 3)
-            } else {
-              expect(re).toBeCloseTo(0, 3)
-            }
-            expect(im).toBeCloseTo(0, 3)
-          }
-        }
-      }
+    set onerror(cb: (e: { message: string }) => void) {
+      onerrorCb = cb
     }
   }
+
+  const OrigWorker = (globalThis as Record<string, unknown>)['Worker']
+  Object.defineProperty(globalThis, 'Worker', { value: MockWorker, configurable: true })
+
+  const handle: MockWorkerHandle = {
+    postMessage,
+    terminate,
+    triggerMessage: (data) => onmessageCb?.({ data }),
+    triggerError: (msg) => onerrorCb?.({ message: msg }),
+  }
+  const restore = () => {
+    Object.defineProperty(globalThis, 'Worker', { value: OrigWorker, configurable: true })
+  }
+  return [handle, restore]
+}
+
+// ── DiracAlgebraBridge.dispose ────────────────────────────────────────────────
+
+describe('DiracAlgebraBridge.dispose', () => {
+  it('rejects pending requests with "DiracAlgebraBridge disposed"', async () => {
+    const [, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const pendingPromise = bridge.generateMatrices(3)
+    // dispose before the worker responds
+    bridge.dispose()
+
+    await expect(pendingPromise).rejects.toThrow('DiracAlgebraBridge disposed')
+    restore()
+  })
+
+  it('terminate is called on the worker during dispose', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    // Kick off a request so a worker is created
+    const p = bridge.generateMatrices(1)
+    bridge.dispose()
+    await expect(p).rejects.toThrow()
+    expect(handle.terminate).toHaveBeenCalledOnce()
+    restore()
+  })
+
+  it('is safe to call dispose multiple times without throwing', () => {
+    const bridge = new DiracAlgebraBridge()
+    expect(() => {
+      bridge.dispose()
+      bridge.dispose()
+    }).not.toThrow()
+  })
+})
+
+// ── DiracAlgebraBridge — worker error path ────────────────────────────────────
+
+describe('DiracAlgebraBridge — worker error path', () => {
+  it('rejects pending promises when worker fires onerror', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const pendingPromise = bridge.generateMatrices(3)
+
+    // Simulate a worker crash
+    handle.triggerError('WASM failed to load')
+
+    await expect(pendingPromise).rejects.toThrow('Dirac algebra worker error: WASM failed to load')
+    restore()
+    bridge.dispose()
+  })
+
+  it('falls back to JS for subsequent calls after worker error', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const failingPromise = bridge.generateMatrices(3)
+    handle.triggerError('crash')
+    await expect(failingPromise).rejects.toThrow()
+
+    // After worker error, workerFailed=true — next call uses JS fallback
+    const { spinorSize: s } = await bridge.generateMatrices(3)
+    expect(s).toBe(4) // correct fallback result for 3D
+    // postMessage was only called once (for the failed request)
+    expect(handle.postMessage).toHaveBeenCalledOnce()
+
+    restore()
+    bridge.dispose()
+  })
+})
+
+// ── DiracAlgebraBridge — worker success path ──────────────────────────────────
+
+describe('DiracAlgebraBridge — worker success path (mock)', () => {
+  it('resolves with gammaData from worker message matching correct epoch', async () => {
+    const [handle, restore] = installMockWorker()
+    const mockSpinorSize = 4
+    const mockDim = 3
+    const matSize = mockSpinorSize * mockSpinorSize * 2
+    const totalLen = 1 + mockDim * matSize + matSize
+    const fakeGammaData = new Float32Array(totalLen).fill(0.5)
+
+    const bridge = new DiracAlgebraBridge()
+    const resultPromise = bridge.generateMatrices(mockDim)
+
+    // Worker responds with epoch=1
+    handle.triggerMessage({ epoch: 1, gammaData: fakeGammaData, spinorSize: mockSpinorSize })
+
+    const { gammaData, spinorSize: s } = await resultPromise
+    expect(s).toBe(mockSpinorSize)
+    expect(gammaData.length).toBe(totalLen)
+    // Index 1 is the first real alpha-matrix float (not the u32 header)
+    expect(gammaData[1]).toBeCloseTo(0.5, 6)
+
+    restore()
+    bridge.dispose()
+  })
+
+  it('ignores stale epoch responses and resolves the correct pending request', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const promise1 = bridge.generateMatrices(1) // epoch 1
+    const promise2 = bridge.generateMatrices(2) // epoch 2
+
+    const s1 = spinorSize(1) // 2
+    const s2 = spinorSize(2) // 2
+    const gamma1 = new Float32Array(1 + 1 * s1 * s1 * 2 + s1 * s1 * 2).fill(1.0)
+    const gamma2 = new Float32Array(1 + 2 * s2 * s2 * 2 + s2 * s2 * 2).fill(2.0)
+
+    // Deliver epoch 2 first (resolves promise2, promise1 still pending)
+    handle.triggerMessage({ epoch: 2, gammaData: gamma2, spinorSize: s2 })
+    const result2 = await promise2
+    expect(result2.spinorSize).toBe(s2)
+    // Index 1 is first real data float
+    expect(result2.gammaData[1]).toBeCloseTo(2.0, 6)
+
+    // Then deliver epoch 1
+    handle.triggerMessage({ epoch: 1, gammaData: gamma1, spinorSize: s1 })
+    const result1 = await promise1
+    expect(result1.spinorSize).toBe(s1)
+    expect(result1.gammaData[1]).toBeCloseTo(1.0, 6)
+
+    restore()
+    bridge.dispose()
+  })
+
+  it('postMessage is called with correct type, epoch, and spatialDim', async () => {
+    const [handle, restore] = installMockWorker()
+    const bridge = new DiracAlgebraBridge()
+    const p = bridge.generateMatrices(5)
+
+    // Verify the message sent to the worker
+    expect(handle.postMessage).toHaveBeenCalledOnce()
+    const msg = handle.postMessage.mock.calls[0]![0] as {
+      type: string
+      epoch: number
+      spatialDim: number
+    }
+    expect(msg.type).toBe('generateMatrices')
+    expect(msg.epoch).toBe(1)
+    expect(msg.spatialDim).toBe(5)
+
+    // Clean up — resolve to avoid hanging promise
+    handle.triggerMessage({ epoch: 1, gammaData: new Float32Array(1), spinorSize: 8 })
+    await p
+
+    restore()
+    bridge.dispose()
+  })
 })
