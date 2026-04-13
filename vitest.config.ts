@@ -72,16 +72,13 @@ export default defineConfig({
       // Coverage ratchet: thresholds track current actuals (rounded down to
       // nearest 0.5%). Raise when coverage improves. Lower only when the
       // denominator changes (new files, exclusion list changes) — document why.
-      // Last measured 2026-04-04: stmts 63.05%, branches 54.79%, funcs 61.74%, lines 63.21%
-      // Recalibrated: added 4 GPU-only setup/buffer files to exclusions (TDSE, TemporalCloud).
-      // Added 7 new test files: ndArray, monitoringSweepStore, diagnosticsStore,
-      // coordinateEntanglementStore, tdseStochasticSetters, tdseUiSetters,
-      // decoherencePresets — 136 new tests covering recent feature additions.
+      // Last measured 2026-04-13: stmts 71.52%, branches 62.00%, funcs 74.26%, lines 71.85%
+      // Raised from 65/55.5/64/65.5 — 697 new tests across 50 files from L7+ audit.
       thresholds: {
-        statements: 62.5,
-        branches: 54.5,
-        functions: 61.5,
-        lines: 62.5,
+        statements: 71.5,
+        branches: 62,
+        functions: 74,
+        lines: 71.5,
       },
     },
   },
