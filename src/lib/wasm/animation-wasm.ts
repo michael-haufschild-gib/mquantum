@@ -79,6 +79,17 @@ interface WasmModule {
     dim: number
   ) => Float64Array
   compute_level_spacing_wasm?: (energies: Float64Array) => Float64Array
+  // BEC: incompressible kinetic-energy spectrum residual math (velocity field
+  // + Helmholtz projection + log-spaced shell binning). Returns a packed
+  // Float64Array of length `2·NUM_SPECTRUM_BINS + 2` = 66.
+  compute_incompressible_spectrum_wasm?: (
+    psi_re: Float32Array,
+    psi_im: Float32Array,
+    grid_size: Uint32Array,
+    spacing: Float64Array,
+    hbar: number,
+    mass: number
+  ) => Float64Array
 }
 
 // ============================================================================
@@ -677,6 +688,52 @@ export function computeLevelSpacingWasm(energies: Float64Array): Float64Array | 
     return fn_(energies)
   } catch (err) {
     logger.warn('[AnimationWASM] compute_level_spacing_wasm failed:', err)
+    return null
+  }
+}
+
+/**
+ * Compute the BEC incompressible kinetic-energy spectrum via WASM.
+ *
+ * Velocity-field finite differences + Helmholtz projection + log-spaced
+ * shell binning. The three FFTs on velocity components run inside the
+ * Rust module via the shared FFT path. Returns a packed `Float64Array`
+ * of length `2 · NUM_SPECTRUM_BINS + 2 = 66` where the first
+ * `NUM_SPECTRUM_BINS` entries are the spectrum, the next
+ * `NUM_SPECTRUM_BINS` are the bin-center k-values, and the final two
+ * entries are the total incompressible / compressible kinetic energies.
+ *
+ * @param psiRe     — wavefunction real part (length = product(gridSize))
+ * @param psiIm     — wavefunction imaginary part
+ * @param gridSize  — per-axis lattice sizes (Uint32Array)
+ * @param spacing   — per-axis lattice spacing
+ * @param hbar      — reduced Planck constant
+ * @param mass      — particle mass
+ * @returns Packed result, or null if WASM unavailable / binding missing
+ */
+export function computeIncompressibleSpectrumWasm(
+  psiRe: Float32Array,
+  psiIm: Float32Array,
+  gridSize: Uint32Array,
+  spacing: Float64Array,
+  hbar: number,
+  mass: number
+): Float64Array | null {
+  if (!wasmReady || !wasmModule) {
+    return null
+  }
+
+  const fn_ = wasmModule.compute_incompressible_spectrum_wasm
+  if (typeof fn_ !== 'function') {
+    return null
+  }
+
+  try {
+    const result = fn_(psiRe, psiIm, gridSize, spacing, hbar, mass)
+    if (result.length === 0) return null
+    return result
+  } catch (err) {
+    logger.warn('[AnimationWASM] compute_incompressible_spectrum_wasm failed:', err)
     return null
   }
 }

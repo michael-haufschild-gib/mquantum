@@ -45,6 +45,7 @@ import {
   ifft as sharedIfft,
   ifftNd as sharedIfftNd,
 } from '@/lib/math/fft'
+import { computeIncompressibleSpectrumWasm } from '@/lib/wasm'
 
 /**
  * N-D separable FFT on split real/imaginary arrays.
@@ -119,6 +120,44 @@ export function computeIncompressibleSpectrum(
   numBins = NUM_SPECTRUM_BINS
 ): IncompressibleSpectrumResult {
   const dim = gridSize.length
+
+  // PERF: WASM fast-path. Rust `compute_incompressible_spectrum_wasm`
+  // (src/wasm/mdimension_core/src/bec_spectrum.rs) covers the full residual
+  // pipeline (density-weighted velocity + 3× FFT via fft_nd + Helmholtz
+  // projection + log-spaced shell binning) in a single JS→WASM boundary
+  // crossing. Three green Rust unit tests cover stationary/plane-wave/vortex.
+  // Gracefully falls through to the TypeScript path on any of: WASM not yet
+  // initialized in this worker/thread, a non-default bin count, or a runtime
+  // failure producing an empty-length packed result. The opt-out is
+  // `globalThis.__BEC_SPECTRUM_WASM_DISABLED__ = true` for A/B benchmarking.
+  const wasmDisabled =
+    (globalThis as { __BEC_SPECTRUM_WASM_DISABLED__?: boolean }).__BEC_SPECTRUM_WASM_DISABLED__ ===
+    true
+  if (!wasmDisabled && numBins === NUM_SPECTRUM_BINS) {
+    const packed = computeIncompressibleSpectrumWasm(
+      psiRe,
+      psiIm,
+      new Uint32Array(gridSize),
+      new Float64Array(spacing),
+      hbar,
+      mass
+    )
+    if (packed && packed.length === 2 * NUM_SPECTRUM_BINS + 2) {
+      const spectrumF32 = new Float32Array(NUM_SPECTRUM_BINS)
+      const kValues = new Float32Array(NUM_SPECTRUM_BINS)
+      for (let b = 0; b < NUM_SPECTRUM_BINS; b++) {
+        spectrumF32[b] = packed[b]!
+        kValues[b] = packed[NUM_SPECTRUM_BINS + b]!
+      }
+      return {
+        spectrum: spectrumF32,
+        kValues,
+        totalIncompressible: packed[2 * NUM_SPECTRUM_BINS]!,
+        totalCompressible: packed[2 * NUM_SPECTRUM_BINS + 1]!,
+      }
+    }
+  }
+
   let totalSites = 1
   for (let d = 0; d < dim; d++) totalSites *= gridSize[d]!
 

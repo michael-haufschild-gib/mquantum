@@ -10,9 +10,11 @@ export {
   complexMatMulWasm,
   // Phase 1: Animation functions
   composeRotationsIndexedWasm,
+  // Phase 7: TDSE diagnostics functions
+  // BEC incompressible spectrum
+  computeIncompressibleSpectrumWasm,
   // Phase 5: Coordinate entanglement functions
   computeJointRdmWasm,
-  // Phase 7: TDSE diagnostics functions
   computeLevelSpacingWasm,
   computeRdmWasm,
   computeScarCorrelationWasm,

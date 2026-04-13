@@ -292,6 +292,59 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
 }
 
 /**
+ * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
+ *
+ * Velocity-field finite differences + Helmholtz projection + log-spaced
+ * shell binning of the Nore/Bradley superfluid decomposition. The three
+ * Float64 FFTs are still called from TypeScript via `fft_nd_wasm` before
+ * this function's input is assembled; this function covers the residual
+ * math that used to run in pure TypeScript in the worker.
+ *
+ * # Arguments
+ * * `psi_re` / `psi_im` — split wavefunction components (Float32,
+ *   length = product(grid_size)).
+ * * `grid_size` — per-axis lattice sizes.
+ * * `spacing` — per-axis lattice spacing.
+ * * `hbar`, `mass` — physical constants.
+ *
+ * # Returns
+ * Packed `Vec<f64>` of length `2 · NUM_SPECTRUM_BINS + 2`:
+ *   - `[0..N)` = spectrum (Float32-precision signal, returned as f64)
+ *   - `[N..2N)` = k-value bin centers
+ *   - `[2N]` = total incompressible kinetic energy
+ *   - `[2N+1]` = total compressible kinetic energy
+ * Empty vector on invalid input.
+ * @param {Float32Array} psi_re
+ * @param {Float32Array} psi_im
+ * @param {Uint32Array} grid_size
+ * @param {Float64Array} spacing
+ * @param {number} hbar
+ * @param {number} mass
+ * @returns {Float64Array}
+ */
+export function compute_incompressible_spectrum_wasm(psi_re, psi_im, grid_size, spacing, hbar, mass) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        wasm.compute_incompressible_spectrum_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, hbar, mass);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v5 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v5;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Compute the joint reduced density matrix for a set of dimensions.
  *
  * # Arguments
