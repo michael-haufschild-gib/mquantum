@@ -188,16 +188,15 @@
     }
   },
   {
-    "id": "e954e210-202b-4e68-895a-eed0439269f9",
-    "name": "Basic",
-    "timestamp": 1768044203114,
+    "id": "12373cde-c7fa-4f6a-881d-24d2324b0b79",
+    "name": "Default",
+    "timestamp": 1776113815007,
     "data": {
       "appearance": {
         "edgeColor": "#ca9c02",
         "faceColor": "#efd536",
-        "backgroundColor": "#232323",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "monochromatic",
+        "colorAlgorithm": "radialDistance",
         "cosineCoefficients": {
           "a": [0.6, 0.2, 0.3],
           "b": [0.4, 0.3, 0.3],
@@ -216,25 +215,37 @@
         },
         "lchLightness": 0.7,
         "lchChroma": 0.15,
-        "edgeThickness": 1.8,
-        "tubeCaps": false,
+        "domainColoring": {
+          "modulusMode": "logPsiAbsSquared",
+          "contoursEnabled": true,
+          "contourDensity": 8,
+          "contourWidth": 0.08,
+          "contourStrength": 0.45
+        },
+        "phaseDiverging": {
+          "neutralColor": "#ebebeb",
+          "positiveColor": "#eb3d38",
+          "negativeColor": "#3866f2"
+        },
+        "divergingPsi": {
+          "neutralColor": "#d9d9d9",
+          "positiveColor": "#e83b3b",
+          "negativeColor": "#3166f5",
+          "intensityFloor": 0.2,
+          "component": "real"
+        },
         "faceEmission": 0,
         "faceEmissionThreshold": 0,
         "faceEmissionColorShift": 0,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
         "shaderType": "surface",
         "shaderSettings": {
           "wireframe": {
             "lineThickness": 1
           },
           "surface": {
-            "specularIntensity": 0.8,
-            "fresnelEnabled": false
+            "specularIntensity": 0.8
           }
         },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.1,
         "sssEnabled": false,
         "sssIntensity": 1,
         "sssColor": "#ff8844",
@@ -253,7 +264,7 @@
         "lightStrength": 1,
         "toneMappingEnabled": true,
         "toneMappingAlgorithm": "aces",
-        "exposure": 0.7,
+        "exposure": 1,
         "lights": [
           {
             "id": "light-default",
@@ -275,18 +286,15 @@
       },
       "postProcessing": {
         "bloomEnabled": false,
+        "bloomGain": 1.5,
         "bloomThreshold": 0.8,
+        "bloomKnee": 0.1,
+        "bloomRadius": 1,
         "antiAliasingMethod": "none",
-        "cinematicEnabled": false,
-        "cinematicAberration": 0.005,
+        "cinematicEnabled": true,
+        "cinematicAberration": 0.001,
         "cinematicVignette": 1.2,
         "cinematicGrain": 0,
-        "objectOnlyDepth": true,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
         "paperEnabled": false,
         "paperContrast": 0.5,
         "paperRoughness": 0.3,
@@ -304,18 +312,13 @@
         "paperQuality": "medium",
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3,
-        "bloomGain": 1.5,
-        "bloomKnee": 0.1,
-        "bloomRadius": 1.0
+        "frameBlendingFactor": 0.3
       },
       "environment": {
-        "activeWalls": ["floor"],
-        "showGroundGrid": true,
         "skyboxSelection": "none",
         "skyboxEnabled": false,
-        "skyboxMode": "procedural_aurora",
-        "skyboxTexture": "space_blue",
+        "skyboxMode": "classic",
+        "skyboxTexture": "none",
         "skyboxIntensity": 1,
         "skyboxRotation": 0,
         "skyboxAnimationMode": "heatwave",
@@ -358,19 +361,17 @@
             "surfaceShimmer": 0.4
           }
         },
-        "backgroundColor": "#afafaf"
+        "backgroundColor": "#000000"
       },
       "pbr": {
         "face": {
           "roughness": 0.05,
           "metallic": 0.15,
+          "reflectance": 0.5,
           "specularIntensity": 0.9,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.18,
-          "metallic": 0,
-          "specularIntensity": 0.5,
+          "ior": 1.5,
+          "transmission": 0,
+          "thickness": 1,
           "specularColor": "#ffffff"
         }
       }
