@@ -114,6 +114,8 @@ export function runStrangEvolution(
   const { pl, bg, dc } = res
   const linearWG = Math.ceil(res.totalSites / LINEAR_WG)
 
+  const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
+
   // Compute speed-scaled step count using fractional accumulator.
   // This preserves dt (critical for numerical stability) while allowing
   // the user to control evolution rate via the timeline speed slider.
@@ -125,7 +127,7 @@ export function runStrangEvolution(
   // Pre-compute stochastic uniforms for all steps (staging buffer pattern).
   // Must happen before the loop so each step gets independent random data.
   // Pass bounding radius so centers concentrate near the wavepacket.
-  if (res.stochasticState && stepsThisFrame > 0) {
+  if (stochasticActive && res.stochasticState && stepsThisFrame > 0) {
     prepareStochasticStaging(
       ctx.device,
       config,
@@ -178,7 +180,6 @@ export function runStrangEvolution(
       // the PML damping AFTER the CSL kicks and we must preserve that operator
       // ordering for stochastic mode. When stochastic is active, absorber is
       // dispatched after the stochastic sub-step loop below.
-      const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
       const inlineAbsorber = config.absorberEnabled && !stochasticActive
       if (inlineAbsorber) {
         dc(strangPass, pl.absorberPipeline, [bg.initBG], linearWG)
@@ -208,8 +209,7 @@ export function runStrangEvolution(
       dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
       fusedUnpackV.end()
 
-      const stochasticActiveFallback = config.stochasticEnabled && config.stochasticGamma > 0
-      if (config.absorberEnabled && !stochasticActiveFallback) {
+      if (config.absorberEnabled && !stochasticActive) {
         const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
         dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
         absPass.end()
@@ -220,7 +220,7 @@ export function runStrangEvolution(
     // Sub-stepped: M micro-kicks per Strang step, each with γ/M and fresh
     // random centers. This smooths the effective collapse field and prevents
     // strong kicks from destroying the wavepacket structure.
-    if (res.stochasticState) {
+    if (stochasticActive && res.stochasticState) {
       const cslSub = computeCSLSubsteps(config.stochasticGamma, config.dt)
       for (let sub = 0; sub < cslSub; sub++) {
         maybeDispatchStochasticLoc(
@@ -240,8 +240,7 @@ export function runStrangEvolution(
     // active, PML must come AFTER the CSL kicks. The batched path above only
     // inlines absorber when stochastic is disabled, so we run the dispatch
     // here for the stochastic case.
-    const stochasticActivePost = config.stochasticEnabled && config.stochasticGamma > 0
-    if (config.absorberEnabled && stochasticActivePost) {
+    if (config.absorberEnabled && stochasticActive) {
       const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
       dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
       absPass.end()
