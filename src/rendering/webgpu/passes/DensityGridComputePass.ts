@@ -6,8 +6,8 @@
  * texture lookups, providing significant performance improvement.
  *
  * Performance expectations:
- * - Before: ~480 density evaluations per pixel × 300-460 ops = ~180K ops/pixel
- * - After: ~96 texture lookups × 10 ops = ~960 ops/pixel
+ * - Before: ~480 density evaluations per pixel x 300-460 ops = ~180K ops/pixel
+ * - After: ~96 texture lookups x 10 ops = ~960 ops/pixel
  * - Expected improvement: 3-6x FPS increase
  *
  * @module rendering/webgpu/passes/DensityGridComputePass
@@ -19,16 +19,23 @@ import type { AnimationSnapshot } from '../core/storeAccess'
 import { getStoreSnapshot } from '../core/storeAccess'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import { SCHROEDINGER_UNIFORM_SIZE } from '../renderers/schroedingerLayout'
 import { composeDensityGridComputeShader } from '../shaders/schroedinger/compute/compose'
 import { DensityDistributionAnalyzer } from './DensityDistributionAnalysis'
+import {
+  createDensityGridResources,
+  GRID_PARAMS_SIZE,
+  selectGridTextureFormat,
+  writeGridParams,
+} from './DensityGridComputePassBuffers'
+import type { DensityReadbackState } from './DensityGridComputePassDispose'
+import {
+  disposeDensityGridResources,
+  refreshDensityDistribution,
+  startPendingReadback,
+} from './DensityGridComputePassDispose'
 import { createGradientPipeline } from './DensityGridGradientSetup'
 
-// Grid parameters struct size (must match WGSL GridParams)
-// vec3u (12) + pad (4) + vec3f (12) + pad (4) + vec3f (12) + pad (4) = 48 bytes
-const GRID_PARAMS_SIZE = 48
-
-// Default grid size (64³ = 262,144 voxels)
+// Default grid size (64^3 = 262,144 voxels)
 const DEFAULT_GRID_SIZE = 64
 
 // Default world space bounds (matches original BOUND_R = 2.0)
@@ -95,7 +102,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private computeBindGroup: GPUBindGroup | null = null
   private computeBindGroupLayout: GPUBindGroupLayout | null = null
 
-  // GPU->CPU readback for uncertainty threshold extraction
+  // GPU->CPU readback state
   private densityReadbackBuffer: GPUBuffer | null = null
   private readbackBytesPerRow = 0
   private readbackInFlight = false
@@ -107,7 +114,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private gridSize: number
   private workgroupCount: number
 
-  // Pre-allocated buffers for updateGridParams to avoid per-call allocation
+  // Pre-allocated buffers for writeGridParams to avoid per-call allocation
   private gridParamsData = new ArrayBuffer(GRID_PARAMS_SIZE)
   private gridParamsU32View = new Uint32Array(this.gridParamsData)
   private gridParamsF32View = new Float32Array(this.gridParamsData)
@@ -130,8 +137,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   constructor(config: DensityGridComputeConfig) {
     super({
       id: 'density-grid-compute',
-      inputs: [], // No render graph inputs - uses its own uniforms
-      outputs: [], // No render graph outputs - exposes texture directly
+      inputs: [],
+      outputs: [],
       isCompute: true,
       workgroupSize: [WORKGROUP_SIZE, WORKGROUP_SIZE, WORKGROUP_SIZE],
     })
@@ -145,9 +152,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
-    this.densityTextureFormat = await this.selectGridTextureFormat(device)
+    this.densityTextureFormat = await selectGridTextureFormat(device, this.passConfig)
 
-    // Compose compute shader (density-only mode for uncertainty threshold extraction)
+    // Compose compute shader
     const { wgsl } = composeDensityGridComputeShader({
       dimension: this.passConfig.dimension,
       quantumMode: this.passConfig.quantumMode,
@@ -156,160 +163,35 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       useDensityMatrix: this.passConfig.useDensityMatrix,
     })
 
-    // Create shader module
     const shaderModule = this.createShaderModule(device, wgsl, 'density-grid-compute')
 
-    // Create 3D texture for density storage (density-only, for uncertainty threshold extraction).
-    this.densityTexture = device.createTexture({
-      label: 'density-grid-texture',
-      size: {
-        width: this.gridSize,
-        height: this.gridSize,
-        depthOrArrayLayers: this.gridSize,
-      },
-      format: this.densityTextureFormat,
-      dimension: '3d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING | // For compute shader write
-        GPUTextureUsage.TEXTURE_BINDING | // For fragment shader sampling (density grid raymarching)
-        GPUTextureUsage.COPY_SRC | // For GPU->CPU readback (uncertainty threshold extraction)
-        GPUTextureUsage.COPY_DST, // For potential debugging
-    })
-
-    this.densityTextureView = this.densityTexture.createView({
-      label: 'density-grid-view',
-      dimension: '3d',
-    })
-
-    // Pre-computed gradient normal texture (rgba8snorm: nx, ny, nz, gradMag indicator)
-    this.normalTexture = device.createTexture({
-      label: 'normal-grid-texture',
-      size: {
-        width: this.gridSize,
-        height: this.gridSize,
-        depthOrArrayLayers: this.gridSize,
-      },
-      format: 'rgba8snorm',
-      dimension: '3d',
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    this.normalTextureView = this.normalTexture.createView({
-      label: 'normal-grid-view',
-      dimension: '3d',
-    })
-
-    // Readback buffer for confidence-boundary threshold extraction.
-    // Stride depends on grid format.
-    this.readbackBytesPerTexel = this.densityTextureFormat === 'r16float' ? 2 : 8
-    this.readbackTexelStrideHalfs = this.densityTextureFormat === 'r16float' ? 1 : 4
-    this.readbackBytesPerRow = Math.ceil((this.gridSize * this.readbackBytesPerTexel) / 256) * 256
-    this.densityReadbackBuffer = device.createBuffer({
-      label: 'density-grid-readback',
-      size: this.readbackBytesPerRow * this.gridSize * this.gridSize,
-      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-    })
-
-    // Create uniform buffers
-    this.schroedingerBuffer = this.createUniformBuffer(
+    // Create all GPU resources via satellite module
+    const resources = createDensityGridResources(
       device,
-      SCHROEDINGER_UNIFORM_SIZE,
-      'density-schroedinger'
+      this.passConfig,
+      this.gridSize,
+      this.densityTextureFormat
     )
-    // BasisVectors: 192 bytes (4 × 3 × vec4f)
-    this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
-    // GridParams: 48 bytes
-    this.gridParamsBuffer = this.createUniformBuffer(
-      device,
-      GRID_PARAMS_SIZE,
-      'density-grid-params'
-    )
+
+    // Assign resources to instance fields
+    this.densityTexture = resources.densityTexture
+    this.densityTextureView = resources.densityTextureView
+    this.normalTexture = resources.normalTexture
+    this.normalTextureView = resources.normalTextureView
+    this.densityReadbackBuffer = resources.densityReadbackBuffer
+    this.readbackBytesPerRow = resources.readbackBytesPerRow
+    this.readbackBytesPerTexel = resources.readbackBytesPerTexel
+    this.readbackTexelStrideHalfs = resources.readbackTexelStrideHalfs
+    this.schroedingerBuffer = resources.schroedingerBuffer
+    this.basisBuffer = resources.basisBuffer
+    this.gridParamsBuffer = resources.gridParamsBuffer
+    this.openQuantumBuffer = resources.openQuantumBuffer
+    this.hydrogenBasisBuffer = resources.hydrogenBasisBuffer
+    this.computeBindGroupLayout = resources.computeBindGroupLayout
+    this.computeBindGroup = resources.computeBindGroup
 
     // Initialize grid params
     this.updateGridParams(device)
-
-    // Create open quantum buffer if density matrix mode is active
-    // Buffer size: 98 vec4f (rho) + 2 vec4f (metrics) = 400 floats = 1600 bytes
-    if (this.passConfig.useDensityMatrix) {
-      this.openQuantumBuffer = this.createUniformBuffer(device, 1600, 'density-open-quantum')
-    }
-
-    // Create hydrogen basis buffer if hydrogen + density matrix mode
-    // Layout: 39 vec4i (quantumNumbers) + 4 vec4f (energies) + 1 vec4u (basisCount+pad)
-    // = (39 + 4 + 1) * 16 = 704 bytes
-    if (this.passConfig.useHydrogenBasis) {
-      this.hydrogenBasisBuffer = this.createUniformBuffer(device, 704, 'density-hydrogen-basis')
-    }
-
-    // Create bind group layout for compute shader
-    // All bindings in group 0:
-    // - binding 0: SchroedingerUniforms (uniform)
-    // - binding 1: BasisVectors (uniform)
-    // - binding 2: GridParams (uniform)
-    // - binding 3: densityGrid (storage texture, write)
-    // - binding 4: OpenQuantumUniforms (uniform) — only when useDensityMatrix
-    const layoutEntries: GPUBindGroupLayoutEntry[] = [
-      {
-        binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' as const },
-      },
-      {
-        binding: 1,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' as const },
-      },
-      {
-        binding: 2,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' as const },
-      },
-      {
-        binding: 3,
-        visibility: GPUShaderStage.COMPUTE,
-        storageTexture: {
-          access: 'write-only' as const,
-          format: this.densityTextureFormat,
-          viewDimension: '3d' as GPUTextureViewDimension,
-        },
-      },
-    ]
-    if (this.passConfig.useDensityMatrix) {
-      layoutEntries.push({
-        binding: 4,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' as const },
-      })
-    }
-    if (this.passConfig.useHydrogenBasis) {
-      layoutEntries.push({
-        binding: 5,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: { type: 'uniform' as const },
-      })
-    }
-    this.computeBindGroupLayout = device.createBindGroupLayout({
-      label: 'density-grid-compute-bgl',
-      entries: layoutEntries,
-    })
-
-    // Create bind group
-    const bindGroupEntries: GPUBindGroupEntry[] = [
-      { binding: 0, resource: { buffer: this.schroedingerBuffer } },
-      { binding: 1, resource: { buffer: this.basisBuffer } },
-      { binding: 2, resource: { buffer: this.gridParamsBuffer } },
-      { binding: 3, resource: this.densityTextureView! },
-    ]
-    if (this.passConfig.useDensityMatrix && this.openQuantumBuffer) {
-      bindGroupEntries.push({ binding: 4, resource: { buffer: this.openQuantumBuffer } })
-    }
-    if (this.passConfig.useHydrogenBasis && this.hydrogenBasisBuffer) {
-      bindGroupEntries.push({ binding: 5, resource: { buffer: this.hydrogenBasisBuffer } })
-    }
-    this.computeBindGroup = device.createBindGroup({
-      label: 'density-grid-compute-bg',
-      layout: this.computeBindGroupLayout,
-      entries: bindGroupEntries,
-    })
 
     // Check pipeline cache before compiling
     const cacheKey = DensityGridComputePass.computeCacheKey(
@@ -341,7 +223,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       DensityGridComputePass.pipelineCache.set(cacheKey, this.computePipeline)
     }
 
-    // ── Gradient normal compute pipeline ──
+    // Gradient normal compute pipeline
     const gradient = await createGradientPipeline(
       device,
       this.densityTextureView!,
@@ -353,76 +235,25 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.gradientBindGroup = gradient.bindGroup
   }
 
-  private async selectGridTextureFormat(device: GPUDevice): Promise<'r16float' | 'rgba16float'> {
-    // Density matrix mode requires rgba16float for coherence fraction in channel B
-    if (this.passConfig.useDensityMatrix) return 'rgba16float'
-    if (this.passConfig.forceRgba) return 'rgba16float'
-    const r16floatSupported = await this.supportsStorageTextureFormat(device, 'r16float')
-    return r16floatSupported ? 'r16float' : 'rgba16float'
-  }
-
-  private async supportsStorageTextureFormat(
-    device: GPUDevice,
-    format: 'r16float' | 'rgba16float'
-  ): Promise<boolean> {
-    if (format === 'rgba16float') {
-      return true
-    }
-
-    device.pushErrorScope('validation')
-    let probeTexture: GPUTexture | null = null
-    try {
-      probeTexture = device.createTexture({
-        label: 'density-grid-format-probe',
-        size: { width: 1, height: 1, depthOrArrayLayers: 1 },
-        format,
-        dimension: '3d',
-        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
-      })
-      probeTexture.destroy()
-    } catch {
-      // Some implementations may throw immediately for unsupported formats.
-    }
-
-    const validationError = await device.popErrorScope()
-    return validationError === null
-  }
-
   /**
    * Update grid parameters uniform buffer.
-   * Uses pre-allocated ArrayBuffer views to avoid per-call allocation.
+   * Delegates to the extracted writeGridParams helper.
    */
   private updateGridParams(device: GPUDevice): void {
     if (!this.gridParamsBuffer) return
-
-    // GridParams layout:
-    // vec3u gridSize (offset 0, 12 bytes)
-    this.gridParamsU32View[0] = this.gridSize
-    this.gridParamsU32View[1] = this.gridSize
-    this.gridParamsU32View[2] = this.gridSize
-    // u32 _pad0 (offset 12, 4 bytes)
-    this.gridParamsU32View[3] = 0
-
-    // vec3f worldMin (offset 16, 12 bytes) - dynamic bounds from bounding radius
-    this.gridParamsF32View[4] = -this.worldBound
-    this.gridParamsF32View[5] = -this.worldBound
-    this.gridParamsF32View[6] = -this.worldBound
-    // f32 _pad1 (offset 28, 4 bytes)
-    this.gridParamsF32View[7] = 0
-
-    // vec3f worldMax (offset 32, 12 bytes) - dynamic bounds from bounding radius
-    this.gridParamsF32View[8] = this.worldBound
-    this.gridParamsF32View[9] = this.worldBound
-    this.gridParamsF32View[10] = this.worldBound
-    // f32 _pad2 (offset 44, 4 bytes)
-    this.gridParamsF32View[11] = 0
-
-    device.queue.writeBuffer(this.gridParamsBuffer, 0, this.gridParamsData)
+    writeGridParams(
+      device,
+      this.gridParamsBuffer,
+      this.gridSize,
+      this.worldBound,
+      this.gridParamsData,
+      this.gridParamsU32View,
+      this.gridParamsF32View
+    )
   }
 
   /**
    * Update Schroedinger uniforms from render context.
-   * This copies the uniform data from the renderer.
    * Only marks for recomputation if version changed (parameter changes).
    *
    * @param device - GPU device
@@ -430,16 +261,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * @param version - Store version number for dirty tracking
    */
   updateSchroedingerUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
-    if (!this.schroedingerBuffer) {
-      return
-    }
-
-    if (version === this.lastSchroedingerVersion) {
-      return
-    }
+    if (!this.schroedingerBuffer) return
+    if (version === this.lastSchroedingerVersion) return
 
     device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
-    // Density |ψ|² is time-independent, so recompute only when tracked parameters change.
     this.needsRecompute = true
     this.shouldRefreshDistribution = true
     this.lastSchroedingerVersion = version
@@ -478,16 +303,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * @param version - Rotation/animation version for dirty tracking
    */
   updateBasisUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
-    if (!this.basisBuffer) {
-      return
-    }
-
-    if (version === this.lastBasisVersion) {
-      return
-    }
+    if (!this.basisBuffer) return
+    if (version === this.lastBasisVersion) return
 
     device.queue.writeBuffer(this.basisBuffer, 0, data)
-    // Basis vectors affect density sampling space, so any version change needs recompute.
     this.needsRecompute = true
     this.lastBasisVersion = version
   }
@@ -507,87 +326,28 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     return this.analyzer.getLogRhoThreshold()
   }
 
-  /**
-   * Queue GPU->CPU readback of the density volume and refresh CDF cache.
-   */
-  private refreshDensityDistribution(ctx: WebGPURenderContext): void {
-    if (
-      !this.densityTexture ||
-      !this.densityReadbackBuffer ||
-      this.readbackInFlight ||
-      this.readbackPendingSubmit ||
-      !this.shouldRefreshDistribution
-    ) {
-      return
+  /** Build readback state snapshot for the extracted readback helpers. */
+  private getReadbackState(): DensityReadbackState {
+    return {
+      densityTexture: this.densityTexture,
+      densityReadbackBuffer: this.densityReadbackBuffer,
+      readbackBytesPerRow: this.readbackBytesPerRow,
+      readbackBytesPerTexel: this.readbackBytesPerTexel,
+      readbackTexelStrideHalfs: this.readbackTexelStrideHalfs,
+      readbackInFlight: this.readbackInFlight,
+      readbackPendingSubmit: this.readbackPendingSubmit,
+      shouldRefreshDistribution: this.shouldRefreshDistribution,
+      gridSize: this.gridSize,
+      worldBound: this.worldBound,
+      analyzer: this.analyzer,
     }
-
-    const readbackBuffer = this.densityReadbackBuffer
-
-    ctx.encoder.copyTextureToBuffer(
-      { texture: this.densityTexture },
-      {
-        buffer: readbackBuffer,
-        bytesPerRow: this.readbackBytesPerRow,
-        rowsPerImage: this.gridSize,
-      },
-      {
-        width: this.gridSize,
-        height: this.gridSize,
-        depthOrArrayLayers: this.gridSize,
-      }
-    )
-
-    this.readbackInFlight = true
-    this.readbackPendingSubmit = true
-    this.shouldRefreshDistribution = false
   }
 
-  /**
-   * Start CPU readback after queued copy work has been submitted.
-   */
-  private startPendingReadback(): void {
-    if (!this.readbackPendingSubmit || !this.device || !this.densityReadbackBuffer) {
-      return
-    }
-
-    const readbackBuffer = this.densityReadbackBuffer
-    this.readbackPendingSubmit = false
-
-    // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
-    // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
-    // map" state when queue.submit() fires later in the same synchronous block.
-    queueMicrotask(() =>
-      readbackBuffer
-        .mapAsync(GPUMapMode.READ)
-        .then(() => {
-          if (this.densityReadbackBuffer !== readbackBuffer) {
-            // Stale buffer from a prior setup — unmap to avoid a permanently mapped buffer
-            try {
-              readbackBuffer.unmap()
-            } catch {
-              /* already destroyed */
-            }
-            return
-          }
-          const mapped = readbackBuffer.getMappedRange()
-          const halfView = new Uint16Array(mapped)
-          this.analyzer.buildDistribution(
-            halfView,
-            this.gridSize,
-            this.readbackBytesPerRow,
-            this.readbackBytesPerTexel,
-            this.readbackTexelStrideHalfs,
-            this.worldBound
-          )
-          readbackBuffer.unmap()
-        })
-        .catch(() => {
-          this.shouldRefreshDistribution = true
-        })
-        .finally(() => {
-          this.readbackInFlight = false
-        })
-    )
+  /** Write back mutable readback flags from the state snapshot. */
+  private applyReadbackState(state: DensityReadbackState): void {
+    this.readbackInFlight = state.readbackInFlight
+    this.readbackPendingSubmit = state.readbackPendingSubmit
+    this.shouldRefreshDistribution = state.shouldRefreshDistribution
   }
 
   /**
@@ -603,22 +363,15 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Check if recomputation is needed based on current state.
    */
   needsUpdate(time: number, dimension: number, quantumMode?: string): boolean {
-    // Always recompute if marked dirty (quantum parameters changed)
     if (this.needsRecompute) return true
-
-    // Recompute if dimension changed
     if (dimension !== this.lastDimension) return true
-
-    // Recompute if quantum mode changed
     if (quantumMode !== this.lastQuantumMode) return true
 
     // Time-dependent density for multi-term superpositions:
-    // |ψ(x,t)|² has cross-term interference fringes that evolve in time.
-    // Single eigenstates (termCount=1) are stationary — skip time check.
+    // |psi(x,t)|^2 has cross-term interference fringes that evolve in time.
+    // Single eigenstates (termCount=1) are stationary.
     // Density matrix mode: time evolution lives in the CPU-evolved density matrix,
-    // not in per-pixel phase factors. evaluateSingleBasis returns time-independent
-    // basis functions, so the grid output only changes when updateOpenQuantumUniforms
-    // sets needsRecompute. Skip the time-bucket trigger to avoid identical recomputation.
+    // not in per-pixel phase factors — skip the time-bucket trigger.
     const termCount = this.passConfig.termCount ?? 1
     if (termCount > 1 && !this.passConfig.useDensityMatrix) {
       const bucket = Math.floor(time * 60.0)
@@ -637,19 +390,16 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       return
     }
 
-    // Early exit if no update needed (same config, no quantum parameter changes)
     const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const time = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     if (!this.needsUpdate(time, this.passConfig.dimension, this.passConfig.quantumMode)) {
       return
     }
 
-    // Create compute pass using context method
+    // Density compute dispatch
     const computePass = ctx.beginComputePass({
       label: 'density-grid-compute-pass',
     })
-
-    // Dispatch compute shader
     this.dispatchCompute(
       computePass,
       this.computePipeline,
@@ -658,10 +408,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       this.workgroupCount,
       this.workgroupCount
     )
-
     computePass.end()
 
-    // Dispatch gradient normal computation (reads density grid, writes normal grid)
+    // Gradient normal dispatch
     if (this.gradientPipeline && this.gradientBindGroup) {
       const gradPass = ctx.beginComputePass({ label: 'gradient-grid-compute-pass' })
       gradPass.setPipeline(this.gradientPipeline)
@@ -670,7 +419,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       gradPass.end()
     }
 
-    this.refreshDensityDistribution(ctx)
+    // Queue readback for threshold extraction
+    const rbState = this.getReadbackState()
+    refreshDensityDistribution(ctx, rbState)
+    this.applyReadbackState(rbState)
 
     // Update tracking state
     this.needsRecompute = false
@@ -680,7 +432,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   }
 
   postFrame(): void {
-    this.startPendingReadback()
+    const rbState = this.getReadbackState()
+    startPendingReadback(rbState, this.device)
+    this.applyReadbackState(rbState)
   }
 
   getTextureFormat(): 'r16float' | 'rgba16float' {
@@ -725,40 +479,45 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Dispose of GPU resources.
    */
   dispose(): void {
-    this.densityTexture?.destroy()
+    disposeDensityGridResources(
+      {
+        densityTexture: this.densityTexture,
+        densityTextureView: this.densityTextureView,
+        normalTexture: this.normalTexture,
+        normalTextureView: this.normalTextureView,
+        gradientPipeline: this.gradientPipeline,
+        gradientBindGroup: this.gradientBindGroup,
+        gridParamsBuffer: this.gridParamsBuffer,
+        schroedingerBuffer: this.schroedingerBuffer,
+        basisBuffer: this.basisBuffer,
+        openQuantumBuffer: this.openQuantumBuffer,
+        hydrogenBasisBuffer: this.hydrogenBasisBuffer,
+        computeBindGroup: this.computeBindGroup,
+        computeBindGroupLayout: this.computeBindGroupLayout,
+        densityReadbackBuffer: this.densityReadbackBuffer,
+      },
+      this.analyzer
+    )
+
+    // Null instance references after satellite dispose
     this.densityTexture = null
     this.densityTextureView = null
-    this.normalTexture?.destroy()
     this.normalTexture = null
     this.normalTextureView = null
     this.gradientPipeline = null
     this.gradientBindGroup = null
-    this.gridParamsBuffer?.destroy()
     this.gridParamsBuffer = null
-    this.schroedingerBuffer?.destroy()
     this.schroedingerBuffer = null
-    this.basisBuffer?.destroy()
     this.basisBuffer = null
-    this.openQuantumBuffer?.destroy()
     this.openQuantumBuffer = null
-    this.hydrogenBasisBuffer?.destroy()
     this.hydrogenBasisBuffer = null
     this.computeBindGroup = null
     this.computeBindGroupLayout = null
-    if (this.densityReadbackBuffer) {
-      try {
-        this.densityReadbackBuffer.unmap()
-      } catch {
-        // ignore: buffer may already be unmapped/destroyed
-      }
-      this.densityReadbackBuffer.destroy()
-    }
     this.densityReadbackBuffer = null
     this.readbackBytesPerRow = 0
     this.readbackInFlight = false
     this.readbackPendingSubmit = false
     this.shouldRefreshDistribution = true
-    this.analyzer.reset()
 
     super.dispose()
   }

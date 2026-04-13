@@ -10,12 +10,22 @@
  */
 
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 
+import type { DisorderState } from './TDSEComputePassDisorder'
+import { disposeDisorder } from './TDSEComputePassDisorder'
 import type { TdseBindGroupResult } from './TDSEComputePassSetup'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { destroyGSBuffers, type GramSchmidtState } from './TDSEGramSchmidt'
+import {
+  disposeHellerStagingBuffers,
+  type HellerReadbackState,
+  resetHellerCapture,
+} from './TDSEHellerReadback'
 import { disposeObservables, type ObservablesState } from './TDSEObservablesDispatch'
 import type { SaveLoadState } from './TDSEStateSaveLoad'
+import { disposeStochasticLoc, type StochasticLocState } from './TDSEStochasticLocalization'
+import { disposeVortexDetect, type VortexDetectState } from './TDSEVortexDetect'
 
 /**
  * Dispose all extracted-module state: diagnostics readback, Gram-Schmidt
@@ -145,4 +155,111 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
  */
 export function destroyTdsePassGpu(fields: TdseGpuFields): void {
   destroyPassBuffers(fields)
+}
+
+/** Fields from TDSEComputePass needed to build the GPU snapshot for disposal. */
+export interface TdsePassGpuSnapshot {
+  psiReBuffer: GPUBuffer | null
+  psiImBuffer: GPUBuffer | null
+  potentialBuffer: GPUBuffer | null
+  fftScratchA: GPUBuffer | null
+  fftScratchB: GPUBuffer | null
+  uniformBuffer: GPUBuffer | null
+  fftUniformBuffer: GPUBuffer | null
+  fftStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffer: GPUBuffer | null
+  fftAxisStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffers: GPUBuffer[] | null
+  packUniformBuffer: GPUBuffer | null
+  omegaStagingBuffer: GPUBuffer | null
+  densityTexture: GPUTexture | null
+  densityTextureView: GPUTextureView | null
+  diagUniformBuffer: GPUBuffer | null
+  diagPartialSumsBuffer: GPUBuffer | null
+  diagPartialMaxBuffer: GPUBuffer | null
+  diagPartialLeftBuffer: GPUBuffer | null
+  diagPartialRightBuffer: GPUBuffer | null
+  diagPartialIprBuffer: GPUBuffer | null
+  pl: { renormalizePipeline?: unknown } | null
+  bg: TdseBindGroupResult | null
+  initialized: boolean
+  lastConfigHash: string
+}
+
+/**
+ * Full pass disposal: cleans up vortex, disorder, stochastic, Heller state,
+ * GPU buffers, and extracted-module resources, then writes nulled fields back.
+ *
+ * Extracted from TDSEComputePass.dispose() to keep the orchestrator under
+ * the 600-line limit.
+ *
+ * @param pass - Mutable pass fields (written back via Object.assign)
+ * @param vdState - Vortex detection state
+ * @param disorderState - Anderson disorder state
+ * @param stochasticState - Stochastic localization state
+ * @param hellerState - Heller spectrometer readback state
+ * @param diagState - Diagnostics readback state
+ * @param gsState - Gram-Schmidt state
+ * @param slState - Save/load state
+ * @param obsState - Observables state
+ */
+export function disposeFullPass(
+  pass: TdsePassGpuSnapshot,
+  vdState: VortexDetectState,
+  disorderState: DisorderState,
+  stochasticState: StochasticLocState,
+  hellerState: HellerReadbackState,
+  diagState: DiagReadbackState,
+  gsState: GramSchmidtState,
+  slState: SaveLoadState,
+  obsState: ObservablesState
+): void {
+  disposeVortexDetect(vdState)
+  disposeDisorder(disorderState)
+  disposeStochasticLoc(stochasticState)
+
+  // Invalidate any in-flight Heller readback and drop psi0 snapshot.
+  // `resetHellerCapture` bumps the generation counter, which causes the
+  // async mapAsync handler to bail out before touching the staging
+  // buffers we are about to destroy. Order matters: bump first, then
+  // release the pool.
+  resetHellerCapture(hellerState)
+  disposeHellerStagingBuffers(hellerState)
+  hellerState.psiReBuffer = null
+  hellerState.psiImBuffer = null
+  hellerState.totalSites = 0
+  useHellerSpectrometerStore.getState().setBufferRef(null)
+
+  const gpu: TdseGpuFields = {
+    psiReBuffer: pass.psiReBuffer,
+    psiImBuffer: pass.psiImBuffer,
+    potentialBuffer: pass.potentialBuffer,
+    fftScratchA: pass.fftScratchA,
+    fftScratchB: pass.fftScratchB,
+    uniformBuffer: pass.uniformBuffer,
+    fftUniformBuffer: pass.fftUniformBuffer,
+    fftStagingBuffer: pass.fftStagingBuffer,
+    fftAxisUniformBuffer: pass.fftAxisUniformBuffer,
+    fftAxisStagingBuffer: pass.fftAxisStagingBuffer,
+    fftAxisUniformBuffers: pass.fftAxisUniformBuffers,
+    packUniformBuffer: pass.packUniformBuffer,
+    omegaStagingBuffer: pass.omegaStagingBuffer,
+    densityTexture: pass.densityTexture,
+    densityTextureView: pass.densityTextureView,
+    normalTexture: null,
+    normalTextureView: null,
+    diagUniformBuffer: pass.diagUniformBuffer,
+    diagPartialSumsBuffer: pass.diagPartialSumsBuffer,
+    diagPartialMaxBuffer: pass.diagPartialMaxBuffer,
+    diagPartialLeftBuffer: pass.diagPartialLeftBuffer,
+    diagPartialRightBuffer: pass.diagPartialRightBuffer,
+    diagPartialIprBuffer: pass.diagPartialIprBuffer,
+    pl: pass.pl,
+    bg: pass.bg,
+    initialized: pass.initialized,
+    lastConfigHash: pass.lastConfigHash,
+  }
+  destroyTdsePassGpu(gpu)
+  Object.assign(pass, gpu)
+  disposeTdseResources(diagState, gsState, slState, obsState)
 }

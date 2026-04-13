@@ -16,10 +16,6 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
-import { sampleAdiabaticVacuum } from '@/lib/physics/cosmology/adiabaticVacuum'
-// k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
-import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -31,6 +27,9 @@ import {
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
 } from './computePassUtils'
+import { type FsfBufferHelpers, rebuildFsfFieldBuffers } from './FreeScalarFieldComputePassBuffers'
+import { disposeFsfPassGpu, type FsfGpuFields } from './FreeScalarFieldComputePassDispose'
+import { initializeFsfField } from './FreeScalarFieldComputePassInit'
 import type {
   FsfBindGroupResult,
   FsfPassHelpers,
@@ -44,7 +43,6 @@ import {
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
   FSF_COSMO_COEFS_F32_COUNT,
-  FSF_DT_BYTE_OFFSET,
   FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from './FreeScalarFieldComputePassUniforms'
@@ -54,7 +52,7 @@ import {
   dispatchFsfGradientNormals,
 } from './FreeScalarFieldGradient'
 import { FsfKSpaceManager } from './FreeScalarFieldKSpace'
-import { captureFsfCosmoDebugSample, getOrCreateFsfCosmoDebugBuffer } from './fsfCosmoDebug'
+import { captureFsfCosmoDebugSample } from './fsfCosmoDebug'
 import {
   computeFsfOuterStepSubsteps,
   projectSimEta,
@@ -67,30 +65,11 @@ import { composeFsfSaveMetadata } from './fsfStateIO'
 import { requestStateSave as genericStateSave } from './stateSave'
 
 /**
- * Uniform layout offsets (re-exported from the uniforms module for in-file
+ * Uniform layout offset (re-exported from the uniforms module for in-file
  * locality). Single source of truth lives in
- * `FreeScalarFieldComputePassUniforms.ts` so the partial-write paths and the
- * full-write `writeFsfUniforms` cannot drift apart.
+ * `FreeScalarFieldComputePassUniforms.ts`.
  */
 const UNIFORM_SIZE = FSF_UNIFORM_SIZE
-const DT_BYTE_OFFSET = FSF_DT_BYTE_OFFSET
-
-/**
- * Create a 4-byte COPY_SRC staging buffer pre-populated with a single f32
- * `dt` value. Used by the leapfrog kickstart to stage `dt/2` and `dt` into
- * the uniform buffer's DT slot via `encoder.copyBufferToBuffer`.
- */
-function createDtStagingBuffer(device: GPUDevice, label: 'half' | 'full', dt: number): GPUBuffer {
-  const staging = device.createBuffer({
-    label: `free-scalar-${label}-dt-staging`,
-    size: 4,
-    usage: GPUBufferUsage.COPY_SRC,
-    mappedAtCreation: true,
-  })
-  new Float32Array(staging.getMappedRange()).set([dt])
-  staging.unmap()
-  return staging
-}
 
 /**
  * Compute pass for free scalar field simulation on a lattice.
@@ -346,50 +325,32 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     })
   }
 
+  /** Bridge to base-class `createUniformBuffer` for the buffer helper. */
+  private readonly bufferHelpers: FsfBufferHelpers = {
+    createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
+  }
+
   /**
    * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
    * The density texture is NOT recreated here — it has a fixed size (DENSITY_GRID_SIZE³)
    * and persists across grid size changes to avoid invalidating the renderer's bind group.
    */
   private rebuildFieldBuffers(device: GPUDevice, config: FreeScalarConfig): void {
-    // Destroy old k-space staging buffers and invalidate in-flight jobs
-    this.kSpace.destroyBuffers()
-
-    // Destroy old field buffers
-    this.phiBuffer?.destroy()
-    this.piBuffer?.destroy()
-    this.uniformBuffer?.destroy()
-
-    // Compute total sites as product of all active dimensions
-    this.totalSites = 1
-    for (let d = 0; d < config.latticeDim; d++) {
-      this.totalSites *= config.gridSize[d]!
-    }
-    const bufferSize = this.totalSites * 4 // f32 per site
-
-    // Create phi and pi storage buffers (COPY_SRC needed for k-space readback)
-    this.phiBuffer = device.createBuffer({
-      label: 'free-scalar-phi',
-      size: bufferSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
-    })
-
-    this.piBuffer = device.createBuffer({
-      label: 'free-scalar-pi',
-      size: bufferSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
-    })
-
-    // Create k-space and diagnostics staging buffers
-    this.kSpace.createBuffers(device, bufferSize)
-
-    // Create uniform buffer
-    this.uniformBuffer = this.createUniformBuffer(device, UNIFORM_SIZE, 'free-scalar-uniforms')
+    const result = rebuildFsfFieldBuffers(
+      device,
+      config,
+      { phiBuffer: this.phiBuffer, piBuffer: this.piBuffer, uniformBuffer: this.uniformBuffer },
+      this.bufferHelpers,
+      this.kSpace
+    )
+    this.phiBuffer = result.phiBuffer
+    this.piBuffer = result.piBuffer
+    this.uniformBuffer = result.uniformBuffer
+    this.totalSites = result.totalSites
+    this.lastConfigHash = result.configHash
 
     // Ensure density texture exists (creates if not yet initialized)
     this.initializeDensityTexture(device)
-
-    this.lastConfigHash = computeFsfConfigHash(config)
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -485,109 +446,26 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Initialize field state and perform leapfrog kickstart. */
   private initializeField(ctx: WebGPURenderContext, config: FreeScalarConfig): void {
-    const { device, encoder } = ctx
-
-    // When a save is resumed the restored phi/pi buffers are already on the
-    // leapfrog half-offset grid (pi is dt/2 ahead of phi, as it was at save
-    // time). Running the usual dt/2 kickstart afterwards would double-advance
-    // pi to a full step ahead and desync the integrator on frame 1. Track
-    // whether init consumed an injection so the kickstart block below can be
-    // skipped in that one case only.
-    let injectedFromSave = false
-
-    // Check for pending loaded wavefunction data — skip init and inject directly
-    if (this.pendingInjection && this.phiBuffer && this.piBuffer) {
-      const { re, im } = this.pendingInjection
-      const elementCount = Math.min(re.length, this.totalSites)
-      const reData = re.slice(0, elementCount)
-      const imData = im.slice(0, elementCount)
-      device.queue.writeBuffer(this.phiBuffer, 0, reData)
-      device.queue.writeBuffer(this.piBuffer, 0, imData)
-      this.pendingInjection = null
-      injectedFromSave = true
-      logger.log(`[FSF] Injected loaded field state (${elementCount} sites)`)
-    } else if (config.initialCondition === 'vacuumNoise') {
-      // When cosmology is active, sample the Bunch-Davies adiabatic vacuum
-      // at `this.simEta` (not `config.cosmology.eta0`). The caller already
-      // resolved the runtime clock from either `pendingLoadedSimEta` or
-      // `config.cosmology.eta0`, so reusing the resolved value keeps the
-      // sampled initial state in lockstep with the shader uniforms —
-      // otherwise a save-resume would initialize at `eta0` while the
-      // uniforms report the saved `simEta`. The canonical δφ sampler uses
-      // the physical dispersion `ω² = k_lat² + m²·a²(η)` internally and
-      // then rescales the result by `B = a^(n−2) = aPotential(η)` so the
-      // sampled `(δφ, π_δφ)` sit on the canonical-variance Hamiltonian —
-      // there is no Mukhanov-Sasaki `v = z·δφ` substitution anywhere in
-      // this path. Cosmology-disabled configs fall through to the ordinary
-      // Minkowski vacuum sampler. Both paths return `(phi, pi)` in the
-      // same shape.
-      const { phi, pi } = config.cosmology.enabled
-        ? sampleAdiabaticVacuum(
-            config,
-            {
-              preset: config.cosmology.preset,
-              spacetimeDim: config.latticeDim + 1,
-              steepness: config.cosmology.steepness,
-              hubble: config.cosmology.hubble,
-              kasnerExponents: config.cosmology.kasnerExponents,
-            },
-            this.simEta,
-            config.vacuumSeed
-          )
-        : sampleVacuumSpectrum(config, config.vacuumSeed, 'kgFloor')
-      device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
-      device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
-    } else if (this.pl && this.bg) {
-      const pass = ctx.beginComputePass({ label: 'free-scalar-init-pass' })
-      this.dispatchCompute(
-        pass,
-        this.pl.initPipeline,
-        [this.bg.initBG],
-        Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
-      )
-      pass.end()
-    }
-
-    // Leapfrog half-step kickstart: advance pi from t=0 to t=dt/2.
-    // Skipped when we injected a saved state — the saved pi is already on
-    // the half-offset grid, and a second kick would full-step it ahead of phi.
-    if (!injectedFromSave && this.pl && this.bg && this.uniformBuffer) {
-      const halfDtStaging = createDtStagingBuffer(device, 'half', config.dt * 0.5)
-      encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
-
-      const kickPass = ctx.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
-      this.dispatchCompute(
-        kickPass,
-        this.pl.updatePiPipeline,
-        [this.bg.updatePiBG],
-        Math.ceil(this.totalSites / LINEAR_WORKGROUP_SIZE)
-      )
-      kickPass.end()
-
-      const fullDtStaging = createDtStagingBuffer(device, 'full', config.dt)
-      encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
-      this.pendingStagingBuffers.push(halfDtStaging, fullDtStaging)
-    }
-
-    this.initialized = true
-    this.stepAccumulator = 0
-    // Reset the debug trace counter so each reset starts from frame 0.
-    // Also clear the shared ring buffer so the playwright spec sees only
-    // data from the post-reset evolution.
-    this.debugFrameIndex = 0
-    this.lastDebugNSub = 1
-    if (config.cosmology.enabled) {
-      const debugBuf = getOrCreateFsfCosmoDebugBuffer()
-      if (debugBuf) {
-        debugBuf.samples.length = 0
-        debugBuf.head = 0
-      }
-    }
-    // Invalidate in-flight async readbacks BEFORE resetting the diagnostics store.
-    // Without this, a stale readback from the old field can resolve between frames,
-    // pass the epoch check, and set initialEnergy from old data — corrupting energyDrift.
-    this.kSpace.invalidateReadbacks()
-    useDiagnosticsStore.getState().resetFsf()
+    const result = initializeFsfField(ctx, config, {
+      pl: this.pl,
+      bg: this.bg,
+      phiBuffer: this.phiBuffer,
+      piBuffer: this.piBuffer,
+      uniformBuffer: this.uniformBuffer,
+      totalSites: this.totalSites,
+      simEta: this.simEta,
+      pendingInjection: this.pendingInjection,
+      pendingStagingBuffers: this.pendingStagingBuffers,
+      kSpace: this.kSpace,
+      dispatchCompute: (pass, pipeline, bindGroups, x, y?, z?) =>
+        this.dispatchCompute(pass, pipeline, bindGroups, x, y, z),
+      beginComputePass: (desc) => ctx.beginComputePass(desc),
+    })
+    this.initialized = result.initialized
+    this.stepAccumulator = result.stepAccumulator
+    this.debugFrameIndex = result.debugFrameIndex
+    this.lastDebugNSub = result.lastDebugNSub
+    this.pendingInjection = result.pendingInjection
   }
 
   /**
@@ -950,27 +828,28 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /** Release all GPU resources. */
   dispose(): void {
-    // Invalidate in-flight async gradient pipeline results
-    this.pipelineGeneration++
-    const gpuBuffers: (GPUBuffer | null)[] = [this.phiBuffer, this.piBuffer, this.uniformBuffer]
-    for (const buf of gpuBuffers) buf?.destroy()
-    this.densityTexture?.destroy()
-    this.analysisTexture?.destroy()
-    this.normalTexture?.destroy()
-    for (const buf of this.pendingStagingBuffers) buf.destroy()
-    this.pendingStagingBuffers.length = 0
-
-    this.phiBuffer = this.piBuffer = this.uniformBuffer = null
-    this.densityTexture = this.analysisTexture = this.normalTexture = null
-    this.densityTextureView = this.analysisTextureView = this.normalTextureView = null
-    this.gradientPipeline = null
-    this.gradientBindGroup = null
-    this.kSpace.dispose()
-    this.pl = null
-    this.bg = null
-    this.initialized = false
-    this.lastConfigHash = ''
-    this.lastInitHash = null
+    const fields: FsfGpuFields = {
+      phiBuffer: this.phiBuffer,
+      piBuffer: this.piBuffer,
+      uniformBuffer: this.uniformBuffer,
+      densityTexture: this.densityTexture,
+      densityTextureView: this.densityTextureView,
+      analysisTexture: this.analysisTexture,
+      analysisTextureView: this.analysisTextureView,
+      normalTexture: this.normalTexture,
+      normalTextureView: this.normalTextureView,
+      gradientPipeline: this.gradientPipeline,
+      gradientBindGroup: this.gradientBindGroup,
+      pipelineGeneration: this.pipelineGeneration,
+      pl: this.pl,
+      bg: this.bg,
+      initialized: this.initialized,
+      lastConfigHash: this.lastConfigHash,
+      lastInitHash: this.lastInitHash,
+      pendingStagingBuffers: this.pendingStagingBuffers,
+    }
+    disposeFsfPassGpu(fields, this.kSpace)
+    Object.assign(this, fields)
     super.dispose()
   }
 }
