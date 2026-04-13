@@ -36,9 +36,9 @@ function ensureWorker(state: BecSpectrumWorkerState): Worker {
   )
   worker.onmessage = (e: MessageEvent<IncompressibleSpectrumWorkerResponse>) => {
     if (state.disposed) return
-    state.inFlight = false
     if (e.data.type !== 'result') return
     if (e.data.epoch !== state.epoch) return
+    state.inFlight = false
     const spec = e.data.result
     useDiagnosticsStore
       .getState()

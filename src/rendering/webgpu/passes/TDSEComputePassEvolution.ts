@@ -208,7 +208,8 @@ export function runStrangEvolution(
       dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
       fusedUnpackV.end()
 
-      if (config.absorberEnabled) {
+      const stochasticActiveFallback = config.stochasticEnabled && config.stochasticGamma > 0
+      if (config.absorberEnabled && !stochasticActiveFallback) {
         const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
         dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
         absPass.end()
