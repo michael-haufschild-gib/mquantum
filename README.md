@@ -8,7 +8,7 @@ An N-dimensional quantum physics visualizer running entirely in the browser via 
 
 This is a vibecoded project. I have no real understanding of the quantum mechanics math behind it. I don't know whether the rendered wavefunctions or the values displayed in the UI are physically correct. It looks cool, and that's about as far as my confidence goes.
 
-The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase — ~1000 source files, 131 WGSL shaders, Rust/WASM math, 5700+ tests, and this README — was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
+The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase -- ~1100 source files, 131 WGSL shaders, Rust/WASM math, 6300+ tests, and this README -- was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
 
 ## What It Does
 
@@ -27,7 +27,7 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 - **State**: Zustand 5
 - **Styling**: Tailwind CSS 4
 - **Math**: Rust/WASM for rotation and projection math
-- **Testing**: Vitest (5700+ tests) + Playwright E2E + Stryker mutation testing
+- **Testing**: Vitest (6300+ tests) + Playwright E2E (77 specs) + Stryker mutation testing
 
 ## Prerequisites
 
@@ -119,6 +119,28 @@ src/
   wasm/             # Rust/WASM bridge (animation math)
 ```
 
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [Architecture Guide](docs/architecture.md) | File placement, naming conventions, code templates |
+| [Frontend Guide](docs/frontend.md) | UI components, stores, hooks, state management |
+| [Testing Guide](docs/testing.md) | Test infrastructure, patterns, quality rules |
+| [Style Guide](docs/meta/styleguide.md) | TypeScript, CSS (Tailwind 4), WGSL, JSDoc rules |
+| [Getting Started](docs/getting-started.md) | Developer onboarding walkthrough |
+| [ADRs](docs/decisions.md) | Architecture decision records |
+| [Physics Docs](docs/physics/) | Per-mode physics documentation and validation |
+
+## Quality Gates
+
+- **TypeScript strict mode**: `noUncheckedIndexedAccess`, `strictNullChecks`, zero `any` types
+- **ESLint**: 9 custom project rules (no shallow test matchers, no hardcoded colors, no raw HTML controls, no DOM traversal in tests, ...)
+- **Stylelint**: oklch-only colors, logical properties, no breakpoint media queries
+- **Coverage ratchet**: thresholds auto-raise, can never regress
+- **Bundle size budgets**: per-chunk gzip limits enforced at build time
+- **Chunk cycle detection**: circular dependency prevention (value imports only)
+- **Mutation testing**: Stryker on pure logic and state management
+
 ## Physics Validation
 
 The quantum math implementations are validated by an extensive automated test suite:
@@ -130,7 +152,7 @@ The quantum math implementations are validated by an extensive automated test su
 - **TDSE dynamics**: Energy conservation, probability normalization, potential evaluation
 - **BEC/Dirac/Pauli**: Mode-specific diagnostics and state evolution correctness
 
-Run `npx vitest run` to execute the full suite (5700+ tests).
+Run `npx vitest run` to execute the full suite (6300+ tests, 385 test files).
 
 ## CI/CD
 
