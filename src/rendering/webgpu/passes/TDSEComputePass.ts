@@ -644,7 +644,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         bg,
         totalSites: this.totalSites,
         diagNumWorkgroups: this.diagNumWorkgroups,
-        fwdStageCount: this.fwdAxisCount,
+        ifftSlotOffset: this.fwdAxisCount,
         gsState: this._gsState,
         stochasticState: this._stochasticState,
         boundingRadius: boundingRadius ?? 2.0,

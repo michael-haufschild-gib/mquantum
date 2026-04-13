@@ -35,6 +35,7 @@ function ensureWorker(state: BecSpectrumWorkerState): Worker {
     { type: 'module' }
   )
   worker.onmessage = (e: MessageEvent<IncompressibleSpectrumWorkerResponse>) => {
+    if (state.disposed) return
     state.inFlight = false
     if (e.data.type !== 'result') return
     if (e.data.epoch !== state.epoch) return
@@ -49,6 +50,7 @@ function ensureWorker(state: BecSpectrumWorkerState): Worker {
       )
   }
   worker.onerror = () => {
+    if (state.disposed) return
     state.inFlight = false
     logger.warn('[BEC] Spectrum worker error')
   }

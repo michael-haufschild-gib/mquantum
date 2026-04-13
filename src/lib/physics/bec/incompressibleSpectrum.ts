@@ -155,7 +155,18 @@ export function computeIncompressibleSpectrum(
         totalIncompressible: packed[2 * NUM_SPECTRUM_BINS]!,
         totalCompressible: packed[2 * NUM_SPECTRUM_BINS + 1]!,
       }
+    } else if (packed) {
+      // WASM returned a result with unexpected length (likely input validation
+      // rejection producing an empty vec). Do NOT fall through to the TS path
+      // which lacks the same validation — return a zeroed result instead.
+      return {
+        spectrum: new Float32Array(NUM_SPECTRUM_BINS),
+        kValues: new Float32Array(NUM_SPECTRUM_BINS),
+        totalIncompressible: 0,
+        totalCompressible: 0,
+      }
     }
+    // packed is null/undefined → WASM not initialized, fall through to TS path
   }
 
   let totalSites = 1

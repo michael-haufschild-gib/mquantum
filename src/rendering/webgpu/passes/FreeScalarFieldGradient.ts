@@ -11,6 +11,9 @@ import { logger } from '@/lib/logger'
 
 import type { WebGPURenderContext } from '../core/types'
 import { DENSITY_GRID_SIZE } from './computePassUtils'
+
+/** Must match `@workgroup_size(8, 8, 8)` in `gradientGrid.wgsl.ts`. */
+const GRADIENT_WORKGROUP_SIZE = 8
 import { createGradientPipeline } from './DensityGridGradientSetup'
 
 /** Allocate the rgba8snorm normal texture + view. */
@@ -72,7 +75,7 @@ export function dispatchFsfGradientNormals(
   bindGroup: GPUBindGroup | null
 ): void {
   if (!pipeline || !bindGroup) return
-  const gradWG = Math.ceil(DENSITY_GRID_SIZE / 8)
+  const gradWG = Math.ceil(DENSITY_GRID_SIZE / GRADIENT_WORKGROUP_SIZE)
   const gradPass = ctx.beginComputePass({ label: 'free-scalar-gradient-grid-pass' })
   gradPass.setPipeline(pipeline)
   gradPass.setBindGroup(0, bindGroup)

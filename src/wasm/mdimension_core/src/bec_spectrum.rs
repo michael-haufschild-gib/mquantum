@@ -1,10 +1,10 @@
 //! BEC incompressible kinetic energy spectrum — compiled residual math.
 //!
-//! Velocity-field finite differences, Helmholtz projection, and log-spaced
-//! shell binning for the Nore/Bradley superfluid decomposition. The three
-//! Float64 FFTs on the velocity components are still called from TypeScript
-//! (they already go through the shared `fft_nd_wasm` path); this module
-//! handles the steps 1/3/4 that were previously pure TS in the worker.
+//! Velocity-field finite differences, N-D FFT (via `fft::fft_nd`),
+//! Helmholtz projection, and log-spaced shell binning for the
+//! Nore/Bradley superfluid decomposition.  All four steps run entirely
+//! in Rust; the TypeScript caller invokes a single WASM entry point
+//! (`compute_incompressible_spectrum_wasm`) and unpacks the result.
 //!
 //! Input layout: split `psi_re`, `psi_im` (Float32, length = prod(grid_size)).
 //! Output layout: packed `Vec<f64>` —
@@ -38,6 +38,12 @@ pub fn compute_incompressible_spectrum(
     let dim = grid_size.len();
     if dim == 0 || dim != spacing.len() {
         return Vec::new();
+    }
+    // Reject non-finite or non-positive spacing up front.
+    for &s in spacing {
+        if !s.is_finite() || s <= 0.0 {
+            return Vec::new();
+        }
     }
     let total_sites: usize = grid_size.iter().product();
     if total_sites == 0 || psi_re.len() != total_sites || psi_im.len() != total_sites {
@@ -150,6 +156,10 @@ pub fn compute_incompressible_spectrum(
     let log_k_min = k_min.ln();
     let log_k_max = k_max.ln();
     let log_range = log_k_max - log_k_min;
+    // Guard degenerate grids where k_max ≤ k_min (e.g. very small sizes).
+    if !log_range.is_finite() || log_range <= 0.0 {
+        return Vec::new();
+    }
     let bin_inv_log_range = NUM_SPECTRUM_BINS as f64 / log_range;
 
     let mut spectrum = vec![0.0f64; NUM_SPECTRUM_BINS];
@@ -308,9 +318,20 @@ mod tests {
         let sp = [0.5f64; 3];
         let out = compute_incompressible_spectrum(&psi_re, &psi_im, &grid, &sp, 1.0, 1.0);
         let total_incomp = out[2 * NUM_SPECTRUM_BINS];
+        let total_comp = out[2 * NUM_SPECTRUM_BINS + 1];
         // Plane wave velocity is uniform → entirely at k=0 which is skipped
-        // (DC bin). Both energies collected on the grid must be finite.
+        // (DC bin). The incompressible component must be near zero because a
+        // uniform velocity field has no curl. Allow small numerical noise.
         assert!(total_incomp.is_finite(), "incomp must be finite");
+        assert!(total_comp.is_finite(), "comp must be finite");
+        let total = total_incomp + total_comp;
+        if total > 1e-15 {
+            assert!(
+                total_incomp / total < 0.01,
+                "plane wave incompressible fraction should be <1%, got {:.4}%",
+                100.0 * total_incomp / total
+            );
+        }
     }
 
     /// Vortex ψ = √ρ₀ · exp(i·θ) around z-axis has a phase gradient that is

@@ -58,17 +58,11 @@ export interface EvolutionResources {
    * starts. Forward axes occupy slots `[0, latticeDim)`, inverse axes
    * occupy `[latticeDim, 2*latticeDim)`.
    *
-   * Named `fwdStageCount` historically because the pre-shared-memory FFT
-   * path (per-stage Stockham kernel) needed this to equal
-   * `Σ log2(gridSize[d])`. That kernel was replaced by
-   * `tdseSharedMemFFTBlock` but the field name stuck in the interface
-   * contract; the populated value is now `fwdAxisCount = latticeDim`
-   * (see `TDSEComputePass.executeTDSE` populating this field from
-   * `this.fwdAxisCount`). Do NOT swap this value back to
-   * `Σ log2(N)` — the Strang inverse-FFT loop now indexes directly into
+   * Value is `latticeDim` (one slot per axis direction). Do NOT set this
+   * to `Σ log2(N)` — the Strang inverse-FFT loop indexes directly into
    * the per-axis bind-group array and would go out of bounds.
    */
-  fwdStageCount: number
+  ifftSlotOffset: number
   gsState: GramSchmidtState
   /** Stochastic localization state (optional — null when feature not built). */
   stochasticState: StochasticLocState | null
@@ -170,7 +164,7 @@ export function runStrangEvolution(
       dc(strangPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
       // 5. Inverse FFT — axes batched
       strangPass.setPipeline(pl.fftSharedMemPipeline)
-      fftSlot = res.fwdStageCount
+      fftSlot = res.ifftSlotOffset
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         const axisDim = config.gridSize[d]!
         strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
@@ -184,7 +178,8 @@ export function runStrangEvolution(
       // the PML damping AFTER the CSL kicks and we must preserve that operator
       // ordering for stochastic mode. When stochastic is active, absorber is
       // dispatched after the stochastic sub-step loop below.
-      const inlineAbsorber = config.absorberEnabled && !res.stochasticState
+      const stochasticActive = config.stochasticEnabled && config.stochasticGamma > 0
+      const inlineAbsorber = config.absorberEnabled && !stochasticActive
       if (inlineAbsorber) {
         dc(strangPass, pl.absorberPipeline, [bg.initBG], linearWG)
       }
@@ -204,7 +199,7 @@ export function runStrangEvolution(
       dc(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
       kinPass.end()
 
-      fftSlot = res.fwdStageCount
+      fftSlot = res.ifftSlotOffset
       for (let d = config.latticeDim - 1; d >= 0; d--) {
         fftSlot = res.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
       }
@@ -244,7 +239,8 @@ export function runStrangEvolution(
     // active, PML must come AFTER the CSL kicks. The batched path above only
     // inlines absorber when stochastic is disabled, so we run the dispatch
     // here for the stochastic case.
-    if (config.absorberEnabled && res.stochasticState) {
+    const stochasticActivePost = config.stochasticEnabled && config.stochasticGamma > 0
+    if (config.absorberEnabled && stochasticActivePost) {
       const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
       dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
       absPass.end()

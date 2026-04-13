@@ -637,7 +637,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     void tdsePass.requestMeasurementReadback(ctx).then(
       (result) => {
-        if (this.disposed) return
+        if (this.disposed || this.transferredOut) return
         if (!result) {
           this.spectrumWorkerState.inFlight = false
           return

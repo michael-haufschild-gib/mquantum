@@ -72,6 +72,8 @@ const allResults: Sample[] = []
 test.setTimeout(300_000)
 
 test.describe('BEC performance baseline', () => {
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
     await requireWebGPU(page, test.info())
