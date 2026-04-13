@@ -66,10 +66,15 @@ export interface TdseGpuFields {
   fftStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
+  /** PERF: per-slot axis uniform buffers for batched Strang FFT (length = 2 × latticeDim). */
+  fftAxisUniformBuffers: GPUBuffer[] | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   densityTexture: GPUTexture | null
   densityTextureView: GPUTextureView | null
+  /** PERF: pre-computed gradient-normal texture + view. */
+  normalTexture?: GPUTexture | null
+  normalTextureView?: GPUTextureView | null
   diagUniformBuffer: GPUBuffer | null
   diagPartialSumsBuffer: GPUBuffer | null
   diagPartialMaxBuffer: GPUBuffer | null
@@ -101,6 +106,7 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
     fields.packUniformBuffer,
     fields.omegaStagingBuffer,
     fields.densityTexture,
+    fields.normalTexture,
     fields.diagUniformBuffer,
     fields.diagPartialSumsBuffer,
     fields.diagPartialMaxBuffer,
@@ -110,15 +116,33 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
     fields.bg?.renormalizeUniformBuffer,
   ]
   for (const b of bufs) b?.destroy()
+  if (fields.fftAxisUniformBuffers) {
+    for (const b of fields.fftAxisUniformBuffers) b.destroy()
+  }
   fields.psiReBuffer = fields.psiImBuffer = fields.potentialBuffer = null
   fields.fftScratchA = fields.fftScratchB = fields.omegaStagingBuffer = null
   fields.uniformBuffer = fields.fftUniformBuffer = fields.fftStagingBuffer = null
   fields.fftAxisUniformBuffer = fields.fftAxisStagingBuffer = null
+  fields.fftAxisUniformBuffers = null
   fields.packUniformBuffer = fields.diagUniformBuffer = null
   fields.diagPartialSumsBuffer = fields.diagPartialMaxBuffer = null
   fields.diagPartialLeftBuffer = fields.diagPartialRightBuffer = fields.diagPartialIprBuffer = null
   fields.densityTexture = fields.densityTextureView = null
+  fields.normalTexture = fields.normalTextureView = null
   fields.pl = fields.bg = null
   fields.initialized = false
   fields.lastConfigHash = ''
+}
+
+/**
+ * Destroy all GPU resources owned by the pass. The caller passes a typed
+ * snapshot of the pass GPU fields so that field accesses stay visible to
+ * `--noUnusedLocals`. Includes the gradient-normal pair, which lives on
+ * the `TdseGradientResources` sub-object on the pass.
+ *
+ * Field keys are mutated in-place on the `fields` object; the caller is
+ * expected to write them back via `Object.assign(this, fields)`.
+ */
+export function destroyTdsePassGpu(fields: TdseGpuFields): void {
+  destroyPassBuffers(fields)
 }

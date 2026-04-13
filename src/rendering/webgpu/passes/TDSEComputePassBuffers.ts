@@ -53,6 +53,9 @@ export interface TdseDestroyableBuffers {
   fftStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
+  /** PERF: one pre-populated uniform buffer per (axis, direction) slot — eliminates
+   *  per-axis copyBufferToBuffer + per-dispatch compute pass boundaries. */
+  fftAxisUniformBuffers?: GPUBuffer[] | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -80,6 +83,10 @@ export interface TdseBufferResult {
   fftStagingBuffer: GPUBuffer
   fftAxisUniformBuffer: GPUBuffer
   fftAxisStagingBuffer: GPUBuffer
+  /** PERF: per-slot axis uniforms for batched Strang FFT dispatch
+   *  (length = 2 × latticeDim: forward axes first, then inverse axes).
+   *  Each buffer holds a single pre-populated FFTAxisUniforms struct. */
+  fftAxisUniformBuffers: GPUBuffer[]
   packUniformBuffer: GPUBuffer
   omegaStagingBuffer: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -131,6 +138,9 @@ export function rebuildTdseBuffers(
   old.fftStagingBuffer?.destroy()
   old.fftAxisUniformBuffer?.destroy()
   old.fftAxisStagingBuffer?.destroy()
+  if (old.fftAxisUniformBuffers) {
+    for (const b of old.fftAxisUniformBuffers) b.destroy()
+  }
   old.packUniformBuffer?.destroy()
   old.omegaStagingBuffer?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -216,6 +226,25 @@ export function rebuildTdseBuffers(
   const fftAxisStagingData = buildTdseFFTAxisStagingData(config, totalSites)
   device.queue.writeBuffer(fftAxisStagingBuffer, 0, fftAxisStagingData)
 
+  // PERF: per-slot uniform buffers for batched Strang-step FFT dispatch.
+  // Each (axis, direction) gets its own uniform buffer with its 32-byte
+  // FFTAxisUniforms struct pre-populated. With one bind group per buffer,
+  // all latticeDim × 2 FFT dispatches can run inside a single compute pass
+  // without per-axis copyBufferToBuffer calls forcing pass boundaries.
+  const fftAxisUniformBuffers: GPUBuffer[] = new Array(axisSlotCount)
+  const axisStagingBytes = new Uint8Array(fftAxisStagingData)
+  for (let slot = 0; slot < axisSlotCount; slot++) {
+    const buf = helpers.createUniformBuffer(
+      device,
+      FFT_UNIFORM_SIZE,
+      `tdse-fft-axis-uniforms-${slot}`
+    )
+    const slotOffset = slot * FFT_UNIFORM_SIZE
+    const slotData = axisStagingBytes.slice(slotOffset, slotOffset + FFT_UNIFORM_SIZE)
+    device.queue.writeBuffer(buf, 0, slotData)
+    fftAxisUniformBuffers[slot] = buf
+  }
+
   // Pack uniforms: totalSites and invN don't change between frames
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
   const pu32 = new Uint32Array(packData)
@@ -287,6 +316,7 @@ export function rebuildTdseBuffers(
     fftStagingBuffer,
     fftAxisUniformBuffer,
     fftAxisStagingBuffer,
+    fftAxisUniformBuffers,
     packUniformBuffer,
     omegaStagingBuffer,
     diagUniformBuffer,
@@ -316,6 +346,7 @@ export interface TdsePassBufferFields {
   fftStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffers: GPUBuffer[] | null
   packUniformBuffer: GPUBuffer | null
   omegaStagingBuffer: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -350,6 +381,7 @@ export function applyBufferResult(fields: TdsePassBufferFields, r: TdseBufferRes
   fields.fftStagingBuffer = r.fftStagingBuffer
   fields.fftAxisUniformBuffer = r.fftAxisUniformBuffer
   fields.fftAxisStagingBuffer = r.fftAxisStagingBuffer
+  fields.fftAxisUniformBuffers = r.fftAxisUniformBuffers
   fields.packUniformBuffer = r.packUniformBuffer
   fields.omegaStagingBuffer = r.omegaStagingBuffer
   fields.diagUniformBuffer = r.diagUniformBuffer

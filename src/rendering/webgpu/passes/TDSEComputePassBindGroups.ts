@@ -37,6 +37,7 @@ export function rebuildTdseBindGroups(
     fftScratchB,
     fftUniformBuffer,
     fftAxisUniformBuffer,
+    fftAxisUniformBuffers,
     packUniformBuffer,
     densityTextureView,
     diagUniformBuffer,
@@ -149,7 +150,9 @@ export function rebuildTdseBindGroups(
     ],
   })
 
-  // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA)
+  // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA).
+  // `fftSharedMemBG` uses the legacy single-uniform buffer; observables momentum FFT path
+  // (runPostStepDispatches) copies the right axis slot into it via copyBufferToBuffer.
   const fftSharedMemBG = device.createBindGroup({
     label: 'tdse-fft-shared-mem-bg',
     layout: pipelines.fftSharedMemBGL,
@@ -158,6 +161,20 @@ export function rebuildTdseBindGroups(
       { binding: 1, resource: { buffer: fftScratchA } },
     ],
   })
+  // PERF: per-slot bind groups (one per axis per direction) so the Strang-step
+  // FFT dispatches can run in a single compute pass without per-axis uniform
+  // copies forcing pass boundaries.
+  const fftSharedMemBGs: GPUBindGroup[] = new Array(fftAxisUniformBuffers.length)
+  for (let slot = 0; slot < fftAxisUniformBuffers.length; slot++) {
+    fftSharedMemBGs[slot] = device.createBindGroup({
+      label: `tdse-fft-shared-mem-bg-slot-${slot}`,
+      layout: pipelines.fftSharedMemBGL,
+      entries: [
+        { binding: 0, resource: { buffer: fftAxisUniformBuffers[slot]! } },
+        { binding: 1, resource: { buffer: fftScratchA } },
+      ],
+    })
+  }
 
   const kineticBG = device.createBindGroup({
     label: 'tdse-kinetic-bg',
@@ -245,6 +262,7 @@ export function rebuildTdseBindGroups(
     fftStageABBG,
     fftStageBABG,
     fftSharedMemBG,
+    fftSharedMemBGs,
     kineticBG,
     writeGridBG,
     diagReduceBG,

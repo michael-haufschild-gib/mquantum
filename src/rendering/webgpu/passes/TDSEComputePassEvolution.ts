@@ -51,6 +51,23 @@ export interface EvolutionResources {
   bg: TdseBindGroupResult
   totalSites: number
   diagNumWorkgroups: number
+  /**
+   * Index into the per-slot FFT axis arrays
+   * (`TdseBufferResult.fftAxisUniformBuffers` /
+   * `TdseBindGroupResult.fftSharedMemBGs`) at which the inverse-FFT run
+   * starts. Forward axes occupy slots `[0, latticeDim)`, inverse axes
+   * occupy `[latticeDim, 2*latticeDim)`.
+   *
+   * Named `fwdStageCount` historically because the pre-shared-memory FFT
+   * path (per-stage Stockham kernel) needed this to equal
+   * `Σ log2(gridSize[d])`. That kernel was replaced by
+   * `tdseSharedMemFFTBlock` but the field name stuck in the interface
+   * contract; the populated value is now `fwdAxisCount = latticeDim`
+   * (see `TDSEComputePass.executeTDSE` populating this field from
+   * `this.fwdAxisCount`). Do NOT swap this value back to
+   * `Σ log2(N)` — the Strang inverse-FFT loop now indexes directly into
+   * the per-axis bind-group array and would go out of bounds.
+   */
   fwdStageCount: number
   gsState: GramSchmidtState
   /** Stochastic localization state (optional — null when feature not built). */
@@ -76,6 +93,12 @@ export interface EvolutionResources {
   ) => void
   /** Dispatch one FFT axis, returning the next slot offset. */
   dispatchFFTAxis: (ctx: WebGPURenderContext, axisDim: number, slotOffset: number) => number
+  /**
+   * PERF: dispatch one FFT axis inside an already-open compute pass.
+   * Used by the Strang loop to batch all substep dispatches into a single pass.
+   * Caller has already set the FFT pipeline on the encoder.
+   */
+  dispatchFFTAxisInPass: (passEncoder: GPUComputePassEncoder, axisDim: number, slot: number) => void
 }
 
 /**
@@ -118,33 +141,84 @@ export function runStrangEvolution(
     )
   }
 
+  // PERF: batch every dispatch of the Strang step into a single compute pass.
+  // Previously each substep opened ~10 separate passes (fused_Vhalf_pack, 3 fwd
+  // FFT, kinetic, 3 inv FFT, fused_unpack_Vhalf, optional absorber). Each pass
+  // boundary carries 5–20 µs of CPU/driver overhead on Metal WebGPU. With per-
+  // slot FFT bind groups (see `TdseBindGroupResult.fftSharedMemBGs`) no
+  // `copyBufferToBuffer` is needed between FFT axes, so we can keep the whole
+  // step inside one `MTLComputeCommandEncoder`. Implicit WAW/RAW barriers
+  // between dispatches touching overlapping storage buffers are inserted by
+  // the driver automatically, so correctness is unchanged.
+  // Enable the batched path when the per-slot bind groups are populated.
+  const fftAxesInPassAvailable = (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
   for (let step = 0; step < stepsThisFrame; step++) {
-    // 1+2. PERF: Fused half-step potential + pack (saves 1 dispatch + 2MB memory)
-    const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
-    dc(fusedVPack, pl.fusedPotentialPackPipeline, [bg.fusedPotentialPackBG], linearWG)
-    fusedVPack.end()
+    if (fftAxesInPassAvailable) {
+      const strangPass = ctx.beginComputePass({ label: `tdse-strang-${step}` })
+      // 1+2. Fused half-step potential + pack
+      dc(strangPass, pl.fusedPotentialPackPipeline, [bg.fusedPotentialPackBG], linearWG)
+      // 3. Forward FFT — one dispatch per axis, batched in this pass
+      strangPass.setPipeline(pl.fftSharedMemPipeline)
+      let fftSlot = 0
+      for (let d = config.latticeDim - 1; d >= 0; d--) {
+        const axisDim = config.gridSize[d]!
+        strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
+        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        fftSlot++
+      }
+      // 4. Kinetic propagator in k-space
+      dc(strangPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
+      // 5. Inverse FFT — axes batched
+      strangPass.setPipeline(pl.fftSharedMemPipeline)
+      fftSlot = res.fwdStageCount
+      for (let d = config.latticeDim - 1; d >= 0; d--) {
+        const axisDim = config.gridSize[d]!
+        strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
+        strangPass.dispatchWorkgroups(res.totalSites / axisDim)
+        fftSlot++
+      }
+      // 6+7. Fused unpack + second half-step potential (reads density for BEC nonlinearity)
+      dc(strangPass, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
+      // 8. Absorber (inline — same pass as the Strang step). Only when
+      // stochastic localization is NOT active, because the legacy code placed
+      // the PML damping AFTER the CSL kicks and we must preserve that operator
+      // ordering for stochastic mode. When stochastic is active, absorber is
+      // dispatched after the stochastic sub-step loop below.
+      const inlineAbsorber = config.absorberEnabled && !res.stochasticState
+      if (inlineAbsorber) {
+        dc(strangPass, pl.absorberPipeline, [bg.initBG], linearWG)
+      }
+      strangPass.end()
+    } else {
+      // Fallback (grid or bind-group layout not yet populated): unfused legacy path.
+      const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
+      dc(fusedVPack, pl.fusedPotentialPackPipeline, [bg.fusedPotentialPackBG], linearWG)
+      fusedVPack.end()
 
-    // 3. Forward FFT (for each spatial axis)
-    let fftSlot = 0
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      fftSlot = res.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+      let fftSlot = 0
+      for (let d = config.latticeDim - 1; d >= 0; d--) {
+        fftSlot = res.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+      }
+
+      const kinPass = ctx.beginComputePass({ label: `tdse-kinetic-${step}` })
+      dc(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
+      kinPass.end()
+
+      fftSlot = res.fwdStageCount
+      for (let d = config.latticeDim - 1; d >= 0; d--) {
+        fftSlot = res.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
+      }
+
+      const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
+      dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
+      fusedUnpackV.end()
+
+      if (config.absorberEnabled) {
+        const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
+        dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
+        absPass.end()
+      }
     }
-
-    // 4. Apply kinetic propagator in k-space
-    const kinPass = ctx.beginComputePass({ label: `tdse-kinetic-${step}` })
-    dc(kinPass, pl.kineticPipeline, [bg.kineticBG], linearWG)
-    kinPass.end()
-
-    // 5. Inverse FFT
-    fftSlot = res.fwdStageCount
-    for (let d = config.latticeDim - 1; d >= 0; d--) {
-      fftSlot = res.dispatchFFTAxis(ctx, config.gridSize[d]!, fftSlot)
-    }
-
-    // 6+7. PERF: Fused unpack (1/N norm) + second half-step potential (saves 1 dispatch + 2MB memory)
-    const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
-    dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
-    fusedUnpackV.end()
 
     // 7.5. Stochastic localization (CSL) — conditional on γ > 0
     // Sub-stepped: M micro-kicks per Strang step, each with γ/M and fresh
@@ -166,12 +240,11 @@ export function runStrangEvolution(
       }
     }
 
-    // 8. Absorber (separate pass AFTER the Strang step)
-    // Applied once per step, after the FFT kinetic step has completed.
-    // This prevents the FFT from seeing the absorber's spatial modulation
-    // and scattering it across k-space (which creates spurious emission artifacts).
-    // PERF: Skip dispatch entirely when absorber is disabled — saves ~5µs per step.
-    if (config.absorberEnabled) {
+    // Absorber dispatch (legacy ordering): when stochastic localization is
+    // active, PML must come AFTER the CSL kicks. The batched path above only
+    // inlines absorber when stochastic is disabled, so we run the dispatch
+    // here for the stochastic case.
+    if (config.absorberEnabled && res.stochasticState) {
       const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
       dc(absPass, pl.absorberPipeline, [bg.initBG], linearWG)
       absPass.end()
