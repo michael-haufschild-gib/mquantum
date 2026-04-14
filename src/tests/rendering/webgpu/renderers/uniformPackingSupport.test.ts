@@ -26,7 +26,7 @@ describe('computeCanonicalCompensation — Hermite convention lock', () => {
   // n=0: max at u=0, H_0²·e⁰ = 1        → peak1D = 1/√π ≈ 0.56418958
   // n=1: max at u=1 (exact sample),
   //      H_1(1)² · e⁻¹ = 4/e ≈ 1.4715   → peak1D ≈ 0.56419/2 · 1.47152 ≈ 0.41514
-  // n=2: true max at u=√2.5 ≈ 1.5811    → peak1D ≈ 0.37017 (sampled)
+  // n=2: true max at u=√2.5 ≈ 1.5811    → peak1D ≈ 0.37049 (sampled)
   //
   // These absolute values are stable across numerical sampling at the quoted
   // precision and would not survive a probabilist-convention swap (which uses

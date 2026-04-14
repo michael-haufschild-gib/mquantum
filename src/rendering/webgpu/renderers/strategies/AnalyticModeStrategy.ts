@@ -41,9 +41,13 @@ function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boole
 
 /**
  * Stride for packing rotation version and animation-time bucket into a single JS number.
- * Wider than any realistic time-bucket range so rotation/time key ranges stay disjoint.
+ * A prime near 2^24 keeps both ranges disjoint for long sessions while leaving
+ * plenty of safe-integer headroom (rotationVersion can safely reach ~5×10^8 before
+ * precision loss at Number.MAX_SAFE_INTEGER = 2^53 - 1). Wrapping bucket modulo this
+ * value also bounds the time bucket range to ~38 h at 120 Hz, well beyond any
+ * realistic single session.
  */
-const BASIS_VERSION_MIXER = 2 ** 32
+const BASIS_VERSION_MIXER = 16777213 // largest prime < 2^24
 const BASIS_TIME_BUCKET_MODULO = BASIS_VERSION_MIXER
 
 /**
@@ -55,6 +59,7 @@ const BASIS_TIME_BUCKET_MODULO = BASIS_VERSION_MIXER
  *
  * The bucket is wrapped modulo `BASIS_VERSION_MIXER` so long-running sessions cannot
  * overflow into the rotationVersion range and cause dirty-check key collisions.
+ * `accumulatedTime` is always ≥ 0, so a single modulo is sufficient.
  */
 function computeBasisVersion(
   rotationVersion: number,
@@ -63,8 +68,7 @@ function computeBasisVersion(
   accumulatedTime: number
 ): number {
   const rawBucket = sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
-  const basisTimeBucket =
-    ((rawBucket % BASIS_TIME_BUCKET_MODULO) + BASIS_TIME_BUCKET_MODULO) % BASIS_TIME_BUCKET_MODULO
+  const basisTimeBucket = rawBucket % BASIS_TIME_BUCKET_MODULO
   return rotationVersion * BASIS_VERSION_MIXER + basisTimeBucket
 }
 

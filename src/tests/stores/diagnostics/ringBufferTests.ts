@@ -81,6 +81,15 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
     }
     ;(fn as () => void)()
   }
+  const getHistoryArray = (channel: ChannelState): Float32Array => {
+    const arr = channel[historyArrayKey]
+    if (!(arr instanceof Float32Array)) {
+      throw new Error(
+        `describeRingBufferBehavior: historyArrayKey "${historyArrayKey}" is not a Float32Array on channel "${channelKey}"`
+      )
+    }
+    return arr
+  }
 
   describe('ring buffer behavior', () => {
     if (hasDataField) {
@@ -102,7 +111,7 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
 
     it('writes values into TypedArray at head position', () => {
       pushOnce()
-      const arr = getChannel()[historyArrayKey] as Float32Array
+      const arr = getHistoryArray(getChannel())
       expect(arr[0]).toBeCloseTo(testValue)
     })
 
@@ -117,7 +126,7 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       pushWithValue(0.12345)
       expect(getChannel().historyHead).toBe(1)
       expect(getChannel().historyCount).toBe(HISTORY_LENGTH)
-      const arr = getChannel()[historyArrayKey] as Float32Array
+      const arr = getHistoryArray(getChannel())
       expect(arr[0]).toBeCloseTo(0.12345)
     })
 
@@ -132,7 +141,7 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       for (let i = 0; i < 10; i++) {
         pushOnce()
       }
-      const arrayBefore = getChannel()[historyArrayKey] as Float32Array
+      const arrayBefore = getHistoryArray(getChannel())
 
       reset()
 
@@ -142,8 +151,9 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       }
       expect(ch.historyHead).toBe(0)
       expect(ch.historyCount).toBe(0)
-      expect(ch[historyArrayKey]).not.toBe(arrayBefore)
-      expect((ch[historyArrayKey] as Float32Array).every((v: number) => v === 0)).toBe(true)
+      const arrayAfter = getHistoryArray(ch)
+      expect(arrayAfter).not.toBe(arrayBefore)
+      expect(arrayAfter.every((v: number) => v === 0)).toBe(true)
     })
   })
 }
