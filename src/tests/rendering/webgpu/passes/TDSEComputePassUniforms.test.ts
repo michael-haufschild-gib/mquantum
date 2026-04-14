@@ -271,9 +271,67 @@ describe('writeTdseUniforms', () => {
     expect(f32[187]).toBeCloseTo(2.5) // bhMass at offset 748
     expect(f32[188]).toBeCloseTo(3) // bhMultipoleL at offset 752
     expect(f32[189]).toBeCloseTo(1) // bhSpin at offset 756
-    // Pad slots (offsets 760, 764) must stay zero to preserve struct alignment
-    expect(u32[190]).toBe(0)
-    expect(u32[191]).toBe(0)
+    // Offsets 760+ now host the analog Hawking block. The previous two-slot
+    // _padBh pad has been consumed by hawkingVmax (f32[190]) and hawkingLh
+    // (f32[191]). The writer seeds them from DEFAULT_TDSE_CONFIG; verify
+    // those defaults land in the right slot rather than asserting zero.
+    expect(f32[190]).toBeCloseTo(2.0) // hawkingVmax @ 760
+    expect(f32[191]).toBeCloseTo(0.6) // hawkingLh @ 764
+  })
+
+  it('packs analog-Hawking fields at f32[190..196] (offsets 760-784)', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({
+        config: createTdseConfig({
+          hawkingVmax: 2.5,
+          hawkingLh: 0.4,
+          hawkingDeltaN: 0.2,
+          hawkingInjectRate: 0.07,
+          hawkingPairInjection: true,
+          hawkingSeed: 4242,
+        }),
+        hawkingStepIndex: 12345,
+      })
+    )
+
+    expect(f32[190]).toBeCloseTo(2.5) // hawkingVmax
+    expect(f32[191]).toBeCloseTo(0.4) // hawkingLh
+    expect(f32[192]).toBeCloseTo(0.2) // hawkingDeltaN (clamp preserves 0.2)
+    expect(f32[193]).toBeCloseTo(0.07) // hawkingInjectRate
+    expect(u32[194]).toBe(1) // hawkingPairInjection
+    expect(u32[195]).toBe(4242) // hawkingSeed
+    expect(u32[196]).toBe(12345) // hawkingStepIndex
+    // Pad slots (offsets 788/792/796) stay zero
+    expect(u32[197]).toBe(0)
+    expect(u32[198]).toBe(0)
+    expect(u32[199]).toBe(0)
+  })
+
+  it('clamps hawkingDeltaN into [0, 0.6]', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ hawkingDeltaN: 2.0 }) })
+    )
+    expect(f32[192]).toBeCloseTo(0.6) // clamped from 2.0 → 0.6
   })
 })
 

@@ -15,15 +15,22 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  * TDSEUniforms struct size in bytes.
  *
  * Last documented offsets in `tdseUniforms.wgsl.ts`:
- *   - compactDimsMask:    u32 @ 736
- *   - branchingEnabled:   u32 @ 740
+ *   - compactDimsMask:     u32 @ 736
+ *   - branchingEnabled:    u32 @ 740
  *   - branchPlanePosition: f32 @ 744
- *   - bhMass:             f32 @ 748 (blackHoleRingdown / Regge-Wheeler)
- *   - bhMultipoleL:       f32 @ 752
- *   - bhSpin:             f32 @ 756
- *   - _padBh0/_padBh1:    u32 @ 760/764 (16-byte align)
+ *   - bhMass:              f32 @ 748 (blackHoleRingdown / Regge-Wheeler)
+ *   - bhMultipoleL:        f32 @ 752
+ *   - bhSpin:              f32 @ 756
+ *   - hawkingVmax:         f32 @ 760 (analog Hawking / waterfall horizon)
+ *   - hawkingLh:           f32 @ 764
+ *   - hawkingDeltaN:       f32 @ 768
+ *   - hawkingInjectRate:   f32 @ 772
+ *   - hawkingPairInjection:u32 @ 776
+ *   - hawkingSeed:         u32 @ 780
+ *   - hawkingStepIndex:    u32 @ 784
+ *   - _padHawk0..2:        u32 @ 788/792/796 (16-byte align)
  *
- * Total = 764 + 4 = 768. Update both this constant and the WGSL struct
+ * Total = 796 + 4 = 800. Update both this constant and the WGSL struct
  * if you add new fields, and keep this comment in sync — the previous
  * "740 = 736 + 4" annotation drifted when stochastic-decoherence
  * branching was added and silently misled readers about the layout.
@@ -32,7 +39,7 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  * offsets can import the canonical size instead of hardcoding a literal
  * that silently drifts from the WGSL definition.
  */
-export const TDSE_UNIFORM_SIZE = 768
+export const TDSE_UNIFORM_SIZE = 800
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256

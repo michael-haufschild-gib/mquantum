@@ -204,6 +204,60 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
     renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
+    id: 'blackHoleAnalog',
+    name: 'Sonic Horizon (Waterfall)',
+    description:
+      'Superflow crosses the speed of sound — an analog black-hole horizon at M=1 in the BEC',
+    minDim: 3,
+    overrides: {
+      interactionStrength: 500,
+      // trapOmega = 1.0 is used ONLY by `resizeBecArrays` to pick a sensible
+      // grid spacing (~0.15 → L_box ~9.6). The init shader itself sees a flat
+      // potential because the BEC-to-TDSE builder overrides `harmonicOmega = 0`
+      // for this preset (see `TdseBecConfigBuilder.ts` — mappedInit branch).
+      // A low trapOmega (e.g. 0.01) would blow up the TF radius, explode the
+      // spacing to ~0.93, and under-sample the waterfall phase (>π per voxel),
+      // aliasing the central-difference velocity and turning the Mach view
+      // into a subsonic-everywhere grey cube.
+      trapOmega: 1.0,
+      initialCondition: 'blackHoleAnalog',
+      fieldView: 'machNumber',
+      // The init shader uses a DETRENDED phase profile so ψ is C¹ across the
+      // periodic FFT wrap (see `docs` in tdseInit.wgsl.ts branch 7 and
+      // `sonicHorizon.ts`). Without detrending the raw tanh phase leaves a
+      // velocity jump of 2·v_max·tanh(L_box/(2·L_h)) at x = ±L_box/2; the GP
+      // nonlinearity amplifies the aliased shock and the condensate dissolves
+      // within tens of frames. Detrending forces v_s(±L_box/2) = 0 at the
+      // cost of shifting the horizon slightly inward from the pure-tanh root
+      // — a physics-neutral change (κ, T_H evaluated numerically at the
+      // shifted root).
+      //
+      // With g=500, n₀=μ/g=0.01, m=1 → c_s0 = √5 ≈ 2.236. v_max=3.5, L_h=0.6
+      // and the default 64³ grid at spacing 0.15 (L_box = 9.6) place the
+      // horizon at x₀ ≈ 0.56, safely inside the PML-free interior.
+      hawkingVmax: 3.5,
+      hawkingLh: 0.6,
+      hawkingDeltaN: 0.15,
+      hawkingPairInjection: false,
+      hawkingInjectRate: 0.05,
+      hawkingSeed: 1337,
+      dt: 0.0005,
+      stepsPerFrame: 4,
+      absorberEnabled: true,
+      // Wider absorber: detrending suppresses the boundary velocity jump but
+      // residual edge dynamics (density modulation tails, any numerical noise)
+      // still benefit from a more aggressive PML width than 0.2.
+      absorberWidth: 0.3,
+      autoScale: true,
+    },
+    // Mach view is already normalized to [0, 1], so a 20× autoscale gain is
+    // pathological once the density saturates (e.g. from residual noise):
+    // densityGate ≈ 1 everywhere and Mach pegs at 1 everywhere. 6× keeps
+    // the autoscaler gentle while still letting the density view
+    // (fieldView override) respond to moderate underexposure.
+    renderingOverrides: { densityGain: 0.25, densityContrast: 1.2, autoScaleMaxGain: 6 },
+  },
+  {
     id: 'vortex4DSingle',
     name: '4D Single Vortex Surface',
     description:

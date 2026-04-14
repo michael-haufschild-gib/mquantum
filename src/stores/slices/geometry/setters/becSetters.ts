@@ -42,6 +42,12 @@ type BecActions = Pick<
   | 'setBecVortexPairCount'
   | 'setBecSolitonDepth'
   | 'setBecSolitonVelocity'
+  | 'setBecHawkingVmax'
+  | 'setBecHawkingLh'
+  | 'setBecHawkingDeltaN'
+  | 'setBecHawkingPairInjection'
+  | 'setBecHawkingInjectRate'
+  | 'setBecHawkingSeed'
   | 'setBecAutoScale'
   | 'setBecAbsorberEnabled'
   | 'setBecAbsorberWidth'
@@ -240,6 +246,76 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         schroedinger: {
           ...state.schroedinger,
           bec: { ...state.schroedinger.bec, solitonVelocity: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecHawkingVmax: (v) => {
+      if (!isFinite(v)) {
+        warnNonFinite('bec.hawkingVmax', v)
+        return
+      }
+      const clamped = Math.max(0.5, Math.min(5.0, v))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingVmax: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecHawkingLh: (lh) => {
+      if (!isFinite(lh)) {
+        warnNonFinite('bec.hawkingLh', lh)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(1.5, lh))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingLh: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecHawkingDeltaN: (dn) => {
+      if (!isFinite(dn)) {
+        warnNonFinite('bec.hawkingDeltaN', dn)
+        return
+      }
+      const clamped = Math.max(0, Math.min(0.6, dn))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingDeltaN: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecHawkingPairInjection: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingPairInjection: !!enabled },
+        },
+      }))
+    },
+    setBecHawkingInjectRate: (rate) => {
+      if (!isFinite(rate)) {
+        warnNonFinite('bec.hawkingInjectRate', rate)
+        return
+      }
+      const clamped = Math.max(0, Math.min(0.5, rate))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingInjectRate: clamped },
+        },
+      }))
+    },
+    setBecHawkingSeed: (seed) => {
+      if (!isFinite(seed)) return
+      const clamped = Math.max(0, Math.floor(seed)) >>> 0
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hawkingSeed: clamped, needsReset: true },
         },
       }))
     },
@@ -453,7 +529,8 @@ export function createBecSetters(ctx: SetterContext): BecActions {
               preset.overrides.absorberEnabled !== undefined
                 ? {
                     absorberEnabled: preset.overrides.absorberEnabled,
-                    absorberWidth: preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
+                    absorberWidth:
+                      preset.overrides.absorberWidth ?? state.schroedinger.absorberWidth,
                   }
                 : {}
             return {

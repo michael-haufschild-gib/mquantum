@@ -23,6 +23,7 @@ export type TdseFieldView =
   | 'potential'
   | 'superfluidVelocity'
   | 'healingLength'
+  | 'machNumber'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -39,6 +40,7 @@ export type TdseInitialCondition =
   | 'vortexLattice'
   | 'darkSoliton'
   | 'ndVortexPair'
+  | 'blackHoleAnalog'
 
 /**
  * External potential type for the TDSE
@@ -251,6 +253,19 @@ export interface TdseConfig {
    *  Defaults to 1.0 for all dimensions when not specified. */
   trapAnisotropy?: number[]
 
+  /** Analog Hawking (waterfall) — asymptotic flow v_max. */
+  hawkingVmax?: number
+  /** Analog Hawking (waterfall) — horizon length scale L_h. */
+  hawkingLh?: number
+  /** Analog Hawking (waterfall) — density dip Δn at the horizon. */
+  hawkingDeltaN?: number
+  /** Analog Hawking — stochastic pair-injection enabled flag. */
+  hawkingPairInjection?: boolean
+  /** Analog Hawking — injection strength per substep. */
+  hawkingInjectRate?: number
+  /** Analog Hawking — deterministic noise seed. */
+  hawkingSeed?: number
+
   /** Trap omega used ONLY during initialization (quench scenarios).
    *  When set and different from harmonicOmega, the init pass creates the TF profile
    *  for this omega, then the potential is filled with harmonicOmega for evolution.
@@ -346,6 +361,13 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   bhMass: 1.0,
   bhMultipoleL: 2,
   bhSpin: 2,
+
+  hawkingVmax: 2.0,
+  hawkingLh: 0.6,
+  hawkingDeltaN: 0.0,
+  hawkingPairInjection: false,
+  hawkingInjectRate: 0.05,
+  hawkingSeed: 1337,
 
   disorderStrength: 0,
   disorderSeed: 42,

@@ -15,6 +15,11 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Slider } from '@/components/ui/Slider'
+import { asymptoticSoundSpeed, hasHorizon, hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
+import {
+  computeWaterfallBackgroundDensity,
+  resolveBecMass,
+} from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -103,7 +108,8 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
   // Compute trap potential profile for SVG (x-axis cross-section with anisotropy)
   const profile = useMemo(() => {
     const omegaX = bec.trapOmega * (bec.trapAnisotropy[0] ?? 1.0)
-    const mass = bec.mass
+    // resolveBecMass reads only `bec.mass` — pin that in the dep array below.
+    const mass = resolveBecMass({ mass: bec.mass })
     const spacing = bec.spacing[0] ?? 0.15
     const gridN = bec.gridSize[0] ?? 64
     const L = gridN * spacing * 0.5
@@ -266,6 +272,9 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
           ) : (
             <span className="text-text-tertiary">Awaiting diagnostics...</span>
           )}
+          {bec.initialCondition === 'blackHoleAnalog' && bec.diagnosticsEnabled ? (
+            <HawkingHudRow bec={bec} />
+          ) : null}
         </div>
       </div>
     </div>
@@ -273,3 +282,80 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
 })
 
 BECDiagnosticsInline.displayName = 'BECDiagnosticsInline'
+
+/* ────────────────────────────────────────────────────────────── */
+/*  Analog Hawking (sonic horizon) readout                        */
+/* ────────────────────────────────────────────────────────────── */
+
+interface HawkingHudRowProps {
+  bec: BECDiagnosticsInlineProps['bec']
+}
+
+/**
+ * Analytic Hawking diagnostics readout for the `blackHoleAnalog` BEC preset.
+ * Shows horizon position x₀, surface gravity κ, and analog Hawking temperature
+ * T_H = κ/(2π). Computed purely CPU-side from the waterfall profile — does
+ * not require GPU diagnostics plumbing, so the readout populates immediately
+ * when the preset is selected.
+ */
+const HawkingHudRow: React.FC<HawkingHudRowProps> = React.memo(({ bec }) => {
+  // Resolve mass via the shared helper so the HUD and TdseBecConfigBuilder
+  // agree when `bec.mass` is ever nulled/undefined upstream.
+  const mass = resolveBecMass(bec)
+  const n0 = computeWaterfallBackgroundDensity({
+    interactionStrength: bec.interactionStrength,
+  })
+
+  // Box length along flow axis (axis 0) — the detrended waterfall profile
+  // needs L_box to compute the parabolic counter-drift that makes ψ C¹ at
+  // the periodic wrap. Must equal gridSize[0] · spacing[0] of the simulator
+  // so HUD analytics and the GPU-seeded field stay consistent.
+  const lBox = (bec.gridSize[0] ?? 64) * (bec.spacing[0] ?? 0.15)
+  const waterfall = useMemo(
+    () => ({
+      vMax: bec.hawkingVmax,
+      lh: bec.hawkingLh,
+      // Match the simulator: TdseBecConfigBuilder overrides μ for the
+      // waterfall init, giving background density n₀ = μ/g. Using the
+      // exported helper keeps the HUD's κ and T_H consistent with the
+      // GPU-seeded field.
+      n0,
+      deltaN: bec.hawkingDeltaN,
+      g: bec.interactionStrength,
+      mass,
+      lBox,
+    }),
+    [bec.hawkingVmax, bec.hawkingLh, bec.hawkingDeltaN, bec.interactionStrength, n0, mass, lBox]
+  )
+  const readout = useMemo(() => hawkingReadout(waterfall), [waterfall])
+  const cs0 = useMemo(() => asymptoticSoundSpeed(waterfall), [waterfall])
+  // hasHorizon is a necessary-and-sufficient predicate — checks that
+  // findHorizonX0 returns a finite value under the detrended profile.
+  // A large L_h/L_box ratio can suppress the horizon even when |v_max| > c_s0.
+  const horizonExists = hasHorizon(waterfall)
+
+  const formatNum = (v: number, digits = 3) => (Number.isFinite(v) ? v.toFixed(digits) : '—')
+
+  return (
+    <div
+      className="mt-1 pt-1 border-t border-[var(--border-subtle)] text-[10px]"
+      data-testid="bec-hawking-hud"
+    >
+      <div className="flex gap-3">
+        <span>x₀={formatNum(readout.horizonX0, 3)}</span>
+        <span>κ={formatNum(readout.kappa, 3)}</span>
+        <span>T_H={formatNum(readout.hawkingTemperature, 4)}</span>
+      </div>
+      {!horizonExists ? (
+        <div
+          className="mt-1 text-[var(--color-warning)]"
+          data-testid="bec-hawking-no-horizon-warning"
+        >
+          No horizon — v_max must exceed local sound speed c_s0 = {formatNum(cs0, 3)}
+        </div>
+      ) : null}
+    </div>
+  )
+})
+
+HawkingHudRow.displayName = 'HawkingHudRow'

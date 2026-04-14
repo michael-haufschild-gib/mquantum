@@ -350,6 +350,65 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let xi = params.hbar / sqrt(denom);
     let xiRef = params.hbar / sqrt(2.0 * params.mass * absG * max(params.maxDensity, 1e-10));
     displayScalar = clamp(xiRef / max(xi, 1e-10), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 6u) {
+    // machNumber M(x) = |v_s| / c_s. Analog black-hole horizon sits at M = 1.
+    //
+    // v_s from j/ρ: v_s = (ℏ/m) · Im(ψ*∇ψ) / |ψ|². This reuses the same
+    // probability-current formulation as superfluidVelocity (fieldView 4),
+    // so the colour agrees with that view at M = 1. c_s = √(g|ψ|²/m) is the
+    // local Bogoliubov sound speed in natural units (ℏ absorbed into mass).
+    //
+    // Boundary handling is unified with fieldView 2 (current) and 4 (velocity):
+    // when the PML is active at a boundary, use a one-sided difference
+    // (forward at lo, backward at hi); otherwise use periodic wrap-around.
+    // Only degenerate grid dimensions (Nd ≤ 1) are skipped. The density gate
+    // still suppresses spurious high-M voxels in the dilute tail.
+    let hbarOverM = params.hbar / max(params.mass, 1e-6);
+    let densitySafe = max(density, 1e-20);
+    let hasPML6 = params.absorberEnabled != 0u;
+    var vsMagSq: f32 = 0.0;
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      if (params.gridSize[d] <= 1u) { continue; }
+      let stride = params.strides[d];
+      let coord = nnCoords[d];
+      let Nd = params.gridSize[d];
+      let invDx = 0.5 / params.spacing[d];
+      let atLo = coord == 0u;
+      let atHi = coord == Nd - 1u;
+
+      var dRe: f32;
+      var dIm: f32;
+      if (hasPML6 && atLo) {
+        let fIdx = idx + stride;
+        dRe = (psiRe[fIdx] - re) / params.spacing[d];
+        dIm = (psiIm[fIdx] - im) / params.spacing[d];
+      } else if (hasPML6 && atHi) {
+        let bIdx = idx - stride;
+        dRe = (re - psiRe[bIdx]) / params.spacing[d];
+        dIm = (im - psiIm[bIdx]) / params.spacing[d];
+      } else {
+        let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+        let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      }
+      let jd = hbarOverM * (re * dIm - im * dRe);
+      let vsd = jd / densitySafe;
+      vsMagSq += vsd * vsd;
+    }
+    // c_s² = g|ψ|²/m (Bogoliubov). Guard against non-positive g or |ψ|²=0.
+    let gAbs = max(abs(params.interactionStrength), 1e-10);
+    let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);
+    let vs = sqrt(vsMagSq);
+    let cs = sqrt(csSq);
+    let mach = vs / cs;
+    // machNumber display mapping: identity-clamp so M = 1 → 1.0 exactly.
+    // This gives the Analog-Horizon preset an unambiguous isosurface contract:
+    // an iso-threshold of 1.0 in the Mach view lies precisely on the horizon
+    // (c_s = v_s). Supersonic voxels saturate at 1.0 rather than being
+    // separately differentiated — use the superfluidVelocity view for |v_s|.
+    let machDisplay = clamp(mach, 0.0, 1.0);
+    displayScalar = machDisplay * densityGate;
   } else if (params.fieldView == 3u) {
     // potential (NN)
     let potentialScale = getPotentialScale();

@@ -385,6 +385,12 @@ export interface SchroedingerSliceActions {
   setBecVortexPairCount: (count: number) => void
   setBecSolitonDepth: (depth: number) => void
   setBecSolitonVelocity: (velocity: number) => void
+  setBecHawkingVmax: (v: number) => void
+  setBecHawkingLh: (lh: number) => void
+  setBecHawkingDeltaN: (dn: number) => void
+  setBecHawkingPairInjection: (enabled: boolean) => void
+  setBecHawkingInjectRate: (rate: number) => void
+  setBecHawkingSeed: (seed: number) => void
   setBecAutoScale: (autoScale: boolean) => void
   setBecAbsorberEnabled: (enabled: boolean) => void
   setBecAbsorberWidth: (width: number) => void

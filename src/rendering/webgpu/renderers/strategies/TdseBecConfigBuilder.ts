@@ -16,6 +16,45 @@ import {
 } from '@/lib/geometry/extended/tdse'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 
+/**
+ * Background condensate density n₀ used by the waterfall (blackHoleAnalog)
+ * initial condition. Mirrors the μ override inside `buildBecConfig`:
+ *
+ *   μ_wf  = max(g · 0.01, 1.0)
+ *   n₀    = μ_wf / g   (for g > 0)
+ *
+ * Exposed as a pure helper so CPU-side analysis (e.g. the HUD's analytic κ,
+ * T_H readout) can compute the same reference density the GPU simulator
+ * uses — avoiding silent mismatches when the PRD window changes.
+ *
+ * @param config - minimal shape carrying `interactionStrength` (g).
+ * @returns background density n₀; returns 1.0 for non-positive g as a safe fallback.
+ */
+export function computeWaterfallBackgroundDensity(config: { interactionStrength: number }): number {
+  const g = config.interactionStrength
+  if (!(g > 0)) return 1.0
+  const muWaterfall = Math.max(g * 0.01, 1.0)
+  return muWaterfall / g
+}
+
+/**
+ * Resolve the effective particle mass used by the BEC simulator.
+ *
+ * Single canonical source of truth for `mass` in the BEC pipeline. Mirrors
+ * the fallback used inside `buildBecConfig` so CPU-side analysis (HUD
+ * readout, analytic κ / T_H, trap-profile plot) can compute the same
+ * value the GPU simulator uses — preventing silent divergence if the
+ * pipeline ever nulls `bec.mass` upstream.
+ *
+ * @param config - minimal shape carrying an optional `mass` field.
+ * @returns `config.mass` when finite and positive, otherwise the TDSE default.
+ */
+export function resolveBecMass(config: { mass?: number | null }): number {
+  const m = config.mass
+  if (typeof m === 'number' && Number.isFinite(m) && m > 0) return m
+  return DEFAULT_TDSE_CONFIG.mass
+}
+
 /** Subset of the schroedinger store needed for absorber + exposure wiring. */
 interface BecSchoedingerOverrides {
   absorberEnabled?: boolean
@@ -28,14 +67,17 @@ interface BecSchoedingerOverrides {
 function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   let initCond = bec.initialCondition ?? 'thomasFermi'
 
-  // Attractive BEC (g < 0): Thomas-Fermi doesn't apply → force Gaussian
+  // Attractive BEC (g < 0): Thomas-Fermi doesn't apply → force Gaussian.
+  // blackHoleAnalog also needs g > 0 because its background density comes from
+  // μ/g; fall back to a Gaussian wavepacket to avoid a divide-by-negative.
   if (
     g < 0 &&
     (initCond === 'thomasFermi' ||
       initCond === 'vortexImprint' ||
       initCond === 'vortexLattice' ||
       initCond === 'darkSoliton' ||
-      initCond === 'vortexReconnection')
+      initCond === 'vortexReconnection' ||
+      initCond === 'blackHoleAnalog')
   ) {
     initCond = 'gaussianPacket'
   }
@@ -43,6 +85,7 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   // Map BEC init conditions to TDSE shader init condition strings:
   // vortexLattice → vortexImprint (same shader, different count)
   // vortexReconnection → ndVortexPair (new shader branch for configurable-plane vortices)
+  // blackHoleAnalog → blackHoleAnalog (new waterfall-horizon branch, index 7)
   let mappedInit: string = initCond
   if (initCond === 'vortexLattice') mappedInit = 'vortexImprint'
   else if (initCond === 'vortexReconnection') mappedInit = 'ndVortexPair'
@@ -92,10 +135,22 @@ export function buildBecConfig(
     }
     effectiveInitOmega = initOmega * Math.pow(anisotropyProduct, 1 / latDim)
   }
-  const mu =
+  let mu =
     g > 0 ? thomasFermiMuND(latDim, g, effectiveInitOmega) : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
   const { mappedInit, mom } = prepareBecInitCondition(bec, g, latDim)
+
+  // Analog Hawking (waterfall) uses a uniform background density set by μ/g,
+  // not a trap profile. A near-zero trap (ω → 0) drives the TF μ to near zero
+  // and empties the volume — the GPU init shader then writes ψ ≈ 0 everywhere
+  // and the horizon is invisible. Override μ with a fixed value that yields a
+  // visible O(0.01) background density for g > 0. Irrelevant to the Mach
+  // field (M = |v_s|/c_s is ratio-invariant) but keeps autoScale happy.
+  if (mappedInit === 'blackHoleAnalog' && g > 0) {
+    // Derived via the shared helper so the HUD's analytic readout sees the
+    // exact same n₀ = μ/g the compute init shader seeds.
+    mu = computeWaterfallBackgroundDensity({ interactionStrength: g }) * g
+  }
 
   // Seed every field from the canonical TDSE defaults so BEC inherits any
   // future additions to TdseConfig (including the BH Regge–Wheeler block,
@@ -111,7 +166,7 @@ export function buildBecConfig(
       latticeDim: latDim,
       gridSize: bec.gridSize ?? new Array(latDim).fill(8),
       spacing: bec.spacing ?? new Array(latDim).fill(0.15),
-      mass: bec.mass ?? DEFAULT_TDSE_CONFIG.mass,
+      mass: resolveBecMass(bec),
       hbar: bec.hbar ?? DEFAULT_TDSE_CONFIG.hbar,
       dt: bec.dt ?? 0.002,
       stepsPerFrame: bec.stepsPerFrame ?? DEFAULT_TDSE_CONFIG.stepsPerFrame,
@@ -128,8 +183,15 @@ export function buildBecConfig(
       wellDepth: 0,
       wellWidth: 0,
       stepHeight: 0,
-      harmonicOmega: omega,
-      harmonicOmegaInit: initOmega !== omega ? initOmega : undefined,
+      // blackHoleAnalog forces a flat trap so the init shader's TF envelope
+      // collapses to n = μ/g everywhere — the uniform background required
+      // by Unruh's analog-horizon construction. We still let resizeBecArrays
+      // use the raw trapOmega for grid-spacing selection (it needs a finite
+      // TF radius to pick sane spacing), but zero out the evolution trap so
+      // the waterfall flow isn't confined to a TF ball.
+      harmonicOmega: mappedInit === 'blackHoleAnalog' ? 0 : omega,
+      harmonicOmegaInit:
+        mappedInit === 'blackHoleAnalog' ? undefined : initOmega !== omega ? initOmega : undefined,
       slitSeparation: 0,
       slitWidth: 0,
       wallThickness: 0,
@@ -183,6 +245,16 @@ export function buildBecConfig(
       branchPlanePosition: 0.0,
       branchColorA: [0, 1, 1] as [number, number, number],
       branchColorB: [1, 0, 1] as [number, number, number],
+      // Analog Hawking (waterfall) — only consulted by the init kernel when
+      // mappedInit === 'blackHoleAnalog' and by the pair-injection kernel
+      // when hawkingPairInjection is true. Passed through verbatim; the
+      // TdseConfig treats them as optional scalars.
+      hawkingVmax: bec.hawkingVmax,
+      hawkingLh: bec.hawkingLh,
+      hawkingDeltaN: bec.hawkingDeltaN,
+      hawkingPairInjection: bec.hawkingPairInjection,
+      hawkingInjectRate: bec.hawkingInjectRate,
+      hawkingSeed: bec.hawkingSeed,
     },
   }
 }
