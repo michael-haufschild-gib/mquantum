@@ -79,10 +79,7 @@ describe('LchPresetSelector', () => {
 
   it('applies optional className to wrapper div', () => {
     render(<LchPresetSelector className="lch-class" />)
-    // The wrapper renders the label — find it and check the parent has the class
-    const label = screen.getByText('LCH Preset')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking className on wrapper div that has no testid
-    expect(label.closest('.lch-class')).toBeInTheDocument()
+    expect(screen.getByTestId('lch-preset-selector')).toHaveClass('lch-class')
   })
 
   it('renders all LCH_PRESET_OPTIONS as select options', () => {

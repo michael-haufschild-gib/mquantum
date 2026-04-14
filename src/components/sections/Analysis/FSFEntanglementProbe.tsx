@@ -30,6 +30,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
+import { logger } from '@/lib/logger'
 import type { CosmologicalEntropyTrajectory } from '@/lib/physics/entanglement/peschelEntropy'
 import type {
   PeschelWorkerRequest,
@@ -202,11 +203,7 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
       setPending(false)
     }
     worker.onerror = (err) => {
-      // Fail loudly enough to surface in dev consoles without crashing
-      // the panel. Peschel is an analysis extra, not a rendering
-      // requirement, so we surface the state instead of bubbling up.
-      // eslint-disable-next-line no-console
-      console.error('[FSFEntanglementProbe] worker error', err)
+      logger.error('[FSFEntanglementProbe] worker error', err)
       setPending(false)
     }
     workerRef.current = worker

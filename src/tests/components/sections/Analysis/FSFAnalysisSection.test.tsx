@@ -97,10 +97,7 @@ describe('FSFAnalysisContent — KG dispersion diagram', () => {
 
   it('renders a polyline SVG element for the dispersion curve', () => {
     render(<FSFAnalysisContent />)
-    const diagram = screen.getByTestId('kg-dispersion')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG polyline has no accessible role
-    const polyline = diagram.querySelector('polyline')
-    expect(polyline).toBeInTheDocument()
+    expect(screen.getByTestId('kg-dispersion-polyline')).toBeInTheDocument()
   })
 })
 

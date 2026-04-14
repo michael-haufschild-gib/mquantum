@@ -69,10 +69,18 @@ export interface CaptureTiming {
  * `sampleInterval * frame_dt` product.
  *
  * @param buf - Ring buffer, or null if the pass has not wired one yet
+ * @param _sampleCount - Snapshot of `buf.count` at call time. Not read
+ *        inside the function — it exists so callers (React memos) can
+ *        pass the latest sample count as a dep and force re-evaluation
+ *        when the pass mutates `buf` in place, which React cannot observe
+ *        through the stable ref.
  * @returns Derived timing values, with NaNs when the buffer is too
  *          thin to measure
  */
-export function deriveCaptureTiming(buf: HellerRingBuffer | null): CaptureTiming {
+export function deriveCaptureTiming(
+  buf: HellerRingBuffer | null,
+  _sampleCount: number
+): CaptureTiming {
   if (!buf || buf.count < 2) {
     return { tCaptured: NaN, deltaOmega: NaN, omegaNyquist: NaN }
   }

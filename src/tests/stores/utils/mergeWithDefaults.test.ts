@@ -214,7 +214,8 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
       },
     }
     const mergedUnsafe = mergeExtendedObjectStateForType(loadedUnsafe, 'schroedinger')
-    const fsUnsafe = (mergedUnsafe.schroedinger as { freeScalar: Record<string, unknown> }).freeScalar
+    const fsUnsafe = (mergedUnsafe.schroedinger as { freeScalar: Record<string, unknown> })
+      .freeScalar
     const cosmoUnsafe = fsUnsafe.cosmology as { enabled: boolean; eta0: number }
     expect(cosmoUnsafe.enabled).toBe(true)
     expect(Math.abs(cosmoUnsafe.eta0)).toBeGreaterThanOrEqual(0.1)
@@ -261,6 +262,110 @@ describe('mergeExtendedObjectStateForType — cosmology invariants', () => {
     const cosmo = fs.cosmology as { enabled: boolean; eta0: number }
     expect(cosmo.enabled).toBe(true)
     expect(cosmo.eta0).toBe(-10)
+  })
+})
+
+describe('mergeExtendedObjectStateForType — compute-mode lattice arrays', () => {
+  // Regression for the Quantum Walk scene black-screen bug: DEFAULT_QUANTUM_WALK_CONFIG
+  // has latticeDim=2 with length-2 arrays. A saved 3D QW scene carries length-3 arrays.
+  // Before the fix, deepMerge's length-equality guard dropped the loaded arrays → the
+  // stored config ended up with latticeDim=3 but gridSize/spacing/initialPosition of
+  // length 2. That fed wrong strides ([64,1,1] instead of [4096,64,1]) into the
+  // qwWriteGrid compute shader and rendered an all-zero density texture.
+
+  it('preserves 3D quantumWalk arrays when loaded latticeDim differs from default', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'quantumWalk',
+        quantumWalk: {
+          latticeDim: 3,
+          gridSize: [64, 64, 64],
+          spacing: [0.1, 0.1, 0.1],
+          initialPosition: [32, 32, 32],
+          coinType: 'dft',
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
+    expect(qw.latticeDim).toBe(3)
+    expect(qw.gridSize).toEqual([64, 64, 64])
+    expect(qw.spacing).toEqual([0.1, 0.1, 0.1])
+    expect(qw.initialPosition).toEqual([32, 32, 32])
+    expect(qw.coinType).toBe('dft')
+  })
+
+  it('preserves higher-dim tdse arrays when loaded latticeDim > default', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          latticeDim: 4,
+          gridSize: [32, 32, 32, 32],
+          spacing: [0.2, 0.2, 0.2, 0.2],
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as { tdse: Record<string, unknown> }).tdse
+    expect(tdse.latticeDim).toBe(4)
+    expect(tdse.gridSize).toEqual([32, 32, 32, 32])
+    expect(tdse.spacing).toEqual([0.2, 0.2, 0.2, 0.2])
+  })
+
+  it('sizes slicePositions to max(0, latticeDim - 3) when loaded omits them', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          latticeDim: 5,
+          gridSize: [16, 16, 16, 16, 16],
+          spacing: [0.1, 0.1, 0.1, 0.1, 0.1],
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const tdse = (merged.schroedinger as { tdse: { slicePositions: number[] } }).tdse
+    expect(tdse.slicePositions).toHaveLength(2)
+    expect(tdse.slicePositions).toEqual([0, 0])
+  })
+
+  it('leaves defaults intact when loaded latticeDim is out of range', () => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'quantumWalk',
+        quantumWalk: {
+          latticeDim: 99,
+          gridSize: Array(99).fill(64),
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
+    expect((qw.gridSize as number[]).length).toBe(2)
+    expect(qw.latticeDim).toBe(2)
+  })
+
+  it.each([
+    { label: 'non-integer', value: 3.5 },
+    { label: 'string', value: '3' },
+    { label: 'negative', value: -1 },
+    { label: 'NaN', value: Number.NaN },
+    { label: 'Infinity', value: Number.POSITIVE_INFINITY },
+  ])('snaps latticeDim to gridSize.length when loaded is $label', ({ value }) => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'quantumWalk',
+        quantumWalk: {
+          latticeDim: value,
+          gridSize: Array(2).fill(64),
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
+    expect(qw.latticeDim).toBe(2)
+    expect((qw.gridSize as number[]).length).toBe(2)
   })
 })
 

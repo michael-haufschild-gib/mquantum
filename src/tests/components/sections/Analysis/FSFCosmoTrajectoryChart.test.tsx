@@ -15,8 +15,7 @@ describe('FSFCosmoTrajectoryChart — null/empty inputs', () => {
     const { container } = render(
       <FSFCosmoTrajectoryChart trajectory={{ etas: [], entropies: [] }} currentEta={-1} />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when all etas are zero', () => {
@@ -26,8 +25,7 @@ describe('FSFCosmoTrajectoryChart — null/empty inputs', () => {
         currentEta={0}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when all entropies are non-finite', () => {
@@ -37,8 +35,7 @@ describe('FSFCosmoTrajectoryChart — null/empty inputs', () => {
         currentEta={-1}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when all etas are non-finite', () => {
@@ -48,16 +45,14 @@ describe('FSFCosmoTrajectoryChart — null/empty inputs', () => {
         currentEta={-1}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when entropies array is shorter than etas and no valid samples remain', () => {
     const { container } = render(
       <FSFCosmoTrajectoryChart trajectory={{ etas: [-1, -2, -3], entropies: [] }} currentEta={-1} />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 })
 
@@ -74,19 +69,15 @@ describe('FSFCosmoTrajectoryChart — valid trajectory', () => {
 
   it('renders an SVG element', () => {
     render(<FSFCosmoTrajectoryChart trajectory={validTrajectory} currentEta={-1.0} />)
-    const title = screen.getByText(/Cosmological trajectory S\(L_A, η\)/i)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG existence
-    expect(title.closest('div')!.querySelector('svg')).toBeInTheDocument()
+    expect(screen.getByTestId('fsf-cosmo-trajectory-svg')).toBeInTheDocument()
   })
 
-  it('renders a polyline for the trajectory data', () => {
+  it('renders a polyline for the trajectory data with non-empty points', () => {
     render(<FSFCosmoTrajectoryChart trajectory={validTrajectory} currentEta={-1.0} />)
-    const title = screen.getByText(/Cosmological trajectory S\(L_A, η\)/i)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG polyline has no accessible role
-    const polyline = title.closest('div')!.querySelector('polyline')
-    expect(polyline).toBeInTheDocument()
-    expect(polyline!).toHaveAttribute('points')
-    expect(polyline!.getAttribute('points')).not.toBe('') // eslint-disable-line project-rules/prefer-jest-dom-matchers -- need to check non-empty string value, toHaveAttribute only checks existence
+    const polyline = screen.getByTestId('fsf-cosmo-trajectory-polyline')
+    const points = polyline.getAttribute('points') ?? ''
+    // Each sample produces an "x,y" token; 4 samples → 4 tokens separated by spaces.
+    expect(points.split(/\s+/).filter(Boolean).length).toBe(validTrajectory.etas.length)
   })
 
   it('renders log|η| axis label', () => {
@@ -108,38 +99,22 @@ describe('FSFCosmoTrajectoryChart — marker line', () => {
 
   it('renders marker line when currentEta is within range', () => {
     render(<FSFCosmoTrajectoryChart trajectory={trajectory} currentEta={-1.0} />)
-    const title = screen.getByText(/Cosmological trajectory/)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG line elements for markers have no accessible role
-    const lines = title.closest('div')!.querySelectorAll('line')
-    const markerLine = Array.from(lines).find((l) => l.getAttribute('stroke-dasharray') === '2,3')
-    expect(markerLine).not.toBeUndefined()
+    expect(screen.getByTestId('fsf-cosmo-trajectory-marker')).toBeInTheDocument()
   })
 
   it('does not render marker line when currentEta is zero', () => {
     render(<FSFCosmoTrajectoryChart trajectory={trajectory} currentEta={0} />)
-    const title = screen.getByText(/Cosmological trajectory/)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG line elements
-    const lines = title.closest('div')!.querySelectorAll('line')
-    const markerLine = Array.from(lines).find((l) => l.getAttribute('stroke-dasharray') === '2,3')
-    expect(markerLine).toBeUndefined()
+    expect(screen.queryByTestId('fsf-cosmo-trajectory-marker')).not.toBeInTheDocument()
   })
 
   it('does not render marker line when currentEta is outside trajectory range', () => {
     render(<FSFCosmoTrajectoryChart trajectory={trajectory} currentEta={-1e-6} />)
-    const title = screen.getByText(/Cosmological trajectory/)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG line elements
-    const lines = title.closest('div')!.querySelectorAll('line')
-    const markerLine = Array.from(lines).find((l) => l.getAttribute('stroke-dasharray') === '2,3')
-    expect(markerLine).toBeUndefined()
+    expect(screen.queryByTestId('fsf-cosmo-trajectory-marker')).not.toBeInTheDocument()
   })
 
   it('does not render marker line when currentEta is non-finite', () => {
     render(<FSFCosmoTrajectoryChart trajectory={trajectory} currentEta={NaN} />)
-    const title = screen.getByText(/Cosmological trajectory/)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG line elements
-    const lines = title.closest('div')!.querySelectorAll('line')
-    const markerLine = Array.from(lines).find((l) => l.getAttribute('stroke-dasharray') === '2,3')
-    expect(markerLine).toBeUndefined()
+    expect(screen.queryByTestId('fsf-cosmo-trajectory-marker')).not.toBeInTheDocument()
   })
 })
 

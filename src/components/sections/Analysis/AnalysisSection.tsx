@@ -24,6 +24,7 @@ import { TDSEAnalysisContent } from '@/components/sections/Analysis/TDSEAnalysis
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ControlGroup } from '@/components/ui/ControlGroup'
+import { FileInput } from '@/components/ui/FileInput'
 import { Switch } from '@/components/ui/Switch'
 import {
   downloadFile,
@@ -40,7 +41,11 @@ import {
   exportTdseDiagnosticsCSV,
   exportWavefunctionSliceCSV,
 } from '@/lib/export/dataExport'
-import { isAnalyticQuantumType, isComputeQuantumType, type QuantumTypeKey } from '@/lib/geometry/registry'
+import {
+  isAnalyticQuantumType,
+  isComputeQuantumType,
+  type QuantumTypeKey,
+} from '@/lib/geometry/registry'
 import { useCarpetStore } from '@/stores/carpetStore'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
@@ -229,18 +234,11 @@ const SaveLoadButtons: React.FC = React.memo(() => {
           {status === 'loading' ? 'Loading...' : 'Load State'}
         </Button>
       </div>
-      {/* eslint-disable-next-line project-rules/no-raw-html-controls -- file input has no UI primitive equivalent */}
-      <input
+      <FileInput
         ref={fileInputRef}
-        type="file"
         accept=".mqstate"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) {
-            useSimulationStateStore.getState().loadFromFile(file)
-            e.target.value = ''
-          }
+        onFileSelected={(file) => {
+          if (file) useSimulationStateStore.getState().loadFromFile(file)
         }}
       />
     </>

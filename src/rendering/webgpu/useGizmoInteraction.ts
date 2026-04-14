@@ -110,19 +110,16 @@ export function useGizmoInteraction(deps: GizmoInteractionDeps): GizmoInteractio
     (e: React.MouseEvent) => {
       // Handle gizmo dragging
       const drag = gizmoDragRef.current
-      if (drag && cameraRef.current && overlayRef.current) {
+      if (drag) {
         // Require minimum mouse movement before actually dragging
         const movedX = Math.abs(e.clientX - mouseDownPosRef.current.x)
         const movedY = Math.abs(e.clientY - mouseDownPosRef.current.y)
         if (movedX < 3 && movedY < 3) return
 
-        const rect = overlayRef.current.getBoundingClientRect()
-        const matrices = cameraRef.current.getMatrices()
-        const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
-        if (!ray) return
+        const result = computeRayFromEvent(cameraRef, overlayRef, e)
+        if (!result) return
 
-        const lighting = useLightingStore.getState()
-        applyGizmoDrag(drag, ray, lighting)
+        applyGizmoDrag(drag, result.ray, useLightingStore.getState())
         return
       }
 

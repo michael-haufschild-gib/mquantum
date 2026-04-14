@@ -20,41 +20,36 @@ import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
 /**
- * Mapping from URL state key → TDSE setter name on the extended object store.
+ * Apply TDSE-specific URL state params.
  *
- * NOTE: `absorberEnabled` is intentionally NOT in this list. PML is shared
- * across all dynamic compute modes via `state.schroedinger.absorberEnabled`
- * (the top-level field that `applySharedPml` reads). Routing the URL param
- * through `setTdseAbsorberEnabled` would write to the per-mode TDSE field,
- * which is then *shadowed* by the top-level shared default `true` — meaning
- * `?abs=0` had no effect on actual rendering. The shared setter is dispatched
- * separately in `applyUrlStateParams` below.
+ * NOTE: `absorberEnabled` is intentionally dispatched separately in
+ * `applyUrlStateParams` (not here). PML is shared across all dynamic compute
+ * modes via `state.schroedinger.absorberEnabled` (the top-level field that
+ * `applySharedPml` reads). Routing the URL param through `setTdseAbsorberEnabled`
+ * would write to the per-mode TDSE field, which is then *shadowed* by the
+ * top-level shared default `true` — meaning `?abs=0` had no effect on actual
+ * rendering.
  */
-const TDSE_PARAM_MAP: ReadonlyArray<
-  readonly [keyof ParsedShareableState, keyof ReturnType<typeof useExtendedObjectStore.getState>]
-> = [
-  ['potentialType', 'setTdsePotentialType'],
-  ['diagnosticsEnabled', 'setTdseDiagnosticsEnabled'],
-  ['observablesEnabled', 'setTdseObservablesEnabled'],
-  ['imaginaryTimeEnabled', 'setTdseImaginaryTimeEnabled'],
-  ['customPotentialExpression', 'setTdseCustomPotentialExpression'],
-  ['anharmonicLambda', 'setTdseAnharmonicLambda'],
-  ['disorderStrength', 'setTdseDisorderStrength'],
-  ['disorderSeed', 'setTdseDisorderSeed'],
-  ['disorderDistribution', 'setTdseDisorderDistribution'],
-] as const
-
-/** Apply TDSE-specific URL state params. */
 function applyTdseParams(
   urlState: ParsedShareableState,
   ext: ReturnType<typeof useExtendedObjectStore.getState>
 ): void {
-  for (const [urlKey, setter] of TDSE_PARAM_MAP) {
-    if (urlState[urlKey] !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic dispatch from validated lookup table
-      ;(ext[setter] as (v: any) => void)(urlState[urlKey])
-    }
-  }
+  if (urlState.potentialType !== undefined) ext.setTdsePotentialType(urlState.potentialType)
+  if (urlState.diagnosticsEnabled !== undefined)
+    ext.setTdseDiagnosticsEnabled(urlState.diagnosticsEnabled)
+  if (urlState.observablesEnabled !== undefined)
+    ext.setTdseObservablesEnabled(urlState.observablesEnabled)
+  if (urlState.imaginaryTimeEnabled !== undefined)
+    ext.setTdseImaginaryTimeEnabled(urlState.imaginaryTimeEnabled)
+  if (urlState.customPotentialExpression !== undefined)
+    ext.setTdseCustomPotentialExpression(urlState.customPotentialExpression)
+  if (urlState.anharmonicLambda !== undefined)
+    ext.setTdseAnharmonicLambda(urlState.anharmonicLambda)
+  if (urlState.disorderStrength !== undefined)
+    ext.setTdseDisorderStrength(urlState.disorderStrength)
+  if (urlState.disorderSeed !== undefined) ext.setTdseDisorderSeed(urlState.disorderSeed)
+  if (urlState.disorderDistribution === 'uniform' || urlState.disorderDistribution === 'gaussian')
+    ext.setTdseDisorderDistribution(urlState.disorderDistribution)
 }
 
 /** Apply open-quantum URL state params. */

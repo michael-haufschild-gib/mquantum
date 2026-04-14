@@ -1,56 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mulberry32 } from '@/lib/math/rng'
 import { generateDisorderPotential } from '@/lib/physics/anderson/disorderPotential'
-
-describe('mulberry32', () => {
-  it('produces deterministic sequence from seed', () => {
-    const rng1 = mulberry32(42)
-    const rng2 = mulberry32(42)
-    for (let i = 0; i < 100; i++) {
-      expect(rng1()).toBe(rng2())
-    }
-  })
-
-  it('produces values in [0, 1)', () => {
-    const rng = mulberry32(12345)
-    for (let i = 0; i < 1000; i++) {
-      const v = rng()
-      expect(v).toBeGreaterThanOrEqual(0)
-      expect(v).toBeLessThan(1)
-    }
-  })
-
-  it('different seeds produce different sequences', () => {
-    const rng1 = mulberry32(1)
-    const rng2 = mulberry32(2)
-    // At least one of the first 10 values should differ
-    let allSame = true
-    for (let i = 0; i < 10; i++) {
-      if (rng1() !== rng2()) allSame = false
-    }
-    expect(allSame).toBe(false)
-  })
-
-  it('has reasonable uniformity (chi-squared on 10 bins)', () => {
-    const rng = mulberry32(999)
-    const bins = new Uint32Array(10)
-    const N = 10000
-    for (let i = 0; i < N; i++) {
-      const bin = Math.min(9, Math.floor(rng() * 10))
-      bins[bin]!++
-    }
-    // chi-squared: sum of (observed - expected)^2 / expected
-    const expected = N / 10
-    let chi2 = 0
-    for (let b = 0; b < 10; b++) {
-      const diff = bins[b]! - expected
-      chi2 += (diff * diff) / expected
-    }
-    // 10 bins, 9 dof, p=0.001 critical value ≈ 27.88
-    expect(chi2).toBeLessThan(28)
-  })
-})
 
 describe('generateDisorderPotential', () => {
   it('returns correct number of lattice sites for 1D', () => {

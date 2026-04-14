@@ -21,6 +21,7 @@ import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/exten
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
+import { DimensionalSweepsSection } from './DimensionalSweepsSection'
 import { DrawerSection } from './DrawerSection'
 
 /**
@@ -87,32 +88,14 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
 
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (
-          <DrawerSection
-            title="Dimensional Sweeps"
+          <DimensionalSweepsSection
             enabled={config.sliceAnimationEnabled}
-            onToggle={(v) => setSliceAnimationEnabled(v)}
-            toggleAriaLabel="Toggle slice animation"
-            testId="animation-panel-sliceAnimation"
-          >
-            <Slider
-              label="Amplitude"
-              min={0.1}
-              max={1.0}
-              step={0.05}
-              value={config.sliceAmplitude}
-              onChange={setSliceAmplitude}
-              showValue
-            />
-            <Slider
-              label="Speed"
-              min={0.01}
-              max={0.1}
-              step={0.01}
-              value={config.sliceSpeed}
-              onChange={setSliceSpeed}
-              showValue
-            />
-          </DrawerSection>
+            amplitude={config.sliceAmplitude}
+            speed={config.sliceSpeed}
+            onToggle={setSliceAnimationEnabled}
+            onChangeAmplitude={setSliceAmplitude}
+            onChangeSpeed={setSliceSpeed}
+          />
         )}
       </AnimationDrawerContainer>
     )

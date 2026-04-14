@@ -32,8 +32,15 @@ interface RingBufferTestConfig {
   hasDataField?: boolean
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StoreState = Record<string, any>
+type StoreState = Record<string, unknown>
+
+/** Ring-buffer-backed diagnostic channel state fields accessed in these tests. */
+interface ChannelState {
+  hasData?: boolean
+  historyHead: number
+  historyCount: number
+  [historyKey: string]: unknown
+}
 
 /**
  * Generates standard ring buffer behavioral tests for a diagnostics channel.
@@ -54,9 +61,35 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
   const { channelKey, pushOnce, pushWithValue, resetFn, historyArrayKey, testValue } = config
   const hasDataField = config.hasDataField ?? true
 
-  const getChannel = (): StoreState => (useDiagnosticsStore.getState() as StoreState)[channelKey]
-  const reset = (): void =>
-    ((useDiagnosticsStore.getState() as StoreState)[resetFn] as () => void)()
+  const getChannel = (): ChannelState => {
+    const state = useDiagnosticsStore.getState() as unknown as StoreState
+    const channel = state[channelKey]
+    if (!channel || typeof channel !== 'object') {
+      throw new Error(
+        `describeRingBufferBehavior: channelKey "${channelKey}" is missing or not an object`
+      )
+    }
+    return channel as ChannelState
+  }
+  const reset = (): void => {
+    const state = useDiagnosticsStore.getState() as unknown as StoreState
+    const fn = state[resetFn]
+    if (typeof fn !== 'function') {
+      throw new Error(
+        `describeRingBufferBehavior: resetFn "${resetFn}" is not a function on the store`
+      )
+    }
+    ;(fn as () => void)()
+  }
+  const getHistoryArray = (channel: ChannelState): Float32Array => {
+    const arr = channel[historyArrayKey]
+    if (!(arr instanceof Float32Array)) {
+      throw new Error(
+        `describeRingBufferBehavior: historyArrayKey "${historyArrayKey}" is not a Float32Array on channel "${channelKey}"`
+      )
+    }
+    return arr
+  }
 
   describe('ring buffer behavior', () => {
     if (hasDataField) {
@@ -78,7 +111,8 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
 
     it('writes values into TypedArray at head position', () => {
       pushOnce()
-      expect(getChannel()[historyArrayKey][0]).toBeCloseTo(testValue)
+      const arr = getHistoryArray(getChannel())
+      expect(arr[0]).toBeCloseTo(testValue)
     })
 
     it(`wraps at ${HISTORY_LENGTH} entries`, () => {
@@ -92,7 +126,8 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       pushWithValue(0.12345)
       expect(getChannel().historyHead).toBe(1)
       expect(getChannel().historyCount).toBe(HISTORY_LENGTH)
-      expect(getChannel()[historyArrayKey][0]).toBeCloseTo(0.12345)
+      const arr = getHistoryArray(getChannel())
+      expect(arr[0]).toBeCloseTo(0.12345)
     })
 
     it(`historyCount saturates at ${HISTORY_LENGTH}`, () => {
@@ -106,7 +141,7 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       for (let i = 0; i < 10; i++) {
         pushOnce()
       }
-      const arrayBefore = getChannel()[historyArrayKey] as Float32Array
+      const arrayBefore = getHistoryArray(getChannel())
 
       reset()
 
@@ -116,8 +151,9 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       }
       expect(ch.historyHead).toBe(0)
       expect(ch.historyCount).toBe(0)
-      expect(ch[historyArrayKey]).not.toBe(arrayBefore)
-      expect((ch[historyArrayKey] as Float32Array).every((v: number) => v === 0)).toBe(true)
+      const arrayAfter = getHistoryArray(ch)
+      expect(arrayAfter).not.toBe(arrayBefore)
+      expect(arrayAfter.every((v: number) => v === 0)).toBe(true)
     })
   })
 }

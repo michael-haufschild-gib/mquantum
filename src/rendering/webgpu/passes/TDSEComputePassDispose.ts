@@ -64,8 +64,12 @@ export function disposeTdseResources(
   disposeObservables(obsState)
 }
 
-/** GPU buffer fields that must be destroyed and nulled on dispose. */
-export interface TdseGpuFields {
+/**
+ * Mutable TDSE pass GPU buffer/texture fields used during disposal.
+ * All handles are nulled and `initialized`/`lastConfigHash` are reset
+ * in place by {@link destroyTdsePassGpu}.
+ */
+export interface TdsePassGpuSnapshot {
   psiReBuffer: GPUBuffer | null
   psiImBuffer: GPUBuffer | null
   potentialBuffer: GPUBuffer | null
@@ -82,9 +86,6 @@ export interface TdseGpuFields {
   omegaStagingBuffer: GPUBuffer | null
   densityTexture: GPUTexture | null
   densityTextureView: GPUTextureView | null
-  /** PERF: pre-computed gradient-normal texture + view. */
-  normalTexture?: GPUTexture | null
-  normalTextureView?: GPUTextureView | null
   diagUniformBuffer: GPUBuffer | null
   diagPartialSumsBuffer: GPUBuffer | null
   diagPartialMaxBuffer: GPUBuffer | null
@@ -98,10 +99,10 @@ export interface TdseGpuFields {
 }
 
 /**
- * Destroy all GPU buffers and textures, null all references.
- * @param fields - Mutable pass fields to destroy and null
+ * Destroy all GPU buffers/textures owned by the pass and null their handles.
+ * Mutates `fields` in place.
  */
-export function destroyPassBuffers(fields: TdseGpuFields): void {
+export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
   const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
     fields.psiReBuffer,
     fields.psiImBuffer,
@@ -116,7 +117,6 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
     fields.packUniformBuffer,
     fields.omegaStagingBuffer,
     fields.densityTexture,
-    fields.normalTexture,
     fields.diagUniformBuffer,
     fields.diagPartialSumsBuffer,
     fields.diagPartialMaxBuffer,
@@ -138,52 +138,9 @@ export function destroyPassBuffers(fields: TdseGpuFields): void {
   fields.diagPartialSumsBuffer = fields.diagPartialMaxBuffer = null
   fields.diagPartialLeftBuffer = fields.diagPartialRightBuffer = fields.diagPartialIprBuffer = null
   fields.densityTexture = fields.densityTextureView = null
-  fields.normalTexture = fields.normalTextureView = null
   fields.pl = fields.bg = null
   fields.initialized = false
   fields.lastConfigHash = ''
-}
-
-/**
- * Destroy all GPU resources owned by the pass. The caller passes a typed
- * snapshot of the pass GPU fields so that field accesses stay visible to
- * `--noUnusedLocals`. Includes the gradient-normal pair, which lives on
- * the `TdseGradientResources` sub-object on the pass.
- *
- * Field keys are mutated in-place on the `fields` object; the caller is
- * expected to write them back via `Object.assign(this, fields)`.
- */
-export function destroyTdsePassGpu(fields: TdseGpuFields): void {
-  destroyPassBuffers(fields)
-}
-
-/** Fields from TDSEComputePass needed to build the GPU snapshot for disposal. */
-export interface TdsePassGpuSnapshot {
-  psiReBuffer: GPUBuffer | null
-  psiImBuffer: GPUBuffer | null
-  potentialBuffer: GPUBuffer | null
-  fftScratchA: GPUBuffer | null
-  fftScratchB: GPUBuffer | null
-  uniformBuffer: GPUBuffer | null
-  fftUniformBuffer: GPUBuffer | null
-  fftStagingBuffer: GPUBuffer | null
-  fftAxisUniformBuffer: GPUBuffer | null
-  fftAxisStagingBuffer: GPUBuffer | null
-  fftAxisUniformBuffers: GPUBuffer[] | null
-  packUniformBuffer: GPUBuffer | null
-  omegaStagingBuffer: GPUBuffer | null
-  densityTexture: GPUTexture | null
-  densityTextureView: GPUTextureView | null
-  diagUniformBuffer: GPUBuffer | null
-  diagPartialSumsBuffer: GPUBuffer | null
-  diagPartialMaxBuffer: GPUBuffer | null
-  diagPartialLeftBuffer: GPUBuffer | null
-  diagPartialRightBuffer: GPUBuffer | null
-  diagPartialIprBuffer: GPUBuffer | null
-  pl: { renormalizePipeline?: unknown } | null
-  bg: TdseBindGroupResult | null
-  initialized: boolean
-  lastConfigHash: string
 }
 
 /**
@@ -193,7 +150,7 @@ export interface TdsePassGpuSnapshot {
  * Extracted from TDSEComputePass.dispose() to keep the orchestrator under
  * the 600-line limit.
  *
- * @param pass - Mutable pass fields (written back via Object.assign)
+ * @param pass - Mutable pass fields (cleared in place)
  * @param vdState - Vortex detection state
  * @param disorderState - Anderson disorder state
  * @param stochasticState - Stochastic localization state
@@ -230,36 +187,6 @@ export function disposeFullPass(
   hellerState.totalSites = 0
   useHellerSpectrometerStore.getState().setBufferRef(null)
 
-  const gpu: TdseGpuFields = {
-    psiReBuffer: pass.psiReBuffer,
-    psiImBuffer: pass.psiImBuffer,
-    potentialBuffer: pass.potentialBuffer,
-    fftScratchA: pass.fftScratchA,
-    fftScratchB: pass.fftScratchB,
-    uniformBuffer: pass.uniformBuffer,
-    fftUniformBuffer: pass.fftUniformBuffer,
-    fftStagingBuffer: pass.fftStagingBuffer,
-    fftAxisUniformBuffer: pass.fftAxisUniformBuffer,
-    fftAxisStagingBuffer: pass.fftAxisStagingBuffer,
-    fftAxisUniformBuffers: pass.fftAxisUniformBuffers,
-    packUniformBuffer: pass.packUniformBuffer,
-    omegaStagingBuffer: pass.omegaStagingBuffer,
-    densityTexture: pass.densityTexture,
-    densityTextureView: pass.densityTextureView,
-    normalTexture: null,
-    normalTextureView: null,
-    diagUniformBuffer: pass.diagUniformBuffer,
-    diagPartialSumsBuffer: pass.diagPartialSumsBuffer,
-    diagPartialMaxBuffer: pass.diagPartialMaxBuffer,
-    diagPartialLeftBuffer: pass.diagPartialLeftBuffer,
-    diagPartialRightBuffer: pass.diagPartialRightBuffer,
-    diagPartialIprBuffer: pass.diagPartialIprBuffer,
-    pl: pass.pl,
-    bg: pass.bg,
-    initialized: pass.initialized,
-    lastConfigHash: pass.lastConfigHash,
-  }
-  destroyTdsePassGpu(gpu)
-  Object.assign(pass, gpu)
+  destroyTdsePassGpu(pass)
   disposeTdseResources(diagState, gsState, slState, obsState)
 }

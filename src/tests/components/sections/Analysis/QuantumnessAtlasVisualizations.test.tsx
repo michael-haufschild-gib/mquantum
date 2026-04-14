@@ -53,8 +53,7 @@ describe('ErosionCurves', () => {
         ]}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG chart element existence
-    expect(screen.getByText('γ').closest('div')!.querySelector('svg')).toBeInTheDocument()
+    expect(screen.getByTestId('three-diag-chart')).toBeInTheDocument()
   })
 
   it('renders the γ axis label', () => {
@@ -79,9 +78,7 @@ describe('ErosionCurves', () => {
         ]}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG polylines have no accessible role
-    const polylines = screen.getByText('γ').closest('div')!.querySelectorAll('polyline')
-    expect(polylines.length).toBe(3)
+    expect(screen.getAllByTestId('diag-polyline').length).toBe(3)
   })
 })
 
@@ -90,19 +87,12 @@ describe('ErosionCurves', () => {
 describe('DiagnosticScatter', () => {
   it('renders nothing when results are empty', () => {
     const { container } = render(<DiagnosticScatter results={[]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders SVG scatter for non-empty results', () => {
     render(<DiagnosticScatter results={[makeAtlasPoint(), makeAtlasPoint({ dim: 4 })]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG existence
-    expect(
-      screen
-        .getByText(/S̄\/log M/)
-        .closest('div')!
-        .querySelector('svg')
-    ).toBeInTheDocument()
+    expect(screen.getByTestId('diagnostic-scatter')).toBeInTheDocument()
   })
 
   it('renders axis labels for S̄ and N̄_W', () => {
@@ -180,8 +170,7 @@ describe('DimensionComparison', () => {
         ]}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG chart existence
-    expect(screen.getByText('dimension N').closest('div')!.querySelector('svg')).toBeInTheDocument()
+    expect(screen.getByTestId('three-diag-chart')).toBeInTheDocument()
   })
 
   it('renders the "dimension N" axis label', () => {
@@ -206,9 +195,7 @@ describe('DimensionComparison', () => {
         ]}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG polylines have no accessible role
-    const polylines = screen.getByText('dimension N').closest('div')!.querySelectorAll('polyline')
-    expect(polylines.length).toBe(3)
+    expect(screen.getAllByTestId('diag-polyline').length).toBe(3)
   })
 
   it('renders tick labels matching each dimension value', () => {

@@ -55,11 +55,13 @@ export const Section: React.FC<SectionProps> = React.memo(
     }, [isOpen, storageKey])
 
     // Sync open state to parent when callback identity changes
-    // (covers initial mount AND quantum mode switches).
-    // `isOpen` is intentionally omitted: toggling fires in handleToggle, not here.
+    // (covers initial mount AND quantum mode switches). Toggles notify via
+    // handleToggle; isOpen is read through a ref so this effect only fires on
+    // callback identity changes.
+    const isOpenRef = useRef(isOpen)
+    isOpenRef.current = isOpen
     useEffect(() => {
-      onOpenChange?.(isOpen)
-      // eslint-disable-next-line @eslint-react/exhaustive-deps -- isOpen omitted: toggles notify via handleToggle, this effect only syncs on callback identity change
+      onOpenChange?.(isOpenRef.current)
     }, [onOpenChange])
 
     const handleToggle = useCallback(() => {

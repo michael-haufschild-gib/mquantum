@@ -3,7 +3,7 @@
  * Manages quality stages after interaction stops
  */
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useEnvironmentStore } from '@/stores/environmentStore'
@@ -88,62 +88,18 @@ export function useProgressiveRefinement(
   const progressRafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number>(0)
 
-  // Clear all timers
-  const clearTimers = useCallback(() => {
-    stageTimersRef.current.forEach((timer) => window.clearTimeout(timer))
-    stageTimersRef.current = []
-
-    if (progressRafRef.current !== null) {
-      cancelAnimationFrame(progressRafRef.current)
-      progressRafRef.current = null
-    }
-  }, [])
-
-  // eslint-disable-next-line @eslint-react/no-unnecessary-use-callback -- inlining into useEffect triggers no-leaked-timeout; timers are cleaned via clearTimers ref
-  const startRefinement = useCallback(() => {
-    if (!enabled) return
-
-    clearTimers()
-    startTimeRef.current = performance.now()
-
-    setRefinementStage('low')
-    setRefinementProgress(0)
-
-    // Schedule stage transitions
-    const stages = REFINEMENT_STAGES.slice(1) // Skip 'low', already set
-    stages.forEach((stageKey) => {
-      const delay = REFINEMENT_STAGE_TIMING[stageKey]
-      const timer = window.setTimeout(() => {
-        setRefinementStage(stageKey)
-      }, delay)
-      stageTimersRef.current.push(timer)
-    })
-
-    // Progress animation using RAF for proper frame sync
-    const totalDuration = REFINEMENT_STAGE_TIMING.final
-    const updateProgress = () => {
-      const elapsed = performance.now() - startTimeRef.current
-      const newProgress = Math.min(100, (elapsed / totalDuration) * 100)
-      setRefinementProgress(newProgress)
-
-      if (newProgress < 100) {
-        progressRafRef.current = requestAnimationFrame(updateProgress)
-      } else {
+  // React to interaction state, skybox loading, scene transitions, and export state
+  useEffect(() => {
+    const stageTimers = stageTimersRef.current
+    const clearTimers = () => {
+      stageTimers.forEach((timer) => window.clearTimeout(timer))
+      stageTimers.length = 0
+      if (progressRafRef.current !== null) {
+        cancelAnimationFrame(progressRafRef.current)
         progressRafRef.current = null
       }
     }
-    progressRafRef.current = requestAnimationFrame(updateProgress)
-  }, [enabled, clearTimers, setRefinementStage, setRefinementProgress])
 
-  // eslint-disable-next-line @eslint-react/no-unnecessary-use-callback -- same: inlining triggers no-leaked-timeout
-  const stopRefinement = useCallback(() => {
-    clearTimers()
-    setRefinementStage('low')
-    setRefinementProgress(0)
-  }, [clearTimers, setRefinementStage, setRefinementProgress])
-
-  // React to interaction state, skybox loading, scene transitions, and export state
-  useEffect(() => {
     // During export, don't manage refinement - VideoExportController handles quality
     if (isExporting) {
       clearTimers()
@@ -156,11 +112,43 @@ export function useProgressiveRefinement(
       return
     }
 
-    if (isInteracting || skyboxLoading || sceneTransitioning || isShaderCompiling) {
-      stopRefinement()
-    } else {
-      startRefinement()
+    const interacting = isInteracting || skyboxLoading || sceneTransitioning || isShaderCompiling
+    if (interacting) {
+      clearTimers()
+      setRefinementStage('low')
+      setRefinementProgress(0)
+      return
     }
+
+    // Start refinement pipeline
+    clearTimers()
+    startTimeRef.current = performance.now()
+    setRefinementStage('low')
+    setRefinementProgress(0)
+
+    // Schedule stage transitions — stored in ref; cleanup runs on unmount/dep change
+    const stages = REFINEMENT_STAGES.slice(1) // Skip 'low', already set
+    stages.forEach((stageKey) => {
+      const delay = REFINEMENT_STAGE_TIMING[stageKey]
+      const timer = window.setTimeout(() => {
+        setRefinementStage(stageKey)
+      }, delay)
+      stageTimers.push(timer)
+    })
+
+    // Progress animation using RAF for proper frame sync
+    const totalDuration = REFINEMENT_STAGE_TIMING.final
+    const updateProgress = () => {
+      const elapsed = performance.now() - startTimeRef.current
+      const newProgress = Math.min(100, (elapsed / totalDuration) * 100)
+      setRefinementProgress(newProgress)
+      if (newProgress < 100) {
+        progressRafRef.current = requestAnimationFrame(updateProgress)
+      } else {
+        progressRafRef.current = null
+      }
+    }
+    progressRafRef.current = requestAnimationFrame(updateProgress)
 
     return clearTimers
   }, [
@@ -170,17 +158,9 @@ export function useProgressiveRefinement(
     isShaderCompiling,
     skyboxLoading,
     sceneTransitioning,
-    startRefinement,
-    stopRefinement,
-    clearTimers,
     setRefinementStage,
     setRefinementProgress,
   ])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return clearTimers
-  }, [clearTimers])
 
   return {
     stage,

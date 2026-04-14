@@ -148,10 +148,7 @@ describe('BECAnalysisContent — BEC diagnostics display', () => {
   it('renders trap diagram SVG', () => {
     render(<BECAnalysisContent />)
     expect(screen.getByTestId('bec-analysis-inline')).toBeInTheDocument()
-    // SVG should be present within the inline analysis
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG element existence within testid container
-    const svg = screen.getByTestId('bec-analysis-inline').querySelector('svg')
-    expect(svg).toBeInTheDocument()
+    expect(screen.getByTestId('bec-trap-svg')).toBeInTheDocument()
   })
 
   it('shows Harmonic Trap label', () => {

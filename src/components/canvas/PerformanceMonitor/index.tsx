@@ -84,6 +84,7 @@ export function PerformanceMonitor() {
           if (!expanded && !didDrag) setExpanded(true)
         }}
         className="absolute top-20 start-4 z-[50] pointer-events-auto select-none"
+        data-testid="performance-monitor"
       >
         {/* Collapsed View - static, no animations */}
         {!expanded && (

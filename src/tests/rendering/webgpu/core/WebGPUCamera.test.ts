@@ -145,6 +145,50 @@ describe('WebGPUCamera', () => {
       expect(m.cameraPosition.z).toBe(3.5)
     })
 
+    it('exposes near and far on the matrices payload', () => {
+      const cam = new WebGPUCamera({ near: 0.5, far: 500 })
+      const m = cam.getMatrices()
+      expect(m.cameraNear).toBe(0.5)
+      expect(m.cameraFar).toBe(500)
+    })
+
+    it('projection × inverseProjection ≈ identity', () => {
+      const cam = new WebGPUCamera({ fov: 60, aspect: 16 / 9, near: 0.1, far: 100 })
+      const { projectionMatrix, inverseProjectionMatrix } = cam.getMatrices()
+
+      const product = new Float32Array(16)
+      for (let col = 0; col < 4; col++) {
+        for (let row = 0; row < 4; row++) {
+          let sum = 0
+          for (let k = 0; k < 4; k++) {
+            sum += projectionMatrix[row + k * 4]! * inverseProjectionMatrix[k + col * 4]!
+          }
+          product[row + col * 4] = sum
+        }
+      }
+
+      for (let i = 0; i < 4; i++) {
+        for (let j = 0; j < 4; j++) {
+          const expected = i === j ? 1 : 0
+          expect(product[i + j * 4]).toBeCloseTo(expected, 4)
+        }
+      }
+    })
+
+    it('setAspect recomputes projectionMatrix[0] to match f/aspect', () => {
+      // Reverse-Z perspective stores f/aspect at index 0; a regression that
+      // skipped the dirty flag on setAspect would leave this stale.
+      const cam = new WebGPUCamera({ aspect: 1.5, fov: 60 })
+      const projInitial0 = cam.getMatrices().projectionMatrix[0]
+
+      cam.setAspect(2.0)
+      const projAfter0 = cam.getMatrices().projectionMatrix[0]
+
+      expect(projAfter0).not.toBeCloseTo(projInitial0!, 4)
+      const f = 1 / Math.tan((60 * Math.PI) / 180 / 2)
+      expect(projAfter0).toBeCloseTo(f / 2.0, 4)
+    })
+
     it('matrices are recomputed after state change', () => {
       const cam = new WebGPUCamera()
       const m1 = cam.getMatrices()

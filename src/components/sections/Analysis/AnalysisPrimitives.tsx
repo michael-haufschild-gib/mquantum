@@ -56,6 +56,55 @@ export const MetricRow: React.FC<{
 }
 
 /**
+ * Compact diagnostics card wrapper.
+ *
+ * Provides the consistent rounded, monospace container used by the Pauli,
+ * Dirac, BEC, and TDSE analysis inline readouts. Renders an "Awaiting
+ * diagnostics..." placeholder until `hasData` flips true.
+ *
+ * @param testId - data-testid for the outer wrapper
+ * @param hasData - Whether diagnostic data is available
+ * @param children - Metric rows to render when hasData is true
+ */
+export const DiagnosticsCard: React.FC<{
+  testId: string
+  hasData: boolean
+  children: React.ReactNode
+}> = ({ testId, hasData, children }) => (
+  <div className="mt-2" data-testid={testId}>
+    <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
+      <div className="px-2 py-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
+        {hasData ? children : <span className="text-text-tertiary">Awaiting diagnostics...</span>}
+      </div>
+    </div>
+  </div>
+)
+
+/**
+ * Norm + drift readout row used across analysis diagnostics.
+ *
+ * Displays `||ψ||²={totalNorm}` plus a signed `Δ={normDrift}%` with danger
+ * coloring when the drift magnitude exceeds 1%. Use `Math.abs` so both
+ * positive (norm gain) and negative (norm loss from absorbing BCs) trigger
+ * the warning — pure-positive checks miss the dominant failure mode.
+ *
+ * @param totalNorm - Current ||ψ||² value
+ * @param normDrift - Signed fractional drift from initial norm
+ */
+export const NormDriftRow: React.FC<{
+  totalNorm: number
+  normDrift: number
+}> = ({ totalNorm, normDrift }) => (
+  <div className="flex gap-3">
+    <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
+    <span className={Math.abs(normDrift) > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
+      Δ={normDrift >= 0 ? '+' : ''}
+      {(normDrift * 100).toFixed(2)}%
+    </span>
+  </div>
+)
+
+/**
  * Labeled sparkline row for a single metric history (ring buffer).
  *
  * @param label - Metric name shown above the sparkline

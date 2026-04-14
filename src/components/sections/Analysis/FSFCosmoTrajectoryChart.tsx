@@ -128,18 +128,24 @@ export const FSFCosmoTrajectoryChart: React.FC<FSFCosmoTrajectoryChartProps> = R
 
     if (!chart) return null
     return (
-      <div className="mt-2">
+      <div className="mt-2" data-testid="fsf-cosmo-trajectory">
         <p className="text-[10px] text-text-tertiary uppercase tracking-wider">
           Cosmological trajectory S(L_A, η)
         </p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-          <svg width="100%" viewBox={`0 0 ${TRAJ_WIDTH} ${TRAJ_HEIGHT}`} className="block">
+          <svg
+            width="100%"
+            viewBox={`0 0 ${TRAJ_WIDTH} ${TRAJ_HEIGHT}`}
+            className="block"
+            data-testid="fsf-cosmo-trajectory-svg"
+          >
             <polyline
               points={chart.pts}
               fill="none"
               stroke="var(--theme-accent)"
               strokeWidth={1.5}
               strokeLinejoin="round"
+              data-testid="fsf-cosmo-trajectory-polyline"
             />
             {chart.markerX !== null && (
               <line
@@ -151,6 +157,7 @@ export const FSFCosmoTrajectoryChart: React.FC<FSFCosmoTrajectoryChartProps> = R
                 strokeWidth={0.75}
                 strokeDasharray="2,3"
                 opacity={0.8}
+                data-testid="fsf-cosmo-trajectory-marker"
               />
             )}
             <text

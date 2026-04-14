@@ -246,15 +246,12 @@ export const TDSESpectrometerPanel: React.FC<TDSESpectrometerPanelProps> = React
     const hasEnoughSamples = sampleCount >= HELLER_DEFAULT_MIN_SAMPLES
     const captureFull = sampleCount >= bufferCapacity
 
+    // bufferRef is a stable mutable reference from the pass that mutates
+    // in place (React cannot observe this). Pass sampleCount through to
+    // force re-derivation when the buffer advances — otherwise T captured /
+    // Δω / Nyquist rows would freeze at the first frame's values.
     const timing = useMemo(
-      () => deriveCaptureTiming(bufferRef),
-      // bufferRef is a stable mutable reference from the pass; the
-      // pass pushes new samples into it in place, which React cannot
-      // see. Including `sampleCount` in the deps is how we force this
-      // memo to re-derive when the buffer advances — without it, the
-      // T captured / Δω / Nyquist rows would freeze at the first
-      // frame's values.
-      // eslint-disable-next-line @eslint-react/exhaustive-deps
+      () => deriveCaptureTiming(bufferRef, sampleCount),
       [bufferRef, sampleCount]
     )
 
