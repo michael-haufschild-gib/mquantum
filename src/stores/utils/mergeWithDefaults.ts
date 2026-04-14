@@ -175,11 +175,49 @@ function normalizeTdseBhParams(normalized: Record<string, unknown>): Record<stri
   return normalized
 }
 
+/**
+ * Reconcile `latticeDim` with the authoritative `gridSize.length` in each
+ * compute-mode sub-config. `reshapeSchroedingerDefaultsForLoadedLattice` only
+ * corrects the default side when the loaded `latticeDim` is a valid integer
+ * in [1, 11]. If the loaded value is out of range, non-integer, non-number,
+ * or non-finite, the reshape step skips and `deepMerge`'s length-equality guard
+ * keeps the default-length arrays while the `latticeDim` primitive is
+ * preserved from the loaded config — leaving an inconsistent (latticeDim,
+ * gridSize) pair. Here we snap `latticeDim` back to `gridSize.length` so the
+ * merged state is always self-consistent.
+ */
+function sanitizeComputeLatticeDims(normalized: Record<string, unknown>): Record<string, unknown> {
+  let out = normalized
+  let cloned = false
+  for (const subKey of LATTICE_SIZED_SUB_CONFIGS) {
+    const sub = out[subKey]
+    if (!sub || typeof sub !== 'object' || Array.isArray(sub)) continue
+    const subRec = sub as Record<string, unknown>
+    const gridSize = subRec.gridSize
+    if (!Array.isArray(gridSize)) continue
+    const authoritative = gridSize.length
+    const current = subRec.latticeDim
+    const valid =
+      typeof current === 'number' &&
+      Number.isFinite(current) &&
+      Number.isInteger(current) &&
+      current === authoritative
+    if (valid) continue
+    if (!cloned) {
+      out = { ...normalized }
+      cloned = true
+    }
+    out[subKey] = { ...subRec, latticeDim: authoritative }
+  }
+  return out
+}
+
 function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
   let normalized = merged as unknown as Record<string, unknown>
   if (normalized.quantumMode === 'hydrogenOrbital') {
     normalized = { ...normalized, quantumMode: 'hydrogenND' }
   }
+  normalized = sanitizeComputeLatticeDims(normalized)
 
   // Enforce the ℓ ≥ s physical invariant on TDSE black-hole parameters for
   // legacy scenes. The BH setters promote ℓ whenever the user raises s, but
@@ -291,7 +329,7 @@ function reshapeSchroedingerDefaultsForLoadedLattice(
     const loadedLatticeDim = (loadedSub as Record<string, unknown>).latticeDim
     if (
       typeof loadedLatticeDim !== 'number' ||
-      !Number.isFinite(loadedLatticeDim) ||
+      !Number.isInteger(loadedLatticeDim) ||
       loadedLatticeDim < 1 ||
       loadedLatticeDim > 11
     ) {

@@ -343,6 +343,29 @@ describe('mergeExtendedObjectStateForType — compute-mode lattice arrays', () =
     const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
     const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
     expect((qw.gridSize as number[]).length).toBe(2)
+    expect(qw.latticeDim).toBe(2)
+  })
+
+  it.each([
+    { label: 'non-integer', value: 3.5 },
+    { label: 'string', value: '3' },
+    { label: 'negative', value: -1 },
+    { label: 'NaN', value: Number.NaN },
+    { label: 'Infinity', value: Number.POSITIVE_INFINITY },
+  ])('snaps latticeDim to gridSize.length when loaded is $label', ({ value }) => {
+    const loaded = {
+      schroedinger: {
+        quantumMode: 'quantumWalk',
+        quantumWalk: {
+          latticeDim: value,
+          gridSize: Array(2).fill(64),
+        },
+      },
+    }
+    const merged = mergeExtendedObjectStateForType(loaded, 'schroedinger')
+    const qw = (merged.schroedinger as { quantumWalk: Record<string, unknown> }).quantumWalk
+    expect(qw.latticeDim).toBe(2)
+    expect((qw.gridSize as number[]).length).toBe(2)
   })
 })
 
