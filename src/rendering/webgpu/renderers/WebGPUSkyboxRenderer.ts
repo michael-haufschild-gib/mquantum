@@ -304,6 +304,14 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       return
     }
 
+    // Guard against dispose() racing with the async load: if the renderer
+    // was torn down while the KTX2 fetch was in flight, destroy the newly
+    // loaded texture immediately to prevent a GPU memory leak.
+    if (!this.device) {
+      cubeTexture.destroy()
+      return
+    }
+
     this.loadedCubeTexture?.destroy()
     this.loadedCubeTexture = cubeTexture
 
