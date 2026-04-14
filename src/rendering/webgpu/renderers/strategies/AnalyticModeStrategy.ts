@@ -39,8 +39,12 @@ function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boole
   return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
 }
 
-/** Prime mixer for combining rotation version and animation-time bucket into a single u32. */
-const BASIS_VERSION_MIXER = 1000003
+/**
+ * Stride for packing rotation version and animation-time bucket into a single JS number.
+ * Wider than any realistic time-bucket range so rotation/time key ranges stay disjoint.
+ */
+const BASIS_VERSION_MIXER = 2 ** 32
+const BASIS_TIME_BUCKET_MODULO = BASIS_VERSION_MIXER
 
 /**
  * Compute the basis-uniform version key from rotation and slice-animation state.
@@ -48,6 +52,9 @@ const BASIS_VERSION_MIXER = 1000003
  * In 4D+ with slice animation enabled, the basis vectors change continuously with
  * `accumulatedTime`, so we bucketize time at 120 Hz to drive uniform-buffer rewrites
  * while still letting the dirty-flag short-circuit static frames.
+ *
+ * The bucket is wrapped modulo `BASIS_VERSION_MIXER` so long-running sessions cannot
+ * overflow into the rotationVersion range and cause dirty-check key collisions.
  */
 function computeBasisVersion(
   rotationVersion: number,
@@ -55,8 +62,9 @@ function computeBasisVersion(
   dimension: number,
   accumulatedTime: number
 ): number {
+  const rawBucket = sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
   const basisTimeBucket =
-    sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
+    ((rawBucket % BASIS_TIME_BUCKET_MODULO) + BASIS_TIME_BUCKET_MODULO) % BASIS_TIME_BUCKET_MODULO
   return rotationVersion * BASIS_VERSION_MIXER + basisTimeBucket
 }
 

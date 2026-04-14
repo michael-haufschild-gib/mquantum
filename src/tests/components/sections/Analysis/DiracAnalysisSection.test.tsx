@@ -68,7 +68,8 @@ describe('DiracAnalysisContent — dispersion diagram', () => {
   it('renders positive and negative energy branch polylines', () => {
     render(<DiracAnalysisContent />)
     // Two branches: particle + antiparticle
-    expect(screen.getAllByTestId('dirac-branch').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByTestId('dirac-branch-positive')).toBeInTheDocument()
+    expect(screen.getByTestId('dirac-branch-negative')).toBeInTheDocument()
   })
 
   it('renders k axis label', () => {

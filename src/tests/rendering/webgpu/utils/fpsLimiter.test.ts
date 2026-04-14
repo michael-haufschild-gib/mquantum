@@ -22,7 +22,9 @@ function runLimiterSimulation({ maxFps, displayFps, durationSeconds }: Simulatio
   let throttleAnchorMs = 0
   let renderedFrames = 0
 
-  for (let nowMs = tickMs; nowMs <= durationMs + 1e-9; nowMs += tickMs) {
+  const frameCount = Math.floor(durationMs / tickMs)
+  for (let frame = 1; frame <= frameCount; frame++) {
+    const nowMs = frame * tickMs
     const decision = evaluateFpsLimit({ nowMs, throttleAnchorMs, maxFps })
     throttleAnchorMs = decision.nextThrottleAnchorMs
     if (decision.shouldRender) renderedFrames++
@@ -161,7 +163,7 @@ describe('evaluateFpsLimit — long-run cadence', () => {
     }
 
     const actualFps = (rendered * 1000) / duration
-    expect(actualFps).toBeGreaterThan(targetFps * 0.9)
-    expect(actualFps).toBeLessThan(targetFps * 1.1)
+    // Tighter than ±10% — catches meaningful throttling regressions
+    expect(Math.abs(actualFps - targetFps)).toBeLessThan(2)
   })
 })

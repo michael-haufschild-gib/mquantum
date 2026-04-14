@@ -61,10 +61,26 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
   const { channelKey, pushOnce, pushWithValue, resetFn, historyArrayKey, testValue } = config
   const hasDataField = config.hasDataField ?? true
 
-  const getChannel = (): ChannelState =>
-    (useDiagnosticsStore.getState() as unknown as StoreState)[channelKey] as ChannelState
-  const reset = (): void =>
-    ((useDiagnosticsStore.getState() as unknown as StoreState)[resetFn] as () => void)()
+  const getChannel = (): ChannelState => {
+    const state = useDiagnosticsStore.getState() as unknown as StoreState
+    const channel = state[channelKey]
+    if (!channel || typeof channel !== 'object') {
+      throw new Error(
+        `describeRingBufferBehavior: channelKey "${channelKey}" is missing or not an object`
+      )
+    }
+    return channel as ChannelState
+  }
+  const reset = (): void => {
+    const state = useDiagnosticsStore.getState() as unknown as StoreState
+    const fn = state[resetFn]
+    if (typeof fn !== 'function') {
+      throw new Error(
+        `describeRingBufferBehavior: resetFn "${resetFn}" is not a function on the store`
+      )
+    }
+    ;(fn as () => void)()
+  }
 
   describe('ring buffer behavior', () => {
     if (hasDataField) {

@@ -149,6 +149,12 @@ describe('isBasisDirty', () => {
     expect(isBasisDirty(t, { ...baseVersions, dimension: 6 })).toBe(true)
   })
 
+  it('reports dirty when schroedinger version changes', () => {
+    const t = createVersionTracker()
+    updateBasisVersions(t, baseVersions)
+    expect(isBasisDirty(t, { ...baseVersions, schroedingerVersion: 3 })).toBe(true)
+  })
+
   it('reports dirty when time-driven basis has a significant time delta', () => {
     const t = createVersionTracker()
     const v = { ...baseVersions, requiresTimeDrivenBasis: true, accumulatedTime: 1.0 }

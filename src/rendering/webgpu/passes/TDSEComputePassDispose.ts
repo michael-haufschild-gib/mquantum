@@ -65,9 +65,9 @@ export function disposeTdseResources(
 }
 
 /**
- * Snapshot of the TDSE pass's GPU buffer/texture fields for disposal.
- * All handles are nulled and the `initialized`/`lastConfigHash` reset flags
- * are cleared in place by {@link destroyTdsePassGpu}.
+ * Mutable TDSE pass GPU buffer/texture fields used during disposal.
+ * All handles are nulled and `initialized`/`lastConfigHash` are reset
+ * in place by {@link destroyTdsePassGpu}.
  */
 export interface TdsePassGpuSnapshot {
   psiReBuffer: GPUBuffer | null
@@ -100,7 +100,7 @@ export interface TdsePassGpuSnapshot {
 
 /**
  * Destroy all GPU buffers/textures owned by the pass and null their handles.
- * Mutates `fields` in place — the caller writes the cleared snapshot back.
+ * Mutates `fields` in place.
  */
 export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
   const bufs: (GPUBuffer | GPUTexture | null | undefined)[] = [
@@ -150,7 +150,7 @@ export function destroyTdsePassGpu(fields: TdsePassGpuSnapshot): void {
  * Extracted from TDSEComputePass.dispose() to keep the orchestrator under
  * the 600-line limit.
  *
- * @param pass - Mutable pass fields (written back via Object.assign)
+ * @param pass - Mutable pass fields (cleared in place)
  * @param vdState - Vortex detection state
  * @param disorderState - Anderson disorder state
  * @param stochasticState - Stochastic localization state
