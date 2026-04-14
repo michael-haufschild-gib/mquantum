@@ -154,4 +154,91 @@ describe('BECControls', () => {
     fireEvent.click(header)
     expect(screen.getByText(/sites/)).toBeInTheDocument()
   })
+
+  describe('Hawking (Analog Horizon) controls', () => {
+    function analogHorizonConfig() {
+      const cfg = defaultConfig()
+      cfg.bec = {
+        ...DEFAULT_BEC_CONFIG,
+        initialCondition: 'blackHoleAnalog',
+        hawkingPairInjection: true,
+      }
+      return cfg
+    }
+
+    it('renders all Hawking sliders, toggle, and seed input for blackHoleAnalog', () => {
+      render(
+        <BECControls config={analogHorizonConfig()} dimension={3} actions={createMockActions()} />
+      )
+      expect(screen.getByTestId('bec-hawking-vmax')).toBeInTheDocument()
+      expect(screen.getByTestId('bec-hawking-lh')).toBeInTheDocument()
+      expect(screen.getByTestId('bec-hawking-deltan')).toBeInTheDocument()
+      expect(screen.getByTestId('bec-hawking-inject')).toBeInTheDocument()
+      expect(screen.getByTestId('bec-hawking-rate')).toBeInTheDocument()
+      expect(screen.getByTestId('bec-hawking-seed')).toBeInTheDocument()
+    })
+
+    it('hides Hawking controls when initial condition is not blackHoleAnalog', () => {
+      render(<BECControls config={defaultConfig()} dimension={3} actions={createMockActions()} />)
+      expect(screen.queryByTestId('bec-hawking-vmax')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('bec-hawking-inject')).not.toBeInTheDocument()
+    })
+
+    it('dispatches setHawkingVmax when the v_max slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={analogHorizonConfig()} dimension={3} actions={actions} />)
+      const slider = screen.getByLabelText('v_max (asymptotic flow)') as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '3.25' } })
+      expect(actions.setHawkingVmax).toHaveBeenCalledWith(3.25)
+    })
+
+    it('dispatches setHawkingLh when the L_h slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={analogHorizonConfig()} dimension={3} actions={actions} />)
+      const slider = screen.getByLabelText('L_h (horizon width)') as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '0.4' } })
+      expect(actions.setHawkingLh).toHaveBeenCalledWith(0.4)
+    })
+
+    it('dispatches setHawkingDeltaN when the Δn slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={analogHorizonConfig()} dimension={3} actions={actions} />)
+      const slider = screen.getByLabelText('Δn (horizon density dip)') as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '0.25' } })
+      expect(actions.setHawkingDeltaN).toHaveBeenCalledWith(0.25)
+    })
+
+    it('dispatches setHawkingPairInjection when the toggle is clicked', () => {
+      const actions = createMockActions()
+      // Start with injection off so toggling flips to true
+      const cfg = defaultConfig()
+      cfg.bec = {
+        ...DEFAULT_BEC_CONFIG,
+        initialCondition: 'blackHoleAnalog',
+        hawkingPairInjection: false,
+      }
+      render(<BECControls config={cfg} dimension={3} actions={actions} />)
+      const toggle = screen.getByRole('switch', { name: 'Pair injection' })
+      fireEvent.click(toggle)
+      expect(actions.setHawkingPairInjection).toHaveBeenCalledWith(true)
+    })
+
+    it('dispatches setHawkingInjectRate when the inject-rate slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={analogHorizonConfig()} dimension={3} actions={actions} />)
+      const slider = screen.getByLabelText('Inject rate') as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '0.12' } })
+      expect(actions.setHawkingInjectRate).toHaveBeenCalledWith(0.12)
+    })
+
+    it('dispatches setHawkingSeed when the seed number input commits on blur', () => {
+      const actions = createMockActions()
+      render(<BECControls config={analogHorizonConfig()} dimension={3} actions={actions} />)
+      const input = screen.getByLabelText('Seed') as HTMLInputElement
+      fireEvent.focus(input)
+      fireEvent.change(input, { target: { value: '42' } })
+      fireEvent.blur(input)
+      expect(actions.setHawkingSeed).toHaveBeenCalledWith(42)
+    })
+  })
 })

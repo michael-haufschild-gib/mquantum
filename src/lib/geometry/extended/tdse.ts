@@ -259,7 +259,7 @@ export interface TdseConfig {
   hawkingLh?: number
   /** Analog Hawking (waterfall) — density dip Δn at the horizon. */
   hawkingDeltaN?: number
-  /** Analog Hawking — stochastic pair-injection enabled flag. */
+  /** Analog Hawking — deterministic (seeded) pair-injection enabled flag. */
   hawkingPairInjection?: boolean
   /** Analog Hawking — injection strength per substep. */
   hawkingInjectRate?: number

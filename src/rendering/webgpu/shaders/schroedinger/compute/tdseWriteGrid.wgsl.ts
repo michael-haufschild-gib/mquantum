@@ -149,6 +149,53 @@ fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   return w;
 }
 
+// Superfluid velocity |v_s|² via central differences with PML-aware boundary
+// handling and periodic wrap-around. Shared by fieldView 4 (superfluidVelocity)
+// and fieldView 6 (machNumber) so both views agree voxel-for-voxel. Uses
+// j/ρ with v_s = (ℏ/m)·Im(ψ*∇ψ)/|ψ|². Returns 0 if only degenerate axes exist.
+fn computeSuperfluidVelocityMagSq(
+  idx: u32,
+  re: f32,
+  im: f32,
+  density: f32,
+  nnCoords: ptr<function, array<u32, 12>>
+) -> f32 {
+  let hbarOverM = params.hbar / max(params.mass, 1e-6);
+  let densitySafe = max(density, 1e-20);
+  let hasPML = params.absorberEnabled != 0u;
+  var vsMagSq: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (params.gridSize[d] <= 1u) { continue; }
+    let stride = params.strides[d];
+    let coord = (*nnCoords)[d];
+    let Nd = params.gridSize[d];
+    let invDx = 0.5 / params.spacing[d];
+    let atLo = coord == 0u;
+    let atHi = coord == Nd - 1u;
+
+    var dRe: f32;
+    var dIm: f32;
+    if (hasPML && atLo) {
+      let fIdx = idx + stride;
+      dRe = (psiRe[fIdx] - re) / params.spacing[d];
+      dIm = (psiIm[fIdx] - im) / params.spacing[d];
+    } else if (hasPML && atHi) {
+      let bIdx = idx - stride;
+      dRe = (re - psiRe[bIdx]) / params.spacing[d];
+      dIm = (im - psiIm[bIdx]) / params.spacing[d];
+    } else {
+      let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+      let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+      dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+      dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+    }
+    let jd = hbarOverM * (re * dIm - im * dRe);
+    let vsd = jd / densitySafe;
+    vsMagSq += vsd * vsd;
+  }
+  return vsMagSq;
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -308,39 +355,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (1.0 - exp(-jNorm)) * densityGate;
   } else if (params.fieldView == 4u) {
     // superfluid velocity magnitude (NN) with PML-aware boundaries
-    let hbarOverM = params.hbar / max(params.mass, 1e-6);
-    var vsqMag: f32 = 0.0;
-    let densitySafe = max(density, 1e-20);
-    let hasPML4 = params.absorberEnabled != 0u;
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      if (params.gridSize[d] <= 1u) { continue; }
-      let stride = params.strides[d];
-      let coord = nnCoords[d];
-      let Nd = params.gridSize[d];
-      let invDx = 0.5 / params.spacing[d];
-      let atLo = coord == 0u;
-      let atHi = coord == Nd - 1u;
-
-      var dRe: f32;
-      var dIm: f32;
-      if (hasPML4 && atLo) {
-        let fIdx = idx + stride;
-        dRe = (psiRe[fIdx] - re) / params.spacing[d];
-        dIm = (psiIm[fIdx] - im) / params.spacing[d];
-      } else if (hasPML4 && atHi) {
-        let bIdx = idx - stride;
-        dRe = (re - psiRe[bIdx]) / params.spacing[d];
-        dIm = (im - psiIm[bIdx]) / params.spacing[d];
-      } else {
-        let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
-        let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
-        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
-      }
-      let jd = hbarOverM * (re * dIm - im * dRe);
-      let vsd = jd / densitySafe;
-      vsqMag += vsd * vsd;
-    }
+    let vsqMag = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords);
     let cs2Peak = max(abs(params.interactionStrength) * params.maxDensity / max(params.mass, 1e-6), 1e-10);
     displayScalar = clamp(sqrt(vsqMag / cs2Peak), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 5u) {
@@ -353,49 +368,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else if (params.fieldView == 6u) {
     // machNumber M(x) = |v_s| / c_s. Analog black-hole horizon sits at M = 1.
     //
-    // v_s from j/ρ: v_s = (ℏ/m) · Im(ψ*∇ψ) / |ψ|². This reuses the same
-    // probability-current formulation as superfluidVelocity (fieldView 4),
-    // so the colour agrees with that view at M = 1. c_s = √(g|ψ|²/m) is the
-    // local Bogoliubov sound speed in natural units (ℏ absorbed into mass).
-    //
-    // Boundary handling is unified with fieldView 2 (current) and 4 (velocity):
-    // when the PML is active at a boundary, use a one-sided difference
-    // (forward at lo, backward at hi); otherwise use periodic wrap-around.
-    // Only degenerate grid dimensions (Nd ≤ 1) are skipped. The density gate
-    // still suppresses spurious high-M voxels in the dilute tail.
-    let hbarOverM = params.hbar / max(params.mass, 1e-6);
-    let densitySafe = max(density, 1e-20);
-    let hasPML6 = params.absorberEnabled != 0u;
-    var vsMagSq: f32 = 0.0;
-    for (var d: u32 = 0u; d < params.latticeDim; d++) {
-      if (params.gridSize[d] <= 1u) { continue; }
-      let stride = params.strides[d];
-      let coord = nnCoords[d];
-      let Nd = params.gridSize[d];
-      let invDx = 0.5 / params.spacing[d];
-      let atLo = coord == 0u;
-      let atHi = coord == Nd - 1u;
-
-      var dRe: f32;
-      var dIm: f32;
-      if (hasPML6 && atLo) {
-        let fIdx = idx + stride;
-        dRe = (psiRe[fIdx] - re) / params.spacing[d];
-        dIm = (psiIm[fIdx] - im) / params.spacing[d];
-      } else if (hasPML6 && atHi) {
-        let bIdx = idx - stride;
-        dRe = (re - psiRe[bIdx]) / params.spacing[d];
-        dIm = (im - psiIm[bIdx]) / params.spacing[d];
-      } else {
-        let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
-        let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
-        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
-      }
-      let jd = hbarOverM * (re * dIm - im * dRe);
-      let vsd = jd / densitySafe;
-      vsMagSq += vsd * vsd;
-    }
+    // v_s from j/ρ: v_s = (ℏ/m) · Im(ψ*∇ψ) / |ψ|². Shares the same
+    // probability-current helper as superfluidVelocity (fieldView 4), so the
+    // colour agrees with that view at M = 1. c_s = √(g|ψ|²/m) is the local
+    // Bogoliubov sound speed in natural units (ℏ absorbed into mass).
+    let vsMagSq = computeSuperfluidVelocityMagSq(idx, re, im, density, &nnCoords);
     // c_s² = g|ψ|²/m (Bogoliubov). Guard against non-positive g or |ψ|²=0.
     let gAbs = max(abs(params.interactionStrength), 1e-10);
     let csSq = max(gAbs * density / max(params.mass, 1e-6), 1e-12);

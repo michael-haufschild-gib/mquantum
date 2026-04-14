@@ -46,9 +46,11 @@ fn hawkingNoise01(siteIdx: u32, seed: u32, stepIdx: u32) -> f32 {
   let a = splitmix32_inj(siteIdx ^ 0x9e3779b1u);
   let b = splitmix32_inj(a ^ splitmix32_inj(seed));
   let c = splitmix32_inj(b ^ splitmix32_inj(stepIdx + 0x632be59bu));
-  // Map to (−1, +1) with 24-bit precision, mirroring the CPU path in
-  // sonicHorizon.ts/hawkingNoise so diagnostics agree with GPU behaviour.
-  return (f32(c & 0xffffffu) / 8388607.0) - 1.0;
+  // Map 24-bit value into [0, 1) via full-scale denominator 2^24 and shift to
+  // (−1, +1). Matches the CPU path in sonicHorizon.ts/hawkingNoise so
+  // diagnostics agree with GPU behaviour and the result never exceeds +1.
+  let v = f32(c & 0xffffffu) / 16777216.0;
+  return v * 2.0 - 1.0;
 }
 
 @compute @workgroup_size(64)

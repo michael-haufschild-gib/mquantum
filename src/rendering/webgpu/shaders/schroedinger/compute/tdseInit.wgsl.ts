@@ -306,9 +306,21 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // the waterfall preset sets trapOmega ≈ 0 so V7 ≈ 0 and the envelope is
     // flat, giving the uniform background that the physics expects. Non-zero
     // trap is still well-defined and just adds a slow envelope.
-    let nTf = max(0.0, (mu7 - V7) / max(abs(g7), 1e-10));
+    //
+    // Guard non-positive g: the TF chemical-potential relation n = (μ − V)/g
+    // only makes sense for a repulsive condensate (g > 0). If the preset is
+    // misconfigured with g ≤ 0 the 1/g division would blow up, so fall back
+    // to a zero TF envelope — the init still runs, the visualization stays
+    // bounded, and the misconfiguration is apparent as a dark slab.
+    var nTf: f32 = 0.0;
+    if (g7 > 0.0) {
+      nTf = max(0.0, (mu7 - V7) / g7);
+    }
     let u7 = x0 / lh;
-    let sech = 1.0 / cosh(u7);
+    // Periodize the sech density dip with the same parabolic detrend used
+    // for the velocity so n'(±L_box/2) = 0 and ψ is C¹ across the FFT wrap.
+    let uPeriod7 = u7 - (2.0 * x0 / lBox) * T7;
+    let sech = 1.0 / cosh(uPeriod7);
     let n = max(nTf * (1.0 - deltaN * sech * sech), 0.0);
     // Numerically-stable ln(cosh(u)) = |u| − ln(2) + ln(1 + e^{−2|u|}).
     let au = abs(u7);

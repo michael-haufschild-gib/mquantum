@@ -99,7 +99,12 @@ export function waterfallSample(x0: number, p: WaterfallParams): SonicSample {
   const lBox = Math.max(Math.abs(p.lBox), 1e-6)
   const T = Math.tanh(lBox / (2 * lh))
   const u = x0 / lh
-  const sech = 1 / Math.cosh(u)
+  // Periodize the sech density dip with the same parabolic detrend used for
+  // the velocity so that n'(±L_box/2) = 0 and ψ stays C¹ across the FFT wrap.
+  // Without this shift the density leaves a derivative seam at the periodic
+  // boundary and the GP nonlinearity amplifies the aliased discontinuity.
+  const uPeriod = u - ((2 * x0) / lBox) * T
+  const sech = 1 / Math.cosh(uPeriod)
   const n = Math.max(p.n0 * (1 - p.deltaN * sech * sech), 1e-12)
   const vsSigned = p.vMax * Math.tanh(u) - p.vMax * ((2 * x0) / lBox) * T
   const vs = Math.abs(vsSigned)
@@ -150,7 +155,11 @@ export function waterfallPhase(x0: number, p: WaterfallParams, hbar = 1): number
 export function findHorizonX0(p: WaterfallParams, samples = 256): number {
   const lBox = Math.max(Math.abs(p.lBox), 1e-6)
   const xMax = lBox * 0.5
-  const n = Math.max(64, Math.floor(samples))
+  // Guard against Infinity/NaN/negative inputs — an unvalidated `samples`
+  // propagates into `n` and the scan loop would never terminate.
+  const MAX_SAMPLES = 1_000_000
+  const safeSamples = Number.isFinite(samples) ? samples : 256
+  const n = Math.min(MAX_SAMPLES, Math.max(64, Math.floor(safeSamples)))
   const xStart = 1e-6 * xMax
   let prevX = xStart
   let prevM = waterfallSample(prevX, p).mach - 1
@@ -282,8 +291,11 @@ export function hawkingNoise(siteIndex: number, seed: number, stepIndex: number)
   const a = splitmix32(siteIndex ^ 0x9e3779b1)
   const b = splitmix32(a ^ splitmix32(seed | 0))
   const c = splitmix32(b ^ splitmix32((stepIndex | 0) + 0x632be59b))
-  // Map to (−1, 1) with 24-bit precision
-  return (c & 0xffffff) / 0x7fffff - 1
+  // Map 24-bit value into [0, 1) via full-scale denominator 2^24 and shift to
+  // (−1, +1). Using 0x1000000 here (not 0x7fffff) guarantees the result never
+  // exceeds +1.
+  const v = (c & 0xffffff) / 0x1000000
+  return v * 2 - 1
 }
 
 /**

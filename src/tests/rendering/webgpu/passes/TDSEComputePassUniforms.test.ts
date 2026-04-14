@@ -333,6 +333,57 @@ describe('writeTdseUniforms', () => {
     )
     expect(f32[192]).toBeCloseTo(0.6) // clamped from 2.0 → 0.6
   })
+
+  it('clamps negative hawkingDeltaN to 0.0', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ hawkingDeltaN: -1.0 }) })
+    )
+    expect(f32[192]).toBe(0.0)
+  })
+
+  it('clamps negative hawkingInjectRate to 0.0', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ hawkingInjectRate: -0.1 }) })
+    )
+    expect(f32[193]).toBe(0.0)
+  })
+
+  it('clamps hawkingInjectRate above 0.5 back to 0.5', () => {
+    const uniformData = new ArrayBuffer(UNIFORM_SIZE)
+    const u32 = new Uint32Array(uniformData)
+    const f32 = new Float32Array(uniformData)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeTdseUniforms(
+      mockDevice,
+      {} as GPUBuffer,
+      uniformData,
+      u32,
+      f32,
+      uniformParams({ config: createTdseConfig({ hawkingInjectRate: 5.0 }) })
+    )
+    expect(f32[193]).toBeCloseTo(0.5)
+  })
 })
 
 describe('buildTdseFFTStagingData', () => {

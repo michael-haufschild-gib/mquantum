@@ -229,6 +229,19 @@ describe('sonicHorizon — deterministic noise', () => {
     }
     expect(differences).toBeGreaterThan(0)
   })
+
+  it('noise stays strictly within [-1, +1) — divisor 2^24 prevents overshoot', () => {
+    // Regression: with the prior 0x7fffff divisor, a masked value of 0xffffff
+    // yielded ≈ 1.000000238 > 1. The fix maps c & 0xffffff into [0, 1) via
+    // the full-scale 0x1000000 denominator so the result cannot exceed +1.
+    const N = 2048
+    for (let i = 0; i < N; i++) {
+      const v = hawkingNoise(i, 0x7fffffff, 0)
+      expect(v).toBeGreaterThanOrEqual(-1)
+      // Strictly < 1 (not <=) — the mapping is (−1, +1) half-open at +1.
+      expect(v).toBeLessThan(1)
+    }
+  })
 })
 
 describe('sonicHorizon — hasHorizon predicate (necessary AND sufficient)', () => {
@@ -260,6 +273,21 @@ describe('sonicHorizon — hasHorizon predicate (necessary AND sufficient)', () 
     const cs0 = asymptoticSoundSpeed(p)
     expect(Math.abs(p.vMax) > cs0).toBe(true) // old predicate would have said "yes horizon"
     expect(hasHorizon(p)).toBe(false) // new predicate correctly says no
+  })
+
+  it('findHorizonX0 terminates for non-finite `samples` (guards against Infinity)', () => {
+    // Regression: an unvalidated `samples = Infinity` would propagate into
+    // `n = Math.floor(samples) = Infinity` and the scan loop would never
+    // terminate. The guard clamps non-finite values to the default and caps
+    // finite inputs at MAX_SAMPLES = 1_000_000.
+    const start = performance.now()
+    const xhInf = findHorizonX0(BASE_PARAMS, Number.POSITIVE_INFINITY)
+    const xhNaN = findHorizonX0(BASE_PARAMS, Number.NaN)
+    const elapsed = performance.now() - start
+    expect(Number.isFinite(xhInf)).toBe(true)
+    expect(Number.isFinite(xhNaN)).toBe(true)
+    // Should complete in well under a second even on cold CI hardware.
+    expect(elapsed).toBeLessThan(1000)
   })
 
   it('returns false for non-finite or non-positive inputs', () => {
