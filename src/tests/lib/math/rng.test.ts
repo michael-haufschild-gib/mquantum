@@ -28,6 +28,24 @@ describe('mulberry32', () => {
       expect(v).toBeLessThan(1)
     }
   })
+
+  it('has reasonable uniformity (chi-squared on 10 bins)', () => {
+    const rng = mulberry32(999)
+    const bins = new Uint32Array(10)
+    const N = 10000
+    for (let i = 0; i < N; i++) {
+      const bin = Math.min(9, Math.floor(rng() * 10))
+      bins[bin]!++
+    }
+    const expectedPerBin = N / 10
+    let chi2 = 0
+    for (let b = 0; b < 10; b++) {
+      const diff = bins[b]! - expectedPerBin
+      chi2 += (diff * diff) / expectedPerBin
+    }
+    // 9 dof, p=0.001 critical value ≈ 27.88
+    expect(chi2).toBeLessThan(28)
+  })
 })
 
 describe('gaussianPair', () => {

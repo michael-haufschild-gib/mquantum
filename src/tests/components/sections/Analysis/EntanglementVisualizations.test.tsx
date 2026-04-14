@@ -24,8 +24,7 @@ import {
 describe('PerDimensionBars', () => {
   it('renders nothing when entropies array is empty', () => {
     const { container } = render(<PerDimensionBars entropies={[]} maxEntropies={[]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking for null render output (no accessible element to query)
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders the per-dimension label', () => {
@@ -58,14 +57,12 @@ describe('PerDimensionBars', () => {
 describe('SpectrumBars', () => {
   it('renders nothing for empty spectrum', () => {
     const { container } = render(<SpectrumBars spectrum={[]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking for null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when all eigenvalues are below threshold (≤ 1e-6)', () => {
     const { container } = render(<SpectrumBars spectrum={[1e-7, 0, 1e-9]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking for null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders the spectrum label with non-zero count', () => {
@@ -79,12 +76,7 @@ describe('SpectrumBars', () => {
     render(<SpectrumBars spectrum={spectrum} />)
     // The label shows all significant eigenvalues (20), but only 16 bars are drawn
     expect(screen.getByText(/ρ₁ spectrum \(20 non-zero\)/)).toBeInTheDocument()
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG rect elements have no accessible name/role for bar chart data
-    const rects = screen
-      .getByText(/ρ₁ spectrum/)
-      .closest('div')!
-      .querySelectorAll('svg rect')
-    expect(rects.length).toBe(16)
+    expect(screen.getAllByTestId('spectrum-bar').length).toBe(16)
   })
 })
 
@@ -101,12 +93,7 @@ describe('MutualInfoHeatmap', () => {
     const N = 3
     const matrix = new Float64Array(N * N).fill(0.1)
     render(<MutualInfoHeatmap matrix={matrix} N={N} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG rect elements for heatmap cells have no accessible role
-    const rects = screen
-      .getByText(/Pairwise mutual information/)
-      .closest('div')!
-      .querySelectorAll('svg rect')
-    expect(rects.length).toBe(N * N)
+    expect(screen.getAllByTestId('mutualinfo-cell').length).toBe(N * N)
   })
 
   it('renders dimension axis labels 0..N-1', () => {
@@ -138,8 +125,7 @@ describe('AtlasHeatmap', () => {
 
   it('renders nothing when results array is empty', () => {
     const { container } = render(<AtlasHeatmap results={[]} />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking for null render output
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders the Entanglement Atlas heading', () => {
@@ -179,8 +165,7 @@ describe('AtlasHeatmap', () => {
     const user = userEvent.setup()
     render(<AtlasHeatmap results={minimalResults} />)
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG g.cursor-crosshair cells have no accessible role for heatmap interaction
-    const cells = document.querySelectorAll('svg g.cursor-crosshair')
+    const cells = screen.getAllByTestId('atlas-cell')
     expect(cells.length).toBeGreaterThan(0)
 
     await user.hover(cells[0]!)
@@ -193,8 +178,7 @@ describe('AtlasHeatmap', () => {
     const user = userEvent.setup()
     render(<AtlasHeatmap results={minimalResults} />)
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG heatmap cells
-    const cells = document.querySelectorAll('svg g.cursor-crosshair')
+    const cells = screen.getAllByTestId('atlas-cell')
     await user.hover(cells[0]!)
     await user.unhover(cells[0]!)
 
@@ -217,8 +201,7 @@ describe('AtlasHeatmap', () => {
         ]}
       />
     )
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- SVG heatmap cells
-    const cells = document.querySelectorAll('svg g.cursor-crosshair')
+    const cells = screen.getAllByTestId('atlas-cell')
     await user.hover(cells[0]!)
     expect(screen.getByText(/Nearly separable/)).toBeInTheDocument()
   })

@@ -75,6 +75,7 @@ export const PortaledSubmenu: React.FC<{
     <m.div
       ref={menuRef}
       data-dropdown-content="true"
+      data-testid="portaled-submenu"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: ready ? 1 : 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}

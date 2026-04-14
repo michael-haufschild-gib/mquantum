@@ -8,7 +8,7 @@
  */
 
 import type { HydrogenBasisState } from './hydrogenBasis'
-import type { TransitionRate } from './hydrogenRates'
+import { KB_ATOMIC, type TransitionRate } from './hydrogenRates'
 import { isAllowedE1 } from './selectionRules'
 import type { LindbladChannel } from './types'
 import type { DensityMatrix } from './types'
@@ -128,8 +128,6 @@ export function validateDetailedBalance(
   temperature: number,
   tolerance: number = 1e-4
 ): boolean {
-  const KB_ATOMIC = 3.1668115634556e-6
-
   for (const rate of rates) {
     if (rate.gammaDown <= 0) continue
     if (temperature <= 0) {

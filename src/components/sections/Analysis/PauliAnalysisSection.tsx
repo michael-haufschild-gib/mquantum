@@ -18,6 +18,8 @@ import { Slider } from '@/components/ui/Slider'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
+import { DiagnosticsCard, NormDriftRow } from './AnalysisPrimitives'
+
 /**
  * Analysis content for pauliSpinor mode.
  * Renders diagnostics controls and live spin observables.
@@ -88,51 +90,34 @@ const PauliDiagnosticsInline: React.FC = React.memo(() => {
   )
 
   return (
-    <div className="mt-2" data-testid="pauli-analysis-inline">
-      <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <div className="px-2 py-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
-          {hasData ? (
-            <>
-              {/* Spin component fractions */}
-              <div className="flex gap-3">
-                <span>↑={(spinUpFraction * 100).toFixed(1)}%</span>
-                <span>↓={(spinDownFraction * 100).toFixed(1)}%</span>
-              </div>
+    <DiagnosticsCard testId="pauli-analysis-inline" hasData={hasData}>
+      {/* Spin component fractions */}
+      <div className="flex gap-3">
+        <span>↑={(spinUpFraction * 100).toFixed(1)}%</span>
+        <span>↓={(spinDownFraction * 100).toFixed(1)}%</span>
+      </div>
 
-              {/* Spin expectation and coherence */}
-              <div className="flex gap-3">
-                <span>
-                  ⟨σ_z⟩={spinExpectationZ >= 0 ? '+' : ''}
-                  {spinExpectationZ.toFixed(3)}
-                </span>
-                <span>|ρ_↑↓|={coherenceMagnitude.toFixed(3)}</span>
-              </div>
+      {/* Spin expectation and coherence */}
+      <div className="flex gap-3">
+        <span>
+          ⟨σ_z⟩={spinExpectationZ >= 0 ? '+' : ''}
+          {spinExpectationZ.toFixed(3)}
+        </span>
+        <span>|ρ_↑↓|={coherenceMagnitude.toFixed(3)}</span>
+      </div>
 
-              {/* Norm and density */}
-              <div className="flex gap-3">
-                <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={Math.abs(normDrift) > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}
-                  {(normDrift * 100).toFixed(2)}%
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <span>n_max={maxDensity.toFixed(4)}</span>
-              </div>
+      <NormDriftRow totalNorm={totalNorm} normDrift={normDrift} />
+      <div className="flex gap-3">
+        <span>n_max={maxDensity.toFixed(4)}</span>
+      </div>
 
-              {/* Characteristic scale */}
-              <div className="mt-1 pt-1 border-t border-[var(--border-subtle)]">
-                <div className="flex gap-3">
-                  <span>ω_L={larmorFrequency.toFixed(3)}</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <span className="text-text-tertiary">Awaiting diagnostics...</span>
-          )}
+      {/* Characteristic scale */}
+      <div className="mt-1 pt-1 border-t border-[var(--border-subtle)]">
+        <div className="flex gap-3">
+          <span>ω_L={larmorFrequency.toFixed(3)}</span>
         </div>
       </div>
-    </div>
+    </DiagnosticsCard>
   )
 })
 

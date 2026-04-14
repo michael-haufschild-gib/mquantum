@@ -86,9 +86,6 @@ describe('PresetSelector', () => {
 
   it('applies optional className prop to wrapper', () => {
     render(<PresetSelector className="test-class" />)
-    // The wrapper renders the label — find it and check the parent has the class
-    const label = screen.getByText('Palette Preset')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking className on wrapper div that has no testid
-    expect(label.closest('.test-class')).toBeInTheDocument()
+    expect(screen.getByTestId('palette-preset-selector')).toHaveClass('test-class')
   })
 })

@@ -18,6 +18,8 @@ import { Slider } from '@/components/ui/Slider'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
+import { DiagnosticsCard, NormDriftRow } from './AnalysisPrimitives'
+
 /**
  * Analysis content for diracEquation mode.
  * Renders diagnostics controls, dispersion diagram, and observables.
@@ -119,7 +121,12 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
           Dirac Dispersion E(k) = ±√((ck)² + (mc²)²)
         </p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-          <svg width="100%" viewBox={`0 0 ${DISP_WIDTH} ${DISP_HEIGHT}`} className="block">
+          <svg
+            width="100%"
+            viewBox={`0 0 ${DISP_WIDTH} ${DISP_HEIGHT}`}
+            className="block"
+            data-testid="dirac-dispersion-svg"
+          >
             {/* Zero energy line */}
             <line
               x1={DISP_PX}
@@ -180,6 +187,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
               stroke="var(--dirac-particle)"
               strokeWidth={2}
               strokeLinejoin="round"
+              data-testid="dirac-branch"
             />
 
             {/* Negative energy branch (antiparticle) */}
@@ -189,6 +197,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
               stroke="var(--dirac-antiparticle)"
               strokeWidth={2}
               strokeLinejoin="round"
+              data-testid="dirac-branch"
             />
 
             {/* Mass gap label */}
@@ -273,46 +282,29 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
   )
 
   return (
-    <div className="mt-2" data-testid="dirac-analysis-inline">
-      <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <div className="px-2 py-1.5 space-y-0.5 text-xs font-mono leading-tight text-text-secondary">
-          {hasData ? (
-            <>
-              {/* Upper / lower spinor component fractions */}
-              <div className="flex gap-3">
-                <span>Upper={(particleFraction * 100).toFixed(1)}%</span>
-                <span>Lower={(antiparticleFraction * 100).toFixed(1)}%</span>
-              </div>
+    <DiagnosticsCard testId="dirac-analysis-inline" hasData={hasData}>
+      {/* Upper / lower spinor component fractions */}
+      <div className="flex gap-3">
+        <span>Upper={(particleFraction * 100).toFixed(1)}%</span>
+        <span>Lower={(antiparticleFraction * 100).toFixed(1)}%</span>
+      </div>
 
-              {/* Norm and density */}
-              <div className="flex gap-3">
-                <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={Math.abs(normDrift) > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}
-                  {(normDrift * 100).toFixed(2)}%
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <span>n_max={maxDensity.toFixed(4)}</span>
-              </div>
+      <NormDriftRow totalNorm={totalNorm} normDrift={normDrift} />
+      <div className="flex gap-3">
+        <span>n_max={maxDensity.toFixed(4)}</span>
+      </div>
 
-              {/* Characteristic scales */}
-              <div className="mt-1 pt-1 border-t border-[var(--border-subtle)]">
-                <div className="flex gap-3">
-                  <span>λ_C={comptonWavelength.toFixed(3)}</span>
-                  <span>ω_Z={zitterbewegungFreq.toFixed(2)}</span>
-                </div>
-                <div className="flex gap-3">
-                  <span>V_K={kleinThreshold.toFixed(2)}</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <span className="text-text-tertiary">Awaiting diagnostics...</span>
-          )}
+      {/* Characteristic scales */}
+      <div className="mt-1 pt-1 border-t border-[var(--border-subtle)]">
+        <div className="flex gap-3">
+          <span>λ_C={comptonWavelength.toFixed(3)}</span>
+          <span>ω_Z={zitterbewegungFreq.toFixed(2)}</span>
+        </div>
+        <div className="flex gap-3">
+          <span>V_K={kleinThreshold.toFixed(2)}</span>
         </div>
       </div>
-    </div>
+    </DiagnosticsCard>
   )
 })
 

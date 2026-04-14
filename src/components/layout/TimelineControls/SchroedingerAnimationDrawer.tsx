@@ -26,6 +26,7 @@ import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/exten
 import { useGeometryStore } from '@/stores/geometryStore'
 
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
+import { DimensionalSweepsSection } from './DimensionalSweepsSection'
 import { DrawerSection } from './DrawerSection'
 import { ProbabilityCurrentPanel } from './ProbabilityCurrentPanel'
 
@@ -274,35 +275,14 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (
-          <DrawerSection
-            title="Dimensional Sweeps"
+          <DimensionalSweepsSection
             enabled={config.sliceAnimationEnabled}
-            onToggle={(v) => setSliceAnimationEnabled(v)}
-            toggleTooltip="Continuously oscillates the 4D slice position so the rendered 3D cross-section sweeps through different hyperplanar cuts of the N-dimensional wavefunction over time."
-            toggleAriaLabel="Toggle dimensional sweeps"
-            testId="animation-panel-sliceAnimation"
-          >
-            <Slider
-              label="Amplitude"
-              min={0.1}
-              max={1.0}
-              step={0.05}
-              tooltip="How far the 4D slice position oscillates from the origin (in wavefunction units). Large values sweep into the outer regions of the hypervolume, revealing more exotic cross-sections; small values stay near the central slice."
-              value={config.sliceAmplitude}
-              onChange={setSliceAmplitude}
-              showValue
-            />
-            <Slider
-              label="Speed"
-              min={0.01}
-              max={0.1}
-              step={0.01}
-              tooltip="Oscillation rate of the slice position. Slow values give a leisurely drift through dimensional layers; fast values cycle rapidly through the full amplitude, blurring distinctions between cross-sections."
-              value={config.sliceSpeed}
-              onChange={setSliceSpeed}
-              showValue
-            />
-          </DrawerSection>
+            amplitude={config.sliceAmplitude}
+            speed={config.sliceSpeed}
+            onToggle={setSliceAnimationEnabled}
+            onChangeAmplitude={setSliceAmplitude}
+            onChangeSpeed={setSliceSpeed}
+          />
         )}
 
         {/* Quantum Phase Evolution - Hydrogen ND mode only */}

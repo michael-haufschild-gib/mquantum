@@ -294,11 +294,10 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
 /**
  * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
  *
- * Velocity-field finite differences + Helmholtz projection + log-spaced
- * shell binning of the Nore/Bradley superfluid decomposition. The three
- * Float64 FFTs are still called from TypeScript via `fft_nd_wasm` before
- * this function's input is assembled; this function covers the residual
- * math that used to run in pure TypeScript in the worker.
+ * Velocity-field finite differences + N-D FFT (via `fft::fft_nd`) +
+ * Helmholtz projection + log-spaced shell binning of the Nore/Bradley
+ * superfluid decomposition.  All steps run entirely in Rust; the JS
+ * caller invokes this single WASM entry point and unpacks the result.
  *
  * # Arguments
  * * `psi_re` / `psi_im` — split wavefunction components (Float32,

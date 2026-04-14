@@ -127,6 +127,7 @@ export const SpectrumBars: React.FC<{ spectrum: number[] }> = React.memo(({ spec
                 height={h}
                 fill="var(--chart-pass-4)"
                 rx={1}
+                data-testid="spectrum-bar"
               />
             )
           })}
@@ -179,6 +180,7 @@ export const MutualInfoHeatmap: React.FC<{
                       : `oklch(${lightness} ${0.15 * frac} 30)` // eslint-disable-line project-rules/no-hardcoded-colors
                   }
                   rx={1}
+                  data-testid="mutualinfo-cell"
                 />
               )
             })
@@ -349,6 +351,7 @@ export const AtlasHeatmap: React.FC<{
               <g
                 key={`${r.lambda}-${r.dim}`}
                 className="cursor-crosshair"
+                data-testid="atlas-cell"
                 onMouseEnter={(e) => {
                   const box = (e.currentTarget as unknown as Element).getBoundingClientRect()
                   setHovered({

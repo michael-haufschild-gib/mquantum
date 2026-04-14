@@ -151,8 +151,7 @@ describe('PortaledSubmenu', () => {
       />
     )
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- data-dropdown-content is a custom attribute with no accessible role
-    const menu = screen.getByText('Sub Item 1').closest('[data-dropdown-content]')!
+    const menu = screen.getByTestId('portaled-submenu')
     await user.hover(menu)
     expect(onMouseEnter).toHaveBeenCalled()
 
@@ -172,9 +171,8 @@ describe('PortaledSubmenu', () => {
       />
     )
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying custom data attribute on portal container
-    const menuEl = screen.getByText('Sub Item 1').closest('[data-dropdown-content="true"]')
-    expect(menuEl).toBeInTheDocument()
+    const menuEl = screen.getByTestId('portaled-submenu')
+    expect(menuEl).toHaveAttribute('data-dropdown-content', 'true')
   })
 
   it('applies fixed position styling', () => {
@@ -189,10 +187,7 @@ describe('PortaledSubmenu', () => {
       />
     )
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking inline style on portal container
-    const menuEl = screen
-      .getByText('Sub Item 1')
-      .closest('[data-dropdown-content="true"]') as HTMLElement
+    const menuEl = screen.getByTestId('portaled-submenu')
     expect(menuEl).toHaveStyle({ position: 'fixed' })
   })
 
@@ -208,11 +203,8 @@ describe('PortaledSubmenu', () => {
       />
     )
 
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking inline style on portal container
-    const menuEl = screen
-      .getByText('Sub Item 1')
-      .closest('[data-dropdown-content="true"]') as HTMLElement
+    const menuEl = screen.getByTestId('portaled-submenu')
     // zIndex = 200 + depth * 10 = 200 + 30 = 230
-    expect(parseInt(menuEl.style.zIndex, 10)).toBe(230)
+    expect(menuEl).toHaveStyle({ zIndex: 230 })
   })
 })

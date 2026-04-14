@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FreeScalarFieldControls } from '@/components/sections/Geometry/SchroedingerControls/FreeScalarFieldControls'
@@ -164,12 +164,9 @@ describe('FreeScalarFieldControls', () => {
         actions={createMockActions()}
       />
     )
-    const select = screen.getByTestId('init-condition-select')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- reading option values from native select element; no accessible query for option values
-    const optionValues = Array.from(select.querySelectorAll('option')).map(
-      (o) => (o as HTMLOptionElement).value
-    )
-    expect(optionValues).toContain('kinkProfile')
+    const select = screen.getByTestId('init-condition-select') as HTMLSelectElement
+    const options = Array.from(select.options).map((o) => o.value)
+    expect(options).toContain('kinkProfile')
   })
 
   it('wallDensity option absent when self-interaction is disabled', () => {
@@ -180,10 +177,9 @@ describe('FreeScalarFieldControls', () => {
         actions={createMockActions()}
       />
     )
-    const select = screen.getByTestId('field-view-selector')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- reading radio button values from toggle group; no accessible query for all values at once
-    const buttons = select.querySelectorAll('[role="radio"]')
-    const values = Array.from(buttons).map((b) => b.getAttribute('value'))
+    const selector = screen.getByTestId('field-view-selector')
+    const radios = within(selector).getAllByRole('radio')
+    const values = radios.map((b) => b.getAttribute('value'))
     expect(values).not.toContain('wallDensity')
   })
 

@@ -57,9 +57,7 @@ describe('DiracAnalysisContent — dispersion diagram', () => {
 
   it('renders an SVG element for E(k) dispersion', () => {
     render(<DiracAnalysisContent />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- verifying SVG existence within known testid container
-    const svg = screen.getByTestId('dirac-dispersion').querySelector('svg')
-    expect(svg).toBeInTheDocument()
+    expect(screen.getByTestId('dirac-dispersion-svg')).toBeInTheDocument()
   })
 
   it('renders the dispersion title text', () => {
@@ -69,10 +67,8 @@ describe('DiracAnalysisContent — dispersion diagram', () => {
 
   it('renders positive and negative energy branch polylines', () => {
     render(<DiracAnalysisContent />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- polyline elements in SVG charts have no accessible roles or text
-    const polylines = screen.getByTestId('dirac-dispersion').querySelectorAll('polyline')
     // Two branches: particle + antiparticle
-    expect(polylines.length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByTestId('dirac-branch').length).toBeGreaterThanOrEqual(2)
   })
 
   it('renders k axis label', () => {

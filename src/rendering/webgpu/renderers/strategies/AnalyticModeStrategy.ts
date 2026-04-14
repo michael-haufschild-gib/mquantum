@@ -39,6 +39,27 @@ function isHydrogenQuantumMode(mode: SchroedingerQuantumMode | undefined): boole
   return mode === 'hydrogenND' || mode === 'hydrogenNDCoupled'
 }
 
+/** Prime mixer for combining rotation version and animation-time bucket into a single u32. */
+const BASIS_VERSION_MIXER = 1000003
+
+/**
+ * Compute the basis-uniform version key from rotation and slice-animation state.
+ *
+ * In 4D+ with slice animation enabled, the basis vectors change continuously with
+ * `accumulatedTime`, so we bucketize time at 120 Hz to drive uniform-buffer rewrites
+ * while still letting the dirty-flag short-circuit static frames.
+ */
+function computeBasisVersion(
+  rotationVersion: number,
+  sliceAnimationEnabled: boolean,
+  dimension: number,
+  accumulatedTime: number
+): number {
+  const basisTimeBucket =
+    sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
+  return rotationVersion * BASIS_VERSION_MIXER + basisTimeBucket
+}
+
 /** Strategy for analytic quantum modes (harmonic oscillator, hydrogen) evaluated per-fragment in WGSL. */
 export class AnalyticModeStrategy implements QuantumModeStrategy {
   readonly isComputeMode = false
@@ -320,9 +341,12 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     const dimension = geometry?.dimension ?? shared.rendererConfig.dimension ?? 3
     const sliceAnimationEnabled = extended?.schroedinger?.sliceAnimationEnabled ?? false
     const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    const basisTimeBucket =
-      sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
-    const basisVersion = rotationVersion * 1000003 + basisTimeBucket
+    const basisVersion = computeBasisVersion(
+      rotationVersion,
+      sliceAnimationEnabled,
+      dimension,
+      accumulatedTime
+    )
 
     // Sync uniform data from renderer to compute pass
     gridPass.updateSchroedingerUniforms(
@@ -440,12 +464,11 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     const dimension = geometry?.dimension ?? shared.rendererConfig.dimension ?? 3
     const sliceAnimEnabled = extended?.schroedinger?.sliceAnimationEnabled ?? false
     const accTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-    const basisTimeBucket = sliceAnimEnabled && dimension > 3 ? Math.floor(accTime * 120.0) : 0
     const rotationVersion = rotation?.version ?? 0
     wignerPass.updateBasisUniforms(
       ctx.device,
       shared.basisUniformData.buffer as ArrayBuffer,
-      rotationVersion * 1000003 + basisTimeBucket
+      computeBasisVersion(rotationVersion, sliceAnimEnabled, dimension, accTime)
     )
 
     const schroedinger = extended?.schroedinger

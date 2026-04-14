@@ -18,6 +18,8 @@ import { Slider } from '@/components/ui/Slider'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
+import { NormDriftRow } from './AnalysisPrimitives'
+
 /* ── SVG layout constants ── */
 const WIDTH = 260
 const HEIGHT = 130
@@ -139,7 +141,12 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
     <div className="mt-2" data-testid="bec-analysis-inline">
       <p className="text-xs text-text-secondary mb-1">Harmonic Trap V(x) & Chemical Potential</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
-        <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
+        <svg
+          width="100%"
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          className="block"
+          data-testid="bec-trap-svg"
+        >
           {/* Zero line */}
           <line
             x1={PADDING_X}
@@ -254,13 +261,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
                 <span>R_TF={thomasFermiRadius.toFixed(2)}</span>
                 <span>n_max={maxDensity.toFixed(4)}</span>
               </div>
-              <div className="flex gap-3">
-                <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={normDrift > 0.01 ? 'text-danger' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}
-                  {(normDrift * 100).toFixed(2)}%
-                </span>
-              </div>
+              <NormDriftRow totalNorm={totalNorm} normDrift={normDrift} />
             </>
           ) : (
             <span className="text-text-tertiary">Awaiting diagnostics...</span>

@@ -323,6 +323,7 @@ const KGDispersionDiagram: React.FC<{
             stroke="var(--theme-accent)"
             strokeWidth={2}
             strokeLinejoin="round"
+            data-testid="kg-dispersion-polyline"
           />
 
           {/* Vertical k-axis */}

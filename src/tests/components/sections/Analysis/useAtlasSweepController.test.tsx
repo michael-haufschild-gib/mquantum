@@ -13,6 +13,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAtlasSweepController } from '@/components/sections/Analysis/useAtlasSweepController'
+import { Button } from '@/components/ui/Button'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -26,14 +27,8 @@ function TestHarness() {
   return (
     <div>
       <span data-testid="status">{status}</span>
-      {/* eslint-disable-next-line project-rules/no-raw-html-controls -- test harness component, not production UI */}
-      <button type="button" onClick={() => handleStartAtlasSweep()}>
-        Start
-      </button>
-      {/* eslint-disable-next-line project-rules/no-raw-html-controls -- test harness component, not production UI */}
-      <button type="button" onClick={handleAbortAtlasSweep}>
-        Abort
-      </button>
+      <Button onClick={() => handleStartAtlasSweep()}>Start</Button>
+      <Button onClick={handleAbortAtlasSweep}>Abort</Button>
     </div>
   )
 }

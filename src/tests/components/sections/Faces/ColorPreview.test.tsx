@@ -29,10 +29,11 @@ describe('ColorPreview', () => {
     }
 
     const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
-    /* eslint-disable @typescript-eslint/no-explicit-any -- getContext has overloaded signatures */
-    getContextSpy.mockImplementationOnce(((contextType: string) =>
-      contextType === '2d' ? (mockContext as CanvasRenderingContext2D) : null) as any)
-    /* eslint-enable @typescript-eslint/no-explicit-any */
+    // getContext's overloaded signatures can't be satisfied by a single
+    // function; cast through unknown to the overload's first form.
+    const impl = (contextType: string): CanvasRenderingContext2D | null =>
+      contextType === '2d' ? (mockContext as CanvasRenderingContext2D) : null
+    getContextSpy.mockImplementationOnce(impl as unknown as HTMLCanvasElement['getContext'])
 
     try {
       useAppearanceStore.getState().setColorAlgorithm('radialDistance')

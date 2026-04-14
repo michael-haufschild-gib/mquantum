@@ -32,8 +32,15 @@ interface RingBufferTestConfig {
   hasDataField?: boolean
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StoreState = Record<string, any>
+type StoreState = Record<string, unknown>
+
+/** Ring-buffer-backed diagnostic channel state fields accessed in these tests. */
+interface ChannelState {
+  hasData?: boolean
+  historyHead: number
+  historyCount: number
+  [historyKey: string]: unknown
+}
 
 /**
  * Generates standard ring buffer behavioral tests for a diagnostics channel.
@@ -54,9 +61,10 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
   const { channelKey, pushOnce, pushWithValue, resetFn, historyArrayKey, testValue } = config
   const hasDataField = config.hasDataField ?? true
 
-  const getChannel = (): StoreState => (useDiagnosticsStore.getState() as StoreState)[channelKey]
+  const getChannel = (): ChannelState =>
+    (useDiagnosticsStore.getState() as unknown as StoreState)[channelKey] as ChannelState
   const reset = (): void =>
-    ((useDiagnosticsStore.getState() as StoreState)[resetFn] as () => void)()
+    ((useDiagnosticsStore.getState() as unknown as StoreState)[resetFn] as () => void)()
 
   describe('ring buffer behavior', () => {
     if (hasDataField) {
@@ -78,7 +86,8 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
 
     it('writes values into TypedArray at head position', () => {
       pushOnce()
-      expect(getChannel()[historyArrayKey][0]).toBeCloseTo(testValue)
+      const arr = getChannel()[historyArrayKey] as Float32Array
+      expect(arr[0]).toBeCloseTo(testValue)
     })
 
     it(`wraps at ${HISTORY_LENGTH} entries`, () => {
@@ -92,7 +101,8 @@ export function describeRingBufferBehavior(config: RingBufferTestConfig): void {
       pushWithValue(0.12345)
       expect(getChannel().historyHead).toBe(1)
       expect(getChannel().historyCount).toBe(HISTORY_LENGTH)
-      expect(getChannel()[historyArrayKey][0]).toBeCloseTo(0.12345)
+      const arr = getChannel()[historyArrayKey] as Float32Array
+      expect(arr[0]).toBeCloseTo(0.12345)
     })
 
     it(`historyCount saturates at ${HISTORY_LENGTH}`, () => {

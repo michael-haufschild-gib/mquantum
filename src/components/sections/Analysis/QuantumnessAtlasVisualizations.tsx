@@ -100,7 +100,12 @@ function ThreeDiagChart<T extends DiagPoint>({
       .join(' ')
 
   return (
-    <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
+    <svg
+      width="100%"
+      viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+      className="block"
+      data-testid="three-diag-chart"
+    >
       <line
         x1={PAD.left}
         y1={PAD.top + PH}
@@ -161,18 +166,21 @@ function ThreeDiagChart<T extends DiagPoint>({
         fill="none"
         stroke={DIAG_COLORS.entanglement}
         strokeWidth={1.5}
+        data-testid="diag-polyline"
       />
       <polyline
         points={polyline('wigner', maxW)}
         fill="none"
         stroke={DIAG_COLORS.wigner}
         strokeWidth={1.5}
+        data-testid="diag-polyline"
       />
       <polyline
         points={polyline('ipr', maxI)}
         fill="none"
         stroke={DIAG_COLORS.ipr}
         strokeWidth={1.5}
+        data-testid="diag-polyline"
       />
       {data.map((d, i) => (
         <React.Fragment key={i}>
@@ -238,7 +246,12 @@ export const DiagnosticScatter: React.FC<{ results: AtlasPoint[] }> = React.memo
           </span>
         ))}
       </div>
-      <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
+      <svg
+        width="100%"
+        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+        className="block"
+        data-testid="diagnostic-scatter"
+      >
         <line
           x1={PAD.left}
           y1={PAD.top + PH}

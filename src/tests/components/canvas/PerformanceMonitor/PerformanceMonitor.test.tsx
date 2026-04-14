@@ -108,9 +108,7 @@ describe('PerformanceMonitor', () => {
     render(<PerformanceMonitor />)
 
     // The outermost m.div has onTap mapped to onClick — click the wrapper above the collapsed-view
-    const collapsedView = screen.getByTestId('collapsed-view')
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- need parent wrapper that has the onTap/onClick handler; no testid available
-    const wrapper = collapsedView.closest('div')!.parentElement!
+    const wrapper = screen.getByTestId('performance-monitor')
     await user.click(wrapper)
     expect(useUIStore.getState().perfMonitorExpanded).toBe(true)
   })

@@ -23,10 +23,21 @@
  */
 
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
-import type { WavefunctionReadbackResult } from '@/rendering/webgpu/utils/wavefunctionReadback'
 
 /** Quantum modes that can be saved/loaded, including pauliSpinor (separate object type). */
 export type SaveableQuantumMode = SchroedingerQuantumMode | 'pauliSpinor'
+
+/** Wavefunction data read back from GPU, ready for serialization. */
+export interface WavefunctionReadbackResult {
+  /** Real parts of the wavefunction (interleaved for multi-component). */
+  re: Float32Array
+  /** Imaginary parts of the wavefunction. */
+  im: Float32Array
+  /** Total number of lattice sites. */
+  totalSites: number
+  /** Number of components per site (1 for TDSE/BEC, 2 for Pauli, S for Dirac). */
+  componentCount: number
+}
 
 const MAGIC = 'MQST'
 const VERSION = 1

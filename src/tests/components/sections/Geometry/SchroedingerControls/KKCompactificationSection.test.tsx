@@ -33,8 +33,7 @@ describe('KKCompactificationSection', () => {
   it('returns null for non-TDSE/BEC modes', () => {
     setMode('harmonicOscillator')
     const { container } = render(<KKCompactificationSection />)
-    // eslint-disable-next-line testing-library/no-node-access, project-rules/no-dom-node-access -- checking null render output for unsupported mode
-    expect(container.firstChild).toBeNull()
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('renders section header for tdseDynamics mode', () => {

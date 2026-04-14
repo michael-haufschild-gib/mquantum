@@ -131,8 +131,8 @@ function scheduleSceneLoadComplete(): void {
   })
 }
 
-/** Restore style stores (appearance, lighting, post-processing, environment, PBR) from scene data. */
-function restoreStyleStores(data: SavedScene['data']): void {
+/** Restore style stores (appearance, lighting, post-processing, environment, PBR) from scene or style data. */
+function restoreStyleStores(data: SavedStyle['data']): void {
   useAppearanceStore.setState({
     ...APPEARANCE_INITIAL_STATE,
     ...normalizeAppearanceLoadData(sanitizeLoadedState(data.appearance)),
@@ -243,12 +243,22 @@ function enforceComputeModeInvariants(): void {
   }
 }
 
-/** Bump all version counters to trigger re-renders after direct setState calls. */
-function bumpAllVersionCounters(): void {
+/**
+ * Bump version counters for the style-side stores (appearance, lighting,
+ * environment, PBR). Direct setState calls bypass the wrapped setters that
+ * auto-increment versions — renderers need these bumps to re-pick material
+ * state after a preset load.
+ */
+function bumpStyleVersionCounters(): void {
   useAppearanceStore.getState().bumpVersion()
   useLightingStore.getState().bumpVersion()
   useEnvironmentStore.getState().bumpAllVersions()
   usePBRStore.getState().bumpVersion()
+}
+
+/** Bump all version counters (style + scene-specific) after a full scene load. */
+function bumpAllVersionCounters(): void {
+  bumpStyleVersionCounters()
   useRotationStore.getState().bumpVersion()
   useExtendedObjectStore.getState().bumpAllVersions()
 }
@@ -338,48 +348,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         const style = get().savedStyles.find((s) => s.id === id)
         if (!style) return
 
-        // Signal scene transition start
         usePerformanceStore.getState().setSceneTransitioning(true)
 
-        // Restore states: spread defaults first, then override with loaded data.
-        // This ensures fields missing from older presets reset to defaults instead
-        // of retaining whatever the current store value happens to be.
-        useAppearanceStore.setState({
-          ...APPEARANCE_INITIAL_STATE,
-          ...normalizeAppearanceLoadData(sanitizeLoadedState(style.data.appearance)),
-        })
-        useLightingStore.setState({
-          ...LIGHTING_INITIAL_STATE,
-          ...normalizeLightingLoadData(sanitizeLoadedState(style.data.lighting)),
-        })
-        usePostProcessingStore.setState({
-          ...POST_PROCESSING_INITIAL_STATE,
-          ...normalizePostProcessingLoadData(sanitizeLoadedState(style.data.postProcessing)),
-        })
-
-        // Handle legacy environment data and keep unified skybox fields canonical.
-        const envData = normalizeEnvironmentLoadData(
-          sanitizeLoadedState({ ...style.data.environment })
-        )
-        useEnvironmentStore.setState({ ...SKYBOX_INITIAL_STATE, ...envData })
-
-        // Restore PBR settings (legacy imports without pbr should reset to defaults)
-        const stylePbrData = style.data.pbr
-          ? sanitizeLoadedState(style.data.pbr)
-          : ({} as Record<string, unknown>)
-        if (Object.keys(stylePbrData).length > 0) {
-          usePBRStore.setState({ ...PBR_INITIAL_STATE, ...normalizePbrLoadData(stylePbrData) })
-        } else {
-          usePBRStore.getState().resetPBR()
-        }
-
-        // Bump version counters to trigger re-renders after direct setState calls
-        // This is necessary because setState bypasses the wrapped setters that auto-increment versions
-        useAppearanceStore.getState().bumpVersion()
-        useLightingStore.getState().bumpVersion()
-
-        useEnvironmentStore.getState().bumpAllVersions()
-        usePBRStore.getState().bumpVersion()
+        restoreStyleStores(style.data)
+        bumpStyleVersionCounters()
 
         // Increment preset load version to trigger material recreation in renderers
         // This ensures material properties (transparent, depthWrite) match loaded state

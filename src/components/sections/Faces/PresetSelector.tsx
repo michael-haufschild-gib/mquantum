@@ -67,7 +67,7 @@ export const PresetSelector: React.FC<PresetSelectorProps> = React.memo(({ class
   )
 
   return (
-    <div className={className}>
+    <div className={className} data-testid="palette-preset-selector">
       <Select
         label="Palette Preset"
         tooltip="Pre-built cosine gradient palettes. Select a preset or customize coefficients in the Advanced Editor."

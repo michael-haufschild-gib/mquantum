@@ -10,6 +10,8 @@
 
 import type { QuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { logger } from '@/lib/logger'
+import { hermite } from '@/lib/math/hermitePolynomial'
+import { factorial } from '@/lib/math/specialFunctions'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
@@ -436,18 +438,6 @@ export function computeCanonicalCompensation(
   dimension: number,
   boundingRadius: number
 ): { compensation: number; peakDensity: number } {
-  // Physicists' Hermite polynomial coefficients H_n(u), stored as [u^0, u^1, ..., u^6]
-  const HERMITE_COEFFS: number[][] = [
-    [1], // H_0
-    [0, 2], // H_1
-    [-2, 0, 4], // H_2
-    [0, -12, 0, 8], // H_3
-    [12, 0, -48, 0, 16], // H_4
-    [0, 120, 0, -160, 0, 32], // H_5
-    [-120, 0, 720, 0, -480, 0, 64], // H_6
-  ]
-  const FACTORIALS = [1, 1, 2, 6, 24, 120, 720]
-
   if (preset.termCount === 0) return { compensation: 1.0, peakDensity: 0.1 }
 
   // Find the dominant term (largest |c_k|^2)
@@ -475,23 +465,17 @@ export function computeCanonicalCompensation(
     if (nRaw == null) continue
     const n = Math.max(0, Math.min(6, Math.round(nRaw)))
     const omega = Math.max(preset.omega[j] ?? 1.0, 0.01)
-    const coeffs = HERMITE_COEFFS[n]
-    if (!coeffs) continue
 
     // Find max of H_n^2(u) * exp(-u^2) numerically over u in [0, 5]
     let maxHermiteSq = 0
     for (let i = 0; i <= 500; i++) {
       const u = (i / 500) * 5.0
-      let hn = 0
-      for (let k = coeffs.length - 1; k >= 0; k--) {
-        hn = hn * u + (coeffs[k] ?? 0)
-      }
+      const hn = hermite(n, u)
       const val = hn * hn * Math.exp(-u * u)
       if (val > maxHermiteSq) maxHermiteSq = val
     }
 
-    const factorial = FACTORIALS[n] ?? 1
-    const twoN_nFact = Math.pow(2, n) * factorial
+    const twoN_nFact = Math.pow(2, n) * factorial(n)
     const peak1D = (Math.sqrt(omega / Math.PI) / twoN_nFact) * maxHermiteSq
     peakDensity *= peak1D
   }

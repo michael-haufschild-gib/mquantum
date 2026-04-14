@@ -43,8 +43,8 @@ export interface TransitionRate {
 /** Fine structure constant */
 const ALPHA = 1 / 137.035999084
 
-/** Boltzmann constant in atomic units (E_h / K) */
-const KB_ATOMIC = 3.1668115634556e-6
+/** Boltzmann constant in atomic units (E_h / K). */
+export const KB_ATOMIC = 3.1668115634556e-6
 
 // ---------------------------------------------------------------------------
 // Rate functions
