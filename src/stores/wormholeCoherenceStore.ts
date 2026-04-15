@@ -34,7 +34,8 @@ export interface WormholeCoherenceBuffer {
  * clamped to `[1, MAX]`).
  */
 export function createWormholeCoherenceBuffer(capacity: number): WormholeCoherenceBuffer {
-  const cap = Math.max(1, Math.min(MAX_WORMHOLE_COHERENCE_CAPACITY, Math.floor(capacity)))
+  const raw = Number.isFinite(capacity) ? Math.floor(capacity) : DEFAULT_WORMHOLE_COHERENCE_CAPACITY
+  const cap = Math.max(1, Math.min(MAX_WORMHOLE_COHERENCE_CAPACITY, raw))
   return {
     simTime: new Float64Array(cap),
     coherence: new Float64Array(cap),
@@ -142,6 +143,8 @@ export const useWormholeCoherenceStore = create<WormholeCoherenceState>((set, ge
       set((s) => ({
         lastCoherence: 0,
         lastT: 0,
+        lastAxis: 0,
+        lastG: 0,
         version: s.version + 1,
       }))
     },
@@ -154,6 +157,8 @@ export const useWormholeCoherenceStore = create<WormholeCoherenceState>((set, ge
             buffer: fresh,
             lastCoherence: 0,
             lastT: 0,
+            lastAxis: 0,
+            lastG: 0,
             version: s.version + 1,
           }) as Partial<WormholeCoherenceState>
       )
