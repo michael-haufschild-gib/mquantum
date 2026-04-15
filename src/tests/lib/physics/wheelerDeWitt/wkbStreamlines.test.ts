@@ -52,4 +52,39 @@ describe('WKB streamlines', () => {
     })
     expect(overlay.maxIntensity).toBeGreaterThan(0)
   })
+
+  it('propagate beyond the seed cell (regression: RK4 stall on fractional indices)', () => {
+    // Before the sampleArg rounding fix: rk4Step advanced to fractional
+    // coordinates; sampleArg indexed the typed array with non-integer keys,
+    // got undefined → 0, collapsed the gradient to zero, and the `delta <
+    // 1e-4` guard terminated every streamline after a single step. Overlay
+    // then only held single-splat clusters.
+    // After the fix: streamlines march for many steps and the overlay
+    // touches an order of magnitude more voxels.
+    const out = solveWheelerDeWitt({
+      boundaryCondition: 'tunneling',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.2,
+      aMin: 0.5,
+      aMax: 2.0,
+      gridNa: 32,
+      gridNphi: 16,
+      phiExtent: 2.0,
+    })
+    const overlay = integrateWkbStreamlines(out, {
+      density: 4,
+      maxSteps: 40,
+      splatRadius: 0.9,
+    })
+
+    let touched = 0
+    for (let i = 0; i < overlay.intensity.length; i++) {
+      if ((overlay.intensity[i] ?? 0) > 1e-6) touched++
+    }
+
+    // Broken: ~seedCount × splatFootprint ≈ O(100) voxels.
+    // Fixed: seedCount × steps × splatFootprint ≈ O(10000). 1000 gives
+    // comfortable margin and is insensitive to small physics tuning.
+    expect(touched).toBeGreaterThan(1000)
+  })
 })

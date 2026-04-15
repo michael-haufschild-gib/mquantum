@@ -11,8 +11,12 @@
  *
  *   χ(a+da, φ) = 2 χ(a, φ) − χ(a−da, φ) + da²·[ (1/a²)·∇²_φ χ − U·χ ]
  *
- * The φ-Laplacian uses 2nd-order central differences with Dirichlet-zero
- * boundary conditions at the outer φ-edges.
+ * The φ-Laplacian uses 2nd-order central differences with ghost-zero
+ * Dirichlet conditions at the outer φ-edges — i.e. cells one step beyond
+ * the grid are treated as χ = 0 when computing the Laplacian at edge
+ * cells `i1 ∈ {0, Nphi-1}` and `i2 ∈ {0, Nphi-1}`. Edge cells themselves
+ * evolve under the PDE (they are not pinned to zero), which preserves the
+ * non-trivial Gaussian-in-φ envelope supplied by the boundary generators.
  *
  * Output: interleaved (re, im) Float32Array of shape (Na, Nphi, Nphi) in
  * row-major order [ia, iPhi1, iPhi2] with 2 floats per cell, plus a
@@ -159,7 +163,8 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       const V = wdwPotential(phi1, phi2, inflatonMass, cosmologicalConstant)
       const U0 = -C_U * a0 * a0 * (1 - WDW_G_PREFACTOR * a0 * a0 * V)
 
-      // Central differences with zero Dirichlet boundary at Nphi edges.
+      // Central differences with ghost-zero Dirichlet (ghost cells one step
+      // beyond the grid are χ = 0; edge cells evolve under the PDE).
       const cre = initial.chi[2 * idx] ?? 0
       const cim = initial.chi[2 * idx + 1] ?? 0
       const pre1 = i1 > 0 ? (initial.chi[2 * ((i1 - 1) * Nphi + i2)] ?? 0) : 0

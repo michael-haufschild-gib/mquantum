@@ -149,6 +149,44 @@ fn cornerWeight(fracs: ptr<function, array<f32, 12>>, corner: u32) -> f32 {
   return w;
 }
 
+// Analog-Hawking quantum-extremal island membership test. Returns true iff
+// the voxel at nnCoords lies inside the Page-curve island ball on the
+// supersonic side of the horizon. See islandMask.ts for the pure-TS
+// reference used by unit tests. When islandOverlayEnabled is 0 or the
+// radius is zero the function short-circuits to false so callers can treat
+// it as a no-op in the common path.
+fn voxelIsInIsland(nnCoords: ptr<function, array<u32, 12>>) -> bool {
+  if (params.islandOverlayEnabled == 0u) { return false; }
+  if (params.islandRadiusWs <= 0.0) { return false; }
+  let interpDims = min(params.latticeDim, 3u);
+  // Voxel world-space coordinate: (coord - N/2) * spacing along each of the
+  // visible lattice axes. Axes with latticeDim < 3 contribute 0 (treated as
+  // coincident with the origin in the missing dimensions).
+  var wx: array<f32, 3>;
+  wx[0] = 0.0;
+  wx[1] = 0.0;
+  wx[2] = 0.0;
+  for (var d: u32 = 0u; d < interpDims; d++) {
+    let N = f32(params.gridSize[d]);
+    let dx = params.spacing[d];
+    wx[d] = (f32((*nnCoords)[d]) - 0.5 * N) * dx;
+  }
+  let cx = params.islandCenterX0;
+  // Supersonic-side gate mirrors islandMask.ts:
+  //   centerX0 == 0  → gate is permissive (ball centred at origin)
+  //   otherwise      → same sign AND |wx[0]| ≥ |centerX0| (modulo fuzz)
+  let eps = 1e-6;
+  let onSupersonicSide = (cx == 0.0) ||
+    (wx[0] * cx >= 0.0 && abs(wx[0]) >= abs(cx) - eps);
+  if (!onSupersonicSide) { return false; }
+  let dx0 = wx[0] - cx;
+  let dy = wx[1];
+  let dz = wx[2];
+  let r2 = dx0 * dx0 + dy * dy + dz * dz;
+  let R = params.islandRadiusWs;
+  return r2 <= R * R;
+}
+
 // Superfluid velocity |v_s|² via central differences with PML-aware boundary
 // handling and periodic wrap-around. Shared by fieldView 4 (superfluidVelocity)
 // and fieldView 6 (machNumber) so both views agree voxel-for-voxel. Uses
@@ -394,6 +432,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = (0.5 + 0.5 * normPot) * max(densityGate, potGate);
   } else {
     displayScalar = 0.0;
+  }
+
+  // Analog-Hawking quantum-extremal island overlay. When a voxel lies in the
+  // Page-curve island ball we (a) brighten its display scalar by islandBoost
+  // (CPU-clamped to [1.0, 4.0]) and (b) shift its phase by +π/4 so the
+  // existing phase-mixed colormap tints the region. Both effects land before
+  // the final clamp so saturated voxels cap at 1.0 rather than wrapping.
+  if (voxelIsInIsland(&nnCoords)) {
+    displayScalar = displayScalar * params.islandBoost;
+    phase = phase + 0.7853981633974483;
   }
 
   let normDensity = clamp(displayScalar * perpFalloff, 0.0, 1.0);

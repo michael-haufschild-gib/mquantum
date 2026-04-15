@@ -64,8 +64,13 @@ export interface PageCurveState {
   dMaxFrac: number
   /** UI toggle — SVG HUD visibility. */
   pageCurveHudEnabled: boolean
-  /** UI toggle — island overlay in the density render (render integration deferred). */
+  /** UI toggle — island overlay in the density render (3D shader channel). */
   islandOverlayEnabled: boolean
+  /**
+   * Brightness multiplier applied to voxels inside the island in the TDSE
+   * write-grid shader. Clamped to [1.0, 4.0] by {@link setIslandBoost}.
+   */
+  islandBoost: number
   /** Latest Bekenstein–Hawking entropy (cached for HUD). */
   lastSBH: number
   /** Latest thermal entropy rate (cached for HUD + debugging). */
@@ -100,6 +105,8 @@ export interface PageCurveState {
   setPageCurveHudEnabled: (enabled: boolean) => void
   /** Toggle island overlay visibility. */
   setIslandOverlayEnabled: (enabled: boolean) => void
+  /** Set the island-overlay brightness multiplier (clamped to [1.0, 4.0]). */
+  setIslandBoost: (value: number) => void
   /** Compute the Page time from the current buffer, null if no crossing. */
   getPageTime: () => number | null
 }
@@ -113,6 +120,7 @@ export const PAGE_CURVE_DEFAULTS = {
   dMaxFrac: 0.8,
   pageCurveHudEnabled: false,
   islandOverlayEnabled: false,
+  islandBoost: 1.8,
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -136,6 +144,7 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
     dMaxFrac: PAGE_CURVE_DEFAULTS.dMaxFrac,
     pageCurveHudEnabled: PAGE_CURVE_DEFAULTS.pageCurveHudEnabled,
     islandOverlayEnabled: PAGE_CURVE_DEFAULTS.islandOverlayEnabled,
+    islandBoost: PAGE_CURVE_DEFAULTS.islandBoost,
     lastSBH: 0,
     lastRate: 0,
     lastSTherm: 0,
@@ -233,6 +242,7 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
     },
     setPageCurveHudEnabled: (enabled) => set({ pageCurveHudEnabled: !!enabled }),
     setIslandOverlayEnabled: (enabled) => set({ islandOverlayEnabled: !!enabled }),
+    setIslandBoost: (value) => set({ islandBoost: clamp(value, 1.0, 4.0) }),
 
     getPageTime: () => {
       const state = get()

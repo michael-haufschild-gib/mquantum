@@ -266,6 +266,29 @@ export interface TdseConfig {
   /** Analog Hawking — deterministic noise seed. */
   hawkingSeed?: number
 
+  // === Analog Hawking — quantum-extremal island overlay ===
+  /**
+   * Enable the 3D island-density overlay in the TDSE write-grid shader. When
+   * on, voxels inside the Page-curve quantum-extremal island ball receive a
+   * brightness boost and a π/4 phase-hue shift so the region is visually
+   * distinct against the supersonic background.
+   */
+  islandOverlayEnabled?: boolean
+  /**
+   * Horizon centroid along axis 0 in world units. Sign encodes which side of
+   * the origin the black-hole horizon lives on. When the overlay is off or no
+   * horizon exists the strategy writes 0 so the shader no-ops.
+   */
+  islandCenterX0?: number
+  /** Island radius d*(t) in world units (≥ 0). */
+  islandRadiusWs?: number
+  /**
+   * Brightness multiplier applied to the display scalar inside the island.
+   * Clamped to [1.0, 4.0] by the page-curve store. Defaults to 1.0 (no boost)
+   * when the overlay is off.
+   */
+  islandBoost?: number
+
   /** Trap omega used ONLY during initialization (quench scenarios).
    *  When set and different from harmonicOmega, the init pass creates the TF profile
    *  for this omega, then the potential is filled with harmonicOmega for evolution.

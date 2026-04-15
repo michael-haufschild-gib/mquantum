@@ -32,6 +32,11 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `sloc_n` | int 1-32 | Collapse sites per step |
 | `brc` | 0/1 | TDSE branch visualization — moves diagnostic partition to the branch plane |
 | `brc_p` | float -1 to 1 | Normalized branch plane position along axis 0 |
+| `wdw_bc` | enum | Wheeler–DeWitt boundary condition (`noBoundary`, `tunneling`, `deWitt`) |
+| `wdw_m` | float 0-2 | Wheeler–DeWitt inflaton mass m |
+| `wdw_lambda` | float -1..1 | Wheeler–DeWitt cosmological constant Λ |
+| `wdw_sl` | 0/1 | Wheeler–DeWitt WKB streamline overlay toggle |
+| `wdw_sld` | int 2-16 | Wheeler–DeWitt streamline seed density per axis |
 
 ## Rules
 

@@ -734,4 +734,35 @@ describe('state-serializer', () => {
       expect(round.cosmologySteepness).toBeCloseTo(3.4645, 4)
     })
   })
+
+  describe('Wheeler–DeWitt minisuperspace params', () => {
+    it('round-trips streamline toggle + density alongside physics fields', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwBoundaryCondition: 'tunneling',
+        wdwInflatonMass: 0.42,
+        wdwCosmologicalConstant: 0.11,
+        wdwStreamlinesEnabled: true,
+        wdwStreamlineDensity: 9,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_sl=1')
+      expect(serialized).toContain('wdw_sld=9')
+      const round = deserializeState(serialized)
+      expect(round.wdwBoundaryCondition).toBe('tunneling')
+      expect(round.wdwInflatonMass).toBeCloseTo(0.42, 4)
+      expect(round.wdwCosmologicalConstant).toBeCloseTo(0.11, 4)
+      expect(round.wdwStreamlinesEnabled).toBe(true)
+      expect(round.wdwStreamlineDensity).toBe(9)
+    })
+
+    it('clamps streamline density to [2, 16]', () => {
+      const tooLow = deserializeState('wdw_sld=1')
+      const tooHigh = deserializeState('wdw_sld=42')
+      expect(tooLow.wdwStreamlineDensity).toBe(2)
+      expect(tooHigh.wdwStreamlineDensity).toBe(16)
+    })
+  })
 })

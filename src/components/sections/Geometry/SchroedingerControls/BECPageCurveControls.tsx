@@ -28,11 +28,13 @@ export const BECPageCurveControls: React.FC = React.memo(() => {
     dMaxFrac,
     pageCurveHudEnabled,
     islandOverlayEnabled,
+    islandBoost,
     setGEff,
     setSbCoefficient,
     setDMaxFrac,
     setPageCurveHudEnabled,
     setIslandOverlayEnabled,
+    setIslandBoost,
   } = usePageCurveStore(
     useShallow((s) => ({
       gEff: s.gEff,
@@ -40,11 +42,13 @@ export const BECPageCurveControls: React.FC = React.memo(() => {
       dMaxFrac: s.dMaxFrac,
       pageCurveHudEnabled: s.pageCurveHudEnabled,
       islandOverlayEnabled: s.islandOverlayEnabled,
+      islandBoost: s.islandBoost,
       setGEff: s.setGEff,
       setSbCoefficient: s.setSbCoefficient,
       setDMaxFrac: s.setDMaxFrac,
       setPageCurveHudEnabled: s.setPageCurveHudEnabled,
       setIslandOverlayEnabled: s.setIslandOverlayEnabled,
+      setIslandBoost: s.setIslandBoost,
     }))
   )
 
@@ -63,11 +67,21 @@ export const BECPageCurveControls: React.FC = React.memo(() => {
         data-testid="bec-page-curve-hud-toggle"
       />
       <Switch
-        label="Island overlay (HUD marker)"
-        tooltip="Mark the island radius d*(t) inside the HUD. GPU density integration is deferred — the radius is logged and rendered on the HUD only."
+        label="Island overlay (3D + HUD)"
+        tooltip="Paint the Page-curve island ball into the rendered density volume (and mark it in the HUD). Voxels inside the island are brightened by the Island boost slider and phase-shifted by π/4."
         checked={islandOverlayEnabled}
         onCheckedChange={setIslandOverlayEnabled}
         data-testid="bec-island-overlay-toggle"
+      />
+      <Slider
+        label="Island boost"
+        tooltip="Brightness multiplier applied to voxels inside the island in the 3D render. 1.0 = off, 4.0 = strong glow."
+        value={islandBoost}
+        onChange={setIslandBoost}
+        min={1.0}
+        max={4.0}
+        step={0.05}
+        data-testid="bec-island-boost"
       />
       <Slider
         label="G_eff"

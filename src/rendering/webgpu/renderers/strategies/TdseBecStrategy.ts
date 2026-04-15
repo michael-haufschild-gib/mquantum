@@ -7,8 +7,13 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
  */
 
+import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
+import {
+  hawkingReadout,
+  type WaterfallParams,
+} from '@/lib/physics/bec/sonicHorizon'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import type {
   EntanglementWorkerRequest,
@@ -16,6 +21,7 @@ import type {
 } from '@/lib/physics/coordinateEntanglement.worker'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
+import { usePageCurveStore } from '@/stores/pageCurveStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -35,7 +41,7 @@ import {
   createDensityTextureBindings,
   handleSimulationStateIO,
 } from './computeGridUtils'
-import { buildBecConfig } from './TdseBecConfigBuilder'
+import { buildBecConfig, computeWaterfallBackgroundDensity } from './TdseBecConfigBuilder'
 import { getCurrentEigenstateEnergy, handleMeasurement } from './TdseBecMeasurement'
 import {
   createBecSpectrumWorkerState,
@@ -47,6 +53,56 @@ import type {
   QuantumModeStrategy,
   SchroedingerSnapshot,
 } from './types'
+
+/**
+ * Build the canonical waterfall parameter struct from the current BEC config.
+ * Matches the shape used by `HawkingPageCurvePanel.buildWaterfallParams` so the
+ * GPU-side island centroid and the CPU-side HUD readout stay in lock-step.
+ *
+ * @param bec - BEC slice of the extended object store.
+ * @returns Waterfall parameters consistent with the analog-Hawking simulator.
+ */
+function buildWaterfallParams(bec: BecConfig): WaterfallParams {
+  const gridSize = bec.gridSize as number[]
+  const spacing = bec.spacing as number[]
+  return {
+    vMax: bec.hawkingVmax ?? 2.0,
+    lh: bec.hawkingLh ?? 0.6,
+    n0: computeWaterfallBackgroundDensity({ interactionStrength: bec.interactionStrength ?? 500 }),
+    deltaN: bec.hawkingDeltaN ?? 0,
+    g: bec.interactionStrength ?? 500,
+    mass: bec.mass ?? 1.0,
+    lBox: (gridSize[0] ?? 64) * (spacing[0] ?? 0.15),
+  }
+}
+
+/**
+ * Inject the analog-Hawking quantum-extremal island overlay fields into a
+ * per-frame TDSE config when the overlay is active. When preconditions fail
+ * (disabled, wrong initial condition, no horizon, zero radius) the function
+ * returns the input unchanged — the shader then no-ops on zero radius.
+ *
+ * @param config - base TDSE config built for this frame.
+ * @param bec - BEC slice from the extended store (source of horizon geometry).
+ * @returns Either the original config or a spread copy with island fields set.
+ */
+function applyIslandOverlay(config: TdseConfig, bec: BecConfig): TdseConfig {
+  const pc = usePageCurveStore.getState()
+  if (!pc.islandOverlayEnabled) return config
+  if (bec.initialCondition !== 'blackHoleAnalog') return config
+  const lastIslandRadius = pc.lastIslandRadius
+  if (!Number.isFinite(lastIslandRadius) || lastIslandRadius <= 0) return config
+  const wf = buildWaterfallParams(bec)
+  const readout = hawkingReadout(wf)
+  if (!Number.isFinite(readout.horizonX0)) return config
+  return {
+    ...config,
+    islandOverlayEnabled: true,
+    islandCenterX0: readout.horizonX0,
+    islandRadiusWs: lastIslandRadius,
+    islandBoost: pc.islandBoost,
+  }
+}
 
 /** Interval (in diagnostic cycles) between spectrum computations. */
 const SPECTRUM_INTERVAL = 4
@@ -206,6 +262,17 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     if (appearance?.colorAlgorithm === 'quantumPotential' && tdseConfig.fieldView !== 'density') {
       tdseConfig = { ...tdseConfig, fieldView: 'density' }
+    }
+
+    // Analog-Hawking island overlay: when the user has toggled the overlay
+    // on AND the BEC is in blackHoleAnalog mode with a horizon AND the
+    // page-curve store has accumulated an island radius > 0, forward the
+    // island centroid (x₀ in world units) and radius into the TDSE uniforms
+    // so the write-grid shader can paint the island voxels. When any of
+    // those preconditions fails we pass through with the defaults and the
+    // shader no-ops. Mirrors the hawkingVmax/hawkingSeed plumbing pattern.
+    if (isBecMode && extended?.schroedinger?.bec) {
+      tdseConfig = applyIslandOverlay(tdseConfig, extended.schroedinger.bec)
     }
 
     const tdseWithSharedPml = applySharedPml(tdseConfig, schroedinger)

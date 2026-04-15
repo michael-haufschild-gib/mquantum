@@ -5,11 +5,13 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 800 bytes.
+ * Total size: 832 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  * Black-hole Regge–Wheeler fields at offsets 748-756.
  * Analog Hawking (waterfall sonic horizon) block at offsets 760-792.
+ * ER=EPR double-trace wormhole coupling at offsets 800-815.
+ * Analog Hawking quantum-extremal island overlay at offsets 816-831.
  *
  * @module
  */
@@ -138,6 +140,12 @@ struct TDSEUniforms {
   wormholeCouplingEnabled: u32, // offset 800 — 0/1 flag
   wormholeCouplingG: f32,       // offset 804 — coupling strength g ≥ 0
   wormholeMirrorAxis: u32,      // offset 808 — mirror axis index (0, 1, 2)
-  _padWormhole: u32,            // offset 812 — pad to 16-byte align (total size = 816)
+  _padWormhole: u32,            // offset 812 — pad to 16-byte align
+
+  // Analog Hawking quantum-extremal island overlay (16 bytes, 816-831)
+  islandOverlayEnabled: u32,    // offset 816 — 0/1 flag
+  islandCenterX0: f32,          // offset 820 — horizon centroid along axis 0 (world units, sign encodes side)
+  islandRadiusWs: f32,          // offset 824 — island radius d*(t) in world units (≥ 0)
+  islandBoost: f32,             // offset 828 — brightness multiplier inside the island (1.0 = off)
 }
 `

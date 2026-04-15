@@ -74,6 +74,38 @@ describe('pageCurveStore', () => {
     expect(usePageCurveStore.getState().sbCoefficient).toBe(1e-6)
   })
 
+  it('defaults islandBoost to 1.8 and clamps setIslandBoost to [1.0, 4.0]', () => {
+    // Reset to initial state so prior tests don't bleed boost mutations in.
+    usePageCurveStore.setState(usePageCurveStore.getInitialState())
+    expect(usePageCurveStore.getState().islandBoost).toBe(1.8)
+    // Below 1.0 → clamp up.
+    usePageCurveStore.getState().setIslandBoost(0.1)
+    expect(usePageCurveStore.getState().islandBoost).toBe(1.0)
+    // Above 4.0 → clamp down.
+    usePageCurveStore.getState().setIslandBoost(999)
+    expect(usePageCurveStore.getState().islandBoost).toBe(4.0)
+    // Non-finite → clamp to the min (matches `clamp` helper fallback).
+    usePageCurveStore.getState().setIslandBoost(Number.NaN)
+    expect(usePageCurveStore.getState().islandBoost).toBe(1.0)
+    // In-range value passes through.
+    usePageCurveStore.getState().setIslandBoost(2.5)
+    expect(usePageCurveStore.getState().islandBoost).toBe(2.5)
+  })
+
+  it('setIslandOverlayEnabled + setIslandBoost propagate without resetting the page-curve buffer', () => {
+    const store = usePageCurveStore.getState()
+    // Seed a sample so we can confirm the buffer survives overlay toggles.
+    store.pushSample({ t: 0, tH: 0.1, areaH: 1, cs0: 1, supersonicExtent: 2 })
+    const countBefore = usePageCurveStore.getState().buffer.count
+    expect(countBefore).toBeGreaterThan(0)
+    usePageCurveStore.getState().setIslandOverlayEnabled(true)
+    usePageCurveStore.getState().setIslandBoost(2.4)
+    const after = usePageCurveStore.getState()
+    expect(after.islandOverlayEnabled).toBe(true)
+    expect(after.islandBoost).toBe(2.4)
+    expect(after.buffer.count).toBe(countBefore)
+  })
+
   it('getPageTime returns null before crossing, number after', () => {
     // Ensure the ring buffer is large enough to retain the early samples
     // where the crossing happens — earlier tests may have shrunk it.

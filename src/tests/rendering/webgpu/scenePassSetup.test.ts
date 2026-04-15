@@ -151,6 +151,18 @@ describe('extractSchrodingerConfig', () => {
     expect(extracted.temporalReprojectionEnabled).toBe(false)
   })
 
+  it('disables temporal reprojection for wheelerDeWitt (compute mode)', () => {
+    // Regression: WebGPUScene's disable list had hard-coded compute-mode keys
+    // that omitted wheelerDeWitt; extractSchrodingerConfig correctly derived
+    // the compute-mode set from the registry, producing a mismatch with PP.
+    const extracted = extractSchrodingerConfig(
+      makePassConfig({ quantumMode: 'wheelerDeWitt', temporalReprojectionEnabled: true })
+    )
+    expect(extracted.temporalReprojectionEnabled).toBe(false)
+    expect(extracted.eigenfunctionCacheEnabled).toBe(false)
+    expect(extracted.analyticalGradientEnabled).toBe(false)
+  })
+
   it('forces dimension >= 3 for BEC and Dirac at lower dimension', () => {
     const bec = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'becDynamics', dimension: 2 })
@@ -182,6 +194,7 @@ describe('extractSchrodingerConfig', () => {
       'becDynamics',
       'diracEquation',
       'quantumWalk',
+      'wheelerDeWitt',
     ] as const
     for (const mode of computeModes) {
       const extracted = extractSchrodingerConfig(
@@ -218,6 +231,7 @@ describe('extractSchrodingerConfig', () => {
       'becDynamics',
       'diracEquation',
       'quantumWalk',
+      'wheelerDeWitt',
     ] as const
     for (const mode of computeModes) {
       const extracted = extractSchrodingerConfig(
