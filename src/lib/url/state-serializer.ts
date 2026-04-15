@@ -198,6 +198,10 @@ export interface ShareableObjectState {
   wdwInflatonMass?: number
   /** Wheeler–DeWitt cosmological constant Λ */
   wdwCosmologicalConstant?: number
+  /** Wheeler–DeWitt WKB streamline overlay toggle */
+  wdwStreamlinesEnabled?: boolean
+  /** Wheeler–DeWitt streamline seed density (2-16) */
+  wdwStreamlineDensity?: number
 }
 
 /**
@@ -420,6 +424,8 @@ export function serializeState(state: ShareableState): string {
     setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
     setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
     setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
+    setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
+    setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
   }
 
   return params.toString()
@@ -643,6 +649,8 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
   state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
   state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
+  state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
+  state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

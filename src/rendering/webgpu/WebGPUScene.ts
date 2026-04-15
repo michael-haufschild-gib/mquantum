@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { isComputeQuantumType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { logger } from '@/lib/logger'
 import { useRotationUpdates } from '@/rendering/renderers/base'
@@ -331,12 +332,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
       temporalReprojectionEnabled:
         // Temporal reprojection is incompatible with compute modes (they use density grids)
-        // and 2D pipelines (fullscreen triangle, no depth/MRT)
-        schroedingerCompile.quantumMode === 'freeScalarField' ||
-        schroedingerCompile.quantumMode === 'tdseDynamics' ||
-        schroedingerCompile.quantumMode === 'becDynamics' ||
-        schroedingerCompile.quantumMode === 'diracEquation' ||
-        schroedingerCompile.quantumMode === 'quantumWalk' ||
+        // and 2D pipelines (fullscreen triangle, no depth/MRT). Derive the
+        // compute-mode set from the registry so new compute modes (e.g.
+        // wheelerDeWitt) are gated automatically without editing this list.
+        isComputeQuantumType(schroedingerCompile.quantumMode) ||
         objectType === 'pauliSpinor' ||
         dimension === 2 ||
         schroedingerCompile.representation === 'wigner'

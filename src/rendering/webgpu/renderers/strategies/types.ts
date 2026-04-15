@@ -86,8 +86,6 @@ export interface SchroedingerSnapshot {
     phiExtent?: number
     streamlinesEnabled?: boolean
     streamlineDensity?: number
-    swamplandEnabled?: boolean
-    swamplandC?: number
     needsReset?: boolean
     [key: string]: unknown
   }

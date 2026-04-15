@@ -176,6 +176,10 @@ function applyWdwParams(
   if (urlState.wdwInflatonMass !== undefined) ext.setWdwInflatonMass(urlState.wdwInflatonMass)
   if (urlState.wdwCosmologicalConstant !== undefined)
     ext.setWdwCosmologicalConstant(urlState.wdwCosmologicalConstant)
+  if (urlState.wdwStreamlinesEnabled !== undefined)
+    ext.setWdwStreamlinesEnabled(urlState.wdwStreamlinesEnabled)
+  if (urlState.wdwStreamlineDensity !== undefined)
+    ext.setWdwStreamlineDensity(urlState.wdwStreamlineDensity)
 }
 
 /** Apply coordinate entanglement URL state params (lazy import). */

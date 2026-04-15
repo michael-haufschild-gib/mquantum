@@ -84,10 +84,16 @@ export interface PageCurveState {
   clear: () => void
   /** Resize the ring buffer (also clears). */
   setBufferSize: (capacity: number) => void
-  /** Set G_eff (clamped to [1e-6, 1e6]). */
+  /** Set G_eff (clamped to [1e-6, 1e6]). Resets the trapezoid integrator. */
   setGEff: (value: number) => void
-  /** Set Stefan–Boltzmann coefficient (clamped to [1e-6, 1e6]). */
+  /** Set Stefan–Boltzmann coefficient (clamped to [1e-6, 1e6]). Resets the trapezoid integrator. */
   setSbCoefficient: (value: number) => void
+  /**
+   * Invalidate the trapezoid-integrator's last-seen `t` and rate without
+   * touching stored samples, so the next `pushSample` does not blend an old
+   * rate (computed under stale gEff/sbCoefficient) with the new rate.
+   */
+  invalidateIntegrator: () => void
   /** Set island-radius maximum fraction (clamped to [0, 1]). */
   setDMaxFrac: (value: number) => void
   /** Toggle HUD visibility. */
@@ -210,9 +216,21 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
       } as Partial<PageCurveState>)
     },
 
-    setGEff: (value) => set({ gEff: clamp(value, 1e-6, 1e6) }),
-    setSbCoefficient: (value) => set({ sbCoefficient: clamp(value, 1e-6, 1e6) }),
+    setGEff: (value) => {
+      integrator.lastT = Number.NaN
+      integrator.lastRate = 0
+      set({ gEff: clamp(value, 1e-6, 1e6) })
+    },
+    setSbCoefficient: (value) => {
+      integrator.lastT = Number.NaN
+      integrator.lastRate = 0
+      set({ sbCoefficient: clamp(value, 1e-6, 1e6) })
+    },
     setDMaxFrac: (value) => set({ dMaxFrac: clamp(value, 0, 1) }),
+    invalidateIntegrator: () => {
+      integrator.lastT = Number.NaN
+      integrator.lastRate = 0
+    },
     setPageCurveHudEnabled: (enabled) => set({ pageCurveHudEnabled: !!enabled }),
     setIslandOverlayEnabled: (enabled) => set({ islandOverlayEnabled: !!enabled }),
 

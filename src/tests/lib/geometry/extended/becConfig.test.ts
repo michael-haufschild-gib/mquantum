@@ -25,7 +25,10 @@ import { BEC_SCENARIO_PRESETS, getBecPreset } from '@/lib/physics/bec/presets'
 
 describe('DEFAULT_BEC_CONFIG — analog Hawking fields', () => {
   it('exposes physically-motivated defaults for the waterfall parameters', () => {
-    expect(DEFAULT_BEC_CONFIG.hawkingVmax).toBeCloseTo(2.0)
+    // Default bumped to 3.5 so a fresh session has v_max > c_s0 for the
+    // canonical n0 set by the simulator (≈0.01 at g=500) — otherwise
+    // hasHorizon returns false and the Page curve HUD flatlines.
+    expect(DEFAULT_BEC_CONFIG.hawkingVmax).toBeCloseTo(3.5)
     expect(DEFAULT_BEC_CONFIG.hawkingLh).toBeCloseTo(0.6)
     expect(DEFAULT_BEC_CONFIG.hawkingDeltaN).toBeCloseTo(0.0)
     expect(DEFAULT_BEC_CONFIG.hawkingInjectRate).toBeCloseTo(0.05)

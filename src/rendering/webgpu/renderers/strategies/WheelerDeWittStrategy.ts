@@ -38,7 +38,7 @@ import type {
 
 /**
  * Compute a stable hash of the WdW config fields that affect the solver
- * output. Display-only fields (swamplandEnabled, swamplandC) are excluded.
+ * output.
  */
 function computeWdwConfigHash(config: WheelerDeWittConfig): string {
   return [

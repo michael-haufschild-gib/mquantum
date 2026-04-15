@@ -25,8 +25,6 @@ export interface WheelerDeWittSetters {
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
-  setWdwSwamplandEnabled: (enabled: boolean) => void
-  setWdwSwamplandC: (c: number) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 }
@@ -50,8 +48,6 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
   )
   const setStreamlinesEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'streamlinesEnabled')
   const setStreamlineDensity = nestedIntSetter(ctx, 'wheelerDeWitt', 'streamlineDensity', 2, 16)
-  const setSwamplandEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'swamplandEnabled')
-  const setSwamplandC = nestedClampedSetter(ctx, 'wheelerDeWitt', 'swamplandC', 0, 3)
 
   /** Physics setters also flip needsReset so the strategy re-runs the solver. */
   const withReset = (apply: () => void): void => {
@@ -70,8 +66,6 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwCosmologicalConstant: (lambda) => withReset(() => setCosmologicalConstant(lambda)),
     setWdwStreamlinesEnabled: (enabled) => withReset(() => setStreamlinesEnabled(enabled)),
     setWdwStreamlineDensity: (density) => withReset(() => setStreamlineDensity(density)),
-    setWdwSwamplandEnabled: (enabled) => setSwamplandEnabled(enabled),
-    setWdwSwamplandC: (c) => setSwamplandC(c),
     triggerWdwRecompute: () => {
       ctx.setWithVersion((state) => ({
         schroedinger: {

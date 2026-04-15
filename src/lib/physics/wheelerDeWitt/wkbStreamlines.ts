@@ -45,9 +45,16 @@ export const DEFAULT_STREAMLINE_INPUT: WkbStreamlineInput = {
  */
 function sampleArg(output: WheelerDeWittSolverOutput, ia: number, i1: number, i2: number): number {
   const [Na, Nphi] = output.gridSize
-  if (ia < 0 || ia >= Na || i1 < 0 || i1 >= Nphi || i2 < 0 || i2 >= Nphi) return 0
+  // Callers (gradS → rk4Step) pass fractional indices; typed-array lookup with
+  // non-integer keys returns undefined and collapses the phase to 0, stalling
+  // the integrator. Round to nearest grid cell — matches gradS's "nearest-
+  // neighbor-on-grid" finite-difference convention.
+  const iaR = Math.round(ia)
+  const i1R = Math.round(i1)
+  const i2R = Math.round(i2)
+  if (iaR < 0 || iaR >= Na || i1R < 0 || i1R >= Nphi || i2R < 0 || i2R >= Nphi) return 0
   const slab = Nphi * Nphi
-  const idx = ia * 2 * slab + 2 * (i1 * Nphi + i2)
+  const idx = iaR * 2 * slab + 2 * (i1R * Nphi + i2R)
   const re = output.chi[idx] ?? 0
   const im = output.chi[idx + 1] ?? 0
   if (re === 0 && im === 0) return 0

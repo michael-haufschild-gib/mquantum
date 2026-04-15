@@ -474,8 +474,6 @@ export interface SchroedingerSliceActions {
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
-  setWdwSwamplandEnabled: (enabled: boolean) => void
-  setWdwSwamplandC: (c: number) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 

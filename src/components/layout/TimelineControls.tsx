@@ -64,6 +64,7 @@ export const TimelineControls: FC = () => {
       resetQuantumWalk: state.resetQuantumWalk,
       resetPauliField: state.resetPauliField,
       requestOpenQuantumStateReset: state.requestOpenQuantumStateReset,
+      triggerWdwRecompute: state.triggerWdwRecompute,
     }))
   )
 
@@ -176,6 +177,9 @@ export const TimelineControls: FC = () => {
         break
       case 'quantumWalk':
         resetActions.resetQuantumWalk()
+        break
+      case 'wheelerDeWitt':
+        resetActions.triggerWdwRecompute()
         break
     }
   }, [isPauliSpinor, schroedingerConfig.quantumMode, resetActions])

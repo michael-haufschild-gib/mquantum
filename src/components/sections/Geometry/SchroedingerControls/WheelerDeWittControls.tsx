@@ -2,8 +2,7 @@
  * Wheeler–DeWitt (minisuperspace) controls.
  *
  * Exposes boundary-condition selection, inflaton mass, cosmological
- * constant, WKB streamline toggles, and the swampland conjecture overlay
- * for the Wheeler–DeWitt quantum mode.
+ * constant, and WKB streamline toggles for the Wheeler–DeWitt quantum mode.
  *
  * @module components/sections/Geometry/SchroedingerControls/WheelerDeWittControls
  */
@@ -37,8 +36,6 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
     setWdwCosmologicalConstant,
     setWdwStreamlinesEnabled,
     setWdwStreamlineDensity,
-    setWdwSwamplandEnabled,
-    setWdwSwamplandC,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       wdw: s.schroedinger.wheelerDeWitt,
@@ -47,8 +44,6 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       setWdwCosmologicalConstant: s.setWdwCosmologicalConstant,
       setWdwStreamlinesEnabled: s.setWdwStreamlinesEnabled,
       setWdwStreamlineDensity: s.setWdwStreamlineDensity,
-      setWdwSwamplandEnabled: s.setWdwSwamplandEnabled,
-      setWdwSwamplandC: s.setWdwSwamplandC,
     }))
   )
 
@@ -102,25 +97,6 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
           onChange={setWdwStreamlineDensity}
           showValue
           data-testid="wdw-streamline-density"
-        />
-      )}
-      <Switch
-        label="Swampland bound overlay"
-        checked={wdw.swamplandEnabled}
-        onCheckedChange={setWdwSwamplandEnabled}
-        data-testid="wdw-swampland-switch"
-      />
-      {wdw.swamplandEnabled && (
-        <Slider
-          label="Swampland c"
-          tooltip="Lower bound in |∇V|/V ≥ c (de-Sitter swampland conjecture)."
-          min={0}
-          max={3}
-          step={0.05}
-          value={wdw.swamplandC}
-          onChange={setWdwSwamplandC}
-          showValue
-          data-testid="wdw-swampland-c"
         />
       )}
     </div>

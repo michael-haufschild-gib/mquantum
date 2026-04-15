@@ -50,10 +50,6 @@ export interface WheelerDeWittConfig {
   streamlinesEnabled: boolean
   /** Streamline seed density — number of seeds per axis (display) */
   streamlineDensity: number
-  /** Swampland de-Sitter conjecture overlay toggle (display) */
-  swamplandEnabled: boolean
-  /** Swampland bound c in |∇V|/V ≥ c (display) */
-  swamplandC: number
   /** Runtime flag: when true, strategy recomputes the solver on next frame */
   needsReset: boolean
 }
@@ -83,7 +79,5 @@ export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   phiExtent: 2.0,
   streamlinesEnabled: true,
   streamlineDensity: 6,
-  swamplandEnabled: false,
-  swamplandC: 0.6,
   needsReset: true,
 }
