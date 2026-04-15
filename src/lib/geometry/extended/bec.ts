@@ -181,7 +181,14 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   observablesEnabled: false,
-  hawkingVmax: 2.0,
+  // 3.5 (not 2.0): with the canonical interactionStrength g = 500 and mass = 1
+  // the simulator's true background density is n0 = max(g·0.01, 1)/g = 0.01,
+  // giving asymptotic sound speed c_s0 = √(g·n0/m) = √5 ≈ 2.236. v_max = 2.0
+  // sat below c_s0, leaving the user with a no-horizon default that produced
+  // a flat Page-curve HUD and silent sliders. v_max = 3.5 matches the
+  // "Sonic Horizon (Waterfall)" preset and gives a clean horizon at the
+  // default 64³ grid (x_horizon ≈ 0.56, well inside the PML-free interior).
+  hawkingVmax: 3.5,
   hawkingLh: 0.6,
   hawkingDeltaN: 0.0,
   hawkingPairInjection: false,

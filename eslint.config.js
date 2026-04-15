@@ -697,7 +697,7 @@ const projectRulesPlugin = {
 
 export default [
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'scripts/!(playwright)/**', 'playwright.config.ts', 'playwright.benchmark.config.ts', 'src/wasm/**/pkg/**'],
+    ignores: ['dist', 'coverage', 'node_modules', 'scripts/!(playwright)/**', 'playwright.config.ts', 'playwright.benchmark.config.ts', 'src/wasm/**/pkg/**', '.claude/worktrees/**'],
   },
 
   // @eslint-react strict-typescript: registers all @eslint-react/* plugins + sets strict rule
@@ -1033,9 +1033,10 @@ export default [
             '!@/stores/hellerSpectrometerStore',
             '!@/stores/performanceStore',
             '!@/stores/extendedObjectStore',
+            '!@/stores/wormholeCoherenceStore',
           ],
           allowTypeImports: true,
-          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, and defaults/* are exempt.',
+          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), and defaults/* are exempt.',
         }],
       }],
     },

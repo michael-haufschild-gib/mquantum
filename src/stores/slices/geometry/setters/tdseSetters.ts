@@ -99,6 +99,10 @@ type TdseActions = Pick<
   | 'setTdseBranchPlanePosition'
   | 'setTdseBranchColorA'
   | 'setTdseBranchColorB'
+  | 'setTdseWormholeEnabled'
+  | 'setTdseWormholeG'
+  | 'setTdseWormholeAxis'
+  | 'setTdseWormholeHudEnabled'
 >
 
 /**

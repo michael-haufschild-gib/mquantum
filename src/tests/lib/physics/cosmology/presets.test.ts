@@ -340,13 +340,14 @@ describe('isValidPreset', () => {
 })
 
 describe('COSMOLOGY_PRESETS catalogue', () => {
-  it('lists all five presets in a stable order', () => {
+  it('lists all six presets in a stable order', () => {
     expect(COSMOLOGY_PRESETS).toEqual([
       'minkowski',
       'deSitter',
       'ekpyrotic',
       'kasner',
       'bianchiKasner',
+      'lqcBounce',
     ])
   })
 })

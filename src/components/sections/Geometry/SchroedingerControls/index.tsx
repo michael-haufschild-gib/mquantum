@@ -34,6 +34,7 @@ import type {
   TdseActions,
 } from './types'
 import { useSchroedingerActions } from './useSchroedingerActions'
+import { WheelerDeWittControls } from './WheelerDeWittControls'
 import { WignerControls } from './WignerControls'
 
 /**
@@ -49,6 +50,7 @@ function renderModeControls(p: {
   config: SchroedingerConfig
   dimension: number
   isQuantumWalk: boolean
+  isWheelerDeWitt: boolean
   isDiracEquation: boolean
   isBecDynamics: boolean
   isTdseDynamics: boolean
@@ -63,6 +65,7 @@ function renderModeControls(p: {
   hydrogenNDActions: HydrogenNDActions
   harmonicActions: HarmonicOscillatorActions
 }): React.ReactNode {
+  if (p.isWheelerDeWitt) return <WheelerDeWittControls />
   if (p.isQuantumWalk) return <QuantumWalkControls />
   if (p.isDiracEquation)
     return <DiracControls config={p.config} dimension={p.dimension} actions={p.diracActions} />
@@ -145,6 +148,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isBecDynamics = config.quantumMode === 'becDynamics'
     const isDiracEquation = config.quantumMode === 'diracEquation'
     const isQuantumWalk = config.quantumMode === 'quantumWalk'
+    const isWheelerDeWitt = config.quantumMode === 'wheelerDeWitt'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -153,7 +157,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isTdseDynamics &&
           !isBecDynamics &&
           !isDiracEquation &&
-          !isQuantumWalk && (
+          !isQuantumWalk &&
+          !isWheelerDeWitt && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup
@@ -228,11 +233,13 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         {/* Quantum State / Field Config Section */}
         <Section
           title={
-            isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
-              ? 'Field Configuration'
-              : isQuantumWalk
-                ? 'Walk Configuration'
-                : 'Quantum State'
+            isWheelerDeWitt
+              ? 'Minisuperspace'
+              : isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
+                ? 'Field Configuration'
+                : isQuantumWalk
+                  ? 'Walk Configuration'
+                  : 'Quantum State'
           }
           defaultOpen={true}
         >
@@ -240,6 +247,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
             config,
             dimension,
             isQuantumWalk,
+            isWheelerDeWitt,
             isDiracEquation,
             isBecDynamics,
             isTdseDynamics,

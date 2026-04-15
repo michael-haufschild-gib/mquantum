@@ -675,6 +675,49 @@ describe('packSchroedingerUniforms', () => {
     // densityGain at offset 684: gain * compensation = 3.0 * 2.5 = 7.5
     expect(floatView[684 / 4]).toBeCloseTo(7.5)
   })
+
+  // Wheeler–DeWitt render-only phase rotation rate: 0 unless mode+enabled.
+  it('writes wdwPhaseRotationRate = 0 for non-WdW modes even when flag set', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        wheelerDeWitt: { phaseRotationEnabled: true, phaseRotationSpeed: 4.2 },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.wdwPhaseRotationRate]).toBe(0)
+  })
+
+  it('writes wdwPhaseRotationRate = 0 when WdW but flag disabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'wheelerDeWitt',
+      schroedinger: {
+        wheelerDeWitt: { phaseRotationEnabled: false, phaseRotationSpeed: 3.7 },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.wdwPhaseRotationRate]).toBe(0)
+  })
+
+  it('writes wdwPhaseRotationRate = phaseRotationSpeed when WdW + enabled', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'wheelerDeWitt',
+      schroedinger: {
+        wheelerDeWitt: { phaseRotationEnabled: true, phaseRotationSpeed: 2.75 },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.wdwPhaseRotationRate]).toBeCloseTo(2.75)
+  })
 })
 
 // ============================================================================

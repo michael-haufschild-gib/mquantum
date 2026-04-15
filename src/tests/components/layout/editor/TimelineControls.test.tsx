@@ -90,6 +90,16 @@ vi.mock('@/stores/defaults/visualDefaults', () => ({
   MAX_ANIMATION_BIAS: 1,
 }))
 
+vi.mock('@/stores/appearanceStore', () => ({
+  useAppearanceStore: vi.fn((selector) => {
+    const state = {
+      colorAlgorithm: 'blackbody',
+      setColorAlgorithm: vi.fn(),
+    }
+    return selector ? selector(state) : state
+  }),
+}))
+
 vi.mock('@/stores/extendedObjectStore', () => ({
   useExtendedObjectStore: vi.fn((selector) => {
     return selector ? selector(mockExtendedState) : mockExtendedState

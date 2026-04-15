@@ -228,7 +228,8 @@ export function normalizeColorAlgorithmForQuantumMode(
     quantumMode === 'tdseDynamics' ||
     quantumMode === 'becDynamics' ||
     quantumMode === 'freeScalarField' ||
-    quantumMode === 'diracEquation'
+    quantumMode === 'diracEquation' ||
+    quantumMode === 'wheelerDeWitt'
   ) {
     return 'phaseDensity'
   }

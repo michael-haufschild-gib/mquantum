@@ -47,6 +47,7 @@ export type CosmologyPreset =
   | 'ekpyrotic'
   | 'kasner'
   | 'bianchiKasner'
+  | 'lqcBounce'
 
 /** All preset keys in a stable UI order. */
 export const COSMOLOGY_PRESETS: readonly CosmologyPreset[] = [
@@ -55,6 +56,7 @@ export const COSMOLOGY_PRESETS: readonly CosmologyPreset[] = [
   'ekpyrotic',
   'kasner',
   'bianchiKasner',
+  'lqcBounce',
 ] as const
 
 /** Minimum spacetime dimension supported (paper requires `n ≥ 3`). */
@@ -116,6 +118,24 @@ export interface CosmologyPresetParams {
    * Bianchi-I background.
    */
   kasnerExponents?: KasnerExponents
+  /**
+   * LQC critical density `ρ_c > 0` (only consulted for `lqcBounce`). Sets
+   * the density at which the Hubble rate vanishes and the pre-bounce
+   * contraction switches to post-bounce expansion.
+   */
+  lqcRhoCritical?: number
+  /**
+   * LQC matter equation-of-state `w ∈ [0, 1]` (only consulted for
+   * `lqcBounce`). Default path is the stiff-fluid `w = 1` case which
+   * admits the closed-form `ρ(τ) = ρ_c / (1 + γτ²)` analytic solution.
+   */
+  lqcEquationOfState?: number
+  /**
+   * LQC initial `ρ/ρ_c` ratio at the pre-bounce window edge, `(0, 1)`.
+   * Only consulted for `lqcBounce`; controls how far into the Kasner
+   * asymptote the integration starts.
+   */
+  lqcInitialRhoRatio?: number
 }
 
 /**
@@ -150,6 +170,17 @@ export function qExponent(params: CosmologyPresetParams): number {
   if (preset === 'deSitter') return -1
   if (preset === 'kasner') {
     return 1 / (spacetimeDim - 2)
+  }
+  if (preset === 'lqcBounce') {
+    // LQC bounce is NOT a closed-form scalar-q FLRW preset — the scale
+    // factor has a local minimum at the bounce and the three cosmology
+    // coefficients come from a dense tabulated look-up in
+    // `lqcBounce.ts`, consumed by `computeCosmologyAt` directly. Mirror
+    // the Bianchi-I branch: throw so mis-routed callers (e.g. the
+    // Mukhanov-Sasaki `β(β−1)/η²` helper) are found at runtime.
+    throw new RangeError(
+      `qExponent is not defined for preset='lqcBounce' — use evaluateLqcBounceCoefs directly.`
+    )
   }
   if (preset === 'bianchiKasner') {
     // Bianchi-I vacuum Kasner is NOT a closed-form scalar-q FLRW preset —
@@ -271,6 +302,26 @@ export function validateSpacetimeDim(spacetimeDim: number): void {
  * @returns `true` if every downstream consumer would accept these params
  */
 export function isValidPreset(params: CosmologyPresetParams): boolean {
+  if (params.preset === 'lqcBounce') {
+    // LQC bounce requires n ≥ 3 (the Friedmann prefactor 1/(3(n − 2))
+    // diverges at n = 2). The overall cosmology range `[3, 7]` applies
+    // here too so the shader stays bit-identical on unsupported
+    // dimensions.
+    if (
+      !Number.isInteger(params.spacetimeDim) ||
+      params.spacetimeDim < MIN_SPACETIME_DIM ||
+      params.spacetimeDim > MAX_SPACETIME_DIM
+    ) {
+      return false
+    }
+    const rhoC = params.lqcRhoCritical
+    if (typeof rhoC !== 'number' || !Number.isFinite(rhoC) || rhoC <= 0) return false
+    const w = params.lqcEquationOfState
+    if (typeof w !== 'number' || !Number.isFinite(w) || w < 0 || w > 1) return false
+    const r0 = params.lqcInitialRhoRatio
+    if (typeof r0 !== 'number' || !Number.isFinite(r0) || r0 <= 0 || r0 >= 1) return false
+    return true
+  }
   if (params.preset === 'bianchiKasner') {
     // Bianchi-I is only physically defined on the first three spatial
     // axes, so we need `spacetimeDim ≥ 4` (spatial dim ≥ 3). Exponents
@@ -279,12 +330,7 @@ export function isValidPreset(params: CosmologyPresetParams): boolean {
     if (!Number.isInteger(params.spacetimeDim) || params.spacetimeDim < 4) return false
     if (params.spacetimeDim > MAX_SPACETIME_DIM) return false
     const exp = params.kasnerExponents
-    if (
-      !exp ||
-      !Number.isFinite(exp.p1) ||
-      !Number.isFinite(exp.p2) ||
-      !Number.isFinite(exp.p3)
-    ) {
+    if (!exp || !Number.isFinite(exp.p1) || !Number.isFinite(exp.p2) || !Number.isFinite(exp.p3)) {
       return false
     }
     return true

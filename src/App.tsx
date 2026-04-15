@@ -12,8 +12,10 @@ import React, { Suspense, useCallback, useMemo, useState } from 'react'
 import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
+import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
+import { WormholeCoherencePanel } from '@/components/overlays/WormholeCoherencePanel'
 
 // Lazy-load components not needed on first render
 const PerformanceMonitor = React.lazy(() =>
@@ -258,6 +260,12 @@ function AppContent() {
 
         {/* Quantum Carpet Panel */}
         <QuantumCarpetPanel />
+
+        {/* Analog Hawking Page Curve Panel (gated by pageCurveHudEnabled) */}
+        <HawkingPageCurvePanel />
+
+        {/* ER=EPR Wormhole Coherence Panel (gated by TDSE HUD toggle) */}
+        <WormholeCoherencePanel />
 
         {/* Screenshot Preview Modal */}
         <Suspense fallback={null}>

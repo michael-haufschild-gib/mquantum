@@ -141,6 +141,9 @@ function resetWaveEvolution(): void {
     case 'quantumWalk':
       state.resetQuantumWalk()
       break
+    case 'wheelerDeWitt':
+      state.triggerWdwRecompute()
+      break
     default: {
       const _exhaustive: never = quantumMode
       void _exhaustive

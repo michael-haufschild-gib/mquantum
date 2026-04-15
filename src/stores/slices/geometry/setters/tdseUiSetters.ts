@@ -84,5 +84,70 @@ export function createTdseUiSetters(ctx: SetterContext) {
     setTdseCustomPotentialExpression: nestedValueSetter(ctx, D, 'customPotentialExpression') as (
       expression: string
     ) => void,
+    /**
+     * Toggle the ER=EPR double-trace wormhole coupling. A transition of the
+     * flag resets ψ: enabling the coupling mid-evolution introduces a
+     * discontinuity that is hard to interpret visually, and disabling it
+     * similarly leaves the wavefunction carrying hidden L↔R correlations
+     * that no longer match the running Hamiltonian. An idempotent write
+     * (same value on both sides) does NOT flip `needsReset` so UI round
+     * trips don't kick the simulation.
+     */
+    setTdseWormholeEnabled: (enabled: boolean) => {
+      ctx.setWithVersion((state) => {
+        const prev = state.schroedinger.tdse
+        const next = !!enabled
+        if (prev.wormholeCouplingEnabled === next) return state
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...prev, wormholeCouplingEnabled: next, needsReset: true },
+          },
+        }
+      })
+    },
+    /** Clamp coupling `g` to `[0, 5]`. Non-finite is rejected with a warning. */
+    setTdseWormholeG: (g: number) => {
+      if (!ctx.isFinite(g)) {
+        ctx.warnNonFinite(`${D}.wormholeCouplingG`, g)
+        return
+      }
+      const clamped = Math.max(0, Math.min(5, g))
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wormholeCouplingG: clamped },
+        },
+      }))
+    },
+    /**
+     * Set the mirror-plane axis index. Accepts only `0 | 1 | 2`; other
+     * values are silently floored/clamped to the `{0,1,2}` range.
+     */
+    setTdseWormholeAxis: (axis: number) => {
+      const raw = Number(axis)
+      const clamped = (Math.max(0, Math.min(2, Math.floor(raw))) | 0) as 0 | 1 | 2
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wormholeMirrorAxis: clamped },
+        },
+      }))
+    },
+    /**
+     * Toggle the coherence HUD overlay. This is a pure UI flag — it does
+     * not affect the wavefunction evolution, only whether the readback
+     * path runs at the diagnostic cadence. Uses `set` rather than
+     * `setWithVersion` so that toggling the panel does not participate in
+     * any schroedingerVersion-keyed recompute flows.
+     */
+    setTdseWormholeHudEnabled: (enabled: boolean) => {
+      ctx.set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wormholeCoherenceHudEnabled: !!enabled },
+        },
+      }))
+    },
   }
 }

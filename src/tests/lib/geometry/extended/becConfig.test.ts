@@ -10,8 +10,9 @@
  *      the uniform writer (TypeScript would still compile because the
  *      writer's record uses `string` keys).
  *   2. Default hawking parameters silently drifting away from the documented
- *      physically-motivated values (v_max=2, L_h=0.6, Δn=0, rate=0.05,
- *      seed=1337) which the preset and UI both rely on.
+ *      physically-motivated values (v_max=3.5, L_h=0.6, Δn=0, rate=0.05,
+ *      seed=1337) which the preset and UI both rely on. The v_max default is
+ *      bumped above c_s0 for the canonical `n0` so `hasHorizon` returns true.
  */
 import { describe, expect, it } from 'vitest'
 
@@ -25,7 +26,10 @@ import { BEC_SCENARIO_PRESETS, getBecPreset } from '@/lib/physics/bec/presets'
 
 describe('DEFAULT_BEC_CONFIG — analog Hawking fields', () => {
   it('exposes physically-motivated defaults for the waterfall parameters', () => {
-    expect(DEFAULT_BEC_CONFIG.hawkingVmax).toBeCloseTo(2.0)
+    // Default bumped to 3.5 so a fresh session has v_max > c_s0 for the
+    // canonical n0 set by the simulator (≈0.01 at g=500) — otherwise
+    // hasHorizon returns false and the Page curve HUD flatlines.
+    expect(DEFAULT_BEC_CONFIG.hawkingVmax).toBeCloseTo(3.5)
     expect(DEFAULT_BEC_CONFIG.hawkingLh).toBeCloseTo(0.6)
     expect(DEFAULT_BEC_CONFIG.hawkingDeltaN).toBeCloseTo(0.0)
     expect(DEFAULT_BEC_CONFIG.hawkingInjectRate).toBeCloseTo(0.05)

@@ -146,7 +146,12 @@ const ExposureSectionInner: React.FC<{
   defaultOpen: boolean
 }> = React.memo(({ objectType, defaultOpen }) => {
   const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
-  const isStatic = objectType !== 'pauliSpinor' && isAnalyticQuantumType(quantumMode)
+  // Wheeler–DeWitt is a compute mode but the density is solved once per config
+  // change (no time evolution), so frame-to-frame auto-scale is meaningless —
+  // treat it like the analytic modes in this section.
+  const isStatic =
+    objectType !== 'pauliSpinor' &&
+    (isAnalyticQuantumType(quantumMode) || quantumMode === 'wheelerDeWitt')
   const isDynamic = !isStatic
 
   const autoScale = useAutoScaleValue(objectType)

@@ -185,6 +185,7 @@ export interface ExtendedStoreSnapshot {
   clearBecNeedsReset?: () => void
   clearDiracNeedsReset?: () => void
   clearQuantumWalkNeedsReset?: () => void
+  clearWdwNeedsReset?: () => void
   pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
   pauliSpinorVersion?: number
   clearPauliNeedsReset?: () => void

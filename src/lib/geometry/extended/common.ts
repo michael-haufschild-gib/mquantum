@@ -105,3 +105,4 @@ export type SchroedingerQuantumMode =
   | 'becDynamics'
   | 'diracEquation'
   | 'quantumWalk'
+  | 'wheelerDeWitt'

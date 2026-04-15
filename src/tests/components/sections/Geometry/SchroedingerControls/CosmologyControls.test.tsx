@@ -18,6 +18,9 @@ function makeMockActions() {
     setCosmologyHubble: vi.fn(),
     setCosmologyEta0: vi.fn(),
     setCosmologyBianchiExponents: vi.fn(),
+    setCosmologyLqcRhoCritical: vi.fn(),
+    setCosmologyLqcEquationOfState: vi.fn(),
+    setCosmologyLqcInitialRhoRatio: vi.fn(),
   }
 }
 

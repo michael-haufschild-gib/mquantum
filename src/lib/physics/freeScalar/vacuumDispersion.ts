@@ -115,6 +115,9 @@ function asCosmologyParams(config: FreeScalarConfig): {
   steepness: number
   hubble: number
   kasnerExponents: FreeScalarConfig['cosmology']['kasnerExponents']
+  lqcRhoCritical: number | undefined
+  lqcEquationOfState: number | undefined
+  lqcInitialRhoRatio: number | undefined
 } {
   return {
     preset: config.cosmology.preset,
@@ -122,6 +125,9 @@ function asCosmologyParams(config: FreeScalarConfig): {
     steepness: config.cosmology.steepness,
     hubble: config.cosmology.hubble,
     kasnerExponents: config.cosmology.kasnerExponents,
+    lqcRhoCritical: config.cosmology.lqcRhoCritical,
+    lqcEquationOfState: config.cosmology.lqcEquationOfState,
+    lqcInitialRhoRatio: config.cosmology.lqcInitialRhoRatio,
   }
 }
 

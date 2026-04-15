@@ -27,6 +27,11 @@ import {
 } from './computePassUtils'
 import { dispatchDiagnostics as extDispatchDiagnostics } from './TDSEComputePassDispatchers'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
+import {
+  dispatchWormholeCoupling,
+  dispatchWormholeCouplingInPass,
+  type WormholePipelineResources,
+} from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import { dispatchGramSchmidt as gsDispatch, type GramSchmidtState } from './TDSEGramSchmidt'
 import { type HellerReadbackState, tickHellerStep } from './TDSEHellerReadback'
@@ -76,6 +81,12 @@ export interface EvolutionResources {
    * `null` if Heller is not wired up.
    */
   hellerState: HellerReadbackState | null
+  /**
+   * ER=EPR double-trace wormhole coupling — pipeline + bind group.
+   * Both `null` disables the coupling entirely (hot path untouched).
+   */
+  wormholePipeline: WormholePipelineResources | null
+  wormholeBG: GPUBindGroup | null
   /** Dispatch a compute pass. */
   dc: (
     pe: GPUComputePassEncoder,
@@ -148,9 +159,30 @@ export function runStrangEvolution(
   // the driver automatically, so correctness is unchanged.
   // Enable the batched path when the per-slot bind groups are populated.
   const fftAxesInPassAvailable = (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
+  // ER=EPR wormhole coupling — Strang-split around the kinetic+potential
+  // block. Each dispatch applies exp(-i·(dt/2)·g·P_M); two dispatches per
+  // step reconstruct exp(-i·dt·g·P_M) to first order in the full Trotter
+  // factorization. Off-path: both branches skip when the uniform flag is
+  // zero, so the hot path stays bit-identical when disabled. We also gate
+  // dispatch here on the TS-side flag so the pipeline/bind-group isn't
+  // touched at all when the feature is off — preserves command-buffer
+  // identity with the pre-feature build.
+  const wormholeActive =
+    config.wormholeCouplingEnabled === true &&
+    res.wormholePipeline !== null &&
+    res.wormholeBG !== null
   for (let step = 0; step < stepsThisFrame; step++) {
     if (fftAxesInPassAvailable) {
       const strangPass = ctx.beginComputePass({ label: `tdse-strang-${step}` })
+      if (wormholeActive && res.wormholePipeline && res.wormholeBG) {
+        // Leading half-kick of g·P_M.
+        dispatchWormholeCouplingInPass(
+          strangPass,
+          res.wormholePipeline.pipeline,
+          res.wormholeBG,
+          res.totalSites
+        )
+      }
       // 1+2. Fused half-step potential + pack
       dc(strangPass, pl.fusedPotentialPackPipeline, [bg.fusedPotentialPackBG], linearWG)
       // 3. Forward FFT — one dispatch per axis, batched in this pass
@@ -175,6 +207,15 @@ export function runStrangEvolution(
       }
       // 6+7. Fused unpack + second half-step potential (reads density for BEC nonlinearity)
       dc(strangPass, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
+      if (wormholeActive && res.wormholePipeline && res.wormholeBG) {
+        // Trailing half-kick of g·P_M (before absorber + renorm).
+        dispatchWormholeCouplingInPass(
+          strangPass,
+          res.wormholePipeline.pipeline,
+          res.wormholeBG,
+          res.totalSites
+        )
+      }
       // 8. Absorber (inline — same pass as the Strang step). Only when
       // stochastic localization is NOT active, because the legacy code placed
       // the PML damping AFTER the CSL kicks and we must preserve that operator
@@ -187,6 +228,15 @@ export function runStrangEvolution(
       strangPass.end()
     } else {
       // Fallback (grid or bind-group layout not yet populated): unfused legacy path.
+      if (wormholeActive && res.wormholePipeline && res.wormholeBG) {
+        dispatchWormholeCoupling(
+          ctx.encoder,
+          res.wormholePipeline.pipeline,
+          res.wormholeBG,
+          res.totalSites,
+          `tdse-wormhole-leading-${step}`
+        )
+      }
       const fusedVPack = ctx.beginComputePass({ label: `tdse-fused-Vhalf-pack-${step}` })
       dc(fusedVPack, pl.fusedPotentialPackPipeline, [bg.fusedPotentialPackBG], linearWG)
       fusedVPack.end()
@@ -208,6 +258,16 @@ export function runStrangEvolution(
       const fusedUnpackV = ctx.beginComputePass({ label: `tdse-fused-unpack-Vhalf-${step}` })
       dc(fusedUnpackV, pl.fusedUnpackPotentialPipeline, [bg.fusedUnpackPotentialBG], linearWG)
       fusedUnpackV.end()
+
+      if (wormholeActive && res.wormholePipeline && res.wormholeBG) {
+        dispatchWormholeCoupling(
+          ctx.encoder,
+          res.wormholePipeline.pipeline,
+          res.wormholeBG,
+          res.totalSites,
+          `tdse-wormhole-trailing-${step}`
+        )
+      }
 
       if (config.absorberEnabled && !stochasticActive) {
         const absPass = ctx.beginComputePass({ label: `tdse-absorber-${step}` })
@@ -325,15 +385,7 @@ export interface PostStepResources {
   diagState: DiagReadbackState
   obsState: ObservablesState
   vdState: VortexDetectState
-  dc: EvolutionResources['dc']
-  dispatchCompute: (
-    pe: GPUComputePassEncoder,
-    p: GPUComputePipeline,
-    b: GPUBindGroup[],
-    x: number,
-    y?: number,
-    z?: number
-  ) => void
+  dispatchCompute: EvolutionResources['dc']
   dispatchFFTAxis: EvolutionResources['dispatchFFTAxis']
 }
 
@@ -352,7 +404,7 @@ export function runPostStepDispatches(
   frameState: DiagFrameState,
   res: PostStepResources
 ): void {
-  const { pl, bg, dc } = res
+  const { pl, bg, dispatchCompute: dc } = res
 
   // Write density grid
   const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)

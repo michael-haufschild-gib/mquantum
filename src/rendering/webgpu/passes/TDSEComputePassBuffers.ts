@@ -29,8 +29,16 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  *   - hawkingSeed:         u32 @ 780
  *   - hawkingStepIndex:    u32 @ 784
  *   - _padHawk0..2:        u32 @ 788/792/796 (16-byte align)
+ *   - wormholeCouplingEnabled: u32 @ 800 (ER=EPR double-trace coupling)
+ *   - wormholeCouplingG:       f32 @ 804
+ *   - wormholeMirrorAxis:      u32 @ 808
+ *   - _padWormhole:            u32 @ 812 (16-byte align)
+ *   - islandOverlayEnabled:    u32 @ 816 (analog-Hawking island overlay)
+ *   - islandCenterX0:          f32 @ 820
+ *   - islandRadiusWs:          f32 @ 824
+ *   - islandBoost:             f32 @ 828
  *
- * Total = 796 + 4 = 800. Update both this constant and the WGSL struct
+ * Total = 828 + 4 = 832. Update both this constant and the WGSL struct
  * if you add new fields, and keep this comment in sync — the previous
  * "740 = 736 + 4" annotation drifted when stochastic-decoherence
  * branching was added and silently misled readers about the layout.
@@ -39,7 +47,7 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  * offsets can import the canonical size instead of hardcoding a literal
  * that silently drifts from the WGSL definition.
  */
-export const TDSE_UNIFORM_SIZE = 800
+export const TDSE_UNIFORM_SIZE = 832
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256

@@ -33,11 +33,22 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'becDynamics',
   'diracEquation',
   'quantumWalk',
+  'wheelerDeWitt',
 ]
+
+const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
+type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
 
-const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = ['minkowski', 'deSitter', 'ekpyrotic', 'kasner']
+const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = [
+  'minkowski',
+  'deSitter',
+  'ekpyrotic',
+  'kasner',
+  'bianchiKasner',
+  'lqcBounce',
+]
 
 const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'free',
@@ -146,6 +157,14 @@ export interface ShareableObjectState {
   /** Normalized branch plane position along axis 0 (-1 to 1, 0 = origin). */
   branchPlanePosition?: number
 
+  // ── ER=EPR Wormhole Coupling ──────────────────────────────────────────
+  /** Enable the double-trace mirror coupling Ĥ_int = g·P_M. */
+  wormholeCouplingEnabled?: boolean
+  /** Coupling strength g ≥ 0 (clamped to `[0, 5]`). */
+  wormholeCouplingG?: number
+  /** Mirror-plane axis index (0, 1, or 2). */
+  wormholeMirrorAxis?: 0 | 1 | 2
+
   // ── Coordinate Entanglement ────────────────────────────────────────────
   /** Coordinate entanglement tracking enabled */
   entanglementEnabled?: boolean
@@ -165,6 +184,34 @@ export interface ShareableObjectState {
   cosmologyHubble?: number
   /** Initial conformal time `η₀` (strictly non-zero) */
   cosmologyEta0?: number
+  /** LQC critical density `ρ_c > 0` (only consulted under `lqcBounce`). */
+  cosmologyLqcRhoCritical?: number
+  /** LQC matter equation of state `w ∈ [0, 1]`. */
+  cosmologyLqcEquationOfState?: number
+  /** LQC starting `ρ/ρ_c` ratio in `(0, 1)`. */
+  cosmologyLqcInitialRhoRatio?: number
+
+  // ── Wheeler–DeWitt Minisuperspace ───────────────────────────────────────
+  /** Wheeler–DeWitt boundary condition proposal */
+  wdwBoundaryCondition?: UrlWdwBoundaryCondition
+  /** Wheeler–DeWitt inflaton mass m */
+  wdwInflatonMass?: number
+  /** Wheeler–DeWitt cosmological constant Λ */
+  wdwCosmologicalConstant?: number
+  /** Wheeler–DeWitt WKB streamline overlay toggle */
+  wdwStreamlinesEnabled?: boolean
+  /** Wheeler–DeWitt streamline seed density (2-16) */
+  wdwStreamlineDensity?: number
+  /** Wheeler–DeWitt phase rotation enabled (render-only; visual only) */
+  wdwPhaseRotationEnabled?: boolean
+  /** Wheeler–DeWitt phase rotation angular-velocity multiplier (0-5) */
+  wdwPhaseRotationSpeed?: number
+  /** Wheeler–DeWitt semiclassical worldline pulse enabled (render-only) */
+  wdwWorldlineEnabled?: boolean
+  /** Wheeler–DeWitt worldline pulse cycles per unit time (0.1-3) */
+  wdwWorldlineSpeed?: number
+  /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
+  wdwWorldlinePulseWidth?: number
 }
 
 /**
@@ -276,6 +323,10 @@ function serializeCosmology(params: URLSearchParams, state: ShareableObjectState
     setFloatParam(params, 'cos_s', state.cosmologySteepness, true, 4)
   } else if (state.cosmologyPreset === 'deSitter') {
     setFloatParam(params, 'cos_h', state.cosmologyHubble, true)
+  } else if (state.cosmologyPreset === 'lqcBounce') {
+    setFloatParam(params, 'cos_rhoc', state.cosmologyLqcRhoCritical, true, 4)
+    setFloatParam(params, 'cos_w', state.cosmologyLqcEquationOfState, true, 4)
+    setFloatParam(params, 'cos_rhostart', state.cosmologyLqcInitialRhoRatio, true, 4)
   }
   setFloatParam(params, 'cos_eta0', state.cosmologyEta0, true)
 }
@@ -362,6 +413,14 @@ export function serializeState(state: ShareableState): string {
     setFloatParam(params, 'brc_p', state.branchPlanePosition, true)
   }
 
+  // ER=EPR wormhole coupling. Only emits the sub-params when enabled so a
+  // `?tdse_wh=0` link isn't polluted with redundant coupling/axis values.
+  if (state.wormholeCouplingEnabled) {
+    params.set('tdse_wh', '1')
+    setFloatParam(params, 'tdse_whg', state.wormholeCouplingG, true)
+    setIntParam(params, 'tdse_whax', state.wormholeMirrorAxis)
+  }
+
   // Coordinate entanglement
   setBoolParam(params, 'ent', state.entanglementEnabled)
   setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
@@ -369,6 +428,21 @@ export function serializeState(state: ShareableState): string {
 
   // Cosmological background — only emit the sub-params when enabled
   serializeCosmology(params, state)
+
+  // Wheeler–DeWitt minisuperspace
+  if (state.quantumMode === 'wheelerDeWitt') {
+    setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
+    setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
+    setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
+    setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
+    setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
+    // Render-only animation effects
+    setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
+    setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed, true)
+    setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
+    setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
+    setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+  }
 
   return params.toString()
 }
@@ -402,7 +476,15 @@ function resolveCosmologyPresetParams(
   params: URLSearchParams,
   preset: CosmologyPreset,
   spacetimeDim: number
-): { steepness?: number; hubble?: number } | undefined {
+):
+  | {
+      steepness?: number
+      hubble?: number
+      lqcRhoCritical?: number
+      lqcEquationOfState?: number
+      lqcInitialRhoRatio?: number
+    }
+  | undefined {
   if (preset === 'ekpyrotic') {
     const raw = parseFloatParam(params, 'cos_s', 0, 100)
     if (raw === undefined) return undefined
@@ -416,6 +498,21 @@ function resolveCosmologyPresetParams(
     const hubble = parseFloatParam(params, 'cos_h', 0.01, 100)
     if (hubble === undefined) return undefined
     return { hubble }
+  }
+  if (preset === 'lqcBounce') {
+    // LQC bounce: cos_rhoc is required (sets the scale of the bounce).
+    // cos_w and cos_rhostart are optional and fall back to defaults
+    // (1.0, 0.01). Reject the whole block only if the required cos_rhoc
+    // is missing or out of range.
+    const rhoC = parseFloatParam(params, 'cos_rhoc', 0.1, 10)
+    if (rhoC === undefined) return undefined
+    const wRaw = parseFloatParam(params, 'cos_w', 0, 1)
+    const rhoStartRaw = parseFloatParam(params, 'cos_rhostart', 0.001, 0.999)
+    return {
+      lqcRhoCritical: rhoC,
+      lqcEquationOfState: wRaw ?? 1.0,
+      lqcInitialRhoRatio: rhoStartRaw ?? 0.01,
+    }
   }
   return {}
 }
@@ -456,6 +553,15 @@ function deserializeCosmologyParams(params: URLSearchParams, state: ParsedSharea
   state.cosmologyPreset = preset
   if (presetParams.steepness !== undefined) state.cosmologySteepness = presetParams.steepness
   if (presetParams.hubble !== undefined) state.cosmologyHubble = presetParams.hubble
+  if (presetParams.lqcRhoCritical !== undefined) {
+    state.cosmologyLqcRhoCritical = presetParams.lqcRhoCritical
+  }
+  if (presetParams.lqcEquationOfState !== undefined) {
+    state.cosmologyLqcEquationOfState = presetParams.lqcEquationOfState
+  }
+  if (presetParams.lqcInitialRhoRatio !== undefined) {
+    state.cosmologyLqcInitialRhoRatio = presetParams.lqcInitialRhoRatio
+  }
   state.cosmologyEta0 = eta0
 }
 
@@ -482,6 +588,16 @@ function deserializeFeatureParams(params: URLSearchParams, state: ParsedShareabl
     state.branchingEnabled = brc
     // Matches the store's setTdseBranchPlanePosition clamp [-1, 1].
     state.branchPlanePosition = parseFloatParam(params, 'brc_p', -1, 1)
+  }
+
+  const wh = parseBoolParam(params, 'tdse_wh')
+  if (wh !== undefined) {
+    state.wormholeCouplingEnabled = wh
+    state.wormholeCouplingG = parseFloatParam(params, 'tdse_whg', 0, 5)
+    const axis = parseIntParam(params, 'tdse_whax', 0, 2)
+    if (axis !== undefined) {
+      state.wormholeMirrorAxis = axis as 0 | 1 | 2
+    }
   }
 
   state.entanglementEnabled = parseBoolParam(params, 'ent')
@@ -544,6 +660,18 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   // Cosmological background (must come AFTER dimension parsing so `d` is
   // available for the s_c(n) check).
   deserializeCosmologyParams(params, state)
+
+  // Wheeler–DeWitt minisuperspace
+  state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
+  state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
+  state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
+  state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
+  state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
+  state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')
+  state.wdwPhaseRotationSpeed = parseFloatParam(params, 'wdw_prs', 0, 5)
+  state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
+  state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
+  state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

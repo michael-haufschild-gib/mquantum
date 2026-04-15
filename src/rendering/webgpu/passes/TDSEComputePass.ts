@@ -27,17 +27,10 @@ import {
   type TdseDiagnosticsSnapshot,
 } from '@/lib/physics/tdse/diagnostics'
 import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
-import { useSimulationStateStore } from '@/stores/simulationStateStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import {
-  computeConfigHash,
-  computeStridesPadded,
-  createDensityTexture,
-  LINEAR_WG,
-  sanitizeGridSizes,
-} from './computePassUtils'
+import { computeConfigHash, createDensityTexture, LINEAR_WG } from './computePassUtils'
 import {
   applyBufferResult,
   collectOldBuffers,
@@ -45,29 +38,17 @@ import {
   TDSE_UNIFORM_SIZE,
   type TdsePassBufferFields,
 } from './TDSEComputePassBuffers'
-import {
-  computePotentialHash,
-  uploadAndersonDisorderBuffer,
-  uploadCustomPotentialBuffer,
-} from './TDSEComputePassCustomPotential'
-import {
-  type DiagFrameState,
-  type EvolutionFrameState,
-  runPostStepDispatches,
-  runStrangEvolution,
-} from './TDSEComputePassEvolution'
+import { type DiagFrameState } from './TDSEComputePassEvolution'
+import { runTdseExecute, type TdseExecuteFields } from './TDSEComputePassExecute'
 import { dispatchFFTAxisExternal, dispatchFFTAxisInPassExternal } from './TDSEComputePassGradient'
+import { runTdseDispose, type TdseDisposeFields } from './TDSEComputePassLifecycle'
 import type {
   TdseBindGroupInputs,
   TdseBindGroupResult,
   TdsePipelineResult,
 } from './TDSEComputePassSetup'
 import { buildTdsePipelines, rebuildTdseBindGroups } from './TDSEComputePassSetup'
-import { writeTdseUniforms } from './TDSEComputePassUniforms'
-import {
-  type ObservablesState,
-  updateObservablesResources as obsUpdate,
-} from './TDSEObservablesDispatch'
+import { type ObservablesState } from './TDSEObservablesDispatch'
 
 /**
  * TDSEUniforms struct size in bytes.
@@ -78,41 +59,39 @@ import {
  *   hawkingVmax (f32 @ 760), hawkingLh (f32 @ 764),
  *   hawkingDeltaN (f32 @ 768), hawkingInjectRate (f32 @ 772),
  *   hawkingPairInjection (u32 @ 776), hawkingSeed (u32 @ 780),
- *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796).
- * Total = 800 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
+ *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796),
+ *   wormholeCouplingEnabled (u32 @ 800), wormholeCouplingG (f32 @ 804),
+ *   wormholeMirrorAxis (u32 @ 808), _padWormhole (u32 @ 812).
+ * Total = 816 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
  * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
  * struct together when adding new fields.
  */
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 
-import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-
 import {
   buildDisorderPipeline,
   createDisorderState,
   type DisorderState,
-  maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
-import { disposeFullPass, type TdsePassGpuSnapshot } from './TDSEComputePassDispose'
 import {
   buildHawkingInjectPipeline,
   createHawkingInjectState,
-  disposeHawkingInject,
   type HawkingInjectState,
-  runHawkingFrame,
 } from './TDSEComputePassHawking'
 import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
+import {
+  createWormholeBindGroup,
+  createWormholePipeline,
+  type WormholePipelineResources,
+} from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
-  clearEigenstates as gsClearEigenstates,
-  ensureGSBuffers as gsEnsureBuffers,
   type GramSchmidtState,
   storeCurrentEigenstate as gsStoreEigenstate,
 } from './TDSEGramSchmidt'
 import {
   createHellerReadbackState,
   type HellerReadbackState,
-  prepareHellerFrame,
   resetHellerCapture,
 } from './TDSEHellerReadback'
 import { requestMeasurementReadback as extRequestMeasurementReadback } from './TDSEMeasurementReadback'
@@ -134,36 +113,45 @@ import {
   rebuildVortexDetect,
   type VortexDetectState,
 } from './TDSEVortexDetect'
+import {
+  createWormholeReadbackState,
+  resetWormholeReadback,
+  type WormholeReadbackState,
+} from './TDSEWormholeReadback'
 
 /**
  * Compute pass for TDSE split-operator dynamics.
  * Manages psi buffers, FFT scratch, potential buffer, and density grid output.
  */
 export class TDSEComputePass extends WebGPUBaseComputePass {
-  private psiReBuffer: GPUBuffer | null = null
-  private psiImBuffer: GPUBuffer | null = null
-  private potentialBuffer: GPUBuffer | null = null
-  private fftScratchA: GPUBuffer | null = null
-  private fftScratchB: GPUBuffer | null = null
-  private uniformBuffer: GPUBuffer | null = null
-  private fftUniformBuffer: GPUBuffer | null = null
-  private fftStagingBuffer: GPUBuffer | null = null
+  // Fields marked without `private` are accessed via the `_fieldView` typed
+  // cast by the extracted `runTdseExecute` / `runTdseDispose` helpers; TS
+  // `noUnusedLocals` fires on unused private class members, so those helpers'
+  // fields are declared as package-internal instead.
+  psiReBuffer: GPUBuffer | null = null
+  psiImBuffer: GPUBuffer | null = null
+  potentialBuffer: GPUBuffer | null = null
+  fftScratchA: GPUBuffer | null = null
+  fftScratchB: GPUBuffer | null = null
+  uniformBuffer: GPUBuffer | null = null
+  fftUniformBuffer: GPUBuffer | null = null
+  fftStagingBuffer: GPUBuffer | null = null
   private fftAxisUniformBuffer: GPUBuffer | null = null
   private fftAxisStagingBuffer: GPUBuffer | null = null
   /** Per-slot FFT axis uniform buffers (length = 2 × latticeDim). */
   private fftAxisUniformBuffers: GPUBuffer[] | null = null
-  private packUniformBuffer: GPUBuffer | null = null
+  packUniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
-  private pl: TdsePipelineResult | null = null
-  private bg: TdseBindGroupResult | null = null
-  private diagUniformBuffer: GPUBuffer | null = null
-  private diagPartialSumsBuffer: GPUBuffer | null = null
-  private diagPartialMaxBuffer: GPUBuffer | null = null
-  private diagPartialLeftBuffer: GPUBuffer | null = null
-  private diagPartialRightBuffer: GPUBuffer | null = null
-  private diagPartialIprBuffer: GPUBuffer | null = null
-  private diagNumWorkgroups = 0
+  pl: TdsePipelineResult | null = null
+  bg: TdseBindGroupResult | null = null
+  diagUniformBuffer: GPUBuffer | null = null
+  diagPartialSumsBuffer: GPUBuffer | null = null
+  diagPartialMaxBuffer: GPUBuffer | null = null
+  diagPartialLeftBuffer: GPUBuffer | null = null
+  diagPartialRightBuffer: GPUBuffer | null = null
+  diagPartialIprBuffer: GPUBuffer | null = null
+  diagNumWorkgroups = 0
   private readonly _diagFrameState: DiagFrameState = { diagFrameCounter: 0 }
   private readonly _diagState: DiagReadbackState = {
     diagResultBuffer: null,
@@ -230,32 +218,38 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   // Heller wavepacket spectrometer state (shared mutable object).
   private readonly _hellerState: HellerReadbackState = createHellerReadbackState()
   /** Last UI-requested Heller reset token handled by this pass. */
-  private _hellerLastResetToken = 0
+  _hellerLastResetToken = 0
 
   // State
-  private initialized = false
-  private lastConfigHash = ''
-  private lastPotentialHash = ''
-  private totalSites = 0
-  private simTime = 0
-  private fwdAxisCount = 0
-  private stepAccumulator = 0
-  private omegaStagingBuffer: GPUBuffer | null = null
+  initialized = false
+  lastConfigHash = ''
+  lastPotentialHash = ''
+  totalSites = 0
+  simTime = 0
+  fwdAxisCount = 0
+  stepAccumulator = 0
+  omegaStagingBuffer: GPUBuffer | null = null
   /** Max |V| from the last custom potential upload, for display normalization */
-  private customPotentialScale = 1.0
+  customPotentialScale = 1.0
 
   private readonly _disorderState: DisorderState = createDisorderState()
   private readonly _stochasticState: StochasticLocState = createStochasticLocState()
   /** Analog Hawking pair-injection state (pipeline, bindings, step counter). */
   private readonly _hawkingState: HawkingInjectState = createHawkingInjectState()
+  /** ER=EPR wormhole coupling — pipeline (shared across lattice rebuilds). */
+  wormholePipeline: WormholePipelineResources | null = null
+  /** ER=EPR wormhole coupling — bind group (rebuilt each lattice rebuild). */
+  wormholeBG: GPUBindGroup | null = null
+  /** ER=EPR wormhole coherence readback (staging + in-flight gate). */
+  readonly _wormholeReadback: WormholeReadbackState = createWormholeReadbackState()
 
   // Pre-allocated uniform views
-  private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
-  private readonly uniformU32 = new Uint32Array(this.uniformData)
-  private readonly uniformF32 = new Float32Array(this.uniformData)
+  readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
+  readonly uniformU32 = new Uint32Array(this.uniformData)
+  readonly uniformF32 = new Float32Array(this.uniformData)
 
   /** Adapter: wraps base dispatchCompute with optional y/z defaulting to 1. */
-  private readonly dc = (
+  readonly dc = (
     pe: GPUComputePassEncoder,
     p: GPUComputePipeline,
     b: GPUBindGroup[],
@@ -346,7 +340,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   /** Sync shared state objects with current buffer references. */
-  private syncSharedState(): void {
+  syncSharedState(): void {
     const {
       psiReBuffer: re,
       psiImBuffer: im,
@@ -369,7 +363,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     })
   }
 
-  private rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
+  rebuildBuffers(device: GPUDevice, config: TdseConfig): void {
     // Cancel any pending diagnostic mapAsync before destroying the staging buffer.
     if (this._diagState.diagMappingInFlight && this._diagState.diagStagingBuffer) {
       this._diagState.diagStagingBuffer.unmap()
@@ -407,13 +401,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.psiReBuffer,
       this.psiImBuffer
     )
+    // Wormhole HUD staging — drop stale buffers; new size picked lazily.
+    resetWormholeReadback(this._wormholeReadback)
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
     // Pipelines created lazily on first execute
   }
 
-  private buildPipelines(device: GPUDevice): void {
+  buildPipelines(device: GPUDevice): void {
     const smBind = this.createShaderModule.bind(this)
     const cpBind = this.createComputePipeline.bind(this)
     this.pl = buildTdsePipelines(device, {
@@ -424,9 +420,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
     buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
     buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
+    if (!this.wormholePipeline) {
+      this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
+    }
   }
 
-  private rebuildBindGroups(device: GPUDevice): void {
+  rebuildBindGroups(device: GPUDevice): void {
     if (!this.pl || !this.densityTextureView) return
     const bgSelf = this as unknown as TdsePassBufferFields
     this.bg = rebuildTdseBindGroups(
@@ -463,10 +462,20 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         expectWG
       )
     }
+    // ER=EPR wormhole coupling bind group — reuses uniform + ψ storage.
+    if (this.wormholePipeline && this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
+      this.wormholeBG = createWormholeBindGroup(
+        device,
+        this.wormholePipeline,
+        this.uniformBuffer,
+        this.psiReBuffer,
+        this.psiImBuffer
+      )
+    }
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
-  private maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
+  maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void {
     const ic = {
       pl: this.pl,
       bg: this.bg,
@@ -492,7 +501,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   /** Dispatch FFT for one axis (own compute pass). See helper for details. */
-  private dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
+  dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number {
     return dispatchFFTAxisExternal(ctx, axisDim, slotOffset, {
       pl: this.pl,
       bg: this.bg,
@@ -504,13 +513,20 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   /** PERF: dispatch one FFT axis inside an open compute pass. */
-  private dispatchFFTAxisInPass(
-    passEncoder: GPUComputePassEncoder,
-    axisDim: number,
-    slot: number
-  ): void {
+  dispatchFFTAxisInPass(passEncoder: GPUComputePassEncoder, axisDim: number, slot: number): void {
     dispatchFFTAxisInPassExternal(passEncoder, axisDim, slot, this.bg, this.totalSites)
   }
+
+  /**
+   * Proxy object bridging the class instance to extracted helper modules.
+   *
+   * Built once in the constructor via `Object.setPrototypeOf` on `this` so
+   * all reads/writes go directly to the real instance fields (no copy).
+   * Keeps the extracted `runTdseExecute` / `runTdseDispose` helpers from
+   * needing to re-declare the entire field surface on the class.
+   */
+  private readonly _fieldView: TdseExecuteFields & TdseDisposeFields =
+    this as unknown as TdseExecuteFields & TdseDisposeFields
 
   /** Execute the full TDSE compute pipeline. */
   executeTDSE(
@@ -523,166 +539,17 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     basisZ?: Float32Array,
     boundingRadius?: number
   ): void {
-    const config = sanitizeGridSizes(rawConfig)
-    const { device } = ctx
-    this.syncSharedState()
-    const configHash = computeConfigHash(config.gridSize, config.latticeDim)
-
-    if (configHash !== this.lastConfigHash || !this.psiReBuffer) {
-      this.rebuildBuffers(device, config)
-      this.buildPipelines(device)
-      this.rebuildBindGroups(device)
-      this.initialized = false
-      this.simTime = 0
-      this.lastPotentialHash = ''
-      this._obsState.obsEnabled = false // force rebuild on next check
-      gsClearEigenstates(this._gsState) // eigenstates are grid-size-specific
-      useSimulationStateStore.getState().clearStoredEigenstates()
-      useDiagnosticsStore.getState().clearEigenstate()
-    }
-
-    // Create/destroy observables resources when toggle changes or after rebuild
-    this.syncSharedState()
-    obsUpdate(device, config, this._obsState)
-    // Ensure GS uniform buffer exists when needed
-    gsEnsureBuffers(device, this._gsState)
-
-    if (this.uniformBuffer) {
-      writeTdseUniforms(
-        device,
-        this.uniformBuffer,
-        this.uniformData,
-        this.uniformU32,
-        this.uniformF32,
-        {
-          config,
-          totalSites: this.totalSites,
-          simTime: this.simTime,
-          maxDensity: this._diagState.maxDensity,
-          initialMaxDensity: this._diagState.initialMaxDensity,
-          autoScaleMaxGain: config.autoScaleMaxGain ?? 20,
-          strides: computeStridesPadded(config.gridSize, config.latticeDim),
-          needsInit: !this.initialized || config.needsReset || this._diagState.pendingAutoReset,
-          basisX,
-          basisY,
-          basisZ,
-          boundingRadius,
-          customPotentialScale: this.customPotentialScale,
-          hawkingStepIndex: this._hawkingState.stepIndex,
-        }
-      )
-    }
-
-    this.maybeInitialize(ctx, config)
-
-    // Strang splitting time steps (only when playing)
-    const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
-
-    // Refresh potential only when parameters change (dirty tracking).
-    const fullPotHash = computePotentialHash(config, this.simTime)
-    if (fullPotHash !== this.lastPotentialHash) {
-      this.lastPotentialHash = fullPotHash
-      if (this.pl && this.bg) {
-        if (config.potentialType === 'custom') {
-          this.customPotentialScale = uploadCustomPotentialBuffer(
-            device,
-            this.potentialBuffer,
-            config
-          )
-        } else if (config.potentialType === 'andersonDisorder') {
-          this.customPotentialScale = uploadAndersonDisorderBuffer(
-            device,
-            this.potentialBuffer,
-            config
-          )
-        } else {
-          const p = ctx.beginComputePass({ label: 'tdse-potential-update' })
-          this.dispatchCompute(p, this.pl.potentialPipeline, [this.bg.potentialBG], linearWG)
-          p.end()
-        }
-        // Disorder overlay: add random noise to non-Anderson potentials.
-        // Anderson disorder is fully generated by uploadAndersonDisorderBuffer —
-        // dispatching the overlay here would double-apply disorder.
-        if (config.potentialType !== 'andersonDisorder') {
-          maybeDispatchDisorder(
-            device,
-            ctx,
-            config,
-            this._disorderState,
-            this.potentialBuffer,
-            this.totalSites,
-            linearWG,
-            this.dispatchCompute.bind(this)
-          )
-        }
-      }
-    }
-
-    const { pl, bg } = this
-    if (!pl || !bg) return
-
-    // Heller wavepacket spectrometer — sync store → readback state
-    // BEFORE the evolution loop so that the per-Strang-step tick inside
-    // `runStrangEvolution` sees the current `enabled` / `sampleInterval`
-    // values for this frame. See `prepareHellerFrame` for the
-    // time-dependent Hamiltonian guard and reset-token handling.
-    this._hellerLastResetToken = prepareHellerFrame(
-      this._hellerState,
-      config,
-      this._hellerLastResetToken
+    runTdseExecute(
+      this._fieldView,
+      ctx,
+      rawConfig,
+      isPlaying,
+      speed,
+      basisX,
+      basisY,
+      basisZ,
+      boundingRadius
     )
-
-    if (isPlaying) {
-      const evoState: EvolutionFrameState = {
-        simTime: this.simTime,
-        stepAccumulator: this.stepAccumulator,
-      }
-      runStrangEvolution(ctx, config, speed, evoState, {
-        pl,
-        bg,
-        totalSites: this.totalSites,
-        diagNumWorkgroups: this.diagNumWorkgroups,
-        ifftSlotOffset: this.fwdAxisCount,
-        gsState: this._gsState,
-        stochasticState: this._stochasticState,
-        boundingRadius: boundingRadius ?? 2.0,
-        hellerState: this._hellerState,
-        dc: this.dc,
-        dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
-        dispatchFFTAxisInPass: (pass, axisDim, slot) =>
-          this.dispatchFFTAxisInPass(pass, axisDim, slot),
-      })
-      this.simTime = evoState.simTime
-      this.stepAccumulator = evoState.stepAccumulator
-
-      // Analog Hawking pair injection + step-counter advance (gated off by default).
-      runHawkingFrame(
-        device,
-        ctx,
-        config,
-        this._hawkingState,
-        this.uniformBuffer,
-        this.psiReBuffer,
-        this.psiImBuffer,
-        linearWG,
-        this.dispatchCompute.bind(this)
-      )
-    }
-
-    runPostStepDispatches(ctx, config, this._diagFrameState, {
-      pl,
-      bg,
-      totalSites: this.totalSites,
-      diagNumWorkgroups: this.diagNumWorkgroups,
-      simTime: this.simTime,
-      diagUniformBuffer: this.diagUniformBuffer,
-      diagState: this._diagState,
-      obsState: this._obsState,
-      vdState: this._vdState,
-      dc: this.dc,
-      dispatchCompute: this.dc,
-      dispatchFFTAxis: (c, axisDim, slot) => this.dispatchFFTAxis(c, axisDim, slot),
-    })
   }
 
   execute(_ctx: WebGPURenderContext): void {
@@ -690,46 +557,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   dispose(): void {
-    const gpu: TdsePassGpuSnapshot = {
-      psiReBuffer: this.psiReBuffer,
-      psiImBuffer: this.psiImBuffer,
-      potentialBuffer: this.potentialBuffer,
-      fftScratchA: this.fftScratchA,
-      fftScratchB: this.fftScratchB,
-      uniformBuffer: this.uniformBuffer,
-      fftUniformBuffer: this.fftUniformBuffer,
-      fftStagingBuffer: this.fftStagingBuffer,
-      fftAxisUniformBuffer: this.fftAxisUniformBuffer,
-      fftAxisStagingBuffer: this.fftAxisStagingBuffer,
-      fftAxisUniformBuffers: this.fftAxisUniformBuffers,
-      packUniformBuffer: this.packUniformBuffer,
-      omegaStagingBuffer: this.omegaStagingBuffer,
-      densityTexture: this.densityTexture,
-      densityTextureView: this.densityTextureView,
-      diagUniformBuffer: this.diagUniformBuffer,
-      diagPartialSumsBuffer: this.diagPartialSumsBuffer,
-      diagPartialMaxBuffer: this.diagPartialMaxBuffer,
-      diagPartialLeftBuffer: this.diagPartialLeftBuffer,
-      diagPartialRightBuffer: this.diagPartialRightBuffer,
-      diagPartialIprBuffer: this.diagPartialIprBuffer,
-      pl: this.pl,
-      bg: this.bg,
-      initialized: this.initialized,
-      lastConfigHash: this.lastConfigHash,
-    }
-    disposeFullPass(
-      gpu,
-      this._vdState,
-      this._disorderState,
-      this._stochasticState,
-      this._hellerState,
-      this._diagState,
-      this._gsState,
-      this._slState,
-      this._obsState
-    )
-    disposeHawkingInject(this._hawkingState)
-    Object.assign(this, gpu)
+    runTdseDispose(this._fieldView)
     super.dispose()
   }
 }

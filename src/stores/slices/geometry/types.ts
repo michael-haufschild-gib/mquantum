@@ -274,6 +274,21 @@ export interface SchroedingerSliceActions {
    * it. Non-finite inputs are rejected with a dev warning.
    */
   setFreeScalarCosmologyBianchiExponents: (p1: number, p2: number, p3: number) => void
+  /**
+   * Set the LQC critical density `ρ_c > 0` (clamped to `[0.1, 10]`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcRhoCritical: (rhoCritical: number) => void
+  /**
+   * Set the LQC matter equation-of-state `w ∈ [0, 1]`. Only consulted
+   * when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcEquationOfState: (w: number) => void
+  /**
+   * Set the LQC starting `ρ/ρ_c` ratio (clamped to `(0, 1)`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcInitialRhoRatio: (ratio: number) => void
 
   // Parametric Resonance / Preheating
   setFreeScalarPreheatingEnabled: (enabled: boolean) => void
@@ -371,6 +386,12 @@ export interface SchroedingerSliceActions {
   setTdseBranchColorA: (color: [number, number, number]) => void
   setTdseBranchColorB: (color: [number, number, number]) => void
 
+  // ER=EPR Double-trace Wormhole Coupling
+  setTdseWormholeEnabled: (enabled: boolean) => void
+  setTdseWormholeG: (g: number) => void
+  setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
+  setTdseWormholeHudEnabled: (enabled: boolean) => void
+
   // BEC (Gross-Pitaevskii Equation) Configuration
   setBecInteractionStrength: (g: number) => void
   setBecTrapOmega: (omega: number) => void
@@ -444,6 +465,22 @@ export interface SchroedingerSliceActions {
   clearDiracNeedsReset: () => void
   setDiracSlicePosition: (dimIndex: number, value: number) => void
   applyDiracPreset: (presetId: string) => void
+
+  // Wheeler–DeWitt Minisuperspace Configuration
+  setWdwBoundaryCondition: (
+    bc: import('@/lib/geometry/extended/wheelerDeWitt').WdwBoundaryCondition
+  ) => void
+  setWdwInflatonMass: (m: number) => void
+  setWdwCosmologicalConstant: (lambda: number) => void
+  setWdwStreamlinesEnabled: (enabled: boolean) => void
+  setWdwStreamlineDensity: (density: number) => void
+  setWdwPhaseRotationEnabled: (enabled: boolean) => void
+  setWdwPhaseRotationSpeed: (speed: number) => void
+  setWdwWorldlineEnabled: (enabled: boolean) => void
+  setWdwWorldlineSpeed: (speed: number) => void
+  setWdwWorldlinePulseWidth: (w: number) => void
+  triggerWdwRecompute: () => void
+  clearWdwNeedsReset: () => void
 
   // Free Scalar Field Presets
   applyFreeScalarPreset: (presetId: string) => void

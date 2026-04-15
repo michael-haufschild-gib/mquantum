@@ -200,6 +200,27 @@ export interface CosmologyConfig {
    * land on a physically well-defined starting point.
    */
   kasnerExponents?: KasnerExponents
+  /**
+   * LQC critical density `ρ_c > 0`. Only consulted when
+   * `preset === 'lqcBounce'`; preserved through serialization for all
+   * other presets. Defaults to `1.0` in sim units — the scale at which
+   * the LQC bounce occurs in the default `n = 4`, stiff-fluid regime.
+   */
+  lqcRhoCritical?: number
+  /**
+   * LQC matter equation-of-state `w ∈ [0, 1]`. Only consulted when
+   * `preset === 'lqcBounce'`; default `1.0` (stiff fluid, equivalent to
+   * a massless scalar in its kinetic-dominated regime) admits the
+   * closed-form analytic solution used as the test oracle.
+   */
+  lqcEquationOfState?: number
+  /**
+   * LQC starting `ρ/ρ_c` ratio at the pre-bounce window edge, `(0, 1)`.
+   * Only consulted when `preset === 'lqcBounce'`. Small values (e.g.
+   * `0.01`) mean the integration window extends deep into the Kasner
+   * asymptote before turning around at the bounce.
+   */
+  lqcInitialRhoRatio?: number
 }
 
 /**
@@ -213,6 +234,9 @@ export const DEFAULT_COSMOLOGY_CONFIG: CosmologyConfig = {
   hubble: 1,
   eta0: -10,
   kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+  lqcRhoCritical: 1.0,
+  lqcEquationOfState: 1.0,
+  lqcInitialRhoRatio: 0.01,
 }
 
 // ============================================================================

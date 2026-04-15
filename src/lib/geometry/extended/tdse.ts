@@ -266,6 +266,29 @@ export interface TdseConfig {
   /** Analog Hawking — deterministic noise seed. */
   hawkingSeed?: number
 
+  // === Analog Hawking — quantum-extremal island overlay ===
+  /**
+   * Enable the 3D island-density overlay in the TDSE write-grid shader. When
+   * on, voxels inside the Page-curve quantum-extremal island ball receive a
+   * brightness boost and a π/4 phase-hue shift so the region is visually
+   * distinct against the supersonic background.
+   */
+  islandOverlayEnabled?: boolean
+  /**
+   * Horizon centroid along axis 0 in world units. Sign encodes which side of
+   * the origin the black-hole horizon lives on. When the overlay is off or no
+   * horizon exists the strategy writes 0 so the shader no-ops.
+   */
+  islandCenterX0?: number
+  /** Island radius d*(t) in world units (≥ 0). */
+  islandRadiusWs?: number
+  /**
+   * Brightness multiplier applied to the display scalar inside the island.
+   * Clamped to [1.0, 4.0] by the page-curve store. Defaults to 1.0 (no boost)
+   * when the overlay is off.
+   */
+  islandBoost?: number
+
   /** Trap omega used ONLY during initialization (quench scenarios).
    *  When set and different from harmonicOmega, the init pass creates the TF profile
    *  for this omega, then the potential is filled with harmonicOmega for evolution.
@@ -309,6 +332,20 @@ export interface TdseConfig {
   branchColorA: [number, number, number]
   /** Branch B color as [r, g, b] in 0–1 range */
   branchColorB: [number, number, number]
+
+  // === ER=EPR Double-trace Wormhole Coupling ===
+  /**
+   * Enable the double-trace mirror coupling Ĥ_int = g·P_M, where P_M reflects
+   * the wavefunction across the chosen mirror axis. Strang-split around the
+   * kinetic+potential block each substep. Off = hot path untouched.
+   */
+  wormholeCouplingEnabled: boolean
+  /** Coupling strength g ≥ 0 — tunneling rate between L and R halves. */
+  wormholeCouplingG: number
+  /** Mirror-plane axis index (0, 1, or 2). Grid size along the axis must be even. */
+  wormholeMirrorAxis: 0 | 1 | 2
+  /** Toggle for the WormholeCoherencePanel SVG HUD overlay. */
+  wormholeCoherenceHudEnabled: boolean
 }
 
 /**
@@ -408,6 +445,11 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   branchPlanePosition: 0.0,
   branchColorA: [0.0, 1.0, 1.0],
   branchColorB: [1.0, 0.0, 1.0],
+
+  wormholeCouplingEnabled: false,
+  wormholeCouplingG: 0.5,
+  wormholeMirrorAxis: 0,
+  wormholeCoherenceHudEnabled: false,
 
   needsReset: false,
   slicePositions: [],

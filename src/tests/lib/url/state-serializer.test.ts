@@ -734,4 +734,73 @@ describe('state-serializer', () => {
       expect(round.cosmologySteepness).toBeCloseTo(3.4645, 4)
     })
   })
+
+  describe('Wheeler–DeWitt minisuperspace params', () => {
+    it('round-trips streamline toggle + density alongside physics fields', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwBoundaryCondition: 'tunneling',
+        wdwInflatonMass: 0.42,
+        wdwCosmologicalConstant: 0.11,
+        wdwStreamlinesEnabled: true,
+        wdwStreamlineDensity: 9,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_sl=1')
+      expect(serialized).toContain('wdw_sld=9')
+      const round = deserializeState(serialized)
+      expect(round.wdwBoundaryCondition).toBe('tunneling')
+      expect(round.wdwInflatonMass).toBeCloseTo(0.42, 4)
+      expect(round.wdwCosmologicalConstant).toBeCloseTo(0.11, 4)
+      expect(round.wdwStreamlinesEnabled).toBe(true)
+      expect(round.wdwStreamlineDensity).toBe(9)
+    })
+
+    it('clamps streamline density to [2, 16]', () => {
+      const tooLow = deserializeState('wdw_sld=1')
+      const tooHigh = deserializeState('wdw_sld=42')
+      expect(tooLow.wdwStreamlineDensity).toBe(2)
+      expect(tooHigh.wdwStreamlineDensity).toBe(16)
+    })
+
+    it('round-trips render-only animation-effect params (phase rotation + worldline)', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwPhaseRotationEnabled: true,
+        wdwPhaseRotationSpeed: 2.5,
+        wdwWorldlineEnabled: true,
+        wdwWorldlineSpeed: 1.2,
+        wdwWorldlinePulseWidth: 0.12,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_pr=1')
+      expect(serialized).toContain('wdw_wl=1')
+      expect(serialized).toContain('wdw_prs=2.50')
+      expect(serialized).toContain('wdw_wls=1.20')
+      expect(serialized).toContain('wdw_wlw=0.1200')
+
+      const round = deserializeState(serialized)
+      expect(round.wdwPhaseRotationEnabled).toBe(true)
+      expect(round.wdwPhaseRotationSpeed).toBeCloseTo(2.5, 4)
+      expect(round.wdwWorldlineEnabled).toBe(true)
+      expect(round.wdwWorldlineSpeed).toBeCloseTo(1.2, 4)
+      expect(round.wdwWorldlinePulseWidth).toBeCloseTo(0.12, 4)
+    })
+
+    it('clamps animation-effect floats to their declared ranges', () => {
+      const outOfRange = deserializeState('wdw_prs=99&wdw_wls=99&wdw_wlw=99')
+      expect(outOfRange.wdwPhaseRotationSpeed).toBe(5)
+      expect(outOfRange.wdwWorldlineSpeed).toBe(3)
+      expect(outOfRange.wdwWorldlinePulseWidth).toBe(0.3)
+
+      const negative = deserializeState('wdw_prs=-10&wdw_wls=-10&wdw_wlw=-10')
+      expect(negative.wdwPhaseRotationSpeed).toBe(0)
+      expect(negative.wdwWorldlineSpeed).toBe(0.1)
+      expect(negative.wdwWorldlinePulseWidth).toBe(0.02)
+    })
+  })
 })

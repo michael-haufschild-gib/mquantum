@@ -306,6 +306,28 @@ export function writeTdseUniforms(
   u32[195] = (config.hawkingSeed ?? 1337) >>> 0
   u32[196] = (params.hawkingStepIndex ?? 0) >>> 0
 
+  // ER=EPR double-trace wormhole coupling (offsets 800-815, indices 200-203).
+  // Enabled + G + axis + pad. Axis defaults to 0 (x-axis reflection).
+  u32[200] = config.wormholeCouplingEnabled ? 1 : 0
+  f32[201] = Math.max(0, config.wormholeCouplingG ?? 0)
+  u32[202] = Math.max(0, Math.min(2, Math.floor(config.wormholeMirrorAxis ?? 0))) >>> 0
+  u32[203] = 0
+
+  // Analog-Hawking island overlay (offsets 816-831, indices 204-207).
+  // When the overlay is off (or radius is zero) the shader no-ops regardless
+  // of the other fields — we still zero them so the GPU sees stable data.
+  const islandEnabled = config.islandOverlayEnabled === true
+  const islandRadius = Math.max(0, config.islandRadiusWs ?? 0)
+  const islandActive = islandEnabled && islandRadius > 0
+  u32[204] = islandActive ? 1 : 0
+  f32[205] = islandActive ? (config.islandCenterX0 ?? 0) : 0
+  f32[206] = islandActive ? islandRadius : 0
+  // Boost defaults to 1.0 (no brightening) when off; clamp to [1.0, 4.0] so a
+  // bogus config value cannot over-saturate the density texture.
+  const rawBoost = config.islandBoost ?? 1.0
+  const clampedBoost = Math.min(4.0, Math.max(1.0, Number.isFinite(rawBoost) ? rawBoost : 1.0))
+  f32[207] = islandActive ? clampedBoost : 1.0
+
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
 

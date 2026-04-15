@@ -302,7 +302,8 @@ struct SchroedingerUniforms {
   branchColorB: vec3f,              // offset 1584 — branch B color (default magenta)
   branchPlaneThreshold: f32,        // offset 1596 — world-space branch plane threshold (axis 0)
   branchTransitionWidth: f32,       // offset 1600 — smoothstep transition half-width
-  _padBranch: vec3f,                // offset 1604 — padding
+  _padBranch: vec3f,                // offset 1616 — padding (vec3f aligns to 16)
+  wdwPhaseRotationRate: f32,        // offset 1628 — rad/unit-time; 0 disables (non-WdW or toggle off)
 }
 
 // ============================================
