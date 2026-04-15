@@ -28,6 +28,8 @@ import type { QuantumWalkConfig } from './quantumWalk'
 import { DEFAULT_QUANTUM_WALK_CONFIG } from './quantumWalk'
 import type { TdseConfig } from './tdse'
 import { DEFAULT_TDSE_CONFIG } from './tdse'
+import type { WheelerDeWittConfig } from './wheelerDeWitt'
+import { DEFAULT_WHEELER_DEWITT_CONFIG } from './wheelerDeWitt'
 
 // ============================================================================
 // Schroedinger-Specific Types
@@ -484,6 +486,10 @@ export interface SchroedingerConfig {
   /** Discrete-time quantum walk on N-D lattice */
   quantumWalk: QuantumWalkConfig
 
+  // === Wheeler–DeWitt Configuration (when quantumMode === 'wheelerDeWitt') ===
+  /** Minisuperspace Wheeler–DeWitt (a, φ₁, φ₂) solver configuration */
+  wheelerDeWitt: WheelerDeWittConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -710,6 +716,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Quantum Walk
   quantumWalk: DEFAULT_QUANTUM_WALK_CONFIG,
+
+  // Wheeler–DeWitt minisuperspace
+  wheelerDeWitt: DEFAULT_WHEELER_DEWITT_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

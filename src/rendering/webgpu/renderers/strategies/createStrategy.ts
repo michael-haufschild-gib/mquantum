@@ -12,6 +12,7 @@ import { PauliStrategy } from './PauliStrategy'
 import { QuantumWalkStrategy } from './QuantumWalkStrategy'
 import { TdseBecStrategy } from './TdseBecStrategy'
 import type { QuantumModeStrategy } from './types'
+import { WheelerDeWittStrategy } from './WheelerDeWittStrategy'
 
 /**
  * Create the appropriate quantum mode strategy for the given renderer configuration.
@@ -35,6 +36,8 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
       return new DiracStrategy()
     case 'quantumWalk':
       return new QuantumWalkStrategy()
+    case 'wheelerDeWitt':
+      return new WheelerDeWittStrategy()
     case 'harmonicOscillator':
     case 'hydrogenND':
     case 'hydrogenNDCoupled':

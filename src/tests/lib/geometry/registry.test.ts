@@ -190,6 +190,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
         'pauliSpinor',
         'quantumWalk',
         'tdseDynamics',
+        'wheelerDeWitt',
       ])
     })
 

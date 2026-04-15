@@ -33,7 +33,11 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'becDynamics',
   'diracEquation',
   'quantumWalk',
+  'wheelerDeWitt',
 ]
+
+const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
+type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
 
@@ -165,6 +169,14 @@ export interface ShareableObjectState {
   cosmologyHubble?: number
   /** Initial conformal time `η₀` (strictly non-zero) */
   cosmologyEta0?: number
+
+  // ── Wheeler–DeWitt Minisuperspace ───────────────────────────────────────
+  /** Wheeler–DeWitt boundary condition proposal */
+  wdwBoundaryCondition?: UrlWdwBoundaryCondition
+  /** Wheeler–DeWitt inflaton mass m */
+  wdwInflatonMass?: number
+  /** Wheeler–DeWitt cosmological constant Λ */
+  wdwCosmologicalConstant?: number
 }
 
 /**
@@ -370,6 +382,13 @@ export function serializeState(state: ShareableState): string {
   // Cosmological background — only emit the sub-params when enabled
   serializeCosmology(params, state)
 
+  // Wheeler–DeWitt minisuperspace
+  if (state.quantumMode === 'wheelerDeWitt') {
+    setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
+    setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
+    setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
+  }
+
   return params.toString()
 }
 
@@ -544,6 +563,11 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   // Cosmological background (must come AFTER dimension parsing so `d` is
   // available for the s_c(n) check).
   deserializeCosmologyParams(params, state)
+
+  // Wheeler–DeWitt minisuperspace
+  state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
+  state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
+  state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

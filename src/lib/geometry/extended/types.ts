@@ -12,6 +12,7 @@ export * from './freeScalar'
 export * from './pauli'
 export * from './schroedinger'
 export * from './tdse'
+export * from './wheelerDeWitt'
 
 // ============================================================================
 // Combined Object Parameters

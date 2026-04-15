@@ -138,7 +138,14 @@ export const defaultDiracGridPerDim = (d: number): number =>
 // Used by tdse, bec, dirac, freeScalar, openQuantum setter files.
 
 /** Union of SchroedingerConfig keys that hold nested domain config objects. */
-type DomainKey = 'tdse' | 'bec' | 'dirac' | 'freeScalar' | 'openQuantum' | 'quantumWalk'
+type DomainKey =
+  | 'tdse'
+  | 'bec'
+  | 'dirac'
+  | 'freeScalar'
+  | 'openQuantum'
+  | 'quantumWalk'
+  | 'wheelerDeWitt'
 
 /**
  * Create a setter that validates, clamps, and writes a single numeric field

@@ -129,6 +129,25 @@ function applyCosmologyParams(
   ext.setFreeScalarCosmologyEnabled(urlState.cosmologyEnabled)
 }
 
+/**
+ * Apply Wheeler–DeWitt minisuperspace URL state params.
+ *
+ * Each setter (`setWdwBoundaryCondition`, `setWdwInflatonMass`,
+ * `setWdwCosmologicalConstant`) clamps its input and flips
+ * `wheelerDeWitt.needsReset` so the strategy re-runs the solver on the
+ * next frame with the URL-supplied parameters.
+ */
+function applyWdwParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.wdwBoundaryCondition !== undefined)
+    ext.setWdwBoundaryCondition(urlState.wdwBoundaryCondition)
+  if (urlState.wdwInflatonMass !== undefined) ext.setWdwInflatonMass(urlState.wdwInflatonMass)
+  if (urlState.wdwCosmologicalConstant !== undefined)
+    ext.setWdwCosmologicalConstant(urlState.wdwCosmologicalConstant)
+}
+
 /** Apply coordinate entanglement URL state params (lazy import). */
 function applyEntanglementParams(urlState: ParsedShareableState): void {
   if (urlState.entanglementEnabled === undefined) return
@@ -241,6 +260,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyBranchingParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
+    applyWdwParams(urlState, ext)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

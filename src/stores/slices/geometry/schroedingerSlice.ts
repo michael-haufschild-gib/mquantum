@@ -31,6 +31,7 @@ import type { SetterContext } from './setters/sliceSetterUtils'
 import { clampDtWithCfl } from './setters/sliceSetterUtils'
 import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
 import { createVisualEffectSetters } from './setters/visualEffectSetters'
+import { createWheelerDeWittSetters } from './setters/wheelerDeWittSetters'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 // ============================================================================
@@ -492,6 +493,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createBecSetters(ctx),
     ...createDiracSetters(ctx),
     ...createOpenQuantumSetters(ctx),
+    ...createWheelerDeWittSetters(ctx),
 
     // === Quantum Walk ===
     applyQuantumWalkPreset: (presetId) => {

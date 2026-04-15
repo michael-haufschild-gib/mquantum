@@ -445,6 +445,19 @@ export interface SchroedingerSliceActions {
   setDiracSlicePosition: (dimIndex: number, value: number) => void
   applyDiracPreset: (presetId: string) => void
 
+  // Wheeler–DeWitt Minisuperspace Configuration
+  setWdwBoundaryCondition: (
+    bc: import('@/lib/geometry/extended/wheelerDeWitt').WdwBoundaryCondition
+  ) => void
+  setWdwInflatonMass: (m: number) => void
+  setWdwCosmologicalConstant: (lambda: number) => void
+  setWdwStreamlinesEnabled: (enabled: boolean) => void
+  setWdwStreamlineDensity: (density: number) => void
+  setWdwSwamplandEnabled: (enabled: boolean) => void
+  setWdwSwamplandC: (c: number) => void
+  triggerWdwRecompute: () => void
+  clearWdwNeedsReset: () => void
+
   // Free Scalar Field Presets
   applyFreeScalarPreset: (presetId: string) => void
 

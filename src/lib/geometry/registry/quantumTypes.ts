@@ -349,6 +349,43 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
       },
     ],
 
+    [
+      'wheelerDeWitt',
+      {
+        key: 'wheelerDeWitt',
+        name: 'Wheeler–DeWitt',
+        description:
+          'Wavefunction of the universe in 3D minisuperspace: Hartle–Hawking vs Vilenkin vs DeWitt.',
+        category: 'compute',
+        dimensions: {
+          min: 3,
+          max: 3,
+          recommended: 3,
+          recommendedReason: 'Minisuperspace is (a, φ₁, φ₂) — 3D by construction',
+        },
+        rendering: SHARED_RENDERING,
+        animation: {
+          hasTypeSpecificAnimations: false,
+          systems: {},
+        },
+        urlSerialization: {
+          typeKey: 'wheelerDeWitt',
+          serializableParams: [],
+        },
+        ui: {
+          controlsComponentKey: 'SchroedingerControls',
+          hasTimelineControls: false,
+          qualityPresets: QUALITY_PRESETS,
+        },
+        internal: {
+          objectType: 'schroedinger',
+          quantumMode: 'wheelerDeWitt',
+          configStoreKey: 'schroedinger',
+          configSubKey: 'wheelerDeWitt',
+        },
+      },
+    ],
+
     // ─── Pauli Spinor ──────────────────────────────────────────────────────────
 
     [

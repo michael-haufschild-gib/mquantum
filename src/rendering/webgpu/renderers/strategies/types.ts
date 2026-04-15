@@ -75,6 +75,22 @@ export interface SchroedingerSnapshot {
     needsReset?: boolean
     [key: string]: unknown
   }
+  wheelerDeWitt?: {
+    boundaryCondition?: string
+    inflatonMass?: number
+    cosmologicalConstant?: number
+    aMin?: number
+    aMax?: number
+    gridNa?: number
+    gridNphi?: number
+    phiExtent?: number
+    streamlinesEnabled?: boolean
+    streamlineDensity?: number
+    swamplandEnabled?: boolean
+    swamplandC?: number
+    needsReset?: boolean
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number
