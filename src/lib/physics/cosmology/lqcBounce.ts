@@ -244,6 +244,36 @@ export function validateLqcBounceParams(params: LqcBounceParams): void {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
+// Parameter resolution
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the effective integration window half-width for the bounce table.
+ *
+ * If the caller supplies `tHalfWidth` we honor it verbatim. Otherwise we pick
+ * the cosmic-time point `τ*` at which the stiff-fluid analytic oracle hits
+ * `initialRhoRatio`, clamped to `[2, 50]` so undersized windows still cover
+ * the near-bounce region and oversized windows don't bake Kasner tails that
+ * round to zero in f32.
+ *
+ * Shared by {@link computeLqcBounceBackground} and
+ * {@link getOrComputeLqcBounceTable}: the former uses it to drive the RK4
+ * loop, the latter uses it to build cache keys that match. Keeping the
+ * formula in a single place prevents a drift where the two callers compute
+ * slightly different `tHalfWidth` and the cache key never matches the table.
+ *
+ * @param params - Bounce parameters (only `tHalfWidth`, `spacetimeDim`,
+ *                 `rhoCritical`, `initialRhoRatio` are consulted).
+ * @returns The `tHalfWidth` that the actual integrator will use.
+ */
+function resolveTHalfWidth(params: LqcBounceParams): number {
+  if (params.tHalfWidth !== undefined) return params.tHalfWidth
+  const gamma = stiffFluidGamma(params.spacetimeDim, params.rhoCritical)
+  const tStar = gamma > 0 ? Math.sqrt((1 / params.initialRhoRatio - 1) / gamma) : 5
+  return Math.max(2, Math.min(50, tStar))
+}
+
+// ───────────────────────────────────────────────────────────────────────────
 // ODE system
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -435,22 +465,13 @@ function integrateConformalTime(
     const inv = 0.5 * (1 / as[i - 1]! + 1 / as[i]!)
     eta[i] = eta[i - 1]! + dt * inv
   }
-  // Integrate backward from the bounce via trapezoid rule. ts decreases
-  // going backward, so dt < 0 and the trapezoid accumulates negatively —
-  // subtract it to keep η monotonically increasing in *cosmic-time order*
-  // (i.e. η grows as i decreases because the contracting branch is mapped
-  // to t < 0 and we want η(t = −tHalf) > η(t_B) ⇒ bounceIdx sits in the
-  // middle of a monotonically increasing etaGrid WHEN read in reverse).
-  //
-  // Wait — the requirement from the PRD is `etaGrid is strictly
-  // monotonically increasing` indexed the same way the table is stored
-  // (t going −tHalf → +tHalf). That means η(−tHalf) is the SMALLEST
-  // value, η(+tHalf) is the LARGEST. So going backward from the bounce
-  // in i we want η to DECREASE. In cosmic-time backward integration:
-  // going from t_B backward to t < t_B, η decreases (because dη/dt = 1/a
-  // > 0, so dη has the sign of dt; dt < 0 ⇒ dη < 0). This gives us
-  // exactly the monotonic-increasing-in-i etaGrid we want, provided
-  // etaAnchor is big enough that no i lands at η ≤ 0.
+  // Integrate backward from the bounce. `etaGrid` is stored in cosmic-time
+  // order (t: -tHalf → +tHalf), so η at index 0 is the SMALLEST value.
+  // With dη/dt = 1/a > 0, traversing i from bounceIdx-1 down to 0 walks
+  // dt < 0 and picks up dη < 0 via the trapezoid rule — the desired
+  // monotonically-increasing-in-i grid. `etaAnchor` must be large enough
+  // that no η reaches ≤ 0; the caller-supplied default (10) covers the
+  // entire integration window for typical params.
   for (let i = bounceIdx - 1; i >= 0; i--) {
     const dt = ts[i]! - ts[i + 1]! // negative
     const inv = 0.5 * (1 / as[i + 1]! + 1 / as[i]!)
@@ -505,7 +526,6 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
     spacetimeDim,
     rhoCritical,
     equationOfState,
-    initialRhoRatio,
     stepSize = 5e-4,
     etaBounceAnchor = 10,
   } = params
@@ -513,25 +533,7 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   const tBounce = 0
   const aBounce = 1 // gauge choice; overall amplitude drops out of the FSF spectrum
 
-  // Adaptive half-width: if the caller did not override, pick a window
-  // large enough to naturally reach ρ ≈ ρ_c · initialRhoRatio on the
-  // stiff-fluid analytic oracle. With `γ = (n−1)² ρ_c / (3(n−2))` the
-  // ratio 1/(1 + γτ²) hits `initialRhoRatio` at
-  // `τ* = √((1/initialRhoRatio − 1) / γ)`. This lets the
-  // `initialRhoRatio` param actually steer the window without forcing
-  // the caller to also set `tHalfWidth`, while still honouring an
-  // explicit override when provided.
-  let tHalfWidth: number
-  if (params.tHalfWidth !== undefined) {
-    tHalfWidth = params.tHalfWidth
-  } else {
-    const gamma = stiffFluidGamma(spacetimeDim, rhoCritical)
-    const tStar = gamma > 0 ? Math.sqrt((1 / initialRhoRatio - 1) / gamma) : 5
-    // Cap at 50 — far from the bounce the Kasner tail is boring and
-    // floats overflow eventually anyway. Floor at 2 so we always cover
-    // the near-bounce region even for high initialRhoRatio.
-    tHalfWidth = Math.max(2, Math.min(50, tStar))
-  }
+  const tHalfWidth = resolveTHalfWidth(params)
 
   // How many RK4 steps per branch. Integer round-down so h stays exactly
   // equal to stepSize (no end-point bias) and the branch terminates at or
@@ -633,22 +635,12 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
     post.rhos[i + 1] = postInterior.rhos[i]!
   }
 
-  // Note the contracting branch was integrated as "bounce → past" so its
-  // time array runs 0 → -tHalf. Our concatenation reverses it to get the
-  // cosmic-time-ordered -tHalf → 0. The density samples correspondingly
-  // run from "ρ at earliest time" → ρ_c at bounce, so they also come
-  // out correctly after the reverse.
-  //
-  // One subtlety: RK4 with hubbleSign = -1 and h < 0 gives da/dt =
-  // (-1)·a·|H|, so over a negative h this produces Δa = h · (-1)·a·|H| =
-  // |h|·a·|H| > 0. This means 'a' GROWS as we integrate backward —
-  // wrong! Let me re-think.
-  //
-  // Physically: pre-bounce (contracting) has H < 0, so a decreases as
-  // cosmic time INCREASES. Going BACKWARD in cosmic time (h < 0), a
-  // should INCREASE. So growth during backward integration is correct.
-  // At t = -tHalf (far past), a is large; approaching t_B, a shrinks to
-  // a_B = 1. Good — matches the Kasner contracting asymptote.
+  // Contracting branch: integrated from bounce backward (ts: 0 → -tHalf),
+  // reversed by joinBranches into cosmic-time order (-tHalf → 0). With
+  // hubbleSign = -1 and h < 0, Δa = |h|·a·|H| > 0, so `a` grows as we
+  // integrate backward — physically correct: pre-bounce has H < 0 (a
+  // shrinks with cosmic time), so going backward in time a grows from
+  // a_B = 1 at t_B toward its Kasner asymptote at t = -tHalf.
   const joined = joinBranches(pre, post)
   // After joinBranches, the array is [pre reversed, post], ordering
   // cosmic time monotonically from -tHalf → +tHalf with the bounce
@@ -764,71 +756,92 @@ interface LqcCacheKey {
   etaBounceAnchor: number
 }
 
-let cachedKey: LqcCacheKey | null = null
-let cachedTable: LqcBounceTable | null = null
+/**
+ * Maximum number of LQC tables held in the LRU cache. Each table is a few
+ * hundred KB (etaGrid, aGrid, aPrimeGrid, rhoGrid at ~20k samples), so the
+ * cache cap keeps total residency under ~2 MB and comfortably inside the
+ * main-thread heap budget. Four slots lets the UI keep the "current" table
+ * alongside one or two "comparison" presets (e.g., two LQC scenes open in
+ * rapid succession during a parameter sweep) without thrashing the single-
+ * slot cache that preceded this.
+ */
+const LQC_CACHE_LIMIT = 4
 
 /**
- * True iff every field of `a` equals the corresponding field of `b`. Used
- * to decide whether the module-level LQC table cache is still valid.
+ * Map-backed LRU: JavaScript `Map` preserves insertion order. A cache hit
+ * re-inserts the entry at the tail; when the map is full, the head entry
+ * (the oldest) is evicted. This gives amortised O(1) lookup + update with
+ * no external dependency.
  */
-function sameKey(a: LqcCacheKey, b: LqcCacheKey): boolean {
-  return (
-    a.spacetimeDim === b.spacetimeDim &&
-    a.rhoCritical === b.rhoCritical &&
-    a.equationOfState === b.equationOfState &&
-    a.initialRhoRatio === b.initialRhoRatio &&
-    a.tHalfWidth === b.tHalfWidth &&
-    a.stepSize === b.stepSize &&
-    a.etaBounceAnchor === b.etaBounceAnchor
-  )
+const lqcCache = new Map<string, LqcBounceTable>()
+
+/**
+ * Build a deterministic cache key string from the resolved LQC params.
+ * Each field is stringified with enough precision to distinguish semantic
+ * changes but not so much that rounding flicker invalidates the entry.
+ */
+function lqcCacheKeyString(k: LqcCacheKey): string {
+  return [
+    k.spacetimeDim,
+    k.rhoCritical,
+    k.equationOfState,
+    k.initialRhoRatio,
+    k.tHalfWidth,
+    k.stepSize,
+    k.etaBounceAnchor,
+  ].join('|')
 }
 
 /**
  * Memoised {@link computeLqcBounceBackground}. Returns the cached table
- * when the params match the previous invocation; rebuilds otherwise. The
+ * when the params match a previous invocation; rebuilds otherwise. The
  * FSF compute pass invokes this every substep under an active `lqcBounce`
  * preset, so the cache is essential — a full rebuild touches ~20k float
  * samples.
+ *
+ * The cache is an LRU of up to {@link LQC_CACHE_LIMIT} entries so a user
+ * toggling between two presets (A → B → A → B) hits the cache every call
+ * instead of rebuilding on each switch.
  *
  * @param params - Bounce parameters.
  * @returns Cached or freshly computed lookup table.
  */
 export function getOrComputeLqcBounceTable(params: LqcBounceParams): LqcBounceTable {
-  // Mirror `computeLqcBounceBackground`'s adaptive default for `tHalfWidth`
-  // so undefined-caller inputs produce a cache key that matches the actual
-  // integration window — otherwise two calls with the same semantic params
-  // can miss the cache (or, worse, collide across different windows).
-  let tHalfWidthKey: number
-  if (params.tHalfWidth !== undefined) {
-    tHalfWidthKey = params.tHalfWidth
-  } else {
-    const gamma = stiffFluidGamma(params.spacetimeDim, params.rhoCritical)
-    const tStar = gamma > 0 ? Math.sqrt((1 / params.initialRhoRatio - 1) / gamma) : 5
-    tHalfWidthKey = Math.max(2, Math.min(50, tStar))
-  }
+  // The effective `tHalfWidth` is shared with `computeLqcBounceBackground`
+  // via `resolveTHalfWidth` — identical input params therefore always hash
+  // to the same key regardless of whether the caller passed `tHalfWidth`
+  // explicitly or relied on the adaptive default.
   const key: LqcCacheKey = {
     spacetimeDim: params.spacetimeDim,
     rhoCritical: params.rhoCritical,
     equationOfState: params.equationOfState,
     initialRhoRatio: params.initialRhoRatio,
-    tHalfWidth: tHalfWidthKey,
+    tHalfWidth: resolveTHalfWidth(params),
     stepSize: params.stepSize ?? 5e-4,
     etaBounceAnchor: params.etaBounceAnchor ?? 10,
   }
-  if (cachedKey && cachedTable && sameKey(cachedKey, key)) {
-    return cachedTable
+  const keyStr = lqcCacheKeyString(key)
+  const cached = lqcCache.get(keyStr)
+  if (cached) {
+    // Refresh recency: Map preserves insertion order, so delete + re-insert
+    // moves the entry to the tail.
+    lqcCache.delete(keyStr)
+    lqcCache.set(keyStr, cached)
+    return cached
   }
   const table = computeLqcBounceBackground(params)
-  cachedKey = key
-  cachedTable = table
+  lqcCache.set(keyStr, table)
+  if (lqcCache.size > LQC_CACHE_LIMIT) {
+    const oldest = lqcCache.keys().next().value
+    if (oldest !== undefined) lqcCache.delete(oldest)
+  }
   return table
 }
 
 /**
- * Test-only helper: clear the memoised table so cache state does not leak
+ * Test-only helper: clear the memoised tables so cache state does not leak
  * across `vitest` runs. Production code never needs this.
  */
 export function __resetLqcBounceCacheForTests(): void {
-  cachedKey = null
-  cachedTable = null
+  lqcCache.clear()
 }

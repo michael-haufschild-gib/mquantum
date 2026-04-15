@@ -266,6 +266,44 @@ describe('getOrComputeLqcBounceTable — caching', () => {
     const t2 = getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: 2.0 })
     expect(t1).not.toBe(t2)
   })
+
+  it('LRU: alternating A/B/A hits the cache on the third call (no rebuild)', () => {
+    __resetLqcBounceCacheForTests()
+    const A = DEFAULT_PARAMS
+    const B = { ...DEFAULT_PARAMS, rhoCritical: 2.0 }
+    const tA1 = getOrComputeLqcBounceTable(A)
+    getOrComputeLqcBounceTable(B)
+    // Third call with A must return the SAME table reference as the first
+    // — the single-slot predecessor would have evicted A by now.
+    const tA2 = getOrComputeLqcBounceTable(A)
+    expect(tA2).toBe(tA1)
+  })
+
+  it('LRU: evicts the oldest entry once the limit is exceeded', () => {
+    __resetLqcBounceCacheForTests()
+    // Populate 5 distinct entries — exceeds LQC_CACHE_LIMIT (=4) by one.
+    // After insertion order is [1,2,3,4,5] the cache retains {2,3,4,5} and
+    // entry 1 is evicted.
+    const tables = [1, 2, 3, 4, 5].map((rhoC) =>
+      getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: rhoC })
+    )
+    // Re-asking for entry 1 must rebuild (different reference than the
+    // original) because it was evicted when entry 5 arrived.
+    const refetched = getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: 1 })
+    expect(refetched).not.toBe(tables[0])
+  })
+
+  it('LRU: keeps the 4 most-recently-used entries hot', () => {
+    __resetLqcBounceCacheForTests()
+    // Populate exactly LQC_CACHE_LIMIT (=4) entries; all should stay cached.
+    const tables = [1, 2, 3, 4].map((rhoC) =>
+      getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: rhoC })
+    )
+    for (let i = 0; i < 4; i++) {
+      const again = getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: i + 1 })
+      expect(again).toBe(tables[i])
+    }
+  })
 })
 
 describe('computeCosmologyAt dispatch — lqcBounce', () => {
