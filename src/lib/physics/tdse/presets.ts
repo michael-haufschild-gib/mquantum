@@ -456,6 +456,57 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     // backdrop without saturating the barrier region.
     renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
+  {
+    id: 'erEprWormhole',
+    name: 'ER=EPR Wormhole (teleportation)',
+    description:
+      'Stationary Gaussian in the left well of a symmetric double well. The double-trace mirror coupling Ĥ_int = g·P_M drives clean Rabi teleportation between L and R at angular frequency 2g (period π/g ≈ 1.6s). Watch the density lobe hop across the barrier — kinetic tunneling is negligible, only the wormhole channel moves probability.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [64, 64, 64],
+      spacing: [0.1, 0.1, 0.1],
+      mass: 1.0,
+      dt: 0.005,
+      stepsPerFrame: 4,
+      initialCondition: 'gaussianPacket',
+      packetCenter: [-1.2, 0, 0],
+      // σ = √(ℏ/mω_well) with ω_well = √(8λa²/m) ≈ 9.6 → 0.32. Matching
+      // the well ground-state width keeps breathing-mode mixing low so
+      // transverse spreading stays slow across many Rabi cycles.
+      packetWidth: 0.32,
+      packetAmplitude: 1.0,
+      packetMomentum: [0, 0, 0],
+      potentialType: 'doubleWell',
+      doubleWellLambda: 8.0,
+      doubleWellSeparation: 1.2,
+      doubleWellAsymmetry: 0.0,
+      absorberEnabled: false,
+      diagnosticsEnabled: true,
+      diagnosticsInterval: 5,
+      fieldView: 'density',
+      // autoScale compensates for the slow transverse spread in y/z —
+      // the doubleWell potential only confines axis 0, and the soft
+      // quartic transverse walls only activate in the outer 25%, so the
+      // packet eventually delocalizes in y/z without this.
+      autoScale: true,
+      autoScaleMaxGain: 20,
+      autoLoop: false,
+      showPotential: false,
+      wormholeCouplingEnabled: true,
+      wormholeCouplingG: 2.0,
+      wormholeMirrorAxis: 0,
+      // HUD intentionally off: I(L:R) = |⟨ψ|P_M|ψ⟩|² vanishes for a pure
+      // |L⟩ → Rabi-rotated state (Re(α*β) = 0 throughout the oscillation),
+      // so the trace would flatline at 0 while the density visibly hops.
+      // User can enable the HUD manually to inspect mirror symmetry if
+      // starting from a non-pure superposition.
+      wormholeCoherenceHudEnabled: false,
+    },
+    // The packet splits amplitude between the two wells during the
+    // crossover (both lobes at half density near t = π/(4g)). Without
+    // boosted gain the mid-oscillation frame looks empty.
+    renderingOverrides: { densityGain: 3.0, densityContrast: 2.0 },
+  },
   ...DECOHERENCE_PRESETS,
 ]
 
