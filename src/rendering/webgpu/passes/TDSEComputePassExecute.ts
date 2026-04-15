@@ -35,6 +35,7 @@ import type { HawkingInjectState } from './TDSEComputePassHawking'
 import { runHawkingFrame } from './TDSEComputePassHawking'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import { writeTdseUniforms } from './TDSEComputePassUniforms'
+import type { WormholePipelineResources } from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import type { GramSchmidtState } from './TDSEGramSchmidt'
 import {
@@ -47,6 +48,7 @@ import type { ObservablesState } from './TDSEObservablesDispatch'
 import { updateObservablesResources as obsUpdate } from './TDSEObservablesDispatch'
 import type { StochasticLocState } from './TDSEStochasticLocalization'
 import type { VortexDetectState } from './TDSEVortexDetect'
+import { requestWormholeReadback, type WormholeReadbackState } from './TDSEWormholeReadback'
 
 /** Narrow view of `TDSEComputePass` used by `runTdseExecute`. */
 export interface TdseExecuteFields {
@@ -88,6 +90,9 @@ export interface TdseExecuteFields {
   _disorderState: DisorderState
   _stochasticState: StochasticLocState
   _hawkingState: HawkingInjectState
+  _wormholeReadback: WormholeReadbackState
+  wormholePipeline: WormholePipelineResources | null
+  wormholeBG: GPUBindGroup | null
   _hellerLastResetToken: number
 
   // Methods
@@ -270,6 +275,8 @@ export function runTdseExecute(
       stochasticState: pass._stochasticState,
       boundingRadius: boundingRadius ?? 2.0,
       hellerState: pass._hellerState,
+      wormholePipeline: pass.wormholePipeline,
+      wormholeBG: pass.wormholeBG,
       dc: pass.dc,
       dispatchFFTAxis: (c, axisDim, slot) => pass.dispatchFFTAxis(c, axisDim, slot),
       dispatchFFTAxisInPass: (passEncoder, axisDim, slot) =>
@@ -289,6 +296,25 @@ export function runTdseExecute(
       pass.psiImBuffer,
       linearWG,
       pass.dispatchCompute.bind(pass)
+    )
+  }
+
+  // ER=EPR wormhole coherence HUD readback — piggybacks on the same
+  // per-frame cadence as diagnostics. Allocates staging buffers lazily
+  // on first enabled call; no-op when the HUD toggle is off.
+  if (config.wormholeCoherenceHudEnabled === true) {
+    requestWormholeReadback(
+      device,
+      ctx.encoder,
+      pass._wormholeReadback,
+      true,
+      pass.psiReBuffer,
+      pass.psiImBuffer,
+      pass.totalSites,
+      config.gridSize,
+      (config.wormholeMirrorAxis ?? 0) as 0 | 1 | 2,
+      config.wormholeCouplingG ?? 0,
+      pass.simTime
     )
   }
 

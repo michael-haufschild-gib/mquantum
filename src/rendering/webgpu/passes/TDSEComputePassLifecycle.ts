@@ -19,6 +19,7 @@ import { disposeFullPass } from './TDSEComputePassDispose'
 import type { HawkingInjectState } from './TDSEComputePassHawking'
 import { disposeHawkingInject } from './TDSEComputePassHawking'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
+import type { WormholePipelineResources } from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import type { GramSchmidtState } from './TDSEGramSchmidt'
 import type { HellerReadbackState } from './TDSEHellerReadback'
@@ -26,6 +27,7 @@ import type { ObservablesState } from './TDSEObservablesDispatch'
 import type { SaveLoadState } from './TDSEStateSaveLoad'
 import type { StochasticLocState } from './TDSEStochasticLocalization'
 import type { VortexDetectState } from './TDSEVortexDetect'
+import { resetWormholeReadback, type WormholeReadbackState } from './TDSEWormholeReadback'
 
 /** Narrow view of `TDSEComputePass` used by `runTdseDispose`. */
 export interface TdseDisposeFields {
@@ -63,6 +65,9 @@ export interface TdseDisposeFields {
   _slState: SaveLoadState
   _obsState: ObservablesState
   _hawkingState: HawkingInjectState
+  wormholePipeline: WormholePipelineResources | null
+  wormholeBG: GPUBindGroup | null
+  _wormholeReadback: WormholeReadbackState
 }
 
 /**
@@ -113,5 +118,10 @@ export function runTdseDispose(pass: TdseDisposeFields): void {
     pass._obsState
   )
   disposeHawkingInject(pass._hawkingState)
+  // ER=EPR wormhole — pipeline + bind group are GC'd via field nulling;
+  // readback staging has its own destroy path.
+  pass.wormholePipeline = null
+  pass.wormholeBG = null
+  resetWormholeReadback(pass._wormholeReadback)
   Object.assign(pass, gpu)
 }

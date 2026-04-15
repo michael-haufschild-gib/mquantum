@@ -386,6 +386,12 @@ export interface SchroedingerSliceActions {
   setTdseBranchColorA: (color: [number, number, number]) => void
   setTdseBranchColorB: (color: [number, number, number]) => void
 
+  // ER=EPR Double-trace Wormhole Coupling
+  setTdseWormholeEnabled: (enabled: boolean) => void
+  setTdseWormholeG: (g: number) => void
+  setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
+  setTdseWormholeHudEnabled: (enabled: boolean) => void
+
   // BEC (Gross-Pitaevskii Equation) Configuration
   setBecInteractionStrength: (g: number) => void
   setBecTrapOmega: (omega: number) => void

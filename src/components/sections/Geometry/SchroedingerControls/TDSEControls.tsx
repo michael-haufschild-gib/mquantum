@@ -24,6 +24,7 @@ import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSett
 import { FIELD_VIEW_OPTIONS, INITIAL_CONDITION_OPTIONS } from './tdseControlsConstants'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
 import type { TdseControlsProps } from './types'
+import { WormholeControls } from './WormholeControls'
 
 /**
  * TDSE Dynamics configuration panel.
@@ -288,6 +289,8 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             data-testid="tdse-steps-per-frame"
           />
         </ControlGroup>
+
+        <WormholeControls td={td} />
 
         {/* Slice positions for dims > 3 */}
         {activeDims > 3 && (

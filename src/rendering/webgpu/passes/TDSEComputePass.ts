@@ -59,8 +59,10 @@ import { type ObservablesState } from './TDSEObservablesDispatch'
  *   hawkingVmax (f32 @ 760), hawkingLh (f32 @ 764),
  *   hawkingDeltaN (f32 @ 768), hawkingInjectRate (f32 @ 772),
  *   hawkingPairInjection (u32 @ 776), hawkingSeed (u32 @ 780),
- *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796).
- * Total = 800 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
+ *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796),
+ *   wormholeCouplingEnabled (u32 @ 800), wormholeCouplingG (f32 @ 804),
+ *   wormholeMirrorAxis (u32 @ 808), _padWormhole (u32 @ 812).
+ * Total = 816 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
  * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
  * struct together when adding new fields.
  */
@@ -77,6 +79,11 @@ import {
   type HawkingInjectState,
 } from './TDSEComputePassHawking'
 import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
+import {
+  createWormholeBindGroup,
+  createWormholePipeline,
+  type WormholePipelineResources,
+} from './TDSEComputePassWormhole'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
   type GramSchmidtState,
@@ -106,6 +113,11 @@ import {
   rebuildVortexDetect,
   type VortexDetectState,
 } from './TDSEVortexDetect'
+import {
+  createWormholeReadbackState,
+  resetWormholeReadback,
+  type WormholeReadbackState,
+} from './TDSEWormholeReadback'
 
 /**
  * Compute pass for TDSE split-operator dynamics.
@@ -224,6 +236,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private readonly _stochasticState: StochasticLocState = createStochasticLocState()
   /** Analog Hawking pair-injection state (pipeline, bindings, step counter). */
   private readonly _hawkingState: HawkingInjectState = createHawkingInjectState()
+  /** ER=EPR wormhole coupling — pipeline (shared across lattice rebuilds). */
+  wormholePipeline: WormholePipelineResources | null = null
+  /** ER=EPR wormhole coupling — bind group (rebuilt each lattice rebuild). */
+  wormholeBG: GPUBindGroup | null = null
+  /** ER=EPR wormhole coherence readback (staging + in-flight gate). */
+  readonly _wormholeReadback: WormholeReadbackState = createWormholeReadbackState()
 
   // Pre-allocated uniform views
   readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -383,6 +401,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.psiReBuffer,
       this.psiImBuffer
     )
+    // Wormhole HUD staging — drop stale buffers; new size picked lazily.
+    resetWormholeReadback(this._wormholeReadback)
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -400,6 +420,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
     buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
     buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
+    if (!this.wormholePipeline) {
+      this.wormholePipeline = createWormholePipeline(device, smBind, cpBind)
+    }
   }
 
   rebuildBindGroups(device: GPUDevice): void {
@@ -437,6 +460,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.psiReBuffer,
         this.psiImBuffer,
         expectWG
+      )
+    }
+    // ER=EPR wormhole coupling bind group — reuses uniform + ψ storage.
+    if (this.wormholePipeline && this.uniformBuffer && this.psiReBuffer && this.psiImBuffer) {
+      this.wormholeBG = createWormholeBindGroup(
+        device,
+        this.wormholePipeline,
+        this.uniformBuffer,
+        this.psiReBuffer,
+        this.psiImBuffer
       )
     }
   }

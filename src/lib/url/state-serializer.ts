@@ -157,6 +157,14 @@ export interface ShareableObjectState {
   /** Normalized branch plane position along axis 0 (-1 to 1, 0 = origin). */
   branchPlanePosition?: number
 
+  // ── ER=EPR Wormhole Coupling ──────────────────────────────────────────
+  /** Enable the double-trace mirror coupling Ĥ_int = g·P_M. */
+  wormholeCouplingEnabled?: boolean
+  /** Coupling strength g ≥ 0 (clamped to `[0, 5]`). */
+  wormholeCouplingG?: number
+  /** Mirror-plane axis index (0, 1, or 2). */
+  wormholeMirrorAxis?: 0 | 1 | 2
+
   // ── Coordinate Entanglement ────────────────────────────────────────────
   /** Coordinate entanglement tracking enabled */
   entanglementEnabled?: boolean
@@ -391,6 +399,14 @@ export function serializeState(state: ShareableState): string {
     setFloatParam(params, 'brc_p', state.branchPlanePosition, true)
   }
 
+  // ER=EPR wormhole coupling. Only emits the sub-params when enabled so a
+  // `?tdse_wh=0` link isn't polluted with redundant coupling/axis values.
+  if (state.wormholeCouplingEnabled) {
+    params.set('tdse_wh', '1')
+    setFloatParam(params, 'tdse_whg', state.wormholeCouplingG, true)
+    setIntParam(params, 'tdse_whax', state.wormholeMirrorAxis)
+  }
+
   // Coordinate entanglement
   setBoolParam(params, 'ent', state.entanglementEnabled)
   setBoolParam(params, 'ent_mi', state.entanglementPairwiseMI)
@@ -550,6 +566,16 @@ function deserializeFeatureParams(params: URLSearchParams, state: ParsedShareabl
     state.branchingEnabled = brc
     // Matches the store's setTdseBranchPlanePosition clamp [-1, 1].
     state.branchPlanePosition = parseFloatParam(params, 'brc_p', -1, 1)
+  }
+
+  const wh = parseBoolParam(params, 'tdse_wh')
+  if (wh !== undefined) {
+    state.wormholeCouplingEnabled = wh
+    state.wormholeCouplingG = parseFloatParam(params, 'tdse_whg', 0, 5)
+    const axis = parseIntParam(params, 'tdse_whax', 0, 2)
+    if (axis !== undefined) {
+      state.wormholeMirrorAxis = axis as 0 | 1 | 2
+    }
   }
 
   state.entanglementEnabled = parseBoolParam(params, 'ent')

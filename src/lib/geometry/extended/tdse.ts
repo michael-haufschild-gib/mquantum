@@ -309,6 +309,20 @@ export interface TdseConfig {
   branchColorA: [number, number, number]
   /** Branch B color as [r, g, b] in 0–1 range */
   branchColorB: [number, number, number]
+
+  // === ER=EPR Double-trace Wormhole Coupling ===
+  /**
+   * Enable the double-trace mirror coupling Ĥ_int = g·P_M, where P_M reflects
+   * the wavefunction across the chosen mirror axis. Strang-split around the
+   * kinetic+potential block each substep. Off = hot path untouched.
+   */
+  wormholeCouplingEnabled: boolean
+  /** Coupling strength g ≥ 0 — tunneling rate between L and R halves. */
+  wormholeCouplingG: number
+  /** Mirror-plane axis index (0, 1, or 2). Grid size along the axis must be even. */
+  wormholeMirrorAxis: 0 | 1 | 2
+  /** Toggle for the WormholeCoherencePanel SVG HUD overlay. */
+  wormholeCoherenceHudEnabled: boolean
 }
 
 /**
@@ -408,6 +422,11 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   branchPlanePosition: 0.0,
   branchColorA: [0.0, 1.0, 1.0],
   branchColorB: [1.0, 0.0, 1.0],
+
+  wormholeCouplingEnabled: false,
+  wormholeCouplingG: 0.5,
+  wormholeMirrorAxis: 0,
+  wormholeCoherenceHudEnabled: false,
 
   needsReset: false,
   slicePositions: [],

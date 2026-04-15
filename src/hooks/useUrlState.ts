@@ -101,6 +101,27 @@ function applyBranchingParams(
 }
 
 /**
+ * Apply ER=EPR double-trace wormhole coupling URL state params. Order
+ * matters: `setTdseWormholeEnabled` flips the `needsReset` flag, so we
+ * set the axis/g first and only flip the enable last. This matches the
+ * convention used by `applyCosmologyParams`.
+ */
+function applyWormholeParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.wormholeCouplingEnabled === undefined) return
+
+  if (urlState.wormholeMirrorAxis !== undefined) {
+    ext.setTdseWormholeAxis(urlState.wormholeMirrorAxis)
+  }
+  if (urlState.wormholeCouplingG !== undefined) {
+    ext.setTdseWormholeG(urlState.wormholeCouplingG)
+  }
+  ext.setTdseWormholeEnabled(urlState.wormholeCouplingEnabled)
+}
+
+/**
  * Apply cosmological-background URL state params. Sets preset/steepness/hubble
  * BEFORE eta0 and enable so the setter chain sees a consistent preset state
  * at each step (setFreeScalarCosmologyPreset re-clamps eta0, setEnabled
@@ -267,6 +288,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyOpenQuantumParams(urlState, ext)
     applyStochasticParams(urlState, ext)
     applyBranchingParams(urlState, ext)
+    applyWormholeParams(urlState, ext)
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)

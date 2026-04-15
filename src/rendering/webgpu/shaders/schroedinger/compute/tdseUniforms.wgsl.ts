@@ -132,6 +132,12 @@ struct TDSEUniforms {
   hawkingStepIndex: u32,     // offset 784 — frame counter, drives noise evolution
   _padHawk0: u32,            // offset 788 — pad to 16-byte alignment
   _padHawk1: u32,            // offset 792 — pad to 16-byte alignment
-  _padHawk2: u32,            // offset 796 — pad to 16-byte alignment (total size = 800)
+  _padHawk2: u32,            // offset 796 — pad to 16-byte alignment
+
+  // ER=EPR Double-trace Wormhole Coupling (16 bytes, 800-815)
+  wormholeCouplingEnabled: u32, // offset 800 — 0/1 flag
+  wormholeCouplingG: f32,       // offset 804 — coupling strength g ≥ 0
+  wormholeMirrorAxis: u32,      // offset 808 — mirror axis index (0, 1, 2)
+  _padWormhole: u32,            // offset 812 — pad to 16-byte align (total size = 816)
 }
 `

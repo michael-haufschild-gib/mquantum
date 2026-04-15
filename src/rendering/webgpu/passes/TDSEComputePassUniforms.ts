@@ -306,6 +306,13 @@ export function writeTdseUniforms(
   u32[195] = (config.hawkingSeed ?? 1337) >>> 0
   u32[196] = (params.hawkingStepIndex ?? 0) >>> 0
 
+  // ER=EPR double-trace wormhole coupling (offsets 800-815, indices 200-203).
+  // Enabled + G + axis + pad. Axis defaults to 0 (x-axis reflection).
+  u32[200] = config.wormholeCouplingEnabled ? 1 : 0
+  f32[201] = Math.max(0, config.wormholeCouplingG ?? 0)
+  u32[202] = Math.max(0, Math.min(2, Math.floor(config.wormholeMirrorAxis ?? 0))) >>> 0
+  u32[203] = 0
+
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }
 
