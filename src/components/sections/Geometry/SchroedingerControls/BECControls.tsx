@@ -11,8 +11,10 @@
 import React, { useCallback, useMemo } from 'react'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
 import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
 import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
@@ -26,6 +28,7 @@ const INITIAL_CONDITION_OPTIONS = [
   { value: 'vortexLattice', label: 'Vortex Lattice' },
   { value: 'darkSoliton', label: 'Dark Soliton' },
   { value: 'vortexReconnection', label: 'Vortex Reconnection (D≥4)' },
+  { value: 'blackHoleAnalog', label: 'Analog Horizon (Waterfall)' },
 ]
 
 const FIELD_VIEW_OPTIONS = [
@@ -35,6 +38,7 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'potential', label: 'Potential V(x)' },
   { value: 'superfluidVelocity', label: 'Superfluid Velocity' },
   { value: 'healingLength', label: 'Healing Length' },
+  { value: 'machNumber', label: 'Mach Number M = |v_s|/c_s' },
 ]
 
 /**
@@ -82,6 +86,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
       bec.initialCondition === 'vortexImprint' || bec.initialCondition === 'vortexLattice'
     const showSolitonControls = bec.initialCondition === 'darkSoliton'
     const showReconnectionControls = bec.initialCondition === 'vortexReconnection'
+    const showAnalogHorizonControls = bec.initialCondition === 'blackHoleAnalog'
 
     // Build axis pair options for vortex plane selectors
     const axisPairOptions = useMemo(() => {
@@ -210,6 +215,70 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                   { value: '1', label: '1 (single vortex)' },
                   { value: '2', label: '2 (reconnection pair)' },
                 ]}
+              />
+            </>
+          )}
+
+          {showAnalogHorizonControls && (
+            <>
+              <Slider
+                label="v_max (asymptotic flow)"
+                tooltip="Supersonic flow speed as |x₀| → ∞. The waterfall profile v_s = v_max·tanh(x₀/L_h) crosses the sound speed c_s at the horizon; the horizon exists iff v_max > c_s."
+                value={bec.hawkingVmax}
+                onChange={actions.setHawkingVmax}
+                min={0.5}
+                max={5}
+                step={0.05}
+                data-testid="bec-hawking-vmax"
+              />
+              <Slider
+                label="L_h (horizon width)"
+                tooltip="Profile length scale. Smaller L_h ⇒ steeper velocity gradient ⇒ higher surface gravity κ ⇒ higher analog Hawking temperature T_H = κ/2π."
+                value={bec.hawkingLh}
+                onChange={actions.setHawkingLh}
+                min={0.1}
+                max={1.5}
+                step={0.01}
+                data-testid="bec-hawking-lh"
+              />
+              <Slider
+                label="Δn (horizon density dip)"
+                tooltip="Fractional density depletion at the horizon: n(x₀) = n₀(1 − Δn·sech²(x₀/L_h)). Larger Δn localizes the horizon but risks a dark-soliton instability."
+                value={bec.hawkingDeltaN}
+                onChange={actions.setHawkingDeltaN}
+                min={0}
+                max={0.6}
+                step={0.01}
+                data-testid="bec-hawking-deltan"
+              />
+              <Switch
+                label="Pair injection"
+                tooltip="Horizon-localized stochastic phase kick δφ = rate·w(M)·η. Deterministic per (seed, stepIndex). Off by default — turn on to seed analog Hawking pair production."
+                checked={bec.hawkingPairInjection}
+                onCheckedChange={actions.setHawkingPairInjection}
+                data-testid="bec-hawking-inject"
+              />
+              {bec.hawkingPairInjection && (
+                <Slider
+                  label="Inject rate"
+                  tooltip="Strength of the horizon phase kick per substep. Kept small (≤ 0.5 rad) to stay in the small-angle regime and preserve norm."
+                  value={bec.hawkingInjectRate}
+                  onChange={actions.setHawkingInjectRate}
+                  min={0}
+                  max={0.5}
+                  step={0.005}
+                  data-testid="bec-hawking-rate"
+                />
+              )}
+              <NumberInput
+                label="Seed"
+                tooltip="Deterministic integer seed for the pair-injection noise. Changing it selects a different realization of the phonon bath."
+                value={bec.hawkingSeed}
+                onChange={actions.setHawkingSeed}
+                min={0}
+                max={2_147_483_647}
+                step={1}
+                data-testid="bec-hawking-seed"
               />
             </>
           )}

@@ -9,7 +9,10 @@ import { describe, expect, it } from 'vitest'
 
 import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/bec'
 import { DEFAULT_TDSE_CONFIG } from '@/lib/geometry/extended/tdse'
-import { buildBecConfig } from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
+import {
+  buildBecConfig,
+  computeWaterfallBackgroundDensity,
+} from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
 
 /** Minimal valid BecConfig for test use. */
 function minimalBec(overrides: Partial<BecConfig> = {}): BecConfig {
@@ -189,6 +192,33 @@ describe('buildBecConfig — lattice passthrough', () => {
     const { config } = buildBecConfig(minimalBec({ trapOmega: 1.0, initTrapOmega: 1.0 }), undefined)
     expect(config.harmonicOmegaInit).toBeUndefined()
   })
+
+  it('blackHoleAnalog forces harmonicOmega = 0 regardless of trapOmega', () => {
+    // The init shader gates the TF envelope on `harmonicOmega`. Any non-zero
+    // value confines the condensate to a TF ball instead of producing the
+    // uniform background required by the Unruh analog-horizon construction.
+    // The trapOmega=1.0 on the BEC config is still used by resizeBecArrays
+    // to pick a sane spacing, but the evolution trap must be flat.
+    const { config } = buildBecConfig(
+      minimalBec({ trapOmega: 1.0, initialCondition: 'blackHoleAnalog' }),
+      undefined
+    )
+    expect(config.harmonicOmega).toBe(0)
+    expect(config.harmonicOmegaInit).toBeUndefined()
+  })
+
+  it('blackHoleAnalog forces harmonicOmega = 0 even with initTrapOmega ≠ trapOmega', () => {
+    const { config } = buildBecConfig(
+      minimalBec({
+        trapOmega: 1.0,
+        initTrapOmega: 2.0,
+        initialCondition: 'blackHoleAnalog',
+      }),
+      undefined
+    )
+    expect(config.harmonicOmega).toBe(0)
+    expect(config.harmonicOmegaInit).toBeUndefined()
+  })
 })
 
 describe('buildBecConfig — fixed BEC overrides', () => {
@@ -224,5 +254,36 @@ describe('buildBecConfig — fixed BEC overrides', () => {
     // mass and hbar come from bec config (same as TDSE default)
     expect(config.mass).toBe(DEFAULT_TDSE_CONFIG.mass)
     expect(config.hbar).toBe(DEFAULT_TDSE_CONFIG.hbar)
+  })
+})
+
+describe('computeWaterfallBackgroundDensity', () => {
+  it('matches the builder μ override: n₀ = max(g·0.01, 1)/g for the preset g=500', () => {
+    // Builder path: mu = max(500*0.01, 1.0) = 5  ⇒  n₀ = mu / g = 0.01
+    expect(computeWaterfallBackgroundDensity({ interactionStrength: 500 })).toBeCloseTo(0.01, 12)
+  })
+
+  it('saturates to the floor μ=1 at small g: n₀ = 1/g for g·0.01 < 1', () => {
+    // g=50: max(0.5, 1) = 1  ⇒  n₀ = 1/50
+    expect(computeWaterfallBackgroundDensity({ interactionStrength: 50 })).toBeCloseTo(1 / 50, 12)
+  })
+
+  it('returns 1.0 for non-positive g (safe fallback; builder branch is skipped anyway)', () => {
+    expect(computeWaterfallBackgroundDensity({ interactionStrength: 0 })).toBe(1.0)
+    expect(computeWaterfallBackgroundDensity({ interactionStrength: -10 })).toBe(1.0)
+  })
+
+  it('matches the μ the builder actually writes into packetAmplitude', () => {
+    const g = 500
+    const { config } = buildBecConfig(
+      minimalBec({
+        initialCondition: 'blackHoleAnalog',
+        interactionStrength: g,
+      }),
+      undefined
+    )
+    // buildBecConfig writes mu into packetAmplitude; the helper must agree.
+    const nBg = computeWaterfallBackgroundDensity({ interactionStrength: g })
+    expect(config.packetAmplitude).toBeCloseTo(nBg * g, 12)
   })
 })

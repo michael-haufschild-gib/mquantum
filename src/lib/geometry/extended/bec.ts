@@ -16,6 +16,8 @@
  * - vortexLattice: Thomas-Fermi with an array of imprinted vortices
  * - darkSoliton: Thomas-Fermi with a density dip (phase step) along axis 0
  * - vortexReconnection: Two vortices in configurable N-D planes for reconnection studies (D≥4)
+ * - blackHoleAnalog: Waterfall flow profile v_s = v_max·tanh(x/L_h) with density dip,
+ *   creates a sonic horizon at |v_s| = c_s — analog black hole (Unruh 1981).
  */
 export type BecInitialCondition =
   | 'thomasFermi'
@@ -24,6 +26,7 @@ export type BecInitialCondition =
   | 'vortexLattice'
   | 'darkSoliton'
   | 'vortexReconnection'
+  | 'blackHoleAnalog'
 
 /**
  * BEC field view type.
@@ -33,6 +36,7 @@ export type BecInitialCondition =
  * - potential: External potential V(x) (trap shape)
  * - superfluidVelocity: v_s = (ℏ/m) ∇arg(ψ), shows vortex flow
  * - healingLength: local ξ(x) = ℏ/√(2m·g·|ψ|²)
+ * - machNumber: M = |v_s|/c_s (analog black-hole Mach-number field; horizon at M=1)
  */
 export type BecFieldView =
   | 'density'
@@ -41,6 +45,7 @@ export type BecFieldView =
   | 'potential'
   | 'superfluidVelocity'
   | 'healingLength'
+  | 'machNumber'
 
 // ============================================================================
 // BEC Config
@@ -125,6 +130,20 @@ export interface BecConfig {
   /** Enable observable expectation value computation (⟨x⟩, ⟨p⟩, ΔxΔp) */
   observablesEnabled: boolean
 
+  // === Analog Hawking (waterfall sonic horizon) ===
+  /** Waterfall asymptotic flow speed v_max (supersonic side). */
+  hawkingVmax: number
+  /** Horizon profile length L_h (smaller → steeper gradient → larger κ). */
+  hawkingLh: number
+  /** Fractional density dip Δn ∈ [0, 0.6] at the horizon (n(x₀) = n₀(1 − Δn·sech²)). */
+  hawkingDeltaN: number
+  /** Enable horizon-localized stochastic pair injection (phonon bath seed). */
+  hawkingPairInjection: boolean
+  /** Injection strength per substep applied as δφ = rate·w·η (w Gaussian in M, η ∈ (-1,1)). */
+  hawkingInjectRate: number
+  /** Deterministic integer seed for the pair-injection noise. */
+  hawkingSeed: number
+
   // === Runtime ===
   needsReset: boolean
   /** Slice positions for dimensions > 3 */
@@ -162,6 +181,12 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   observablesEnabled: false,
+  hawkingVmax: 2.0,
+  hawkingLh: 0.6,
+  hawkingDeltaN: 0.0,
+  hawkingPairInjection: false,
+  hawkingInjectRate: 0.05,
+  hawkingSeed: 1337,
   needsReset: true,
   // Empty by convention: BEC uses the TDSE pipeline, and TDSE's dimension
   // setter builds `slicePositions` as `Array.from({ length: max(0, latticeDim - 3) })`.

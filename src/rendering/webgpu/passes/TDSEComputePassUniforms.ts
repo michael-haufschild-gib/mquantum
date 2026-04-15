@@ -29,6 +29,13 @@ export interface TdseUniformParams {
   boundingRadius?: number
   /** Max |V| for custom potential display normalization (set by uploadCustomPotentialBuffer) */
   customPotentialScale?: number
+  /**
+   * Frame counter for analog-Hawking pair-injection noise evolution. Increments
+   * monotonically once per rendered frame so the deterministic noise
+   * realization advances even with `simTime` held constant (e.g. when paused,
+   * the counter stays fixed and noise is frozen — correct).
+   */
+  hawkingStepIndex?: number
 }
 
 /** Enum maps for TDSE initial conditions. */
@@ -40,6 +47,7 @@ const INIT_MAP: Record<string, number> = {
   vortexImprint: 4,
   darkSoliton: 5,
   ndVortexPair: 6,
+  blackHoleAnalog: 7,
 }
 
 /** Enum maps for TDSE potential types. */
@@ -69,6 +77,7 @@ const VIEW_MAP: Record<string, number> = {
   potential: 3,
   superfluidVelocity: 4,
   healingLength: 5,
+  machNumber: 6,
 }
 
 /** Enum maps for TDSE drive waveform types. */
@@ -284,7 +293,18 @@ export function writeTdseUniforms(
   f32[187] = config.bhMass ?? 1.0
   f32[188] = config.bhMultipoleL ?? 2
   f32[189] = config.bhSpin ?? 2
-  // Indices 190 (offset 760) and 191 (offset 764) are pad — zero-filled above by u32.fill(0).
+
+  // Analog Hawking (waterfall sonic horizon) parameters (offsets 760-796, indices 190-199).
+  // Only the first 7 slots are live — the remaining three are pad to preserve
+  // the 16-byte struct-size alignment. The u32.fill(0) above has already
+  // zeroed the pad slots; writing them explicitly would add no value.
+  f32[190] = config.hawkingVmax ?? 2.0
+  f32[191] = config.hawkingLh ?? 0.6
+  f32[192] = Math.max(0, Math.min(0.6, config.hawkingDeltaN ?? 0.0))
+  f32[193] = Math.max(0, Math.min(0.5, config.hawkingInjectRate ?? 0.05))
+  u32[194] = config.hawkingPairInjection ? 1 : 0
+  u32[195] = (config.hawkingSeed ?? 1337) >>> 0
+  u32[196] = (params.hawkingStepIndex ?? 0) >>> 0
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

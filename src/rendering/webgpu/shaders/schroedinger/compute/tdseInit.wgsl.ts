@@ -262,6 +262,76 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
     reVal = vRe;
     imVal = vIm;
+  } else if (params.initCondition == 7u) {
+    // Analog Hawking (waterfall) — detrended for periodic C¹ continuity at wrap.
+    //
+    //   n(x₀) = n_bg · (1 − Δn · sech²(x₀/L_h))
+    //   T     = tanh(L_box / (2·L_h))
+    //   φ(x₀) = (m v_max / ℏ) · [ L_h · ln(cosh(x₀/L_h)) − T · x₀² / L_box ]
+    //   ⇒ v_s(x₀) = v_max · tanh(x₀/L_h) − v_max · (2x₀/L_box) · T
+    //
+    // Without the parabolic counter-drift the FFT Strang split sees a jump
+    // of 2·v_max·T across the periodic boundary, which the GP nonlinearity
+    // amplifies into aliased noise within ~tens of steps. The counter-drift
+    // forces v_s(±L_box/2) = 0 exactly so ψ is C¹ at the wrap and the
+    // simulation stays well-posed for long runs. φ remains even in x so
+    // ψ(+L_box/2) = ψ(−L_box/2).
+    //
+    // n_bg is inherited from the Thomas-Fermi chemical potential μ so the
+    // background density matches the BEC equilibrium at x₀ → ∞ (sech² → 0).
+    // packetAmplitude carries μ; interactionStrength carries g̃.
+    let mu7 = params.packetAmplitude;
+    let g7 = params.interactionStrength;
+    let vmax = params.hawkingVmax;
+    let lh = max(abs(params.hawkingLh), 1e-4);
+    // Matches the uniform writer (canonical) and UI slider cap. Keep all
+    // three agreeing — divergence here silently masks out-of-range uniform
+    // values that were already clamped upstream.
+    let deltaN = clamp(params.hawkingDeltaN, 0.0, 0.6);
+    // Physical box length along flow axis 0: L_box = gridSize[0] · spacing[0].
+    // Guard against degenerate (empty) grids — degenerate lattices should
+    // never reach this kernel, but a 1e-4 floor matches the lh floor so a
+    // stray 0 cannot produce NaNs in the detrend term.
+    let lBox = max(f32(params.gridSize[0]) * params.spacing[0], 1e-4);
+    let T7 = tanh(lBox / (2.0 * lh));
+    var V7: f32 = 0.0;
+    var x0: f32 = 0.0;
+    for (var d7: u32 = 0u; d7 < params.latticeDim; d7++) {
+      let pos7 = (f32(coords[d7]) - f32(params.gridSize[d7]) * 0.5 + 0.5) * params.spacing[d7];
+      let omega7 = params.harmonicOmega * params.trapAnisotropy[d7];
+      V7 += 0.5 * params.mass * omega7 * omega7 * pos7 * pos7;
+      if (d7 == 0u) { x0 = pos7; }
+    }
+    // TF envelope (uses full trap including axis 0). For BEC-analog presets
+    // the waterfall preset sets trapOmega ≈ 0 so V7 ≈ 0 and the envelope is
+    // flat, giving the uniform background that the physics expects. Non-zero
+    // trap is still well-defined and just adds a slow envelope.
+    //
+    // Guard non-positive g: the TF chemical-potential relation n = (μ − V)/g
+    // only makes sense for a repulsive condensate (g > 0). If the preset is
+    // misconfigured with g ≤ 0 the 1/g division would blow up, so fall back
+    // to a zero TF envelope — the init still runs, the visualization stays
+    // bounded, and the misconfiguration is apparent as a dark slab.
+    var nTf: f32 = 0.0;
+    if (g7 > 0.0) {
+      nTf = max(0.0, (mu7 - V7) / g7);
+    }
+    let u7 = x0 / lh;
+    // Periodize the sech density dip with the same parabolic detrend used
+    // for the velocity so n'(±L_box/2) = 0 and ψ is C¹ across the FFT wrap.
+    let uPeriod7 = u7 - (2.0 * x0 / lBox) * T7;
+    let sech = 1.0 / cosh(uPeriod7);
+    let n = max(nTf * (1.0 - deltaN * sech * sech), 0.0);
+    // Numerically-stable ln(cosh(u)) = |u| − ln(2) + ln(1 + e^{−2|u|}).
+    let au = abs(u7);
+    let logCosh = au + log(1.0 + exp(-2.0 * au)) - 0.6931471806;
+    // coef carries the (m · v_max / ℏ) prefactor; L_h·logCosh is the tanh
+    // phase and T·x² / L_box is the counter-drift ensuring ∂_xφ(±L_box/2) = 0.
+    let coef = (params.mass * vmax) / max(params.hbar, 1e-10);
+    let phi = coef * (lh * logCosh - T7 * (x0 * x0) / lBox);
+    let rho = sqrt(n);
+    reVal = rho * cos(phi);
+    imVal = rho * sin(phi);
   }
 
   psiRe[idx] = reVal;

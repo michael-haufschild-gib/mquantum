@@ -75,8 +75,11 @@ import {
  * Mirrors the layout in `tdseUniforms.wgsl.ts`. Trailing fields:
  *   ... branchingEnabled (u32 @ 740), branchPlanePosition (f32 @ 744),
  *   bhMass (f32 @ 748), bhMultipoleL (f32 @ 752), bhSpin (f32 @ 756),
- *   _padBh0 (u32 @ 760), _padBh1 (u32 @ 764).
- * Total = 768 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
+ *   hawkingVmax (f32 @ 760), hawkingLh (f32 @ 764),
+ *   hawkingDeltaN (f32 @ 768), hawkingInjectRate (f32 @ 772),
+ *   hawkingPairInjection (u32 @ 776), hawkingSeed (u32 @ 780),
+ *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796).
+ * Total = 800 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
  * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
  * struct together when adding new fields.
  */
@@ -91,6 +94,13 @@ import {
   maybeDispatchDisorder,
 } from './TDSEComputePassDisorder'
 import { disposeFullPass, type TdsePassGpuSnapshot } from './TDSEComputePassDispose'
+import {
+  buildHawkingInjectPipeline,
+  createHawkingInjectState,
+  disposeHawkingInject,
+  type HawkingInjectState,
+  runHawkingFrame,
+} from './TDSEComputePassHawking'
 import { maybeInitialize as extMaybeInitialize } from './TDSEComputePassInit'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
@@ -236,6 +246,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   private readonly _disorderState: DisorderState = createDisorderState()
   private readonly _stochasticState: StochasticLocState = createStochasticLocState()
+  /** Analog Hawking pair-injection state (pipeline, bindings, step counter). */
+  private readonly _hawkingState: HawkingInjectState = createHawkingInjectState()
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -402,23 +414,16 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   }
 
   private buildPipelines(device: GPUDevice): void {
+    const smBind = this.createShaderModule.bind(this)
+    const cpBind = this.createComputePipeline.bind(this)
     this.pl = buildTdsePipelines(device, {
-      createShaderModule: (d, code, label) => this.createShaderModule(d, code, label),
-      createComputePipeline: (d, sm, bgls, label) => this.createComputePipeline(d, sm, bgls, label),
+      createShaderModule: smBind,
+      createComputePipeline: cpBind,
       createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
     })
-    buildDisorderPipeline(
-      device,
-      this._disorderState,
-      this.createShaderModule.bind(this),
-      this.createComputePipeline.bind(this)
-    )
-    buildStochasticLocPipeline(
-      device,
-      this._stochasticState,
-      this.createShaderModule.bind(this),
-      this.createComputePipeline.bind(this)
-    )
+    buildDisorderPipeline(device, this._disorderState, smBind, cpBind)
+    buildStochasticLocPipeline(device, this._stochasticState, smBind, cpBind)
+    buildHawkingInjectPipeline(device, this._hawkingState, smBind, cpBind)
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
@@ -563,6 +568,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
           basisZ,
           boundingRadius,
           customPotentialScale: this.customPotentialScale,
+          hawkingStepIndex: this._hawkingState.stepIndex,
         }
       )
     }
@@ -648,6 +654,19 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       })
       this.simTime = evoState.simTime
       this.stepAccumulator = evoState.stepAccumulator
+
+      // Analog Hawking pair injection + step-counter advance (gated off by default).
+      runHawkingFrame(
+        device,
+        ctx,
+        config,
+        this._hawkingState,
+        this.uniformBuffer,
+        this.psiReBuffer,
+        this.psiImBuffer,
+        linearWG,
+        this.dispatchCompute.bind(this)
+      )
     }
 
     runPostStepDispatches(ctx, config, this._diagFrameState, {
@@ -709,6 +728,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this._slState,
       this._obsState
     )
+    disposeHawkingInject(this._hawkingState)
     Object.assign(this, gpu)
     super.dispose()
   }

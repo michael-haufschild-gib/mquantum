@@ -157,7 +157,10 @@ describe('slicePositions write clamp: TDSE (observable overflow)', () => {
     return {} as GPUBuffer
   }
 
-  const TDSE_UNIFORM_F32_COUNT = 192 // 768 bytes / 4
+  // 800 bytes / 4 — struct grew by 32 bytes (one 16-byte-aligned row) when
+  // the analog Hawking block was appended after the black-hole Regge–Wheeler
+  // slots. See TDSE_UNIFORM_SIZE in TDSEComputePassBuffers.ts.
+  const TDSE_UNIFORM_F32_COUNT = 200
 
   function callWriteTdseUniforms(config: TdseConfig): Float32Array {
     const uniformData = new ArrayBuffer(TDSE_UNIFORM_F32_COUNT * 4)

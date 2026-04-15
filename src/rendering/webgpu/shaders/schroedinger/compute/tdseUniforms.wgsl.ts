@@ -5,10 +5,11 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 768 bytes.
+ * Total size: 800 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  * Black-hole Regge–Wheeler fields at offsets 748-756.
+ * Analog Hawking (waterfall sonic horizon) block at offsets 760-792.
  *
  * @module
  */
@@ -24,7 +25,7 @@ struct TDSEUniforms {
   // Physics scalars (16 bytes)
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
-  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton, 6=ndVortexPair)
+  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton, 6=ndVortexPair, 7=blackHoleAnalog)
   potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=finiteWell, 4=harmonicTrap, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap, 10=radialDoubleWell, 11=custom, 12=andersonDisorder, 13=coupledAnharmonic, 14=blackHoleRingdown)
 
   // Per-dimension arrays (48 bytes each)
@@ -38,7 +39,7 @@ struct TDSEUniforms {
   packetWidth: f32,          // offset 272
   packetAmplitude: f32,      // offset 276
   boundingRadius: f32,       // offset 280
-  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential, 4=superfluidVelocity, 5=healingLength)
+  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential, 4=superfluidVelocity, 5=healingLength, 6=machNumber)
 
   // Potential parameters (32 bytes)
   barrierHeight: f32,        // offset 288
@@ -120,7 +121,17 @@ struct TDSEUniforms {
   bhMass: f32,               // offset 748 — Schwarzschild mass M (geometrized units)
   bhMultipoleL: f32,         // offset 752 — multipole index ℓ (stored as f32 for uniform layout)
   bhSpin: f32,               // offset 756 — perturbation spin s ∈ {0, 1, 2} as f32
-  _padBh0: u32,              // offset 760 — pad to 16-byte alignment
-  _padBh1: u32,              // offset 764 — pad to 16-byte alignment (total size = 768)
+
+  // Analog Hawking (waterfall sonic horizon) — 32 bytes = 2 × 16-byte rows (760-791)
+  hawkingVmax: f32,          // offset 760 — asymptotic supersonic flow v_max
+  hawkingLh: f32,            // offset 764 — horizon length scale L_h
+  hawkingDeltaN: f32,        // offset 768 — fractional density dip Δn at horizon
+  hawkingInjectRate: f32,    // offset 772 — pair-injection strength δφ = rate·w·η
+  hawkingPairInjection: u32, // offset 776 — 0/1 flag
+  hawkingSeed: u32,          // offset 780 — deterministic integer noise seed
+  hawkingStepIndex: u32,     // offset 784 — frame counter, drives noise evolution
+  _padHawk0: u32,            // offset 788 — pad to 16-byte alignment
+  _padHawk1: u32,            // offset 792 — pad to 16-byte alignment
+  _padHawk2: u32,            // offset 796 — pad to 16-byte alignment (total size = 800)
 }
 `
