@@ -27,7 +27,9 @@ export type WdwBoundaryCondition = 'noBoundary' | 'tunneling' | 'deWitt'
  * Wheeler–DeWitt minisuperspace configuration.
  *
  * Fields marked "(physics)" feed the solver. Fields marked "(display)" only
- * influence the rendered overlay.
+ * influence the rendered overlay. Fields marked "(render-only)" drive
+ * visual-only animation and DO NOT trigger a solver re-run — they are
+ * consumed by shaders or post-solve overlay builders.
  */
 export interface WheelerDeWittConfig {
   /** Selected boundary condition proposal (physics) */
@@ -50,6 +52,19 @@ export interface WheelerDeWittConfig {
   streamlinesEnabled: boolean
   /** Streamline seed density — number of seeds per axis (display) */
   streamlineDensity: number
+
+  // Animation effects (render-only; no solver impact)
+  /** Enable phase rotation (Option 1 — visual χ → χ·e^{iωt}) (render-only) */
+  phaseRotationEnabled: boolean
+  /** Angular-velocity multiplier for phase rotation, 0–5 rad/unit-time (render-only) */
+  phaseRotationSpeed: number
+  /** Enable semiclassical worldline traveling pulse (Option 3) (render-only) */
+  worldlineEnabled: boolean
+  /** Pulse cycles per unit time; 0.1–3.0 (render-only) */
+  worldlineSpeed: number
+  /** Gaussian pulse width in normalized trajectory-progress units (0.02–0.3) (render-only) */
+  worldlinePulseWidth: number
+
   /** Runtime flag: when true, strategy recomputes the solver on next frame */
   needsReset: boolean
 }
@@ -79,5 +94,10 @@ export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   phiExtent: 2.0,
   streamlinesEnabled: true,
   streamlineDensity: 6,
+  phaseRotationEnabled: false,
+  phaseRotationSpeed: 1.0,
+  worldlineEnabled: false,
+  worldlineSpeed: 0.5,
+  worldlinePulseWidth: 0.08,
   needsReset: true,
 }

@@ -37,6 +37,11 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `wdw_lambda` | float -1..1 | Wheeler–DeWitt cosmological constant Λ |
 | `wdw_sl` | 0/1 | Wheeler–DeWitt WKB streamline overlay toggle |
 | `wdw_sld` | int 2-16 | Wheeler–DeWitt streamline seed density per axis |
+| `wdw_pr` | 0/1 | Wheeler–DeWitt phase rotation visual (render-only) |
+| `wdw_prs` | float 0-5 | Wheeler–DeWitt phase rotation angular-velocity multiplier |
+| `wdw_wl` | 0/1 | Wheeler–DeWitt semiclassical worldline pulse (render-only) |
+| `wdw_wls` | float 0.1-3 | Wheeler–DeWitt worldline pulse cycles per unit time |
+| `wdw_wlw` | float 0.02-0.3 | Wheeler–DeWitt worldline Gaussian pulse width |
 
 ## Rules
 

@@ -43,6 +43,21 @@ const WDW_CFL_WARN_LIMIT = 3
 /** Prefactor in U: c_U = 36·π². With G = 1 this matches the WdW derivation. */
 const C_U = 36 * Math.PI * Math.PI
 
+/**
+ * Soft absorber strength for the Euclidean (U > 0) region. At each leapfrog
+ * step, cells with U > 0 are multiplied by exp(-η·sqrt(U)·da) to suppress
+ * the exponentially growing branch — which is non-physical for the
+ * Hartle–Hawking and DeWitt proposals (they should be Euclidean-decaying)
+ * and is dominant under the classically symmetric BC otherwise.
+ *
+ * η = 1.0 cancels the WKB growth rate of the growing branch exactly. Note
+ * the absorber is NOT branch-selective: it damps both branches equally.
+ * That is fine in the classically forbidden region where physical |χ| is
+ * exponentially small (~ exp(-S_E)); avoid raising η so much that
+ * legitimate decaying-branch amplitude is also suppressed.
+ */
+const WDW_EUCLIDEAN_ABSORBER_ETA = 1.0
+
 /** Solver inputs mirroring the WdW config fields. */
 export interface WheelerDeWittSolverInput {
   boundaryCondition: WdwBoundaryCondition
@@ -189,17 +204,25 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       const dim = initial.chiDeriv[2 * idx + 1] ?? 0
 
       // χ(a_min + da) via Taylor:
-      const nextRe = cre + da * dre + 0.5 * da * da * chiDDotRe
-      const nextIm = cim + da * dim + 0.5 * da * da * chiDDotIm
-
-      chi[complexSlabFloats + 2 * idx] = nextRe
-      chi[complexSlabFloats + 2 * idx + 1] = nextIm
+      let nextRe = cre + da * dre + 0.5 * da * da * chiDDotRe
+      let nextIm = cim + da * dim + 0.5 * da * da * chiDDotIm
 
       // Mask for slab 0
       mask[idx] = U0 < 0 ? 1 : 0
       // Mask for slab 1 — reuse a1 here
       const Ua1 = -C_U * a1 * a1 * (1 - WDW_G_PREFACTOR * a1 * a1 * V)
       mask[slabSize + idx] = Ua1 < 0 ? 1 : 0
+
+      // Soft Euclidean absorber on the written slab — damps the growing WKB
+      // branch so it cannot saturate the clamp at cube corners.
+      if (Ua1 > 0) {
+        const damp = Math.exp(-WDW_EUCLIDEAN_ABSORBER_ETA * Math.sqrt(Ua1) * da)
+        nextRe *= damp
+        nextIm *= damp
+      }
+
+      chi[complexSlabFloats + 2 * idx] = nextRe
+      chi[complexSlabFloats + 2 * idx + 1] = nextIm
     }
   }
 
@@ -242,8 +265,17 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         // -∂²_a χ + (1/a²)∇²_φ χ + U·χ = 0).
         const chiDDotRe = invAprevSq * lapRe + U * cre
         const chiDDotIm = invAprevSq * lapIm + U * cim
-        const nextRe = 2 * cre - prevRe + da * da * chiDDotRe
-        const nextIm = 2 * cim - prevIm + da * da * chiDDotIm
+        let nextRe = 2 * cre - prevRe + da * da * chiDDotRe
+        let nextIm = 2 * cim - prevIm + da * da * chiDDotIm
+
+        // Soft Euclidean absorber on the written slab — damps the growing
+        // WKB branch so it cannot saturate the clamp at cube corners.
+        const Ucur = -C_U * a * a * (1 - WDW_G_PREFACTOR * a * a * V)
+        if (Ucur > 0) {
+          const damp = Math.exp(-WDW_EUCLIDEAN_ABSORBER_ETA * Math.sqrt(Ucur) * da)
+          nextRe *= damp
+          nextIm *= damp
+        }
 
         // Clamp extreme divergence — WdW is not unitary and U·χ can blow up
         // for pathological (m, Λ) in the Euclidean region. Saturate to a
@@ -252,7 +284,6 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         chi[curSlabBase + 2 * idx] = nextRe > CLAMP ? CLAMP : nextRe < -CLAMP ? -CLAMP : nextRe
         chi[curSlabBase + 2 * idx + 1] = nextIm > CLAMP ? CLAMP : nextIm < -CLAMP ? -CLAMP : nextIm
 
-        const Ucur = -C_U * a * a * (1 - WDW_G_PREFACTOR * a * a * V)
         mask[maskBase + idx] = Ucur < 0 ? 1 : 0
       }
     }
@@ -373,6 +404,28 @@ export function wdwOperatorResidual(
         const lapIm = (pim1 + nim1 - 2 * cim + pim2 + nim2 - 2 * cim) * invDphi2
 
         const U = wdwU(a, phi1, phi2, input.inflatonMass, input.cosmologicalConstant)
+
+        // Skip cells where any stencil input (current, previous, or next in
+        // a) is Euclidean. The solver applies the Euclidean absorber in those
+        // cells which violates the PDE by construction, so the discrete
+        // residual there reports the absorber strength rather than solver
+        // fidelity. Only interior Lorentzian runs with all three stencil
+        // points Lorentzian give a meaningful residual.
+        const Uprev = wdwU(
+          output.aMin + (ia - 1) * da,
+          phi1,
+          phi2,
+          input.inflatonMass,
+          input.cosmologicalConstant
+        )
+        const Unext = wdwU(
+          output.aMin + (ia + 1) * da,
+          phi1,
+          phi2,
+          input.inflatonMass,
+          input.cosmologicalConstant
+        )
+        if (U > 0 || Uprev > 0 || Unext > 0) continue
 
         const resRe = -d2aRe + invAsq * lapRe + U * cre
         const resIm = -d2aIm + invAsq * lapIm + U * cim

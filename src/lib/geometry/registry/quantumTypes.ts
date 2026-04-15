@@ -374,7 +374,7 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
         },
         ui: {
           controlsComponentKey: 'SchroedingerControls',
-          hasTimelineControls: false,
+          hasTimelineControls: true,
           qualityPresets: QUALITY_PRESETS,
         },
         internal: {

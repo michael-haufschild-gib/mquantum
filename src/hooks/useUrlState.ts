@@ -180,6 +180,16 @@ function applyWdwParams(
     ext.setWdwStreamlinesEnabled(urlState.wdwStreamlinesEnabled)
   if (urlState.wdwStreamlineDensity !== undefined)
     ext.setWdwStreamlineDensity(urlState.wdwStreamlineDensity)
+  // Render-only animation effects — these setters do NOT flip needsReset.
+  if (urlState.wdwPhaseRotationEnabled !== undefined)
+    ext.setWdwPhaseRotationEnabled(urlState.wdwPhaseRotationEnabled)
+  if (urlState.wdwPhaseRotationSpeed !== undefined)
+    ext.setWdwPhaseRotationSpeed(urlState.wdwPhaseRotationSpeed)
+  if (urlState.wdwWorldlineEnabled !== undefined)
+    ext.setWdwWorldlineEnabled(urlState.wdwWorldlineEnabled)
+  if (urlState.wdwWorldlineSpeed !== undefined) ext.setWdwWorldlineSpeed(urlState.wdwWorldlineSpeed)
+  if (urlState.wdwWorldlinePulseWidth !== undefined)
+    ext.setWdwWorldlinePulseWidth(urlState.wdwWorldlinePulseWidth)
 }
 
 /** Apply coordinate entanglement URL state params (lazy import). */

@@ -5,6 +5,8 @@ import {
   deWittBoundary,
   hartleHawkingBoundary,
   vilenkinBoundary,
+  WDW_G_PREFACTOR,
+  wdwPotential,
 } from '@/lib/physics/wheelerDeWitt/boundaryConditions'
 
 const INPUT = {
@@ -31,14 +33,43 @@ function meanAbsPhase(chi: Float32Array): number {
 }
 
 describe('Hartle–Hawking boundary', () => {
-  it('produces real-valued (zero-imaginary) initial data', () => {
+  it('produces real-valued initial data with decaying-branch derivative', () => {
     const { chi, chiDeriv } = hartleHawkingBoundary(INPUT)
+    // χ is real.
     for (let i = 0; i < chi.length; i += 2) {
       expect(chi[i + 1]).toBeCloseTo(0, 6)
     }
-    for (let i = 0; i < chiDeriv.length; i++) {
+    // χ' imaginary part is zero everywhere.
+    for (let i = 1; i < chiDeriv.length; i += 2) {
       expect(chiDeriv[i]).toBeCloseTo(0, 6)
     }
+    // χ' real part follows the decaying-branch WKB formula inside the bounce,
+    // zero otherwise. Reconstruct per-cell via INPUT.
+    const { Nphi, phiExtent, aMin, mass, lambda } = INPUT
+    const a2 = aMin * aMin
+    let insideBounceCells = 0
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = -phiExtent + (2 * phiExtent * i1) / (Nphi - 1)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = -phiExtent + (2 * phiExtent * i2) / (Nphi - 1)
+        const V = wdwPotential(phi1, phi2, mass, lambda)
+        const idx = i1 * Nphi + i2
+        const actual = chiDeriv[2 * idx] ?? 0
+        if (V > 1e-12) {
+          const arg = 1.0 - a2 * WDW_G_PREFACTOR * V
+          if (arg > 0) {
+            insideBounceCells++
+            const amp = chi[2 * idx] ?? 0
+            const expected = -WDW_G_PREFACTOR * aMin * Math.sqrt(arg) * amp
+            expect(actual).toBeCloseTo(expected, 5)
+            continue
+          }
+        }
+        expect(actual).toBeCloseTo(0, 6)
+      }
+    }
+    // With m=0.3, Λ=0.05, aMin=0.05 every cell should be inside the bounce.
+    expect(insideBounceCells).toBeGreaterThan(0)
   })
   it('amplitude is bounded in [0, 1]', () => {
     const { chi } = hartleHawkingBoundary(INPUT)

@@ -196,31 +196,35 @@ function splat(
   }
 }
 
+/** A per-seed integrated trajectory in grid-index space. */
+export interface WkbTrajectory {
+  /** Sequence of grid-index points (ia, i1, i2). Length ≤ maxSteps. */
+  points: Array<[number, number, number]>
+}
+
 /**
- * Integrate WKB streamlines on a Wheeler–DeWitt solution and return an
- * additive per-voxel overlay. Streamlines stop upon leaving the Lorentzian
- * region or the grid. The overlay is intended to be added to the density
- * channel during texture packing.
+ * Integrate all WKB streamlines on a Wheeler–DeWitt solution and return the
+ * raw trajectories (no splat). Streamlines stop upon leaving the Lorentzian
+ * region, stalling (|Δ| < 1e-4), or leaving the grid. Seed iteration order is
+ * deterministic and matches `buildStaticOverlay`, so consumers can rebuild
+ * the exact legacy overlay bit-for-bit by chaining the two calls.
  *
  * @param output - Solver output
  * @param input - Streamline config
- * @returns Per-voxel additive overlay
+ * @returns List of trajectories; skipped-seed entries are omitted (not pushed
+ *   as empty trajectories).
  */
-export function integrateWkbStreamlines(
+export function integrateWkbTrajectories(
   output: WheelerDeWittSolverOutput,
   input: WkbStreamlineInput = DEFAULT_STREAMLINE_INPUT
-): StreamlineOverlay {
+): WkbTrajectory[] {
   const [Na, Nphi] = output.gridSize
-  const total = Na * Nphi * Nphi
-  const intensity = new Float32Array(total)
   const da = (output.aMax - output.aMin) / (Na - 1)
   const dphi = (2 * output.phiExtent) / (Nphi - 1)
-
-  // Integrate in grid-index space. `stepScale` converts the physical gradient
-  // (dS/da, dS/dphi) into an index delta — we want unit speed in grid cells,
-  // so we normalize by the gradient magnitude inside each step.
   const density = Math.max(2, Math.min(16, input.density | 0))
   const stepScale = 0.5
+
+  const trajectories: WkbTrajectory[] = []
 
   for (let sa = 1; sa < Na - 1; sa += Math.max(1, Math.floor((Na - 2) / density))) {
     for (let s1 = 0; s1 < density; s1++) {
@@ -234,14 +238,13 @@ export function integrateWkbStreamlines(
         let i1 = i1Seed
         let i2 = i2Seed
 
+        const points: Array<[number, number, number]> = []
+
         for (let step = 0; step < input.maxSteps; step++) {
           if (!isLorentzian(output, ia, i1, i2)) break
-
-          const weight = 1.0
-          splat(intensity, output.gridSize, ia, i1, i2, input.splatRadius, weight)
+          points.push([ia, i1, i2])
 
           const [ian, i1n, i2n] = rk4Step(output, ia, i1, i2, da, dphi, stepScale)
-          // Bail when the gradient is essentially zero (Euclidean tail).
           const delta = Math.abs(ian - ia) + Math.abs(i1n - i1) + Math.abs(i2n - i2)
           if (delta < 1e-4) break
           ia = ian
@@ -249,7 +252,39 @@ export function integrateWkbStreamlines(
           i2 = i2n
           if (ia < 0 || ia >= Na || i1 < 0 || i1 >= Nphi || i2 < 0 || i2 >= Nphi) break
         }
+
+        if (points.length > 0) trajectories.push({ points })
       }
+    }
+  }
+
+  return trajectories
+}
+
+/**
+ * Build the static streamline-ridge overlay (legacy visual) from a list of
+ * trajectories. Every point is splatted with unit weight — the result is
+ * bit-for-bit identical to `integrateWkbStreamlines` when the trajectory
+ * list comes from `integrateWkbTrajectories` called with the same solver
+ * output and input.
+ *
+ * @param trajectories - Raw trajectories from `integrateWkbTrajectories`
+ * @param splatRadius - Gaussian splat radius in grid cells
+ * @param gridSize - Solver grid size `[Na, Nphi, Nphi]`
+ * @returns Per-voxel additive overlay
+ */
+export function buildStaticOverlay(
+  trajectories: WkbTrajectory[],
+  splatRadius: number,
+  gridSize: [number, number, number]
+): StreamlineOverlay {
+  const [Na, Nphi] = gridSize
+  const total = Na * Nphi * Nphi
+  const intensity = new Float32Array(total)
+
+  for (const traj of trajectories) {
+    for (const [ia, i1, i2] of traj.points) {
+      splat(intensity, gridSize, ia, i1, i2, splatRadius, 1.0)
     }
   }
 
@@ -259,6 +294,74 @@ export function integrateWkbStreamlines(
     if (v > maxIntensity) maxIntensity = v
   }
   return { intensity, maxIntensity }
+}
+
+/**
+ * Build a traveling-pulse overlay: at each trajectory point with normalized
+ * progress `t_p = p / max(1, M-1)`, splat with Gaussian weight
+ * `exp(-((t_p - animTime)/pulseWidth)²)`.
+ *
+ * `animTime` is expected to be in `[0, 1]`; callers animating with a speed
+ * multiplier should pass `frac(speed * t)` externally. `maxIntensity` is
+ * fixed to `1.0` so downstream normalization does not flash as the pulse
+ * moves — the raw Gaussian peak is 1 by construction, and a constant
+ * normalization denominator keeps the shader output stable across frames.
+ *
+ * @param trajectories - Raw trajectories from `integrateWkbTrajectories`
+ * @param animTime - Normalized pulse position in `[0, 1]`
+ * @param pulseWidth - Gaussian width in normalized progress units
+ * @param splatRadius - Gaussian splat radius in grid cells
+ * @param gridSize - Solver grid size `[Na, Nphi, Nphi]`
+ * @returns Per-voxel additive pulse overlay with `maxIntensity = 1.0`
+ */
+export function buildPulseOverlay(
+  trajectories: WkbTrajectory[],
+  animTime: number,
+  pulseWidth: number,
+  splatRadius: number,
+  gridSize: [number, number, number]
+): StreamlineOverlay {
+  const [Na, Nphi] = gridSize
+  const total = Na * Nphi * Nphi
+  const intensity = new Float32Array(total)
+  const invW = 1 / Math.max(1e-6, pulseWidth)
+
+  for (const traj of trajectories) {
+    const M = traj.points.length
+    const denom = Math.max(1, M - 1)
+    for (let p = 0; p < M; p++) {
+      const [ia, i1, i2] = traj.points[p]!
+      const tp = p / denom
+      const x = (tp - animTime) * invW
+      const weight = Math.exp(-x * x)
+      if (weight < 1e-6) continue
+      splat(intensity, gridSize, ia, i1, i2, splatRadius, weight)
+    }
+  }
+
+  return { intensity, maxIntensity: 1.0 }
+}
+
+/**
+ * Integrate WKB streamlines on a Wheeler–DeWitt solution and return an
+ * additive per-voxel overlay. Streamlines stop upon leaving the Lorentzian
+ * region or the grid. The overlay is intended to be added to the density
+ * channel during texture packing.
+ *
+ * Preserved for backward compatibility — implemented on top of
+ * `integrateWkbTrajectories` + `buildStaticOverlay`. Output bytes are
+ * bit-identical to the pre-split implementation.
+ *
+ * @param output - Solver output
+ * @param input - Streamline config
+ * @returns Per-voxel additive overlay
+ */
+export function integrateWkbStreamlines(
+  output: WheelerDeWittSolverOutput,
+  input: WkbStreamlineInput = DEFAULT_STREAMLINE_INPUT
+): StreamlineOverlay {
+  const trajectories = integrateWkbTrajectories(output, input)
+  return buildStaticOverlay(trajectories, input.splatRadius, output.gridSize)
 }
 
 /**

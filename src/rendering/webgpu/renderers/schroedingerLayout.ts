@@ -215,6 +215,10 @@ const SCHROEDINGER_FIELDS = [
   { name: 'branchPlaneThreshold', type: 'f32' },
   { name: 'branchTransitionWidth', type: 'f32' },
   { name: '_padBranch', type: 'vec3f' },
+
+  // --- Wheeler–DeWitt render-only effects (offset 1628) ---
+  // Phase rotation rate (rad/unit-time). 0 disables visually; non-WdW modes always write 0.
+  { name: 'wdwPhaseRotationRate', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

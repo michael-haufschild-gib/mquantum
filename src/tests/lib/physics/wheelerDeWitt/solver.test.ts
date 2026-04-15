@@ -182,4 +182,36 @@ describe('Wheeler–DeWitt solver', () => {
     // 1e-20 floor and everything renders black.
     expect(out.maxDensity).toBeGreaterThan(0)
   })
+
+  it.each(['noBoundary', 'tunneling', 'deWitt'] as const)(
+    'maxDensity stays at a physical scale at default render config (%s)',
+    (bc) => {
+      // Regression: prior to the Euclidean absorber + decaying-branch BC,
+      // the growing WKB branch saturated the CLAMP = 1e8 at cube corners and
+      // produced maxDensity ≈ 1e16. With the absorber in place the field
+      // stays at a physical scale across all three boundary conditions.
+      const out = solveWheelerDeWitt({
+        boundaryCondition: bc,
+        inflatonMass: 0.3,
+        cosmologicalConstant: 0.0,
+        aMin: 0.1,
+        aMax: 1.5,
+        gridNa: 128,
+        gridNphi: 32,
+        phiExtent: 2.0,
+      })
+      expect(Number.isFinite(out.maxDensity)).toBe(true)
+      expect(out.maxDensity).toBeGreaterThan(0)
+      expect(out.maxDensity).toBeLessThan(100)
+    }
+  )
+
+  it('operator residual stays tight with the Euclidean absorber active', () => {
+    const out = solveWheelerDeWitt(BASE_INPUT)
+    const residual = wdwOperatorResidual(out, BASE_INPUT)
+    // wdwOperatorResidual skips Euclidean cells, so the absorber cannot
+    // perturb the measurement. The Lorentzian region should still satisfy
+    // the 5% target.
+    expect(residual).toBeLessThan(0.05)
+  })
 })

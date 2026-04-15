@@ -97,10 +97,18 @@ export function packWdwDensityGrid(
         }
         const rho = re * re + im * im
         const rhoNorm = clamp01(rho / maxRho)
-        const logRho = Math.log(rho + 1e-10)
         const phase = re === 0 && im === 0 ? 0 : Math.atan2(im, re)
         const overlayVal = overlay ? (overlay.intensity[cellIdx] ?? 0) / maxStreamline : 0
-        packRGBA16F(density, pixelIdx, rhoNorm, logRho, phase, clamp01(overlayVal))
+        // Mix the streamline/worldline overlay into the rendered R/G channels
+        // so it is actually visible. The raymarcher only reads R (rho) and G
+        // (logRho); A is reserved for negative-encoded potential overlays in
+        // TDSE. Clamp to 1 so the overlay can't blow out the scene — at peak
+        // weight the overlay appears as a bright ridge co-located with the
+        // WKB trajectory.
+        const rhoWithOverlay = clamp01(rhoNorm + overlayVal)
+        const rhoPhysicalBoosted = rhoWithOverlay * maxRho
+        const logRho = Math.log(rhoPhysicalBoosted + 1e-10)
+        packRGBA16F(density, pixelIdx, rhoWithOverlay, logRho, phase, clamp01(overlayVal))
       }
     }
   }

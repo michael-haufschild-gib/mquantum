@@ -25,6 +25,11 @@ export interface WheelerDeWittSetters {
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
+  setWdwPhaseRotationEnabled: (enabled: boolean) => void
+  setWdwPhaseRotationSpeed: (speed: number) => void
+  setWdwWorldlineEnabled: (enabled: boolean) => void
+  setWdwWorldlineSpeed: (speed: number) => void
+  setWdwWorldlinePulseWidth: (w: number) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 }
@@ -49,6 +54,26 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
   const setStreamlinesEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'streamlinesEnabled')
   const setStreamlineDensity = nestedIntSetter(ctx, 'wheelerDeWitt', 'streamlineDensity', 2, 16)
 
+  // Render-only animation-effect setters: MUST NOT flip needsReset so the
+  // solver does not re-run when the user toggles a visual overlay.
+  const setPhaseRotationEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'phaseRotationEnabled')
+  const setPhaseRotationSpeed = nestedClampedSetter(
+    ctx,
+    'wheelerDeWitt',
+    'phaseRotationSpeed',
+    0,
+    5
+  )
+  const setWorldlineEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'worldlineEnabled')
+  const setWorldlineSpeed = nestedClampedSetter(ctx, 'wheelerDeWitt', 'worldlineSpeed', 0.1, 3)
+  const setWorldlinePulseWidth = nestedClampedSetter(
+    ctx,
+    'wheelerDeWitt',
+    'worldlinePulseWidth',
+    0.02,
+    0.3
+  )
+
   /** Physics setters also flip needsReset so the strategy re-runs the solver. */
   const withReset = (apply: () => void): void => {
     apply()
@@ -66,6 +91,12 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwCosmologicalConstant: (lambda) => withReset(() => setCosmologicalConstant(lambda)),
     setWdwStreamlinesEnabled: (enabled) => withReset(() => setStreamlinesEnabled(enabled)),
     setWdwStreamlineDensity: (density) => withReset(() => setStreamlineDensity(density)),
+    // Render-only: no withReset — solver output is not affected.
+    setWdwPhaseRotationEnabled: setPhaseRotationEnabled,
+    setWdwPhaseRotationSpeed: setPhaseRotationSpeed,
+    setWdwWorldlineEnabled: setWorldlineEnabled,
+    setWdwWorldlineSpeed: setWorldlineSpeed,
+    setWdwWorldlinePulseWidth: setWorldlinePulseWidth,
     triggerWdwRecompute: () => {
       ctx.setWithVersion((state) => ({
         schroedinger: {

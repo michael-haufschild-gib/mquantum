@@ -87,6 +87,12 @@ export interface SchroedingerSnapshot {
     streamlinesEnabled?: boolean
     streamlineDensity?: number
     needsReset?: boolean
+    // Render-only animation effects (never re-solve the WdW equation)
+    phaseRotationEnabled?: boolean
+    phaseRotationSpeed?: number
+    worldlineEnabled?: boolean
+    worldlineSpeed?: number
+    worldlinePulseWidth?: number
     [key: string]: unknown
   }
   absorberEnabled?: boolean

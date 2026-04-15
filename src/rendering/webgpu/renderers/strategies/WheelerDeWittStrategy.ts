@@ -8,7 +8,9 @@
  *     `DENSITY_GRID_SIZE`³ density texture for the existing raymarcher to consume
  *
  * This strategy owns the density texture directly and re-uploads it via
- * `device.queue.writeTexture` whenever the WdW config hash changes.
+ * `device.queue.writeTexture` whenever the WdW config hash changes OR when
+ * the worldline pulse is animating (render-only re-pack, preserving the cached
+ * solver output + trajectories).
  *
  * @module rendering/webgpu/renderers/strategies/WheelerDeWittStrategy
  */
@@ -16,18 +18,28 @@
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
 import { packWdwDensityGrid } from '@/lib/physics/wheelerDeWitt/densityGrid'
-import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 import {
+  solveWheelerDeWitt,
+  type WheelerDeWittSolverOutput,
+} from '@/lib/physics/wheelerDeWitt/solver'
+import {
+  buildPulseOverlay,
+  buildStaticOverlay,
   DEFAULT_STREAMLINE_INPUT,
-  integrateWkbStreamlines,
+  integrateWkbTrajectories,
   type StreamlineOverlay,
+  type WkbTrajectory,
 } from '@/lib/physics/wheelerDeWitt/wkbStreamlines'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { createDensityTexture } from '../../passes/computePassUtils'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
-import { type ExtendedStoreSnapshot, getStoreSnapshot } from '../schrodingerRendererTypes'
+import {
+  type AnimationState,
+  type ExtendedStoreSnapshot,
+  getStoreSnapshot,
+} from '../schrodingerRendererTypes'
 import { createDensityTextureBindings } from './computeGridUtils'
 import type {
   ModeFrameContext,
@@ -37,10 +49,16 @@ import type {
 } from './types'
 
 /**
- * Compute a stable hash of the WdW config fields that affect the solver
- * output.
+ * Compute a stable hash of the WdW config fields that affect the SOLVER output.
+ *
+ * Render-only effect fields (`phaseRotationEnabled`, `phaseRotationSpeed`,
+ * `worldlineEnabled`, `worldlineSpeed`, `worldlinePulseWidth`) are intentionally
+ * NOT included — they never change the solution, only the visualization, so
+ * toggling them must not trigger a re-solve.
+ *
+ * Exported for unit-testing hash stability across animation-effect toggles.
  */
-function computeWdwConfigHash(config: WheelerDeWittConfig): string {
+export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
   return [
     config.boundaryCondition,
     config.inflatonMass.toFixed(6),
@@ -63,6 +81,15 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   private densityTextureView: GPUTextureView | null = null
   private lastConfigHash: string | null = null
   private transferredOut = false
+
+  // Cached solver output + trajectories — reused across frames so the worldline
+  // animation can re-pack the density texture without re-running the solver.
+  private lastSolverOutput: WheelerDeWittSolverOutput | null = null
+  private lastTrajectories: WkbTrajectory[] | null = null
+
+  // Tracks the last-packed worldline-enabled state so a toggle-off while paused
+  // still triggers exactly one repack (clears the pulse snapshot from the texture).
+  private lastWorldlineEnabled = false
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
@@ -120,33 +147,73 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     if (!wdw) return
 
     const hash = computeWdwConfigHash(wdw)
-    if (hash === this.lastConfigHash && !wdw.needsReset) return
+    const solverDirty = hash !== this.lastConfigHash || !!wdw.needsReset
 
-    // Solve the WdW equation on the CPU. Bounded cost at default grid
-    // (Na=128, Nphi=32 → 128 × 32 × 32 ≈ 131k complex cells × ~12 FLOPs/cell/step
-    // × ~125 leapfrog steps ≈ 200 MFLOPs). Completes in ≈ 10–15 ms on
-    // budget hardware; the result is cached behind `lastConfigHash` so the
-    // solver only re-runs when WdW physics inputs change.
-    const solverOutput = solveWheelerDeWitt({
-      boundaryCondition: wdw.boundaryCondition,
-      inflatonMass: wdw.inflatonMass,
-      cosmologicalConstant: wdw.cosmologicalConstant,
-      aMin: wdw.aMin,
-      aMax: wdw.aMax,
-      gridNa: wdw.gridNa,
-      gridNphi: wdw.gridNphi,
-      phiExtent: wdw.phiExtent,
-    })
-
-    let overlay: StreamlineOverlay | null = null
-    if (wdw.streamlinesEnabled) {
-      overlay = integrateWkbStreamlines(solverOutput, {
-        ...DEFAULT_STREAMLINE_INPUT,
-        density: wdw.streamlineDensity,
+    if (solverDirty) {
+      // Solve the WdW equation on the CPU. Bounded cost at default grid
+      // (Na=128, Nphi=32 → 128 × 32 × 32 ≈ 131k complex cells × ~12 FLOPs/cell/step
+      // × ~125 leapfrog steps ≈ 200 MFLOPs). Completes in ≈ 10–15 ms on
+      // budget hardware; the result is cached behind `lastConfigHash` so the
+      // solver only re-runs when WdW physics inputs change.
+      this.lastSolverOutput = solveWheelerDeWitt({
+        boundaryCondition: wdw.boundaryCondition,
+        inflatonMass: wdw.inflatonMass,
+        cosmologicalConstant: wdw.cosmologicalConstant,
+        aMin: wdw.aMin,
+        aMax: wdw.aMax,
+        gridNa: wdw.gridNa,
+        gridNphi: wdw.gridNphi,
+        phiExtent: wdw.phiExtent,
       })
+      this.lastTrajectories = wdw.streamlinesEnabled
+        ? integrateWkbTrajectories(this.lastSolverOutput, {
+            ...DEFAULT_STREAMLINE_INPUT,
+            density: wdw.streamlineDensity,
+          })
+        : null
+      this.lastConfigHash = hash
+      if (wdw.needsReset) extended?.clearWdwNeedsReset?.()
     }
 
-    const packed = packWdwDensityGrid(solverOutput, overlay)
+    if (!this.lastSolverOutput) return
+
+    // Render-only: worldline pulse moves every playing frame, so re-pack the
+    // density texture even when the solver output has not changed. A one-shot
+    // repack also fires when the user toggles worldlineEnabled so the stale
+    // pulse snapshot is cleared back to the static overlay (or nothing).
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+    const isPlaying = animation?.isPlaying ?? false
+    const worldlineEnabled = !!wdw.worldlineEnabled
+    const worldlineAnimating =
+      worldlineEnabled && isPlaying && (this.lastTrajectories?.length ?? 0) > 0
+    const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
+    const needRepack = solverDirty || worldlineAnimating || worldlineToggled
+
+    if (!needRepack) return
+
+    let overlay: StreamlineOverlay | null = null
+    if (this.lastTrajectories && this.lastTrajectories.length > 0) {
+      if (worldlineEnabled) {
+        const t = animation?.accumulatedTime ?? 0
+        const rawAnim = (t * wdw.worldlineSpeed) % 1
+        const animTime = rawAnim < 0 ? rawAnim + 1 : rawAnim
+        overlay = buildPulseOverlay(
+          this.lastTrajectories,
+          animTime,
+          wdw.worldlinePulseWidth,
+          DEFAULT_STREAMLINE_INPUT.splatRadius,
+          this.lastSolverOutput.gridSize
+        )
+      } else if (wdw.streamlinesEnabled) {
+        overlay = buildStaticOverlay(
+          this.lastTrajectories,
+          DEFAULT_STREAMLINE_INPUT.splatRadius,
+          this.lastSolverOutput.gridSize
+        )
+      }
+    }
+
+    const packed = packWdwDensityGrid(this.lastSolverOutput, overlay)
 
     ctx.device.queue.writeTexture(
       { texture: this.densityTexture },
@@ -159,10 +226,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       { width: packed.gridSize, height: packed.gridSize, depthOrArrayLayers: packed.gridSize }
     )
 
-    this.lastConfigHash = hash
-    if (wdw.needsReset) {
-      extended?.clearWdwNeedsReset?.()
-    }
+    this.lastWorldlineEnabled = worldlineEnabled
   }
 
   adoptComputeState(source: QuantumModeStrategy): boolean {
@@ -171,8 +235,13 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.densityTexture = source.densityTexture
     this.densityTextureView = source.densityTextureView
     this.lastConfigHash = source.lastConfigHash
+    this.lastSolverOutput = source.lastSolverOutput
+    this.lastTrajectories = source.lastTrajectories
+    this.lastWorldlineEnabled = source.lastWorldlineEnabled
     source.densityTexture = null
     source.densityTextureView = null
+    source.lastSolverOutput = null
+    source.lastTrajectories = null
     source.transferredOut = true
     return true
   }
@@ -185,5 +254,9 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.densityTexture?.destroy()
     this.densityTexture = null
     this.densityTextureView = null
+    this.lastSolverOutput = null
+    this.lastTrajectories = null
+    this.lastConfigHash = null
+    this.lastWorldlineEnabled = false
   }
 }

@@ -474,6 +474,11 @@ export interface SchroedingerSliceActions {
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
+  setWdwPhaseRotationEnabled: (enabled: boolean) => void
+  setWdwPhaseRotationSpeed: (speed: number) => void
+  setWdwWorldlineEnabled: (enabled: boolean) => void
+  setWdwWorldlineSpeed: (speed: number) => void
+  setWdwWorldlinePulseWidth: (w: number) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 

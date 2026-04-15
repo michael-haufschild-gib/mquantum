@@ -20,6 +20,7 @@ import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
 import { RotationAnimationDrawer } from './TimelineControls/RotationAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
+import { WheelerDeWittAnimationDrawer } from './TimelineControls/WheelerDeWittAnimationDrawer'
 
 export const TimelineControls: FC = () => {
   const objectType = useGeometryStore((state: GeometryState) => state.objectType)
@@ -47,6 +48,10 @@ export const TimelineControls: FC = () => {
       openQuantumDephasingEnabled: state.schroedinger.openQuantum.dephasingEnabled,
       openQuantumRelaxationEnabled: state.schroedinger.openQuantum.relaxationEnabled,
       openQuantumThermalEnabled: state.schroedinger.openQuantum.thermalEnabled,
+      // Wheeler–DeWitt render-only effects. Defensive reads — tests may omit
+      // the wheelerDeWitt sub-state when they mock schroedinger partially.
+      wdwPhaseRotationEnabled: state.schroedinger.wheelerDeWitt?.phaseRotationEnabled ?? false,
+      wdwWorldlineEnabled: state.schroedinger.wheelerDeWitt?.worldlineEnabled ?? false,
     }))
   )
 
@@ -87,18 +92,27 @@ export const TimelineControls: FC = () => {
       schroedingerConfig.quantumMode === 'hydrogenNDCoupled') &&
     schroedingerConfig.representation !== 'wigner'
 
+  const isWdW = schroedingerConfig.quantumMode === 'wheelerDeWitt'
+
   // Compute modes with no animation effects content in the drawer
   const isEffectlessComputeMode =
     isSchroedinger &&
     schroedingerConfig.quantumMode !== 'harmonicOscillator' &&
     schroedingerConfig.quantumMode !== 'hydrogenND' &&
     schroedingerConfig.quantumMode !== 'hydrogenNDCoupled' &&
-    schroedingerConfig.quantumMode !== 'tdseDynamics'
+    schroedingerConfig.quantumMode !== 'tdseDynamics' &&
+    schroedingerConfig.quantumMode !== 'wheelerDeWitt'
 
   const hasEffectsDrawerContent = !isEffectlessComputeMode
 
   const activeAnimationCount = useMemo(() => {
     if (configStoreKey === 'schroedinger') {
+      if (isWdW) {
+        return (
+          (schroedingerConfig.wdwPhaseRotationEnabled ? 1 : 0) +
+          (schroedingerConfig.wdwWorldlineEnabled ? 1 : 0)
+        )
+      }
       return [
         schroedingerConfig.sliceAnimationEnabled,
         schroedingerConfig.interferenceEnabled,
@@ -113,11 +127,14 @@ export const TimelineControls: FC = () => {
     return 0
   }, [
     configStoreKey,
+    isWdW,
     schroedingerConfig.sliceAnimationEnabled,
     schroedingerConfig.interferenceEnabled,
     schroedingerConfig.phaseShimmerEnabled,
     schroedingerConfig.probabilityCurrentEnabled,
     schroedingerConfig.phaseAnimationEnabled,
+    schroedingerConfig.wdwPhaseRotationEnabled,
+    schroedingerConfig.wdwWorldlineEnabled,
     pauliSliceAnimationEnabled,
   ])
 
@@ -132,8 +149,11 @@ export const TimelineControls: FC = () => {
     if (isSchroedinger && schroedingerConfig.quantumMode === 'tdseDynamics') {
       return 'TDSE auto-loop control for automatic wavepacket re-initialization.'
     }
+    if (isSchroedinger && isWdW) {
+      return 'Wheeler–DeWitt visual effects: phase rotation of the colored fringes and a semiclassical worldline pulse traveling along each WKB streamline.'
+    }
     return 'Quantum animation effects: phase evolution, interference fringes, probability current, and dimensional sweeps.'
-  }, [isPauliSpinor, isSchroedinger, schroedingerConfig.quantumMode])
+  }, [isPauliSpinor, isSchroedinger, isWdW, schroedingerConfig.quantumMode])
 
   const activeOpenQuantumCount = useMemo(() => {
     if (!schroedingerConfig.openQuantumEnabled) return 0
@@ -205,7 +225,11 @@ export const TimelineControls: FC = () => {
       <AnimatePresence>
         {showRotationDrawer && <RotationAnimationDrawer onClose={() => setActiveDrawer(null)} />}
 
-        {showAnimDrawer && isSchroedinger && hasEffectsDrawerContent && (
+        {showAnimDrawer && isSchroedinger && isWdW && (
+          <WheelerDeWittAnimationDrawer onClose={() => setActiveDrawer(null)} />
+        )}
+
+        {showAnimDrawer && isSchroedinger && !isWdW && hasEffectsDrawerContent && (
           <SchroedingerAnimationDrawer onClose={() => setActiveDrawer(null)} />
         )}
 

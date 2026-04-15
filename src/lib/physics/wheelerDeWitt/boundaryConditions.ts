@@ -66,7 +66,14 @@ function indexToPhi(i: number, Nphi: number, phiExtent: number): number {
  * S_E(φ, a) = (1/(3 V(φ))) · [(1 − a²·(8πG/3)·V(φ))^{3/2} − 1] when the
  * argument is non-negative, falling back to a Gaussian-in-φ envelope
  * when the expression is imaginary (V(φ) is too large for the bounce).
- * ∂_a χ = 0 by symmetry.
+ *
+ * The a-derivative selects the Euclidean decaying branch: inside the bounce
+ * (V > 0 and 1 − K·V·a² > 0) we set ∂_a χ = −K·a·√(1 − K·V·a²)·χ, the WKB
+ * relation χ' = −|dS_E/da|·χ. Setting χ' = 0 (classically symmetric between
+ * growing and decaying branches) would let the non-physical growing branch
+ * dominate the march and saturate the solver's overflow clamp at the cube
+ * corners. Outside the bounce or in the V ≤ 1e-12 fallback the WKB relation
+ * is ill-defined, so we fall back to χ' = 0.
  *
  * @param input - Grid + physics inputs
  * @returns Real-valued (im = 0) boundary field
@@ -84,6 +91,7 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
       const V = wdwPotential(phi1, phi2, mass, lambda)
       const idx = i1 * Nphi + i2
       let amp: number
+      let dChi = 0
       if (V <= 1e-12) {
         // Λ ≤ 0 region: fall back to exponential damping in φ.
         amp = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
@@ -97,10 +105,13 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
           // S_E is negative when arg<1 (expanding bounce), so |S_E| = -S_E.
           // exp(-|S_E|) is bounded in (0,1].
           amp = Math.exp(-Math.abs(Se))
+          // Decaying-branch WKB derivative: χ' = −|dS_E/da|·χ with
+          // |dS_E/da| = K·a·√(1 − K·V·a²).
+          dChi = -WDW_G_PREFACTOR * aMin * Math.sqrt(arg) * amp
         }
       }
       setPair(chi, idx, amp, 0)
-      setPair(chiDeriv, idx, 0, 0)
+      setPair(chiDeriv, idx, dChi, 0)
     }
   }
   return { chi, chiDeriv }

@@ -76,7 +76,8 @@ fn volumeRaymarchGrid(
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     var rho = gridSample.r;
     let sCenter = gridSample.g;
-    let phase = gridSample.b;
+    // wdwPhaseRotationRate is 0 for all non-WdW modes — subtraction is a no-op
+    let phase = gridSample.b - uniforms.wdwPhaseRotationRate * uniforms.time;
 
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
@@ -246,9 +247,13 @@ fn volumeRaymarchGrid(
     }
 
     // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
+    // WdW phase rotation only applies to the spatial-phase (B) channel; relativePhase (A)
+    // is a different observable and is not rotated. wdwPhaseRotationRate is 0 for all
+    // non-WdW modes so the subtraction is a no-op there.
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
-      phase = select(gridSample.b, gridSample.a, COLOR_ALGORITHM == 10);
+      let rotatedB = gridSample.b - uniforms.wdwPhaseRotationRate * uniforms.time;
+      phase = select(rotatedB, gridSample.a, COLOR_ALGORITHM == 10);
     } else {
       phase = 0.0;
     }

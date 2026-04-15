@@ -202,6 +202,16 @@ export interface ShareableObjectState {
   wdwStreamlinesEnabled?: boolean
   /** Wheeler–DeWitt streamline seed density (2-16) */
   wdwStreamlineDensity?: number
+  /** Wheeler–DeWitt phase rotation enabled (render-only; visual only) */
+  wdwPhaseRotationEnabled?: boolean
+  /** Wheeler–DeWitt phase rotation angular-velocity multiplier (0-5) */
+  wdwPhaseRotationSpeed?: number
+  /** Wheeler–DeWitt semiclassical worldline pulse enabled (render-only) */
+  wdwWorldlineEnabled?: boolean
+  /** Wheeler–DeWitt worldline pulse cycles per unit time (0.1-3) */
+  wdwWorldlineSpeed?: number
+  /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
+  wdwWorldlinePulseWidth?: number
 }
 
 /**
@@ -426,6 +436,12 @@ export function serializeState(state: ShareableState): string {
     setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
     setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
     setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
+    // Render-only animation effects
+    setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
+    setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed, true)
+    setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
+    setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
+    setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
   }
 
   return params.toString()
@@ -651,6 +667,11 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
   state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
+  state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')
+  state.wdwPhaseRotationSpeed = parseFloatParam(params, 'wdw_prs', 0, 5)
+  state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
+  state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
+  state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {
