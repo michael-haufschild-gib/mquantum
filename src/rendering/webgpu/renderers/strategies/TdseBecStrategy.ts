@@ -7,11 +7,8 @@
  * @module rendering/webgpu/renderers/strategies/TdseBecStrategy
  */
 
-import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
-import { hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
-import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import type {
   EntanglementWorkerRequest,
@@ -19,7 +16,6 @@ import type {
 } from '@/lib/physics/coordinateEntanglement.worker'
 import { useCoordinateEntanglementStore } from '@/stores/coordinateEntanglementStore'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
-import { usePageCurveStore } from '@/stores/pageCurveStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
@@ -45,40 +41,13 @@ import {
   createBecSpectrumWorkerState,
   dispatchBecSpectrumComputation,
 } from './TdseBecSpectrumWorker'
+import { applyIslandOverlay } from './tdseIslandOverlay'
 import type {
   ModeFrameContext,
   ModeSetupResult,
   QuantumModeStrategy,
   SchroedingerSnapshot,
 } from './types'
-
-/**
- * Inject the analog-Hawking quantum-extremal island overlay fields into a
- * per-frame TDSE config when the overlay is active. When preconditions fail
- * (disabled, wrong initial condition, no horizon, zero radius) the function
- * returns the input unchanged — the shader then no-ops on zero radius.
- *
- * @param config - base TDSE config built for this frame.
- * @param bec - BEC slice from the extended store (source of horizon geometry).
- * @returns Either the original config or a spread copy with island fields set.
- */
-function applyIslandOverlay(config: TdseConfig, bec: BecConfig): TdseConfig {
-  const pc = usePageCurveStore.getState()
-  if (!pc.islandOverlayEnabled) return config
-  if (bec.initialCondition !== 'blackHoleAnalog') return config
-  const lastIslandRadius = pc.lastIslandRadius
-  if (!Number.isFinite(lastIslandRadius) || lastIslandRadius <= 0) return config
-  const wf = buildWaterfallParams(bec)
-  const readout = hawkingReadout(wf)
-  if (!Number.isFinite(readout.horizonX0)) return config
-  return {
-    ...config,
-    islandOverlayEnabled: true,
-    islandCenterX0: readout.horizonX0,
-    islandRadiusWs: lastIslandRadius,
-    islandBoost: pc.islandBoost,
-  }
-}
 
 /** Interval (in diagnostic cycles) between spectrum computations. */
 const SPECTRUM_INTERVAL = 4
@@ -454,8 +423,13 @@ export class TdseBecStrategy implements QuantumModeStrategy {
 
     void tdsePass.requestMeasurementReadback(ctx).then(
       (result) => {
-        // Guard against late callbacks after dispose()
-        if (this.disposed) return
+        // Guard against late callbacks after dispose() or warm-swap handoff.
+        // Clearing `entanglementInFlight` here is safe because both lifecycle
+        // exits guarantee no further dispatches will run through this instance.
+        if (this.disposed || this.transferredOut) {
+          this.entanglementInFlight = false
+          return
+        }
 
         if (!result) {
           this.entanglementInFlight = false
@@ -472,8 +446,8 @@ export class TdseBecStrategy implements QuantumModeStrategy {
             this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
               this.entanglementInFlight = false
               if (e.data.type !== 'result') return
-              // Discard stale results from previous epochs
-              if (e.data.epoch !== this.entanglementEpoch) return
+              // Discard stale results from previous epochs or post-dispose.
+              if (this.disposed || e.data.epoch !== this.entanglementEpoch) return
               useCoordinateEntanglementStore.getState().pushResult(e.data.result)
             }
             this.entanglementWorker.onerror = () => {

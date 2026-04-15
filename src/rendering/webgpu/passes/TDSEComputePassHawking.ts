@@ -153,24 +153,21 @@ export function maybeDispatchHawkingInject(
 }
 
 /**
- * One-call helper combining dispatch + step-counter advance. Returns the new
- * counter value so the caller stores it back on the pass. Keeping the
+ * One-call helper combining dispatch + step-counter advance. Keeping the
  * increment here (rather than in the caller) localises the "once per frame,
- * post-evolution" contract in a single function.
+ * post-evolution" contract in a single function. The advanced counter lands
+ * back on `state.stepIndex`; the caller's next uniform write reads it from
+ * there.
  *
  * @param device - WebGPU device
  * @param ctx - Render context
  * @param config - Current TDSE config (carries hawking flags in BEC mode)
- * @param state - Hawking injection state
+ * @param state - Hawking injection state (stepIndex is mutated in place)
  * @param uniformBuffer - TDSEUniforms buffer
  * @param psiRe - Real part of wavefunction
  * @param psiIm - Imaginary part of wavefunction
  * @param linearWG - Dispatch count (ceil(totalSites / 64))
- * @param currentStepIndex - The step counter already written to the uniform
- *   buffer this frame. The kernel consumes that value; we return the
- *   next-frame value for storage on the caller.
  * @param dispatchCompute - Pass's dispatch helper
- * @returns Advanced step counter (u32-wrapped)
  */
 export function runHawkingFrame(
   device: GPUDevice,

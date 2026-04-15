@@ -15,45 +15,10 @@ import {
   type TdseInitialCondition,
 } from '@/lib/geometry/extended/tdse'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
-
-/**
- * Background condensate density n₀ used by the waterfall (blackHoleAnalog)
- * initial condition. Mirrors the μ override inside `buildBecConfig`:
- *
- *   μ_wf  = max(g · 0.01, 1.0)
- *   n₀    = μ_wf / g   (for g > 0)
- *
- * Exposed as a pure helper so CPU-side analysis (e.g. the HUD's analytic κ,
- * T_H readout) can compute the same reference density the GPU simulator
- * uses — avoiding silent mismatches when the PRD window changes.
- *
- * @param config - minimal shape carrying `interactionStrength` (g).
- * @returns background density n₀; returns 1.0 for non-positive g as a safe fallback.
- */
-export function computeWaterfallBackgroundDensity(config: { interactionStrength: number }): number {
-  const g = config.interactionStrength
-  if (!(g > 0)) return 1.0
-  const muWaterfall = Math.max(g * 0.01, 1.0)
-  return muWaterfall / g
-}
-
-/**
- * Resolve the effective particle mass used by the BEC simulator.
- *
- * Single canonical source of truth for `mass` in the BEC pipeline. Mirrors
- * the fallback used inside `buildBecConfig` so CPU-side analysis (HUD
- * readout, analytic κ / T_H, trap-profile plot) can compute the same
- * value the GPU simulator uses — preventing silent divergence if the
- * pipeline ever nulls `bec.mass` upstream.
- *
- * @param config - minimal shape carrying an optional `mass` field.
- * @returns `config.mass` when finite and positive, otherwise the TDSE default.
- */
-export function resolveBecMass(config: { mass?: number | null }): number {
-  const m = config.mass
-  if (typeof m === 'number' && Number.isFinite(m) && m > 0) return m
-  return DEFAULT_TDSE_CONFIG.mass
-}
+import {
+  computeWaterfallBackgroundDensity,
+  resolveBecMass,
+} from '@/lib/physics/bec/waterfallParams'
 
 /** Subset of the schroedinger store needed for absorber + exposure wiring. */
 interface BecSchoedingerOverrides {
@@ -86,7 +51,10 @@ function prepareBecInitCondition(bec: BecConfig, g: number, latDim: number) {
   // vortexLattice → vortexImprint (same shader, different count)
   // vortexReconnection → ndVortexPair (new shader branch for configurable-plane vortices)
   // blackHoleAnalog → blackHoleAnalog (new waterfall-horizon branch, index 7)
-  let mappedInit: string = initCond
+  // Typed narrowly — every branch below must land on a valid
+  // `TdseInitialCondition` so the caller's `initialCondition: mappedInit`
+  // assignment doesn't need a cast.
+  let mappedInit: TdseInitialCondition = initCond as TdseInitialCondition
   if (initCond === 'vortexLattice') mappedInit = 'vortexImprint'
   else if (initCond === 'vortexReconnection') mappedInit = 'ndVortexPair'
 
@@ -170,7 +138,7 @@ export function buildBecConfig(
       hbar: bec.hbar ?? DEFAULT_TDSE_CONFIG.hbar,
       dt: bec.dt ?? 0.002,
       stepsPerFrame: bec.stepsPerFrame ?? DEFAULT_TDSE_CONFIG.stepsPerFrame,
-      initialCondition: mappedInit as TdseInitialCondition,
+      initialCondition: mappedInit,
       packetCenter: new Array(latDim).fill(0),
       packetWidth: 1.0,
       packetAmplitude: mu,

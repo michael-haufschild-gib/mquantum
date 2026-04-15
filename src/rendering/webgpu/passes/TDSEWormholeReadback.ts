@@ -36,6 +36,14 @@ export interface WormholeReadbackState {
   mappingInFlight: boolean
   /** Monotonic generation counter — bumped on reset, drops stale results. */
   generation: number
+  /**
+   * Persistent scratch buffer for the interleaved (re, im) ψ used by the CPU
+   * coherence reduction. Sized to match `stagingTotalSites` and reused across
+   * readbacks so the diagnostic cadence doesn't allocate (and GC) a fresh
+   * `Float32Array(2 * totalSites)` every tick. For a 128³ grid the buffer is
+   * 16 MiB — keeping it resident avoids megabyte-scale churn at ~5 Hz.
+   */
+  interleavedScratch: Float32Array | null
 }
 
 /** Create a zeroed readback state container. */
@@ -46,6 +54,7 @@ export function createWormholeReadbackState(): WormholeReadbackState {
     stagingTotalSites: 0,
     mappingInFlight: false,
     generation: 0,
+    interleavedScratch: null,
   }
 }
 
@@ -74,6 +83,9 @@ function ensureStagingBuffers(
   })
   state.stagingTotalSites = totalSites
   state.mappingInFlight = false
+  // Resize the interleaved scratch to match; the previous backing is dropped
+  // with the lattice so no data needs copying.
+  state.interleavedScratch = new Float32Array(Math.max(2, 2 * totalSites))
 }
 
 /**
@@ -146,7 +158,15 @@ export function requestWormholeReadback(
       }
       const reView = new Float32Array(stagingRe.getMappedRange())
       const imView = new Float32Array(stagingIm.getMappedRange())
-      const interleaved = new Float32Array(2 * totalSites)
+      // Reuse the persistent scratch buffer. `ensureStagingBuffers` sizes it
+      // to `2*totalSites` when staging is (re)allocated, so it cannot be
+      // shorter here. Allocate lazily only as a last-line-of-defence — this
+      // path only fires if a race dropped the scratch reference.
+      let interleaved = state.interleavedScratch
+      if (!interleaved || interleaved.length < 2 * totalSites) {
+        interleaved = new Float32Array(2 * totalSites)
+        state.interleavedScratch = interleaved
+      }
       for (let i = 0; i < totalSites; i++) {
         interleaved[2 * i] = reView[i]!
         interleaved[2 * i + 1] = imView[i]!
@@ -155,7 +175,11 @@ export function requestWormholeReadback(
       stagingIm.unmap()
       let coherence: number
       try {
-        coherence = computeWormholeCoherence(interleaved, capturedGridSize, axis)
+        // Pass a view sized exactly to the lattice so `computeWormholeCoherence`'s
+        // length check keeps working even when the scratch buffer was
+        // over-allocated by a prior larger grid.
+        const view = interleaved.subarray(0, 2 * totalSites)
+        coherence = computeWormholeCoherence(view, capturedGridSize, axis)
       } catch (err) {
         logger.warn('[TDSE] Wormhole coherence CPU reduction failed:', err)
         state.mappingInFlight = false
@@ -181,5 +205,6 @@ export function resetWormholeReadback(state: WormholeReadbackState): void {
   state.stagingIm = null
   state.stagingTotalSites = 0
   state.mappingInFlight = false
+  state.interleavedScratch = null
   state.generation = (state.generation + 1) >>> 0
 }

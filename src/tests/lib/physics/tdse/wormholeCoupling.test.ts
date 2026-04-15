@@ -225,6 +225,34 @@ describe('applyWormholeCoupling — visible teleportation at GPU cadence', () =>
   })
 })
 
+describe('applyWormholeCoupling — input validation', () => {
+  it('throws on empty gridSize', () => {
+    expect(() => applyWormholeCoupling(new Float32Array(0), [], 0, 0.1, 1)).toThrow(/non-empty/)
+  })
+
+  it('throws on non-integer grid size along a non-mirror axis', () => {
+    expect(() =>
+      applyWormholeCoupling(new Float32Array(0), [4, 3.5] as unknown as number[], 0, 0.1, 1)
+    ).toThrow(/positive integer/)
+  })
+
+  it('throws on non-finite grid size', () => {
+    expect(() =>
+      applyWormholeCoupling(new Float32Array(0), [Number.NaN, 4] as unknown as number[], 1, 0.1, 1)
+    ).toThrow(/positive integer/)
+  })
+
+  it('throws on out-of-range axis', () => {
+    expect(() =>
+      applyWormholeCoupling(new Float32Array(16), [4, 2], 2 as 0 | 1 | 2, 0.1, 1)
+    ).toThrow(/out of range/)
+  })
+
+  it('throws on odd grid size along mirror axis', () => {
+    expect(() => applyWormholeCoupling(new Float32Array(10), [5], 0, 0.1, 1)).toThrow(/even/)
+  })
+})
+
 describe('isValidMirrorAxis', () => {
   it('accepts 0, 1, 2 and rejects other values', () => {
     expect(isValidMirrorAxis(0)).toBe(true)
