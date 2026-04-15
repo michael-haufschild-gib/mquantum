@@ -147,25 +147,36 @@ test.describe('Page curve HUD', () => {
 
     // G_eff slider observable effect: S_BH = A_h / (4·G_eff), so setting
     // G_eff to 10× its current value must cut S_BH by 10× on the next push.
-    const { gEffBefore, sBHBefore } = await page.evaluate(async () => {
-      const mod = await import('/src/stores/pageCurveStore.ts')
-      const s = mod.usePageCurveStore.getState()
-      return { gEffBefore: s.gEff, sBHBefore: s.lastSBH }
+    const { gEffBefore, sBHBefore, becGenBefore } = await page.evaluate(async () => {
+      const pcMod = await import('/src/stores/pageCurveStore.ts')
+      const dxMod = await import('/src/stores/diagnosticsStore.ts')
+      const s = pcMod.usePageCurveStore.getState()
+      const d = dxMod.useDiagnosticsStore.getState() as {
+        bec?: { readbackGeneration?: number }
+      }
+      return {
+        gEffBefore: s.gEff,
+        sBHBefore: s.lastSBH,
+        becGenBefore: d.bec?.readbackGeneration ?? 0,
+      }
     })
     await page.evaluate(async (newG: number) => {
       const mod = await import('/src/stores/pageCurveStore.ts')
       const pc = mod.usePageCurveStore.getState() as Record<string, (...args: unknown[]) => void>
       pc.setGEff(newG)
     }, gEffBefore * 10)
-    // Wait for at least one BEC readback tick so the next sample bakes the
-    // new G_eff into S_BH.
+    // Wait for ≥ 3 BEC diagnostic ticks after the slider change so the
+    // panel's sample-push effect has observed the new gEff.
     await page.waitForFunction(
-      async (prevSBH: number) => {
-        const m = await import('/src/stores/pageCurveStore.ts')
-        return m.usePageCurveStore.getState().lastSBH < 0.5 * prevSBH
+      async (prevGen: number) => {
+        const m = await import('/src/stores/diagnosticsStore.ts')
+        const d = m.useDiagnosticsStore.getState() as {
+          bec?: { readbackGeneration?: number }
+        }
+        return (d.bec?.readbackGeneration ?? 0) >= prevGen + 3
       },
-      sBHBefore,
-      { timeout: 10_000 }
+      becGenBefore,
+      { timeout: 20_000 }
     )
     const sBHAfter = await page.evaluate(async () => {
       const mod = await import('/src/stores/pageCurveStore.ts')
@@ -213,9 +224,8 @@ test.describe('Page curve HUD', () => {
       const pcMod = await import('/src/stores/pageCurveStore.ts')
       const extMod = await import('/src/stores/extendedObjectStore.ts')
       const bhMod = await import('/src/lib/physics/bec/sonicHorizon.ts')
-      const bcMod = await import(
-        '/src/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder.ts'
-      )
+      const bcMod =
+        await import('/src/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder.ts')
       // Synthetic sample with T_H·area·dt big enough that S_therm > S_BH →
       // island radius becomes strictly positive on the very next push.
       const pc = pcMod.usePageCurveStore.getState()

@@ -23,7 +23,68 @@
  */
 
 import { act, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import React from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Mock motion/react — avoid framer drag/animation in happy-dom.
+vi.mock('motion/react', () => {
+  const MotionDiv = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement> & { drag?: boolean; dragMomentum?: boolean }
+  >(
+    (
+      { children, drag: _d, dragMomentum: _dm, onDragStart: _ods, onDragEnd: _ode, style, ...rest },
+      ref
+    ) => (
+      <div ref={ref} style={style as React.CSSProperties} {...rest}>
+        {children}
+      </div>
+    )
+  )
+  MotionDiv.displayName = 'MotionDiv'
+  const MotionButton = React.forwardRef<
+    HTMLButtonElement,
+    React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      whileHover?: unknown
+      whileTap?: unknown
+      initial?: unknown
+      animate?: unknown
+    }
+  >(({ children, whileHover: _wh, whileTap: _wt, initial: _i, animate: _a, ...rest }, ref) => (
+    // eslint-disable-next-line project-rules/no-raw-html-controls -- motion/react mock
+    <button ref={ref} type="button" {...rest}>
+      {children}
+    </button>
+  ))
+  MotionButton.displayName = 'MotionButton'
+  return {
+    m: { div: MotionDiv, button: MotionButton },
+    useMotionValue: (initial: number) => {
+      let val = initial
+      return {
+        get: () => val,
+        set: (v: number) => {
+          val = v
+        },
+      }
+    },
+    HTMLMotionProps: {},
+  }
+})
+
+// Mock usePanelCollision — no-op in tests.
+vi.mock('@/hooks/usePanelCollision', () => ({ usePanelCollision: vi.fn() }))
+
+// Mock useIsDesktop → always true so the panel mounts under happy-dom.
+vi.mock('@/hooks/useMediaQuery', () => ({
+  useIsDesktop: () => true,
+  useMediaQuery: vi.fn(() => false),
+}))
+
+// Mock Icon — SVG imports not available in happy-dom.
+vi.mock('@/components/ui/Icon', () => ({
+  Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
+}))
 
 import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'

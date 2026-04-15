@@ -156,4 +156,30 @@ describe('Wheeler–DeWitt solver', () => {
     // residual ~ O(0.01). The PRD says < 5%.
     expect(residual).toBeLessThan(0.05)
   })
+
+  it('maxDensity reflects the Lorentzian region, not clamp-saturated Euclidean cells', () => {
+    // Regression: at default params (m=0.3, Λ=0, aMax=1.5, phiExtent=2) the
+    // Euclidean region at cube corners hosts the exponentially-growing branch
+    // of the WdW solution, which saturates to |χ| = CLAMP = 1e8 and used to
+    // set maxDensity ≈ CLAMP² = 1e16. Downstream the density packer then
+    // rendered only eight bright cube corners — the physical Lorentzian
+    // interior crushed to black by the normalization.
+    const out = solveWheelerDeWitt({
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.0,
+      aMin: 0.1,
+      aMax: 1.5,
+      gridNa: 128,
+      gridNphi: 32,
+      phiExtent: 2.0,
+    })
+    // maxDensity should reflect the Lorentzian signal, bounded well below
+    // CLAMP². A very loose upper bound of 1e12 still eliminates the prior
+    // 1e16 regression by four orders of magnitude.
+    expect(out.maxDensity).toBeLessThan(1e12)
+    // And it must be strictly positive — otherwise the packer divides by the
+    // 1e-20 floor and everything renders black.
+    expect(out.maxDensity).toBeGreaterThan(0)
+  })
 })

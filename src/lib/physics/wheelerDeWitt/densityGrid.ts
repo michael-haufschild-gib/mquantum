@@ -60,6 +60,11 @@ export function packWdwDensityGrid(
   const slab = Nphi * Nphi
   const maxRho = Math.max(output.maxDensity, 1e-20)
   const maxStreamline = overlay ? Math.max(overlay.maxIntensity, 1e-20) : 1
+  // Solver saturates |χ| at CLAMP in the Euclidean growing branch. Those
+  // cells are non-physical and, if packed naively, bright-render the cube
+  // corners regardless of the Lorentzian interior (which is the actual
+  // physics). Gate them out at the packer — render as zero density.
+  const CLAMP_SOFT = 0.9 * 1e8
 
   for (let z = 0; z < N; z++) {
     // z maps to φ₂
@@ -84,6 +89,12 @@ export function packWdwDensityGrid(
         const cellIdx = ia * slab + i1 * Nphi + i2
         const re = output.chi[2 * cellIdx] ?? 0
         const im = output.chi[2 * cellIdx + 1] ?? 0
+        // Skip clamp-saturated cells: they carry no physical signal and would
+        // otherwise dominate the rendered density with bright corner blobs.
+        if (Math.abs(re) >= CLAMP_SOFT || Math.abs(im) >= CLAMP_SOFT) {
+          // Leave this texel at zero (the Uint16Array is pre-initialized to 0).
+          continue
+        }
         const rho = re * re + im * im
         const rhoNorm = clamp01(rho / maxRho)
         const logRho = Math.log(rho + 1e-10)

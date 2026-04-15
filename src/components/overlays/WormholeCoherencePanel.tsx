@@ -15,11 +15,17 @@
  * @module components/overlays/WormholeCoherencePanel
  */
 
-import React, { useEffect, useMemo } from 'react'
+import { m, useMotionValue } from 'motion/react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { usePanelCollision } from '@/hooks/usePanelCollision'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useLayoutStore } from '@/stores/layoutStore'
 import { getWormholeSample, useWormholeCoherenceStore } from '@/stores/wormholeCoherenceStore'
 
 const WIDTH = 360
@@ -28,6 +34,8 @@ const PAD_L = 36
 const PAD_R = 8
 const PAD_T = 18
 const PAD_B = 22
+const PANEL_W = WIDTH + 16
+const PANEL_H = HEIGHT + 64
 
 interface TracePoint {
   x: number
@@ -44,12 +52,13 @@ function buildPath(points: TracePoint[]): string {
 }
 
 /**
- * Overlay panel rendering the wormhole coherence trace. Header badges
- * surface the current `I` value, mirror-axis index, and coupling `g`.
- *
- * @returns React element or `null` when the HUD is disabled.
+ * Heavy inner panel — only mounted when the Wormhole-coherence HUD is
+ * enabled. Uses the same drag + sidebar-collision convention as
+ * {@link QuantumCarpetPanel} / {@link HawkingPageCurvePanel} so all
+ * floating HUDs share consistent behavior and get pushed aside by the
+ * editor panels instead of being obscured.
  */
-export function WormholeCoherencePanel(): React.ReactElement | null {
+const WormholeCoherencePanelInner: React.FC = React.memo(() => {
   const { lastCoherence, lastAxis, lastG, version, bufferCount } = useWormholeCoherenceStore(
     useShallow((s) => ({
       lastCoherence: s.lastCoherence,
@@ -62,9 +71,32 @@ export function WormholeCoherencePanel(): React.ReactElement | null {
 
   const config = useExtendedObjectStore((state) => state.schroedinger)
   const { objectType } = useGeometryStore(useShallow((s) => ({ objectType: s.objectType })))
+  const setTdseWormholeHudEnabled = useExtendedObjectStore((s) => s.setTdseWormholeHudEnabled)
 
   const hudEnabled = !!config.tdse.wormholeCoherenceHudEnabled
   const modeActive = objectType === 'schroedinger' && config.quantumMode === 'tdseDynamics'
+
+  // Drag + panel-collision, matching Carpet / Hawking panels. Initial
+  // position: bottom-right, stacked below the Hawking panel so both fit
+  // on standard laptops.
+  const [isDragging, setIsDragging] = useState(false)
+  const initializedRef = useRef(false)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+    const offsetX = window.innerWidth - PANEL_W - 16 - 16
+    const offsetY = window.innerHeight - PANEL_H - 80 - 96
+    x.set(Math.max(0, offsetX))
+    y.set(Math.max(0, offsetY))
+  }, [x, y])
+  usePanelCollision(x, y, PANEL_W, PANEL_H, isDragging)
+
+  const handleClose = useCallback(
+    () => setTdseWormholeHudEnabled(false),
+    [setTdseWormholeHudEnabled]
+  )
 
   // Clear samples on mode switch, wormhole enable flip, or HUD disable so
   // stale traces from a previous run don't leak into the new session.
@@ -119,103 +151,148 @@ export function WormholeCoherencePanel(): React.ReactElement | null {
     return out
   }, [version, bufferCount])
 
-  if (!hudEnabled || !modeActive) return null
+  if (!modeActive) return null
 
   return (
-    <div
-      className="glass-panel absolute right-4 top-[220px] rounded-md border border-border-default p-2 shadow-lg"
+    <m.div
+      drag
+      dragMomentum={false}
+      style={{ x, y }}
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={() => setTimeout(() => setIsDragging(false), 100)}
+      className="absolute top-20 start-4 z-[45] pointer-events-auto select-none"
       data-testid="wormhole-coherence-panel"
-      style={{ width: WIDTH + 16, zIndex: 40 }}
     >
-      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-        <span>Wormhole Coherence I(L:R)</span>
-        <span className="flex gap-2 text-text-tertiary">
-          <span>ax&nbsp;{lastAxis}</span>
-          <span>g&nbsp;{lastG.toFixed(2)}</span>
-          <span className="text-text-primary">
-            I&nbsp;{snapshot.hasData ? lastCoherence.toFixed(3) : '—'}
-          </span>
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        width={WIDTH}
-        height={HEIGHT}
-        role="img"
-        aria-label="Wormhole coherence"
+      <div
+        className="flex flex-col overflow-hidden rounded-2xl shadow-[var(--shadow-hard)]"
+        style={{ width: PANEL_W }}
       >
-        {/* Axes background */}
-        <rect
-          x={PAD_L}
-          y={PAD_T}
-          width={WIDTH - PAD_L - PAD_R}
-          height={HEIGHT - PAD_T - PAD_B}
-          fill="var(--color-glass)"
-          stroke="var(--color-panel-border)"
-          strokeWidth={1}
-        />
-        {/* Horizontal guide at I = 1 */}
-        <line
-          x1={PAD_L}
-          x2={WIDTH - PAD_R}
-          y1={PAD_T}
-          y2={PAD_T}
-          stroke="var(--color-warning)"
-          strokeDasharray="3 3"
-          strokeWidth={1}
-        />
-        {/* Coherence trace */}
-        {snapshot.hasData && (
-          <path
-            d={snapshot.path}
-            fill="none"
-            stroke="var(--color-accent)"
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-          />
-        )}
-        {/* Axis labels */}
-        <text
-          x={PAD_L}
-          y={HEIGHT - 4}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          t {snapshot.hasData ? snapshot.tMin.toFixed(2) : '—'}
-        </text>
-        <text
-          x={WIDTH - PAD_R}
-          y={HEIGHT - 4}
-          fontSize={10}
-          fontFamily="monospace"
-          textAnchor="end"
-          fill="var(--color-text-tertiary)"
-        >
-          t {snapshot.hasData ? snapshot.tMax.toFixed(2) : '—'}
-        </text>
-        <text
-          x={4}
-          y={PAD_T + 10}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          1
-        </text>
-        <text
-          x={4}
-          y={HEIGHT - PAD_B}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          0
-        </text>
-      </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-text-tertiary">
-        <span>samples: {bufferCount}</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel">
+          <span className="text-xs font-medium text-primary/80 whitespace-nowrap">
+            Wormhole I(L:R)
+          </span>
+          <span className="flex gap-2 text-xs text-neutral-500 ms-auto">
+            <span>ax&nbsp;{lastAxis}</span>
+            <span>g&nbsp;{lastG.toFixed(2)}</span>
+            <span className="text-neutral-300">
+              I&nbsp;{snapshot.hasData ? lastCoherence.toFixed(3) : '—'}
+            </span>
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            ariaLabel="Close wormhole coherence panel"
+            className="!p-1 !min-w-0"
+            title="Close"
+            data-testid="wormhole-coherence-close"
+          >
+            <Icon name="cross" size={10} />
+          </Button>
+        </div>
+        <div className="bg-black/90 p-2">
+          <svg
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            width={WIDTH}
+            height={HEIGHT}
+            role="img"
+            aria-label="Wormhole coherence"
+          >
+            {/* Axes background */}
+            <rect
+              x={PAD_L}
+              y={PAD_T}
+              width={WIDTH - PAD_L - PAD_R}
+              height={HEIGHT - PAD_T - PAD_B}
+              fill="var(--color-glass)"
+              stroke="var(--color-panel-border)"
+              strokeWidth={1}
+            />
+            {/* Horizontal guide at I = 1 */}
+            <line
+              x1={PAD_L}
+              x2={WIDTH - PAD_R}
+              y1={PAD_T}
+              y2={PAD_T}
+              stroke="var(--color-warning)"
+              strokeDasharray="3 3"
+              strokeWidth={1}
+            />
+            {/* Coherence trace */}
+            {snapshot.hasData && (
+              <path
+                d={snapshot.path}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+              />
+            )}
+            {/* Axis labels */}
+            <text
+              x={PAD_L}
+              y={HEIGHT - 4}
+              fontSize={10}
+              fontFamily="monospace"
+              fill="var(--color-text-tertiary)"
+            >
+              t {snapshot.hasData ? snapshot.tMin.toFixed(2) : '—'}
+            </text>
+            <text
+              x={WIDTH - PAD_R}
+              y={HEIGHT - 4}
+              fontSize={10}
+              fontFamily="monospace"
+              textAnchor="end"
+              fill="var(--color-text-tertiary)"
+            >
+              t {snapshot.hasData ? snapshot.tMax.toFixed(2) : '—'}
+            </text>
+            <text
+              x={4}
+              y={PAD_T + 10}
+              fontSize={10}
+              fontFamily="monospace"
+              fill="var(--color-text-tertiary)"
+            >
+              1
+            </text>
+            <text
+              x={4}
+              y={HEIGHT - PAD_B}
+              fontSize={10}
+              fontFamily="monospace"
+              fill="var(--color-text-tertiary)"
+            >
+              0
+            </text>
+          </svg>
+        </div>
+        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-xs text-neutral-500">
+          <span>samples: {bufferCount}</span>
+        </div>
       </div>
-    </div>
+    </m.div>
   )
-}
+})
+
+WormholeCoherencePanelInner.displayName = 'WormholeCoherencePanelInner'
+
+/**
+ * Wormhole-coherence HUD overlay for the TDSE double-trace-coupling mode.
+ * Thin gate: mounts the heavy inner only when the HUD toggle is on, the
+ * current mode is TDSE, not in cinematic mode, and on a desktop viewport.
+ *
+ * @returns The panel, or null when hidden.
+ */
+export const WormholeCoherencePanel: React.FC = React.memo(() => {
+  const hudEnabled = useExtendedObjectStore(
+    (s) => !!s.schroedinger.tdse.wormholeCoherenceHudEnabled
+  )
+  const isCinematic = useLayoutStore((s) => s.isCinematicMode)
+  const isDesktop = useIsDesktop()
+  if (!hudEnabled || isCinematic || !isDesktop) return null
+  return <WormholeCoherencePanelInner />
+})
+
+WormholeCoherencePanel.displayName = 'WormholeCoherencePanel'

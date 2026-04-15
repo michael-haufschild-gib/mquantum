@@ -20,9 +20,14 @@
  * @module components/overlays/HawkingPageCurvePanel
  */
 
-import React, { useEffect, useMemo, useRef } from 'react'
+import { m, useMotionValue } from 'motion/react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { usePanelCollision } from '@/hooks/usePanelCollision'
 import { getPageCurveSample, horizonPlaneArea } from '@/lib/physics/bec/pageCurve'
 import {
   asymptoticSoundSpeed,
@@ -34,6 +39,7 @@ import { computeWaterfallBackgroundDensity } from '@/rendering/webgpu/renderers/
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useLayoutStore } from '@/stores/layoutStore'
 import { usePageCurveStore } from '@/stores/pageCurveStore'
 
 const WIDTH = 360
@@ -42,6 +48,11 @@ const PAD_L = 36
 const PAD_R = 8
 const PAD_T = 18
 const PAD_B = 22
+
+/** Outer panel frame width in CSS px (includes padding for the SVG). */
+const PANEL_W = WIDTH + 16
+/** Outer panel frame height in CSS px (header + SVG + footer). */
+const PANEL_H = HEIGHT + 64
 
 interface TracePoint {
   x: number
@@ -87,12 +98,15 @@ function buildWaterfallParams(bec: {
 }
 
 /**
- * Overlay panel that renders the Page curve when the `pageCurveHudEnabled`
- * flag is on and the current object is in BEC mode. Drives sample updates
- * from a BEC-diagnostics subscription so no extra render-pass plumbing is
- * needed.
+ * Heavy inner panel — only mounted when the HUD toggle is on, not in cinematic
+ * mode, and on a desktop viewport. Handles sampling, drawing, drag, and
+ * sidebar-collision spring offsets (same pattern as QuantumCarpetPanel).
  */
-export function HawkingPageCurvePanel(): React.ReactElement | null {
+const PageCurvePanelInner: React.FC = React.memo(() => {
+  // `enabled` is always true here — outer gate mounts us only when the HUD
+  // is on — but the horizon-context memo and sample-push effect still
+  // discriminate on mode/initialCondition via this flag, so read it for
+  // dep-array correctness.
   const enabled = usePageCurveStore((s) => s.pageCurveHudEnabled)
   const islandOverlayEnabled = usePageCurveStore((s) => s.islandOverlayEnabled)
   const dMaxFrac = usePageCurveStore((s) => s.dMaxFrac)
@@ -105,8 +119,29 @@ export function HawkingPageCurvePanel(): React.ReactElement | null {
     useShallow((s) => ({ dimension: s.dimension, objectType: s.objectType }))
   )
   const becGen = useDiagnosticsStore((s) => s.bec.readbackGeneration)
+  const setPageCurveHudEnabled = usePageCurveStore((s) => s.setPageCurveHudEnabled)
 
   const bec = config.bec
+
+  // Drag state + initial bottom-right position. Same convention as
+  // QuantumCarpetPanel so both floating HUDs have the same behavior and
+  // can't fight for the same pixels.
+  const [isDragging, setIsDragging] = useState(false)
+  const initializedRef = useRef(false)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+    const offsetX = window.innerWidth - PANEL_W - 16 - 16
+    // Stacked above the Quantum Carpet panel so both fit on standard laptops.
+    const offsetY = window.innerHeight - PANEL_H - 80 - 96 - 300
+    x.set(Math.max(0, offsetX))
+    y.set(Math.max(0, offsetY))
+  }, [x, y])
+  usePanelCollision(x, y, PANEL_W, PANEL_H, isDragging)
+
+  const handleClose = useCallback(() => setPageCurveHudEnabled(false), [setPageCurveHudEnabled])
 
   // Capture the becGen value at view start so the time axis begins at t = 0
   // for each fresh BEC view session. Mode/initialCondition switches reset the
@@ -260,8 +295,6 @@ export function HawkingPageCurvePanel(): React.ReactElement | null {
     return out
   }, [version, bufferCount])
 
-  if (!enabled) return null
-
   const tPagePixel =
     snapshot.tPage !== null && snapshot.tMax > snapshot.tMin
       ? PAD_L +
@@ -292,196 +325,240 @@ export function HawkingPageCurvePanel(): React.ReactElement | null {
   const showEmptyState = horizonContext.isBec && !horizonContext.horizonPresent
 
   return (
-    <div
-      className="glass-panel absolute right-4 top-4 rounded-md border border-border-default p-2 shadow-lg"
+    <m.div
+      drag
+      dragMomentum={false}
+      style={{ x, y }}
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={() => setTimeout(() => setIsDragging(false), 100)}
+      className="absolute top-20 start-4 z-[45] pointer-events-auto select-none"
       data-testid="hawking-page-curve-panel"
-      style={{ width: WIDTH + 16, zIndex: 40 }}
     >
-      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
-        <span>Hawking Page Curve</span>
-        <span className="text-text-tertiary">
-          S_BH&nbsp;
-          {!showEmptyState && snapshot.hasData && snapshot.sBH > 0
-            ? snapshot.sBH.toExponential(2)
-            : '—'}
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        width={WIDTH}
-        height={HEIGHT}
-        role="img"
-        aria-label="Page curve"
-        data-testid="hawking-page-curve-svg"
-        data-island-overlay={islandOverlayEnabled ? 'on' : 'off'}
-        data-has-horizon={horizonContext.horizonPresent ? 'on' : 'off'}
+      <div
+        className="flex flex-col overflow-hidden rounded-2xl shadow-[var(--shadow-hard)]"
+        style={{ width: PANEL_W }}
       >
-        {/* Axes */}
-        <rect
-          x={PAD_L}
-          y={PAD_T}
-          width={WIDTH - PAD_L - PAD_R}
-          height={HEIGHT - PAD_T - PAD_B}
-          fill="var(--color-glass)"
-          stroke="var(--color-panel-border)"
-          strokeWidth={1}
-        />
-        {/* Empty state — supersedes the traces when no horizon exists. */}
-        {showEmptyState && (
-          <g data-testid="hawking-empty-state">
-            <text
-              x={WIDTH / 2}
-              y={HEIGHT / 2 - 6}
-              fontSize={11}
-              fontFamily="monospace"
-              textAnchor="middle"
-              fill="var(--color-warning)"
-            >
-              No horizon — raise v_max above c_s0
-            </text>
-            <text
-              x={WIDTH / 2}
-              y={HEIGHT / 2 + 10}
+        <div className="flex items-center gap-2 px-3 py-1.5 glass-panel">
+          <span className="text-xs font-medium text-primary/80 whitespace-nowrap">
+            Hawking Page Curve
+          </span>
+          <span className="text-xs text-neutral-500 ms-auto">
+            S_BH&nbsp;
+            {!showEmptyState && snapshot.hasData && snapshot.sBH > 0
+              ? snapshot.sBH.toExponential(2)
+              : '—'}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            ariaLabel="Close Hawking Page Curve panel"
+            className="!p-1 !min-w-0"
+            title="Close"
+            data-testid="hawking-page-curve-close"
+          >
+            <Icon name="cross" size={10} />
+          </Button>
+        </div>
+        <div className="bg-black/90 p-2">
+          <svg
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            width={WIDTH}
+            height={HEIGHT}
+            role="img"
+            aria-label="Page curve"
+            data-testid="hawking-page-curve-svg"
+            data-island-overlay={islandOverlayEnabled ? 'on' : 'off'}
+            data-has-horizon={horizonContext.horizonPresent ? 'on' : 'off'}
+          >
+            {/* Axes */}
+            <rect
+              x={PAD_L}
+              y={PAD_T}
+              width={WIDTH - PAD_L - PAD_R}
+              height={HEIGHT - PAD_T - PAD_B}
+              fill="var(--color-glass)"
+              stroke="var(--color-panel-border)"
+              strokeWidth={1}
+            />
+            {/* Empty state — supersedes the traces when no horizon exists. */}
+            {showEmptyState && (
+              <g data-testid="hawking-empty-state">
+                <text
+                  x={WIDTH / 2}
+                  y={HEIGHT / 2 - 6}
+                  fontSize={11}
+                  fontFamily="monospace"
+                  textAnchor="middle"
+                  fill="var(--color-warning)"
+                >
+                  No horizon — raise v_max above c_s0
+                </text>
+                <text
+                  x={WIDTH / 2}
+                  y={HEIGHT / 2 + 10}
+                  fontSize={10}
+                  fontFamily="monospace"
+                  textAnchor="middle"
+                  fill="var(--color-text-tertiary)"
+                >
+                  c_s0 ≈ {horizonContext.cs0.toFixed(3)}
+                </text>
+              </g>
+            )}
+            {/* S_BH line — only meaningful when a horizon exists. */}
+            {!showEmptyState && sBHPixel !== null && (
+              <line
+                x1={PAD_L}
+                x2={WIDTH - PAD_R}
+                y1={sBHPixel}
+                y2={sBHPixel}
+                stroke="var(--color-warning)"
+                strokeDasharray="3 3"
+                strokeWidth={1}
+              />
+            )}
+            {/* t_Page line */}
+            {!showEmptyState && tPagePixel !== null && (
+              <line
+                x1={tPagePixel}
+                x2={tPagePixel}
+                y1={PAD_T}
+                y2={HEIGHT - PAD_B}
+                stroke="var(--color-text-secondary)"
+                strokeDasharray="2 3"
+                strokeWidth={1}
+              />
+            )}
+            {/* Island extent guide — only after t_Page and when the toggle is on. */}
+            {islandPixel !== null && (
+              <>
+                <line
+                  x1={PAD_L}
+                  x2={WIDTH - PAD_R}
+                  y1={islandPixel}
+                  y2={islandPixel}
+                  stroke="var(--color-accent)"
+                  strokeDasharray="1 4"
+                  strokeWidth={1}
+                  data-testid="hawking-island-extent-line"
+                />
+                <text
+                  x={WIDTH - PAD_R - 2}
+                  y={islandPixel - 2}
+                  fontSize={9}
+                  fontFamily="monospace"
+                  textAnchor="end"
+                  fill="var(--color-accent)"
+                >
+                  island d*
+                </text>
+              </>
+            )}
+            {/* S_therm trace */}
+            {!showEmptyState && snapshot.hasData && (
+              <path
+                d={snapshot.thermPath}
+                fill="none"
+                stroke="var(--color-danger)"
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                data-testid="hawking-stherm-path"
+              />
+            )}
+            {/* S_page trace */}
+            {!showEmptyState && snapshot.hasData && (
+              <path
+                d={snapshot.pagePath}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                data-testid="hawking-spage-path"
+              />
+            )}
+            {/* Legend */}
+            <g
+              transform={`translate(${PAD_L + 4} ${PAD_T + 4})`}
               fontSize={10}
               fontFamily="monospace"
-              textAnchor="middle"
+              fill="var(--color-text-primary)"
+            >
+              <rect x={0} y={0} width={86} height={30} fill="var(--color-overlay)" rx={2} />
+              <line x1={4} y1={9} x2={14} y2={9} stroke="var(--color-danger)" strokeWidth={2} />
+              <text x={18} y={12}>
+                S_therm
+              </text>
+              <line x1={4} y1={22} x2={14} y2={22} stroke="var(--color-accent)" strokeWidth={2} />
+              <text x={18} y={25}>
+                S_page
+              </text>
+            </g>
+            {/* Axis labels */}
+            <text
+              x={PAD_L}
+              y={HEIGHT - 4}
+              fontSize={10}
+              fontFamily="monospace"
               fill="var(--color-text-tertiary)"
             >
-              c_s0 ≈ {horizonContext.cs0.toFixed(3)}
+              t {snapshot.hasData ? snapshot.tMin.toFixed(2) : '—'}
             </text>
-          </g>
-        )}
-        {/* S_BH line — only meaningful when a horizon exists. */}
-        {!showEmptyState && sBHPixel !== null && (
-          <line
-            x1={PAD_L}
-            x2={WIDTH - PAD_R}
-            y1={sBHPixel}
-            y2={sBHPixel}
-            stroke="var(--color-warning)"
-            strokeDasharray="3 3"
-            strokeWidth={1}
-          />
-        )}
-        {/* t_Page line */}
-        {!showEmptyState && tPagePixel !== null && (
-          <line
-            x1={tPagePixel}
-            x2={tPagePixel}
-            y1={PAD_T}
-            y2={HEIGHT - PAD_B}
-            stroke="var(--color-text-secondary)"
-            strokeDasharray="2 3"
-            strokeWidth={1}
-          />
-        )}
-        {/* Island extent guide — only after t_Page and when the toggle is on. */}
-        {islandPixel !== null && (
-          <>
-            <line
-              x1={PAD_L}
-              x2={WIDTH - PAD_R}
-              y1={islandPixel}
-              y2={islandPixel}
-              stroke="var(--color-accent)"
-              strokeDasharray="1 4"
-              strokeWidth={1}
-              data-testid="hawking-island-extent-line"
-            />
             <text
-              x={WIDTH - PAD_R - 2}
-              y={islandPixel - 2}
-              fontSize={9}
+              x={WIDTH - PAD_R}
+              y={HEIGHT - 4}
+              fontSize={10}
               fontFamily="monospace"
               textAnchor="end"
-              fill="var(--color-accent)"
+              fill="var(--color-text-tertiary)"
             >
-              island d*
+              t {snapshot.hasData ? snapshot.tMax.toFixed(2) : '—'}
             </text>
-          </>
-        )}
-        {/* S_therm trace */}
-        {!showEmptyState && snapshot.hasData && (
-          <path
-            d={snapshot.thermPath}
-            fill="none"
-            stroke="var(--color-danger)"
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-            data-testid="hawking-stherm-path"
-          />
-        )}
-        {/* S_page trace */}
-        {!showEmptyState && snapshot.hasData && (
-          <path
-            d={snapshot.pagePath}
-            fill="none"
-            stroke="var(--color-accent)"
-            strokeWidth={1.5}
-            strokeLinejoin="round"
-            data-testid="hawking-spage-path"
-          />
-        )}
-        {/* Legend */}
-        <g
-          transform={`translate(${PAD_L + 4} ${PAD_T + 4})`}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-primary)"
-        >
-          <rect x={0} y={0} width={86} height={30} fill="var(--color-overlay)" rx={2} />
-          <line x1={4} y1={9} x2={14} y2={9} stroke="var(--color-danger)" strokeWidth={2} />
-          <text x={18} y={12}>
-            S_therm
-          </text>
-          <line x1={4} y1={22} x2={14} y2={22} stroke="var(--color-accent)" strokeWidth={2} />
-          <text x={18} y={25}>
-            S_page
-          </text>
-        </g>
-        {/* Axis labels */}
-        <text
-          x={PAD_L}
-          y={HEIGHT - 4}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          t {snapshot.hasData ? snapshot.tMin.toFixed(2) : '—'}
-        </text>
-        <text
-          x={WIDTH - PAD_R}
-          y={HEIGHT - 4}
-          fontSize={10}
-          fontFamily="monospace"
-          textAnchor="end"
-          fill="var(--color-text-tertiary)"
-        >
-          t {snapshot.hasData ? snapshot.tMax.toFixed(2) : '—'}
-        </text>
-        <text
-          x={4}
-          y={PAD_T + 10}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          S {snapshot.hasData ? snapshot.sMax.toExponential(1) : '—'}
-        </text>
-        <text
-          x={4}
-          y={HEIGHT - PAD_B}
-          fontSize={10}
-          fontFamily="monospace"
-          fill="var(--color-text-tertiary)"
-        >
-          0
-        </text>
-      </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-text-tertiary">
-        <span>t_Page: {snapshot.tPage !== null ? snapshot.tPage.toFixed(3) : '—'}</span>
-        <span>samples: {bufferCount}</span>
+            <text
+              x={4}
+              y={PAD_T + 10}
+              fontSize={10}
+              fontFamily="monospace"
+              fill="var(--color-text-tertiary)"
+            >
+              S {snapshot.hasData ? snapshot.sMax.toExponential(1) : '—'}
+            </text>
+            <text
+              x={4}
+              y={HEIGHT - PAD_B}
+              fontSize={10}
+              fontFamily="monospace"
+              fill="var(--color-text-tertiary)"
+            >
+              0
+            </text>
+          </svg>
+        </div>
+        <div className="flex items-center justify-between px-3 py-1 bg-black/80 text-xs text-neutral-500">
+          <span>t_Page: {snapshot.tPage !== null ? snapshot.tPage.toFixed(3) : '—'}</span>
+          <span>samples: {bufferCount}</span>
+        </div>
       </div>
-    </div>
+    </m.div>
   )
-}
+})
+
+PageCurvePanelInner.displayName = 'PageCurvePanelInner'
+
+/**
+ * Page curve + island-formula HUD overlay for the analog Hawking BEC.
+ * Thin gate that mounts the heavy inner panel only when enabled, not in
+ * cinematic mode, and on a desktop viewport — same contract as
+ * {@link QuantumCarpetPanel}.
+ *
+ * @returns The panel, or null when hidden.
+ */
+export const HawkingPageCurvePanel: React.FC = React.memo(() => {
+  const enabled = usePageCurveStore((s) => s.pageCurveHudEnabled)
+  const isCinematic = useLayoutStore((s) => s.isCinematicMode)
+  const isDesktop = useIsDesktop()
+  if (!enabled || isCinematic || !isDesktop) return null
+  return <PageCurvePanelInner />
+})
+
+HawkingPageCurvePanel.displayName = 'HawkingPageCurvePanel'

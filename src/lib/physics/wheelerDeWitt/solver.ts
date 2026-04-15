@@ -258,14 +258,30 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     }
   }
 
-  // Find max |χ|² for downstream normalization.
+  // Find max |χ|² for downstream normalization. Restrict to Lorentzian
+  // (classically allowed, U < 0) cells: the growing branch of the
+  // Euclidean solution saturates at CLAMP = 1e8 and would otherwise set
+  // maxDensity = 1e16, crushing the physical interior signal to black
+  // in the packed density grid.
+  // Fallback: if the whole grid is Euclidean (e.g. large-m regime),
+  // fall back to the non-clamp-saturated max so normalization still
+  // produces a meaningful range.
+  const CLAMP_SOFT_SQ = 0.9 * 1e8 * (0.9 * 1e8) // ~(0.9·CLAMP)² per component
   let maxDensity = 0
+  let maxDensityEuclideanFallback = 0
   for (let i = 0; i < chi.length; i += 2) {
     const re = chi[i] ?? 0
     const im = chi[i + 1] ?? 0
     const d = re * re + im * im
-    if (d > maxDensity) maxDensity = d
+    const cellIdx = i >> 1
+    const isLorentzian = (mask[cellIdx] ?? 0) !== 0
+    if (isLorentzian) {
+      if (d > maxDensity) maxDensity = d
+    } else if (re * re < CLAMP_SOFT_SQ && im * im < CLAMP_SOFT_SQ) {
+      if (d > maxDensityEuclideanFallback) maxDensityEuclideanFallback = d
+    }
   }
+  if (maxDensity === 0) maxDensity = maxDensityEuclideanFallback
 
   return {
     chi,
