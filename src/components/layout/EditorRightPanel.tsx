@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { AnalysisSection } from '@/components/sections/Analysis/AnalysisSection'
+import { BECPageCurveSection } from '@/components/sections/Analysis/BECPageCurveSection'
 import { CoordinateEntanglementSection } from '@/components/sections/Analysis/CoordinateEntanglementSection'
 import { DecoherenceSection } from '@/components/sections/Analysis/DecoherenceSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Analysis/OpenQuantumDiagnosticsSection'
@@ -37,6 +38,7 @@ const AnalysisTabContent: React.FC = React.memo(() => {
   return (
     <div>
       <AnalysisSection defaultOpen={true} />
+      <BECPageCurveSection />
       <DecoherenceSection />
       <CoordinateEntanglementSection />
       <QuantumnessAtlasSection />

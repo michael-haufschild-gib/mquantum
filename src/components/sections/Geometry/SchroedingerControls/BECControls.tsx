@@ -19,7 +19,6 @@ import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
 import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
 import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
-import { BECPageCurveControls } from './BECPageCurveControls'
 import type { BecControlsProps } from './types'
 
 const INITIAL_CONDITION_OPTIONS = [
@@ -281,7 +280,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
                 step={1}
                 data-testid="bec-hawking-seed"
               />
-              <BECPageCurveControls />
             </>
           )}
         </ControlGroup>

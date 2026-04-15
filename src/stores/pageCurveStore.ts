@@ -54,8 +54,14 @@ export interface PageCurveTickInputs {
 
 /** Shape of the page-curve Zustand store. */
 export interface PageCurveState {
-  /** Ring buffer of samples (struct-of-arrays). */
-  readonly buffer: PageCurveRingBuffer
+  /**
+   * Ring buffer of samples (struct-of-arrays). The reference is swapped by
+   * {@link PageCurveState.setBufferSize} when capacity changes; individual
+   * sample columns are mutated in place by pushSample to avoid GC churn.
+   * Callers subscribe to {@link PageCurveState.version} to observe changes
+   * rather than shallow-comparing `buffer` itself.
+   */
+  buffer: PageCurveRingBuffer
   /** Effective Newton constant G_eff for S_BH. */
   gEff: number
   /** Stefan–Boltzmann-like coefficient for dS/dt. */
@@ -214,15 +220,13 @@ export const usePageCurveStore = create<PageCurveState>((set, get) => {
       integrator.lastRate = 0
       // Replace the buffer reference — readers observe via `version`.
       set({
-        // Casting because `buffer` is declared readonly externally but the
-        // store owner is the sole legitimate writer.
         buffer: fresh,
         lastSBH: 0,
         lastRate: 0,
         lastSTherm: 0,
         lastIslandRadius: 0,
         version: get().version + 1,
-      } as Partial<PageCurveState>)
+      })
     },
 
     setGEff: (value) => {
