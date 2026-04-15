@@ -130,8 +130,14 @@ describe('buildWdwBoundary dispatch', () => {
     const hh = buildWdwBoundary('noBoundary', INPUT)
     const vil = buildWdwBoundary('tunneling', INPUT)
     const dw = buildWdwBoundary('deWitt', INPUT)
+    const directDw = deWittBoundary(INPUT)
     expect(hh.chi.length).toBe(vil.chi.length)
     expect(hh.chi.length).toBe(dw.chi.length)
+    // Proves the 'deWitt' branch actually invokes deWittBoundary — a
+    // regression that silently dispatched to hartleHawking would still
+    // match lengths but not these per-element values.
+    expect(Array.from(dw.chi)).toEqual(Array.from(directDw.chi))
+    expect(Array.from(dw.chiDeriv)).toEqual(Array.from(directDw.chiDeriv))
     // HH vs Vilenkin should produce different fields
     let diff = 0
     for (let i = 0; i < hh.chi.length; i++) {

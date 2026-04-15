@@ -37,9 +37,7 @@ export const tdseWormholeCoupleBlock = /* wgsl */ `
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let halfTotal = params.totalSites / 2u;
   let tid = gid.x;
-  if (tid >= halfTotal) { return; }
   if (params.wormholeCouplingEnabled == 0u) { return; }
 
   let axis = params.wormholeMirrorAxis;
@@ -49,6 +47,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let Na = params.gridSize[axis];
   if (Na < 2u) { return; }
 
+  // totalSites/2 over-counts the mirrored-pair space for odd Na (e.g. Na=3
+  // leaves a self-mirror center row that belongs to no pair). Bound threads
+  // by the exact pair count = (totalSites / Na) * (Na/2).
+  let halfA = Na / 2u;
+  let pairTotal = (params.totalSites / Na) * halfA;
+  if (tid >= pairTotal) { return; }
+
   // Map the half-space thread id to a full-lattice voxel index whose
   // coordinate along the mirror axis is < Na/2. This is done by unfolding
   // tid into the lattice coordinates, treating the mirror axis as the
@@ -57,7 +62,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // and the "outer block" counts how many full (Na/2) steps of axis coord
   // plus how many full strides we've advanced past.
   let strideA = params.strides[axis];
-  let halfA = Na / 2u;
   let blockSize = strideA * halfA;
   let outer = tid / blockSize;
   let withinBlock = tid - outer * blockSize;

@@ -124,7 +124,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * Set the mirror-plane axis index. Accepts only `0 | 1 | 2`; other
      * values are silently floored/clamped to the `{0,1,2}` range.
      */
-    setTdseWormholeAxis: (axis: 0 | 1 | 2) => {
+    setTdseWormholeAxis: (axis: number) => {
       const raw = Number(axis)
       const clamped = (Math.max(0, Math.min(2, Math.floor(raw))) | 0) as 0 | 1 | 2
       ctx.setWithVersion((state) => ({
@@ -137,10 +137,12 @@ export function createTdseUiSetters(ctx: SetterContext) {
     /**
      * Toggle the coherence HUD overlay. This is a pure UI flag — it does
      * not affect the wavefunction evolution, only whether the readback
-     * path runs at the diagnostic cadence.
+     * path runs at the diagnostic cadence. Uses `set` rather than
+     * `setWithVersion` so that toggling the panel does not participate in
+     * any schroedingerVersion-keyed recompute flows.
      */
     setTdseWormholeHudEnabled: (enabled: boolean) => {
-      ctx.setWithVersion((state) => ({
+      ctx.set((state) => ({
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, wormholeCoherenceHudEnabled: !!enabled },

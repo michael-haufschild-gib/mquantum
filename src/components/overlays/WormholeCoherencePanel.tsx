@@ -106,6 +106,7 @@ const WormholeCoherencePanelInner: React.FC = React.memo(() => {
     objectType,
     config.quantumMode,
     config.tdse.wormholeCouplingEnabled,
+    config.tdse.wormholeCouplingG,
     config.tdse.wormholeMirrorAxis,
     hudEnabled,
   ])

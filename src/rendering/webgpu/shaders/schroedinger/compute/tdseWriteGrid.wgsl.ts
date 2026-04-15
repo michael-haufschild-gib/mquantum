@@ -169,7 +169,7 @@ fn voxelIsInIsland(nnCoords: ptr<function, array<u32, 12>>) -> bool {
   for (var d: u32 = 0u; d < interpDims; d++) {
     let N = f32(params.gridSize[d]);
     let dx = params.spacing[d];
-    wx[d] = (f32((*nnCoords)[d]) - 0.5 * N) * dx;
+    wx[d] = (f32((*nnCoords)[d]) + 0.5 - 0.5 * N) * dx;
   }
   let cx = params.islandCenterX0;
   // Supersonic-side gate mirrors islandMask.ts:
@@ -442,6 +442,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (voxelIsInIsland(&nnCoords)) {
     displayScalar = displayScalar * params.islandBoost;
     phase = phase + 0.7853981633974483;
+    if (phase >= 6.283185307179586) {
+      phase = phase - 6.283185307179586;
+    }
   }
 
   let normDensity = clamp(displayScalar * perpFalloff, 0.0, 1.0);

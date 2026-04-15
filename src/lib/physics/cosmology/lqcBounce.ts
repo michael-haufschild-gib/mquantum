@@ -794,12 +794,24 @@ function sameKey(a: LqcCacheKey, b: LqcCacheKey): boolean {
  * @returns Cached or freshly computed lookup table.
  */
 export function getOrComputeLqcBounceTable(params: LqcBounceParams): LqcBounceTable {
+  // Mirror `computeLqcBounceBackground`'s adaptive default for `tHalfWidth`
+  // so undefined-caller inputs produce a cache key that matches the actual
+  // integration window — otherwise two calls with the same semantic params
+  // can miss the cache (or, worse, collide across different windows).
+  let tHalfWidthKey: number
+  if (params.tHalfWidth !== undefined) {
+    tHalfWidthKey = params.tHalfWidth
+  } else {
+    const gamma = stiffFluidGamma(params.spacetimeDim, params.rhoCritical)
+    const tStar = gamma > 0 ? Math.sqrt((1 / params.initialRhoRatio - 1) / gamma) : 5
+    tHalfWidthKey = Math.max(2, Math.min(50, tStar))
+  }
   const key: LqcCacheKey = {
     spacetimeDim: params.spacetimeDim,
     rhoCritical: params.rhoCritical,
     equationOfState: params.equationOfState,
     initialRhoRatio: params.initialRhoRatio,
-    tHalfWidth: params.tHalfWidth ?? 5,
+    tHalfWidth: tHalfWidthKey,
     stepSize: params.stepSize ?? 5e-4,
     etaBounceAnchor: params.etaBounceAnchor ?? 10,
   }

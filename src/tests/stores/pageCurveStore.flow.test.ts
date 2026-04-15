@@ -95,5 +95,23 @@ describe('pageCurveStore — push flow + snapshot integrity', () => {
     expect(afterClear.buffer.count).toBe(0)
     expect(afterClear.lastSTherm).toBe(0)
     expect(afterClear.version).toBeGreaterThan(versionBeforeClear)
+
+    // Prove the integrator actually forgot the prior timestamp: push a
+    // fresh sample into the cleared store and compare its lastSTherm to
+    // the same push into a pristine store. A stale `lastT`/`lastSTherm`
+    // carry-over would accumulate from the pre-clear sample and diverge.
+    const sample = {
+      t: 0.3,
+      tH: 0.5,
+      areaH: 10,
+      cs0: 1.5,
+      supersonicExtent: 1.0,
+    }
+    usePageCurveStore.getState().pushSample(sample)
+    const afterClearPush = usePageCurveStore.getState().lastSTherm
+
+    resetStore()
+    usePageCurveStore.getState().pushSample(sample)
+    expect(usePageCurveStore.getState().lastSTherm).toBe(afterClearPush)
   })
 })

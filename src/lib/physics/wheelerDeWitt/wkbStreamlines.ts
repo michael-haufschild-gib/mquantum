@@ -89,7 +89,6 @@ function gradS(
   const aCur = output.aMin + ia * da
   const aNext = output.aMin + (ia + 1) * da
   const aPrev = output.aMin + (ia - 1) * da
-  const sCur = Math.pow(aCur, 1.5) * sampleArg(output, ia, i1, i2)
   const sNextA = Math.pow(aNext, 1.5) * sampleArg(output, ia + 1, i1, i2)
   const sPrevA = Math.pow(aPrev, 1.5) * sampleArg(output, ia - 1, i1, i2)
   const sNext1 = Math.pow(aCur, 1.5) * sampleArg(output, ia, i1 + 1, i2)
@@ -97,10 +96,13 @@ function gradS(
   const sNext2 = Math.pow(aCur, 1.5) * sampleArg(output, ia, i1, i2 + 1)
   const sPrev2 = Math.pow(aCur, 1.5) * sampleArg(output, ia, i1, i2 - 1)
 
-  // Unwrap relative to center phase
-  const dSda = (wrappedDiff(sNextA, sCur) - wrappedDiff(sPrevA, sCur)) / (2 * da)
-  const dSdp1 = (wrappedDiff(sNext1, sCur) - wrappedDiff(sPrev1, sCur)) / (2 * dphi)
-  const dSdp2 = (wrappedDiff(sNext2, sCur) - wrappedDiff(sPrev2, sCur)) / (2 * dphi)
+  // Standard central difference for wrapped-phase gradients: compute the
+  // next-vs-prev difference first, unwrap once. Unwrapping each neighbor
+  // against the center separately and subtracting yields a non-equivalent
+  // result across wrap boundaries.
+  const dSda = wrappedDiff(sNextA, sPrevA) / (2 * da)
+  const dSdp1 = wrappedDiff(sNext1, sPrev1) / (2 * dphi)
+  const dSdp2 = wrappedDiff(sNext2, sPrev2) / (2 * dphi)
   return [dSda, dSdp1, dSdp2]
 }
 

@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { isComputeQuantumType } from '@/lib/geometry/registry/helpers'
 import {
   computeCasSharpnessFromRenderScale,
   extractPPConfig,
@@ -155,6 +156,11 @@ describe('extractSchrodingerConfig', () => {
     // Regression: WebGPUScene's disable list had hard-coded compute-mode keys
     // that omitted wheelerDeWitt; extractSchrodingerConfig correctly derived
     // the compute-mode set from the registry, producing a mismatch with PP.
+    // Both gates key off `isComputeQuantumType`, so if `wheelerDeWitt` ever
+    // falls out of the `compute` category the WebGPUScene-level gate would
+    // silently re-enable temporal reprojection — assert the registry
+    // classification explicitly so the regression cannot sneak back in.
+    expect(isComputeQuantumType('wheelerDeWitt')).toBe(true)
     const extracted = extractSchrodingerConfig(
       makePassConfig({ quantumMode: 'wheelerDeWitt', temporalReprojectionEnabled: true })
     )

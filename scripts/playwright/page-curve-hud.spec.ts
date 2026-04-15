@@ -49,12 +49,11 @@ test.describe('Page curve HUD', () => {
     await page.evaluate(async () => {
       const extMod = await import('/src/stores/extendedObjectStore.ts')
       const pcMod = await import('/src/stores/pageCurveStore.ts')
-      const ext = extMod.useExtendedObjectStore.getState() as Record<
-        string,
-        (...args: unknown[]) => void
-      >
+      const ext = extMod.useExtendedObjectStore.getState() as Partial<{
+        setBecDiagnosticsEnabled: (enabled: boolean) => void
+      }>
       ext.setBecDiagnosticsEnabled?.(true)
-      const pc = pcMod.usePageCurveStore.getState() as Record<string, (...args: unknown[]) => void>
+      const pc = pcMod.usePageCurveStore.getState()
       pc.clear()
       pc.setPageCurveHudEnabled(true)
     })
@@ -133,7 +132,7 @@ test.describe('Page curve HUD', () => {
 
     await page.evaluate(async () => {
       const mod = await import('/src/stores/pageCurveStore.ts')
-      const pc = mod.usePageCurveStore.getState() as Record<string, (...args: unknown[]) => void>
+      const pc = mod.usePageCurveStore.getState()
       pc.setIslandOverlayEnabled(true)
     })
     // Wait one frame for React to flush the attribute change.
@@ -162,7 +161,7 @@ test.describe('Page curve HUD', () => {
     })
     await page.evaluate(async (newG: number) => {
       const mod = await import('/src/stores/pageCurveStore.ts')
-      const pc = mod.usePageCurveStore.getState() as Record<string, (...args: unknown[]) => void>
+      const pc = mod.usePageCurveStore.getState()
       pc.setGEff(newG)
     }, gEffBefore * 10)
     // Wait for ≥ 3 BEC diagnostic ticks after the slider change so the
@@ -201,12 +200,11 @@ test.describe('Page curve HUD', () => {
     await page.evaluate(async () => {
       const extMod = await import('/src/stores/extendedObjectStore.ts')
       const pcMod = await import('/src/stores/pageCurveStore.ts')
-      const ext = extMod.useExtendedObjectStore.getState() as Record<
-        string,
-        (...args: unknown[]) => void
-      >
+      const ext = extMod.useExtendedObjectStore.getState() as Partial<{
+        setBecDiagnosticsEnabled: (enabled: boolean) => void
+      }>
       ext.setBecDiagnosticsEnabled?.(true)
-      const pc = pcMod.usePageCurveStore.getState() as Record<string, (...args: unknown[]) => void>
+      const pc = pcMod.usePageCurveStore.getState()
       pc.clear()
       pc.setPageCurveHudEnabled(true)
       pc.setGEff(10) // shrinks S_BH by 10×, brings t_Page forward.

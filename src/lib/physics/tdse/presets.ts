@@ -489,7 +489,6 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       // quartic transverse walls only activate in the outer 25%, so the
       // packet eventually delocalizes in y/z without this.
       autoScale: true,
-      autoScaleMaxGain: 20,
       autoLoop: false,
       showPotential: false,
       wormholeCouplingEnabled: true,
@@ -505,7 +504,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     // The packet splits amplitude between the two wells during the
     // crossover (both lobes at half density near t = π/(4g)). Without
     // boosted gain the mid-oscillation frame looks empty.
-    renderingOverrides: { densityGain: 3.0, densityContrast: 2.0 },
+    renderingOverrides: { densityGain: 3.0, densityContrast: 2.0, autoScaleMaxGain: 20 },
   },
   ...DECOHERENCE_PRESETS,
 ]

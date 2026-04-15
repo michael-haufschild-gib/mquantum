@@ -36,8 +36,9 @@ const CHUNK_BUDGETS = {
   index: 30,
 }
 
-/** Total JS gzip budget in KB (all .js chunks combined). */
-const TOTAL_JS_BUDGET_KB = 750
+/** Total JS gzip budget in KB (all .js chunks combined).
+ *  Updated 2026-04-15 for WDW cosmology + ER=EPR + Hawking/Page features. */
+const TOTAL_JS_BUDGET_KB = 775
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

@@ -10,10 +10,8 @@
 import type { BecConfig } from '@/lib/geometry/extended/bec'
 import type { TdseConfig } from '@/lib/geometry/extended/tdse'
 import { logger } from '@/lib/logger'
-import {
-  hawkingReadout,
-  type WaterfallParams,
-} from '@/lib/physics/bec/sonicHorizon'
+import { hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
+import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
 import { computeEffectiveSpacing } from '@/lib/physics/compactification'
 import type {
   EntanglementWorkerRequest,
@@ -41,7 +39,7 @@ import {
   createDensityTextureBindings,
   handleSimulationStateIO,
 } from './computeGridUtils'
-import { buildBecConfig, computeWaterfallBackgroundDensity } from './TdseBecConfigBuilder'
+import { buildBecConfig } from './TdseBecConfigBuilder'
 import { getCurrentEigenstateEnergy, handleMeasurement } from './TdseBecMeasurement'
 import {
   createBecSpectrumWorkerState,
@@ -53,28 +51,6 @@ import type {
   QuantumModeStrategy,
   SchroedingerSnapshot,
 } from './types'
-
-/**
- * Build the canonical waterfall parameter struct from the current BEC config.
- * Matches the shape used by `HawkingPageCurvePanel.buildWaterfallParams` so the
- * GPU-side island centroid and the CPU-side HUD readout stay in lock-step.
- *
- * @param bec - BEC slice of the extended object store.
- * @returns Waterfall parameters consistent with the analog-Hawking simulator.
- */
-function buildWaterfallParams(bec: BecConfig): WaterfallParams {
-  const gridSize = bec.gridSize as number[]
-  const spacing = bec.spacing as number[]
-  return {
-    vMax: bec.hawkingVmax ?? 2.0,
-    lh: bec.hawkingLh ?? 0.6,
-    n0: computeWaterfallBackgroundDensity({ interactionStrength: bec.interactionStrength ?? 500 }),
-    deltaN: bec.hawkingDeltaN ?? 0,
-    g: bec.interactionStrength ?? 500,
-    mass: bec.mass ?? 1.0,
-    lBox: (gridSize[0] ?? 64) * (spacing[0] ?? 0.15),
-  }
-}
 
 /**
  * Inject the analog-Hawking quantum-extremal island overlay fields into a

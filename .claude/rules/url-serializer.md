@@ -48,5 +48,6 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - Unknown params are silently ignored (forward compatible)
 - Missing params keep app defaults (merge behavior)
 - All extended params are optional — only `d` and `t` are required for object links
+- `wdw_*` params are only applied when `qm=wheelerDeWitt`
 - New params follow the pattern: short key, validated/clamped in `deserializeState`, applied in `applyUrlStateParams`
 - Camera state and visual appearance (colors, PBR, post-processing) are NOT url-serialized — use scene presets for those

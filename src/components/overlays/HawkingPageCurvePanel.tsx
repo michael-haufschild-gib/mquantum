@@ -29,13 +29,8 @@ import { Icon } from '@/components/ui/Icon'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { usePanelCollision } from '@/hooks/usePanelCollision'
 import { getPageCurveSample, horizonPlaneArea } from '@/lib/physics/bec/pageCurve'
-import {
-  asymptoticSoundSpeed,
-  hasHorizon,
-  hawkingReadout,
-  type WaterfallParams,
-} from '@/lib/physics/bec/sonicHorizon'
-import { computeWaterfallBackgroundDensity } from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
+import { asymptoticSoundSpeed, hasHorizon, hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
+import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -66,35 +61,6 @@ function buildPath(points: TracePoint[]): string {
     d += ` L ${points[i]!.x.toFixed(2)} ${points[i]!.y.toFixed(2)}`
   }
   return d
-}
-
-/**
- * Build the canonical waterfall parameter struct from current BEC config.
- * Extracted so the empty-state derivation, the sample-push effect, and the
- * tests can all share a single source of truth for `n0` (the simulator's
- * `computeWaterfallBackgroundDensity` helper, NOT the legacy `1.0` placeholder).
- *
- * @param bec - BEC sub-config from `extendedObjectStore.schroedinger.bec`.
- * @returns Waterfall parameters consistent with the GPU simulator.
- */
-function buildWaterfallParams(bec: {
-  hawkingVmax: number
-  hawkingLh: number
-  hawkingDeltaN: number
-  interactionStrength: number
-  mass: number
-  gridSize: number[]
-  spacing: number[]
-}): WaterfallParams {
-  return {
-    vMax: bec.hawkingVmax,
-    lh: bec.hawkingLh,
-    n0: computeWaterfallBackgroundDensity({ interactionStrength: bec.interactionStrength }),
-    deltaN: bec.hawkingDeltaN,
-    g: bec.interactionStrength,
-    mass: bec.mass,
-    lBox: (bec.gridSize[0] ?? 64) * (bec.spacing[0] ?? 0.15),
-  }
 }
 
 /**
@@ -149,6 +115,13 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
   const genRefRef = useRef<number | null>(null)
   // genRefRef.current === null is a sentinel meaning "set on next push"; the
   // value is the becGen reading at the moment t = 0 should be anchored.
+  // `lastPushedGenRef` dedupes: without it, any dependency change (e.g. HUD
+  // toggle, gridSize) re-runs the effect and pushes another sample for the
+  // same becGen, producing duplicate timestamps.
+  const lastPushedGenRef = useRef<number | null>(null)
+  // Guards the reset effect so simply re-mounting the panel (HUD toggle,
+  // cinematic mode, desktop breakpoint) does not wipe the running curve.
+  const didInitResetRef = useRef(false)
 
   const becParams = useMemo(
     () =>
@@ -192,6 +165,7 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
     if (objectType !== 'schroedinger') return
     if (config.quantumMode !== 'becDynamics') return
     if (bec.initialCondition !== 'blackHoleAnalog') return
+    if (lastPushedGenRef.current === becGen) return
 
     const horizonPresent = hasHorizon(becParams)
     const readout = hawkingReadout(becParams)
@@ -218,6 +192,7 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
       cs0,
       supersonicExtent,
     })
+    lastPushedGenRef.current = becGen
   }, [
     enabled,
     objectType,
@@ -234,10 +209,17 @@ const PageCurvePanelInner: React.FC = React.memo(() => {
   ])
 
   // Clear samples on mode/initialCondition change AND reset the time anchor
-  // so the new view session starts at t = 0.
+  // so the new view session starts at t = 0. Skip the initial mount so
+  // re-opening the panel (HUD toggle, cinematic mode, breakpoint switch)
+  // does not wipe an in-flight page curve.
   useEffect(() => {
+    if (!didInitResetRef.current) {
+      didInitResetRef.current = true
+      return
+    }
     usePageCurveStore.getState().clear()
     genRefRef.current = null
+    lastPushedGenRef.current = null
   }, [bec.initialCondition, config.quantumMode, objectType])
 
   const snapshot = useMemo(() => {

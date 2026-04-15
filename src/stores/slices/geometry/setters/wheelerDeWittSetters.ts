@@ -11,12 +11,7 @@
 
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
 
-import {
-  nestedClampedSetter,
-  nestedIntSetter,
-  nestedValueSetter,
-  type SetterContext,
-} from './sliceSetterUtils'
+import { nestedClampedSetter, nestedValueSetter, type SetterContext } from './sliceSetterUtils'
 
 /** Actions exposed by the Wheeler–DeWitt setter bundle. */
 export interface WheelerDeWittSetters {
@@ -42,18 +37,6 @@ export interface WheelerDeWittSetters {
  * @returns Map of action name → setter
  */
 export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSetters {
-  const setBoundaryCondition = nestedValueSetter(ctx, 'wheelerDeWitt', 'boundaryCondition')
-  const setInflatonMass = nestedClampedSetter(ctx, 'wheelerDeWitt', 'inflatonMass', 0, 2.0)
-  const setCosmologicalConstant = nestedClampedSetter(
-    ctx,
-    'wheelerDeWitt',
-    'cosmologicalConstant',
-    -1,
-    1
-  )
-  const setStreamlinesEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'streamlinesEnabled')
-  const setStreamlineDensity = nestedIntSetter(ctx, 'wheelerDeWitt', 'streamlineDensity', 2, 16)
-
   // Render-only animation-effect setters: MUST NOT flip needsReset so the
   // solver does not re-run when the user toggles a visual overlay.
   const setPhaseRotationEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'phaseRotationEnabled')
@@ -74,23 +57,50 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     0.3
   )
 
-  /** Physics setters also flip needsReset so the strategy re-runs the solver. */
-  const withReset = (apply: () => void): void => {
-    apply()
+  /**
+   * Physics setters: update the field AND flip `needsReset` in a single
+   * setWithVersion call. Calling a nested*Setter first and then a second
+   * setWithVersion for `needsReset` would cause two React state updates
+   * (two version bumps, two re-renders) per physics mutation.
+   */
+  const applyWithReset = <V>(field: string, value: V): void => {
     ctx.setWithVersion((state) => ({
       schroedinger: {
         ...state.schroedinger,
-        wheelerDeWitt: { ...state.schroedinger.wheelerDeWitt, needsReset: true },
+        wheelerDeWitt: {
+          ...state.schroedinger.wheelerDeWitt,
+          [field]: value,
+          needsReset: true,
+        },
       },
     }))
   }
+  const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
 
   return {
-    setWdwBoundaryCondition: (bc) => withReset(() => setBoundaryCondition(bc)),
-    setWdwInflatonMass: (m) => withReset(() => setInflatonMass(m)),
-    setWdwCosmologicalConstant: (lambda) => withReset(() => setCosmologicalConstant(lambda)),
-    setWdwStreamlinesEnabled: (enabled) => withReset(() => setStreamlinesEnabled(enabled)),
-    setWdwStreamlineDensity: (density) => withReset(() => setStreamlineDensity(density)),
+    setWdwBoundaryCondition: (bc) => applyWithReset('boundaryCondition', bc),
+    setWdwInflatonMass: (m) => {
+      if (!ctx.isFinite(m)) {
+        ctx.warnNonFinite('wheelerDeWitt.inflatonMass', m)
+        return
+      }
+      applyWithReset('inflatonMass', clamp(m, 0, 2))
+    },
+    setWdwCosmologicalConstant: (lambda) => {
+      if (!ctx.isFinite(lambda)) {
+        ctx.warnNonFinite('wheelerDeWitt.cosmologicalConstant', lambda)
+        return
+      }
+      applyWithReset('cosmologicalConstant', clamp(lambda, -1, 1))
+    },
+    setWdwStreamlinesEnabled: (enabled) => applyWithReset('streamlinesEnabled', enabled),
+    setWdwStreamlineDensity: (density) => {
+      if (!ctx.isFinite(density)) {
+        ctx.warnNonFinite('wheelerDeWitt.streamlineDensity', density)
+        return
+      }
+      applyWithReset('streamlineDensity', clamp(Math.round(density), 2, 16))
+    },
     // Render-only: no withReset — solver output is not affected.
     setWdwPhaseRotationEnabled: setPhaseRotationEnabled,
     setWdwPhaseRotationSpeed: setPhaseRotationSpeed,

@@ -66,21 +66,32 @@ export function packWdwDensityGrid(
   // physics). Gate them out at the packer — render as zero density.
   const CLAMP_SOFT = 0.9 * 1e8
 
+  // The render cube is [-R, +R]³ with R = aMax. Reconstruct physical
+  // (a, φ₁, φ₂) from texel normalized coords so texels outside the
+  // solver domain (a ∈ [aMin, aMax], |φ₁|, |φ₂| ≤ phiExtent) stay zero
+  // instead of getting projected onto the nearest solver sample.
+  const { aMin, aMax, phiExtent } = output
+  const aSpan = aMax - aMin
+  const da = aSpan > 0 ? aSpan / (Na - 1) : 0
+  const dphi = phiExtent > 0 ? (2 * phiExtent) / (Nphi - 1) : 0
+  const R = aMax
+
   for (let z = 0; z < N; z++) {
-    // z maps to φ₂
+    // z maps to φ₂ via cube coord physPhi2 = (2·tz - 1)·R
     const tz = (z + 0.5) / N
-    const i2f = tz * (Nphi - 1)
-    const i2 = Math.round(i2f)
+    const physPhi2 = (2 * tz - 1) * R
+    const insideZ = Math.abs(physPhi2) <= phiExtent
+    const i2 = insideZ && dphi > 0 ? Math.round((physPhi2 + phiExtent) / dphi) : -1
     for (let y = 0; y < N; y++) {
-      // y maps to φ₁
       const ty = (y + 0.5) / N
-      const i1f = ty * (Nphi - 1)
-      const i1 = Math.round(i1f)
+      const physPhi1 = (2 * ty - 1) * R
+      const insideY = Math.abs(physPhi1) <= phiExtent
+      const i1 = insideY && dphi > 0 ? Math.round((physPhi1 + phiExtent) / dphi) : -1
       for (let x = 0; x < N; x++) {
-        // x maps to a
         const tx = (x + 0.5) / N
-        const iaF = tx * (Na - 1)
-        const ia = Math.round(iaF)
+        const physA = (2 * tx - 1) * R
+        const insideX = physA >= aMin && physA <= aMax
+        const ia = insideX && da > 0 ? Math.round((physA - aMin) / da) : -1
         const pixelIdx = (z * N + y) * N + x
         if (ia < 0 || ia >= Na || i1 < 0 || i1 >= Nphi || i2 < 0 || i2 >= Nphi) {
           // Uint16Array is zero-initialized — skip writes for out-of-grid

@@ -328,7 +328,6 @@ export function runTdseExecute(
     diagState: pass._diagState,
     obsState: pass._obsState,
     vdState: pass._vdState,
-    dc: pass.dc,
     dispatchCompute: pass.dc,
     dispatchFFTAxis: (c, axisDim, slot) => pass.dispatchFFTAxis(c, axisDim, slot),
   })

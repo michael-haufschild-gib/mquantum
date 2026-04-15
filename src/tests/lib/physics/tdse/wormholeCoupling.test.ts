@@ -36,24 +36,26 @@ function totalNorm2(psi: Float32Array): number {
 }
 
 describe('applyWormholeCoupling — unitarity', () => {
-  it('preserves the ψ norm after 500 successive applications', () => {
-    // 3D lattice with different N per axis exercises the half-space
-    // decomposition on non-square grids.
-    const gridSize = [8, 4, 4] as const
-    const total = gridSize[0] * gridSize[1] * gridSize[2]
-    const psi = makeRandomPsi(total, 12345)
-    const initialNorm = totalNorm2(psi)
-    const dt = 0.01
-    const g = 2.0
-    for (let k = 0; k < 500; k++) {
-      applyWormholeCoupling(psi, gridSize, 0, dt, g)
+  // Runs the norm-preservation check for every supported mirror axis.
+  // Axis 0 lives in a stride-dominant slot while axes 1 and 2 exercise
+  // the generic stride decomposition, so a regression on the non-zero
+  // paths would otherwise slip through.
+  it.each([0, 1, 2] as const)(
+    'preserves the ψ norm after 500 successive applications (axis=%i)',
+    (axis) => {
+      const gridSize = [8, 4, 4] as const
+      const total = gridSize[0] * gridSize[1] * gridSize[2]
+      const psi = makeRandomPsi(total, 12345)
+      const initialNorm = totalNorm2(psi)
+      const dt = 0.01
+      const g = 2.0
+      for (let k = 0; k < 500; k++) {
+        applyWormholeCoupling(psi, gridSize, axis, dt, g)
+      }
+      const finalNorm = totalNorm2(psi)
+      expect(Math.abs(finalNorm - initialNorm)).toBeLessThan(5e-5)
     }
-    const finalNorm = totalNorm2(psi)
-    // Unitary coupling must preserve norm to f32 precision per step; with 500
-    // steps that is at most ~5e-5. A 1e-3 tolerance would hide a missing
-    // cross-term. Tighten to catch subtle non-unitarity.
-    expect(Math.abs(finalNorm - initialNorm)).toBeLessThan(5e-5)
-  })
+  )
 })
 
 describe('applyWormholeCoupling — no coupling preserves L-localized state', () => {

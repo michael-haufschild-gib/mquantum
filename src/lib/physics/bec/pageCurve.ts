@@ -223,8 +223,8 @@ export interface IslandMembershipInputs {
  */
 export function isInsideIsland({ voxelPos, centroid, radius }: IslandMembershipInputs): boolean {
   if (!Number.isFinite(radius) || radius <= 0) return false
-  const n = Math.min(voxelPos.length, centroid.length)
-  if (n === 0) return false
+  if (voxelPos.length === 0 || voxelPos.length !== centroid.length) return false
+  const n = voxelPos.length
   let sq = 0
   for (let i = 0; i < n; i++) {
     const dx = (voxelPos[i] ?? 0) - (centroid[i] ?? 0)
@@ -271,6 +271,7 @@ export function horizonPlaneArea({
   if (!horizonExists) return 0
   const dim = Math.min(gridSize.length, spacing.length)
   if (dim < 2) return 0
+  if (!Number.isInteger(flowAxis) || flowAxis < 0 || flowAxis >= dim) return 0
   let area = 1
   for (let d = 0; d < dim; d++) {
     if (d === flowAxis) continue

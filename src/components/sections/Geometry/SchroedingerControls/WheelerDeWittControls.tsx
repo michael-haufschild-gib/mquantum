@@ -52,6 +52,10 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       <ToggleGroup
         options={BOUNDARY_CONDITION_OPTIONS}
         value={wdw.boundaryCondition}
+        // Cast is safe because BOUNDARY_CONDITION_OPTIONS is a static
+        // tuple of the three valid `WdwBoundaryCondition` values — the
+        // ToggleGroup can only emit one of those, even though the memo
+        // wrapper erases the T generic at the type level.
         onChange={(v) => setWdwBoundaryCondition(v as WdwBoundaryCondition)}
         ariaLabel="Wheeler–DeWitt boundary condition"
         tooltip="Hartle–Hawking: real Euclidean no-boundary proposal. Vilenkin: complex outgoing tunneling wave. DeWitt: χ(0,·)=0 hard node."

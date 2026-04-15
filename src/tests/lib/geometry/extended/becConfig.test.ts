@@ -10,8 +10,9 @@
  *      the uniform writer (TypeScript would still compile because the
  *      writer's record uses `string` keys).
  *   2. Default hawking parameters silently drifting away from the documented
- *      physically-motivated values (v_max=2, L_h=0.6, Δn=0, rate=0.05,
- *      seed=1337) which the preset and UI both rely on.
+ *      physically-motivated values (v_max=3.5, L_h=0.6, Δn=0, rate=0.05,
+ *      seed=1337) which the preset and UI both rely on. The v_max default is
+ *      bumped above c_s0 for the canonical `n0` so `hasHorizon` returns true.
  */
 import { describe, expect, it } from 'vitest'
 

@@ -385,15 +385,7 @@ export interface PostStepResources {
   diagState: DiagReadbackState
   obsState: ObservablesState
   vdState: VortexDetectState
-  dc: EvolutionResources['dc']
-  dispatchCompute: (
-    pe: GPUComputePassEncoder,
-    p: GPUComputePipeline,
-    b: GPUBindGroup[],
-    x: number,
-    y?: number,
-    z?: number
-  ) => void
+  dispatchCompute: EvolutionResources['dc']
   dispatchFFTAxis: EvolutionResources['dispatchFFTAxis']
 }
 
@@ -412,7 +404,7 @@ export function runPostStepDispatches(
   frameState: DiagFrameState,
   res: PostStepResources
 ): void {
-  const { pl, bg, dc } = res
+  const { pl, bg, dispatchCompute: dc } = res
 
   // Write density grid
   const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)

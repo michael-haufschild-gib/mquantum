@@ -741,6 +741,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 export function createDefaultSchroedingerConfig(): SchroedingerConfig {
   return {
     ...DEFAULT_SCHROEDINGER_CONFIG,
+    wheelerDeWitt: { ...DEFAULT_SCHROEDINGER_CONFIG.wheelerDeWitt },
     basisX: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisX),
     basisY: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisY),
     basisZ: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisZ),

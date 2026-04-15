@@ -155,6 +155,7 @@ describe('WKB streamlines', () => {
 
       // Pick the longest trajectory so start and end cells are well separated,
       // giving the test unambiguous peaks to compare.
+      expect(trajectories.length).toBeGreaterThan(0)
       let best = trajectories[0]!
       for (const t of trajectories) if (t.points.length > best.points.length) best = t
       expect(best.points.length).toBeGreaterThan(4)
