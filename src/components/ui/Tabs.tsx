@@ -135,7 +135,7 @@ const TabButton = React.memo(
         ${variant === 'pills' && !isActive && !isDisabled ? 'hover:bg-[var(--bg-hover)] rounded' : ''}
         ${isPending && !isActive && !isDisabled ? 'opacity-50' : ''}
       `}
-        data-testid={testId ? `${testId}-tab-${tab.id}` : undefined}
+        data-testid={testId ? `${testId}-tab-${tab.id}` : `tab-${tab.id}`}
       >
         {isActive && variant !== 'pills' && (
           <m.div
