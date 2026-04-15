@@ -15,6 +15,7 @@ dist-ssr
 # Claude Code
 .claude/scheduled_tasks.lock
 .claude/commands/
+.claude/worktrees/
 claude.sh
 claude-mcp.sh
 
