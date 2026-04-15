@@ -41,6 +41,7 @@
  */
 
 import { computeBianchiKasnerCoefs } from './bianchiKasner'
+import { evaluateLqcBounceCoefs, getOrComputeLqcBounceTable } from './lqcBounce'
 import type { CosmologyPreset, CosmologyPresetParams } from './presets'
 import { qExponent, sCritical } from './presets'
 
@@ -273,10 +274,7 @@ export interface CosmologySnapshot extends CosmologyCoefs {
  * @returns `{ a, hubble, aKinetic, aPotential, aFull }`
  * @throws {RangeError} If `eta === 0` for a non-Minkowski preset
  */
-export function computeCosmologyAt(
-  eta: number,
-  params: CosmologyPresetParams
-): CosmologySnapshot {
+export function computeCosmologyAt(eta: number, params: CosmologyPresetParams): CosmologySnapshot {
   if (params.preset === 'minkowski') {
     return {
       a: 1,
@@ -284,6 +282,55 @@ export function computeCosmologyAt(
       aKinetic: 1,
       aPotential: 1,
       aFull: 1,
+      aPotentialRatio1: 1,
+      aPotentialRatio2: 1,
+    }
+  }
+
+  if (params.preset === 'lqcBounce') {
+    const rhoC = params.lqcRhoCritical
+    const w = params.lqcEquationOfState
+    const r0 = params.lqcInitialRhoRatio
+    if (
+      typeof rhoC !== 'number' ||
+      !Number.isFinite(rhoC) ||
+      rhoC <= 0 ||
+      typeof w !== 'number' ||
+      !Number.isFinite(w) ||
+      w < 0 ||
+      w > 1 ||
+      typeof r0 !== 'number' ||
+      !Number.isFinite(r0) ||
+      r0 <= 0 ||
+      r0 >= 1
+    ) {
+      throw new RangeError(
+        `computeCosmologyAt: lqcBounce preset requires lqcRhoCritical > 0, ` +
+          `lqcEquationOfState in [0, 1], lqcInitialRhoRatio in (0, 1); got ` +
+          `(${rhoC}, ${w}, ${r0})`
+      )
+    }
+    if (!Number.isFinite(eta) || eta <= 0) {
+      throw new RangeError(
+        `computeCosmologyAt: lqcBounce preset requires eta > 0 (positive-η gauge), got ${eta}`
+      )
+    }
+    const table = getOrComputeLqcBounceTable({
+      spacetimeDim: params.spacetimeDim,
+      rhoCritical: rhoC,
+      equationOfState: w,
+      initialRhoRatio: r0,
+    })
+    const c = evaluateLqcBounceCoefs(table, eta, params.spacetimeDim)
+    // Conformal Hubble rate ℋ = a'/a; undefined when a = 0 (never reached
+    // at the bounce under LQC — a_B = 1 by construction).
+    const hubble = c.a > 0 ? c.aPrime / c.a : 0
+    return {
+      a: c.a,
+      hubble,
+      aKinetic: c.A,
+      aPotential: c.B,
+      aFull: c.B_full,
       aPotentialRatio1: 1,
       aPotentialRatio2: 1,
     }
@@ -360,10 +407,7 @@ export function computeCosmologyAt(
  * @param params - Preset parameters
  * @returns `{ aKinetic, aPotential, aFull }`
  */
-export function computeCosmologyCoefs(
-  eta: number,
-  params: CosmologyPresetParams
-): CosmologyCoefs {
+export function computeCosmologyCoefs(eta: number, params: CosmologyPresetParams): CosmologyCoefs {
   if (params.preset === 'minkowski') {
     return { aKinetic: 1, aPotential: 1, aFull: 1, aPotentialRatio1: 1, aPotentialRatio2: 1 }
   }

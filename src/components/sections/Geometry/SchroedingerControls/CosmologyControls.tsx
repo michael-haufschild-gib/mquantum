@@ -54,6 +54,9 @@ export interface CosmologyControlsProps {
     | 'setCosmologyHubble'
     | 'setCosmologyEta0'
     | 'setCosmologyBianchiExponents'
+    | 'setCosmologyLqcRhoCritical'
+    | 'setCosmologyLqcEquationOfState'
+    | 'setCosmologyLqcInitialRhoRatio'
   >
 }
 
@@ -64,6 +67,7 @@ const PRESET_LABELS: Record<CosmologyPreset, string> = {
   ekpyrotic: 'Ekpyrotic (paper)',
   kasner: 'Kasner (stiff FLRW)',
   bianchiKasner: 'Bianchi-I (vacuum Kasner)',
+  lqcBounce: 'LQC Bounce (polymer Friedmann)',
 }
 
 /**
@@ -80,7 +84,7 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
 
     const presetOptions = useMemo(
       () =>
-        (['minkowski', 'deSitter', 'ekpyrotic', 'kasner', 'bianchiKasner'] as const)
+        (['minkowski', 'deSitter', 'ekpyrotic', 'kasner', 'bianchiKasner', 'lqcBounce'] as const)
           .filter((p) => (p === 'bianchiKasner' ? latticeDim >= 3 : true))
           .map((p) => ({
             value: p,
@@ -111,6 +115,9 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
         steepness: cosmology.steepness,
         hubble: cosmology.hubble,
         kasnerExponents: cosmology.kasnerExponents,
+        lqcRhoCritical: cosmology.lqcRhoCritical,
+        lqcEquationOfState: cosmology.lqcEquationOfState,
+        lqcInitialRhoRatio: cosmology.lqcInitialRhoRatio,
       }
       if (!isValidPreset(params)) return undefined
       try {
@@ -123,6 +130,9 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
       cosmology.steepness,
       cosmology.hubble,
       cosmology.kasnerExponents,
+      cosmology.lqcRhoCritical,
+      cosmology.lqcEquationOfState,
+      cosmology.lqcInitialRhoRatio,
       spacetimeDim,
       gridSize,
       spacing,
@@ -234,11 +244,61 @@ export const CosmologyControls: React.FC<CosmologyControlsProps> = React.memo(
               />
             )}
 
+            {cosmology.preset === 'lqcBounce' && (
+              <>
+                <Slider
+                  label="ρ_c (critical density)"
+                  tooltip="LQC critical density at which the Hubble rate vanishes and the contracting phase turns into expansion. Units match the sim; increase to push the bounce to higher densities."
+                  min={0.1}
+                  max={10}
+                  step={0.01}
+                  value={cosmology.lqcRhoCritical ?? 1.0}
+                  onChange={actions.setCosmologyLqcRhoCritical}
+                  showValue
+                  data-testid="cosmology-lqc-rhoc-slider"
+                />
+                <Slider
+                  label="w (equation of state)"
+                  tooltip="Matter equation of state p = w·ρ. w = 1 is the stiff-fluid default (massless scalar in its kinetic-dominated regime); w = 0 is dust-like."
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={cosmology.lqcEquationOfState ?? 1.0}
+                  onChange={actions.setCosmologyLqcEquationOfState}
+                  showValue
+                  data-testid="cosmology-lqc-w-slider"
+                />
+                <Slider
+                  label="ρ/ρ_c (start ratio)"
+                  tooltip="Starting density ratio ρ/ρ_c at the pre-bounce window edge. Smaller values push the starting point further from the bounce into the Kasner asymptote."
+                  min={0.001}
+                  max={0.999}
+                  step={0.001}
+                  value={cosmology.lqcInitialRhoRatio ?? 0.01}
+                  onChange={actions.setCosmologyLqcInitialRhoRatio}
+                  showValue
+                  data-testid="cosmology-lqc-rhostart-slider"
+                />
+              </>
+            )}
+
             <Slider
               label="η₀ (initial)"
-              tooltip="Initial conformal time. Isotropic FLRW presets use η < 0 (deep past). Bianchi-I Kasner uses η > 0 (conformal time increases away from the singularity). Runtime floor |η| ≥ 1e-3 prevents singularity crossing."
-              min={cosmology.preset === 'bianchiKasner' ? 0.01 : -200}
-              max={cosmology.preset === 'bianchiKasner' ? 200 : -0.01}
+              tooltip="Initial conformal time. Isotropic FLRW presets use η < 0 (deep past). Bianchi-I Kasner and LQC Bounce use η > 0 (conformal time increases monotonically through the bounce). Runtime floor |η| ≥ 1e-3 prevents singularity crossing."
+              min={
+                cosmology.preset === 'bianchiKasner'
+                  ? 0.01
+                  : cosmology.preset === 'lqcBounce'
+                    ? 1
+                    : -200
+              }
+              max={
+                cosmology.preset === 'bianchiKasner'
+                  ? 200
+                  : cosmology.preset === 'lqcBounce'
+                    ? 19
+                    : -0.01
+              }
               step={0.01}
               value={cosmology.eta0}
               onChange={actions.setCosmologyEta0}

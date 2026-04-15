@@ -104,6 +104,9 @@ export function initializeFsfField(
             steepness: config.cosmology.steepness,
             hubble: config.cosmology.hubble,
             kasnerExponents: config.cosmology.kasnerExponents,
+            lqcRhoCritical: config.cosmology.lqcRhoCritical,
+            lqcEquationOfState: config.cosmology.lqcEquationOfState,
+            lqcInitialRhoRatio: config.cosmology.lqcInitialRhoRatio,
           },
           ic.simEta,
           config.vacuumSeed

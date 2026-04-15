@@ -41,7 +41,14 @@ type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
 
-const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = ['minkowski', 'deSitter', 'ekpyrotic', 'kasner']
+const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = [
+  'minkowski',
+  'deSitter',
+  'ekpyrotic',
+  'kasner',
+  'bianchiKasner',
+  'lqcBounce',
+]
 
 const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'free',
@@ -169,6 +176,12 @@ export interface ShareableObjectState {
   cosmologyHubble?: number
   /** Initial conformal time `η₀` (strictly non-zero) */
   cosmologyEta0?: number
+  /** LQC critical density `ρ_c > 0` (only consulted under `lqcBounce`). */
+  cosmologyLqcRhoCritical?: number
+  /** LQC matter equation of state `w ∈ [0, 1]`. */
+  cosmologyLqcEquationOfState?: number
+  /** LQC starting `ρ/ρ_c` ratio in `(0, 1)`. */
+  cosmologyLqcInitialRhoRatio?: number
 
   // ── Wheeler–DeWitt Minisuperspace ───────────────────────────────────────
   /** Wheeler–DeWitt boundary condition proposal */
@@ -288,6 +301,10 @@ function serializeCosmology(params: URLSearchParams, state: ShareableObjectState
     setFloatParam(params, 'cos_s', state.cosmologySteepness, true, 4)
   } else if (state.cosmologyPreset === 'deSitter') {
     setFloatParam(params, 'cos_h', state.cosmologyHubble, true)
+  } else if (state.cosmologyPreset === 'lqcBounce') {
+    setFloatParam(params, 'cos_rhoc', state.cosmologyLqcRhoCritical, true, 4)
+    setFloatParam(params, 'cos_w', state.cosmologyLqcEquationOfState, true, 4)
+    setFloatParam(params, 'cos_rhostart', state.cosmologyLqcInitialRhoRatio, true, 4)
   }
   setFloatParam(params, 'cos_eta0', state.cosmologyEta0, true)
 }
@@ -421,7 +438,15 @@ function resolveCosmologyPresetParams(
   params: URLSearchParams,
   preset: CosmologyPreset,
   spacetimeDim: number
-): { steepness?: number; hubble?: number } | undefined {
+):
+  | {
+      steepness?: number
+      hubble?: number
+      lqcRhoCritical?: number
+      lqcEquationOfState?: number
+      lqcInitialRhoRatio?: number
+    }
+  | undefined {
   if (preset === 'ekpyrotic') {
     const raw = parseFloatParam(params, 'cos_s', 0, 100)
     if (raw === undefined) return undefined
@@ -435,6 +460,21 @@ function resolveCosmologyPresetParams(
     const hubble = parseFloatParam(params, 'cos_h', 0.01, 100)
     if (hubble === undefined) return undefined
     return { hubble }
+  }
+  if (preset === 'lqcBounce') {
+    // LQC bounce: cos_rhoc is required (sets the scale of the bounce).
+    // cos_w and cos_rhostart are optional and fall back to defaults
+    // (1.0, 0.01). Reject the whole block only if the required cos_rhoc
+    // is missing or out of range.
+    const rhoC = parseFloatParam(params, 'cos_rhoc', 0.1, 10)
+    if (rhoC === undefined) return undefined
+    const wRaw = parseFloatParam(params, 'cos_w', 0, 1)
+    const rhoStartRaw = parseFloatParam(params, 'cos_rhostart', 0.001, 0.999)
+    return {
+      lqcRhoCritical: rhoC,
+      lqcEquationOfState: wRaw ?? 1.0,
+      lqcInitialRhoRatio: rhoStartRaw ?? 0.01,
+    }
   }
   return {}
 }
@@ -475,6 +515,15 @@ function deserializeCosmologyParams(params: URLSearchParams, state: ParsedSharea
   state.cosmologyPreset = preset
   if (presetParams.steepness !== undefined) state.cosmologySteepness = presetParams.steepness
   if (presetParams.hubble !== undefined) state.cosmologyHubble = presetParams.hubble
+  if (presetParams.lqcRhoCritical !== undefined) {
+    state.cosmologyLqcRhoCritical = presetParams.lqcRhoCritical
+  }
+  if (presetParams.lqcEquationOfState !== undefined) {
+    state.cosmologyLqcEquationOfState = presetParams.lqcEquationOfState
+  }
+  if (presetParams.lqcInitialRhoRatio !== undefined) {
+    state.cosmologyLqcInitialRhoRatio = presetParams.lqcInitialRhoRatio
+  }
   state.cosmologyEta0 = eta0
 }
 

@@ -274,6 +274,21 @@ export interface SchroedingerSliceActions {
    * it. Non-finite inputs are rejected with a dev warning.
    */
   setFreeScalarCosmologyBianchiExponents: (p1: number, p2: number, p3: number) => void
+  /**
+   * Set the LQC critical density `ρ_c > 0` (clamped to `[0.1, 10]`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcRhoCritical: (rhoCritical: number) => void
+  /**
+   * Set the LQC matter equation-of-state `w ∈ [0, 1]`. Only consulted
+   * when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcEquationOfState: (w: number) => void
+  /**
+   * Set the LQC starting `ρ/ρ_c` ratio (clamped to `(0, 1)`). Only
+   * consulted when `cosmology.preset === 'lqcBounce'`.
+   */
+  setFreeScalarCosmologyLqcInitialRhoRatio: (ratio: number) => void
 
   // Parametric Resonance / Preheating
   setFreeScalarPreheatingEnabled: (enabled: boolean) => void

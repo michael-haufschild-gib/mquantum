@@ -76,6 +76,9 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
     steepness: fs.cosmology.steepness,
     hubble: fs.cosmology.hubble,
     kasnerExponents: fs.cosmology.kasnerExponents,
+    lqcRhoCritical: fs.cosmology.lqcRhoCritical,
+    lqcEquationOfState: fs.cosmology.lqcEquationOfState,
+    lqcInitialRhoRatio: fs.cosmology.lqcInitialRhoRatio,
   }
   // Invalid preset combo (e.g. ekpyrotic with steepness ≤ s_c after a lattice
   // bump pushed s_c past the current value, or de Sitter with non-positive
@@ -100,7 +103,7 @@ export function reconcileCosmologyInvariants(fs: FreeScalarConfig): Partial<Free
   // Bianchi-I does not use the isotropic safe-η₀ heuristic — the runtime
   // COSMOLOGY_ETA_FLOOR is the only guard needed. Matches the bypass in
   // resolveEta0ForPresetSwitch and setFreeScalarCosmologyEnabled.
-  if (fs.cosmology.preset !== 'bianchiKasner') {
+  if (fs.cosmology.preset !== 'bianchiKasner' && fs.cosmology.preset !== 'lqcBounce') {
     try {
       const result = clampEta0(fs.cosmology.eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
       if (result.clamped) {
@@ -149,6 +152,9 @@ function resolveEta0ForPresetSwitch(
     steepness: number
     hubble: number
     kasnerExponents: NonNullable<FreeScalarConfig['cosmology']['kasnerExponents']>
+    lqcRhoCritical: number
+    lqcEquationOfState: number
+    lqcInitialRhoRatio: number
     eta0: number
     enabled: boolean
   }
@@ -161,6 +167,9 @@ function resolveEta0ForPresetSwitch(
     steepness: staged.steepness,
     hubble: staged.hubble,
     kasnerExponents: staged.kasnerExponents,
+    lqcRhoCritical: staged.lqcRhoCritical,
+    lqcEquationOfState: staged.lqcEquationOfState,
+    lqcInitialRhoRatio: staged.lqcInitialRhoRatio,
   }
   if (!isValidPreset(params)) {
     logger.warn(
@@ -170,9 +179,10 @@ function resolveEta0ForPresetSwitch(
     )
     return { eta0, enabled: false }
   }
-  if (preset === 'bianchiKasner') {
-    // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
-    // runtime COSMOLOGY_ETA_FLOOR is the only guard needed.
+  if (preset === 'bianchiKasner' || preset === 'lqcBounce') {
+    // Bianchi-I and LQC bounce do not use the isotropic safe-η₀
+    // heuristic — the runtime COSMOLOGY_ETA_FLOOR is the only guard
+    // needed, and both use the η > 0 gauge.
     return { eta0, enabled }
   }
   try {
@@ -207,8 +217,18 @@ function resolvePresetSwitchSubstate(
 } {
   const kasnerExponents = fs.cosmology.kasnerExponents ?? { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
   let eta0 = fs.cosmology.eta0
-  if (preset === 'bianchiKasner' && eta0 < 0) eta0 = -eta0
-  if (preset !== 'bianchiKasner' && eta0 > 0) eta0 = -eta0
+  const positiveEta = preset === 'bianchiKasner' || preset === 'lqcBounce'
+  if (positiveEta && eta0 < 0) eta0 = -eta0
+  if (!positiveEta && eta0 > 0) eta0 = -eta0
+  // LQC bounce lives on a bounded η-window centred on `etaBounceAnchor = 10`
+  // by default. If the user's previous η₀ was huge (e.g. −200 from the
+  // FLRW slider), after the flip it lands outside the LQC table's range
+  // and evaluateLqcBounceCoefs would clamp. Snap into the table window
+  // so the starting frame is physically meaningful.
+  if (preset === 'lqcBounce') {
+    if (eta0 < 1) eta0 = 1
+    if (eta0 > 19) eta0 = 19
+  }
   return { eta0, kasnerExponents }
 }
 
@@ -220,6 +240,9 @@ type CosmologyActions = Pick<
   | 'setFreeScalarCosmologyHubble'
   | 'setFreeScalarCosmologyEta0'
   | 'setFreeScalarCosmologyBianchiExponents'
+  | 'setFreeScalarCosmologyLqcRhoCritical'
+  | 'setFreeScalarCosmologyLqcEquationOfState'
+  | 'setFreeScalarCosmologyLqcInitialRhoRatio'
 >
 
 /**
@@ -251,6 +274,9 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
             steepness: fs.cosmology.steepness,
             hubble: fs.cosmology.hubble,
             kasnerExponents: fs.cosmology.kasnerExponents,
+            lqcRhoCritical: fs.cosmology.lqcRhoCritical,
+            lqcEquationOfState: fs.cosmology.lqcEquationOfState,
+            lqcInitialRhoRatio: fs.cosmology.lqcInitialRhoRatio,
           }
           if (!isValidPreset(params)) {
             logger.warn(
@@ -259,10 +285,14 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
                 `hubble=${fs.cosmology.hubble}, spacetimeDim=${fs.latticeDim + 1}).`
             )
             nextEnabled = false
-          } else if (fs.cosmology.preset === 'bianchiKasner') {
-            // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
-            // runtime COSMOLOGY_ETA_FLOOR is the only guard needed. Matches
-            // the bypass in resolveEta0ForPresetSwitch.
+          } else if (
+            fs.cosmology.preset === 'bianchiKasner' ||
+            fs.cosmology.preset === 'lqcBounce'
+          ) {
+            // Bianchi-I and LQC bounce do not use the isotropic safe-η₀
+            // heuristic — the runtime COSMOLOGY_ETA_FLOOR is the only
+            // guard needed, and both use the η > 0 gauge. Matches the
+            // bypass in resolveEta0ForPresetSwitch.
           } else {
             try {
               const clamped = clampEta0(eta0, params, fs.gridSize, fs.spacing, fs.latticeDim)
@@ -312,6 +342,9 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           steepness,
           hubble: fs.cosmology.hubble,
           kasnerExponents,
+          lqcRhoCritical: fs.cosmology.lqcRhoCritical ?? 1.0,
+          lqcEquationOfState: fs.cosmology.lqcEquationOfState ?? 1.0,
+          lqcInitialRhoRatio: fs.cosmology.lqcInitialRhoRatio ?? 0.01,
           eta0: presetEta0,
           enabled: fs.cosmology.enabled,
         })
@@ -477,9 +510,12 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
           steepness: fs.cosmology.steepness,
           hubble: fs.cosmology.hubble,
           kasnerExponents: fs.cosmology.kasnerExponents,
+          lqcRhoCritical: fs.cosmology.lqcRhoCritical,
+          lqcEquationOfState: fs.cosmology.lqcEquationOfState,
+          lqcInitialRhoRatio: fs.cosmology.lqcInitialRhoRatio,
         }
         if (isValidPreset(params)) {
-          if (fs.cosmology.preset === 'bianchiKasner') {
+          if (fs.cosmology.preset === 'bianchiKasner' || fs.cosmology.preset === 'lqcBounce') {
             // Bianchi-I does not use the isotropic safe-η₀ heuristic — the
             // runtime COSMOLOGY_ETA_FLOOR is the only guard needed.
             clampedEta0 = eta0
@@ -506,6 +542,71 @@ export function createFreeScalarCosmologySetters(ctx: SetterContext): CosmologyA
               ...fs,
               cosmology: { ...fs.cosmology, eta0: clampedEta0 },
               needsReset: true,
+            },
+          },
+        }
+      })
+    },
+    setFreeScalarCosmologyLqcRhoCritical: (rhoC) => {
+      if (!isFinite(rhoC)) {
+        warnNonFinite('freeScalar.cosmology.lqcRhoCritical', rhoC)
+        return
+      }
+      // Clamp matches the UI slider range. Keeps `isValidPreset` happy and
+      // prevents the RK4 integrator from running at a near-zero critical
+      // density where ρ_c·a^(2(n−1)) scales destabilise.
+      const clamped = Math.max(0.1, Math.min(10, rhoC))
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              cosmology: { ...fs.cosmology, lqcRhoCritical: clamped },
+              needsReset: fs.cosmology.preset === 'lqcBounce' || fs.needsReset,
+            },
+          },
+        }
+      })
+    },
+    setFreeScalarCosmologyLqcEquationOfState: (w) => {
+      if (!isFinite(w)) {
+        warnNonFinite('freeScalar.cosmology.lqcEquationOfState', w)
+        return
+      }
+      const clamped = Math.max(0, Math.min(1, w))
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              cosmology: { ...fs.cosmology, lqcEquationOfState: clamped },
+              needsReset: fs.cosmology.preset === 'lqcBounce' || fs.needsReset,
+            },
+          },
+        }
+      })
+    },
+    setFreeScalarCosmologyLqcInitialRhoRatio: (r) => {
+      if (!isFinite(r)) {
+        warnNonFinite('freeScalar.cosmology.lqcInitialRhoRatio', r)
+        return
+      }
+      // Strict (0, 1) — the inner clamp uses a finite safety epsilon so
+      // `isValidPreset` validation never rejects a slider endpoint.
+      const clamped = Math.max(0.001, Math.min(0.999, r))
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: {
+              ...fs,
+              cosmology: { ...fs.cosmology, lqcInitialRhoRatio: clamped },
+              needsReset: fs.cosmology.preset === 'lqcBounce' || fs.needsReset,
             },
           },
         }

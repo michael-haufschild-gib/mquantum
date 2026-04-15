@@ -121,6 +121,15 @@ function applyCosmologyParams(
   if (urlState.cosmologyHubble !== undefined) {
     ext.setFreeScalarCosmologyHubble(urlState.cosmologyHubble)
   }
+  if (urlState.cosmologyLqcRhoCritical !== undefined) {
+    ext.setFreeScalarCosmologyLqcRhoCritical(urlState.cosmologyLqcRhoCritical)
+  }
+  if (urlState.cosmologyLqcEquationOfState !== undefined) {
+    ext.setFreeScalarCosmologyLqcEquationOfState(urlState.cosmologyLqcEquationOfState)
+  }
+  if (urlState.cosmologyLqcInitialRhoRatio !== undefined) {
+    ext.setFreeScalarCosmologyLqcInitialRhoRatio(urlState.cosmologyLqcInitialRhoRatio)
+  }
   if (urlState.cosmologyEta0 !== undefined) {
     ext.setFreeScalarCosmologyEta0(urlState.cosmologyEta0)
   }

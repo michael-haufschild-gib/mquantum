@@ -272,6 +272,9 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
                 spacetimeDim: latticeDim + 1,
                 hubble: fsf.cosmology.hubble,
                 steepness: fsf.cosmology.steepness,
+                lqcRhoCritical: fsf.cosmology.lqcRhoCritical,
+                lqcEquationOfState: fsf.cosmology.lqcEquationOfState,
+                lqcInitialRhoRatio: fsf.cosmology.lqcInitialRhoRatio,
               },
               etaSweep: buildCosmoEtaSweep(cosmologyEta0),
             }
