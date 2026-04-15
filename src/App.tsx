@@ -12,6 +12,7 @@ import React, { Suspense, useCallback, useMemo, useState } from 'react'
 import { QuantumCarpetPanel } from '@/components/canvas/QuantumCarpetPanel'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
+import { HawkingPageCurvePanel } from '@/components/overlays/HawkingPageCurvePanel'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
 
@@ -258,6 +259,9 @@ function AppContent() {
 
         {/* Quantum Carpet Panel */}
         <QuantumCarpetPanel />
+
+        {/* Analog Hawking Page Curve Panel (gated by pageCurveHudEnabled) */}
+        <HawkingPageCurvePanel />
 
         {/* Screenshot Preview Modal */}
         <Suspense fallback={null}>
