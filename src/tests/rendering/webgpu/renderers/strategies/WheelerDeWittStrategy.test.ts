@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import {
   computeWdwConfigHash,
+  computeWdwTrajectoryHash,
   WheelerDeWittStrategy,
 } from '@/rendering/webgpu/renderers/strategies/WheelerDeWittStrategy'
 import { mockWebGPU } from '@/tests/__mocks__/webgpu'
@@ -49,18 +50,43 @@ describe('computeWdwConfigHash', () => {
     expect(computeWdwConfigHash({ ...base, gridNa: base.gridNa + 8 })).not.toBe(baseHash)
   })
 
-  it('hashes differently when display-only streamline fields change', () => {
-    // These are in the hash today (solver-level caching for trajectory reuse) —
-    // documented behavior; captured here so a future change that folds them into
-    // the render-only bucket is an explicit decision, not an accidental drop.
+  it('hashes identically when display-only streamline fields change', () => {
+    // Display-only streamline controls (`streamlinesEnabled`,
+    // `streamlineDensity`) drive WKB trajectory integration only — the
+    // Wheeler–DeWitt solve is unaffected. Including them in the SOLVER hash
+    // would force the ~10-15 ms CPU solve on every overlay toggle. A separate
+    // trajectory hash (see `computeWdwTrajectoryHash` test below) invalidates
+    // the cached trajectories instead.
     const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG }
     const baseHash = computeWdwConfigHash(base)
+    expect(computeWdwConfigHash({ ...base, streamlinesEnabled: !base.streamlinesEnabled })).toBe(
+      baseHash
+    )
+    expect(computeWdwConfigHash({ ...base, streamlineDensity: base.streamlineDensity + 1 })).toBe(
+      baseHash
+    )
+  })
+})
+
+describe('computeWdwTrajectoryHash', () => {
+  it('changes when display-only streamline fields change', () => {
+    const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG }
+    const baseHash = computeWdwTrajectoryHash(base)
     expect(
-      computeWdwConfigHash({ ...base, streamlinesEnabled: !base.streamlinesEnabled })
+      computeWdwTrajectoryHash({ ...base, streamlinesEnabled: !base.streamlinesEnabled })
     ).not.toBe(baseHash)
     expect(
-      computeWdwConfigHash({ ...base, streamlineDensity: base.streamlineDensity + 1 })
+      computeWdwTrajectoryHash({ ...base, streamlineDensity: base.streamlineDensity + 1 })
     ).not.toBe(baseHash)
+  })
+
+  it('is invariant to physics changes (solver hash owns those)', () => {
+    const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG }
+    const baseHash = computeWdwTrajectoryHash(base)
+    expect(computeWdwTrajectoryHash({ ...base, inflatonMass: base.inflatonMass + 0.1 })).toBe(
+      baseHash
+    )
+    expect(computeWdwTrajectoryHash({ ...base, gridNa: base.gridNa + 8 })).toBe(baseHash)
   })
 })
 

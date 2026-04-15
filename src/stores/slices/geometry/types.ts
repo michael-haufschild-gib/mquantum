@@ -472,6 +472,9 @@ export interface SchroedingerSliceActions {
   ) => void
   setWdwInflatonMass: (m: number) => void
   setWdwCosmologicalConstant: (lambda: number) => void
+  setWdwGridSize: (
+    preset: import('@/stores/slices/geometry/setters/wheelerDeWittSetters').WdwGridPreset
+  ) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
   setWdwPhaseRotationEnabled: (enabled: boolean) => void

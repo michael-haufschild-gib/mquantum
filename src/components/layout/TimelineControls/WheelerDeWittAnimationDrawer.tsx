@@ -25,16 +25,16 @@ import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 import { DrawerSection } from './DrawerSection'
 
 /**
- * Color algorithms whose output depends on the phase channel. Enabling phase
- * rotation while the active algorithm is outside this set produces no visible
- * change — so we auto-switch to a phase-sensitive palette on toggle-on.
+ * Color algorithms whose output depends on the spatial-phase channel (B).
+ * Wheeler–DeWitt phase rotation only modulates B; `relativePhase` reads A and
+ * is unaffected by rotation, so it is intentionally absent from this set —
+ * toggling rotation while on it would be a silent no-op.
  */
 const PHASE_SENSITIVE_COLOR_ALGORITHMS = new Set([
   'phase',
   'phaseCyclicUniform',
   'phaseDiverging',
   'phaseDensity',
-  'relativePhase',
   'domainColoringPsi',
 ])
 

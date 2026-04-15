@@ -92,6 +92,48 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     })
   })
 
+  describe('setWdwStreamlinesEnabled — display-only, no solver re-run', () => {
+    it('writes the toggle without flipping needsReset', () => {
+      const initial = getWdw().streamlinesEnabled
+      useExtendedObjectStore.getState().setWdwStreamlinesEnabled(!initial)
+      expect(getWdw().streamlinesEnabled).toBe(!initial)
+      expect(getWdw().needsReset).toBe(false)
+    })
+  })
+
+  describe('setWdwStreamlineDensity — display-only, no solver re-run', () => {
+    it('clamps to [2, 16], rounds to int, and does not flip needsReset', () => {
+      useExtendedObjectStore.getState().setWdwStreamlineDensity(7.4)
+      expect(getWdw().streamlineDensity).toBe(7)
+      expect(getWdw().needsReset).toBe(false)
+
+      useExtendedObjectStore.getState().setWdwStreamlineDensity(99)
+      expect(getWdw().streamlineDensity).toBe(16)
+      expect(getWdw().needsReset).toBe(false)
+
+      useExtendedObjectStore.getState().setWdwStreamlineDensity(0)
+      expect(getWdw().streamlineDensity).toBe(2)
+      expect(getWdw().needsReset).toBe(false)
+    })
+  })
+
+  describe('setWdwGridSize — preset-driven physics setter', () => {
+    it('applies the Low preset and flips needsReset', () => {
+      useExtendedObjectStore.getState().setWdwGridSize('low')
+      const wdw = getWdw()
+      expect(wdw.gridNa).toBe(64)
+      expect(wdw.gridNphi).toBe(16)
+      expect(wdw.needsReset).toBe(true)
+    })
+
+    it('applies the High preset', () => {
+      useExtendedObjectStore.getState().setWdwGridSize('high')
+      const wdw = getWdw()
+      expect(wdw.gridNa).toBe(192)
+      expect(wdw.gridNphi).toBe(32)
+    })
+  })
+
   describe('contrast: existing physics setters still flip needsReset', () => {
     it('setWdwInflatonMass (physics) flips needsReset — regression guard for the withReset split', () => {
       useExtendedObjectStore.getState().setWdwInflatonMass(0.5)
