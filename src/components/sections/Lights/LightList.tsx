@@ -18,6 +18,9 @@ import { type LightingSlice, useLightingStore } from '@/stores/lightingStore'
 
 import { AMBIENT_LIGHT_ID, LightListItem } from './LightListItem'
 
+/** Stable no-op — ambient light cannot be removed. */
+const noop = () => {}
+
 /** Props for the light source list with add/remove support. */
 export interface LightListProps {
   className?: string
@@ -85,10 +88,6 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({ cla
     selectLight(AMBIENT_LIGHT_ID)
   }, [selectLight])
 
-  const handleAmbientRemove = () => {
-    // No-op, ambient can't be removed
-  }
-
   const canAddLight = lights.length < MAX_LIGHTS
 
   const handleAddLight = useCallback(
@@ -116,7 +115,7 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({ cla
           isSelected={isAmbientSelected}
           onSelect={handleAmbientSelect}
           onToggle={handleAmbientToggle}
-          onRemove={handleAmbientRemove}
+          onRemove={noop}
           isDeleteDisabled={true}
         />
 

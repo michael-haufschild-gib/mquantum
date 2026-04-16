@@ -359,20 +359,6 @@ export function createTdseUiSetters(ctx: SetterContext) {
         },
       }))
     },
-    /**
-     * Set the spatial metric for the TDSE kinetic operator. A change of
-     * `kind` or any kind-relevant parameter invalidates the running
-     * wavefunction (the Laplace–Beltrami operator it was propagated under
-     * no longer matches), so this setter flips `needsReset`. An idempotent
-     * write — identical normalized config — is a no-op that leaves
-     * `needsReset` untouched so harmless UI round-trips don't kick the
-     * simulation.
-     *
-     * Each kind only retains its relevant fields; mismatched fields are
-     * silently stripped to keep the stored config small and semantically
-     * clean. Invalid / non-finite numeric params are clamped to the
-     * matching bound and a dev-mode warning is emitted.
-     */
     /** Toggle the Ricci-scalar curvature overlay. Pure render flag. */
     setShowCurvatureOverlay: nestedValueSetter(ctx, D, 'showCurvatureOverlay') as (
       enabled: boolean
@@ -388,6 +374,20 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * Clamp the Wave 6 overlay opacity into `[0, 1]`. Render-only.
      */
     setCurvatureOverlayOpacity: nestedClampedSetter(ctx, D, 'curvatureOverlayOpacity', 0, 1),
+    /**
+     * Set the spatial metric for the TDSE kinetic operator. A change of
+     * `kind` or any kind-relevant parameter invalidates the running
+     * wavefunction (the Laplace-Beltrami operator it was propagated under
+     * no longer matches), so this setter flips `needsReset`. An idempotent
+     * write — identical normalized config — is a no-op that leaves
+     * `needsReset` untouched so harmless UI round-trips don't kick the
+     * simulation.
+     *
+     * Each kind only retains its relevant fields; mismatched fields are
+     * silently stripped to keep the stored config small and semantically
+     * clean. Invalid / non-finite numeric params are clamped to the
+     * matching bound and a dev-mode warning is emitted.
+     */
     setTdseMetric: (cfg: MetricConfig) => {
       ctx.setWithVersion((state) => {
         const prev: MetricConfig = state.schroedinger.tdse.metric ?? DEFAULT_METRIC_CONFIG

@@ -170,4 +170,54 @@ describe('BEC setters', () => {
       })
     })
   })
+
+  describe('disorder overlay (cross-mode port from TDSE)', () => {
+    it('defaults to strength=0, seed=42, uniform distribution', () => {
+      const bec = getBec()
+      expect(bec.disorderStrength).toBe(0)
+      expect(bec.disorderSeed).toBe(42)
+      expect(bec.disorderDistribution).toBe('uniform')
+    })
+
+    it('clamps disorderStrength to [0, 100]', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setBecDisorderStrength(-5)
+      expect(getBec().disorderStrength).toBe(0)
+      s.setBecDisorderStrength(500)
+      expect(getBec().disorderStrength).toBe(100)
+      s.setBecDisorderStrength(2.5)
+      expect(getBec().disorderStrength).toBe(2.5)
+    })
+
+    it('rejects NaN for disorderStrength', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setBecDisorderStrength(5)
+      s.setBecDisorderStrength(NaN)
+      expect(getBec().disorderStrength).toBe(5)
+    })
+
+    it('floors disorderSeed to non-negative integer', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setBecDisorderSeed(1234.7)
+      expect(getBec().disorderSeed).toBe(1234)
+      s.setBecDisorderSeed(-50)
+      expect(getBec().disorderSeed).toBe(0)
+    })
+
+    it('accepts both uniform and gaussian distributions', () => {
+      const s = useExtendedObjectStore.getState()
+      s.setBecDisorderDistribution('gaussian')
+      expect(getBec().disorderDistribution).toBe('gaussian')
+      s.setBecDisorderDistribution('uniform')
+      expect(getBec().disorderDistribution).toBe('uniform')
+    })
+
+    it('bumps schroedingerVersion on disorder change for renderer dirty-flag', () => {
+      const s = useExtendedObjectStore.getState()
+      const beforeVersion = useExtendedObjectStore.getState().schroedingerVersion
+      s.setBecDisorderStrength(10)
+      const afterVersion = useExtendedObjectStore.getState().schroedingerVersion
+      expect(afterVersion).toBeGreaterThan(beforeVersion)
+    })
+  })
 })

@@ -420,6 +420,9 @@ export interface SchroedingerSliceActions {
   setBecHawkingPairInjection: (enabled: boolean) => void
   setBecHawkingInjectRate: (rate: number) => void
   setBecHawkingSeed: (seed: number) => void
+  setBecDisorderStrength: (strength: number) => void
+  setBecDisorderSeed: (seed: number) => void
+  setBecDisorderDistribution: (distribution: TdseDisorderDistribution) => void
   setBecAutoScale: (autoScale: boolean) => void
   setBecAbsorberEnabled: (enabled: boolean) => void
   setBecAbsorberWidth: (width: number) => void

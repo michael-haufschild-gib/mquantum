@@ -7,6 +7,8 @@
 
 import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
 
+import type { DisorderDistribution } from './crossMode'
+
 // ============================================================================
 // TDSE Types
 // ============================================================================
@@ -85,11 +87,14 @@ export type TdsePotentialType =
 export type TdseDriveWaveform = 'sine' | 'pulse' | 'chirp'
 
 /**
- * Distribution type for Anderson disorder potential
- * - uniform: V(r) ∈ [-W/2, W/2] uniform distribution
- * - gaussian: V(r) ~ N(0, W) Gaussian distribution
+ * Distribution type for Anderson disorder potential.
+ *
+ * Re-exported alias of {@link DisorderDistribution} kept for API stability
+ * — every call site that imported `TdseDisorderDistribution` still works,
+ * but the canonical definition lives in `crossMode.ts` where other modes
+ * (BEC, Dirac, …) also pick it up.
  */
-export type TdseDisorderDistribution = 'uniform' | 'gaussian'
+export type TdseDisorderDistribution = DisorderDistribution
 
 // ============================================================================
 // TDSE Config

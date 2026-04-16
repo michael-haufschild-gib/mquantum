@@ -26,7 +26,7 @@ export const tdseCurvatureHelpersBlock = /* wgsl */ `
 // block stays self-contained (does not depend on the curved-kinetic helpers).
 const TDSE_CURV_SCHW_MIN_RADIUS: f32 = 0.01;
 const TDSE_CURV_ADS_MIN_Z: f32 = 0.05;
-const TDSE_CURV_SPHERE_POLE_EPS: f32 = 0.05;
+const TDSE_CURV_SPHERE_POLE_EPS: f32 = 0.2;
 const TDSE_CURV_MT_MIN_RADIUS: f32 = 1e-4;
 
 /**

@@ -244,6 +244,8 @@ describe('buildBecConfig — fixed BEC overrides', () => {
     expect(config.wellWidth).toBe(0)
     expect(config.stepHeight).toBe(0)
     expect(config.latticeDepth).toBe(0)
+    // disorderStrength defaults to 0 but is now configurable (not hard-zero).
+    // See the 'disorder overlay forwarding' block below.
     expect(config.disorderStrength).toBe(0)
   })
 
@@ -252,6 +254,31 @@ describe('buildBecConfig — fixed BEC overrides', () => {
     // mass and hbar come from bec config (same as TDSE default)
     expect(config.mass).toBe(DEFAULT_TDSE_CONFIG.mass)
     expect(config.hbar).toBe(DEFAULT_TDSE_CONFIG.hbar)
+  })
+})
+
+describe('buildBecConfig — disorder overlay forwarding (cross-mode port)', () => {
+  it('forwards disorderStrength from bec config to tdse config', () => {
+    const { config } = buildBecConfig(minimalBec({ disorderStrength: 7.5 }), undefined)
+    expect(config.disorderStrength).toBeCloseTo(7.5)
+  })
+
+  it('forwards disorderSeed from bec config to tdse config', () => {
+    const { config } = buildBecConfig(minimalBec({ disorderSeed: 12345 }), undefined)
+    expect(config.disorderSeed).toBe(12345)
+  })
+
+  it('forwards disorderDistribution from bec config to tdse config', () => {
+    const { config } = buildBecConfig(minimalBec({ disorderDistribution: 'gaussian' }), undefined)
+    expect(config.disorderDistribution).toBe('gaussian')
+  })
+
+  it('defaults disorder to zero-strength no-op when bec config has no override', () => {
+    // Physical guarantee: the shared TDSE compute pipeline short-circuits the
+    // disorder dispatch when strength <= 0, so a BEC run without disorder must
+    // forward strength = 0 to keep the fast path.
+    const { config } = buildBecConfig(minimalBec(), undefined)
+    expect(config.disorderStrength).toBe(0)
   })
 })
 

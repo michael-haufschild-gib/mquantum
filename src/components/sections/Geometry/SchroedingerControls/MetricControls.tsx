@@ -227,7 +227,7 @@ export function MetricControls({ td }: { td: TdseConfig }): React.ReactElement {
       {kind === 'sphere2D' && (
         <Slider
           label="R"
-          tooltip="2-sphere radius R. Chart uses axis 1 = θ, axis 2 = φ; pole buffer ε = 0.05 keeps the chart non-singular."
+          tooltip="2-sphere radius R. Chart uses axis 1 = θ, axis 2 = φ; pole buffer ε = 0.2 keeps the chart non-singular."
           min={MIN_SPHERE_RADIUS}
           max={MAX_SPHERE_RADIUS}
           step={0.05}

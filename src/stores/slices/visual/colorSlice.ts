@@ -193,10 +193,3 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
         },
       })),
   }) as unknown as AppearanceSlice
-// Casting because we are only implementing part of the interface here,
-// but in the final merge it will be complete.
-// Actually, safer pattern is:
-// export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice> = ...
-// But ColorSlice doesn't include the other properties needed for initialization if we do spreading.
-// The standard Zustand pattern for slice splitting with TypeScript usually involves
-// defining the Slice as a part of the whole Store state.

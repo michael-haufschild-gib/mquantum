@@ -136,7 +136,7 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
       {...(supportsPopover ? { popover: 'manual' } : {})}
       id={DROPDOWN_ID}
       data-testid="canvas-context-menu"
-      className="fixed z-50 min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1 m-0 p-0 border-none bg-transparent"
+      className="fixed z-50 m-0 p-0 border-none bg-transparent"
       style={{ top: position.y, left: position.x }}
     >
       <AnimatePresence>

@@ -53,7 +53,7 @@ export const MeasurementControls: React.FC = React.memo(() => {
   const dimension = useGeometryStore((s) => s.dimension)
   const {
     enabled,
-    measurements,
+    hasMeasurements,
     totalCount,
     collapseWidth,
     measureAxis,
@@ -68,7 +68,7 @@ export const MeasurementControls: React.FC = React.memo(() => {
   } = useMeasurementStore(
     useShallow((s) => ({
       enabled: s.enabled,
-      measurements: s.measurements,
+      hasMeasurements: s.measurements.length > 0,
       totalCount: s.totalCount,
       collapseWidth: s.collapseWidth,
       measureAxis: s.measureAxis,
@@ -164,16 +164,14 @@ export const MeasurementControls: React.FC = React.memo(() => {
             />
           )}
 
-          {isCollapsing && (
-            <div className="text-xs text-accent-primary animate-pulse">Collapsing...</div>
-          )}
+          {isCollapsing && <div className="text-xs text-accent animate-pulse">Collapsing...</div>}
           {!isCollapsing && cooldownFrames > 0 && (
             <div className="text-xs text-text-tertiary">Evolving... ({cooldownFrames} frames)</div>
           )}
 
           <div className="text-xs text-text-secondary">Measurements: {totalCount}</div>
 
-          {measurements.length > 0 && positionMean.length > 0 && (
+          {hasMeasurements && positionMean.length > 0 && (
             <div className="text-xs font-mono space-y-0.5">
               <div className="flex gap-2 text-text-tertiary font-semibold">
                 <span className="w-4">d</span>

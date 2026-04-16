@@ -213,9 +213,7 @@ ${bayerJitterSection}
       schroedinger.branchPlaneThreshold + schroedinger.branchTransitionWidth,
       p.x
     );
-    let branchColorA = vec3f(schroedinger.branchColorA[0], schroedinger.branchColorA[1], schroedinger.branchColorA[2]);
-    let branchColorB = vec3f(schroedinger.branchColorB[0], schroedinger.branchColorB[1], schroedinger.branchColorB[2]);
-    let branchTint = mix(branchColorA, branchColorB, branchFrac);
+    let branchTint = mix(schroedinger.branchColorA, schroedinger.branchColorB, branchFrac);
     let lum = dot(surfaceColor, vec3f(0.2126, 0.7152, 0.0722));
     surfaceColor = branchTint * lum;
   }
@@ -249,7 +247,7 @@ ${bayerJitterSection}
   let viewDir = -rd;
   let roughness = max(material.roughness, 0.04);
 
-  for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < MAX_LIGHTS; i++) {
     if (i >= lighting.lightCount) { break; }
 
     let light = lighting.lights[i];

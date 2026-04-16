@@ -131,9 +131,7 @@ fn volumeRaymarchGrid(
           uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
           pos.x
         );
-        let branchColorA = vec3f(uniforms.branchColorA[0], uniforms.branchColorA[1], uniforms.branchColorA[2]);
-        let branchColorB = vec3f(uniforms.branchColorB[0], uniforms.branchColorB[1], uniforms.branchColorB[2]);
-        let branchColor = mix(branchColorA, branchColorB, branchFrac);
+        let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
         let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
         emission = branchColor * lum;
       }
@@ -205,9 +203,6 @@ fn volumeRaymarchGrid(
   let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
 
   var transmittance: f32 = 1.0;
-
-  // Profiling: iteration budget override
-  let maxIter = select(MAX_VOLUME_SAMPLES, 64, PROFILING_HALF_SAMPLES);
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
@@ -408,9 +403,7 @@ fn volumeRaymarchGrid(
             uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
             pos.x
           );
-          let branchColorA = vec3f(uniforms.branchColorA[0], uniforms.branchColorA[1], uniforms.branchColorA[2]);
-          let branchColorB = vec3f(uniforms.branchColorB[0], uniforms.branchColorB[1], uniforms.branchColorB[2]);
-          let branchColor = mix(branchColorA, branchColorB, branchFrac);
+          let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
           let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
           emission = branchColor * lum;
         }

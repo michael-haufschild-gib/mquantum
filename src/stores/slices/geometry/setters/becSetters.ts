@@ -7,7 +7,11 @@
  * @module stores/slices/geometry/setters/becSetters
  */
 
-import { type BecConfig, DEFAULT_BEC_CONFIG } from '@/lib/geometry/extended/types'
+import {
+  type BecConfig,
+  DEFAULT_BEC_CONFIG,
+  type TdseDisorderDistribution,
+} from '@/lib/geometry/extended/types'
 import { logger } from '@/lib/logger'
 import { reduceGridToFit } from '@/lib/math/ndArray'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
@@ -48,6 +52,9 @@ type BecActions = Pick<
   | 'setBecHawkingPairInjection'
   | 'setBecHawkingInjectRate'
   | 'setBecHawkingSeed'
+  | 'setBecDisorderStrength'
+  | 'setBecDisorderSeed'
+  | 'setBecDisorderDistribution'
   | 'setBecAutoScale'
   | 'setBecAbsorberEnabled'
   | 'setBecAbsorberWidth'
@@ -316,6 +323,31 @@ export function createBecSetters(ctx: SetterContext): BecActions {
         schroedinger: {
           ...state.schroedinger,
           bec: { ...state.schroedinger.bec, hawkingSeed: clamped, needsReset: true },
+        },
+      }))
+    },
+    // Anderson-style disorder overlay on the trap potential.
+    // Mirrors TDSE's disorder plumbing — the same generic dispatcher runs
+    // because BEC shares the TDSE compute pass (see TdseBecConfigBuilder).
+    setBecDisorderStrength: nestedClampedSetter(ctx, D, 'disorderStrength', 0, 100),
+    setBecDisorderSeed: (seed: number) => {
+      if (!isFinite(seed)) {
+        warnNonFinite('bec.disorderSeed', seed)
+        return
+      }
+      const clamped = Math.floor(Math.max(0, seed))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, disorderSeed: clamped },
+        },
+      }))
+    },
+    setBecDisorderDistribution: (distribution: TdseDisorderDistribution) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, disorderDistribution: distribution },
         },
       }))
     },

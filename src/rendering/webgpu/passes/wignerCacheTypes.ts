@@ -88,11 +88,11 @@ export function buildCrossPairMap(termCount: number): {
   return { crossPairs, numCrossLayers: Math.ceil(crossPairs.length / 2) }
 }
 
-/** Float index of the coeff array in SchroedingerUniforms (offset 416 bytes). */
-export const SCHROEDINGER_COEFF_FLOAT_INDEX = 104
+/** Float index of the coeff array in SchroedingerUniforms (derived from layout). */
+export const SCHROEDINGER_COEFF_FLOAT_INDEX = _LAYOUT.index.coeff
 
-/** Float index of the energy array in SchroedingerUniforms (offset 544 bytes). */
-export const SCHROEDINGER_ENERGY_FLOAT_INDEX = 136
+/** Float index of the energy array in SchroedingerUniforms (derived from layout). */
+export const SCHROEDINGER_ENERGY_FLOAT_INDEX = _LAYOUT.index.energy
 
 /**
  * Read a packed f32 from a vec4f array at a given base offset.

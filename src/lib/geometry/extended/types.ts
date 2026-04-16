@@ -7,6 +7,7 @@
 
 export * from './bec'
 export * from './common'
+export * from './crossMode'
 export * from './dirac'
 export * from './freeScalar'
 export * from './pauli'
