@@ -297,11 +297,9 @@ export function ricciScalar(
       const R = Math.max(cfg.sphereRadius ?? MIN_SPHERE_RADIUS, MIN_SPHERE_RADIUS)
       return 2 / (R * R)
     }
-    case 'deSitter': {
-      const H = Math.max(cfg.hubbleRate ?? MIN_HUBBLE_RATE, MIN_HUBBLE_RATE)
-      const n = latticeDim
-      return n * (n - 1) * H * H
-    }
+    case 'deSitter':
+      // g_ij = a(t)²δ_ij is conformally flat — spatial Ricci scalar is 0.
+      return 0
     case 'antiDeSitter': {
       const L = Math.max(cfg.adsRadius ?? MIN_ADS_RADIUS, MIN_ADS_RADIUS)
       const n = latticeDim
@@ -322,7 +320,9 @@ export function ricciScalar(
         MIN_DOUBLE_THROAT_SEPARATION
       )
       const l = (coords[0] ?? 0) as number
-      return morrisThorneRicci(l - s / 2, b0, latticeDim) + morrisThorneRicci(l + s / 2, b0, latticeDim)
+      return (
+        morrisThorneRicci(l - s / 2, b0, latticeDim) + morrisThorneRicci(l + s / 2, b0, latticeDim)
+      )
     }
   }
 }

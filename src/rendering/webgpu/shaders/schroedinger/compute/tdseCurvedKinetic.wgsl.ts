@@ -438,8 +438,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let hRe = curvedBkTRe[idx] + V * curvedBkStageRe[idx];
   let hIm = curvedBkTIm[idx] + V * curvedBkStageIm[idx];
 
-  curvedBkKRe[idx] = invHbar * hIm;
-  curvedBkKIm[idx] = -invHbar * hRe;
+  if (params.imaginaryTime != 0u) {
+    curvedBkKRe[idx] = -invHbar * hRe;
+    curvedBkKIm[idx] = -invHbar * hIm;
+  } else {
+    curvedBkKRe[idx] = invHbar * hIm;
+    curvedBkKIm[idx] = -invHbar * hRe;
+  }
 }
 `
 

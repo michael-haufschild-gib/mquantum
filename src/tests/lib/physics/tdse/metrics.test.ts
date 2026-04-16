@@ -390,12 +390,8 @@ describe('ricciScalar', () => {
     )
   })
 
-  it('de Sitter 3D → 6H²', () => {
-    const H = 0.5
-    expect(ricciScalar({ kind: 'deSitter', hubbleRate: H }, [0, 0, 0], 3)).toBeCloseTo(
-      6 * H * H,
-      10
-    )
+  it('de Sitter 3D → 0 (conformally flat spatial slice)', () => {
+    expect(ricciScalar({ kind: 'deSitter', hubbleRate: 0.5 }, [0, 0, 0], 3)).toBe(0)
   })
 
   it('Schwarzschild (vacuum) → 0', () => {
@@ -433,10 +429,9 @@ describe('ricciScalar', () => {
     const b = 0.5
     const dim = 5
     const expected = ((dim - 1) * (dim - 4)) / (b * b)
-    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0, 0, 0], dim)).toBeCloseTo(
-      expected,
-      10
-    )
+    expect(
+      ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0, 0, 0], dim)
+    ).toBeCloseTo(expected, 10)
   })
 
   it('doubleThroat Ricci is sum of two shifted MT contributions', () => {

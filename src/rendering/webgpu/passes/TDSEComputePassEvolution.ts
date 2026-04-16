@@ -174,6 +174,18 @@ export function runStrangEvolution(
         const sPass = ctx.beginComputePass({ label: `tdse-curved-renorm-scale-${step}` })
         curvedDc(sPass, curvedPl.renormalizePipeline, [curvedBg.renormalizeBG], curvedLinearWG)
         sPass.end()
+
+        if (config.imaginaryTimeEnabled && res.gsState.gsEigenstates.length > 0) {
+          gsDispatch(ctx, res.gsState, curvedDc, {
+            diagReducePipeline: curvedPl.diagReducePipeline,
+            diagReduceBG: curvedBg.diagReduceBG,
+            diagFinalizePipeline: curvedPl.diagFinalizePipeline,
+            diagFinalizeBG: curvedBg.diagFinalizeBG,
+            renormalizePipeline: curvedPl.renormalizePipeline,
+            renormalizeBG: curvedBg.renormalizeBG,
+            diagNumWorkgroups: res.diagNumWorkgroups,
+          })
+        }
       }
       // Heller spectrometer tick — same per-step cadence as the flat path.
       if (res.hellerState) {

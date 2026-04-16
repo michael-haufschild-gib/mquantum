@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 
 import type { BecConfig } from '@/lib/geometry/extended/bec'
+import type { ObjectType } from '@/lib/geometry/types'
 import { horizonPlaneArea } from '@/lib/physics/bec/pageCurve'
 import { asymptoticSoundSpeed, hasHorizon, hawkingReadout } from '@/lib/physics/bec/sonicHorizon'
 import { buildWaterfallParams } from '@/lib/physics/bec/waterfallParams'
@@ -27,7 +28,7 @@ import { usePageCurveStore } from '@/stores/pageCurveStore'
 /** Inputs driving the sampling loop — all read via zustand selectors in the caller. */
 export interface PageCurveSamplingInputs {
   enabled: boolean
-  objectType: string
+  objectType: ObjectType
   quantumMode: string
   dimension: number
   bec: BecConfig

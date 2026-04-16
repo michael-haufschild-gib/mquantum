@@ -370,8 +370,12 @@ test.describe('TDSE curved space v2 — presets and render toggles', () => {
         expect(s.metric.adsRadius as number).toBeCloseTo(cfg.adsRadius, 4)
       if (cfg.sphereRadius !== undefined)
         expect(s.metric.sphereRadius as number).toBeCloseTo(cfg.sphereRadius, 4)
-      if (cfg.throatRadius !== undefined)
+      if (cfg.kind === 'doubleThroat') {
+        if (cfg.doubleThroatRadius !== undefined)
+          expect(s.metric.doubleThroatRadius as number).toBeCloseTo(cfg.doubleThroatRadius, 4)
+      } else if (cfg.throatRadius !== undefined) {
         expect(s.metric.throatRadius as number).toBeCloseTo(cfg.throatRadius, 4)
+      }
       if (cfg.doubleThroatSeparation !== undefined)
         expect(s.metric.doubleThroatSeparation as number).toBeCloseTo(cfg.doubleThroatSeparation, 4)
       if (cfg.torusPeriod !== undefined) {

@@ -268,7 +268,10 @@ export function validateLqcBounceParams(params: LqcBounceParams): void {
  */
 function resolveTHalfWidth(params: LqcBounceParams): number {
   if (params.tHalfWidth !== undefined) return params.tHalfWidth
-  const gamma = stiffFluidGamma(params.spacetimeDim, params.rhoCritical)
+  const w = params.equationOfState ?? 1
+  // General coefficient: γ_w = (n-1)²(1+w)²ρ_c / (12(n-2)).
+  // stiffFluidGamma assumes w=1 → (1+w)²/4 = 1, so scale accordingly.
+  const gamma = (stiffFluidGamma(params.spacetimeDim, params.rhoCritical) * ((1 + w) * (1 + w))) / 4
   const tStar = gamma > 0 ? Math.sqrt((1 / params.initialRhoRatio - 1) / gamma) : 5
   return Math.max(2, Math.min(50, tStar))
 }
@@ -649,10 +652,16 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   const bounceIdx = nSteps // index of t = tBounce in the joined array
 
   const etaGrid = integrateConformalTime(joined.ts, joined.as, etaBounceAnchor, tBounce)
-  // When using the default anchor (10) with a large adaptive window, the
-  // pre-bounce conformal-time span can push etaGrid[0] non-positive,
-  // violating the positive-η contract. Shift the whole grid upward.
-  if (params.etaBounceAnchor === undefined && etaGrid[0]! <= 0) {
+  // Ensure the positive-η contract: if the conformal-time span pushes
+  // etaGrid[0] non-positive, shift the whole grid upward. For explicit
+  // anchors that can't maintain the contract, throw rather than silently
+  // producing a broken table.
+  if (etaGrid[0]! <= 0) {
+    if (params.etaBounceAnchor !== undefined) {
+      throw new RangeError(
+        `LqcBounceParams.etaBounceAnchor must keep etaGrid > 0 across the full window, got ${params.etaBounceAnchor}`
+      )
+    }
     const shift = 1 - etaGrid[0]!
     for (let i = 0; i < etaGrid.length; i++) {
       etaGrid[i] = etaGrid[i]! + shift
@@ -831,8 +840,14 @@ export function getOrComputeLqcBounceTable(params: LqcBounceParams): LqcBounceTa
     return cached
   }
   const table = computeLqcBounceBackground(params)
+  const tableBytes =
+    table.etaGrid.byteLength +
+    table.aGrid.byteLength +
+    table.aPrimeGrid.byteLength +
+    table.rhoGrid.byteLength
+  if (tableBytes > LQC_CACHE_MAX_BYTES) return table
+
   lqcCache.set(keyStr, table)
-  // Evict oldest entries until total byte budget is respected.
   let totalBytes = 0
   for (const t of lqcCache.values()) {
     totalBytes +=

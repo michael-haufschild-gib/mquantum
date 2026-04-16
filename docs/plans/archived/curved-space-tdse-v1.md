@@ -247,15 +247,15 @@ One v1 preset added to `src/lib/physics/tdse/presets.ts`:
 
 ### 3.3 Acceptance criteria
 
-v1 is done when **all of the following** hold:
+v1 was done when **all of the following** held (satisfied at merge):
 
-- [ ] All 22 tests above pass locally.
-- [ ] `npm run build` passes.
-- [ ] `npm run lint` passes.
-- [ ] `npx vitest run` passes full suite (no regressions).
-- [ ] Preset `wormholeWavepacket` loads from URL, renders a visible moving wave packet, and produces a visually different result from the flat-metric control.
-- [ ] The accompanying description in the preset correctly frames what is shown (curved-space quantum dynamics, not classical geodesics, not a cartoon bridge).
-- [ ] No new lint/TS warnings. No magic numbers without a source comment citing the physics.
+- [x] All 22 tests above pass locally.
+- [x] `npm run build` passes.
+- [x] `npm run lint` passes.
+- [x] `npx vitest run` passes full suite (no regressions).
+- [x] Preset `wormholeWavepacket` loads from URL, renders a visible moving wave packet, and produces a visually different result from the flat-metric control.
+- [x] The accompanying description in the preset correctly frames what is shown (curved-space quantum dynamics, not classical geodesics, not a cartoon bridge).
+- [x] No new lint/TS warnings. No magic numbers without a source comment citing the physics.
 
 ---
 

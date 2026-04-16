@@ -39,15 +39,12 @@ fn tdseCurvatureRicci(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
   let kind = params.metricKind;
   // flat / torus / schwarzschild → 0 (vacuum Ricci).
   if (kind == 0u || kind == 6u || kind == 2u) { return 0.0; }
-  if (kind == 5u) {
+  if (kind == 5u && dim >= 3u) {
     let R = max(params.sphereRadius, 0.1);
     return 2.0 / (R * R);
   }
-  if (kind == 3u) {
-    let H = max(params.hubbleRate, 0.0);
-    let n = f32(dim);
-    return n * (n - 1.0) * H * H;
-  }
+  // deSitter: g_ij = a(t)^2 δ_ij → conformally flat, spatial Ricci = 0.
+  if (kind == 3u) { return 0.0; }
   if (kind == 4u) {
     let L = max(params.adsRadius, 0.1);
     let n = f32(dim);
