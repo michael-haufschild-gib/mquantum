@@ -268,10 +268,9 @@ const ExposureIndicator: React.FC = React.memo(() => {
 
   const autoScaleMaxGain = useExtendedObjectStore((s) => s.schroedinger.autoScaleMaxGain ?? 20)
 
-  if (!hasData || maxDensity <= 0) return null
-
-  const rawGain = 1.0 / Math.max(maxDensity, 1e-10)
-  const isCapped = rawGain > autoScaleMaxGain
+  const hasValue = hasData && maxDensity > 0
+  const rawGain = hasValue ? 1.0 / Math.max(maxDensity, 1e-10) : 0
+  const isCapped = hasValue && rawGain > autoScaleMaxGain
   const effectiveGain = Math.min(rawGain, autoScaleMaxGain)
 
   const formatGain = (g: number) => (g >= 10 ? `${Math.round(g)}x` : `${g.toFixed(1)}x`)
@@ -283,8 +282,14 @@ const ExposureIndicator: React.FC = React.memo(() => {
     >
       <span className="text-[var(--text-tertiary)]">Current gain</span>
       <span className={isCapped ? 'text-[var(--text-warning)]' : 'text-[var(--text-secondary)]'}>
-        {formatGain(effectiveGain)}
-        {isCapped ? ` (capped from ~${formatGain(rawGain)})` : ''}
+        {hasValue ? (
+          <>
+            {formatGain(effectiveGain)}
+            {isCapped ? ` (capped from ~${formatGain(rawGain)})` : ''}
+          </>
+        ) : (
+          '—'
+        )}
       </span>
     </div>
   )
