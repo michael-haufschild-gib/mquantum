@@ -53,22 +53,10 @@ import { type ObservablesState } from './TDSEObservablesDispatch'
 /**
  * TDSEUniforms struct size in bytes.
  *
- * Mirrors the layout in `tdseUniforms.wgsl.ts`. Trailing fields:
- *   ... branchingEnabled (u32 @ 740), branchPlanePosition (f32 @ 744),
- *   bhMass (f32 @ 748), bhMultipoleL (f32 @ 752), bhSpin (f32 @ 756),
- *   hawkingVmax (f32 @ 760), hawkingLh (f32 @ 764),
- *   hawkingDeltaN (f32 @ 768), hawkingInjectRate (f32 @ 772),
- *   hawkingPairInjection (u32 @ 776), hawkingSeed (u32 @ 780),
- *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796),
- *   wormholeCouplingEnabled (u32 @ 800), wormholeCouplingG (f32 @ 804),
- *   wormholeMirrorAxis (u32 @ 808), _padWormhole (u32 @ 812),
- *   islandOverlayEnabled (u32 @ 816), islandCenterX0 (f32 @ 820),
- *   islandRadiusWs (f32 @ 824), islandBoost (f32 @ 828),
- *   metricKind (u32 @ 832), throatRadius (f32 @ 836),
- *   _padMetric0..1 (u32 @ 840/844).
- * Total = 848 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
- * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
- * struct together when adding new fields.
+ * Mirrors the layout in `tdseUniforms.wgsl.ts` (authoritative source).
+ * Total = 928 bytes (16-byte aligned). Update `TDSE_UNIFORM_SIZE` in
+ * `TDSEComputePassBuffers.ts` and the WGSL struct together when adding
+ * new fields.
  */
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 

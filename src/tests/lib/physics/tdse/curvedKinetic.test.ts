@@ -554,7 +554,7 @@ describe('applyCurvedKineticRef — torus hermiticity (periodic)', () => {
 
 describe('applyCurvedKineticRef — sphere2D hermiticity', () => {
   it('⟨φ|Tψ⟩ = ⟨Tφ|ψ⟩ with packet at θ=π/2 (3D lattice, R=1)', () => {
-    const N = 12
+    const N = 16
     const dx = 0.25
     const grid = makeGrid(N, dx, 3)
     const metric: MetricConfig = { kind: 'sphere2D', sphereRadius: 1 }

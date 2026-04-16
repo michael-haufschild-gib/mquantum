@@ -310,7 +310,7 @@ export function ricciScalar(
     case 'morrisThorne': {
       const b0 = Math.max(cfg.throatRadius ?? MIN_THROAT_RADIUS, MIN_THROAT_RADIUS)
       const l = (coords[0] ?? 0) as number
-      return morrisThorneRicci(l, b0)
+      return morrisThorneRicci(l, b0, latticeDim)
     }
     case 'doubleThroat': {
       const b0 = Math.max(
@@ -322,21 +322,22 @@ export function ricciScalar(
         MIN_DOUBLE_THROAT_SEPARATION
       )
       const l = (coords[0] ?? 0) as number
-      // Superposition of two MT throats at ±s/2 (plan-approved approximation).
-      return morrisThorneRicci(l - s / 2, b0) + morrisThorneRicci(l + s / 2, b0)
+      return morrisThorneRicci(l - s / 2, b0, latticeDim) + morrisThorneRicci(l + s / 2, b0, latticeDim)
     }
   }
 }
 
 /**
- * Ricci scalar of the Morris–Thorne spatial slice at proper distance l with
- * throat radius b₀. Formula: R = 2(1 − r'²)/r² − 2·r''/r.
+ * Ricci scalar of the d-dimensional Morris–Thorne spatial slice
+ * ds² = dl² + r(l)² dΩ²_{d-1} at proper distance l with throat radius b₀.
+ * Formula: R = (d-1)(d-2)(1 − r'²)/r² − 2(d-1)·r''/r.
  */
-function morrisThorneRicci(l: number, b0: number): number {
+function morrisThorneRicci(l: number, b0: number, dim: number): number {
   const r = Math.sqrt(b0 * b0 + l * l)
   const rPrime = l / r
   const rDoublePrime = (b0 * b0) / (r * r * r)
-  return (2 * (1 - rPrime * rPrime)) / (r * r) - (2 * rDoublePrime) / r
+  const d1 = dim - 1
+  return (d1 * (dim - 2) * (1 - rPrime * rPrime)) / (r * r) - (2 * d1 * rDoublePrime) / r
 }
 
 /**

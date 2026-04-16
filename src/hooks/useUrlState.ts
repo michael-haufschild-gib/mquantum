@@ -72,8 +72,8 @@ const METRIC_FIELD_EXTRACTORS: {
   sphere2D: (u) => (u.tdseSphereRadius !== undefined ? { sphereRadius: u.tdseSphereRadius } : {}),
   torus: (u) => {
     const { tdseTorusPeriod0: p0, tdseTorusPeriod1: p1, tdseTorusPeriod2: p2 } = u
-    return p0 !== undefined || p1 !== undefined || p2 !== undefined
-      ? { torusPeriod: [p0 ?? 1, p1 ?? 1, p2 ?? 1] }
+    return p0 !== undefined && p1 !== undefined && p2 !== undefined
+      ? { torusPeriod: [p0, p1, p2] }
       : {}
   },
   doubleThroat: (u) => {

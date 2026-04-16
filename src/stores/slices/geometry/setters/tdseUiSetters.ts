@@ -373,11 +373,7 @@ export function createTdseUiSetters(ctx: SetterContext) {
      * clean. Invalid / non-finite numeric params are clamped to the
      * matching bound and a dev-mode warning is emitted.
      */
-    /**
-     * Toggle the Wave 6 Ricci-scalar curvature overlay. Pure render flag —
-     * does not invalidate the running wavefunction. Uses `nestedValueSetter`
-     * so the schroedingerVersion bump propagates to the uniform writer.
-     */
+    /** Toggle the Ricci-scalar curvature overlay. Pure render flag. */
     setShowCurvatureOverlay: nestedValueSetter(ctx, D, 'showCurvatureOverlay') as (
       enabled: boolean
     ) => void,

@@ -1,6 +1,6 @@
 # Curved-Space TDSE — v1 Plan
 
-**Status**: Proposed
+**Status**: Completed / Archived
 **Scope**: Minimum viable quantum dynamics on curved backgrounds
 **Depends on**: TDSE compute pipeline (existing)
 
@@ -165,7 +165,7 @@ One v1 preset added to `src/lib/physics/tdse/presets.ts`:
     packetCenter: [-3.0, 0, 0],
     packetWidth: 0.5,
     packetMomentum: [3.0, 0, 0],
-    potentialType: 'none',   // pure geometric effect
+    potentialType: 'free',   // pure geometric effect (no external potential)
     metric: { kind: 'morrisThorne', throatRadius: 0.5 },
     absorberEnabled: true,
     absorberWidth: 0.15,

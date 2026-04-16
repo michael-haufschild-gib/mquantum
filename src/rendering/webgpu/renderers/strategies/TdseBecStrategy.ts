@@ -446,8 +446,9 @@ export class TdseBecStrategy implements QuantumModeStrategy {
             this.entanglementWorker.onmessage = (e: MessageEvent<EntanglementWorkerResponse>) => {
               this.entanglementInFlight = false
               if (e.data.type !== 'result') return
-              // Discard stale results from previous epochs or post-dispose.
-              if (this.disposed || e.data.epoch !== this.entanglementEpoch) return
+              // Discard stale results from previous epochs or after lifecycle exit.
+              if (this.disposed || this.transferredOut || e.data.epoch !== this.entanglementEpoch)
+                return
               useCoordinateEntanglementStore.getState().pushResult(e.data.result)
             }
             this.entanglementWorker.onerror = () => {

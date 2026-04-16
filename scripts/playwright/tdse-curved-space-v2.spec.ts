@@ -115,7 +115,7 @@ const METRIC_QUERY_BUILDERS: {
   doubleThroat: (cfg) => {
     const out: string[] = []
     if (cfg.doubleThroatSeparation !== undefined) out.push(`tdse_dts=${cfg.doubleThroatSeparation}`)
-    if (cfg.doubleThroatRadius !== undefined) out.push(`tdse_b0=${cfg.doubleThroatRadius}`)
+    if (cfg.doubleThroatRadius !== undefined) out.push(`tdse_dtb=${cfg.doubleThroatRadius}`)
     return out
   },
 }

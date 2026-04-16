@@ -150,6 +150,8 @@ export function runStrangEvolution(
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
     const curvedAbsorberActive = config.absorberEnabled === true
+    const curvedNeedsRenorm =
+      config.imaginaryTimeEnabled || (config.stochasticEnabled && config.stochasticGamma > 0)
     for (let step = 0; step < curvedSteps; step++) {
       res.dispatchCurvedRK4(ctx)
       state.simTime += config.dt
@@ -159,6 +161,19 @@ export function runStrangEvolution(
         const absPass = ctx.beginComputePass({ label: `tdse-curved-absorber-${step}` })
         curvedDc(absPass, curvedPl.absorberPipeline, [curvedBg.initBG], curvedLinearWG)
         absPass.end()
+      }
+      // Per-step renormalization for non-unitary modes (imaginary-time,
+      // stochastic). Same reduce→finalize→scale sequence as the Strang path.
+      if (curvedNeedsRenorm) {
+        const rPass = ctx.beginComputePass({ label: `tdse-curved-renorm-reduce-${step}` })
+        curvedDc(rPass, curvedPl.diagReducePipeline, [curvedBg.diagReduceBG], res.diagNumWorkgroups)
+        rPass.end()
+        const fPass = ctx.beginComputePass({ label: `tdse-curved-renorm-finalize-${step}` })
+        curvedDc(fPass, curvedPl.diagFinalizePipeline, [curvedBg.diagFinalizeBG], 1)
+        fPass.end()
+        const sPass = ctx.beginComputePass({ label: `tdse-curved-renorm-scale-${step}` })
+        curvedDc(sPass, curvedPl.renormalizePipeline, [curvedBg.renormalizeBG], curvedLinearWG)
+        sPass.end()
       }
       // Heller spectrometer tick — same per-step cadence as the flat path.
       if (res.hellerState) {

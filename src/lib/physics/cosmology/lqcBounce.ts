@@ -649,6 +649,15 @@ export function computeLqcBounceBackground(params: LqcBounceParams): LqcBounceTa
   const bounceIdx = nSteps // index of t = tBounce in the joined array
 
   const etaGrid = integrateConformalTime(joined.ts, joined.as, etaBounceAnchor, tBounce)
+  // When using the default anchor (10) with a large adaptive window, the
+  // pre-bounce conformal-time span can push etaGrid[0] non-positive,
+  // violating the positive-η contract. Shift the whole grid upward.
+  if (params.etaBounceAnchor === undefined && etaGrid[0]! <= 0) {
+    const shift = 1 - etaGrid[0]!
+    for (let i = 0; i < etaGrid.length; i++) {
+      etaGrid[i] = etaGrid[i]! + shift
+    }
+  }
   const aPrimeGrid = computeAPrime(joined.as, joined.rhos, bounceIdx, spacetimeDim, rhoCritical)
 
   return {
@@ -756,16 +765,8 @@ interface LqcCacheKey {
   etaBounceAnchor: number
 }
 
-/**
- * Maximum number of LQC tables held in the LRU cache. Each table is a few
- * hundred KB (etaGrid, aGrid, aPrimeGrid, rhoGrid at ~20k samples), so the
- * cache cap keeps total residency under ~2 MB and comfortably inside the
- * main-thread heap budget. Four slots lets the UI keep the "current" table
- * alongside one or two "comparison" presets (e.g., two LQC scenes open in
- * rapid succession during a parameter sweep) without thrashing the single-
- * slot cache that preceded this.
- */
-const LQC_CACHE_LIMIT = 4
+/** Maximum total byte budget for the LQC LRU cache (~4 MB). */
+const LQC_CACHE_MAX_BYTES = 4 * 1024 * 1024
 
 /**
  * Map-backed LRU: JavaScript `Map` preserves insertion order. A cache hit
@@ -799,7 +800,7 @@ function lqcCacheKeyString(k: LqcCacheKey): string {
  * preset, so the cache is essential — a full rebuild touches ~20k float
  * samples.
  *
- * The cache is an LRU of up to {@link LQC_CACHE_LIMIT} entries so a user
+ * The cache is a byte-budgeted LRU ({@link LQC_CACHE_MAX_BYTES}) so a user
  * toggling between two presets (A → B → A → B) hits the cache every call
  * instead of rebuilding on each switch.
  *
@@ -831,9 +832,22 @@ export function getOrComputeLqcBounceTable(params: LqcBounceParams): LqcBounceTa
   }
   const table = computeLqcBounceBackground(params)
   lqcCache.set(keyStr, table)
-  if (lqcCache.size > LQC_CACHE_LIMIT) {
+  // Evict oldest entries until total byte budget is respected.
+  let totalBytes = 0
+  for (const t of lqcCache.values()) {
+    totalBytes +=
+      t.etaGrid.byteLength + t.aGrid.byteLength + t.aPrimeGrid.byteLength + t.rhoGrid.byteLength
+  }
+  while (totalBytes > LQC_CACHE_MAX_BYTES && lqcCache.size > 1) {
     const oldest = lqcCache.keys().next().value
-    if (oldest !== undefined) lqcCache.delete(oldest)
+    if (oldest === undefined) break
+    const evicted = lqcCache.get(oldest)!
+    totalBytes -=
+      evicted.etaGrid.byteLength +
+      evicted.aGrid.byteLength +
+      evicted.aPrimeGrid.byteLength +
+      evicted.rhoGrid.byteLength
+    lqcCache.delete(oldest)
   }
   return table
 }

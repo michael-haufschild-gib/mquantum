@@ -64,8 +64,13 @@ export const PageCurveSvg = React.memo(function PageCurveSvg({
 
   // Island extent guide line — the illustrative 50 % mid-band marker. The
   // deferred 3D GPU island channel will replace this UI-only approximation.
+  const showEmptyState = horizonContext.isBec && !horizonContext.horizonPresent
   const showIslandLine =
-    islandOverlayEnabled && snapshot.tPage !== null && lastIslandRadius > 0 && dMaxFrac > 0
+    !showEmptyState &&
+    islandOverlayEnabled &&
+    snapshot.tPage !== null &&
+    lastIslandRadius > 0 &&
+    dMaxFrac > 0
   const islandPixel = showIslandLine
     ? PAD_T +
       (PAGE_CURVE_HEIGHT - PAD_T - PAD_B) -
@@ -73,8 +78,6 @@ export const PageCurveSvg = React.memo(function PageCurveSvg({
         (PAGE_CURVE_HEIGHT - PAD_T - PAD_B) *
         0.5
     : null
-
-  const showEmptyState = horizonContext.isBec && !horizonContext.horizonPresent
 
   return (
     <svg

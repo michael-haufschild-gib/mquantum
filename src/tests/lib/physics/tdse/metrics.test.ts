@@ -405,20 +405,35 @@ describe('ricciScalar', () => {
     )
   })
 
-  it('MT at l=0: R = 2/b² (from 2(1−0)/b² − 2(b²/b³)/b = 2/b² − 2/b² = 0 — recheck)', () => {
-    // At l=0: r=b, r'=0, r''=1/b ⇒ R = 2(1)/b² − 2·(1/b)/b = 2/b² − 2/b² = 0.
+  it('MT at l=0, d=3: R = −2/b² (maximum negative curvature at throat)', () => {
     const b = 0.5
-    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0], 3)).toBeCloseTo(0, 10)
+    const expected = -2 / (b * b)
+    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0], 3)).toBeCloseTo(
+      expected,
+      10
+    )
   })
 
-  it('MT at l=b: R = closed form', () => {
+  it('MT at l=b, d=3: R = closed form with dim-dependent coefficients', () => {
     const b = 0.5
+    const dim = 3
     const l = b
     const r = Math.sqrt(b * b + l * l)
     const rP = l / r
     const rPP = (b * b) / (r * r * r)
-    const expected = (2 * (1 - rP * rP)) / (r * r) - (2 * rPP) / r
-    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l, 0, 0], 3)).toBeCloseTo(
+    const d1 = dim - 1
+    const expected = (d1 * (dim - 2) * (1 - rP * rP)) / (r * r) - (2 * d1 * rPP) / r
+    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [l, 0, 0], dim)).toBeCloseTo(
+      expected,
+      10
+    )
+  })
+
+  it('MT at l=0, d=5: R = (d-1)(d-4)/b² = 4/b²', () => {
+    const b = 0.5
+    const dim = 5
+    const expected = ((dim - 1) * (dim - 4)) / (b * b)
+    expect(ricciScalar({ kind: 'morrisThorne', throatRadius: b }, [0, 0, 0, 0, 0], dim)).toBeCloseTo(
       expected,
       10
     )

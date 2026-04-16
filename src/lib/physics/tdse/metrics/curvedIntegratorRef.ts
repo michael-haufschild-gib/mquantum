@@ -96,6 +96,11 @@ function rhs(
   }
   const T = applyCurvedKineticRef(kinParams)
   const n = inRe.length
+  if (params.potential !== undefined && params.potential.length !== n) {
+    throw new Error(
+      `rhs: potential length ${params.potential.length} does not match state length ${n}`
+    )
+  }
   const hRe = T.re
   const hIm = T.im
   if (params.potential !== undefined) {
@@ -193,8 +198,8 @@ export function advanceRK4(
   params: CurvedIntegratorParams,
   steps: number
 ): { finalTime: number } {
-  if (steps < 0 || !Number.isFinite(steps)) {
-    throw new Error(`advanceRK4: steps must be a non-negative finite number (got ${steps})`)
+  if (!Number.isInteger(steps) || steps < 0) {
+    throw new Error(`advanceRK4: steps must be a non-negative integer (got ${steps})`)
   }
   let t = params.time ?? 0
   const dt = params.dt

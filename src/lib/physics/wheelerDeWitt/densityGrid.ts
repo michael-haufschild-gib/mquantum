@@ -74,7 +74,7 @@ export function packWdwDensityGrid(
   const aSpan = aMax - aMin
   const da = aSpan > 0 ? aSpan / (Na - 1) : 0
   const dphi = phiExtent > 0 ? (2 * phiExtent) / (Nphi - 1) : 0
-  const R = aMax
+  const R = Math.max(0.25, aMax)
 
   for (let z = 0; z < N; z++) {
     // z maps to φ₂ via cube coord physPhi2 = (2·tz - 1)·R

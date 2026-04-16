@@ -28,7 +28,7 @@ rather than evolved.
 
 The curved-space Hamiltonian on a spatial manifold with diagonal metric is
 
-```
+```text
 Ĥ = −(ℏ²/2m) · (1/√|g|) · ∂_μ [ √|g| · g^μν · ∂_ν ψ ] + V·ψ
 ```
 
@@ -39,7 +39,7 @@ kinetic operator becomes a sum over axes of the conservative-form derivative
 
 Inner products use the proper volume element:
 
-```
+```text
 ⟨φ | ψ⟩_g = ∫ φ*(x) ψ(x) √|g(x)| dⁿx
 ```
 
@@ -192,7 +192,7 @@ frames under budget.
 | `tdse_dtb` | float | [0.1, 5.0] | Double-throat shared radius (falls back to `tdse_b0`). |
 | `tdse_co` | 0/1 | — | Ricci-scalar curvature overlay toggle. |
 | `tdse_co_op` | float | [0, 1] | Curvature overlay opacity. |
-| `tdse_dv` | enum | coordinate, proper | Density view: coordinate |ψ|² or proper-volume √|g|·|ψ|². |
+| `tdse_dv` | enum | coordinate, proper | Density view: coordinate \|ψ\|² or proper-volume √\|g\|·\|ψ\|². |
 
 Metric-specific params are only emitted when the active `tdse_metric` needs
 them; unknown params are silently ignored (forward-compatible per the URL

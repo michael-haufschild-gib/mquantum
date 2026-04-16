@@ -271,20 +271,23 @@ fn ricciScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
     let r = sqrt(b0 * b0 + l * l);
     let rPrime = l / r;
     let rDoublePrime = (b0 * b0) / (r * r * r);
-    return 2.0 * (1.0 - rPrime * rPrime) / (r * r) - 2.0 * rDoublePrime / r;
+    let d1 = f32(dim - 1u);
+    let d2 = f32(dim - 2u);
+    return d1 * d2 * (1.0 - rPrime * rPrime) / (r * r) - 2.0 * d1 * rDoublePrime / r;
   }
   if (kind == 7u) {
-    // Superposition of two MT throats at ±s/2 (plan-approved approximation).
     let b0 = max(params.doubleThroatRad, 0.1);
     let s = max(params.doubleThroatSep, 0.2);
+    let d1 = f32(dim - 1u);
+    let d2 = f32(dim - 2u);
     let lLeft = coords[0] - 0.5 * s;
     let lRight = coords[0] + 0.5 * s;
     let rL = sqrt(b0 * b0 + lLeft * lLeft);
     let rR = sqrt(b0 * b0 + lRight * lRight);
     let rpL = lLeft / rL; let rppL = (b0 * b0) / (rL * rL * rL);
     let rpR = lRight / rR; let rppR = (b0 * b0) / (rR * rR * rR);
-    let ricciL = 2.0 * (1.0 - rpL * rpL) / (rL * rL) - 2.0 * rppL / rL;
-    let ricciR = 2.0 * (1.0 - rpR * rpR) / (rR * rR) - 2.0 * rppR / rR;
+    let ricciL = d1 * d2 * (1.0 - rpL * rpL) / (rL * rL) - 2.0 * d1 * rppL / rL;
+    let ricciR = d1 * d2 * (1.0 - rpR * rpR) / (rR * rR) - 2.0 * d1 * rppR / rR;
     return ricciL + ricciR;
   }
   return 0.0;

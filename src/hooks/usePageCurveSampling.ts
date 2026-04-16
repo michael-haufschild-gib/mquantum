@@ -123,7 +123,7 @@ export function usePageCurveSampling(inputs: PageCurveSamplingInputs): HorizonCo
     // region |x| ≥ x_horizon within the box.
     const lBoxHalf = 0.5 * becParams.lBox
     const supersonicExtent = horizonPresent
-      ? Math.max(0, lBoxHalf - Math.abs(readout.horizonX0))
+      ? Math.max(0, 2 * (lBoxHalf - Math.abs(readout.horizonX0)))
       : 0
     const frameTime =
       (bec.dt ?? 0.002) * (bec.stepsPerFrame ?? 4) * Math.max(1, bec.diagnosticsInterval ?? 5)
