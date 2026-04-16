@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Switch } from '@/components/ui/Switch'
@@ -29,10 +29,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     paperEnabled,
     setPaperEnabled,
   } = usePostProcessingStore(postProcessingSelector)
-
-  const handleTabChange = useCallback((id: string) => {
-    setActiveTab(id)
-  }, [])
 
   const tabs = useMemo(
     () => [
@@ -111,7 +107,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
   return (
     <Tabs
       value={activeTab}
-      onChange={handleTabChange}
+      onChange={setActiveTab}
       tabs={tabs}
       variant="default"
       tabListClassName="mb-4"

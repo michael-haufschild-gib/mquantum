@@ -105,6 +105,29 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
 }`)
   }
 
+  // viridis(): algorithms 19 (Viridis) and 21 (Density Contours)
+  if (colorAlgorithm === 19 || colorAlgorithm === 21) {
+    parts.push(/* wgsl */ `
+// Viridis colormap — 5-stop piecewise-linear approximation in linear RGB
+fn viridis(t: f32) -> vec3f {
+  var r: f32; var g: f32; var b: f32;
+  if (t < 0.25) {
+    let u = t / 0.25;
+    r = mix(0.267, 0.282, u); g = mix(0.004, 0.140, u); b = mix(0.329, 0.457, u);
+  } else if (t < 0.5) {
+    let u = (t - 0.25) / 0.25;
+    r = mix(0.282, 0.127, u); g = mix(0.140, 0.566, u); b = mix(0.457, 0.550, u);
+  } else if (t < 0.75) {
+    let u = (t - 0.5) / 0.25;
+    r = mix(0.127, 0.741, u); g = mix(0.566, 0.873, u); b = mix(0.550, 0.150, u);
+  } else {
+    let u = (t - 0.75) / 0.25;
+    r = mix(0.741, 0.993, u); g = mix(0.873, 0.906, u); b = mix(0.150, 0.144, u);
+  }
+  return vec3f(r, g, b);
+}`)
+  }
+
   // applyPhaseMateriality(): shared plasma/smoke color modulation for all render modes.
   // Depends on blackbody() (above). Placed before applyHDREmissionGlow since both are
   // called sequentially in the same main blocks.
@@ -381,24 +404,7 @@ const ALGO_BRANCH: Record<number, string> = {
 
   19: /* wgsl */ `
     // 19: Viridis — perceptually uniform, colorblind-safe scientific colormap
-    // Attempt to match matplotlib's viridis: dark purple → teal → yellow
-    // 5-stop piecewise-linear approximation in linear RGB
-    let t = clamp(normalized, 0.0, 1.0);
-    var vr: f32; var vg: f32; var vb: f32;
-    if (t < 0.25) {
-      let u = t / 0.25;
-      vr = mix(0.267, 0.282, u); vg = mix(0.004, 0.140, u); vb = mix(0.329, 0.457, u);
-    } else if (t < 0.5) {
-      let u = (t - 0.25) / 0.25;
-      vr = mix(0.282, 0.127, u); vg = mix(0.140, 0.566, u); vb = mix(0.457, 0.550, u);
-    } else if (t < 0.75) {
-      let u = (t - 0.5) / 0.25;
-      vr = mix(0.127, 0.741, u); vg = mix(0.566, 0.873, u); vb = mix(0.550, 0.150, u);
-    } else {
-      let u = (t - 0.75) / 0.25;
-      vr = mix(0.741, 0.993, u); vg = mix(0.873, 0.906, u); vb = mix(0.150, 0.144, u);
-    }
-    col = vec3f(vr, vg, vb);`,
+    col = viridis(clamp(normalized, 0.0, 1.0));`,
 
   20: /* wgsl */ `
     // 20: Inferno — high-contrast scientific colormap, resolves low-density features
@@ -425,22 +431,7 @@ const ALGO_BRANCH: Record<number, string> = {
     // Topographic-style visualization showing quantized density levels.
     // Useful for verifying Thomas-Fermi profiles, soliton notch depths, vortex cores.
     let t = clamp(normalized, 0.0, 1.0);
-    // Base color: viridis-style ramp
-    var vr: f32; var vg: f32; var vb: f32;
-    if (t < 0.25) {
-      let u = t / 0.25;
-      vr = mix(0.267, 0.282, u); vg = mix(0.004, 0.140, u); vb = mix(0.329, 0.457, u);
-    } else if (t < 0.5) {
-      let u = (t - 0.25) / 0.25;
-      vr = mix(0.282, 0.127, u); vg = mix(0.140, 0.566, u); vb = mix(0.457, 0.550, u);
-    } else if (t < 0.75) {
-      let u = (t - 0.5) / 0.25;
-      vr = mix(0.127, 0.741, u); vg = mix(0.566, 0.873, u); vb = mix(0.550, 0.150, u);
-    } else {
-      let u = (t - 0.75) / 0.25;
-      vr = mix(0.741, 0.993, u); vg = mix(0.873, 0.906, u); vb = mix(0.150, 0.144, u);
-    }
-    col = vec3f(vr, vg, vb);
+    col = viridis(t);
     // Overlay contour lines at 10 evenly-spaced density levels
     let contourT = fract(t * 10.0);
     let lineDistance = min(contourT, 1.0 - contourT);

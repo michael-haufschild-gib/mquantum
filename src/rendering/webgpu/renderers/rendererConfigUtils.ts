@@ -156,7 +156,12 @@ export function buildShaderConfig(
     rendererConfig.termCount
   )
 
-  const useEigenfunctionCache = useDensityGrid || pipelineIs2D ? false : enableCache
+  // Enable the eigenfunction cache alongside the density grid so the inline
+  // raymarch fallback (triggered by phase-dependent color algorithms and by the
+  // grid-transparent safety path) uses the fast cached ho1D/hydrogenND
+  // evaluation instead of recomputing Hermite / Laguerre polynomials per step.
+  // The cache and the grid bind to disjoint slots (2/3 vs 4/5) so they coexist.
+  const useEigenfunctionCache = pipelineIs2D ? false : enableCache
   const useAnalyticalGradient = computeMode
     ? false
     : (rendererConfig.analyticalGradientEnabled ?? true)

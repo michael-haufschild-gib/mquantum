@@ -47,7 +47,7 @@ struct CurvedMetric {
 // Numerical safety constants (mirror lib/physics/tdse/metrics/evaluator.ts).
 const CURVED_SCHW_MIN_RADIUS: f32 = 0.01;
 const CURVED_ADS_MIN_Z: f32 = 0.05;
-const CURVED_SPHERE_POLE_EPS: f32 = 0.05;
+const CURVED_SPHERE_POLE_EPS: f32 = 0.2;
 const CURVED_MT_MIN_RADIUS: f32 = 1e-4;
 
 // World coordinate of cell index i along an axis with N cells and spacing dx.

@@ -27,7 +27,7 @@ const SCHWARZSCHILD_MIN_RADIUS = 0.01
 /** Minimum AdS Poincaré z-coordinate (conformal boundary). */
 const ADS_MIN_Z = 0.05
 /** Sphere polar-angle buffer (θ clamped to [ε, π−ε]). */
-const SPHERE_POLE_EPSILON = 0.05
+const SPHERE_POLE_EPSILON = 0.2
 
 // ── Morris–Thorne (reused by doubleThroat) ───────────────────────────────
 

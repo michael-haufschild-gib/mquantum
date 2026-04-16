@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Section } from '@/components/sections/Section'
@@ -23,13 +23,15 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     (state: ExtendedObjectState) => state.schroedinger?.representation ?? 'position'
   )
 
-  const { config, setPowderScale, setScatteringAnisotropy } = useExtendedObjectStore(
-    useShallow((state: ExtendedObjectState) => ({
-      config: state.schroedinger,
-      setPowderScale: state.setSchroedingerPowderScale,
-      setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
-    }))
-  )
+  const { powderScale, scatteringAnisotropy, setPowderScale, setScatteringAnisotropy } =
+    useExtendedObjectStore(
+      useShallow((state: ExtendedObjectState) => ({
+        powderScale: state.schroedinger?.powderScale ?? 0,
+        scatteringAnisotropy: state.schroedinger?.scatteringAnisotropy ?? 0,
+        setPowderScale: state.setSchroedingerPowderScale,
+        setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
+      }))
+    )
 
   const {
     sssEnabled,
@@ -75,13 +77,6 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
     }))
   )
 
-  const handleSssColorChange = useCallback(
-    (c: string) => {
-      setSssColor(c)
-    },
-    [setSssColor]
-  )
-
   if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
     return null
   }
@@ -123,7 +118,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
               <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
               <ColorPicker
                 value={sssColor}
-                onChange={handleSssColorChange}
+                onChange={setSssColor}
                 tooltip="Tint color for subsurface scattered light. Warm tones simulate organic materials; cool tones simulate crystalline media."
                 disableAlpha={true}
                 className="w-24"
@@ -215,7 +210,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
               min={0.0}
               max={2.0}
               step={0.1}
-              value={config.powderScale}
+              value={powderScale}
               onChange={setPowderScale}
               showValue
               data-testid="schroedinger-powder-scale"
@@ -226,7 +221,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
               min={-0.9}
               max={0.9}
               step={0.05}
-              value={config.scatteringAnisotropy ?? 0.0}
+              value={scatteringAnisotropy}
               onChange={setScatteringAnisotropy}
               showValue
               data-testid="schroedinger-anisotropy"

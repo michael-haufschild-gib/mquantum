@@ -271,6 +271,11 @@ export function dispatchFFTAxis(
   slotOffset: number,
   params: FFTAxisParams
 ): number {
+  if (axisDim < 2 || (axisDim & (axisDim - 1)) !== 0) {
+    throw new Error(
+      `[Dirac FFT] axisDim=${axisDim} must be a power of 2 >= 2 for Stockham butterfly`
+    )
+  }
   const { encoder } = ctx
   const stages = Math.log2(axisDim)
   const halfTotal = params.totalSites / 2

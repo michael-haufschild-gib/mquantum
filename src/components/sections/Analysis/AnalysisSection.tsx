@@ -71,6 +71,7 @@ const MODE_LABELS: Record<string, string> = {
   tdseDynamics: 'TDSE',
   becDynamics: 'BEC',
   diracEquation: 'Dirac',
+  quantumWalk: 'Quantum Walk',
 }
 
 /**
@@ -402,7 +403,7 @@ const DataExportButtons: React.FC<{
               const csv = exportWavefunctionSliceCSV('wavefunction', 'x')
               if (csv) downloadFile(csv, exportFilename('mdim-slice', 'csv'))
             }}
-            data-testid="export-slice-csv"
+            data-testid="export-wf-slice-csv"
           >
             Export |&psi;|&sup2; Slice (CSV)
           </Button>

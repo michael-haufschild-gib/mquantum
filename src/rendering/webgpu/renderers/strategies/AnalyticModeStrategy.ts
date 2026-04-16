@@ -158,7 +158,10 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
     this.eigenCacheInitialized = false
 
     const enableCache = config.eigenfunctionCacheEnabled ?? !pipelineIs2D
-    const useEigenfunctionCache = useDensityGrid || pipelineIs2D ? false : enableCache
+    // Cache is created alongside the density grid (bindings 2/3 vs 4/5 — disjoint).
+    // The grid serves non-phase color algorithms; phase algorithms fall back to
+    // the inline raymarcher which uses the cache for fast per-step evaluation.
+    const useEigenfunctionCache = pipelineIs2D ? false : enableCache
 
     if (!pipelineIs2D && useEigenfunctionCache) {
       this.eigenCachePass = new EigenfunctionCacheComputePass({

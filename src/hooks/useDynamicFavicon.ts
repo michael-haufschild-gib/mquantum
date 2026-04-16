@@ -23,22 +23,12 @@ export const useDynamicFavicon = () => {
     const ctx = canvas.getContext('2d')
 
     if (ctx) {
-      // Get accent color from computed style or mapping
-      let color = '#3b82f6' // Default blue
-
-      const accentColors: Record<string, string> = {
-        cyan: '#06b6d4',
-        green: '#10b981',
-        magenta: '#d946ef',
-        orange: '#f97316',
-        blue: '#3b82f6',
-        violet: '#8b5cf6',
-        red: '#ef4444',
-      }
-
-      if (accent in accentColors) {
-        color = accentColors[accent] || color
-      }
+      // Read the resolved accent color from the theme CSS custom property.
+      // getComputedStyle resolves oklch() → rgb(), which canvas accepts.
+      const resolved = getComputedStyle(document.documentElement)
+        .getPropertyValue('--theme-accent')
+        .trim()
+      const color = resolved || '#3b82f6'
 
       // Draw Circle
       ctx.clearRect(0, 0, 32, 32)
@@ -67,9 +57,6 @@ export const useDynamicFavicon = () => {
         newLink.href = dataUrl
         document.head.appendChild(newLink)
       }
-
-      // Revoke object URL on next update to prevent memory accumulation
-      // Note: toDataURL returns a data URL (not a blob URL), so no revocation needed
     }
   }, [accent])
 }

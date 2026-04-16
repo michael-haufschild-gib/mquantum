@@ -53,8 +53,8 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
       return (
         <div className="space-y-6">
           {/* Structure Settings */}
-          <div className="space-y-4 border-s-2 border-accent-primary/20 ps-4">
-            <span className="text-xs font-bold text-accent-primary uppercase tracking-wider block mb-2">
+          <div className="space-y-4 border-s-2 border-accent/20 ps-4">
+            <span className="text-xs font-bold text-accent uppercase tracking-wider block mb-2">
               Structure
             </span>
             <Slider

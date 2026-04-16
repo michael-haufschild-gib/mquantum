@@ -115,7 +115,7 @@ fn computeEmissionLit(
 
   // Loop through lights — inlined helper functions to avoid redundant
   // lighting.lights[i] struct reads (was 4x per light, now 1x)
-  for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < MAX_LIGHTS; i++) {
     if (i >= lighting.lightCount) { break; }
 
     let light = lighting.lights[i];

@@ -71,9 +71,9 @@ export const MIN_LIGHTS = 0
  * Must match constants in shader code.
  */
 export const LIGHT_TYPE_TO_INT: Record<LightType, number> = {
-  point: 0,
-  directional: 1,
-  spot: 2,
+  point: 1,
+  directional: 2,
+  spot: 3,
 } as const
 
 /**
@@ -119,7 +119,7 @@ export const DEFAULT_NEW_LIGHT_POSITIONS: [number, number, number][] = [
  */
 export function createDefaultLight(): LightSource {
   // Convert spherical coordinates to Cartesian
-  // h=45deg, v=130deg, d=8 => x~-3.64, y~6.13, z~-3.64
+  // h=45deg, v=130deg, d=7 => x~-3.18, y~5.36, z~-3.18
   const h = (45 * Math.PI) / 180
   const v = (130 * Math.PI) / 180
   const d = 7

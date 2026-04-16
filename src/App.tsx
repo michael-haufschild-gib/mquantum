@@ -124,8 +124,6 @@ function AppContent() {
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
 
-  const handleWebGPUError = handleWebGPUErrorStable
-
   const canvasStyle = useMemo(() => ({ background: backgroundColor }), [backgroundColor])
 
   return (
@@ -216,7 +214,7 @@ function AppContent() {
               className="absolute inset-0"
               style={canvasStyle}
               dpr={scaledDpr}
-              onError={handleWebGPUError}
+              onError={handleWebGPUErrorStable}
             >
               <WebGPUScene objectType={objectType} dimension={dimension} />
             </WebGPUCanvas>
@@ -239,10 +237,7 @@ function AppContent() {
                 <ul className="text-xs text-text-tertiary space-y-1">
                   <li>Chrome 113+ (desktop &amp; Android)</li>
                   <li>Edge 113+</li>
-                  <li>
-                    Firefox — enable via <code className="text-text-secondary">about:config</code>{' '}
-                    &rarr; <code className="text-text-secondary">dom.webgpu.enabled</code>
-                  </li>
+                  <li>Firefox 141+</li>
                 </ul>
               </div>
             </div>

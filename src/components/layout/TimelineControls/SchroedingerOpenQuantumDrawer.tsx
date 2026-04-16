@@ -149,7 +149,7 @@ export const SchroedingerOpenQuantumDrawer: React.FC<SchroedingerOpenQuantumDraw
         <DrawerSection
           title="Open Quantum"
           enabled={enabled}
-          onToggle={(v) => setEnabled(v)}
+          onToggle={setEnabled}
           toggleAriaLabel="Toggle open quantum system"
           testId="openq-panel-main"
           className="col-span-full"
