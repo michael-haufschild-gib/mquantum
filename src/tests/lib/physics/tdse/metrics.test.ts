@@ -452,11 +452,13 @@ describe('ricciScalar', () => {
 })
 
 describe('kretschmannScalar', () => {
-  it('Schwarzschild → 48 M²/r⁶', () => {
+  it('Schwarzschild → 48 M²/R⁶ (areal radius)', () => {
     const M = 0.5
-    const r = 3
-    const K = kretschmannScalar({ kind: 'schwarzschild', schwarzschildMass: M }, [r, 0, 0], 3)
-    expect(K).toBeCloseTo((48 * M * M) / r ** 6, 10)
+    const rho = 3
+    const psi = 1 + M / (2 * rho)
+    const arealR = rho * psi * psi
+    const K = kretschmannScalar({ kind: 'schwarzschild', schwarzschildMass: M }, [rho, 0, 0], 3)
+    expect(K).toBeCloseTo((48 * M * M) / arealR ** 6, 10)
   })
 
   it('returns 0 for non-Schwarzschild kinds', () => {

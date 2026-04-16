@@ -343,8 +343,9 @@ function morrisThorneRicci(l: number, b0: number, dim: number): number {
 /**
  * Kretschmann scalar K = R_{μνρσ} R^{μνρσ}.
  *
- * Non-trivial for Schwarzschild: K = 48 M² / r⁶ (Wald §6.1, or standard
- * textbook result). All other supported kinds return 0 here; this function
+ * Non-trivial for Schwarzschild: K = 48 M² / R⁶, where
+ * R = ρ (1 + M / (2ρ))² is the areal radius for isotropic radius ρ = |x|.
+ * All other supported kinds return 0 here; this function
  * is primarily a diagnostic for the Schwarzschild tidal strength.
  */
 export function kretschmannScalar(
@@ -357,7 +358,9 @@ export function kretschmannScalar(
   let r2 = 0
   for (let d = 0; d < latticeDim; d++) r2 += (coords[d] ?? 0) * (coords[d] ?? 0)
   const rMin = Math.max(M / 2, SCHWARZSCHILD_MIN_RADIUS)
-  const r = Math.max(Math.sqrt(r2), rMin)
-  const r6 = r * r * r * r * r * r
+  const rho = Math.max(Math.sqrt(r2), rMin)
+  const psi = 1 + M / (2 * rho)
+  const arealR = rho * psi * psi
+  const r6 = arealR * arealR * arealR * arealR * arealR * arealR
   return (48 * M * M) / r6
 }

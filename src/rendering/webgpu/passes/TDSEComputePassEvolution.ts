@@ -150,7 +150,7 @@ export function runStrangEvolution(
     const curvedSteps = Math.floor(state.stepAccumulator)
     state.stepAccumulator -= curvedSteps
     const curvedAbsorberActive = config.absorberEnabled === true
-    const curvedNeedsRenorm =
+    const curvedPerStepRenorm =
       config.imaginaryTimeEnabled || (config.stochasticEnabled && config.stochasticGamma > 0)
     for (let step = 0; step < curvedSteps; step++) {
       res.dispatchCurvedRK4(ctx)
@@ -163,8 +163,10 @@ export function runStrangEvolution(
         absPass.end()
       }
       // Per-step renormalization for non-unitary modes (imaginary-time,
-      // stochastic). Same reduce→finalize→scale sequence as the Strang path.
-      if (curvedNeedsRenorm) {
+      // stochastic), plus a last-step frame-level renorm when absorber is
+      // off to correct numeric drift — same logic as the Strang path.
+      const curvedFrameRenorm = !curvedAbsorberActive && step === curvedSteps - 1
+      if (curvedPerStepRenorm || curvedFrameRenorm) {
         const rPass = ctx.beginComputePass({ label: `tdse-curved-renorm-reduce-${step}` })
         curvedDc(rPass, curvedPl.diagReducePipeline, [curvedBg.diagReduceBG], res.diagNumWorkgroups)
         rPass.end()
