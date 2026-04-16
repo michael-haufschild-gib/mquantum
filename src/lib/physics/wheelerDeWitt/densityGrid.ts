@@ -83,89 +83,11 @@ export function packWdwDensityGrid(
   const iaScale = Na > 1 ? Na - 1 : 0
   const iPhiScale = Nphi > 1 ? Nphi - 1 : 0
 
-  /**
-   * Trilinear sample of the complex χ field. Cells clamped at the solver's
-   * Euclidean overflow guard are treated as (0, 0) so they don't leak
-   * non-physical amplitude into neighbours. Returns [re, im].
-   */
-  const sampleChi = (
-    ia0: number,
-    ia1: number,
-    i10: number,
-    i11: number,
-    i20: number,
-    i21: number,
-    wa: number,
-    w1: number,
-    w2: number
-  ): [number, number] => {
-    // 8-corner fetch; each corner masked to (0, 0) if clamp-saturated.
-    const fetchCorner = (ia: number, i1: number, i2: number): [number, number] => {
-      const base = 2 * (ia * slab + i1 * Nphi + i2)
-      const re = output.chi[base] ?? 0
-      const im = output.chi[base + 1] ?? 0
-      if (Math.abs(re) >= CLAMP_SOFT || Math.abs(im) >= CLAMP_SOFT) return [0, 0]
-      return [re, im]
-    }
-    const [re000, im000] = fetchCorner(ia0, i10, i20)
-    const [re100, im100] = fetchCorner(ia1, i10, i20)
-    const [re010, im010] = fetchCorner(ia0, i11, i20)
-    const [re110, im110] = fetchCorner(ia1, i11, i20)
-    const [re001, im001] = fetchCorner(ia0, i10, i21)
-    const [re101, im101] = fetchCorner(ia1, i10, i21)
-    const [re011, im011] = fetchCorner(ia0, i11, i21)
-    const [re111, im111] = fetchCorner(ia1, i11, i21)
-
-    const re00 = re000 + (re100 - re000) * wa
-    const re10 = re010 + (re110 - re010) * wa
-    const re01 = re001 + (re101 - re001) * wa
-    const re11 = re011 + (re111 - re011) * wa
-    const re0 = re00 + (re10 - re00) * w1
-    const re1 = re01 + (re11 - re01) * w1
-    const re = re0 + (re1 - re0) * w2
-
-    const im00 = im000 + (im100 - im000) * wa
-    const im10 = im010 + (im110 - im010) * wa
-    const im01 = im001 + (im101 - im001) * wa
-    const im11 = im011 + (im111 - im011) * wa
-    const im0 = im00 + (im10 - im00) * w1
-    const im1 = im01 + (im11 - im01) * w1
-    const im = im0 + (im1 - im0) * w2
-    return [re, im]
-  }
-
-  /** Trilinear sample of the streamline overlay (scalar intensity). */
-  const sampleOverlay = (
-    ia0: number,
-    ia1: number,
-    i10: number,
-    i11: number,
-    i20: number,
-    i21: number,
-    wa: number,
-    w1: number,
-    w2: number
-  ): number => {
-    if (!overlay) return 0
-    const intensity = overlay.intensity
-    const fetch = (ia: number, i1: number, i2: number): number =>
-      intensity[ia * slab + i1 * Nphi + i2] ?? 0
-    const s000 = fetch(ia0, i10, i20)
-    const s100 = fetch(ia1, i10, i20)
-    const s010 = fetch(ia0, i11, i20)
-    const s110 = fetch(ia1, i11, i20)
-    const s001 = fetch(ia0, i10, i21)
-    const s101 = fetch(ia1, i10, i21)
-    const s011 = fetch(ia0, i11, i21)
-    const s111 = fetch(ia1, i11, i21)
-    const s00 = s000 + (s100 - s000) * wa
-    const s10 = s010 + (s110 - s010) * wa
-    const s01 = s001 + (s101 - s001) * wa
-    const s11 = s011 + (s111 - s011) * wa
-    const s0 = s00 + (s10 - s00) * w1
-    const s1 = s01 + (s11 - s01) * w1
-    return s0 + (s1 - s0) * w2
-  }
+  // Scalar inline sampling — closures + tuple allocations across 64³ voxels
+  // became measurable GC pressure during interactive repacks. Hot path below
+  // indexes `chi` and `overlay.intensity` directly.
+  const chi = output.chi
+  const overlayIntensity = overlay?.intensity ?? null
 
   for (let z = 0; z < N; z++) {
     const tz = (z + 0.5) / N
@@ -187,12 +109,102 @@ export function packWdwDensityGrid(
         const wa = fx - ia0
         const pixelIdx = (z * N + y) * N + x
 
-        const [re, im] = sampleChi(ia0, ia1, i10, i11, i20, i21, wa, w1, w2)
+        // χ — 8-corner complex fetch with clamp-saturation masked to (0, 0).
+        const b000 = 2 * (ia0 * slab + i10 * Nphi + i20)
+        let re000 = chi[b000] ?? 0
+        let im000 = chi[b000 + 1] ?? 0
+        if (Math.abs(re000) >= CLAMP_SOFT || Math.abs(im000) >= CLAMP_SOFT) {
+          re000 = 0
+          im000 = 0
+        }
+        const b100 = 2 * (ia1 * slab + i10 * Nphi + i20)
+        let re100 = chi[b100] ?? 0
+        let im100 = chi[b100 + 1] ?? 0
+        if (Math.abs(re100) >= CLAMP_SOFT || Math.abs(im100) >= CLAMP_SOFT) {
+          re100 = 0
+          im100 = 0
+        }
+        const b010 = 2 * (ia0 * slab + i11 * Nphi + i20)
+        let re010 = chi[b010] ?? 0
+        let im010 = chi[b010 + 1] ?? 0
+        if (Math.abs(re010) >= CLAMP_SOFT || Math.abs(im010) >= CLAMP_SOFT) {
+          re010 = 0
+          im010 = 0
+        }
+        const b110 = 2 * (ia1 * slab + i11 * Nphi + i20)
+        let re110 = chi[b110] ?? 0
+        let im110 = chi[b110 + 1] ?? 0
+        if (Math.abs(re110) >= CLAMP_SOFT || Math.abs(im110) >= CLAMP_SOFT) {
+          re110 = 0
+          im110 = 0
+        }
+        const b001 = 2 * (ia0 * slab + i10 * Nphi + i21)
+        let re001 = chi[b001] ?? 0
+        let im001 = chi[b001 + 1] ?? 0
+        if (Math.abs(re001) >= CLAMP_SOFT || Math.abs(im001) >= CLAMP_SOFT) {
+          re001 = 0
+          im001 = 0
+        }
+        const b101 = 2 * (ia1 * slab + i10 * Nphi + i21)
+        let re101 = chi[b101] ?? 0
+        let im101 = chi[b101 + 1] ?? 0
+        if (Math.abs(re101) >= CLAMP_SOFT || Math.abs(im101) >= CLAMP_SOFT) {
+          re101 = 0
+          im101 = 0
+        }
+        const b011 = 2 * (ia0 * slab + i11 * Nphi + i21)
+        let re011 = chi[b011] ?? 0
+        let im011 = chi[b011 + 1] ?? 0
+        if (Math.abs(re011) >= CLAMP_SOFT || Math.abs(im011) >= CLAMP_SOFT) {
+          re011 = 0
+          im011 = 0
+        }
+        const b111 = 2 * (ia1 * slab + i11 * Nphi + i21)
+        let re111 = chi[b111] ?? 0
+        let im111 = chi[b111 + 1] ?? 0
+        if (Math.abs(re111) >= CLAMP_SOFT || Math.abs(im111) >= CLAMP_SOFT) {
+          re111 = 0
+          im111 = 0
+        }
+
+        const re00 = re000 + (re100 - re000) * wa
+        const re10 = re010 + (re110 - re010) * wa
+        const re01 = re001 + (re101 - re001) * wa
+        const re11 = re011 + (re111 - re011) * wa
+        const re0 = re00 + (re10 - re00) * w1
+        const re1 = re01 + (re11 - re01) * w1
+        const re = re0 + (re1 - re0) * w2
+
+        const im00 = im000 + (im100 - im000) * wa
+        const im10 = im010 + (im110 - im010) * wa
+        const im01 = im001 + (im101 - im001) * wa
+        const im11 = im011 + (im111 - im011) * wa
+        const im0 = im00 + (im10 - im00) * w1
+        const im1 = im01 + (im11 - im01) * w1
+        const im = im0 + (im1 - im0) * w2
+
         const rho = re * re + im * im
         const rhoNorm = clamp01(rho / maxRho)
         const phase = re === 0 && im === 0 ? 0 : Math.atan2(im, re)
 
-        const overlayRaw = sampleOverlay(ia0, ia1, i10, i11, i20, i21, wa, w1, w2)
+        let overlayRaw = 0
+        if (overlayIntensity) {
+          const s000 = overlayIntensity[ia0 * slab + i10 * Nphi + i20] ?? 0
+          const s100 = overlayIntensity[ia1 * slab + i10 * Nphi + i20] ?? 0
+          const s010 = overlayIntensity[ia0 * slab + i11 * Nphi + i20] ?? 0
+          const s110 = overlayIntensity[ia1 * slab + i11 * Nphi + i20] ?? 0
+          const s001 = overlayIntensity[ia0 * slab + i10 * Nphi + i21] ?? 0
+          const s101 = overlayIntensity[ia1 * slab + i10 * Nphi + i21] ?? 0
+          const s011 = overlayIntensity[ia0 * slab + i11 * Nphi + i21] ?? 0
+          const s111 = overlayIntensity[ia1 * slab + i11 * Nphi + i21] ?? 0
+          const s00 = s000 + (s100 - s000) * wa
+          const s10 = s010 + (s110 - s010) * wa
+          const s01 = s001 + (s101 - s001) * wa
+          const s11 = s011 + (s111 - s011) * wa
+          const s0 = s00 + (s10 - s00) * w1
+          const s1 = s01 + (s11 - s01) * w1
+          overlayRaw = s0 + (s1 - s0) * w2
+        }
         const overlayVal = overlay ? overlayRaw / maxStreamline : 0
         // Mix the streamline/worldline overlay into the rendered R/G channels
         // so it is actually visible. The raymarcher only reads R (rho) and G
