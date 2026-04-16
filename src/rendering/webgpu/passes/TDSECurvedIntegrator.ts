@@ -39,6 +39,7 @@ import {
 } from '../shaders/schroedinger/compute/tdseCurvedKinetic.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
+import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassBuffers'
 
 /** Workgroup size — must match `@workgroup_size` in all curved kernels. */
 const CURVED_WG = 64
@@ -52,11 +53,12 @@ const CURVED_WG = 64
 export const CURVED_MAX_STEPS_PER_FRAME = 64
 
 /**
- * Byte offset of the `stageTimeK1` field inside `TDSEUniforms`. Used by the
- * per-step stage-time copy — keep in sync with the layout comment in
- * `TDSEComputePassBuffers.ts` and the struct in `tdseUniforms.wgsl.ts`.
+ * Byte offset of the `stageTimeK1` field inside `TDSEUniforms`. Used by
+ * the per-step stage-time copy. Re-exported under a local name for call
+ * sites in this module; the canonical source lives in
+ * {@link TDSE_UNIFORM_OFFSET_STAGE_TIME_K1}.
  */
-export const CURVED_STAGE_TIMES_OFFSET = 896
+export const CURVED_STAGE_TIMES_OFFSET = TDSE_UNIFORM_OFFSET_STAGE_TIME_K1
 
 /** Byte size of one (K1, K2, K3, K4) quartet of f32 stage times. */
 export const CURVED_STAGE_TIMES_STRIDE = 16

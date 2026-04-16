@@ -558,10 +558,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
    * the subsequent per-step {@link applyCurvedStageTimesForStep} calls
    * copy from.
    *
-   * No-op when the curved integrator scratch hasn't been materialized
-   * yet; the next `runCurvedFrame` will allocate it and the stage-time
-   * copies for this first frame will safely fall back to whatever
-   * frame-start values `writeTdseUniforms` wrote.
+   * Lazily allocates the curved scratch buffer when it hasn't been
+   * materialized yet (startup, post-rebuild). Without this, the first
+   * multi-step frame on a time-dependent metric (e.g. de Sitter) would
+   * skip the writeBuffer entirely and every `copyBufferToBuffer` issued
+   * by {@link applyCurvedStageTimesForStep} on steps 1..N-1 of that
+   * frame would read zeros, drifting `a(t)` by up to `(steps-1)·dt`
+   * before `runCurvedFrame` eventually allocates the scratch and
+   * subsequent frames stabilize.
    *
    * @param device - GPU device (forwarded to the writeBuffer call).
    * @param simTimeStart - Simulation time at the start of step 0.
@@ -574,9 +578,12 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     dt: number,
     steps: number
   ): void {
-    const scratch = this._curvedState.scratch
-    if (!scratch) return
-    writeCurvedStageTimes(device, scratch, simTimeStart, dt, steps)
+    if (!this._curvedState.scratch) {
+      if (this.totalSites <= 0) return
+      this._curvedState.scratch = createCurvedScratchBuffers(device, this.totalSites)
+      this._curvedState.bindGroups = null
+    }
+    writeCurvedStageTimes(device, this._curvedState.scratch, simTimeStart, dt, steps)
   }
 
   /**

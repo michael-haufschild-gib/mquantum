@@ -8,7 +8,7 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
+import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComputePassUniforms'
 
 /**
@@ -64,6 +64,18 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  */
 export const TDSE_UNIFORM_SIZE = 928
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
+
+/**
+ * Byte offset of `TDSEUniforms.stageTimeK1` — start of the 16-byte
+ * (K1, K2, K3, K4) RK4 stage-time quartet consumed by the curved-space
+ * integrator for time-dependent metrics (deSitter).
+ *
+ * Canonical source of truth. Importers (e.g. {@link TDSECurvedIntegrator})
+ * must reference this constant rather than duplicating the literal — the
+ * next field insertion in `TDSEUniforms` would silently redirect copies
+ * into the wrong slots otherwise.
+ */
+export const TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 = 896
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
 /** DiagReduceUniforms struct size (32 bytes) */
@@ -229,7 +241,7 @@ export function rebuildTdseBuffers(
   // ensures correct per-stage data (device.queue.writeBuffer would race with command buffer).
   let fwdStageCount = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    fwdStageCount += Math.round(Math.log2(config.gridSize[d]!))
+    fwdStageCount += assertPow2Log2(config.gridSize[d]!)
   }
   const totalFFTStages = fwdStageCount * 2 // forward + inverse
   const fftStagingBuffer = device.createBuffer({
