@@ -8,6 +8,23 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { buildCompactDimsMask, computeEffectiveSpacing } from '@/lib/physics/compactification'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
+import type { MetricKind } from '@/lib/physics/tdse/metrics/types'
+import {
+  MAX_ADS_RADIUS,
+  MAX_DOUBLE_THROAT_SEPARATION,
+  MAX_HUBBLE_RATE,
+  MAX_SCHWARZSCHILD_MASS,
+  MAX_SPHERE_RADIUS,
+  MAX_THROAT_RADIUS,
+  MAX_TORUS_PERIOD,
+  MIN_ADS_RADIUS,
+  MIN_DOUBLE_THROAT_SEPARATION,
+  MIN_HUBBLE_RATE,
+  MIN_SCHWARZSCHILD_MASS,
+  MIN_SPHERE_RADIUS,
+  MIN_THROAT_RADIUS,
+  MIN_TORUS_PERIOD,
+} from '@/lib/physics/tdse/metrics/types'
 
 import { FFT_UNIFORM_SIZE, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
 
@@ -82,6 +99,28 @@ const VIEW_MAP: Record<string, number> = {
 
 /** Enum maps for TDSE drive waveform types. */
 const WAVEFORM_MAP: Record<string, number> = { sine: 0, pulse: 1, chirp: 2 }
+
+/**
+ * Metric kind → numeric code for the GPU uniform. Must match the codes
+ * documented in `tdseUniforms.wgsl.ts` and consumed by `evalMetric` in
+ * `tdseCurvedKinetic.wgsl.ts`.
+ */
+const METRIC_KIND_MAP: Record<MetricKind, number> = {
+  flat: 0,
+  morrisThorne: 1,
+  schwarzschild: 2,
+  deSitter: 3,
+  antiDeSitter: 4,
+  sphere2D: 5,
+  torus: 6,
+  doubleThroat: 7,
+}
+
+/** Clamp `v` into `[lo, hi]`; non-finite input returns `lo`. */
+function clampFinite(v: number | undefined, lo: number, hi: number): number {
+  if (v === undefined || !Number.isFinite(v)) return lo
+  return Math.min(hi, Math.max(lo, v))
+}
 
 /**
  * Write TDSE uniform data into a pre-allocated ArrayBuffer, then upload to the GPU.
@@ -327,6 +366,86 @@ export function writeTdseUniforms(
   const rawBoost = config.islandBoost ?? 1.0
   const clampedBoost = Math.min(4.0, Math.max(1.0, Number.isFinite(rawBoost) ? rawBoost : 1.0))
   f32[207] = islandActive ? clampedBoost : 1.0
+
+  // Curved-space TDSE v1 metric (offsets 832-847, indices 208-211).
+  // metricKind codes: 0=flat, 1=morrisThorne, 2=schwarzschild, 3=deSitter,
+  // 4=antiDeSitter, 5=sphere2D, 6=torus, 7=doubleThroat.
+  // The curved RK4 integrator evaluates the metric analytically from these
+  // fields + the v2 block below. Pad slots stay 0 from the u32.fill(0) at top.
+  const metric = config.metric
+  const kind: MetricKind = metric?.kind ?? 'flat'
+  const metricKind = METRIC_KIND_MAP[kind] ?? 0
+  u32[208] = metricKind
+  // throatRadius is consumed by both morrisThorne and doubleThroat (as the
+  // shared b₀). Clamp to its physical bounds; zero when not relevant.
+  const wantsThroat = kind === 'morrisThorne' || kind === 'doubleThroat'
+  f32[209] = wantsThroat
+    ? clampFinite(metric?.throatRadius, MIN_THROAT_RADIUS, MAX_THROAT_RADIUS)
+    : 0
+
+  // Curved-space TDSE v2 metric block (offsets 848-911, indices 212-227).
+  // Each field is zero when not relevant to the active metric kind; otherwise
+  // clamped to its bounds from `lib/physics/tdse/metrics/types.ts`.
+  f32[212] =
+    kind === 'schwarzschild'
+      ? clampFinite(metric?.schwarzschildMass, MIN_SCHWARZSCHILD_MASS, MAX_SCHWARZSCHILD_MASS)
+      : 0
+  f32[213] =
+    kind === 'deSitter' ? clampFinite(metric?.hubbleRate, MIN_HUBBLE_RATE, MAX_HUBBLE_RATE) : 0
+  f32[214] =
+    kind === 'antiDeSitter' ? clampFinite(metric?.adsRadius, MIN_ADS_RADIUS, MAX_ADS_RADIUS) : 0
+  f32[215] =
+    kind === 'sphere2D'
+      ? clampFinite(metric?.sphereRadius, MIN_SPHERE_RADIUS, MAX_SPHERE_RADIUS)
+      : 0
+  f32[216] =
+    kind === 'doubleThroat'
+      ? clampFinite(
+          metric?.doubleThroatSeparation,
+          MIN_DOUBLE_THROAT_SEPARATION,
+          MAX_DOUBLE_THROAT_SEPARATION
+        )
+      : 0
+  // doubleThroatRadius: falls back to throatRadius per the CPU evaluator.
+  f32[217] =
+    kind === 'doubleThroat'
+      ? clampFinite(
+          metric?.doubleThroatRadius ?? metric?.throatRadius,
+          MIN_THROAT_RADIUS,
+          MAX_THROAT_RADIUS
+        )
+      : 0
+  // indices 218, 219 are _padV2a/b — kept at 0 from u32.fill(0) above.
+
+  // torusPeriod (3 × f32 at indices 220-222). Zero when not torus.
+  if (kind === 'torus') {
+    const periods = metric?.torusPeriod
+    f32[220] = clampFinite(periods?.[0], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    f32[221] = clampFinite(periods?.[1], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+    f32[222] = clampFinite(periods?.[2], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+  }
+  // index 223 is _padV2c.
+
+  // RK4 per-stage simTime offsets (indices 224-227).
+  // K1 = t, K2 = K3 = t + dt/2, K4 = t + dt.
+  // NOTE: written once per frame at start-of-frame simTime — stale for
+  // stepsPerFrame > 1. Acceptable for v2a; only deSitter consumes time.
+  const tStart = simTime
+  const halfDt = 0.5 * config.dt
+  f32[224] = tStart
+  f32[225] = tStart + halfDt
+  f32[226] = tStart + halfDt
+  f32[227] = tStart + config.dt
+
+  // Curved-space TDSE v2 Wave 6 visualization block (offsets 912-927,
+  // indices 228-231). All render-only — do not touch the kinetic path.
+  // showCurvatureOverlay (228) and densityViewMode (229) are u32 flags.
+  // Opacity is clamped to [0, 1] so a bogus store value can't amplify the
+  // overlay beyond the intended blend range. _padV2d stays 0 from fill.
+  u32[228] = config.showCurvatureOverlay ? 1 : 0
+  u32[229] = config.densityView === 'proper' ? 1 : 0
+  const rawOpacity = config.curvatureOverlayOpacity ?? 0.4
+  f32[230] = Math.min(1, Math.max(0, Number.isFinite(rawOpacity) ? rawOpacity : 0.4))
 
   device.queue.writeBuffer(uniformBuffer, 0, uniformData)
 }

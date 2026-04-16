@@ -61,8 +61,12 @@ import { type ObservablesState } from './TDSEObservablesDispatch'
  *   hawkingPairInjection (u32 @ 776), hawkingSeed (u32 @ 780),
  *   hawkingStepIndex (u32 @ 784), _padHawk0..2 (u32 @ 788/792/796),
  *   wormholeCouplingEnabled (u32 @ 800), wormholeCouplingG (f32 @ 804),
- *   wormholeMirrorAxis (u32 @ 808), _padWormhole (u32 @ 812).
- * Total = 816 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
+ *   wormholeMirrorAxis (u32 @ 808), _padWormhole (u32 @ 812),
+ *   islandOverlayEnabled (u32 @ 816), islandCenterX0 (f32 @ 820),
+ *   islandRadiusWs (f32 @ 824), islandBoost (f32 @ 828),
+ *   metricKind (u32 @ 832), throatRadius (f32 @ 836),
+ *   _padMetric0..1 (u32 @ 840/844).
+ * Total = 848 (16-byte aligned). Update the canonical `TDSE_UNIFORM_SIZE`
  * constant in `TDSEComputePassBuffers.ts` (re-used here) and the WGSL
  * struct together when adding new fields.
  */
@@ -84,6 +88,15 @@ import {
   createWormholePipeline,
   type WormholePipelineResources,
 } from './TDSEComputePassWormhole'
+import {
+  buildCurvedPipelines,
+  createCurvedIntegratorState,
+  createCurvedScratchBuffers,
+  type CurvedIntegratorState,
+  disposeCurvedScratch,
+  rebuildCurvedBindGroups,
+  runCurvedRK4Step,
+} from './TDSECurvedIntegrator'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
   type GramSchmidtState,
@@ -242,6 +255,15 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   wormholeBG: GPUBindGroup | null = null
   /** ER=EPR wormhole coherence readback (staging + in-flight gate). */
   readonly _wormholeReadback: WormholeReadbackState = createWormholeReadbackState()
+
+  /**
+   * Curved-space TDSE RK4 integrator state. Stays `{null,null,null}` until the
+   * first frame with `config.metric?.kind === 'morrisThorne'`, at which point
+   * pipelines + scratch + bind groups are built lazily. Flat sessions pay
+   * zero cost — no shader compile, no buffer allocation, no bind-group
+   * creation — so the command buffer stays bit-identical to pre-feature.
+   */
+  readonly _curvedState: CurvedIntegratorState = createCurvedIntegratorState()
 
   // Pre-allocated uniform views
   readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -403,6 +425,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     )
     // Wormhole HUD staging — drop stale buffers; new size picked lazily.
     resetWormholeReadback(this._wormholeReadback)
+    // Curved-space RK4 scratch is sized by totalSites; destroy now and
+    // re-allocate on the next curved frame. Pipelines are lattice-independent
+    // and stay compiled. Flat sessions never built scratch so this is a no-op.
+    if (this._curvedState.scratch) {
+      disposeCurvedScratch(this._curvedState.scratch)
+      this._curvedState.scratch = null
+      this._curvedState.bindGroups = null
+    }
   }
 
   protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
@@ -472,6 +502,63 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
         this.psiImBuffer
       )
     }
+    // Curved-space RK4 bind groups — rebuild only when the integrator has
+    // already been activated (i.e. a prior frame saw a Morris–Thorne metric).
+    // Pure-flat sessions skip this entirely.
+    this.rebuildCurvedBindGroupsIfActive(device)
+  }
+
+  /**
+   * Rebuild curved integrator bind groups if the curved state has been
+   * activated. No-op when pipelines / scratch have not been lazily built yet.
+   */
+  private rebuildCurvedBindGroupsIfActive(device: GPUDevice): void {
+    const { pipelines, scratch } = this._curvedState
+    if (!pipelines || !scratch) return
+    if (!this.uniformBuffer || !this.psiReBuffer || !this.psiImBuffer || !this.potentialBuffer) {
+      return
+    }
+    this._curvedState.bindGroups = rebuildCurvedBindGroups(device, pipelines, {
+      uniformBuffer: this.uniformBuffer,
+      psiReBuffer: this.psiReBuffer,
+      psiImBuffer: this.psiImBuffer,
+      potentialBuffer: this.potentialBuffer,
+      scratch,
+    })
+  }
+
+  /**
+   * Ensure the curved-space integrator state is fully built and dispatch one
+   * RK4 step. Lazy-compiles pipelines on first invocation, then lazily
+   * rebuilds scratch + bind groups whenever they're missing (e.g. after a
+   * lattice rebuild). Callers guard on `config.metric?.kind` before calling
+   * to preserve the flat-path zero-regression invariant.
+   */
+  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder): void {
+    if (
+      !this.uniformBuffer ||
+      !this.psiReBuffer ||
+      !this.psiImBuffer ||
+      !this.potentialBuffer ||
+      this.totalSites <= 0
+    ) {
+      return
+    }
+    if (!this._curvedState.pipelines) {
+      this._curvedState.pipelines = buildCurvedPipelines(
+        device,
+        this.createShaderModule.bind(this),
+        this.createComputePipeline.bind(this)
+      )
+    }
+    if (!this._curvedState.scratch) {
+      this._curvedState.scratch = createCurvedScratchBuffers(device, this.totalSites)
+      this._curvedState.bindGroups = null
+    }
+    if (!this._curvedState.bindGroups) {
+      this.rebuildCurvedBindGroupsIfActive(device)
+    }
+    runCurvedRK4Step(encoder, this._curvedState)
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
@@ -558,6 +645,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   dispose(): void {
     runTdseDispose(this._fieldView)
+    // Tear down curved-space integrator scratch. Pipelines are GC'd by the
+    // underlying GPUDevice; scratch buffers need explicit destroy() to
+    // release GPU memory.
+    disposeCurvedScratch(this._curvedState.scratch)
+    this._curvedState.scratch = null
+    this._curvedState.bindGroups = null
+    this._curvedState.pipelines = null
     super.dispose()
   }
 }

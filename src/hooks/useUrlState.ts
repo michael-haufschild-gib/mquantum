@@ -52,6 +52,73 @@ function applyTdseParams(
     ext.setTdseDisorderDistribution(urlState.disorderDistribution)
 }
 
+type MetricKindFromUrl = NonNullable<ParsedShareableState['tdseMetricKind']>
+
+/**
+ * Per-kind extractors that pull the scalars a given metric kind cares about
+ * from the parsed URL state. Each returns a partial config without `kind`.
+ * Dispatched by kind to keep the top-level `buildMetricCfgFromUrl` linear.
+ */
+const METRIC_FIELD_EXTRACTORS: {
+  [K in MetricKindFromUrl]: (u: ParsedShareableState) => Record<string, unknown>
+} = {
+  flat: () => ({}),
+  morrisThorne: (u) =>
+    u.tdseMetricThroatRadius !== undefined ? { throatRadius: u.tdseMetricThroatRadius } : {},
+  schwarzschild: (u) =>
+    u.tdseSchwarzschildMass !== undefined ? { schwarzschildMass: u.tdseSchwarzschildMass } : {},
+  deSitter: (u) => (u.tdseHubbleRate !== undefined ? { hubbleRate: u.tdseHubbleRate } : {}),
+  antiDeSitter: (u) => (u.tdseAdsRadius !== undefined ? { adsRadius: u.tdseAdsRadius } : {}),
+  sphere2D: (u) => (u.tdseSphereRadius !== undefined ? { sphereRadius: u.tdseSphereRadius } : {}),
+  torus: (u) => {
+    const { tdseTorusPeriod0: p0, tdseTorusPeriod1: p1, tdseTorusPeriod2: p2 } = u
+    return p0 !== undefined || p1 !== undefined || p2 !== undefined
+      ? { torusPeriod: [p0 ?? 1, p1 ?? 1, p2 ?? 1] }
+      : {}
+  },
+  doubleThroat: (u) => {
+    const out: Record<string, unknown> = {}
+    if (u.tdseDoubleThroatSeparation !== undefined)
+      out.doubleThroatSeparation = u.tdseDoubleThroatSeparation
+    if (u.tdseDoubleThroatRadius !== undefined) out.doubleThroatRadius = u.tdseDoubleThroatRadius
+    return out
+  },
+}
+
+/**
+ * Build a `MetricConfig`-shaped object from URL state for a given kind. Each
+ * kind only consumes the scalars it cares about; unknown fields are dropped
+ * by the downstream setter's clamping logic.
+ */
+function buildMetricCfgFromUrl(
+  urlState: ParsedShareableState,
+  kind: MetricKindFromUrl
+): Record<string, unknown> {
+  return { kind, ...METRIC_FIELD_EXTRACTORS[kind](urlState) }
+}
+
+/**
+ * Apply TDSE metric + curvature-visualization URL state params (Waves 5-6).
+ *
+ * Builds a `MetricConfig` by selecting only the scalars relevant to the
+ * declared `tdseMetricKind` and calls `setTdseMetric` once. Sets overlay /
+ * density-view flags independently. No-ops when the URL specified no metric.
+ */
+function applyTdseMetricParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.tdseMetricKind !== undefined) {
+    const cfg = buildMetricCfgFromUrl(urlState, urlState.tdseMetricKind)
+    ext.setTdseMetric(cfg as unknown as Parameters<typeof ext.setTdseMetric>[0])
+  }
+  if (urlState.tdseShowCurvatureOverlay !== undefined)
+    ext.setShowCurvatureOverlay(urlState.tdseShowCurvatureOverlay)
+  if (urlState.tdseCurvatureOverlayOpacity !== undefined)
+    ext.setCurvatureOverlayOpacity(urlState.tdseCurvatureOverlayOpacity)
+  if (urlState.tdseDensityView !== undefined) ext.setDensityView(urlState.tdseDensityView)
+}
+
 /** Apply open-quantum URL state params. */
 function applyOpenQuantumParams(
   urlState: ParsedShareableState,
@@ -297,6 +364,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
 
     // ── TDSE config ──────────────────────────────────────────────────────────
     applyTdseParams(urlState, ext)
+    applyTdseMetricParams(urlState, ext)
 
     // ── Features ─────────────────────────────────────────────────────────────
     applyOpenQuantumParams(urlState, ext)

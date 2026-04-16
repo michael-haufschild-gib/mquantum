@@ -5,6 +5,8 @@
  * for the split-operator GPU solver.
  */
 
+import type { MetricConfig } from '@/lib/physics/tdse/metrics/types'
+
 // ============================================================================
 // TDSE Types
 // ============================================================================
@@ -239,6 +241,37 @@ export interface TdseConfig {
   /** Imaginary-time propagation mode (Wick rotation for ground state search) */
   imaginaryTimeEnabled: boolean
 
+  /**
+   * Spatial metric for the kinetic operator. `kind:'flat'` (default)
+   * preserves existing split-step FFT behavior. `kind:'morrisThorne'`
+   * enables the Laplace-Beltrami kinetic path via curved integrator.
+   */
+  metric: MetricConfig
+
+  // === Curved-space TDSE v2 — Wave 6 visualization (render-only, no needsReset) ===
+  /**
+   * Toggle the diagnostic Ricci-scalar curvature overlay on the TDSE density
+   * volume. The overlay modulates the display scalar by a diverging
+   * sign(R)-keyed factor — positive curvature brightens voxels, negative
+   * curvature darkens them — with |R|-dependent strength. No-ops on flat /
+   * torus / Schwarzschild metrics (all have Ricci = 0). Pure visual effect.
+   */
+  showCurvatureOverlay?: boolean
+  /**
+   * Curvature overlay opacity in [0, 1]. 0 = off, 1 = fully saturated.
+   * Clamped in `TDSEComputePassUniforms`.
+   */
+  curvatureOverlayOpacity?: number
+  /**
+   * Density-volume interpretation. `coordinate` = bare |ψ|² (the existing
+   * default); `proper` multiplies the display scalar by √|g| so the rendered
+   * brightness reflects probability per unit PROPER volume — physically
+   * meaningful on curved metrics where √|g| ≠ 1. Warning: on strongly curved
+   * regions (near MT throats) √|g| can be large; auto-scale + proper view
+   * interact — see the shader comment in `tdseWriteGrid.wgsl.ts`.
+   */
+  densityView?: 'coordinate' | 'proper'
+
   /** Runtime flag to trigger wavefunction re-initialization (not persisted) */
   needsReset: boolean
   /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
@@ -450,6 +483,12 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   wormholeCouplingG: 0.5,
   wormholeMirrorAxis: 0,
   wormholeCoherenceHudEnabled: false,
+
+  metric: { kind: 'flat' },
+
+  showCurvatureOverlay: false,
+  curvatureOverlayOpacity: 0.4,
+  densityView: 'coordinate',
 
   needsReset: false,
   slicePositions: [],

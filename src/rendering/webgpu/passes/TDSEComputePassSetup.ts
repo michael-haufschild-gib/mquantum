@@ -10,6 +10,7 @@ import {
   tdseComplexUnpackShaderBlock,
   tdsePackUniformsShaderBlock,
 } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import { tdseCurvatureHelpersBlock } from '../shaders/schroedinger/compute/tdseCurvatureHelpers.wgsl'
 import {
   tdseDiagNormFinalizeBlock,
   tdseDiagNormReduceBlock,
@@ -355,7 +356,11 @@ export function buildTdsePipelines(
   ])
   const writeGridPipeline = helpers.createComputePipeline(
     device,
-    helpers.createShaderModule(device, unifAndIndex + tdseWriteGridBlock, 'tdse-write-grid'),
+    helpers.createShaderModule(
+      device,
+      unifAndIndex + tdseCurvatureHelpersBlock + tdseWriteGridBlock,
+      'tdse-write-grid'
+    ),
     [writeGridBGL],
     'tdse-write-grid'
   )

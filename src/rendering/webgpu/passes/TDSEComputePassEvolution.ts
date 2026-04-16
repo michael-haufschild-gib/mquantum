@@ -104,6 +104,17 @@ export interface EvolutionResources {
    * Caller has already set the FFT pipeline on the encoder.
    */
   dispatchFFTAxisInPass: (passEncoder: GPUComputePassEncoder, axisDim: number, slot: number) => void
+  /**
+   * Curved-space RK4 integrator dispatcher. When `undefined`, the Strang
+   * loop runs as before — this preserves the flat-metric zero-regression
+   * guarantee. When present AND the metric kind is non-flat and non-torus,
+   * the Strang body is entirely replaced by per-step RK4 dispatches.
+   * (Flat and torus both use the existing split-step FFT path. All other
+   * metrics invoke the curved-space RK4 integrator. This preserves the v1
+   * zero-regression guarantee for flat and adds torus as a zero-curvature
+   * periodic case — FFT naturally implements periodic BC for a uniform grid.)
+   */
+  dispatchCurvedRK4?: (ctx: WebGPURenderContext) => void
 }
 
 /**
@@ -122,6 +133,41 @@ export function runStrangEvolution(
   state: EvolutionFrameState,
   res: EvolutionResources
 ): void {
+  // ─── Curved-space early branch ───────────────────────────────────────────
+  // For non-flat metrics the split-step FFT kinetic step does not diagonalize
+  // the Hamiltonian. Replace the entire Strang body with a per-step RK4
+  // integrator on the position-space Laplace–Beltrami operator. The branch
+  // is guarded so that any flat or missing-metric config — plus any build
+  // where `dispatchCurvedRK4` wasn't injected — falls through to the
+  // existing path unchanged (zero-regression guarantee).
+  const metricKind = config.metric?.kind
+  const curvedBranch = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
+  if (curvedBranch && res.dispatchCurvedRK4) {
+    const { pl: curvedPl, bg: curvedBg, dc: curvedDc } = res
+    const curvedLinearWG = Math.ceil(res.totalSites / LINEAR_WG)
+    const scaledSteps = config.stepsPerFrame * speed
+    state.stepAccumulator += scaledSteps
+    const curvedSteps = Math.floor(state.stepAccumulator)
+    state.stepAccumulator -= curvedSteps
+    const curvedAbsorberActive = config.absorberEnabled === true
+    for (let step = 0; step < curvedSteps; step++) {
+      res.dispatchCurvedRK4(ctx)
+      state.simTime += config.dt
+      // PML absorber: ψ damping at boundaries. Uses the same pipeline +
+      // init-bind-group as the flat path; operates on ψ regardless of metric.
+      if (curvedAbsorberActive) {
+        const absPass = ctx.beginComputePass({ label: `tdse-curved-absorber-${step}` })
+        curvedDc(absPass, curvedPl.absorberPipeline, [curvedBg.initBG], curvedLinearWG)
+        absPass.end()
+      }
+      // Heller spectrometer tick — same per-step cadence as the flat path.
+      if (res.hellerState) {
+        tickHellerStep(ctx.device, ctx.encoder, res.hellerState, state.simTime)
+      }
+    }
+    return
+  }
+
   const { pl, bg, dc } = res
   const linearWG = Math.ceil(res.totalSites / LINEAR_WG)
 

@@ -20,25 +20,29 @@ const DIST_DIR = join(import.meta.dirname, '..', 'dist', 'assets')
 
 /** Per-chunk gzip budgets in KB.
  *  Updated 2026-03-22 for roadmap features (quantum walk, measurement,
- *  observables, expression parser, Pauli spinor, Dirac equation). */
+ *  observables, expression parser, Pauli spinor, Dirac equation).
+ *  Updated 2026-04-15 for curved-space TDSE (Morris–Thorne metric + RK4
+ *  integrator + metric evaluator pulled into the physics chunk via
+ *  state-serializer/setter/config type imports). */
 const CHUNK_BUDGETS = {
   'react-vendor': 65,
   motion: 35,
   rendering: 150,
-  'shaders-schroedinger': 150,
+  'shaders-schroedinger': 158,
   shaders: 50,
   components: 100,
   'components-panels': 100,
   stores: 50,
-  physics: 50,
+  physics: 55,
   mediabunny: 50,
   vendor: 20,
   index: 30,
 }
 
 /** Total JS gzip budget in KB (all .js chunks combined).
- *  Updated 2026-04-15 for WDW cosmology + ER=EPR + Hawking/Page features. */
-const TOTAL_JS_BUDGET_KB = 775
+ *  Updated 2026-04-15 for WDW cosmology + ER=EPR + Hawking/Page features.
+ *  Lifted 2026-04-15 for curved-space TDSE v2 (8 metrics, RK4 curved integrator). */
+const TOTAL_JS_BUDGET_KB = 785
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

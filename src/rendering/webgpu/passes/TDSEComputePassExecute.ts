@@ -103,6 +103,8 @@ export interface TdseExecuteFields {
   maybeInitialize(ctx: WebGPURenderContext, config: TdseConfig): void
   dispatchFFTAxis(ctx: WebGPURenderContext, axisDim: number, slotOffset: number): number
   dispatchFFTAxisInPass(passEncoder: GPUComputePassEncoder, axisDim: number, slot: number): void
+  /** Curved-space RK4 dispatcher — only invoked when the TDSE metric is non-flat. */
+  runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder): void
   dispatchCompute(
     pe: GPUComputePassEncoder,
     p: GPUComputePipeline,
@@ -265,6 +267,19 @@ export function runTdseExecute(
       simTime: pass.simTime,
       stepAccumulator: pass.stepAccumulator,
     }
+    // Inject the curved-RK4 dispatcher only when the active metric is
+    // non-flat. Creating the closure is cheap but gating it here keeps the
+    // flat path fully identical to pre-feature — the resource field stays
+    // `undefined` and the evolution branch falls through unchanged.
+    // Flat and torus both use the existing split-step FFT path. All other
+    // metrics invoke the curved-space RK4 integrator. This preserves the
+    // v1 zero-regression guarantee for flat and adds torus as a
+    // zero-curvature periodic case — FFT wraps natively on a uniform grid.
+    const metricKind = config.metric?.kind
+    const curvedActive = metricKind !== undefined && metricKind !== 'flat' && metricKind !== 'torus'
+    const dispatchCurvedRK4 = curvedActive
+      ? (curvedCtx: WebGPURenderContext) => pass.runCurvedFrame(curvedCtx.device, curvedCtx.encoder)
+      : undefined
     runStrangEvolution(ctx, config, speed, evoState, {
       pl,
       bg,
@@ -281,6 +296,7 @@ export function runTdseExecute(
       dispatchFFTAxis: (c, axisDim, slot) => pass.dispatchFFTAxis(c, axisDim, slot),
       dispatchFFTAxisInPass: (passEncoder, axisDim, slot) =>
         pass.dispatchFFTAxisInPass(passEncoder, axisDim, slot),
+      dispatchCurvedRK4,
     })
     pass.simTime = evoState.simTime
     pass.stepAccumulator = evoState.stepAccumulator
