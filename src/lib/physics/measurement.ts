@@ -9,6 +9,8 @@
  * @module lib/physics/measurement
  */
 
+import { computeFullCollapseWasm, computePartialCollapseWasm } from '@/lib/wasm'
+
 /** Result of a single measurement. */
 export interface MeasurementResult {
   /** Linear grid index of the sampled site (full measurement only) */
@@ -190,6 +192,23 @@ export function computeFullCollapse(
   compactDims?: boolean[]
 ): [Float32Array, Float32Array] {
   const latticeDim = gridSize.length
+
+  // WASM fast path — builds the same collapse on the Rust side. The TS
+  // loop below remains the authoritative spec; both paths are covered by
+  // a parity test in `src/tests/lib/physics/wasmInitLoopsParity.test.ts`.
+  const wasmCompact = new Uint8Array(compactDims ? latticeDim : 0)
+  if (compactDims) {
+    for (let d = 0; d < latticeDim; d++) wasmCompact[d] = compactDims[d] ? 1 : 0
+  }
+  const wasmResult = computeFullCollapseWasm(
+    new Uint32Array(gridSize),
+    new Float64Array(spacing),
+    new Float64Array(center),
+    sigma,
+    wasmCompact
+  )
+  if (wasmResult) return wasmResult
+
   const psiRe = new Float32Array(totalSites)
   const psiIm = new Float32Array(totalSites)
   const sigma2 = Math.max(sigma * sigma, 1e-8)
@@ -246,6 +265,18 @@ export function computePartialCollapse(
 ): [Float32Array, Float32Array] {
   const latticeDim = gridSize.length
   const totalSites = psiRe.length
+
+  const wasmResult = computePartialCollapseWasm(
+    psiRe,
+    psiIm,
+    new Uint32Array(gridSize),
+    new Float64Array(spacing),
+    axis,
+    axisPosition,
+    sigma,
+    axisCompact === true
+  )
+  if (wasmResult) return wasmResult
   const axisSize = gridSize[axis]!
   const axisSpacing = spacing[axis]!
   const sigma2 = Math.max(sigma * sigma, 1e-8)

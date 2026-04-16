@@ -22,7 +22,7 @@ pub type ComplexMatrix = Vec<f32>;
 ///
 /// Pairs: (1,2)→2, (3,4)→4, (5,6)→8, (7,8)→16, (9,10)→32, (11)→64
 pub fn spinor_size(spatial_dim: usize) -> usize {
-    (1usize << ((spatial_dim + 1) / 2)).max(2)
+    (1usize << spatial_dim.div_ceil(2)).max(2)
 }
 
 /// Complex S×S identity matrix.
@@ -202,7 +202,7 @@ fn permute_matrix(m: &[f32], s: usize, perm: &[usize]) -> ComplexMatrix {
 /// Construction uses recursive tensor products followed by a basis
 /// permutation to achieve the standard block-diagonal β.
 pub fn generate_dirac_matrices(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix) {
-    assert!(spatial_dim >= 1 && spatial_dim <= 11, "spatial_dim must be 1..=11");
+    assert!((1..=11).contains(&spatial_dim), "spatial_dim must be 1..=11");
 
     match spatial_dim {
         1 => {
@@ -249,7 +249,7 @@ fn generate_higher_dim(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix
         let id_old = complex_identity(old_s);
 
         // Extend existing alphas: αⱼ → αⱼ ⊗ σ₃
-        for alpha in all_alphas.iter_mut() {
+        for alpha in &mut all_alphas {
             *alpha = kronecker_product(alpha, old_s, &s3, 2);
         }
 
@@ -276,7 +276,7 @@ fn generate_higher_dim(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix
     // which interleaves +1 and -1 eigenvalues. The permutation groups all +1
     // eigenvalues (even popcount) into the first S/2 indices.
     let perm = standard_form_permutation(current_s);
-    for alpha in all_alphas.iter_mut() {
+    for alpha in &mut all_alphas {
         *alpha = permute_matrix(alpha, current_s, &perm);
     }
     beta = permute_matrix(&beta, current_s, &perm);

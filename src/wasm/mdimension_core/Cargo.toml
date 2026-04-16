@@ -26,13 +26,28 @@ overflow-checks = false # Skip overflow checks (we validate inputs)
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 # Allow common patterns that pedantic flags but are fine for WASM bindings
+# and performance-oriented numerical code. Each allow has a concrete reason:
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
 cast_possible_truncation = "allow"
 cast_sign_loss = "allow"
 cast_precision_loss = "allow"
+cast_lossless = "allow"           # `as f64` reads more naturally than `f64::from()` in tight numerical loops
+cast_possible_wrap = "allow"      # usize → i64 casts are guarded by validated-size preconditions
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+doc_markdown = "allow"            # Backtick-every-identifier noise; doc comments stay readable as prose
+doc_link_with_quotes = "allow"    # Quoted doc references are idiomatic in this crate's style
+excessive_precision = "allow"     # Scientific constants are copied from references at full precision on purpose
+too_many_lines = "allow"          # Unrolled N×N matrix multiplies are intentionally flat
+too_many_arguments = "allow"      # Numerical kernels take many scalar params; packaging them would hide intent
+inline_always = "allow"           # Performance-critical inner helpers (fsin/fcos/matrix N×N) benefit measurably
+needless_range_loop = "allow"     # Index-style loops are clearer than iter().enumerate() over multiple arrays
+needless_pass_by_value = "allow"  # wasm-bindgen ABI requires owned arguments in some entry points
+similar_names = "allow"           # `re`/`im`, `a_re`/`a_im` are the standard naming convention
+many_single_char_names = "allow"  # Matrix/vector code uses mathematical single-letter names
+manual_strip = "allow"            # Legacy pattern — fix opportunistically when touching the site
+inconsistent_digit_grouping = "allow"  # Hex/decimal grouping is intentional in PRNG constants
 
 [lints.rust]
 missing_docs = "warn"

@@ -4401,9 +4401,8 @@ pub fn compose_rotations(dimension: usize, plane_names: &[String], angles: &[f64
     // Apply each rotation
     for (plane_name, &angle) in plane_names.iter().zip(angles.iter()) {
         // Parse plane name to get indices
-        let (idx1, idx2) = match parse_plane_name(plane_name) {
-            Some(indices) => indices,
-            None => continue, // Skip invalid plane names
+        let Some((idx1, idx2)) = parse_plane_name(plane_name) else {
+            continue; // Skip invalid plane names
         };
 
         // Validate indices

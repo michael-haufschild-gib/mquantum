@@ -88,6 +88,13 @@ function passArray32ToWasm0(arg, malloc) {
     return ptr;
 }
 
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
 function passArrayF32ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 4, 4) >>> 0;
     getFloat32ArrayMemory0().set(arg, ptr / 4);
@@ -292,6 +299,54 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
 }
 
 /**
+ * Full Gaussian measurement collapse.
+ *
+ * Matches `src/lib/physics/measurement.ts::computeFullCollapse`. Returns a
+ * packed `Float32Array` of length `2 · total_sites` where the first half is
+ * `ψ_re` and the second is `ψ_im` (which is identically zero for a full
+ * collapse — included so the JS caller unpacks symmetrically with the
+ * partial-collapse ABI).
+ *
+ * # Arguments
+ * * `grid_size` - Per-axis lattice sizes (`Uint32Array`, length = `latticeDim`)
+ * * `spacing` - Per-axis spacing (`Float64Array`, length = `latticeDim`)
+ * * `center` - Measurement center in world units (length = `latticeDim`)
+ * * `sigma` - Gaussian width
+ * * `compact_dims` - Optional per-axis periodicity flags (0/1). Pass empty
+ *   slice for fully-open boundaries.
+ *
+ * # Returns
+ * Packed `Float32Array`, or empty on shape mismatch.
+ * @param {Uint32Array} grid_size
+ * @param {Float64Array} spacing
+ * @param {Float64Array} center
+ * @param {number} sigma
+ * @param {Uint8Array} compact_dims
+ * @returns {Float32Array}
+ */
+export function compute_full_collapse_wasm(grid_size, spacing, center, sigma, compact_dims) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArrayF64ToWasm0(center, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArray8ToWasm0(compact_dims, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        wasm.compute_full_collapse_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, sigma, ptr3, len3);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v5 = getArrayF32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 4, 4);
+        return v5;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
  *
  * Velocity-field finite differences + N-D FFT (via `fft::fft_nd`) +
@@ -406,6 +461,54 @@ export function compute_level_spacing_wasm(energies) {
         var v2 = getArrayF64FromWasm0(r0, r1).slice();
         wasm.__wbindgen_export3(r0, r1 * 8, 8);
         return v2;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Partial axis-aligned measurement collapse.
+ *
+ * Matches `src/lib/physics/measurement.ts::computePartialCollapse`. Returns
+ * packed `[re..., im...]` of length `2 · total_sites`.
+ *
+ * # Arguments
+ * * `psi_re`, `psi_im` - Current wavefunction components (length = `total_sites`)
+ * * `grid_size`, `spacing` - Lattice geometry
+ * * `axis` - Measured axis index
+ * * `axis_position` - Measurement coordinate along `axis`
+ * * `sigma` - Gaussian width
+ * * `axis_compact` - Non-zero to wrap on the measured axis
+ *
+ * # Returns
+ * Packed `Float32Array`, or empty on shape mismatch / invalid axis.
+ * @param {Float32Array} psi_re
+ * @param {Float32Array} psi_im
+ * @param {Uint32Array} grid_size
+ * @param {Float64Array} spacing
+ * @param {number} axis
+ * @param {number} axis_position
+ * @param {number} sigma
+ * @param {number} axis_compact
+ * @returns {Float32Array}
+ */
+export function compute_partial_collapse_wasm(psi_re, psi_im, grid_size, spacing, axis, axis_position, sigma, axis_compact) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArrayF32ToWasm0(psi_re, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(psi_im, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray32ToWasm0(grid_size, wasm.__wbindgen_export);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passArrayF64ToWasm0(spacing, wasm.__wbindgen_export);
+        const len3 = WASM_VECTOR_LEN;
+        wasm.compute_partial_collapse_wasm(retptr, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, axis, axis_position, sigma, axis_compact);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v5 = getArrayF32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 4, 4);
+        return v5;
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
     }
@@ -614,6 +717,70 @@ export function generate_dirac_matrices_wasm(spatial_dim) {
     try {
         const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
         wasm.generate_dirac_matrices_wasm(retptr, spatial_dim);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v1 = getArrayF32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 4, 4);
+        return v1;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Generate a seeded uniform noise lattice in `[-0.5, 0.5]`.
+ *
+ * Matches `src/lib/physics/tdse/disorderNoise.ts::generateDisorderNoise`
+ * bit-for-bit (mulberry32 PRNG parity).
+ *
+ * # Arguments
+ * * `total_sites` - Length of the output Float32Array
+ * * `seed` - Integer seed (wraps to u32 at the boundary)
+ *
+ * # Returns
+ * Float32Array of length `total_sites`.
+ * @param {number} total_sites
+ * @param {number} seed
+ * @returns {Float32Array}
+ */
+export function generate_disorder_noise_wasm(total_sites, seed) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.generate_disorder_noise_wasm(retptr, total_sites, seed);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v1 = getArrayF32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 4, 4);
+        return v1;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
+ * Generate an Anderson disorder potential.
+ *
+ * Matches `src/lib/physics/anderson/disorderPotential.ts` with
+ * `distribution_code`: `0 = uniform`, `1 = gaussian`.
+ *
+ * # Arguments
+ * * `total_sites` - Lattice site count (product of grid sizes)
+ * * `disorder_strength` - `W` (uniform half-range × 2; Gaussian σ)
+ * * `seed` - Integer seed
+ * * `distribution_code` - `0` uniform, `1` gaussian
+ *
+ * # Returns
+ * `Float32Array` of length `total_sites`, or empty on invalid distribution.
+ * @param {number} total_sites
+ * @param {number} disorder_strength
+ * @param {number} seed
+ * @param {number} distribution_code
+ * @returns {Float32Array}
+ */
+export function generate_disorder_potential_wasm(total_sites, disorder_strength, seed, distribution_code) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.generate_disorder_potential_wasm(retptr, total_sites, disorder_strength, seed, distribution_code);
         var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
         var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
         var v1 = getArrayF32FromWasm0(r0, r1).slice();
