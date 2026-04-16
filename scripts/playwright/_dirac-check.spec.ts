@@ -19,5 +19,5 @@ test('dirac ui full inspection', async ({ page }) => {
   })
 
   expect(full.switchCount).toBeGreaterThan(0)
-  expect(full.hasNodal || full.hasUnc || full.hasPhaseMat).toBeTruthy()
+  expect(full.hasNodal || full.hasUnc || full.hasPhaseMat).toBe(true)
 })
