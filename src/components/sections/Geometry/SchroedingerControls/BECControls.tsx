@@ -347,7 +347,11 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
         >
           <Slider
             label="Strength (W)"
-            tooltip="Anderson-style on-site disorder strength added to the trap potential: V(x) += W·η(x) where η(x) ∈ [−0.5, +0.5] is deterministic seeded noise. 0 = disabled (no simulation cost). Sweep at fixed interaction strength to trace the superfluid↔Bose-glass phase boundary (Fisher et al., Phys. Rev. B 40, 546 (1989))."
+            tooltip={
+              bec.disorderDistribution === 'gaussian'
+                ? 'Anderson-style on-site disorder strength (tight-binding units W/t) added to the trap potential: V(x) += W·η(x) where η(x) ~ N(0, 1) is unbounded deterministic seeded noise. 0 = disabled (no simulation cost). Sweep at fixed interaction strength to trace the superfluid↔Bose-glass phase boundary (Fisher et al., Phys. Rev. B 40, 546 (1989)).'
+                : 'Anderson-style on-site disorder strength (tight-binding units W/t) added to the trap potential: V(x) += W·η(x) where η(x) ∈ [−0.5, +0.5] is deterministic seeded noise. 0 = disabled (no simulation cost). Sweep at fixed interaction strength to trace the superfluid↔Bose-glass phase boundary (Fisher et al., Phys. Rev. B 40, 546 (1989)).'
+            }
             value={bec.disorderStrength}
             onChange={actions.setDisorderStrength}
             min={0}

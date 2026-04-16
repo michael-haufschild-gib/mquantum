@@ -134,8 +134,14 @@ export interface BecConfig {
 
   // === Disorder overlay (Anderson-style on-site disorder on the trap) ===
   /**
-   * On-site disorder strength W. Added to the trap potential as
-   * `V(x) += W · η(x)` where `η(x)` is deterministic noise in [−0.5, +0.5].
+   * On-site disorder strength W (tight-binding units — measured relative
+   * to the nearest-neighbor hopping `t_eff = ℏ²/(2m·dx²)`). Added to the
+   * trap potential as `V(x) += W · η(x)`. The statistical shape of `η(x)`
+   * depends on {@link disorderDistribution}:
+   *
+   * - `uniform`: `η(x)` is deterministic seeded noise in [−0.5, +0.5].
+   * - `gaussian`: `η(x) ~ N(0, 1)` (unbounded standard normal).
+   *
    * 0 disables the overlay (fast path in the dispatcher).
    *
    * Scientific context: disordered BEC is the canonical route to the
@@ -148,7 +154,10 @@ export interface BecConfig {
   disorderStrength: number
   /** Deterministic PRNG seed for disorder realization reproducibility. */
   disorderSeed: number
-  /** Statistical distribution of on-site disorder energies. */
+  /**
+   * Statistical distribution of on-site disorder energies. `uniform` gives
+   * `η(x) ∈ [−0.5, +0.5]`; `gaussian` gives `η(x) ~ N(0, 1)` (unbounded).
+   */
   disorderDistribution: DisorderDistribution
 
   // === Analog Hawking (waterfall sonic horizon) ===
