@@ -34,6 +34,13 @@ export const ADS_LIMITS = {
   lMax: 3,
   mLMin: -3,
   mLMax: 3,
+  // Stage 2A BTZ bounds (see PRD).
+  btzHorizonMin: 0.05,
+  btzHorizonMax: 2.0,
+  btzOmegaMin: 0.1,
+  btzOmegaMax: 10.0,
+  btzAngularMMin: -5,
+  btzAngularMMax: 5,
 } as const
 
 /** Actions exposed by the AdS setter bundle. */
@@ -46,6 +53,10 @@ export interface AntiDeSitterSetters {
   setAdsQuantizationBranch: (branch: AdsQuantizationBranch) => void
   setAdsBoundaryOverlay: (enabled: boolean) => void
   setAdsPreset: (name: AdsPresetName) => void
+  setAdsBtzEnabled: (enabled: boolean) => void
+  setAdsBtzHorizonRadius: (r: number) => void
+  setAdsBtzOmega: (omega: number) => void
+  setAdsBtzAngularM: (m: number) => void
   triggerAdsRecompute: () => void
   clearAdsNeedsReset: () => void
 }
@@ -84,7 +95,22 @@ function clampInt(v: number, lo: number, hi: number): number {
  * @returns Map of action name → setter
  */
 export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSetters {
-  const { dMin, dMax, nMin, nMax, lMin, lMax, mLMin, mLMax } = ADS_LIMITS
+  const {
+    dMin,
+    dMax,
+    nMin,
+    nMax,
+    lMin,
+    lMax,
+    mLMin,
+    mLMax,
+    btzHorizonMin,
+    btzHorizonMax,
+    btzOmegaMin,
+    btzOmegaMax,
+    btzAngularMMin,
+    btzAngularMMax,
+  } = ADS_LIMITS
 
   return {
     setAdsDimension: (d) => {
@@ -154,8 +180,43 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         mL: preset.mL,
         branch: preset.branch,
         boundaryOverlay: preset.boundaryOverlay,
+        // BTZ sub-config: explicit values override; absent means "reset to
+        // default". Stops a BTZ preset from leaking its horizon/omega
+        // settings into a subsequently-selected AdS bound-state preset.
+        btzEnabled: preset.btzEnabled ?? false,
+        btzHorizonRadius: preset.btzHorizonRadius ?? 0.3,
+        btzOmega: preset.btzOmega ?? 1.0,
+        btzAngularM: preset.btzAngularM ?? 0,
         preset: name,
       })
+    },
+    setAdsBtzEnabled: (enabled) => {
+      applyWithReset(ctx, { btzEnabled: !!enabled, preset: 'custom' })
+    },
+    setAdsBtzHorizonRadius: (r) => {
+      if (!ctx.isFinite(r)) {
+        ctx.warnNonFinite('antiDeSitter.btzHorizonRadius', r)
+        return
+      }
+      applyWithReset(ctx, {
+        btzHorizonRadius: clamp(r, btzHorizonMin, btzHorizonMax),
+        preset: 'custom',
+      })
+    },
+    setAdsBtzOmega: (omega) => {
+      if (!ctx.isFinite(omega)) {
+        ctx.warnNonFinite('antiDeSitter.btzOmega', omega)
+        return
+      }
+      applyWithReset(ctx, { btzOmega: clamp(omega, btzOmegaMin, btzOmegaMax), preset: 'custom' })
+    },
+    setAdsBtzAngularM: (m) => {
+      if (!ctx.isFinite(m)) {
+        ctx.warnNonFinite('antiDeSitter.btzAngularM', m)
+        return
+      }
+      const clampedM = clampInt(m, btzAngularMMin, btzAngularMMax) || 0
+      applyWithReset(ctx, { btzAngularM: clampedM, preset: 'custom' })
     },
     triggerAdsRecompute: () => {
       ctx.setWithVersion((state) => ({

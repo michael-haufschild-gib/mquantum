@@ -58,6 +58,18 @@ export interface AntiDeSitterConfig {
   /** Runtime dirty flag — strategy re-packs the density texture on the next
    * frame when true. Cleared via `clearAdsNeedsReset`. */
   needsReset: boolean
+
+  // ── Stage 2A: BTZ black-hole thermal state ─────────────────────────────
+  /** Activate the BTZ thermal-state code path. Only honoured when `d === 3`;
+   * silently ignored at other dimensions so the UI can remember the toggle
+   * across dimension changes. */
+  btzEnabled: boolean
+  /** Outer horizon radius r_+ in AdS-length units (L ≡ 1). Float [0.05, 2]. */
+  btzHorizonRadius: number
+  /** Scalar mode angular frequency ω in 1/L units. Float [0.1, 10]. */
+  btzOmega: number
+  /** Azimuthal BTZ m on the S¹. Integer [−5, +5]. */
+  btzAngularM: number
 }
 
 /**
@@ -81,6 +93,9 @@ export type AdsPresetName =
   | 'adsSevenSUGRA'
   | 'adsFourHeavyPrimary'
   | 'adsFourCosineNode'
+  | 'btzHotSmall'
+  | 'btzWarmMedium'
+  | 'btzCoolLarge'
   | 'custom'
 
 /**
@@ -98,4 +113,8 @@ export const DEFAULT_ANTI_DE_SITTER_CONFIG: AntiDeSitterConfig = {
   boundaryOverlay: false,
   preset: 'adsFourGround',
   needsReset: true,
+  btzEnabled: false,
+  btzHorizonRadius: 0.3,
+  btzOmega: 1.0,
+  btzAngularM: 0,
 }

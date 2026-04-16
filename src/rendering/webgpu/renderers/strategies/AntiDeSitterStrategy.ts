@@ -53,6 +53,13 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
     config.mL.toFixed(6),
     config.branch,
     config.boundaryOverlay ? 1 : 0,
+    // Stage 2A BTZ fields — every knob that changes the packed density
+    // must be in the hash, otherwise the strategy will skip repacks on
+    // BTZ slider moves and the rendered horizon will desync.
+    config.btzEnabled ? 1 : 0,
+    config.btzHorizonRadius.toFixed(6),
+    config.btzOmega.toFixed(6),
+    config.btzAngularM,
   ].join('|')
 }
 

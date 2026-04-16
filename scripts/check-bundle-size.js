@@ -37,7 +37,7 @@ const CHUNK_BUDGETS = {
   'components-deferred': 21, // measured 19
   components: 67, // measured 63
   stores: 47, // measured 44
-  physics: 56, // measured 53
+  physics: 59, // measured 57 after BTZ (Stage 2A)
   mediabunny: 45, // measured 42
   vendor: 18, // measured 17
   index: 10, // measured 9

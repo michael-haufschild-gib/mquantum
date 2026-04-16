@@ -527,6 +527,14 @@ export function packAdsTimeEvolution(
     floatView[I.adsGrowthRate] = 0
     return
   }
+  // Stage 2A: BTZ thermal state is time-translation-invariant (KMS
+  // stationarity). Zero both uniforms so the shader neither spins the
+  // phase nor amplifies |ψ|² — the packed density IS the observable.
+  if (ads.btzEnabled && ads.d === 3) {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
   const growth = computeAdsGrowthRate(ads.d, ads.mL)
   if (growth > 0) {
     floatView[I.adsEnergy] = 0

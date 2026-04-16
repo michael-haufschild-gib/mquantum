@@ -13,7 +13,14 @@
 
 import type { AdsPresetName, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
 
-/** Preset scalar payload — the strategy applies these onto `AntiDeSitterConfig`. */
+/** Preset scalar payload — the strategy applies these onto `AntiDeSitterConfig`.
+ *
+ * BTZ-specific fields (`btzEnabled`, `btzHorizonRadius`, `btzOmega`,
+ * `btzAngularM`) are optional. When undefined the `setAdsPreset` helper
+ * resets them to the default (`btzEnabled: false`, defaults for the rest).
+ * That lets the existing 15 bound-state presets stay untouched while the
+ * three new BTZ presets opt in explicitly.
+ */
 export interface AdsPresetDefinition {
   id: Exclude<AdsPresetName, 'custom'>
   label: string
@@ -25,6 +32,10 @@ export interface AdsPresetDefinition {
   mL: number
   branch: AdsQuantizationBranch
   boundaryOverlay: boolean
+  btzEnabled?: boolean
+  btzHorizonRadius?: number
+  btzOmega?: number
+  btzAngularM?: number
 }
 
 /**
@@ -210,6 +221,57 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
     mL: 0,
     branch: 'standard',
     boundaryOverlay: false,
+  },
+  {
+    id: 'btzHotSmall',
+    label: 'BTZ Hot (small r₊)',
+    description:
+      'd=3 BTZ black hole with small horizon r₊=0.15 — high Hawking temperature, sharp thermal spike near the horizon.',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    btzEnabled: true,
+    btzHorizonRadius: 0.15,
+    btzOmega: 1.0,
+    btzAngularM: 0,
+  },
+  {
+    id: 'btzWarmMedium',
+    label: 'BTZ Warm (moderate r₊)',
+    description:
+      'd=3 BTZ with r₊=0.6 and angular mode m_A=1 — moderate T and visible azimuthal lobes.',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    btzEnabled: true,
+    btzHorizonRadius: 0.6,
+    btzOmega: 1.2,
+    btzAngularM: 1,
+  },
+  {
+    id: 'btzCoolLarge',
+    label: 'BTZ Cool (large r₊)',
+    description:
+      'd=3 BTZ with r₊=1.5 — large, cool horizon dominates the visible region; thermal spectrum pushed to low frequencies.',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    btzEnabled: true,
+    btzHorizonRadius: 1.5,
+    btzOmega: 0.5,
+    btzAngularM: 0,
   },
 ]
 

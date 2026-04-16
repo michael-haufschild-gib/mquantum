@@ -128,4 +128,72 @@ describe('AdS URL round-trip', () => {
     // repacks the density on the next frame.
     expect(ads.needsReset).toBe(true)
   })
+
+  describe('BTZ (Stage 2A) URL params', () => {
+    it('parses the canonical BTZ URL from the spec', () => {
+      applyUrl(
+        'qm=antiDeSitter&d=4&t=schroedinger&ads_d=3&ads_btz=1&ads_btz_r=0.3&ads_btz_omega=1.0&ads_btz_mA=0'
+      )
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.d).toBe(3)
+      expect(ads.btzEnabled).toBe(true)
+      expect(ads.btzHorizonRadius).toBeCloseTo(0.3, 5)
+      expect(ads.btzOmega).toBeCloseTo(1.0, 5)
+      expect(ads.btzAngularM).toBe(0)
+    })
+
+    it('clamps out-of-range BTZ values via the URL parser and the store setters', () => {
+      applyUrl(
+        'qm=antiDeSitter&d=4&t=schroedinger&ads_d=3&ads_btz=1&ads_btz_r=50&ads_btz_omega=-5&ads_btz_mA=99'
+      )
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.btzHorizonRadius).toBe(2.0)
+      expect(ads.btzOmega).toBe(0.1)
+      expect(ads.btzAngularM).toBe(5)
+    })
+
+    it('does NOT emit ads_btz_* params when the mode is not antiDeSitter', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'harmonicOscillator',
+        adsBtzEnabled: true,
+        adsBtzHorizonRadius: 0.5,
+      })
+      expect(serialized).not.toContain('ads_btz=')
+      expect(serialized).not.toContain('ads_btz_r=')
+    })
+
+    it('round-trips the full BTZ sub-block through serialize → deserialize', () => {
+      const serialized = serializeState({
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsDimension: 3,
+        adsBtzEnabled: true,
+        adsBtzHorizonRadius: 0.75,
+        adsBtzOmega: 2.5,
+        adsBtzAngularM: -3,
+      })
+      const parsed = deserializeState(serialized)
+      expect(parsed.adsBtzEnabled).toBe(true)
+      expect(parsed.adsBtzHorizonRadius).toBeCloseTo(0.75, 3)
+      expect(parsed.adsBtzOmega).toBeCloseTo(2.5, 3)
+      expect(parsed.adsBtzAngularM).toBe(-3)
+    })
+
+    it('negative horizon radius fails the [0.05, 2.0] parser and keeps the default', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_d=3&ads_btz=1&ads_btz_r=-1')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.btzEnabled).toBe(true)
+      // Parser clamps to 0.05 (lower bound).
+      expect(ads.btzHorizonRadius).toBe(0.05)
+    })
+
+    it('BTZ sub-block is dormant when not opted in (ads_btz missing)', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_d=3')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.btzEnabled).toBe(false)
+    })
+  })
 })

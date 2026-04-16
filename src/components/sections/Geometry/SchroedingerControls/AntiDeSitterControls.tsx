@@ -35,6 +35,8 @@ import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { ADS_LIMITS } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 
+import { AntiDeSitterBtzControls } from './AntiDeSitterBtzControls'
+
 const BRANCH_OPTIONS: Array<{ value: AdsQuantizationBranch; label: string }> = [
   { value: 'standard', label: 'Δ₊ (standard)' },
   { value: 'alternate', label: 'Δ₋ (alternate)' },
@@ -107,7 +109,11 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
     }))
   )
 
-  const { d, n, l, m, mL, branch, boundaryOverlay, preset } = ads
+  const { d, n, l, m, mL, branch, boundaryOverlay, preset, btzEnabled } = ads
+  // When BTZ is active at d=3 the bound-state sliders describe a distinct,
+  // mutually exclusive state. Hide them so the UI doesn't suggest they
+  // feed the thermal density render (they don't).
+  const btzActive = btzEnabled && d === 3
 
   const { effectiveDelta, effectiveBranch, kwFallbackApplied, isTachyon, growthRate, energy } =
     useMemo(() => {
@@ -175,95 +181,105 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
           showValue
           data-testid="ads-d-slider"
         />
-        <Slider
-          label="Radial n"
-          tooltip="Number of radial nodes. Energies rise by 2/L per unit n."
-          min={ADS_LIMITS.nMin}
-          max={ADS_LIMITS.nMax}
-          step={1}
-          value={n}
-          onChange={setRadial}
-          showValue
-          data-testid="ads-n-slider"
-        />
-        <Slider
-          label="Angular ℓ"
-          tooltip="Angular momentum on the celestial sphere. Energies rise by 1/L per unit ℓ."
-          min={ADS_LIMITS.lMin}
-          max={ADS_LIMITS.lMax}
-          step={1}
-          value={l}
-          onChange={setAngular}
-          showValue
-          data-testid="ads-l-slider"
-        />
-        {l > 0 && (
+        {!btzActive && (
+          <>
+            <Slider
+              label="Radial n"
+              tooltip="Number of radial nodes. Energies rise by 2/L per unit n."
+              min={ADS_LIMITS.nMin}
+              max={ADS_LIMITS.nMax}
+              step={1}
+              value={n}
+              onChange={setRadial}
+              showValue
+              data-testid="ads-n-slider"
+            />
+            <Slider
+              label="Angular ℓ"
+              tooltip="Angular momentum on the celestial sphere. Energies rise by 1/L per unit ℓ."
+              min={ADS_LIMITS.lMin}
+              max={ADS_LIMITS.lMax}
+              step={1}
+              value={l}
+              onChange={setAngular}
+              showValue
+              data-testid="ads-l-slider"
+            />
+            {l > 0 && (
+              <Slider
+                label="Magnetic m"
+                tooltip="Azimuthal component along the rendered z axis. Clamped to [−ℓ, +ℓ]."
+                min={-magneticMax}
+                max={magneticMax}
+                step={1}
+                value={m}
+                onChange={setMagnetic}
+                showValue
+                data-testid="ads-m-slider"
+              />
+            )}
+          </>
+        )}
+      </ControlGroup>
+
+      {!btzActive && (
+        <ControlGroup title="Mass & Quantization" collapsible defaultOpen>
           <Slider
-            label="Magnetic m"
-            tooltip="Azimuthal component along the rendered z axis. Clamped to [−ℓ, +ℓ]."
-            min={-magneticMax}
-            max={magneticMax}
-            step={1}
-            value={m}
-            onChange={setMagnetic}
+            label="Mass mL"
+            tooltip="Bulk mass in AdS-radius units. Negative values encode imaginary mass; below BF ⇒ tachyonic."
+            min={ADS_LIMITS.mLMin}
+            max={ADS_LIMITS.mLMax}
+            step={0.05}
+            value={mL}
+            onChange={setMass}
             showValue
-            data-testid="ads-m-slider"
+            data-testid="ads-mL-slider"
           />
-        )}
-      </ControlGroup>
+          <ToggleGroup
+            options={BRANCH_OPTIONS}
+            value={branch}
+            onChange={(v) => setBranch(v as AdsQuantizationBranch)}
+            ariaLabel="Quantization branch"
+            tooltip="Standard Δ₊ vs alternate Klebanov-Witten Δ₋. Alternate silently falls back when outside the KW window."
+            fullWidth
+            data-testid="ads-branch-toggle"
+          />
+          <Switch
+            label="Boundary overlay |O|²"
+            checked={boundaryOverlay}
+            onCheckedChange={setBoundary}
+            data-testid="ads-boundary-overlay-switch"
+          />
+        </ControlGroup>
+      )}
 
-      <ControlGroup title="Mass & Quantization" collapsible defaultOpen>
-        <Slider
-          label="Mass mL"
-          tooltip="Bulk mass in AdS-radius units. Negative values encode imaginary mass; below BF ⇒ tachyonic."
-          min={ADS_LIMITS.mLMin}
-          max={ADS_LIMITS.mLMax}
-          step={0.05}
-          value={mL}
-          onChange={setMass}
-          showValue
-          data-testid="ads-mL-slider"
-        />
-        <ToggleGroup
-          options={BRANCH_OPTIONS}
-          value={branch}
-          onChange={(v) => setBranch(v as AdsQuantizationBranch)}
-          ariaLabel="Quantization branch"
-          tooltip="Standard Δ₊ vs alternate Klebanov-Witten Δ₋. Alternate silently falls back when outside the KW window."
-          fullWidth
-          data-testid="ads-branch-toggle"
-        />
-        <Switch
-          label="Boundary overlay |O|²"
-          checked={boundaryOverlay}
-          onCheckedChange={setBoundary}
-          data-testid="ads-boundary-overlay-switch"
-        />
-      </ControlGroup>
+      {d === 3 && <AntiDeSitterBtzControls ads={ads} />}
 
-      <div
-        className="rounded-md bg-white/5 border border-white/10 px-3 py-2 text-xs text-text-secondary space-y-1"
-        data-testid="ads-readout"
-      >
-        <div>
-          <span className="text-text-tertiary">Δ</span>{' '}
-          <span className="font-mono">{effectiveDelta.toFixed(4)}</span>
-          <span className="text-text-tertiary">
-            {' '}
-            ({effectiveBranch === 'standard' ? 'Δ₊' : 'Δ₋'})
-          </span>
-        </div>
-        <div>
-          <span className="text-text-tertiary">E_{`{n,ℓ}`}</span>{' '}
-          <span className="font-mono">{energy.toFixed(4)}</span>
-        </div>
-        {isTachyon && (
-          <div className="text-rose-300">
-            γ = <span className="font-mono">{growthRate.toFixed(4)}</span>
-            <span className="text-text-tertiary"> (|ψ|² grows as cosh²(γt))</span>
+      {!btzActive && (
+        <div
+          className="rounded-md bg-white/5 border border-white/10 px-3 py-2 text-xs text-text-secondary space-y-1"
+          data-testid="ads-readout"
+        >
+          <div>
+            <span className="text-text-tertiary">Δ</span>{' '}
+            <span className="font-mono">{effectiveDelta.toFixed(4)}</span>
+            <span className="text-text-tertiary">
+              {' '}
+              ({effectiveBranch === 'standard' ? 'Δ₊' : 'Δ₋'})
+            </span>
           </div>
-        )}
-      </div>
+          <div>
+            <span className="text-text-tertiary">E_{`{n,ℓ}`}</span>{' '}
+            <span className="font-mono">{energy.toFixed(4)}</span>
+          </div>
+          {isTachyon && (
+            <div className="text-rose-300">
+              γ = <span className="font-mono">{growthRate.toFixed(4)}</span>
+              <span className="text-text-tertiary"> (|ψ|² grows as cosh²(γt))</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 })

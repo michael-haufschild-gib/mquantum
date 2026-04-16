@@ -49,6 +49,10 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `ads_mL` | float -3..3 | Anti-de Sitter mass × AdS radius (signed; negative encodes imaginary mass) |
 | `ads_qb` | 0/1 | Anti-de Sitter quantization branch (0 = standard Δ₊, 1 = alternate Δ₋ with KW fallback) |
 | `ads_bo` | 0/1 | Anti-de Sitter asymptotic boundary primary overlay toggle |
+| `ads_btz` | 0/1 | BTZ (Stage 2A) thermal-state code path (only honoured when `ads_d=3`) |
+| `ads_btz_r` | float 0.05..2.0 | BTZ outer horizon radius r₊ in AdS-length units |
+| `ads_btz_omega` | float 0.1..10 | BTZ scalar-mode angular frequency ω (1/L units) |
+| `ads_btz_mA` | int -5..5 | BTZ azimuthal quantum number m on the S¹ |
 
 ## Rules
 

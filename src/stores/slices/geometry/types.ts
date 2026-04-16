@@ -507,6 +507,10 @@ export interface SchroedingerSliceActions {
   ) => void
   setAdsBoundaryOverlay: (enabled: boolean) => void
   setAdsPreset: (name: import('@/lib/geometry/extended/antiDeSitter').AdsPresetName) => void
+  setAdsBtzEnabled: (enabled: boolean) => void
+  setAdsBtzHorizonRadius: (r: number) => void
+  setAdsBtzOmega: (omega: number) => void
+  setAdsBtzAngularM: (m: number) => void
   triggerAdsRecompute: () => void
   clearAdsNeedsReset: () => void
 

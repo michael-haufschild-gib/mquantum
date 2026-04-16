@@ -245,6 +245,13 @@ function applyAdsParams(
   if (urlState.adsBranch !== undefined) ext.setAdsQuantizationBranch(urlState.adsBranch)
   if (urlState.adsBoundaryOverlay !== undefined)
     ext.setAdsBoundaryOverlay(urlState.adsBoundaryOverlay)
+  // Stage 2A — BTZ. Apply horizon/omega/m_angular before the enable flag
+  // so the toggle observes the final parameters in one strategy repack.
+  if (urlState.adsBtzHorizonRadius !== undefined)
+    ext.setAdsBtzHorizonRadius(urlState.adsBtzHorizonRadius)
+  if (urlState.adsBtzOmega !== undefined) ext.setAdsBtzOmega(urlState.adsBtzOmega)
+  if (urlState.adsBtzAngularM !== undefined) ext.setAdsBtzAngularM(urlState.adsBtzAngularM)
+  if (urlState.adsBtzEnabled !== undefined) ext.setAdsBtzEnabled(urlState.adsBtzEnabled)
 }
 
 /**

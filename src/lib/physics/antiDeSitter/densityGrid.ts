@@ -33,6 +33,7 @@ import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
+import { BTZ_AMPLITUDE_CEILING, btzScalarDelta, btzTemperature, btzThermalAmplitude } from './btz'
 import { jacobiP, radialNorm, resolveDelta, sphericalHarmonicReal } from './math'
 
 /** Packed density buffer + metadata consumed by the GPU upload path. */
@@ -69,8 +70,16 @@ function clamp01(v: number): number {
  * transcendentals per voxel (cos, sin, pow, Jacobi loop) the typical
  * repack budget at 64³ = 262k voxels is ~30-60 ms on budget hardware —
  * acceptable for a one-shot recompute on config change.
+ *
+ * When `config.btzEnabled && config.d === 3` the bound-state path is
+ * bypassed entirely — the density is packed from the BTZ thermal ansatz
+ * instead; the horizon is painted as an opaque cylinder at a fixed world
+ * radius. See `packBtzThermalDensityGrid` below.
  */
 export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+  if (config.btzEnabled && config.d === 3) {
+    return packBtzThermalDensityGrid(config)
+  }
   const N = DENSITY_GRID_SIZE
   const total = N * N * N
   const density = new Uint16Array(total * 4)
@@ -195,6 +204,135 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
     peakDensity,
     isTachyon,
     kwFallbackApplied: resolved.kwFallbackApplied,
+    effectiveDelta: delta,
+  }
+}
+
+/** World radius at which the BTZ horizon is drawn. Independent of r_+ so
+ * sliding r_+ changes the thermal spectrum but leaves the horizon at the
+ * same visible scale — keeps the rendered object framed inside the unit
+ * cube for the full slider range. */
+const BTZ_WORLD_HORIZON = 0.35
+/** Thickness of the opaque horizon shell (world units). */
+const BTZ_HORIZON_SHELL = 0.04
+/** Lower floor on the BTZ compactification coordinate u = r_+/r; below
+ * this the mapping r = r_+/u would blow up. u_min = 0.05 ⇒ r_max = 20 r_+. */
+const BTZ_U_MIN = 0.05
+/** Amplitude written into the horizon-marker voxels. Large enough to
+ * saturate the raymarcher's alpha compositor for a crisp black disk. */
+const BTZ_HORIZON_MARKER_AMP = BTZ_AMPLITUDE_CEILING * 2
+
+/**
+ * Pack the BTZ thermal state onto the density grid. Only called when
+ * `config.btzEnabled && config.d === 3`.
+ *
+ * ## Coordinate map
+ * The BTZ spacetime is cylindrically symmetric in (r, φ); the rendered 3D
+ * volume packs a z-independent slab so the horizon appears as an opaque
+ * cylinder along z — a recognisable black-hole shadow regardless of the
+ * camera angle inside the unit cube.
+ *
+ *   world (x, y, z) ∈ [−1, 1]³  →  ρ_w = √(x² + y²),   φ = atan2(y, x)
+ *   ρ_w < `BTZ_WORLD_HORIZON`                          →  inside horizon → density 0
+ *   ρ_w ∈ [WH, WH+SHELL]                               →  opaque horizon shell
+ *   ρ_w > WH+SHELL                                     →  bulk thermal profile
+ *
+ * Bulk mapping ρ_w → physical r uses the spec's Poincaré-disk coord
+ *   u = r_+ / r ∈ (0, 1]    with    r = r_+ / max(u, BTZ_U_MIN).
+ * Outer world radius ρ_w = 1 corresponds to u = BTZ_U_MIN (asymptotic
+ * AdS₃ boundary); world radius ρ_w = WH+SHELL corresponds to u = 1
+ * (just outside the horizon).
+ *
+ * @param config - AdS configuration with btzEnabled = true and d = 3.
+ * @returns Packed RGBA16F density + diagnostics (isTachyon reported false
+ *   for BTZ; effectiveDelta = scalar asymptotic dimension).
+ */
+export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+  const N = DENSITY_GRID_SIZE
+  const total = N * N * N
+  const density = new Uint16Array(total * 4)
+  const bulk = new Float32Array(total)
+
+  const rplus = Math.max(config.btzHorizonRadius, 1e-3)
+  const L = 1
+  const omega = Math.max(config.btzOmega, 1e-3)
+  const delta = btzScalarDelta(config.mL)
+  const mA = Math.round(config.btzAngularM)
+  const T = btzTemperature(rplus, L)
+  const beta = T > 1e-8 ? 1 / T : 1e8
+
+  const outerHorizon = BTZ_WORLD_HORIZON + BTZ_HORIZON_SHELL
+  const uRange = 1 - outerHorizon
+
+  let peakDensity = 1e-20
+  const horizonFlags = new Uint8Array(total)
+
+  for (let z = 0; z < N; z++) {
+    const wz = ((z + 0.5) / N) * 2 - 1
+    for (let y = 0; y < N; y++) {
+      const wy = ((y + 0.5) / N) * 2 - 1
+      for (let x = 0; x < N; x++) {
+        const wx = ((x + 0.5) / N) * 2 - 1
+        const pixelIdx = (z * N + y) * N + x
+        const rhoW = Math.sqrt(wx * wx + wy * wy)
+        // Clip rendering to the inscribed cylinder (keep corners empty so
+        // the outer cube faces don't bleed "boundary" density onto the
+        // camera path at oblique angles).
+        if (rhoW > 1 || Math.abs(wz) > 1) continue
+
+        if (rhoW < BTZ_WORLD_HORIZON) continue
+
+        if (rhoW <= outerHorizon) {
+          // Opaque horizon shell marker.
+          bulk[pixelIdx] = BTZ_HORIZON_MARKER_AMP
+          horizonFlags[pixelIdx] = 1
+          if (BTZ_HORIZON_MARKER_AMP > peakDensity) peakDensity = BTZ_HORIZON_MARKER_AMP
+          continue
+        }
+
+        // Map ρ_w → u = r_+/r ∈ [u_min, 1]
+        const uNorm = 1 - (rhoW - outerHorizon) / uRange
+        const uClamped = Math.max(uNorm, BTZ_U_MIN)
+        const r = rplus / uClamped
+        const phi = Math.atan2(wy, wx)
+
+        const amp = btzThermalAmplitude(r, phi, rplus, L, omega, delta, mA, beta)
+        if (amp > 0) {
+          bulk[pixelIdx] = amp
+          if (amp > peakDensity) peakDensity = amp
+        }
+      }
+    }
+  }
+
+  const peakNorm = peakDensity > 1e-20 ? 1 / peakDensity : 0
+  for (let i = 0; i < total; i++) {
+    const amp = bulk[i]!
+    if (amp === 0) {
+      packRGBA16F(density, i, 0, Math.log(1e-10), 0, 0)
+      continue
+    }
+    const r = Math.min(amp * peakNorm, 1)
+    const logRho = Math.log(amp + 1e-10)
+    // Encode horizon marker into the phase channel so the color palette
+    // paints horizon voxels with a distinct tone. Value chosen so the
+    // cosine-palette lookup lands on a near-black phase colour.
+    const phase = horizonFlags[i] === 1 ? Math.PI : 0
+    // Route horizon markers into the boundary-overlay channel so the
+    // additive A blend in the raymarcher reinforces the shell at low
+    // view angles where the shell voxels are thin.
+    const a = horizonFlags[i] === 1 ? 1 : 0
+    packRGBA16F(density, i, r, logRho, phase, a)
+  }
+
+  return {
+    density,
+    gridSize: N,
+    bytesPerRow: N * 8,
+    rowsPerImage: N,
+    peakDensity,
+    isTachyon: false,
+    kwFallbackApplied: false,
     effectiveDelta: delta,
   }
 }

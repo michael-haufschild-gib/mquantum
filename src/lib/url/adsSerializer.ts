@@ -22,6 +22,13 @@ export interface AdsUrlState {
   adsMassParameter?: number
   adsBranch?: UrlAdsBranch
   adsBoundaryOverlay?: boolean
+  // Stage 2A — BTZ sub-block (only applied when d = 3 at render time;
+  // the URL carries them regardless so the toggle survives dimension
+  // swaps).
+  adsBtzEnabled?: boolean
+  adsBtzHorizonRadius?: number
+  adsBtzOmega?: number
+  adsBtzAngularM?: number
 }
 
 const INTEGER_RE = /^-?\d+$/
@@ -91,6 +98,12 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
     params.set('ads_qb', state.adsBranch === 'alternate' ? '1' : '0')
   }
   setBoolParam(params, 'ads_bo', state.adsBoundaryOverlay)
+  // BTZ sub-block — emit only when at least one knob is defined so the
+  // canonical bound-state links stay free of empty BTZ params.
+  setBoolParam(params, 'ads_btz', state.adsBtzEnabled)
+  setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius)
+  setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega)
+  setIntParam(params, 'ads_btz_mA', state.adsBtzAngularM)
 }
 
 /**
@@ -111,4 +124,8 @@ export function deserializeAds(params: URLSearchParams, state: AdsUrlState): voi
   const adsQb = parseIntParam(params, 'ads_qb', 0, 1)
   if (adsQb !== undefined) state.adsBranch = adsQb === 1 ? 'alternate' : 'standard'
   state.adsBoundaryOverlay = parseBoolParam(params, 'ads_bo')
+  state.adsBtzEnabled = parseBoolParam(params, 'ads_btz')
+  state.adsBtzHorizonRadius = parseFloatParam(params, 'ads_btz_r', 0.05, 2.0)
+  state.adsBtzOmega = parseFloatParam(params, 'ads_btz_omega', 0.1, 10.0)
+  state.adsBtzAngularM = parseIntParam(params, 'ads_btz_mA', -5, 5)
 }

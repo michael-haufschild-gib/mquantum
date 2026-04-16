@@ -146,4 +146,110 @@ describe('anti-de Sitter setters', () => {
     store.clearAdsNeedsReset()
     expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.needsReset).toBe(false)
   })
+
+  describe('BTZ (Stage 2A)', () => {
+    it('setAdsBtzEnabled toggles the flag and flips needsReset', () => {
+      const store = useExtendedObjectStore.getState()
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzEnabled).toBe(false)
+      store.setAdsBtzEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(true)
+      expect(after.needsReset).toBe(true)
+      expect(after.preset).toBe('custom')
+    })
+
+    it('setAdsBtzHorizonRadius clamps to [0.05, 2.0]', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzHorizonRadius(-99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzHorizonRadius).toBe(
+        0.05
+      )
+      store.setAdsBtzHorizonRadius(99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzHorizonRadius).toBe(2.0)
+      store.setAdsBtzHorizonRadius(0.75)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzHorizonRadius).toBe(
+        0.75
+      )
+    })
+
+    it('setAdsBtzOmega clamps to [0.1, 10]', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzOmega(-5)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzOmega).toBe(0.1)
+      store.setAdsBtzOmega(25)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzOmega).toBe(10)
+    })
+
+    it('setAdsBtzAngularM clamps to [-5, 5] and coerces to integer', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzAngularM(99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzAngularM).toBe(5)
+      store.setAdsBtzAngularM(-99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzAngularM).toBe(-5)
+      store.setAdsBtzAngularM(2.7) // floors.
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzAngularM).toBe(2)
+    })
+
+    it('BTZ setters reject non-finite inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzHorizonRadius(0.4)
+      store.setAdsBtzOmega(1.3)
+      store.setAdsBtzAngularM(2)
+      useExtendedObjectStore.getState().clearAdsNeedsReset()
+
+      store.setAdsBtzHorizonRadius(Number.NaN)
+      store.setAdsBtzOmega(Number.POSITIVE_INFINITY)
+      store.setAdsBtzAngularM(Number.NEGATIVE_INFINITY)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzHorizonRadius).toBe(0.4)
+      expect(after.btzOmega).toBe(1.3)
+      expect(after.btzAngularM).toBe(2)
+      expect(after.needsReset).toBe(false)
+    })
+
+    it('preset btzHotSmall applies BTZ config (enabled, r+=0.15, ω=1, m_A=0)', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('btzHotSmall')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.preset).toBe('btzHotSmall')
+      expect(after.d).toBe(3)
+      expect(after.btzEnabled).toBe(true)
+      expect(after.btzHorizonRadius).toBeCloseTo(0.15, 6)
+      expect(after.btzOmega).toBeCloseTo(1.0, 6)
+      expect(after.btzAngularM).toBe(0)
+    })
+
+    it('preset btzWarmMedium applies its BTZ config', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('btzWarmMedium')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(true)
+      expect(after.btzHorizonRadius).toBeCloseTo(0.6, 6)
+      expect(after.btzOmega).toBeCloseTo(1.2, 6)
+      expect(after.btzAngularM).toBe(1)
+    })
+
+    it('preset btzCoolLarge applies its BTZ config', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('btzCoolLarge')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(true)
+      expect(after.btzHorizonRadius).toBeCloseTo(1.5, 6)
+      expect(after.btzOmega).toBeCloseTo(0.5, 6)
+      expect(after.btzAngularM).toBe(0)
+    })
+
+    it('switching from a BTZ preset to a non-BTZ preset clears btzEnabled', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('btzHotSmall')
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzEnabled).toBe(true)
+      store.setAdsPreset('adsFourGround')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.btzEnabled).toBe(false)
+      // Defaults restored.
+      expect(after.btzHorizonRadius).toBe(0.3)
+      expect(after.btzOmega).toBe(1.0)
+      expect(after.btzAngularM).toBe(0)
+    })
+  })
 })

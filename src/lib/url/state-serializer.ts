@@ -56,7 +56,7 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'antiDeSitter',
 ]
 
-import { deserializeAds, serializeAds, type UrlAdsBranch } from './adsSerializer'
+import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 
 const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
@@ -111,7 +111,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
  * All fields except dimension and objectType are optional — missing fields
  * keep their app defaults.
  */
-export interface ShareableObjectState {
+export interface ShareableObjectState extends AdsUrlState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
@@ -278,21 +278,8 @@ export interface ShareableObjectState {
   /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
   wdwWorldlinePulseWidth?: number
 
-  // ── Anti-de Sitter (Stage 1) ────────────────────────────────────────────
-  /** AdS spacetime dimension d (integer 3-7) */
-  adsDimension?: number
-  /** AdS radial quantum number n (integer 0-4) */
-  adsRadial?: number
-  /** AdS angular momentum ℓ (integer 0-3) */
-  adsAngular?: number
-  /** AdS magnetic quantum number m (clamped to [-ℓ, +ℓ]) */
-  adsMagnetic?: number
-  /** AdS mass parameter mL (signed; negative encodes imaginary mass). Float [-3, 3]. */
-  adsMassParameter?: number
-  /** Quantization branch selector: standard Δ₊ or alternate Δ₋ (silently falls back when outside KW). */
-  adsBranch?: UrlAdsBranch
-  /** Whether the asymptotic boundary primary overlay |O|² is rendered. */
-  adsBoundaryOverlay?: boolean
+  // ── Anti-de Sitter (Stage 1 + Stage 2A BTZ) ─────────────────────────────
+  // AdS / BTZ fields inherited from `AdsUrlState` — see adsSerializer.ts.
 }
 
 /**
