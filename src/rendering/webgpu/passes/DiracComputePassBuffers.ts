@@ -128,7 +128,7 @@ export function rebuildDiracBuffers(
   // FFT staging buffer (Stockham per-stage fallback — still allocated for diagnostics FFT)
   let stockhamFwdStageCount = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    stockhamFwdStageCount += Math.log2(config.gridSize[d]!)
+    stockhamFwdStageCount += Math.round(Math.log2(config.gridSize[d]!))
   }
   const totalFFTStages = stockhamFwdStageCount * 2
   // Shared-memory FFT: one slot per axis (used as inverse FFT offset)

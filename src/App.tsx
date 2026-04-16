@@ -237,7 +237,7 @@ function AppContent() {
                 <ul className="text-xs text-text-tertiary space-y-1">
                   <li>Chrome 113+ (desktop &amp; Android)</li>
                   <li>Edge 113+</li>
-                  <li>Firefox 141+</li>
+                  <li>Firefox 141+ (Windows; macOS 145+, Linux/Android unsupported)</li>
                 </ul>
               </div>
             </div>

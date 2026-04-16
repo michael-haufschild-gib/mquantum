@@ -26,7 +26,7 @@ export const AdvancedObjectControls: React.FC = React.memo(() => {
   const { powderScale, scatteringAnisotropy, setPowderScale, setScatteringAnisotropy } =
     useExtendedObjectStore(
       useShallow((state: ExtendedObjectState) => ({
-        powderScale: state.schroedinger?.powderScale ?? 0,
+        powderScale: state.schroedinger?.powderScale ?? 1.0,
         scatteringAnisotropy: state.schroedinger?.scatteringAnisotropy ?? 0,
         setPowderScale: state.setSchroedingerPowderScale,
         setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,

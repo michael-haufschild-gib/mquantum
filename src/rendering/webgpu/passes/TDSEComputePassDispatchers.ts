@@ -71,7 +71,7 @@ export function dispatchFFTAxis(
   p: FFTAxisParams
 ): number {
   const encoder = ctx.encoder
-  const stages = Math.log2(axisDim)
+  const stages = Math.round(Math.log2(axisDim))
   const halfTotal = p.totalSites / 2
 
   for (let s = 0; s < stages; s++) {

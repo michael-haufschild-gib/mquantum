@@ -229,7 +229,7 @@ export function rebuildTdseBuffers(
   // ensures correct per-stage data (device.queue.writeBuffer would race with command buffer).
   let fwdStageCount = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    fwdStageCount += Math.log2(config.gridSize[d]!)
+    fwdStageCount += Math.round(Math.log2(config.gridSize[d]!))
   }
   const totalFFTStages = fwdStageCount * 2 // forward + inverse
   const fftStagingBuffer = device.createBuffer({

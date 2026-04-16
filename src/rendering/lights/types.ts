@@ -114,7 +114,7 @@ export const DEFAULT_NEW_LIGHT_POSITIONS: [number, number, number][] = [
 
 /**
  * Create a default light matching the current single-light behavior.
- * Position derived from: horizontal=45deg, vertical=130deg, distance=8
+ * Position derived from: horizontal=45deg, vertical=130deg, distance=7
  * @returns A new default light source configuration
  */
 export function createDefaultLight(): LightSource {

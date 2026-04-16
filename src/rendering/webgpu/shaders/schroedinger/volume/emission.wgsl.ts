@@ -108,21 +108,24 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   // viridis(): algorithms 19 (Viridis) and 21 (Density Contours)
   if (colorAlgorithm === 19 || colorAlgorithm === 21) {
     parts.push(/* wgsl */ `
-// Viridis colormap — 5-stop piecewise-linear approximation in linear RGB
+// Viridis colormap — 5-stop piecewise-linear approximation in linear RGB.
+// Stops at t = 0.0, 0.25, 0.5, 0.75, 1.0 derived from the 11-point reference
+// LUT in src/lib/physics/colormaps.ts (0.25 and 0.75 are midpoints between
+// adjacent control points).
 fn viridis(t: f32) -> vec3f {
   var r: f32; var g: f32; var b: f32;
   if (t < 0.25) {
     let u = t / 0.25;
-    r = mix(0.267, 0.282, u); g = mix(0.004, 0.140, u); b = mix(0.329, 0.457, u);
+    r = mix(0.267, 0.231, u); g = mix(0.005, 0.319, u); b = mix(0.329, 0.542, u);
   } else if (t < 0.5) {
     let u = (t - 0.25) / 0.25;
-    r = mix(0.282, 0.127, u); g = mix(0.140, 0.566, u); b = mix(0.457, 0.550, u);
+    r = mix(0.231, 0.128, u); g = mix(0.319, 0.567, u); b = mix(0.542, 0.551, u);
   } else if (t < 0.75) {
     let u = (t - 0.5) / 0.25;
-    r = mix(0.127, 0.741, u); g = mix(0.566, 0.873, u); b = mix(0.550, 0.150, u);
+    r = mix(0.128, 0.373, u); g = mix(0.567, 0.785, u); b = mix(0.551, 0.380, u);
   } else {
     let u = (t - 0.75) / 0.25;
-    r = mix(0.741, 0.993, u); g = mix(0.873, 0.906, u); b = mix(0.150, 0.144, u);
+    r = mix(0.373, 0.993, u); g = mix(0.785, 0.906, u); b = mix(0.380, 0.144, u);
   }
   return vec3f(r, g, b);
 }`)

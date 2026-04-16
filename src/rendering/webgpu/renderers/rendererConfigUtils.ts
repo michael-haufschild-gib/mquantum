@@ -161,7 +161,9 @@ export function buildShaderConfig(
   // grid-transparent safety path) uses the fast cached ho1D/hydrogenND
   // evaluation instead of recomputing Hermite / Laguerre polynomials per step.
   // The cache and the grid bind to disjoint slots (2/3 vs 4/5) so they coexist.
-  const useEigenfunctionCache = pipelineIs2D ? false : enableCache
+  // Compute modes (TDSE/BEC/Dirac/QuantumWalk) never instantiate an
+  // EigenfunctionCacheComputePass, so the cache must stay off for them.
+  const useEigenfunctionCache = !pipelineIs2D && !computeMode && enableCache
   const useAnalyticalGradient = computeMode
     ? false
     : (rendererConfig.analyticalGradientEnabled ?? true)

@@ -206,7 +206,7 @@ function sampleAntiDeSitter(
  * in √|g|). For latticeDim < 3 the chart degenerates — fall back to flat.
  *
  * Chart:
- *   coords[1] ≡ θ, clamped to [ε, π−ε] with ε = 0.05.
+ *   coords[1] ≡ θ, clamped to [ε, π−ε] with ε = SPHERE_POLE_EPSILON (0.2).
  *   coords[2] ≡ φ (periodic; periodicity is the integrator's concern).
  * ⇒ g^11 = 1/R², g^22 = 1/(R² sin²θ_eff), √|g| = R² · sin(θ_eff).
  * (Carroll §3.7.)
