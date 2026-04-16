@@ -14,6 +14,7 @@ describe('QUANTUM_TYPE_REGISTRY', () => {
       'diracEquation',
       'quantumWalk',
       'wheelerDeWitt',
+      'antiDeSitter',
       'pauliSpinor',
     ]
     expect(QUANTUM_TYPE_REGISTRY.size).toBe(expectedKeys.length)

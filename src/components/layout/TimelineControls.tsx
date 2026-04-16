@@ -70,6 +70,7 @@ export const TimelineControls: FC = () => {
       resetPauliField: state.resetPauliField,
       requestOpenQuantumStateReset: state.requestOpenQuantumStateReset,
       triggerWdwRecompute: state.triggerWdwRecompute,
+      triggerAdsRecompute: state.triggerAdsRecompute,
     }))
   )
 
@@ -94,7 +95,8 @@ export const TimelineControls: FC = () => {
 
   const isWdW = schroedingerConfig.quantumMode === 'wheelerDeWitt'
 
-  // Compute modes with no animation effects content in the drawer
+  // Compute modes with no animation effects content in the drawer.
+  // AdS (Stage 1) is static — no time evolution, no effects drawer yet.
   const isEffectlessComputeMode =
     isSchroedinger &&
     schroedingerConfig.quantumMode !== 'harmonicOscillator' &&
@@ -200,6 +202,9 @@ export const TimelineControls: FC = () => {
         break
       case 'wheelerDeWitt':
         resetActions.triggerWdwRecompute()
+        break
+      case 'antiDeSitter':
+        resetActions.triggerAdsRecompute()
         break
     }
   }, [isPauliSpinor, schroedingerConfig.quantumMode, resetActions])

@@ -5,6 +5,7 @@
  * Import from this module to access any quantum mode type.
  */
 
+export * from './antiDeSitter'
 export * from './bec'
 export * from './common'
 export * from './crossMode'

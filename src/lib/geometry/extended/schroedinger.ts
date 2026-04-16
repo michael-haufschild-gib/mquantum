@@ -9,6 +9,8 @@
 import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
+import type { AntiDeSitterConfig } from './antiDeSitter'
+import { DEFAULT_ANTI_DE_SITTER_CONFIG } from './antiDeSitter'
 import type { BecConfig } from './bec'
 import { DEFAULT_BEC_CONFIG } from './bec'
 import type {
@@ -490,6 +492,10 @@ export interface SchroedingerConfig {
   /** Minisuperspace Wheeler–DeWitt (a, φ₁, φ₂) solver configuration */
   wheelerDeWitt: WheelerDeWittConfig
 
+  // === Anti-de Sitter Configuration (when quantumMode === 'antiDeSitter') ===
+  /** Closed-form bound-state configuration for AdS_d scalar fields. */
+  antiDeSitter: AntiDeSitterConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -720,6 +726,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   // Wheeler–DeWitt minisuperspace
   wheelerDeWitt: DEFAULT_WHEELER_DEWITT_CONFIG,
 
+  // Anti-de Sitter bound-state (Stage 1)
+  antiDeSitter: DEFAULT_ANTI_DE_SITTER_CONFIG,
+
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),
   basisY: new Float32Array([0, 1, 0]),
@@ -742,6 +751,7 @@ export function createDefaultSchroedingerConfig(): SchroedingerConfig {
   return {
     ...DEFAULT_SCHROEDINGER_CONFIG,
     wheelerDeWitt: { ...DEFAULT_SCHROEDINGER_CONFIG.wheelerDeWitt },
+    antiDeSitter: { ...DEFAULT_SCHROEDINGER_CONFIG.antiDeSitter },
     basisX: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisX),
     basisY: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisY),
     basisZ: Float32Array.from(DEFAULT_SCHROEDINGER_CONFIG.basisZ),

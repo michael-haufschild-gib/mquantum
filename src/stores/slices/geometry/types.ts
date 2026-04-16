@@ -496,6 +496,20 @@ export interface SchroedingerSliceActions {
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 
+  // Anti-de Sitter Bound-State Configuration (Stage 1)
+  setAdsDimension: (d: number) => void
+  setAdsRadialQuantumNumber: (n: number) => void
+  setAdsAngularQuantumNumber: (l: number) => void
+  setAdsMagneticQuantumNumber: (m: number) => void
+  setAdsMassParameter: (mL: number) => void
+  setAdsQuantizationBranch: (
+    branch: import('@/lib/geometry/extended/antiDeSitter').AdsQuantizationBranch
+  ) => void
+  setAdsBoundaryOverlay: (enabled: boolean) => void
+  setAdsPreset: (name: import('@/lib/geometry/extended/antiDeSitter').AdsPresetName) => void
+  triggerAdsRecompute: () => void
+  clearAdsNeedsReset: () => void
+
   // Free Scalar Field Presets
   applyFreeScalarPreset: (presetId: string) => void
 

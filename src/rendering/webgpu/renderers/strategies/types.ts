@@ -95,6 +95,18 @@ export interface SchroedingerSnapshot {
     worldlinePulseWidth?: number
     [key: string]: unknown
   }
+  antiDeSitter?: {
+    d?: number
+    n?: number
+    l?: number
+    m?: number
+    mL?: number
+    branch?: string
+    boundaryOverlay?: boolean
+    preset?: string
+    needsReset?: boolean
+    [key: string]: unknown
+  }
   absorberEnabled?: boolean
   absorberWidth?: number
   pmlTargetReflection?: number

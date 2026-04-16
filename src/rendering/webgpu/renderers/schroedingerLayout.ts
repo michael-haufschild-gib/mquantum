@@ -219,6 +219,16 @@ const SCHROEDINGER_FIELDS = [
   // --- Wheeler–DeWitt render-only effects (offset 1628) ---
   // Phase rotation rate (rad/unit-time). 0 disables visually; non-WdW modes always write 0.
   { name: 'wdwPhaseRotationRate', type: 'f32' },
+
+  // --- Anti-de Sitter render-time time evolution (offset 1632) ---
+  // Energy E used to rotate the stored spatial phase as -E*t. Written only when
+  // the active quantum mode is antiDeSitter AND the state is above the BF
+  // bound (stable). 0 for all other modes and for tachyonic states.
+  { name: 'adsEnergy', type: 'f32' },
+  // Tachyon growth rate γ. Written only when the active mode is antiDeSitter
+  // AND the state is below the BF bound (tachyonic). The shader multiplies |ψ|²
+  // by cosh²(γ*t) at render time. 0 otherwise.
+  { name: 'adsGrowthRate', type: 'f32' },
 ] as const satisfies readonly StructFieldDef[]
 
 /** Computed struct layout for SchroedingerUniforms. */

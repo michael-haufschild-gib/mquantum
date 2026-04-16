@@ -1,0 +1,114 @@
+/**
+ * Anti-de Sitter URL sub-block serializer / deserializer.
+ *
+ * Extracted from `state-serializer.ts` to keep the main serializer under
+ * its per-file `max-lines` budget. Uses its own local parse/set helpers to
+ * avoid re-exporting state-serializer internals.
+ *
+ * @module lib/url/adsSerializer
+ */
+
+import type { AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+
+/** URL-side branch type (mirrors the store enum). */
+export type UrlAdsBranch = AdsQuantizationBranch
+
+/** Shareable fields this module reads from the parent state type. */
+export interface AdsUrlState {
+  adsDimension?: number
+  adsRadial?: number
+  adsAngular?: number
+  adsMagnetic?: number
+  adsMassParameter?: number
+  adsBranch?: UrlAdsBranch
+  adsBoundaryOverlay?: boolean
+}
+
+const INTEGER_RE = /^-?\d+$/
+const FLOAT_RE = /^-?(?:\d+\.?\d*|\.\d+)$/
+
+function parseIntParam(
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined {
+  const raw = params.get(key)
+  if (!raw || !INTEGER_RE.test(raw)) return undefined
+  const v = Number(raw)
+  if (!Number.isSafeInteger(v)) return undefined
+  return Math.max(min, Math.min(max, v))
+}
+
+function parseFloatParam(
+  params: URLSearchParams,
+  key: string,
+  min: number,
+  max: number
+): number | undefined {
+  const raw = params.get(key)
+  if (!raw || !FLOAT_RE.test(raw)) return undefined
+  const v = Number(raw)
+  if (!Number.isFinite(v)) return undefined
+  return Math.max(min, Math.min(max, v))
+}
+
+function parseBoolParam(params: URLSearchParams, key: string): boolean | undefined {
+  const raw = params.get(key)
+  if (raw === '1') return true
+  if (raw === '0') return false
+  return undefined
+}
+
+function setIntParam(params: URLSearchParams, key: string, value: number | undefined): void {
+  if (value !== undefined) params.set(key, value.toString())
+}
+
+function setFloatParam(
+  params: URLSearchParams,
+  key: string,
+  value: number | undefined,
+  precision = 3
+): void {
+  if (value !== undefined) params.set(key, value.toFixed(precision))
+}
+
+function setBoolParam(params: URLSearchParams, key: string, value: boolean | undefined): void {
+  if (value !== undefined) params.set(key, value ? '1' : '0')
+}
+
+/**
+ * Emit the `ads_*` sub-block. Callers gate on
+ * `state.quantumMode === 'antiDeSitter'`.
+ */
+export function serializeAds(params: URLSearchParams, state: AdsUrlState): void {
+  setIntParam(params, 'ads_d', state.adsDimension)
+  setIntParam(params, 'ads_n', state.adsRadial)
+  setIntParam(params, 'ads_l', state.adsAngular)
+  setIntParam(params, 'ads_m', state.adsMagnetic)
+  setFloatParam(params, 'ads_mL', state.adsMassParameter)
+  if (state.adsBranch !== undefined) {
+    params.set('ads_qb', state.adsBranch === 'alternate' ? '1' : '0')
+  }
+  setBoolParam(params, 'ads_bo', state.adsBoundaryOverlay)
+}
+
+/**
+ * Parse the `ads_*` sub-block into state. Unknown / out-of-range values
+ * fall back to undefined per the project-wide forward-compatibility rule;
+ * the store's clamped setters enforce invariants on the happy path.
+ *
+ * `adsMagnetic` is parsed over the full [−6, +6] range — the downstream
+ * setter re-clamps against the final ℓ value, which may be applied later
+ * in the same transaction.
+ */
+export function deserializeAds(params: URLSearchParams, state: AdsUrlState): void {
+  state.adsDimension = parseIntParam(params, 'ads_d', 3, 7)
+  state.adsRadial = parseIntParam(params, 'ads_n', 0, 4)
+  state.adsAngular = parseIntParam(params, 'ads_l', 0, 3)
+  state.adsMagnetic = parseIntParam(params, 'ads_m', -6, 6)
+  state.adsMassParameter = parseFloatParam(params, 'ads_mL', -3, 3)
+  const adsQb = parseIntParam(params, 'ads_qb', 0, 1)
+  if (adsQb !== undefined) state.adsBranch = adsQb === 1 ? 'alternate' : 'standard'
+  state.adsBoundaryOverlay = parseBoolParam(params, 'ads_bo')
+}

@@ -21,6 +21,7 @@ import {
 import { logger } from '@/lib/logger'
 import { useGeometryStore } from '@/stores/geometryStore'
 
+import { createAntiDeSitterSetters } from './setters/antiDeSitterSetters'
 import { createBecSetters, resizeBecArrays } from './setters/becSetters'
 import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
 import { reconcileCosmologyInvariants } from './setters/freeScalarCosmologySetters'
@@ -494,6 +495,7 @@ export const createSchroedingerSlice: StateCreator<
     ...createDiracSetters(ctx),
     ...createOpenQuantumSetters(ctx),
     ...createWheelerDeWittSetters(ctx),
+    ...createAntiDeSitterSetters(ctx),
 
     // === Quantum Walk ===
     applyQuantumWalkPreset: (presetId) => {

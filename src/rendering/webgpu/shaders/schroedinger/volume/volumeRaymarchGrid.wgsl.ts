@@ -74,10 +74,17 @@ fn volumeRaymarchGrid(
 
     let pos = rayOrigin + rayDir * t;
     let gridSample = sampleDensityFromGrid(pos, uniforms);
-    var rho = gridSample.r;
+    // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
+    // adsGrowthRate is 0 outside AdS (and 0 for stable AdS states), so the
+    // cosh² factor is 1 and rho is untouched for every other mode.
+    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+    var rho = gridSample.r * adsCoshGamma * adsCoshGamma;
     let sCenter = gridSample.g;
-    // wdwPhaseRotationRate is 0 for all non-WdW modes — subtraction is a no-op
-    let phase = gridSample.b - uniforms.wdwPhaseRotationRate * uniforms.time;
+    // wdwPhaseRotationRate rotates WdW; adsEnergy rotates AdS stable states
+    // via phase' = B - E·t. Both uniforms are 0 for every other mode so the
+    // combined subtraction is an identity outside their owning modes.
+    let phase = gridSample.b
+      - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
 
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
@@ -217,7 +224,13 @@ fn volumeRaymarchGrid(
     // Returns (rho, logRho, spatialPhase, relativePhase) for rgba16float
     // Returns (rho, 0, 0, 0) for r16float
     let gridSample = sampleDensityFromGrid(pos, uniforms);
-    var rho = gridSample.r;
+    // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
+    // adsGrowthRate is 0 for every non-AdS mode and for stable AdS states,
+    // so the factor is 1 and rho is untouched. Applied to the R channel only
+    // (AdS is never dual-channel, so no secondary-channel impact).
+    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+    let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+    var rho = gridSample.r * adsAmplitudeSq;
 
     // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
     //   R = primary density, G = secondary density (NOT logRho)
@@ -242,12 +255,14 @@ fn volumeRaymarchGrid(
     }
 
     // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
-    // WdW phase rotation only applies to the spatial-phase (B) channel; relativePhase (A)
-    // is a different observable and is not rotated. wdwPhaseRotationRate is 0 for all
-    // non-WdW modes so the subtraction is a no-op there.
+    // WdW and AdS (stable) phase rotation only applies to the spatial-phase (B)
+    // channel; relativePhase (A) is a different observable and is not rotated.
+    // wdwPhaseRotationRate and adsEnergy are 0 outside their owning modes so
+    // the combined subtraction is an identity everywhere else.
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
-      let rotatedB = gridSample.b - uniforms.wdwPhaseRotationRate * uniforms.time;
+      let rotatedB = gridSample.b
+        - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
       phase = select(rotatedB, gridSample.a, COLOR_ALGORITHM == 10);
     } else {
       phase = 0.0;

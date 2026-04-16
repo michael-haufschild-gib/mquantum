@@ -12,6 +12,7 @@ Two object types: `ObjectType = 'schroedinger' | 'pauliSpinor'`. Both are quantu
 | ---------------------- | -------------------- | ---------- | -------------------------------------------------- | ---------------------------------------------------------------- |
 | Harmonic Oscillator    | `harmonicOscillator` | 1D-11D     | Hermite polynomials                                | Superposition up to 8 terms, per-dimension frequencies (`omega`) |
 | Hydrogen N-Dimensional | `hydrogenND`         | 3D-11D     | Laguerre + spherical harmonics + HO for extra dims | Quantum numbers `n`, `l`, `m`; n_eff = n + (D-3)/2               |
+| Anti-de Sitter         | `antiDeSitter`       | 3D-7D      | Jacobi P_n^{(α,β)} + Y_ℓm on Poincaré ball         | `d`, `n`, `l`, `m`, `mL`; Δ_± = (d−1)/2 ± √((d−1)²/4 + m²L²); BF + Klebanov-Witten window; boundary overlay |
 
 ### Compute Modes (GPU lattice simulation, 3D+ only)
 

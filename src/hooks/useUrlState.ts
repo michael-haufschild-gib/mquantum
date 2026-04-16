@@ -227,6 +227,27 @@ function applyCosmologyParams(
 }
 
 /**
+ * Apply Anti-de Sitter (Stage 1) URL state params.
+ *
+ * Order mirrors the WdW helper: set ℓ BEFORE m so the magnetic-QN setter
+ * sees the correct [-ℓ, +ℓ] clamp window — setting m first against a stale
+ * ℓ would silently over-clamp when ℓ later increases.
+ */
+function applyAdsParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.adsDimension !== undefined) ext.setAdsDimension(urlState.adsDimension)
+  if (urlState.adsRadial !== undefined) ext.setAdsRadialQuantumNumber(urlState.adsRadial)
+  if (urlState.adsAngular !== undefined) ext.setAdsAngularQuantumNumber(urlState.adsAngular)
+  if (urlState.adsMagnetic !== undefined) ext.setAdsMagneticQuantumNumber(urlState.adsMagnetic)
+  if (urlState.adsMassParameter !== undefined) ext.setAdsMassParameter(urlState.adsMassParameter)
+  if (urlState.adsBranch !== undefined) ext.setAdsQuantizationBranch(urlState.adsBranch)
+  if (urlState.adsBoundaryOverlay !== undefined)
+    ext.setAdsBoundaryOverlay(urlState.adsBoundaryOverlay)
+}
+
+/**
  * Apply Wheeler–DeWitt minisuperspace URL state params.
  *
  * Each setter (`setWdwBoundaryCondition`, `setWdwInflatonMass`,
@@ -374,6 +395,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)
+    applyAdsParams(urlState, ext)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

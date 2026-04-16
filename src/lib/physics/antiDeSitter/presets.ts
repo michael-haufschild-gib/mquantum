@@ -1,0 +1,224 @@
+/**
+ * Named presets for the Anti-de Sitter bound-state mode.
+ *
+ * Each preset is a curated (d, n, ℓ, m, mL, branch, boundaryOverlay) tuple
+ * illustrating a distinct physical regime:
+ *   - Ground-state / conformal / multipole states across d = 4.
+ *   - Radial / mixed excitations across d = 4.
+ *   - Three-dimensional states covering the standard, Klebanov-Witten, and
+ *     tachyonic branches.
+ *   - Higher-dimensional SUGRA-style towers (d = 5, 6, 7).
+ *   - A heavy-primary and a cosine-node state for visual contrast.
+ */
+
+import type { AdsPresetName, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+
+/** Preset scalar payload — the strategy applies these onto `AntiDeSitterConfig`. */
+export interface AdsPresetDefinition {
+  id: Exclude<AdsPresetName, 'custom'>
+  label: string
+  description: string
+  d: number
+  n: number
+  l: number
+  m: number
+  mL: number
+  branch: AdsQuantizationBranch
+  boundaryOverlay: boolean
+}
+
+/**
+ * Full catalogue of AdS presets surfaced in the UI dropdown. Order is UI-stable.
+ */
+export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
+  {
+    id: 'adsFourGround',
+    label: 'AdS₄ Ground',
+    description: 'Massless scalar ground state in AdS₄ (Δ = 3, E = 3).',
+    d: 4,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsFourConformal',
+    label: 'AdS₄ Conformal (Δ = 2)',
+    description: 'Near-BF scalar Δ = 2 in AdS₄ (m²L² = −2, inside Klebanov–Witten window).',
+    d: 4,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: -Math.sqrt(2),
+    branch: 'standard',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsFourDipole',
+    label: 'AdS₄ Dipole (ℓ=1)',
+    description: 'ℓ=1, m=0 dipole in AdS₄ (pz-like lobes in the Poincaré ball).',
+    d: 4,
+    n: 0,
+    l: 1,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsFourQuadrupole',
+    label: 'AdS₄ Quadrupole (ℓ=2)',
+    description: 'ℓ=2, m=0 d-like quadrupole state.',
+    d: 4,
+    n: 0,
+    l: 2,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsFourRadialExcited',
+    label: 'AdS₄ Radial Excited (n=2)',
+    description: 'Radially excited ℓ=0 state with two radial nodes.',
+    d: 4,
+    n: 2,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsFourMixed',
+    label: 'AdS₄ Mixed (n=1, ℓ=1)',
+    description: 'Mixed radial+angular excitation with a ring node.',
+    d: 4,
+    n: 1,
+    l: 1,
+    m: 1,
+    mL: 0.5,
+    branch: 'standard',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsThreeGround',
+    label: 'AdS₃ Ground',
+    description: 'Massless scalar ground in AdS₃ / BTZ bulk (Δ = 2).',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsThreeAlternate',
+    label: 'AdS₃ Alternate (Δ₋)',
+    description: 'Klebanov-Witten window demo — Δ_− quantization in AdS₃.',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: -Math.sqrt(0.7),
+    branch: 'alternate',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsThreeTachyon',
+    label: 'AdS₃ Tachyon',
+    description: 'Below-BF state in AdS₃ (m²L² = −1.21 < −1); grows in time.',
+    d: 3,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: -1.1,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsFiveSUGRA',
+    label: 'AdS₅ SUGRA',
+    description: 'Type-IIB SUGRA-like massless scalar in AdS₅ (Δ = 4).',
+    d: 5,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsFiveKKTower',
+    label: 'AdS₅ KK Tower (n=1)',
+    description: 'First Kaluza-Klein excitation on S⁵ projected into AdS₅.',
+    d: 5,
+    n: 1,
+    l: 1,
+    m: 0,
+    mL: 1,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsSixHigh',
+    label: 'AdS₆ High-ℓ',
+    description: 'Six-dimensional AdS with ℓ=3, m=2 — rich angular structure.',
+    d: 6,
+    n: 0,
+    l: 3,
+    m: 2,
+    mL: 0.5,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+  {
+    id: 'adsSevenSUGRA',
+    label: 'AdS₇ SUGRA',
+    description: 'M5-brane worldvolume SUGRA scalar in AdS₇.',
+    d: 7,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsFourHeavyPrimary',
+    label: 'AdS₄ Heavy Primary',
+    description: 'Large-Δ primary (mL = 3, Δ ≈ 4.85) — sharp cosine profile.',
+    d: 4,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 3,
+    branch: 'standard',
+    boundaryOverlay: true,
+  },
+  {
+    id: 'adsFourCosineNode',
+    label: 'AdS₄ Cosine Node',
+    description: 'n=3, ℓ=0 state — three radial zeros illustrate Jacobi nodes.',
+    d: 4,
+    n: 3,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+  },
+]
+
+/** O(1) lookup from preset id to definition. */
+export const ADS_PRESET_MAP: Readonly<
+  Record<Exclude<AdsPresetName, 'custom'>, AdsPresetDefinition>
+> = Object.freeze(
+  Object.fromEntries(ADS_PRESETS.map((p) => [p.id, p])) as Record<
+    Exclude<AdsPresetName, 'custom'>,
+    AdsPresetDefinition
+  >
+)

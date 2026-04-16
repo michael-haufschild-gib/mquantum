@@ -53,7 +53,10 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'diracEquation',
   'quantumWalk',
   'wheelerDeWitt',
+  'antiDeSitter',
 ]
+
+import { deserializeAds, serializeAds, type UrlAdsBranch } from './adsSerializer'
 
 const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
@@ -274,6 +277,22 @@ export interface ShareableObjectState {
   wdwWorldlineSpeed?: number
   /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
   wdwWorldlinePulseWidth?: number
+
+  // ── Anti-de Sitter (Stage 1) ────────────────────────────────────────────
+  /** AdS spacetime dimension d (integer 3-7) */
+  adsDimension?: number
+  /** AdS radial quantum number n (integer 0-4) */
+  adsRadial?: number
+  /** AdS angular momentum ℓ (integer 0-3) */
+  adsAngular?: number
+  /** AdS magnetic quantum number m (clamped to [-ℓ, +ℓ]) */
+  adsMagnetic?: number
+  /** AdS mass parameter mL (signed; negative encodes imaginary mass). Float [-3, 3]. */
+  adsMassParameter?: number
+  /** Quantization branch selector: standard Δ₊ or alternate Δ₋ (silently falls back when outside KW). */
+  adsBranch?: UrlAdsBranch
+  /** Whether the asymptotic boundary primary overlay |O|² is rendered. */
+  adsBoundaryOverlay?: boolean
 }
 
 /**
@@ -556,6 +575,13 @@ export function serializeState(state: ShareableState): string {
     setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
     setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
     setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+  }
+
+  // Anti-de Sitter (Stage 1). Only emitted while the mode is active — the
+  // AdS fields are otherwise dormant on SchroedingerConfig and would pollute
+  // links for unrelated modes.
+  if (state.quantumMode === 'antiDeSitter') {
+    serializeAds(params, state)
   }
 
   return params.toString()
@@ -871,6 +897,10 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
   state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
   state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
+
+  // Anti-de Sitter (Stage 1) — extracted to keep `deserializeState` under
+  // the cognitive-complexity budget and the file under max-lines.
+  deserializeAds(params, state)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

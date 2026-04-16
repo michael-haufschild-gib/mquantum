@@ -54,6 +54,8 @@ export const QUANTUM_MODE_MAP: Record<string, number> = {
   becDynamics: 4,
   diracEquation: 5,
   quantumWalk: 6,
+  // 7 = hydrogenNDCoupled (pre-existing). AdS takes the next free slot.
+  antiDeSitter: 8,
 }
 
 /** Maps color algorithm names to shader integer constants */
@@ -186,6 +188,7 @@ export interface ExtendedStoreSnapshot {
   clearDiracNeedsReset?: () => void
   clearQuantumWalkNeedsReset?: () => void
   clearWdwNeedsReset?: () => void
+  clearAdsNeedsReset?: () => void
   pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
   pauliSpinorVersion?: number
   clearPauliNeedsReset?: () => void

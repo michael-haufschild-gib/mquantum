@@ -42,6 +42,13 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `wdw_wl` | 0/1 | Wheeler–DeWitt semiclassical worldline pulse (render-only) |
 | `wdw_wls` | float 0.1-3 | Wheeler–DeWitt worldline pulse cycles per unit time |
 | `wdw_wlw` | float 0.02-0.3 | Wheeler–DeWitt worldline Gaussian pulse width |
+| `ads_d` | int 3-7 | Anti-de Sitter boundary dimension |
+| `ads_n` | int 0-4 | Anti-de Sitter radial quantum number |
+| `ads_l` | int 0-3 | Anti-de Sitter angular momentum |
+| `ads_m` | int | Anti-de Sitter magnetic quantum number (clamped to [−ℓ, +ℓ] downstream) |
+| `ads_mL` | float -3..3 | Anti-de Sitter mass × AdS radius (signed; negative encodes imaginary mass) |
+| `ads_qb` | 0/1 | Anti-de Sitter quantization branch (0 = standard Δ₊, 1 = alternate Δ₋ with KW fallback) |
+| `ads_bo` | 0/1 | Anti-de Sitter asymptotic boundary primary overlay toggle |
 
 ## Rules
 
@@ -49,5 +56,6 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - Missing params keep app defaults (merge behavior)
 - All extended params are optional — only `d` and `t` are required for object links
 - `wdw_*` params are only applied when `qm=wheelerDeWitt`
+- `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
 - New params follow the pattern: short key, validated/clamped in `deserializeState`, applied in `applyUrlStateParams`
 - Camera state and visual appearance (colors, PBR, post-processing) are NOT url-serialized — use scene presets for those
