@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
 
@@ -87,5 +87,52 @@ describe('generateDisorderNoise', () => {
     for (let i = 0; i < a.length; i++) {
       expect(a[i]).toBe(b[i])
     }
+  })
+
+  // Vitest short-circuits WASM loading via MODE==='test', so the WASM helpers
+  // already return null here. These tests make the JS fallback contract
+  // explicit by stubbing the helpers and covering the odd-totalSites branch
+  // `i + 1 < totalSites` that the even-length suite above never reaches.
+  describe('JS fallback (odd totalSites)', () => {
+    it('uniform: reproducible, correct length, no throw with odd totalSites', async () => {
+      const wasm = await import('@/lib/wasm')
+      const noiseSpy = vi.spyOn(wasm, 'generateDisorderNoiseWasm').mockReturnValue(null)
+      const potSpy = vi.spyOn(wasm, 'generateDisorderPotentialWasm').mockReturnValue(null)
+      try {
+        const a = generateDisorderNoise(257, 13, 'uniform')
+        const b = generateDisorderNoise(257, 13, 'uniform')
+        expect(a).toHaveLength(257)
+        expect(b).toHaveLength(257)
+        for (let i = 0; i < a.length; i++) expect(a[i]).toBe(b[i])
+        for (let i = 0; i < a.length; i++) {
+          expect(a[i]).toBeGreaterThanOrEqual(-0.5)
+          expect(a[i]).toBeLessThan(0.5)
+        }
+      } finally {
+        noiseSpy.mockRestore()
+        potSpy.mockRestore()
+      }
+    })
+
+    it('gaussian: reproducible and final slot assigned for odd totalSites', async () => {
+      const wasm = await import('@/lib/wasm')
+      const noiseSpy = vi.spyOn(wasm, 'generateDisorderNoiseWasm').mockReturnValue(null)
+      const potSpy = vi.spyOn(wasm, 'generateDisorderPotentialWasm').mockReturnValue(null)
+      try {
+        const a = generateDisorderNoise(257, 99, 'gaussian')
+        const b = generateDisorderNoise(257, 99, 'gaussian')
+        expect(a).toHaveLength(257)
+        for (let i = 0; i < a.length; i++) expect(a[i]).toBe(b[i])
+        // Last slot (index 256, even) is assigned by the `i += 2` loop.
+        // The `i + 1 < totalSites` guard drops the unused second gaussian
+        // sample at index 257; ensure the last slot itself is a finite
+        // number, not zero-initialized.
+        expect(Number.isFinite(a[256])).toBe(true)
+        expect(a[256]).not.toBe(0)
+      } finally {
+        noiseSpy.mockRestore()
+        potSpy.mockRestore()
+      }
+    })
   })
 })
