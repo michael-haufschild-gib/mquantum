@@ -105,6 +105,19 @@ export interface TdseExecuteFields {
   dispatchFFTAxisInPass(passEncoder: GPUComputePassEncoder, axisDim: number, slot: number): void
   /** Curved-space RK4 dispatcher — only invoked when the TDSE metric is non-flat. */
   runCurvedFrame(device: GPUDevice, encoder: GPUCommandEncoder): void
+  /**
+   * Populate the curved integrator's per-step RK4 stage-time staging buffer
+   * for the upcoming frame. Called once per frame before any encoder work
+   * when the metric is time-dependent (deSitter).
+   */
+  prepareCurvedStageTimes(device: GPUDevice, simTimeStart: number, dt: number, steps: number): void
+  /**
+   * Emit a `copyBufferToBuffer` on the active encoder that patches
+   * `TDSEUniforms.stageTimeK{1..4}` with the pre-computed stage times for
+   * step `stepIdx`. Called before each RK4 step's kinetic dispatches when
+   * the metric is time-dependent.
+   */
+  applyCurvedStageTimesForStep(encoder: GPUCommandEncoder, stepIdx: number): void
   dispatchCompute(
     pe: GPUComputePassEncoder,
     p: GPUComputePipeline,
@@ -280,6 +293,18 @@ export function runTdseExecute(
     const dispatchCurvedRK4 = curvedActive
       ? (curvedCtx: WebGPURenderContext) => pass.runCurvedFrame(curvedCtx.device, curvedCtx.encoder)
       : undefined
+    // Per-step RK4 stage-time hooks for time-dependent metrics. Wired up
+    // only when the curved path is active — flat / torus runs get
+    // `undefined` here so the evolution branch short-circuits on a cheap
+    // falsy check.
+    const prepareCurvedStageTimes = curvedActive
+      ? (device: GPUDevice, simTimeStart: number, steps: number) =>
+          pass.prepareCurvedStageTimes(device, simTimeStart, config.dt, steps)
+      : undefined
+    const applyCurvedStageTimesForStep = curvedActive
+      ? (encoder: GPUCommandEncoder, stepIdx: number) =>
+          pass.applyCurvedStageTimesForStep(encoder, stepIdx)
+      : undefined
     runStrangEvolution(ctx, config, speed, evoState, {
       pl,
       bg,
@@ -297,6 +322,8 @@ export function runTdseExecute(
       dispatchFFTAxisInPass: (passEncoder, axisDim, slot) =>
         pass.dispatchFFTAxisInPass(passEncoder, axisDim, slot),
       dispatchCurvedRK4,
+      prepareCurvedStageTimes,
+      applyCurvedStageTimesForStep,
     })
     pass.simTime = evoState.simTime
     pass.stepAccumulator = evoState.stepAccumulator

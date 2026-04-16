@@ -78,12 +78,14 @@ import {
 } from './TDSEComputePassWormhole'
 import {
   buildCurvedPipelines,
+  copyCurvedStageTimesForStep,
   createCurvedIntegratorState,
   createCurvedScratchBuffers,
   type CurvedIntegratorState,
   disposeCurvedScratch,
   rebuildCurvedBindGroups,
   runCurvedRK4Step,
+  writeCurvedStageTimes,
 } from './TDSECurvedIntegrator'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
@@ -547,6 +549,48 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.rebuildCurvedBindGroupsIfActive(device)
     }
     runCurvedRK4Step(encoder, this._curvedState)
+  }
+
+  /**
+   * Populate the curved integrator's per-step RK4 stage-time staging
+   * buffer for the upcoming frame. Called by the evolution loop once per
+   * frame BEFORE any encoder work — queues a CPU→GPU writeBuffer that
+   * the subsequent per-step {@link applyCurvedStageTimesForStep} calls
+   * copy from.
+   *
+   * No-op when the curved integrator scratch hasn't been materialized
+   * yet; the next `runCurvedFrame` will allocate it and the stage-time
+   * copies for this first frame will safely fall back to whatever
+   * frame-start values `writeTdseUniforms` wrote.
+   *
+   * @param device - GPU device (forwarded to the writeBuffer call).
+   * @param simTimeStart - Simulation time at the start of step 0.
+   * @param dt - Integration step size (seconds).
+   * @param steps - Number of Strang steps in this frame.
+   */
+  prepareCurvedStageTimes(
+    device: GPUDevice,
+    simTimeStart: number,
+    dt: number,
+    steps: number
+  ): void {
+    const scratch = this._curvedState.scratch
+    if (!scratch) return
+    writeCurvedStageTimes(device, scratch, simTimeStart, dt, steps)
+  }
+
+  /**
+   * Emit a `copyBufferToBuffer` on the active encoder that patches
+   * `TDSEUniforms.stageTimeK{1..4}` with the pre-computed stage times
+   * for step `stepIdx`. Must execute on the same encoder as the
+   * subsequent RK4 dispatches so the copy is ordered before the
+   * kinetic pipeline reads the uniform. No-op when the curved scratch
+   * or uniform buffer is not yet materialized.
+   */
+  applyCurvedStageTimesForStep(encoder: GPUCommandEncoder, stepIdx: number): void {
+    const scratch = this._curvedState.scratch
+    if (!scratch || !this.uniformBuffer) return
+    copyCurvedStageTimesForStep(encoder, scratch, this.uniformBuffer, stepIdx)
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */
