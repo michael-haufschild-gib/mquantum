@@ -72,6 +72,29 @@ export function nearestPow2(v: number): number {
 }
 
 /**
+ * Return `log2(axisDim)` as an integer, asserting `axisDim` is a power of
+ * two `>= 2`. Use in FFT dispatch/buffer paths — the Stockham butterfly
+ * kernels are only correct for power-of-two axis lengths, so silently
+ * rounding a stale/corrupted 12 into 4 stages would produce garbage
+ * instead of failing.
+ *
+ * @param axisDim - Axis length (must be a power of 2, `>= 2`)
+ * @returns `log2(axisDim)` as an integer
+ * @throws If `axisDim` is not a finite power of two `>= 2`
+ */
+export function assertPow2Log2(axisDim: number): number {
+  if (
+    !Number.isFinite(axisDim) ||
+    !Number.isInteger(axisDim) ||
+    axisDim < 2 ||
+    (axisDim & (axisDim - 1)) !== 0
+  ) {
+    throw new Error(`[FFT] axisDim=${axisDim} must be a power of 2 >= 2`)
+  }
+  return Math.log2(axisDim)
+}
+
+/**
  * Reduce grid dimensions until total sites fit within the GPU dispatch limit.
  * Halves the largest axis repeatedly until the product is within bounds.
  *

@@ -14,7 +14,7 @@ import {
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
 import type { WebGPURenderContext } from '../core/types'
-import { FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
+import { assertPow2Log2, FFT_UNIFORM_SIZE, LINEAR_WG } from './computePassUtils'
 import type { DiracBindGroupResult, DiracPipelineResult } from './DiracComputePassTypes'
 
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
@@ -271,13 +271,8 @@ export function dispatchFFTAxis(
   slotOffset: number,
   params: FFTAxisParams
 ): number {
-  if (axisDim < 2 || (axisDim & (axisDim - 1)) !== 0) {
-    throw new Error(
-      `[Dirac FFT] axisDim=${axisDim} must be a power of 2 >= 2 for Stockham butterfly`
-    )
-  }
   const { encoder } = ctx
-  const stages = Math.round(Math.log2(axisDim))
+  const stages = assertPow2Log2(axisDim)
   const halfTotal = params.totalSites / 2
 
   for (let s = 0; s < stages; s++) {

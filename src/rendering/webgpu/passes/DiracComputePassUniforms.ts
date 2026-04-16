@@ -8,7 +8,12 @@
 import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 
-import { FFT_UNIFORM_SIZE, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
+import {
+  assertPow2Log2,
+  FFT_UNIFORM_SIZE,
+  MAX_DIM,
+  MAX_SLICE_POSITIONS_WRITE_COUNT,
+} from './computePassUtils'
 
 /** Parameters for writing DiracUniforms to a GPU buffer. */
 export interface DiracUniformParams {
@@ -172,7 +177,7 @@ export function writeDiracUniforms(
 export function buildDiracFFTStagingData(config: DiracConfig, totalSites: number): ArrayBuffer {
   let totalSlots = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    totalSlots += Math.round(Math.log2(config.gridSize[d]!))
+    totalSlots += assertPow2Log2(config.gridSize[d]!)
   }
   totalSlots *= 2
 
@@ -183,7 +188,7 @@ export function buildDiracFFTStagingData(config: DiracConfig, totalSites: number
     let axisStride = 1
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      const stages = Math.round(Math.log2(axisDim))
+      const stages = assertPow2Log2(axisDim)
 
       for (let s = 0; s < stages; s++) {
         const offset = slotIdx * FFT_UNIFORM_SIZE

@@ -9,7 +9,7 @@ import type { DiracConfig } from '@/lib/geometry/extended/dirac'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 
-import { FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
+import { assertPow2Log2, FFT_UNIFORM_SIZE, PACK_UNIFORM_SIZE } from './computePassUtils'
 import type {
   DiracBufferResult,
   DiracDestroyableBuffers,
@@ -128,7 +128,7 @@ export function rebuildDiracBuffers(
   // FFT staging buffer (Stockham per-stage fallback — still allocated for diagnostics FFT)
   let stockhamFwdStageCount = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    stockhamFwdStageCount += Math.round(Math.log2(config.gridSize[d]!))
+    stockhamFwdStageCount += assertPow2Log2(config.gridSize[d]!)
   }
   const totalFFTStages = stockhamFwdStageCount * 2
   // Shared-memory FFT: one slot per axis (used as inverse FFT offset)
@@ -258,7 +258,7 @@ function buildFFTAxisStagingData(config: DiracConfig, totalSites: number): Array
     let axisStride = 1
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      const log2N = Math.round(Math.log2(axisDim))
+      const log2N = assertPow2Log2(axisDim)
 
       const offset = slotIdx * FFT_UNIFORM_SIZE
       const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
