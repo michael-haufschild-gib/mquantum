@@ -19,6 +19,14 @@ import type { TdseScenarioPreset } from './presets'
 
 /** Curved-space TDSE v2 presets, appended to the main preset registry. */
 export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
+  // NOTE: the three `[128, 64, 64]`-style presets below are written in
+  // post-`resizeTdseArrays` form — the runtime 262k-site budget caps a 3D
+  // TDSE lattice at 64³ (`defaultTdseGridPerDim(3) = 64`), so writing
+  // `gridSize: [128, 64, 64]` would be silently collapsed to `[64, 64, 64]`
+  // with `spacing: [0.2, 0.1, 0.1]` (extent preserved). We declare the
+  // post-resize geometry directly so the preset literal matches what the
+  // simulation actually runs, following the convention used by
+  // `blackHoleRingdown` in `presets.ts`.
   {
     id: 'wormholeEntangledPair',
     name: 'Wormhole: Entangled-Looking Pair',
@@ -26,8 +34,9 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
       'Two Gaussians launched outward from the joined throat of a double Morris–Thorne geometry. Each packet evolves on the same curved-space TDSE and reflects off the geometric bottleneck of the opposite throat. NOT a physical entangled-particle experiment; the "pair" label is structural — two classically-separable packets on a shared metric background, not a Bell-pair state.',
     overrides: {
       latticeDim: 3,
-      gridSize: [128, 64, 64],
-      spacing: [0.1, 0.1, 0.1],
+      gridSize: [64, 64, 64],
+      // Extent 12.8 × 6.4 × 6.4 — axis 0 runs along the throat-to-throat line.
+      spacing: [0.2, 0.1, 0.1],
       dt: 0.001,
       stepsPerFrame: 8,
       initialCondition: 'superposition',
@@ -57,8 +66,9 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
       'Gaussian wavepacket on a Schwarzschild spatial slice in isotropic coordinates, launched tangentially to hint at orbital motion. Shows curvature-induced dispersion and lensing-like path bending around the conformal-factor singularity at r=M/2. NOT a classical geodesic orbit — the packet is a quantum wavefunction on a fixed 3-slice; there is no temporal metric component, no proper-time evolution along worldlines, and no backreaction on the geometry.',
     overrides: {
       latticeDim: 3,
-      gridSize: [128, 64, 64],
-      spacing: [0.1, 0.1, 0.1],
+      gridSize: [64, 64, 64],
+      // Extent 12.8 × 6.4 × 6.4 — radial axis elongated for clearer lensing.
+      spacing: [0.2, 0.1, 0.1],
       dt: 0.002,
       stepsPerFrame: 4,
       initialCondition: 'gaussianPacket',
@@ -83,8 +93,10 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
       'Wavefunction phase on a Schwarzschild exterior spatial slice. The visible phase-wavelength is the carrier de Broglie wavelength, which varies with depth in the gravitational well via the conformal factor ψ⁴. NOT a proper-time-evolved clock — the metric here is purely spatial. The phase rolling difference across the field reflects the conformal factor of the spatial 3-slice, not a real gravitational time-dilation measurement; a true redshift demo requires a (3+1) metric.',
     overrides: {
       latticeDim: 3,
-      gridSize: [128, 64, 64],
-      spacing: [0.1, 0.1, 0.1],
+      gridSize: [64, 64, 64],
+      // Extent 12.8 × 6.4 × 6.4 — radial axis elongated so the phase
+      // gradient is visible across several de Broglie wavelengths.
+      spacing: [0.2, 0.1, 0.1],
       dt: 0.002,
       stepsPerFrame: 4,
       initialCondition: 'gaussianPacket',
@@ -135,7 +147,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     id: 'sphereCompactification',
     name: '2-Sphere: Wavepacket on Compact Geometry',
     description:
-      'Wavepacket on a 2-sphere of radius R, visualized through the chart axis 1 = θ (polar) and axis 2 = φ (azimuthal). The packet wraps around the φ direction (treated as periodic-compact via Dirichlet φ boundaries — a chart simplification) and bounces off the polar clamp ε=0.2 that keeps the metric non-singular. NOT a true Kaluza–Klein dimensional reduction — just the Laplace–Beltrami operator on a 2-sphere chart embedded in the 3-axis lattice.',
+      'Wavepacket on a 2-sphere of radius R, visualized through the chart axis 1 = θ (polar) and axis 2 = φ (azimuthal). Dirichlet boundaries apply on every axis — the packet reflects off the φ walls rather than wrapping around, and bounces off the polar clamp ε=0.2 that keeps the metric non-singular. NOT a true compactification: the sphere is embedded as a coordinate chart in the 3-axis lattice and the azimuthal direction is treated as reflective rather than periodic. Just the Laplace–Beltrami operator on the (θ, φ) 2-sphere chart.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -194,7 +206,7 @@ export const CURVED_METRIC_TDSE_PRESETS: TdseScenarioPreset[] = [
     id: 'adsBoundaryBounce',
     name: 'AdS: Wavepacket Reflecting off Conformal Boundary',
     description:
-      'Wavepacket launched toward the AdS conformal boundary on the Poincaré half-space chart (axis 0 = z, boundary at z→0). The conformal factor (L/z)² steepens without bound as z→0, producing reflective-like behavior off the effective boundary at finite proper time — a hallmark of AdS being a "box" despite its infinite volume. NOT a holographic-duality demo — this is purely the Schrödinger equation on a fixed AdS spatial slice in Poincaré coordinates; no boundary CFT, no bulk-to-boundary propagator.',
+      'Wavepacket launched toward the AdS conformal boundary on the Poincaré half-space chart (axis 0 = z, boundary at z→0). The conformal factor (L/z)² steepens without bound as z→0, producing reflective-like behavior off the effective boundary at finite proper time — a hallmark of AdS being a "box" despite its infinite volume. The implementation folds the z axis via |z| (the metric uses max(|z|, 0.05) as a soft boundary floor), so the chart covers both sides of z=0 symmetrically rather than being a true half-space. NOT a holographic-duality demo — this is purely the Schrödinger equation on a fixed AdS spatial slice in Poincaré coordinates; no boundary CFT, no bulk-to-boundary propagator.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],

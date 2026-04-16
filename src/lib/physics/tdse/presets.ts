@@ -225,7 +225,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     id: 'falseVacuumDecay',
     name: 'False Vacuum Decay',
     description:
-      'Packet in a metastable radial well — tunnels through the barrier as an expanding bubble',
+      'Packet in the higher (metastable) minimum of a tilted 1D quartic double well — tunnels through the intervening barrier into the true (lower) minimum. Tunneling is along axis 0 only; this preset uses the directional `doubleWell` potential, not the radial one. For the radial bubble-nucleation analog see the `bubbleNucleation` preset.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -347,13 +347,19 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   },
   {
     id: 'andersonTransition4D',
-    name: 'Anderson: 4D Transition',
+    name: 'Anderson: 4D Transport',
     description:
-      'Moderate disorder W/t=15 in 4D. Probes transport at the Anderson transition in higher dimensions.',
+      'Disorder W/t=15 on a 4D cube. Because the Anderson transition in 4D sits around Wc/t ≈ 34, W/t=15 lies well inside the extended (diffusive) phase; this preset probes weak-disorder transport in one dimension above 3D rather than sitting on the mobility edge.',
+    // Post-`resizeTdseArrays` form: the 262k-site budget yields
+    // `defaultTdseGridPerDim(4) = 16` per axis (16⁴ = 65k sites). A
+    // pre-resize [32]⁴ literal would be silently collapsed here with
+    // spacing doubled 0.1→0.2 — write the runtime geometry directly so
+    // the literal values match what the simulation actually runs.
     overrides: {
       latticeDim: 4,
-      gridSize: [32, 32, 32, 32],
-      spacing: [0.1, 0.1, 0.1, 0.1],
+      gridSize: [16, 16, 16, 16],
+      // Extent 3.2 per axis (same as pre-resize extent 32·0.1=3.2).
+      spacing: [0.2, 0.2, 0.2, 0.2],
       dt: 0.002,
       stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
@@ -362,6 +368,9 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       packetAmplitude: 1.0,
       packetMomentum: [0, 0, 0, 0],
       potentialType: 'andersonDisorder',
+      // W/t is spacing-independent: `uploadAndersonDisorderBuffer` scales
+      // the user-facing W by the current t_eff = ℏ²/(2m·dx²), so the
+      // localization physics is invariant under the dx=0.1→0.2 resize.
       disorderStrength: 15.0,
       disorderSeed: 42,
       disorderDistribution: 'uniform',
@@ -377,11 +386,16 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     id: 'andersonTransition5D',
     name: 'Anderson: 5D Transport',
     description:
-      'Disorder W/t=15 in 5D. Probes localization in dimensions where exact diagonalization is infeasible.',
+      'Disorder W/t=15 on a 5D cube. Higher-dimensional Anderson critical points are much larger than 3D (Wc/t increases roughly linearly with d), so this preset sits in the extended phase. Lets the user see how transport compares against the 3D and 4D presets in a regime where exact diagonalization is infeasible.',
+    // Post-`resizeTdseArrays` form: 262k-site budget yields
+    // `defaultTdseGridPerDim(5) = 8` per axis (8⁵ = 32k sites). A pre-
+    // resize [16]⁵ literal would be silently collapsed with spacing
+    // doubled 0.1→0.2.
     overrides: {
       latticeDim: 5,
-      gridSize: [16, 16, 16, 16, 16],
-      spacing: [0.1, 0.1, 0.1, 0.1, 0.1],
+      gridSize: [8, 8, 8, 8, 8],
+      // Extent 1.6 per axis (same as pre-resize extent 16·0.1=1.6).
+      spacing: [0.2, 0.2, 0.2, 0.2, 0.2],
       dt: 0.002,
       stepsPerFrame: 10,
       initialCondition: 'gaussianPacket',
@@ -517,14 +531,22 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     name: 'Wavepacket on a Wormhole Metric',
     description:
       'Gaussian wave packet propagating along the proper-distance axis of a Morris–Thorne throat. The kinetic operator is the Laplace–Beltrami operator on the curved spatial slice — not a potential. Shows partial reflection off the geometric bottleneck, curvature-induced dispersion, and transmitted amplitude that continues toward the far asymptotic region. No teleportation, no traversal between disconnected regions — just a single ψ on a single curved 3-slice.',
+    // Grid is written in post-`resizeTdseArrays` form (same convention as
+    // blackHoleRingdown). The 262k-site TDSE budget caps a 3D lattice at
+    // 64³; a [128,64,64] preset would otherwise be silently collapsed to
+    // 64³ with spacing [0.2, 0.1, 0.1], halving axis-0 resolution without
+    // surfacing the change to the user. Writing the post-resize geometry
+    // directly keeps preset intent and runtime physics in lockstep.
     overrides: {
       latticeDim: 3,
-      gridSize: [128, 64, 64],
-      spacing: [0.1, 0.1, 0.1],
-      // CFL bound for RK4 on the curved FD Laplace–Beltrami at b₀=0.5,
-      // dx=0.1 is dt ≲ 2√2 / ‖T‖ ≈ 0.0016. dt=0.001 keeps the integrator
-      // comfortably stable; stepsPerFrame=8 preserves the same simulation-
-      // time-per-frame pace as the rest of the TDSE presets.
+      gridSize: [64, 64, 64],
+      // Extent: 12.8 × 6.4 × 6.4 (elongated along the wormhole axis).
+      spacing: [0.2, 0.1, 0.1],
+      // CFL bound for RK4 on the curved FD Laplace–Beltrami at b₀=0.5.
+      // At dx₀=0.2 the bound dt ≲ 2√2 / ‖T‖ ≈ 0.0064; dt=0.001 keeps the
+      // integrator comfortably stable and stepsPerFrame=8 preserves the
+      // same simulation-time-per-frame pace as the rest of the TDSE
+      // presets.
       dt: 0.001,
       stepsPerFrame: 8,
       initialCondition: 'gaussianPacket',
