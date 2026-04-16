@@ -170,7 +170,15 @@ export function buildBecConfig(
       doubleWellSeparation: 1,
       doubleWellAsymmetry: 0,
       anharmonicLambda: 0,
-      disorderStrength: 0,
+      // Disorder overlay: forward the BEC-side configuration so the shared
+      // TDSE compute pipeline adds on-site disorder to the trap potential.
+      // `disorderStrength === 0` is the fast-path no-op in the dispatcher;
+      // BEC defaults to 0, matching the pre-existing behavior for presets
+      // that don't set it. Re-using the existing TDSE field names keeps
+      // the schema flat — no BEC-only branch in the compute pass.
+      disorderStrength: bec.disorderStrength ?? 0,
+      disorderSeed: bec.disorderSeed ?? DEFAULT_TDSE_CONFIG.disorderSeed,
+      disorderDistribution: bec.disorderDistribution ?? DEFAULT_TDSE_CONFIG.disorderDistribution,
       driveEnabled: false,
       driveFrequency: 0,
       driveAmplitude: 0,

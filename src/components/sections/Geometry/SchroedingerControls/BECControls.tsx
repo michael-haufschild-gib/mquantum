@@ -16,10 +16,19 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ALL_GRID_SIZE_OPTIONS, AXIS_LABELS } from '@/constants/dimension'
-import type { BecFieldView, BecInitialCondition } from '@/lib/geometry/extended/types'
+import type {
+  BecFieldView,
+  BecInitialCondition,
+  DisorderDistribution,
+} from '@/lib/geometry/extended/types'
 import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
 import type { BecControlsProps } from './types'
+
+const DISORDER_DISTRIBUTION_OPTIONS = [
+  { value: 'uniform', label: 'Uniform [-W/2, +W/2]' },
+  { value: 'gaussian', label: 'Gaussian N(0, W)' },
+]
 
 const INITIAL_CONDITION_OPTIONS = [
   { value: 'thomasFermi', label: 'Thomas-Fermi' },
@@ -328,6 +337,48 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(
             onChange={(v) => actions.setFieldView(v as BecFieldView)}
             options={FIELD_VIEW_OPTIONS}
           />
+        </ControlGroup>
+
+        <ControlGroup
+          title="Disorder Overlay"
+          collapsible
+          defaultOpen={false}
+          data-testid="control-group-bec-disorder"
+        >
+          <Slider
+            label="Strength (W)"
+            tooltip="Anderson-style on-site disorder strength added to the trap potential: V(x) += W·η(x) where η(x) ∈ [−0.5, +0.5] is deterministic seeded noise. 0 = disabled (no simulation cost). Sweep at fixed interaction strength to trace the superfluid↔Bose-glass phase boundary (Fisher et al., Phys. Rev. B 40, 546 (1989))."
+            value={bec.disorderStrength}
+            onChange={actions.setDisorderStrength}
+            min={0}
+            max={100}
+            step={0.1}
+            showValue
+            data-testid="bec-disorder-strength"
+          />
+          {bec.disorderStrength > 0 && (
+            <>
+              <Select
+                label="Distribution"
+                tooltip="Statistical distribution of on-site disorder energies."
+                value={bec.disorderDistribution}
+                onChange={(v) => actions.setDisorderDistribution(v as DisorderDistribution)}
+                options={DISORDER_DISTRIBUTION_OPTIONS}
+                data-testid="bec-disorder-distribution"
+              />
+              <Slider
+                label="Seed"
+                tooltip="PRNG seed for the disorder realization. Same seed + grid = same random potential for reproducibility."
+                value={bec.disorderSeed}
+                onChange={actions.setDisorderSeed}
+                min={0}
+                max={999999}
+                step={1}
+                showValue
+                data-testid="bec-disorder-seed"
+              />
+            </>
+          )}
         </ControlGroup>
 
         <ControlGroup

@@ -4,6 +4,8 @@
  * Config interface, initial-condition/field-view types, and default constants.
  */
 
+import type { DisorderDistribution } from './crossMode'
+
 // ============================================================================
 // BEC Types
 // ============================================================================
@@ -130,6 +132,25 @@ export interface BecConfig {
   /** Enable observable expectation value computation (⟨x⟩, ⟨p⟩, ΔxΔp) */
   observablesEnabled: boolean
 
+  // === Disorder overlay (Anderson-style on-site disorder on the trap) ===
+  /**
+   * On-site disorder strength W. Added to the trap potential as
+   * `V(x) += W · η(x)` where `η(x)` is deterministic noise in [−0.5, +0.5].
+   * 0 disables the overlay (fast path in the dispatcher).
+   *
+   * Scientific context: disordered BEC is the canonical route to the
+   * Bose-glass phase (Fisher et al., Phys. Rev. B 40, 546 (1989)) — the
+   * combination of repulsive interactions and on-site disorder produces
+   * a gapless, compressible, insulating phase distinct from both the
+   * superfluid and the Mott insulator. Sweeping `disorderStrength` at
+   * fixed `interactionStrength` traces the SF↔BG phase boundary.
+   */
+  disorderStrength: number
+  /** Deterministic PRNG seed for disorder realization reproducibility. */
+  disorderSeed: number
+  /** Statistical distribution of on-site disorder energies. */
+  disorderDistribution: DisorderDistribution
+
   // === Analog Hawking (waterfall sonic horizon) ===
   /** Waterfall asymptotic flow speed v_max (supersonic side). */
   hawkingVmax: number
@@ -181,6 +202,9 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   observablesEnabled: false,
+  disorderStrength: 0,
+  disorderSeed: 42,
+  disorderDistribution: 'uniform',
   // 3.5 (not 2.0): with the canonical interactionStrength g = 500 and mass = 1
   // the simulator's true background density is n0 = max(g·0.01, 1)/g = 0.01,
   // giving asymptotic sound speed c_s0 = √(g·n0/m) = √5 ≈ 2.236. v_max = 2.0
