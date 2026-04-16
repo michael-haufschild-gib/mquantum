@@ -73,7 +73,11 @@ export function maybeDispatchDisorder(
   maybeDispatchDisorderGeneric(
     device,
     ctx,
-    { strength: config.disorderStrength, seed: config.disorderSeed },
+    {
+      strength: config.disorderStrength,
+      seed: config.disorderSeed,
+      distribution: config.disorderDistribution,
+    },
     state,
     potentialBuffer,
     totalSites,

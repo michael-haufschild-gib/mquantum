@@ -4,9 +4,9 @@
  *
  * Physics: `V(x) += strength · η(x)` where `η(x)` is deterministic noise
  * generated on the CPU via {@link generateDisorderNoise} and seeded by
- * `(seed, totalSites)`. The WGSL kernel is
- * {@link disorderOverlayBlock} — it operates on any f32 storage buffer
- * and is not coupled to any particular quantum mode.
+ * `(seed, distribution, totalSites)`. The WGSL kernel is
+ * {@link disorderOverlayShaderBlock} — it operates on any f32 storage
+ * buffer and is not coupled to any particular quantum mode.
  *
  * Currently consumed by:
  * - TDSE compute pass (`TDSEComputePassDisorder.ts` re-exports the
@@ -24,7 +24,8 @@ import type { DisorderOverlayConfig } from '@/lib/geometry/extended/types'
 import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
 
 import type { WebGPURenderContext } from '../core/types'
-import { disorderOverlayBlock } from '../shaders/schroedinger/compute/tdseAddDisorder.wgsl'
+import { disorderOverlayShaderBlock } from '../shaders/schroedinger/compute/tdseAddDisorder.wgsl'
+import { assembleShaderBlocks } from '../shaders/shared/compose-helpers'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
 
 /** Mutable state for the disorder overlay pass. */
@@ -64,17 +65,19 @@ export function buildDisorderPipeline(
   label = 'disorder-overlay'
 ): void {
   state.bgl = createComputeBGL(device, `${label}-bgl`, ['uniform', 'storage', 'read-only-storage'])
-  const sm = createShaderModule(device, disorderOverlayBlock, label)
+  const { wgsl } = assembleShaderBlocks([disorderOverlayShaderBlock])
+  const sm = createShaderModule(device, wgsl, label)
   state.pipeline = createComputePipeline(device, sm, [state.bgl], label)
 }
 
 /**
  * Generate and dispatch disorder overlay if `config.strength > 0`.
- * Regenerates the noise buffer when the seed or grid size changes.
+ * Regenerates the noise buffer when the seed, distribution, or grid
+ * size changes.
  *
  * @param device - WebGPU device
  * @param ctx - Render context (for beginComputePass)
- * @param config - Disorder overlay configuration (strength + seed)
+ * @param config - Disorder overlay configuration (strength + seed + distribution)
  * @param state - Disorder state
  * @param potentialBuffer - The potential buffer to overlay disorder onto
  * @param totalSites - Total lattice sites
@@ -85,7 +88,7 @@ export function buildDisorderPipeline(
 export function maybeDispatchDisorder(
   device: GPUDevice,
   ctx: WebGPURenderContext,
-  config: Pick<DisorderOverlayConfig, 'strength' | 'seed'>,
+  config: Pick<DisorderOverlayConfig, 'strength' | 'seed' | 'distribution'>,
   state: DisorderState,
   potentialBuffer: GPUBuffer | null,
   totalSites: number,
@@ -100,12 +103,12 @@ export function maybeDispatchDisorder(
 ): void {
   if (config.strength <= 0 || !potentialBuffer || !state.pipeline) return
 
-  const disorderHash = `${config.seed}|${totalSites}`
+  const disorderHash = `${config.seed}|${config.distribution}|${totalSites}`
   if (disorderHash !== state.lastHash) {
     state.buffer?.destroy()
     state.uniformBuffer?.destroy()
 
-    const noise = generateDisorderNoise(totalSites, config.seed)
+    const noise = generateDisorderNoise(totalSites, config.seed, config.distribution)
     state.buffer = device.createBuffer({
       label: `${label}-noise`,
       size: totalSites * 4,

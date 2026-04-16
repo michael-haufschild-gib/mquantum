@@ -4,9 +4,9 @@
  * Adds pre-generated random disorder to a potential / mass² buffer:
  *   V(x) += strength * disorder(x)
  *
- * The disorder buffer contains uniform random values in [-0.5, +0.5],
- * generated on the CPU for reproducibility (seeded PRNG). The strength
- * parameter scales the disorder amplitude: effective noise ∈ [-W/2, +W/2].
+ * The disorder buffer contains unit-scale random values ([-0.5, +0.5] for
+ * uniform, N(0, 1) for gaussian), generated on the CPU for reproducibility
+ * (seeded PRNG). The strength parameter scales the disorder amplitude.
  *
  * Dispatched after the host mode's potential-fill pass when strength > 0.
  * Currently consumed by the TDSE compute path (and BEC via the shared
@@ -15,6 +15,8 @@
  * @workgroup_size(64)
  * @module
  */
+
+import type { ShaderBlock } from '../../shared/compose-helpers'
 
 export const disorderOverlayBlock = /* wgsl */ `
 struct DisorderUniforms {
@@ -35,6 +37,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   potential[idx] = potential[idx] + params.strength * disorder[idx];
 }
 `
+
+/** Disorder overlay entry point as a {@link ShaderBlock} (styleguide form). */
+export const disorderOverlayShaderBlock: ShaderBlock = {
+  name: 'disorder-overlay',
+  content: disorderOverlayBlock,
+}
 
 /**
  * Back-compat alias. Prefer {@link disorderOverlayBlock} — the block is

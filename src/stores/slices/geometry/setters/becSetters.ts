@@ -331,10 +331,15 @@ export function createBecSetters(ctx: SetterContext): BecActions {
     // because BEC shares the TDSE compute pass (see TdseBecConfigBuilder).
     setBecDisorderStrength: nestedClampedSetter(ctx, D, 'disorderStrength', 0, 100),
     setBecDisorderSeed: (seed: number) => {
+      if (!isFinite(seed)) {
+        warnNonFinite('bec.disorderSeed', seed)
+        return
+      }
+      const clamped = Math.floor(Math.max(0, seed))
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, disorderSeed: Math.floor(Math.max(0, seed)) },
+          bec: { ...state.schroedinger.bec, disorderSeed: clamped },
         },
       }))
     },
