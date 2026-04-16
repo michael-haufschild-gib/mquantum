@@ -196,4 +196,83 @@ describe('AdS URL round-trip', () => {
       expect(ads.btzEnabled).toBe(false)
     })
   })
+
+  describe('HKLL (Stage 2B) URL params', () => {
+    it('parses the canonical HKLL localized-beam URL', () => {
+      applyUrl(
+        'qm=antiDeSitter&d=4&t=schroedinger&ads_d=4&ads_hkll=1&ads_hkll_src=1&ads_hkll_sigma=0.25'
+      )
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.d).toBe(4)
+      expect(ads.hkllEnabled).toBe(true)
+      expect(ads.hkllBoundarySource).toBe('localized')
+      expect(ads.hkllSourceSigma).toBeCloseTo(0.25, 5)
+    })
+
+    it('parses planeWave mode with m_b', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_hkll=1&ads_hkll_src=2&ads_hkll_mb=4')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.hkllBoundarySource).toBe('planeWave')
+      expect(ads.hkllPlaneWaveM).toBe(4)
+    })
+
+    it('clamps out-of-range HKLL values', () => {
+      applyUrl(
+        'qm=antiDeSitter&d=4&t=schroedinger&ads_hkll=1&ads_hkll_src=99&ads_hkll_sigma=99&ads_hkll_mb=99'
+      )
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      // ads_hkll_src is clamped by the parser to the upper bound (2 →
+      // 'planeWave') — matches the behaviour of the other clamped ads_*
+      // integer params (no dedicated rejection on integer out-of-range,
+      // just a saturating clamp into the accepted enum range).
+      expect(ads.hkllBoundarySource).toBe('planeWave')
+      expect(ads.hkllSourceSigma).toBe(1.5)
+      expect(ads.hkllPlaneWaveM).toBe(8)
+    })
+
+    it('rejects a non-integer ads_hkll_src value (parser returns undefined, source stays default)', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_hkll=1&ads_hkll_src=abc')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      // INTEGER_RE match fails → undefined → setter not called → default stays.
+      expect(ads.hkllBoundarySource).toBe('eigenstate')
+    })
+
+    it('does NOT emit ads_hkll_* params when the mode is not antiDeSitter', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'harmonicOscillator',
+        adsHkllEnabled: true,
+        adsHkllBoundarySource: 'localized',
+        adsHkllSourceSigma: 0.3,
+      })
+      expect(serialized).not.toContain('ads_hkll=')
+      expect(serialized).not.toContain('ads_hkll_src=')
+    })
+
+    it('round-trips the full HKLL sub-block through serialize → deserialize', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsDimension: 4,
+        adsHkllEnabled: true,
+        adsHkllBoundarySource: 'planeWave',
+        adsHkllSourceSigma: 0.4,
+        adsHkllPlaneWaveM: 5,
+      })
+      const parsed = deserializeState(serialized)
+      expect(parsed.adsHkllEnabled).toBe(true)
+      expect(parsed.adsHkllBoundarySource).toBe('planeWave')
+      expect(parsed.adsHkllSourceSigma).toBeCloseTo(0.4, 3)
+      expect(parsed.adsHkllPlaneWaveM).toBe(5)
+    })
+
+    it('HKLL URL forcibly clears a previously-set BTZ flag (store-level mutex)', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_d=3&ads_btz=1&ads_hkll=1')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.hkllEnabled).toBe(true)
+      expect(ads.btzEnabled).toBe(false)
+    })
+  })
 })

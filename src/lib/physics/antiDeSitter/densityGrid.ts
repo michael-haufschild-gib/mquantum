@@ -34,6 +34,13 @@ import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { packRGBA16F } from '@/lib/physics/freeScalar/kSpaceOccupation'
 
 import { BTZ_AMPLITUDE_CEILING, btzScalarDelta, btzTemperature, btzThermalAmplitude } from './btz'
+import {
+  createBoundaryProfile,
+  defaultHkllParams,
+  fillBoundarySampleGrid,
+  type HkllParams,
+  reconstructBulkFromSampleGrid,
+} from './hkll'
 import { jacobiP, radialNorm, resolveDelta, sphericalHarmonicReal } from './math'
 
 /** Packed density buffer + metadata consumed by the GPU upload path. */
@@ -77,6 +84,12 @@ function clamp01(v: number): number {
  * radius. See `packBtzThermalDensityGrid` below.
  */
 export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+  // HKLL takes precedence (Stage 2B). The UI setters also enforce mutex so
+  // both flags should not be true simultaneously, but in case they are, the
+  // HKLL reconstruction wins because it's the more specialised story.
+  if (config.hkllEnabled) {
+    return packHkllReconstructedDensityGrid(config)
+  }
   if (config.btzEnabled && config.d === 3) {
     return packBtzThermalDensityGrid(config)
   }
@@ -335,4 +348,179 @@ export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensit
     kwFallbackApplied: false,
     effectiveDelta: delta,
   }
+}
+
+/** Coarse grid resolution used by the HKLL evaluation. The bulk field is
+ *  computed on this grid and trilinearly upsampled to `DENSITY_GRID_SIZE`
+ *  before RGBA packing. Sized to keep the CPU pack under ~500 ms on a
+ *  typical laptop. At d=3 (S¹ boundary) the convolution is cheap and a
+ *  32³ grid fits the budget; at d≥4 (S² boundary) the per-voxel work is
+ *  an order of magnitude larger, so we drop the coarse grid to 24³ and
+ *  let the trilinear upsampler carry the bulk structure to 96³. */
+const HKLL_COARSE_SIZE_S1 = 32
+const HKLL_COARSE_SIZE_S2 = 24
+
+/**
+ * Pack the HKLL-reconstructed bulk density onto the shared rgba16float
+ * texture. Dispatched by `packAntiDeSitterDensityGrid` when
+ * `config.hkllEnabled` is true.
+ *
+ * ## Algorithm
+ *
+ *   1. Resolve Δ (plus KW-window fallback diagnostic) exactly as the bound-
+ *      state path does.
+ *   2. Build the boundary profile O(t, Ω') from the selected source mode.
+ *   3. Walk the coarse `HKLL_COARSE_SIZE³` grid. For each bulk voxel inside
+ *      the Poincaré ball compute φ(t = 0, ρ, θ, φ) by calling
+ *      `reconstructBulk` with the default per-dimension sample parameters.
+ *   4. Peak-normalise and trilinearly upsample the coarse field to the
+ *      renderer-expected `DENSITY_GRID_SIZE³` grid, writing
+ *      (|ψ|²/peak, log|ψ|², arg(ψ), 0) into RGBA.
+ *
+ * The render-time adsEnergy uniform keeps rotating the phase channel at
+ * rate E_{n,ℓ} from the current bound-state parameters. This is physically
+ * meaningful only in `eigenstate` mode — the other sources are treated as
+ * static demonstrations. The alternative (per-mode energy dispatch) would
+ * require shader changes that are out of Stage 2B scope.
+ */
+export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+  const N = DENSITY_GRID_SIZE
+  const density = new Uint16Array(N * N * N * 4)
+
+  const resolved = resolveDelta(config.d, config.mL, config.branch)
+  const delta = resolved.delta
+  const params: HkllParams = defaultHkllParams(config.d, delta)
+  const profile = createBoundaryProfile({
+    mode: config.hkllBoundarySource,
+    d: config.d,
+    delta,
+    n: config.n,
+    l: config.l,
+    m: config.m,
+    branch: config.branch,
+    sourceSigma: config.hkllSourceSigma,
+    planeWaveM: config.hkllPlaneWaveM,
+  })
+
+  // Coarse buffers: Re(ψ), Im(ψ), |ψ|². Kept as Float32Array for the
+  // trilinear upsampler, then written into rgba16float.
+  const C = config.d <= 3 ? HKLL_COARSE_SIZE_S1 : HKLL_COARSE_SIZE_S2
+  const coarseTotal = C ** 3
+  const reField = new Float32Array(coarseTotal)
+  const imField = new Float32Array(coarseTotal)
+  const rhoField = new Float32Array(coarseTotal)
+  let peakDensity = 1e-20
+
+  // Precompute the boundary source samples on the τ' × Ω' grid once. The
+  // per-(τ, Ω') value depends only on the boundary coordinate, not on the
+  // bulk voxel, so factoring it out of the voxel loop replaces C³ · N_τ ·
+  // N_Ω redundant profile() calls with N_τ · N_Ω.
+  const sampleGrid = fillBoundarySampleGrid(profile, params)
+
+  for (let z = 0; z < C; z++) {
+    const wz = ((z + 0.5) / C) * 2 - 1
+    for (let y = 0; y < C; y++) {
+      const wy = ((y + 0.5) / C) * 2 - 1
+      for (let x = 0; x < C; x++) {
+        const wx = ((x + 0.5) / C) * 2 - 1
+        const pixelIdx = (z * C + y) * C + x
+        const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz) / WORLD_HALF_EXTENT
+        if (rCompact >= 1) continue
+        const rho = 2 * Math.atan(rCompact)
+        if (rho <= 0 || rho >= Math.PI / 2) continue
+        const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
+        const invR = radius3D > 1e-10 ? 1 / radius3D : 0
+        const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
+        const phi = Math.atan2(wy, wx)
+        reconstructBulkFromSampleGrid(sampleGrid, rho, theta, phi, reField, imField, pixelIdx)
+        const re = reField[pixelIdx]!
+        const im = imField[pixelIdx]!
+        const rho2 = re * re + im * im
+        rhoField[pixelIdx] = rho2
+        if (rho2 > peakDensity) peakDensity = rho2
+      }
+    }
+  }
+
+  const peakNorm = peakDensity > 1e-20 ? 1 / peakDensity : 0
+
+  // Trilinear upsample into the packed density.
+  for (let z = 0; z < N; z++) {
+    const fz = ((z + 0.5) / N) * C - 0.5
+    const iz0 = Math.max(0, Math.min(C - 1, Math.floor(fz)))
+    const iz1 = Math.max(0, Math.min(C - 1, iz0 + 1))
+    const tz = Math.max(0, Math.min(1, fz - iz0))
+    for (let y = 0; y < N; y++) {
+      const fy = ((y + 0.5) / N) * C - 0.5
+      const iy0 = Math.max(0, Math.min(C - 1, Math.floor(fy)))
+      const iy1 = Math.max(0, Math.min(C - 1, iy0 + 1))
+      const ty = Math.max(0, Math.min(1, fy - iy0))
+      for (let x = 0; x < N; x++) {
+        const fx = ((x + 0.5) / N) * C - 0.5
+        const ix0 = Math.max(0, Math.min(C - 1, Math.floor(fx)))
+        const ix1 = Math.max(0, Math.min(C - 1, ix0 + 1))
+        const tx = Math.max(0, Math.min(1, fx - ix0))
+
+        const re = trilinear(reField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
+        const im = trilinear(imField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
+        const rho2 = trilinear(rhoField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
+        const outIdx = (z * N + y) * N + x
+
+        const r = clamp01(rho2 * peakNorm)
+        const logRho = Math.log(rho2 + 1e-10)
+        const phase = Math.atan2(im, re)
+        packRGBA16F(density, outIdx, r, logRho, phase, 0)
+      }
+    }
+  }
+
+  return {
+    density,
+    gridSize: N,
+    bytesPerRow: N * 8,
+    rowsPerImage: N,
+    peakDensity,
+    // HKLL reconstructions by construction sit above the BF bound (we pick
+    // the BF-safe Δ via resolveDelta) and never hit the KW fallback path
+    // that the bound-state diagnostics report.
+    isTachyon: false,
+    kwFallbackApplied: resolved.kwFallbackApplied,
+    effectiveDelta: delta,
+  }
+}
+
+/**
+ * Fetch-with-trilinear-interpolation from a coarse Float32 buffer indexed
+ * (ix, iy, iz) with per-axis fractional positions (tx, ty, tz) ∈ [0, 1].
+ * Returns the interpolated scalar.
+ */
+function trilinear(
+  field: Float32Array,
+  size: number,
+  ix0: number,
+  iy0: number,
+  iz0: number,
+  ix1: number,
+  iy1: number,
+  iz1: number,
+  tx: number,
+  ty: number,
+  tz: number
+): number {
+  const idx = (x: number, y: number, z: number): number => (z * size + y) * size + x
+  const c000 = field[idx(ix0, iy0, iz0)]!
+  const c100 = field[idx(ix1, iy0, iz0)]!
+  const c010 = field[idx(ix0, iy1, iz0)]!
+  const c110 = field[idx(ix1, iy1, iz0)]!
+  const c001 = field[idx(ix0, iy0, iz1)]!
+  const c101 = field[idx(ix1, iy0, iz1)]!
+  const c011 = field[idx(ix0, iy1, iz1)]!
+  const c111 = field[idx(ix1, iy1, iz1)]!
+  const c00 = c000 * (1 - tx) + c100 * tx
+  const c10 = c010 * (1 - tx) + c110 * tx
+  const c01 = c001 * (1 - tx) + c101 * tx
+  const c11 = c011 * (1 - tx) + c111 * tx
+  const c0 = c00 * (1 - ty) + c10 * ty
+  const c1 = c01 * (1 - ty) + c11 * ty
+  return c0 * (1 - tz) + c1 * tz
 }

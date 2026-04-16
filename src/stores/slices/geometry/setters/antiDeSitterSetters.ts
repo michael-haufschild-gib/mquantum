@@ -16,6 +16,7 @@
  */
 
 import type {
+  AdsHkllSource,
   AdsPresetName,
   AdsQuantizationBranch,
   AntiDeSitterConfig,
@@ -41,6 +42,11 @@ export const ADS_LIMITS = {
   btzOmegaMax: 10.0,
   btzAngularMMin: -5,
   btzAngularMMax: 5,
+  // Stage 2B HKLL bounds (see PRD).
+  hkllSigmaMin: 0.05,
+  hkllSigmaMax: 1.5,
+  hkllPlaneWaveMMin: 0,
+  hkllPlaneWaveMMax: 8,
 } as const
 
 /** Actions exposed by the AdS setter bundle. */
@@ -57,6 +63,10 @@ export interface AntiDeSitterSetters {
   setAdsBtzHorizonRadius: (r: number) => void
   setAdsBtzOmega: (omega: number) => void
   setAdsBtzAngularM: (m: number) => void
+  setAdsHkllEnabled: (enabled: boolean) => void
+  setAdsHkllBoundarySource: (source: AdsHkllSource) => void
+  setAdsHkllSourceSigma: (sigma: number) => void
+  setAdsHkllPlaneWaveM: (m: number) => void
   triggerAdsRecompute: () => void
   clearAdsNeedsReset: () => void
 }
@@ -110,6 +120,10 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
     btzOmegaMax,
     btzAngularMMin,
     btzAngularMMax,
+    hkllSigmaMin,
+    hkllSigmaMax,
+    hkllPlaneWaveMMin,
+    hkllPlaneWaveMMax,
   } = ADS_LIMITS
 
   return {
@@ -187,11 +201,24 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         btzHorizonRadius: preset.btzHorizonRadius ?? 0.3,
         btzOmega: preset.btzOmega ?? 1.0,
         btzAngularM: preset.btzAngularM ?? 0,
+        // HKLL sub-config: same "explicit-or-reset" rule. A BTZ or bound-
+        // state preset auto-clears hkllEnabled; an HKLL preset sets its
+        // source/sigma/m_b explicitly. Mutex with BTZ is enforced by each
+        // HKLL preset carrying `btzEnabled: false` (via the default above).
+        hkllEnabled: preset.hkllEnabled ?? false,
+        hkllBoundarySource: preset.hkllBoundarySource ?? 'eigenstate',
+        hkllSourceSigma: preset.hkllSourceSigma ?? 0.3,
+        hkllPlaneWaveM: preset.hkllPlaneWaveM ?? 2,
         preset: name,
       })
     },
     setAdsBtzEnabled: (enabled) => {
-      applyWithReset(ctx, { btzEnabled: !!enabled, preset: 'custom' })
+      // BTZ and HKLL are mutually exclusive in Stage 2B — turning on BTZ
+      // forcibly clears the HKLL flag so the dispatch in
+      // `packAntiDeSitterDensityGrid` has no ambiguity to resolve.
+      const partial: Partial<AntiDeSitterConfig> = { btzEnabled: !!enabled, preset: 'custom' }
+      if (enabled) partial.hkllEnabled = false
+      applyWithReset(ctx, partial)
     },
     setAdsBtzHorizonRadius: (r) => {
       if (!ctx.isFinite(r)) {
@@ -217,6 +244,33 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
       }
       const clampedM = clampInt(m, btzAngularMMin, btzAngularMMax) || 0
       applyWithReset(ctx, { btzAngularM: clampedM, preset: 'custom' })
+    },
+    setAdsHkllEnabled: (enabled) => {
+      // Mirror the BTZ mutex — turning on HKLL forcibly clears btzEnabled.
+      const partial: Partial<AntiDeSitterConfig> = { hkllEnabled: !!enabled, preset: 'custom' }
+      if (enabled) partial.btzEnabled = false
+      applyWithReset(ctx, partial)
+    },
+    setAdsHkllBoundarySource: (source) => {
+      applyWithReset(ctx, { hkllBoundarySource: source, preset: 'custom' })
+    },
+    setAdsHkllSourceSigma: (sigma) => {
+      if (!ctx.isFinite(sigma)) {
+        ctx.warnNonFinite('antiDeSitter.hkllSourceSigma', sigma)
+        return
+      }
+      applyWithReset(ctx, {
+        hkllSourceSigma: clamp(sigma, hkllSigmaMin, hkllSigmaMax),
+        preset: 'custom',
+      })
+    },
+    setAdsHkllPlaneWaveM: (m) => {
+      if (!ctx.isFinite(m)) {
+        ctx.warnNonFinite('antiDeSitter.hkllPlaneWaveM', m)
+        return
+      }
+      const clampedM = clampInt(m, hkllPlaneWaveMMin, hkllPlaneWaveMMax)
+      applyWithReset(ctx, { hkllPlaneWaveM: clampedM, preset: 'custom' })
     },
     triggerAdsRecompute: () => {
       ctx.setWithVersion((state) => ({

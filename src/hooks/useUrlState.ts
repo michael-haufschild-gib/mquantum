@@ -252,6 +252,17 @@ function applyAdsParams(
   if (urlState.adsBtzOmega !== undefined) ext.setAdsBtzOmega(urlState.adsBtzOmega)
   if (urlState.adsBtzAngularM !== undefined) ext.setAdsBtzAngularM(urlState.adsBtzAngularM)
   if (urlState.adsBtzEnabled !== undefined) ext.setAdsBtzEnabled(urlState.adsBtzEnabled)
+  // Stage 2B — HKLL. Same ordering rule: apply parameters before the
+  // enable toggle so the strategy sees a fully-configured HKLL sub-block
+  // on its first repack. The HKLL enable setter also clears btzEnabled to
+  // maintain the mutex — setting BTZ first and HKLL second therefore
+  // works regardless of the order inside the URL.
+  if (urlState.adsHkllBoundarySource !== undefined)
+    ext.setAdsHkllBoundarySource(urlState.adsHkllBoundarySource)
+  if (urlState.adsHkllSourceSigma !== undefined)
+    ext.setAdsHkllSourceSigma(urlState.adsHkllSourceSigma)
+  if (urlState.adsHkllPlaneWaveM !== undefined) ext.setAdsHkllPlaneWaveM(urlState.adsHkllPlaneWaveM)
+  if (urlState.adsHkllEnabled !== undefined) ext.setAdsHkllEnabled(urlState.adsHkllEnabled)
 }
 
 /**

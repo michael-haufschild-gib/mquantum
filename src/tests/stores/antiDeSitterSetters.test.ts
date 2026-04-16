@@ -252,4 +252,122 @@ describe('anti-de Sitter setters', () => {
       expect(after.btzAngularM).toBe(0)
     })
   })
+
+  describe('HKLL (Stage 2B)', () => {
+    it('setAdsHkllEnabled toggles the flag and flips needsReset', () => {
+      const store = useExtendedObjectStore.getState()
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllEnabled).toBe(false)
+      store.setAdsHkllEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.needsReset).toBe(true)
+      expect(after.preset).toBe('custom')
+    })
+
+    it('enabling HKLL forcibly clears btzEnabled (mutex)', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsBtzEnabled(true)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.btzEnabled).toBe(true)
+      store.setAdsHkllEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.btzEnabled).toBe(false)
+    })
+
+    it('enabling BTZ forcibly clears hkllEnabled (mutex)', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllEnabled(true)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllEnabled).toBe(true)
+      store.setAdsBtzEnabled(true)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(false)
+      expect(after.btzEnabled).toBe(true)
+    })
+
+    it('setAdsHkllSourceSigma clamps to [0.05, 1.5]', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllSourceSigma(-5)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllSourceSigma).toBe(0.05)
+      store.setAdsHkllSourceSigma(99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllSourceSigma).toBe(1.5)
+      store.setAdsHkllSourceSigma(0.4)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllSourceSigma).toBe(0.4)
+    })
+
+    it('setAdsHkllPlaneWaveM clamps to [0, 8] and coerces to integer', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllPlaneWaveM(-5)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllPlaneWaveM).toBe(0)
+      store.setAdsHkllPlaneWaveM(99)
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllPlaneWaveM).toBe(8)
+      store.setAdsHkllPlaneWaveM(3.7) // floors.
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllPlaneWaveM).toBe(3)
+    })
+
+    it('setAdsHkllBoundarySource records the mode and flags needsReset', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllBoundarySource('localized')
+      const afterA = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(afterA.hkllBoundarySource).toBe('localized')
+      expect(afterA.needsReset).toBe(true)
+      useExtendedObjectStore.getState().clearAdsNeedsReset()
+      store.setAdsHkllBoundarySource('planeWave')
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllBoundarySource).toBe(
+        'planeWave'
+      )
+    })
+
+    it('HKLL setters reject non-finite inputs', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsHkllSourceSigma(0.4)
+      store.setAdsHkllPlaneWaveM(3)
+      useExtendedObjectStore.getState().clearAdsNeedsReset()
+
+      store.setAdsHkllSourceSigma(Number.NaN)
+      store.setAdsHkllPlaneWaveM(Number.POSITIVE_INFINITY)
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllSourceSigma).toBe(0.4)
+      expect(after.hkllPlaneWaveM).toBe(3)
+      expect(after.needsReset).toBe(false)
+    })
+
+    it('preset hkllEigenstateCheck applies HKLL config (d=4, n=0, ℓ=1, eigenstate)', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('hkllEigenstateCheck')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.preset).toBe('hkllEigenstateCheck')
+      expect(after.d).toBe(4)
+      expect(after.l).toBe(1)
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.hkllBoundarySource).toBe('eigenstate')
+      expect(after.btzEnabled).toBe(false)
+    })
+
+    it('preset hkllBoundarySpot applies the localized source at σ=0.25', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('hkllBoundarySpot')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.hkllBoundarySource).toBe('localized')
+      expect(after.hkllSourceSigma).toBeCloseTo(0.25, 6)
+    })
+
+    it('preset hkllBoundaryPlaneWave applies the planeWave source with m_b=3', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('hkllBoundaryPlaneWave')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(true)
+      expect(after.hkllBoundarySource).toBe('planeWave')
+      expect(after.hkllPlaneWaveM).toBe(3)
+    })
+
+    it('switching from an HKLL preset to a non-HKLL preset clears hkllEnabled', () => {
+      const store = useExtendedObjectStore.getState()
+      store.setAdsPreset('hkllEigenstateCheck')
+      expect(useExtendedObjectStore.getState().schroedinger.antiDeSitter.hkllEnabled).toBe(true)
+      store.setAdsPreset('adsFourGround')
+      const after = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(after.hkllEnabled).toBe(false)
+    })
+  })
 })

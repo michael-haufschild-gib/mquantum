@@ -511,6 +511,12 @@ export interface SchroedingerSliceActions {
   setAdsBtzHorizonRadius: (r: number) => void
   setAdsBtzOmega: (omega: number) => void
   setAdsBtzAngularM: (m: number) => void
+  setAdsHkllEnabled: (enabled: boolean) => void
+  setAdsHkllBoundarySource: (
+    source: import('@/lib/geometry/extended/antiDeSitter').AdsHkllSource
+  ) => void
+  setAdsHkllSourceSigma: (sigma: number) => void
+  setAdsHkllPlaneWaveM: (m: number) => void
   triggerAdsRecompute: () => void
   clearAdsNeedsReset: () => void
 

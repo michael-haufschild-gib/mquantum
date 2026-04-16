@@ -11,7 +11,11 @@
  *   - A heavy-primary and a cosine-node state for visual contrast.
  */
 
-import type { AdsPresetName, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+import type {
+  AdsHkllSource,
+  AdsPresetName,
+  AdsQuantizationBranch,
+} from '@/lib/geometry/extended/antiDeSitter'
 
 /** Preset scalar payload — the strategy applies these onto `AntiDeSitterConfig`.
  *
@@ -36,6 +40,11 @@ export interface AdsPresetDefinition {
   btzHorizonRadius?: number
   btzOmega?: number
   btzAngularM?: number
+  // Stage 2B — HKLL sub-block. Optional so legacy presets stay concise.
+  hkllEnabled?: boolean
+  hkllBoundarySource?: AdsHkllSource
+  hkllSourceSigma?: number
+  hkllPlaneWaveM?: number
 }
 
 /**
@@ -272,6 +281,58 @@ export const ADS_PRESETS: readonly AdsPresetDefinition[] = [
     btzHorizonRadius: 1.5,
     btzOmega: 0.5,
     btzAngularM: 0,
+  },
+  // ── Stage 2B: HKLL bulk-from-boundary reconstruction ──────────────────
+  {
+    id: 'hkllEigenstateCheck',
+    label: 'HKLL Eigenstate Check (AdS₄)',
+    description:
+      'AdS₄ dipole (n=0, ℓ=1, m=0) reconstructed from its own boundary asymptotic via the HKLL smearing kernel. Validates reconstruction reproduces the exact bulk.',
+    d: 4,
+    n: 0,
+    l: 1,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    hkllEnabled: true,
+    hkllBoundarySource: 'eigenstate',
+    hkllSourceSigma: 0.3,
+    hkllPlaneWaveM: 2,
+  },
+  {
+    id: 'hkllBoundarySpot',
+    label: 'HKLL Boundary Spot',
+    description:
+      'Localized Gaussian excitation on the AdS₄ boundary (σ=0.25 rad); HKLL smearing produces a bulk beam emerging from the spot.',
+    d: 4,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    hkllEnabled: true,
+    hkllBoundarySource: 'localized',
+    hkllSourceSigma: 0.25,
+    hkllPlaneWaveM: 2,
+  },
+  {
+    id: 'hkllBoundaryPlaneWave',
+    label: 'HKLL Boundary Plane Wave',
+    description:
+      'Azimuthal boundary standing wave m_b=3 on AdS₄; HKLL smearing reconstructs the m-dependent bulk pattern.',
+    d: 4,
+    n: 0,
+    l: 0,
+    m: 0,
+    mL: 0,
+    branch: 'standard',
+    boundaryOverlay: false,
+    hkllEnabled: true,
+    hkllBoundarySource: 'planeWave',
+    hkllSourceSigma: 0.3,
+    hkllPlaneWaveM: 3,
   },
 ]
 

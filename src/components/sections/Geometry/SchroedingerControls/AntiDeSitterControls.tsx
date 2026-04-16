@@ -36,6 +36,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { ADS_LIMITS } from '@/stores/slices/geometry/setters/antiDeSitterSetters'
 
 import { AntiDeSitterBtzControls } from './AntiDeSitterBtzControls'
+import { AntiDeSitterHkllControls } from './AntiDeSitterHkllControls'
 
 const BRANCH_OPTIONS: Array<{ value: AdsQuantizationBranch; label: string }> = [
   { value: 'standard', label: 'Δ₊ (standard)' },
@@ -46,6 +47,116 @@ const PRESET_OPTIONS: SelectOption<AdsPresetName>[] = [
   ...ADS_PRESETS.map((p) => ({ value: p.id, label: p.label })),
   { value: 'custom', label: 'Custom' },
 ]
+
+/**
+ * Derived status-chip summary for the BF bound and KW quantization state.
+ * Extracted into a standalone helper so the top-level component keeps its
+ * cognitive complexity below the project's sonarjs threshold.
+ *
+ * @param d - Spacetime boundary dimension.
+ * @param mL - Mass × AdS radius.
+ * @param branch - Requested quantization branch.
+ * @param growthRate - Tachyonic amplification rate γ.
+ * @param isTachyon - Whether the state sits below the BF bound.
+ * @param kwFallbackApplied - Whether the alternate branch fell back to Δ₊.
+ * @returns A React fragment of status chips.
+ */
+function AdsStatusChips({
+  d,
+  mL,
+  branch,
+  growthRate,
+  isTachyon,
+  kwFallbackApplied,
+}: {
+  d: number
+  mL: number
+  branch: AdsQuantizationBranch
+  growthRate: number
+  isTachyon: boolean
+  kwFallbackApplied: boolean
+}): React.ReactElement {
+  const bfTone = isTachyon ? 'red' : 'green'
+  const bfLabel = isTachyon ? `Tachyon γ=${growthRate.toFixed(2)}` : 'BF OK'
+  const bfTooltip = isTachyon
+    ? `m²L² = ${(mL >= 0 ? mL * mL : -mL * mL).toFixed(2)} < −(d−1)²/4 = ${(-((d - 1) * (d - 1)) / 4).toFixed(2)}. The state amplifies in time as cosh(γt); the renderer multiplies |ψ|² by cosh²(γt) at render time.`
+    : 'Breitenlohner-Freedman bound satisfied — state is normalisable.'
+
+  const inKW = isInKWWindow(d, mL)
+  const kwTone: 'green' | 'grey' = branch === 'alternate' && inKW ? 'green' : 'grey'
+  const kwLabel = branch === 'alternate' ? (inKW ? 'KW window' : 'KW outside') : 'Δ₊ only'
+  const kwTooltip =
+    branch === 'alternate'
+      ? inKW
+        ? 'm²L² inside (−(d−1)²/4, −(d−1)²/4 + 1) — Δ₋ quantization is allowed.'
+        : 'Alternate quantization unavailable — outside Klebanov-Witten window. Rendering uses Δ₊.'
+      : 'Standard quantization active.'
+
+  return (
+    <div className="flex flex-wrap gap-1.5" data-testid="ads-status-chips">
+      <Chip tone={bfTone} label={bfLabel} tooltip={bfTooltip} />
+      <Chip tone={kwTone} label={kwLabel} tooltip={kwTooltip} />
+      {kwFallbackApplied && (
+        <Chip
+          tone="yellow"
+          label="Δ₋ unavailable"
+          tooltip="Alternate quantization requested outside the KW window — silently rendering Δ₊."
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Numerical readout of Δ, energy, and (if tachyonic) growth rate. Rendered
+ * only while the bound-state path drives the density.
+ *
+ * @param effectiveDelta - Resolved Δ after KW fallback.
+ * @param effectiveBranch - Resolved branch after KW fallback.
+ * @param energy - E_{n,ℓ}(Δ).
+ * @param isTachyon - Below-BF flag.
+ * @param growthRate - Tachyon growth rate γ.
+ * @returns A styled numerical readout block.
+ */
+function AdsReadout({
+  effectiveDelta,
+  effectiveBranch,
+  energy,
+  isTachyon,
+  growthRate,
+}: {
+  effectiveDelta: number
+  effectiveBranch: AdsQuantizationBranch
+  energy: number
+  isTachyon: boolean
+  growthRate: number
+}): React.ReactElement {
+  return (
+    <div
+      className="rounded-md bg-white/5 border border-white/10 px-3 py-2 text-xs text-text-secondary space-y-1"
+      data-testid="ads-readout"
+    >
+      <div>
+        <span className="text-text-tertiary">Δ</span>{' '}
+        <span className="font-mono">{effectiveDelta.toFixed(4)}</span>
+        <span className="text-text-tertiary">
+          {' '}
+          ({effectiveBranch === 'standard' ? 'Δ₊' : 'Δ₋'})
+        </span>
+      </div>
+      <div>
+        <span className="text-text-tertiary">E_{`{n,ℓ}`}</span>{' '}
+        <span className="font-mono">{energy.toFixed(4)}</span>
+      </div>
+      {isTachyon && (
+        <div className="text-rose-300">
+          γ = <span className="font-mono">{growthRate.toFixed(4)}</span>
+          <span className="text-text-tertiary"> (|ψ|² grows as cosh²(γt))</span>
+        </div>
+      )}
+    </div>
+  )
+}
 
 /**
  * Inline status chip rendered inside the AdS controls for BF / KW indicators.
@@ -95,6 +206,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
     setBranch,
     setBoundary,
     setPreset,
+    setHkllEnabled,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       ads: s.schroedinger.antiDeSitter,
@@ -106,14 +218,18 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
       setBranch: s.setAdsQuantizationBranch,
       setBoundary: s.setAdsBoundaryOverlay,
       setPreset: s.setAdsPreset,
+      setHkllEnabled: s.setAdsHkllEnabled,
     }))
   )
 
-  const { d, n, l, m, mL, branch, boundaryOverlay, preset, btzEnabled } = ads
+  const { d, n, l, m, mL, branch, boundaryOverlay, preset, btzEnabled, hkllEnabled } = ads
   // When BTZ is active at d=3 the bound-state sliders describe a distinct,
   // mutually exclusive state. Hide them so the UI doesn't suggest they
-  // feed the thermal density render (they don't).
+  // feed the thermal density render (they don't). HKLL is similarly
+  // mutually exclusive: when on, the bulk density is fully determined by
+  // the boundary source / kernel grid and the Stage-1 sliders are dormant.
   const btzActive = btzEnabled && d === 3
+  const hkllActive = hkllEnabled
 
   const { effectiveDelta, effectiveBranch, kwFallbackApplied, isTachyon, growthRate, energy } =
     useMemo(() => {
@@ -128,24 +244,14 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
       }
     }, [d, mL, branch, n, l])
 
-  const bfTone = isTachyon ? 'red' : 'green'
-  const bfLabel = isTachyon ? `Tachyon γ=${growthRate.toFixed(2)}` : 'BF OK'
-  const bfTooltip = isTachyon
-    ? `m²L² = ${(mL >= 0 ? mL * mL : -mL * mL).toFixed(2)} < −(d−1)²/4 = ${(-((d - 1) * (d - 1)) / 4).toFixed(2)}. The state amplifies in time as cosh(γt); the renderer multiplies |ψ|² by cosh²(γt) at render time.`
-    : 'Breitenlohner-Freedman bound satisfied — state is normalisable.'
-
-  const inKW = isInKWWindow(d, mL)
-  const kwTone: 'green' | 'grey' = branch === 'alternate' && inKW ? 'green' : 'grey'
-  const kwLabel = branch === 'alternate' ? (inKW ? 'KW window' : 'KW outside') : 'Δ₊ only'
-  const kwTooltip =
-    branch === 'alternate'
-      ? inKW
-        ? 'm²L² inside (−(d−1)²/4, −(d−1)²/4 + 1) — Δ₋ quantization is allowed.'
-        : 'Alternate quantization unavailable — outside Klebanov-Witten window. Rendering uses Δ₊.'
-      : 'Standard quantization active.'
-
   // Clamp the m slider to a symmetric range that shrinks with ℓ.
   const magneticMax = Math.max(0, l)
+  // Bound-state sliders (n, ℓ, m, mL, branch) are meaningful only when the
+  // render is NOT driven by a non-eigenstate HKLL reconstruction and not by
+  // a BTZ thermal state. Centralise this invariant so every conditional
+  // reads the same predicate.
+  const showBoundStateControls =
+    !btzActive && (!hkllActive || ads.hkllBoundarySource === 'eigenstate')
 
   return (
     <div className="space-y-3" data-testid="anti-de-sitter-controls">
@@ -157,17 +263,14 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         data-testid="ads-preset-select"
       />
 
-      <div className="flex flex-wrap gap-1.5" data-testid="ads-status-chips">
-        <Chip tone={bfTone} label={bfLabel} tooltip={bfTooltip} />
-        <Chip tone={kwTone} label={kwLabel} tooltip={kwTooltip} />
-        {kwFallbackApplied && (
-          <Chip
-            tone="yellow"
-            label="Δ₋ unavailable"
-            tooltip="Alternate quantization requested outside the KW window — silently rendering Δ₊."
-          />
-        )}
-      </div>
+      <AdsStatusChips
+        d={d}
+        mL={mL}
+        branch={branch}
+        growthRate={growthRate}
+        isTachyon={isTachyon}
+        kwFallbackApplied={kwFallbackApplied}
+      />
 
       <ControlGroup title="Dimensions & Quantum Numbers" collapsible defaultOpen>
         <Slider
@@ -181,7 +284,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
           showValue
           data-testid="ads-d-slider"
         />
-        {!btzActive && (
+        {showBoundStateControls && (
           <>
             <Slider
               label="Radial n"
@@ -222,7 +325,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         )}
       </ControlGroup>
 
-      {!btzActive && (
+      {showBoundStateControls && (
         <ControlGroup title="Mass & Quantization" collapsible defaultOpen>
           <Slider
             label="Mass mL"
@@ -253,32 +356,26 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         </ControlGroup>
       )}
 
-      {d === 3 && <AntiDeSitterBtzControls ads={ads} />}
+      <ControlGroup title="HKLL Bulk Reconstruction" collapsible defaultOpen>
+        <Switch
+          label="HKLL reconstruction"
+          checked={hkllEnabled}
+          onCheckedChange={setHkllEnabled}
+          data-testid="ads-hkll-toggle"
+        />
+        {hkllEnabled && <AntiDeSitterHkllControls ads={ads} />}
+      </ControlGroup>
 
-      {!btzActive && (
-        <div
-          className="rounded-md bg-white/5 border border-white/10 px-3 py-2 text-xs text-text-secondary space-y-1"
-          data-testid="ads-readout"
-        >
-          <div>
-            <span className="text-text-tertiary">Δ</span>{' '}
-            <span className="font-mono">{effectiveDelta.toFixed(4)}</span>
-            <span className="text-text-tertiary">
-              {' '}
-              ({effectiveBranch === 'standard' ? 'Δ₊' : 'Δ₋'})
-            </span>
-          </div>
-          <div>
-            <span className="text-text-tertiary">E_{`{n,ℓ}`}</span>{' '}
-            <span className="font-mono">{energy.toFixed(4)}</span>
-          </div>
-          {isTachyon && (
-            <div className="text-rose-300">
-              γ = <span className="font-mono">{growthRate.toFixed(4)}</span>
-              <span className="text-text-tertiary"> (|ψ|² grows as cosh²(γt))</span>
-            </div>
-          )}
-        </div>
+      {d === 3 && !hkllActive && <AntiDeSitterBtzControls ads={ads} />}
+
+      {showBoundStateControls && (
+        <AdsReadout
+          effectiveDelta={effectiveDelta}
+          effectiveBranch={effectiveBranch}
+          energy={energy}
+          isTachyon={isTachyon}
+          growthRate={growthRate}
+        />
       )}
     </div>
   )

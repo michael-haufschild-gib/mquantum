@@ -30,6 +30,21 @@
 export type AdsQuantizationBranch = 'standard' | 'alternate'
 
 /**
+ * HKLL boundary-source mode (Stage 2B).
+ *
+ *   - `eigenstate`  — derive O(t, Ω) from the current (n, ℓ, m, mL, branch)
+ *                     bulk eigenstate's boundary asymptotic. Reconstructing
+ *                     via the smearing integral must reproduce the bulk.
+ *   - `localized`   — Gaussian spot on the boundary S^{d-2}, width
+ *                     `hkllSourceSigma`. Shows a bulk beam emerging from the
+ *                     spot.
+ *   - `planeWave`   — azimuthal standing wave cos(m_b · φ') on the boundary
+ *                     with `hkllPlaneWaveM = m_b`. Shows a bulk m-dependent
+ *                     pattern.
+ */
+export type AdsHkllSource = 'eigenstate' | 'localized' | 'planeWave'
+
+/**
  * Serializable AdS bound-state configuration. Values are stored on
  * `SchroedingerConfig.antiDeSitter` and routed to the strategy through the
  * schroedinger version counter.
@@ -70,6 +85,21 @@ export interface AntiDeSitterConfig {
   btzOmega: number
   /** Azimuthal BTZ m on the S¹. Integer [−5, +5]. */
   btzAngularM: number
+
+  // ── Stage 2B: HKLL bulk-from-boundary reconstruction ────────────────────
+  /** Activate the HKLL reconstruction code path. When true, the bulk density
+   * is filled by convolving the selected boundary source against the HKLL
+   * smearing kernel instead of evaluating the Stage-1 bound state. Mutually
+   * exclusive with `btzEnabled` — the setters enforce the invariant. */
+  hkllEnabled: boolean
+  /** Boundary source profile used by the HKLL convolution. */
+  hkllBoundarySource: AdsHkllSource
+  /** Gaussian width σ (radians) of the boundary spot in `localized` mode.
+   * Float in [0.05, 1.5]. Ignored in other source modes. */
+  hkllSourceSigma: number
+  /** Azimuthal quantum number m_b of the boundary standing wave in
+   * `planeWave` mode. Integer in [0, 8]. Ignored in other source modes. */
+  hkllPlaneWaveM: number
 }
 
 /**
@@ -96,6 +126,9 @@ export type AdsPresetName =
   | 'btzHotSmall'
   | 'btzWarmMedium'
   | 'btzCoolLarge'
+  | 'hkllEigenstateCheck'
+  | 'hkllBoundarySpot'
+  | 'hkllBoundaryPlaneWave'
   | 'custom'
 
 /**
@@ -117,4 +150,8 @@ export const DEFAULT_ANTI_DE_SITTER_CONFIG: AntiDeSitterConfig = {
   btzHorizonRadius: 0.3,
   btzOmega: 1.0,
   btzAngularM: 0,
+  hkllEnabled: false,
+  hkllBoundarySource: 'eigenstate',
+  hkllSourceSigma: 0.3,
+  hkllPlaneWaveM: 2,
 }

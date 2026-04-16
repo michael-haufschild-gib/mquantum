@@ -8,10 +8,13 @@
  * @module lib/url/adsSerializer
  */
 
-import type { AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+import type { AdsHkllSource, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
 
 /** URL-side branch type (mirrors the store enum). */
 export type UrlAdsBranch = AdsQuantizationBranch
+
+/** URL-side HKLL source type (mirrors the store enum). */
+export type UrlAdsHkllSource = AdsHkllSource
 
 /** Shareable fields this module reads from the parent state type. */
 export interface AdsUrlState {
@@ -29,6 +32,27 @@ export interface AdsUrlState {
   adsBtzHorizonRadius?: number
   adsBtzOmega?: number
   adsBtzAngularM?: number
+  // Stage 2B — HKLL bulk-reconstruction sub-block. Like BTZ, the toggle is
+  // URL-carried regardless of d so the user can pre-configure it and
+  // dimension-swap without losing intent.
+  adsHkllEnabled?: boolean
+  adsHkllBoundarySource?: UrlAdsHkllSource
+  adsHkllSourceSigma?: number
+  adsHkllPlaneWaveM?: number
+}
+
+/** Wire-format integer → HKLL source string. */
+const HKLL_SOURCE_BY_INT: Readonly<Record<number, UrlAdsHkllSource>> = {
+  0: 'eigenstate',
+  1: 'localized',
+  2: 'planeWave',
+}
+
+/** HKLL source string → wire-format integer. */
+const HKLL_SOURCE_TO_INT: Readonly<Record<UrlAdsHkllSource, number>> = {
+  eigenstate: 0,
+  localized: 1,
+  planeWave: 2,
 }
 
 const INTEGER_RE = /^-?\d+$/
@@ -104,6 +128,14 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
   setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius)
   setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega)
   setIntParam(params, 'ads_btz_mA', state.adsBtzAngularM)
+  // HKLL sub-block. Mirrors BTZ: every defined knob is emitted explicitly
+  // so a reconstructed URL round-trips losslessly.
+  setBoolParam(params, 'ads_hkll', state.adsHkllEnabled)
+  if (state.adsHkllBoundarySource !== undefined) {
+    params.set('ads_hkll_src', HKLL_SOURCE_TO_INT[state.adsHkllBoundarySource].toString())
+  }
+  setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma)
+  setIntParam(params, 'ads_hkll_mb', state.adsHkllPlaneWaveM)
 }
 
 /**
@@ -128,4 +160,9 @@ export function deserializeAds(params: URLSearchParams, state: AdsUrlState): voi
   state.adsBtzHorizonRadius = parseFloatParam(params, 'ads_btz_r', 0.05, 2.0)
   state.adsBtzOmega = parseFloatParam(params, 'ads_btz_omega', 0.1, 10.0)
   state.adsBtzAngularM = parseIntParam(params, 'ads_btz_mA', -5, 5)
+  state.adsHkllEnabled = parseBoolParam(params, 'ads_hkll')
+  const srcInt = parseIntParam(params, 'ads_hkll_src', 0, 2)
+  if (srcInt !== undefined) state.adsHkllBoundarySource = HKLL_SOURCE_BY_INT[srcInt]
+  state.adsHkllSourceSigma = parseFloatParam(params, 'ads_hkll_sigma', 0.05, 1.5)
+  state.adsHkllPlaneWaveM = parseIntParam(params, 'ads_hkll_mb', 0, 8)
 }

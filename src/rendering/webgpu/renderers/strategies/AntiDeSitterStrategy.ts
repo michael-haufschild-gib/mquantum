@@ -60,6 +60,13 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
     config.btzHorizonRadius.toFixed(6),
     config.btzOmega.toFixed(6),
     config.btzAngularM,
+    // Stage 2B HKLL fields — repack whenever the reconstruction parameters
+    // change, otherwise the strategy would serve a stale density from the
+    // previous source mode.
+    config.hkllEnabled ? 1 : 0,
+    config.hkllBoundarySource,
+    config.hkllSourceSigma.toFixed(6),
+    config.hkllPlaneWaveM,
   ].join('|')
 }
 
