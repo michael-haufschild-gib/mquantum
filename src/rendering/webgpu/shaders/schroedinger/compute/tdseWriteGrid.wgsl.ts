@@ -487,8 +487,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       // |tanh(log(|R|+1))| — bounded soft-saturating magnitude in [0, 1).
       let magnitude = abs(tanh(log(absR + 1.0)));
       let tintFactor = clamp(magnitude, 0.0, 1.0) * clamp(params.curvatureOverlayOpacity, 0.0, 1.0);
-      let target = select(0.0, 1.0, ricci > 0.0);
-      displayScalar = mix(displayScalar, target, tintFactor);
+      let tintVal = select(0.0, 1.0, ricci > 0.0);
+      displayScalar = mix(displayScalar, tintVal, tintFactor);
     }
   }
 

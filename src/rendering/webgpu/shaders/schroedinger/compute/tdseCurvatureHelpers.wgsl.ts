@@ -46,7 +46,6 @@ fn tdseCurvatureRicci(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
   if (kind == 3u) {
     let H = max(params.hubbleRate, 0.0);
     let n = f32(dim);
-    let _t = time; // de Sitter Ricci is time-independent (spatial slice).
     return n * (n - 1.0) * H * H;
   }
   if (kind == 4u) {

@@ -258,8 +258,6 @@ fn ricciScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
   if (kind == 3u) {
     let H = max(params.hubbleRate, 0.0);
     let n = f32(dim);
-    // Suppress unused-param warning for static curvature.
-    let _ = time;
     return n * (n - 1.0) * H * H;
   }
   if (kind == 4u) {
@@ -293,7 +291,6 @@ fn ricciScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
 }
 
 fn kretschmannScalarWGSL(coords: array<f32, 12>, dim: u32, time: f32) -> f32 {
-  let _t = time;
   // Only non-zero for Schwarzschild: K = 48 M² / r⁶.
   if (params.metricKind != 2u) { return 0.0; }
   let M = max(params.schwarzschildMass, 0.01);
