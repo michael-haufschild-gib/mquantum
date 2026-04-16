@@ -244,4 +244,50 @@ describe('BECControls', () => {
       expect(actions.setHawkingSeed).toHaveBeenCalledWith(42)
     })
   })
+
+  describe('Disorder overlay controls', () => {
+    function disorderConfig(disorderStrength = 2.5) {
+      const cfg = defaultConfig()
+      cfg.bec = { ...DEFAULT_BEC_CONFIG, disorderStrength }
+      return cfg
+    }
+
+    it('dispatches setDisorderStrength when the strength slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={disorderConfig(0)} dimension={3} actions={actions} />)
+      const header = screen.getByTestId('control-group-bec-disorder-header')
+      fireEvent.click(header)
+      const slider = screen.getByLabelText('Strength (W)') as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '7.5' } })
+      expect(actions.setDisorderStrength).toHaveBeenCalledWith(7.5)
+    })
+
+    it('hides distribution and seed controls when strength is 0', () => {
+      render(<BECControls config={disorderConfig(0)} dimension={3} actions={createMockActions()} />)
+      const header = screen.getByTestId('control-group-bec-disorder-header')
+      fireEvent.click(header)
+      expect(screen.queryByTestId('bec-disorder-distribution')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('bec-disorder-seed')).not.toBeInTheDocument()
+    })
+
+    it('dispatches setDisorderDistribution when the distribution select changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={disorderConfig()} dimension={3} actions={actions} />)
+      const header = screen.getByTestId('control-group-bec-disorder-header')
+      fireEvent.click(header)
+      const select = screen.getByTestId('bec-disorder-distribution') as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'gaussian' } })
+      expect(actions.setDisorderDistribution).toHaveBeenCalledWith('gaussian')
+    })
+
+    it('dispatches setDisorderSeed when the seed slider changes', () => {
+      const actions = createMockActions()
+      render(<BECControls config={disorderConfig()} dimension={3} actions={actions} />)
+      const header = screen.getByTestId('control-group-bec-disorder-header')
+      fireEvent.click(header)
+      const slider = screen.getByLabelText('Seed', { selector: 'input' }) as HTMLInputElement
+      fireEvent.change(slider, { target: { value: '1337' } })
+      expect(actions.setDisorderSeed).toHaveBeenCalledWith(1337)
+    })
+  })
 })

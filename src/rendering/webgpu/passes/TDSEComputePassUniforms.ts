@@ -26,7 +26,12 @@ import {
   MIN_TORUS_PERIOD,
 } from '@/lib/physics/tdse/metrics/types'
 
-import { FFT_UNIFORM_SIZE, MAX_DIM, MAX_SLICE_POSITIONS_WRITE_COUNT } from './computePassUtils'
+import {
+  assertPow2Log2,
+  FFT_UNIFORM_SIZE,
+  MAX_DIM,
+  MAX_SLICE_POSITIONS_WRITE_COUNT,
+} from './computePassUtils'
 
 /** Parameters for writing TDSEUniforms to a GPU buffer. */
 export interface TdseUniformParams {
@@ -163,6 +168,36 @@ export function writeTdseUniforms(
     config.compactRadii,
     config.latticeDim
   )
+
+  // Torus metric override: the user-specified `torusPeriod[i]` is the
+  // authoritative spatial period of the compactified torus. The split-step
+  // FFT path uses `spacing[i]` to compute k_max = π/dx (and thus the quantized
+  // momenta k_n = 2π·n/(N·dx)); without this override the FFT wraps at the
+  // lattice extent N·spacing, not at the user-set period, and the "torusPeriod"
+  // UI field is ignored entirely. Remapping dx_eff = L/N makes k_n = 2π·n/L
+  // exactly, so `torusEigenstates` (packetMomentum = 2 on period π) becomes
+  // the fundamental mode n=1 as its description claims. Only the first three
+  // entries are stored (TDSE supports up to dim 3 for the curved path; higher
+  // dims on a torus use spacing unchanged).
+  if (config.metric?.kind === 'torus') {
+    const periods = config.metric.torusPeriod
+    if (periods && periods.length === 3) {
+      const overrideDims = Math.min(config.latticeDim, 3)
+      for (let d = 0; d < overrideDims; d++) {
+        // Clamp through the same window as the uniform write at f32[220..222]
+        // so the FFT k-grid and the shader's torusPeriod see identical values.
+        // Without this, an out-of-range period produces one spacing for the
+        // host-side effSpacing / FFT math and a different period in the
+        // uniform block, giving inconsistent quantized momenta vs. the period
+        // the shader actually reads.
+        const L = clampFinite(periods[d], MIN_TORUS_PERIOD, MAX_TORUS_PERIOD)
+        const N = config.gridSize[d]
+        if (Number.isFinite(N) && N! > 0) {
+          effSpacing[d] = L / N!
+        }
+      }
+    }
+  }
 
   // Lattice params (0-15)
   u32[0] = config.latticeDim
@@ -470,7 +505,7 @@ export function writeTdseUniforms(
 export function buildTdseFFTStagingData(config: TdseConfig, totalSites: number): ArrayBuffer {
   let totalSlots = 0
   for (let d = 0; d < config.latticeDim; d++) {
-    totalSlots += Math.round(Math.log2(config.gridSize[d]!))
+    totalSlots += assertPow2Log2(config.gridSize[d]!)
   }
   totalSlots *= 2 // forward + inverse
 
@@ -481,7 +516,7 @@ export function buildTdseFFTStagingData(config: TdseConfig, totalSites: number):
     let axisStride = 1
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      const stages = Math.round(Math.log2(axisDim))
+      const stages = assertPow2Log2(axisDim)
 
       for (let s = 0; s < stages; s++) {
         const offset = slotIdx * FFT_UNIFORM_SIZE
@@ -523,7 +558,7 @@ export function buildTdseFFTAxisStagingData(config: TdseConfig, totalSites: numb
     let axisStride = 1
     for (let d = config.latticeDim - 1; d >= 0; d--) {
       const axisDim = config.gridSize[d]!
-      const log2N = Math.round(Math.log2(axisDim))
+      const log2N = assertPow2Log2(axisDim)
 
       const offset = slotIdx * FFT_UNIFORM_SIZE
       const view = new DataView(data, offset, FFT_UNIFORM_SIZE)

@@ -16,6 +16,7 @@
  */
 
 import type { TdseConfig } from '@/lib/geometry/extended/types'
+import { isTimeDependentMetric } from '@/lib/physics/tdse/metrics/types'
 
 import type { WebGPURenderContext } from '../core/types'
 import {
@@ -115,6 +116,21 @@ export interface EvolutionResources {
    * periodic case — FFT naturally implements periodic BC for a uniform grid.)
    */
   dispatchCurvedRK4?: (ctx: WebGPURenderContext) => void
+  /**
+   * Per-frame refresh + per-step apply of RK4 stage times in the TDSE
+   * uniform buffer. Without these, `stageTimeK{1..4}` is written once per
+   * frame from the start-of-frame simTime, so multi-step frames
+   * (`stepsPerFrame × speed > 1`) drift by up to `(stepsPerFrame−1)·dt`
+   * on time-dependent metrics (deSitter). `prepareCurvedStageTimes`
+   * uploads a per-step stage-time table for the whole frame via
+   * queue.writeBuffer; `applyCurvedStageTimesForStep` emits the
+   * copyBufferToBuffer on the active encoder that patches
+   * `stageTimeK{1..4}` for the current step. Both are no-ops on flat /
+   * torus / static-curved runs because they're only invoked inside the
+   * curved branch when the metric is time-dependent.
+   */
+  prepareCurvedStageTimes?: (device: GPUDevice, simTimeStart: number, steps: number) => void
+  applyCurvedStageTimesForStep?: (encoder: GPUCommandEncoder, stepIdx: number) => void
 }
 
 /**
@@ -152,7 +168,25 @@ export function runStrangEvolution(
     const curvedAbsorberActive = config.absorberEnabled === true
     const curvedPerStepRenorm =
       config.imaginaryTimeEnabled || (config.stochasticEnabled && config.stochasticGamma > 0)
+    // Per-step RK4 stage-time patch for time-dependent metrics (deSitter).
+    // The frame-start `stageTimeK{1..4}` values in TDSEUniforms are only
+    // correct for step 0; without a per-step rewrite, step i uses t_start
+    // instead of t_start + i·dt, so a(t) = exp(H·t) drifts across the
+    // frame. Only dispatch the copy when (a) the hooks are wired, (b) the
+    // metric actually reads the stage time (`deSitter`), and (c) the frame
+    // executes at least one step.
+    const curvedTimeDep =
+      metricKind !== undefined &&
+      isTimeDependentMetric(metricKind) &&
+      res.prepareCurvedStageTimes !== undefined &&
+      res.applyCurvedStageTimesForStep !== undefined
+    if (curvedTimeDep && curvedSteps > 0 && res.prepareCurvedStageTimes) {
+      res.prepareCurvedStageTimes(ctx.device, state.simTime, curvedSteps)
+    }
     for (let step = 0; step < curvedSteps; step++) {
+      if (curvedTimeDep && res.applyCurvedStageTimesForStep) {
+        res.applyCurvedStageTimesForStep(ctx.encoder, step)
+      }
       res.dispatchCurvedRK4(ctx)
       state.simTime += config.dt
       // PML absorber: ψ damping at boundaries. Uses the same pipeline +

@@ -480,13 +480,23 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   //   - toggle is off,
   //   - metric has zero Ricci (flat / torus / Schwarzschild),
   //   - |R| < 1e-6 (numerical floor — matches the plan's contract).
+  //
+  // The tint is gated by densityGate so empty voxels stay empty. Without
+  // the gate, constant-positive-Ricci metrics (sphere2D) lifted every voxel
+  // to ~tintFactor, which the raymarcher accumulated into a solid "white
+  // cube" that hid the packet entirely. Gating keeps the tint bound to the
+  // wavefunction support — the curvature signature is visible where the
+  // packet is, which is also the only place the overlay is physically
+  // meaningful.
   if (params.showCurvatureOverlay == 1u && params.fieldView == 0u) {
     let ricci = tdseCurvatureRicci(ndWorldPos, params.latticeDim, params.simTime);
     let absR = abs(ricci);
     if (absR >= 1e-6) {
       // |tanh(log(|R|+1))| — bounded soft-saturating magnitude in [0, 1).
       let magnitude = abs(tanh(log(absR + 1.0)));
-      let tintFactor = clamp(magnitude, 0.0, 1.0) * clamp(params.curvatureOverlayOpacity, 0.0, 1.0);
+      let tintFactor = clamp(magnitude, 0.0, 1.0)
+        * clamp(params.curvatureOverlayOpacity, 0.0, 1.0)
+        * densityGate;
       let tintVal = select(0.0, 1.0, ricci > 0.0);
       displayScalar = mix(displayScalar, tintVal, tintFactor);
     }

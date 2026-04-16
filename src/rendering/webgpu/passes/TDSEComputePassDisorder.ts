@@ -52,8 +52,16 @@ export function buildDisorderPipeline(
 
 /**
  * Generate and dispatch disorder overlay if `config.disorderStrength > 0`.
- * Extracts `{strength, seed}` from the full TDSE config and delegates to
- * the generic dispatcher.
+ *
+ * The UI exposes disorder in tight-binding units `W/t` (Anderson convention);
+ * the generic helper, by contract, dispatches a *physical* potential
+ * amplitude. This adapter performs the `W · t_eff` conversion so a preset
+ * stays physically identical across grid resizes (which change `dx` and
+ * therefore `t_eff = ℏ²/(2m·dx²)`).
+ *
+ * Matches the scaling in `uploadAndersonDisorderBuffer` so the overlay
+ * path (non-Anderson potentials with disorderStrength > 0) agrees with
+ * the dedicated Anderson potential path on what `W/t` means.
  */
 export function maybeDispatchDisorder(
   device: GPUDevice,
@@ -70,11 +78,17 @@ export function maybeDispatchDisorder(
     wgX: number
   ) => void
 ): void {
+  const dx = config.spacing[0] ?? 0.1
+  const hbar = config.hbar ?? 1
+  const mass = config.mass ?? 1
+  const tEff = (hbar * hbar) / (2 * mass * dx * dx)
+  const amplitude = config.disorderStrength * tEff
+
   maybeDispatchDisorderGeneric(
     device,
     ctx,
     {
-      strength: config.disorderStrength,
+      amplitude,
       seed: config.disorderSeed,
       distribution: config.disorderDistribution,
     },

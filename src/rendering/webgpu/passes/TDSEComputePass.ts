@@ -78,12 +78,14 @@ import {
 } from './TDSEComputePassWormhole'
 import {
   buildCurvedPipelines,
+  copyCurvedStageTimesForStep,
   createCurvedIntegratorState,
   createCurvedScratchBuffers,
   type CurvedIntegratorState,
   disposeCurvedScratch,
   rebuildCurvedBindGroups,
   runCurvedRK4Step,
+  writeCurvedStageTimes,
 } from './TDSECurvedIntegrator'
 import type { DiagReadbackState } from './TDSEDiagnosticsReadback'
 import {
@@ -547,6 +549,55 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       this.rebuildCurvedBindGroupsIfActive(device)
     }
     runCurvedRK4Step(encoder, this._curvedState)
+  }
+
+  /**
+   * Populate the curved integrator's per-step RK4 stage-time staging
+   * buffer for the upcoming frame. Called by the evolution loop once per
+   * frame BEFORE any encoder work — queues a CPU→GPU writeBuffer that
+   * the subsequent per-step {@link applyCurvedStageTimesForStep} calls
+   * copy from.
+   *
+   * Lazily allocates the curved scratch buffer when it hasn't been
+   * materialized yet (startup, post-rebuild). Without this, the first
+   * multi-step frame on a time-dependent metric (e.g. de Sitter) would
+   * skip the writeBuffer entirely and every `copyBufferToBuffer` issued
+   * by {@link applyCurvedStageTimesForStep} on steps 1..N-1 of that
+   * frame would read zeros, drifting `a(t)` by up to `(steps-1)·dt`
+   * before `runCurvedFrame` eventually allocates the scratch and
+   * subsequent frames stabilize.
+   *
+   * @param device - GPU device (forwarded to the writeBuffer call).
+   * @param simTimeStart - Simulation time at the start of step 0.
+   * @param dt - Integration step size (seconds).
+   * @param steps - Number of Strang steps in this frame.
+   */
+  prepareCurvedStageTimes(
+    device: GPUDevice,
+    simTimeStart: number,
+    dt: number,
+    steps: number
+  ): void {
+    if (!this._curvedState.scratch) {
+      if (this.totalSites <= 0) return
+      this._curvedState.scratch = createCurvedScratchBuffers(device, this.totalSites)
+      this._curvedState.bindGroups = null
+    }
+    writeCurvedStageTimes(device, this._curvedState.scratch, simTimeStart, dt, steps)
+  }
+
+  /**
+   * Emit a `copyBufferToBuffer` on the active encoder that patches
+   * `TDSEUniforms.stageTimeK{1..4}` with the pre-computed stage times
+   * for step `stepIdx`. Must execute on the same encoder as the
+   * subsequent RK4 dispatches so the copy is ordered before the
+   * kinetic pipeline reads the uniform. No-op when the curved scratch
+   * or uniform buffer is not yet materialized.
+   */
+  applyCurvedStageTimesForStep(encoder: GPUCommandEncoder, stepIdx: number): void {
+    const scratch = this._curvedState.scratch
+    if (!scratch || !this.uniformBuffer) return
+    copyCurvedStageTimesForStep(encoder, scratch, this.uniformBuffer, stepIdx)
   }
 
   /** Initialize wavefunction and potential if not yet initialized, reset requested, or auto-loop. */

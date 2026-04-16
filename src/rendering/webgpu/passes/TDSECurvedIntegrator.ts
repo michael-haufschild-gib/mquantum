@@ -39,9 +39,29 @@ import {
 } from '../shaders/schroedinger/compute/tdseCurvedKinetic.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import { createComputeBGL } from '../utils/computeBindGroupLayout'
+import { TDSE_UNIFORM_OFFSET_STAGE_TIME_K1 } from './TDSEComputePassBuffers'
 
 /** Workgroup size — must match `@workgroup_size` in all curved kernels. */
 const CURVED_WG = 64
+
+/**
+ * Maximum number of Strang steps per frame for which the curved integrator
+ * can stage pre-computed RK4 stage times. Sized for 64 — well above any
+ * realistic `stepsPerFrame` × `speed` product, and small enough to fit in a
+ * single 1 KiB uniform-staging buffer.
+ */
+export const CURVED_MAX_STEPS_PER_FRAME = 64
+
+/**
+ * Byte offset of the `stageTimeK1` field inside `TDSEUniforms`. Used by
+ * the per-step stage-time copy. Re-exported under a local name for call
+ * sites in this module; the canonical source lives in
+ * {@link TDSE_UNIFORM_OFFSET_STAGE_TIME_K1}.
+ */
+export const CURVED_STAGE_TIMES_OFFSET = TDSE_UNIFORM_OFFSET_STAGE_TIME_K1
+
+/** Byte size of one (K1, K2, K3, K4) quartet of f32 stage times. */
+export const CURVED_STAGE_TIMES_STRIDE = 16
 
 /** Factory signatures matching the base pass's protected helpers. */
 type CreateShaderModule = (device: GPUDevice, code: string, label: string) => GPUShaderModule
@@ -103,6 +123,19 @@ export interface CurvedIntegratorScratch {
   stageIndex1Buffer: GPUBuffer
   stageIndex2Buffer: GPUBuffer
   stageIndex3Buffer: GPUBuffer
+  /**
+   * Per-frame staging for RK4 stage-time offsets. One (K1,K2,K3,K4) quartet
+   * per step, sized for up to {@link CURVED_MAX_STEPS_PER_FRAME} steps. The
+   * CPU fills this once per frame via {@link writeCurvedStageTimes}, then
+   * the encoder copies the active slot into the TDSEUniforms buffer before
+   * each RK4 step via {@link copyCurvedStageTimesForStep}. Without this,
+   * `stageTimeK1..K4` in `TDSEUniforms` remain at the frame-start value for
+   * every step in a `stepsPerFrame > 1` frame — breaking time-dependent
+   * metrics (`deSitter` a(t) = exp(H·t)) by ~(stepsPerFrame−1)·dt per frame.
+   */
+  stageTimeStagingBuffer: GPUBuffer
+  /** CPU-side Float32 view backing `stageTimeStagingBuffer`. */
+  stageTimeStagingData: Float32Array
   totalSites: number
 }
 
@@ -312,6 +345,7 @@ export function disposeCurvedScratch(scratch: CurvedIntegratorScratch | null): v
   scratch.stageIndex1Buffer.destroy()
   scratch.stageIndex2Buffer.destroy()
   scratch.stageIndex3Buffer.destroy()
+  scratch.stageTimeStagingBuffer.destroy()
 }
 
 /**
@@ -326,6 +360,15 @@ export function createCurvedScratchBuffers(
   const mk = (label: string) => createScratch(device, totalSites, label)
   const oneSixth = 1 / 6
   const twoSixths = 2 / 6
+  // 4 f32 per step, one step per active RK4 frame. COPY_SRC so
+  // `copyBufferToBuffer` can fan it into `TDSEUniforms.stageTimeK{1..4}`
+  // before each step's kinetic dispatch. COPY_DST so `device.queue.writeBuffer`
+  // can refresh it once per frame.
+  const stageTimeStagingBuffer = device.createBuffer({
+    label: 'tdse-curved-stage-times-staging',
+    size: CURVED_MAX_STEPS_PER_FRAME * CURVED_STAGE_TIMES_STRIDE,
+    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  })
   return {
     stagedRe: mk('tdse-curved-stagedRe'),
     stagedIm: mk('tdse-curved-stagedIm'),
@@ -349,8 +392,89 @@ export function createCurvedScratchBuffers(
     stageIndex1Buffer: createU32Uniform(device, 'tdse-curved-stage-idx-1', 1),
     stageIndex2Buffer: createU32Uniform(device, 'tdse-curved-stage-idx-2', 2),
     stageIndex3Buffer: createU32Uniform(device, 'tdse-curved-stage-idx-3', 3),
+    stageTimeStagingBuffer,
+    stageTimeStagingData: new Float32Array(CURVED_MAX_STEPS_PER_FRAME * 4),
     totalSites,
   }
+}
+
+/**
+ * Fill `scratch.stageTimeStagingBuffer` with RK4 stage-time offsets for
+ * the next `steps` Strang steps. Stage ordering matches the classical
+ * tableau: K1=t, K2=t+dt/2, K3=t+dt/2, K4=t+dt — computed from the
+ * absolute simulation time at the START of each step so that
+ * time-dependent metrics (deSitter) see the correct `a(t)` across every
+ * step in a multi-step frame.
+ *
+ * Caller must invoke this exactly once per frame, BEFORE the encoder's
+ * curved-RK4 loop emits any {@link copyCurvedStageTimesForStep} call.
+ * `steps` is clamped to {@link CURVED_MAX_STEPS_PER_FRAME}; excess steps
+ * fall back to the last-populated slot — harmless for static metrics and
+ * a small remaining drift (~dt per step above the cap) for deSitter,
+ * which is only hit when `stepsPerFrame × speed > 64`.
+ *
+ * @param device - GPU device (for the `writeBuffer` queue).
+ * @param scratch - Curved integrator scratch state owning the staging buffer.
+ * @param simTimeStart - Simulation time at the start of the frame's first step.
+ * @param dt - Integration step size (seconds).
+ * @param steps - Number of Strang steps the frame will execute.
+ */
+export function writeCurvedStageTimes(
+  device: GPUDevice,
+  scratch: CurvedIntegratorScratch,
+  simTimeStart: number,
+  dt: number,
+  steps: number
+): void {
+  const clampedSteps = Math.max(0, Math.min(steps, CURVED_MAX_STEPS_PER_FRAME))
+  if (clampedSteps === 0) return
+  const data = scratch.stageTimeStagingData
+  const halfDt = 0.5 * dt
+  for (let s = 0; s < clampedSteps; s++) {
+    const t = simTimeStart + s * dt
+    const base = s * 4
+    data[base] = t // K1 = t
+    data[base + 1] = t + halfDt // K2 = t + dt/2
+    data[base + 2] = t + halfDt // K3 = t + dt/2
+    data[base + 3] = t + dt // K4 = t + dt
+  }
+  // Upload only the populated prefix. WebGPU writeBuffer is queue-serialized,
+  // so this completes before the command buffer that reads the staging data
+  // via copyBufferToBuffer.
+  device.queue.writeBuffer(
+    scratch.stageTimeStagingBuffer,
+    0,
+    data.buffer,
+    data.byteOffset,
+    clampedSteps * CURVED_STAGE_TIMES_STRIDE
+  )
+}
+
+/**
+ * Emit a `copyBufferToBuffer` that copies the 4 RK4 stage times for step
+ * `stepIdx` from the staging buffer into `TDSEUniforms.stageTimeK{1..4}`.
+ * Must run on the same encoder as the subsequent RK4 kinetic dispatches so
+ * the copy is ordered before the dispatches read the uniform.
+ *
+ * Out-of-range `stepIdx` (≥ {@link CURVED_MAX_STEPS_PER_FRAME}) is clamped
+ * to the last slot to avoid a GPU validation error; the small residual
+ * drift is acceptable only on deSitter and only when stepsPerFrame × speed
+ * exceeds the cap.
+ */
+export function copyCurvedStageTimesForStep(
+  encoder: GPUCommandEncoder,
+  scratch: CurvedIntegratorScratch,
+  uniformBuffer: GPUBuffer,
+  stepIdx: number
+): void {
+  const safeIdx = Math.max(0, Math.min(stepIdx, CURVED_MAX_STEPS_PER_FRAME - 1))
+  encoder.copyBufferToBuffer(
+    scratch.stageTimeStagingBuffer,
+    safeIdx * CURVED_STAGE_TIMES_STRIDE,
+    uniformBuffer,
+    CURVED_STAGE_TIMES_OFFSET,
+    CURVED_STAGE_TIMES_STRIDE
+  )
 }
 
 /** Inputs required to (re)build the RK4 bind groups. */

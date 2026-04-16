@@ -2,11 +2,18 @@
  * Generic Disorder Overlay — mode-agnostic pipeline, buffer, and dispatch
  * for adding Anderson-style on-site disorder to a scalar potential buffer.
  *
- * Physics: `V(x) += strength · η(x)` where `η(x)` is deterministic noise
+ * Physics: `V(x) += amplitude · η(x)` where `η(x)` is deterministic noise
  * generated on the CPU via {@link generateDisorderNoise} and seeded by
  * `(seed, distribution, totalSites)`. The WGSL kernel is
  * {@link disorderOverlayShaderBlock} — it operates on any f32 storage
  * buffer and is not coupled to any particular quantum mode.
+ *
+ * IMPORTANT: `amplitude` is a *physical* potential scale (same units as
+ * V(x)). Callers that expose disorder in tight-binding `W/t` units are
+ * responsible for multiplying by `t_eff = ℏ²/(2m·dx²)` before calling
+ * this helper. The overlay intentionally has no knowledge of spacing,
+ * mass, or ℏ so a BEC preset stays physically identical across a grid
+ * resize that changes `dx`.
  *
  * Currently consumed by:
  * - TDSE compute pass (`TDSEComputePassDisorder.ts` re-exports the
@@ -20,7 +27,7 @@
  * @module rendering/webgpu/passes/DisorderOverlay
  */
 
-import type { DisorderOverlayConfig } from '@/lib/geometry/extended/types'
+import type { TdseDisorderDistribution } from '@/lib/geometry/extended/types'
 import { generateDisorderNoise } from '@/lib/physics/tdse/disorderNoise'
 
 import type { WebGPURenderContext } from '../core/types'
@@ -70,14 +77,28 @@ export function buildDisorderPipeline(
   state.pipeline = createComputePipeline(device, sm, [state.bgl], label)
 }
 
+/** Parameters for a single disorder-overlay dispatch. */
+export interface DisorderDispatchParams {
+  /**
+   * Pre-scaled disorder amplitude in *physical* potential units (same as
+   * V(x)). Callers expose `W` in tight-binding units and must multiply
+   * by `t_eff = ℏ²/(2m·dx²)` before passing it here. `<= 0` short-circuits.
+   */
+  amplitude: number
+  /** Deterministic noise seed. */
+  seed: number
+  /** Noise distribution — `uniform` or `gaussian`. See {@link generateDisorderNoise}. */
+  distribution: TdseDisorderDistribution
+}
+
 /**
- * Generate and dispatch disorder overlay if `config.strength > 0`.
+ * Generate and dispatch disorder overlay if `params.amplitude > 0`.
  * Regenerates the noise buffer when the seed, distribution, or grid
  * size changes.
  *
  * @param device - WebGPU device
  * @param ctx - Render context (for beginComputePass)
- * @param config - Disorder overlay configuration (strength + seed + distribution)
+ * @param params - Dispatch parameters (pre-scaled amplitude + seed + distribution)
  * @param state - Disorder state
  * @param potentialBuffer - The potential buffer to overlay disorder onto
  * @param totalSites - Total lattice sites
@@ -88,7 +109,7 @@ export function buildDisorderPipeline(
 export function maybeDispatchDisorder(
   device: GPUDevice,
   ctx: WebGPURenderContext,
-  config: Pick<DisorderOverlayConfig, 'strength' | 'seed' | 'distribution'>,
+  params: DisorderDispatchParams,
   state: DisorderState,
   potentialBuffer: GPUBuffer | null,
   totalSites: number,
@@ -101,14 +122,14 @@ export function maybeDispatchDisorder(
   ) => void,
   label = 'disorder-overlay'
 ): void {
-  if (config.strength <= 0 || !potentialBuffer || !state.pipeline) return
+  if (params.amplitude <= 0 || !potentialBuffer || !state.pipeline) return
 
-  const disorderHash = `${config.seed}|${config.distribution}|${totalSites}`
+  const disorderHash = `${params.seed}|${params.distribution}|${totalSites}`
   if (disorderHash !== state.lastHash) {
     state.buffer?.destroy()
     state.uniformBuffer?.destroy()
 
-    const noise = generateDisorderNoise(totalSites, config.seed, config.distribution)
+    const noise = generateDisorderNoise(totalSites, params.seed, params.distribution)
     state.buffer = device.createBuffer({
       label: `${label}-noise`,
       size: totalSites * 4,
@@ -126,10 +147,10 @@ export function maybeDispatchDisorder(
 
   if (!state.buffer || !state.uniformBuffer || !state.bgl) return
 
-  // Write disorder uniforms: { totalSites: u32, strength: f32 }
+  // Write disorder uniforms: { totalSites: u32, amplitude: f32 }
   const buf = new ArrayBuffer(8)
   new Uint32Array(buf, 0, 1)[0] = totalSites
-  new Float32Array(buf, 4, 1)[0] = config.strength
+  new Float32Array(buf, 4, 1)[0] = params.amplitude
   device.queue.writeBuffer(state.uniformBuffer, 0, buf)
 
   state.bg = device.createBindGroup({

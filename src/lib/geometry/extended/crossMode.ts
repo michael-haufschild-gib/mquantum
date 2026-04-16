@@ -60,13 +60,19 @@ export type DisorderDistribution = 'uniform' | 'gaussian'
 /**
  * Anderson-style disorder overlay for a scalar potential / mass² buffer.
  *
- * Applied as `V(x) += strength · η(x)` where `η(x)` is deterministic
+ * Applied as `V(x) += amplitude · η(x)` where `η(x)` is deterministic
  * noise seeded by `seed`. The noise is generated once on the CPU and
  * uploaded to a GPU storage buffer; the WGSL dispatch kernel is the
  * mode-agnostic `disorderOverlayBlock` in
  * `src/rendering/webgpu/shaders/schroedinger/compute/tdseAddDisorder.wgsl.ts`.
  *
- * - `strength = 0` is a guaranteed no-op (kernel short-circuits).
+ * `strength` is the user-facing tight-binding disorder parameter `W/t`.
+ * The per-mode adapter (e.g. `TDSEComputePassDisorder.maybeDispatchDisorder`)
+ * converts this into the physical amplitude `W · t_eff` where
+ * `t_eff = ℏ²/(2m·dx²)` before dispatch, so the overlay stays physically
+ * identical across grid resizes that change `dx`.
+ *
+ * - `strength = 0` is a guaranteed no-op (dispatcher short-circuits).
  * - Seed + grid-size together determine the noise realization;
  *   reproducibility is preserved across WASM and JS fallback paths
  *   (`generateDisorderNoise` in `src/lib/physics/tdse/disorderNoise.ts`).
@@ -75,7 +81,11 @@ export type DisorderDistribution = 'uniform' | 'gaussian'
  * @see TDSEComputePassDisorder.maybeDispatchDisorder
  */
 export interface DisorderOverlayConfig {
-  /** Disorder strength W. 0 disables the overlay. */
+  /**
+   * Disorder strength W in tight-binding units (W/t). 0 disables the
+   * overlay. The per-mode adapter multiplies by `t_eff` to convert to
+   * the physical amplitude passed to the generic GPU dispatcher.
+   */
   strength: number
   /** Deterministic PRNG seed for the noise realization. */
   seed: number
