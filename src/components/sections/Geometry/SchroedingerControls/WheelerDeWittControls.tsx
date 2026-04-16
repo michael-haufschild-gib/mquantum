@@ -15,12 +15,31 @@ import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import {
+  WDW_GRID_PRESETS,
+  type WdwGridPreset,
+} from '@/stores/slices/geometry/setters/wheelerDeWittSetters'
 
 const BOUNDARY_CONDITION_OPTIONS = [
   { value: 'noBoundary', label: 'Hartle–Hawking' },
   { value: 'tunneling', label: 'Vilenkin' },
   { value: 'deWitt', label: 'DeWitt' },
 ]
+
+const GRID_PRESET_OPTIONS = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
+
+/** Resolve the current `(gridNa, gridNphi)` pair to a preset label. */
+function gridPresetKey(gridNa: number, gridNphi: number): WdwGridPreset {
+  for (const key of ['low', 'medium', 'high'] as const) {
+    const p = WDW_GRID_PRESETS[key]
+    if (p.gridNa === gridNa && p.gridNphi === gridNphi) return key
+  }
+  return 'medium'
+}
 
 /**
  * Top-level Wheeler–DeWitt controls panel. Shown inside the Quantum State
@@ -34,6 +53,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
     setWdwBoundaryCondition,
     setWdwInflatonMass,
     setWdwCosmologicalConstant,
+    setWdwGridSize,
     setWdwStreamlinesEnabled,
     setWdwStreamlineDensity,
   } = useExtendedObjectStore(
@@ -42,10 +62,13 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       setWdwBoundaryCondition: s.setWdwBoundaryCondition,
       setWdwInflatonMass: s.setWdwInflatonMass,
       setWdwCosmologicalConstant: s.setWdwCosmologicalConstant,
+      setWdwGridSize: s.setWdwGridSize,
       setWdwStreamlinesEnabled: s.setWdwStreamlinesEnabled,
       setWdwStreamlineDensity: s.setWdwStreamlineDensity,
     }))
   )
+
+  const activePreset = gridPresetKey(wdw.gridNa, wdw.gridNphi)
 
   return (
     <div className="space-y-3" data-testid="wheeler-dewitt-controls">
@@ -72,6 +95,15 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         onChange={setWdwInflatonMass}
         showValue
         data-testid="wdw-mass-slider"
+      />
+      <ToggleGroup
+        options={GRID_PRESET_OPTIONS}
+        value={activePreset}
+        onChange={(v) => setWdwGridSize(v as WdwGridPreset)}
+        ariaLabel="Wheeler–DeWitt grid size"
+        tooltip={`Solver grid: Low ${WDW_GRID_PRESETS.low.gridNa}×${WDW_GRID_PRESETS.low.gridNphi}², Medium ${WDW_GRID_PRESETS.medium.gridNa}×${WDW_GRID_PRESETS.medium.gridNphi}² (default), High ${WDW_GRID_PRESETS.high.gridNa}×${WDW_GRID_PRESETS.high.gridNphi}². Higher = finer classical-regime fringes, slower solve.`}
+        fullWidth
+        data-testid="wdw-grid-size"
       />
       <Slider
         label="Cosmological constant Λ"

@@ -20,25 +20,31 @@ const DIST_DIR = join(import.meta.dirname, '..', 'dist', 'assets')
 
 /** Per-chunk gzip budgets in KB.
  *  Updated 2026-03-22 for roadmap features (quantum walk, measurement,
- *  observables, expression parser, Pauli spinor, Dirac equation). */
+ *  observables, expression parser, Pauli spinor, Dirac equation).
+ *  Updated 2026-04-15 for curved-space TDSE (Morris–Thorne metric + RK4
+ *  integrator + metric evaluator pulled into the physics chunk via
+ *  state-serializer/setter/config type imports). */
+/** Per-chunk gzip budgets (KB). Measured 2026-04-16 + 5 % headroom.
+ *  Order matters: longer prefixes first (components-panels before components,
+ *  shaders-schroedinger before shaders, react-vendor before vendor). */
 const CHUNK_BUDGETS = {
-  'react-vendor': 65,
-  motion: 35,
-  rendering: 150,
-  'shaders-schroedinger': 150,
-  shaders: 50,
-  components: 100,
-  'components-panels': 100,
-  stores: 50,
-  physics: 50,
-  mediabunny: 50,
-  vendor: 20,
-  index: 30,
+  'react-vendor': 63, // measured 59
+  motion: 33, // measured 31
+  rendering: 141, // measured 134
+  'shaders-schroedinger': 159, // measured 151
+  shaders: 32, // measured 30
+  'components-panels': 103, // measured 98
+  'components-deferred': 21, // measured 19
+  components: 67, // measured 63
+  stores: 47, // measured 44
+  physics: 56, // measured 53
+  mediabunny: 45, // measured 42
+  vendor: 18, // measured 17
+  index: 10, // measured 9
 }
 
-/** Total JS gzip budget in KB (all .js chunks combined).
- *  Updated 2026-04-15 for WDW cosmology + ER=EPR + Hawking/Page features. */
-const TOTAL_JS_BUDGET_KB = 775
+/** Total JS gzip budget in KB. Measured 776 + ~2 % headroom. */
+const TOTAL_JS_BUDGET_KB = 795
 
 function getGzipSize(filePath) {
   const content = readFileSync(filePath)

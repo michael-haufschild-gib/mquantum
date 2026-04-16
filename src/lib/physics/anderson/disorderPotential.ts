@@ -14,6 +14,16 @@
 
 import type { TdseDisorderDistribution } from '@/lib/geometry/extended/types'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
+import { generateDisorderPotentialWasm } from '@/lib/wasm'
+
+// Wire-level distribution codes — must stay in sync with the `FromU32` impl on
+// the Rust side (`src/wasm/mdimension_core/src/disorder.rs`). A mismatch here
+// silently produces an empty WASM result → null → TS fallback, so divergence
+// degrades performance but never swaps distributions.
+const DISTRIBUTION_CODE: Record<TdseDisorderDistribution, number> = {
+  uniform: 0,
+  gaussian: 1,
+}
 
 /**
  * Generate a random disorder potential on an N-D lattice.
@@ -36,6 +46,14 @@ export function generateDisorderPotential(
   for (let d = 0; d < latticeDim; d++) {
     totalSites *= gridSize[d]!
   }
+
+  const wasmResult = generateDisorderPotentialWasm(
+    totalSites,
+    disorderStrength,
+    seed,
+    DISTRIBUTION_CODE[distribution]
+  )
+  if (wasmResult) return wasmResult
 
   const potential = new Float32Array(totalSites)
   const rng = mulberry32(seed)

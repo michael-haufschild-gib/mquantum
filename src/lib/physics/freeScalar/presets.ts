@@ -320,12 +320,13 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
 
   {
     id: 'preheatingFirstTongue',
-    name: 'Preheating: First Tongue (k=0)',
+    name: 'Preheating: First Tongue (k=[1,0,0])',
     description:
-      'Post-inflation parametric resonance: effective mass m²(η) = m²·(1 + 0.3·sin(2η)) drives the Mathieu first tongue at Ω = 2·m. Vacuum noise on Minkowski background — the k=0 mode amplifies exponentially over a few seconds, visible as a bright central shell in k-space.',
+      'Post-inflation parametric resonance seeded on a single lattice plane-wave mode. The drive m²(η) = m²·(1 + 0.3·sin(Ωη)) puts the k=[1,0,0] mode on the Mathieu first tongue (Ω = 2·ω_k ≈ 4.40 for the default 32³ lattice at a=0.1, m=1). Stripes along x amplify exponentially at μ ≈ A·m²/(4ω) ≈ 0.034, doubling every ~20 η — purely resonant, no dispersion, no corner-symmetry artifacts. Note: Ω is calibrated to the default grid shape.',
     overrides: {
-      initialCondition: 'vacuumNoise',
-      vacuumSeed: 17,
+      initialCondition: 'singleMode',
+      modeK: [1, 0, 0],
+      packetAmplitude: 0.05,
       mass: 1.0,
       dt: 0.01,
       stepsPerFrame: 4,
@@ -338,10 +339,10 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       preheating: {
         enabled: true,
         amplitude: 0.3,
-        frequency: 2.0,
+        frequency: 4.4,
       },
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+    renderingOverrides: { densityGain: 1.0, densityContrast: 1.2 },
   },
 
   {

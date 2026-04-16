@@ -42,6 +42,28 @@ export function compose_rotations_indexed_wasm(dimension: number, plane_indices:
 export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array): Float64Array;
 
 /**
+ * Full Gaussian measurement collapse.
+ *
+ * Matches `src/lib/physics/measurement.ts::computeFullCollapse`. Returns a
+ * packed `Float32Array` of length `2 · total_sites` where the first half is
+ * `ψ_re` and the second is `ψ_im` (which is identically zero for a full
+ * collapse — included so the JS caller unpacks symmetrically with the
+ * partial-collapse ABI).
+ *
+ * # Arguments
+ * * `grid_size` - Per-axis lattice sizes (`Uint32Array`, length = `latticeDim`)
+ * * `spacing` - Per-axis spacing (`Float64Array`, length = `latticeDim`)
+ * * `center` - Measurement center in world units (length = `latticeDim`)
+ * * `sigma` - Gaussian width
+ * * `compact_dims` - Optional per-axis periodicity flags (0/1). Pass empty
+ *   slice for fully-open boundaries.
+ *
+ * # Returns
+ * Packed `Float32Array`, or empty on shape mismatch.
+ */
+export function compute_full_collapse_wasm(grid_size: Uint32Array, spacing: Float64Array, center: Float64Array, sigma: number, compact_dims: Uint8Array): Float32Array;
+
+/**
  * Compute the BEC incompressible kinetic-energy spectrum E_incomp(k).
  *
  * Velocity-field finite differences + N-D FFT (via `fft::fft_nd`) +
@@ -92,6 +114,25 @@ export function compute_joint_rdm_wasm(psi_re: Float32Array, psi_im: Float32Arra
  * Classification codes: 0 = poisson, 1 = intermediate, 2 = wigner-dyson
  */
 export function compute_level_spacing_wasm(energies: Float64Array): Float64Array;
+
+/**
+ * Partial axis-aligned measurement collapse.
+ *
+ * Matches `src/lib/physics/measurement.ts::computePartialCollapse`. Returns
+ * packed `[re..., im...]` of length `2 · total_sites`.
+ *
+ * # Arguments
+ * * `psi_re`, `psi_im` - Current wavefunction components (length = `total_sites`)
+ * * `grid_size`, `spacing` - Lattice geometry
+ * * `axis` - Measured axis index
+ * * `axis_position` - Measurement coordinate along `axis`
+ * * `sigma` - Gaussian width
+ * * `axis_compact` - Non-zero to wrap on the measured axis
+ *
+ * # Returns
+ * Packed `Float32Array`, or empty on shape mismatch / invalid axis.
+ */
+export function compute_partial_collapse_wasm(psi_re: Float32Array, psi_im: Float32Array, grid_size: Uint32Array, spacing: Float64Array, axis: number, axis_position: number, sigma: number, axis_compact: number): Float32Array;
 
 /**
  * Compute the reduced density matrix for a single dimension by tracing out
@@ -184,6 +225,38 @@ export function fft_nd_wasm(data: Float64Array, grid_size: Uint32Array): Float64
  * Each matrix is S×S×2 floats (complex, row-major, re/im interleaved).
  */
 export function generate_dirac_matrices_wasm(spatial_dim: number): Float32Array;
+
+/**
+ * Generate a seeded uniform noise lattice in `[-0.5, 0.5]`.
+ *
+ * Matches `src/lib/physics/tdse/disorderNoise.ts::generateDisorderNoise`
+ * bit-for-bit (mulberry32 PRNG parity).
+ *
+ * # Arguments
+ * * `total_sites` - Length of the output Float32Array
+ * * `seed` - Integer seed (wraps to u32 at the boundary)
+ *
+ * # Returns
+ * Float32Array of length `total_sites`.
+ */
+export function generate_disorder_noise_wasm(total_sites: number, seed: number): Float32Array;
+
+/**
+ * Generate an Anderson disorder potential.
+ *
+ * Matches `src/lib/physics/anderson/disorderPotential.ts` with
+ * `distribution_code`: `0 = uniform`, `1 = gaussian`.
+ *
+ * # Arguments
+ * * `total_sites` - Lattice site count (product of grid sizes)
+ * * `disorder_strength` - `W` (uniform half-range × 2; Gaussian σ)
+ * * `seed` - Integer seed
+ * * `distribution_code` - `0` uniform, `1` gaussian
+ *
+ * # Returns
+ * `Float32Array` of length `total_sites`, or empty on invalid distribution.
+ */
+export function generate_disorder_potential_wasm(total_sites: number, disorder_strength: number, seed: number, distribution_code: number): Float32Array;
 
 /**
  * Hermitian eigendecomposition via Jacobi iteration.
@@ -338,9 +411,11 @@ export interface InitOutput {
   readonly complex_mat_mul_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly compute_full_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly compute_incompressible_spectrum_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void;
   readonly compute_joint_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void;
   readonly compute_level_spacing_wasm: (a: number, b: number, c: number) => void;
+  readonly compute_partial_collapse_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number) => void;
   readonly compute_rdm_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
   readonly compute_scar_correlation_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number) => void;
   readonly dirac_spinor_size_wasm: (a: number) => number;
@@ -348,6 +423,8 @@ export interface InitOutput {
   readonly fft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
   readonly fft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly generate_dirac_matrices_wasm: (a: number, b: number) => void;
+  readonly generate_disorder_noise_wasm: (a: number, b: number, c: number) => void;
+  readonly generate_disorder_potential_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly hermitian_eigenvalues_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly ifft_1d_wasm: (a: number, b: number, c: number, d: number) => void;
   readonly ifft_nd_wasm: (a: number, b: number, c: number, d: number, e: number) => void;

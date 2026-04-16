@@ -10,7 +10,9 @@
  * Extended params (merged into defaults):
  *   Rendering: `repr`, `iso`, `iso_t`, `cs`, `dg`, `scale`
  *   Quantum numbers: `hyd_n`, `hyd_l`, `hyd_m`, `tc`, `seed`
- *   TDSE config: `pot`, `abs`, `diag`, `obs`, `it`
+ *   TDSE config: `pot`, `abs`, `diag`, `obs`, `it`, `tdse_metric`, `tdse_b0`,
+ *                `tdse_sm`, `tdse_h`, `tdse_ads`, `tdse_sr`,
+ *                `tdse_tp0`, `tdse_tp1`, `tdse_tp2`, `tdse_dts`, `tdse_dtb`
  *   Features: `oq`, `co`
  */
 
@@ -21,6 +23,23 @@ import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { type CosmologyPreset, isValidPreset, sCritical } from '@/lib/physics/cosmology/presets'
+import {
+  MAX_ADS_RADIUS,
+  MAX_DOUBLE_THROAT_SEPARATION,
+  MAX_HUBBLE_RATE,
+  MAX_SCHWARZSCHILD_MASS,
+  MAX_SPHERE_RADIUS,
+  MAX_THROAT_RADIUS,
+  MAX_TORUS_PERIOD,
+  type MetricKind,
+  MIN_ADS_RADIUS,
+  MIN_DOUBLE_THROAT_SEPARATION,
+  MIN_HUBBLE_RATE,
+  MIN_SCHWARZSCHILD_MASS,
+  MIN_SPHERE_RADIUS,
+  MIN_THROAT_RADIUS,
+  MIN_TORUS_PERIOD,
+} from '@/lib/physics/tdse/metrics/types'
 
 // ─── Validation Sets ─────────────────────────────────────────────────────────
 
@@ -49,6 +68,21 @@ const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = [
   'bianchiKasner',
   'lqcBounce',
 ]
+
+const VALID_DENSITY_VIEWS = ['coordinate', 'proper'] as const
+type UrlDensityView = (typeof VALID_DENSITY_VIEWS)[number]
+
+const VALID_METRIC_KINDS = [
+  'flat',
+  'morrisThorne',
+  'schwarzschild',
+  'deSitter',
+  'antiDeSitter',
+  'sphere2D',
+  'torus',
+  'doubleThroat',
+] as const satisfies readonly MetricKind[]
+type UrlMetricKind = (typeof VALID_METRIC_KINDS)[number]
 
 const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
   'free',
@@ -126,6 +160,34 @@ export interface ShareableObjectState {
   disorderSeed?: number
   /** Anderson disorder distribution ('uniform' | 'gaussian') */
   disorderDistribution?: string
+  /** TDSE spatial metric kind. */
+  tdseMetricKind?: MetricKind
+  /** Morris–Thorne throat radius b₀ (world units). */
+  tdseMetricThroatRadius?: number
+  /** Schwarzschild mass M (geometrized units). */
+  tdseSchwarzschildMass?: number
+  /** de Sitter Hubble rate H. */
+  tdseHubbleRate?: number
+  /** AdS radius L (Poincaré half-space chart). */
+  tdseAdsRadius?: number
+  /** 2-sphere radius R. */
+  tdseSphereRadius?: number
+  /** Flat-torus period along axis 0. */
+  tdseTorusPeriod0?: number
+  /** Flat-torus period along axis 1. */
+  tdseTorusPeriod1?: number
+  /** Flat-torus period along axis 2. */
+  tdseTorusPeriod2?: number
+  /** Double-throat separation s along axis 0. */
+  tdseDoubleThroatSeparation?: number
+  /** Double-throat shared throat radius b₀. */
+  tdseDoubleThroatRadius?: number
+  /** Wave 6: diagnostic Ricci-scalar curvature overlay toggle. */
+  tdseShowCurvatureOverlay?: boolean
+  /** Wave 6: curvature overlay opacity in `[0, 1]`. */
+  tdseCurvatureOverlayOpacity?: number
+  /** Wave 6: density-volume interpretation — `coordinate` or `proper` (×√|g|). */
+  tdseDensityView?: 'coordinate' | 'proper'
 
   // ── Features ─────────────────────────────────────────────────────────────
   /** Open quantum system enabled */
@@ -308,6 +370,48 @@ function setStringParam(params: URLSearchParams, key: string, value: string | un
 }
 
 /**
+ * Emit the curved-space TDSE metric sub-block. Extracted to keep
+ * `serializeState` under the cognitive-complexity budget.
+ *
+ * `tdse_metric` emits unconditionally when the kind is set (including
+ * `flat` — explicit flat distinguishes "user chose flat" from "no
+ * opinion"). `tdse_b0` only rides along for morrisThorne; emitting it
+ * under flat would be confusing and the deserializer would ignore it.
+ */
+function serializeTdseMetric(params: URLSearchParams, state: ShareableObjectState): void {
+  if (state.tdseMetricKind === undefined) return
+  setStringParam(params, 'tdse_metric', state.tdseMetricKind)
+  switch (state.tdseMetricKind) {
+    case 'flat':
+      return
+    case 'morrisThorne':
+      setFloatParam(params, 'tdse_b0', state.tdseMetricThroatRadius, false, 4)
+      return
+    case 'schwarzschild':
+      setFloatParam(params, 'tdse_sm', state.tdseSchwarzschildMass, false, 4)
+      return
+    case 'deSitter':
+      setFloatParam(params, 'tdse_h', state.tdseHubbleRate, false, 4)
+      return
+    case 'antiDeSitter':
+      setFloatParam(params, 'tdse_ads', state.tdseAdsRadius, false, 4)
+      return
+    case 'sphere2D':
+      setFloatParam(params, 'tdse_sr', state.tdseSphereRadius, false, 4)
+      return
+    case 'torus':
+      setFloatParam(params, 'tdse_tp0', state.tdseTorusPeriod0, false, 4)
+      setFloatParam(params, 'tdse_tp1', state.tdseTorusPeriod1, false, 4)
+      setFloatParam(params, 'tdse_tp2', state.tdseTorusPeriod2, false, 4)
+      return
+    case 'doubleThroat':
+      setFloatParam(params, 'tdse_dts', state.tdseDoubleThroatSeparation, false, 4)
+      setFloatParam(params, 'tdse_dtb', state.tdseDoubleThroatRadius, false, 4)
+      return
+  }
+}
+
+/**
  * Emit the cosmology sub-block. Extracted to keep `serializeState` below
  * the cognitive-complexity budget.
  */
@@ -387,6 +491,16 @@ export function serializeState(state: ShareableState): string {
     setIntParam(params, 'dis_s', state.disorderSeed)
     setStringParam(params, 'dis_d', state.disorderDistribution)
   }
+
+  // Curved-space TDSE metric (extracted helper — see serializeTdseMetric).
+  serializeTdseMetric(params, state)
+
+  // Wave 6 curved-space TDSE visualization flags. Independent of metric kind
+  // so a user can pin a coordinate/proper preference that survives metric
+  // swaps in the URL. Emitted unconditionally when set.
+  setBoolParam(params, 'tdse_co', state.tdseShowCurvatureOverlay)
+  setFloatParam(params, 'tdse_co_op', state.tdseCurvatureOverlayOpacity, false, 3)
+  setStringParam(params, 'tdse_dv', state.tdseDensityView)
 
   // Features
   if (state.openQuantumEnabled) {
@@ -653,6 +767,91 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.observablesEnabled = parseBoolParam(params, 'obs')
   state.imaginaryTimeEnabled = parseBoolParam(params, 'it')
   deserializePotentialParams(params, state)
+
+  // Curved-space metric. Invalid `tdse_metric` values (e.g. `foobar`)
+  // leave `tdseMetricKind` undefined per the unknown-params policy. Each
+  // kind reads only its own params; values are clamped to the physical
+  // bounds defined in `metrics/types.ts`. Missing optional sub-params stay
+  // undefined so the consumer can fall back to its own default.
+  const metricKind = parseEnumParam<UrlMetricKind>(params, 'tdse_metric', VALID_METRIC_KINDS)
+  if (metricKind !== undefined) {
+    state.tdseMetricKind = metricKind
+    switch (metricKind) {
+      case 'flat':
+        break
+      case 'morrisThorne':
+        state.tdseMetricThroatRadius = parseFloatParam(
+          params,
+          'tdse_b0',
+          MIN_THROAT_RADIUS,
+          MAX_THROAT_RADIUS
+        )
+        break
+      case 'schwarzschild':
+        state.tdseSchwarzschildMass = parseFloatParam(
+          params,
+          'tdse_sm',
+          MIN_SCHWARZSCHILD_MASS,
+          MAX_SCHWARZSCHILD_MASS
+        )
+        break
+      case 'deSitter':
+        state.tdseHubbleRate = parseFloatParam(params, 'tdse_h', MIN_HUBBLE_RATE, MAX_HUBBLE_RATE)
+        break
+      case 'antiDeSitter':
+        state.tdseAdsRadius = parseFloatParam(params, 'tdse_ads', MIN_ADS_RADIUS, MAX_ADS_RADIUS)
+        break
+      case 'sphere2D':
+        state.tdseSphereRadius = parseFloatParam(
+          params,
+          'tdse_sr',
+          MIN_SPHERE_RADIUS,
+          MAX_SPHERE_RADIUS
+        )
+        break
+      case 'torus':
+        state.tdseTorusPeriod0 = parseFloatParam(
+          params,
+          'tdse_tp0',
+          MIN_TORUS_PERIOD,
+          MAX_TORUS_PERIOD
+        )
+        state.tdseTorusPeriod1 = parseFloatParam(
+          params,
+          'tdse_tp1',
+          MIN_TORUS_PERIOD,
+          MAX_TORUS_PERIOD
+        )
+        state.tdseTorusPeriod2 = parseFloatParam(
+          params,
+          'tdse_tp2',
+          MIN_TORUS_PERIOD,
+          MAX_TORUS_PERIOD
+        )
+        break
+      case 'doubleThroat':
+        state.tdseDoubleThroatSeparation = parseFloatParam(
+          params,
+          'tdse_dts',
+          MIN_DOUBLE_THROAT_SEPARATION,
+          MAX_DOUBLE_THROAT_SEPARATION
+        )
+        state.tdseDoubleThroatRadius = parseFloatParam(
+          params,
+          'tdse_dtb',
+          MIN_THROAT_RADIUS,
+          MAX_THROAT_RADIUS
+        )
+        break
+    }
+  }
+
+  // Wave 6 curved-space TDSE visualization flags. Parsed independently of
+  // the metric kind so the preference survives a metric swap. Opacity is
+  // clamped to [0, 1]; density view is rejected outside the enum set.
+  state.tdseShowCurvatureOverlay = parseBoolParam(params, 'tdse_co')
+  state.tdseCurvatureOverlayOpacity = parseFloatParam(params, 'tdse_co_op', 0, 1)
+  state.tdseDensityView = parseEnumParam<UrlDensityView>(params, 'tdse_dv', VALID_DENSITY_VIEWS)
 
   // Features
   deserializeFeatureParams(params, state)

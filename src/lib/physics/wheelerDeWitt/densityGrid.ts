@@ -9,7 +9,7 @@
  *   A = streamline overlay — WKB intensity from the classical-flow pass
  *
  * Coordinate mapping: the solver grid is (ia, iPhi1, iPhi2) but the density
- * grid lives in a cube [−R, +R]³ with R = boundingRadius = a_max. We place:
+ * grid lives in a cube [−R, +R]³ with R = max(0.25, a_max). We place:
  *   X  in the render cube ↔ a coordinate, mapped linearly to [−R, R]
  *   Y  ↔ φ₁
  *   Z  ↔ φ₂
@@ -66,7 +66,7 @@ export function packWdwDensityGrid(
   // physics). Gate them out at the packer — render as zero density.
   const CLAMP_SOFT = 0.9 * 1e8
 
-  // The render cube is [-R, +R]³ with R = aMax. Reconstruct physical
+  // The render cube is [-R, +R]³ with R = max(0.25, aMax). Reconstruct physical
   // (a, φ₁, φ₂) from texel normalized coords so texels outside the
   // solver domain (a ∈ [aMin, aMax], |φ₁|, |φ₂| ≤ phiExtent) stay zero
   // instead of getting projected onto the nearest solver sample.
@@ -74,7 +74,7 @@ export function packWdwDensityGrid(
   const aSpan = aMax - aMin
   const da = aSpan > 0 ? aSpan / (Na - 1) : 0
   const dphi = phiExtent > 0 ? (2 * phiExtent) / (Nphi - 1) : 0
-  const R = aMax
+  const R = Math.max(0.25, aMax)
 
   for (let z = 0; z < N; z++) {
     // z maps to φ₂ via cube coord physPhi2 = (2·tz - 1)·R

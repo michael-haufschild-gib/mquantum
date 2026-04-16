@@ -37,17 +37,32 @@ import { buildTdseFFTAxisStagingData, buildTdseFFTStagingData } from './TDSEComp
  *   - islandCenterX0:          f32 @ 820
  *   - islandRadiusWs:          f32 @ 824
  *   - islandBoost:             f32 @ 828
+ *   - metricKind:              u32 @ 832 (curved-space TDSE v1 metric)
+ *   - throatRadius:            f32 @ 836
+ *   - _padMetric0..1:          u32 @ 840/844 (16-byte align)
+ *   - schwarzschildMass:       f32 @ 848 (curved-space TDSE v2 metric block)
+ *   - hubbleRate:              f32 @ 852
+ *   - adsRadius:               f32 @ 856
+ *   - sphereRadius:            f32 @ 860
+ *   - doubleThroatSep:         f32 @ 864
+ *   - doubleThroatRad:         f32 @ 868
+ *   - _padV2a/b:               f32 @ 872/876
+ *   - torusPeriod[0..2]:       f32 @ 880/884/888
+ *   - _padV2c:                 f32 @ 892
+ *   - stageTimeK1..K4:         f32 @ 896/900/904/908 (RK4 stage-time offsets)
+ *   - showCurvatureOverlay:    u32 @ 912 (Wave 6: diagnostic Ricci overlay flag)
+ *   - densityViewMode:         u32 @ 916 (Wave 6: 0=coordinate, 1=proper ×√|g|)
+ *   - curvatureOverlayOpacity: f32 @ 920 (Wave 6: clamped [0, 1])
+ *   - _padV2d:                 u32 @ 924 (pad to 16-byte row)
  *
- * Total = 828 + 4 = 832. Update both this constant and the WGSL struct
- * if you add new fields, and keep this comment in sync — the previous
- * "740 = 736 + 4" annotation drifted when stochastic-decoherence
- * branching was added and silently misled readers about the layout.
+ * Total = 832 + 16 + 64 + 16 = 928. Update both this constant and the WGSL
+ * struct if you add new fields, and keep this comment in sync.
  *
  * Exported as `TDSE_UNIFORM_SIZE` so tests that validate struct packing
  * offsets can import the canonical size instead of hardcoding a literal
  * that silently drifts from the WGSL definition.
  */
-export const TDSE_UNIFORM_SIZE = 832
+export const TDSE_UNIFORM_SIZE = 928
 const UNIFORM_SIZE = TDSE_UNIFORM_SIZE
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256

@@ -11,6 +11,7 @@
 import type { TdseConfig } from '@/lib/geometry/extended/types'
 import type { ScenarioPreset } from '@/lib/physics/presetTypes'
 
+import { CURVED_METRIC_TDSE_PRESETS } from './curvedMetricPresets'
 import { DECOHERENCE_PRESETS } from './decoherencePresets'
 
 /** Subset of TdseConfig fields that a scenario preset can override. */
@@ -57,10 +58,10 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       packetCenter: [-1.5, 0, 0],
       packetWidth: 0.4,
       packetAmplitude: 1.0,
-      packetMomentum: [6.0, 0, 0],
+      packetMomentum: [3.0, 0, 0],
       potentialType: 'barrier',
-      barrierHeight: 12.0,
-      barrierWidth: 0.2,
+      barrierHeight: 8.0,
+      barrierWidth: 0.4,
       barrierCenter: 0.5,
       absorberEnabled: true,
       absorberWidth: 0.2,
@@ -71,6 +72,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       autoScale: false,
       autoLoop: false,
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
     id: 'thickBarrier',
@@ -87,7 +89,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       packetCenter: [-1.5, 0, 0],
       packetWidth: 0.35,
       packetAmplitude: 1.0,
-      packetMomentum: [5.0, 0, 0],
+      packetMomentum: [2.0, 0, 0],
       potentialType: 'barrier',
       barrierHeight: 6.0,
       barrierWidth: 1.0,
@@ -101,6 +103,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       autoScale: false,
       autoLoop: false,
     },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 4.0 },
   },
   {
     id: 'doubleSlit',
@@ -235,7 +238,7 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       packetAmplitude: 1.0,
       packetMomentum: [1.0, 0, 0],
       potentialType: 'doubleWell',
-      doubleWellLambda: 5.0,
+      doubleWellLambda: 3.0,
       doubleWellSeparation: 1.0,
       doubleWellAsymmetry: 1.5,
       absorberEnabled: true,
@@ -244,10 +247,11 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       diagnosticsEnabled: true,
       diagnosticsInterval: 5,
       fieldView: 'density',
-      autoScale: false,
+      autoScale: true,
       autoLoop: false,
       showPotential: true,
     },
+    renderingOverrides: { densityGain: 3.0, densityContrast: 2.5, autoScaleMaxGain: 2 },
   },
   {
     id: 'bubbleNucleation',
@@ -458,9 +462,9 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
   },
   {
     id: 'erEprWormhole',
-    name: 'ER=EPR Wormhole (teleportation)',
+    name: 'Mirror-Coupled Rabi Oscillation (ER=EPR boundary dual)',
     description:
-      'Stationary Gaussian in the left well of a symmetric double well. The double-trace mirror coupling Ĥ_int = g·P_M drives clean Rabi teleportation between L and R at angular frequency 2g (period π/g ≈ 1.6s). Watch the density lobe hop across the barrier — kinetic tunneling is negligible, only the wormhole channel moves probability.',
+      'Quantum / boundary-side dual of a traversable wormhole. A stationary Gaussian sits in the left well of a symmetric double well, and the nonlocal mirror term Ĥ_int = g·P_M drives clean Rabi oscillation between L and R at period π/g ≈ 1.6s. The bridge itself is NOT visualized — in the quantum picture of ER=EPR there is no geometric path between the two sides, only this nonlocal coupling operator. What you see is the consequence (density vanishing on one side and reappearing on the other), not a signal traversing a tube. The geometric bridge exists only in the dual GR description, which this simulator does not compute. Kinetic tunneling through the physical barrier is negligible; all probability transfer comes from the mirror coupling.',
     overrides: {
       latticeDim: 3,
       gridSize: [64, 64, 64],
@@ -480,7 +484,9 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
       doubleWellLambda: 8.0,
       doubleWellSeparation: 1.2,
       doubleWellAsymmetry: 0.0,
-      absorberEnabled: false,
+      absorberEnabled: true,
+      absorberWidth: 0.2,
+      pmlTargetReflection: 1e-6,
       diagnosticsEnabled: true,
       diagnosticsInterval: 5,
       fieldView: 'density',
@@ -506,6 +512,42 @@ export const TDSE_SCENARIO_PRESETS: TdseScenarioPreset[] = [
     // boosted gain the mid-oscillation frame looks empty.
     renderingOverrides: { densityGain: 3.0, densityContrast: 2.0, autoScaleMaxGain: 20 },
   },
+  {
+    id: 'wormholeWavepacket',
+    name: 'Wavepacket on a Wormhole Metric',
+    description:
+      'Gaussian wave packet propagating along the proper-distance axis of a Morris–Thorne throat. The kinetic operator is the Laplace–Beltrami operator on the curved spatial slice — not a potential. Shows partial reflection off the geometric bottleneck, curvature-induced dispersion, and transmitted amplitude that continues toward the far asymptotic region. No teleportation, no traversal between disconnected regions — just a single ψ on a single curved 3-slice.',
+    overrides: {
+      latticeDim: 3,
+      gridSize: [128, 64, 64],
+      spacing: [0.1, 0.1, 0.1],
+      // CFL bound for RK4 on the curved FD Laplace–Beltrami at b₀=0.5,
+      // dx=0.1 is dt ≲ 2√2 / ‖T‖ ≈ 0.0016. dt=0.001 keeps the integrator
+      // comfortably stable; stepsPerFrame=8 preserves the same simulation-
+      // time-per-frame pace as the rest of the TDSE presets.
+      dt: 0.001,
+      stepsPerFrame: 8,
+      initialCondition: 'gaussianPacket',
+      packetCenter: [-3.0, 0, 0],
+      packetWidth: 0.5,
+      packetAmplitude: 1.0,
+      packetMomentum: [3.0, 0, 0],
+      // No external potential — the curvature of the spatial slice alone
+      // produces reflection and dispersion via the Laplace–Beltrami kinetic
+      // operator. `potentialType: 'free'` is the enum value for the flat
+      // "no potential" case (the plan's `'none'` does not exist).
+      potentialType: 'free',
+      metric: { kind: 'morrisThorne', throatRadius: 0.5 },
+      absorberEnabled: true,
+      absorberWidth: 0.15,
+      diagnosticsEnabled: true,
+      fieldView: 'density',
+      autoScale: true,
+    },
+    renderingOverrides: { densityGain: 3.0, densityContrast: 2.5 },
+  },
+  // ── Curved-space TDSE v2 presets (Wave 5) — see curvedMetricPresets.ts
+  ...CURVED_METRIC_TDSE_PRESETS,
   ...DECOHERENCE_PRESETS,
 ]
 

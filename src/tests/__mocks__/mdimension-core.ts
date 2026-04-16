@@ -259,3 +259,79 @@ export function compute_scar_correlation_wasm(
 export function compute_level_spacing_wasm(_energies: Float64Array): Float64Array {
   return new Float64Array(0)
 }
+
+// Phase 8: Init-loop kernels — tests force the TS fallback by not loading WASM
+// (MODE === 'test' short-circuits `initAnimationWasm`), so these mocks are only
+// reached when production code imports the module directly. Empty-returns
+// trigger the null path in the bridge, which in turn triggers the TS fallback.
+
+/**
+ * Disorder noise mock
+ * @param _total_sites - Number of lattice sites
+ * @param _seed - Integer seed
+ * @returns Empty array
+ */
+export function generate_disorder_noise_wasm(_total_sites: number, _seed: number): Float32Array {
+  return new Float32Array(0)
+}
+
+/**
+ * Disorder potential mock
+ * @param _total_sites - Number of lattice sites
+ * @param _disorder_strength - Disorder width W
+ * @param _seed - Integer seed
+ * @param _distribution_code - 0 = uniform, 1 = gaussian
+ * @returns Empty array
+ */
+export function generate_disorder_potential_wasm(
+  _total_sites: number,
+  _disorder_strength: number,
+  _seed: number,
+  _distribution_code: number
+): Float32Array {
+  return new Float32Array(0)
+}
+
+/**
+ * Full collapse mock
+ * @param _grid_size - Per-axis lattice sizes
+ * @param _spacing - Per-axis spacing
+ * @param _center - Measurement center
+ * @param _sigma - Gaussian width
+ * @param _compact_dims - Per-axis periodicity flags
+ * @returns Empty array
+ */
+export function compute_full_collapse_wasm(
+  _grid_size: Uint32Array,
+  _spacing: Float64Array,
+  _center: Float64Array,
+  _sigma: number,
+  _compact_dims: Uint8Array
+): Float32Array {
+  return new Float32Array(0)
+}
+
+/**
+ * Partial collapse mock
+ * @param _psi_re - Real part of wavefunction
+ * @param _psi_im - Imaginary part of wavefunction
+ * @param _grid_size - Per-axis lattice sizes
+ * @param _spacing - Per-axis spacing
+ * @param _axis - Measured axis index
+ * @param _axis_position - Measurement coordinate
+ * @param _sigma - Gaussian width
+ * @param _axis_compact - Periodicity flag for measured axis
+ * @returns Empty array
+ */
+export function compute_partial_collapse_wasm(
+  _psi_re: Float32Array,
+  _psi_im: Float32Array,
+  _grid_size: Uint32Array,
+  _spacing: Float64Array,
+  _axis: number,
+  _axis_position: number,
+  _sigma: number,
+  _axis_compact: number
+): Float32Array {
+  return new Float32Array(0)
+}

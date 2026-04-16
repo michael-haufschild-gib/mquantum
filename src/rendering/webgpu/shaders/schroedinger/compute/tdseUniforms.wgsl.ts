@@ -5,13 +5,21 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 832 bytes.
+ * Total size: 928 bytes.
  * Note: imaginaryTime at offset 700 controls Wick rotation mode.
  * Vortex reconnection fields at offsets 708-727 for N-D vortex topology.
  * Black-hole Regge–Wheeler fields at offsets 748-756.
  * Analog Hawking (waterfall sonic horizon) block at offsets 760-792.
  * ER=EPR double-trace wormhole coupling at offsets 800-815.
  * Analog Hawking quantum-extremal island overlay at offsets 816-831.
+ * Curved-space TDSE v1 metric block at offsets 832-847 (metricKind + throatRadius).
+ * Curved-space TDSE v2 metric block at offsets 848-911:
+ *   - per-kind scalar params (mass, Hubble, AdS L, sphere R, doubleThroat)
+ *   - torus periods (3 × f32)
+ *   - RK4 per-stage simTime offsets (K1..K4)
+ * Curved-space TDSE v2 Wave 6 visualization block at offsets 912-927:
+ *   - showCurvatureOverlay (u32), densityViewMode (u32 enum 0=coordinate,1=proper),
+ *     curvatureOverlayOpacity (f32), _padV2d (u32).
  *
  * @module
  */
@@ -147,5 +155,46 @@ struct TDSEUniforms {
   islandCenterX0: f32,          // offset 820 — horizon centroid along axis 0 (world units, sign encodes side)
   islandRadiusWs: f32,          // offset 824 — island radius d*(t) in world units (≥ 0)
   islandBoost: f32,             // offset 828 — brightness multiplier inside the island (1.0 = off)
+
+  // Curved-space TDSE v1 metric (16 bytes, 832-847)
+  // metricKind codes: 0=flat, 1=morrisThorne, 2=schwarzschild, 3=deSitter,
+  // 4=antiDeSitter, 5=sphere2D, 6=torus, 7=doubleThroat.
+  metricKind: u32,              // offset 832
+  throatRadius: f32,            // offset 836 — Morris–Thorne b₀ (world units)
+  _padMetric0: u32,             // offset 840 — pad to 16-byte alignment
+  _padMetric1: u32,             // offset 844 — pad to 16-byte alignment
+
+  // Curved-space TDSE v2 metric block (64 bytes, 848-911)
+  // Per-kind scalar params. Unused fields hold zero.
+  schwarzschildMass: f32,       // offset 848 — M (geometrized units)
+  hubbleRate: f32,              // offset 852 — deSitter H (a(t)=exp(H·t))
+  adsRadius: f32,               // offset 856 — AdS L (Poincaré half-space)
+  sphereRadius: f32,            // offset 860 — 2-sphere R on axes (1,2)
+  doubleThroatSep: f32,         // offset 864 — doubleThroat separation s
+  doubleThroatRad: f32,         // offset 868 — doubleThroat shared b₀
+  _padV2a: f32,                 // offset 872
+  _padV2b: f32,                 // offset 876
+  // Torus spatial periods per axis (flat metric, periodic BC; v2a routes
+  // torus through FFT path which implements wrap natively).
+  torusPeriod: array<f32, 3>,   // offsets 880, 884, 888
+  _padV2c: f32,                 // offset 892
+  // RK4 per-stage simTime offsets (K1=t, K2=K3=t+dt/2, K4=t+dt).
+  // Time-dependent metrics (deSitter) read the relevant stage via
+  // stageIndex (group-1 uniform bound to the kinetic pipeline).
+  // NOTE: Written once per FRAME at start-of-frame simTime — for
+  // stepsPerFrame > 1 the stage times are stale for later steps;
+  // acceptable for v2a scope.
+  stageTimeK1: f32,             // offset 896
+  stageTimeK2: f32,             // offset 900
+  stageTimeK3: f32,             // offset 904
+  stageTimeK4: f32,             // offset 908
+
+  // Curved-space TDSE v2 Wave 6 visualization (16 bytes, 912-927).
+  // When showCurvatureOverlay == 0u AND densityViewMode == 0u the write-grid
+  // shader path is bit-identical to pre-W6 output (zero-regression guarantee).
+  showCurvatureOverlay: u32,    // offset 912 — 0=off, 1=on
+  densityViewMode: u32,         // offset 916 — 0=coordinate, 1=proper (×√|g|)
+  curvatureOverlayOpacity: f32, // offset 920 — clamped to [0, 1] by host
+  _padV2d: u32,                 // offset 924 — pad to 16-byte row
 }
 `

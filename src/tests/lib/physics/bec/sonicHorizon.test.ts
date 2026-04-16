@@ -38,7 +38,7 @@ import {
 import {
   computeWaterfallBackgroundDensity,
   resolveBecMass,
-} from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
+} from '@/lib/physics/bec/waterfallParams'
 
 const BASE_LBOX = 20 * 0.6 // lBox ≫ L_h so detrend is a small perturbation on the tanh.
 

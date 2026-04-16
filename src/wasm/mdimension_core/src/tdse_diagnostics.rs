@@ -124,7 +124,7 @@ fn fit_brody_parameter(spacings: &mut [f64]) -> f64 {
         }
     }
 
-    (a + b) / 2.0
+    f64::midpoint(a, b)
 }
 
 /// Compute level spacing statistics from energy eigenvalues.
@@ -371,10 +371,10 @@ pub fn compute_scar_correlation(
         }
     }
 
-    let mean_correlation = if !orbit_correlations.is_empty() {
-        sum_correlation / orbit_correlations.len() as f64
-    } else {
+    let mean_correlation = if orbit_correlations.is_empty() {
         0.0
+    } else {
+        sum_correlation / orbit_correlations.len() as f64
     };
 
     let orbit_correlation = if mean_correlation > 0.0 {

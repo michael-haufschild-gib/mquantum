@@ -9,6 +9,24 @@
  */
 
 import type { TdseDisorderDistribution, TdseFieldView } from '@/lib/geometry/extended/tdse'
+import {
+  DEFAULT_METRIC_CONFIG,
+  MAX_ADS_RADIUS,
+  MAX_DOUBLE_THROAT_SEPARATION,
+  MAX_HUBBLE_RATE,
+  MAX_SCHWARZSCHILD_MASS,
+  MAX_SPHERE_RADIUS,
+  MAX_THROAT_RADIUS,
+  MAX_TORUS_PERIOD,
+  type MetricConfig,
+  MIN_ADS_RADIUS,
+  MIN_DOUBLE_THROAT_SEPARATION,
+  MIN_HUBBLE_RATE,
+  MIN_SCHWARZSCHILD_MASS,
+  MIN_SPHERE_RADIUS,
+  MIN_THROAT_RADIUS,
+  MIN_TORUS_PERIOD,
+} from '@/lib/physics/tdse/metrics/types'
 
 import {
   nestedClampedSetter,
@@ -16,6 +34,198 @@ import {
   nestedValueSetter,
   type SetterContext,
 } from './sliceSetterUtils'
+
+/** Default fall-back throat radius b₀ when none is otherwise available. */
+const DEFAULT_THROAT_RADIUS = 0.5
+/** Default Schwarzschild mass M when none is otherwise available. */
+const DEFAULT_SCHWARZSCHILD_MASS = 1.0
+/** Default Hubble rate H when none is otherwise available. */
+const DEFAULT_HUBBLE_RATE = 0.3
+/** Default AdS radius L when none is otherwise available. */
+const DEFAULT_ADS_RADIUS = 1.0
+/** Default 2-sphere radius R when none is otherwise available. */
+const DEFAULT_SPHERE_RADIUS = 1.0
+/** Default torus periods (one per axis). */
+const DEFAULT_TORUS_PERIOD: [number, number, number] = [1, 1, 1]
+/** Default double-throat separation s. */
+const DEFAULT_DOUBLE_THROAT_SEPARATION = 4.0
+
+/**
+ * Clamp a numeric param to `[min, max]`. If `value` is not finite, fall back
+ * to `fallback` and emit a dev-mode warning. Pure helper used by the metric
+ * normalizer.
+ *
+ * @param value - Incoming raw value (may be undefined / non-finite)
+ * @param fallback - Last-known good value
+ * @param min - Inclusive minimum
+ * @param max - Inclusive maximum
+ * @param fieldName - Param name for the warning
+ */
+function clampOrFallback(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+  fieldName: string
+): number {
+  if (value === undefined) return Math.max(min, Math.min(max, fallback))
+  if (!Number.isFinite(value)) {
+    if (import.meta.env?.DEV) {
+      // eslint-disable-next-line no-console
+      console.warn(`metric.${fieldName}: non-finite ${value}, falling back to ${fallback}`)
+    }
+    return Math.max(min, Math.min(max, fallback))
+  }
+  return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Project an arbitrary `MetricConfig` payload to its canonical form for the
+ * given `kind`: only kind-relevant fields survive, each clamped to the
+ * physical bound. Missing fields fall back to `prev` (when same kind) or to
+ * the per-kind defaults.
+ */
+function normalizeMetricConfig(cfg: MetricConfig, prev: MetricConfig): MetricConfig {
+  const samePrev = prev.kind === cfg.kind ? prev : undefined
+  switch (cfg.kind) {
+    case 'flat':
+      return { kind: 'flat' }
+    case 'morrisThorne': {
+      const fallback = samePrev?.throatRadius ?? prev.throatRadius ?? DEFAULT_THROAT_RADIUS
+      return {
+        kind: 'morrisThorne',
+        throatRadius: clampOrFallback(
+          cfg.throatRadius,
+          fallback,
+          MIN_THROAT_RADIUS,
+          MAX_THROAT_RADIUS,
+          'throatRadius'
+        ),
+      }
+    }
+    case 'schwarzschild': {
+      const fallback = samePrev?.schwarzschildMass ?? DEFAULT_SCHWARZSCHILD_MASS
+      return {
+        kind: 'schwarzschild',
+        schwarzschildMass: clampOrFallback(
+          cfg.schwarzschildMass,
+          fallback,
+          MIN_SCHWARZSCHILD_MASS,
+          MAX_SCHWARZSCHILD_MASS,
+          'schwarzschildMass'
+        ),
+      }
+    }
+    case 'deSitter': {
+      const fallback = samePrev?.hubbleRate ?? DEFAULT_HUBBLE_RATE
+      return {
+        kind: 'deSitter',
+        hubbleRate: clampOrFallback(
+          cfg.hubbleRate,
+          fallback,
+          MIN_HUBBLE_RATE,
+          MAX_HUBBLE_RATE,
+          'hubbleRate'
+        ),
+      }
+    }
+    case 'antiDeSitter': {
+      const fallback = samePrev?.adsRadius ?? DEFAULT_ADS_RADIUS
+      return {
+        kind: 'antiDeSitter',
+        adsRadius: clampOrFallback(
+          cfg.adsRadius,
+          fallback,
+          MIN_ADS_RADIUS,
+          MAX_ADS_RADIUS,
+          'adsRadius'
+        ),
+      }
+    }
+    case 'sphere2D': {
+      const fallback = samePrev?.sphereRadius ?? DEFAULT_SPHERE_RADIUS
+      return {
+        kind: 'sphere2D',
+        sphereRadius: clampOrFallback(
+          cfg.sphereRadius,
+          fallback,
+          MIN_SPHERE_RADIUS,
+          MAX_SPHERE_RADIUS,
+          'sphereRadius'
+        ),
+      }
+    }
+    case 'torus': {
+      const prevPeriod = samePrev?.torusPeriod
+      const incoming = Array.isArray(cfg.torusPeriod) ? cfg.torusPeriod : undefined
+      const periodOf = (i: 0 | 1 | 2): number =>
+        clampOrFallback(
+          incoming && incoming.length === 3 ? incoming[i] : undefined,
+          prevPeriod?.[i] ?? DEFAULT_TORUS_PERIOD[i],
+          MIN_TORUS_PERIOD,
+          MAX_TORUS_PERIOD,
+          `torusPeriod[${i}]`
+        )
+      return { kind: 'torus', torusPeriod: [periodOf(0), periodOf(1), periodOf(2)] }
+    }
+    case 'doubleThroat': {
+      const sepFallback = samePrev?.doubleThroatSeparation ?? DEFAULT_DOUBLE_THROAT_SEPARATION
+      const radFallback = samePrev?.doubleThroatRadius ?? prev.throatRadius ?? DEFAULT_THROAT_RADIUS
+      return {
+        kind: 'doubleThroat',
+        doubleThroatSeparation: clampOrFallback(
+          cfg.doubleThroatSeparation,
+          sepFallback,
+          MIN_DOUBLE_THROAT_SEPARATION,
+          MAX_DOUBLE_THROAT_SEPARATION,
+          'doubleThroatSeparation'
+        ),
+        doubleThroatRadius: clampOrFallback(
+          cfg.doubleThroatRadius,
+          radFallback,
+          MIN_THROAT_RADIUS,
+          MAX_THROAT_RADIUS,
+          'doubleThroatRadius'
+        ),
+      }
+    }
+  }
+}
+
+/**
+ * Structural equality on canonical MetricConfig objects. Both inputs must
+ * already be in normalized form (only kind-relevant fields populated).
+ */
+function metricsEqual(a: MetricConfig, b: MetricConfig): boolean {
+  if (a.kind !== b.kind) return false
+  switch (a.kind) {
+    case 'flat':
+      return true
+    case 'morrisThorne':
+      return a.throatRadius === (b as typeof a).throatRadius
+    case 'schwarzschild':
+      return a.schwarzschildMass === (b as typeof a).schwarzschildMass
+    case 'deSitter':
+      return a.hubbleRate === (b as typeof a).hubbleRate
+    case 'antiDeSitter':
+      return a.adsRadius === (b as typeof a).adsRadius
+    case 'sphere2D':
+      return a.sphereRadius === (b as typeof a).sphereRadius
+    case 'torus': {
+      const ap = a.torusPeriod
+      const bp = (b as typeof a).torusPeriod
+      if (!ap || !bp) return false
+      return ap[0] === bp[0] && ap[1] === bp[1] && ap[2] === bp[2]
+    }
+    case 'doubleThroat': {
+      const bb = b as typeof a
+      return (
+        a.doubleThroatSeparation === bb.doubleThroatSeparation &&
+        a.doubleThroatRadius === bb.doubleThroatRadius
+      )
+    }
+  }
+}
 
 /**
  * Creates UI, diagnostic, absorber, and disorder setters for the TDSE slice.
@@ -148,6 +358,48 @@ export function createTdseUiSetters(ctx: SetterContext) {
           tdse: { ...state.schroedinger.tdse, wormholeCoherenceHudEnabled: !!enabled },
         },
       }))
+    },
+    /**
+     * Set the spatial metric for the TDSE kinetic operator. A change of
+     * `kind` or any kind-relevant parameter invalidates the running
+     * wavefunction (the Laplace–Beltrami operator it was propagated under
+     * no longer matches), so this setter flips `needsReset`. An idempotent
+     * write — identical normalized config — is a no-op that leaves
+     * `needsReset` untouched so harmless UI round-trips don't kick the
+     * simulation.
+     *
+     * Each kind only retains its relevant fields; mismatched fields are
+     * silently stripped to keep the stored config small and semantically
+     * clean. Invalid / non-finite numeric params are clamped to the
+     * matching bound and a dev-mode warning is emitted.
+     */
+    /** Toggle the Ricci-scalar curvature overlay. Pure render flag. */
+    setShowCurvatureOverlay: nestedValueSetter(ctx, D, 'showCurvatureOverlay') as (
+      enabled: boolean
+    ) => void,
+    /**
+     * Select the density-volume view mode. `coordinate` = bare |ψ|²,
+     * `proper` = |ψ|²·√|g|. Render-only.
+     */
+    setDensityView: nestedValueSetter(ctx, D, 'densityView') as (
+      view: 'coordinate' | 'proper'
+    ) => void,
+    /**
+     * Clamp the Wave 6 overlay opacity into `[0, 1]`. Render-only.
+     */
+    setCurvatureOverlayOpacity: nestedClampedSetter(ctx, D, 'curvatureOverlayOpacity', 0, 1),
+    setTdseMetric: (cfg: MetricConfig) => {
+      ctx.setWithVersion((state) => {
+        const prev: MetricConfig = state.schroedinger.tdse.metric ?? DEFAULT_METRIC_CONFIG
+        const next = normalizeMetricConfig(cfg, prev)
+        if (metricsEqual(prev, next)) return state
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...state.schroedinger.tdse, metric: next, needsReset: true },
+          },
+        }
+      })
     },
   }
 }

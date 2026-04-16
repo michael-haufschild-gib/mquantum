@@ -61,8 +61,20 @@ function decompose(
   blockSize: number
   totalSites: number
 } {
+  if (gridSize.length === 0) {
+    throw new Error('[wormholeCoupling] gridSize must be non-empty')
+  }
   if (axis < 0 || axis >= gridSize.length) {
     throw new Error(`[wormholeCoupling] axis ${axis} out of range for D=${gridSize.length}`)
+  }
+  // Guard each axis — a non-positive, non-integer, or non-finite size would
+  // let `totalSites` silently round to 0/NaN and downstream dispatches would
+  // zero-iterate or throw index-out-of-range on ψ reads.
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`[wormholeCoupling] gridSize[${d}] must be a positive integer, got ${n}`)
+    }
   }
   const Na = gridSize[axis]!
   if (Na < 2 || Na % 2 !== 0) {

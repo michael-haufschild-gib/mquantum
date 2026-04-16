@@ -19,7 +19,7 @@ import { asymptoticSoundSpeed, hasHorizon, hawkingReadout } from '@/lib/physics/
 import {
   computeWaterfallBackgroundDensity,
   resolveBecMass,
-} from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
+} from '@/lib/physics/bec/waterfallParams'
 import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 

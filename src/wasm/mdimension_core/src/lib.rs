@@ -21,7 +21,9 @@ pub fn start() {
 mod animation;
 mod bec_spectrum;
 mod clifford;
+mod collapse;
 mod complex_matrix;
+mod disorder;
 mod entanglement;
 mod fft;
 mod tdse_diagnostics;
@@ -455,9 +457,8 @@ pub fn hermitian_eigenvalues_wasm(re: &[f64], im: &[f64], n: u32) -> Vec<f64> {
     if n == 0 {
         return Vec::new();
     }
-    let size = match n.checked_mul(n) {
-        Some(s) => s,
-        None => return Vec::new(),
+    let Some(size) = n.checked_mul(n) else {
+        return Vec::new();
     };
     if re.len() < size || im.len() < size {
         return Vec::new();
@@ -498,9 +499,8 @@ pub fn matrix_exponential_pade_wasm(a_re: &[f64], a_im: &[f64], n: u32) -> Vec<f
     if n == 0 {
         return Vec::new();
     }
-    let size = match n.checked_mul(n) {
-        Some(s) => s,
-        None => return Vec::new(),
+    let Some(size) = n.checked_mul(n) else {
+        return Vec::new();
     };
     if a_re.len() < size || a_im.len() < size {
         return Vec::new();
@@ -533,9 +533,8 @@ pub fn complex_mat_mul_wasm(
     if n == 0 {
         return Vec::new();
     }
-    let size = match n.checked_mul(n) {
-        Some(s) => s,
-        None => return Vec::new(),
+    let Some(size) = n.checked_mul(n) else {
+        return Vec::new();
     };
     if a_re.len() < size || a_im.len() < size || b_re.len() < size || b_im.len() < size {
         return Vec::new();
@@ -587,6 +586,130 @@ pub fn compute_scar_correlation_wasm(
         orbit_lengths,
         sigma,
         dim,
+    )
+}
+
+// ============================================================================
+// Phase 8: Init-Loop Kernels (Disorder + Measurement Collapse)
+// ============================================================================
+
+/// Generate a seeded uniform noise lattice in `[-0.5, 0.5]`.
+///
+/// Matches `src/lib/physics/tdse/disorderNoise.ts::generateDisorderNoise`
+/// bit-for-bit (mulberry32 PRNG parity).
+///
+/// # Arguments
+/// * `total_sites` - Length of the output Float32Array
+/// * `seed` - Integer seed (wraps to u32 at the boundary)
+///
+/// # Returns
+/// Float32Array of length `total_sites`.
+#[wasm_bindgen]
+pub fn generate_disorder_noise_wasm(total_sites: u32, seed: i32) -> Vec<f32> {
+    disorder::generate_disorder_noise(total_sites as usize, seed as u32)
+}
+
+/// Generate an Anderson disorder potential.
+///
+/// Matches `src/lib/physics/anderson/disorderPotential.ts` with
+/// `distribution_code`: `0 = uniform`, `1 = gaussian`.
+///
+/// # Arguments
+/// * `total_sites` - Lattice site count (product of grid sizes)
+/// * `disorder_strength` - `W` (uniform half-range × 2; Gaussian σ)
+/// * `seed` - Integer seed
+/// * `distribution_code` - `0` uniform, `1` gaussian
+///
+/// # Returns
+/// `Float32Array` of length `total_sites`, or empty on invalid distribution.
+#[wasm_bindgen]
+pub fn generate_disorder_potential_wasm(
+    total_sites: u32,
+    disorder_strength: f64,
+    seed: i32,
+    distribution_code: u32,
+) -> Vec<f32> {
+    let Some(distribution) = disorder::DisorderDistribution::from_u32(distribution_code) else {
+        return Vec::new();
+    };
+    disorder::generate_disorder_potential(
+        total_sites as usize,
+        disorder_strength,
+        seed as u32,
+        distribution,
+    )
+}
+
+/// Full Gaussian measurement collapse.
+///
+/// Matches `src/lib/physics/measurement.ts::computeFullCollapse`. Returns a
+/// packed `Float32Array` of length `2 · total_sites` where the first half is
+/// `ψ_re` and the second is `ψ_im` (which is identically zero for a full
+/// collapse — included so the JS caller unpacks symmetrically with the
+/// partial-collapse ABI).
+///
+/// # Arguments
+/// * `grid_size` - Per-axis lattice sizes (`Uint32Array`, length = `latticeDim`)
+/// * `spacing` - Per-axis spacing (`Float64Array`, length = `latticeDim`)
+/// * `center` - Measurement center in world units (length = `latticeDim`)
+/// * `sigma` - Gaussian width
+/// * `compact_dims` - Optional per-axis periodicity flags (0/1). Pass empty
+///   slice for fully-open boundaries.
+///
+/// # Returns
+/// Packed `Float32Array`, or empty on shape mismatch.
+#[wasm_bindgen]
+pub fn compute_full_collapse_wasm(
+    grid_size: &[u32],
+    spacing: &[f64],
+    center: &[f64],
+    sigma: f64,
+    compact_dims: &[u8],
+) -> Vec<f32> {
+    let compact = if compact_dims.is_empty() {
+        None
+    } else {
+        Some(compact_dims)
+    };
+    collapse::compute_full_collapse(grid_size, spacing, center, sigma, compact)
+}
+
+/// Partial axis-aligned measurement collapse.
+///
+/// Matches `src/lib/physics/measurement.ts::computePartialCollapse`. Returns
+/// packed `[re..., im...]` of length `2 · total_sites`.
+///
+/// # Arguments
+/// * `psi_re`, `psi_im` - Current wavefunction components (length = `total_sites`)
+/// * `grid_size`, `spacing` - Lattice geometry
+/// * `axis` - Measured axis index
+/// * `axis_position` - Measurement coordinate along `axis`
+/// * `sigma` - Gaussian width
+/// * `axis_compact` - Non-zero to wrap on the measured axis
+///
+/// # Returns
+/// Packed `Float32Array`, or empty on shape mismatch / invalid axis.
+#[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
+pub fn compute_partial_collapse_wasm(
+    psi_re: &[f32],
+    psi_im: &[f32],
+    grid_size: &[u32],
+    spacing: &[f64],
+    axis: u32,
+    axis_position: f64,
+    sigma: f64,
+    axis_compact: u32,
+) -> Vec<f32> {
+    collapse::compute_partial_collapse(
+        psi_re,
+        psi_im,
+        grid_size,
+        spacing,
+        axis,
+        axis_position,
+        sigma,
+        axis_compact != 0,
     )
 }
 

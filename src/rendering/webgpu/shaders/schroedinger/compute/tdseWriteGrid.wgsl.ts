@@ -447,6 +447,51 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
 
+  // ── Curved-space TDSE v2 Wave 6 visualization ────────────────────────────
+  //
+  // Proper-volume density view: |ψ|² → |ψ|²·√|g|. Only applied to the
+  // density field view (fieldView == 0); phase / current / potential field
+  // views carry no volume-form meaning so √|g| would be visually confusing.
+  // On flat / torus metrics √|g| = 1 so this branch is a no-op.
+  //
+  // WARNING: auto-scale tracks the COORDINATE-volume maximum density, so in
+  // proper mode the packet may appear dim or bright depending on where the
+  // √|g| peak is relative to the packet support. The downstream 'clamp' to
+  // [0, 1] prevents visual overflow, but users exploring with auto-scale
+  // should be aware of the interaction.
+  if (params.densityViewMode == 1u && params.fieldView == 0u) {
+    let properSqrtDet = tdseCurvatureSqrtDet(ndWorldPos, params.latticeDim, params.simTime);
+    displayScalar = displayScalar * properSqrtDet;
+  }
+
+  // Ricci-scalar curvature overlay (diverging sign(R)-keyed modulation).
+  //
+  // Because the write-grid output texture is scalar (R=density, G=log, B=
+  // phase, A=dual-purpose) we cannot literally mix an RGB overlay colour
+  // into the voxel here — the palette lives in the raymarch fragment stage.
+  // Instead we re-use the display scalar: for R > 0 we bias the voxel
+  // toward 1.0 (bright / hot side of the density palette) and for R < 0
+  // toward 0.0 (dim / cool). |R| drives the blend strength via a soft
+  // log·tanh mapping so large values saturate rather than overwhelm.
+  //
+  // Restricted to the density field view so we don't clash with the
+  // island overlay's phase shift (fieldView == 1) or the potential-
+  // overlay alpha encoding below. No-ops when:
+  //   - toggle is off,
+  //   - metric has zero Ricci (flat / torus / Schwarzschild),
+  //   - |R| < 1e-6 (numerical floor — matches the plan's contract).
+  if (params.showCurvatureOverlay == 1u && params.fieldView == 0u) {
+    let ricci = tdseCurvatureRicci(ndWorldPos, params.latticeDim, params.simTime);
+    let absR = abs(ricci);
+    if (absR >= 1e-6) {
+      // |tanh(log(|R|+1))| — bounded soft-saturating magnitude in [0, 1).
+      let magnitude = abs(tanh(log(absR + 1.0)));
+      let tintFactor = clamp(magnitude, 0.0, 1.0) * clamp(params.curvatureOverlayOpacity, 0.0, 1.0);
+      let tintVal = select(0.0, 1.0, ricci > 0.0);
+      displayScalar = mix(displayScalar, tintVal, tintFactor);
+    }
+  }
+
   let normDensity = clamp(displayScalar * perpFalloff, 0.0, 1.0);
   let logDensity = log(normDensity + 1e-10);
 

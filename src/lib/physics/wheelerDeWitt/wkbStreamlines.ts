@@ -70,9 +70,18 @@ function wrappedDiff(a: number, b: number): number {
 }
 
 /**
- * Evaluate the gradient of S = a^{3/2}·arg(χ) at a (continuous) grid point,
- * returning (dS/da, dS/dphi1, dS/dphi2). Uses nearest-neighbor-on-grid
- * (rounded indices) finite differences with phase unwrapping.
+ * Evaluate the Hamilton–Jacobi flow velocity of S = a^{3/2}·arg(χ) in
+ * GRID-INDEX SPACE: returns (d(ia)/dτ, d(i1)/dτ, d(i2)/dτ) given the
+ * classical-flow equation dq/dτ = ∂S/∂q in physical coordinates. The
+ * conversion is d(index)/dτ = (∂S/∂q)/dx, so each axis divides the central
+ * difference by (2·dx·dx) rather than (2·dx).
+ *
+ * Subtle: the legacy implementation returned ∂S/∂q (physical) and then added
+ * it directly to index coordinates inside rk4Step, mixing units and making
+ * the per-step advance scale linearly with dphi/da. That broke resolution
+ * invariance and distorted trajectory shape along the φ axes (defaults:
+ * da≈0.011, dphi≈0.13 — ~12× differential error). Returning proper index-
+ * space velocity fixes both.
  */
 function gradS(
   output: WheelerDeWittSolverOutput,
@@ -100,9 +109,12 @@ function gradS(
   // next-vs-prev difference first, unwrap once. Unwrapping each neighbor
   // against the center separately and subtracting yields a non-equivalent
   // result across wrap boundaries.
-  const dSda = wrappedDiff(sNextA, sPrevA) / (2 * da)
-  const dSdp1 = wrappedDiff(sNext1, sPrev1) / (2 * dphi)
-  const dSdp2 = wrappedDiff(sNext2, sPrev2) / (2 * dphi)
+  //
+  // Index-space velocity: dx/dτ = ∂S/∂x (physical) → d(index)/dτ = (∂S/∂x)/dx.
+  // Finite-difference ∂S/∂x ≈ wrappedDiff/(2·dx), so d(index)/dτ = wrappedDiff/(2·dx²).
+  const dSda = wrappedDiff(sNextA, sPrevA) / (2 * da * da)
+  const dSdp1 = wrappedDiff(sNext1, sPrev1) / (2 * dphi * dphi)
+  const dSdp2 = wrappedDiff(sNext2, sPrev2) / (2 * dphi * dphi)
   return [dSda, dSdp1, dSdp2]
 }
 
@@ -122,7 +134,19 @@ function isLorentzian(
   return (output.lorentzianMask[idx] ?? 0) !== 0
 }
 
-/** RK4 step along ∇S on the grid. Returns new (ia, i1, i2) in grid-index units. */
+/** Maximum per-rk4-step displacement in cells. Keeps the integrator stable
+ * regardless of gradient magnitude or grid resolution — see rk4Step. */
+const MAX_STEP_CELLS = 0.5
+
+/** RK4 step along ∇S on the grid. Returns new (ia, i1, i2) in grid-index units.
+ *
+ * `gradS` returns index-space velocity; `stepScale` is dimensionless
+ * (τ-units). If the gradient is large compared with the grid spacing the
+ * per-step displacement is capped at `MAX_STEP_CELLS`, converting RK4 to a
+ * CFL-bounded integrator. Without the cap, typical WdW solutions (∂S/∂a ≈ 40
+ * at default grid) would advance tens of cells per step and exit the grid in
+ * one stride.
+ */
 function rk4Step(
   output: WheelerDeWittSolverOutput,
   ia: number,
@@ -157,9 +181,18 @@ function rk4Step(
     da,
     dphi
   )
-  const dx0 = (stepScale * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0])) / 6
-  const dx1 = (stepScale * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])) / 6
-  const dx2 = (stepScale * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2])) / 6
+  let dx0 = (stepScale * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0])) / 6
+  let dx1 = (stepScale * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1])) / 6
+  let dx2 = (stepScale * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2])) / 6
+
+  // CFL cap: rescale to keep Euclidean-norm displacement ≤ MAX_STEP_CELLS.
+  const mag = Math.sqrt(dx0 * dx0 + dx1 * dx1 + dx2 * dx2)
+  if (mag > MAX_STEP_CELLS) {
+    const s = MAX_STEP_CELLS / mag
+    dx0 *= s
+    dx1 *= s
+    dx2 *= s
+  }
   return [ia + dx0, i1 + dx1, i2 + dx2]
 }
 

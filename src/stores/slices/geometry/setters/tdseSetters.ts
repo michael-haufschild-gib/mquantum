@@ -103,6 +103,10 @@ type TdseActions = Pick<
   | 'setTdseWormholeG'
   | 'setTdseWormholeAxis'
   | 'setTdseWormholeHudEnabled'
+  | 'setTdseMetric'
+  | 'setShowCurvatureOverlay'
+  | 'setDensityView'
+  | 'setCurvatureOverlayOpacity'
 >
 
 /**

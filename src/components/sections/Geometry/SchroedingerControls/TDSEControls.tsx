@@ -21,6 +21,7 @@ import { useDiagnosticsStore } from '@/stores/diagnosticsStore'
 import { useSimulationStateStore } from '@/stores/simulationStateStore'
 import { TDSE_MAX_TOTAL_SITES } from '@/stores/slices/geometry/setters/sliceSetterUtils'
 
+import { MetricControls } from './MetricControls'
 import { FIELD_VIEW_OPTIONS, INITIAL_CONDITION_OPTIONS } from './tdseControlsConstants'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
 import type { TdseControlsProps } from './types'
@@ -291,6 +292,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         </ControlGroup>
 
         <WormholeControls td={td} />
+        <MetricControls td={td} />
 
         {/* Slice positions for dims > 3 */}
         {activeDims > 3 && (

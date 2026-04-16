@@ -1286,3 +1286,104 @@ export async function hideQuantumObject(page: Page): Promise<void> {
   })
   await waitForUniformUpdate(page)
 }
+
+// ─── Curved-space TDSE v2 helpers ────────────────────────────────────────────
+
+/**
+ * MetricConfig shape mirrored from `/src/lib/physics/tdse/metrics/types.ts`.
+ * Duplicated here so spec files don't import from `src/` (Playwright specs
+ * live outside the tsconfig src graph).
+ */
+export interface CurvedMetricConfig {
+  kind:
+    | 'flat'
+    | 'morrisThorne'
+    | 'schwarzschild'
+    | 'deSitter'
+    | 'antiDeSitter'
+    | 'sphere2D'
+    | 'torus'
+    | 'doubleThroat'
+  throatRadius?: number
+  schwarzschildMass?: number
+  hubbleRate?: number
+  adsRadius?: number
+  sphereRadius?: number
+  torusPeriod?: [number, number, number]
+  doubleThroatSeparation?: number
+  doubleThroatRadius?: number
+}
+
+/**
+ * Set the TDSE metric via the extended object store setter. Supports all
+ * 8 v2 metric kinds — mismatched fields are silently stripped by the
+ * setter's normalizer.
+ */
+export async function setTdseMetricV2(page: Page, cfg: CurvedMetricConfig): Promise<void> {
+  await page.evaluate(async (metric) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).setTdseMetric(metric)
+  }, cfg)
+}
+
+/** Toggle the Wave 6 Ricci-scalar curvature overlay (render-only). */
+export async function setTdseShowCurvatureOverlay(page: Page, enabled: boolean): Promise<void> {
+  await page.evaluate(async (flag: boolean) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).setShowCurvatureOverlay(flag)
+  }, enabled)
+}
+
+/** Set the overlay opacity (clamped to `[0, 1]` by the setter). */
+export async function setTdseCurvatureOverlayOpacity(page: Page, opacity: number): Promise<void> {
+  await page.evaluate(async (v: number) => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).setCurvatureOverlayOpacity(v)
+  }, opacity)
+}
+
+/** Select coordinate- vs. proper-volume density view. Render-only. */
+export async function setTdseDensityView(page: Page, view: 'coordinate' | 'proper'): Promise<void> {
+  await page.evaluate(async (v: 'coordinate' | 'proper') => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    ;(
+      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
+    ).setDensityView(v)
+  }, view)
+}
+
+/**
+ * Snapshot of the curved-space TDSE v2 fields as seen by the store.
+ * Safely reads optional fields — any missing nested object returns defaults.
+ */
+export interface TdseV2StateSnapshot {
+  metric: { kind: string } & Record<string, unknown>
+  showCurvatureOverlay: boolean
+  curvatureOverlayOpacity: number
+  densityView: 'coordinate' | 'proper'
+}
+
+/**
+ * Read the Wave 6/Wave 5 state from the extended object store — metric
+ * config plus overlay/density-view flags. Used by URL-round-trip tests.
+ */
+export async function readTdseV2State(page: Page): Promise<TdseV2StateSnapshot> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
+    const schroedinger = s.schroedinger as { tdse?: Record<string, unknown> } | undefined
+    const tdse = schroedinger?.tdse ?? {}
+    return {
+      metric: (tdse.metric as { kind: string } & Record<string, unknown>) ?? { kind: 'flat' },
+      showCurvatureOverlay: tdse.showCurvatureOverlay === true,
+      curvatureOverlayOpacity: (tdse.curvatureOverlayOpacity as number | undefined) ?? 0.4,
+      densityView: (tdse.densityView as 'coordinate' | 'proper' | undefined) ?? 'coordinate',
+    }
+  })
+}

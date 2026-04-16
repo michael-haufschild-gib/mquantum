@@ -91,6 +91,93 @@ describe('WKB streamlines', () => {
     expect(touched).toBeGreaterThan(1000)
   })
 
+  describe('resolution invariance — trajectories live in physical (a, φ) space', () => {
+    // Regression: the legacy integrator returned ∂S/∂q in PHYSICAL units and
+    // added those values directly to GRID-INDEX coordinates. The resulting
+    // per-step index advance then scaled with the grid spacing (dphi ≫ da
+    // under defaults), so trajectories were both shape-distorted and
+    // resolution-dependent. The fix returns index-space velocity — trajectories
+    // in physical (a, φ) space become ~resolution-invariant (up to finite-diff
+    // discretization error).
+
+    const baseSolverParams = {
+      boundaryCondition: 'tunneling' as const,
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.2,
+      aMin: 0.5,
+      aMax: 2.0,
+      phiExtent: 2.0,
+    }
+
+    it('trajectories cover comparable physical extent across a 2× grid refinement', () => {
+      const coarseOut = solveWheelerDeWitt({
+        ...baseSolverParams,
+        gridNa: 32,
+        gridNphi: 16,
+      })
+      const fineOut = solveWheelerDeWitt({
+        ...baseSolverParams,
+        gridNa: 64,
+        gridNphi: 32,
+      })
+
+      const integratorInput = { density: 4, maxSteps: 64, splatRadius: 0.9 }
+      const coarse = integrateWkbTrajectories(coarseOut, integratorInput)
+      const fine = integrateWkbTrajectories(fineOut, integratorInput)
+
+      // Convert index-space trajectory point to physical (a, φ₁, φ₂).
+      const toPhysical = (
+        out: ReturnType<typeof solveWheelerDeWitt>,
+        pt: [number, number, number]
+      ): [number, number, number] => {
+        const [Na, Nphi] = out.gridSize
+        const da = (out.aMax - out.aMin) / (Na - 1)
+        const dphi = (2 * out.phiExtent) / (Nphi - 1)
+        return [out.aMin + pt[0] * da, -out.phiExtent + pt[1] * dphi, -out.phiExtent + pt[2] * dphi]
+      }
+
+      // Mean physical path length per trajectory (Euclidean distance in (a,φ,φ)).
+      const meanPathLength = (
+        out: ReturnType<typeof solveWheelerDeWitt>,
+        trajs: ReturnType<typeof integrateWkbTrajectories>
+      ): number => {
+        if (trajs.length === 0) return 0
+        let total = 0
+        for (const t of trajs) {
+          if (t.points.length < 2) continue
+          let len = 0
+          for (let i = 1; i < t.points.length; i++) {
+            const a = toPhysical(out, t.points[i - 1]!)
+            const b = toPhysical(out, t.points[i]!)
+            const dx = b[0] - a[0]
+            const dy = b[1] - a[1]
+            const dz = b[2] - a[2]
+            len += Math.sqrt(dx * dx + dy * dy + dz * dz)
+          }
+          total += len
+        }
+        return total / trajs.length
+      }
+
+      const coarseLen = meanPathLength(coarseOut, coarse)
+      const fineLen = meanPathLength(fineOut, fine)
+
+      // Both integrators must produce propagating trajectories.
+      expect(coarseLen).toBeGreaterThan(0)
+      expect(fineLen).toBeGreaterThan(0)
+
+      // Under the pre-fix code, fineLen was ~½ coarseLen (per-step physical
+      // displacement scaled with da). After the fix, the ratio collapses to
+      // O(1). Allow a generous band [0.4, 2.5] — the assertion is "same
+      // order, not half/double", which is exactly what resolution invariance
+      // guarantees. The broken integrator would violate the lower bound
+      // (fineLen/coarseLen ≈ 0.5 at 2× refinement).
+      const ratio = fineLen / coarseLen
+      expect(ratio).toBeGreaterThan(0.5)
+      expect(ratio).toBeLessThan(2.5)
+    })
+  })
+
   describe('split integrator (integrateWkbTrajectories + buildStaticOverlay + buildPulseOverlay)', () => {
     const solverParams = {
       boundaryCondition: 'tunneling' as const,

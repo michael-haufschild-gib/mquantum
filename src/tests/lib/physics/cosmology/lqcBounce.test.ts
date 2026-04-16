@@ -266,6 +266,43 @@ describe('getOrComputeLqcBounceTable — caching', () => {
     const t2 = getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: 2.0 })
     expect(t1).not.toBe(t2)
   })
+
+  it('LRU: alternating A/B/A hits the cache on the third call (no rebuild)', () => {
+    __resetLqcBounceCacheForTests()
+    const A = DEFAULT_PARAMS
+    const B = { ...DEFAULT_PARAMS, rhoCritical: 2.0 }
+    const tA1 = getOrComputeLqcBounceTable(A)
+    getOrComputeLqcBounceTable(B)
+    // Third call with A must return the SAME table reference as the first
+    // — the single-slot predecessor would have evicted A by now.
+    const tA2 = getOrComputeLqcBounceTable(A)
+    expect(tA2).toBe(tA1)
+  })
+
+  it('LRU: evicts the oldest entry once the byte budget is exceeded', () => {
+    __resetLqcBounceCacheForTests()
+    // Use large tHalfWidth so each table is ~1.6 MB (4 Float64Arrays of ~50k
+    // elements). With a 4 MB cache budget, the 3rd entry triggers eviction of
+    // the 1st.
+    const bigParams = { ...DEFAULT_PARAMS, tHalfWidth: 25, stepSize: 5e-4 }
+    const tables = [1, 2, 3].map((rhoC) =>
+      getOrComputeLqcBounceTable({ ...bigParams, rhoCritical: rhoC })
+    )
+    const refetched = getOrComputeLqcBounceTable({ ...bigParams, rhoCritical: 1 })
+    expect(refetched).not.toBe(tables[0])
+  })
+
+  it('LRU: keeps entries within the byte budget', () => {
+    __resetLqcBounceCacheForTests()
+    // Default params produce small tables (~640 KB each); 4 fit within 4 MB.
+    const tables = [1, 2, 3, 4].map((rhoC) =>
+      getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: rhoC })
+    )
+    for (let i = 0; i < 4; i++) {
+      const again = getOrComputeLqcBounceTable({ ...DEFAULT_PARAMS, rhoCritical: i + 1 })
+      expect(again).toBe(tables[i])
+    }
+  })
 })
 
 describe('computeCosmologyAt dispatch — lqcBounce', () => {

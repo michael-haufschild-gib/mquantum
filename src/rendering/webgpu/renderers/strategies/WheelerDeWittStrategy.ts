@@ -51,12 +51,16 @@ import type {
 /**
  * Compute a stable hash of the WdW config fields that affect the SOLVER output.
  *
- * Render-only effect fields (`phaseRotationEnabled`, `phaseRotationSpeed`,
- * `worldlineEnabled`, `worldlineSpeed`, `worldlinePulseWidth`) are intentionally
- * NOT included — they never change the solution, only the visualization, so
- * toggling them must not trigger a re-solve.
+ * Excluded fields:
+ *   - Render-only animation effects (`phaseRotationEnabled`, `phaseRotationSpeed`,
+ *     `worldlineEnabled`, `worldlineSpeed`, `worldlinePulseWidth`) never change
+ *     the solution.
+ *   - Display-only streamline overlay fields (`streamlinesEnabled`,
+ *     `streamlineDensity`) control WKB-trajectory integration only, which runs
+ *     on the cached solver output — they are hashed separately via
+ *     `computeWdwTrajectoryHash`.
  *
- * Exported for unit-testing hash stability across animation-effect toggles.
+ * Exported for unit-testing hash stability across display-only toggles.
  */
 export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
   return [
@@ -68,9 +72,16 @@ export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
     config.gridNa,
     config.gridNphi,
     config.phiExtent.toFixed(4),
-    config.streamlinesEnabled ? 1 : 0,
-    config.streamlineDensity,
   ].join('|')
+}
+
+/**
+ * Hash of WdW fields that affect only WKB-trajectory integration. When this
+ * changes, trajectories are rebuilt from the cached solver output — the
+ * solver itself is NOT re-invoked.
+ */
+export function computeWdwTrajectoryHash(config: WheelerDeWittConfig): string {
+  return [config.streamlinesEnabled ? 1 : 0, config.streamlineDensity].join('|')
 }
 
 /** Strategy owning a CPU-solved Wheeler–DeWitt density texture. */
@@ -80,6 +91,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
   private lastConfigHash: string | null = null
+  private lastTrajectoryHash: string | null = null
   private transferredOut = false
 
   // Cached solver output + trajectories — reused across frames so the worldline
@@ -137,7 +149,11 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const wdw = schroedinger.wheelerDeWitt as WheelerDeWittConfig | undefined
     if (!wdw) return null
     // Bounding radius = a_max so the density cube covers the simulated range.
-    return Math.max(0.25, wdw.aMax) * 1.05
+    // No padding: the packer (packWdwDensityGrid) uses R = aMax as the cube
+    // extent, and the shader (worldToDensityGridUVW) maps world positions by
+    // the same bound. Any multiplier here introduces a silent spatial rescale
+    // mismatch between the baked texels and the rendered cube.
+    return Math.max(0.25, wdw.aMax)
   }
 
   executeFrame(ctx: WebGPURenderContext, _shared: ModeFrameContext): void {
@@ -147,7 +163,9 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     if (!wdw) return
 
     const hash = computeWdwConfigHash(wdw)
+    const trajectoryHash = computeWdwTrajectoryHash(wdw)
     const solverDirty = hash !== this.lastConfigHash || !!wdw.needsReset
+    const trajectoryDirty = solverDirty || trajectoryHash !== this.lastTrajectoryHash
 
     if (solverDirty) {
       // Solve the WdW equation on the CPU. Bounded cost at default grid
@@ -165,14 +183,18 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
         gridNphi: wdw.gridNphi,
         phiExtent: wdw.phiExtent,
       })
+      this.lastConfigHash = hash
+      if (wdw.needsReset) extended?.clearWdwNeedsReset?.()
+    }
+
+    if (trajectoryDirty && this.lastSolverOutput) {
       this.lastTrajectories = wdw.streamlinesEnabled
         ? integrateWkbTrajectories(this.lastSolverOutput, {
             ...DEFAULT_STREAMLINE_INPUT,
             density: wdw.streamlineDensity,
           })
         : null
-      this.lastConfigHash = hash
-      if (wdw.needsReset) extended?.clearWdwNeedsReset?.()
+      this.lastTrajectoryHash = trajectoryHash
     }
 
     if (!this.lastSolverOutput) return
@@ -187,7 +209,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const worldlineAnimating =
       worldlineEnabled && isPlaying && (this.lastTrajectories?.length ?? 0) > 0
     const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
-    const needRepack = solverDirty || worldlineAnimating || worldlineToggled
+    const needRepack = solverDirty || trajectoryDirty || worldlineAnimating || worldlineToggled
 
     if (!needRepack) return
 
@@ -235,6 +257,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.densityTexture = source.densityTexture
     this.densityTextureView = source.densityTextureView
     this.lastConfigHash = source.lastConfigHash
+    this.lastTrajectoryHash = source.lastTrajectoryHash
     this.lastSolverOutput = source.lastSolverOutput
     this.lastTrajectories = source.lastTrajectories
     this.lastWorldlineEnabled = source.lastWorldlineEnabled
@@ -257,6 +280,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.lastSolverOutput = null
     this.lastTrajectories = null
     this.lastConfigHash = null
+    this.lastTrajectoryHash = null
     this.lastWorldlineEnabled = false
   }
 }

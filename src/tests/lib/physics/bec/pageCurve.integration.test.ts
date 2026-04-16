@@ -25,7 +25,7 @@ import {
   hawkingReadout,
   type WaterfallParams,
 } from '@/lib/physics/bec/sonicHorizon'
-import { computeWaterfallBackgroundDensity } from '@/rendering/webgpu/renderers/strategies/TdseBecConfigBuilder'
+import { computeWaterfallBackgroundDensity } from '@/lib/physics/bec/waterfallParams'
 
 /** Build the canonical Sonic-Horizon waterfall params using the simulator's true n0. */
 function canonicalParams(): WaterfallParams {

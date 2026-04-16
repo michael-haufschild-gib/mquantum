@@ -88,8 +88,13 @@ export interface WormholeCoherenceSnapshot {
 
 /** Shape of the wormhole coherence Zustand store. */
 export interface WormholeCoherenceState {
-  /** Ring buffer of samples (struct-of-arrays). */
-  readonly buffer: WormholeCoherenceBuffer
+  /**
+   * Ring buffer of samples (struct-of-arrays). The reference is swapped by
+   * {@link WormholeCoherenceState.setBufferSize}; sample columns are mutated
+   * in place by pushSample. Subscribe to {@link WormholeCoherenceState.version}
+   * to observe changes.
+   */
+  buffer: WormholeCoherenceBuffer
   /** Latest coherence value `I(L:R)` ∈ `[0, 1]`. */
   lastCoherence: number
   /** Latest simulation time associated with `lastCoherence`. */
@@ -151,17 +156,14 @@ export const useWormholeCoherenceStore = create<WormholeCoherenceState>((set, ge
 
     setBufferSize: (capacity) => {
       const fresh = createWormholeCoherenceBuffer(capacity)
-      set(
-        (s) =>
-          ({
-            buffer: fresh,
-            lastCoherence: 0,
-            lastT: 0,
-            lastAxis: 0,
-            lastG: 0,
-            version: s.version + 1,
-          }) as Partial<WormholeCoherenceState>
-      )
+      set((s) => ({
+        buffer: fresh,
+        lastCoherence: 0,
+        lastT: 0,
+        lastAxis: 0,
+        lastG: 0,
+        version: s.version + 1,
+      }))
     },
 
     getSnapshot: () => {

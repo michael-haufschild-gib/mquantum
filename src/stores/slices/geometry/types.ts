@@ -392,6 +392,14 @@ export interface SchroedingerSliceActions {
   setTdseWormholeAxis: (axis: 0 | 1 | 2) => void
   setTdseWormholeHudEnabled: (enabled: boolean) => void
 
+  // Curved-space kinetic operator (Laplace–Beltrami)
+  setTdseMetric: (cfg: import('@/lib/physics/tdse/metrics/types').MetricConfig) => void
+
+  // Curved-space TDSE v2 — Wave 6 visualization (render-only)
+  setShowCurvatureOverlay: (enabled: boolean) => void
+  setDensityView: (view: 'coordinate' | 'proper') => void
+  setCurvatureOverlayOpacity: (opacity: number) => void
+
   // BEC (Gross-Pitaevskii Equation) Configuration
   setBecInteractionStrength: (g: number) => void
   setBecTrapOmega: (omega: number) => void
@@ -472,6 +480,9 @@ export interface SchroedingerSliceActions {
   ) => void
   setWdwInflatonMass: (m: number) => void
   setWdwCosmologicalConstant: (lambda: number) => void
+  setWdwGridSize: (
+    preset: import('@/stores/slices/geometry/setters/wheelerDeWittSetters').WdwGridPreset
+  ) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
   setWdwPhaseRotationEnabled: (enabled: boolean) => void

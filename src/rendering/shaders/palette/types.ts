@@ -466,6 +466,14 @@ export function getAvailableColorAlgorithms(
     'vortexDensity',
   ])
 
+  // Wheeler–DeWitt: the density grid packs streamline overlay intensity into
+  // the A channel, NOT a relative-phase observable. The shader's relativePhase
+  // branch reads A, so selecting it would colorize the WKB overlay as if it
+  // were arg(conj(ψ_ref)·ψ) and produce nonsense. Exclude here rather than
+  // branching inside the shader.
+  const wdwExcludedAlgos =
+    quantumMode === 'wheelerDeWitt' ? new Set<string>(['relativePhase']) : new Set<string>()
+
   // Dirac-only algorithms — require spinor field data not present in other modes
   const diracOnlyAlgos = new Set<string>(['particleAntiparticle'])
 
@@ -496,6 +504,7 @@ export function getAvailableColorAlgorithms(
       !educationalAlgos.has(opt.value) &&
       !diracOnlyAlgos.has(opt.value) &&
       !pauliOnlyAlgos.has(opt.value) &&
+      !wdwExcludedAlgos.has(opt.value) &&
       (!densityGridOnlyAlgos.has(opt.value) || analyticHasDensityGrid) &&
       (!openQuantumAlgos.has(opt.value) || openQuantumEnabled) &&
       (!phaseDependentAlgos.has(opt.value) || !openQuantumEnabled)

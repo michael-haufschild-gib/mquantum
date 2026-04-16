@@ -233,6 +233,31 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
   })
 })
 
+describe('getAvailableColorAlgorithms — Wheeler–DeWitt A-channel hazard', () => {
+  // The Wheeler–DeWitt density grid packs WKB streamline overlay intensity into
+  // the A channel, not a relative-phase observable. The shader's relativePhase
+  // branch reads A, so if the dropdown lets the user select it the rendered
+  // colors become a misinterpretation of the overlay intensity. Regression:
+  // keep relativePhase out of the WdW algorithm list.
+  it('excludes relativePhase for wheelerDeWitt mode', () => {
+    const algos = getAvailableColorAlgorithms('wheelerDeWitt', false)
+    const values = algos.map((a) => a.value)
+    expect(values).not.toContain('relativePhase')
+    // Sanity: spatial-phase and density algorithms are still present — the
+    // shader path using the B (spatial phase) and R (density) channels is
+    // unaffected.
+    expect(values).toContain('phaseCyclicUniform')
+    expect(values).toContain('phaseDiverging')
+    expect(values).toContain('blackbody')
+  })
+
+  it('still exposes relativePhase for other closed-system modes (no regression)', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', false)
+    const values = algos.map((a) => a.value)
+    expect(values).toContain('relativePhase')
+  })
+})
+
 describe('getAvailableColorAlgorithms — density-grid availability for analytic modes', () => {
   // Round 1 review fix: quantumPotential and vortexDensity require a bound
   // density grid texture. AnalyticModeStrategy binds one for HO / hydrogenND

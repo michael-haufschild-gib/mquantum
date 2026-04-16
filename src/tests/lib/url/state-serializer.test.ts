@@ -803,4 +803,143 @@ describe('state-serializer', () => {
       expect(negative.wdwWorldlinePulseWidth).toBe(0.02)
     })
   })
+
+  describe('Curved-space TDSE metric params', () => {
+    it('round-trips tdse_metric=morrisThorne with tdse_b0 and omits b0 for flat', () => {
+      // morrisThorne: both keys must survive a deserialize → serialize round trip.
+      const curved = deserializeState('d=3&t=schroedinger&tdse_metric=morrisThorne&tdse_b0=0.5000')
+      expect(curved.tdseMetricKind).toBe('morrisThorne')
+      expect(curved.tdseMetricThroatRadius).toBeCloseTo(0.5, 4)
+
+      const reCurved = serializeState(curved as ShareableState)
+      expect(reCurved).toContain('tdse_metric=morrisThorne')
+      expect(reCurved).toContain('tdse_b0=0.5000')
+
+      // flat: tdse_metric=flat is preserved but tdse_b0 must NOT be emitted.
+      const flat = deserializeState('d=3&t=schroedinger&tdse_metric=flat&tdse_b0=0.5000')
+      expect(flat.tdseMetricKind).toBe('flat')
+      expect(flat.tdseMetricThroatRadius).toBeUndefined()
+
+      const reFlat = serializeState(flat as ShareableState)
+      expect(reFlat).toContain('tdse_metric=flat')
+      expect(reFlat).not.toContain('tdse_b0')
+    })
+
+    it('silently ignores unknown metric kinds (e.g. foobar)', () => {
+      expect(() => deserializeState('d=3&t=schroedinger&tdse_metric=foobar')).not.toThrow()
+      const parsed = deserializeState('d=3&t=schroedinger&tdse_metric=foobar&tdse_b0=1.0')
+      expect(parsed.tdseMetricKind).toBeUndefined()
+      expect(parsed.tdseMetricThroatRadius).toBeUndefined()
+    })
+
+    it('clamps tdse_b0 to [MIN_THROAT_RADIUS, MAX_THROAT_RADIUS]', () => {
+      // Below-range clamps up to the floor (0.1).
+      const low = deserializeState('d=3&t=schroedinger&tdse_metric=morrisThorne&tdse_b0=-5')
+      expect(low.tdseMetricThroatRadius).toBe(0.1)
+
+      // Above-range clamps down to the ceiling (5.0).
+      const high = deserializeState('d=3&t=schroedinger&tdse_metric=morrisThorne&tdse_b0=100')
+      expect(high.tdseMetricThroatRadius).toBe(5.0)
+    })
+
+    it('round-trips tdse_metric=schwarzschild with tdse_sm', () => {
+      const parsed = deserializeState('d=3&t=schroedinger&tdse_metric=schwarzschild&tdse_sm=1.5')
+      expect(parsed.tdseMetricKind).toBe('schwarzschild')
+      expect(parsed.tdseSchwarzschildMass).toBeCloseTo(1.5, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_metric=schwarzschild')
+      expect(re).toContain('tdse_sm=1.5000')
+      expect(re).not.toContain('tdse_b0')
+    })
+
+    it('round-trips tdse_metric=deSitter with tdse_h and clamps to [0, 5]', () => {
+      const parsed = deserializeState('d=3&t=schroedinger&tdse_metric=deSitter&tdse_h=0.7')
+      expect(parsed.tdseMetricKind).toBe('deSitter')
+      expect(parsed.tdseHubbleRate).toBeCloseTo(0.7, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_metric=deSitter')
+      expect(re).toContain('tdse_h=0.7000')
+
+      const high = deserializeState('d=3&t=schroedinger&tdse_metric=deSitter&tdse_h=99')
+      expect(high.tdseHubbleRate).toBe(5)
+      const low = deserializeState('d=3&t=schroedinger&tdse_metric=deSitter&tdse_h=-1')
+      expect(low.tdseHubbleRate).toBe(0)
+    })
+
+    it('round-trips tdse_metric=antiDeSitter with tdse_ads', () => {
+      const parsed = deserializeState('d=3&t=schroedinger&tdse_metric=antiDeSitter&tdse_ads=2.5')
+      expect(parsed.tdseMetricKind).toBe('antiDeSitter')
+      expect(parsed.tdseAdsRadius).toBeCloseTo(2.5, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_ads=2.5000')
+    })
+
+    it('round-trips tdse_metric=sphere2D with tdse_sr', () => {
+      const parsed = deserializeState('d=3&t=schroedinger&tdse_metric=sphere2D&tdse_sr=1.75')
+      expect(parsed.tdseMetricKind).toBe('sphere2D')
+      expect(parsed.tdseSphereRadius).toBeCloseTo(1.75, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_sr=1.7500')
+    })
+
+    it('round-trips tdse_metric=torus with tdse_tp{0,1,2}', () => {
+      const parsed = deserializeState(
+        'd=3&t=schroedinger&tdse_metric=torus&tdse_tp0=1.5&tdse_tp1=2.0&tdse_tp2=3.0'
+      )
+      expect(parsed.tdseMetricKind).toBe('torus')
+      expect(parsed.tdseTorusPeriod0).toBeCloseTo(1.5, 4)
+      expect(parsed.tdseTorusPeriod1).toBeCloseTo(2.0, 4)
+      expect(parsed.tdseTorusPeriod2).toBeCloseTo(3.0, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_tp0=1.5000')
+      expect(re).toContain('tdse_tp1=2.0000')
+      expect(re).toContain('tdse_tp2=3.0000')
+    })
+
+    it('round-trips tdse_metric=doubleThroat with tdse_dts and tdse_dtb', () => {
+      const parsed = deserializeState(
+        'd=3&t=schroedinger&tdse_metric=doubleThroat&tdse_dts=4.5&tdse_dtb=0.6'
+      )
+      expect(parsed.tdseMetricKind).toBe('doubleThroat')
+      expect(parsed.tdseDoubleThroatSeparation).toBeCloseTo(4.5, 4)
+      expect(parsed.tdseDoubleThroatRadius).toBeCloseTo(0.6, 4)
+      const re = serializeState(parsed as ShareableState)
+      expect(re).toContain('tdse_dts=4.5000')
+      expect(re).toContain('tdse_dtb=0.6000')
+    })
+
+    it('clamps each new metric param to its physical bounds', () => {
+      // Schwarzschild mass ∈ [0.01, 10].
+      const sm = deserializeState('d=3&t=schroedinger&tdse_metric=schwarzschild&tdse_sm=99')
+      expect(sm.tdseSchwarzschildMass).toBe(10)
+      // AdS radius ∈ [0.1, 10].
+      const ads = deserializeState('d=3&t=schroedinger&tdse_metric=antiDeSitter&tdse_ads=99')
+      expect(ads.tdseAdsRadius).toBe(10)
+      // Sphere radius ∈ [0.1, 10].
+      const sr = deserializeState('d=3&t=schroedinger&tdse_metric=sphere2D&tdse_sr=-1')
+      expect(sr.tdseSphereRadius).toBe(0.1)
+      // Torus period ∈ [0.5, 20].
+      const tp = deserializeState('d=3&t=schroedinger&tdse_metric=torus&tdse_tp0=99&tdse_tp1=0.01')
+      expect(tp.tdseTorusPeriod0).toBe(20)
+      expect(tp.tdseTorusPeriod1).toBe(0.5)
+      // Double-throat separation ∈ [0.2, 20], throat ∈ [0.1, 5].
+      const dt = deserializeState(
+        'd=3&t=schroedinger&tdse_metric=doubleThroat&tdse_dts=99&tdse_dtb=99'
+      )
+      expect(dt.tdseDoubleThroatSeparation).toBe(20)
+      expect(dt.tdseDoubleThroatRadius).toBe(5)
+    })
+
+    it('keeps app defaults when sub-params are missing', () => {
+      // Each kind: missing sub-params leave the corresponding fields undefined.
+      const sm = deserializeState('d=3&t=schroedinger&tdse_metric=schwarzschild')
+      expect(sm.tdseMetricKind).toBe('schwarzschild')
+      expect(sm.tdseSchwarzschildMass).toBeUndefined()
+
+      const tp = deserializeState('d=3&t=schroedinger&tdse_metric=torus&tdse_tp0=2')
+      expect(tp.tdseTorusPeriod0).toBe(2)
+      expect(tp.tdseTorusPeriod1).toBeUndefined()
+      expect(tp.tdseTorusPeriod2).toBeUndefined()
+    })
+  })
 })

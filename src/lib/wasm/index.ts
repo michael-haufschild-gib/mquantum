@@ -10,12 +10,15 @@ export {
   complexMatMulWasm,
   // Phase 1: Animation functions
   composeRotationsIndexedWasm,
+  // Phase 8: Init-loop kernels (measurement collapse)
+  computeFullCollapseWasm,
   // Phase 7: TDSE diagnostics functions
   // BEC incompressible spectrum
   computeIncompressibleSpectrumWasm,
   // Phase 5: Coordinate entanglement functions
   computeJointRdmWasm,
   computeLevelSpacingWasm,
+  computePartialCollapseWasm,
   computeRdmWasm,
   computeScarCorrelationWasm,
   dotProductWasm,
@@ -24,6 +27,9 @@ export {
   fftNdWasm,
   // Data conversion helpers
   float64ToVector,
+  // Phase 8: Init-loop kernels (disorder)
+  generateDisorderNoiseWasm,
+  generateDisorderPotentialWasm,
   hermitianEigenvaluesWasm,
   ifft1dWasm,
   ifftNdWasm,

@@ -1,27 +1,66 @@
 /**
- * BECPageCurveControls
+ * BEC Page Curve analysis section.
  *
- * Collapsible sub-section inside the BEC sidebar. Lets the user tune the
- * Page-curve analysis knobs (G_eff, Stefan–Boltzmann coefficient, island
- * max-fraction) and toggle the overlay HUD.
+ * Lives in the right panel's Analysis tab. Exposes the Page-curve / island
+ * knobs (G_eff, Stefan–Boltzmann coefficient, island max-fraction, boost)
+ * and HUD/overlay toggles. Shown as an `UnavailableSection` when the
+ * current mode is not BEC Dynamics with the Analog Horizon initial
+ * condition.
  *
- * @module components/sections/Geometry/SchroedingerControls/BECPageCurveControls
+ * @module components/sections/Analysis/BECPageCurveSection
  */
 
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { DEFAULT_SB_COEFFICIENT } from '@/lib/physics/bec/pageCurve'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { usePageCurveStore } from '@/stores/pageCurveStore'
 
+const SECTION_TITLE = 'Page Curve & Island'
+
 /**
- * Page-curve + island knobs. Rendered under the main BEC controls when the
- * `blackHoleAnalog` initial condition is selected (gated by caller).
+ * Analysis section exposing Page-curve + island controls. Renders an
+ * `UnavailableSection` placeholder when BEC Dynamics with the Analog
+ * Horizon initial condition is not active, mirroring the visible-but-
+ * disabled pattern used by other analysis sections.
  */
-export const BECPageCurveControls: React.FC = React.memo(() => {
+export function BECPageCurveSection() {
+  const { quantumMode, initialCondition } = useExtendedObjectStore(
+    useShallow((s) => ({
+      quantumMode: s.schroedinger.quantumMode,
+      initialCondition: s.schroedinger.bec?.initialCondition,
+    }))
+  )
+
+  if (quantumMode !== 'becDynamics') {
+    return (
+      <UnavailableSection
+        title={SECTION_TITLE}
+        reason="Available in BEC Dynamics mode"
+        data-testid="bec-page-curve-section-unavailable"
+      />
+    )
+  }
+
+  if (initialCondition !== 'blackHoleAnalog') {
+    return (
+      <UnavailableSection
+        title={SECTION_TITLE}
+        reason="Requires Analog Horizon initial condition"
+        data-testid="bec-page-curve-section-unavailable"
+      />
+    )
+  }
+
+  return <BECPageCurveContent />
+}
+
+const BECPageCurveContent: React.FC = React.memo(() => {
   const {
     gEff,
     sbCoefficient,
@@ -53,12 +92,7 @@ export const BECPageCurveControls: React.FC = React.memo(() => {
   )
 
   return (
-    <ControlGroup
-      title="Page Curve & Island"
-      collapsible
-      defaultOpen={false}
-      data-testid="control-group-bec-page-curve"
-    >
+    <Section title={SECTION_TITLE} data-testid="bec-page-curve-section">
       <Switch
         label="Show HUD panel"
         tooltip="Overlay the S_therm(t) and S_page(t) = min(S_therm, S_BH) traces. Page curve resolves the information paradox (Penington/Almheiri 2019-2020)."
@@ -113,8 +147,8 @@ export const BECPageCurveControls: React.FC = React.memo(() => {
         step={0.01}
         data-testid="bec-page-dmax"
       />
-    </ControlGroup>
+    </Section>
   )
 })
 
-BECPageCurveControls.displayName = 'BECPageCurveControls'
+BECPageCurveContent.displayName = 'BECPageCurveContent'
