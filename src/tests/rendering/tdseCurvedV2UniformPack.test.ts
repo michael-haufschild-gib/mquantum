@@ -191,4 +191,31 @@ describe('TDSE uniform pack — curved-space v2 metric block', () => {
       expect(f32[i]).toBe(0)
     }
   })
+
+  // ── Torus metric override: effective spacing derived from torusPeriod ─
+  // The FFT kinetic step uses spacing[axis] to compute k_max = π/dx and thus
+  // the quantized torus momenta k_n = 2π·n/(N·dx). When torus metric is
+  // active, torusPeriod[axis] is the authoritative period of the compactified
+  // torus, so effective spacing must be L/N — not the user's raw dx.
+  it('torus metric overrides effective spacing to torusPeriod / gridSize', () => {
+    const { f32 } = packAndCapture({
+      kind: 'torus',
+      torusPeriod: [Math.PI, Math.PI, Math.PI],
+    })
+    // DEFAULT_TDSE_CONFIG uses gridSize=[64,64,64] so dx_eff = π/64.
+    const expected = Math.PI / 64
+    expect(f32[32]).toBeCloseTo(expected, 6)
+    expect(f32[33]).toBeCloseTo(expected, 6)
+    expect(f32[34]).toBeCloseTo(expected, 6)
+    // The raw torusPeriod values remain visible at 220..222 (for shader + URL).
+    expect(f32[220]).toBeCloseTo(Math.PI, 5)
+  })
+
+  it('non-torus metric leaves effective spacing at user-set dx', () => {
+    // With the default 0.1 spacing and flat metric, no override should fire.
+    const { f32 } = packAndCapture({ kind: 'flat' })
+    expect(f32[32]).toBeCloseTo(0.1, 6)
+    expect(f32[33]).toBeCloseTo(0.1, 6)
+    expect(f32[34]).toBeCloseTo(0.1, 6)
+  })
 })

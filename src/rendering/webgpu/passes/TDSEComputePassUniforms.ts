@@ -164,6 +164,30 @@ export function writeTdseUniforms(
     config.latticeDim
   )
 
+  // Torus metric override: the user-specified `torusPeriod[i]` is the
+  // authoritative spatial period of the compactified torus. The split-step
+  // FFT path uses `spacing[i]` to compute k_max = π/dx (and thus the quantized
+  // momenta k_n = 2π·n/(N·dx)); without this override the FFT wraps at the
+  // lattice extent N·spacing, not at the user-set period, and the "torusPeriod"
+  // UI field is ignored entirely. Remapping dx_eff = L/N makes k_n = 2π·n/L
+  // exactly, so `torusEigenstates` (packetMomentum = 2 on period π) becomes
+  // the fundamental mode n=1 as its description claims. Only the first three
+  // entries are stored (TDSE supports up to dim 3 for the curved path; higher
+  // dims on a torus use spacing unchanged).
+  if (config.metric?.kind === 'torus') {
+    const periods = config.metric.torusPeriod
+    if (periods && periods.length === 3) {
+      const overrideDims = Math.min(config.latticeDim, 3)
+      for (let d = 0; d < overrideDims; d++) {
+        const L = periods[d]
+        const N = config.gridSize[d]
+        if (Number.isFinite(L) && Number.isFinite(N) && L! > 0 && N! > 0) {
+          effSpacing[d] = L! / N!
+        }
+      }
+    }
+  }
+
   // Lattice params (0-15)
   u32[0] = config.latticeDim
   u32[1] = totalSites
