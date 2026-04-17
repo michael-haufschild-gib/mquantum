@@ -224,13 +224,28 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
   )
 
   const { d, n, l, m, mL, branch, boundaryOverlay, preset, btzEnabled, hkllEnabled } = ads
-  // When BTZ is active at d=3 the bound-state sliders describe a distinct,
-  // mutually exclusive state. Hide them so the UI doesn't suggest they
-  // feed the thermal density render (they don't). HKLL is similarly
-  // mutually exclusive: when on, the bulk density is fully determined by
-  // the boundary source / kernel grid and the Stage-1 sliders are dormant.
+  // Split the panel's visibility into per-control flags so the UI surfaces
+  // every slider that still affects the render:
+  //   - (n, ℓ, m) feed the bulk eigenstate packer and the HKLL eigenstate
+  //     source; hidden in BTZ and in non-eigenstate HKLL (dormant there).
+  //   - mL feeds Δ in every mode: bound-state (via resolveDelta), BTZ (via
+  //     btzScalarDelta), HKLL eigenstate/non-eigenstate (via resolveDelta
+  //     → kernel expo = Δ − d). Always visible while AdS is active.
+  //   - branch feeds Δ in bound-state and HKLL paths; BTZ's Δ uses |mL|
+  //     only (branch is ignored), so hide it under BTZ.
+  //   - boundaryOverlay only applies to the Stage-1 bound-state path.
+  //   - BF/KW status chips reflect bound-state semantics; suppress them
+  //     under BTZ (thermal state) and non-eigenstate HKLL (source-defined).
   const btzActive = btzEnabled && d === 3
   const hkllActive = hkllEnabled
+  const hkllEigenstate = hkllActive && ads.hkllBoundarySource === 'eigenstate'
+
+  const showQuantumNumbers = !btzActive && (!hkllActive || hkllEigenstate)
+  const showMass = true
+  const showBranch = !btzActive
+  const showBoundaryOverlay = !btzActive && !hkllActive
+  const showStatusChips = !btzActive && (!hkllActive || hkllEigenstate)
+  const showReadout = showQuantumNumbers
 
   const { effectiveDelta, effectiveBranch, kwFallbackApplied, isTachyon, growthRate, energy } =
     useMemo(() => {
@@ -247,12 +262,6 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
 
   // Clamp the m slider to a symmetric range that shrinks with ℓ.
   const magneticMax = Math.max(0, l)
-  // Bound-state sliders (n, ℓ, m, mL, branch) are meaningful only when the
-  // render is NOT driven by a non-eigenstate HKLL reconstruction and not by
-  // a BTZ thermal state. Centralise this invariant so every conditional
-  // reads the same predicate.
-  const showBoundStateControls =
-    !btzActive && (!hkllActive || ads.hkllBoundarySource === 'eigenstate')
 
   return (
     <div className="space-y-3" data-testid="anti-de-sitter-controls">
@@ -264,14 +273,16 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         data-testid="ads-preset-select"
       />
 
-      <AdsStatusChips
-        d={d}
-        mL={mL}
-        branch={branch}
-        growthRate={growthRate}
-        isTachyon={isTachyon}
-        kwFallbackApplied={kwFallbackApplied}
-      />
+      {showStatusChips && (
+        <AdsStatusChips
+          d={d}
+          mL={mL}
+          branch={branch}
+          growthRate={growthRate}
+          isTachyon={isTachyon}
+          kwFallbackApplied={kwFallbackApplied}
+        />
+      )}
 
       <ControlGroup title="Dimensions & Quantum Numbers" collapsible defaultOpen>
         <Slider
@@ -285,7 +296,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
           showValue
           data-testid="ads-d-slider"
         />
-        {showBoundStateControls && (
+        {showQuantumNumbers && (
           <>
             <Slider
               label="Radial n"
@@ -326,11 +337,11 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         )}
       </ControlGroup>
 
-      {showBoundStateControls && (
+      {showMass && (
         <ControlGroup title="Mass & Quantization" collapsible defaultOpen>
           <Slider
             label="Mass mL"
-            tooltip="Bulk mass in AdS-radius units. Negative values encode imaginary mass; below BF ⇒ tachyonic."
+            tooltip="Bulk mass in AdS-radius units. Always affects Δ in every mode (bound-state, BTZ, HKLL). Negative values encode imaginary mass; below BF ⇒ tachyonic."
             min={ADS_LIMITS.mLMin}
             max={ADS_LIMITS.mLMax}
             step={0.05}
@@ -339,21 +350,25 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
             showValue
             data-testid="ads-mL-slider"
           />
-          <ToggleGroup
-            options={BRANCH_OPTIONS}
-            value={branch}
-            onChange={(v) => setBranch(v as AdsQuantizationBranch)}
-            ariaLabel="Quantization branch"
-            tooltip="Standard Δ₊ vs alternate Klebanov-Witten Δ₋. Alternate silently falls back when outside the KW window."
-            fullWidth
-            data-testid="ads-branch-toggle"
-          />
-          <Switch
-            label="Boundary overlay |O|²"
-            checked={boundaryOverlay}
-            onCheckedChange={setBoundary}
-            data-testid="ads-boundary-overlay-switch"
-          />
+          {showBranch && (
+            <ToggleGroup
+              options={BRANCH_OPTIONS}
+              value={branch}
+              onChange={(v) => setBranch(v as AdsQuantizationBranch)}
+              ariaLabel="Quantization branch"
+              tooltip="Standard Δ₊ vs alternate Klebanov-Witten Δ₋. Alternate silently falls back when outside the KW window."
+              fullWidth
+              data-testid="ads-branch-toggle"
+            />
+          )}
+          {showBoundaryOverlay && (
+            <Switch
+              label="Boundary overlay |O|²"
+              checked={boundaryOverlay}
+              onCheckedChange={setBoundary}
+              data-testid="ads-boundary-overlay-switch"
+            />
+          )}
         </ControlGroup>
       )}
 
@@ -371,7 +386,7 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
 
       {d === 3 && !hkllActive && <AntiDeSitterBtzControls ads={ads} />}
 
-      {showBoundStateControls && (
+      {showReadout && (
         <AdsReadout
           effectiveDelta={effectiveDelta}
           effectiveBranch={effectiveBranch}

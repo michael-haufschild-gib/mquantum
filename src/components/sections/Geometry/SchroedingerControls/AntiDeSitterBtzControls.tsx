@@ -75,7 +75,7 @@ export const AntiDeSitterBtzControls: React.FC<{ ads: AntiDeSitterConfig }> = Re
           <>
             <Slider
               label="Horizon r₊"
-              tooltip="Outer horizon radius r₊ in AdS-length units. Larger r₊ ⇒ larger, cooler BH (T_H ∝ r₊). Spec range [0.05, 2.0]."
+              tooltip="Outer horizon radius r₊ in AdS-length units. Larger r₊ grows T_H, S_BH, M and the visible horizon scale. The thermal profile in dimensionless ρ_w is a geometric invariant of BTZ in L=1 units, so only the horizon scale and thermodynamic readouts track r₊. Spec range [0.05, 2.0]."
               min={ADS_LIMITS.btzHorizonMin}
               max={ADS_LIMITS.btzHorizonMax}
               step={0.01}

@@ -226,14 +226,13 @@ function applyCosmologyParams(
   ext.setFreeScalarCosmologyEnabled(urlState.cosmologyEnabled)
 }
 
-/**
- * Apply Anti-de Sitter (Stage 1) URL state params.
+/** Apply the AdS bound-state (Stage 1) URL fields. Extracted so the top-
+ * level `applyAdsParams` stays under the cognitive-complexity budget.
  *
- * Order mirrors the WdW helper: set ℓ BEFORE m so the magnetic-QN setter
- * sees the correct [-ℓ, +ℓ] clamp window — setting m first against a stale
- * ℓ would silently over-clamp when ℓ later increases.
- */
-function applyAdsParams(
+ * Ordering: set ℓ BEFORE m so the magnetic-QN setter sees the correct
+ * [−ℓ, +ℓ] clamp window — setting m first against a stale ℓ would silently
+ * over-clamp when ℓ later increases. */
+function applyAdsBoundStateFields(
   urlState: ParsedShareableState,
   ext: ReturnType<typeof useExtendedObjectStore.getState>
 ): void {
@@ -245,24 +244,46 @@ function applyAdsParams(
   if (urlState.adsBranch !== undefined) ext.setAdsQuantizationBranch(urlState.adsBranch)
   if (urlState.adsBoundaryOverlay !== undefined)
     ext.setAdsBoundaryOverlay(urlState.adsBoundaryOverlay)
-  // Stage 2A — BTZ. Apply horizon/omega/m_angular before the enable flag
-  // so the toggle observes the final parameters in one strategy repack.
+}
+
+/** Apply the AdS Stage-2 (BTZ + HKLL) URL fields. Sub-fields are applied
+ * BEFORE the enable toggles so the strategy sees a fully-configured block
+ * on its first repack. The HKLL enable setter clears `btzEnabled` to hold
+ * the mutex — order between the two blocks at the URL level is therefore
+ * irrelevant. */
+function applyAdsStageTwoFields(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
   if (urlState.adsBtzHorizonRadius !== undefined)
     ext.setAdsBtzHorizonRadius(urlState.adsBtzHorizonRadius)
   if (urlState.adsBtzOmega !== undefined) ext.setAdsBtzOmega(urlState.adsBtzOmega)
   if (urlState.adsBtzAngularM !== undefined) ext.setAdsBtzAngularM(urlState.adsBtzAngularM)
   if (urlState.adsBtzEnabled !== undefined) ext.setAdsBtzEnabled(urlState.adsBtzEnabled)
-  // Stage 2B — HKLL. Same ordering rule: apply parameters before the
-  // enable toggle so the strategy sees a fully-configured HKLL sub-block
-  // on its first repack. The HKLL enable setter also clears btzEnabled to
-  // maintain the mutex — setting BTZ first and HKLL second therefore
-  // works regardless of the order inside the URL.
   if (urlState.adsHkllBoundarySource !== undefined)
     ext.setAdsHkllBoundarySource(urlState.adsHkllBoundarySource)
   if (urlState.adsHkllSourceSigma !== undefined)
     ext.setAdsHkllSourceSigma(urlState.adsHkllSourceSigma)
   if (urlState.adsHkllPlaneWaveM !== undefined) ext.setAdsHkllPlaneWaveM(urlState.adsHkllPlaneWaveM)
   if (urlState.adsHkllEnabled !== undefined) ext.setAdsHkllEnabled(urlState.adsHkllEnabled)
+}
+
+/**
+ * Apply Anti-de Sitter URL state params.
+ *
+ * Preset first, then raw fields. A URL carrying only `ads_preset=…` restores
+ * as that preset label; a URL with raw fields alongside cascades into
+ * `custom` via the individual setters (each one flips `preset` to `custom`).
+ */
+function applyAdsParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.adsPreset !== undefined && urlState.adsPreset !== 'custom') {
+    ext.setAdsPreset(urlState.adsPreset)
+  }
+  applyAdsBoundStateFields(urlState, ext)
+  applyAdsStageTwoFields(urlState, ext)
 }
 
 /**
