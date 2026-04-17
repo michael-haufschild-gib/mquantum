@@ -386,6 +386,42 @@ export const QUANTUM_TYPE_REGISTRY: QuantumTypeRegistry = new Map<QuantumTypeKey
       },
     ],
 
+    [
+      'antiDeSitter',
+      {
+        key: 'antiDeSitter',
+        name: 'Anti-de Sitter',
+        description: 'Closed-form bulk scalar eigenstates on AdS_d (d=3..7) in the Poincaré ball.',
+        category: 'compute',
+        dimensions: {
+          min: 3,
+          max: 7,
+          recommended: 4,
+          recommendedReason: 'AdS₄ hosts the classic Δ=3 massless scalar and the Δ=2 BF edge',
+        },
+        rendering: SHARED_RENDERING,
+        animation: {
+          hasTypeSpecificAnimations: false,
+          systems: {},
+        },
+        urlSerialization: {
+          typeKey: 'antiDeSitter',
+          serializableParams: [],
+        },
+        ui: {
+          controlsComponentKey: 'SchroedingerControls',
+          hasTimelineControls: true,
+          qualityPresets: QUALITY_PRESETS,
+        },
+        internal: {
+          objectType: 'schroedinger',
+          quantumMode: 'antiDeSitter',
+          configStoreKey: 'schroedinger',
+          configSubKey: 'antiDeSitter',
+        },
+      },
+    ],
+
     // ─── Pauli Spinor ──────────────────────────────────────────────────────────
 
     [

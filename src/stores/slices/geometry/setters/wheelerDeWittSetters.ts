@@ -35,6 +35,7 @@ export interface WheelerDeWittSetters {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  applyWheelerDeWittPreset: (presetId: string) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 }
@@ -151,6 +152,42 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwWorldlineEnabled: setWorldlineEnabled,
     setWdwWorldlineSpeed: setWorldlineSpeed,
     setWdwWorldlinePulseWidth: setWorldlinePulseWidth,
+    applyWheelerDeWittPreset: (presetId) => {
+      void import('@/lib/physics/wheelerDeWitt/presets')
+        .then(({ getWdwPreset, WDW_PRESET_PHYSICS_FIELDS }) => {
+          const preset = getWdwPreset(presetId)
+          if (!preset) return
+          ctx.setWithVersion((state) => {
+            const prev = state.schroedinger.wheelerDeWitt
+            // Scope to physics fields only. Render-only overlay toggles
+            // (streamlines, phase rotation, worldline pulse) and grid/CFL
+            // parameters stay at whatever the user already has.
+            const physics: Partial<typeof prev> = {}
+            for (const field of WDW_PRESET_PHYSICS_FIELDS) {
+              const value = preset.overrides[field]
+              if (value !== undefined) {
+                ;(physics as Record<string, unknown>)[field] = value
+              }
+            }
+            return {
+              schroedinger: {
+                ...state.schroedinger,
+                wheelerDeWitt: {
+                  ...prev,
+                  ...physics,
+                  needsReset: true,
+                },
+              },
+            }
+          })
+        })
+        .catch((error) => {
+          if (import.meta.env?.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn('[wheelerDeWitt] applyWheelerDeWittPreset import failed', error)
+          }
+        })
+    },
     triggerWdwRecompute: () => {
       ctx.setWithVersion((state) => ({
         schroedinger: {

@@ -42,6 +42,21 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `wdw_wl` | 0/1 | Wheeler–DeWitt semiclassical worldline pulse (render-only) |
 | `wdw_wls` | float 0.1-3 | Wheeler–DeWitt worldline pulse cycles per unit time |
 | `wdw_wlw` | float 0.02-0.3 | Wheeler–DeWitt worldline Gaussian pulse width |
+| `ads_d` | int 3-7 | Anti-de Sitter boundary dimension |
+| `ads_n` | int 0-4 | Anti-de Sitter radial quantum number |
+| `ads_l` | int 0-3 | Anti-de Sitter angular momentum |
+| `ads_m` | int | Anti-de Sitter magnetic quantum number (clamped to [−ℓ, +ℓ] downstream) |
+| `ads_mL` | float -3..3 | Anti-de Sitter mass × AdS radius (signed; negative encodes imaginary mass) |
+| `ads_qb` | 0/1 | Anti-de Sitter quantization branch (0 = standard Δ₊, 1 = alternate Δ₋ with KW fallback) |
+| `ads_bo` | 0/1 | Anti-de Sitter asymptotic boundary primary overlay toggle |
+| `ads_btz` | 0/1 | BTZ (Stage 2A) thermal-state code path (only honoured when `ads_d=3`) |
+| `ads_btz_r` | float 0.05..2.0 | BTZ outer horizon radius r₊ in AdS-length units |
+| `ads_btz_omega` | float 0.1..10 | BTZ scalar-mode angular frequency ω (1/L units) |
+| `ads_btz_mA` | int -5..5 | BTZ azimuthal quantum number m on the S¹ |
+| `ads_hkll` | 0/1 | HKLL (Stage 2B) bulk-from-boundary reconstruction code path. Mutually exclusive with `ads_btz` — setting either clears the other. |
+| `ads_hkll_src` | int 0..2 | HKLL boundary source (0 = eigenstate, 1 = localized, 2 = planeWave) |
+| `ads_hkll_sigma` | float 0.05..1.5 | Gaussian spot angular width σ (radians) for the `localized` source |
+| `ads_hkll_mb` | int 0..8 | Azimuthal quantum number m_b for the `planeWave` source |
 
 ## Rules
 
@@ -49,5 +64,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - Missing params keep app defaults (merge behavior)
 - All extended params are optional — only `d` and `t` are required for object links
 - `wdw_*` params are only applied when `qm=wheelerDeWitt`
+- `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
+- `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.
 - New params follow the pattern: short key, validated/clamped in `deserializeState`, applied in `applyUrlStateParams`
 - Camera state and visual appearance (colors, PBR, post-processing) are NOT url-serialized — use scene presets for those

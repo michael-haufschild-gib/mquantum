@@ -53,7 +53,10 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'diracEquation',
   'quantumWalk',
   'wheelerDeWitt',
+  'antiDeSitter',
 ]
+
+import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 
 const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
@@ -108,7 +111,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
  * All fields except dimension and objectType are optional — missing fields
  * keep their app defaults.
  */
-export interface ShareableObjectState {
+export interface ShareableObjectState extends AdsUrlState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
@@ -274,6 +277,9 @@ export interface ShareableObjectState {
   wdwWorldlineSpeed?: number
   /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
   wdwWorldlinePulseWidth?: number
+
+  // ── Anti-de Sitter (Stage 1 + Stage 2A BTZ) ─────────────────────────────
+  // AdS / BTZ fields inherited from `AdsUrlState` — see adsSerializer.ts.
 }
 
 /**
@@ -556,6 +562,13 @@ export function serializeState(state: ShareableState): string {
     setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
     setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
     setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+  }
+
+  // Anti-de Sitter (Stage 1). Only emitted while the mode is active — the
+  // AdS fields are otherwise dormant on SchroedingerConfig and would pollute
+  // links for unrelated modes.
+  if (state.quantumMode === 'antiDeSitter') {
+    serializeAds(params, state)
   }
 
   return params.toString()
@@ -871,6 +884,10 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
   state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
   state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
+
+  // Anti-de Sitter (Stage 1) — extracted to keep `deserializeState` under
+  // the cognitive-complexity budget and the file under max-lines.
+  deserializeAds(params, state)
 
   // Strip undefined values so Object.keys(state).length reflects actual params
   for (const key of Object.keys(state) as Array<keyof typeof state>) {

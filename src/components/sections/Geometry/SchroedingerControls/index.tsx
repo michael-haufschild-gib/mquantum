@@ -15,6 +15,7 @@ import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 
+import { AntiDeSitterControls } from './AntiDeSitterControls'
 import { BECControls } from './BECControls'
 import { DiracControls } from './DiracControls'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
@@ -51,6 +52,7 @@ function renderModeControls(p: {
   dimension: number
   isQuantumWalk: boolean
   isWheelerDeWitt: boolean
+  isAntiDeSitter: boolean
   isDiracEquation: boolean
   isBecDynamics: boolean
   isTdseDynamics: boolean
@@ -65,6 +67,7 @@ function renderModeControls(p: {
   hydrogenNDActions: HydrogenNDActions
   harmonicActions: HarmonicOscillatorActions
 }): React.ReactNode {
+  if (p.isAntiDeSitter) return <AntiDeSitterControls />
   if (p.isWheelerDeWitt) return <WheelerDeWittControls />
   if (p.isQuantumWalk) return <QuantumWalkControls />
   if (p.isDiracEquation)
@@ -149,6 +152,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isDiracEquation = config.quantumMode === 'diracEquation'
     const isQuantumWalk = config.quantumMode === 'quantumWalk'
     const isWheelerDeWitt = config.quantumMode === 'wheelerDeWitt'
+    const isAntiDeSitter = config.quantumMode === 'antiDeSitter'
 
     return (
       <div className={className} data-testid="schroedinger-controls">
@@ -158,7 +162,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           !isBecDynamics &&
           !isDiracEquation &&
           !isQuantumWalk &&
-          !isWheelerDeWitt && (
+          !isWheelerDeWitt &&
+          !isAntiDeSitter && (
             <Section title="Representation" defaultOpen={true}>
               <div className="space-y-3">
                 <ToggleGroup
@@ -233,13 +238,15 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         {/* Quantum State / Field Config Section */}
         <Section
           title={
-            isWheelerDeWitt
-              ? 'Minisuperspace'
-              : isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
-                ? 'Field Configuration'
-                : isQuantumWalk
-                  ? 'Walk Configuration'
-                  : 'Quantum State'
+            isAntiDeSitter
+              ? 'AdS Bound State'
+              : isWheelerDeWitt
+                ? 'Minisuperspace'
+                : isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
+                  ? 'Field Configuration'
+                  : isQuantumWalk
+                    ? 'Walk Configuration'
+                    : 'Quantum State'
           }
           defaultOpen={true}
         >
@@ -248,6 +255,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
             dimension,
             isQuantumWalk,
             isWheelerDeWitt,
+            isAntiDeSitter,
             isDiracEquation,
             isBecDynamics,
             isTdseDynamics,
@@ -302,6 +310,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
             <p className="text-text-tertiary mt-1">
               {dimension}D quantum walk, {config.quantumWalk.coinType} coin,{' '}
               {config.quantumWalk.gridSize.slice(0, dimension).join('\u00D7')} lattice
+            </p>
+          )}
+          {isAntiDeSitter && (
+            <p className="text-text-tertiary mt-1">
+              AdS{config.antiDeSitter.d} bulk scalar, Poincaré ball compactification
             </p>
           )}
         </div>

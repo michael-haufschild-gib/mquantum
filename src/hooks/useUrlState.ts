@@ -227,6 +227,45 @@ function applyCosmologyParams(
 }
 
 /**
+ * Apply Anti-de Sitter (Stage 1) URL state params.
+ *
+ * Order mirrors the WdW helper: set ℓ BEFORE m so the magnetic-QN setter
+ * sees the correct [-ℓ, +ℓ] clamp window — setting m first against a stale
+ * ℓ would silently over-clamp when ℓ later increases.
+ */
+function applyAdsParams(
+  urlState: ParsedShareableState,
+  ext: ReturnType<typeof useExtendedObjectStore.getState>
+): void {
+  if (urlState.adsDimension !== undefined) ext.setAdsDimension(urlState.adsDimension)
+  if (urlState.adsRadial !== undefined) ext.setAdsRadialQuantumNumber(urlState.adsRadial)
+  if (urlState.adsAngular !== undefined) ext.setAdsAngularQuantumNumber(urlState.adsAngular)
+  if (urlState.adsMagnetic !== undefined) ext.setAdsMagneticQuantumNumber(urlState.adsMagnetic)
+  if (urlState.adsMassParameter !== undefined) ext.setAdsMassParameter(urlState.adsMassParameter)
+  if (urlState.adsBranch !== undefined) ext.setAdsQuantizationBranch(urlState.adsBranch)
+  if (urlState.adsBoundaryOverlay !== undefined)
+    ext.setAdsBoundaryOverlay(urlState.adsBoundaryOverlay)
+  // Stage 2A — BTZ. Apply horizon/omega/m_angular before the enable flag
+  // so the toggle observes the final parameters in one strategy repack.
+  if (urlState.adsBtzHorizonRadius !== undefined)
+    ext.setAdsBtzHorizonRadius(urlState.adsBtzHorizonRadius)
+  if (urlState.adsBtzOmega !== undefined) ext.setAdsBtzOmega(urlState.adsBtzOmega)
+  if (urlState.adsBtzAngularM !== undefined) ext.setAdsBtzAngularM(urlState.adsBtzAngularM)
+  if (urlState.adsBtzEnabled !== undefined) ext.setAdsBtzEnabled(urlState.adsBtzEnabled)
+  // Stage 2B — HKLL. Same ordering rule: apply parameters before the
+  // enable toggle so the strategy sees a fully-configured HKLL sub-block
+  // on its first repack. The HKLL enable setter also clears btzEnabled to
+  // maintain the mutex — setting BTZ first and HKLL second therefore
+  // works regardless of the order inside the URL.
+  if (urlState.adsHkllBoundarySource !== undefined)
+    ext.setAdsHkllBoundarySource(urlState.adsHkllBoundarySource)
+  if (urlState.adsHkllSourceSigma !== undefined)
+    ext.setAdsHkllSourceSigma(urlState.adsHkllSourceSigma)
+  if (urlState.adsHkllPlaneWaveM !== undefined) ext.setAdsHkllPlaneWaveM(urlState.adsHkllPlaneWaveM)
+  if (urlState.adsHkllEnabled !== undefined) ext.setAdsHkllEnabled(urlState.adsHkllEnabled)
+}
+
+/**
  * Apply Wheeler–DeWitt minisuperspace URL state params.
  *
  * Each setter (`setWdwBoundaryCondition`, `setWdwInflatonMass`,
@@ -374,6 +413,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyEntanglementParams(urlState)
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)
+    applyAdsParams(urlState, ext)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

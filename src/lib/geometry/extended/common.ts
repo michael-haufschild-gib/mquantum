@@ -106,3 +106,4 @@ export type SchroedingerQuantumMode =
   | 'diracEquation'
   | 'quantumWalk'
   | 'wheelerDeWitt'
+  | 'antiDeSitter'

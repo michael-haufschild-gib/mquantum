@@ -144,6 +144,9 @@ function resetWaveEvolution(): void {
     case 'wheelerDeWitt':
       state.triggerWdwRecompute()
       break
+    case 'antiDeSitter':
+      state.triggerAdsRecompute()
+      break
     default: {
       const _exhaustive: never = quantumMode
       void _exhaustive

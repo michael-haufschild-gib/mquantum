@@ -181,6 +181,7 @@ describe('Quantum Type Registry (Flat Model)', () => {
     it('contains all expected quantum type entries', () => {
       const keys = Array.from(QUANTUM_TYPE_REGISTRY.keys()).sort()
       expect(keys).toEqual([
+        'antiDeSitter',
         'becDynamics',
         'diracEquation',
         'freeScalarField',

@@ -142,3 +142,68 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     })
   })
 })
+
+describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    expect(getWdw().needsReset).toBe(false)
+  })
+
+  it('writes physics fields from the preset and flips needsReset', async () => {
+    useExtendedObjectStore.getState().applyWheelerDeWittPreset('deSitterLargeLambda')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(getWdw().boundaryCondition).toBe('noBoundary')
+    expect(getWdw().cosmologicalConstant).toBeCloseTo(0.8)
+    expect(getWdw().inflatonMass).toBeCloseTo(0.3)
+    expect(getWdw().needsReset).toBe(true)
+  })
+
+  it('preserves render-only overlay toggles across preset application', async () => {
+    useExtendedObjectStore.getState().setWdwPhaseRotationEnabled(true)
+    useExtendedObjectStore.getState().setWdwPhaseRotationSpeed(2.0)
+    useExtendedObjectStore.getState().setWdwWorldlineEnabled(true)
+    useExtendedObjectStore.getState().setWdwStreamlinesEnabled(false)
+    useExtendedObjectStore.getState().setWdwStreamlineDensity(12)
+
+    useExtendedObjectStore.getState().applyWheelerDeWittPreset('vilenkinTunneling')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(getWdw().boundaryCondition).toBe('tunneling')
+    expect(getWdw().cosmologicalConstant).toBeCloseTo(0.3)
+    expect(getWdw().phaseRotationEnabled).toBe(true)
+    expect(getWdw().phaseRotationSpeed).toBe(2.0)
+    expect(getWdw().worldlineEnabled).toBe(true)
+    expect(getWdw().streamlinesEnabled).toBe(false)
+    expect(getWdw().streamlineDensity).toBe(12)
+  })
+
+  it('ignores unknown preset ids', async () => {
+    const before = getWdw()
+    useExtendedObjectStore.getState().applyWheelerDeWittPreset('doesNotExist')
+    await new Promise((r) => setTimeout(r, 0))
+    const after = getWdw()
+
+    expect(after.boundaryCondition).toBe(before.boundaryCondition)
+    expect(after.inflatonMass).toBe(before.inflatonMass)
+    expect(after.cosmologicalConstant).toBe(before.cosmologicalConstant)
+    expect(after.needsReset).toBe(false)
+  })
+
+  it('leaves grid and range parameters at their pre-apply values', async () => {
+    useExtendedObjectStore.getState().setWdwGridSize('high')
+    useExtendedObjectStore.getState().clearWdwNeedsReset()
+    const before = getWdw()
+
+    useExtendedObjectStore.getState().applyWheelerDeWittPreset('inflationHighMass')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(getWdw().gridNa).toBe(before.gridNa)
+    expect(getWdw().gridNphi).toBe(before.gridNphi)
+    expect(getWdw().aMin).toBe(before.aMin)
+    expect(getWdw().aMax).toBe(before.aMax)
+    expect(getWdw().phiExtent).toBe(before.phiExtent)
+    expect(getWdw().inflatonMass).toBeCloseTo(0.8)
+  })
+})

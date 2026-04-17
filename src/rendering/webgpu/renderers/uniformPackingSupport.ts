@@ -8,10 +8,16 @@
  * @module rendering/webgpu/renderers/uniformPackingSupport
  */
 
+import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import type { QuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
 import { logger } from '@/lib/logger'
 import { hermite } from '@/lib/math/hermitePolynomial'
 import { factorial } from '@/lib/math/specialFunctions'
+import {
+  adsEnergy as computeAdsEnergy,
+  resolveDelta as resolveAdsDelta,
+  tachyonGrowthRate as computeAdsGrowthRate,
+} from '@/lib/physics/antiDeSitter/math'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
@@ -492,4 +498,59 @@ export function computeCanonicalCompensation(
     compensation: neededGain / DEFAULT_DENSITY_GAIN,
     peakDensity,
   }
+}
+
+// =========================================================================
+// Anti-de Sitter time-evolution uniforms
+// =========================================================================
+
+/**
+ * Write the two AdS time-evolution uniforms (`adsEnergy`, `adsGrowthRate`).
+ *
+ * Stable states (above BF): `adsEnergy = Δ + ℓ + 2n` so the shader rotates
+ * phase by `-E·t`. Tachyonic states (below BF): `adsGrowthRate = γ` so the
+ * shader amplifies `|ψ|²` by `cosh²(γ·t)`. The slots are mutually exclusive
+ * — only one is nonzero at a time. Every non-AdS mode leaves both at 0, so
+ * the shader's phase/rho multipliers are no-ops there.
+ *
+ * @param floatView Float32 view into the SchroedingerUniforms buffer.
+ * @param quantumModeStr Active quantum mode key.
+ * @param ads Active Anti-de Sitter configuration, or undefined.
+ */
+export function packAdsTimeEvolution(
+  floatView: Float32Array,
+  quantumModeStr: string,
+  ads: AntiDeSitterConfig | undefined
+): void {
+  if (quantumModeStr !== 'antiDeSitter' || !ads) {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
+  // Stage 2A: BTZ thermal state is time-translation-invariant (KMS
+  // stationarity). Zero both uniforms so the shader neither spins the
+  // phase nor amplifies |ψ|² — the packed density IS the observable.
+  if (ads.btzEnabled && ads.d === 3) {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
+  // Stage 2B: HKLL non-eigenstate sources (localized spot, planeWave) have no
+  // well-defined single-mode energy — the bound-state (n, ℓ) sliders are
+  // hidden in these modes, so rotating the phase at that stale rate would be
+  // physically meaningless. Eigenstate mode keeps the standard E·t rotation.
+  if (ads.hkllEnabled && ads.hkllBoundarySource !== 'eigenstate') {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
+  const growth = computeAdsGrowthRate(ads.d, ads.mL)
+  if (growth > 0) {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = growth
+    return
+  }
+  const E = computeAdsEnergy(ads.n, ads.l, resolveAdsDelta(ads.d, ads.mL, ads.branch).delta)
+  floatView[I.adsEnergy] = Number.isFinite(E) ? E : 0
+  floatView[I.adsGrowthRate] = 0
 }

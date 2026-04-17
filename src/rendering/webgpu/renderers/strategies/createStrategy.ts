@@ -6,6 +6,7 @@
 
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import { AnalyticModeStrategy } from './AnalyticModeStrategy'
+import { AntiDeSitterStrategy } from './AntiDeSitterStrategy'
 import { DiracStrategy } from './DiracStrategy'
 import { FreeScalarFieldStrategy } from './FreeScalarFieldStrategy'
 import { PauliStrategy } from './PauliStrategy'
@@ -38,6 +39,8 @@ export function createModeStrategy(config: SchrodingerRendererConfig): QuantumMo
       return new QuantumWalkStrategy()
     case 'wheelerDeWitt':
       return new WheelerDeWittStrategy()
+    case 'antiDeSitter':
+      return new AntiDeSitterStrategy()
     case 'harmonicOscillator':
     case 'hydrogenND':
     case 'hydrogenNDCoupled':

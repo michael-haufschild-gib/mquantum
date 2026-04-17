@@ -315,6 +315,12 @@ function applyFirstPreset(
     case 'quantumWalk':
       store.applyQuantumWalkPreset(presetId)
       break
+    case 'wheelerDeWitt':
+      store.applyWheelerDeWittPreset(presetId)
+      break
+    case 'antiDeSitter':
+      store.setAdsPreset(presetId as import('@/lib/geometry/extended/antiDeSitter').AdsPresetName)
+      break
   }
 }
 

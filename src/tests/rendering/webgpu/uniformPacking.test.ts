@@ -718,6 +718,58 @@ describe('packSchroedingerUniforms', () => {
 
     expect(floatView[SCHROEDINGER_LAYOUT.index.wdwPhaseRotationRate]).toBeCloseTo(2.75)
   })
+
+  // Anti-de Sitter render-time time evolution uniforms. adsEnergy drives phase
+  // rotation for stable bound states; adsGrowthRate drives |ψ|² amplification
+  // for tachyons. The two slots are mutually exclusive and zeroed for every
+  // non-AdS mode.
+  it('writes adsEnergy = 0 and adsGrowthRate = 0 for non-AdS modes', () => {
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'harmonicOscillator',
+      schroedinger: {
+        antiDeSitter: { d: 4, n: 0, l: 0, m: 0, mL: 0, branch: 'standard' },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsEnergy]).toBe(0)
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsGrowthRate]).toBe(0)
+  })
+
+  it('writes adsEnergy = E = Δ + ℓ + 2n for stable AdS states', () => {
+    // d=4, mL=0 ⇒ Δ=3; n=0, ℓ=0 ⇒ E=3. Stable (above BF) ⇒ growthRate=0.
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'antiDeSitter',
+      schroedinger: {
+        antiDeSitter: { d: 4, n: 0, l: 0, m: 0, mL: 0, branch: 'standard' },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsEnergy]).toBeCloseTo(3)
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsGrowthRate]).toBe(0)
+  })
+
+  it('writes adsGrowthRate = γ and adsEnergy = 0 for tachyonic AdS states', () => {
+    // d=3, mL=-1.1 ⇒ m²L²=-1.21, BF=-1 ⇒ below BF (tachyon).
+    // γ = √(|1 + (-1.21)|) = √0.21 ≈ 0.4583.
+    const { floatView, intView } = createBuffer(BUFFER_SIZE)
+    const params = makeBaseParams({
+      quantumModeStr: 'antiDeSitter',
+      schroedinger: {
+        antiDeSitter: { d: 3, n: 0, l: 0, m: 0, mL: -1.1, branch: 'standard' },
+      } as never,
+    })
+
+    packSchroedingerUniforms(floatView, intView, params)
+
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsEnergy]).toBe(0)
+    expect(floatView[SCHROEDINGER_LAYOUT.index.adsGrowthRate]).toBeCloseTo(Math.sqrt(0.21), 5)
+  })
 })
 
 // ============================================================================

@@ -10,6 +10,7 @@
  * @module rendering/webgpu/renderers/uniformPacking
  */
 
+import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import { DEFAULT_PAULI_CONFIG, type SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
@@ -32,6 +33,7 @@ import {
   REPRESENTATION_MODE_MAP,
 } from './schrodingerRendererTypes'
 import { SCHROEDINGER_LAYOUT } from './schroedingerLayout'
+import { packAdsTimeEvolution } from './uniformPackingSupport'
 
 // Field name → float32/int32 index (byte offset / 4)
 const I = SCHROEDINGER_LAYOUT.index
@@ -157,6 +159,13 @@ export function packSchroedingerUniforms(
       ? (wdwCfg.phaseRotationSpeed ?? 0)
       : 0
   floatView[I.wdwPhaseRotationRate] = wdwRate
+
+  // AdS time evolution — stable phase rotation at E or tachyon cosh growth at γ.
+  packAdsTimeEvolution(
+    floatView,
+    p.quantumModeStr,
+    p.schroedinger?.antiDeSitter as AntiDeSitterConfig | undefined
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -753,6 +762,7 @@ function packVec4Color(
 }
 
 // Re-export support functions from the split module
+export { packAdsTimeEvolution }
 export {
   applyHOMomentumTransform,
   type BasisPackParams,

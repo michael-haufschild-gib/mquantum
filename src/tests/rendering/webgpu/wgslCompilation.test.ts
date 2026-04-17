@@ -706,7 +706,11 @@ describe('WGSL Color Algorithm Specialization', () => {
     })
 
     expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 10;')
-    expect(wgsl).toContain('select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10)')
+    // AdS (mode 8) reuses gridColor.a as boundary-overlay / horizon-marker
+    // intensity, so the relativePhase palette now runtime-gates on the
+    // quantum mode — see isosurfaceSampling.ts.
+    expect(wgsl).toContain('(COLOR_ALGORITHM == 10) && (schroedinger.quantumMode != 8)')
+    expect(wgsl).toContain('select(gridColor.b, gridColor.a, useRelPhase)')
   })
 
   it('does not emit derivative ops in domainColoringPsi emission path', () => {

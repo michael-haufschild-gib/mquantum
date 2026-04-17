@@ -11,6 +11,7 @@
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/common'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 
+import { ADS_PRESETS } from './antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from './bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from './dirac/presets'
 import { FREE_SCALAR_PRESETS } from './freeScalar/presets'
@@ -18,6 +19,7 @@ import { HYDROGEN_COUPLED_PRESETS } from './hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from './pauli/presets'
 import { QUANTUM_WALK_PRESETS } from './quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from './tdse/presets'
+import { WDW_SCENARIO_PRESETS } from './wheelerDeWitt/presets'
 
 /**
  * Returns the first dimension-compatible preset ID for a given quantum mode.
@@ -85,6 +87,17 @@ export function getFirstPresetId(
 
     case 'pauliSpinor':
       return PAULI_SCENARIO_PRESETS[0]?.id
+
+    case 'wheelerDeWitt':
+      return WDW_SCENARIO_PRESETS[0]?.id
+
+    case 'antiDeSitter': {
+      // Honour dimension: find the lowest-d preset compatible with the
+      // active global dimension. Falls back to the first preset if none
+      // match (the strategy clamps d against the registry min anyway).
+      const preset = ADS_PRESETS.find((p) => p.d <= dimension) ?? ADS_PRESETS[0]
+      return preset?.id
+    }
 
     default:
       return undefined

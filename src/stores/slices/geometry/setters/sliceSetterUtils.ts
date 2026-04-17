@@ -146,6 +146,7 @@ type DomainKey =
   | 'openQuantum'
   | 'quantumWalk'
   | 'wheelerDeWitt'
+  | 'antiDeSitter'
 
 /**
  * Create a setter that validates, clamps, and writes a single numeric field
