@@ -13,7 +13,13 @@ export default defineConfig({
   reporter: [['list', { printSteps: true }]],
 
   // Only run benchmark/profiling specs
-  testMatch: ['**/perf-benchmark.spec.ts', '**/compute-mode-profiling.spec.ts'],
+  testMatch: [
+    '**/perf-benchmark.spec.ts',
+    '**/compute-mode-profiling.spec.ts',
+    '**/dirac-batch-ab.spec.ts',
+    '**/shader-ab-profiling.spec.ts',
+    '**/bec-raymarch-profile.spec.ts',
+  ],
 
   use: {
     baseURL: `http://localhost:${devServerPort}`,

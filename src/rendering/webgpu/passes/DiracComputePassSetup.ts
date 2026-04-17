@@ -394,7 +394,9 @@ export function rebuildDiracBindGroups(
     ],
   })
 
-  // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA)
+  // Shared-memory FFT bind group: per-axis uniforms + complexBuf (read_write on fftScratchA).
+  // `fftSharedMemBG` uses the shared single-uniform buffer (legacy dispatchFFTAxisSharedMem
+  // path patches it via copyBufferToBuffer and incurs a pass boundary per axis).
   const fftSharedMemBG = device.createBindGroup({
     label: 'dirac-fft-shared-mem-bg',
     layout: pipelines.fftSharedMemBGL,
@@ -403,6 +405,21 @@ export function rebuildDiracBindGroups(
       { binding: 1, resource: { buffer: fftScratchA } },
     ],
   })
+  // PERF: per-slot bind groups (one per axis per direction). Each references a
+  // pre-populated per-slot uniform buffer, so the entire Strang step can
+  // dispatch its FFT axes inside a single compute pass by just switching
+  // bind groups — no copyBufferToBuffer forces a pass boundary.
+  const fftSharedMemBGs: GPUBindGroup[] = new Array(inputs.fftAxisUniformBuffers.length)
+  for (let slot = 0; slot < inputs.fftAxisUniformBuffers.length; slot++) {
+    fftSharedMemBGs[slot] = device.createBindGroup({
+      label: `dirac-fft-shared-mem-bg-slot-${slot}`,
+      layout: pipelines.fftSharedMemBGL,
+      entries: [
+        { binding: 0, resource: { buffer: inputs.fftAxisUniformBuffers[slot]! } },
+        { binding: 1, resource: { buffer: fftScratchA } },
+      ],
+    })
+  }
 
   const kineticBG = device.createBindGroup({
     label: 'dirac-kinetic-bg',
@@ -535,6 +552,7 @@ export function rebuildDiracBindGroups(
     fftStageABBG,
     fftStageBABG,
     fftSharedMemBG,
+    fftSharedMemBGs,
     kineticBG,
     writeGridBG,
     diagReduceBG,

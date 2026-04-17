@@ -204,3 +204,121 @@ test.describe('render performance benchmark', () => {
     }
   })
 })
+
+// Higher-resolution BEC scenario — forces GPU-bound conditions on M3 Max where
+// the default 1280x800 hits VSync. At DPR=2 the fragment raymarcher does ~4×
+// the per-pixel work, making render-side optimizations measurable.
+test.describe('render performance benchmark @2x', () => {
+  test.use({ deviceScaleFactor: 2 })
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  const hiResScenarios = [
+    { mode: 'becDynamics', dim: 3, label: 'BEC 3D @2x' },
+    { mode: 'tdseDynamics', dim: 3, label: 'TDSE 3D @2x' },
+  ] as const
+
+  const hiResResults: BenchmarkResult[] = []
+
+  for (const { mode, dim, label } of hiResScenarios) {
+    test(`benchmark: ${label}`, async ({ page }) => {
+      await gotoMode(page, mode, dim)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+
+      await page.evaluate(async () => {
+        const perfStore = (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+        perfStore.getState().setMaxFps(0)
+        const mod = await import('/src/stores/uiStore.ts')
+        mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+      })
+
+      await page.evaluate(async () => {
+        const mod = await import('/src/stores/animationStore.ts')
+        mod.useAnimationStore.getState().play()
+      })
+
+      await page.waitForFunction(
+        (warmupFrames: number) => {
+          const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+          return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > warmupFrames
+        },
+        WARMUP_FRAMES,
+        { timeout: 30_000 }
+      )
+
+      await page.waitForFunction(
+        async () => {
+          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          return mod.usePerformanceMetricsStore.getState().fps > 0
+        },
+        { timeout: 10_000 }
+      )
+
+      const startFrame = await page.evaluate(() => {
+        const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+        return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10)
+      })
+
+      await page.waitForFunction(
+        ({ start, count }: { start: number; count: number }) => {
+          const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+          return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > start + count
+        },
+        { start: startFrame, count: MEASURE_FRAMES },
+        { timeout: 60_000 }
+      )
+
+      // Collect a full BenchmarkSample so the @2x entries flow through the
+      // same BENCHMARK_JSON pipeline as the primary scenarios and can be
+      // aggregated by scripts/bench-summary.js.
+      const sample = await page.evaluate(async (): Promise<BenchmarkSample> => {
+        const mod = await import('/src/stores/performanceMetricsStore.ts')
+        const s = mod.usePerformanceMetricsStore.getState()
+        return {
+          fps: s.fps,
+          frameTimeMs: s.frameTime,
+          cpuTimeMs: s.cpuTime,
+          totalGpuTimeMs: s.totalGpuTimeMs,
+          passTimings: s.passTimings.map((pt) => ({
+            passId: pt.passId,
+            gpuTimeMs: pt.gpuTimeMs,
+            computeGpuTimeMs: pt.computeGpuTimeMs ?? 0,
+            renderGpuTimeMs: pt.renderGpuTimeMs ?? 0,
+            cpuTimeMs: pt.cpuTimeMs,
+            skipped: pt.skipped,
+          })),
+          cpuBreakdown: { ...s.cpuBreakdown },
+          vramMB: s.vram.total,
+          viewport: { width: s.viewport.width, height: s.viewport.height },
+        }
+      })
+
+      const schrod = sample.passTimings.find((p) => p.passId === 'schroedinger')
+      const result: BenchmarkResult = { mode, dimension: dim, label, sample }
+      hiResResults.push(result)
+
+      console.log(`\n━━━ ${label} ━━━`)
+      console.log(
+        `  FPS: ${sample.fps} | Frame: ${sample.frameTimeMs.toFixed(2)}ms | GPU total: ${sample.totalGpuTimeMs.toFixed(2)}ms`
+      )
+      if (schrod) {
+        console.log(
+          `  Schroedinger: total=${schrod.gpuTimeMs.toFixed(3)}ms render=${schrod.renderGpuTimeMs.toFixed(3)}ms compute=${schrod.computeGpuTimeMs.toFixed(3)}ms`
+        )
+      }
+      console.log(`  Viewport: ${sample.viewport.width}×${sample.viewport.height} (DPR=2)`)
+    })
+  }
+
+  test.afterAll(() => {
+    if (hiResResults.length > 0) {
+      console.log('BENCHMARK_JSON_START')
+      console.log(JSON.stringify(hiResResults, null, 2))
+      console.log('BENCHMARK_JSON_END')
+    }
+  })
+})

@@ -39,12 +39,17 @@ import {
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { DiagDispatchParams, FFTAxisSharedMemParams } from './DiracComputePassDispatchers'
-import { dispatchDiagnostics, dispatchFFTAxisSharedMem } from './DiracComputePassDispatchers'
+import {
+  dispatchDiagnostics,
+  dispatchFFTAxisSharedMem,
+  SHARED_MEM_FFT_MAX_AXIS,
+} from './DiracComputePassDispatchers'
 import {
   buildDiracPipelines,
   rebuildDiracBindGroups,
   rebuildDiracBuffers,
 } from './DiracComputePassSetup'
+import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
 import type {
   DiracBindGroupResult,
   DiracPassHelpers,
@@ -84,6 +89,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private fftStagingBuffer: GPUBuffer | null = null
   private fftAxisUniformBuffer: GPUBuffer | null = null
   private fftAxisStagingBuffer: GPUBuffer | null = null
+  private fftAxisUniformBuffers: GPUBuffer[] | null = null
   private packUniformBuffer: GPUBuffer | null = null
   private packUniformBufferNoNorm: GPUBuffer | null = null
 
@@ -248,6 +254,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         fftStagingBuffer: this.fftStagingBuffer,
         fftAxisUniformBuffer: this.fftAxisUniformBuffer,
         fftAxisStagingBuffer: this.fftAxisStagingBuffer,
+        fftAxisUniformBuffers: this.fftAxisUniformBuffers,
         packUniformBuffer: this.packUniformBuffer,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm,
         diagUniformBuffer: this.diagUniformBuffer,
@@ -274,6 +281,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.fftStagingBuffer = result.fftStagingBuffer
     this.fftAxisUniformBuffer = result.fftAxisUniformBuffer
     this.fftAxisStagingBuffer = result.fftAxisStagingBuffer
+    this.fftAxisUniformBuffers = result.fftAxisUniformBuffers
     this.packUniformBuffer = result.packUniformBuffer
     this.packUniformBufferNoNorm = result.packUniformBufferNoNorm
     this.diagUniformBuffer = result.diagUniformBuffer
@@ -336,6 +344,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
         fftScratchB: this.fftScratchB!,
         fftUniformBuffer: this.fftUniformBuffer!,
         fftAxisUniformBuffer: this.fftAxisUniformBuffer!,
+        fftAxisUniformBuffers: this.fftAxisUniformBuffers!,
         packUniformBuffer: this.packUniformBuffer!,
         packUniformBufferNoNorm: this.packUniformBufferNoNorm!,
         densityTextureView: this.densityTextureView,
@@ -511,71 +520,64 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       const stepsThisFrame = Math.floor(this.stepAccumulator)
       this.stepAccumulator -= stepsThisFrame
 
+      // PERF: batch the entire Strang step into a single compute pass when
+      // per-slot FFT bind groups are available. Previously each substep
+      // opened ~43 separate passes (vHalf + S×(pack+3·FFT+unpack) + kinetic +
+      // S×(pack+3·FFT+unpack) + vHalf + optional absorber). Each pass
+      // boundary carries 5–20 µs of CPU/driver overhead on Metal; at S=4,
+      // latticeDim=3, that's ~1 ms per step wasted on pass boundaries alone.
+      // Mirrors the TDSE optimization landed 2026-04-12: per-slot FFT bind
+      // groups remove the per-axis copyBufferToBuffer which was the only
+      // reason the FFT axes couldn't live inside one pass. Implicit RAW/WAW
+      // barriers between dispatches touching overlapping storage buffers
+      // preserve correctness — behaviour is bit-identical to the legacy path.
+      // PERF: runtime toggle for A/B benchmarking. `window.__DIRAC_DISABLE_BATCH = true`
+      // forces the legacy unbatched path so before/after numbers can be collected in
+      // the same process without rebuilding. No-op in production.
+      const batchDisabled =
+        typeof window !== 'undefined' &&
+        (window as unknown as { __DIRAC_DISABLE_BATCH?: boolean }).__DIRAC_DISABLE_BATCH === true
+      // Axis-size guard: mirror the legacy dispatchFFTAxisSharedMem validation
+      // (power-of-2 in [2, SHARED_MEM_FFT_MAX_AXIS]) so the batched path does
+      // not silently dispatch the shared-memory FFT on unsupported sizes.
+      // Unsupported sizes fall through to the legacy path, which throws.
+      const axesOk = config.gridSize
+        .slice(0, config.latticeDim)
+        .every((d) => d >= 2 && d <= SHARED_MEM_FFT_MAX_AXIS && (d & (d - 1)) === 0)
+      const batchedFFT =
+        !batchDisabled && axesOk && (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
+      const ifftSlotOffset = config.latticeDim // forward = [0, D), inverse = [D, 2D)
+
+      const dispatchCompute = this.dispatchCompute.bind(this)
+      const dispatchFFTAxisDelegated = this.dispatchFFTAxisDelegated.bind(this)
+
       for (let step = 0; step < stepsThisFrame; step++) {
-        // 1. Half-step potential (per-component phase rotation)
-        const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
-        this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-        vHalf.end()
-
-        // 2-3. Forward FFT for each spinor component
-        for (let c = 0; c < S; c++) {
-          const packBG = bg.cachedPackBGs[c]
-          if (packBG) {
-            const p = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
-            this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
-            p.end()
-          }
-          let fftSlot = 0
-          for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
-          }
-          const unpackBG = bg.cachedUnpackBGsNoNorm[c]
-          if (unpackBG) {
-            const p = ctx.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
-            this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
-            p.end()
-          }
-        }
-
-        // 4. Apply free Dirac propagator in k-space
-        const kinPass = ctx.beginComputePass({ label: `dirac-kinetic-${step}` })
-        this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
-        kinPass.end()
-
-        // 5. Inverse FFT for each spinor component
-        for (let c = 0; c < S; c++) {
-          const packBG = bg.cachedPackBGs[c]
-          if (packBG) {
-            const p = ctx.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
-            this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
-            p.end()
-          }
-          let fftSlot = this.fwdStageCount
-          for (let d = config.latticeDim - 1; d >= 0; d--) {
-            fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
-          }
-          const unpackBG = bg.cachedUnpackBGs[c]
-          if (unpackBG) {
-            const p = ctx.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
-            this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
-            p.end()
-          }
-        }
-
-        // 6. Second half-step potential
-        const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })
-        this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-        vHalf2.end()
-
-        // 7. Absorber (separate pass AFTER the Strang step)
-        // Applied once per step, after the FFT kinetic step has completed.
-        // This prevents the FFT from seeing the absorber's spatial modulation
-        // and scattering it across k-space (which creates spurious emission artifacts).
-        // PERF: Skip dispatch entirely when absorber is disabled — saves ~5µs per step.
-        if (config.absorberEnabled) {
-          const absPass = ctx.beginComputePass({ label: `dirac-absorber-${step}` })
-          this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG!], linearWG)
-          absPass.end()
+        if (batchedFFT) {
+          runBatchedStrangStep({
+            ctx,
+            pl,
+            bg,
+            config,
+            step,
+            S,
+            linearWG,
+            dispatchCompute,
+            ifftSlotOffset,
+            totalSites: this.totalSites,
+          })
+        } else {
+          runLegacyStrangStep({
+            ctx,
+            pl,
+            bg,
+            config,
+            step,
+            S,
+            linearWG,
+            dispatchCompute,
+            fwdStageCount: this.fwdStageCount,
+            dispatchFFTAxisDelegated,
+          })
         }
 
         this.simTime += config.dt
@@ -670,11 +672,15 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       this.diagResultBuffer, this.diagStagingBuffer, this.bg?.renormalizeUniformBuffer,
     ]
     for (const buf of gpuBuffers) buf?.destroy()
+    if (this.fftAxisUniformBuffers) {
+      for (const b of this.fftAxisUniformBuffers) b.destroy()
+    }
     this.densityTexture?.destroy()
 
     this.spinorReBuffer = this.spinorImBuffer = this.potentialBuffer = this.gammaBuffer = null
     this.fftScratchA = this.fftScratchB = this.uniformBuffer = this.fftUniformBuffer = null
     this.fftStagingBuffer = this.fftAxisUniformBuffer = this.fftAxisStagingBuffer = null
+    this.fftAxisUniformBuffers = null
     this.packUniformBuffer = this.packUniformBufferNoNorm = null
     this.diagUniformBuffer = this.diagPartialNormBuffer = this.diagPartialMaxBuffer = null
     this.diagPartialParticleBuffer = this.diagPartialAntiBuffer = null

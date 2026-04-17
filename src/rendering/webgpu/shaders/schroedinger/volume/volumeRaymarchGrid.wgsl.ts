@@ -66,7 +66,24 @@ fn volumeRaymarchGrid(
   let viewDir = -rayDir;
   var transmittance: f32 = 1.0;
 
+  // PERF: Hoist loop-invariant uniform computations out of the raymarch loop.
+  // These evaluate to identity values (1.0 for adsAmplitudeSq, 0.0 for phaseOffset)
+  // outside their owning modes — they are ZERO for every compute mode (BEC/TDSE/
+  // Dirac/FSF/QW) because adsGrowthRate, wdwPhaseRotationRate, and adsEnergy
+  // are all zero. Computing them once per ray instead of 128 times saves ~384
+  // ALU ops per pixel per frame on BEC/TDSE (one cosh + two muls per iter).
+  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+
+  // PERF: Pre-compute 1/stepLen for adaptive-step ratio (used in potential overlay
+  // opacity clamp). stepLen is constant per ray but the ratio is recomputed per
+  // iteration for both the potential overlay branch. Hoisting saves 128 divisions
+  // per pixel per frame in the worst case.
+  let invStepLen = 1.0 / max(stepLen, 1e-5);
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
+    if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
 
@@ -75,32 +92,33 @@ fn volumeRaymarchGrid(
     let pos = rayOrigin + rayDir * t;
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
-    // adsGrowthRate is 0 outside AdS (and 0 for stable AdS states), so the
-    // cosh² factor is 1 and rho is untouched for every other mode.
-    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-    var rho = gridSample.r * adsCoshGamma * adsCoshGamma;
+    // adsAmplitudeSq is 1.0 outside AdS (all compute modes) — hoisted above.
+    var rho = gridSample.r * adsAmplitudeSq;
     let sCenter = gridSample.g;
     // wdwPhaseRotationRate rotates WdW; adsEnergy rotates AdS stable states
-    // via phase' = B - E·t. Both uniforms are 0 for every other mode so the
-    // combined subtraction is an identity outside their owning modes.
-    let phase = gridSample.b
-      - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+    // via phase' = B - E·t. phaseOffset is 0 for every compute mode (hoisted).
+    let phase = gridSample.b - phaseOffset;
 
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
 
     // Empty-skip: jump ahead when density is negligible.
-    // Compute modes produce smoother density fields (grid-interpolated), so a
-    // 2-probe scheme at 10× step is safe and saves 1 texture fetch per skip.
-    if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+    // Compute modes produce smoothly trilinearly-interpolated density fields on
+    // the fixed-resolution density grid (DENSITY_GRID_SIZE, see
+    // src/constants/densityGrid.ts). The density's spatial-frequency content
+    // is capped at the grid's Nyquist limit and further smeared by the
+    // sampler's trilinear filter, so a single midpoint probe is a faithful
+    // predictor of the full 10·stepLen segment being empty. Replacing the
+    // previous 2-probe scheme with 1-probe saves one texture fetch per skip
+    // attempt with no detectable correctness loss on BEC groundState /
+    // singleVortex / quantumTurbulence (measured via
+    // bec-raymarch-profile.spec.ts at DPR=2).
+    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
-        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD
-            && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD && !midHasPot) {
           t += skipDistance;
           continue;
         }
@@ -108,13 +126,18 @@ fn volumeRaymarchGrid(
     }
 
     // Adaptive step
-    let adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+    var adaptiveStep: f32;
+    if (!PROFILING_STRIP_ADAPTIVE_STEP) {
+      adaptiveStep = computeAdaptiveStep(sCenter, stepLen, tFar - t);
+    } else {
+      adaptiveStep = min(stepLen, tFar - t);
+    }
 
     // Potential overlay rendering
     if (DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potIntensity = abs(gridSample.a);
-      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.2);
+      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
     }
@@ -127,23 +150,36 @@ fn volumeRaymarchGrid(
     if (alpha > primaryHitThreshold) {
       if (primaryHitT < 0.0) { primaryHitT = t; }
 
-      // Gradient + lit emission
-      let gradient = fetchGradient(pos, uniforms);
-      var emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+      if (!PROFILING_STRIP_COMPOSITING) {
+        // Gradient + lit emission
+        var gradient: vec3f;
+        if (PROFILING_STRIP_GRADIENT) {
+          gradient = vec3f(0.0, 1.0, 0.0);
+        } else {
+          gradient = fetchGradient(pos, uniforms);
+        }
 
-      // Branch coloring: compute from ray position (not density texture alpha)
-      if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
-        let branchFrac = smoothstep(
-          uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
-          uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
-          pos.x
-        );
-        let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
-        let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
-        emission = branchColor * lum;
+        var emission: vec3f;
+        if (PROFILING_STRIP_LIGHTING) {
+          emission = computeBaseColor(rho, sCenter, phase, pos, uniforms);
+        } else {
+          emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+        }
+
+        // Branch coloring: compute from ray position (not density texture alpha)
+        if (uniforms.quantumMode == 3 && uniforms.branchSeparation > 0.5 && uniforms.branchTransitionWidth > 0.0) {
+          let branchFrac = smoothstep(
+            uniforms.branchPlaneThreshold - uniforms.branchTransitionWidth,
+            uniforms.branchPlaneThreshold + uniforms.branchTransitionWidth,
+            pos.x
+          );
+          let branchColor = mix(uniforms.branchColorA, uniforms.branchColorB, branchFrac);
+          let lum = dot(emission, vec3f(0.2126, 0.7152, 0.0722));
+          emission = branchColor * lum;
+        }
+
+        accColor += transmittance * alpha * emission;
       }
-
-      accColor += transmittance * alpha * emission;
       transmittance *= (1.0 - alpha);
     }
 
@@ -211,6 +247,20 @@ fn volumeRaymarchGrid(
 
   var transmittance: f32 = 1.0;
 
+  // PERF: Hoist loop-invariant AdS + phase-rotation uniforms out of the
+  // per-sample loop. Mirrors the Simple variant above. These evaluate to
+  // identity values (1.0 for adsAmplitudeSq, 0.0 for phaseOffset) for every
+  // non-AdS analytical mode because adsGrowthRate, wdwPhaseRotationRate, and
+  // adsEnergy are zero outside their owning quantum modes.
+  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+
+  // PERF: Hoist 1/stepLen for the potential-overlay opacity clamp (mirrors
+  // Simple variant). stepLen is constant per ray; the per-iteration division
+  // would otherwise run up to 128 times per pixel.
+  let invStepLen = 1.0 / max(stepLen, 1e-5);
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
@@ -225,11 +275,8 @@ fn volumeRaymarchGrid(
     // Returns (rho, 0, 0, 0) for r16float
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
-    // adsGrowthRate is 0 for every non-AdS mode and for stable AdS states,
-    // so the factor is 1 and rho is untouched. Applied to the R channel only
-    // (AdS is never dual-channel, so no secondary-channel impact).
-    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-    let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+    // adsAmplitudeSq is 1.0 outside AdS — hoisted above the loop.
+    // Applied to the R channel only (AdS is never dual-channel).
     var rho = gridSample.r * adsAmplitudeSq;
 
     // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
@@ -257,12 +304,10 @@ fn volumeRaymarchGrid(
     // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
     // WdW and AdS (stable) phase rotation only applies to the spatial-phase (B)
     // channel; relativePhase (A) is a different observable and is not rotated.
-    // wdwPhaseRotationRate and adsEnergy are 0 outside their owning modes so
-    // the combined subtraction is an identity everywhere else.
+    // phaseOffset (hoisted above) is 0 outside the owning modes.
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
-      let rotatedB = gridSample.b
-        - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+      let rotatedB = gridSample.b - phaseOffset;
       // AdS (mode 8) packs boundary-overlay / horizon-marker intensity into
       // channel A, not a radian-valued relative phase. Fall back to the
       // spatial-phase (B) channel so the relativePhase palette doesn't read
@@ -329,7 +374,7 @@ fn volumeRaymarchGrid(
       // Scale opacity by current transmittance: first samples contribute strongly,
       // deep samples contribute progressively less — prevents thick potential regions
       // (step, harmonic) from going fully opaque while keeping thin barriers visible.
-      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.2);
+      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
     }
