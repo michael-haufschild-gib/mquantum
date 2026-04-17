@@ -204,3 +204,95 @@ test.describe('render performance benchmark', () => {
     }
   })
 })
+
+// Higher-resolution BEC scenario — forces GPU-bound conditions on M3 Max where
+// the default 1280x800 hits VSync. At DPR=2 the fragment raymarcher does ~4×
+// the per-pixel work, making render-side optimizations measurable.
+test.describe('render performance benchmark @2x', () => {
+  test.use({ deviceScaleFactor: 2 })
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+    await requireWebGPU(page, test.info())
+  })
+
+  const hiResScenarios = [
+    { mode: 'becDynamics', dim: 3, label: 'BEC 3D @2x' },
+    { mode: 'tdseDynamics', dim: 3, label: 'TDSE 3D @2x' },
+  ] as const
+
+  for (const { mode, dim, label } of hiResScenarios) {
+    test(`benchmark: ${label}`, async ({ page }) => {
+      await gotoMode(page, mode, dim)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+
+      await page.evaluate(async () => {
+        const perfStore = (await import('/src/stores/performanceStore.ts')).usePerformanceStore
+        perfStore.getState().setMaxFps(0)
+        const mod = await import('/src/stores/uiStore.ts')
+        mod.useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: true })
+      })
+
+      await page.evaluate(async () => {
+        const mod = await import('/src/stores/animationStore.ts')
+        mod.useAnimationStore.getState().play()
+      })
+
+      await page.waitForFunction(
+        (warmupFrames: number) => {
+          const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+          return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > warmupFrames
+        },
+        WARMUP_FRAMES,
+        { timeout: 30_000 }
+      )
+
+      await page.waitForFunction(
+        async () => {
+          const mod = await import('/src/stores/performanceMetricsStore.ts')
+          return mod.usePerformanceMetricsStore.getState().fps > 0
+        },
+        { timeout: 10_000 }
+      )
+
+      const startFrame = await page.evaluate(() => {
+        const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+        return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10)
+      })
+
+      await page.waitForFunction(
+        ({ start, count }: { start: number; count: number }) => {
+          const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+          return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > start + count
+        },
+        { start: startFrame, count: MEASURE_FRAMES },
+        { timeout: 60_000 }
+      )
+
+      const sample = await page.evaluate(async () => {
+        const mod = await import('/src/stores/performanceMetricsStore.ts')
+        const s = mod.usePerformanceMetricsStore.getState()
+        const schrod = s.passTimings.find((p) => p.passId === 'schroedinger')
+        return {
+          fps: s.fps,
+          frameTimeMs: s.frameTime,
+          totalGpuTimeMs: s.totalGpuTimeMs,
+          schroMs: schrod?.gpuTimeMs ?? 0,
+          schroRenderMs: schrod?.renderGpuTimeMs ?? 0,
+          schroComputeMs: schrod?.computeGpuTimeMs ?? 0,
+          viewport: { width: s.viewport.width, height: s.viewport.height },
+        }
+      })
+
+      console.log(`\n━━━ ${label} ━━━`)
+      console.log(
+        `  FPS: ${sample.fps} | Frame: ${sample.frameTimeMs.toFixed(2)}ms | GPU total: ${sample.totalGpuTimeMs.toFixed(2)}ms`
+      )
+      console.log(
+        `  Schroedinger: total=${sample.schroMs.toFixed(3)}ms render=${sample.schroRenderMs.toFixed(3)}ms compute=${sample.schroComputeMs.toFixed(3)}ms`
+      )
+      console.log(`  Viewport: ${sample.viewport.width}×${sample.viewport.height} (DPR=2)`)
+    })
+  }
+})
