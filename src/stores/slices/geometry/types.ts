@@ -493,6 +493,7 @@ export interface SchroedingerSliceActions {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  applyWheelerDeWittPreset: (presetId: string) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
 

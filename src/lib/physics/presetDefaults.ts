@@ -19,6 +19,7 @@ import { HYDROGEN_COUPLED_PRESETS } from './hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from './pauli/presets'
 import { QUANTUM_WALK_PRESETS } from './quantumWalk/presets'
 import { TDSE_SCENARIO_PRESETS } from './tdse/presets'
+import { WDW_SCENARIO_PRESETS } from './wheelerDeWitt/presets'
 
 /**
  * Returns the first dimension-compatible preset ID for a given quantum mode.
@@ -86,6 +87,9 @@ export function getFirstPresetId(
 
     case 'pauliSpinor':
       return PAULI_SCENARIO_PRESETS[0]?.id
+
+    case 'wheelerDeWitt':
+      return WDW_SCENARIO_PRESETS[0]?.id
 
     case 'antiDeSitter': {
       // Honour dimension: find the lowest-d preset compatible with the

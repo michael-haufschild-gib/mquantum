@@ -10,10 +10,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { Select } from '@/components/ui/Select'
+import type { AdsPresetName, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
 import type { SchroedingerPresetName } from '@/lib/geometry/extended/common'
 import type { HydrogenNDPresetName } from '@/lib/geometry/extended/schroedinger'
 import { getHydrogenNDPresetsWithKeysByDimension } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
+import { ADS_PRESETS } from '@/lib/physics/antiDeSitter/presets'
 import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 import { DIRAC_SCENARIO_PRESETS } from '@/lib/physics/dirac/presets'
 import { FREE_SCALAR_PRESETS } from '@/lib/physics/freeScalar/presets'
@@ -21,6 +23,7 @@ import { HYDROGEN_COUPLED_PRESETS } from '@/lib/physics/hydrogenCoupled/presets'
 import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import { getFirstPresetId } from '@/lib/physics/presetDefaults'
 import { QUANTUM_WALK_PRESETS } from '@/lib/physics/quantumWalk/presets'
+import { WDW_SCENARIO_PRESETS } from '@/lib/physics/wheelerDeWitt/presets'
 import { PAULI_FIELD_VIEW_TO_COLOR_ALGO } from '@/rendering/shaders/palette/types'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -80,6 +83,22 @@ const QUANTUM_WALK_PRESET_OPTIONS = QUANTUM_WALK_PRESETS.map((p) => ({
   label: p.name,
 }))
 
+/* ── Wheeler–DeWitt options ────────────────────────────────── */
+
+const WDW_PRESET_OPTIONS = WDW_SCENARIO_PRESETS.map((p) => ({
+  value: p.id,
+  label: p.name,
+}))
+
+/* ── Anti-de Sitter options (dimension-filtered by preset `d`) ─ */
+
+function getAdsPresetOptions(dim: number) {
+  return ADS_PRESETS.filter((p) => p.d <= dim).map((p) => ({
+    value: p.id,
+    label: p.label,
+  }))
+}
+
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
 function getHydrogenNDOptions(dimension: number) {
@@ -109,11 +128,12 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     useShallow((s) => ({ objectType: s.objectType, dimension: s.dimension }))
   )
 
-  const { quantumMode, presetName, hydrogenNDPreset } = useExtendedObjectStore(
+  const { quantumMode, presetName, hydrogenNDPreset, adsPreset } = useExtendedObjectStore(
     useShallow((s) => ({
       quantumMode: s.schroedinger.quantumMode,
       presetName: s.schroedinger.presetName,
       hydrogenNDPreset: s.schroedinger.hydrogenNDPreset,
+      adsPreset: (s.schroedinger.antiDeSitter as AntiDeSitterConfig | undefined)?.preset,
     }))
   )
 
@@ -127,7 +147,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     applyDiracPreset,
     applyFreeScalarPreset,
     applyQuantumWalkPreset,
+    applyWheelerDeWittPreset,
     setPauliConfig,
+    setAdsPreset,
   } = useExtendedObjectStore(
     useShallow((s) => ({
       setPresetName: s.setSchroedingerPresetName,
@@ -138,7 +160,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyDiracPreset: s.applyDiracPreset,
       applyFreeScalarPreset: s.applyFreeScalarPreset,
       applyQuantumWalkPreset: s.applyQuantumWalkPreset,
+      applyWheelerDeWittPreset: s.applyWheelerDeWittPreset,
       setPauliConfig: s.setPauliConfig,
+      setAdsPreset: s.setAdsPreset,
     }))
   )
 
@@ -165,8 +189,12 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return FREE_SCALAR_PRESET_OPTIONS
       case 'quantumWalk':
         return QUANTUM_WALK_PRESET_OPTIONS
+      case 'wheelerDeWitt':
+        return WDW_PRESET_OPTIONS
       case 'pauliSpinor':
         return PAULI_PRESET_OPTIONS
+      case 'antiDeSitter':
+        return getAdsPresetOptions(dimension)
       default:
         return null
     }
@@ -204,6 +232,8 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         return presetName === 'custom' ? '' : (presetName ?? '')
       case 'hydrogenND':
         return hydrogenNDPreset === 'custom' ? '' : (hydrogenNDPreset ?? '')
+      case 'antiDeSitter':
+        return adsPreset === 'custom' || adsPreset === undefined ? '' : adsPreset
       default:
         return (
           computePreset[mode] ??
@@ -211,7 +241,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
           ''
         )
     }
-  }, [mode, presetName, hydrogenNDPreset, dimension, computePreset])
+  }, [mode, presetName, hydrogenNDPreset, adsPreset, dimension, computePreset])
 
   // Dispatch change to the correct store action
   const handleChange = useCallback(
@@ -247,8 +277,14 @@ export const ScenarioSelector: React.FC = React.memo(() => {
         case 'quantumWalk':
           applyQuantumWalkPreset(value)
           break
+        case 'wheelerDeWitt':
+          applyWheelerDeWittPreset(value)
+          break
         case 'pauliSpinor':
           applyPauliPresetById(value, setPauliConfig)
+          break
+        case 'antiDeSitter':
+          setAdsPreset(value as AdsPresetName)
           break
       }
     },
@@ -262,7 +298,9 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       applyDiracPreset,
       applyFreeScalarPreset,
       applyQuantumWalkPreset,
+      applyWheelerDeWittPreset,
       setPauliConfig,
+      setAdsPreset,
     ]
   )
 
