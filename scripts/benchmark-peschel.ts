@@ -10,7 +10,7 @@
  * complexity.
  *
  * Run with:
- *   npx tsx scripts/benchmark-peschel.ts
+ *   pnpm exec tsx scripts/benchmark-peschel.ts
  *
  * The script prints a small table with per-run timings, the min/median
  * timings, and the peak heap delta for each configuration.

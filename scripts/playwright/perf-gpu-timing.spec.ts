@@ -5,7 +5,7 @@
  * which passes consume the most GPU time. This reveals actual bottlenecks
  * beyond vsync-capped FPS measurements.
  *
- * Run: npx playwright test scripts/playwright/perf-gpu-timing.spec.ts
+ * Run: pnpm exec playwright test scripts/playwright/perf-gpu-timing.spec.ts
  */
 
 import { expect, test } from '@playwright/test'

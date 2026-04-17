@@ -4,55 +4,55 @@
 
 ```bash
 # Start dev server on port 3000
-npm run dev
+pnpm run dev
 
 # Build for production (includes WASM build)
-npm run build
+pnpm run build
 
 # Build web only (no WASM rebuild)
-npm run build:web
+pnpm run build:web
 
 # Preview production build
-npm run preview
+pnpm run preview
 ```
 
 ## Testing
 
 ```bash
 # Run all Vitest tests (CI-safe, max 4 workers)
-npm test
+pnpm test
 
 # Run single test file
-npx vitest run src/tests/path/to/test.test.ts
+pnpm exec vitest run src/tests/path/to/test.test.ts
 
 # Run tests matching pattern
-npx vitest run -t "Render graph"
+pnpm exec vitest run -t "Render graph"
 
 # Watch mode (human-authorized only, never in automation)
-npm run test:watch
+pnpm run test:watch
 
 # Playwright E2E tests
-npx playwright test
+pnpm exec playwright test
 
 # Single Playwright spec
-npx playwright test scripts/playwright/spec-name.spec.ts
+pnpm exec playwright test scripts/playwright/spec-name.spec.ts
 ```
 
 ## Code Quality
 
 ```bash
 # Lint TypeScript/JavaScript
-npm run lint
+pnpm run lint
 
 # Format code with Prettier
-npm run format
+pnpm run format
 ```
 
 ## WASM
 
 ```bash
 # Build WASM module (animation math: rotation, projection, matrix/vector)
-npm run wasm:build
+pnpm run wasm:build
 ```
 
 ## Important Notes
@@ -62,3 +62,4 @@ npm run wasm:build
 - **Tests in `src/tests/`**, Playwright specs in `scripts/playwright/`
 - **Screenshots go in `screenshots/`**, never project root
 - **No WebGL/GLSL** - all rendering is WebGPU/WGSL only
+- **Package manager is pnpm** (>= 10). Never run `npm`/`npx`.

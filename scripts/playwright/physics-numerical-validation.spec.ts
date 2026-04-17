@@ -15,7 +15,7 @@
  * - HO dimensional scaling (N-dim Hermite product correct in WGSL?)
  * - Cross-mode density sanity (different physics → different numbers?)
  *
- * Run: npx playwright test scripts/playwright/physics-numerical-validation.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/physics-numerical-validation.spec.ts --workers=1
  *
  * @module scripts/playwright/physics-numerical-validation
  */

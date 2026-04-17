@@ -1,8 +1,8 @@
-npx lint-staged
+pnpm exec lint-staged
 
 # Type check: prevents committing code with type errors.
 # Takes ~4s — acceptable for pre-commit since type safety is a core quality gate.
-npx tsc -b
+pnpm exec tsc -b
 
 # Check for circular chunk dependencies when chunk config changes
 if git diff --cached --name-only | grep -q 'vite.config.ts'; then

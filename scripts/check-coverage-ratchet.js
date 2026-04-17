@@ -9,7 +9,7 @@
  * This prevents "threshold drift" where someone lowers a threshold to make CI
  * pass after reducing coverage. Thresholds should only move upward.
  *
- * Usage: npx vitest run --coverage && node scripts/check-coverage-ratchet.js
+ * Usage: pnpm exec vitest run --coverage && node scripts/check-coverage-ratchet.js
  *
  * Reads: coverage/coverage-summary.json (produced by v8 provider with lcov reporter)
  * Compares against: vitest.config.ts thresholds
@@ -32,7 +32,7 @@ try {
 } catch {
   console.error(
     'coverage/coverage-summary.json not found.\n' +
-    'Run `npx vitest run --coverage` first to generate coverage data.'
+    'Run `pnpm exec vitest run --coverage` first to generate coverage data.'
   )
   process.exit(1)
 }

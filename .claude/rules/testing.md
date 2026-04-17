@@ -18,9 +18,9 @@ paths:
 ## Commands
 
 ```bash
-npx vitest run              # Run all unit tests (no watch mode)
-npx vitest run src/path     # Run specific test file/directory
-npx playwright test         # Run E2E tests
+pnpm exec vitest run              # Run all unit tests (no watch mode)
+pnpm exec vitest run src/path     # Run specific test file/directory
+pnpm exec playwright test         # Run E2E tests
 ```
 
 ## Constraints

@@ -18,28 +18,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 24
+          cache: pnpm
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Format check
-        run: npx prettier --check "src/**/*.{ts,tsx,json,css}"
+        run: pnpm exec prettier --check "src/**/*.{ts,tsx,json,css}"
 
       - name: Lint
-        run: npx eslint . --max-warnings 0 --no-warn-ignored
+        run: pnpm exec eslint . --max-warnings 0 --no-warn-ignored
 
       - name: Lint CSS
-        run: npx stylelint "src/**/*.css" --max-warnings 0
+        run: pnpm exec stylelint "src/**/*.css" --max-warnings 0
 
       - name: Type check
-        run: npx tsc -b
+        run: pnpm exec tsc -b
 
       - name: Test with coverage
-        run: npx vitest run --coverage
+        run: pnpm exec vitest run --coverage
 
       - name: Coverage ratchet
         run: node scripts/check-coverage-ratchet.js
@@ -47,7 +51,7 @@ jobs:
       # build:web skips wasm:build — the separate `wasm` job handles that.
       # WASM has JS fallbacks, so the main build doesn't need it.
       - name: Build
-        run: npm run build:web
+        run: pnpm run build:web
 
       - name: Bundle size budget
         run: node scripts/check-bundle-size.js
@@ -60,7 +64,7 @@ jobs:
   # indefinitely on WebGPU initialization. No replacement gate is needed:
   # these tests are run locally before merge. This is a known platform
   # limitation, not a gap to be fixed. Do not flag this in reviews.
-  #   Local: npx playwright test
+  #   Local: pnpm exec playwright test
 
   # Separate optional job — verifies Rust/WASM compilation without blocking PRs.
   # The main `ci` job does NOT depend on this; WASM has JS fallbacks.

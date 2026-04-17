@@ -12,7 +12,7 @@
  *
  * Run under the benchmark config (which is already wired to match this spec
  * via testMatch) rather than the default Playwright config:
- *   BENCHMARK_DPR=2 npx playwright test --config=playwright.benchmark.config.ts \
+ *   BENCHMARK_DPR=2 pnpm exec playwright test --config=playwright.benchmark.config.ts \
  *     scripts/playwright/bec-raymarch-profile.spec.ts
  *
  * Output: logs/bec_raymarch_profile_<timestamp>.json + per-preset cost table.

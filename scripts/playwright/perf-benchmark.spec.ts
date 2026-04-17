@@ -4,7 +4,7 @@
  * Measures per-pass GPU and CPU timing across quantum modes and dimensions.
  * Uses the existing GPU timestamp query infrastructure in the render graph.
  *
- * Run: npx playwright test scripts/playwright/perf-benchmark.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/perf-benchmark.spec.ts --workers=1
  * Output: structured JSON benchmark results to stdout
  */
 

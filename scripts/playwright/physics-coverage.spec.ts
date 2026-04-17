@@ -14,7 +14,7 @@
  * GPU contention mitigation: tests run serially with explicit GPU resource
  * release between groups to prevent adapter/device accumulation.
  *
- * Run: npx playwright test scripts/playwright/physics-coverage.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/physics-coverage.spec.ts --workers=1
  */
 
 import { test } from './fixtures'

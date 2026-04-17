@@ -20,7 +20,7 @@
  * - Open quantum shader blocks have syntax error in Lindblad operator
  * - Temporal accumulation path has stale bind group layout
  *
- * Run: npx playwright test scripts/playwright/shader-compilation-matrix.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/shader-compilation-matrix.spec.ts --workers=1
  */
 
 import { test } from './fixtures'

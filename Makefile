@@ -2,51 +2,51 @@
 
 ## Install dependencies
 setup:
-	npm ci
+	pnpm install --frozen-lockfile
 
 ## Start dev server (port 3000)
 dev:
-	npm run dev
+	pnpm run dev
 
 ## Full build (WASM + TypeScript + Vite)
 build:
-	npm run build
+	pnpm run build
 
 ## Web-only build (TypeScript + Vite, no WASM)
 build-web:
-	npm run build:web
+	pnpm run build:web
 
 ## Run unit tests
 test:
-	npx vitest run
+	pnpm exec vitest run
 
 ## Run unit tests with coverage report
 test-coverage:
-	npx vitest run --coverage
+	pnpm exec vitest run --coverage
 
 ## Run Playwright e2e tests (requires running dev server)
 test-e2e:
-	npx playwright test
+	pnpm exec playwright test
 
 ## Run linter (matches CI: zero warnings allowed)
 lint:
-	npx eslint . --max-warnings 0 --no-warn-ignored
+	pnpm exec eslint . --max-warnings 0 --no-warn-ignored
 
 ## Run CSS linter
 lint-css:
-	npx stylelint "src/**/*.css" --max-warnings 0
+	pnpm exec stylelint "src/**/*.css" --max-warnings 0
 
 ## Format code with Prettier
 format:
-	npx prettier --write "src/**/*.{ts,tsx,json,css}"
+	pnpm exec prettier --write "src/**/*.{ts,tsx,json,css}"
 
 ## Check formatting without writing
 format-check:
-	npx prettier --check "src/**/*.{ts,tsx,json,css}"
+	pnpm exec prettier --check "src/**/*.{ts,tsx,json,css}"
 
 ## Run TypeScript type checker
 type-check:
-	npx tsc -b
+	pnpm exec tsc -b
 
 ## Check bundle size budget (requires prior build)
 bundle-check:

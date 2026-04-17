@@ -8,7 +8,7 @@ See [docs/getting-started.md](docs/getting-started.md) for prerequisites and fir
 
 ## Code Style
 
-All style rules are enforced automatically via ESLint, Stylelint, and Prettier. Run `npm run lint` before committing. The pre-commit hook (Husky + lint-staged) runs linting automatically on staged files.
+All style rules are enforced automatically via ESLint, Stylelint, and Prettier. Run `pnpm run lint` before committing. The pre-commit hook (Husky + lint-staged) runs linting automatically on staged files.
 
 Key rules:
 - **TypeScript**: strict mode, no `any` types, `@/` path aliases
@@ -29,9 +29,9 @@ Follow the decision tree in [docs/architecture.md](docs/architecture.md). New fi
 Every change must pass the existing test suite:
 
 ```bash
-npx vitest run        # Must pass: 6300+ tests
-npx tsc -b --noEmit   # Must pass: zero type errors
-npm run lint           # Must pass: zero warnings
+pnpm exec vitest run        # Must pass: 6300+ tests
+pnpm exec tsc -b --noEmit   # Must pass: zero type errors
+pnpm run lint               # Must pass: zero warnings
 ```
 
 ### Test quality rules

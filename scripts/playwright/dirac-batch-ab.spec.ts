@@ -7,7 +7,7 @@
  *
  * Run under the benchmark config (which is already wired to match this spec
  * via testMatch) rather than the default Playwright config:
- *   npx playwright test --config=playwright.benchmark.config.ts scripts/playwright/dirac-batch-ab.spec.ts
+ *   pnpm exec playwright test --config=playwright.benchmark.config.ts scripts/playwright/dirac-batch-ab.spec.ts
  */
 
 import fs from 'node:fs'

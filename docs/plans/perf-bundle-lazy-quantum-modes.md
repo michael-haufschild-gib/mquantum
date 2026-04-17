@@ -66,7 +66,7 @@ Lazy-loading the 4 rare modes (AdS, WdW, Pauli, QW) could move ~340 KB raw / ~85
 Before touching code, measure exactly how much each strategy chunk contributes. Use `rollup-plugin-visualizer`:
 
 ```bash
-npm install -D rollup-plugin-visualizer
+pnpm add -D rollup-plugin-visualizer
 ```
 
 In `vite.config.ts`, in the `plugins:` array add:
@@ -79,7 +79,7 @@ plugins: [
 ],
 ```
 
-Run `ANALYZE=1 npm run build` and read `dist/bundle-stats.html`. For each strategy + its compute pass + its shader files, record the exact gzip byte count. Commit these numbers to the task state log.
+Run `ANALYZE=1 pnpm run build` and read `dist/bundle-stats.html`. For each strategy + its compute pass + its shader files, record the exact gzip byte count. Commit these numbers to the task state log.
 
 **Gate**: if the combined rare-modes chunks are < 40 KB gzip, stop — the win isn't worth the refactor. Estimated from file sizes + typical gzip ratio, but confirm.
 
@@ -148,8 +148,8 @@ Look for `setShaderCompiling` in `usePerformanceStore` — the existing flow cal
 
 ### Part 6 — Verification
 
-1. **Bundle size**: `npm run build` → `check-bundle-size.js` must pass. Before-after gzip total should drop ~40–85 KB.
-2. **Per-chunk inspection**: re-run `ANALYZE=1 npm run build`, confirm the 4 rare mode files are in separate async chunks (filename-hashed).
+1. **Bundle size**: `pnpm run build` → `check-bundle-size.js` must pass. Before-after gzip total should drop ~40–85 KB.
+2. **Per-chunk inspection**: re-run `ANALYZE=1 pnpm run build`, confirm the 4 rare mode files are in separate async chunks (filename-hashed).
 3. **Functional**: e2e spec that switches to each rare mode and verifies render produces pixels. Pattern: `scripts/playwright/rendering.spec.ts` already does this for all modes — run it twice, once cold (fresh dev server) to exercise chunk fetch, once warm.
 4. **Unit tests**: all 7630 must still pass.
 
@@ -193,7 +193,7 @@ Look for `setShaderCompiling` in `usePerformanceStore` — the existing flow cal
 1. Bundle visualiser output committed to the task state log with before-after gzip per chunk.
 2. `dist/assets/` shows separate hashed chunks for each lazy mode.
 3. Total JS gzip drops by at least 40 KB (hard floor — below that the refactor isn't worth it).
-4. `npx playwright test scripts/playwright/rendering.spec.ts` passes for all modes.
+4. `pnpm exec playwright test scripts/playwright/rendering.spec.ts` passes for all modes.
 5. Cold mode-switch to a lazy mode shows a <500 ms delay (shader compile + chunk fetch).
 6. All 7630 unit tests pass.
 7. `scripts/check-bundle-size.js` updated with new per-chunk budgets.

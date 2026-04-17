@@ -16,7 +16,7 @@ const COLLISION_RE = /name collision/gi
 
 let output
 try {
-  output = execSync('npx vite build', {
+  output = execSync('pnpm exec vite build', {
     cwd: import.meta.dirname + '/..',
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],
