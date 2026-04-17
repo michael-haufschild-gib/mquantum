@@ -167,7 +167,7 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
  */
 export function deserializeAds(params: URLSearchParams, state: AdsUrlState): void {
   const presetRaw = params.get('ads_preset')
-  if (presetRaw && presetRaw in ADS_PRESET_MAP) {
+  if (presetRaw && Object.prototype.hasOwnProperty.call(ADS_PRESET_MAP, presetRaw)) {
     state.adsPreset = presetRaw as AdsPresetName
   }
   state.adsDimension = parseIntParam(params, 'ads_d', 3, 7)

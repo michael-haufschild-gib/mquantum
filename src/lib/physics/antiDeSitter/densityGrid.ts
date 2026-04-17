@@ -246,9 +246,9 @@ const BTZ_HORIZON_SHELL = 0.04
  *   visible(r_+) = clamp(0.066 + 0.68·r_+, 0.10, 0.55)
  *
  * Anchors: (0.05 → 0.10), (0.3 → 0.270), (2.0 → 0.55). At the default r_+ =
- * 0.3 this is close to the legacy 0.35 so existing peak-position tests still
- * pass; small-r_+ presets (`btzHotSmall` at 0.15) shrink to ~0.17 and large-
- * r_+ presets (`btzCoolLarge` at 1.5) saturate at 0.55 — a visible ≈5.5× span.
+ * 0.3 this maps to 0.270; small-r_+ presets (`btzHotSmall` at 0.15) shrink
+ * to ~0.17 and large-r_+ presets (`btzCoolLarge` at 1.5) saturate at 0.55 —
+ * a visible ≈5.5× span.
  */
 const BTZ_VISIBLE_HORIZON_MIN = 0.1
 const BTZ_VISIBLE_HORIZON_MAX = 0.55
