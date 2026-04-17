@@ -92,7 +92,7 @@ function isCycleAllowed(cycleFiles) {
 // Run madge
 let output
 try {
-  output = execSync('npx madge --circular --extensions ts,tsx --json src/', {
+  output = execSync('pnpm exec madge --circular --extensions ts,tsx --json src/', {
     cwd: ROOT,
     encoding: 'utf-8',
     stdio: ['pipe', 'pipe', 'pipe'],

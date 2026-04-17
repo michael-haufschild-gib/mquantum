@@ -4,7 +4,7 @@
  * Measures execution time of critical CPU-side physics math functions.
  * These functions run per-frame and directly impact frame rate.
  *
- * Run: npx vitest bench src/tests/lib/physics/physicsPerformance.bench.ts
+ * Run: pnpm exec vitest bench src/tests/lib/physics/physicsPerformance.bench.ts
  *
  * @module tests/lib/physics/physicsPerformance.bench
  */

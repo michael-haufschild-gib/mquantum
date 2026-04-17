@@ -15,7 +15,7 @@
  *   no-compositing  — skip gradient+emission+compositing entirely
  *
  * Run:
- *   BENCHMARK_DPR=2 npx playwright test scripts/playwright/shader-ab-profiling.spec.ts --workers=1
+ *   BENCHMARK_DPR=2 pnpm exec playwright test scripts/playwright/shader-ab-profiling.spec.ts --workers=1
  */
 
 import { test } from './fixtures'

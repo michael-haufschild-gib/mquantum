@@ -26,10 +26,10 @@ These docs are auto-loaded via `@import` — refer to them for details:
 
 | Command | Purpose |
 |---------|---------|
-| `npm run dev` | Dev server (already running — do NOT start) |
-| `npm run build` | Full build: wasm:build -> tsc -b -> vite build |
-| `npx vitest run` | Unit tests |
-| `npx vite build` | Vite-only build (skips tsc) |
+| `pnpm run dev` | Dev server (already running — do NOT start) |
+| `pnpm run build` | Full build: wasm:build -> tsc -b -> vite build |
+| `pnpm exec vitest run` | Unit tests |
+| `pnpm exec vite build` | Vite-only build (skips tsc) |
 
 ## Code Style (Quick Reference)
 

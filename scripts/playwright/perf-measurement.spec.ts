@@ -4,7 +4,7 @@
  * Measures frame rate for key quantum modes to verify rendering performance.
  * Not a pass/fail test — captures metrics for before/after comparison.
  *
- * Run: npx playwright test scripts/playwright/perf-measurement.spec.ts
+ * Run: pnpm exec playwright test scripts/playwright/perf-measurement.spec.ts
  */
 
 import { expect, test } from '@playwright/test'

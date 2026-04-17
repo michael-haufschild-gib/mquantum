@@ -6,17 +6,17 @@ When completing a coding task, perform these steps:
 
 ```bash
 # Lint the code
-npm run lint
+pnpm run lint
 
 # Format the code
-npm run format
+pnpm run format
 ```
 
 ## 2. Run Tests
 
 ```bash
 # Run all tests (REQUIRED before completing)
-npm test
+pnpm test
 ```
 
 - **Fix any failing tests** - do not weaken assertions

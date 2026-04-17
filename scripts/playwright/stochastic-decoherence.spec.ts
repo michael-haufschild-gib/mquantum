@@ -14,7 +14,7 @@
  * Chain of trust:
  *   WGSL shader → GPU compute → readback buffer → mapAsync → Zustand store → assertion
  *
- * Run: npx playwright test scripts/playwright/stochastic-decoherence.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/stochastic-decoherence.spec.ts --workers=1
  */
 
 import { expect, test } from './fixtures'

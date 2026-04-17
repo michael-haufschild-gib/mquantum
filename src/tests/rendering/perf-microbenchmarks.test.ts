@@ -4,7 +4,7 @@
  * Measures hot-path functions that run per-frame or per-state-change.
  * Use these baselines to verify optimization impact.
  *
- * Run: npx vitest run src/tests/rendering/perf-microbenchmarks.test.ts
+ * Run: pnpm exec vitest run src/tests/rendering/perf-microbenchmarks.test.ts
  */
 
 import { describe, expect, it } from 'vitest'

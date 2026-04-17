@@ -17,11 +17,11 @@
 
 | Command | Purpose |
 |---------|---------|
-| `npx vitest run` | Run all unit tests |
-| `npx vitest run src/tests/path/to/test.test.ts` | Run specific test file |
-| `npx vitest run -t "pattern"` | Run tests matching pattern |
-| `npx playwright test` | Run all E2E tests |
-| `npx playwright test scripts/playwright/spec.spec.ts` | Run specific E2E test |
+| `pnpm exec vitest run` | Run all unit tests |
+| `pnpm exec vitest run src/tests/path/to/test.test.ts` | Run specific test file |
+| `pnpm exec vitest run -t "pattern"` | Run tests matching pattern |
+| `pnpm exec playwright test` | Run all E2E tests |
+| `pnpm exec playwright test scripts/playwright/spec.spec.ts` | Run specific E2E test |
 
 ## Test Placement
 

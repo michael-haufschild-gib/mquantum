@@ -89,6 +89,6 @@ core-utils (leaf) <- physics <- stores -> shaders
                   shaders-schroedinger    rendering -> stores
 ```
 
-**Enforcement**: `scripts/check-chunk-cycles.js` runs as part of `npm run build` and fails CI on circular chunk dependencies.
+**Enforcement**: `scripts/check-chunk-cycles.js` runs as part of `pnpm run build` and fails CI on circular chunk dependencies.
 
 **File**: `vite.config.ts` (assignChunk function)

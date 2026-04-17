@@ -9,7 +9,7 @@
  * - Larger grid sizes
  * - Multiple simulation steps per rendered frame
  *
- * Run: npx playwright test scripts/playwright/compute-mode-profiling.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/compute-mode-profiling.spec.ts --workers=1
  */
 
 import { test } from './fixtures'

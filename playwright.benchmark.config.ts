@@ -40,7 +40,7 @@ export default defineConfig({
   },
 
   webServer: {
-    command: `npm run dev -- --port ${devServerPort} --strictPort`,
+    command: `pnpm run dev -- --port ${devServerPort} --strictPort`,
     url: `http://localhost:${devServerPort}`,
     reuseExistingServer: true,
     stdout: 'ignore',

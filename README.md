@@ -31,8 +31,8 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 
 ## Prerequisites
 
-- Node.js 22+
-- npm 10+
+- Node.js 24+
+- pnpm 10+
 - A browser with WebGPU support (Chrome/Edge 113+, Firefox Nightly)
 - (Optional) Rust toolchain + wasm-pack for WASM builds
 
@@ -40,10 +40,10 @@ The project exists as an experiment in pushing the limits of vibecoding with Cla
 
 ```bash
 # Install dependencies
-npm ci
+pnpm install --frozen-lockfile
 
 # Start dev server on port 3000
-npm run dev
+pnpm run dev
 ```
 
 Opens at `http://localhost:3000`.
@@ -62,15 +62,15 @@ Opens at `http://localhost:3000`.
 | `make type-check` | Run TypeScript type checker |
 | `make ci` | Run full CI pipeline (lint + type-check + test + build) |
 
-Or use npm directly:
+Or use pnpm directly:
 
 ```bash
-npm run dev        # Dev server
-npm run build      # Full build (wasm + tsc + vite)
-npm run build:web  # Web-only build (tsc + vite)
-npx vitest run     # Unit tests
-npx eslint .       # Lint
-npx tsc -b         # Type check
+pnpm run dev          # Dev server
+pnpm run build        # Full build (wasm + tsc + vite)
+pnpm run build:web    # Web-only build (tsc + vite)
+pnpm exec vitest run  # Unit tests
+pnpm exec eslint .    # Lint
+pnpm exec tsc -b      # Type check
 ```
 
 ## Architecture
@@ -152,7 +152,7 @@ The quantum math implementations are validated by an extensive automated test su
 - **TDSE dynamics**: Energy conservation, probability normalization, potential evaluation
 - **BEC/Dirac/Pauli**: Mode-specific diagnostics and state evolution correctness
 
-Run `npx vitest run` to execute the full suite (6300+ tests, 385 test files).
+Run `pnpm exec vitest run` to execute the full suite (6300+ tests, 385 test files).
 
 ## CI/CD
 

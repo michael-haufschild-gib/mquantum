@@ -6,8 +6,8 @@ Developer onboarding for the mquantum codebase. This guide gets you from `git cl
 
 | Requirement | Version | Check |
 |-------------|---------|-------|
-| Node.js | >= 20 | `node --version` |
-| npm | >= 10 | `npm --version` |
+| Node.js | >= 24 | `node --version` |
+| pnpm | >= 10 | `pnpm --version` |
 | Chrome/Chromium | >= 113 with WebGPU | `chrome://gpu` shows "WebGPU: Hardware accelerated" |
 | Rust + wasm-pack | Latest stable | Only needed for WASM rebuilds; pre-built binary is committed |
 
@@ -16,8 +16,8 @@ Safari is not supported (WGSL compiler hangs on deep nested loops).
 ## First Run
 
 ```bash
-npm ci                # Install dependencies (uses lockfile)
-npm run dev           # Starts Vite dev server on http://localhost:3000
+pnpm install --frozen-lockfile   # Install dependencies (uses lockfile)
+pnpm run dev                     # Starts Vite dev server on http://localhost:3000
 ```
 
 The app opens in your default browser. You should see a rotating 3D quantum wavefunction.
@@ -43,25 +43,25 @@ For detailed file placement rules, see [architecture.md](architecture.md).
 ### Run tests
 
 ```bash
-npx vitest run                          # All unit tests (~6300 tests)
-npx vitest run src/tests/stores/        # Tests for a specific directory
-npx vitest run -t "hermite"             # Tests matching a pattern
-npx playwright test                     # E2E tests (needs GPU)
+pnpm exec vitest run                          # All unit tests (~6300 tests)
+pnpm exec vitest run src/tests/stores/        # Tests for a specific directory
+pnpm exec vitest run -t "hermite"             # Tests matching a pattern
+pnpm exec playwright test                     # E2E tests (needs GPU)
 ```
 
 ### Check code quality
 
 ```bash
-npm run lint                            # ESLint (zero warnings tolerance)
-npm run lint:css                        # Stylelint (oklch colors, logical properties)
-npx tsc -b --noEmit                     # TypeScript strict check
+pnpm run lint                                 # ESLint (zero warnings tolerance)
+pnpm run lint:css                             # Stylelint (oklch colors, logical properties)
+pnpm exec tsc -b --noEmit                     # TypeScript strict check
 ```
 
 ### Build for production
 
 ```bash
-npm run build                           # Full: WASM + tsc + Vite + bundle checks
-npm run build:web                       # Web only: tsc + Vite + bundle checks (skips WASM)
+pnpm run build                                # Full: WASM + tsc + Vite + bundle checks
+pnpm run build:web                            # Web only: tsc + Vite + bundle checks (skips WASM)
 ```
 
 The build pipeline includes chunk cycle detection and bundle size budget enforcement.

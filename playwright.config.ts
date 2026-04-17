@@ -14,7 +14,7 @@ export default defineConfig({
   // Exclude profiling/benchmark instrumentation from the default test run.
   // These files contain zero assertions — they measure GPU timing and print
   // tables, but do not verify correctness. Run them explicitly:
-  //   npx playwright test scripts/playwright/perf-benchmark.spec.ts
+  //   pnpm exec playwright test scripts/playwright/perf-benchmark.spec.ts
   testIgnore: [
     '**/perf-benchmark.spec.ts',
     '**/compute-mode-profiling.spec.ts',
@@ -42,7 +42,7 @@ export default defineConfig({
   },
 
   webServer: {
-    command: `npm run dev -- --port ${devServerPort} --strictPort`,
+    command: `pnpm run dev -- --port ${devServerPort} --strictPort`,
     url: `http://localhost:${devServerPort}`,
     reuseExistingServer: !process.env.CI,
     stdout: 'ignore',

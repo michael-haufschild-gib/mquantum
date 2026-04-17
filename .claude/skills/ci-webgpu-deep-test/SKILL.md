@@ -227,13 +227,13 @@ For most configs: use `minPixels: 5` (default).
 
 ## After Writing
 
-1. Run the new spec: `npx playwright test scripts/playwright/{file}.spec.ts --workers=1`
+1. Run the new spec: `pnpm exec playwright test scripts/playwright/{file}.spec.ts --workers=1`
 2. Expect 10-30% of tests to fail on first run. Debug each failure by category:
    - **Timing**: output is faint or async pipeline needs more frames → increase frame wait or lower `minPixels`
    - **Physically blank**: a config combination produces correct-but-empty output (like kSpaceOccupation + vacuum) → gate the combination in the UI or skip the pixel assertion
    - **Real bug**: GPU error, shader compilation failure, blank output where something should render → keep the test, report the finding
 3. If a test reveals a real rendering bug, keep the test failing and report it — do not weaken assertions to make it pass.
-4. Run lint: `npx eslint scripts/playwright/{file}.spec.ts --max-warnings 0 --no-warn-ignored`
+4. Run lint: `pnpm exec eslint scripts/playwright/{file}.spec.ts --max-warnings 0 --no-warn-ignored`
 
 ## Output
 

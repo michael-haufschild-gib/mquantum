@@ -14,7 +14,7 @@
  *
  * Scope: 3D+ volumetric modes only (density grid disabled for 2D and isosurface).
  *
- * Run: npx playwright test scripts/playwright/physics-density-oracle.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/physics-density-oracle.spec.ts --workers=1
  */
 
 import { expect, test } from './fixtures'

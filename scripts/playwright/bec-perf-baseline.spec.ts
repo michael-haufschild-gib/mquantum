@@ -4,7 +4,7 @@
  * Measures every BEC scenario preset with full per-pass GPU timing.
  * Writes machine-readable JSON to logs/bec_baseline_<timestamp>.json.
  *
- * Run: npx playwright test scripts/playwright/bec-perf-baseline.spec.ts --workers=1
+ * Run: pnpm exec playwright test scripts/playwright/bec-perf-baseline.spec.ts --workers=1
  */
 
 import fs from 'node:fs'
