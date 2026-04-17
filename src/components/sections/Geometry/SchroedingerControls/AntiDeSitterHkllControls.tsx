@@ -21,7 +21,6 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { AdsHkllSource, AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
@@ -68,12 +67,7 @@ export const AntiDeSitterHkllControls: React.FC<{ ads: AntiDeSitterConfig }> = R
     }, [d, mL, branch])
 
     return (
-      <ControlGroup
-        title="HKLL Bulk Reconstruction"
-        collapsible
-        defaultOpen
-        data-testid="ads-hkll-group"
-      >
+      <div className="space-y-2" data-testid="ads-hkll-group">
         <ToggleGroup
           options={SOURCE_OPTIONS}
           value={hkllBoundarySource}
@@ -126,7 +120,7 @@ export const AntiDeSitterHkllControls: React.FC<{ ads: AntiDeSitterConfig }> = R
             </div>
           )}
         </div>
-      </ControlGroup>
+      </div>
     )
   }
 )

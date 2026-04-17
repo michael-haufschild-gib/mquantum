@@ -28,6 +28,7 @@ import {
   adsEnergy,
   isBelowBF,
   isInKWWindow,
+  mSquaredL2,
   resolveDelta,
   tachyonGrowthRate,
 } from '@/lib/physics/antiDeSitter/math'
@@ -79,7 +80,7 @@ function AdsStatusChips({
   const bfTone = isTachyon ? 'red' : 'green'
   const bfLabel = isTachyon ? `Tachyon γ=${growthRate.toFixed(2)}` : 'BF OK'
   const bfTooltip = isTachyon
-    ? `m²L² = ${(mL >= 0 ? mL * mL : -mL * mL).toFixed(2)} < −(d−1)²/4 = ${(-((d - 1) * (d - 1)) / 4).toFixed(2)}. The state amplifies in time as cosh(γt); the renderer multiplies |ψ|² by cosh²(γt) at render time.`
+    ? `m²L² = ${mSquaredL2(mL).toFixed(2)} < −(d−1)²/4 = ${(-((d - 1) * (d - 1)) / 4).toFixed(2)}. The state amplifies in time as cosh(γt); the renderer multiplies |ψ|² by cosh²(γt) at render time.`
     : 'Breitenlohner-Freedman bound satisfied — state is normalisable.'
 
   const inKW = isInKWWindow(d, mL)
@@ -356,15 +357,17 @@ export const AntiDeSitterControls: React.FC = React.memo(() => {
         </ControlGroup>
       )}
 
-      <ControlGroup title="HKLL Bulk Reconstruction" collapsible defaultOpen>
-        <Switch
-          label="HKLL reconstruction"
-          checked={hkllEnabled}
-          onCheckedChange={setHkllEnabled}
-          data-testid="ads-hkll-toggle"
-        />
-        {hkllEnabled && <AntiDeSitterHkllControls ads={ads} />}
-      </ControlGroup>
+      {!btzActive && (
+        <ControlGroup title="HKLL Bulk Reconstruction" collapsible defaultOpen>
+          <Switch
+            label="HKLL reconstruction"
+            checked={hkllEnabled}
+            onCheckedChange={setHkllEnabled}
+            data-testid="ads-hkll-toggle"
+          />
+          {hkllEnabled && <AntiDeSitterHkllControls ads={ads} />}
+        </ControlGroup>
+      )}
 
       {d === 3 && !hkllActive && <AntiDeSitterBtzControls ads={ads} />}
 

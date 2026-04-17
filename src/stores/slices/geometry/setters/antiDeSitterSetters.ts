@@ -157,8 +157,11 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         return
       }
       const l = ctx.get().schroedinger.antiDeSitter.l
-      // `|| 0` normalises JS −0 to +0 when l = 0.
-      const clampedM = clampInt(m, -l, l) || 0
+      // Normalise JS −0 to +0 explicitly; `clampInt` of 0 with l = 0 yields
+      // the sign-preserving −0 which survives round-trips and confuses
+      // integer comparisons downstream.
+      const raw = clampInt(m, -l, l)
+      const clampedM = raw === 0 ? 0 : raw
       applyWithReset(ctx, { m: clampedM, preset: 'custom' })
     },
     setAdsMassParameter: (mL) => {
@@ -242,7 +245,8 @@ export function createAntiDeSitterSetters(ctx: SetterContext): AntiDeSitterSette
         ctx.warnNonFinite('antiDeSitter.btzAngularM', m)
         return
       }
-      const clampedM = clampInt(m, btzAngularMMin, btzAngularMMax) || 0
+      const raw = clampInt(m, btzAngularMMin, btzAngularMMax)
+      const clampedM = raw === 0 ? 0 : raw
       applyWithReset(ctx, { btzAngularM: clampedM, preset: 'custom' })
     },
     setAdsHkllEnabled: (enabled) => {

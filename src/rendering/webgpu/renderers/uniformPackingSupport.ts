@@ -535,6 +535,15 @@ export function packAdsTimeEvolution(
     floatView[I.adsGrowthRate] = 0
     return
   }
+  // Stage 2B: HKLL non-eigenstate sources (localized spot, planeWave) have no
+  // well-defined single-mode energy — the bound-state (n, ℓ) sliders are
+  // hidden in these modes, so rotating the phase at that stale rate would be
+  // physically meaningless. Eigenstate mode keeps the standard E·t rotation.
+  if (ads.hkllEnabled && ads.hkllBoundarySource !== 'eigenstate') {
+    floatView[I.adsEnergy] = 0
+    floatView[I.adsGrowthRate] = 0
+    return
+  }
   const growth = computeAdsGrowthRate(ads.d, ads.mL)
   if (growth > 0) {
     floatView[I.adsEnergy] = 0

@@ -263,7 +263,13 @@ fn volumeRaymarchGrid(
     if (DENSITY_GRID_HAS_PHASE) {
       let rotatedB = gridSample.b
         - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
-      phase = select(rotatedB, gridSample.a, COLOR_ALGORITHM == 10);
+      // AdS (mode 8) packs boundary-overlay / horizon-marker intensity into
+      // channel A, not a radian-valued relative phase. Fall back to the
+      // spatial-phase (B) channel so the relativePhase palette doesn't read
+      // [0, 1] overlay amplitudes as phase angles. quantumMode is i32 so
+      // compare with the signed literal 8 rather than the u32 suffix 8u.
+      let useRelPhase = (COLOR_ALGORITHM == 10) && (uniforms.quantumMode != 8);
+      phase = select(rotatedB, gridSample.a, useRelPhase);
     } else {
       phase = 0.0;
     }

@@ -175,18 +175,14 @@ export function hkllKernel(
   // Guard against lightcone divergence; Δ − d is typically negative so
   // (neg)^{Δ−d} = 1/(neg)^{d−Δ}.
   const negSafe = neg < KERNEL_EPSILON ? KERNEL_EPSILON : neg
-  const power = Math.pow(negSafe, Delta - d)
-  // The proper HKLL prefactor carries a `(d − Δ − 1)` factor that reverses
-  // sign across the Δ = d − 1 point. For the physical bulk modes (Δ ≥
-  // (d−1)/2 via the BF bound) we take sign = sign(d−Δ−1) so that the
-  // simplified kernel preserves the direction of the reconstruction even
-  // though the magnitude is absorbed by peak normalisation. At Δ = d − 1
-  // exactly (many preset points) we adopt the Δ→(d−1)⁻ limit sign (+1),
-  // which matches the HKLL expansion's projection onto positive-energy
-  // bulk eigenstates.
-  const diff = d - Delta - 1
-  const sign = diff > 0 ? 1 : diff < 0 ? -1 : 1
-  return sign * power
+  // Peak normalisation in the density packer discards the absolute sign of
+  // the reconstructed field, and the full HKLL prefactor (d − Δ − 1)/π
+  // flips sign across Δ = d − 1. Returning a signed kernel caused a visible
+  // phase discontinuity (rendered color wheel jump) when sweeping mL across
+  // the massless point — exactly where several presets (hkllEigenstateCheck,
+  // hkllBoundarySpot, hkllBoundaryPlaneWave) sit. Return the magnitude
+  // kernel; the boundary source carries any physical sign.
+  return Math.pow(negSafe, Delta - d)
 }
 
 /**
@@ -439,8 +435,8 @@ export function reconstructBulkFromSampleGrid(
   const secRho = 1 / Math.cos(rho)
   const tanRho = Math.tan(rho)
   const expo = params.delta - params.d
-  const diff = params.d - params.delta - 1
-  const sign = diff > 0 ? 1 : diff < 0 ? -1 : 1
+  // Magnitude-only kernel — see `hkllKernel` rationale for why the sign
+  // from the (d − Δ − 1) prefactor is dropped.
 
   let re = 0
   let im = 0
@@ -462,7 +458,7 @@ export function reconstructBulkFromSampleGrid(
         if (sigma >= 0) continue
         const neg = -sigma
         const negSafe = neg < KERNEL_EPSILON ? KERNEL_EPSILON : neg
-        const K = sign * Math.pow(negSafe, expo)
+        const K = Math.pow(negSafe, expo)
         const measure = params.d <= 3 ? dTauGrid * dPhi : sinThetaP * dTauGrid * dTheta * dPhi
         const weight = K * measure
         const k = (iτ * nTheta + iθ) * params.nPhi + iφ

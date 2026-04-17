@@ -124,7 +124,13 @@ export function generateColorSample(useDensityGrid: boolean): string {
     if (IS_DUAL_CHANNEL) {
       dualSecondary = gridColor.g * isoGain;
     }
-    phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
+    // AdS (mode 8) reuses the .a channel as boundary-overlay / horizon marker
+    // intensity, NOT a relative-phase angle. Force phase-based palettes back to
+    // the spatial-phase channel B so the relativePhase palette stays sane.
+    // quantumMode is i32 (see SchroedingerUniforms layout) — compare with the
+    // signed literal 8 to keep WGSL strict type checking happy.
+    let useRelPhase = (COLOR_ALGORITHM == 10) && (schroedinger.quantumMode != 8);
+    phase = select(gridColor.b, gridColor.a, useRelPhase);
   } else {
     let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
     rhoSurface = densityInfo.x * isoGain;

@@ -32,7 +32,13 @@
  *   n_β(x) = 1 / (exp(β·x) − 1),
  * inverse temperature β = 1/T_H, and the asymptotic radial × angular
  * envelope
- *   |R_∞(r, φ)|² = (r_+/r)^{2Δ} · cos²(m_A · φ).
+ *   |R_∞(r, φ)|² = (r_+/r)^{2Δ} · A_{m_A}(φ),
+ * where A uses a signed cos/sin basis so ±m_A give distinguishable patterns
+ *   A_{m_A}(φ) = cos²(m_A φ) if m_A ≥ 0,
+ *              = sin²(|m_A|φ) if m_A < 0.
+ * Both are positive-definite with 2|m_A| lobes on S¹; the sin branch is the
+ * cos branch rotated by π/(2|m_A|), so sweeping m_A through zero smoothly
+ * reorients the angular interference.
  *
  * Near the horizon f(r) → 0 drives ω_loc → 0 so n_β ~ T_H/ω_loc ~ 1/√f,
  * reproducing the expected Hartle-Hawking thermal divergence — clamped
@@ -199,8 +205,17 @@ export function btzThermalAmplitude(
   const ratio = rplus / r
   const radialPow = Math.pow(ratio, 2 * delta)
 
-  // Angular harmonic cos²(m_A φ) — 2|m_A| lobes, positive definite.
-  const ang = mAngular === 0 ? 1 : Math.cos(mAngular * phi) ** 2
+  // Angular harmonic — 2|m_A| lobes, positive definite. Cos for m_A ≥ 0,
+  // sin for m_A < 0 so negative m_A gives a distinct (π/(2|m_A|)-rotated)
+  // pattern rather than aliasing onto +m_A.
+  let ang: number
+  if (mAngular === 0) {
+    ang = 1
+  } else if (mAngular > 0) {
+    ang = Math.cos(mAngular * phi) ** 2
+  } else {
+    ang = Math.sin(-mAngular * phi) ** 2
+  }
 
   let amp = nBeta * radialPow * ang
   if (!Number.isFinite(amp) || amp < 0) amp = 0

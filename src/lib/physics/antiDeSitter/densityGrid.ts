@@ -61,7 +61,6 @@ export interface AdsDensityUpload {
 
 const BOUNDARY_SHELL_MIN = 0.975
 const BOUNDARY_SHELL_MAX = 0.995
-const BOUNDARY_OVERLAY_MAX = 100
 const WORLD_HALF_EXTENT = 1.0
 
 function clamp01(v: number): number {
@@ -163,14 +162,18 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
     }
   }
 
-  // Second pass: optional boundary overlay magnitude. We evaluate
-  // |ψ|²·cos^{-2Δ}(ρ) on the thin shell r ∈ [0.975, 0.995] (compactified
-  // coordinate), then clamp and normalise against the bulk peak so channel A
-  // stays in [0, 1] for the downstream raymarcher.
+  // Second pass: optional boundary overlay. The asymptotic CFT primary
+  // envelope |O|²(Ω) = lim_{ρ→π/2} R²(ρ)/cos^{2Δ}(ρ) · Y² factorises
+  // analytically into N² · sin^{2ℓ}(ρ) · P_n^{(α,β)}(cos 2ρ)² · Y_ℓm²(Ω)
+  // — the cos^{2Δ} / cos^{−2Δ} factors cancel exactly, so no overflow
+  // guard or amplitude cap is needed. Evaluating at the shell ρ (rather
+  // than literally ρ = π/2) picks up a smooth sub-leading correction
+  // that fades near the shell's outer edge, which is what we want to
+  // visualise.
   const boundary = new Float32Array(total)
   let peakBoundary = 0
   if (config.boundaryOverlay) {
-    const boundaryCap = BOUNDARY_OVERLAY_MAX * peakDensity
+    const norm2 = norm * norm
     for (let z = 0; z < N; z++) {
       const wz = ((z + 0.5) / N) * 2 - 1
       for (let y = 0; y < N; y++) {
@@ -182,14 +185,23 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
           if (rCompact < BOUNDARY_SHELL_MIN || rCompact >= BOUNDARY_SHELL_MAX) continue
           const rho = 2 * Math.atan(rCompact)
           if (rho <= 0 || rho >= Math.PI / 2) continue
-          const cosRho = Math.cos(rho)
-          // cos^{-2Δ}(ρ) grows rapidly near ρ=π/2; rely on the cap below
-          // rather than attempting analytical clamping.
-          const cosPower = Math.pow(cosRho, -2 * delta)
-          const rho2 = bulk[pixelIdx]!
-          let value = rho2 * cosPower
-          if (!Number.isFinite(value)) value = boundaryCap
-          if (value > boundaryCap) value = boundaryCap
+          const sinRho = Math.sin(rho)
+          const sin2l = config.l === 0 ? 1 : Math.pow(sinRho, 2 * config.l)
+          const jacobi = jacobiP(config.n, alpha, beta, Math.cos(2 * rho))
+          // Angular part on the visible 2-sphere slice (same convention
+          // as the bulk packing above — keeps the overlay aligned with
+          // the bulk angular structure).
+          let Y: number
+          if (config.l === 0) {
+            Y = 1 / Math.sqrt(4 * Math.PI)
+          } else {
+            const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
+            const invR = radius3D > 1e-10 ? 1 / radius3D : 0
+            const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
+            const phi = Math.atan2(wy, wx)
+            Y = sphericalHarmonicReal(config.l, config.m, theta, phi)
+          }
+          const value = norm2 * sin2l * jacobi * jacobi * Y * Y
           boundary[pixelIdx] = value
           if (value > peakBoundary) peakBoundary = value
         }
@@ -402,13 +414,15 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
     planeWaveM: config.hkllPlaneWaveM,
   })
 
-  // Coarse buffers: Re(ψ), Im(ψ), |ψ|². Kept as Float32Array for the
-  // trilinear upsampler, then written into rgba16float.
+  // Coarse buffers: Re(ψ), Im(ψ). The density |ψ|² is derived from the
+  // interpolated (re, im) pair AFTER upsampling — interpolating rho² on its
+  // own would produce rho² · trilinear ≠ |re·trilinear|² + |im·trilinear|²
+  // at points between opposite-phase voxels (finite density + random phase
+  // from quantisation noise = visible sparkle near nodal surfaces).
   const C = config.d <= 3 ? HKLL_COARSE_SIZE_S1 : HKLL_COARSE_SIZE_S2
   const coarseTotal = C ** 3
   const reField = new Float32Array(coarseTotal)
   const imField = new Float32Array(coarseTotal)
-  const rhoField = new Float32Array(coarseTotal)
   let peakDensity = 1e-20
 
   // Precompute the boundary source samples on the τ' × Ω' grid once. The
@@ -436,7 +450,6 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
         const re = reField[pixelIdx]!
         const im = imField[pixelIdx]!
         const rho2 = re * re + im * im
-        rhoField[pixelIdx] = rho2
         if (rho2 > peakDensity) peakDensity = rho2
       }
     }
@@ -444,7 +457,10 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
 
   const peakNorm = peakDensity > 1e-20 ? 1 / peakDensity : 0
 
-  // Trilinear upsample into the packed density.
+  // Trilinear upsample into the packed density. rho² is derived from the
+  // INTERPOLATED (re, im) pair rather than from a separately-interpolated
+  // rho² field, so density and phase stay self-consistent across nodal
+  // surfaces (both go to zero together, no sparkly/random phase angle).
   for (let z = 0; z < N; z++) {
     const fz = ((z + 0.5) / N) * C - 0.5
     const iz0 = Math.max(0, Math.min(C - 1, Math.floor(fz)))
@@ -463,7 +479,7 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
 
         const re = trilinear(reField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
         const im = trilinear(imField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
-        const rho2 = trilinear(rhoField, C, ix0, iy0, iz0, ix1, iy1, iz1, tx, ty, tz)
+        const rho2 = re * re + im * im
         const outIdx = (z * N + y) * N + x
 
         const r = clamp01(rho2 * peakNorm)
