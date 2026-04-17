@@ -21,6 +21,13 @@ export interface DiracBufferResult {
   fftStagingBuffer: GPUBuffer
   fftAxisUniformBuffer: GPUBuffer
   fftAxisStagingBuffer: GPUBuffer
+  /**
+   * Per-slot FFT axis uniform buffers (one per axis per direction).
+   * Enables batching every FFT axis dispatch into a single open compute pass
+   * without copyBufferToBuffer forcing pass boundaries. Length = latticeDim * 2
+   * (latticeDim forward axes followed by latticeDim inverse axes).
+   */
+  fftAxisUniformBuffers: GPUBuffer[]
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   diagUniformBuffer: GPUBuffer
@@ -49,6 +56,7 @@ export interface DiracDestroyableBuffers {
   fftStagingBuffer: GPUBuffer | null
   fftAxisUniformBuffer: GPUBuffer | null
   fftAxisStagingBuffer: GPUBuffer | null
+  fftAxisUniformBuffers: GPUBuffer[] | null
   packUniformBuffer: GPUBuffer | null
   packUniformBufferNoNorm: GPUBuffer | null
   diagUniformBuffer: GPUBuffer | null
@@ -101,6 +109,13 @@ export interface DiracBindGroupResult {
   fftStageABBG: GPUBindGroup | null
   fftStageBABG: GPUBindGroup | null
   fftSharedMemBG: GPUBindGroup | null
+  /**
+   * Per-slot shared-memory FFT bind groups (one per axis per direction).
+   * Indexed by fftSlot: forward axes in [0, latticeDim), inverse axes in
+   * [latticeDim, 2*latticeDim). Populated when the buffer layer provides
+   * per-slot uniform buffers; enables single-compute-pass Strang batching.
+   */
+  fftSharedMemBGs: GPUBindGroup[]
   kineticBG: GPUBindGroup | null
   writeGridBG: GPUBindGroup | null
   diagReduceBG: GPUBindGroup | null
@@ -123,6 +138,7 @@ export interface DiracBindGroupInputs {
   fftScratchB: GPUBuffer
   fftUniformBuffer: GPUBuffer
   fftAxisUniformBuffer: GPUBuffer
+  fftAxisUniformBuffers: GPUBuffer[]
   packUniformBuffer: GPUBuffer
   packUniformBufferNoNorm: GPUBuffer
   densityTextureView: GPUTextureView

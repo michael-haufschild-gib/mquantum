@@ -55,6 +55,9 @@ export function rebuildDiracBuffers(
   old.fftStagingBuffer?.destroy()
   old.fftAxisUniformBuffer?.destroy()
   old.fftAxisStagingBuffer?.destroy()
+  if (old.fftAxisUniformBuffers) {
+    for (const b of old.fftAxisUniformBuffers) b.destroy()
+  }
   old.packUniformBuffer?.destroy()
   old.packUniformBufferNoNorm?.destroy()
   old.diagUniformBuffer?.destroy()
@@ -156,6 +159,25 @@ export function rebuildDiracBuffers(
   const fftAxisStagingData = buildFFTAxisStagingData(config, totalSites)
   device.queue.writeBuffer(fftAxisStagingBuffer, 0, fftAxisStagingData)
 
+  // PERF: per-slot uniform buffers for batched Strang-step FFT dispatch.
+  // Each (axis, direction) gets its own uniform buffer with its 32-byte
+  // FFTAxisUniforms struct pre-populated, so every FFT axis can dispatch
+  // inside a single open compute pass by just switching bind groups — no
+  // copyBufferToBuffer forces a pass boundary. Layout mirrors TDSE.
+  const fftAxisUniformBuffers: GPUBuffer[] = new Array(axisSlotCount)
+  const axisStagingBytes = new Uint8Array(fftAxisStagingData)
+  for (let slot = 0; slot < axisSlotCount; slot++) {
+    const buf = helpers.createUniformBuffer(
+      device,
+      FFT_UNIFORM_SIZE,
+      `dirac-fft-axis-uniforms-${slot}`
+    )
+    const slotOffset = slot * FFT_UNIFORM_SIZE
+    const slotData = axisStagingBytes.slice(slotOffset, slotOffset + FFT_UNIFORM_SIZE)
+    device.queue.writeBuffer(buf, 0, slotData)
+    fftAxisUniformBuffers[slot] = buf
+  }
+
   // Pack uniforms (with 1/N normalization for inverse FFT unpack)
   const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
   const pu32 = new Uint32Array(packData)
@@ -228,6 +250,7 @@ export function rebuildDiracBuffers(
     fftStagingBuffer,
     fftAxisUniformBuffer,
     fftAxisStagingBuffer,
+    fftAxisUniformBuffers,
     packUniformBuffer,
     packUniformBufferNoNorm,
     diagUniformBuffer,
