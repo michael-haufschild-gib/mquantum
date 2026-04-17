@@ -26,9 +26,9 @@ import {
   sampleBoundaryFromBulkEigenstate,
 } from '@/lib/physics/antiDeSitter/hkll'
 import {
+  adsAngularHarmonic,
   computeDelta,
   radialWavefunction,
-  sphericalHarmonicReal,
 } from '@/lib/physics/antiDeSitter/math'
 
 describe('hkllKernel', () => {
@@ -183,7 +183,9 @@ describe('HKLL eigenstate reconstruction', () => {
     return denom > 1e-30 ? dotER / denom : 0
   }
 
-  // Use a coarse 8³ sample inside the ball for speed.
+  // Use a coarse 8³ sample inside the ball for speed. Reference harmonic is
+  // dimension-aware (adsAngularHarmonic) so d=3 compares against the S¹
+  // basis that the fixed packer actually writes.
   function runReconstruction(
     n: number,
     l: number,
@@ -211,7 +213,7 @@ describe('HKLL eigenstate reconstruction', () => {
           const psi = reconstructBulk(profile, rho, theta, phi, 0, params)
           recon.push(psi.re)
           const R = radialWavefunction(n, l, delta, d, rho)
-          const Y = sphericalHarmonicReal(l, m, theta, phi)
+          const Y = adsAngularHarmonic(l, m, d, theta, phi)
           exact.push(R * Y)
         }
       }
@@ -239,5 +241,18 @@ describe('HKLL eigenstate reconstruction', () => {
     // ≥0.3 |correlation| floor still rules out bugs that would scramble
     // the angular structure (random correlation would centre on 0).
     expect(Math.abs(correlation)).toBeGreaterThan(0.3)
+  })
+
+  it('reconstruction for (n=0, ℓ=1, m=0, d=3) is non-trivial and correlates with the S¹ dipole', () => {
+    // Regression: the legacy Y_ℓm(π/2, φ) boundary evaluator silently
+    // collapsed to zero for (d=3, l=1, m=0) because P_1^0(cos π/2) = 0.
+    // With the S¹-native adsAngularHarmonic branch in both the packer and
+    // the boundary eigenstate, the reconstruction is non-zero and tracks
+    // the cos(φ) standing wave. The unit-prefactor kernel approximation
+    // leaves an O(1) radial-profile mismatch (documented in hkllKernel);
+    // the ≥0.25 floor rules out sign flips or wrong-mode projection.
+    const { correlation, reconMax } = runReconstruction(0, 1, 0, 3, 0)
+    expect(reconMax).toBeGreaterThan(1e-3)
+    expect(Math.abs(correlation)).toBeGreaterThan(0.25)
   })
 })

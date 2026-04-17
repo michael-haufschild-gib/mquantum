@@ -8,7 +8,12 @@
  * @module lib/url/adsSerializer
  */
 
-import type { AdsHkllSource, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
+import type {
+  AdsHkllSource,
+  AdsPresetName,
+  AdsQuantizationBranch,
+} from '@/lib/geometry/extended/antiDeSitter'
+import { ADS_PRESET_MAP } from '@/lib/physics/antiDeSitter/presets'
 
 /** URL-side branch type (mirrors the store enum). */
 export type UrlAdsBranch = AdsQuantizationBranch
@@ -18,6 +23,10 @@ export type UrlAdsHkllSource = AdsHkllSource
 
 /** Shareable fields this module reads from the parent state type. */
 export interface AdsUrlState {
+  /** Named preset id. Emitted when a named preset is active so shared links
+   * preserve the user-visible label (without it, the raw-field round-trip
+   * would reload as `custom`). Applied before the raw fields on deserialize. */
+  adsPreset?: AdsPresetName
   adsDimension?: number
   adsRadial?: number
   adsAngular?: number
@@ -25,16 +34,15 @@ export interface AdsUrlState {
   adsMassParameter?: number
   adsBranch?: UrlAdsBranch
   adsBoundaryOverlay?: boolean
-  // Stage 2A — BTZ sub-block (only applied when d = 3 at render time;
-  // the URL carries them regardless so the toggle survives dimension
-  // swaps).
+  // Stage 2A — BTZ sub-block. Toggle is emitted only when true; sub-fields
+  // are emitted only when the toggle is on. Keeps canonical bound-state
+  // links free of dormant `ads_btz=0` noise.
   adsBtzEnabled?: boolean
   adsBtzHorizonRadius?: number
   adsBtzOmega?: number
   adsBtzAngularM?: number
-  // Stage 2B — HKLL bulk-reconstruction sub-block. Like BTZ, the toggle is
-  // URL-carried regardless of d so the user can pre-configure it and
-  // dimension-swap without losing intent.
+  // Stage 2B — HKLL bulk-reconstruction sub-block. Same gating as BTZ:
+  // emit when enabled, drop when dormant.
   adsHkllEnabled?: boolean
   adsHkllBoundarySource?: UrlAdsHkllSource
   adsHkllSourceSigma?: number
@@ -111,8 +119,18 @@ function setBoolParam(params: URLSearchParams, key: string, value: boolean | und
 /**
  * Emit the `ads_*` sub-block. Callers gate on
  * `state.quantumMode === 'antiDeSitter'`.
+ *
+ * Emission rules:
+ *   - `ads_preset` is emitted when a named (non-`custom`) preset is active.
+ *   - BTZ sub-fields are emitted only when `adsBtzEnabled === true`; the
+ *     toggle itself is also emitted only when true (dormant `ads_btz=0`
+ *     would otherwise pollute canonical bound-state links).
+ *   - HKLL sub-fields follow the same rule keyed off `adsHkllEnabled`.
  */
 export function serializeAds(params: URLSearchParams, state: AdsUrlState): void {
+  if (state.adsPreset !== undefined && state.adsPreset !== 'custom') {
+    params.set('ads_preset', state.adsPreset)
+  }
   setIntParam(params, 'ads_d', state.adsDimension)
   setIntParam(params, 'ads_n', state.adsRadial)
   setIntParam(params, 'ads_l', state.adsAngular)
@@ -122,20 +140,20 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
     params.set('ads_qb', state.adsBranch === 'alternate' ? '1' : '0')
   }
   setBoolParam(params, 'ads_bo', state.adsBoundaryOverlay)
-  // BTZ sub-block — emit only when at least one knob is defined so the
-  // canonical bound-state links stay free of empty BTZ params.
-  setBoolParam(params, 'ads_btz', state.adsBtzEnabled)
-  setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius)
-  setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega)
-  setIntParam(params, 'ads_btz_mA', state.adsBtzAngularM)
-  // HKLL sub-block. Mirrors BTZ: every defined knob is emitted explicitly
-  // so a reconstructed URL round-trips losslessly.
-  setBoolParam(params, 'ads_hkll', state.adsHkllEnabled)
-  if (state.adsHkllBoundarySource !== undefined) {
-    params.set('ads_hkll_src', HKLL_SOURCE_TO_INT[state.adsHkllBoundarySource].toString())
+  if (state.adsBtzEnabled === true) {
+    params.set('ads_btz', '1')
+    setFloatParam(params, 'ads_btz_r', state.adsBtzHorizonRadius)
+    setFloatParam(params, 'ads_btz_omega', state.adsBtzOmega)
+    setIntParam(params, 'ads_btz_mA', state.adsBtzAngularM)
   }
-  setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma)
-  setIntParam(params, 'ads_hkll_mb', state.adsHkllPlaneWaveM)
+  if (state.adsHkllEnabled === true) {
+    params.set('ads_hkll', '1')
+    if (state.adsHkllBoundarySource !== undefined) {
+      params.set('ads_hkll_src', HKLL_SOURCE_TO_INT[state.adsHkllBoundarySource].toString())
+    }
+    setFloatParam(params, 'ads_hkll_sigma', state.adsHkllSourceSigma)
+    setIntParam(params, 'ads_hkll_mb', state.adsHkllPlaneWaveM)
+  }
 }
 
 /**
@@ -148,6 +166,10 @@ export function serializeAds(params: URLSearchParams, state: AdsUrlState): void 
  * in the same transaction.
  */
 export function deserializeAds(params: URLSearchParams, state: AdsUrlState): void {
+  const presetRaw = params.get('ads_preset')
+  if (presetRaw && Object.prototype.hasOwnProperty.call(ADS_PRESET_MAP, presetRaw)) {
+    state.adsPreset = presetRaw as AdsPresetName
+  }
   state.adsDimension = parseIntParam(params, 'ads_d', 3, 7)
   state.adsRadial = parseIntParam(params, 'ads_n', 0, 4)
   state.adsAngular = parseIntParam(params, 'ads_l', 0, 3)

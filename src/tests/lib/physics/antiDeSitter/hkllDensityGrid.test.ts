@@ -130,4 +130,36 @@ describe('packAntiDeSitterDensityGrid (HKLL path)', () => {
     // d=4, mL=0 → Δ = 3.
     expect(packed.effectiveDelta).toBeCloseTo(3, 6)
   })
+
+  it('eigenstate reconstruction at (d=3, l=1) is non-zero (S¹ basis regression)', () => {
+    // Pre-fix the boundary evaluator called Y_1^0(π/2, φ) which is zero, so
+    // the reconstructed bulk was identically zero. Post-fix the S¹-native
+    // adsAngularHarmonic returns cos(φ)/√π and the reconstruction shows a
+    // cos(φ)² azimuthal profile. Peak normalisation concentrates the R
+    // channel near the HKLL peak (close to the boundary) so mid-bulk
+    // samples are small in absolute terms — we assert the ANGULAR ratio.
+    const packed = packAntiDeSitterDensityGrid(
+      hkllConfig({ d: 3, n: 0, l: 1, m: 0, hkllBoundarySource: 'eigenstate' })
+    )
+    const zC = worldToIdx(0)
+    // Find the peak along +x for this state, then compare that voxel's R
+    // to the corresponding voxel rotated by 90° (φ=π/2) which should be at
+    // a cos²(φ) node.
+    const N = DENSITY_GRID_SIZE
+    let peakX = 0
+    let peakR = 0
+    for (let x = 0; x < N; x++) {
+      const wx = ((x + 0.5) / N) * 2 - 1
+      if (wx <= 0.05 || wx >= 0.95) continue
+      const r = readRChannel(packed.density, voxelIdx(x, worldToIdx(0), zC))
+      if (r > peakR) {
+        peakR = r
+        peakX = wx
+      }
+    }
+    // Compare the +x peak against the same-radius voxel on +y (cos²(π/2)=0).
+    const rAtYNode = readRChannel(packed.density, voxelIdx(worldToIdx(0), worldToIdx(peakX), zC))
+    expect(peakR).toBeGreaterThan(0)
+    expect(peakR).toBeGreaterThan(rAtYNode + 1e-4)
+  })
 })

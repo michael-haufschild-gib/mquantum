@@ -275,4 +275,70 @@ describe('AdS URL round-trip', () => {
       expect(ads.btzEnabled).toBe(false)
     })
   })
+
+  describe('preset round-trip (ads_preset)', () => {
+    it('emits ads_preset for a named preset and restores the label', () => {
+      const serialized = serializeState({
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsPreset: 'btzHotSmall',
+      })
+      expect(serialized).toContain('ads_preset=btzHotSmall')
+      applyUrl(serialized)
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.preset).toBe('btzHotSmall')
+      expect(ads.btzEnabled).toBe(true)
+      expect(ads.btzHorizonRadius).toBeCloseTo(0.15, 5)
+    })
+
+    it('does NOT emit ads_preset when preset is "custom" or absent', () => {
+      const custom = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsPreset: 'custom',
+        adsDimension: 4,
+      })
+      expect(custom).not.toContain('ads_preset=')
+    })
+
+    it('raw-field overrides after ads_preset cascade the label to "custom"', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_preset=adsFourGround&ads_mL=1.5')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      expect(ads.mL).toBeCloseTo(1.5, 5)
+      expect(ads.preset).toBe('custom')
+    })
+
+    it('rejects unknown ads_preset values silently', () => {
+      applyUrl('qm=antiDeSitter&d=4&t=schroedinger&ads_preset=notARealPreset')
+      const ads = useExtendedObjectStore.getState().schroedinger.antiDeSitter
+      // Default preset survives since the invalid value was dropped at parse.
+      expect(ads.preset).toBe('adsFourGround')
+    })
+
+    it('does NOT emit dormant ads_btz=0 when BTZ is off', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsBtzEnabled: false,
+        adsBtzHorizonRadius: 0.5,
+      })
+      expect(serialized).not.toContain('ads_btz=')
+      expect(serialized).not.toContain('ads_btz_r=')
+    })
+
+    it('does NOT emit dormant ads_hkll=0 when HKLL is off', () => {
+      const serialized = serializeState({
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'antiDeSitter',
+        adsHkllEnabled: false,
+        adsHkllSourceSigma: 0.5,
+      })
+      expect(serialized).not.toContain('ads_hkll=')
+      expect(serialized).not.toContain('ads_hkll_sigma=')
+    })
+  })
 })

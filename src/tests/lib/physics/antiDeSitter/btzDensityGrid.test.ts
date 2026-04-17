@@ -113,7 +113,10 @@ describe('packAntiDeSitterDensityGrid (BTZ path)', () => {
     const packed = packAntiDeSitterDensityGrid(btzConfig())
     const zCenter = worldToIdx(0)
     const yCenter = worldToIdx(0)
-    const xOuter = worldToIdx(0.6)
+    // Sample just outside the visible-horizon shell. The thermal profile
+    // decays steeply away from the horizon (n_β · (r_+/r)^{2Δ}), so far-out
+    // samples land below half-float precision after peak normalisation.
+    const xOuter = worldToIdx(0.45)
     const r = readRChannel(packed.density, voxelIdx(xOuter, yCenter, zCenter))
     expect(r).toBeGreaterThan(0)
   })
@@ -184,6 +187,40 @@ describe('packAntiDeSitterDensityGrid (BTZ path)', () => {
     expect(diffCount).toBeGreaterThan(500)
   })
 
+  it('visible horizon scales with r₊: small r₊ draws horizon closer to origin than large r₊', () => {
+    // The physical thermal profile in dimensionless BTZ coordinates is r₊-
+    // invariant by construction (β·ω√f and (r_+/r)^{2Δ} cancel). To honour
+    // the UI tooltip's promise that larger r₊ looks bigger, the packer scales
+    // the world-space horizon with r₊. This test locks in that scaling.
+    const pSmall = packAntiDeSitterDensityGrid(btzConfig({ btzHorizonRadius: 0.1 }))
+    const pLarge = packAntiDeSitterDensityGrid(btzConfig({ btzHorizonRadius: 1.5 }))
+
+    // Scan outward along +x from origin; the first non-zero voxel marks the
+    // horizon's outer edge on the +x axis (inside the horizon is a zero disk).
+    function rightHorizonEdge(packed: { density: Uint16Array }): number {
+      const zCenter = worldToIdx(0)
+      const yCenter = worldToIdx(0)
+      const N = DENSITY_GRID_SIZE
+      const xCenter = worldToIdx(0)
+      for (let x = xCenter; x < N; x++) {
+        const r = readRChannel(packed.density, voxelIdx(x, yCenter, zCenter))
+        if (r > 0) {
+          return ((x + 0.5) / N) * 2 - 1
+        }
+      }
+      return Number.POSITIVE_INFINITY
+    }
+
+    const smallEdge = rightHorizonEdge(pSmall)
+    const largeEdge = rightHorizonEdge(pLarge)
+    expect(Number.isFinite(smallEdge)).toBe(true)
+    expect(Number.isFinite(largeEdge)).toBe(true)
+    // Large r₊ pushes the horizon further along +x; the edge gap should be
+    // comfortably above voxel quantisation (1 voxel ≈ 0.03 world units at
+    // N=64, so a 0.15 margin catches the intended scaling).
+    expect(largeEdge - smallEdge).toBeGreaterThan(0.15)
+  })
+
   it('varies with m_angular: non-zero m_A breaks the rotational symmetry', () => {
     const pIso = packAntiDeSitterDensityGrid(btzConfig({ btzAngularM: 0 }))
     const pAniso = packAntiDeSitterDensityGrid(btzConfig({ btzAngularM: 3 }))
@@ -192,5 +229,30 @@ describe('packAntiDeSitterDensityGrid (BTZ path)', () => {
       if (pIso.density[i] !== pAniso.density[i]) diffCount++
     }
     expect(diffCount).toBeGreaterThan(500)
+  })
+})
+
+describe('packAntiDeSitterDensityGrid (d=3 S¹ angular regression)', () => {
+  it('bound-state (d=3, l=1, m=0) produces a cos²(φ) ribbon, not Y_ℓm(π/2) zeros', () => {
+    // Pre-fix the bulk pack evaluated sphericalHarmonicReal(1, 0, θ, φ) with
+    // θ = acos(wz / |v|). At the z=0 equator this reduces to cos(π/2) = 0
+    // — the entire equatorial slab read zero density. Post-fix the S¹-native
+    // adsAngularHarmonic renders cos²(φ) regardless of wz, so +x and +y
+    // differ while both remain non-zero.
+    const packed = packAntiDeSitterDensityGrid({
+      ...DEFAULT_ANTI_DE_SITTER_CONFIG,
+      d: 3,
+      n: 0,
+      l: 1,
+      m: 0,
+      btzEnabled: false,
+    })
+    const zC = worldToIdx(0)
+    const yC = worldToIdx(0)
+    const xPos = readRChannel(packed.density, voxelIdx(worldToIdx(0.4), yC, zC))
+    const yPos = readRChannel(packed.density, voxelIdx(worldToIdx(0), worldToIdx(0.4), zC))
+    // +x (φ=0) should sit near the cos² maximum; +y (φ=π/2) near the node.
+    expect(xPos).toBeGreaterThan(0.1)
+    expect(xPos).toBeGreaterThan(yPos + 0.05)
   })
 })

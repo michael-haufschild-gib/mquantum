@@ -90,14 +90,20 @@ const WDW_PRESET_OPTIONS = WDW_SCENARIO_PRESETS.map((p) => ({
   label: p.name,
 }))
 
-/* ── Anti-de Sitter options (dimension-filtered by preset `d`) ─ */
+/* ── Anti-de Sitter options ─────────────────────────────────── */
 
-function getAdsPresetOptions(dim: number) {
-  return ADS_PRESETS.filter((p) => p.d <= dim).map((p) => ({
-    value: p.id,
-    label: p.label,
-  }))
-}
+// AdS presets carry their own boundary dimension `d` and apply it on
+// selection (via `setAdsPreset` → `setAdsDimension`). The global
+// `geometry.dimension` is the visualizer's spatial dimension — unrelated
+// to AdS's boundary dimension — so there is nothing meaningful to filter
+// against. Previously we filtered `p.d <= dim`, which could hide the
+// currently-active preset after the user changed `geometry.dimension`
+// and left the header selector showing an empty value while the AdS
+// state still pointed at that preset.
+const ADS_PRESET_OPTIONS = ADS_PRESETS.map((p) => ({
+  value: p.id,
+  label: p.label,
+}))
 
 /* ── HydrogenND options (dimension-grouped, flattened) ─────── */
 
@@ -194,7 +200,7 @@ export const ScenarioSelector: React.FC = React.memo(() => {
       case 'pauliSpinor':
         return PAULI_PRESET_OPTIONS
       case 'antiDeSitter':
-        return getAdsPresetOptions(dimension)
+        return ADS_PRESET_OPTIONS
       default:
         return null
     }

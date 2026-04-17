@@ -44,12 +44,15 @@
  * with P_0(x) = 1 and P_1(x) = ½[(α−β) + (α+β+2) x].
  *
  * ## Scope
- * Stage 1: closed-form radial + 3D spherical-harmonic angular density. The
- * PRD notes that for d ≥ 5 the angular part maps to a multi-index on the
- * (d−2)-sphere with all intermediate ℓ_k equal — since the rendered target
- * is a 3D Poincaré ball, we evaluate Y_ℓm on the 2-sphere of the visible
- * slice (θ from the rendered z axis, φ in the xy plane). This is an exact
- * match for d=3 and d=4 and a defensible 3D projection for d ≥ 5.
+ * Stage 1: closed-form radial + dimension-aware angular density. AdS_d has
+ * boundary S^{d−2}; the renderer handles each case via `adsAngularHarmonic`:
+ *   - d=3: S¹ boundary parameterised by φ. The UI's ℓ slider is read as the
+ *     S¹ angular-momentum magnitude |k|; `m`'s sign picks the standing-wave
+ *     branch (cos for m≥0, sin for m<0). Values with |m|<ℓ collapse to sign-
+ *     only at d=3 — documented as a cosmetic quirk, not a correctness issue.
+ *   - d=4: S² boundary — exact match to Y_ℓm(θ, φ).
+ *   - d≥5: the (d−2)-sphere harmonic with all intermediate ℓ_k equal, rendered
+ *     as the 3D slice Y_ℓm(θ, φ) (defensible projection; see PRD).
  *
  * TODO(Stage2): BTZ thermal state, HKLL bulk reconstruction, dS/CFT
  * continuation, soft backreaction, Chern-Simons level. See PRD.
@@ -266,6 +269,48 @@ export function sphericalHarmonicReal(l: number, m: number, theta: number, phi: 
   if (m > 0) return norm * P * Math.cos(m * phi)
   if (m < 0) return norm * P * Math.sin(absM * phi)
   return norm * P
+}
+
+/**
+ * Dimension-aware real-valued angular harmonic for the AdS bulk renderer.
+ *
+ * At d≤3 the boundary of AdS_d is S¹; the UI's ℓ slider is interpreted as the
+ * S¹ magnetic-number magnitude |k|, and `m`'s sign selects the standing-wave
+ * branch (cos for m≥0, sin for m<0). The θ argument is ignored at d=3 — on
+ * AdS₃ the bulk density is cylindrical in z.
+ *
+ * At d≥4 this delegates to `sphericalHarmonicReal` on the visible 2-sphere.
+ * For d≥5 this is the axisymmetric 3D projection of the (d−2)-sphere tower.
+ *
+ * Normalisations (unit L² on the respective sphere):
+ *   - d=3, l=0:  1/√(2π)
+ *   - d=3, l>0:  cos(lφ)/√π  or  sin(lφ)/√π
+ *   - d≥4:       sphericalHarmonicReal(l, m, θ, φ)
+ *
+ * Downstream the bulk packer peak-normalises the density, so absolute factors
+ * are cosmetic — but the relative factors between modes are preserved.
+ *
+ * @param l - Angular momentum quantum number (d≥4) or |k| magnitude (d=3).
+ * @param m - Magnetic quantum number at d≥4; at d=3 only its sign is used.
+ * @param d - Spacetime boundary dimension d (≥3).
+ * @param theta - Polar angle from rendered z-axis. Ignored at d=3.
+ * @param phi - Azimuthal angle in the xy-plane.
+ * @returns Real-valued angular harmonic on the dimension-appropriate sphere.
+ */
+export function adsAngularHarmonic(
+  l: number,
+  m: number,
+  d: number,
+  theta: number,
+  phi: number
+): number {
+  if (d <= 3) {
+    if (l <= 0) return 1 / Math.sqrt(2 * Math.PI)
+    const inv = 1 / Math.sqrt(Math.PI)
+    // Map (l, m) → S¹ mode: |k| = l; sign chosen from m (default cos when m=0).
+    return m >= 0 ? inv * Math.cos(l * phi) : inv * Math.sin(l * phi)
+  }
+  return sphericalHarmonicReal(l, m, theta, phi)
 }
 
 /**

@@ -41,7 +41,7 @@ import {
   type HkllParams,
   reconstructBulkFromSampleGrid,
 } from './hkll'
-import { jacobiP, radialNorm, resolveDelta, sphericalHarmonicReal } from './math'
+import { adsAngularHarmonic, jacobiP, radialNorm, resolveDelta } from './math'
 
 /** Packed density buffer + metadata consumed by the GPU upload path. */
 export interface AdsDensityUpload {
@@ -134,18 +134,18 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
         const jacobi = jacobiP(config.n, alpha, beta, Math.cos(2 * rho))
         const R = norm * cosPow * sinPow * jacobi
 
-        // Angular part on the 2-sphere slice. For l = 0 the harmonic is a
-        // constant 1/√(4π); use the explicit formula to skip the associated
-        // Legendre path.
+        // Angular part. d=3 routes through adsAngularHarmonic's S¹ branch so
+        // the AdS₃ bulk is z-invariant (cylindrical); d≥4 evaluates Y_ℓm on
+        // the visible 2-sphere. For l=0 the S² case reduces to a constant.
         let Y: number
-        if (config.l === 0) {
+        if (config.l === 0 && config.d >= 4) {
           Y = 1 / Math.sqrt(4 * Math.PI)
         } else {
           const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
           const invR = radius3D > 1e-10 ? 1 / radius3D : 0
           const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
           const phi = Math.atan2(wy, wx)
-          Y = sphericalHarmonicReal(config.l, config.m, theta, phi)
+          Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
         }
 
         const psi = R * Y
@@ -188,18 +188,17 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
           const sinRho = Math.sin(rho)
           const sin2l = config.l === 0 ? 1 : Math.pow(sinRho, 2 * config.l)
           const jacobi = jacobiP(config.n, alpha, beta, Math.cos(2 * rho))
-          // Angular part on the visible 2-sphere slice (same convention
-          // as the bulk packing above — keeps the overlay aligned with
-          // the bulk angular structure).
+          // Angular part — same dimension-aware routing as the bulk pass so
+          // the overlay stays aligned with the bulk angular structure at d=3.
           let Y: number
-          if (config.l === 0) {
+          if (config.l === 0 && config.d >= 4) {
             Y = 1 / Math.sqrt(4 * Math.PI)
           } else {
             const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
             const invR = radius3D > 1e-10 ? 1 / radius3D : 0
             const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
             const phi = Math.atan2(wy, wx)
-            Y = sphericalHarmonicReal(config.l, config.m, theta, phi)
+            Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
           }
           const value = norm2 * sin2l * jacobi * jacobi * Y * Y
           boundary[pixelIdx] = value
@@ -233,13 +232,33 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
   }
 }
 
-/** World radius at which the BTZ horizon is drawn. Independent of r_+ so
- * sliding r_+ changes the thermal spectrum but leaves the horizon at the
- * same visible scale — keeps the rendered object framed inside the unit
- * cube for the full slider range. */
-const BTZ_WORLD_HORIZON = 0.35
 /** Thickness of the opaque horizon shell (world units). */
 const BTZ_HORIZON_SHELL = 0.04
+/** Visible-horizon mapping. The thermal profile in dimensionless ρ_w =
+ * (rhoW − outerHorizon)/(1 − outerHorizon) is a true geometric invariant of
+ * BTZ in L = 1 units — β·ω·√f and (r_+/r)^{2Δ} cancel the r_+ dependence
+ * outside the near-horizon ε-clamp. If we drew the horizon at a fixed world
+ * radius, moving r_+ would leave the render almost unchanged. To honour the
+ * UI's promise that larger r_+ looks bigger (matching the BTZ thermodynamic
+ * readouts T_H ∝ r_+, S ∝ r_+, M ∝ r_+²), we scale the horizon's world
+ * radius with r_+ under a linear fit clamped inside the unit cube:
+ *
+ *   visible(r_+) = clamp(0.066 + 0.68·r_+, 0.10, 0.55)
+ *
+ * Anchors: (0.05 → 0.10), (0.3 → 0.270), (2.0 → 0.55). At the default r_+ =
+ * 0.3 this maps to 0.270; small-r_+ presets (`btzHotSmall` at 0.15) shrink
+ * to ~0.17 and large-r_+ presets (`btzCoolLarge` at 1.5) saturate at 0.55 —
+ * a visible ≈5.5× span.
+ */
+const BTZ_VISIBLE_HORIZON_MIN = 0.1
+const BTZ_VISIBLE_HORIZON_MAX = 0.55
+
+function btzVisibleHorizon(rplus: number): number {
+  const raw = 0.066 + 0.68 * rplus
+  if (raw < BTZ_VISIBLE_HORIZON_MIN) return BTZ_VISIBLE_HORIZON_MIN
+  if (raw > BTZ_VISIBLE_HORIZON_MAX) return BTZ_VISIBLE_HORIZON_MAX
+  return raw
+}
 /** Lower floor on the BTZ compactification coordinate u = r_+/r; below
  * this the mapping r = r_+/u would blow up. u_min = 0.05 ⇒ r_max = 20 r_+. */
 const BTZ_U_MIN = 0.05
@@ -286,7 +305,8 @@ export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensit
   const T = btzTemperature(rplus, L)
   const beta = T > 1e-8 ? 1 / T : 1e8
 
-  const outerHorizon = BTZ_WORLD_HORIZON + BTZ_HORIZON_SHELL
+  const horizonWorld = btzVisibleHorizon(rplus)
+  const outerHorizon = horizonWorld + BTZ_HORIZON_SHELL
   const uRange = 1 - outerHorizon
 
   let peakDensity = 1e-20
@@ -305,7 +325,7 @@ export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensit
         // camera path at oblique angles).
         if (rhoW > 1 || Math.abs(wz) > 1) continue
 
-        if (rhoW < BTZ_WORLD_HORIZON) continue
+        if (rhoW < horizonWorld) continue
 
         if (rhoW <= outerHorizon) {
           // Opaque horizon shell marker.

@@ -58,7 +58,7 @@
 
 import type { AdsHkllSource, AdsQuantizationBranch } from '@/lib/geometry/extended/antiDeSitter'
 
-import { adsEnergy, lnFactorial, lnGamma, radialNorm, sphericalHarmonicReal } from './math'
+import { adsAngularHarmonic, adsEnergy, lnFactorial, lnGamma, radialNorm } from './math'
 
 /** Small guard added to (−σ) to keep the kernel finite near the lightcone. */
 const KERNEL_EPSILON = 1e-3
@@ -211,8 +211,11 @@ export function eigenstateBoundaryAmplitude(
  * Sample the boundary source O(t, Ω') from a Stage-1 bulk eigenstate's
  * asymptotic behaviour. Used by the eigenstate-verification preset.
  *
- * For d = 3 the S¹ angular coordinate is φ'; the caller passes θ' = π/2
- * (equatorial) by convention.
+ * Routes the angular part through `adsAngularHarmonic` so d=3 uses the S¹
+ * branch (standing-wave cos(ℓφ)/sin(ℓφ) — NOT the degenerate Y_ℓm(π/2, φ)
+ * which silently collapsed l=1, m=0 to zero) and d≥4 uses Y_ℓm. The caller
+ * passes θ' = π/2 at d=3 by convention; at d=3 the θ argument is ignored
+ * inside `adsAngularHarmonic`.
  */
 export function sampleBoundaryFromBulkEigenstate(
   n: number,
@@ -224,7 +227,7 @@ export function sampleBoundaryFromBulkEigenstate(
   const A = eigenstateBoundaryAmplitude(n, l, delta, d)
   const energy = adsEnergy(n, l, delta)
   return (t: number, theta: number, phi: number): ComplexValue => {
-    const Y = sphericalHarmonicReal(l, m, theta, phi)
+    const Y = adsAngularHarmonic(l, m, d, theta, phi)
     const amp = A * Y
     // O(t, Ω') = amp · e^{−iE·t}.
     const cosE = Math.cos(energy * t)
