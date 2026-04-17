@@ -5,7 +5,8 @@
  * per-dispatch paths, back-to-back in the same process, so baseline and
  * optimized numbers are collected under identical GPU/thermal conditions.
  *
- * NOT part of the default benchmark config — invoke explicitly:
+ * Run under the benchmark config (which is already wired to match this spec
+ * via testMatch) rather than the default Playwright config:
  *   npx playwright test --config=playwright.benchmark.config.ts scripts/playwright/dirac-batch-ab.spec.ts
  */
 
@@ -83,13 +84,33 @@ async function collectSample(page: import('@playwright/test').Page): Promise<Per
   await waitForSimulationFrames(page, 40)
   const measureStart = await getFrameCount(page)
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
-  await page.waitForFunction(
-    async () => {
-      const mod = await import('/src/stores/performanceMetricsStore.ts')
-      return mod.usePerformanceMetricsStore.getState().fps > 0
-    },
-    { timeout: 5_000 }
-  )
+  try {
+    await page.waitForFunction(
+      async () => {
+        const mod = await import('/src/stores/performanceMetricsStore.ts')
+        return mod.usePerformanceMetricsStore.getState().fps > 0
+      },
+      { timeout: 5_000 }
+    )
+  } catch (err) {
+    // Wrap with identifying details so the failure explains why FPS stayed
+    // at 0 instead of surfacing as an opaque playwright timeout. Include
+    // frame counters and the current store snapshot so the log pinpoints
+    // collectSample / getPerformanceMetrics as the stall site.
+    const fps = await page
+      .evaluate(async () => {
+        const mod = await import('/src/stores/performanceMetricsStore.ts')
+        return mod.usePerformanceMetricsStore.getState().fps
+      })
+      .catch(() => 'unavailable')
+    throw new Error(
+      `[collectSample] FPS remained 0 after 5s (warmupStart=${warmupStart}, ` +
+        `measureStart=${measureStart}, WARMUP_FRAMES=${WARMUP_FRAMES}, ` +
+        `MEASURE_FRAMES=${MEASURE_FRAMES}, current fps=${String(fps)}) — ` +
+        `getPerformanceMetrics would return stale data`,
+      { cause: err }
+    )
+  }
   return getPerformanceMetrics(page)
 }
 
@@ -140,6 +161,12 @@ test.describe('Dirac batching A/B', () => {
       }
       const stats = (arr: ArmResult[], key: keyof ArmResult) => {
         const vals = arr.map((r) => r[key] as number).sort((a, b) => a - b)
+        if (vals.length === 0) {
+          throw new Error(
+            `[dirac-batch-ab] stats called with empty ${key} array — ` +
+              `expected SAMPLES_PER_ARM=${SAMPLES_PER_ARM} values from collectSample`
+          )
+        }
         const med =
           vals.length % 2 === 0
             ? (vals[vals.length / 2 - 1]! + vals[vals.length / 2]!) / 2

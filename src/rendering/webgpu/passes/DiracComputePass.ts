@@ -39,12 +39,17 @@ import {
   sanitizeGridSizes,
 } from './computePassUtils'
 import type { DiagDispatchParams, FFTAxisSharedMemParams } from './DiracComputePassDispatchers'
-import { dispatchDiagnostics, dispatchFFTAxisSharedMem } from './DiracComputePassDispatchers'
+import {
+  dispatchDiagnostics,
+  dispatchFFTAxisSharedMem,
+  SHARED_MEM_FFT_MAX_AXIS,
+} from './DiracComputePassDispatchers'
 import {
   buildDiracPipelines,
   rebuildDiracBindGroups,
   rebuildDiracBuffers,
 } from './DiracComputePassSetup'
+import { runBatchedStrangStep, runLegacyStrangStep } from './DiracComputePassStrang'
 import type {
   DiracBindGroupResult,
   DiracPassHelpers,
@@ -532,126 +537,47 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       const batchDisabled =
         typeof window !== 'undefined' &&
         (window as unknown as { __DIRAC_DISABLE_BATCH?: boolean }).__DIRAC_DISABLE_BATCH === true
+      // Axis-size guard: mirror the legacy dispatchFFTAxisSharedMem validation
+      // (power-of-2 in [2, SHARED_MEM_FFT_MAX_AXIS]) so the batched path does
+      // not silently dispatch the shared-memory FFT on unsupported sizes.
+      // Unsupported sizes fall through to the legacy path, which throws.
+      const axesOk = config.gridSize
+        .slice(0, config.latticeDim)
+        .every((d) => d >= 2 && d <= SHARED_MEM_FFT_MAX_AXIS && (d & (d - 1)) === 0)
       const batchedFFT =
-        !batchDisabled && (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
+        !batchDisabled && axesOk && (bg.fftSharedMemBGs?.length ?? 0) >= config.latticeDim * 2
       const ifftSlotOffset = config.latticeDim // forward = [0, D), inverse = [D, 2D)
+
+      const dispatchCompute = this.dispatchCompute.bind(this)
+      const dispatchFFTAxisDelegated = this.dispatchFFTAxisDelegated.bind(this)
 
       for (let step = 0; step < stepsThisFrame; step++) {
         if (batchedFFT) {
-          const strangPass = ctx.beginComputePass({ label: `dirac-strang-${step}` })
-          // 1. Half-step potential (per-component phase rotation)
-          this.dispatchCompute(
-            strangPass,
-            pl.potentialHalfPipeline,
-            [bg.potentialHalfBG!],
-            linearWG
-          )
-          // 2. Forward FFT for each spinor component: pack → 3 axes → unpack (no-norm)
-          for (let c = 0; c < S; c++) {
-            const packBG = bg.cachedPackBGs[c]
-            if (packBG) this.dispatchCompute(strangPass, pl.packPipeline, [packBG], linearWG)
-            strangPass.setPipeline(pl.fftSharedMemPipeline)
-            let fftSlot = 0
-            for (let d = config.latticeDim - 1; d >= 0; d--) {
-              const axisDim = config.gridSize[d]!
-              strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-              strangPass.dispatchWorkgroups(this.totalSites / axisDim)
-              fftSlot++
-            }
-            const unpackBG = bg.cachedUnpackBGsNoNorm[c]
-            if (unpackBG) this.dispatchCompute(strangPass, pl.unpackPipeline, [unpackBG], linearWG)
-          }
-          // 3. Free Dirac propagator in k-space
-          this.dispatchCompute(strangPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
-          // 4. Inverse FFT per component: pack → 3 axes → unpack (with 1/N norm)
-          for (let c = 0; c < S; c++) {
-            const packBG = bg.cachedPackBGs[c]
-            if (packBG) this.dispatchCompute(strangPass, pl.packPipeline, [packBG], linearWG)
-            strangPass.setPipeline(pl.fftSharedMemPipeline)
-            let fftSlot = ifftSlotOffset
-            for (let d = config.latticeDim - 1; d >= 0; d--) {
-              const axisDim = config.gridSize[d]!
-              strangPass.setBindGroup(0, bg.fftSharedMemBGs[fftSlot]!)
-              strangPass.dispatchWorkgroups(this.totalSites / axisDim)
-              fftSlot++
-            }
-            const unpackBG = bg.cachedUnpackBGs[c]
-            if (unpackBG) this.dispatchCompute(strangPass, pl.unpackPipeline, [unpackBG], linearWG)
-          }
-          // 5. Second half-step potential
-          this.dispatchCompute(
-            strangPass,
-            pl.potentialHalfPipeline,
-            [bg.potentialHalfBG!],
-            linearWG
-          )
-          // 6. Absorber — inlined. Placed after the FFT kinetic step so the
-          // FFT doesn't see the absorber's spatial modulation (which would
-          // scatter across k-space and create spurious emission artifacts).
-          if (config.absorberEnabled) {
-            this.dispatchCompute(strangPass, pl.absorberPipeline, [bg.initBG!], linearWG)
-          }
-          strangPass.end()
+          runBatchedStrangStep({
+            ctx,
+            pl,
+            bg,
+            config,
+            step,
+            S,
+            linearWG,
+            dispatchCompute,
+            ifftSlotOffset,
+            totalSites: this.totalSites,
+          })
         } else {
-          // Fallback: legacy per-dispatch pass. Kept for the narrow window
-          // between buffer rebuild and bind-group rebuild where fftSharedMemBGs
-          // may not yet be populated (e.g. partial rebuild failure). Behaviour
-          // matches the pre-optimisation path exactly.
-          const vHalf = ctx.beginComputePass({ label: `dirac-V-half-1-${step}` })
-          this.dispatchCompute(vHalf, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-          vHalf.end()
-
-          for (let c = 0; c < S; c++) {
-            const packBG = bg.cachedPackBGs[c]
-            if (packBG) {
-              const p = ctx.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
-              this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
-              p.end()
-            }
-            let fftSlot = 0
-            for (let d = config.latticeDim - 1; d >= 0; d--) {
-              fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
-            }
-            const unpackBG = bg.cachedUnpackBGsNoNorm[c]
-            if (unpackBG) {
-              const p = ctx.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
-              this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
-              p.end()
-            }
-          }
-
-          const kinPass = ctx.beginComputePass({ label: `dirac-kinetic-${step}` })
-          this.dispatchCompute(kinPass, pl.kineticPipeline, [bg.kineticBG!], linearWG)
-          kinPass.end()
-
-          for (let c = 0; c < S; c++) {
-            const packBG = bg.cachedPackBGs[c]
-            if (packBG) {
-              const p = ctx.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
-              this.dispatchCompute(p, pl.packPipeline, [packBG], linearWG)
-              p.end()
-            }
-            let fftSlot = this.fwdStageCount
-            for (let d = config.latticeDim - 1; d >= 0; d--) {
-              fftSlot = this.dispatchFFTAxisDelegated(ctx, config.gridSize[d]!, fftSlot)
-            }
-            const unpackBG = bg.cachedUnpackBGs[c]
-            if (unpackBG) {
-              const p = ctx.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
-              this.dispatchCompute(p, pl.unpackPipeline, [unpackBG], linearWG)
-              p.end()
-            }
-          }
-
-          const vHalf2 = ctx.beginComputePass({ label: `dirac-V-half-2-${step}` })
-          this.dispatchCompute(vHalf2, pl.potentialHalfPipeline, [bg.potentialHalfBG!], linearWG)
-          vHalf2.end()
-
-          if (config.absorberEnabled) {
-            const absPass = ctx.beginComputePass({ label: `dirac-absorber-${step}` })
-            this.dispatchCompute(absPass, pl.absorberPipeline, [bg.initBG!], linearWG)
-            absPass.end()
-          }
+          runLegacyStrangStep({
+            ctx,
+            pl,
+            bg,
+            config,
+            step,
+            S,
+            linearWG,
+            dispatchCompute,
+            fwdStageCount: this.fwdStageCount,
+            dispatchFFTAxisDelegated,
+          })
         }
 
         this.simTime += config.dt

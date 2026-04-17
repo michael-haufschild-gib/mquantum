@@ -10,7 +10,8 @@
  *   singleVortex        — smooth fill + core hole (mixed density)
  *   quantumTurbulence   — dense tangled vortex cloud (worst case for skip)
  *
- * NOT part of the default benchmark config — invoke explicitly:
+ * Run under the benchmark config (which is already wired to match this spec
+ * via testMatch) rather than the default Playwright config:
  *   BENCHMARK_DPR=2 npx playwright test --config=playwright.benchmark.config.ts \
  *     scripts/playwright/bec-raymarch-profile.spec.ts
  *
@@ -79,12 +80,22 @@ interface Sample {
   fps: number
   frameMs: number
   gpuTotalMs: number
+  viewportW: number
+  viewportH: number
 }
 
 const allResults: Sample[] = []
 
 test.setTimeout(600_000)
 
+/**
+ * Formats a variant-vs-baseline delta as a per-row improvement string.
+ * Convention: delta = baseline − sample, so a positive delta means the
+ * variant is faster than baseline and renders with a leading '-' (time
+ * saved); a negative delta means the variant is slower and renders with
+ * a leading '+' (time added). Intentionally inverted from the typical
+ * "new − old" sign so the table reads as savings, not regressions.
+ */
 function formatDelta(delta: number): string {
   return `${delta >= 0 ? '-' : '+'}${Math.abs(delta).toFixed(3)}`
 }
@@ -157,6 +168,11 @@ async function measure(
   await waitForFrameAdvance(page, measureStart + MEASURE_FRAMES)
 
   const metrics = await getPerformanceMetrics(page)
+  const viewport = await page.evaluate(async () => {
+    const mod = await import('/src/stores/performanceMetricsStore.ts')
+    const s = mod.usePerformanceMetricsStore.getState()
+    return { width: s.viewport.width, height: s.viewport.height }
+  })
   const schrod = metrics.passTimings.find((p) => p.passId === 'schroedinger')
   return {
     schroMs: schrod?.gpuTimeMs ?? 0,
@@ -165,6 +181,8 @@ async function measure(
     fps: metrics.fps,
     frameMs: metrics.frameTime,
     gpuTotalMs: metrics.totalGpuTimeMs,
+    viewportW: viewport.width,
+    viewportH: viewport.height,
   }
 }
 
@@ -227,10 +245,18 @@ test.describe('BEC raymarch A/B profile', () => {
       .slice(0, 14)
     const outFile = path.join(outDir, `bec_raymarch_profile_${stamp}.json`)
     const stableFile = path.join(outDir, 'bec_raymarch_profile.json')
+    // Derive viewport from actual measured samples — the metrics store
+    // reports the true physical viewport including Playwright defaults and
+    // any device-pixel-ratio scaling, which is more reliable than
+    // hardcoding 1280×800·DPR.
+    const firstWithViewport = allResults.find((r) => r.viewportW > 0 && r.viewportH > 0)
+    const viewport = firstWithViewport
+      ? { width: firstWithViewport.viewportW, height: firstWithViewport.viewportH }
+      : { width: 1280 * DPR, height: 800 * DPR }
     const payload = {
       generated: new Date().toISOString(),
       dpr: DPR,
-      viewport: { width: 1280 * DPR, height: 800 * DPR },
+      viewport,
       results: allResults,
     }
     fs.writeFileSync(outFile, JSON.stringify(payload, null, 2))

@@ -104,13 +104,15 @@ fn volumeRaymarchGrid(
 
     // Empty-skip: jump ahead when density is negligible.
     // Compute modes produce smoothly trilinearly-interpolated density fields on
-    // a 64³ grid — the density's spatial-frequency content is capped at the
-    // grid's Nyquist limit and further smeared by the sampler's trilinear
-    // filter, so a single midpoint probe is a faithful predictor of the full
-    // 10·stepLen segment being empty. Replacing the previous 2-probe scheme
-    // with 1-probe saves one texture fetch per skip attempt with no detectable
-    // correctness loss on BEC groundState / singleVortex / quantumTurbulence
-    // (measured via bec-raymarch-profile.spec.ts at DPR=2).
+    // the fixed-resolution density grid (DENSITY_GRID_SIZE, see
+    // src/constants/densityGrid.ts). The density's spatial-frequency content
+    // is capped at the grid's Nyquist limit and further smeared by the
+    // sampler's trilinear filter, so a single midpoint probe is a faithful
+    // predictor of the full 10·stepLen segment being empty. Replacing the
+    // previous 2-probe scheme with 1-probe saves one texture fetch per skip
+    // attempt with no detectable correctness loss on BEC groundState /
+    // singleVortex / quantumTurbulence (measured via
+    // bec-raymarch-profile.spec.ts at DPR=2).
     if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
@@ -245,6 +247,15 @@ fn volumeRaymarchGrid(
 
   var transmittance: f32 = 1.0;
 
+  // PERF: Hoist loop-invariant AdS + phase-rotation uniforms out of the
+  // per-sample loop. Mirrors the Simple variant above. These evaluate to
+  // identity values (1.0 for adsAmplitudeSq, 0.0 for phaseOffset) for every
+  // non-AdS analytical mode because adsGrowthRate, wdwPhaseRotationRate, and
+  // adsEnergy are zero outside their owning quantum modes.
+  let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
+  let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+  let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
@@ -259,11 +270,8 @@ fn volumeRaymarchGrid(
     // Returns (rho, 0, 0, 0) for r16float
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     // Anti-de Sitter tachyon amplification: |ψ(t)|² = |ψ(0)|² · cosh²(γ·t).
-    // adsGrowthRate is 0 for every non-AdS mode and for stable AdS states,
-    // so the factor is 1 and rho is untouched. Applied to the R channel only
-    // (AdS is never dual-channel, so no secondary-channel impact).
-    let adsCoshGamma = cosh(uniforms.adsGrowthRate * uniforms.time);
-    let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
+    // adsAmplitudeSq is 1.0 outside AdS — hoisted above the loop.
+    // Applied to the R channel only (AdS is never dual-channel).
     var rho = gridSample.r * adsAmplitudeSq;
 
     // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
@@ -291,12 +299,10 @@ fn volumeRaymarchGrid(
     // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
     // WdW and AdS (stable) phase rotation only applies to the spatial-phase (B)
     // channel; relativePhase (A) is a different observable and is not rotated.
-    // wdwPhaseRotationRate and adsEnergy are 0 outside their owning modes so
-    // the combined subtraction is an identity everywhere else.
+    // phaseOffset (hoisted above) is 0 outside the owning modes.
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
-      let rotatedB = gridSample.b
-        - (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
+      let rotatedB = gridSample.b - phaseOffset;
       // AdS (mode 8) packs boundary-overlay / horizon-marker intensity into
       // channel A, not a radian-valued relative phase. Fall back to the
       // spatial-phase (B) channel so the relativePhase palette doesn't read

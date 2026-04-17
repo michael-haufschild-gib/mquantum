@@ -221,6 +221,8 @@ test.describe('render performance benchmark @2x', () => {
     { mode: 'tdseDynamics', dim: 3, label: 'TDSE 3D @2x' },
   ] as const
 
+  const hiResResults: BenchmarkResult[] = []
+
   for (const { mode, dim, label } of hiResScenarios) {
     test(`benchmark: ${label}`, async ({ page }) => {
       await gotoMode(page, mode, dim)
@@ -270,29 +272,53 @@ test.describe('render performance benchmark @2x', () => {
         { timeout: 60_000 }
       )
 
-      const sample = await page.evaluate(async () => {
+      // Collect a full BenchmarkSample so the @2x entries flow through the
+      // same BENCHMARK_JSON pipeline as the primary scenarios and can be
+      // aggregated by scripts/bench-summary.js.
+      const sample = await page.evaluate(async (): Promise<BenchmarkSample> => {
         const mod = await import('/src/stores/performanceMetricsStore.ts')
         const s = mod.usePerformanceMetricsStore.getState()
-        const schrod = s.passTimings.find((p) => p.passId === 'schroedinger')
         return {
           fps: s.fps,
           frameTimeMs: s.frameTime,
+          cpuTimeMs: s.cpuTime,
           totalGpuTimeMs: s.totalGpuTimeMs,
-          schroMs: schrod?.gpuTimeMs ?? 0,
-          schroRenderMs: schrod?.renderGpuTimeMs ?? 0,
-          schroComputeMs: schrod?.computeGpuTimeMs ?? 0,
+          passTimings: s.passTimings.map((pt) => ({
+            passId: pt.passId,
+            gpuTimeMs: pt.gpuTimeMs,
+            computeGpuTimeMs: pt.computeGpuTimeMs ?? 0,
+            renderGpuTimeMs: pt.renderGpuTimeMs ?? 0,
+            cpuTimeMs: pt.cpuTimeMs,
+            skipped: pt.skipped,
+          })),
+          cpuBreakdown: { ...s.cpuBreakdown },
+          vramMB: s.vram.total,
           viewport: { width: s.viewport.width, height: s.viewport.height },
         }
       })
+
+      const schrod = sample.passTimings.find((p) => p.passId === 'schroedinger')
+      const result: BenchmarkResult = { mode, dimension: dim, label, sample }
+      hiResResults.push(result)
 
       console.log(`\n━━━ ${label} ━━━`)
       console.log(
         `  FPS: ${sample.fps} | Frame: ${sample.frameTimeMs.toFixed(2)}ms | GPU total: ${sample.totalGpuTimeMs.toFixed(2)}ms`
       )
-      console.log(
-        `  Schroedinger: total=${sample.schroMs.toFixed(3)}ms render=${sample.schroRenderMs.toFixed(3)}ms compute=${sample.schroComputeMs.toFixed(3)}ms`
-      )
+      if (schrod) {
+        console.log(
+          `  Schroedinger: total=${schrod.gpuTimeMs.toFixed(3)}ms render=${schrod.renderGpuTimeMs.toFixed(3)}ms compute=${schrod.computeGpuTimeMs.toFixed(3)}ms`
+        )
+      }
       console.log(`  Viewport: ${sample.viewport.width}×${sample.viewport.height} (DPR=2)`)
     })
   }
+
+  test.afterAll(() => {
+    if (hiResResults.length > 0) {
+      console.log('BENCHMARK_JSON_START')
+      console.log(JSON.stringify(hiResResults, null, 2))
+      console.log('BENCHMARK_JSON_END')
+    }
+  })
 })

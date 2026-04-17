@@ -205,7 +205,7 @@ export interface FFTAxisSharedMemParams {
 }
 
 /** Maximum axis dimension for the shared-memory FFT kernel (smemA/smemB are array<vec2f, 128>). */
-const SHARED_MEM_FFT_MAX_AXIS = 128
+export const SHARED_MEM_FFT_MAX_AXIS = 128
 
 /**
  * Dispatch shared-memory FFT for one axis: single dispatch completes all stages.
