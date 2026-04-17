@@ -87,6 +87,10 @@ function summarize(files) {
     const data = parseFile(f)
     for (const r of data) {
       const key = r.label
+      if (typeof key !== 'string' || key.length === 0) {
+        console.warn(`Skipping result without label in ${f}`)
+        continue
+      }
       const existing = labelMap.get(key) ?? {
         label: key,
         fps: [],

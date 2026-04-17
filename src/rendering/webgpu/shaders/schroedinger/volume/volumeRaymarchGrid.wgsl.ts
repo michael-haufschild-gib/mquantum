@@ -256,6 +256,11 @@ fn volumeRaymarchGrid(
   let adsAmplitudeSq = adsCoshGamma * adsCoshGamma;
   let phaseOffset = (uniforms.wdwPhaseRotationRate + uniforms.adsEnergy) * uniforms.time;
 
+  // PERF: Hoist 1/stepLen for the potential-overlay opacity clamp (mirrors
+  // Simple variant). stepLen is constant per ray; the per-iteration division
+  // would otherwise run up to 128 times per pixel.
+  let invStepLen = 1.0 / max(stepLen, 1e-5);
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (PROFILING_HALF_SAMPLES && i >= 64) { break; }
     if (i >= sampleCount) { break; }
@@ -369,7 +374,7 @@ fn volumeRaymarchGrid(
       // Scale opacity by current transmittance: first samples contribute strongly,
       // deep samples contribute progressively less — prevents thick potential regions
       // (step, harmonic) from going fully opaque while keeping thin barriers visible.
-      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.2);
+      let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
     }
