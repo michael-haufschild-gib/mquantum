@@ -98,7 +98,7 @@ const AIRY_SERIES_EPS = 1e-18
  * cancels against the same factor in the falling factorial).
  *
  * The derivative series `f'(z) = Σ_{k≥1} (3k)·a_k·z^{3k−1}` and `g'(z) =
- * a_0 + Σ_{k≥1} (3k+1)·b_k·z^{3k}` are evaluated in a SEPARATE loop with
+ * b_0 + Σ_{k≥1} (3k+1)·b_k·z^{3k}` are evaluated in a SEPARATE loop with
  * its own running power of `z`, not fused into the `f`/`g` pass. The
  * separation avoids a `1/z` division at `z = 0` for the `f'` series. The
  * two loops share coefficients but have independent early-exit
@@ -266,6 +266,9 @@ export function airyAll(z: number): {
   aiPrime: number
   biPrime: number
 } {
+  if (!Number.isFinite(z)) {
+    throw new RangeError(`airyAll expects a finite real argument (got ${z})`)
+  }
   if (Math.abs(z) <= AIRY_SERIES_RADIUS) {
     return airyMaclaurin(z)
   }

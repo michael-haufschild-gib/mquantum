@@ -467,8 +467,13 @@ export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchAr
   // from a previous `queueSrmtCompute` would cause the reply handler to
   // auto-dispatch the next queued clock AND gate `setDiagnostic` on the
   // old selection, skipping the publish for the clock we're about to post.
+  // Also drop the cached per-clock results so `qualityFromResults()` on the
+  // reply path does not publish stale qualities for the untouched clocks
+  // alongside the fresh single-clock snapshot.
   state.queue = []
   state.selectedClock = null
+  state.resultsByClock = createEmptyResultsByClock()
+  state.lastDispatchedRankCap = createEmptyLastDispatchedRankCap()
   // Bump epoch so any stale in-flight reply for a different hash drops.
   state.epoch += 1
   state.inFlight = true

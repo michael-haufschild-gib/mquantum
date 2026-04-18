@@ -111,7 +111,7 @@ export const SrmtSpectrumPanel: React.FC<SrmtSpectrumPanelProps> = React.memo(
           style={{
             color: 'var(--text-tertiary)',
             borderColor: 'var(--border-subtle)',
-            background: 'var(--panel-elevated)',
+            background: 'var(--bg-elevated)',
           }}
           data-testid="wdw-srmt-disabled-placeholder"
         >
@@ -134,7 +134,7 @@ export const SrmtSpectrumPanel: React.FC<SrmtSpectrumPanelProps> = React.memo(
           style={{
             color: 'var(--text-tertiary)',
             borderColor: 'var(--border-subtle)',
-            background: 'var(--panel-elevated)',
+            background: 'var(--bg-elevated)',
           }}
           data-testid="wdw-srmt-pending-placeholder"
         >

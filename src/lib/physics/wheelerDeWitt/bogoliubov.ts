@@ -191,9 +191,12 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
         fluxRatioSum += fluxRatio
         fluxRatioCount += 1
       }
-      if (alphaSq > 0) {
-        betaOverAlphaSum += Math.sqrt(betaSq / alphaSq)
-        betaOverAlphaCount += 1
+      if (Number.isFinite(alphaSq) && Number.isFinite(betaSq) && alphaSq > 0) {
+        const betaOverAlpha = Math.sqrt(betaSq / alphaSq)
+        if (Number.isFinite(betaOverAlpha)) {
+          betaOverAlphaSum += betaOverAlpha
+          betaOverAlphaCount += 1
+        }
       }
     }
   }
@@ -202,7 +205,9 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
     columns,
     extractedCount,
     totalColumns: total,
-    // NaN (not 0) when nothing was extracted — 0 would be indistinguishable
+    // NaN (not 0) when no column contributed a finite flux ratio — either
+    // because no extraction succeeded or because every extracted column had
+    // zero amplitude (`fluxRatioCount === 0`). 0 would be indistinguishable
     // from a real standing-wave / zero-particle signal and would silently
     // misclassify failed runs as meaningful physics.
     meanFluxRatio: fluxRatioCount > 0 ? fluxRatioSum / fluxRatioCount : Number.NaN,

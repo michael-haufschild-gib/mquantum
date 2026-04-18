@@ -34,6 +34,18 @@ import {
 } from './WheelerDeWittSrmtWorker'
 
 /**
+ * Clamp the user-facing `srmtRankCap` to the integer range the worker
+ * actually honours. Kept as a shared helper so the compute hash and the
+ * per-dispatch rank cap stay in lock-step — otherwise values like `7`,
+ * `7.4`, and `8` all collapse to a worker rank cap of `8` but each
+ * produce a different raw hash, invalidating the whole SRMT batch on
+ * innocuous URL/store churn.
+ */
+export function normalizeSrmtRankCap(rankCap: number): number {
+  return Math.max(8, Math.min(256, Math.round(rankCap)))
+}
+
+/**
  * Hash of the fields that affect the SRMT COMPUTE step. Embeds the
  * solver config hash — any change that re-runs the solver also
  * invalidates the SRMT cache. Also includes the cut position and rank
@@ -50,7 +62,7 @@ export function computeWdwSrmtComputeHash(config: WheelerDeWittConfig): string {
     config.srmtEnabled ? 1 : 0,
     computeWdwConfigHash(config),
     config.srmtCutNormalized.toFixed(4),
-    config.srmtRankCap,
+    normalizeSrmtRankCap(config.srmtRankCap),
   ].join('|')
 }
 
@@ -189,11 +201,15 @@ export class WheelerDeWittSrmtCoordinator {
     // not force a full-grid repack.
     const selectedClockGeneration =
       this.workerState.resultsByClock[config.srmtClock]?.generation ?? 0
-    const selectedClockResultChanged =
-      enabled && selectedClockGeneration !== this.lastSelectedClockGeneration
-
     const hasSelectedClockResult =
       enabled && this.workerState.resultsByClock[config.srmtClock] !== null
+    // Only treat the generation delta as a meaningful repack trigger once
+    // the newly selected clock actually has a cached result. Switching
+    // from a completed clock to one that is still pending otherwise
+    // drags `selectedClockGeneration` down to 0 and forces a full repack
+    // of the previous (re-used) overlay.
+    const selectedClockResultChanged =
+      hasSelectedClockResult && selectedClockGeneration !== this.lastSelectedClockGeneration
     // Skip repacks that would clear the overlay mid-dispatch: on a
     // render-only clock switch the newly selected clock may still be
     // pending, and we prefer to keep the prior snapshot visible until
@@ -263,7 +279,7 @@ export class WheelerDeWittSrmtCoordinator {
     config: WheelerDeWittConfig,
     solverOutput: WheelerDeWittSolverOutput
   ): void {
-    const rankCap = Math.max(8, Math.min(256, Math.round(config.srmtRankCap)))
+    const rankCap = normalizeSrmtRankCap(config.srmtRankCap)
     const hash = computeWdwSrmtComputeHash(config)
     const argsByClock: Record<SrmtClock, SrmtDispatchArgs> = {
       a: this.buildDispatchArgs(config, solverOutput, 'a', rankCap, hash),

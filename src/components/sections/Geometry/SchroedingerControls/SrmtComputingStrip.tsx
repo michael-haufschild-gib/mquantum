@@ -41,7 +41,7 @@ export const SrmtComputingStrip: React.FC<SrmtComputingStripProps> = ({ complete
       style={{
         color: 'var(--text-secondary)',
         borderColor: 'var(--border-subtle)',
-        background: 'var(--panel-elevated)',
+        background: 'var(--bg-elevated)',
       }}
     >
       <span

@@ -119,7 +119,7 @@ export const SrmtSpectrumChart: React.FC<SrmtSpectrumChartProps> = ({ snapshot }
       aria-label={`SRMT spectrum comparison: ${maxLen} modes`}
       data-testid="wdw-srmt-spectrum-chart"
       className="rounded-md border"
-      style={{ borderColor: 'var(--border-subtle)', background: 'var(--panel-elevated)' }}
+      style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-elevated)' }}
     >
       <line
         x1={CHART_PADDING}
