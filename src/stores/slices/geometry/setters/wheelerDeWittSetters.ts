@@ -9,9 +9,14 @@
  * @module stores/slices/geometry/setters/wheelerDeWittSetters
  */
 
-import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt'
+import type { WdwBoundaryCondition, WdwSrmtClock } from '@/lib/geometry/extended/wheelerDeWitt'
 
-import { nestedClampedSetter, nestedValueSetter, type SetterContext } from './sliceSetterUtils'
+import {
+  nestedClampedSetter,
+  nestedIntSetter,
+  nestedValueSetter,
+  type SetterContext,
+} from './sliceSetterUtils'
 
 /** Grid-size preset tuple: (Na, Nphi). All within the solver's CFL budget at
  * default `(aMin, aMax, phiExtent)` and the hard minima (>= 3). */
@@ -35,6 +40,11 @@ export interface WheelerDeWittSetters {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  setWdwSrmtEnabled: (enabled: boolean) => void
+  setWdwSrmtClock: (clock: WdwSrmtClock) => void
+  setWdwSrmtCutNormalized: (cut: number) => void
+  setWdwSrmtRankCap: (cap: number) => void
+  setWdwSrmtHeatmapIntensity: (intensity: number) => void
   applyWheelerDeWittPreset: (presetId: string) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void
@@ -66,6 +76,29 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     'worldlinePulseWidth',
     0.02,
     0.3
+  )
+
+  // SRMT diagnostic setters — all display-only: they do NOT flip needsReset
+  // because toggling the modular-time diagnostic or its clock choice has no
+  // effect on the Wheeler–DeWitt PDE solution. The diagnostic runs on the
+  // cached solver output and writes into `useSrmtDiagnosticStore`; see
+  // WheelerDeWittStrategy.executeFrame for the hash-based recompute gate.
+  const setSrmtEnabled = nestedValueSetter(ctx, 'wheelerDeWitt', 'srmtEnabled')
+  const setSrmtClock = nestedValueSetter(ctx, 'wheelerDeWitt', 'srmtClock')
+  const setSrmtCutNormalized = nestedClampedSetter(
+    ctx,
+    'wheelerDeWitt',
+    'srmtCutNormalized',
+    0.1,
+    0.9
+  )
+  const setSrmtRankCap = nestedIntSetter(ctx, 'wheelerDeWitt', 'srmtRankCap', 8, 256)
+  const setSrmtHeatmapIntensity = nestedClampedSetter(
+    ctx,
+    'wheelerDeWitt',
+    'srmtHeatmapIntensity',
+    0,
+    1
   )
 
   // Display-only streamline setters. These fields drive WKB trajectory
@@ -152,6 +185,12 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwWorldlineEnabled: setWorldlineEnabled,
     setWdwWorldlineSpeed: setWorldlineSpeed,
     setWdwWorldlinePulseWidth: setWorldlinePulseWidth,
+    // SRMT diagnostic — display-only, no solver re-run.
+    setWdwSrmtEnabled: setSrmtEnabled,
+    setWdwSrmtClock: setSrmtClock,
+    setWdwSrmtCutNormalized: setSrmtCutNormalized,
+    setWdwSrmtRankCap: setSrmtRankCap,
+    setWdwSrmtHeatmapIntensity: setSrmtHeatmapIntensity,
     applyWheelerDeWittPreset: (presetId) => {
       void import('@/lib/physics/wheelerDeWitt/presets')
         .then(({ getWdwPreset, WDW_PRESET_PHYSICS_FIELDS }) => {

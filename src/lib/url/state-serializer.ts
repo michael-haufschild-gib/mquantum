@@ -61,6 +61,8 @@ import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
 const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
 
+import { deserializeSrmt, serializeSrmt, type SrmtUrlState } from './srmtSerializer'
+
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
 
 const VALID_COSMOLOGY_PRESETS: CosmologyPreset[] = [
@@ -111,7 +113,7 @@ const VALID_POTENTIAL_TYPES: TdsePotentialType[] = [
  * All fields except dimension and objectType are optional — missing fields
  * keep their app defaults.
  */
-export interface ShareableObjectState extends AdsUrlState {
+export interface ShareableObjectState extends AdsUrlState, SrmtUrlState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
@@ -549,19 +551,19 @@ export function serializeState(state: ShareableState): string {
   // Cosmological background — only emit the sub-params when enabled
   serializeCosmology(params, state)
 
-  // Wheeler–DeWitt minisuperspace
+  // Wheeler–DeWitt minisuperspace (physics + render-only + SRMT diagnostic)
   if (state.quantumMode === 'wheelerDeWitt') {
     setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
     setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
     setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
     setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
     setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
-    // Render-only animation effects
     setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
     setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed, true)
     setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
     setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
     setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+    serializeSrmt(params, state.quantumMode, state)
   }
 
   // Anti-de Sitter (Stage 1). Only emitted while the mode is active — the
@@ -873,7 +875,6 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   // available for the s_c(n) check).
   deserializeCosmologyParams(params, state)
 
-  // Wheeler–DeWitt minisuperspace
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
   state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
   state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
@@ -884,6 +885,7 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
   state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
   state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
+  deserializeSrmt(params, state)
 
   // Anti-de Sitter (Stage 1) — extracted to keep `deserializeState` under
   // the cognitive-complexity budget and the file under max-lines.

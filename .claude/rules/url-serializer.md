@@ -42,6 +42,11 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `wdw_wl` | 0/1 | Wheeler–DeWitt semiclassical worldline pulse (render-only) |
 | `wdw_wls` | float 0.1-3 | Wheeler–DeWitt worldline pulse cycles per unit time |
 | `wdw_wlw` | float 0.02-0.3 | Wheeler–DeWitt worldline Gaussian pulse width |
+| `srmt` | 0/1 | Wheeler–DeWitt SRMT diagnostic master toggle (display-only) |
+| `srmt_c` | enum | SRMT clock axis (`a`, `phi1`, `phi2`) |
+| `srmt_x` | float 0.1-0.9 | SRMT normalized cut position along the selected clock axis |
+| `srmt_r` | int 8-256 | SRMT Schmidt rank cap |
+| `srmt_h` | float 0-1 | SRMT heatmap overlay brightness |
 | `ads_d` | int 3-7 | Anti-de Sitter boundary dimension |
 | `ads_n` | int 0-4 | Anti-de Sitter radial quantum number |
 | `ads_l` | int 0-3 | Anti-de Sitter angular momentum |
@@ -64,6 +69,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - Missing params keep app defaults (merge behavior)
 - All extended params are optional — only `d` and `t` are required for object links
 - `wdw_*` params are only applied when `qm=wheelerDeWitt`
+- `srmt*` params (`srmt`, `srmt_c`, `srmt_x`, `srmt_r`, `srmt_h`) are Wheeler–DeWitt SRMT-scoped — only emitted when `qm=wheelerDeWitt`, and accepted on parse regardless but only wired into `schroedinger.wheelerDeWitt.*` by `applyWdwParams`. They are display-only: toggling them does not re-run the Wheeler–DeWitt solver.
 - `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
 - `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.
 - New params follow the pattern: short key, validated/clamped in `deserializeState`, applied in `applyUrlStateParams`

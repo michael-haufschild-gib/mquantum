@@ -194,6 +194,34 @@ describe('useUrlState', () => {
     })
   })
 
+  it('applies the full SRMT block when qm=wheelerDeWitt', async () => {
+    // Regression guard for the SRMT URL pipeline: `srmt`, `srmt_c`, `srmt_x`,
+    // `srmt_r`, `srmt_h` must land on `schroedinger.wheelerDeWitt.srmt*` so a
+    // shared link reconstructs the clock/cut/rank config the sender saw.
+    const parsedState: Partial<ShareableState> = {
+      objectType: 'schroedinger',
+      dimension: 3,
+      quantumMode: 'wheelerDeWitt',
+      wdwSrmtEnabled: true,
+      wdwSrmtClock: 'phi1',
+      wdwSrmtCutNormalized: 0.6,
+      wdwSrmtRankCap: 96,
+      wdwSrmtHeatmapIntensity: 0.75,
+    }
+    mockedParseCurrentUrl.mockReturnValue(parsedState)
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      const wdw = useExtendedObjectStore.getState().schroedinger.wheelerDeWitt
+      expect(wdw.srmtEnabled).toBe(true)
+      expect(wdw.srmtClock).toBe('phi1')
+      expect(wdw.srmtCutNormalized).toBeCloseTo(0.6, 2)
+      expect(wdw.srmtRankCap).toBe(96)
+      expect(wdw.srmtHeatmapIntensity).toBeCloseTo(0.75, 2)
+    })
+  })
+
   it('loads scene examples when scene parameter is present', async () => {
     const hasHydratedSpy = vi
       .spyOn(usePresetManagerStore.persist, 'hasHydrated')

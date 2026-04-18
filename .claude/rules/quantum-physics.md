@@ -26,6 +26,12 @@ Two object types: `ObjectType = 'schroedinger' | 'pauliSpinor'`. Both are quantu
 | Dirac Equation    | `diracEquation`   | Relativistic Dirac equation on a lattice                          |
 | Quantum Walk      | `quantumWalk`     | Discrete-time quantum walk with coin operator                     |
 
+## Wheeler–DeWitt SRMT Diagnostic (display-only overlay)
+
+| Feature | Key | Clocks | Metric | Phase status |
+| ------- | --- | ------ | ------ | ------------ |
+| SRMT (Superspace-Relational Modular Time) | `srmtEnabled`, `srmtClock`, `srmtCutNormalized`, `srmtRankCap`, `srmtHeatmapIntensity` | `{a, phi1, phi2}` — `a` is the DeWitt-timelike clock (SRMT conjecture's preferred choice); `phi1` and `phi2` are spacelike controls | Affine-match quality `q = Σ (K_n − (α·E_n + β))² / Σ K_n²` between the modular-Hamiltonian spectrum `K_n = −log(s_n² + ε)` and the Hamilton–Jacobi operator spectrum on the clock slice — lower `q` = better tracking | SRMT is a *framework candidate* for the "problem of time" in quantum cosmology, not a settled physics result. The diagnostic runs in a dedicated Web Worker (`src/lib/physics/srmt/srmtDiagnostic.worker.ts`) so the top-k Lanczos eigensolver for HJ spectrum extraction never blocks the main thread — the UI shows a "computing" indicator while the worker runs. Cross-clock comparison is sequential: all three clocks are queued and drained one at a time (the non-selected clocks are marked "pending" in the UI until their worker reply lands; a future Rust/WASM port will enable parallel all-clock compute). The diagnostic overlay is display-only — toggling SRMT or changing its clock never re-runs the Wheeler–DeWitt PDE solve. |
+
 ## Physics Accuracy Requirements
 
 - Use mathematically correct implementations — no approximations that sacrifice physical accuracy

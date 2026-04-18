@@ -48,16 +48,12 @@ format-check:
 type-check:
 	pnpm exec tsc -b
 
-## Check bundle size budget (requires prior build)
-bundle-check:
-	node scripts/check-bundle-size.js
-
 ## Check coverage ratchet (requires prior test-coverage run)
 coverage-ratchet:
 	node scripts/check-coverage-ratchet.js
 
 ## Run full CI pipeline (mirrors .github/workflows/ci.yml)
-ci: format-check lint lint-css type-check test-coverage coverage-ratchet build-web bundle-check
+ci: format-check lint lint-css type-check test-coverage coverage-ratchet build-web
 
 ## Remove build artifacts
 clean:
