@@ -24,13 +24,11 @@ const CHART_WIDTH = 240
 const CHART_HEIGHT = 90
 const CHART_PADDING = 4
 
-// Chart series use literal oklch() values rather than theme tokens
-// because the K and HJ series need consistent contrast with the panel
-// regardless of the active accent colour.
-// eslint-disable-next-line project-rules/no-hardcoded-colors
-export const K_SERIES_COLOR = 'oklch(0.68 0.18 245)' // blue — modular spectrum
-// eslint-disable-next-line project-rules/no-hardcoded-colors
-export const HJ_SERIES_COLOR = 'oklch(0.72 0.17 55)' // orange — HJ spectrum
+// Chart series colors are theme tokens defined in `src/styles/theme.css`
+// (block: SRMT SPECTRUM SERIES). Kept outside the accent chain so the
+// K/HJ contrast stays readable whatever accent the user picks.
+export const K_SERIES_COLOR = 'var(--srmt-chart-k)'
+export const HJ_SERIES_COLOR = 'var(--srmt-chart-hj)'
 
 interface ChartSeries {
   points: string
@@ -44,27 +42,33 @@ interface ChartGeometry {
 }
 
 /**
- * Build a polyline `points` string for one series after unit-max
- * normalisation. Returns `null` when the series has fewer than 2 values
- * or the peak magnitude is non-positive (caller renders only the
- * non-null series; both-null triggers the "no data" placeholder).
+ * Build a polyline `points` string for one series after min/max
+ * normalisation. A legitimate flat spectrum (`min === max`) renders as a
+ * horizontal line at the mid-band rather than being hidden. Returns
+ * `null` when the series has fewer than 2 values or contains any
+ * non-finite sample (NaN/Inf would poison the normalised coordinates);
+ * callers render only the non-null series (both-null triggers the
+ * "no data" placeholder).
  */
 function buildSeries(values: Float32Array, width: number, height: number): ChartSeries | null {
   if (values.length < 2) return null
   // Use min/max normalisation so any negative entries still fall inside
-  // the [0, 1] band rather than flipping below the SVG viewBox.
+  // the [0, 1] band rather than flipping below the SVG viewBox. Bail on
+  // the first non-finite sample — a single NaN would make `min`/`max`
+  // finite (NaN comparisons drop through) but still emit NaN coordinates
+  // in the second loop, producing an invalid `points` string.
   let min = Number.POSITIVE_INFINITY
   let max = Number.NEGATIVE_INFINITY
   for (let i = 0; i < values.length; i++) {
     const v = values[i]!
+    if (!Number.isFinite(v)) return null
     if (v < min) min = v
     if (v > max) max = v
   }
   if (!Number.isFinite(min) || !Number.isFinite(max)) return null
   const span = max - min
   // Negative span should never happen (min <= max by construction), but
-  // guard just in case. A legitimate flat spectrum (`span === 0`) is
-  // rendered as a horizontal line at the mid-band instead of hidden.
+  // guard just in case.
   if (span < 0) return null
   const n = values.length
   const normalized = new Float32Array(n)

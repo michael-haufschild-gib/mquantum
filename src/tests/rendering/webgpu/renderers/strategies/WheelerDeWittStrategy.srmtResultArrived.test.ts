@@ -259,6 +259,42 @@ describe('WheelerDeWittStrategy — repacks when worker result arrives', () => {
     expect(callsAfterFrame4).toBe(callsAfterFrame3)
   })
 
+  it('repacks when a second batch replies while the previous overlay is still on screen', () => {
+    const Nphi = 6
+    const wdw = smallWdwConfig({ gridNphi: Nphi })
+    const { render } = setup(wdw)
+
+    // Frame 1 + reply: produce a first valid overlay.
+    render()
+    expect(sharedStates).toHaveLength(1)
+    const state = sharedStates[0]!
+    simulateClockReply(state, 'a', Nphi)
+    render()
+    const callsAfterFirstOverlay = writeTexture.mock.calls.length
+    expect(callsAfterFirstOverlay).toBeGreaterThan(0)
+
+    // Frame with no changes — writeTexture stays flat; overlay stable.
+    render()
+    expect(writeTexture.mock.calls.length).toBe(callsAfterFirstOverlay)
+
+    // Invalidate compute state by moving the cut. This triggers
+    // `queueAllClocks` via the mock (which flushes `resultsByClock`), so
+    // the coordinator must NOT continue packing the previous overlay.
+    // The repack on this frame may be a clearing write (new overlay is
+    // still pending), which is the desired behaviour.
+    wdw.srmtCutNormalized = 0.7
+    render()
+    const callsDuringRecompute = writeTexture.mock.calls.length
+    expect(callsDuringRecompute).toBeGreaterThan(callsAfterFirstOverlay)
+
+    // Simulate the new batch's selected-clock reply.
+    simulateClockReply(state, 'a', Nphi)
+    render()
+    // The second reply must trigger another repack — the density texture
+    // now carries the new `sliceK` payload.
+    expect(writeTexture.mock.calls.length).toBeGreaterThan(callsDuringRecompute)
+  })
+
   it('does not treat a stale generation as arrival after SRMT is disabled and re-enabled', () => {
     const Nphi = 6
     const wdw = smallWdwConfig({ gridNphi: Nphi })

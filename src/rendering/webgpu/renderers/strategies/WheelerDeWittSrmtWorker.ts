@@ -463,6 +463,12 @@ export function queueSrmtCompute(
 export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchArgs): void {
   if (state.disposed) return
   if (state.inFlight && state.lastDispatchedHash[args.clock] === args.hash) return
+  // Detach from any prior batch: a lingering `queue` or `selectedClock`
+  // from a previous `queueSrmtCompute` would cause the reply handler to
+  // auto-dispatch the next queued clock AND gate `setDiagnostic` on the
+  // old selection, skipping the publish for the clock we're about to post.
+  state.queue = []
+  state.selectedClock = null
   // Bump epoch so any stale in-flight reply for a different hash drops.
   state.epoch += 1
   state.inFlight = true

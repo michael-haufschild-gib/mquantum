@@ -136,6 +136,15 @@
     --chart-cost-warm: oklch(75% 0.17 55deg);
 
     /* ═══════════════════════════════════════════════════════════════════
+       SRMT SPECTRUM SERIES
+       K (modular Hamiltonian) vs HJ (Hamilton–Jacobi) polyline colors for
+       the SRMT diagnostic panel chart. Must stay distinguishable against
+       the panel-elevated background regardless of the active accent.
+       ═══════════════════════════════════════════════════════════════════ */
+    --srmt-chart-k: oklch(68% 0.18 245deg);
+    --srmt-chart-hj: oklch(72% 0.17 55deg);
+
+    /* ═══════════════════════════════════════════════════════════════════
        PHYSICS: DIRAC DISPERSION
        Particle and antiparticle branch colors for dispersion diagrams.
        ═══════════════════════════════════════════════════════════════════ */

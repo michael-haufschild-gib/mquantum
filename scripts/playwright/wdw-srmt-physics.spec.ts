@@ -29,7 +29,7 @@
  * test-end.
  */
 
-import { DEFAULT_CHAMPION_TIE_TOLERANCE } from '@/lib/physics/srmt'
+import { findChampionClock } from '@/lib/physics/srmt'
 
 import { expect, test } from './fixtures'
 import {
@@ -151,13 +151,15 @@ test.describe('Wheeler–DeWitt SRMT — physics invariants across boundary cond
       expect(diag.computing, `[wdw_bc=${bc}] computing flag must be false after drain`).toBe(false)
 
       // ─── Science-level readout — soft annotation only ─────────────────────
+      // Champion selection uses the shared `findChampionClock` helper so the
+      // spec annotation mirrors what the worker telemetry and UI panel show.
+      const champion = findChampionClock(diag.clockAffineQuality) ?? 'tied'
       const ordered = (['a', 'phi1', 'phi2'] as const)
         .map((c) => ({ clock: c, q: diag.clockAffineQuality[c] }))
         .sort((x, y) => x.q - y.q)
       const [best, second] = ordered
       if (!best || !second) throw new Error('unreachable — three finite qualities required')
       const gap = second.q - best.q
-      const champion = gap >= DEFAULT_CHAMPION_TIE_TOLERANCE ? best.clock : 'tied'
 
       const readout = `[SRMT][BC=${bc}] a=${diag.clockAffineQuality.a.toFixed(4)} phi1=${diag.clockAffineQuality.phi1.toFixed(4)} phi2=${diag.clockAffineQuality.phi2.toFixed(4)} champion=${champion} gap=${gap.toFixed(4)}`
 

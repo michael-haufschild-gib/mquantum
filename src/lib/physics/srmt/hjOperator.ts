@@ -135,6 +135,12 @@ interface SparseHjOperator {
  */
 function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  // Explicit `Na >= 2` guard — otherwise the failing `sliceIndex` check
+  // below issues a confusing "must be strictly interior" error when the
+  // real problem is that the `a` grid is too small to have any interior.
+  if (Na < 2) {
+    throw new Error(`buildSparseOpA: Na must be >= 2, got ${Na}`)
+  }
   if (Nphi < 2) {
     throw new Error(`buildSparseOpA: Nphi must be >= 2, got ${Nphi}`)
   }
@@ -398,7 +404,9 @@ export function harmonicOscillator1DSpectrum(N: number, L: number, omega: number
   const invDx2 = 1 / (dx * dx)
   const M = new Float64Array(N * N)
   const add = (at: number, delta: number): void => {
-    M[at] = (M[at] ?? 0) + delta
+    // `noUncheckedIndexedAccess` types `M[at]` as `number | undefined`;
+    // Float64Array reads are always numbers, so the assertion is safe.
+    M[at] = M[at]! + delta
   }
   for (let i = 0; i < N; i++) {
     const x = -L + i * dx

@@ -73,7 +73,15 @@ const U2 = 385 / 10368
 const U3 = 85085 / 2239488
 const U4 = 37182145 / 644972544
 
-/** Asymptotic coefficients `v_k` (DLMF 9.7.6, derivative series). */
+/**
+ * Absolute magnitudes `|v_k|` of the derivative-series coefficients
+ * (DLMF 9.7.6). DLMF's signed `v_k = −((6k+1)/(6k−1))·u_k` is negative
+ * for every `k ≥ 1`; stashing `|v_k|` here lets the series assembly in
+ * `airyAsymptoticPositive` / `airyAsymptoticNegative` spell out the sign
+ * pattern explicitly. The resulting formulas (`1 + V1/ξ − V2/ξ² + V3/ξ³`
+ * for `Ai′`, `1 − V1/ξ − V2/ξ² − V3/ξ³` for `Bi′`) are verified by the
+ * Wronskian identity test in `airy.test.ts` to < 1e−5 at `|z| = 12`.
+ */
 const V1 = 7 / 72
 const V2 = 455 / 10368
 const V3 = 95095 / 2239488
@@ -87,10 +95,15 @@ const AIRY_SERIES_EPS = 1e-18
 /**
  * Tabulate `f(z)`, `g(z)`, `f'(z)`, `g'(z)` over the Maclaurin window via
  * the simplified `1 / ((3k−1)·3k)` recurrence (the `(3k−2)` numerator
- * cancels against the same factor in the falling factorial). The
- * derivative `f'(z) = Σ_{k≥1} (3k)·a_k·z^{3k−1}` and `g'(z) = a_0 +
- * Σ_{k≥1} (3k+1)·b_k·z^{3k}` are accumulated alongside the function
- * series to avoid a second pass.
+ * cancels against the same factor in the falling factorial).
+ *
+ * The derivative series `f'(z) = Σ_{k≥1} (3k)·a_k·z^{3k−1}` and `g'(z) =
+ * a_0 + Σ_{k≥1} (3k+1)·b_k·z^{3k}` are evaluated in a SEPARATE loop with
+ * its own running power of `z`, not fused into the `f`/`g` pass. The
+ * separation avoids a `1/z` division at `z = 0` for the `f'` series. The
+ * two loops share coefficients but have independent early-exit
+ * conditions, so their term counts may differ by one or two for `|z|`
+ * near the convergence boundary.
  */
 function airySeriesEvaluate(z: number): {
   f: number
@@ -120,15 +133,13 @@ function airySeriesEvaluate(z: number): {
     f += dF
     g += dG
 
-    // Derivatives are computed in a separate pass (below) with their own
-    // running power of z, avoiding a division by z at z = 0.
-
     if (Math.abs(dF) < AIRY_SERIES_EPS && Math.abs(dG) < AIRY_SERIES_EPS) break
   }
 
-  // Recompute derivative series in a second pass with its own running
-  // power, decoupled from the f/g power chain to avoid the z=0 guard
-  // gymnastics inline. Same coefficients, same number of terms; cheap.
+  // Second pass for the derivative series. Decoupled from the f/g power
+  // chain so the f' series can run without a 1/z division at z = 0. Same
+  // coefficient recurrence; this loop has its own early-exit so the term
+  // count may differ by one or two from the f/g pass near `|z| = 6`.
   aCoef = 1
   bCoef = 1
   let zPow3kMinus1 = 1 // start at z^{0} for k=0; for k≥1 we'll multiply by z²·z^{3(k−1)} = z^{3k−1}

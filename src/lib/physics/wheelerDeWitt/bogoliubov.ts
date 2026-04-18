@@ -105,10 +105,13 @@ export interface BogoliubovSummary {
   /** Total number of columns (`Nphi · Nphi`). */
   totalColumns: number
   /**
-   * Mean flux ratio across extracted columns. Near 0 indicates HH/DeWitt
-   * standing-wave structure; near +1 indicates Vilenkin outgoing-wave
-   * selection. `NaN` when no column extracted successfully, so callers
-   * can distinguish a failed run from a real zero-particle signal.
+   * Mean flux ratio across columns with a finite `fluxRatio`. Near 0
+   * indicates HH/DeWitt standing-wave structure; near +1 indicates
+   * Vilenkin outgoing-wave selection. `NaN` when no column contributed
+   * a finite flux ratio — either because no extraction succeeded or
+   * because every extracted column had zero amplitude (`|α|² + |β|² =
+   * 0`) — so callers can distinguish missing data from a real
+   * zero-particle signal.
    */
   meanFluxRatio: number
   /**
@@ -140,6 +143,10 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
   let betaOverAlphaSum = 0
   let betaOverAlphaCount = 0
 
+  // α = (A_c + i·A_s) / √2,  β = (A_c − i·A_s) / √2 — the `1/√2` prefactor
+  // is column-invariant, so hoist it out of the hot loop.
+  const inv2 = 1 / Math.sqrt(2)
+
   for (let i1 = 0; i1 < Nphi; i1++) {
     const phi1 = Nphi > 1 ? -output.phiExtent + i1 * dphi : 0
     for (let i2 = 0; i2 < Nphi; i2++) {
@@ -154,7 +161,6 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
       // α = (A_c + i·A_s) / √2,  β = (A_c − i·A_s) / √2.
       // (A_c + i·A_s) = (acRe − asIm) + i·(acIm + asRe).
       // (A_c − i·A_s) = (acRe + asIm) + i·(acIm − asRe).
-      const inv2 = 1 / Math.sqrt(2)
       const alphaRe = inv2 * (info.acRe - info.asIm)
       const alphaIm = inv2 * (info.acIm + info.asRe)
       const betaRe = inv2 * (info.acRe + info.asIm)

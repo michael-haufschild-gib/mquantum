@@ -202,12 +202,22 @@ export class WheelerDeWittSrmtCoordinator {
     const overlayDirty =
       computeDirty || justToggledOff || renderDirtyGated || selectedClockResultChanged
     const nextOverlay = enabled ? this.buildOverlay(config, solverOutput) : null
-    // Retain the last non-null overlay so a still-pending clock switch
-    // doesn't momentarily wipe the visible SRMT plane.
-    const overlay = enabled ? (nextOverlay ?? this.lastOverlay) : null
+    // Retain the last non-null overlay ONLY for render-only clock switches
+    // where the newly selected clock is still pending — we prefer holding
+    // the prior snapshot a few frames over a black gap. After a compute
+    // invalidation (`computeDirty`) the cache was flushed and `lastOverlay`
+    // reflects the PREVIOUS solver/cut/rank output; reusing it would repaint
+    // the density texture with stale physics for the whole worker latency.
+    const canReusePreviousOverlay =
+      enabled && renderChanged && !computeDirty && !hasSelectedClockResult
+    const overlay = enabled
+      ? (nextOverlay ?? (canReusePreviousOverlay ? this.lastOverlay : null))
+      : null
     if (nextOverlay) {
       this.lastOverlay = nextOverlay
-    } else if (!enabled || justToggledOff) {
+    } else if (!enabled || justToggledOff || computeDirty) {
+      // Drop the stale overlay on compute invalidation so downstream frames
+      // don't resurrect it via `lastOverlay` the next time renderChanged fires.
       this.lastOverlay = null
     }
 
