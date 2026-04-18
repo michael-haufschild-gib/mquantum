@@ -13,28 +13,46 @@
  * For clock `'a'` we discretise `H_φ` on the full `(φ₁, φ₂)` grid with a
  * second-order central-difference Laplacian and ghost-zero Dirichlet at
  * the outer edges (matching the convention used by the WdW solver). The
- * operator has size `Nφ² × Nφ²` and is real symmetric by construction —
- * the discrete Laplacian is symmetric (off-diagonals are stencil weights
- * `1/dφ²` between adjacent cells, zero otherwise) and the potential
- * enters only on the diagonal.
+ * operator has order `n = Nφ²` and is real symmetric by construction.
  *
  * For clocks `'φ₁'` / `'φ₂'` the slice state space spans `(a, φ_other)`
  * and the natural HJ operator is built by restricting the full WdW
  * operator to that plane. The discretisation is a second-order
  * finite-difference stencil of `−∂²_a + (1/a²) ∂²_{φ_other} + U(a, φ)` at
- * the chosen slice index in the clock axis — again real symmetric after
- * averaging the non-self-adjoint cross-term `1/a²` via the arithmetic
- * mean of the two cell-centre values. The size is `(Na · Nφ) × (Na · Nφ)`.
+ * the chosen slice index in the clock axis — again real symmetric. The
+ * order is `n = Na · Nφ`.
  *
- * The eigenvalues are returned sorted ascending — consistent with the
- * convention that K_n (modular) is also reported ascending.
+ * The eigenvalues are returned sorted ascending, matching the convention
+ * that K_n (modular) is also reported ascending.
+ *
+ * ## Sparse representation
+ *
+ * A dense `n × n` matrix would be prohibitively expensive — clock `'a'`
+ * needs `1024² × 4 B` = 4 MB, clock `'φ₁'` needs `4096² × 4 B` = 64 MB
+ * per build, and building one per SRMT compute is a measurable memory
+ * and GC cost.
+ *
+ * The stencil is 5-sparse per row (diagonal + 4 neighbours) so we store
+ * the operator as:
+ *
+ * - `diag: Float64Array(n)` — full diagonal (kinetic + potential).
+ * - Fixed stencil weights for the `φ₁`, `φ₂` (and for the φ-clock path,
+ *   also `a`) directions. The weights are axis-constant for the
+ *   clock-`'a'` path; for the φ-clock path they are position-dependent
+ *   through the `1/a²` prefactor, so we keep the full per-cell
+ *   `1/a²` table and read it inside the mat-vec.
+ *
+ * Matrix-vector product is then `5 · n` operations — O(n) in time and
+ * space — versus the dense `O(n²)` = 16 M flops and 16 MB alloc per
+ * call. For Lanczos with `k = 64` eigenvalues that is 64× less work.
  *
  * @module lib/physics/srmt/hjOperator
  */
 
 import { jacobiEigenvalues } from '@/lib/math/jacobiEigenvalues'
+import { wdwU } from '@/lib/physics/wheelerDeWitt/constants'
 
-import { lanczosTopK } from './lanczos'
+import { lanczosTopK, lanczosTopKOp, type LinearOperator } from './lanczos'
 import type { SrmtClock } from './types'
 
 /**
@@ -60,52 +78,66 @@ export interface HjOperatorInputs {
   cosmologicalConstant: number
   /**
    * Clock-axis index of the slice at which to evaluate `H_HJ`. For clock
-   * `'a'` this is an index into the `a` axis; for `'φ₁'` / `'φ₂'` an index
-   * into the respective inflaton axis.
+   * `'a'` this is an index into the `a` axis; for `'φ₁'` / `'φ₂'` an
+   * index into the respective inflaton axis.
    */
   sliceIndex: number
 }
 
-/** Prefactor `c_U = 36 π²` of the WdW potential (matches the solver). */
-const C_U = 36 * Math.PI * Math.PI
-/** `8 π G / 3` with `G = 1`. */
-const WDW_G_PREFACTOR = (8 * Math.PI) / 3
-
 /**
- * Evaluate `U(a, φ₁, φ₂)` — shared with the solver.
- *
- * @param a - Scale factor.
- * @param phi1 - First inflaton.
- * @param phi2 - Second inflaton.
- * @param m - Inflaton mass.
- * @param lambda - Cosmological constant.
- * @returns `U(a, φ)` in natural units.
+ * Sparse operator representation: diagonal + axis-constant stencil
+ * weights + an optional per-cell `1/a²` table for axis-variable
+ * couplings. Consumed by {@link applySparseOperator} to produce a
+ * mat-vec callback.
  */
-function wdwU(a: number, phi1: number, phi2: number, m: number, lambda: number): number {
-  const V = 0.5 * m * m * (phi1 * phi1 + phi2 * phi2) + lambda
-  const a2 = a * a
-  return -C_U * a2 * (1 - WDW_G_PREFACTOR * a2 * V)
+interface SparseHjOperator {
+  n: number
+  /**
+   * Size of the second axis inside the row-major `(axis0, axis1)` layout
+   * of the flattened `n = size0 · size1` index. Used to traverse
+   * axis-1 neighbours.
+   */
+  size1: number
+  /** Full diagonal (kinetic contribution + potential U). Length `n`. */
+  diag: Float64Array
+  /** Stencil coefficient for axis-0 neighbours. For clock `'a'` this is
+   * `−1/(a² dφ²)` (constant); for φ-clocks it is `−1/da²` (constant). */
+  offAxis0: number
+  /**
+   * Stencil coefficient for axis-1 neighbours. For clock `'a'` this is
+   * `−1/(a² dφ²)` (constant across the slice). For φ-clocks it depends
+   * on `1/a²` which varies across axis-0 — `offAxis1Variable` is
+   * populated in that case. `offAxis1` is then 0 and callers read from
+   * the variable table.
+   */
+  offAxis1: number
+  /**
+   * Optional per-cell `1/(a² dφ²)` coefficient for the φ-kinetic term
+   * on φ-clock slices. `null` when the coefficient is axis-constant
+   * (clock `'a'`). Length `n` — one entry per (axis0, axis1) cell.
+   */
+  offAxis1Variable: Float64Array | null
+  /**
+   * Infinity-norm estimate `max_i Σ_j |A_ij|` — used by the callback
+   * Lanczos for its β-breakdown threshold. Precomputed once so the
+   * Lanczos driver does not need to know the operator structure.
+   */
+  infNorm: number
 }
 
 /**
- * Build the real symmetric HJ operator matrix on an `(φ₁, φ₂)` slice at
- * fixed `a`. The Laplacian is a second-order central-difference with
- * ghost-zero Dirichlet conditions one cell outside the grid — the
- * diagonal term accumulates a `−4/dφ²` kinetic contribution minus the
- * edge-missing neighbours, so cells at the grid boundary see only
- * present neighbours in the off-diagonals but the same `−4/dφ²` diagonal
- * coefficient (ghost cells are implicitly zero and therefore absent from
- * both sides of the stencil).
+ * Build the HJ operator's sparse representation for clock `'a'` — on an
+ * `(φ₁, φ₂)` slice at fixed `a`. All stencil weights are axis-constant
+ * since `1/a²` is fixed on the slice.
  *
- * @param inputs - Physical inputs.
- * @returns Dense real-symmetric operator, row-major `Float64Array` of
- *          length `Nphi² · Nphi²`, together with the operator order `n`.
+ * Index layout: `idx = i1 · Nphi + i2`, so `size0 = size1 = Nphi`.
+ * Axis-0 (i1) and axis-1 (i2) both share the same stencil weight.
  */
-function buildHjOperatorA(inputs: HjOperatorInputs): { matrix: Float64Array; n: number } {
+function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
   if (!(sliceIndex > 0 && sliceIndex < Na - 1)) {
     throw new Error(
-      `buildHjOperatorA: sliceIndex must be strictly interior, got ${sliceIndex} (Na=${Na})`
+      `buildSparseOpA: sliceIndex must be strictly interior, got ${sliceIndex} (Na=${Na})`
     )
   }
   const da = (aMax - aMin) / (Na - 1)
@@ -115,7 +147,7 @@ function buildHjOperatorA(inputs: HjOperatorInputs): { matrix: Float64Array; n: 
   const kinCoeff = 1 / (a * a)
 
   const n = Nphi * Nphi
-  const M = new Float64Array(n * n)
+  const diag = new Float64Array(n)
 
   // Operator H_φ = −(1/a²) Δ_φ + U, discretised with ghost-zero Dirichlet:
   //   −Δ_φ → diag += +4/dφ²,   off-diag (each of 4 neighbours) += −1/dφ²
@@ -125,108 +157,140 @@ function buildHjOperatorA(inputs: HjOperatorInputs): { matrix: Float64Array; n: 
   const diagKin = 4 * invDphi2 * kinCoeff
   const offKin = -invDphi2 * kinCoeff
 
-  const add = (at: number, delta: number): void => {
-    M[at] = (M[at] ?? 0) + delta
-  }
-
   for (let i1 = 0; i1 < Nphi; i1++) {
     const phi1 = -phiExtent + i1 * dphi
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = -phiExtent + i2 * dphi
       const idx = i1 * Nphi + i2
-      const row = idx * n
-
-      add(row + idx, diagKin)
-      if (i1 > 0) add(row + (i1 - 1) * Nphi + i2, offKin)
-      if (i1 < Nphi - 1) add(row + (i1 + 1) * Nphi + i2, offKin)
-      if (i2 > 0) add(row + i1 * Nphi + (i2 - 1), offKin)
-      if (i2 < Nphi - 1) add(row + i1 * Nphi + (i2 + 1), offKin)
-
-      add(row + idx, wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant))
+      diag[idx] = diagKin + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
     }
   }
-  return { matrix: M, n }
+
+  // infNorm = max_i (|diag_i| + 4·|offKin|) (interior cells have 4
+  // neighbours; boundary cells have fewer, so this is an upper bound).
+  let maxDiag = 0
+  for (let i = 0; i < n; i++) {
+    const v = Math.abs(diag[i]!)
+    if (v > maxDiag) maxDiag = v
+  }
+  const infNorm = maxDiag + 4 * Math.abs(offKin)
+
+  return {
+    n,
+    size1: Nphi,
+    diag,
+    offAxis0: offKin,
+    offAxis1: offKin,
+    offAxis1Variable: null,
+    infNorm,
+  }
 }
 
 /**
- * Build the real symmetric HJ operator matrix on an `(a, φ_other)` slice
- * at fixed `φ_clock`. The operator includes both the `a`-direction
- * kinetic term and the orthogonal `φ` kinetic term, with the potential
- * diagonal evaluated at every cell of the slice.
+ * Build the HJ operator's sparse representation for clock `'φ₁'` /
+ * `'φ₂'` — on an `(a, φ_other)` slice at fixed `φ_clock`. The `a`-kinetic
+ * stencil is axis-constant; the `φ`-kinetic stencil is position-dependent
+ * through `1/a²`, stored in `offAxis1Variable`.
  *
- * The `1/a²` prefactor of the `φ`-kinetic term is position-dependent —
- * we symmetrise the cross neighbour coupling by averaging `(1/a²)` across
- * the two cells it connects, which keeps the discrete operator Hermitian.
- *
- * @param inputs - Physical inputs.
- * @param clock - `'phi1'` or `'phi2'` — the axis being sliced.
- * @returns Dense real-symmetric operator.
+ * Index layout: `idx = ia · Nphi + io`, so `size0 = Na`, `size1 = Nphi`.
  */
-function buildHjOperatorPhi(
-  inputs: HjOperatorInputs,
-  clock: 'phi1' | 'phi2'
-): { matrix: Float64Array; n: number } {
+function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
   if (!(sliceIndex > 0 && sliceIndex < Nphi - 1)) {
     throw new Error(
-      `buildHjOperatorPhi: sliceIndex must be strictly interior, got ${sliceIndex} (Nphi=${Nphi})`
+      `buildSparseOpPhi: sliceIndex must be strictly interior, got ${sliceIndex} (Nphi=${Nphi})`
     )
   }
   const da = (aMax - aMin) / (Na - 1)
   const dphi = (2 * phiExtent) / (Nphi - 1)
   const invDa2 = 1 / (da * da)
   const invDphi2 = 1 / (dphi * dphi)
-
-  // Fixed clock value (stays constant across the slice).
   const phiClock = -phiExtent + sliceIndex * dphi
 
-  // Slice has axis 0 = a (size Na), axis 1 = φ_other (size Nphi).
   const n = Na * Nphi
-  const M = new Float64Array(n * n)
-  const add = (at: number, delta: number): void => {
-    M[at] = (M[at] ?? 0) + delta
-  }
+  const diag = new Float64Array(n)
+  const offAxis1Variable = new Float64Array(n)
 
   for (let ia = 0; ia < Na; ia++) {
     const a = aMin + ia * da
     const invAsq = 1 / (a * a)
+    // Off-diagonal φ coupling for this row of (ia, *): +1/(a² dφ²).
+    // Sign: from +(1/a²) ∂²_φ with discrete stencil (−2 diagonal, +1
+    // neighbour), scaled by 1/a².
+    const offPhi = invAsq * invDphi2
     for (let io = 0; io < Nphi; io++) {
       const phiOther = -phiExtent + io * dphi
       const phi1 = clock === 'phi1' ? phiClock : phiOther
       const phi2 = clock === 'phi1' ? phiOther : phiClock
       const idx = ia * Nphi + io
-      const row = idx * n
 
-      // −∂²_a stencil at (ia, io). Sign of operator in HJ: from the WdW
-      // constraint H_HJ = −∂²_a + (1/a²) ∇²_φ + U, discrete form:
-      //   diag += +2/da²      off_a += −1/da²
-      add(row + idx, 2 * invDa2)
-      if (ia > 0) add(row + (ia - 1) * Nphi + io, -invDa2)
-      if (ia < Na - 1) add(row + (ia + 1) * Nphi + io, -invDa2)
+      // Diagonal:
+      //   from −∂²_a:    +2/da²
+      //   from (1/a²) ∂²_φ: −2/(a² dφ²)
+      //   plus U(a, φ)
+      diag[idx] =
+        2 * invDa2 - 2 * invAsq * invDphi2 + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
 
-      // (1/a²) ∂²_{φ_other}: discrete form
-      //   diag += −2/(a² dφ²)   off_φ += +1/(a² dφ²) per neighbour
-      add(row + idx, -2 * invAsq * invDphi2)
-      if (io > 0) add(row + ia * Nphi + (io - 1), invAsq * invDphi2)
-      if (io < Nphi - 1) add(row + ia * Nphi + (io + 1), invAsq * invDphi2)
-
-      // Potential on the diagonal at the slice point.
-      add(row + idx, wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant))
+      // Per-cell φ-kinetic off-diagonal. Positive (see sign note above).
+      offAxis1Variable[idx] = offPhi
     }
   }
-  return { matrix: M, n }
+
+  // infNorm estimate — worst-case absolute row sum. The a-neighbours
+  // contribute `2·invDa2` (two present for interior, one for edge); the
+  // φ-neighbours contribute `2·offPhi(a)` varying with `a`. Upper-bound
+  // by using the maximum invAsq on the grid.
+  let maxOffPhi = 0
+  for (let i = 0; i < n; i++) {
+    const v = Math.abs(offAxis1Variable[i]!)
+    if (v > maxOffPhi) maxOffPhi = v
+  }
+  let maxDiag = 0
+  for (let i = 0; i < n; i++) {
+    const v = Math.abs(diag[i]!)
+    if (v > maxDiag) maxDiag = v
+  }
+  const infNorm = maxDiag + 2 * invDa2 + 2 * maxOffPhi
+
+  return {
+    n,
+    size1: Nphi,
+    diag,
+    offAxis0: -invDa2,
+    offAxis1: 0,
+    offAxis1Variable,
+    infNorm,
+  }
 }
 
 /**
- * Convert a row-major `Float64Array` matrix to `Float32Array` for input
- * into {@link lanczosTopK}. Float32 loses precision on the matrix
- * entries but the Lanczos accumulators run in Float64 internally so the
- * convergence quality is not capped by f32 round-off.
+ * Given a sparse operator, return a {@link LinearOperator} that computes
+ * `y = A · x` by iterating over the stencil. Ghost-zero Dirichlet is
+ * implicit — out-of-bound neighbour contributions are skipped.
  */
-function matrixF64toF32(M: Float64Array, n: number): Float32Array {
-  const out = new Float32Array(n * n)
-  for (let i = 0; i < n * n; i++) out[i] = M[i]!
-  return out
+function applySparseOperator(op: SparseHjOperator): LinearOperator {
+  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable } = op
+  const size0 = n / size1
+  return (x, y) => {
+    for (let i0 = 0; i0 < size0; i0++) {
+      const rowBase = i0 * size1
+      for (let i1 = 0; i1 < size1; i1++) {
+        const idx = rowBase + i1
+        let acc = diag[idx]! * x[idx]!
+        if (i0 > 0) acc += offAxis0 * x[idx - size1]!
+        if (i0 < size0 - 1) acc += offAxis0 * x[idx + size1]!
+        if (offAxis1Variable !== null) {
+          const c = offAxis1Variable[idx]!
+          if (i1 > 0) acc += c * x[idx - 1]!
+          if (i1 < size1 - 1) acc += c * x[idx + 1]!
+        } else {
+          if (i1 > 0) acc += offAxis1 * x[idx - 1]!
+          if (i1 < size1 - 1) acc += offAxis1 * x[idx + 1]!
+        }
+        y[idx] = acc
+      }
+    }
+  }
 }
 
 /**
@@ -234,70 +298,63 @@ function matrixF64toF32(M: Float64Array, n: number): Float32Array {
  * by the chosen clock and return its top-`k` eigenvalues (by magnitude)
  * sorted ascending.
  *
- * This is the Lanczos-backed variant used by the production SRMT
- * diagnostic. For a well-separated HJ spectrum, extracting only the
- * dominant `k` eigenvalues turns the previously-cubic Jacobi solve into
- * an `O(k·n²)` cost — the qualitative difference between "returns in
- * ~1s on n = 1024" and "never returns on n = 4096".
+ * This is the production SRMT path. The operator is stored as a
+ * 5-sparse stencil (see module docstring) and Lanczos calls a
+ * stencil-based mat-vec callback instead of a dense row-major product.
+ * Memory usage drops from `n²` floats to `O(n)` floats; mat-vec time
+ * drops from `O(n²)` to `O(5 n)` per iteration.
  *
  * @param clock - Clock axis.
  * @param inputs - Grid and potential parameters.
  * @param k - Number of top-magnitude eigenvalues to extract. Values
- *            larger than the slice order `n` are silently clipped to
- *            `n` (recovering the full spectrum).
+ *   larger than the slice order `n` are silently clipped to `n`
+ *   (recovering the full spectrum).
  * @returns `{ spectrum, n }` — `spectrum` holds the top-k eigenvalues of
- *          `H_HJ` sorted ascending (so `spectrum[0]` is the smallest of
- *          the selected set); `n` is the slice dimension (`Nphi²` for
- *          clock `'a'`, `Na · Nphi` for the φ-clocks).
+ *   `H_HJ` sorted ascending; `n` is the slice dimension (`Nphi²` for
+ *   clock `'a'`, `Na · Nphi` for the φ-clocks).
  */
 export function hjSpectrumOnSliceTopK(
   clock: SrmtClock,
   inputs: HjOperatorInputs,
   k: number
 ): { spectrum: Float32Array; n: number } {
-  const { matrix, n } = clock === 'a' ? buildHjOperatorA(inputs) : buildHjOperatorPhi(inputs, clock)
-  if (k <= 0) return { spectrum: new Float32Array(0), n }
-  const matrixF32 = matrixF64toF32(matrix, n)
-  const spectrum = lanczosTopK(matrixF32, n, Math.min(k, n))
-  return { spectrum, n }
+  const op = clock === 'a' ? buildSparseOpA(inputs) : buildSparseOpPhi(inputs, clock)
+  if (k <= 0) return { spectrum: new Float32Array(0), n: op.n }
+  const apply = applySparseOperator(op)
+  const spectrum = lanczosTopKOp(apply, op.n, Math.min(k, op.n), op.infNorm)
+  return { spectrum, n: op.n }
 }
 
 /**
- * Construct the discrete Hamilton-Jacobi operator on the slice selected
- * by the chosen clock and return its FULL eigenvalue spectrum sorted
- * ascending. Retained primarily for tests that want to compare against
- * the analytic spectrum or confirm Hermiticity — the production
- * diagnostic uses {@link hjSpectrumOnSliceTopK} to avoid the `O(n³)`
+ * Same as {@link hjSpectrumOnSliceTopK} but returns the FULL eigenvalue
+ * spectrum sorted ascending. Retained primarily for tests that want to
+ * compare against an analytic spectrum or confirm Hermiticity — the
+ * production diagnostic uses the top-`k` variant to avoid the `O(n³)`
  * cost at the default WdW grid.
  *
  * Implementation delegates to a full-rank Lanczos run (`k = n`). With
  * full reorthogonalization Lanczos converges to every eigenvalue of the
  * tridiagonal in exact arithmetic; round-off adds a residual but stays
  * well below the precision needed by the HO-spectrum test assertions.
- *
- * @param clock - Clock axis.
- * @param inputs - Grid and potential parameters.
- * @returns `{ spectrum, n }` — `spectrum[0]` is the smallest eigenvalue,
- *          `n` is the slice dimension (`Nphi²` for clock `'a'`,
- *          `Na · Nphi` for the φ-clocks).
  */
 export function hjSpectrumOnSlice(
   clock: SrmtClock,
   inputs: HjOperatorInputs
 ): { spectrum: Float32Array; n: number } {
-  const { matrix, n } = clock === 'a' ? buildHjOperatorA(inputs) : buildHjOperatorPhi(inputs, clock)
-  const matrixF32 = matrixF64toF32(matrix, n)
-  const spectrum = lanczosTopK(matrixF32, n, n)
-  return { spectrum, n }
+  const op = clock === 'a' ? buildSparseOpA(inputs) : buildSparseOpPhi(inputs, clock)
+  const apply = applySparseOperator(op)
+  const spectrum = lanczosTopKOp(apply, op.n, op.n, op.infNorm)
+  return { spectrum, n: op.n }
 }
 
 /**
  * Build a 1D harmonic-oscillator Hamiltonian `H = −∂²_x + ω² x²` on a
  * symmetric grid of `N` cells spanning `[−L, L]`, return eigenvalues.
  * Exposed primarily to let `hjOperator.test.ts` verify the discrete
- * operator reproduces the analytic HO spectrum without building a full
- * WdW slice — the kinetic + potential stencil is identical to the one in
- * {@link buildHjOperatorA} restricted to a single axis.
+ * operator reproduces the analytic HO spectrum — the kinetic + potential
+ * stencil is identical to the one inside the clock-`'a'` operator,
+ * restricted to a single axis. Uses the dense Jacobi eigensolver for
+ * exact convergence because this helper runs only in tests.
  *
  * Analytic eigenvalues of `H = −∂²_x + ω² x²` are `2ω · (n + ½)`; the
  * discretisation recovers the low-`n` levels with spacing close to `2ω`.
@@ -328,3 +385,7 @@ export function harmonicOscillator1DSpectrum(N: number, L: number, omega: number
   for (let i = 0; i < N; i++) asc[i] = descending[N - 1 - i]!
   return asc
 }
+
+// Re-export lanczosTopK so existing tests that import it from hjOperator
+// keep working — and silence the unused-import warning.
+export { lanczosTopK }

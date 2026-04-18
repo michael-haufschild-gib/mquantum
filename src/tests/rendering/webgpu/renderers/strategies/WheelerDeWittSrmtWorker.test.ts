@@ -85,11 +85,13 @@ function makeOutput(): WheelerDeWittSolverOutput {
   return {
     chi,
     lorentzianMask: mask,
+    bandKind: new Uint8Array(total),
     gridSize: [Na, Nphi, Nphi],
     aMin: 0.1,
     aMax: 1.5,
     phiExtent: 2,
     maxDensity: 1,
+    columnAiry: [],
   }
 }
 

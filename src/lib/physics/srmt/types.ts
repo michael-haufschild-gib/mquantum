@@ -14,9 +14,9 @@
  * `K_n = −log(s_n² + ε)`, constructs a Hamilton-Jacobi operator on a
  * fixed clock slice, and returns an affine-match quality metric together
  * with the two spectra side-by-side and a `sliceK` array used downstream
- * by the Phase-3 render overlay.
+ * by the render overlay.
  *
- * Phase 1 scope: pure functions only. No store access, no WebGPU, no UI.
+ * Scope: pure functions only. No store access, no WebGPU, no UI.
  *
  * @module lib/physics/srmt/types
  */
@@ -100,7 +100,7 @@ export interface SrmtResult {
    * `K_A` eigenvalue density on the slice. Exactly `Nphi²` entries.
    * Populated by projecting the Schmidt `K` spectrum onto the slice
    * axis count and zero-padding if the rank is lower than `Nphi²`. Used
-   * downstream by the Phase-3 render overlay.
+   * downstream by the render overlay.
    */
   sliceK: Float32Array
 }

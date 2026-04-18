@@ -6,16 +6,13 @@
  * two Float32 buffers as interleaved (re, im) pairs indexed by
  * `i = i_phi1 * Nphi + i_phi2`.
  *
- * All quantities use G = ℏ = c = 1 units.
+ * All quantities use G = ℏ = c = 1 units. Physics constants and the
+ * potential helper live in {@link ./constants}; they are re-exported here
+ * for backward compatibility with existing imports.
  */
 
-/** 8πG / 3 with G = 1 — shared constant reused by solver + boundary. */
-export const WDW_G_PREFACTOR = (8 * Math.PI) / 3
-
-/** Potential V(φ) = ½m²(φ₁²+φ₂²) + Λ. Real-valued scalar. */
-export function wdwPotential(phi1: number, phi2: number, m: number, lambda: number): number {
-  return 0.5 * m * m * (phi1 * phi1 + phi2 * phi2) + lambda
-}
+export { WDW_G_PREFACTOR, wdwPotential } from './constants'
+import { WDW_G_PREFACTOR, wdwPotential, wdwU } from './constants'
 
 /** Shared inputs for the boundary-condition generators. */
 export interface WdwBoundaryInputs {
@@ -120,16 +117,35 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
 /**
  * Vilenkin tunneling boundary data.
  *
- * χ(a_min, φ) = A(φ)·exp(+i·S_L(φ)) with Lorentzian WKB phase
- * S_L(φ) = a_min³·V(φ)/3 — the leading small-a term of the classical
- * action — and A(φ) a Gaussian envelope. ∂_a χ ≈ i·(a_min²·V(φ))·χ,
- * from ∂_a S_L at a=a_min.
+ * χ(a_min, φ) = A(φ) · exp(+i·a_min³·V(φ)/3) with Gaussian envelope
+ * `A(φ) = exp(−½|φ|²)` and a small initial phase `a_min³·V(φ)/3`. The
+ * phase value at `a_min` is a global gauge — only the *gradient* picks
+ * the in/out branch. The Vilenkin tunneling proposal selects the
+ * **outgoing** branch (wave moving in `+a` direction = expanding
+ * universe), which corresponds to `χ ∝ e^{+iS} / |U|^{1/4}` in the
+ * leading-WKB ansatz.
  *
- * This produces a non-trivial oscillating phase with non-zero mean phase
- * magnitude, distinguishing Vilenkin from Hartle–Hawking visually.
+ * Differentiating the WKB ansatz at `a = a_min` (Lorentzian region,
+ * `U < 0`) gives
+ *
+ *     χ′(a_min) = [ +i · √|U(a_min)|  −  (1 / (4·|U(a_min)|)) · ∂_a|U(a_min)| ] · χ(a_min)
+ *
+ * Both terms are essential: the `+i·√|U|` term sets the phase
+ * direction, and the real `−(∂_a|U|)/(4|U|)` term carries the
+ * `|U|^{−1/4}` prefactor's logarithmic derivative. Dropping the
+ * prefactor term superposes incoming and outgoing modes with
+ * comparable amplitude — at `a_min = 0.05`, `V = 0.5` the prefactor
+ * coefficient is `≈ 9.89` vs the phase coefficient `≈ 0.94`, so the
+ * resulting standing wave has `|β/α| ≈ 1` instead of the physical
+ * Vilenkin `β = 0`.
+ *
+ * Falls back to the legacy small-`a` expansion `∂_a S = a²·V` when
+ * `U(a_min) ≥ 0` (a_min sits inside the Euclidean region — happens for
+ * very large `V` columns). In that case there is no Lorentzian outgoing
+ * wave to select and Stage-3 Airy connection skips the column anyway.
  *
  * @param input - Grid + physics inputs
- * @returns Complex boundary field with |arg(χ)|_mean > 0
+ * @returns Complex boundary field with the WKB outgoing-wave gradient.
  */
 export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin, mass, lambda } = input
@@ -148,14 +164,29 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
       const cosS = Math.cos(S_L)
       const sinS = Math.sin(S_L)
       const idx = i1 * Nphi + i2
-      setPair(chi, idx, amp * cosS, amp * sinS)
-      // ∂_a (amp·exp(iS_L)) = amp · i · (∂_a S_L) · exp(iS_L) with
-      // ∂_a S_L|_{aMin} = a_min²·V(φ).
-      const dSda = a2 * V
-      // d/da of chi = i·dSda·chi
       const cre = amp * cosS
       const cim = amp * sinS
-      setPair(chiDeriv, idx, -dSda * cim, dSda * cre)
+      setPair(chi, idx, cre, cim)
+
+      const U0 = wdwU(aMin, phi1, phi2, mass, lambda)
+      if (U0 < 0) {
+        // Lorentzian: full WKB outgoing-wave derivative.
+        //   ∂_a U = −2·c_U·a·(1 − 2·K·V·a²)
+        //   ∂_a|U| = −∂_a U  (since U < 0).
+        //   prefactor coefficient = −(1/(4·|U|))·∂_a|U|
+        const dUda = -2 * 36 * Math.PI * Math.PI * aMin * (1 - 2 * WDW_G_PREFACTOR * V * a2)
+        const absU = -U0
+        const phaseRate = Math.sqrt(absU)
+        const prefactorRate = -(-dUda) / (4 * absU)
+        // χ' = (prefactorRate + i·phaseRate)·χ.
+        const dRe = prefactorRate * cre - phaseRate * cim
+        const dIm = prefactorRate * cim + phaseRate * cre
+        setPair(chiDeriv, idx, dRe, dIm)
+      } else {
+        // Euclidean a_min: legacy small-a expansion ∂_a S_L = a²·V.
+        const dSda = a2 * V
+        setPair(chiDeriv, idx, -dSda * cim, dSda * cre)
+      }
     }
   }
   return { chi, chiDeriv }

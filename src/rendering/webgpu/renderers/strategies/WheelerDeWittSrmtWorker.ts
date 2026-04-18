@@ -1,18 +1,18 @@
 /**
  * SRMT diagnostic Web-Worker dispatcher with cross-clock sequential queue.
  *
- * Phase 5 architecture: when SRMT is enabled, the diagnostic runs for all
- * three clocks (`a`, `phi1`, `phi2`) back-to-back on the single worker. The
+ * Architecture: when SRMT is enabled, the diagnostic runs for all three
+ * clocks (`a`, `phi1`, `phi2`) back-to-back on a single worker. The
  * dispatcher owns the queue; the worker still processes one request at a
- * time. Sequential execution keeps peak memory bounded and avoids contention
- * on the main thread's worker proxy.
+ * time. Sequential execution keeps peak memory bounded and avoids
+ * contention on the main thread's worker proxy.
  *
  * The user-selected clock is placed first in the queue so the panel chart
  * and the density-grid overlay (driven by the selected-clock `sliceK`) fill
  * fastest. Non-selected clocks drain afterward to populate the cross-clock
  * quality table.
  *
- * State changes from Phase 4:
+ * Key pieces of state:
  *  - `result` / `quality` / `cutIndex` collapsed into `resultsByClock` —
  *    indexed by {@link SrmtClock}, each entry holds `{ result, snapshot,
  *    cutIndex }`. Adoption across strategy swaps moves the whole state
@@ -33,6 +33,7 @@
 
 import { logger } from '@/lib/logger'
 import type { SrmtClock, SrmtResult } from '@/lib/physics/srmt'
+import { findChampionClock } from '@/lib/physics/srmt'
 import type {
   SrmtWorkerRequest,
   SrmtWorkerResponse,
@@ -205,30 +206,10 @@ function buildSnapshot(
 }
 
 /**
- * Pick the champion clock (min affine quality). Returns `null` when fewer
- * than three clocks have finite entries OR when the winner's margin over
- * the runner-up is below the tie tolerance (±0.02). Kept module-local and
- * exported so tests and the UI agree on the rule.
+ * Re-export the champion-clock selection helper from the shared SRMT
+ * library so existing call sites continue to work.
  */
-export function findChampionClock(
-  quality: SrmtClockQuality,
-  tieTolerance = 0.02
-): SrmtClock | null {
-  const entries: { clock: SrmtClock; q: number }[] = [
-    { clock: 'a', q: quality.a },
-    { clock: 'phi1', q: quality.phi1 },
-    { clock: 'phi2', q: quality.phi2 },
-  ]
-  if (!entries.every((e) => Number.isFinite(e.q))) return null
-  entries.sort((x, y) => x.q - y.q)
-  const [best, second] = entries
-  if (!best || !second) return null
-  // Strict less-than: a margin of exactly `tieTolerance` is enough to name
-  // the champion. This matches the spec's "near-ties don't oscillate"
-  // intent (real collisions are rarer than clean wins by the tolerance).
-  if (second.q - best.q < tieTolerance) return null
-  return best.clock
-}
+export { findChampionClock }
 
 /**
  * Lazy-construct the worker. Reply handler drives the per-clock cache +
@@ -330,9 +311,31 @@ function dispatchNextInQueue(state: SrmtWorkerState): void {
 }
 
 /**
- * Post one {@link SrmtDispatchArgs} to the worker thread with transferable
- * buffers. No dedup here — the queue has already been filtered by
- * {@link queueSrmtCompute}.
+ * Post one {@link SrmtDispatchArgs} to the worker thread with
+ * transferable buffers. No dedup here — the queue has already been
+ * filtered by {@link queueSrmtCompute}.
+ *
+ * ## Buffer-copy rationale
+ *
+ * The solver output lives in the strategy's cache and may be consumed
+ * by the density-grid packer + SRMT compute on the SAME frame. If we
+ * transferred the original `chi` / `lorentzianMask` buffers directly,
+ * the strategy would lose ownership and the packer's next read would
+ * hit a detached `ArrayBuffer`.
+ *
+ * The fix is to copy once, then transfer the copy. This is the
+ * correct trade-off at current scales:
+ *
+ *  - `chi` at default grid = `2 · 128 · 32 · 32 · 4 B` ≈ 1 MB.
+ *  - `lorentzianMask` = 128 KB.
+ *  - Combined copy cost ≈ 200 µs on typical hardware — dwarfed by
+ *    the SRMT compute itself (0.5-3 s per clock on the worker).
+ *
+ * A pool-and-return scheme (transfer on dispatch, back-transfer on
+ * reply) would remove the allocator pressure but complicate the
+ * worker protocol substantially. If the solver output ever grows 10×
+ * (e.g. a 256³ grid experiment), revisit this decision — until then
+ * the extra copy is negligible.
  */
 function postArgsToWorker(state: SrmtWorkerState, args: SrmtDispatchArgs): void {
   try {
@@ -341,8 +344,6 @@ function postArgsToWorker(state: SrmtWorkerState, args: SrmtDispatchArgs): void 
     state.inFlight = true
     state.lastDispatchedHash[args.clock] = args.hash
     state.lastDispatchedRankCap[args.clock] = args.rankCap
-    // Copy hot buffers so the strategy keeps ownership of the cached solver
-    // output; transfer the copies to the worker thread for zero-copy delivery.
     const chiCopy = new Float32Array(args.output.chi)
     const maskCopy = new Uint8Array(args.output.lorentzianMask)
     const request: SrmtWorkerRequest = {
@@ -429,11 +430,30 @@ export function queueSrmtCompute(
 }
 
 /**
- * Dispatch a single SRMT compute to the worker bypassing the queue. Kept
- * for dedup-checking callers and the existing test surface. Phase 5's
- * normal flow is {@link queueSrmtCompute}; this is retained so the
- * Phase-4 strategy unit tests and the ad-hoc solo dispatch path keep
- * working without modification.
+ * Dispatch a single SRMT compute to the worker, bypassing the
+ * cross-clock queue.
+ *
+ * ## When to use this vs {@link queueSrmtCompute}
+ *
+ * Production code path is {@link queueSrmtCompute} — it queues all
+ * three clocks back-to-back so the cross-clock quality table fills in
+ * without ever falling behind the current selected clock.
+ *
+ * `dispatchSrmtCompute` is the **single-clock primitive** kept for two
+ * permanent use cases:
+ *
+ *  1. **Test authoring.** Unit tests that want to assert a single
+ *     request/reply round-trip without exercising the queue-drain path
+ *     (e.g. "dedup same-hash dispatches" or "epoch bump on cancel")
+ *     use this API to keep the test focused.
+ *  2. **Direct dedup check.** A caller holding its own dedup state can
+ *     invoke this to post exactly one request with an in-flight-hash
+ *     guard; the queued variant rebuilds the whole three-clock set on
+ *     every call.
+ *
+ * The two functions share the internal dispatch machinery
+ * ({@link postArgsToWorker}) — dedup semantics and epoch handling are
+ * consistent across both.
  */
 export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchArgs): void {
   if (state.disposed) return

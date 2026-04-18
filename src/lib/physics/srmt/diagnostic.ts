@@ -9,8 +9,8 @@
  *
  * The SRMT conjecture under test: the DeWitt-timelike clock (`clock = 'a'`)
  * should give a much lower `affineMatchQuality` (better fit) than either
- * `'phi1'` or `'phi2'`. Phase 3 of this project will plot the two
- * spectra side-by-side and overlay `sliceK` on the φ-slice density field.
+ * `'phi1'` or `'phi2'`. The UI plots the two spectra side-by-side and
+ * overlays `sliceK` on the φ-slice density field.
  *
  * @module lib/physics/srmt/diagnostic
  */
@@ -50,7 +50,7 @@ const DEFAULT_PHYSICS: SrmtPhysicsContext = {
 
 /**
  * Map the clock axis to the corresponding slice orientation used by the
- * Phase-3 renderer.
+ * density-grid renderer.
  *
  * @param clock - Clock axis.
  * @returns Slice plane label.
@@ -113,32 +113,45 @@ function affineFitQuality(K: Float64Array, E: Float64Array, count: number): numb
 }
 
 /**
- * Populate the 2D sliceK field rendered as a heatmap disk at the cut plane.
+ * Populate the 2D `sliceK` field rendered as a heatmap disk at the cut
+ * plane.
  *
  * Physical content: the diagonal of the reduced density matrix
- * `ρ_A(x_slice) = |χ(x_clock=cut, x_slice)|²` on the slice perpendicular
- * to the selected clock axis. This is the scalar field the modular
- * Hamiltonian `K_A = -log ρ_A` acts upon; rendering it shows *where* on
- * the (φ₁, φ₂) / (a, φ) slice the reduced state has support, which is the
- * physically meaningful 2D companion to the 1D `kSpectrum` plotted in the
- * panel.
+ * `ρ_A(x_slice) = |χ(x_clock = cut, x_slice)|²` on the slice
+ * perpendicular to the selected clock axis. This is the scalar field
+ * the modular Hamiltonian `K_A = −log ρ_A` acts upon; rendering it
+ * shows *where* on the `(φ₁, φ₂) / (a, φ)` slice the reduced state has
+ * support — the physically-meaningful 2D companion to the 1D
+ * `kSpectrum` plotted in the side panel.
  *
- * Indexing convention matches the Phase-3 packer
- * `packWdwDensityGrid` → `srmtOverlay` path:
- *   - `clock='a'`    → slice spans (φ₁, φ₂); out[i1·Nphi + i2] = |χ(cut, i1, i2)|².
- *   - `clock='phi1'` → slice spans (a, φ₂); a axis compressed to Nphi bins
- *                       via nearest-neighbour resample.
- *   - `clock='phi2'` → slice spans (a, φ₁); same a compression.
+ * ## Shape contract
  *
- * The a-axis compression for φ-clocks is a Phase-3 artefact: the packer
- * was written against a `Nphi²`-entry buffer shape for all clocks. Phase
- * 6 may lift this to full `Na·Nphi` shape once the overlay ever shows
- * aliasing.
+ * The packer (`packWdwDensityGrid → srmtOverlay`) consumes a fixed
+ * `Nphi²` buffer for all clocks. For clock `'a'` this matches the
+ * natural slice shape (φ₁ × φ₂). For clock `'φ₁'` / `'φ₂'` the natural
+ * slice is `(a, φ_other)` with size `Na × Nphi` — typically 128 × 32 at
+ * default config, which we compress along the `a` axis into `Nphi`
+ * bins.
  *
- * @param output - Wheeler–DeWitt solver output (source of χ values).
+ * ## Compression kernel
+ *
+ * For `Na >= Nphi` we **bin-average** into `Nphi` contiguous blocks of
+ * `Na / Nphi` cells each (plus the remainder). Averaging preserves the
+ * integrated probability density — if the raw slice has `∫ ρ da = c`,
+ * the compressed slice retains `c / Nphi` per bin up to discretisation.
+ * Nearest-neighbour resampling (the previous behaviour) dropped (Na/Nphi
+ * − 1) source cells per output bin, losing information that would have
+ * contributed to the heatmap brightness.
+ *
+ * For `Na < Nphi` (edge case, e.g. a tiny grid) we fall back to
+ * repeating the source slab to fill the output — there is no
+ * information to gain from upsampling, and the `Nphi²` contract still
+ * has to be satisfied.
+ *
+ * @param output - Wheeler–DeWitt solver output (source of `χ` values).
  * @param clock  - Clock axis selector.
- * @param cutIndex - Cut index along the clock axis (already validated by
- *                   the caller to be strictly interior).
+ * @param cutIndex - Cut index along the clock axis (already validated
+ *   by the caller to be strictly interior).
  * @returns Float32 `Nphi²` slab of slice-plane density values.
  */
 function buildSliceK(
@@ -164,27 +177,65 @@ function buildSliceK(
     return out
   }
 
+  // φ-clock slice: natural shape (Na × Nphi). We bin-average into Nphi
+  // rows along the a-axis so the rendered heatmap reflects all source
+  // cells.
   const cutPhi = Math.min(Nphi - 1, Math.max(0, cutIndex))
-  // Compress a-axis from Na to Nphi via nearest-neighbour resample.
-  const aDen = Nphi > 1 ? Nphi - 1 : 1
+
+  // Per-output-bin starting index and count. Uses the floor/ceil split
+  // so remainders are distributed across the first few bins (e.g. Na=128,
+  // Nphi=32 → every bin = exactly 4; Na=130, Nphi=32 → first 2 bins = 5,
+  // rest = 4).
+  const base = Math.floor(Na / Nphi)
+  const remainder = Na - base * Nphi
+
+  let ia = 0
   for (let i = 0; i < Nphi; i++) {
-    const ia = Math.min(Na - 1, Math.max(0, Math.round((i * (Na - 1)) / aDen)))
-    for (let j = 0; j < Nphi; j++) {
-      let i1: number
-      let i2: number
-      if (clock === 'phi1') {
-        // Slice at phi1=cut, span (a compressed, phi2). Column index j = phi2.
-        i1 = cutPhi
-        i2 = j
-      } else {
-        // Slice at phi2=cut, span (a compressed, phi1). Column index j = phi1.
-        i1 = j
-        i2 = cutPhi
+    const count = base + (i < remainder ? 1 : 0)
+    const iaStart = ia
+    ia += count
+    // `count` may be zero only when Na < Nphi — handled below via
+    // repetition. In the Na >= Nphi path count is always >= 1.
+    if (count > 0) {
+      for (let j = 0; j < Nphi; j++) {
+        let i1: number
+        let i2: number
+        if (clock === 'phi1') {
+          i1 = cutPhi
+          i2 = j
+        } else {
+          i1 = j
+          i2 = cutPhi
+        }
+        let acc = 0
+        for (let k = 0; k < count; k++) {
+          const iaK = iaStart + k
+          const idx = 2 * (iaK * slab + i1 * Nphi + i2)
+          const re = chi[idx] ?? 0
+          const im = chi[idx + 1] ?? 0
+          acc += re * re + im * im
+        }
+        out[i * Nphi + j] = acc / count
       }
-      const idx = 2 * (ia * slab + i1 * Nphi + i2)
-      const re = chi[idx] ?? 0
-      const im = chi[idx + 1] ?? 0
-      out[i * Nphi + j] = re * re + im * im
+    } else {
+      // Na < Nphi fallback: repeat the nearest source row so the contract
+      // `out.length = Nphi²` is satisfied even on degenerate grids.
+      const iaFallback = Math.min(Na - 1, Math.floor((i * Na) / Nphi))
+      for (let j = 0; j < Nphi; j++) {
+        let i1: number
+        let i2: number
+        if (clock === 'phi1') {
+          i1 = cutPhi
+          i2 = j
+        } else {
+          i1 = j
+          i2 = cutPhi
+        }
+        const idx = 2 * (iaFallback * slab + i1 * Nphi + i2)
+        const re = chi[idx] ?? 0
+        const im = chi[idx + 1] ?? 0
+        out[i * Nphi + j] = re * re + im * im
+      }
     }
   }
   return out

@@ -5,6 +5,18 @@
  * its per-file `max-lines` budget. Follows the same pattern as
  * `adsSerializer.ts`: local parse helpers, single emit + parse function.
  *
+ * ## Scope guard
+ *
+ * {@link serializeSrmt} accepts the current `quantumMode` and no-ops when
+ * it is anything other than `'wheelerDeWitt'`. This moves the scope
+ * decision from caller discipline (which was the cause of a repeated
+ * "unguarded SRMT params emitted on a non-WdW link" class of bugs) into
+ * the serializer itself.
+ *
+ * {@link deserializeSrmt} parses unconditionally — apply-time wiring
+ * (`applyWdwParams`) scopes the parsed fields to `wheelerDeWitt` so
+ * pre-existing links with SRMT params still restore correctly.
+ *
  * @module lib/url/srmtSerializer
  */
 
@@ -61,14 +73,21 @@ function parseBool(params: URLSearchParams, key: string): boolean | undefined {
 }
 
 /**
- * Emit the SRMT sub-block. Callers must guard on `state.quantumMode ===
- * 'wheelerDeWitt'` — this helper writes unconditionally for whatever fields
- * are defined on `state`.
+ * Emit the SRMT sub-block. When `quantumMode` is not
+ * `'wheelerDeWitt'` the function is a no-op — SRMT fields never pollute
+ * links for unrelated modes, regardless of whether the state carries
+ * stale SRMT values.
  *
  * @param params - Mutable URLSearchParams accumulator.
+ * @param quantumMode - Active quantum mode; controls the scope guard.
  * @param state - Shareable state containing optional SRMT fields.
  */
-export function serializeSrmt(params: URLSearchParams, state: SrmtUrlState): void {
+export function serializeSrmt(
+  params: URLSearchParams,
+  quantumMode: string | undefined,
+  state: SrmtUrlState
+): void {
+  if (quantumMode !== 'wheelerDeWitt') return
   if (state.wdwSrmtEnabled !== undefined) params.set('srmt', state.wdwSrmtEnabled ? '1' : '0')
   if (state.wdwSrmtClock !== undefined) params.set('srmt_c', state.wdwSrmtClock)
   if (state.wdwSrmtCutNormalized !== undefined)

@@ -107,14 +107,21 @@ scope.onmessage = (e: MessageEvent<SrmtWorkerRequest>) => {
 
   const start = nowMs()
   try {
+    // SRMT consumes only `chi`, `lorentzianMask`, `gridSize`, and the
+    // physical extents — it does not read `bandKind` or `columnAiry`.
+    // Stub them out with empty buffers / array so the reconstructed
+    // object satisfies the full {@link WheelerDeWittSolverOutput} type.
+    const slab = msg.gridSize[0] * msg.gridSize[1] * msg.gridSize[2]
     const output: WheelerDeWittSolverOutput = {
       chi: msg.chi,
       lorentzianMask: msg.lorentzianMask,
+      bandKind: new Uint8Array(slab),
       gridSize: msg.gridSize,
       aMin: msg.aMin,
       aMax: msg.aMax,
       phiExtent: msg.phiExtent,
       maxDensity: msg.maxDensity,
+      columnAiry: [],
     }
     const result = computeSrmtDiagnostic(output, msg.config, msg.physics)
     const response: SrmtWorkerResponse = {

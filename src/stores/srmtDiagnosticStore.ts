@@ -5,19 +5,36 @@
  * eigenspectrum, and affine-match quality readouts produced by
  * {@link WheelerDeWittStrategy} after evaluating
  * {@link computeSrmtDiagnostic} against the cached Wheeler–DeWitt solver
- * output. The UI (Phase 4) subscribes to this store to render the
+ * output. The UI subscribes to this store to render the
  * side-by-side spectra comparison and the cross-clock quality table.
  *
  * Pattern mirrors {@link useWormholeCoherenceStore}: mutable arrays
  * written by the strategy, a monotonic `version` counter so React
- * consumers can detect updates cheaply, and a `clear` action that resets
- * everything (used on `WheelerDeWittStrategy.dispose` and on
+ * consumers can detect updates cheaply, and a `clear` action that
+ * resets everything (used on `WheelerDeWittStrategy.dispose` and on
  * `srmtEnabled` true → false transitions).
+ *
+ * ## Ownership and coupling
+ *
+ * The store is **singleton-coupled to the active Wheeler–DeWitt
+ * strategy**. The renderer instantiates exactly one strategy per mode
+ * and swaps it when the quantum mode changes — so at most one writer
+ * exists at any wall-clock moment. `dispose()` unconditionally
+ * `clear()`s the store because the caller guarantees no other
+ * coordinator is writing.
+ *
+ * If side-by-side rendering of multiple WdW instances is ever
+ * introduced, this store becomes a global singleton on a per-instance
+ * resource, and the ownership guarantee breaks. The refactor would be
+ * to make the coordinator carry its own local store (via `createStore`
+ * from Zustand's vanilla API) and expose a scoped hook to the panel.
+ * Tracked in the `WheelerDeWittSrmtCoordinator.dispose` docstring.
  *
  * All three clock slots are always populated — clocks that were not
  * computed synchronously hold `NaN` for affine quality and empty
- * `Float32Array`s for the spectra; the Phase 4 UI displays these as
- * "pending" with a reference to the Phase 6 Rust/WASM port plan.
+ * `Float32Array`s for the spectra; the UI displays these as "pending"
+ * with a reference to the upcoming Rust/WASM port plan tracked in
+ * ADR-011.
  *
  * @module stores/srmtDiagnosticStore
  */
@@ -65,7 +82,7 @@ export interface SrmtDiagnosticState {
   snapshot: SrmtSnapshot | null
   /**
    * Cross-clock affine-match quality. NaN entries are "pending" — either
-   * the queue has not drained yet (Phase-5 sequential dispatch fills them
+   * the queue has not drained yet (the sequential dispatcher fills them
    * one at a time) or SRMT is disabled. The UI renders these as
    * placeholders until a concrete number arrives.
    */
@@ -85,7 +102,7 @@ export interface SrmtDiagnosticState {
   setDiagnostic: (snapshot: SrmtSnapshot, quality: SrmtClockQuality) => void
   /**
    * Merge a single clock's affine-match quality into `clockAffineQuality`.
-   * Used by the Phase-5 sequential dispatcher when a non-selected clock's
+   * Used by the sequential dispatcher when a non-selected clock's
    * result arrives — the snapshot is driven by the selected clock, so that
    * stays put; only the one slot gets overwritten. Bumps `version`.
    *

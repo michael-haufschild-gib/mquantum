@@ -9,6 +9,8 @@
  * @module lib/physics/srmt
  */
 
+export type { ClockQualityRecord } from './championClock'
+export { DEFAULT_CHAMPION_TIE_TOLERANCE, findChampionClock } from './championClock'
 export type { SrmtPhysicsContext } from './diagnostic'
 export { computeSrmtDiagnostic } from './diagnostic'
 export type { HjOperatorInputs } from './hjOperator'

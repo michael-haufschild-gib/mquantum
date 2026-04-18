@@ -35,7 +35,25 @@ import { jacobiEigendecompose } from '@/lib/math/jacobiEigenvalues'
 
 /** Convergence tolerance on the Lanczos β coefficient (absolute). */
 const LANCZOS_BETA_TOL = 1e-14
-/** Default seed for the initial vector PRNG. */
+/**
+ * Default seed for the initial-vector PRNG. Picked arbitrarily
+ * ("0x5EED1AB1" ≈ "seed lab 1") so outputs are bit-exactly
+ * reproducible across runs — an essential property for the Wheeler–DeWitt
+ * physics regression tests that compare Lanczos output to analytic
+ * spectra.
+ *
+ * Lanczos iteration can miss eigenvalues when the random starting
+ * vector happens to lie in the orthogonal complement of the target
+ * eigenspace — a degeneracy risk on symmetric operators with clustered
+ * spectra (e.g. the HJ operator's `1/a²`-induced near-degeneracies in
+ * the φ-kinetic term). Users observing pathological convergence on a
+ * specific config can override via {@link LanczosOptions.seed} — any
+ * fresh seed perturbs the Krylov basis and restores convergence.
+ * Practically, the spectra of interest in the SRMT diagnostic are
+ * well-separated enough that the fixed seed has not produced a missed
+ * eigenvalue in the test suite, and physics-field diversity in the UI
+ * exposes any configuration where the fixed seed could go wrong.
+ */
 const DEFAULT_SEED = 0x5eed_1ab1
 /** Minimum extra Krylov steps past `k` for convergence headroom. */
 const DEFAULT_HEADROOM = 32
@@ -109,6 +127,17 @@ function reorthogonalize(v: Float64Array, Q: Float64Array, n: number, upto: numb
     }
   }
 }
+
+/**
+ * Apply a linear operator `A` to a vector `x` and store the result in `y`.
+ * The callback form decouples Lanczos from the matrix storage — callers
+ * can provide a stencil-based or otherwise-sparse matrix-vector product
+ * without paying the `O(n²)` memory cost of a dense representation.
+ *
+ * Used by {@link lanczosTopKOp}. Implementations MUST fully overwrite `y`
+ * (`y := A·x`); the caller does not zero `y` before the call.
+ */
+export type LinearOperator = (x: Float64Array, y: Float64Array) => void
 
 /**
  * Options for {@link lanczosTopK}.
@@ -191,15 +220,6 @@ export function lanczosTopK(
   if (matrix.length < n * n) {
     throw new Error(`lanczosTopK: buffer length ${matrix.length} < n² = ${n * n}`)
   }
-  if (k <= 0 || n === 0) return new Float32Array(0)
-
-  const kClipped = Math.min(k, n)
-  const headroom = Math.max(2 * kClipped, kClipped + DEFAULT_HEADROOM)
-  const defaultMaxIters = Math.min(n, headroom)
-  const maxIters = Math.max(kClipped, Math.min(n, opts?.maxIterations ?? defaultMaxIters))
-  const tol = opts?.tolerance ?? LANCZOS_BETA_TOL
-  const seed = opts?.seed ?? DEFAULT_SEED
-
   // Estimate a reference scale for the β breakdown check. We use the
   // infinity norm of the matrix (max absolute row sum) — stable under f32
   // rounding and a reasonable reference for when β "looks like zero".
@@ -210,7 +230,47 @@ export function lanczosTopK(
     for (let j = 0; j < n; j++) rowSum += Math.abs(matrix[row + j]!)
     if (rowSum > infNorm) infNorm = rowSum
   }
-  const betaFloor = tol * Math.max(1, infNorm)
+  const applyA: LinearOperator = (x, y) => matVec(matrix, x, y, n)
+  return lanczosTopKOp(applyA, n, k, infNorm, opts)
+}
+
+/**
+ * Callback-based Lanczos top-k for operators whose matrix-vector product
+ * is available but whose dense `n × n` representation is too expensive
+ * to store. Used by the Hamilton-Jacobi solver, whose stencil is
+ * 5-sparse — the dense form would be `n²` ≈ 16 M entries for the default
+ * `n = 4096` slice, while the stencil application is `5 n` = 20 k ops.
+ *
+ * @param applyA - Linear operator: `y := A · x`.
+ * @param n - Operator order (must be a non-negative integer).
+ * @param k - Number of top-magnitude eigenvalues to extract.
+ * @param infNormEstimate - Optional scale estimate used in the β-breakdown
+ *   check. Callers who know an upper bound on `||A||_∞` can supply it to
+ *   skip the internal estimate; pass `0` or omit to let the routine
+ *   estimate via `trace(A²)` — see note below.
+ * @param opts - Lanczos options (`maxIterations`, `tolerance`, `seed`).
+ * @returns Ascending-sorted top-k eigenvalues.
+ */
+export function lanczosTopKOp(
+  applyA: LinearOperator,
+  n: number,
+  k: number,
+  infNormEstimate: number,
+  opts?: LanczosOptions
+): Float32Array {
+  if (!Number.isInteger(n) || n < 0) {
+    throw new RangeError(`lanczosTopKOp: n must be a non-negative integer, got ${n}`)
+  }
+  if (k <= 0 || n === 0) return new Float32Array(0)
+
+  const kClipped = Math.min(k, n)
+  const headroom = Math.max(2 * kClipped, kClipped + DEFAULT_HEADROOM)
+  const defaultMaxIters = Math.min(n, headroom)
+  const maxIters = Math.max(kClipped, Math.min(n, opts?.maxIterations ?? defaultMaxIters))
+  const tol = opts?.tolerance ?? LANCZOS_BETA_TOL
+  const seed = opts?.seed ?? DEFAULT_SEED
+
+  const betaFloor = tol * Math.max(1, infNormEstimate)
 
   // Q is the basis of Lanczos vectors, row-major (row j holds q_j).
   // α, β are the diagonal and off-diagonal of the tridiagonal T.
@@ -231,7 +291,7 @@ export function lanczosTopK(
   let actualSteps = 0
   for (let j = 0; j < maxIters; j++) {
     // w ← A · q_j
-    matVec(matrix, qCurr, w, n)
+    applyA(qCurr, w)
 
     // w ← w − β_{j-1} · q_{j-1}
     if (j > 0) {

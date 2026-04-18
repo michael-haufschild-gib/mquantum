@@ -563,7 +563,7 @@ export function serializeState(state: ShareableState): string {
     setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
     setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
     setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
-    serializeSrmt(params, state)
+    serializeSrmt(params, state.quantumMode, state)
   }
 
   // Anti-de Sitter (Stage 1). Only emitted while the mode is active — the

@@ -1,33 +1,34 @@
 /**
  * WKB phase extraction from a complex Wheeler–DeWitt amplitude.
  *
- * The reduced WdW wavefunction `χ(a, φ)` factorises (in the semiclassical
- * regime) as `R · exp(i S / ℏ)` with slowly-varying amplitude `R` and
- * rapidly-oscillating phase `S`. Extracting `S` naively via
- * `atan2(Im, Re)` yields a phase confined to `(−π, π]`; across `a`-slabs
- * the true phase can roll through many multiples of `2π`, so we unwrap
- * along the clock axis before scaling.
+ * ## Physics
  *
- * Task specification defines `S(a, φ) = ℏ · arg(χ) / a^{3/2}`. The
- * `a^{3/2}` divisor follows the `χ = a^{3/2} · Ψ` substitution used by
- * the WdW solver — dividing through restores `arg(Ψ)`. We use `ℏ = 1`
- * throughout the codebase.
+ * The reduced WdW wavefunction `χ(a, φ)` factorises (in the
+ * semiclassical regime) as `R · exp(i S / ℏ)` with slowly-varying
+ * amplitude `R` and rapidly-oscillating phase `S`. The physical
+ * Hamilton-Jacobi action is
  *
- * Phase unwrapping uses the canonical "wrap the increment" approach: the
- * unwrapped phase at step `k` is the unwrapped phase at `k−1` plus the
- * branch of the instantaneous difference that lies in `(−π, π]`. This is
- * implemented by computing
+ *   `S(a, φ) = ℏ · arg(χ)`
  *
- *   `δ = atan2(sin(φ_k − φ_{k−1}), cos(φ_k − φ_{k−1}))`
+ * with `ℏ = 1` in the simulator's natural units. The `a^{3/2}` Jacobi
+ * factor in the substitution `χ = a^{3/2} · Ψ` is real and positive, so
+ * `arg(χ) = arg(Ψ)` unconditionally — the physical phase does not
+ * acquire an `a^{3/2}` rescaling.
  *
- * which is identical to the principal value of the signed angular
- * difference and works correctly even when the raw `atan2` values already
- * roll through the branch cut.
+ * (A rescaled visualisation phase `S_vis = a^{3/2} · arg(χ)` is used in
+ * `wheelerDeWitt/wkbStreamlines.ts` to push streamlines out of the
+ * near-`a_min` bunching region; that is a rendering choice, not the
+ * physical `S`. Distinguish the two carefully.)
  *
- * Optional 1D Gaussian smoothing along the clock axis suppresses
- * high-frequency numerical noise in `S` without blurring across the
- * non-clock axes. The kernel is truncated at `±3σ` and renormalised so
- * the reflected edges do not bias the interior.
+ * ## Extraction
+ *
+ * Naïve `atan2(Im, Re)` yields a phase confined to `(−π, π]`, while the
+ * true `S` rolls through many multiples of `2π` along the clock axis.
+ * We unwrap along the chosen clock axis (branch-correct via
+ * `atan2(sin(Δ), cos(Δ))`) before optionally smoothing with a 1D
+ * Gaussian kernel to suppress high-frequency numerical noise. The kernel
+ * is truncated at `±3σ` and renormalised at the edges so the filter
+ * does not bias the boundary.
  *
  * @module lib/physics/srmt/wkbPhase
  */
@@ -152,22 +153,25 @@ function gaussianSmoothAlong(
 }
 
 /**
- * Extract the WKB phase `S(a, φ) = ℏ · arg(χ) / a^{3/2}` with unwrapping
+ * Extract the physical WKB phase `S(a, φ) = ℏ · arg(χ)` with unwrapping
  * along the specified clock axis and optional 1D Gaussian smoothing.
+ * Uses `ℏ = 1` in the simulator's natural units.
  *
  * The output is an unwrapped, optionally-smoothed phase field of the
- * same 3D grid as the input. Caller supplies the physical `a`-axis
- * coordinate mapping via `aMin` and `aMax`.
+ * same 3D grid as the input. `aMin` and `aMax` are accepted for API
+ * parity with the pre-refactor signature but are not consulted by the
+ * extraction — the WKB phase itself has no explicit `a`-axis scaling
+ * (see module docstring for why an earlier `a^{3/2}` factor was
+ * physically incorrect).
  *
  * @param chi - Interleaved complex amplitudes, length `2 · Na · Nphi²`.
  * @param shape - `[Na, Nphi, Nphi]`.
  * @param aMin - Lower bound of the `a` grid in physical units.
- * @param aMax - Upper bound.
- * @param clock - Axis along which to unwrap; the scaling `a^{3/2}` is
- *                always applied (regardless of clock) because it follows
- *                the WdW solver's `χ = a^{3/2} Ψ` substitution.
+ *   Retained for signature compatibility; also used by boundary checks.
+ * @param aMax - Upper bound; must exceed `aMin`.
+ * @param clock - Axis along which to unwrap (`'a'`, `'phi1'`, or `'phi2'`).
  * @param sigmaCells - Gaussian smoothing width in clock-axis cells.
- *                     Defaults to `1.0`. Set to `0` to disable.
+ *   Defaults to `1.0`. Set to `0` to disable.
  * @returns Phase field `S` as a `Float64Array` of length `Na · Nphi²`.
  */
 export function extractWkbPhase(
@@ -231,21 +235,7 @@ export function extractWkbPhase(
     for (let k = 0; k < axisLen; k++) raw[base + k * axisStride] = strip[k]!
   }
 
-  // Smooth along the clock axis.
-  const smoothed = gaussianSmoothAlong(raw, [Na, Nphi1, Nphi2], axisIdx, sigmaCells)
-
-  // Apply the a^{3/2} scaling. S = ℏ · arg(χ) / a^{3/2} with ℏ = 1.
-  const da = (aMax - aMin) / (Na - 1)
-  const out = new Float64Array(smoothed.length)
-  for (let ia = 0; ia < Na; ia++) {
-    const a = aMin + ia * da
-    const scale = a > 0 ? 1 / Math.pow(a, 1.5) : 0
-    for (let i1 = 0; i1 < Nphi1; i1++) {
-      for (let i2 = 0; i2 < Nphi2; i2++) {
-        const idx = ia * Nphi1 * Nphi2 + i1 * Nphi2 + i2
-        out[idx] = smoothed[idx]! * scale
-      }
-    }
-  }
-  return out
+  // Smooth along the clock axis (if sigma > 0). No additional rescaling:
+  // S = ℏ · arg(χ) with ℏ = 1 is already the physical WKB phase.
+  return gaussianSmoothAlong(raw, [Na, Nphi1, Nphi2], axisIdx, sigmaCells)
 }

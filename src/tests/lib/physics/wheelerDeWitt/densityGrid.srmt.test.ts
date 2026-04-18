@@ -46,11 +46,13 @@ function makeSyntheticOutput(Na: number, Nphi: number): WheelerDeWittSolverOutpu
   return {
     chi,
     lorentzianMask: new Uint8Array(Na * slab).fill(1),
+    bandKind: new Uint8Array(Na * slab),
     gridSize: [Na, Nphi, Nphi],
     aMin: 0.1,
     aMax: 1.5,
     phiExtent: 2,
     maxDensity: 1,
+    columnAiry: [],
   }
 }
 
