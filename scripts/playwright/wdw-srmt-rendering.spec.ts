@@ -23,6 +23,8 @@
  * is wired before the test body runs and asserts at test-end.
  */
 
+import { DEFAULT_CHAMPION_TIE_TOLERANCE } from '@/lib/physics/srmt'
+
 import { expect, test } from './fixtures'
 import {
   collectPageErrors,
@@ -38,13 +40,6 @@ import {
 import { LeftPanel } from './pages/LeftPanel'
 
 test.setTimeout(180_000)
-
-/**
- * UI tie-tolerance — mirrors `CHAMPION_TIE_TOLERANCE` in `SrmtSpectrumPanel.tsx`.
- * When the top two affine-match qualities are within this window, the UI
- * refuses to name a champion (ambiguous result).
- */
-const CHAMPION_TIE_TOLERANCE = 0.02
 
 test.describe('Wheeler–DeWitt SRMT — rendering & console cleanliness', () => {
   test('SRMT diagnostic drains queue, populates chart, renders canvas, leaves console clean', async ({
@@ -91,9 +86,10 @@ test.describe('Wheeler–DeWitt SRMT — rendering & console cleanliness', () =>
     const hjPoints = await hjSeries.getAttribute('points')
     // Length gate alone is sufficient: SVG `points` values are non-null strings
     // whenever the polyline renders. `length > 0` proves at least one vertex
-    // survived normalization (buildSeries emits `null` on peak ≤ 0, which would
-    // cause the polyline to be skipped entirely and fail the visibility check
-    // above). Checking length avoids the shallow-matcher lint rule.
+    // survived normalization (buildSeries emits `null` when the span is zero,
+    // which would cause the polyline to be skipped entirely and fail the
+    // visibility check above). Checking length avoids the shallow-matcher lint
+    // rule.
     expect(kPoints?.length ?? 0, 'K-series points must be a non-empty string').toBeGreaterThan(0)
     expect(hjPoints?.length ?? 0, 'HJ-series points must be a non-empty string').toBeGreaterThan(0)
 
@@ -120,7 +116,7 @@ test.describe('Wheeler–DeWitt SRMT — rendering & console cleanliness', () =>
 
     // ─── Champion highlight consistency ───────────────────────────────────────
     // Select the min-quality clock and, when its margin over the runner-up
-    // clears `CHAMPION_TIE_TOLERANCE`, assert the UI marks that row as champion.
+    // clears `DEFAULT_CHAMPION_TIE_TOLERANCE`, assert the UI marks that row as champion.
     // Genuine ties (gap < 0.02) are valid and leave no champion — do NOT hard-
     // assert `champion === 'a'` here; that is the science test in the physics
     // spec, and the winner depends on the default grid + BC.
@@ -131,7 +127,7 @@ test.describe('Wheeler–DeWitt SRMT — rendering & console cleanliness', () =>
       .sort((x, y) => x.q - y.q)
     const [best, second] = ordered
     if (!best || !second) throw new Error('unreachable — three finite clock qualities expected')
-    const hasChampion = second.q - best.q >= CHAMPION_TIE_TOLERANCE
+    const hasChampion = second.q - best.q >= DEFAULT_CHAMPION_TIE_TOLERANCE
 
     for (const clock of ['a', 'phi1', 'phi2'] as const) {
       const row = page.getByTestId(`wdw-srmt-clock-row-${clock}`)

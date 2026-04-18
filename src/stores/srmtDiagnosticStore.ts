@@ -145,13 +145,20 @@ export const useSrmtDiagnosticStore = create<SrmtDiagnosticState>((set) => ({
   },
 
   setClockQuality: (clock, affineMatchQuality) => {
-    set((s) => ({
-      clockAffineQuality: {
-        ...s.clockAffineQuality,
-        [clock]: affineMatchQuality,
-      },
-      version: s.version + 1,
-    }))
+    set((s) => {
+      // NaN = pending sentinel; keep the previous value and skip the version
+      // bump so callers can't accidentally regress a finite quality back to
+      // "pending" or trigger a wasted re-render.
+      if (Number.isNaN(affineMatchQuality)) return s
+      if (s.clockAffineQuality[clock] === affineMatchQuality) return s
+      return {
+        clockAffineQuality: {
+          ...s.clockAffineQuality,
+          [clock]: affineMatchQuality,
+        },
+        version: s.version + 1,
+      }
+    })
   },
 
   setSrmtComputing: (computing) => {

@@ -22,10 +22,16 @@ export interface SrmtComputingStripProps {
 }
 
 export const SrmtComputingStrip: React.FC<SrmtComputingStripProps> = ({ completed, total }) => {
-  const message =
-    typeof completed === 'number' && typeof total === 'number'
-      ? `Computing: ${completed}/${total} clocks`
-      : 'Computing modular spectrum…'
+  const hasProgress =
+    typeof completed === 'number' &&
+    typeof total === 'number' &&
+    Number.isFinite(completed) &&
+    Number.isFinite(total) &&
+    completed >= 0 &&
+    total > 0
+  const message = hasProgress
+    ? `Computing: ${completed}/${total} clocks`
+    : 'Computing modular spectrum…'
   return (
     <div
       role="status"

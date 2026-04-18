@@ -107,6 +107,10 @@ export function reshapeForClock(tensor: ChiTensor, clock: SrmtClock): ComplexMat
     return { rows, cols, re, im }
   }
 
+  if (clock !== 'phi2') {
+    throw new Error(`reshapeForClock: unsupported clock "${String(clock)}"`)
+  }
+
   // clock === 'phi2'
   // rows = i_2, cols = (i_a * Nphi + i_1)
   const rows = Nphi2

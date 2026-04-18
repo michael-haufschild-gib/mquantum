@@ -82,9 +82,10 @@ export interface SrmtResult {
    */
   kSpectrum: Float32Array
   /**
-   * Eigenvalues of the discretised Hamilton-Jacobi operator on the clock
-   * slice, sorted ascending. Length equals the slice dimension (e.g.
-   * `Nphi²` for clock `'a'`).
+   * Top-`k` eigenvalues of the discretised Hamilton–Jacobi operator on the
+   * clock slice, sorted ascending. Extracted via Lanczos with
+   * `k = min(rankCap, sliceDim)`, so the length is `≤ rankCap`, not the
+   * full slice dimension.
    */
   hjSpectrum: Float32Array
   /**
@@ -97,10 +98,11 @@ export interface SrmtResult {
   /** Orientation of the clock slice for render-time consumers. */
   slicePlane: SrmtSlicePlane
   /**
-   * `K_A` eigenvalue density on the slice. Exactly `Nphi²` entries.
-   * Populated by projecting the Schmidt `K` spectrum onto the slice
-   * axis count and zero-padding if the rank is lower than `Nphi²`. Used
-   * downstream by the render overlay.
+   * `K_A` eigenvalue density on the slice. Length equals the active
+   * slice area: `Nphi²` for `'phi-phi'`, `Na * Nphi` for the `'a-phi1'`
+   * and `'a-phi2'` planes. Populated by projecting the Schmidt `K`
+   * spectrum onto the slice axis count and zero-padding if the rank is
+   * lower than the slice area. Used downstream by the render overlay.
    */
   sliceK: Float32Array
 }

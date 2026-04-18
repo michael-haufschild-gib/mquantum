@@ -116,9 +116,20 @@ describe('srmtDiagnosticStore', () => {
     expect(useSrmtDiagnosticStore.getState().snapshot).toBe(before)
   })
 
-  it('setClockQuality accepts NaN (no-op merge keeps prior value pending)', () => {
+  it('setClockQuality treats NaN as a true no-op — prior finite value is preserved and version is not bumped', () => {
+    useSrmtDiagnosticStore.getState().setClockQuality('a', 0.25)
+    const v0 = useSrmtDiagnosticStore.getState().version
     useSrmtDiagnosticStore.getState().setClockQuality('a', Number.NaN)
-    expect(Number.isNaN(useSrmtDiagnosticStore.getState().clockAffineQuality.a)).toBe(true)
+    const s = useSrmtDiagnosticStore.getState()
+    expect(s.clockAffineQuality.a).toBeCloseTo(0.25, 6)
+    expect(s.version).toBe(v0)
+  })
+
+  it('setClockQuality with the same value is a no-op (no version bump, no re-render)', () => {
+    useSrmtDiagnosticStore.getState().setClockQuality('phi1', 0.42)
+    const v0 = useSrmtDiagnosticStore.getState().version
+    useSrmtDiagnosticStore.getState().setClockQuality('phi1', 0.42)
+    expect(useSrmtDiagnosticStore.getState().version).toBe(v0)
   })
 
   it('setClockQuality accumulates across successive calls until all three populated', () => {

@@ -2,16 +2,16 @@
  * Dual-series SVG chart rendering for the SRMT spectrum panel.
  *
  * Renders the modular Hamiltonian spectrum `K_n` and the Hamilton-Jacobi
- * eigenspectrum as two overlaid polylines, each peak-normalised to
+ * eigenspectrum as two overlaid polylines, each min/max-normalised to
  * `[0, 1]` so the *shape* comparison is the headline read. A numeric
  * affine-match quality chip (rendered by the parent) carries the
  * precise residual.
  *
- * Rationale for unit-max Y scaling: `K_n` is already `−log(s²)`, so
- * re-log-ing would compress structure the user is meant to read. The
- * HJ spectrum is typically positive and spans a broad range; mapping
- * both to `[0, 1]` via peak-normalisation lets the eye compare shape
- * at a glance while the numeric `q` tells the precise story.
+ * Rationale for linear [0,1] Y scaling: `K_n` is already `−log(s²)`, so
+ * re-log-ing would compress structure the user is meant to read.
+ * Min/max normalisation (rather than peak-absolute) keeps any
+ * negative-valued entries inside the viewBox so the polyline never
+ * inverts or clips below the chart floor.
  *
  * @module components/sections/Geometry/SchroedingerControls/SrmtSpectrumChart
  */
@@ -51,19 +51,25 @@ interface ChartGeometry {
  */
 function buildSeries(values: Float32Array, width: number, height: number): ChartSeries | null {
   if (values.length < 2) return null
-  let peak = 0
+  // Use min/max normalisation so any negative entries still fall inside
+  // the [0, 1] band rather than flipping below the SVG viewBox.
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
   for (let i = 0; i < values.length; i++) {
-    const v = Math.abs(values[i]!)
-    if (v > peak) peak = v
+    const v = values[i]!
+    if (v < min) min = v
+    if (v > max) max = v
   }
-  if (peak <= 0) return null
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return null
+  const span = max - min
+  if (span <= 0) return null
   const n = values.length
   const normalized = new Float32Array(n)
   const usableW = width - CHART_PADDING * 2
   const usableH = height - CHART_PADDING * 2
   const pts = new Array<string>(n)
   for (let i = 0; i < n; i++) {
-    const nv = values[i]! / peak
+    const nv = (values[i]! - min) / span
     normalized[i] = nv
     const x = CHART_PADDING + (i / (n - 1)) * usableW
     const y = CHART_PADDING + (1 - nv) * usableH

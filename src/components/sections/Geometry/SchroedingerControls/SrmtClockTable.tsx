@@ -18,7 +18,8 @@ import type { SrmtClockQuality } from '@/stores/srmtDiagnosticStore'
 import { countCompletedClocks, qualityTier, selectChampionClock } from './srmtPanelHelpers'
 import { SrmtQualityChip } from './SrmtQualityChip'
 
-const PENDING_TOOLTIP = 'Cross-clock diagnostic requires Phase 6 WASM port — not yet computed'
+const PENDING_TOOLTIP =
+  'This clock is queued or computing. Its quality appears once the worker reply arrives.'
 
 /** Presentation label for each clock axis. */
 const CLOCK_LABEL: Record<SrmtClock, string> = {

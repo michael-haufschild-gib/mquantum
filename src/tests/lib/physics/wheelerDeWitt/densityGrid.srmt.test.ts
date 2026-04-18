@@ -74,6 +74,12 @@ function readBlue(density: Uint16Array, x: number, y: number, z: number): number
   const idx = (z * N + y) * N + x
   return halfToFloat(density[idx * 4 + 2]!)
 }
+/** Read the green (log-density) channel at a given density-texel coordinate. */
+function readGreen(density: Uint16Array, x: number, y: number, z: number): number {
+  const N = DENSITY_GRID_SIZE
+  const idx = (z * N + y) * N + x
+  return halfToFloat(density[idx * 4 + 1]!)
+}
 
 describe('packWdwDensityGrid — SRMT overlay', () => {
   const Nphi = 8
@@ -134,8 +140,10 @@ describe('packWdwDensityGrid — SRMT overlay', () => {
     const { density: withSrmt } = packWdwDensityGrid(output, null, srmt)
 
     const N = DENSITY_GRID_SIZE
-    // Sample a few voxels on a plane that is NOT the SRMT cut — their R
-    // and B channels must match the baseline exactly.
+    // Sample a few voxels on a plane that is NOT the SRMT cut — all of R
+    // (density), G (log-density), and B (phase) must match the baseline
+    // exactly. Asserting G closes the previous blind spot where log-density
+    // regressions could slip through unnoticed.
     const samples: [number, number, number][] = [
       [0, 0, 0],
       [N - 1, N - 1, N - 1],
@@ -143,6 +151,7 @@ describe('packWdwDensityGrid — SRMT overlay', () => {
     ]
     for (const [x, y, z] of samples) {
       expect(readRed(withSrmt, x, y, z)).toBeCloseTo(readRed(baseline, x, y, z), 6)
+      expect(readGreen(withSrmt, x, y, z)).toBeCloseTo(readGreen(baseline, x, y, z), 6)
       expect(readBlue(withSrmt, x, y, z)).toBeCloseTo(readBlue(baseline, x, y, z), 6)
     }
   })

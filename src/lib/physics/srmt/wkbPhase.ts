@@ -207,7 +207,20 @@ export function extractWkbPhase(
   }
 
   // Axis indexing convention: axis 0 = a, axis 1 = φ₁, axis 2 = φ₂.
-  const axisIdx: 0 | 1 | 2 = clock === 'a' ? 0 : clock === 'phi1' ? 1 : 2
+  let axisIdx: 0 | 1 | 2
+  switch (clock) {
+    case 'a':
+      axisIdx = 0
+      break
+    case 'phi1':
+      axisIdx = 1
+      break
+    case 'phi2':
+      axisIdx = 2
+      break
+    default:
+      throw new Error(`extractWkbPhase: unsupported clock "${String(clock)}"`)
+  }
   const stride0 = Nphi1 * Nphi2
   const stride1 = Nphi2
   const stride2 = 1

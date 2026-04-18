@@ -2,12 +2,14 @@
  * Web Worker for the SRMT (Superspace-Relational Modular Time) diagnostic.
  *
  * Offloads {@link computeSrmtDiagnostic} from the main thread. At the default
- * Wheeler–DeWitt grid (`Na=128, Nphi=32`) the Hamilton–Jacobi Jacobi
- * eigendecomposition runs on a 1024×1024 symmetric matrix — O(n³) ≈ 10⁹
- * ops in pure JS, which blocks the main thread for seconds. Dispatching to
- * this worker keeps the UI responsive while the compute runs on a background
- * thread; results are posted back with transferable buffers for zero-copy
- * delivery to the strategy + store.
+ * Wheeler–DeWitt grid (`Na=128, Nphi=32`) the Hamilton–Jacobi spectrum is
+ * extracted from a 1024×1024 sparse 5-stencil operator via top-k Lanczos
+ * (`src/lib/physics/srmt/lanczos.ts`) — O(k·n·nnz) with k ≤ `rankCap` (default
+ * 64), far below the O(n³) a full Jacobi eigendecomposition would cost, but
+ * still several hundred ms of compute that would jank the main thread.
+ * Dispatching to this worker keeps the UI responsive while the compute runs on
+ * a background thread; results are posted back with transferable buffers for
+ * zero-copy delivery to the strategy + store.
  *
  * Message protocol:
  *   Main → Worker: {@link SrmtWorkerRequest} with transferable `chi` /
@@ -112,6 +114,18 @@ scope.onmessage = (e: MessageEvent<SrmtWorkerRequest>) => {
     // Stub them out with empty buffers / array so the reconstructed
     // object satisfies the full {@link WheelerDeWittSolverOutput} type.
     const slab = msg.gridSize[0] * msg.gridSize[1] * msg.gridSize[2]
+    // Fail fast on malformed payloads so the error surfaces at the worker
+    // boundary rather than deep inside compute — easier to trace.
+    if (msg.chi.length !== 2 * slab) {
+      throw new Error(
+        `SRMT worker: chi length ${msg.chi.length} !== 2·slab (2·${slab}) for gridSize=${msg.gridSize.join('x')}`
+      )
+    }
+    if (msg.lorentzianMask.length !== slab) {
+      throw new Error(
+        `SRMT worker: lorentzianMask length ${msg.lorentzianMask.length} !== slab ${slab} for gridSize=${msg.gridSize.join('x')}`
+      )
+    }
     const output: WheelerDeWittSolverOutput = {
       chi: msg.chi,
       lorentzianMask: msg.lorentzianMask,

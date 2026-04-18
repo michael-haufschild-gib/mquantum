@@ -731,7 +731,11 @@ export function wdwOperatorResidual(
         const bandPrev = output.bandKind[(ia - 1) * slabSize + idx] ?? 0
         const bandNext = output.bandKind[(ia + 1) * slabSize + idx] ?? 0
 
-        // Only all-Lorentzian or all-deep-band stencils contribute.
+        // Only all-Lorentzian or all-deep-band stencils contribute. The
+        // φ-Laplacian below reads (i1±1, i2) and (i1, i2±1), so those
+        // neighbours must also be in the same valid band — otherwise the
+        // residual is contaminated by transition-band cells where the
+        // absorber intentionally violates the PDE.
         const allSameValid =
           (bandCur === BandKind.Lorentzian &&
             bandPrev === BandKind.Lorentzian &&
@@ -740,6 +744,13 @@ export function wdwOperatorResidual(
             bandPrev === BandKind.EuclideanDeep &&
             bandNext === BandKind.EuclideanDeep)
         if (!allSameValid) continue
+
+        const samePhiStencil =
+          (output.bandKind[ia * slabSize + (i1 - 1) * Nphi + i2] ?? 0) === bandCur &&
+          (output.bandKind[ia * slabSize + (i1 + 1) * Nphi + i2] ?? 0) === bandCur &&
+          (output.bandKind[ia * slabSize + i1 * Nphi + (i2 - 1)] ?? 0) === bandCur &&
+          (output.bandKind[ia * slabSize + i1 * Nphi + (i2 + 1)] ?? 0) === bandCur
+        if (!samePhiStencil) continue
 
         const cre = output.chi[ia * complexSlab + 2 * idx] ?? 0
         const cim = output.chi[ia * complexSlab + 2 * idx + 1] ?? 0

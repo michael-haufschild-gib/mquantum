@@ -20,33 +20,26 @@ import { qualityTier, type SrmtQualityTier } from './srmtPanelHelpers'
  * chip re-themes cleanly; borders / backgrounds use the semantic
  * `color-*-bg` / `color-*-border` palette entries.
  */
-const TIER_STYLES: Record<
-  SrmtQualityTier,
-  { bg: string; color: string; border: string; label: string }
-> = {
+const TIER_STYLES: Record<SrmtQualityTier, { bg: string; color: string; border: string }> = {
   good: {
     bg: 'var(--color-success-bg)',
     color: 'var(--color-success)',
     border: 'var(--color-success-border)',
-    label: 'good',
   },
   marginal: {
     bg: 'var(--color-warning-bg)',
     color: 'var(--color-warning)',
     border: 'var(--color-warning-border)',
-    label: 'marginal',
   },
   poor: {
     bg: 'var(--color-danger-bg)',
     color: 'var(--color-danger)',
     border: 'var(--color-danger-border)',
-    label: 'poor',
   },
   pending: {
     bg: 'transparent',
     color: 'var(--text-tertiary)',
     border: 'var(--border-subtle)',
-    label: 'pending',
   },
 }
 
@@ -59,8 +52,8 @@ export interface SrmtQualityChipProps {
 
 /**
  * Quality chip rendering. For `pending` tiers an optional tooltip is
- * surfaced explaining why no value is available yet (e.g. awaiting the
- * Phase-6 WASM port).
+ * surfaced explaining why no value is available yet (typically because
+ * the clock is still queued in the worker).
  */
 export const SrmtQualityChip: React.FC<SrmtQualityChipProps> = ({
   value,

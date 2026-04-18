@@ -512,6 +512,9 @@ export function cancelSrmtCompute(state: SrmtWorkerState): void {
   state.lastDispatchedRankCap = createEmptyLastDispatchedRankCap()
   state.selectedClock = null
   state.resultGeneration = 0
+  // Without this the "Computing…" strip can stay live after the user
+  // flips SRMT off mid-batch.
+  useSrmtDiagnosticStore.getState().setSrmtComputing(false)
 }
 
 /**
@@ -529,4 +532,5 @@ export function disposeSrmtWorker(state: SrmtWorkerState): void {
   state.resultGeneration = 0
   state.worker?.terminate()
   state.worker = null
+  useSrmtDiagnosticStore.getState().setSrmtComputing(false)
 }

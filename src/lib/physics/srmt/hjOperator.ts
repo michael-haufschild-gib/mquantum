@@ -196,6 +196,12 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
  */
 function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  if (!(aMin > 0)) {
+    // 1/(a·a) below would feed Infinity into Lanczos at ia=0 if a=0 were in the grid.
+    throw new Error(
+      `buildSparseOpPhi: aMin must be > 0 for phi-clock spectra (1/a^2 kinetic term), got ${aMin}`
+    )
+  }
   if (!(sliceIndex > 0 && sliceIndex < Nphi - 1)) {
     throw new Error(
       `buildSparseOpPhi: sliceIndex must be strictly interior, got ${sliceIndex} (Nphi=${Nphi})`

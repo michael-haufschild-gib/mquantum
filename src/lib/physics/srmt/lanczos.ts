@@ -261,6 +261,27 @@ export function lanczosTopKOp(
   if (!Number.isInteger(n) || n < 0) {
     throw new RangeError(`lanczosTopKOp: n must be a non-negative integer, got ${n}`)
   }
+  if (!Number.isInteger(k)) {
+    throw new RangeError(`lanczosTopKOp: k must be an integer, got ${k}`)
+  }
+  if (
+    opts?.maxIterations !== undefined &&
+    (!Number.isInteger(opts.maxIterations) || opts.maxIterations < 1)
+  ) {
+    throw new RangeError(
+      `lanczosTopKOp: maxIterations must be a positive integer, got ${opts.maxIterations}`
+    )
+  }
+  if (opts?.tolerance !== undefined && (!Number.isFinite(opts.tolerance) || opts.tolerance < 0)) {
+    throw new RangeError(
+      `lanczosTopKOp: tolerance must be a finite non-negative number, got ${opts.tolerance}`
+    )
+  }
+  if (!Number.isFinite(infNormEstimate) || infNormEstimate < 0) {
+    throw new RangeError(
+      `lanczosTopKOp: infNormEstimate must be a finite non-negative number, got ${infNormEstimate}`
+    )
+  }
   if (k <= 0 || n === 0) return new Float32Array(0)
 
   const kClipped = Math.min(k, n)

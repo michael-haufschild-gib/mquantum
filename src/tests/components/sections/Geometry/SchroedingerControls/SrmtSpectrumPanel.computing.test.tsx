@@ -71,8 +71,8 @@ describe('SrmtSpectrumPanel — computing state', () => {
     expect(screen.getByTestId('wdw-srmt-computing-indicator')).toBeInTheDocument()
     const body = screen.getByTestId('wdw-srmt-spectrum-body')
     expect(body).toHaveAttribute('data-computing', 'true')
-    // Inline style contains the 0.6 opacity used to fade stale data.
-    expect(body.getAttribute('style') ?? '').toMatch(/opacity:\s*0\.6/)
+    // 0.6 opacity fades stale data while the next result is computed.
+    expect(body).toHaveStyle({ opacity: '0.6' })
   })
 
   it('does not render the computing strip when computing=false (fresh result)', () => {
@@ -81,7 +81,7 @@ describe('SrmtSpectrumPanel — computing state', () => {
     expect(screen.queryByTestId('wdw-srmt-computing-indicator')).not.toBeInTheDocument()
     const body = screen.getByTestId('wdw-srmt-spectrum-body')
     expect(body).toHaveAttribute('data-computing', 'false')
-    expect(body.getAttribute('style') ?? '').toMatch(/opacity:\s*1/)
+    expect(body).toHaveStyle({ opacity: '1' })
   })
 
   it('falls back to the pending placeholder when enabled + no snapshot + not computing', () => {

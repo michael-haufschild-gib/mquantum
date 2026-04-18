@@ -189,22 +189,32 @@ function gradS(
     return [0, 0, 0]
   }
   const aCur = aMin + ia * da
-  const aNext = aMin + (ia + 1) * da
-  const aPrev = aMin + (ia - 1) * da
-  const aNext3half = Math.pow(aNext, 1.5)
-  const aPrev3half = Math.pow(aPrev, 1.5)
   const aCur3half = Math.pow(aCur, 1.5)
+  const aCurHalf = Math.sqrt(aCur)
 
-  const sNextA = aNext3half * sampleArg(table, ia + 1, i1, i2)
-  const sPrevA = aPrev3half * sampleArg(table, ia - 1, i1, i2)
-  const sNext1 = aCur3half * sampleArg(table, ia, i1 + 1, i2)
-  const sPrev1 = aCur3half * sampleArg(table, ia, i1 - 1, i2)
-  const sNext2 = aCur3half * sampleArg(table, ia, i1, i2 + 1)
-  const sPrev2 = aCur3half * sampleArg(table, ia, i1, i2 - 1)
+  // Read raw χ phases first. `wrappedDiff` is only defined modulo 2π on
+  // raw angles; applying it after the a^{3/2} scaling shifts the branch
+  // spacing away from 2π and lets the `a`-gradient flip sign near the
+  // ±π cut. Compute the central differences on the raw phases, then
+  // rebuild ∂_a S_vis via the product rule.
+  const argCur = sampleArg(table, ia, i1, i2)
+  const argNextA = sampleArg(table, ia + 1, i1, i2)
+  const argPrevA = sampleArg(table, ia - 1, i1, i2)
+  const argNext1 = sampleArg(table, ia, i1 + 1, i2)
+  const argPrev1 = sampleArg(table, ia, i1 - 1, i2)
+  const argNext2 = sampleArg(table, ia, i1, i2 + 1)
+  const argPrev2 = sampleArg(table, ia, i1, i2 - 1)
 
-  const dSda = wrappedDiff(sNextA, sPrevA) / (2 * da * da)
-  const dSdp1 = wrappedDiff(sNext1, sPrev1) / (2 * dphi * dphi)
-  const dSdp2 = wrappedDiff(sNext2, sPrev2) / (2 * dphi * dphi)
+  // ∂ₐ S_vis = d/da[a^{3/2} · arg] = (3/2)·a^{1/2}·arg + a^{3/2}·∂ₐ arg
+  const dArgDa = wrappedDiff(argNextA, argPrevA) / (2 * da)
+  const dSdaPhys = 1.5 * aCurHalf * argCur + aCur3half * dArgDa
+  const dSda = dSdaPhys / da
+
+  // φ-direction factors are a-constant, so product rule gives pure scaling.
+  const dArgDp1 = wrappedDiff(argNext1, argPrev1) / (2 * dphi)
+  const dArgDp2 = wrappedDiff(argNext2, argPrev2) / (2 * dphi)
+  const dSdp1 = (aCur3half * dArgDp1) / dphi
+  const dSdp2 = (aCur3half * dArgDp2) / dphi
   return [dSda, dSdp1, dSdp2]
 }
 

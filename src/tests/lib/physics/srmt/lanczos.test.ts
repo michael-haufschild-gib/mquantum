@@ -189,7 +189,7 @@ describe('lanczosTopK — edge cases', () => {
 })
 
 describe('lanczosTopK — timing sanity at n = 1024, k = 64', () => {
-  it('completes under 1 second', { timeout: 3000 }, () => {
+  it('completes under the soft 2.5-second gate', { timeout: 3000 }, () => {
     const n = 1024
     const k = 64
     const A = randomSymmetric(n, 0x5a11_ed)
@@ -205,10 +205,11 @@ describe('lanczosTopK — timing sanity at n = 1024, k = 64', () => {
     const elapsedMs = t1 - t0
     expect(top.length).toBeGreaterThan(0)
     expect(top.length).toBeLessThanOrEqual(k)
-    // Soft gate: must finish well under the 3 s vitest timeout. The
-    // "under 1 s" target is a local-hardware aspiration and may be
-    // loosened on very slow CI runners; 2500 ms gives a meaningful
-    // signal without being flaky.
+    // Soft gate: must finish well under the 3 s vitest timeout. A hard
+    // sub-second expectation would be flaky on slower CI runners; 2500
+    // ms catches pathological regressions without false positives. If
+    // this ever becomes flaky, move the measurement to a `.bench.ts`
+    // file alongside `solver.bench.ts`.
     expect(elapsedMs).toBeLessThan(2500)
   })
 })

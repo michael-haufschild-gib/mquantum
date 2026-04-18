@@ -43,6 +43,13 @@ export function modularSpectrum(
   schmidt: Float64Array,
   truncationRatio: number = DEFAULT_RANK_TRUNCATION
 ): { spectrum: Float64Array; epsilon: number; rankThreshold: number } {
+  // Fall back to the default when the caller passes a garbage value; otherwise
+  // a NaN/negative ratio silently produces a surprising `rankThreshold`.
+  const safeTruncationRatio =
+    Number.isFinite(truncationRatio) && truncationRatio > 0
+      ? truncationRatio
+      : DEFAULT_RANK_TRUNCATION
+
   const n = schmidt.length
   if (n === 0) {
     return { spectrum: new Float64Array(0), epsilon: 0, rankThreshold: 0 }
@@ -62,7 +69,7 @@ export function modularSpectrum(
 
   let rankThreshold = n
   if (maxSq > 0) {
-    const thresh = truncationRatio * maxSq
+    const thresh = safeTruncationRatio * maxSq
     for (let i = 0; i < n; i++) {
       const s = schmidt[i]!
       if (s * s < thresh) {

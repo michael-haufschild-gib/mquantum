@@ -162,12 +162,22 @@ describe('SRMT dispatcher state machine', () => {
     cancelSrmtCompute(state)
     useSrmtDiagnosticStore.getState().clear()
     queueSrmtCompute(state, makeArgsByClock('h2'), 'a')
-    // At this point state.epoch is for the currently-pending 'a'
-    // dispatch. Reply with that epoch, then advance through each
-    // clock; state.epoch bumps on each auto-advance post.
-    postReplyThroughFake(state, replyFor('a', state.epoch, 0.05))
-    postReplyThroughFake(state, replyFor('phi1', state.epoch, 0.25))
-    postReplyThroughFake(state, replyFor('phi2', state.epoch, 0.4))
+    // Capture the epoch for each reply BEFORE the post, then assert the
+    // dispatcher auto-advanced it on drain. Using state.epoch inline
+    // would hide an auto-advance regression (each reply would always
+    // target the current value).
+    const epochA = state.epoch
+    postReplyThroughFake(state, replyFor('a', epochA, 0.05))
+    expect(state.epoch).toBe(epochA + 1)
+
+    const epochPhi1 = state.epoch
+    postReplyThroughFake(state, replyFor('phi1', epochPhi1, 0.25))
+    expect(state.epoch).toBe(epochPhi1 + 1)
+
+    const epochPhi2 = state.epoch
+    postReplyThroughFake(state, replyFor('phi2', epochPhi2, 0.4))
+    // Final reply drains the queue; epoch does not bump again.
+    expect(state.epoch).toBe(epochPhi2)
     expect(useSrmtDiagnosticStore.getState().computing).toBe(false)
     expect(state.resultsByClock.a?.result.affineMatchQuality).toBeCloseTo(0.05, 6)
     expect(state.resultsByClock.phi1?.result.affineMatchQuality).toBeCloseTo(0.25, 6)

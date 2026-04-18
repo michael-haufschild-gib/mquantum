@@ -81,7 +81,7 @@ export interface BogoliubovColumn {
   alphaSq: number
   /** `|β|²`. */
   betaSq: number
-  /** Flux invariant `|α|² − |β|² = −2·Im(A_c·conj(A_s))`. */
+  /** Flux invariant `|α|² − |β|² = +2·Im(A_c·conj(A_s))`. */
   flux: number
   /**
    * Flux ratio `(|α|² − |β|²) / (|α|² + |β|²)` ∈ `[−1, 1]`. BC-amplitude
@@ -105,10 +105,15 @@ export interface BogoliubovSummary {
   /**
    * Mean flux ratio across extracted columns. Near 0 indicates HH/DeWitt
    * standing-wave structure; near +1 indicates Vilenkin outgoing-wave
-   * selection.
+   * selection. `NaN` when no column extracted successfully, so callers
+   * can distinguish a failed run from a real zero-particle signal.
    */
   meanFluxRatio: number
-  /** Mean `|β/α|` ratio across extracted columns with `|α|² > 0`. */
+  /**
+   * Mean `|β/α|` ratio across extracted columns with `|α|² > 0`. `NaN`
+   * when no column contributed (all `|α|²` were zero or no column
+   * extracted).
+   */
   meanBetaOverAlpha: number
 }
 
@@ -122,7 +127,9 @@ export interface BogoliubovSummary {
  */
 export function extractBogoliubov(output: WheelerDeWittSolverOutput): BogoliubovSummary {
   const Nphi = output.gridSize[1]
-  const dphi = (2 * output.phiExtent) / (Nphi - 1)
+  // Guard the single-column synthetic case (Nphi === 1) where the stride
+  // would blow up to Infinity; callers in tests pin the column at φ = 0.
+  const dphi = Nphi > 1 ? (2 * output.phiExtent) / (Nphi - 1) : 0
   const total = Nphi * Nphi
   const columns: (BogoliubovColumn | null)[] = new Array(total)
   let extractedCount = 0
@@ -131,9 +138,9 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
   let betaOverAlphaCount = 0
 
   for (let i1 = 0; i1 < Nphi; i1++) {
-    const phi1 = -output.phiExtent + i1 * dphi
+    const phi1 = Nphi > 1 ? -output.phiExtent + i1 * dphi : 0
     for (let i2 = 0; i2 < Nphi; i2++) {
-      const phi2 = -output.phiExtent + i2 * dphi
+      const phi2 = Nphi > 1 ? -output.phiExtent + i2 * dphi : 0
       const idx = i1 * Nphi + i2
       const info = output.columnAiry[idx]
       if (!info || !info.hasOverwrite) {
@@ -181,7 +188,10 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
     columns,
     extractedCount,
     totalColumns: total,
-    meanFluxRatio: extractedCount > 0 ? fluxRatioSum / extractedCount : 0,
-    meanBetaOverAlpha: betaOverAlphaCount > 0 ? betaOverAlphaSum / betaOverAlphaCount : 0,
+    // NaN (not 0) when nothing was extracted — 0 would be indistinguishable
+    // from a real standing-wave / zero-particle signal and would silently
+    // misclassify failed runs as meaningful physics.
+    meanFluxRatio: extractedCount > 0 ? fluxRatioSum / extractedCount : Number.NaN,
+    meanBetaOverAlpha: betaOverAlphaCount > 0 ? betaOverAlphaSum / betaOverAlphaCount : Number.NaN,
   }
 }

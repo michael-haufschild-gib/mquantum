@@ -115,6 +115,15 @@ export class WheelerDeWittSrmtCoordinator {
    * packed into the density texture.
    */
   private lastResultGeneration = 0
+  /** Last non-null overlay — reused when the selected clock is still pending. */
+  private lastOverlay: WdwSrmtOverlay | null = null
+  /**
+   * True when this coordinator still owns the global
+   * {@link useSrmtDiagnosticStore}. Flipped to `false` on the source side
+   * of {@link adoptFrom} so a late `dispose()` cannot wipe the live UI
+   * after worker-state ownership has moved to a successor.
+   */
+  private ownsDiagnosticStore = true
 
   /**
    * Update the coordinator with the current config and solver output.
@@ -161,9 +170,23 @@ export class WheelerDeWittSrmtCoordinator {
       this.syncStoreForSelectedClock(config.srmtClock)
     }
 
-    const overlayDirty =
-      computeDirty || justToggledOff || (enabled && renderChanged) || resultArrived
-    const overlay = enabled ? this.buildOverlay(config, solverOutput) : null
+    const hasSelectedClockResult =
+      enabled && this.workerState.resultsByClock[config.srmtClock] !== null
+    // Skip repacks that would clear the overlay mid-dispatch: on a
+    // render-only clock switch the newly selected clock may still be
+    // pending, and we prefer to keep the prior snapshot visible until
+    // its reply lands.
+    const renderDirtyGated = enabled && renderChanged && hasSelectedClockResult
+    const overlayDirty = computeDirty || justToggledOff || renderDirtyGated || resultArrived
+    const nextOverlay = enabled ? this.buildOverlay(config, solverOutput) : null
+    // Retain the last non-null overlay so a still-pending clock switch
+    // doesn't momentarily wipe the visible SRMT plane.
+    const overlay = enabled ? (nextOverlay ?? this.lastOverlay) : null
+    if (nextOverlay) {
+      this.lastOverlay = nextOverlay
+    } else if (!enabled || justToggledOff) {
+      this.lastOverlay = null
+    }
 
     this.lastEnabled = enabled
     // Advance the paired generation counter after this tick — written
@@ -277,11 +300,18 @@ export class WheelerDeWittSrmtCoordinator {
     this.lastRenderHash = source.lastRenderHash
     this.lastEnabled = source.lastEnabled
     this.lastResultGeneration = source.lastResultGeneration
+    this.lastOverlay = source.lastOverlay
+    // Move diagnostic-store ownership too: after adoption the successor
+    // drives the global SRMT store, and `source.dispose()` must not wipe
+    // the live panel.
+    this.ownsDiagnosticStore = true
+    source.ownsDiagnosticStore = false
     source.workerState = createSrmtWorkerState()
     source.lastComputeHash = null
     source.lastRenderHash = null
     source.lastEnabled = false
     source.lastResultGeneration = 0
+    source.lastOverlay = null
   }
 
   /**
@@ -295,7 +325,13 @@ export class WheelerDeWittSrmtCoordinator {
     this.lastRenderHash = null
     this.lastEnabled = false
     this.lastResultGeneration = 0
-    useSrmtDiagnosticStore.getState().clear()
+    this.lastOverlay = null
+    // Skip the global store clear if we've been detached via `adoptFrom`
+    // — the successor now owns the store and expects its readings to
+    // survive this dispose.
+    if (this.ownsDiagnosticStore) {
+      useSrmtDiagnosticStore.getState().clear()
+    }
   }
 
   /** Expose the canonical clock order for tests + debugging. */

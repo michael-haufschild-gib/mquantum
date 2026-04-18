@@ -120,17 +120,8 @@ function airySeriesEvaluate(z: number): {
     f += dF
     g += dG
 
-    // f' = Σ_{k≥1} 3k·a_k·z^{3k−1} = (3k·a_k·z^{3k}) / z. To stay numerically
-    // safe at z = 0 (where dF = 0 and the loop exits anyway), guard the
-    // division on a non-zero z. The k=1 term contributes z²·1/(2·3) → its
-    // derivative is z·1/(2·3)·... wait let me just write it out.
-    // Term k of f' = 3k·a_k·z^{3k-1}. We can compute as 3k·aCoef·(zPow3k/z²)·z
-    //              = 3k·aCoef·zPow3kMinus1
-    // Where zPow3kMinus1 = zPow3k / z = z^{3k-1}, but for k=1 that's z².
-    // Cleaner: compute zPow3kMinus1 = zPow3k * z^{-1}; needs z != 0.
-    // Alternative: track zPow3kMinus1 separately. For k=1: z². For k=2: z⁵ = z²·z³.
-    // So we can multiply by z3 each iteration starting from z² at k=1.
-    // Below uses a separate running power.
+    // Derivatives are computed in a separate pass (below) with their own
+    // running power of z, avoiding a division by z at z = 0.
 
     if (Math.abs(dF) < AIRY_SERIES_EPS && Math.abs(dG) < AIRY_SERIES_EPS) break
   }

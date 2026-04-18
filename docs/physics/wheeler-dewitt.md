@@ -79,7 +79,7 @@ with
 The solver uses an **explicit second-order leapfrog in `a`** with
 second-order central-difference φ-Laplacian (ghost-zero Dirichlet).
 
-```
+```text
 χ(a+da, φ) = 2 χ(a, φ) − χ(a−da, φ) + da² · [ (1/a²)·∇²_φ χ − U·χ ]
 ```
 
@@ -117,7 +117,7 @@ deep-band slab of each φ-column the solver captures the numerical
 χ as the match coefficient and freezes it. Deeper slabs receive the
 analytic one-dimensional WKB propagator
 
-```
+```text
 χ(a, φ) = χ_match(φ) · (U_match / U(a))^{1/4} · exp(−(S_E(a) − S_E_match))
 ```
 
@@ -161,11 +161,11 @@ would be the next correctness frontier.
 
 ## Boundary conditions
 
-| BC              | Key         | Interior `χ(a_min, φ)`                  | `∂_a χ(a_min, φ)`                           |
-| --------------- | ----------- | --------------------------------------- | ------------------------------------------- |
-| Hartle–Hawking  | `noBoundary`| `exp(−|S_E|)` (Euclidean WKB amplitude) | `−(8πG/3)·a·√(1−(8πG/3)·a²V)·χ` (WKB decay) |
-| Vilenkin        | `tunneling` | Gaussian × `exp(i·S_L)`, `S_L ≈ a³V/3`  | `i·a²·V·χ` (outgoing Lorentzian wave)       |
-| DeWitt          | `deWitt`    | `a_min · exp(−½φ²)` (linear-in-a from 0)| `χ(a_min) / a_min` (linear ramp from node)  |
+| BC              | Key         | Interior `χ(a_min, φ)`                    | `∂_a χ(a_min, φ)`                           |
+| --------------- | ----------- | ----------------------------------------- | ------------------------------------------- |
+| Hartle–Hawking  | `noBoundary`| `exp(−\|S_E\|)` (Euclidean WKB amplitude) | `−(8πG/3)·a·√(1−(8πG/3)·a²V)·χ` (WKB decay) |
+| Vilenkin        | `tunneling` | Gaussian × `exp(i·S_L)`, `S_L ≈ a³V/3`    | `i·a²·V·χ` (outgoing Lorentzian wave)       |
+| DeWitt          | `deWitt`    | `a_min · exp(−½φ²)` (linear-in-a from 0)  | `χ(a_min) / a_min` (linear ramp from node)  |
 
 Each generator lives in
 `src/lib/physics/wheelerDeWitt/boundaryConditions.ts`. They consume
@@ -210,7 +210,7 @@ Lanczos eigendecomposition does not block the main thread.
 
 ### Pipeline
 
-```
+```text
 WdW solver output (cached)
         │
         ▼
@@ -249,7 +249,7 @@ does not flicker under noise.
 
 ## File map
 
-```
+```text
 src/lib/physics/wheelerDeWitt/
 ├── constants.ts            Physics constants, U, V (single source of truth)
 ├── boundaryConditions.ts   Hartle–Hawking / Vilenkin / DeWitt initial data

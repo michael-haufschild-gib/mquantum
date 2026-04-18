@@ -73,6 +73,12 @@ test.describe('Wheeler–DeWitt SRMT — physics invariants across boundary cond
       await waitForRendererReady(page)
       await waitForFirstFrame(page)
 
+      // Capture the store's version BEFORE the SRMT dispatch so the bump
+      // assertion below can use a delta. Init/URL-sync can bump the store
+      // on page load, which would otherwise satisfy an absolute ≥ 4 check
+      // without any SRMT writes happening.
+      const baseline = await readSrmtDiagnostics(page)
+
       // Drain the three-clock queue — 60 s budget per SRMT drain.
       await waitForSrmtQueueDrain(page, 60_000)
 
@@ -131,14 +137,16 @@ test.describe('Wheeler–DeWitt SRMT — physics invariants across boundary cond
         `[wdw_bc=${bc}] snapshot.affineMatchQuality must be finite (got ${snap.affineMatchQuality})`
       ).toBe(true)
 
-      // ─── Version counter bumped enough to cover the dispatch ──────────────
-      // Bumps: setSrmtComputing(true) + 3× setClockQuality + setDiagnostic +
-      // setSrmtComputing(false) = 6 in the common case. The task's minimum
-      // contract is ≥ 4 to tolerate either-clock-first ordering races or
-      // possible clear() bumps on toggle edges.
+      // ─── Version counter delta covers the SRMT dispatch ───────────────────
+      // Bumps from the dispatch itself: setSrmtComputing(true) +
+      // 3× setClockQuality + setDiagnostic + setSrmtComputing(false) = 6
+      // in the common case. Assert the delta (not the absolute value) so
+      // the test isn't satisfied by earlier store writes (page init, URL
+      // sync). ≥ 4 tolerates clock-first ordering races / toggle-edge
+      // clears.
       expect(
-        diag.version,
-        `[wdw_bc=${bc}] srmtDiagnosticStore.version must bump >= ${MIN_VERSION_BUMPS} times`
+        diag.version - baseline.version,
+        `[wdw_bc=${bc}] srmtDiagnosticStore.version delta from baseline must be >= ${MIN_VERSION_BUMPS} (baseline=${baseline.version}, diag=${diag.version})`
       ).toBeGreaterThanOrEqual(MIN_VERSION_BUMPS)
 
       expect(diag.computing, `[wdw_bc=${bc}] computing flag must be false after drain`).toBe(false)

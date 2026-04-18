@@ -146,6 +146,15 @@ function clamp01(v: number): number {
  * @param wa, w1, w2 - Fractional blend weights in `[0, 1]`.
  * @returns Interpolated complex pair.
  */
+/**
+ * Module-scoped scratch for {@link sampleChiTrilinear} output. Reusing a
+ * single 2-element buffer keeps the packer allocation-free in the hot
+ * loop — at 96³ that's ~900k samples per repack, so the per-voxel
+ * object literal the previous implementation returned turned SRMT /
+ * overlay updates into GC-heavy stalls.
+ */
+const CHI_SAMPLE_OUT = new Float64Array(2)
+
 function sampleChiTrilinear(
   chi: Float32Array,
   slab: number,
@@ -159,20 +168,33 @@ function sampleChiTrilinear(
   wa: number,
   w1: number,
   w2: number
-): { re: number; im: number } {
-  const fetch = (ia: number, i1: number, i2: number): [number, number] => {
-    const idx = 2 * (ia * slab + i1 * Nphi + i2)
-    return [chi[idx] ?? 0, chi[idx + 1] ?? 0]
-  }
+): Float64Array {
+  const iBase000 = 2 * (ia0 * slab + i10 * Nphi + i20)
+  const iBase100 = 2 * (ia1 * slab + i10 * Nphi + i20)
+  const iBase010 = 2 * (ia0 * slab + i11 * Nphi + i20)
+  const iBase110 = 2 * (ia1 * slab + i11 * Nphi + i20)
+  const iBase001 = 2 * (ia0 * slab + i10 * Nphi + i21)
+  const iBase101 = 2 * (ia1 * slab + i10 * Nphi + i21)
+  const iBase011 = 2 * (ia0 * slab + i11 * Nphi + i21)
+  const iBase111 = 2 * (ia1 * slab + i11 * Nphi + i21)
 
-  const [re000, im000] = fetch(ia0, i10, i20)
-  const [re100, im100] = fetch(ia1, i10, i20)
-  const [re010, im010] = fetch(ia0, i11, i20)
-  const [re110, im110] = fetch(ia1, i11, i20)
-  const [re001, im001] = fetch(ia0, i10, i21)
-  const [re101, im101] = fetch(ia1, i10, i21)
-  const [re011, im011] = fetch(ia0, i11, i21)
-  const [re111, im111] = fetch(ia1, i11, i21)
+  const re000 = chi[iBase000] ?? 0
+  const re100 = chi[iBase100] ?? 0
+  const re010 = chi[iBase010] ?? 0
+  const re110 = chi[iBase110] ?? 0
+  const re001 = chi[iBase001] ?? 0
+  const re101 = chi[iBase101] ?? 0
+  const re011 = chi[iBase011] ?? 0
+  const re111 = chi[iBase111] ?? 0
+
+  const im000 = chi[iBase000 + 1] ?? 0
+  const im100 = chi[iBase100 + 1] ?? 0
+  const im010 = chi[iBase010 + 1] ?? 0
+  const im110 = chi[iBase110 + 1] ?? 0
+  const im001 = chi[iBase001 + 1] ?? 0
+  const im101 = chi[iBase101 + 1] ?? 0
+  const im011 = chi[iBase011 + 1] ?? 0
+  const im111 = chi[iBase111 + 1] ?? 0
 
   const re00 = re000 + (re100 - re000) * wa
   const re10 = re010 + (re110 - re010) * wa
@@ -188,10 +210,9 @@ function sampleChiTrilinear(
   const im0 = im00 + (im10 - im00) * w1
   const im1 = im01 + (im11 - im01) * w1
 
-  return {
-    re: re0 + (re1 - re0) * w2,
-    im: im0 + (im1 - im0) * w2,
-  }
+  CHI_SAMPLE_OUT[0] = re0 + (re1 - re0) * w2
+  CHI_SAMPLE_OUT[1] = im0 + (im1 - im0) * w2
+  return CHI_SAMPLE_OUT
 }
 
 /**
@@ -405,7 +426,7 @@ export function packWdwDensityGrid(
         const wa = fx - ia0
         const pixelIdx = (z * N + y) * N + x
 
-        const { re, im } = sampleChiTrilinear(
+        const chiSample = sampleChiTrilinear(
           chi,
           slab,
           Nphi,
@@ -419,6 +440,8 @@ export function packWdwDensityGrid(
           w1,
           w2
         )
+        const re = chiSample[0]!
+        const im = chiSample[1]!
 
         const rho = re * re + im * im
         const rhoNorm = clamp01(rho / maxRho)

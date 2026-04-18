@@ -12,7 +12,7 @@
  */
 
 export { WDW_G_PREFACTOR, wdwPotential } from './constants'
-import { WDW_G_PREFACTOR, wdwPotential, wdwU } from './constants'
+import { WDW_C_U, WDW_G_PREFACTOR, wdwPotential, wdwU } from './constants'
 
 /** Shared inputs for the boundary-condition generators. */
 export interface WdwBoundaryInputs {
@@ -174,7 +174,7 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
         //   ∂_a U = −2·c_U·a·(1 − 2·K·V·a²)
         //   ∂_a|U| = −∂_a U  (since U < 0).
         //   prefactor coefficient = −(1/(4·|U|))·∂_a|U|
-        const dUda = -2 * 36 * Math.PI * Math.PI * aMin * (1 - 2 * WDW_G_PREFACTOR * V * a2)
+        const dUda = -2 * WDW_C_U * aMin * (1 - 2 * WDW_G_PREFACTOR * V * a2)
         const absU = -U0
         const phaseRate = Math.sqrt(absU)
         const prefactorRate = -(-dUda) / (4 * absU)

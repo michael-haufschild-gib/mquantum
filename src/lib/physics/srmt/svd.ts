@@ -197,9 +197,9 @@ export function complexSvdSingularValues(M: ComplexMatrix): Float64Array {
   if (m < 0 || n < 0 || !Number.isInteger(m) || !Number.isInteger(n)) {
     throw new Error(`complexSvdSingularValues: invalid shape (${m}, ${n})`)
   }
-  if (re.length < m * n || im.length < m * n) {
+  if (re.length !== m * n || im.length !== m * n) {
     throw new Error(
-      `complexSvdSingularValues: buffer length < m·n (re=${re.length}, im=${im.length}, m·n=${m * n})`
+      `complexSvdSingularValues: buffer length !== m·n (re=${re.length}, im=${im.length}, m·n=${m * n})`
     )
   }
   if (m === 0 || n === 0) return new Float64Array(0)
