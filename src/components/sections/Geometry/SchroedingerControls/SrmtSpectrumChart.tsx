@@ -32,7 +32,6 @@ export const HJ_SERIES_COLOR = 'var(--srmt-chart-hj)'
 
 interface ChartSeries {
   points: string
-  normalizedValues: Float32Array
 }
 
 interface ChartGeometry {
@@ -71,18 +70,16 @@ function buildSeries(values: Float32Array, width: number, height: number): Chart
   // guard just in case.
   if (span < 0) return null
   const n = values.length
-  const normalized = new Float32Array(n)
   const usableW = width - CHART_PADDING * 2
   const usableH = height - CHART_PADDING * 2
   const pts = new Array<string>(n)
   for (let i = 0; i < n; i++) {
     const nv = span === 0 ? 0.5 : (values[i]! - min) / span
-    normalized[i] = nv
     const x = CHART_PADDING + (i / (n - 1)) * usableW
     const y = CHART_PADDING + (1 - nv) * usableH
     pts[i] = `${x.toFixed(1)},${y.toFixed(1)}`
   }
-  return { points: pts.join(' '), normalizedValues: normalized }
+  return { points: pts.join(' ') }
 }
 
 function computeChartGeometry(snapshot: SrmtSnapshot): ChartGeometry {

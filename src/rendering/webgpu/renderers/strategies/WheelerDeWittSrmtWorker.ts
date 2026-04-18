@@ -265,9 +265,14 @@ function handleResultReply(
   // rankCap travelled side-channel on state.lastDispatchedRankCap (the
   // worker response doesn't echo it). Fall back to the schmidt count when
   // the side-channel is missing — can happen in tests that exercise
-  // dispatchSrmtCompute directly without queueSrmtCompute.
+  // dispatchSrmtCompute directly without queueSrmtCompute. Clamp to the
+  // returned spectrum length so boundary-adjacent cuts (where the
+  // available rank is smaller than the requested cap) don't publish a
+  // cap the dispatched output never actually hit.
   const carriedRankCap = state.lastDispatchedRankCap[replyClock]
-  const effectiveRankCap = carriedRankCap > 0 ? carriedRankCap : msg.result.schmidtValues.length
+  const availableRank = msg.result.schmidtValues.length
+  const effectiveRankCap =
+    carriedRankCap > 0 ? Math.min(carriedRankCap, availableRank) : availableRank
   const snapshot = buildSnapshot(
     msg.result,
     replyClock,

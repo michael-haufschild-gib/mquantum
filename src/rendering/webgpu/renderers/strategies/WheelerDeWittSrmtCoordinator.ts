@@ -46,6 +46,19 @@ export function normalizeSrmtRankCap(rankCap: number): number {
 }
 
 /**
+ * Pure form of {@link WheelerDeWittSrmtCoordinator.resolveSrmtCutIndex}
+ * used by the compute-hash to match what the worker actually consumes.
+ * Maps a normalized cut position onto the interior index range
+ * `[1, clockLen - 2]` required by `computeSrmtDiagnostic`. Returns `1`
+ * for degenerate axes (`clockLen < 3`).
+ */
+export function resolveSrmtCutIndexForLen(srmtCutNormalized: number, clockLen: number): number {
+  if (clockLen < 3) return 1
+  const raw = Math.round(srmtCutNormalized * (clockLen - 1))
+  return Math.max(1, Math.min(clockLen - 2, raw))
+}
+
+/**
  * Hash of the fields that affect the SRMT COMPUTE step. Embeds the
  * solver config hash — any change that re-runs the solver also
  * invalidates the SRMT cache. Also includes the cut position and rank
@@ -55,13 +68,31 @@ export function normalizeSrmtRankCap(rankCap: number): number {
  *   {@link computeWdwSrmtRenderHash}.
  * - `srmtHeatmapIntensity` — pure render-side alpha multiplier.
  *
+ * When `gridSize` is provided, the cut position is folded in as the
+ * resolved *integer* cut indices the worker actually consumes (one per
+ * axis length), so sub-pixel slider / URL churn that collapses to the
+ * same interior index leaves the hash stable. Without `gridSize`
+ * (callers that do not yet have solver output — e.g. unit tests), the
+ * raw normalized float is hashed instead.
+ *
  * When this hash changes, all three clocks are re-queued on the worker.
  */
-export function computeWdwSrmtComputeHash(config: WheelerDeWittConfig): string {
+export function computeWdwSrmtComputeHash(
+  config: WheelerDeWittConfig,
+  gridSize?: readonly [number, number, number]
+): string {
+  // The worker consumes the resolved interior cut index, not the raw
+  // `srmtCutNormalized` float. Emit the resolved per-axis indices when
+  // we know the grid size so slider/URL changes that don't actually
+  // shift any dispatched index keep the hash stable.
+  const cutToken = gridSize
+    ? `${resolveSrmtCutIndexForLen(config.srmtCutNormalized, gridSize[0])},` +
+      `${resolveSrmtCutIndexForLen(config.srmtCutNormalized, gridSize[1])}`
+    : config.srmtCutNormalized.toFixed(4)
   return [
     config.srmtEnabled ? 1 : 0,
     computeWdwConfigHash(config),
-    config.srmtCutNormalized.toFixed(4),
+    cutToken,
     normalizeSrmtRankCap(config.srmtRankCap),
   ].join('|')
 }
@@ -73,9 +104,12 @@ export function computeWdwSrmtComputeHash(config: WheelerDeWittConfig): string {
  * strategy swaps which cached per-clock result drives the panel snapshot
  * + density texture without re-dispatching the worker.
  */
-export function computeWdwSrmtRenderHash(config: WheelerDeWittConfig): string {
+export function computeWdwSrmtRenderHash(
+  config: WheelerDeWittConfig,
+  gridSize?: readonly [number, number, number]
+): string {
   return [
-    computeWdwSrmtComputeHash(config),
+    computeWdwSrmtComputeHash(config, gridSize),
     config.srmtClock,
     config.srmtHeatmapIntensity.toFixed(4),
   ].join('|')
@@ -159,8 +193,9 @@ export class WheelerDeWittSrmtCoordinator {
     solverDirty: boolean
   ): SrmtTick {
     const enabled = !!config.srmtEnabled
-    const computeHash = computeWdwSrmtComputeHash(config)
-    const renderHash = computeWdwSrmtRenderHash(config)
+    const gridSize = solverOutput?.gridSize
+    const computeHash = computeWdwSrmtComputeHash(config, gridSize)
+    const renderHash = computeWdwSrmtRenderHash(config, gridSize)
     const justToggledOff = !enabled && this.lastEnabled
     const justToggledOn = enabled && !this.lastEnabled
     const computeChanged = computeHash !== this.lastComputeHash
@@ -215,8 +250,6 @@ export class WheelerDeWittSrmtCoordinator {
     // pending, and we prefer to keep the prior snapshot visible until
     // its reply lands.
     const renderDirtyGated = enabled && renderChanged && hasSelectedClockResult
-    const overlayDirty =
-      computeDirty || justToggledOff || renderDirtyGated || selectedClockResultChanged
     const nextOverlay = enabled ? this.buildOverlay(config, solverOutput) : null
     // Retain the last non-null overlay ONLY for render-only clock switches
     // where the newly selected clock is still pending — we prefer holding
@@ -226,11 +259,26 @@ export class WheelerDeWittSrmtCoordinator {
     // the density texture with stale physics for the whole worker latency.
     const canReusePreviousOverlay =
       enabled && renderChanged && !computeDirty && !hasSelectedClockResult
-    const overlay = enabled
-      ? (nextOverlay ?? (canReusePreviousOverlay ? this.lastOverlay : null))
-      : null
+    // Apply the current heatmap intensity to the reused overlay so a
+    // render-only intensity change is not silently frozen until the
+    // worker reply for the newly selected clock lands.
+    const reusedOverlay =
+      canReusePreviousOverlay && this.lastOverlay
+        ? { ...this.lastOverlay, intensity: config.srmtHeatmapIntensity }
+        : null
+    const overlayDirty =
+      computeDirty ||
+      justToggledOff ||
+      renderDirtyGated ||
+      selectedClockResultChanged ||
+      reusedOverlay !== null
+    const overlay = enabled ? (nextOverlay ?? reusedOverlay) : null
     if (nextOverlay) {
       this.lastOverlay = nextOverlay
+    } else if (reusedOverlay) {
+      // Persist the freshly-stamped intensity so subsequent ticks keep
+      // the correct alpha rather than reverting to the pre-change value.
+      this.lastOverlay = reusedOverlay
     } else if (!enabled || justToggledOff || computeDirty) {
       // Drop the stale overlay on compute invalidation so downstream frames
       // don't resurrect it via `lastOverlay` the next time renderChanged fires.
@@ -280,7 +328,7 @@ export class WheelerDeWittSrmtCoordinator {
     solverOutput: WheelerDeWittSolverOutput
   ): void {
     const rankCap = normalizeSrmtRankCap(config.srmtRankCap)
-    const hash = computeWdwSrmtComputeHash(config)
+    const hash = computeWdwSrmtComputeHash(config, solverOutput.gridSize)
     const argsByClock: Record<SrmtClock, SrmtDispatchArgs> = {
       a: this.buildDispatchArgs(config, solverOutput, 'a', rankCap, hash),
       phi1: this.buildDispatchArgs(config, solverOutput, 'phi1', rankCap, hash),
@@ -319,9 +367,7 @@ export class WheelerDeWittSrmtCoordinator {
     clock: SrmtClock
   ): number {
     const clockLen = clockAxisLenFor(clock, solverOutput.gridSize)
-    if (clockLen < 3) return 1
-    const raw = Math.round(config.srmtCutNormalized * (clockLen - 1))
-    return Math.max(1, Math.min(clockLen - 2, raw))
+    return resolveSrmtCutIndexForLen(config.srmtCutNormalized, clockLen)
   }
 
   /**

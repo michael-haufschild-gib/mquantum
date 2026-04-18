@@ -241,7 +241,10 @@ describe('WheelerDeWittSrmtWorker (dispatcher)', () => {
     if (snapshot === null) throw new Error('expected snapshot populated')
     expect(snapshot.clock).toBe('a')
     expect(snapshot.cutIndex).toBe(3)
-    expect(snapshot.rankCap).toBe(16)
+    // Dispatched cap is 16 (see baseArgs) but the returned schmidtValues
+    // spectrum only has 3 entries — snapshot reports the CLIPPED rank,
+    // i.e. what the spectrum actually contains, not the requested cap.
+    expect(snapshot.rankCap).toBe(3)
     expect(snapshot.affineMatchQuality).toBeCloseTo(0.02, 6)
     expect(snapshot.computeTimeMs).toBe(42)
     const q: SrmtClockQuality = s.clockAffineQuality

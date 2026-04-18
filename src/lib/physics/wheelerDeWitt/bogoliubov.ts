@@ -115,9 +115,13 @@ export interface BogoliubovSummary {
    */
   meanFluxRatio: number
   /**
-   * Mean `|β/α|` ratio across extracted columns with `|α|² > 0`. `NaN`
-   * when no column contributed (all `|α|²` were zero or no column
-   * extracted).
+   * Mean `|β/α|` ratio across extracted columns with finite `|α|²`,
+   * finite `|β|²`, and `|α|² > 0`. The per-column term is
+   * `sqrt(|β|² / |α|²)`, which must itself be finite to contribute
+   * (non-finite ratios — e.g. from subnormal underflow or Inf/Inf — are
+   * dropped). `NaN` when no finite ratio contributed: no extraction
+   * succeeded, all extracted `|α|²` were zero or non-finite, or every
+   * computed ratio was non-finite.
    */
   meanBetaOverAlpha: number
 }
