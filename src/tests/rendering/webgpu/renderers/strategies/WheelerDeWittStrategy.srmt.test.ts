@@ -59,7 +59,7 @@ vi.mock('@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker', () =>
     selectedClock: null,
     resultGeneration: 0,
   })
-  const computeForClock = (args: SrmtDispatchArgs): SrmtClockCacheEntry => {
+  const computeForClock = (args: SrmtDispatchArgs, generation: number): SrmtClockCacheEntry => {
     const result: SrmtResult = computeSrmtDiagnostic(
       args.output,
       { clock: args.clock, cutIndex: args.cutIndex, rankCap: args.rankCap },
@@ -81,6 +81,7 @@ vi.mock('@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker', () =>
         computeTimeMs: 0,
       },
       cutIndex: args.cutIndex,
+      generation,
     }
   }
   const qualityFromResults = (results: Record<SrmtClock, SrmtClockCacheEntry | null>) => ({
@@ -112,8 +113,8 @@ vi.mock('@/rendering/webgpu/renderers/strategies/WheelerDeWittSrmtWorker', () =>
           ...(['a', 'phi1', 'phi2'] as SrmtClock[]).filter((c) => c !== selectedClock),
         ]
         for (const clock of order) {
-          state.resultsByClock[clock] = computeForClock(argsByClock[clock])
           state.resultGeneration += 1
+          state.resultsByClock[clock] = computeForClock(argsByClock[clock], state.resultGeneration)
           useSrmtDiagnosticStore
             .getState()
             .setClockQuality(clock, state.resultsByClock[clock]!.result.affineMatchQuality)

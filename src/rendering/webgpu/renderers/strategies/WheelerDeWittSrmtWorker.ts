@@ -51,12 +51,16 @@ export const SRMT_CLOCKS: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
 /**
  * Entry in the worker-state result cache. `snapshot` is the UI-shaped view
  * (chart + chip), `result` is the raw diagnostic (used by the density-grid
- * packer for the `sliceK` overlay), `cutIndex` is echoed from the request.
+ * packer for the `sliceK` overlay), `cutIndex` is echoed from the request,
+ * `generation` is the value of {@link SrmtWorkerState.resultGeneration}
+ * assigned when this entry was installed (so a consumer can detect a
+ * per-clock update without watching the batch-wide counter).
  */
 export interface SrmtClockCacheEntry {
   result: SrmtResult
   snapshot: SrmtSnapshot
   cutIndex: number
+  generation: number
 }
 
 /** Per-clock mapping (`null` until that clock completes). */
@@ -271,13 +275,14 @@ function handleResultReply(
     effectiveRankCap,
     msg.computeTimeMs
   )
+  state.resultGeneration += 1
   state.resultsByClock[replyClock] = {
     result: msg.result,
     snapshot,
     cutIndex: msg.cutIndex,
+    generation: state.resultGeneration,
   }
   state.lastDispatchedHash[replyClock] = null
-  state.resultGeneration += 1
 
   // Store-side publish rule:
   //  - Always merge this clock's quality into `clockAffineQuality` so the
@@ -518,10 +523,29 @@ export function cancelSrmtCompute(state: SrmtWorkerState): void {
 }
 
 /**
+ * Options for {@link disposeSrmtWorker}.
+ */
+export interface DisposeSrmtWorkerOptions {
+  /**
+   * When `true`, skip the global `setSrmtComputing(false)` write.
+   *
+   * Used by strategy warm-swaps (`adoptFrom` → transferring worker-state
+   * ownership): the successor now drives the live worker, so the source's
+   * `dispose()` — and the pre-adoption teardown of the successor's fresh
+   * idle state — must NOT clear the global computing flag. Defaults to
+   * `false` (production teardown does flip the flag).
+   */
+  skipStoreMutation?: boolean
+}
+
+/**
  * Terminate the worker and mark the state disposed. Safe to call multiple
  * times.
  */
-export function disposeSrmtWorker(state: SrmtWorkerState): void {
+export function disposeSrmtWorker(
+  state: SrmtWorkerState,
+  options: DisposeSrmtWorkerOptions = {}
+): void {
   state.disposed = true
   state.inFlight = false
   state.queue = []
@@ -532,5 +556,7 @@ export function disposeSrmtWorker(state: SrmtWorkerState): void {
   state.resultGeneration = 0
   state.worker?.terminate()
   state.worker = null
-  useSrmtDiagnosticStore.getState().setSrmtComputing(false)
+  if (!options.skipStoreMutation) {
+    useSrmtDiagnosticStore.getState().setSrmtComputing(false)
+  }
 }

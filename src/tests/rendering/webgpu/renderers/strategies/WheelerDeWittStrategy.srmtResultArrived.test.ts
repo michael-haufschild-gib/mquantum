@@ -171,6 +171,7 @@ function fabricateSrmtResult(Nphi: number): SrmtResult {
  */
 function simulateClockReply(state: MockSrmtState, clock: SrmtClock, Nphi: number): void {
   const result = fabricateSrmtResult(Nphi)
+  state.resultGeneration += 1
   state.resultsByClock[clock] = {
     result,
     snapshot: {
@@ -184,8 +185,8 @@ function simulateClockReply(state: MockSrmtState, clock: SrmtClock, Nphi: number
       computeTimeMs: 1,
     },
     cutIndex: 3,
+    generation: state.resultGeneration,
   }
-  state.resultGeneration += 1
 }
 
 // ---------------------------------------------------------------------------

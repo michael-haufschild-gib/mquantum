@@ -62,14 +62,17 @@ function buildSeries(values: Float32Array, width: number, height: number): Chart
   }
   if (!Number.isFinite(min) || !Number.isFinite(max)) return null
   const span = max - min
-  if (span <= 0) return null
+  // Negative span should never happen (min <= max by construction), but
+  // guard just in case. A legitimate flat spectrum (`span === 0`) is
+  // rendered as a horizontal line at the mid-band instead of hidden.
+  if (span < 0) return null
   const n = values.length
   const normalized = new Float32Array(n)
   const usableW = width - CHART_PADDING * 2
   const usableH = height - CHART_PADDING * 2
   const pts = new Array<string>(n)
   for (let i = 0; i < n; i++) {
-    const nv = (values[i]! - min) / span
+    const nv = span === 0 ? 0.5 : (values[i]! - min) / span
     normalized[i] = nv
     const x = CHART_PADDING + (i / (n - 1)) * usableW
     const y = CHART_PADDING + (1 - nv) * usableH

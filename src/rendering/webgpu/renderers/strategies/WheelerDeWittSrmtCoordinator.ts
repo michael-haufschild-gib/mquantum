@@ -112,9 +112,18 @@ export class WheelerDeWittSrmtCoordinator {
    * Counter paired with `SrmtWorkerState.resultGeneration`. When the
    * worker posts a new result the worker state bumps its counter; the
    * coordinator's paired counter tracks the last generation that was
-   * packed into the density texture.
+   * packed into the density texture. Used to trigger store syncs on ANY
+   * reply (so the cross-clock quality table fills in as non-selected
+   * replies arrive).
    */
   private lastResultGeneration = 0
+  /**
+   * Generation of the selected-clock cache entry that was last packed
+   * into the density texture. Repacks are gated on THIS counter rather
+   * than the batch-wide one so replies for non-selected clocks do not
+   * trigger redundant full-grid repacks.
+   */
+  private lastSelectedClockGeneration = 0
   /** Last non-null overlay — reused when the selected clock is still pending. */
   private lastOverlay: WdwSrmtOverlay | null = null
   /**
@@ -157,6 +166,7 @@ export class WheelerDeWittSrmtCoordinator {
       this.lastComputeHash = null
       this.lastRenderHash = null
       this.lastResultGeneration = 0
+      this.lastSelectedClockGeneration = 0
       useSrmtDiagnosticStore.getState().clear()
     } else if (enabled && renderChanged) {
       // Transition 3: render-only delta.
@@ -164,11 +174,23 @@ export class WheelerDeWittSrmtCoordinator {
       this.lastRenderHash = renderHash
     }
 
-    // Transition 5: worker reply arrived since the last tick.
+    // Transition 5a: any worker reply arrived since the last tick →
+    // refresh the store so the cross-clock quality table fills in as
+    // replies for non-selected clocks land. Harmless when the selected
+    // clock has no cache yet (syncStoreForSelectedClock early-returns).
     const resultArrived = enabled && this.workerState.resultGeneration !== this.lastResultGeneration
     if (resultArrived) {
       this.syncStoreForSelectedClock(config.srmtClock)
     }
+
+    // Transition 5b: density repacks are expensive, so gate them on the
+    // SELECTED clock's per-entry generation — not the batch-wide counter.
+    // Replies for the other two clocks update the quality table but must
+    // not force a full-grid repack.
+    const selectedClockGeneration =
+      this.workerState.resultsByClock[config.srmtClock]?.generation ?? 0
+    const selectedClockResultChanged =
+      enabled && selectedClockGeneration !== this.lastSelectedClockGeneration
 
     const hasSelectedClockResult =
       enabled && this.workerState.resultsByClock[config.srmtClock] !== null
@@ -177,7 +199,8 @@ export class WheelerDeWittSrmtCoordinator {
     // pending, and we prefer to keep the prior snapshot visible until
     // its reply lands.
     const renderDirtyGated = enabled && renderChanged && hasSelectedClockResult
-    const overlayDirty = computeDirty || justToggledOff || renderDirtyGated || resultArrived
+    const overlayDirty =
+      computeDirty || justToggledOff || renderDirtyGated || selectedClockResultChanged
     const nextOverlay = enabled ? this.buildOverlay(config, solverOutput) : null
     // Retain the last non-null overlay so a still-pending clock switch
     // doesn't momentarily wipe the visible SRMT plane.
@@ -189,11 +212,12 @@ export class WheelerDeWittSrmtCoordinator {
     }
 
     this.lastEnabled = enabled
-    // Advance the paired generation counter after this tick — written
+    // Advance the paired generation counters after this tick — written
     // unconditionally so the next frame sees no drift even when SRMT is
     // disabled (the worker state is zeroed on cancel, so this just
     // re-affirms the 0 baseline).
     this.lastResultGeneration = this.workerState.resultGeneration
+    this.lastSelectedClockGeneration = selectedClockGeneration
 
     return { overlayDirty, overlay }
   }
@@ -293,13 +317,17 @@ export class WheelerDeWittSrmtCoordinator {
    * late dispose on the source cannot terminate the live worker.
    */
   adoptFrom(source: WheelerDeWittSrmtCoordinator): void {
-    // Transfer worker-state ownership.
-    disposeSrmtWorker(this.workerState)
+    // Transfer worker-state ownership. Successor's own (fresh, idle)
+    // worker state is torn down with `skipStoreMutation` so the global
+    // `srmtComputing` flag is preserved for the live worker we're about
+    // to adopt from `source`.
+    disposeSrmtWorker(this.workerState, { skipStoreMutation: true })
     this.workerState = source.workerState
     this.lastComputeHash = source.lastComputeHash
     this.lastRenderHash = source.lastRenderHash
     this.lastEnabled = source.lastEnabled
     this.lastResultGeneration = source.lastResultGeneration
+    this.lastSelectedClockGeneration = source.lastSelectedClockGeneration
     this.lastOverlay = source.lastOverlay
     // Move diagnostic-store ownership too: after adoption the successor
     // drives the global SRMT store, and `source.dispose()` must not wipe
@@ -311,6 +339,7 @@ export class WheelerDeWittSrmtCoordinator {
     source.lastRenderHash = null
     source.lastEnabled = false
     source.lastResultGeneration = 0
+    source.lastSelectedClockGeneration = 0
     source.lastOverlay = null
   }
 
@@ -320,15 +349,17 @@ export class WheelerDeWittSrmtCoordinator {
    * "no diagnostic" state rather than showing stale readings.
    */
   dispose(): void {
-    disposeSrmtWorker(this.workerState)
+    // After `adoptFrom`, this coordinator is detached: the worker state
+    // is fresh+idle (no live worker) and a successor owns the global
+    // store. Skip store mutation in that case so we don't clear the
+    // successor's live `srmtComputing` flag or its readings.
+    disposeSrmtWorker(this.workerState, { skipStoreMutation: !this.ownsDiagnosticStore })
     this.lastComputeHash = null
     this.lastRenderHash = null
     this.lastEnabled = false
     this.lastResultGeneration = 0
+    this.lastSelectedClockGeneration = 0
     this.lastOverlay = null
-    // Skip the global store clear if we've been detached via `adoptFrom`
-    // — the successor now owns the store and expects its readings to
-    // survive this dispose.
     if (this.ownsDiagnosticStore) {
       useSrmtDiagnosticStore.getState().clear()
     }

@@ -132,7 +132,7 @@ function airySeriesEvaluate(z: number): {
   aCoef = 1
   bCoef = 1
   let zPow3kMinus1 = 1 // start at z^{0} for k=0; for k≥1 we'll multiply by z²·z^{3(k−1)} = z^{3k−1}
-  let zPow3kForG = 1 // z^{3k}, will be z² at k=1
+  let zPow3kForG = 1 // z^{3k}, will be z³ at k=1
   for (let k = 1; k < AIRY_SERIES_MAX_TERMS; k++) {
     aCoef /= (3 * k - 1) * (3 * k)
     bCoef /= 3 * k * (3 * k + 1)

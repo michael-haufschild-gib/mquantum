@@ -29,6 +29,8 @@
  * test-end.
  */
 
+import { DEFAULT_CHAMPION_TIE_TOLERANCE } from '@/lib/physics/srmt'
+
 import { expect, test } from './fixtures'
 import {
   gotoModeWithParams,
@@ -47,9 +49,6 @@ const WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
 
 /** Min version bumps observed after a three-clock dispatch completes. */
 const MIN_VERSION_BUMPS = 4
-
-/** UI tie-tolerance — mirrors `CHAMPION_TIE_TOLERANCE` in the spectrum panel. */
-const CHAMPION_TIE_TOLERANCE = 0.02
 
 /** Monotonicity tolerance for the Schmidt-derived K spectrum and HJ spectrum. */
 const MONOTONIC_EPS = 1e-6
@@ -158,7 +157,7 @@ test.describe('Wheeler–DeWitt SRMT — physics invariants across boundary cond
       const [best, second] = ordered
       if (!best || !second) throw new Error('unreachable — three finite qualities required')
       const gap = second.q - best.q
-      const champion = gap >= CHAMPION_TIE_TOLERANCE ? best.clock : 'tied'
+      const champion = gap >= DEFAULT_CHAMPION_TIE_TOLERANCE ? best.clock : 'tied'
 
       const readout = `[SRMT][BC=${bc}] a=${diag.clockAffineQuality.a.toFixed(4)} phi1=${diag.clockAffineQuality.phi1.toFixed(4)} phi2=${diag.clockAffineQuality.phi2.toFixed(4)} champion=${champion} gap=${gap.toFixed(4)}`
 

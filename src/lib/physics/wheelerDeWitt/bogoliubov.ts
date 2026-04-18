@@ -87,7 +87,9 @@ export interface BogoliubovColumn {
    * Flux ratio `(|α|² − |β|²) / (|α|² + |β|²)` ∈ `[−1, 1]`. BC-amplitude
    * independent; +1 for pure outgoing, 0 for standing wave, −1 for pure
    * incoming. The sign convention matches the in/out scattering picture
-   * for a Wronskian-normalised mode basis.
+   * for a Wronskian-normalised mode basis. `NaN` when the column had
+   * zero amplitude (`|α|² + |β|² = 0`) — excluded from `meanFluxRatio`
+   * to avoid biasing the aggregate toward a fake standing-wave signal.
    */
   fluxRatio: number
   /** Number of Lorentzian-asymptotic cells used in the extraction. */
@@ -134,6 +136,7 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
   const columns: (BogoliubovColumn | null)[] = new Array(total)
   let extractedCount = 0
   let fluxRatioSum = 0
+  let fluxRatioCount = 0
   let betaOverAlphaSum = 0
   let betaOverAlphaCount = 0
 
@@ -160,7 +163,9 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
       const betaSq = betaRe * betaRe + betaIm * betaIm
       const flux = alphaSq - betaSq
       const sumSq = alphaSq + betaSq
-      const fluxRatio = sumSq > 0 ? flux / sumSq : 0
+      // NaN for zero-amplitude columns so they don't masquerade as a
+      // standing-wave signal and bias meanFluxRatio toward HH/DeWitt.
+      const fluxRatio = sumSq > 0 ? flux / sumSq : Number.NaN
 
       columns[idx] = {
         phi1,
@@ -176,7 +181,10 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
         asymptoticCellCount: info.asymptoticCellCount,
       }
       extractedCount += 1
-      fluxRatioSum += fluxRatio
+      if (Number.isFinite(fluxRatio)) {
+        fluxRatioSum += fluxRatio
+        fluxRatioCount += 1
+      }
       if (alphaSq > 0) {
         betaOverAlphaSum += Math.sqrt(betaSq / alphaSq)
         betaOverAlphaCount += 1
@@ -191,7 +199,7 @@ export function extractBogoliubov(output: WheelerDeWittSolverOutput): Bogoliubov
     // NaN (not 0) when nothing was extracted — 0 would be indistinguishable
     // from a real standing-wave / zero-particle signal and would silently
     // misclassify failed runs as meaningful physics.
-    meanFluxRatio: extractedCount > 0 ? fluxRatioSum / extractedCount : Number.NaN,
+    meanFluxRatio: fluxRatioCount > 0 ? fluxRatioSum / fluxRatioCount : Number.NaN,
     meanBetaOverAlpha: betaOverAlphaCount > 0 ? betaOverAlphaSum / betaOverAlphaCount : Number.NaN,
   }
 }

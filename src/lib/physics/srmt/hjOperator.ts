@@ -52,7 +52,7 @@
 import { jacobiEigenvalues } from '@/lib/math/jacobiEigenvalues'
 import { wdwU } from '@/lib/physics/wheelerDeWitt/constants'
 
-import { lanczosTopK, lanczosTopKOp, type LinearOperator } from './lanczos'
+import { lanczosTopKOp, type LinearOperator } from './lanczos'
 import type { SrmtClock } from './types'
 
 /**
@@ -135,6 +135,15 @@ interface SparseHjOperator {
  */
 function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  if (Nphi < 2) {
+    throw new Error(`buildSparseOpA: Nphi must be >= 2, got ${Nphi}`)
+  }
+  if (!(aMax > aMin)) {
+    throw new Error(`buildSparseOpA: aMax must be > aMin, got [${aMin}, ${aMax}]`)
+  }
+  if (!(phiExtent > 0)) {
+    throw new Error(`buildSparseOpA: phiExtent must be > 0, got ${phiExtent}`)
+  }
   if (!(sliceIndex > 0 && sliceIndex < Na - 1)) {
     throw new Error(
       `buildSparseOpA: sliceIndex must be strictly interior, got ${sliceIndex} (Na=${Na})`
@@ -196,6 +205,18 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
  */
 function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  if (Na < 2) {
+    throw new Error(`buildSparseOpPhi: Na must be >= 2, got ${Na}`)
+  }
+  if (Nphi < 2) {
+    throw new Error(`buildSparseOpPhi: Nphi must be >= 2, got ${Nphi}`)
+  }
+  if (!(aMax > aMin)) {
+    throw new Error(`buildSparseOpPhi: aMax must be > aMin, got [${aMin}, ${aMax}]`)
+  }
+  if (!(phiExtent > 0)) {
+    throw new Error(`buildSparseOpPhi: phiExtent must be > 0, got ${phiExtent}`)
+  }
   if (!(aMin > 0)) {
     // 1/(a·a) below would feed Infinity into Lanczos at ia=0 if a=0 were in the grid.
     throw new Error(
@@ -391,7 +412,3 @@ export function harmonicOscillator1DSpectrum(N: number, L: number, omega: number
   for (let i = 0; i < N; i++) asc[i] = descending[N - 1 - i]!
   return asc
 }
-
-// Re-export lanczosTopK so existing tests that import it from hjOperator
-// keep working — and silence the unused-import warning.
-export { lanczosTopK }

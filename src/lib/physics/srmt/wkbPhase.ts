@@ -228,8 +228,11 @@ export function extractWkbPhase(
   const axisStride = strides[axisIdx]!
   const axisLen = [Na, Nphi1, Nphi2][axisIdx]!
 
-  // Unwrap along the clock axis at every (orthogonal) location.
+  // Unwrap along the clock axis at every (orthogonal) location. Hoist the
+  // strip scratch buffer outside the loop — axisLen is constant, and
+  // totalOrtho can reach ~1000 for typical WdW grids.
   const totalOrtho = (Na * Nphi1 * Nphi2) / axisLen
+  const strip = new Float64Array(axisLen)
   for (let flat = 0; flat < totalOrtho; flat++) {
     let base = 0
     {
@@ -242,7 +245,6 @@ export function extractWkbPhase(
         base += coord * strides[d]!
       }
     }
-    const strip = new Float64Array(axisLen)
     for (let k = 0; k < axisLen; k++) strip[k] = raw[base + k * axisStride]!
     unwrap1D(strip)
     for (let k = 0; k < axisLen; k++) raw[base + k * axisStride] = strip[k]!
