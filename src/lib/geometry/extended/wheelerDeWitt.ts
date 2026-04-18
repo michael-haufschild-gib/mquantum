@@ -24,6 +24,18 @@
 export type WdwBoundaryCondition = 'noBoundary' | 'tunneling' | 'deWitt'
 
 /**
+ * SRMT (Superspace-Relational Modular Time) clock identifier — matches
+ * {@link import('@/lib/physics/srmt/types').SrmtClock}. Selects which
+ * minisuperspace axis the modular-time diagnostic partitions the `χ`
+ * tensor along:
+ *
+ *  - `'a'`    — DeWitt-timelike scale factor (SRMT conjecture: best fit).
+ *  - `'phi1'` — First inflaton axis (spacelike in the DeWitt supermetric).
+ *  - `'phi2'` — Second inflaton axis (spacelike in the DeWitt supermetric).
+ */
+export type WdwSrmtClock = 'a' | 'phi1' | 'phi2'
+
+/**
  * Wheeler–DeWitt minisuperspace configuration.
  *
  * Fields marked "(physics)" feed the solver. Fields marked "(display)" only
@@ -65,6 +77,21 @@ export interface WheelerDeWittConfig {
   /** Gaussian pulse width in normalized trajectory-progress units (0.02–0.3) (render-only) */
   worldlinePulseWidth: number
 
+  // ── SRMT (Superspace-Relational Modular Time) diagnostic (display-only) ──
+  // Feeds the modular-vs-HJ spectrum overlay. All five fields participate in
+  // the SRMT hash (see `computeWdwSrmtHash`) but NOT in the solver hash —
+  // toggling SRMT never re-runs the Wheeler–DeWitt solve.
+  /** Master toggle for the SRMT diagnostic + overlay (display-only) */
+  srmtEnabled: boolean
+  /** Clock axis the modular spectrum is computed along (display-only) */
+  srmtClock: WdwSrmtClock
+  /** Normalized cut position along the clock axis, in [0.1, 0.9] (display-only) */
+  srmtCutNormalized: number
+  /** Max Schmidt rank kept; range [8, 256] (display-only) */
+  srmtRankCap: number
+  /** Heatmap overlay brightness multiplier in [0, 1] (display-only) */
+  srmtHeatmapIntensity: number
+
   /** Runtime flag: when true, strategy recomputes the solver on next frame */
   needsReset: boolean
 }
@@ -99,5 +126,10 @@ export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   worldlineEnabled: false,
   worldlineSpeed: 0.5,
   worldlinePulseWidth: 0.08,
+  srmtEnabled: false,
+  srmtClock: 'a',
+  srmtCutNormalized: 0.5,
+  srmtRankCap: 64,
+  srmtHeatmapIntensity: 0.6,
   needsReset: true,
 }

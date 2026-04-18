@@ -348,6 +348,111 @@ export async function readDensityDiagnostics(page: Page) {
   })
 }
 
+// ─── SRMT Diagnostic Store (Wheeler-DeWitt) ──────────────────────────────────
+
+/** Snapshot of the SRMT diagnostic store — numeric spectra flattened to plain arrays. */
+export interface SrmtDiagnosticsSnapshot {
+  clockAffineQuality: { a: number; phi1: number; phi2: number }
+  snapshot: {
+    clock: 'a' | 'phi1' | 'phi2'
+    slicePlane: 'phi-phi' | 'a-phi2' | 'a-phi1'
+    cutIndex: number
+    rankCap: number
+    kSpectrum: number[]
+    hjSpectrum: number[]
+    affineMatchQuality: number
+    computeTimeMs: number
+  } | null
+  computing: boolean
+  version: number
+}
+
+/**
+ * Read the SRMT (Superspace-Relational Modular Time) diagnostic store. Mirrors
+ * the pattern of `readTdseDiagnostics` — serializes Float32Array spectra to
+ * plain `number[]` so Playwright's structured-clone boundary is stable.
+ */
+export async function readSrmtDiagnostics(page: Page): Promise<SrmtDiagnosticsSnapshot> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/srmtDiagnosticStore.ts')
+    const s = mod.useSrmtDiagnosticStore.getState()
+    const snap = s.snapshot
+    return {
+      clockAffineQuality: {
+        a: s.clockAffineQuality.a,
+        phi1: s.clockAffineQuality.phi1,
+        phi2: s.clockAffineQuality.phi2,
+      },
+      snapshot: snap
+        ? {
+            clock: snap.clock,
+            slicePlane: snap.slicePlane,
+            cutIndex: snap.cutIndex,
+            rankCap: snap.rankCap,
+            kSpectrum: Array.from(snap.kSpectrum),
+            hjSpectrum: Array.from(snap.hjSpectrum),
+            affineMatchQuality: snap.affineMatchQuality,
+            computeTimeMs: snap.computeTimeMs,
+          }
+        : null,
+      computing: s.computing,
+      version: s.version,
+    }
+  })
+}
+
+/**
+ * Wait for the SRMT three-clock dispatch queue to fully drain.
+ *
+ * Exit condition: all three `clockAffineQuality` entries are finite numbers
+ * AND the `computing` flag has flipped back to `false`. This is the strictest
+ * terminal signal — it guarantees both per-clock results have landed and the
+ * dispatcher has finalized the batch.
+ *
+ * A single Lanczos compute can take 3-7 s on CI hardware; three clocks
+ * sequentially can total 20-30 s on cold starts. The 60 s default leaves a
+ * 2x safety margin. Callers on heavier grids should bump the timeout.
+ */
+export async function waitForSrmtQueueDrain(page: Page, timeoutMs = 60_000): Promise<void> {
+  // Poll the SRMT store from the test-runner side (not via page.waitForFunction
+  // evaluated inside the page). The in-page evaluator has historically
+  // returned stale/cached values when the probe does a dynamic ES-module
+  // import on every tick — the import resolves to a different module
+  // instance under Vite's dev server cache than the one the live app is
+  // mutating, so `getState()` returns the original (NaN) initial record.
+  //
+  // Using `page.evaluate` per-poll guarantees the probe runs against the
+  // currently-active module graph, matching the pattern in
+  // `readSrmtDiagnostics`.
+  const deadline = Date.now() + timeoutMs
+  const pollMs = 250
+  for (;;) {
+    const snapshot = await page.evaluate(async () => {
+      const mod = await import('/src/stores/srmtDiagnosticStore.ts')
+      const s = mod.useSrmtDiagnosticStore.getState()
+      return {
+        a: s.clockAffineQuality.a,
+        phi1: s.clockAffineQuality.phi1,
+        phi2: s.clockAffineQuality.phi2,
+        computing: s.computing,
+      }
+    })
+    const done =
+      Number.isFinite(snapshot.a) &&
+      Number.isFinite(snapshot.phi1) &&
+      Number.isFinite(snapshot.phi2) &&
+      snapshot.computing === false
+    if (done) return
+    if (Date.now() > deadline) {
+      throw new Error(
+        `waitForSrmtQueueDrain: timeout after ${timeoutMs}ms — last snapshot: ` +
+          `a=${snapshot.a} phi1=${snapshot.phi1} phi2=${snapshot.phi2} computing=${snapshot.computing}`
+      )
+    }
+    await new Promise((r) => setTimeout(r, pollMs))
+  }
+}
+
 /**
  * Wait for a diagnostic store to report hasData === true.
  * Diagnostics are decimated (every 5-60 frames), so this may take a few seconds.

@@ -317,6 +317,14 @@ function applyWdwParams(
   if (urlState.wdwWorldlineSpeed !== undefined) ext.setWdwWorldlineSpeed(urlState.wdwWorldlineSpeed)
   if (urlState.wdwWorldlinePulseWidth !== undefined)
     ext.setWdwWorldlinePulseWidth(urlState.wdwWorldlinePulseWidth)
+  // SRMT diagnostic — display-only; these setters do not flip needsReset.
+  if (urlState.wdwSrmtEnabled !== undefined) ext.setWdwSrmtEnabled(urlState.wdwSrmtEnabled)
+  if (urlState.wdwSrmtClock !== undefined) ext.setWdwSrmtClock(urlState.wdwSrmtClock)
+  if (urlState.wdwSrmtCutNormalized !== undefined)
+    ext.setWdwSrmtCutNormalized(urlState.wdwSrmtCutNormalized)
+  if (urlState.wdwSrmtRankCap !== undefined) ext.setWdwSrmtRankCap(urlState.wdwSrmtRankCap)
+  if (urlState.wdwSrmtHeatmapIntensity !== undefined)
+    ext.setWdwSrmtHeatmapIntensity(urlState.wdwSrmtHeatmapIntensity)
 }
 
 /** Apply coordinate entanglement URL state params (lazy import). */

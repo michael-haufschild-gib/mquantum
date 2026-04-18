@@ -804,6 +804,117 @@ describe('state-serializer', () => {
     })
   })
 
+  describe('Wheeler–DeWitt SRMT diagnostic params', () => {
+    it('serializes all five SRMT params when qm=wheelerDeWitt', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwSrmtEnabled: true,
+        wdwSrmtClock: 'phi1',
+        wdwSrmtCutNormalized: 0.6,
+        wdwSrmtRankCap: 96,
+        wdwSrmtHeatmapIntensity: 0.75,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('srmt=1')
+      expect(serialized).toContain('srmt_c=phi1')
+      expect(serialized).toContain('srmt_x=0.60')
+      expect(serialized).toContain('srmt_r=96')
+      expect(serialized).toContain('srmt_h=0.75')
+    })
+
+    it('omits all SRMT params when quantumMode is NOT wheelerDeWitt', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        wdwSrmtEnabled: true,
+        wdwSrmtClock: 'a',
+        wdwSrmtCutNormalized: 0.5,
+        wdwSrmtRankCap: 64,
+        wdwSrmtHeatmapIntensity: 0.5,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).not.toContain('srmt=')
+      expect(serialized).not.toContain('srmt_c=')
+      expect(serialized).not.toContain('srmt_x=')
+      expect(serialized).not.toContain('srmt_r=')
+      expect(serialized).not.toContain('srmt_h=')
+    })
+
+    it('round-trips srmt=0 toggle', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwSrmtEnabled: false,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('srmt=0')
+      const round = deserializeState(serialized)
+      expect(round.wdwSrmtEnabled).toBe(false)
+    })
+
+    it('round-trips each clock option', () => {
+      for (const clock of ['a', 'phi1', 'phi2'] as const) {
+        const serialized = serializeState({
+          dimension: 3,
+          objectType: 'schroedinger',
+          quantumMode: 'wheelerDeWitt',
+          wdwSrmtClock: clock,
+        })
+        const round = deserializeState(serialized)
+        expect(round.wdwSrmtClock, `roundtrip failed for clock=${clock}`).toBe(clock)
+      }
+    })
+
+    it('rejects invalid clock values', () => {
+      const round = deserializeState('d=3&t=schroedinger&qm=wheelerDeWitt&srmt_c=bogus')
+      expect(round.wdwSrmtClock).toBeUndefined()
+    })
+
+    it('clamps srmt_x to [0.1, 0.9]', () => {
+      const tooLow = deserializeState('srmt_x=-1')
+      const tooHigh = deserializeState('srmt_x=5')
+      expect(tooLow.wdwSrmtCutNormalized).toBe(0.1)
+      expect(tooHigh.wdwSrmtCutNormalized).toBe(0.9)
+    })
+
+    it('clamps srmt_r to [8, 256]', () => {
+      const tooLow = deserializeState('srmt_r=1')
+      const tooHigh = deserializeState('srmt_r=9999')
+      expect(tooLow.wdwSrmtRankCap).toBe(8)
+      expect(tooHigh.wdwSrmtRankCap).toBe(256)
+    })
+
+    it('clamps srmt_h to [0, 1]', () => {
+      const negative = deserializeState('srmt_h=-1')
+      const tooHigh = deserializeState('srmt_h=9')
+      expect(negative.wdwSrmtHeatmapIntensity).toBe(0)
+      expect(tooHigh.wdwSrmtHeatmapIntensity).toBe(1)
+    })
+
+    it('round-trips the full SRMT block combined', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwSrmtEnabled: true,
+        wdwSrmtClock: 'phi2',
+        wdwSrmtCutNormalized: 0.33,
+        wdwSrmtRankCap: 128,
+        wdwSrmtHeatmapIntensity: 0.4,
+      }
+      const round = deserializeState(serializeState(state))
+      expect(round.wdwSrmtEnabled).toBe(true)
+      expect(round.wdwSrmtClock).toBe('phi2')
+      expect(round.wdwSrmtCutNormalized).toBeCloseTo(0.33, 2)
+      expect(round.wdwSrmtRankCap).toBe(128)
+      expect(round.wdwSrmtHeatmapIntensity).toBeCloseTo(0.4, 2)
+    })
+  })
+
   describe('Curved-space TDSE metric params', () => {
     it('round-trips tdse_metric=morrisThorne with tdse_b0 and omits b0 for flat', () => {
       // morrisThorne: both keys must survive a deserialize → serialize round trip.

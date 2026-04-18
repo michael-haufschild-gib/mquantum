@@ -493,6 +493,11 @@ export interface SchroedingerSliceActions {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  setWdwSrmtEnabled: (enabled: boolean) => void
+  setWdwSrmtClock: (clock: import('@/lib/geometry/extended/wheelerDeWitt').WdwSrmtClock) => void
+  setWdwSrmtCutNormalized: (cut: number) => void
+  setWdwSrmtRankCap: (cap: number) => void
+  setWdwSrmtHeatmapIntensity: (intensity: number) => void
   applyWheelerDeWittPreset: (presetId: string) => void
   triggerWdwRecompute: () => void
   clearWdwNeedsReset: () => void

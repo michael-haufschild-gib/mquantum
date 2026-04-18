@@ -93,6 +93,12 @@ export interface SchroedingerSnapshot {
     worldlineEnabled?: boolean
     worldlineSpeed?: number
     worldlinePulseWidth?: number
+    // SRMT (Superspace-Relational Modular Time) diagnostic (display-only)
+    srmtEnabled?: boolean
+    srmtClock?: 'a' | 'phi1' | 'phi2'
+    srmtCutNormalized?: number
+    srmtRankCap?: number
+    srmtHeatmapIntensity?: number
     [key: string]: unknown
   }
   antiDeSitter?: {
