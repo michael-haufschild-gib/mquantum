@@ -1,11 +1,10 @@
 /**
- * Tests for E1 electric dipole selection rules: allowed/forbidden transitions
- * and dipole component computation.
+ * Tests for E1 electric dipole selection rules — allowed/forbidden transitions.
  */
 import { describe, expect, it } from 'vitest'
 
 import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis'
-import { dipoleComponent, isAllowedE1 } from '@/lib/physics/openQuantum/selectionRules'
+import { isAllowedE1 } from '@/lib/physics/openQuantum/selectionRules'
 
 // ---------------------------------------------------------------------------
 // Helper: construct a minimal basis state for selection rule tests
@@ -123,43 +122,5 @@ describe('isAllowedE1', () => {
       // Both have empty arrays — no extra dims to compare
       expect(isAllowedE1(state(1, 0, 0, []), state(2, 1, 0, []))).toBe(true)
     })
-  })
-})
-
-// ---------------------------------------------------------------------------
-// dipoleComponent
-// ---------------------------------------------------------------------------
-
-describe('dipoleComponent', () => {
-  it('returns 0 for Δm=0 (π transition)', () => {
-    expect(dipoleComponent(0, 0)).toBe(0)
-  })
-
-  it('returns +1 for Δm=+1 (σ⁺ transition)', () => {
-    expect(dipoleComponent(0, 1)).toBe(1)
-  })
-
-  it('returns -1 for Δm=-1 (σ⁻ transition)', () => {
-    expect(dipoleComponent(0, -1)).toBe(-1)
-  })
-
-  it('returns +1 for m=-1 → m=0', () => {
-    expect(dipoleComponent(-1, 0)).toBe(1)
-  })
-
-  it('returns -1 for m=1 → m=0', () => {
-    expect(dipoleComponent(1, 0)).toBe(-1)
-  })
-
-  it('returns null for |Δm|=2 (forbidden)', () => {
-    expect(dipoleComponent(0, 2)).toBeNull()
-  })
-
-  it('returns null for |Δm|=3 (forbidden)', () => {
-    expect(dipoleComponent(-1, 2)).toBeNull()
-  })
-
-  it('returns null for large negative Δm', () => {
-    expect(dipoleComponent(2, -1)).toBeNull()
   })
 })

@@ -228,9 +228,9 @@ describe('computeCosmologyAt — de Sitter', () => {
   })
 
   it('rejects eta = 0', () => {
-    expect(() =>
-      computeCosmologyAt(0, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 })
-    ).toThrow(RangeError)
+    expect(() => computeCosmologyAt(0, { preset: 'deSitter', spacetimeDim: 4, hubble: 1 })).toThrow(
+      RangeError
+    )
   })
 })
 
@@ -278,12 +278,50 @@ describe('computeCosmologyAt — ekpyrotic', () => {
     const n = 4
     const sc = sCritical(n)
     for (const mult of [1.1, 2, 5]) {
-      const snap = computeCosmologyAt(
-        -3,
-        { preset: 'ekpyrotic', spacetimeDim: n, steepness: sc * mult }
-      )
+      const snap = computeCosmologyAt(-3, {
+        preset: 'ekpyrotic',
+        spacetimeDim: n,
+        steepness: sc * mult,
+      })
       expect(snap.aFull).toBeCloseTo(snap.aPotential * snap.a * snap.a, 10)
     }
+  })
+})
+
+// ───────────────────────────────────────────────────────────────────────────
+// computeCosmologyAt — Bianchi-Kasner
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('computeCosmologyAt — Bianchi-Kasner', () => {
+  // Canonical symmetric-vacuum triple (−1/3, 2/3, 2/3) at n = 4.
+  // η = (3/2)·t^(2/3); `ã = t^(1/3)`; `ℋ = ã/((n-1)·t) = ã/(3t)`.
+  const n = 4
+  const exp = { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
+
+  it('returns ℋ = ã/((n-1)·t) (not ã²/((n-1)·t)) for the symmetric vacuum triple', () => {
+    // η = 6 ⇒ t = (6·2/3)^(3/2) = 8, ã = 2, ℋ = 2/(3·8) = 1/12.
+    // An off-by-ã² regression would report 4/24 = 1/6 instead.
+    const eta = 6
+    const snap = computeCosmologyAt(eta, {
+      preset: 'bianchiKasner',
+      spacetimeDim: n,
+      kasnerExponents: exp,
+    })
+    expect(snap.a).toBeCloseTo(2, 12)
+    expect(snap.hubble).toBeCloseTo(1 / 12, 12)
+  })
+
+  it('hubble coincides with 1/((n-1)·t) at the η=1.5 Minkowski-equivalent point', () => {
+    // At η = 1.5, t = 1, ã = 1, so ℋ = 1/((n-1)·t) = 1/3. The simple
+    // check `ã=1 ⇒ ℋ = 1/3` is unambiguous and catches any rescaling
+    // regression.
+    const snap = computeCosmologyAt(1.5, {
+      preset: 'bianchiKasner',
+      spacetimeDim: n,
+      kasnerExponents: exp,
+    })
+    expect(snap.a).toBeCloseTo(1, 12)
+    expect(snap.hubble).toBeCloseTo(1 / 3, 12)
   })
 })
 

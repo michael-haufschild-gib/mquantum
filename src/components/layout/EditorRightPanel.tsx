@@ -10,6 +10,8 @@ import { DecoherenceSection } from '@/components/sections/Analysis/DecoherenceSe
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Analysis/OpenQuantumDiagnosticsSection'
 import { QuantumnessAtlasSection } from '@/components/sections/Analysis/QuantumnessAtlasSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Analysis/SchroedingerQuantumEffectsSection'
+import { SrmtDiagnosticSection } from '@/components/sections/Analysis/SrmtDiagnosticSection'
+import { SrmtSweepSection } from '@/components/sections/Analysis/SrmtSweepSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { ExposureSection } from '@/components/sections/Exposure/ExposureSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
@@ -44,6 +46,8 @@ const AnalysisTabContent: React.FC = React.memo(() => {
       <QuantumnessAtlasSection />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <OpenQuantumDiagnosticsSection />
+      <SrmtDiagnosticSection />
+      <SrmtSweepSection />
     </div>
   )
 })

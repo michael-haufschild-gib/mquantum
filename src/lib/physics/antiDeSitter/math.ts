@@ -54,8 +54,12 @@
  *   - d≥5: the (d−2)-sphere harmonic with all intermediate ℓ_k equal, rendered
  *     as the 3D slice Y_ℓm(θ, φ) (defensible projection; see PRD).
  *
- * TODO(Stage2): BTZ thermal state, HKLL bulk reconstruction, dS/CFT
- * continuation, soft backreaction, Chern-Simons level. See PRD.
+ * Stage 2: BTZ thermal state and HKLL bulk reconstruction are implemented
+ * in `./btz.ts` and `./hkll.ts` respectively; the quantization branch is
+ * represented by the `AdsQuantizationBranch` type, and the Kleban-Solodukhin /
+ * Kraus branch-selection logic is implemented by `computeDelta` and
+ * `resolveDelta` below. dS/CFT continuation and Chern-Simons level remain
+ * future work.
  *
  * @module lib/physics/antiDeSitter/math
  */

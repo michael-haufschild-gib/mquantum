@@ -75,7 +75,7 @@ export type { TransitionRate } from './hydrogenRates'
 export { buildTransitionRates, einsteinA, thermalOccupation } from './hydrogenRates'
 export { buildLiouvillian } from './liouvillian'
 export { applyPropagator, computePropagator, evolvePropagatorStep } from './propagator'
-export { dipoleComponent, isAllowedE1 } from './selectionRules'
+export { isAllowedE1 } from './selectionRules'
 export type { ValidationResult } from './validation'
 export {
   validateDensityMatrix,

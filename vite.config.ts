@@ -1,3 +1,6 @@
+import { execSync } from 'node:child_process'
+import process from 'node:process'
+
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -5,6 +8,27 @@ import { defineConfig } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import svgr from 'vite-plugin-svgr'
 import wasm from 'vite-plugin-wasm'
+
+/**
+ * Short git SHA for build provenance. Surfaced to the client via
+ * `import.meta.env.VITE_GIT_SHA` and read by the SRMT sweep reproducibility
+ * manifest. Falls back to `'unknown'` on detached checkouts / zipped
+ * downloads / non-git environments.
+ */
+function resolveGitSha(): string {
+  // Hermetic / CI builds can inject the SHA explicitly rather than
+  // depending on a working `git` binary inside the build sandbox.
+  const envSha = process.env.VITE_GIT_SHA?.trim()
+  if (envSha) return envSha
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return 'unknown'
+  }
+}
+const GIT_SHA = resolveGitSha()
 
 // Favicon and meta image files to copy to dist root
 const faviconFiles = [
@@ -97,6 +121,9 @@ function assignChunk(id: string): string | undefined {
 
 // https://vite.dev/config/
 export default defineConfig((_env) => ({
+  define: {
+    'import.meta.env.VITE_GIT_SHA': JSON.stringify(GIT_SHA),
+  },
   plugins: [
     tailwindcss(),
     react(),

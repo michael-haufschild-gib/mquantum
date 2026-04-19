@@ -59,9 +59,58 @@ export interface AdsDensityUpload {
   effectiveDelta: number
 }
 
+/**
+ * Reusable scratch buffers for the AdS density packer. A single bundle is
+ * reused across the three pack paths (bound-state / BTZ / HKLL); each path
+ * only touches the buffers it needs and the packer zeroes them on entry so
+ * stale voxels from the previous pack never leak through.
+ *
+ * When the strategy holds a pooled bundle and hands it to the packer, a
+ * slider-drag burst avoids ~6 MB/frame of typed-array GC churn (the density,
+ * bulk, reField, boundary, horizonFlags buffers are all N³).
+ */
+export interface AdsPackerScratch {
+  /** Output texture bytes. Length = N³ × 4 (rgba16float). */
+  density: Uint16Array
+  /** Bulk |ψ|² buffer used by the bound-state and BTZ paths. Length = N³. */
+  bulk: Float32Array
+  /** Real part of ψ — only the bound-state path writes this. Length = N³. */
+  reField: Float32Array
+  /** Boundary-overlay shell amplitude. Bound-state path only. Length = N³. */
+  boundary: Float32Array
+  /** 1 for voxels on the BTZ horizon shell, 0 otherwise. Length = N³. */
+  horizonFlags: Uint8Array
+  /** Coarse HKLL real-part buffer. Length = max(C_s1, C_s2)³. */
+  hkllRe: Float32Array
+  /** Coarse HKLL imag-part buffer. Length = max(C_s1, C_s2)³. */
+  hkllIm: Float32Array
+}
+
+/**
+ * Allocate a fresh pool of scratch buffers sized for the renderer-wide
+ * `DENSITY_GRID_SIZE` and the max HKLL coarse grid. The pool is safe to
+ * reuse across successive packer calls as long as the caller never mutates
+ * the returned `density` array between hand-off and the GPU upload — the
+ * WebGPU `queue.writeTexture` call copies the source synchronously so the
+ * pool can be reused on the very next frame.
+ */
+export function createAdsPackerScratch(): AdsPackerScratch {
+  const N = DENSITY_GRID_SIZE
+  const total = N * N * N
+  const coarseMax = Math.max(HKLL_COARSE_SIZE_S1, HKLL_COARSE_SIZE_S2) ** 3
+  return {
+    density: new Uint16Array(total * 4),
+    bulk: new Float32Array(total),
+    reField: new Float32Array(total),
+    boundary: new Float32Array(total),
+    horizonFlags: new Uint8Array(total),
+    hkllRe: new Float32Array(coarseMax),
+    hkllIm: new Float32Array(coarseMax),
+  }
+}
+
 const BOUNDARY_SHELL_MIN = 0.975
 const BOUNDARY_SHELL_MAX = 0.995
-const WORLD_HALF_EXTENT = 1.0
 
 function clamp01(v: number): number {
   if (v < 0) return 0
@@ -82,19 +131,22 @@ function clamp01(v: number): number {
  * instead; the horizon is painted as an opaque cylinder at a fixed world
  * radius. See `packBtzThermalDensityGrid` below.
  */
-export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+export function packAntiDeSitterDensityGrid(
+  config: AntiDeSitterConfig,
+  scratch?: AdsPackerScratch
+): AdsDensityUpload {
   // HKLL takes precedence (Stage 2B). The UI setters also enforce mutex so
   // both flags should not be true simultaneously, but in case they are, the
   // HKLL reconstruction wins because it's the more specialised story.
   if (config.hkllEnabled) {
-    return packHkllReconstructedDensityGrid(config)
+    return packHkllReconstructedDensityGrid(config, scratch)
   }
   if (config.btzEnabled && config.d === 3) {
-    return packBtzThermalDensityGrid(config)
+    return packBtzThermalDensityGrid(config, scratch)
   }
   const N = DENSITY_GRID_SIZE
   const total = N * N * N
-  const density = new Uint16Array(total * 4)
+  const density = scratch ? scratch.density : new Uint16Array(total * 4)
 
   const resolved = resolveDelta(config.d, config.mL, config.branch)
   const delta = resolved.delta
@@ -107,10 +159,25 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
   const norm = radialNorm(config.n, config.l, delta, config.d)
 
   // First pass: compute bulk density at every voxel and track peak.
-  const bulk = new Float32Array(total)
-  const reField = new Float32Array(total)
-  const imField = new Float32Array(total)
-  let peakDensity = 1e-20
+  // Bound-state eigenstates are real at t=0 — the complex time factor
+  // e^{-iEt} (stable) or cosh(γt) (tachyon) is applied by the raymarcher
+  // via the adsEnergy / adsGrowthRate uniforms. The baked grid therefore
+  // stores only ψ (real); the phase channel is 0 when ψ ≥ 0 and π when
+  // ψ < 0 (captures real-eigenstate nodal sign flips).
+  let bulk: Float32Array
+  let reField: Float32Array
+  if (scratch) {
+    bulk = scratch.bulk
+    reField = scratch.reField
+    // Stale voxels from a prior pack would bleed through the "outside the
+    // ball" skip — zero before the loop.
+    bulk.fill(0)
+    reField.fill(0)
+  } else {
+    bulk = new Float32Array(total)
+    reField = new Float32Array(total)
+  }
+  let peakDensity = 0
 
   for (let z = 0; z < N; z++) {
     const wz = ((z + 0.5) / N) * 2 - 1
@@ -119,7 +186,7 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
       for (let x = 0; x < N; x++) {
         const wx = ((x + 0.5) / N) * 2 - 1
         const pixelIdx = (z * N + y) * N + x
-        const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz) / WORLD_HALF_EXTENT
+        const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz)
         if (rCompact >= 1) {
           continue
         }
@@ -141,8 +208,7 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
         if (config.l === 0 && config.d >= 4) {
           Y = 1 / Math.sqrt(4 * Math.PI)
         } else {
-          const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
-          const invR = radius3D > 1e-10 ? 1 / radius3D : 0
+          const invR = rCompact > 1e-10 ? 1 / rCompact : 0
           const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
           const phi = Math.atan2(wy, wx)
           Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
@@ -151,11 +217,6 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
         const psi = R * Y
         const rho2 = psi * psi
         reField[pixelIdx] = psi
-        // Bound-state eigenstates are real at t=0; the complex time factor
-        // e^{-iEt} (stable) or cosh(γt) (tachyon) is applied by the volume
-        // raymarcher via the adsEnergy / adsGrowthRate uniforms, so no imag
-        // component is baked into the grid.
-        imField[pixelIdx] = 0
         bulk[pixelIdx] = rho2
         if (rho2 > peakDensity) peakDensity = rho2
       }
@@ -170,9 +231,15 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
   // than literally ρ = π/2) picks up a smooth sub-leading correction
   // that fades near the shell's outer edge, which is what we want to
   // visualise.
-  const boundary = new Float32Array(total)
+  let boundary: Float32Array | null = null
   let peakBoundary = 0
   if (config.boundaryOverlay) {
+    if (scratch) {
+      boundary = scratch.boundary
+      boundary.fill(0)
+    } else {
+      boundary = new Float32Array(total)
+    }
     const norm2 = norm * norm
     for (let z = 0; z < N; z++) {
       const wz = ((z + 0.5) / N) * 2 - 1
@@ -181,7 +248,7 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
         for (let x = 0; x < N; x++) {
           const wx = ((x + 0.5) / N) * 2 - 1
           const pixelIdx = (z * N + y) * N + x
-          const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz) / WORLD_HALF_EXTENT
+          const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz)
           if (rCompact < BOUNDARY_SHELL_MIN || rCompact >= BOUNDARY_SHELL_MAX) continue
           const rho = 2 * Math.atan(rCompact)
           if (rho <= 0 || rho >= Math.PI / 2) continue
@@ -194,8 +261,7 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
           if (config.l === 0 && config.d >= 4) {
             Y = 1 / Math.sqrt(4 * Math.PI)
           } else {
-            const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
-            const invR = radius3D > 1e-10 ? 1 / radius3D : 0
+            const invR = rCompact > 1e-10 ? 1 / rCompact : 0
             const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
             const phi = Math.atan2(wy, wx)
             Y = adsAngularHarmonic(config.l, config.m, config.d, theta, phi)
@@ -209,14 +275,16 @@ export function packAntiDeSitterDensityGrid(config: AntiDeSitterConfig): AdsDens
   }
 
   // Third pass: write rgba16float.
-  const peakNorm = peakDensity > 1e-20 ? 1 / peakDensity : 0
-  const boundaryNorm = peakBoundary > 1e-20 ? 1 / peakBoundary : 0
+  const peakNorm = peakDensity > 0 ? 1 / peakDensity : 0
+  const boundaryNorm = peakBoundary > 0 ? 1 / peakBoundary : 0
   for (let i = 0; i < total; i++) {
     const rho2 = bulk[i]!
     const r = clamp01(rho2 * peakNorm)
     const logRho = Math.log(rho2 + 1e-10)
-    const phase = Math.atan2(imField[i]!, reField[i]!)
-    const a = clamp01(boundary[i]! * boundaryNorm)
+    // ψ is real at t=0 → phase is 0 (ψ ≥ 0) or π (ψ < 0). atan2(0, re) was
+    // a per-voxel ~60 ns call; the sign check is ~1 ns.
+    const phase = reField[i]! < 0 ? Math.PI : 0
+    const a = boundary ? clamp01(boundary[i]! * boundaryNorm) : 0
     packRGBA16F(density, i, r, logRho, phase, a)
   }
 
@@ -291,11 +359,20 @@ const BTZ_HORIZON_MARKER_AMP = BTZ_AMPLITUDE_CEILING * 2
  * @returns Packed RGBA16F density + diagnostics (isTachyon reported false
  *   for BTZ; effectiveDelta = scalar asymptotic dimension).
  */
-export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+export function packBtzThermalDensityGrid(
+  config: AntiDeSitterConfig,
+  scratch?: AdsPackerScratch
+): AdsDensityUpload {
   const N = DENSITY_GRID_SIZE
   const total = N * N * N
-  const density = new Uint16Array(total * 4)
-  const bulk = new Float32Array(total)
+  const density = scratch ? scratch.density : new Uint16Array(total * 4)
+  let bulk: Float32Array
+  if (scratch) {
+    bulk = scratch.bulk
+    bulk.fill(0)
+  } else {
+    bulk = new Float32Array(total)
+  }
 
   const rplus = Math.max(config.btzHorizonRadius, 1e-3)
   const L = 1
@@ -309,21 +386,26 @@ export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensit
   const outerHorizon = horizonWorld + BTZ_HORIZON_SHELL
   const uRange = 1 - outerHorizon
 
-  let peakDensity = 1e-20
-  const horizonFlags = new Uint8Array(total)
+  let peakDensity = 0
+  let horizonFlags: Uint8Array
+  if (scratch) {
+    horizonFlags = scratch.horizonFlags
+    horizonFlags.fill(0)
+  } else {
+    horizonFlags = new Uint8Array(total)
+  }
 
   for (let z = 0; z < N; z++) {
-    const wz = ((z + 0.5) / N) * 2 - 1
     for (let y = 0; y < N; y++) {
       const wy = ((y + 0.5) / N) * 2 - 1
       for (let x = 0; x < N; x++) {
         const wx = ((x + 0.5) / N) * 2 - 1
         const pixelIdx = (z * N + y) * N + x
         const rhoW = Math.sqrt(wx * wx + wy * wy)
-        // Clip rendering to the inscribed cylinder (keep corners empty so
-        // the outer cube faces don't bleed "boundary" density onto the
-        // camera path at oblique angles).
-        if (rhoW > 1 || Math.abs(wz) > 1) continue
+        // Clip rendering to the inscribed cylinder so the outer cube corners
+        // don't bleed "boundary" density onto the camera path at oblique
+        // angles. (wz is always inside the cube by construction.)
+        if (rhoW > 1) continue
 
         if (rhoW < horizonWorld) continue
 
@@ -350,7 +432,7 @@ export function packBtzThermalDensityGrid(config: AntiDeSitterConfig): AdsDensit
     }
   }
 
-  const peakNorm = peakDensity > 1e-20 ? 1 / peakDensity : 0
+  const peakNorm = peakDensity > 0 ? 1 / peakDensity : 0
   for (let i = 0; i < total; i++) {
     const amp = bulk[i]!
     if (amp === 0) {
@@ -415,9 +497,12 @@ const HKLL_COARSE_SIZE_S2 = 24
  * static demonstrations. The alternative (per-mode energy dispatch) would
  * require shader changes that are out of Stage 2B scope.
  */
-export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): AdsDensityUpload {
+export function packHkllReconstructedDensityGrid(
+  config: AntiDeSitterConfig,
+  scratch?: AdsPackerScratch
+): AdsDensityUpload {
   const N = DENSITY_GRID_SIZE
-  const density = new Uint16Array(N * N * N * 4)
+  const density = scratch ? scratch.density : new Uint16Array(N * N * N * 4)
 
   const resolved = resolveDelta(config.d, config.mL, config.branch)
   const delta = resolved.delta
@@ -441,9 +526,23 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
   // from quantisation noise = visible sparkle near nodal surfaces).
   const C = config.d <= 3 ? HKLL_COARSE_SIZE_S1 : HKLL_COARSE_SIZE_S2
   const coarseTotal = C ** 3
-  const reField = new Float32Array(coarseTotal)
-  const imField = new Float32Array(coarseTotal)
-  let peakDensity = 1e-20
+  let reField: Float32Array
+  let imField: Float32Array
+  if (scratch) {
+    // The pooled buffers are sized for max(C_s1, C_s2)³ — safe to use at
+    // either C. They must be zeroed before use because the coarse loop
+    // skips voxels outside the Poincaré ball, and stale values from the
+    // previous pack would otherwise propagate into the trilinear
+    // upsampler.
+    reField = scratch.hkllRe
+    imField = scratch.hkllIm
+    reField.subarray(0, coarseTotal).fill(0)
+    imField.subarray(0, coarseTotal).fill(0)
+  } else {
+    reField = new Float32Array(coarseTotal)
+    imField = new Float32Array(coarseTotal)
+  }
+  let peakDensity = 0
 
   // Precompute the boundary source samples on the τ' × Ω' grid once. The
   // per-(τ, Ω') value depends only on the boundary coordinate, not on the
@@ -458,12 +557,11 @@ export function packHkllReconstructedDensityGrid(config: AntiDeSitterConfig): Ad
       for (let x = 0; x < C; x++) {
         const wx = ((x + 0.5) / C) * 2 - 1
         const pixelIdx = (z * C + y) * C + x
-        const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz) / WORLD_HALF_EXTENT
+        const rCompact = Math.sqrt(wx * wx + wy * wy + wz * wz)
         if (rCompact >= 1) continue
         const rho = 2 * Math.atan(rCompact)
         if (rho <= 0 || rho >= Math.PI / 2) continue
-        const radius3D = Math.sqrt(wx * wx + wy * wy + wz * wz)
-        const invR = radius3D > 1e-10 ? 1 / radius3D : 0
+        const invR = rCompact > 1e-10 ? 1 / rCompact : 0
         const theta = Math.acos(Math.max(-1, Math.min(1, wz * invR)))
         const phi = Math.atan2(wy, wx)
         reconstructBulkFromSampleGrid(sampleGrid, rho, theta, phi, reField, imField, pixelIdx)

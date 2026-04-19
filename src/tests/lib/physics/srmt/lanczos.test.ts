@@ -170,6 +170,38 @@ describe('lanczosTopK — edge cases', () => {
     expect(out).toHaveLength(0)
   })
 
+  it('handles the degenerate n = 1 case (single-element matrix)', () => {
+    // Minimal non-empty input. β breaks down on step 0 (the tridiagonal is
+    // 1×1), so Lanczos returns the single diagonal entry as the eigenvalue.
+    const A = new Float32Array([7.5])
+    const out = lanczosTopK(A, 1, 1)
+    expect(out).toHaveLength(1)
+    expect(out[0]!).toBeCloseTo(7.5, 5)
+  })
+
+  it('clamps user-supplied maxIterations below k back up to k', () => {
+    // `maxIterations = 1` with `k = 3` is nonsense — you cannot extract 3
+    // eigenvalues from a 1-step Krylov basis. The routine's `Math.max(k, ...)`
+    // floor promises the returned length is `k`, not `1`. We don't check
+    // numerical accuracy here (3 Krylov steps on a 6-dim operator give
+    // Ritz approximations, not exact eigenvalues) — only the length
+    // contract and finiteness.
+    const n = 6
+    const k = 3
+    const diag = [5, 4, 3, 2, 1, 0.5]
+    const M = new Float32Array(n * n)
+    for (let i = 0; i < n; i++) M[i * n + i] = diag[i]!
+    const clipped = lanczosTopK(M, n, k, { maxIterations: 1 })
+    expect(clipped).toHaveLength(k)
+    for (let i = 0; i < k; i++) {
+      expect(Number.isFinite(clipped[i]!)).toBe(true)
+      // Every Ritz value of a real-symmetric matrix lies in the spectral
+      // range — here [0.5, 5].
+      expect(clipped[i]!).toBeGreaterThanOrEqual(0.5 - 1e-3)
+      expect(clipped[i]!).toBeLessThanOrEqual(5 + 1e-3)
+    }
+  })
+
   it('clips k to n when k > n', () => {
     const n = 5
     const A = randomSymmetric(n, 42)

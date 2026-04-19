@@ -66,6 +66,58 @@ function totalSites(gridSize: readonly number[], latticeDim: number): number {
   return n
 }
 
+/**
+ * Shared validation for every entry point: `latticeDim ∈ [1, 3]` and
+ * `gridSize.length >= latticeDim`, `spacing.length >= latticeDim`.
+ *
+ * The per-axis accesses later cast `N[d]` via `as number`, which hides
+ * `undefined` when the caller passes a too-short array. Catching it here
+ * turns the downstream NaN cascade into a clear error.
+ */
+function validateLatticeInput(
+  fnName: string,
+  latticeDim: number,
+  gridSize: readonly number[],
+  spacing: readonly number[]
+): void {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > 3) {
+    throw new Error(`${fnName}: latticeDim ${latticeDim} unsupported (expected 1–3)`)
+  }
+  if (gridSize.length < latticeDim) {
+    throw new Error(`${fnName}: gridSize length ${gridSize.length} < latticeDim ${latticeDim}`)
+  }
+  if (spacing.length < latticeDim) {
+    throw new Error(`${fnName}: spacing length ${spacing.length} < latticeDim ${latticeDim}`)
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new Error(`${fnName}: gridSize[${d}]=${n} must be a positive integer`)
+    }
+    if (!Number.isFinite(dx) || dx <= 0) {
+      throw new Error(`${fnName}: spacing[${d}]=${dx} must be finite and > 0`)
+    }
+  }
+}
+
+/**
+ * Verify a state-vector buffer matches the lattice's expected site count.
+ * Mirrors `validateLatticeInput`'s fast-fail policy so short/long buffers
+ * surface as a clear error instead of silently producing NaN from
+ * out-of-range reads.
+ */
+function validateFieldLength(
+  fnName: string,
+  fieldName: string,
+  actual: number,
+  expected: number
+): void {
+  if (actual !== expected) {
+    throw new Error(`${fnName}: ${fieldName}.length ${actual} !== expected ${expected}`)
+  }
+}
+
 /** World coordinate of lattice index i along an axis with N cells and spacing dx. */
 function worldCoord(i: number, N: number, dx: number): number {
   return (i - (N - 1) / 2) * dx
@@ -173,7 +225,10 @@ function cellCoords(
  *
  * @param params - Field, grid, metric, and (optional) simulation time.
  * @returns New real/imaginary arrays holding Tψ (input arrays not mutated).
- * @throws If `latticeDim > 3` or `< 1`.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         `psiRe`/`psiIm` length does not equal the total site count.
  */
 export function applyCurvedKineticRef(params: CurvedKineticParams): {
   re: Float32Array
@@ -181,12 +236,12 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
 } {
   const { psiRe, psiIm, gridSize, spacing, mass, hbar, latticeDim, metric } = params
   const time = params.time ?? 0
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`applyCurvedKineticRef: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('applyCurvedKineticRef', latticeDim, gridSize, spacing)
 
   const N = gridSize
   const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('applyCurvedKineticRef', 'psiRe', psiRe.length, total)
+  validateFieldLength('applyCurvedKineticRef', 'psiIm', psiIm.length, total)
   const outRe = new Float32Array(total)
   const outIm = new Float32Array(total)
   const prefactor = -(hbar * hbar) / (2 * mass)
@@ -278,6 +333,10 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
  *   (e.g. `deSitter`) the returned norm is time-dependent because √|g|
  *   depends on time.
  * @returns ∫ |ψ|² √|g| dⁿx as a non-negative real number.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         `psiRe`/`psiIm` length does not equal the total site count.
  */
 export function computeProperNorm(
   psiRe: Float32Array,
@@ -288,9 +347,10 @@ export function computeProperNorm(
   metric: MetricConfig,
   time: number = 0
 ): number {
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`computeProperNorm: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('computeProperNorm', latticeDim, gridSize, spacing)
+  const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('computeProperNorm', 'psiRe', psiRe.length, total)
+  validateFieldLength('computeProperNorm', 'psiIm', psiIm.length, total)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number
@@ -333,6 +393,11 @@ export function computeProperNorm(
  * @param metric - Background metric.
  * @param time - Simulation time (default 0); forwarded to `sampleMetric`.
  * @returns `{re, im}` of ⟨φ|ψ⟩_g.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         any of `phiRe`/`phiIm`/`psiRe`/`psiIm` length does not equal the
+ *         total site count.
  */
 export function computeInnerProduct(
   phiRe: Float32Array,
@@ -345,9 +410,12 @@ export function computeInnerProduct(
   metric: MetricConfig,
   time: number = 0
 ): { re: number; im: number } {
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`computeInnerProduct: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('computeInnerProduct', latticeDim, gridSize, spacing)
+  const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('computeInnerProduct', 'phiRe', phiRe.length, total)
+  validateFieldLength('computeInnerProduct', 'phiIm', phiIm.length, total)
+  validateFieldLength('computeInnerProduct', 'psiRe', psiRe.length, total)
+  validateFieldLength('computeInnerProduct', 'psiIm', psiIm.length, total)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number

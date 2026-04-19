@@ -200,6 +200,34 @@ describe('qExponent', () => {
   it('rejects ekpyrotic without a numeric steepness', () => {
     expect(() => qExponent({ preset: 'ekpyrotic', spacetimeDim: 4 })).toThrow(RangeError)
   })
+
+  it('throws for bianchiKasner — no closed-form scalar q exists', () => {
+    // Bianchi-I has three axis-specific scale factors; there is no single `q`
+    // exponent. Callers must use `computeBianchiKasnerCoefs` directly.
+    const run = (): number =>
+      qExponent({
+        preset: 'bianchiKasner',
+        spacetimeDim: 4,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      })
+    expect(run).toThrow(RangeError)
+    expect(run).toThrow(/bianchiKasner/)
+  })
+
+  it('throws for lqcBounce — no closed-form scalar q exists', () => {
+    // The LQC bounce is resolved from a dense look-up table, not a
+    // `a(η) = A·|η|^q` ansatz.
+    const run = (): number =>
+      qExponent({
+        preset: 'lqcBounce',
+        spacetimeDim: 4,
+        lqcRhoCritical: 1,
+        lqcEquationOfState: 1,
+        lqcInitialRhoRatio: 0.1,
+      })
+    expect(run).toThrow(RangeError)
+    expect(run).toThrow(/lqcBounce/)
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -264,6 +292,29 @@ describe('zppOverZCoefficient', () => {
       }
     }
   })
+
+  it('throws for the non-scalar-q presets (bianchiKasner, lqcBounce)', () => {
+    // Both presets lack a closed-form `q` exponent, so z''/z reduces to no
+    // scalar coefficient. The documented contract is a RangeError — pinning
+    // this so a future refactor can't silently return NaN / 0 for those
+    // presets.
+    expect(() =>
+      zppOverZCoefficient({
+        preset: 'bianchiKasner',
+        spacetimeDim: 4,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      })
+    ).toThrow(RangeError)
+    expect(() =>
+      zppOverZCoefficient({
+        preset: 'lqcBounce',
+        spacetimeDim: 4,
+        lqcRhoCritical: 1,
+        lqcEquationOfState: 1,
+        lqcInitialRhoRatio: 0.1,
+      })
+    ).toThrow(RangeError)
+  })
 })
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -289,6 +340,25 @@ describe('betaExponent', () => {
 
   it('returns 0 for Minkowski', () => {
     expect(betaExponent({ preset: 'minkowski', spacetimeDim: 4 })).toBe(0)
+  })
+
+  it('throws for bianchiKasner and lqcBounce — β requires a scalar q', () => {
+    expect(() =>
+      betaExponent({
+        preset: 'bianchiKasner',
+        spacetimeDim: 4,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      })
+    ).toThrow(RangeError)
+    expect(() =>
+      betaExponent({
+        preset: 'lqcBounce',
+        spacetimeDim: 4,
+        lqcRhoCritical: 1,
+        lqcEquationOfState: 1,
+        lqcInitialRhoRatio: 0.1,
+      })
+    ).toThrow(RangeError)
   })
 })
 
@@ -336,6 +406,108 @@ describe('isValidPreset', () => {
     expect(isValidPreset({ preset: 'ekpyrotic', spacetimeDim: 4, steepness: sc * 2 })).toBe(true)
     expect(isValidPreset({ preset: 'ekpyrotic', spacetimeDim: 4, steepness: sc })).toBe(false)
     expect(isValidPreset({ preset: 'ekpyrotic', spacetimeDim: 4 })).toBe(false)
+  })
+
+  describe('bianchiKasner', () => {
+    const vacuum = { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 }
+
+    it('accepts a vacuum-like Kasner triple at n ≥ 4', () => {
+      for (const n of [4, 5, 6, 7]) {
+        expect(
+          isValidPreset({ preset: 'bianchiKasner', spacetimeDim: n, kasnerExponents: vacuum })
+        ).toBe(true)
+      }
+    })
+
+    it('accepts a non-vacuum finite triple — constraint enforcement is a UI concern', () => {
+      // The store deliberately allows non-vacuum Bianchi-I backgrounds so the
+      // user can explore Kasner-violating anisotropy. isValidPreset must not
+      // reject them.
+      expect(
+        isValidPreset({
+          preset: 'bianchiKasner',
+          spacetimeDim: 4,
+          kasnerExponents: { p1: 0, p2: 0, p3: 0 },
+        })
+      ).toBe(true)
+    })
+
+    it('rejects n < 4 (Bianchi-I requires 3 spatial axes)', () => {
+      expect(
+        isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 3, kasnerExponents: vacuum })
+      ).toBe(false)
+    })
+
+    it('rejects n outside [MIN, MAX]', () => {
+      expect(
+        isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 2, kasnerExponents: vacuum })
+      ).toBe(false)
+      expect(
+        isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 11, kasnerExponents: vacuum })
+      ).toBe(false)
+    })
+
+    it('rejects missing exponents', () => {
+      expect(isValidPreset({ preset: 'bianchiKasner', spacetimeDim: 4 })).toBe(false)
+    })
+
+    it('rejects non-finite exponents', () => {
+      expect(
+        isValidPreset({
+          preset: 'bianchiKasner',
+          spacetimeDim: 4,
+          kasnerExponents: { p1: Number.NaN, p2: 0, p3: 0 },
+        })
+      ).toBe(false)
+      expect(
+        isValidPreset({
+          preset: 'bianchiKasner',
+          spacetimeDim: 4,
+          kasnerExponents: { p1: 0, p2: Number.POSITIVE_INFINITY, p3: 0 },
+        })
+      ).toBe(false)
+    })
+  })
+
+  describe('lqcBounce', () => {
+    const validLqc = {
+      preset: 'lqcBounce' as const,
+      spacetimeDim: 4,
+      lqcRhoCritical: 1.0,
+      lqcEquationOfState: 1.0,
+      lqcInitialRhoRatio: 0.1,
+    }
+
+    it('accepts a well-formed LQC config', () => {
+      expect(isValidPreset(validLqc)).toBe(true)
+    })
+
+    it('rejects non-positive rho_c', () => {
+      expect(isValidPreset({ ...validLqc, lqcRhoCritical: 0 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcRhoCritical: -0.5 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcRhoCritical: Number.NaN })).toBe(false)
+    })
+
+    it('rejects equation-of-state outside [0, 1]', () => {
+      expect(isValidPreset({ ...validLqc, lqcEquationOfState: -0.1 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcEquationOfState: 1.01 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcEquationOfState: Number.POSITIVE_INFINITY })).toBe(
+        false
+      )
+    })
+
+    it('rejects initialRhoRatio outside (0, 1)', () => {
+      // Open interval — boundaries are rejected because ρ/ρ_c = 0 gives the
+      // Minkowski limit and ρ/ρ_c = 1 sits exactly at the bounce.
+      expect(isValidPreset({ ...validLqc, lqcInitialRhoRatio: 0 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcInitialRhoRatio: 1 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, lqcInitialRhoRatio: -0.5 })).toBe(false)
+    })
+
+    it('rejects out-of-range spacetimeDim', () => {
+      expect(isValidPreset({ ...validLqc, spacetimeDim: 2 })).toBe(false)
+      expect(isValidPreset({ ...validLqc, spacetimeDim: 11 })).toBe(false)
+    })
   })
 })
 

@@ -349,13 +349,18 @@ export function computeCosmologyAt(eta: number, params: CosmologyPresetParams): 
     const b = computeBianchiKasnerCoefs(eta, exp, params.spacetimeDim)
     // Conformal Hubble rate `ℋ = ã'/ã` isn't a closed-form `q/η` here —
     // we use the analytic form derived from `ã = t^(1/(n−1))` and
-    // `dη/dt = 1/ã` ⇒ `ã' = (1/(n−1))·t^(1/(n−1)−1)·dt/dη = ã²/((n−1)·t)`.
+    // `dη/dt = 1/ã`. Then `ã' = (1/(n−1))·t^(1/(n−1)−1)·dt/dη =
+    // ã²/((n−1)·t)` and `ℋ = ã'/ã = ã/((n−1)·t)`. The `tProper` formula
+    // below assumes the vacuum constraint `Σp_i = 1` (so `dη/dt = 1/ã`
+    // integrates to `η = ((n−1)/(n−2))·t^((n−2)/(n−1))`); non-vacuum
+    // triples set `ã` correctly inside `computeBianchiKasnerCoefs` but the
+    // analysis-only ℋ here would need a per-caller Σp to stay exact.
     // Only consumed by the analysis readout, never by the integrator.
     const n = params.spacetimeDim
     const nm1 = n - 1
     const nm2 = n - 2
     const tProper = Math.pow((eta * nm2) / nm1, nm1 / nm2)
-    const hubble = tProper > 0 ? (b.a * b.a) / ((n - 1) * tProper) : 0
+    const hubble = tProper > 0 ? b.a / ((n - 1) * tProper) : 0
     return {
       a: b.a,
       hubble,

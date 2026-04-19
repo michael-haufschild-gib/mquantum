@@ -146,6 +146,26 @@ describe('computeSrmtDiagnostic', () => {
     )
   })
 
+  it('rejects cutIndex at or past the clock-axis length (must be strictly interior)', () => {
+    // Pre-fix, cutIndex >= Na silently clamped inside buildSliceK to Na-1 and
+    // produced a boundary slice; the diagnostic came back with a
+    // suspiciously-good quality score that looked physical but was
+    // degenerate. Post-fix, the guard mirrors the documented interior
+    // contract in `buildSliceK`'s JSDoc and rejects at the API boundary.
+    expect(() => computeSrmtDiagnostic(output, { clock: 'a', cutIndex: Na - 1, rankCap })).toThrow(
+      /interior/
+    )
+    expect(() => computeSrmtDiagnostic(output, { clock: 'a', cutIndex: Na + 50, rankCap })).toThrow(
+      /interior/
+    )
+    expect(() =>
+      computeSrmtDiagnostic(output, { clock: 'phi1', cutIndex: Nphi - 1, rankCap })
+    ).toThrow(/phi1/)
+    expect(() => computeSrmtDiagnostic(output, { clock: 'phi2', cutIndex: Nphi, rankCap })).toThrow(
+      /phi2/
+    )
+  })
+
   it('rejects non-positive rankCap', () => {
     expect(() => computeSrmtDiagnostic(output, { clock: 'a', cutIndex: 5, rankCap: 0 })).toThrow(
       /rankCap/

@@ -1,0 +1,318 @@
+/**
+ * SRMT Parameter Sweep section.
+ *
+ * Runs the SRMT diagnostic across a swept parameter (cut position,
+ * inflaton mass, or boundary condition) and plots per-clock
+ * affine-match quality vs the swept parameter. The headline physics
+ * read is the landscape of `q_a(x)`, `q_phi1(x)`, `q_phi2(x)` curves
+ * with the classical-turning-point landmark overlaid — the sweep makes
+ * "where does the SRMT conjecture start to fail?" a concrete
+ * observable rather than a single-point anecdote.
+ *
+ * The dispatch flow is store-driven:
+ *   1. User configures the sweep in this panel.
+ *   2. User clicks Start → `useSrmtSweepStore.setPendingSweep(...)`.
+ *   3. `WheelerDeWittStrategy.executeFrame` calls
+ *      `WheelerDeWittSrmtSweepCoordinator.maybeDispatchPending` on the
+ *      next frame; coordinator posts the worker request, streams
+ *      results back to the store.
+ *
+ * Unavailable outside Wheeler–DeWitt mode.
+ *
+ * @module components/sections/Analysis/SrmtSweepSection
+ */
+
+import React, { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
+import { Button } from '@/components/ui/Button'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { getGitSha } from '@/lib/build/buildInfo'
+import { downloadFile, exportFilename } from '@/lib/export/dataExport'
+import { SRMT_DIAGNOSTIC_VERSION } from '@/lib/physics/srmt'
+import { buildSrmtSweepManifest } from '@/lib/physics/srmt/sweepManifest'
+import type { SrmtSweepKind } from '@/lib/physics/srmt/sweepTypes'
+import { WDW_SOLVER_VERSION } from '@/lib/physics/wheelerDeWitt/solver'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
+
+import {
+  clampUiStateToPhiExtent,
+  type SrmtSweepUiState as SweepUiState,
+  sweepPointsToCsv,
+} from './srmtSweepHelpers'
+import { SweepKindControls } from './SrmtSweepKindControls'
+import { SrmtSweepPlot } from './SrmtSweepPlot'
+
+const SECTION_TITLE = 'SRMT Sweep'
+
+const KIND_OPTIONS: { value: SrmtSweepKind; label: string }[] = [
+  { value: 'cut', label: 'cut' },
+  { value: 'mass', label: 'mass' },
+  { value: 'lambda', label: 'Λ' },
+  { value: 'bc', label: 'bc' },
+  { value: 'phiRef', label: 'φref' },
+  { value: 'rankCap', label: 'rank' },
+  { value: 'phiExtent', label: 'φext' },
+]
+
+function defaultUiStateFor(
+  kind: SrmtSweepKind,
+  phiExtent: number,
+  srmtCutNormalized: number
+): SweepUiState {
+  const commonPhiRef = phiExtent / 2
+  if (kind === 'cut') {
+    return {
+      kind,
+      points: 17,
+      sweepMin: 0.1,
+      sweepMax: 0.9,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'mass') {
+    return {
+      kind,
+      points: 9,
+      sweepMin: 0.1,
+      sweepMax: 1.5,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'lambda') {
+    // Default range straddles the AdS (Λ<0) / dS (Λ>0) boundary so the
+    // sweep reveals the turning-surface regime change in one pass.
+    return {
+      kind,
+      points: 9,
+      sweepMin: -0.5,
+      sweepMax: 0.5,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'phiRef') {
+    // phiRef does not enter the q-compute — the plot will be flat by
+    // construction and the physics read is per-point landmark motion.
+    // Range spans (0, phiExtent).
+    return {
+      kind,
+      points: 11,
+      sweepMin: 0.05,
+      sweepMax: Math.max(0.05, phiExtent - 0.05),
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'rankCap') {
+    // Integer rankCap ∈ [8, 256] per driver. The 9-point cadence below
+    // yields 8, 23, 38, …, 128 once the driver rounds + dedups.
+    return {
+      kind,
+      points: 9,
+      sweepMin: 8,
+      sweepMax: 128,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'phiExtent') {
+    return {
+      kind,
+      points: 5,
+      sweepMin: 1.0,
+      sweepMax: 3.0,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  return {
+    kind,
+    points: 3,
+    sweepMin: 0,
+    sweepMax: 2,
+    phiRef: commonPhiRef,
+    cutAnchor: srmtCutNormalized,
+  }
+}
+
+/** Main entry point: gated by quantum mode. */
+export function SrmtSweepSection(): React.ReactElement {
+  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+  if (quantumMode !== 'wheelerDeWitt') {
+    return (
+      <UnavailableSection
+        title={SECTION_TITLE}
+        reason="Available in Wheeler–DeWitt mode"
+        data-testid="srmt-sweep-section-unavailable"
+      />
+    )
+  }
+  return <SrmtSweepContent />
+}
+
+const SrmtSweepContent: React.FC = React.memo(() => {
+  const { phiExtent, srmtCutNormalized } = useExtendedObjectStore(
+    useShallow((s) => ({
+      phiExtent: s.schroedinger.wheelerDeWitt.phiExtent,
+      srmtCutNormalized: s.schroedinger.wheelerDeWitt.srmtCutNormalized,
+    }))
+  )
+  const {
+    status,
+    config,
+    wdwConfigSnapshot,
+    points,
+    landmarks,
+    totalPoints,
+    errorMessage,
+    setPendingSweep,
+    abortSweep,
+    reset,
+  } = useSrmtSweepStore(
+    useShallow((s) => ({
+      status: s.status,
+      config: s.config,
+      wdwConfigSnapshot: s.wdwConfigSnapshot,
+      points: s.points,
+      landmarks: s.landmarks,
+      totalPoints: s.totalPoints,
+      errorMessage: s.errorMessage,
+      setPendingSweep: s.setPendingSweep,
+      abortSweep: s.abortSweep,
+      reset: s.reset,
+    }))
+  )
+  const [ui, setUi] = React.useState<SweepUiState>(() =>
+    defaultUiStateFor('cut', phiExtent, srmtCutNormalized)
+  )
+
+  // Clamp UI state back into the active domain when phiExtent shrinks
+  // beneath a pinned phiRef bound; otherwise `Start` would dispatch a
+  // sweep whose bounds no longer match the active physics config.
+  React.useEffect(() => {
+    setUi((s) => clampUiStateToPhiExtent(s, phiExtent))
+  }, [phiExtent])
+
+  const running = status === 'running'
+  const complete = status === 'complete'
+  const showError = status === 'error'
+  const activeKind = config?.kind ?? ui.kind
+
+  const handleKindChange = useCallback(
+    (value: string): void => {
+      const kind = value as SrmtSweepKind
+      setUi(defaultUiStateFor(kind, phiExtent, srmtCutNormalized))
+    },
+    [phiExtent, srmtCutNormalized]
+  )
+
+  const handleStart = useCallback((): void => {
+    if (running) return
+    setPendingSweep({
+      kind: ui.kind,
+      points: ui.points,
+      sweepMin: ui.sweepMin,
+      sweepMax: ui.sweepMax,
+      phiRef: ui.phiRef,
+      cutAnchor: ui.cutAnchor,
+    })
+  }, [running, setPendingSweep, ui])
+
+  const handleExportCsv = useCallback((): void => {
+    if (points.length === 0) return
+    // Build the reproducibility manifest from the sweep-start snapshot.
+    // UI only enables the export button in `complete` state, where both
+    // snapshots are populated — but guard defensively so a future
+    // refactor that flips the gating can't silently ship a manifest-less
+    // CSV.
+    const manifest =
+      config && wdwConfigSnapshot
+        ? buildSrmtSweepManifest({
+            wdwConfig: wdwConfigSnapshot,
+            srmtConfig: config,
+            gitSha: getGitSha(),
+            wdwSolverVersion: WDW_SOLVER_VERSION,
+            srmtDiagnosticVersion: SRMT_DIAGNOSTIC_VERSION,
+          })
+        : []
+    const csv = sweepPointsToCsv(points, activeKind, landmarks, manifest)
+    downloadFile(csv, exportFilename('mdim-srmt-sweep', 'csv'), 'text/csv')
+  }, [activeKind, config, landmarks, points, wdwConfigSnapshot])
+
+  const progressLabel = useMemo((): string | null => {
+    if (!running) return null
+    return `${points.length} / ${totalPoints}`
+  }, [points.length, running, totalPoints])
+
+  return (
+    <Section title={SECTION_TITLE} data-testid="srmt-sweep-section">
+      <div className="space-y-3">
+        <ToggleGroup
+          options={KIND_OPTIONS}
+          value={ui.kind}
+          onChange={handleKindChange}
+          ariaLabel="SRMT sweep kind"
+          tooltip="Which parameter to vary across sweep points. Cut: sweep the cut position at fixed physics. Mass: sweep inflaton mass. BC: iterate the three boundary conditions."
+          fullWidth
+          disabled={running}
+          data-testid="srmt-sweep-kind-selector"
+        />
+
+        <SweepKindControls ui={ui} running={running} setUi={setUi} phiExtent={phiExtent} />
+
+        <div className="flex gap-2 items-center">
+          {running ? (
+            <Button onClick={abortSweep} data-testid="srmt-sweep-abort">
+              Abort
+            </Button>
+          ) : (
+            <Button onClick={handleStart} data-testid="srmt-sweep-start">
+              Start
+            </Button>
+          )}
+          {(complete || showError) && (
+            <Button onClick={reset} data-testid="srmt-sweep-reset">
+              Reset
+            </Button>
+          )}
+          {complete && points.length > 0 && (
+            <Button onClick={handleExportCsv} data-testid="srmt-sweep-export-csv">
+              Export CSV
+            </Button>
+          )}
+        </div>
+
+        {progressLabel && (
+          <div
+            className="text-[11px] font-mono"
+            style={{ color: 'var(--text-tertiary)' }}
+            data-testid="srmt-sweep-progress"
+          >
+            Running sweep: {progressLabel}
+          </div>
+        )}
+
+        {showError && errorMessage && (
+          <div
+            className="text-[11px] font-mono"
+            style={{ color: 'var(--danger)' }}
+            data-testid="srmt-sweep-error"
+          >
+            {errorMessage}
+          </div>
+        )}
+
+        {points.length >= 2 && (
+          <SrmtSweepPlot points={points} landmarks={landmarks} kind={activeKind} />
+        )}
+      </div>
+    </Section>
+  )
+})
+SrmtSweepContent.displayName = 'SrmtSweepContent'

@@ -62,8 +62,10 @@ export function hydrogenEnergy(n: number): number {
  * barrier. At D=3, n_eff = n and this reduces to hydrogenEnergy(n).
  *
  * @param n - Principal quantum number (≥ 1)
- * @param l - Azimuthal quantum number (0 ≤ l < n)
- * @param dim - Spatial dimension D (≥ 3)
+ * @param l - Azimuthal quantum number (0 ≤ l < n) — unused in the energy
+ *   (kept in the signature so callers pass per-state tuples; l-degeneracy
+ *   is asserted by the dedicated test in hydrogenEnergyND.test.ts)
+ * @param dim - Spatial dimension D (≥ 2 supported; D=2 yields n_eff = n − 0.5)
  * @returns Energy in Hartree atomic units
  */
 export function hydrogenEnergyND(n: number, _l: number, dim: number): number {
@@ -108,7 +110,7 @@ export function extraDimEnergy(
  *   - maxN=3: 14 states (all n=1,2,3 orbitals)
  *
  * @param maxN - Maximum principal quantum number (1-3)
- * @param dimension - Spatial dimension (3-11)
+ * @param dimension - Spatial dimension (2-11). D=2 uses n_eff = n − 0.5.
  * @param extraDimOmega - Angular frequencies for dimensions 4+ (length dimension-3)
  * @returns Sorted array of basis states, truncated to MAX_K
  */

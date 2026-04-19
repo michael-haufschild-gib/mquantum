@@ -2,8 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 // Heavy computation: FFTs on 8^3 grids projected to 64^3 output (262K voxels),
 // plus Gaussian broadening. Runs ~10s in isolation, can exceed 20s under CI
-// load with 4 parallel workers competing for CPU.
-vi.setConfig({ testTimeout: 30_000 })
+// load with 4 parallel workers competing for CPU. Bumped to 60s after the
+// `linear mode maps to [0,1] within percentile window` test at line 301 was
+// observed to fail at test-collection time under peak full-suite load —
+// symptom was a vitest-internal stack trace with no user-code frames, which
+// is the reporter's placeholder for worker-level issues (timeout / worker
+// restart). 60s keeps the budget comfortably above the 20s worst case.
+vi.setConfig({ testTimeout: 60_000 })
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import { DEFAULT_KSPACE_VIZ, PASSTHROUGH_KSPACE_VIZ } from '@/lib/geometry/extended/types'

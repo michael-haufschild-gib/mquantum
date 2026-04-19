@@ -215,4 +215,27 @@ describe('buildLindbladChannels', () => {
       expect(channels[3]!.amplitudeRe).toBeCloseTo(1.0, 12) // sqrt(1.0)
     })
   })
+
+  describe('non-finite rate handling', () => {
+    // The helper rejects every non-finite or non-positive rate at this
+    // API boundary so no downstream call can cascade to NaN amplitudes.
+
+    it('negative rate is treated as disabled (not sqrt of negative)', () => {
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: -1 })
+      expect(buildLindbladChannels(cfg, K)).toEqual([])
+    })
+
+    it('NaN rate is treated as disabled', () => {
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: Number.NaN })
+      expect(buildLindbladChannels(cfg, K)).toEqual([])
+    })
+
+    it('Infinity rate is rejected (prevents NaN cascade downstream)', () => {
+      // The previous contract silently emitted an Infinity-amplitude
+      // channel and deferred validation to the caller. Now `buildLindbladChannels`
+      // refuses non-finite rates at the API boundary.
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: Number.POSITIVE_INFINITY })
+      expect(buildLindbladChannels(cfg, 2)).toEqual([])
+    })
+  })
 })

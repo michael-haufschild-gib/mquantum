@@ -27,6 +27,7 @@ mod disorder;
 mod entanglement;
 mod fft;
 mod tdse_diagnostics;
+mod wheeler_dewitt;
 
 // ============================================================================
 // Animation Operations (Hot Path - 60 FPS)

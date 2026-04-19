@@ -79,6 +79,19 @@ import { WDW_C_U, wdwEuclideanWkbAction, wdwTurningA, wdwU } from './constants'
 export { wdwU } from './constants'
 
 /**
+ * Semver tag of the Wheeler–DeWitt solver implementation. Bumped when
+ * output semantics change (grid layout, stencil order, BC projection,
+ * analytic-tail formulation). Surfaced in the SRMT sweep reproducibility
+ * manifest so archived CSVs can be pinned to the exact code revision
+ * that produced them.
+ *
+ * Convention: major for output-incompatible changes, minor for added
+ * invariants that preserve existing output, patch for internal cleanup
+ * with byte-identical output.
+ */
+export const WDW_SOLVER_VERSION = '1.0.0'
+
+/**
  * Explicit-leapfrog stability budget for the φ-Laplacian term
  * `da² · (1/aMin²) · 8/dphi²`. Empirically the solver stays well-behaved up
  * to ~4; values above that are flagged as borderline. The guard is

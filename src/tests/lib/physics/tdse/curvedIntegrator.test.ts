@@ -641,27 +641,36 @@ describe('stepRK4 — flat metric ignores params.time', () => {
 // --- Test: reduction-to-flat regression ----------------------------------
 
 describe('stepRK4 — flat-metric reduction sanity (time-invariance regression)', () => {
-  it('two runs with different times produce the same dispersion width on flat metric', () => {
-    const sigma0 = 0.35
-    const grid = makeGrid(14, 0.28, 3)
-    const { re, im } = makeGaussian(grid, sigma0)
-    const paramsBase: Omit<CurvedIntegratorParams, 'time'> = {
-      gridSize: grid.gridSize,
-      spacing: grid.spacing,
-      mass: 1,
-      hbar: 1,
-      latticeDim: 3,
-      metric: { kind: 'flat' },
-      dt: 0.001,
+  // 100 RK4 steps on a 14³ grid × 2 runs + two `measureWidth` passes. Siblings
+  // in this file all use `{ timeout: 30000 }` for similar workloads; the
+  // default 5 s runs tight under peak 4-worker load and was observed to fail
+  // at test-collection time on at least one full-suite run. Match the
+  // sibling budget rather than leaving it implicit.
+  it(
+    'two runs with different times produce the same dispersion width on flat metric',
+    { timeout: 30000 },
+    () => {
+      const sigma0 = 0.35
+      const grid = makeGrid(14, 0.28, 3)
+      const { re, im } = makeGaussian(grid, sigma0)
+      const paramsBase: Omit<CurvedIntegratorParams, 'time'> = {
+        gridSize: grid.gridSize,
+        spacing: grid.spacing,
+        mass: 1,
+        hbar: 1,
+        latticeDim: 3,
+        metric: { kind: 'flat' },
+        dt: 0.001,
+      }
+      const a: CurvedIntegratorState = { psiRe: new Float32Array(re), psiIm: new Float32Array(im) }
+      const b: CurvedIntegratorState = { psiRe: new Float32Array(re), psiIm: new Float32Array(im) }
+      for (let t = 0; t < 50; t++) stepRK4(a, { ...paramsBase, time: 0 })
+      for (let t = 0; t < 50; t++) stepRK4(b, { ...paramsBase, time: 42.5 })
+      const wA = measureWidth(a, grid)
+      const wB = measureWidth(b, grid)
+      expect(Math.abs(wA - wB) / wA).toBeLessThan(1e-4)
     }
-    const a: CurvedIntegratorState = { psiRe: new Float32Array(re), psiIm: new Float32Array(im) }
-    const b: CurvedIntegratorState = { psiRe: new Float32Array(re), psiIm: new Float32Array(im) }
-    for (let t = 0; t < 50; t++) stepRK4(a, { ...paramsBase, time: 0 })
-    for (let t = 0; t < 50; t++) stepRK4(b, { ...paramsBase, time: 42.5 })
-    const wA = measureWidth(a, grid)
-    const wB = measureWidth(b, grid)
-    expect(Math.abs(wA - wB) / wA).toBeLessThan(1e-4)
-  })
+  )
 })
 
 // --- Test: energy conservation on static Schwarzschild -------------------

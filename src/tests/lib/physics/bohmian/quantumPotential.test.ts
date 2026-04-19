@@ -11,7 +11,11 @@ import {
   computeHarmonicPotentialV,
   computeQuantumPotentialCpu,
   indexGrid,
+  R_DENOM_FLOOR,
+  RHO_FLOOR,
+  RHO_ZERO_CUTOFF,
 } from '@/lib/physics/bohmian/quantumPotential'
+import { densityGridSamplingBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl'
 
 /** Cell-centred world coordinate for voxel index `i` on [−bound, +bound]. */
 function voxelWorld(i: number, gridSize: number, bound: number): number {
@@ -204,6 +208,75 @@ describe('computeQuantumPotentialCpu — near-vacuum cutoff gate', () => {
       }
     }
     expect(denseHasNonzero).toBe(true)
+  })
+})
+
+describe('CPU/WGSL constant mirror', () => {
+  it('WGSL computeQuantumPotentialFromGrid uses the same three magic numbers as the TS module', () => {
+    // The WGSL stencil and the TS mirror each hold their own copy of the
+    // three guard constants. Any drift silently breaks the unit-test
+    // contract ("CPU mirror must match WGSL stencil exactly"). We parse the
+    // WGSL text and assert the three constants appear inside the
+    // `computeQuantumPotentialFromGrid` function body — if a future shader
+    // refactor renames the function we need to update this test too, but
+    // that's a one-line change with a clear signal.
+    const body = densityGridSamplingBlock
+    const fnMarker = 'fn computeQuantumPotentialFromGrid'
+    const start = body.indexOf(fnMarker)
+    expect(start).toBeGreaterThanOrEqual(0)
+    // Slice only the function body (match the '{' to its matching '}')
+    // so literals in unrelated helpers further down the file can't
+    // produce false positives when this shader is extended.
+    const tail = body.slice(start)
+    const open = tail.indexOf('{')
+    expect(open).toBeGreaterThanOrEqual(0)
+    let depth = 0
+    let close = -1
+    for (let i = open; i < tail.length; i++) {
+      const ch = tail[i]
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) {
+          close = i
+          break
+        }
+      }
+    }
+    expect(close).toBeGreaterThan(open)
+    const fnBody = tail.slice(0, close + 1)
+    // Whitespace-tolerant matches so minor formatting tweaks to the
+    // WGSL don't break this test.
+    expect(fnBody).toMatch(/rhoC\s*<\s*1e-12/)
+    expect(fnBody).toMatch(/max\(\s*rhoC\s*,\s*1e-8\s*\)/)
+    expect(fnBody).toMatch(/max\(\s*Rc\s*,\s*1e-4\s*\)/)
+    // Numeric cross-check: the three literals in the WGSL must equal the
+    // exported TS constants. If either drifts, the equality fails.
+    expect(1e-12).toBe(RHO_ZERO_CUTOFF)
+    expect(1e-8).toBe(RHO_FLOOR)
+    expect(1e-4).toBe(R_DENOM_FLOOR)
+  })
+})
+
+describe('computeQuantumPotentialCpu — input validation', () => {
+  it('rejects gridSize below 3', () => {
+    expect(() => computeQuantumPotentialCpu(new Float32Array(8), 2, 1)).toThrow(/≥ 3/)
+  })
+
+  it('rejects a non-integer gridSize', () => {
+    expect(() => computeQuantumPotentialCpu(new Float32Array(64), 3.5, 1)).toThrow(/integer/)
+  })
+
+  it('rejects non-finite boundingRadius', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    expect(() => computeQuantumPotentialCpu(rho, 3, Number.POSITIVE_INFINITY)).toThrow(/finite/)
+    expect(() => computeQuantumPotentialCpu(rho, 3, Number.NaN)).toThrow(/finite/)
+  })
+
+  it('rejects non-positive boundingRadius', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    expect(() => computeQuantumPotentialCpu(rho, 3, 0)).toThrow(/positive/)
+    expect(() => computeQuantumPotentialCpu(rho, 3, -1)).toThrow(/positive/)
   })
 })
 
