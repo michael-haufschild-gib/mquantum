@@ -39,7 +39,10 @@ q_affine = Σ_n (K_n − (α·E_n + β))² / Σ_n K_n²                      (1)
 
 where `(α, β)` are the linear-least-squares fit minimisers across the
 first `rankCap` modes. The residual is dimensionless and scale-invariant
-in `E` (α absorbs scale), shift-invariant in `K` (β absorbs shift).
+in `E` (α absorbs scale). It is **not** generally shift-invariant in `K`:
+while β removes shifts from the numerator, the denominator `Σ K_n²` is
+not shift-invariant, so translating `K` changes `q` when the fit is
+imperfect.
 
 `q_affine = 0` iff `K_n = α·E_n + β` for some `(α, β)`. This tests a
 **strictly weaker** claim than (C1):

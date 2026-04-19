@@ -203,6 +203,22 @@ describe('handleSrmtSweepRequest — cut', () => {
     }
   })
 
+  it('reports error when snapshot.bandKind length disagrees with gridSize', () => {
+    const output = makeSyntheticOutput(20, 8)
+    const snapshot = snapshotFromOutput(output)
+    const truncated: SrmtSweepSolverSnapshot = {
+      ...snapshot,
+      bandKind: snapshot.bandKind.slice(0, snapshot.bandKind.length - 1),
+    }
+    handleSrmtSweepRequest(cutRequest(state, 9, truncated), emit, state)
+    const err = responses.find((r) => r.type === 'error')
+    expect(err?.type).toBe('error')
+    if (err && err.type === 'error') {
+      expect(err.message).toMatch(/bandKind\.length/)
+      expect(err.epoch).toBe(9)
+    }
+  })
+
   it('drops messages whose epoch is stale after a new start', () => {
     const output = makeSyntheticOutput(20, 8)
     // First, start a sweep; then bump epoch before finalisation.

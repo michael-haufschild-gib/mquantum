@@ -26,9 +26,13 @@
  *
  * ## Message protocol
  *
- *   Main → Worker: {@link SrmtSweepRequest}. For cut sweep the caller
- *   transfers `chi` and `lorentzianMask` buffers; the worker then owns
- *   them. For mass/BC the worker re-solves so only the config is sent.
+ *   Main → Worker: {@link SrmtSweepRequest}. For snapshot-driven sweeps
+ *   (`cut`, `phiRef`, `rankCap`) the caller transfers `chi`,
+ *   `lorentzianMask`, and `bandKind` buffers; the worker then owns them.
+ *   For re-solve sweeps (`mass`, `lambda`, `phiExtent`, `bc`) only the
+ *   config is sent and the worker produces its own solver outputs per
+ *   point. Omitting `solverOutput` for a snapshot-driven kind produces
+ *   an `error` response.
  *
  *   Worker → Main: {@link SrmtSweepResponse} discriminant — `progress`
  *   per-point (with transferable spectrum buffers), `solveStart` before
@@ -86,7 +90,11 @@ export type SrmtSweepRequest =
       physics: SrmtPhysicsContext
       wdwConfig: WheelerDeWittConfig
       landmarks: SrmtSweepLandmark[]
-      /** Required for kind='cut'; omitted for mass/bc (worker re-solves). */
+      /**
+       * Required for snapshot-driven kinds (`cut`, `phiRef`, `rankCap`);
+       * omitted for re-solve kinds (`mass`, `lambda`, `phiExtent`, `bc`),
+       * where the worker runs the Wheeler–DeWitt solver per point.
+       */
       solverOutput?: SrmtSweepSolverSnapshot
     }
   | { type: 'cancel'; epoch: number }
