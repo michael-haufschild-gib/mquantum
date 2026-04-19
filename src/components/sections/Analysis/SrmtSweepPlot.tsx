@@ -49,7 +49,7 @@ interface XRange {
 }
 
 function isPlottableQuality(q: number | undefined): q is number {
-  return q !== undefined && Number.isFinite(q) && q > 0
+  return q !== undefined && Number.isFinite(q) && q >= 0
 }
 
 function collectPlottableQualities(points: SrmtSweepPoint[]): number[] {
@@ -64,14 +64,15 @@ function collectPlottableQualities(points: SrmtSweepPoint[]): number[] {
 }
 
 function computeYRange(points: SrmtSweepPoint[]): YRange {
-  const qs = collectPlottableQualities(points)
-  if (qs.length === 0) return { yMin: 1e-4, yMax: 1 }
-  // Reduce over the already-validated array; `Math.min(...arr)` stack-limits
-  // at large N and silently propagates NaN if any crept in.
-  let yMin = qs[0]!
-  let yMax = qs[0]!
-  for (let i = 1; i < qs.length; i++) {
-    const v = qs[i]!
+  // Log-y range seeds only use strictly positive samples so yMin > 0;
+  // zero-q points are retained in polylines and clamped to the chart
+  // floor by `toY`.
+  const positive = collectPlottableQualities(points).filter((q) => q > 0)
+  if (positive.length === 0) return { yMin: 1e-4, yMax: 1 }
+  let yMin = positive[0]!
+  let yMax = positive[0]!
+  for (let i = 1; i < positive.length; i++) {
+    const v = positive[i]!
     if (v < yMin) yMin = v
     if (v > yMax) yMax = v
   }
@@ -102,7 +103,7 @@ function buildSeries(
     const coords: string[] = []
     for (const p of points) {
       const q = p.quality[clock]
-      if (q !== undefined && Number.isFinite(q) && q > 0) {
+      if (isPlottableQuality(q)) {
         coords.push(`${toX(p.sweepValue).toFixed(1)},${toY(q).toFixed(1)}`)
       }
     }
@@ -148,7 +149,7 @@ export const SrmtSweepPlot: React.FC<SrmtSweepPlotProps> = React.memo(
         <div className="rounded-md overflow-hidden" style={{ background: 'var(--bg-surface)' }}>
           <svg width="100%" viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="block">
             <AxisLines />
-            {kind === 'cut' && <LandmarkLines landmarks={landmarks} />}
+            {kind === 'cut' && <LandmarkLines landmarks={landmarks} toX={toX} />}
             {kind === 'phiRef' && <PhiRefLandmarkTrail points={points} toX={toX} />}
             <ChampionFlipMarkers flips={championFlips} toX={toX} />
             {series.map(({ clock, points: pts }) => (
@@ -216,15 +217,20 @@ const PhiRefLandmarkTrail: React.FC<PhiRefLandmarkTrailProps> = ({ points, toX }
   )
 }
 
-const LandmarkLines: React.FC<{ landmarks: SrmtSweepLandmark[] }> = ({ landmarks }) => (
+interface LandmarkLinesProps {
+  landmarks: SrmtSweepLandmark[]
+  toX: (x: number) => number
+}
+
+const LandmarkLines: React.FC<LandmarkLinesProps> = ({ landmarks, toX }) => (
   <>
     {landmarks.map((landmark) =>
       landmark.sweepValueAtLandmark === null ? null : (
         <line
           key={landmark.clock}
-          x1={PAD.left + landmark.sweepValueAtLandmark * PLOT_W}
+          x1={toX(landmark.sweepValueAtLandmark)}
           y1={PAD.top}
-          x2={PAD.left + landmark.sweepValueAtLandmark * PLOT_W}
+          x2={toX(landmark.sweepValueAtLandmark)}
           y2={PAD.top + PLOT_H}
           stroke={CLOCK_COLORS[landmark.clock]}
           strokeDasharray="2,3"

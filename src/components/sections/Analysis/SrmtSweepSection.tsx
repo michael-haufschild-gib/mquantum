@@ -28,7 +28,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { Button } from '@/components/ui/Button'
-import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { getGitSha } from '@/lib/build/buildInfo'
 import { downloadFile, exportFilename } from '@/lib/export/dataExport'
@@ -39,18 +38,15 @@ import { WDW_SOLVER_VERSION } from '@/lib/physics/wheelerDeWitt/solver'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useSrmtSweepStore } from '@/stores/srmtSweepStore'
 
-import { sweepPointsToCsv } from './srmtSweepHelpers'
+import {
+  clampUiStateToPhiExtent,
+  type SrmtSweepUiState as SweepUiState,
+  sweepPointsToCsv,
+} from './srmtSweepHelpers'
+import { SweepKindControls } from './SrmtSweepKindControls'
 import { SrmtSweepPlot } from './SrmtSweepPlot'
 
 const SECTION_TITLE = 'SRMT Sweep'
-
-/** Per-kind upper bound on the Points slider, mirrors the driver clamps. */
-function pointsMaxFor(kind: SrmtSweepKind): number {
-  if (kind === 'cut') return 64
-  if (kind === 'rankCap') return 32
-  if (kind === 'phiExtent') return 13
-  return 21
-}
 
 const KIND_OPTIONS: { value: SrmtSweepKind; label: string }[] = [
   { value: 'cut', label: 'cut' },
@@ -61,15 +57,6 @@ const KIND_OPTIONS: { value: SrmtSweepKind; label: string }[] = [
   { value: 'rankCap', label: 'rank' },
   { value: 'phiExtent', label: 'φext' },
 ]
-
-interface SweepUiState {
-  kind: SrmtSweepKind
-  points: number
-  sweepMin: number
-  sweepMax: number
-  phiRef: number
-  cutAnchor: number
-}
 
 function defaultUiStateFor(
   kind: SrmtSweepKind,
@@ -205,6 +192,13 @@ const SrmtSweepContent: React.FC = React.memo(() => {
     defaultUiStateFor('cut', phiExtent, srmtCutNormalized)
   )
 
+  // Clamp UI state back into the active domain when phiExtent shrinks
+  // beneath a pinned phiRef bound; otherwise `Start` would dispatch a
+  // sweep whose bounds no longer match the active physics config.
+  React.useEffect(() => {
+    setUi((s) => clampUiStateToPhiExtent(s, phiExtent))
+  }, [phiExtent])
+
   const running = status === 'running'
   const complete = status === 'complete'
   const showError = status === 'error'
@@ -330,243 +324,3 @@ const SrmtSweepContent: React.FC = React.memo(() => {
   )
 })
 SrmtSweepContent.displayName = 'SrmtSweepContent'
-
-interface SweepKindControlsProps {
-  ui: SweepUiState
-  running: boolean
-  phiExtent: number
-  setUi: React.Dispatch<React.SetStateAction<SweepUiState>>
-}
-
-const SweepKindControls: React.FC<SweepKindControlsProps> = ({ ui, running, phiExtent, setUi }) => {
-  return (
-    <>
-      {ui.kind !== 'bc' && (
-        <Slider
-          label="Points"
-          tooltip="Number of sweep points."
-          min={ui.kind === 'cut' ? 4 : 3}
-          max={pointsMaxFor(ui.kind)}
-          step={1}
-          value={ui.points}
-          onChange={(v) => setUi((s) => ({ ...s, points: v }))}
-          showValue
-          disabled={running}
-          data-testid="srmt-sweep-points-slider"
-        />
-      )}
-      {ui.kind === 'cut' && (
-        <>
-          <Slider
-            label="Cut min"
-            min={0}
-            max={0.9}
-            step={0.01}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-cutmin-slider"
-          />
-          <Slider
-            label="Cut max"
-            min={0.1}
-            max={1}
-            step={0.01}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-cutmax-slider"
-          />
-        </>
-      )}
-      {ui.kind === 'mass' && (
-        <>
-          <Slider
-            label="Mass min"
-            min={0}
-            max={2}
-            step={0.01}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-massmin-slider"
-          />
-          <Slider
-            label="Mass max"
-            min={0}
-            max={2}
-            step={0.01}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-massmax-slider"
-          />
-        </>
-      )}
-      {ui.kind === 'lambda' && (
-        <>
-          <Slider
-            label="Λ min"
-            tooltip="Cosmological constant lower bound. Negative values are AdS; positive are dS."
-            min={-1}
-            max={1}
-            step={0.01}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-lambdamin-slider"
-          />
-          <Slider
-            label="Λ max"
-            min={-1}
-            max={1}
-            step={0.01}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-lambdamax-slider"
-          />
-        </>
-      )}
-      {ui.kind === 'phiRef' && (
-        <>
-          <Slider
-            label="φref min"
-            tooltip="Lower bound for φref. q is invariant under φref by construction; the plot's read is that q stays flat while the landmark slides."
-            min={0}
-            max={phiExtent}
-            step={0.01}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-phirefmin-slider"
-          />
-          <Slider
-            label="φref max"
-            min={0}
-            max={phiExtent}
-            step={0.01}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-phirefmax-slider"
-          />
-        </>
-      )}
-      {ui.kind === 'rankCap' && (
-        <>
-          <Slider
-            label="rank min"
-            tooltip="Lower rankCap. Integer-valued; driver rounds + dedups adjacent points."
-            min={8}
-            max={256}
-            step={1}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 1, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-rankmin-slider"
-          />
-          <Slider
-            label="rank max"
-            min={8}
-            max={256}
-            step={1}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 1, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-rankmax-slider"
-          />
-        </>
-      )}
-      {ui.kind === 'phiExtent' && (
-        <>
-          <Slider
-            label="φext min"
-            tooltip="Lower φ-extent bound. CFL stability tightens as φext shrinks at fixed gridNphi; the solver dev-warns below the safe envelope."
-            min={0.5}
-            max={5}
-            step={0.05}
-            value={ui.sweepMin}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.1, s.sweepMax) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-phiextmin-slider"
-          />
-          <Slider
-            label="φext max"
-            min={0.5}
-            max={5}
-            step={0.05}
-            value={ui.sweepMax}
-            onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.1, s.sweepMin) }))
-            }
-            showValue
-            disabled={running}
-            data-testid="srmt-sweep-phiextmax-slider"
-          />
-        </>
-      )}
-      {ui.kind !== 'phiRef' && (
-        <Slider
-          label="phi ref"
-          tooltip="φ used to locate the classical turning point landmark on the plot."
-          min={0}
-          max={phiExtent}
-          step={0.01}
-          value={ui.phiRef}
-          onChange={(v) => setUi((s) => ({ ...s, phiRef: v }))}
-          showValue
-          disabled={running}
-          data-testid="srmt-sweep-phiref-slider"
-        />
-      )}
-      {ui.kind !== 'cut' && (
-        <Slider
-          label="Cut anchor"
-          tooltip="Cut position held fixed while the varying parameter changes."
-          min={0.1}
-          max={0.9}
-          step={0.01}
-          value={ui.cutAnchor}
-          onChange={(v) => setUi((s) => ({ ...s, cutAnchor: v }))}
-          showValue
-          disabled={running}
-          data-testid="srmt-sweep-cutanchor-slider"
-        />
-      )}
-    </>
-  )
-}

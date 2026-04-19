@@ -204,19 +204,20 @@ describe('qExponent', () => {
   it('throws for bianchiKasner — no closed-form scalar q exists', () => {
     // Bianchi-I has three axis-specific scale factors; there is no single `q`
     // exponent. Callers must use `computeBianchiKasnerCoefs` directly.
-    expect(() =>
+    const run = (): number =>
       qExponent({
         preset: 'bianchiKasner',
         spacetimeDim: 4,
         kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
       })
-    ).toThrow(/bianchiKasner/)
+    expect(run).toThrow(RangeError)
+    expect(run).toThrow(/bianchiKasner/)
   })
 
   it('throws for lqcBounce — no closed-form scalar q exists', () => {
     // The LQC bounce is resolved from a dense look-up table, not a
     // `a(η) = A·|η|^q` ansatz.
-    expect(() =>
+    const run = (): number =>
       qExponent({
         preset: 'lqcBounce',
         spacetimeDim: 4,
@@ -224,7 +225,8 @@ describe('qExponent', () => {
         lqcEquationOfState: 1,
         lqcInitialRhoRatio: 0.1,
       })
-    ).toThrow(/lqcBounce/)
+    expect(run).toThrow(RangeError)
+    expect(run).toThrow(/lqcBounce/)
   })
 })
 

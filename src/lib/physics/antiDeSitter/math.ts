@@ -55,9 +55,11 @@
  *     as the 3D slice Y_ℓm(θ, φ) (defensible projection; see PRD).
  *
  * Stage 2: BTZ thermal state and HKLL bulk reconstruction are implemented
- * in `./btz.ts` and `./hkll.ts` respectively; the Kleban-Solodukhin /
- * Kraus "quantization branch" selector lives in `AdsQuantizationBranch`.
- * dS/CFT continuation and Chern-Simons level remain future work.
+ * in `./btz.ts` and `./hkll.ts` respectively; the quantization branch is
+ * represented by the `AdsQuantizationBranch` type, and the Kleban-Solodukhin /
+ * Kraus branch-selection logic is implemented by `computeDelta` and
+ * `resolveDelta` below. dS/CFT continuation and Chern-Simons level remain
+ * future work.
  *
  * @module lib/physics/antiDeSitter/math
  */

@@ -536,10 +536,8 @@ export function packHkllReconstructedDensityGrid(
     // upsampler.
     reField = scratch.hkllRe
     imField = scratch.hkllIm
-    for (let i = 0; i < coarseTotal; i++) {
-      reField[i] = 0
-      imField[i] = 0
-    }
+    reField.subarray(0, coarseTotal).fill(0)
+    imField.subarray(0, coarseTotal).fill(0)
   } else {
     reField = new Float32Array(coarseTotal)
     imField = new Float32Array(coarseTotal)

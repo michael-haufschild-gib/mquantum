@@ -14,6 +14,7 @@ import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDe
 import {
   createSrmtSweepWorkerState,
   handleSrmtSweepRequest,
+  type SrmtSweepEmit,
   type SrmtSweepRequest,
   type SrmtSweepResponse,
   type SrmtSweepSolverSnapshot,
@@ -178,6 +179,40 @@ describe('handleSrmtSweepRequest — cut', () => {
     for (const r of responses) {
       expect(r.epoch).toBe(2)
     }
+  })
+
+  it('suppresses stale-epoch progress messages when a new start interrupts mid-sweep', () => {
+    // Directly exercise the stale-epoch guard: the onProgress callback
+    // reads state.epoch at emission time, so we start a synthetic sweep
+    // and then flip state.epoch to simulate the race where the coordinator
+    // bumps the epoch while the driver is still iterating. The emit on a
+    // stale epoch must be suppressed.
+    const output = makeSyntheticOutput(20, 8)
+    let staleEmits = 0
+    const interleavingEmit: SrmtSweepEmit = (msg) => {
+      if (msg.type === 'progress' && msg.epoch !== state.epoch) {
+        staleEmits++
+      }
+      responses.push(msg)
+    }
+    // Wrap emit so that after the very first progress, we bump state.epoch
+    // to simulate a second start coming in before the sweep finishes.
+    let bumped = false
+    const raceEmit: SrmtSweepEmit = (msg, transfer) => {
+      interleavingEmit(msg, transfer)
+      if (!bumped && msg.type === 'progress') {
+        bumped = true
+        state.epoch = 99
+      }
+    }
+    handleSrmtSweepRequest(cutRequest(state, 42, snapshotFromOutput(output)), raceEmit, state)
+    // After the epoch bump, the driver's subsequent progress callbacks
+    // observe the mismatch and return early — so no further `progress`
+    // messages with `epoch=42` are emitted.
+    const lateProgress = responses.filter((r) => r.type === 'progress' && r.epoch === 42)
+    // Only the single pre-bump progress message should have the old epoch.
+    expect(lateProgress.length).toBe(1)
+    expect(staleEmits).toBe(0)
   })
 })
 

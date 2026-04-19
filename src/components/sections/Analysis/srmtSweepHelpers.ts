@@ -155,6 +155,38 @@ export function sweepPointsToCsv(
   return [header, ...rows].join('\n') + '\n'
 }
 
+/**
+ * Shape of the sweep UI state the section holds in React.
+ * Mirrors the private `SweepUiState` in `SrmtSweepSection.tsx` —
+ * duplicated here so the helper can be used without a circular import.
+ */
+export interface SrmtSweepUiState {
+  kind: SrmtSweepKind
+  points: number
+  sweepMin: number
+  sweepMax: number
+  phiRef: number
+  cutAnchor: number
+}
+
+/**
+ * Return a UI-state clamped so `phiRef` (and, for `kind='phiRef'`, the
+ * sweep bounds) stay inside `[0, phiExtent]`. Returns the original state
+ * reference when no field changes, so React.useState short-circuits the
+ * re-render when phiExtent grew rather than shrank.
+ */
+export function clampUiStateToPhiExtent(s: SrmtSweepUiState, phiExtent: number): SrmtSweepUiState {
+  const clamp = (v: number): number => Math.min(Math.max(v, 0), phiExtent)
+  const phiRef = clamp(s.phiRef)
+  if (s.kind !== 'phiRef') {
+    return phiRef === s.phiRef ? s : { ...s, phiRef }
+  }
+  const sweepMin = clamp(s.sweepMin)
+  const sweepMax = Math.min(phiExtent, Math.max(sweepMin + 0.05, clamp(s.sweepMax)))
+  if (phiRef === s.phiRef && sweepMin === s.sweepMin && sweepMax === s.sweepMax) return s
+  return { ...s, phiRef, sweepMin, sweepMax }
+}
+
 /** Human label for the sweep-axis annotation on the plot. */
 export function labelForKind(kind: SrmtSweepKind): string {
   if (kind === 'cut') return 'cut normalised'

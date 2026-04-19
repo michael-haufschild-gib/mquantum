@@ -60,6 +60,7 @@ describe('AdS packer scratch pool', () => {
     const scratch = createAdsPackerScratch()
     const pooled = packAntiDeSitterDensityGrid(config, scratch)
     const fresh = packAntiDeSitterDensityGrid(config)
+    expect(pooled.density.length).toBe(fresh.density.length)
     for (let i = 0; i < pooled.density.length; i++) {
       if (pooled.density[i] !== fresh.density[i]) {
         throw new Error(`BTZ density[${i}] pooled=${pooled.density[i]} fresh=${fresh.density[i]}`)
@@ -77,6 +78,7 @@ describe('AdS packer scratch pool', () => {
     const scratch = createAdsPackerScratch()
     const pooled = packAntiDeSitterDensityGrid(config, scratch)
     const fresh = packAntiDeSitterDensityGrid(config)
+    expect(pooled.density.length).toBe(fresh.density.length)
     for (let i = 0; i < pooled.density.length; i++) {
       if (pooled.density[i] !== fresh.density[i]) {
         throw new Error(`HKLL density[${i}] pooled=${pooled.density[i]} fresh=${fresh.density[i]}`)

@@ -127,8 +127,14 @@ describe('WheelerDeWittSrmtSweepCoordinator.startSweep', () => {
       expect(m.solverOutput?.chi).toBeInstanceOf(Float32Array)
       expect(m.solverOutput?.lorentzianMask).toBeInstanceOf(Uint8Array)
     }
-    // Solver buffers transferred, not copied on the wire.
-    expect(posts[0]!.transfer.length).toBe(2)
+    // Required solver buffers must be transferred. The exact count is an
+    // implementation detail (a future field like `bandKind` may also be
+    // transferred), so assert presence rather than length.
+    if (m.type === 'start') {
+      expect(posts[0]!.transfer).toEqual(
+        expect.arrayContaining([m.solverOutput!.chi.buffer, m.solverOutput!.lorentzianMask.buffer])
+      )
+    }
   })
 
   it('transitions the store to running', () => {

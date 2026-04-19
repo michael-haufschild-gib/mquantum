@@ -39,10 +39,20 @@ export function computePropagator(
   dt: number,
   K: number
 ): ComplexMatrix {
+  if (!Number.isInteger(K) || K < 1) {
+    throw new Error(`computePropagator: K must be a positive integer, got ${K}`)
+  }
   if (K > MAX_K) {
     throw new Error(`computePropagator: K=${K} exceeds MAX_K=${MAX_K}`)
   }
+  if (!Number.isFinite(dt)) {
+    throw new Error(`computePropagator: dt must be finite, got ${dt}`)
+  }
   const N = K * K
+  const expected = N * N
+  if (liouvillian.real.length < expected || liouvillian.imag.length < expected) {
+    throw new Error(`computePropagator: liouvillian buffer too small (expected >= ${expected})`)
+  }
 
   // Scale Liouvillian: dt · L
   const scaled = complexMatZero(N)
@@ -74,11 +84,22 @@ export function computePropagator(
  */
 export function applyPropagator(propagator: ComplexMatrix, rho: DensityMatrix): void {
   const K = rho.K
+  if (!Number.isInteger(K) || K < 1) {
+    throw new Error(`applyPropagator: K must be a positive integer, got ${K}`)
+  }
   if (K > MAX_K) {
     throw new Error(`applyPropagator: K=${K} exceeds MAX_K=${MAX_K}`)
   }
   const N = K * K
   const el = rho.elements
+  const expectedVec = 2 * N
+  const expectedMat = N * N
+  if (el.length < expectedVec) {
+    throw new Error(`applyPropagator: rho.elements too small (expected >= ${expectedVec})`)
+  }
+  if (propagator.real.length < expectedMat || propagator.imag.length < expectedMat) {
+    throw new Error(`applyPropagator: propagator buffer too small (expected >= ${expectedMat})`)
+  }
 
   // Convert ρ elements (interleaved complex) to separate real/imag scratch
   // arrays. `vecIdx = k*K + l` and `matIdx = 2*vecIdx` for row-major storage,

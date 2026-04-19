@@ -80,7 +80,7 @@ function validateLatticeInput(
   gridSize: readonly number[],
   spacing: readonly number[]
 ): void {
-  if (latticeDim < 1 || latticeDim > 3) {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > 3) {
     throw new Error(`${fnName}: latticeDim ${latticeDim} unsupported (expected 1–3)`)
   }
   if (gridSize.length < latticeDim) {
@@ -88,6 +88,16 @@ function validateLatticeInput(
   }
   if (spacing.length < latticeDim) {
     throw new Error(`${fnName}: spacing length ${spacing.length} < latticeDim ${latticeDim}`)
+  }
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]!
+    const dx = spacing[d]!
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new Error(`${fnName}: gridSize[${d}]=${n} must be a positive integer`)
+    }
+    if (!Number.isFinite(dx) || dx <= 0) {
+      throw new Error(`${fnName}: spacing[${d}]=${dx} must be finite and > 0`)
+    }
   }
 }
 

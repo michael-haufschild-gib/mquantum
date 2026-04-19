@@ -45,10 +45,16 @@ interface ParsedPoint {
   cutNormalized: number
   q_a: number | null
   q_a_sigma: number | null
+  q_a_rigid: number | null
+  q_a_rigid_sigma: number | null
   q_phi1: number | null
   q_phi1_sigma: number | null
+  q_phi1_rigid: number | null
+  q_phi1_rigid_sigma: number | null
   q_phi2: number | null
   q_phi2_sigma: number | null
+  q_phi2_rigid: number | null
+  q_phi2_rigid_sigma: number | null
   computeMs: number
 }
 
@@ -145,7 +151,7 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
     const row = lines[i]!
     if (row.length === 0 || row.startsWith('#')) continue
     const cells = row.split(',')
-    if (cells.length !== 11) throw new Error(`bad CSV row (expected 11 cols): ${row}`)
+    if (cells.length !== 17) throw new Error(`bad CSV row (expected 17 cols): ${row}`)
     points.push({
       index: Number(cells[0]),
       sweepValue: Number(cells[1]),
@@ -153,11 +159,17 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
       cutNormalized: Number(cells[3]),
       q_a: parseCell(cells[4]!),
       q_a_sigma: parseCell(cells[5]!),
-      q_phi1: parseCell(cells[6]!),
-      q_phi1_sigma: parseCell(cells[7]!),
-      q_phi2: parseCell(cells[8]!),
-      q_phi2_sigma: parseCell(cells[9]!),
-      computeMs: Number(cells[10]),
+      q_a_rigid: parseCell(cells[6]!),
+      q_a_rigid_sigma: parseCell(cells[7]!),
+      q_phi1: parseCell(cells[8]!),
+      q_phi1_sigma: parseCell(cells[9]!),
+      q_phi1_rigid: parseCell(cells[10]!),
+      q_phi1_rigid_sigma: parseCell(cells[11]!),
+      q_phi2: parseCell(cells[12]!),
+      q_phi2_sigma: parseCell(cells[13]!),
+      q_phi2_rigid: parseCell(cells[14]!),
+      q_phi2_rigid_sigma: parseCell(cells[15]!),
+      computeMs: Number(cells[16]),
     })
   }
   return { landmarks, points }

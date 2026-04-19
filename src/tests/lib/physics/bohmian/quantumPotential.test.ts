@@ -224,15 +224,32 @@ describe('CPU/WGSL constant mirror', () => {
     const fnMarker = 'fn computeQuantumPotentialFromGrid'
     const start = body.indexOf(fnMarker)
     expect(start).toBeGreaterThanOrEqual(0)
-    // Grab everything from the function marker to the end — good enough
-    // because the magic numbers below don't reappear elsewhere in the file.
-    const slice = body.slice(start)
-    // WGSL literals use exponential notation (`1e-12`, `1e-8`, `1e-4`) while
-    // JS `${n}` interpolation decimalises them to `0.0001`, etc. Match the
-    // raw WGSL literal form and assert numeric agreement separately.
-    expect(slice).toContain('rhoC < 1e-12')
-    expect(slice).toContain('max(rhoC,  1e-8)')
-    expect(slice).toContain('max(Rc, 1e-4)')
+    // Slice only the function body (match the '{' to its matching '}')
+    // so literals in unrelated helpers further down the file can't
+    // produce false positives when this shader is extended.
+    const tail = body.slice(start)
+    const open = tail.indexOf('{')
+    expect(open).toBeGreaterThanOrEqual(0)
+    let depth = 0
+    let close = -1
+    for (let i = open; i < tail.length; i++) {
+      const ch = tail[i]
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) {
+          close = i
+          break
+        }
+      }
+    }
+    expect(close).toBeGreaterThan(open)
+    const fnBody = tail.slice(0, close + 1)
+    // Whitespace-tolerant matches so minor formatting tweaks to the
+    // WGSL don't break this test.
+    expect(fnBody).toMatch(/rhoC\s*<\s*1e-12/)
+    expect(fnBody).toMatch(/max\(\s*rhoC\s*,\s*1e-8\s*\)/)
+    expect(fnBody).toMatch(/max\(\s*Rc\s*,\s*1e-4\s*\)/)
     // Numeric cross-check: the three literals in the WGSL must equal the
     // exported TS constants. If either drifts, the equality fails.
     expect(1e-12).toBe(RHO_ZERO_CUTOFF)
@@ -242,6 +259,10 @@ describe('CPU/WGSL constant mirror', () => {
 })
 
 describe('computeQuantumPotentialCpu — input validation', () => {
+  it('rejects gridSize below 3', () => {
+    expect(() => computeQuantumPotentialCpu(new Float32Array(8), 2, 1)).toThrow(/≥ 3/)
+  })
+
   it('rejects a non-integer gridSize', () => {
     expect(() => computeQuantumPotentialCpu(new Float32Array(64), 3.5, 1)).toThrow(/integer/)
   })
@@ -250,6 +271,12 @@ describe('computeQuantumPotentialCpu — input validation', () => {
     const rho = new Float32Array(27).fill(0.1)
     expect(() => computeQuantumPotentialCpu(rho, 3, Number.POSITIVE_INFINITY)).toThrow(/finite/)
     expect(() => computeQuantumPotentialCpu(rho, 3, Number.NaN)).toThrow(/finite/)
+  })
+
+  it('rejects non-positive boundingRadius', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    expect(() => computeQuantumPotentialCpu(rho, 3, 0)).toThrow(/positive/)
+    expect(() => computeQuantumPotentialCpu(rho, 3, -1)).toThrow(/positive/)
   })
 })
 

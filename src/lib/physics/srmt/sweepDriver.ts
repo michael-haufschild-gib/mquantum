@@ -94,6 +94,30 @@ export function clampRankCap(rankCap: number): number {
 }
 
 /**
+ * Clamp + integerise a caller-supplied `points` count to the per-kind
+ * range the sweep drivers expect. Mirrors `totalPointsFor` in the worker
+ * so a malformed URL/programmatic config cannot allocate far more linspace
+ * samples than the UI and worker will advertise.
+ */
+export function normalisePointCount(kind: SrmtSweepConfig['kind'], rawPoints: number): number {
+  const points = Number.isFinite(rawPoints) ? Math.floor(rawPoints) : 1
+  switch (kind) {
+    case 'cut':
+      return Math.max(1, Math.min(64, points))
+    case 'mass':
+    case 'lambda':
+    case 'phiRef':
+      return Math.max(1, Math.min(21, points))
+    case 'rankCap':
+      return Math.max(1, Math.min(32, points))
+    case 'phiExtent':
+      return Math.max(1, Math.min(13, points))
+    case 'bc':
+      return 3
+  }
+}
+
+/**
  * Resolve a normalised cut `∈ [0, 1]` to the nearest interior integer
  * index `∈ [1, axisLen − 2]`. Matches the live diagnostic's resolver in
  * `WheelerDeWittSrmtCoordinator.ts:55` so sweep-cut results align with
@@ -154,7 +178,11 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
   // Generate normalised sweep values, resolve per-clock integer indices,
   // dedup across points that collapse to the same index on ALL requested
   // clocks.
-  const sweepValues = linspace(config.sweepMin, config.sweepMax, config.points)
+  const sweepValues = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('cut', config.points)
+  )
   const uniqueKeys = new Set<string>()
   const results: SrmtSweepPoint[] = []
 
@@ -235,7 +263,11 @@ export function runMassSweep(input: RunMassSweepInputs): SrmtSweepPoint[] {
   if (config.kind !== 'mass') {
     throw new Error(`runMassSweep: expected kind='mass', got '${config.kind}'`)
   }
-  const masses = linspace(config.sweepMin, config.sweepMax, config.points)
+  const masses = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('mass', config.points)
+  )
   const results: SrmtSweepPoint[] = []
   for (let i = 0; i < masses.length; i++) {
     if (cancel?.aborted) break
@@ -287,7 +319,11 @@ export function runLambdaSweep(input: RunLambdaSweepInputs): SrmtSweepPoint[] {
   if (config.kind !== 'lambda') {
     throw new Error(`runLambdaSweep: expected kind='lambda', got '${config.kind}'`)
   }
-  const lambdas = linspace(config.sweepMin, config.sweepMax, config.points)
+  const lambdas = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('lambda', config.points)
+  )
   const results: SrmtSweepPoint[] = []
   for (let i = 0; i < lambdas.length; i++) {
     if (cancel?.aborted) break
@@ -482,6 +518,48 @@ export type { SrmtSweepLandmark }
  */
 export function normaliseClocks(clocks: readonly SrmtClock[]): readonly SrmtClock[] {
   return clocks.length > 0 ? clocks : ['a', 'phi1', 'phi2']
+}
+
+/**
+ * Predict the number of distinct sweep points a `cut` sweep will emit
+ * against a given φ-grid. Mirrors `runCutSweep`'s dedup logic.
+ */
+export function predictCutSweepCount(
+  config: SrmtSweepConfig,
+  gridSize: readonly [number, number, number]
+): number {
+  if (config.kind !== 'cut') return normalisePointCount(config.kind, config.points)
+  const clocks = normaliseClocks(config.clocks)
+  const values = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('cut', config.points)
+  )
+  const keys = new Set<string>()
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!
+    keys.add(
+      clocks
+        .map((c) => resolveCutIndexForAxisLen(v, c === 'a' ? gridSize[0] : gridSize[1]))
+        .join(',')
+    )
+  }
+  return Math.max(1, keys.size)
+}
+
+/**
+ * Predict the number of distinct sweep points a `rankCap` sweep will
+ * emit after rounding + dedup. Solver-independent.
+ */
+export function predictRankCapSweepCount(config: SrmtSweepConfig): number {
+  if (config.kind !== 'rankCap') return normalisePointCount(config.kind, config.points)
+  const lo = clampRankCap(config.sweepMin)
+  const hi = clampRankCap(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('rankCap', config.points))
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
+  return Math.max(1, seen.size)
 }
 
 /** Uniform [min, max] partition with `points` entries. */

@@ -32,9 +32,8 @@ export const VALID_SRMT_SWEEP_KINDS = [
   'rankCap',
   'phiExtent',
 ] as const satisfies readonly SrmtSweepKind[]
-/**
- *
- */
+
+/** String union accepted by `sw=…` — one per entry of {@link VALID_SRMT_SWEEP_KINDS}. */
 export type UrlSrmtSweepKind = (typeof VALID_SRMT_SWEEP_KINDS)[number]
 
 /** Shareable sweep fields on the parent URL state type. */

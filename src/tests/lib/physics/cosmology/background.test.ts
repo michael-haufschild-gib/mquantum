@@ -311,10 +311,10 @@ describe('computeCosmologyAt — Bianchi-Kasner', () => {
     expect(snap.hubble).toBeCloseTo(1 / 12, 12)
   })
 
-  it('hubble coincides with 1/(n-1)η at the η=1.5 Minkowski-equivalent point', () => {
-    // At η = 1.5, t = 1, ã = 1, so ℋ = 1/((n-1)·t) = 1/3. Also equals
-    // 1/(n-1)·(n-2)/(nm1·eta)^(-1) … but the simple check `ã=1 ⇒ ℋ = 1/3`
-    // is unambiguous and catches any rescaling regression.
+  it('hubble coincides with 1/((n-1)·t) at the η=1.5 Minkowski-equivalent point', () => {
+    // At η = 1.5, t = 1, ã = 1, so ℋ = 1/((n-1)·t) = 1/3. The simple
+    // check `ã=1 ⇒ ℋ = 1/3` is unambiguous and catches any rescaling
+    // regression.
     const snap = computeCosmologyAt(1.5, {
       preset: 'bianchiKasner',
       spacetimeDim: n,

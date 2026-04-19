@@ -166,7 +166,14 @@ export class WheelerDeWittSrmtSweepCoordinator {
    */
   abortSweep(): void {
     if (this.disposed) return
-    this.sendCancelBestEffort()
+    // Bump the epoch so any in-flight same-epoch worker messages that
+    // arrive after this call are filtered out by the onmessage guard.
+    // Without this, a worker that was already inside a synchronous
+    // sweep could repopulate the store with `progress` / `done` after
+    // the user has already aborted.
+    const cancelledEpoch = this.epoch
+    this.epoch += 1
+    this.sendCancelBestEffort(cancelledEpoch)
     this.sweepConfigHash = null
     useSrmtSweepStore.getState().abortSweep()
   }
@@ -272,17 +279,22 @@ export class WheelerDeWittSrmtSweepCoordinator {
     return worker
   }
 
-  private sendCancelBestEffort(): void {
+  private sendCancelBestEffort(epoch: number = this.epoch): void {
     if (!this.worker) return
     try {
-      this.worker.postMessage({ type: 'cancel', epoch: this.epoch })
+      this.worker.postMessage({ type: 'cancel', epoch })
     } catch {
       // Swallowing is correct — the worker may already be terminating.
     }
   }
 
   private cancelAndFail(message: string): void {
-    this.sendCancelBestEffort()
+    // Same epoch-invalidation story as `abortSweep` — bump so stale
+    // same-epoch worker messages cannot flip the store back to
+    // `complete` after we've already transitioned to `error`.
+    const cancelledEpoch = this.epoch
+    this.epoch += 1
+    this.sendCancelBestEffort(cancelledEpoch)
     this.sweepConfigHash = null
     useSrmtSweepStore.getState().failSweep(message)
   }

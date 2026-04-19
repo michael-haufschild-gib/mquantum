@@ -9,6 +9,20 @@ import { describe, expect, it } from 'vitest'
 
 import { DECOHERENCE_PRESETS } from '@/lib/physics/tdse/decoherencePresets'
 
+const BRANCHING_PRESET_IDS = [
+  'doubleWellBranching',
+  'barrierBranching',
+  'schrodingersCat',
+  'rapidCollapse',
+] as const
+
+const MONITORING_PRESET_IDS = [
+  'boxMonitoring',
+  'harmonicMonitoring',
+  'latticeMonitoring',
+  'chaoticMonitoring',
+] as const
+
 describe('DECOHERENCE_PRESETS', () => {
   it('contains presets', () => {
     expect(DECOHERENCE_PRESETS.length).toBeGreaterThan(0)
@@ -119,18 +133,7 @@ describe('DECOHERENCE_PRESETS', () => {
   it('canonical preset ids are all present (catalogue contract)', () => {
     // Hard-coded by the UI dropdown and the `stochastic-decoherence.spec.ts`
     // Playwright test. Pin the catalogue so a silent rename would surface.
-    const expected = new Set([
-      // branching (decoherence visualization)
-      'doubleWellBranching',
-      'barrierBranching',
-      'schrodingersCat',
-      'rapidCollapse',
-      // continuous monitoring
-      'boxMonitoring',
-      'harmonicMonitoring',
-      'latticeMonitoring',
-      'chaoticMonitoring',
-    ])
+    const expected = new Set([...BRANCHING_PRESET_IDS, ...MONITORING_PRESET_IDS])
     const actual = new Set(DECOHERENCE_PRESETS.map((p) => p.id))
     expect(actual).toEqual(expected)
   })
@@ -139,12 +142,7 @@ describe('DECOHERENCE_PRESETS', () => {
     // Structural separation between the two categories. A preset flipped
     // into the wrong category would still compile — this test pins the
     // category by id.
-    const branchingIds = new Set([
-      'doubleWellBranching',
-      'barrierBranching',
-      'schrodingersCat',
-      'rapidCollapse',
-    ])
+    const branchingIds = new Set<string>(BRANCHING_PRESET_IDS)
     for (const preset of DECOHERENCE_PRESETS) {
       const shouldBranch = branchingIds.has(preset.id)
       expect(

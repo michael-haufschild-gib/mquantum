@@ -105,7 +105,7 @@ function aOf(out: WheelerDeWittSolverOutput, ia: number): number {
  * tests so the comparison column is exactly at the symmetry axis.
  */
 function centerIdx(Nphi: number): number {
-  return (Nphi - 1) >> 1
+  return Math.floor(Nphi / 2)
 }
 
 /**

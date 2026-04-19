@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import { complexMatIdentity, complexMatZero } from '@/lib/physics/openQuantum/complexMatrix'
 import { densityMatrixFromCoefficients, MAX_K } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
@@ -281,6 +282,39 @@ describe('evolvePropagatorStep', () => {
       elements: new Float64Array((MAX_K + 1) * (MAX_K + 1) * 2),
     }
     expect(() => applyPropagator(smallP, oversize)).toThrow(/MAX_K/)
+  })
+
+  it('rejects a malformed Liouvillian buffer in computePropagator', () => {
+    const K = 2
+    const N = K * K
+    const undersized: ComplexMatrix = {
+      real: new Float64Array(N * N - 1),
+      imag: new Float64Array(N * N - 1),
+    }
+    expect(() => computePropagator(undersized, 0.01, K)).toThrow(/liouvillian buffer/)
+  })
+
+  it('rejects malformed buffers in applyPropagator', () => {
+    const K = 2
+    const N = K * K
+    // propagator too small
+    const smallProp: ComplexMatrix = {
+      real: new Float64Array(N * N - 1),
+      imag: new Float64Array(N * N - 1),
+    }
+    const rho: DensityMatrix = {
+      K,
+      elements: new Float64Array(2 * N),
+    }
+    expect(() => applyPropagator(smallProp, rho)).toThrow(/propagator buffer/)
+
+    // rho.elements too small
+    const goodProp = complexMatIdentity(N)
+    const shortRho: DensityMatrix = {
+      K,
+      elements: new Float64Array(2 * N - 1),
+    }
+    expect(() => applyPropagator(goodProp, shortRho)).toThrow(/rho.elements/)
   })
 
   it('drives population toward ground state under emission-only dissipation', () => {

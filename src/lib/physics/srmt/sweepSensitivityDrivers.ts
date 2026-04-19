@@ -39,6 +39,7 @@ import {
   f32FromF64,
   linspace,
   normaliseClocks,
+  normalisePointCount,
   nowMs,
   resolveCutIndexForAxisLen,
   type SrmtSweepCancelToken,
@@ -122,7 +123,11 @@ export function runPhiRefSweep(input: RunPhiRefSweepInputs): SrmtSweepPoint[] {
     cache.set(clock, { kSpec, hj64, hj32 })
   }
 
-  const phiRefs = linspace(config.sweepMin, config.sweepMax, config.points)
+  const phiRefs = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('phiRef', config.points)
+  )
   const results: SrmtSweepPoint[] = []
   for (let i = 0; i < phiRefs.length; i++) {
     if (cancel?.aborted) break
@@ -191,7 +196,7 @@ export function runRankCapSweep(input: RunRankCapSweepInputs): SrmtSweepPoint[] 
   const lo = clampRankCap(config.sweepMin)
   const hi = clampRankCap(config.sweepMax)
   const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
-  const rankSeries = linspace(rLo, rHi, config.points)
+  const rankSeries = linspace(rLo, rHi, normalisePointCount('rankCap', config.points))
   const uniqueRanks: number[] = []
   const seen = new Set<number>()
   for (let i = 0; i < rankSeries.length; i++) {
@@ -291,7 +296,11 @@ export function runPhiExtentSweep(input: RunPhiExtentSweepInputs): SrmtSweepPoin
   if (config.kind !== 'phiExtent') {
     throw new Error(`runPhiExtentSweep: expected kind='phiExtent', got '${config.kind}'`)
   }
-  const extents = linspace(config.sweepMin, config.sweepMax, config.points)
+  const extents = linspace(
+    config.sweepMin,
+    config.sweepMax,
+    normalisePointCount('phiExtent', config.points)
+  )
   const results: SrmtSweepPoint[] = []
   for (let i = 0; i < extents.length; i++) {
     if (cancel?.aborted) break

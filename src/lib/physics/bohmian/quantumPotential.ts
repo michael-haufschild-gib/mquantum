@@ -98,7 +98,9 @@ export function computeHarmonicPotentialV(x: number, y: number, z: number): numb
  * @param gridSize Per-axis grid resolution.
  * @param boundingRadius World-space half-length of the cube the grid covers.
  * @returns Float32Array of size gridSize³ containing Q at each voxel.
- * @throws If `densityGrid.length !== gridSize³` or `boundingRadius <= 0`.
+ * @throws If `gridSize` is not an integer ≥ 3.
+ * @throws If `boundingRadius` is not a finite positive number.
+ * @throws If `densityGrid.length !== gridSize³`.
  */
 export function computeQuantumPotentialCpu(
   densityGrid: Float32Array,

@@ -165,9 +165,12 @@ describe('SRMT cut-sweep determinism', () => {
   }
 
   it('runCutSweep produces bit-exact qualities across two runs', () => {
-    const solver = solveWheelerDeWitt(WDW_INPUT)
+    // Build two *independent* solver outputs so any silent in-place mutation
+    // of solverOutput buffers cannot mask a reproducibility regression.
+    const solverA = solveWheelerDeWitt(WDW_INPUT)
+    const solverB = solveWheelerDeWitt(WDW_INPUT)
     const pointsA = runCutSweep({
-      solverOutput: solver,
+      solverOutput: solverA,
       config: SWEEP_CFG,
       physics: {
         inflatonMass: WDW_INPUT.inflatonMass,
@@ -175,7 +178,7 @@ describe('SRMT cut-sweep determinism', () => {
       },
     })
     const pointsB = runCutSweep({
-      solverOutput: solver,
+      solverOutput: solverB,
       config: SWEEP_CFG,
       physics: {
         inflatonMass: WDW_INPUT.inflatonMass,
@@ -211,17 +214,20 @@ describe('SRMT cut-sweep determinism', () => {
   })
 
   it('sweepPointsToCsv output is byte-identical with computeMs canonicalised', () => {
-    const solver = solveWheelerDeWitt(WDW_INPUT)
-    const common = {
-      solverOutput: solver,
-      config: SWEEP_CFG,
-      physics: {
-        inflatonMass: WDW_INPUT.inflatonMass,
-        cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
-      },
+    const physics = {
+      inflatonMass: WDW_INPUT.inflatonMass,
+      cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
     }
-    const a = runCutSweep(common).map(canonicalize)
-    const b = runCutSweep(common).map(canonicalize)
+    const a = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: SWEEP_CFG,
+      physics,
+    }).map(canonicalize)
+    const b = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: SWEEP_CFG,
+      physics,
+    }).map(canonicalize)
     const csvA = sweepPointsToCsv(a, 'cut', [])
     const csvB = sweepPointsToCsv(b, 'cut', [])
     expect(csvA).toBe(csvB)
@@ -247,14 +253,9 @@ describe('SRMT cut-sweep determinism', () => {
       gridNphi: WDW_INPUT.gridNphi,
       phiExtent: WDW_INPUT.phiExtent,
     }
-    const solver = solveWheelerDeWitt(WDW_INPUT)
-    const common = {
-      solverOutput: solver,
-      config: SWEEP_CFG,
-      physics: {
-        inflatonMass: WDW_INPUT.inflatonMass,
-        cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
-      },
+    const physics = {
+      inflatonMass: WDW_INPUT.inflatonMass,
+      cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
     }
     const manifest = buildSrmtSweepManifest({
       wdwConfig,
@@ -264,8 +265,16 @@ describe('SRMT cut-sweep determinism', () => {
       srmtDiagnosticVersion: '1.0.0',
       generatedAt: '2026-04-19T10:00:00.000Z',
     })
-    const a = runCutSweep(common).map(canonicalize)
-    const b = runCutSweep(common).map(canonicalize)
+    const a = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: SWEEP_CFG,
+      physics,
+    }).map(canonicalize)
+    const b = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: SWEEP_CFG,
+      physics,
+    }).map(canonicalize)
     const csvA = sweepPointsToCsv(a, 'cut', [], manifest)
     const csvB = sweepPointsToCsv(b, 'cut', [], manifest)
     expect(csvA).toBe(csvB)

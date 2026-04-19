@@ -206,6 +206,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
       // before cannot resurface.
       return {
         status: 'idle',
+        startedAt: 0,
         errorMessage: null,
         currentSolveIndex: -1,
         config: null,
@@ -242,7 +243,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
   completeSweep: () => {
     set((s) => {
       if (s.status !== 'running') return s
-      return { status: 'complete', version: s.version + 1 }
+      return { status: 'complete', currentSolveIndex: -1, version: s.version + 1 }
     })
   },
 
@@ -254,6 +255,7 @@ export const useSrmtSweepStore = create<SrmtSweepState>((set) => ({
       if (s.status !== 'running') return s
       return {
         status: 'error',
+        currentSolveIndex: -1,
         errorMessage: message,
         version: s.version + 1,
       }

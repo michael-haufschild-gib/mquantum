@@ -349,21 +349,7 @@ export function estimateVacuumMaxPhi(
   config: FreeScalarConfig,
   dispersion: VacuumDispersion
 ): number {
-  const { gridSize, spacing, mass, latticeDim } = config
-  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
-  const dims = gridSize.slice(0, latticeDim)
-  const totalSites = dims.reduce((a, b) => a * b, 1)
-  const omegaOf = resolveOmegaEvaluator(config, dispersion)
-  const coords = new Array<number>(latticeDim).fill(0)
-
-  let varianceSum = 0
-  for (let idx = 0; idx < totalSites; idx++) {
-    linearToNDCoordsInto(idx, dims, coords)
-    const omega = omegaOf(coords, dims)
-    varianceSum += 1 / (2 * omega)
-  }
-
-  const variancePerSite = varianceSum / totalSites
+  const variancePerSite = averageOverVacuumModes(config, dispersion, (omega) => 1 / (2 * omega))
   return 3 * Math.sqrt(variancePerSite)
 }
 
@@ -384,21 +370,7 @@ export function estimateVacuumMaxPi(
   config: FreeScalarConfig,
   dispersion: VacuumDispersion
 ): number {
-  const { gridSize, spacing, mass, latticeDim } = config
-  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
-  const dims = gridSize.slice(0, latticeDim)
-  const totalSites = dims.reduce((a, b) => a * b, 1)
-  const omegaOf = resolveOmegaEvaluator(config, dispersion)
-  const coords = new Array<number>(latticeDim).fill(0)
-
-  let varianceSum = 0
-  for (let idx = 0; idx < totalSites; idx++) {
-    linearToNDCoordsInto(idx, dims, coords)
-    const omega = omegaOf(coords, dims)
-    varianceSum += omega / 2
-  }
-
-  const variancePerSite = varianceSum / totalSites
+  const variancePerSite = averageOverVacuumModes(config, dispersion, (omega) => omega / 2)
   return 3 * Math.sqrt(variancePerSite)
 }
 
@@ -430,20 +402,30 @@ export function estimateVacuumEnergyVisualScale(
   config: FreeScalarConfig,
   dispersion: VacuumDispersion
 ): number {
+  return averageOverVacuumModes(config, dispersion, (omega) => omega)
+}
+
+/**
+ * Shared mode-space traversal for the three vacuum estimators. Iterates
+ * every k-mode via `linearToNDCoordsInto`, evaluates `omegaOf`, and
+ * returns the site-averaged `term(omega)`. Factored out so future physics
+ * tweaks (e.g. an alternative dispersion branch) only touch one scaffold.
+ */
+function averageOverVacuumModes(
+  config: FreeScalarConfig,
+  dispersion: VacuumDispersion,
+  term: (omega: number) => number
+): number {
   const { gridSize, spacing, mass, latticeDim } = config
   validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
   const omegaOf = resolveOmegaEvaluator(config, dispersion)
   const coords = new Array<number>(latticeDim).fill(0)
-
-  let omegaSum = 0
+  let sum = 0
   for (let idx = 0; idx < totalSites; idx++) {
     linearToNDCoordsInto(idx, dims, coords)
-    const omega = omegaOf(coords, dims)
-    omegaSum += omega
+    sum += term(omegaOf(coords, dims))
   }
-
-  const meanOmega = omegaSum / totalSites
-  return meanOmega
+  return sum / totalSites
 }

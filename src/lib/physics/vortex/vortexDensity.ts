@@ -48,9 +48,10 @@ export const TAU = 2 * Math.PI
  *
  * ## Exact-boundary behaviour
  * At exact odd multiples of π (`dtheta = ±π, ±3π, ±5π, …`) the signed result
- * depends on the platform `round()` convention (JS `Math.round` is
- * half-away-from-zero; WGSL `round` is half-to-even). Tests that probe those
- * exact values must assert `|wrapPhase(x)| ≈ π`, not a signed result.
+ * depends on the platform `round()` convention (JS `Math.round` rounds half
+ * toward +∞ — e.g. `Math.round(-1.5) === -1`; WGSL `round` is half-to-even).
+ * Tests that probe those exact values must assert `|wrapPhase(x)| ≈ π`, not
+ * a signed result.
  *
  * @param dTheta Raw phase difference in radians.
  * @returns Wrapped difference in (-pi, pi] (or [-pi, pi) at exact boundaries).

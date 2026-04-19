@@ -38,6 +38,7 @@
  */
 export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
   if (count < 2) return Number.NaN
+  if (count > K.length || count > E.length) return Number.NaN
 
   let sumE = 0
   let sumK = 0

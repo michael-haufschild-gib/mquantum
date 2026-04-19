@@ -44,6 +44,9 @@ import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solv
 
 import type { SrmtPhysicsContext } from './diagnostic'
 import {
+  normalisePointCount,
+  predictCutSweepCount,
+  predictRankCapSweepCount,
   runBcSweep,
   runCutSweep,
   runLambdaSweep,
@@ -181,7 +184,7 @@ export function handleSrmtSweepRequest(
   state.cancel = cancel
   const start = nowMs()
 
-  const total = totalPointsFor(msg.config)
+  const total = totalPointsFor(msg.config, msg.solverOutput?.gridSize)
   let completed = 0
   const onProgress = (point: SrmtSweepPoint): void => {
     completed += 1
@@ -309,19 +312,22 @@ if (typeof self !== 'undefined' && typeof (self as unknown as Worker).postMessag
   }
 }
 
-function totalPointsFor(config: SrmtSweepConfig): number {
-  switch (config.kind) {
-    case 'cut':
-      return Math.max(1, Math.min(64, Math.floor(config.points)))
-    case 'mass':
-    case 'lambda':
-    case 'phiRef':
-      return Math.max(1, Math.min(21, Math.floor(config.points)))
-    case 'rankCap':
-      return Math.max(1, Math.min(32, Math.floor(config.points)))
-    case 'phiExtent':
-      return Math.max(1, Math.min(13, Math.floor(config.points)))
-    case 'bc':
-      return 3
+/**
+ * Report the *actual* sweep-point count the driver will emit, so
+ * progress hits 100% instead of stalling at < 100% and then jumping to
+ * `done`. For `cut` this is the deduplicated per-clock-axis set; for
+ * `rankCap` it is the rounded + deduplicated rank set; for the other
+ * kinds it is the driver's clamped `config.points`.
+ */
+function totalPointsFor(
+  config: SrmtSweepConfig,
+  gridSize?: readonly [number, number, number]
+): number {
+  if (config.kind === 'cut' && gridSize) {
+    return predictCutSweepCount(config, gridSize)
   }
+  if (config.kind === 'rankCap') {
+    return predictRankCapSweepCount(config)
+  }
+  return normalisePointCount(config.kind, config.points)
 }

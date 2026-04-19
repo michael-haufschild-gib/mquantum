@@ -192,14 +192,13 @@ describe('SrmtSweepSection behaviour', () => {
     })
     // Capture the Blob content that the download helper passes through
     // URL.createObjectURL so we can assert the manifest round-tripped.
-    let capturedCsv = ''
+    // Store the Promise<string> from blob.text() and await it explicitly
+    // below — polling with `await Promise.resolve()` makes the assertion
+    // order-dependent on happy-dom's microtask scheduler.
+    let capturedCsvPromise: Promise<string> | null = null
     const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((obj: unknown) => {
       const blob = obj as Blob
-      // happy-dom Blob supports .text(); this is resolved synchronously
-      // enough that we can re-read it inside the assertion.
-      void blob.text().then((t) => {
-        capturedCsv = t
-      })
+      capturedCsvPromise = blob.text()
       return 'blob:stub'
     })
     const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
@@ -207,9 +206,10 @@ describe('SrmtSweepSection behaviour', () => {
     await user.click(screen.getByTestId('srmt-sweep-export-csv'))
     expect(createUrlSpy).toHaveBeenCalled()
     expect(clickSpy).toHaveBeenCalled()
-    // Resolve any outstanding microtasks so blob.text() settles.
-    await Promise.resolve()
-    await Promise.resolve()
+    if (!capturedCsvPromise) {
+      throw new Error('createObjectURL spy never captured a Blob promise')
+    }
+    const capturedCsv = await capturedCsvPromise
     expect(capturedCsv).toContain('# SRMT sweep, kind=cut')
     expect(capturedCsv).toContain('# git: ')
     expect(capturedCsv).toContain('# solver: wdw=')
