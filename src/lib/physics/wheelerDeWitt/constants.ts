@@ -175,6 +175,12 @@ export function wdwEuclideanWkbAction(
  * signed Langer variable used by the Airy uniform asymptotic
  * (`{@link ./airyConnection}`).
  *
+ * Note: this function returns the action *measured from the turning
+ * surface*, the convention required by the Langer connection. The
+ * "integrated phase from `a = 0`" convention used by analytic-fixture
+ * comparisons (Λ ≤ 0 included) is exposed separately as
+ * {@link wdwLorentzianWkbPhase} so the two consumers cannot drift.
+ *
  * @param a - Scale factor at which to evaluate the action.
  * @param phi1 - First inflaton coordinate.
  * @param phi2 - Second inflaton coordinate.
@@ -194,6 +200,55 @@ export function wdwLorentzianWkbAction(
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 >= 1) return 0
   return (3 / (4 * V)) * Math.pow(1 - KVa2, 1.5)
+}
+
+/**
+ * Integrated Lorentzian-side WKB phase `Φ_L(a, φ) = ∫_0^a √|U(a', φ)|
+ * da'` valid across all three minisuperspace regimes (`V > 0`, `V = 0`,
+ * `V < 0`). Unlike {@link wdwLorentzianWkbAction} (which is
+ * Langer-anchored at the turning surface), this function is anchored at
+ * `a = 0` — the natural reference point for comparing the solver's
+ * `arg(χ(a))` against the analytic Bessel/Hankel asymptotic phase
+ * (see {@link ./analyticFixtures}).
+ *
+ * Closed forms by `V` sign:
+ *
+ *  - **dS (V > 0)**: `√|U| = 6π·a·√(1 − KVa²)` for `a < a_turn`. Then
+ *    `Φ_L(a) = (3/(4V))·(1 − (1 − KVa²)^{3/2})`. For `a ≥ a_turn` the
+ *    Lorentzian phase saturates at `Φ_L(a_turn) = 3/(4V)`.
+ *  - **Free (V = 0)**: `√|U| = 6π·a`, so `Φ_L(a) = 3π·a²`. This pins
+ *    the leading WKB phase of the Weber-equation Bessel asymptotic
+ *    `χ ∝ √a · H_{1/4}^{(1)}(3π·a²)` ⇒ phase ≈ 3π·a² − π/4·(2·1/4+1)
+ *    at large `a`.
+ *  - **AdS (V < 0)**: `√|U| = 6π·a·√(1 + K|V|·a²)` everywhere. Then
+ *    `Φ_L(a) = (3/(4|V|))·((1 + K|V|·a²)^{3/2} − 1)`.
+ *
+ * @param a - Scale factor at which to evaluate the phase.
+ * @param phi1 - First inflaton coordinate.
+ * @param phi2 - Second inflaton coordinate.
+ * @param m - Inflaton mass.
+ * @param lambda - Cosmological constant.
+ * @returns `Φ_L(a, φ) ≥ 0` in natural units.
+ */
+export function wdwLorentzianWkbPhase(
+  a: number,
+  phi1: number,
+  phi2: number,
+  m: number,
+  lambda: number
+): number {
+  const V = wdwPotential(phi1, phi2, m, lambda)
+  if (V > 0) {
+    const KVa2 = WDW_G_PREFACTOR * V * a * a
+    if (KVa2 >= 1) return 3 / (4 * V)
+    return (3 / (4 * V)) * (1 - Math.pow(1 - KVa2, 1.5))
+  }
+  if (V === 0) {
+    return 3 * Math.PI * a * a
+  }
+  const absV = -V
+  const KabsVa2 = WDW_G_PREFACTOR * absV * a * a
+  return (3 / (4 * absV)) * (Math.pow(1 + KabsVa2, 1.5) - 1)
 }
 
 /**

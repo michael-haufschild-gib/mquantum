@@ -7,9 +7,38 @@
  * the WdW wavefunction" — it could be drifting toward a numerical
  * artefact and we wouldn't know.
  *
- * This module pins the solver against three regimes that admit a
- * **closed-form scalar invariant** computable in elementary functions
- * from the WdW potential `U(a, φ)`:
+ * This module pins the solver against the three minisuperspace regimes
+ * with closed-form analytic references:
+ *
+ *  - **Free / massless / Λ=0** — EXACT pointwise comparison against
+ *    `√a · H_{1/4}^{(1)}(3π·a²)` (the Hankel-form outgoing-wave
+ *    solution of the Weber-equation reduction `χ'' + 36π²·a²·χ = 0`).
+ *    Uses {@link WheelerDeWittSolverInput#customBoundary} to inject a
+ *    constant-in-φ initial slab so the φ-Laplacian term vanishes and
+ *    the solver reduces to a pure 1D problem on the central column.
+ *    Tolerance 5e-3 amplitude / 5e-3 cumulative phase across ~2
+ *    oscillations.
+ *
+ *  - **Pure anti-de Sitter (m=0, Λ<0)** — leading-WKB phase rate
+ *    matches closed-form `Φ_L^AdS(a)` (`wdwLorentzianWkbPhase` in
+ *    `constants.ts`) on the deep tail. Pure-Lorentzian everywhere; no
+ *    Stage-3 overwrite. Constant-φ injection isolates 1D.
+ *
+ *  - **Pure de Sitter (m=0, Λ>0)** — two analytic pins:
+ *    (i) Lorentzian-side WKB phase rate matches `Φ_L^dS(a)` on `a <
+ *    a_turn`; (ii) Euclidean-side HH renormalised tail
+ *    `T(a) = |χ|·|U|^{1/4}·exp(+S_E)` constant on `a > 1.5·a_turn`.
+ *
+ * Plus a residual block of legacy WKB-zero-crossing-count smoke tests
+ * (kept for pattern coverage; the pointwise pins above are the
+ * primary correctness gates).
+ *
+ * The published analytic fixture lives in
+ * `src/lib/physics/wheelerDeWitt/analyticFixtures.ts` (and is itself
+ * pinned by `analyticFixtures.test.ts` against Wronskian / asymptotic
+ * envelope identities).
+ *
+ * Original analytic-coverage block:
  *
  *  - **Pure de Sitter** (`m=0, Λ>0`, BC=`noBoundary`). In the deep
  *    Euclidean band `a ≫ a_turn`, the Hartle–Hawking wavefunction is
@@ -63,8 +92,16 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  besselJQuarter,
+  besselJQuarterPrime,
+  besselYQuarter,
+  besselYQuarterPrime,
+  freeMinisuperspaceChiHankel,
+} from '@/lib/physics/wheelerDeWitt/analyticFixtures'
+import {
   WDW_G_PREFACTOR,
   wdwEuclideanWkbAction,
+  wdwLorentzianWkbPhase,
   wdwTurningA,
   wdwU,
 } from '@/lib/physics/wheelerDeWitt/constants'
@@ -345,5 +382,348 @@ describe('Wheeler–DeWitt analytic-limit pins', () => {
       expect(anyNaN, `lambda=${lambda} produced NaN/Inf`).toBe(false)
       expect(maxMag, `lambda=${lambda} produced zero amplitude`).toBeGreaterThan(0)
     }
+  })
+})
+
+/**
+ * Build a constant-in-φ initial slab for the WdW solver, populating
+ * `χ(a_min, ·) = (cre, cim)` and `∂_a χ(a_min, ·) = (dre, dim)` at
+ * every `(φ₁, φ₂)` cell. The constant profile is an exact eigenfunction
+ * of `∇²_φ` with eigenvalue 0 in the interior; the φ-Laplacian
+ * contribution to the WdW equation vanishes everywhere except at the
+ * outer φ-edges (ghost-zero Dirichlet leaks `−2·const/dφ²`).
+ *
+ * Edge contamination propagates inward at characteristic speed
+ * `1/a` per unit `a`. From the edge `φ = phiExtent` to the centre
+ * `φ = 0` the travel time satisfies `dφ/da = 1/a` ⇒ `Δa = √(2·Δφ +
+ * a₀²) − a₀`. Tests confine measurements to a-ranges where the
+ * edge perturbation has not yet reached the centre.
+ */
+function constantPhiSlab(
+  Nphi: number,
+  cre: number,
+  cim: number,
+  dre: number,
+  dim: number
+): { chi: Float32Array; chiDeriv: Float32Array } {
+  const N = Nphi * Nphi
+  const chi = new Float32Array(2 * N)
+  const chiDeriv = new Float32Array(2 * N)
+  for (let i = 0; i < N; i++) {
+    chi[2 * i] = cre
+    chi[2 * i + 1] = cim
+    chiDeriv[2 * i] = dre
+    chiDeriv[2 * i + 1] = dim
+  }
+  return { chi, chiDeriv }
+}
+
+/** Read χ(a, central) for a constant-in-φ slab (any `(i1, i2)` works
+ * before contamination, but the centre is most contamination-resistant). */
+function chiCentral(out: WheelerDeWittSolverOutput, ia: number): { re: number; im: number } {
+  const Nphi = out.gridSize[1]
+  return chiAt(out, ia, centerIdx(Nphi), centerIdx(Nphi))
+}
+
+/**
+ * Edge-contamination horizon at the central column. From the BC slab
+ * at `a_min` to scale-factor `a` the inward-propagating perturbation
+ * has travelled `Δφ = (a² − a_min²)/2` (integrating `dφ/da = 1/a` is
+ * `dφ = a·da`). Below the horizon `a_safe = √(a_min² + 2·phiExtent)`
+ * the centre is contamination-free.
+ */
+function safeAUpperBound(aMin: number, phiExtent: number): number {
+  return Math.sqrt(aMin * aMin + 2 * phiExtent)
+}
+
+/**
+ * **Exact** derivative `d/da [√a · H_{1/4}^{(1)}(3π·a²)]` at scale
+ * factor `a`. Required as the boundary derivative for the analytic
+ * pointwise comparison: the leading-WKB Vilenkin formula
+ * `χ'/χ ≈ −1/(2a) + i·6π·a` only matches the Hankel solution
+ * **asymptotically** (`3π·a² ≫ 1`); near `a_min ≲ 0.7` the exact
+ * Hankel derivative differs by `O(1/(3π·a²))` — a few percent — and
+ * that mismatch seeds a J/Y branch admixture that grows during
+ * propagation and dominates the 5e-3 amplitude error budget.
+ *
+ * Derivation:
+ *
+ *     d/da [√a · H_ν(3π·a²)]
+ *       = (1/(2√a)) · H_ν(3π·a²) + √a · 6π·a · H_ν'(3π·a²)
+ *       = χ(a)/(2a) + √a · 6π·a · H_ν'(z)
+ *
+ * with `H_ν'(z) = J_ν'(z) + i·Y_ν'(z)` (recurrence
+ * `J_ν'(z) = J_{ν−1}(z) − (ν/z)·J_ν(z)`).
+ */
+function freeHankelDerivativeExact(a: number): { re: number; im: number } {
+  const z = 3 * Math.PI * a * a
+  const Jp = besselJQuarterPrime(z)
+  const Yp = besselYQuarterPrime(z)
+  const J = besselJQuarter(z)
+  const Y = besselYQuarter(z)
+  const sqrtA = Math.sqrt(a)
+  const inv2sqrtA = 1 / (2 * sqrtA)
+  const sixPiA = 6 * Math.PI * a
+  // χ' = (1/(2√a))·H + √a · 6π·a · H'(z)
+  const re = inv2sqrtA * J + sqrtA * sixPiA * Jp
+  const im = inv2sqrtA * Y + sqrtA * sixPiA * Yp
+  return { re, im }
+}
+
+describe('Wheeler–DeWitt solver vs published analytic fixtures (1D-isolated)', () => {
+  /**
+   * Constant-φ Hankel injection on the free regime. The φ-Laplacian
+   * vanishes (constant eigenfunction with eigenvalue 0), so the central
+   * column evolves under the bare 1D Weber equation
+   * `χ'' + 36π²·a²·χ = 0`. The exact solution that matches the
+   * Vilenkin-style outgoing-wave BC is
+   *
+   *     χ(a) = N · √a · H_{1/4}^{(1)}(3π·a²)
+   *
+   * where `N` is fixed by the BC's complex amplitude at `a = a_min`.
+   * Test compares solver output to the analytic fixture pointwise on
+   * the contamination-safe a-range.
+   *
+   * **Why this is the canonical "Hankel function analytic" check** (the
+   * user's request, properly attributed): the free-massless-Λ=0 WdW
+   * minisuperspace problem is the only regime where the solution is a
+   * single named special function on the entire `a > 0` axis. dS and
+   * AdS acquire a quartic-in-`a` term and only admit closed-form WKB
+   * approximations.
+   */
+  it('free (m=0, Λ=0): central column matches √a · H_{1/4}^{(1)}(3π·a²) to 5e-3', () => {
+    resetCflWarningBudget()
+    const aMin = 0.5
+    const aMax = 1.5
+    const Na = 1024 // refine for tight tolerance — analytic test only
+    const Nphi = 17
+    const phiExtent = 5.0 // ensures safeA > aMax (see safeAUpperBound)
+    expect(safeAUpperBound(aMin, phiExtent)).toBeGreaterThan(aMax)
+
+    // Analytic anchor at a_min: N = 1, so χ(a_min) = √a_min · H^{(1)}(z_min)
+    // and χ'(a_min) = exact derivative (NOT the leading-WKB Vilenkin
+    // formula — see freeHankelDerivativeExact for why).
+    const chiAtMin = freeMinisuperspaceChiHankel(aMin)
+    const dChiAtMin = freeHankelDerivativeExact(aMin)
+    const customBoundary = constantPhiSlab(
+      Nphi,
+      chiAtMin.re,
+      chiAtMin.im,
+      dChiAtMin.re,
+      dChiAtMin.im
+    )
+
+    const out = solveWheelerDeWitt({
+      boundaryCondition: 'tunneling', // BC enum is a no-op label here
+      inflatonMass: 0,
+      cosmologicalConstant: 0,
+      aMin,
+      aMax,
+      gridNa: Na,
+      gridNphi: Nphi,
+      phiExtent,
+      customBoundary,
+    })
+
+    // Sample at every 32nd cell.
+    let maxMagErr = 0
+    let maxPhaseErr = 0
+    let nSamples = 0
+    for (let ia = 16; ia < Na - 4; ia += 32) {
+      const a = aOf(out, ia)
+      const numerical = chiCentral(out, ia)
+      const analytic = freeMinisuperspaceChiHankel(a)
+      const errRe = numerical.re - analytic.re
+      const errIm = numerical.im - analytic.im
+      const errMag = Math.sqrt(errRe * errRe + errIm * errIm)
+      const refMag = Math.sqrt(analytic.re ** 2 + analytic.im ** 2)
+      const relMag = errMag / refMag
+      if (relMag > maxMagErr) maxMagErr = relMag
+      // Cumulative phase error.
+      const numPhase = Math.atan2(numerical.im, numerical.re)
+      const refPhase = Math.atan2(analytic.im, analytic.re)
+      let dPhase = numPhase - refPhase
+      // Wrap to [−π, π].
+      while (dPhase > Math.PI) dPhase -= 2 * Math.PI
+      while (dPhase < -Math.PI) dPhase += 2 * Math.PI
+      if (Math.abs(dPhase) > maxPhaseErr) maxPhaseErr = Math.abs(dPhase)
+      nSamples++
+    }
+    expect(nSamples).toBeGreaterThan(20)
+    expect(maxMagErr, `max relative magnitude error = ${maxMagErr}`).toBeLessThan(5e-3)
+    expect(maxPhaseErr, `max phase deviation = ${maxPhaseErr} rad`).toBeLessThan(5e-3)
+  })
+
+  /**
+   * Construct a Vilenkin outgoing-wave BC `χ ∝ |U|^{-1/4}·exp(+i·Φ_L)`
+   * at `a = aMin` with constant-in-φ profile. Returns the BC slab plus
+   * the analytic anchor phase at `aMin` for downstream comparison.
+   */
+  function buildOutgoingWaveBC(
+    aMin: number,
+    Nphi: number,
+    m: number,
+    lambda: number
+  ): {
+    boundary: { chi: Float32Array; chiDeriv: Float32Array }
+    phaseAtMin: number
+  } {
+    const phaseAtMin = wdwLorentzianWkbPhase(aMin, 0, 0, m, lambda)
+    const Umag = -wdwU(aMin, 0, 0, m, lambda)
+    const prefactor = Math.pow(Umag, -0.25)
+    const c0Re = prefactor * Math.cos(phaseAtMin)
+    const c0Im = prefactor * Math.sin(phaseAtMin)
+    const aPlus = aMin + 1e-5
+    const UmagPlus = -wdwU(aPlus, 0, 0, m, lambda)
+    const dUda = (UmagPlus - Umag) / 1e-5
+    const prefRate = -dUda / (4 * Umag)
+    const phaseRate = Math.sqrt(Umag)
+    const dRe = prefRate * c0Re - phaseRate * c0Im
+    const dIm = prefRate * c0Im + phaseRate * c0Re
+    const boundary = constantPhiSlab(Nphi, c0Re, c0Im, dRe, dIm)
+    return { boundary, phaseAtMin }
+  }
+
+  /**
+   * Per-cell **phase-rate** (instantaneous) pin. The accumulated phase
+   * shift over a chunk of `nStep` cells `[ia, ia+nStep]` should equal
+   * the analytic integrated phase `Φ_L(a_{ia+nStep}) − Φ_L(a_{ia})` to
+   * leapfrog precision `O(da²·ω²)`. Bypasses BC-mismatch admixture
+   * (which contaminates absolute phase) and isolates the per-step
+   * propagation accuracy.
+   */
+  function maxLocalPhaseRateError(
+    out: WheelerDeWittSolverOutput,
+    m: number,
+    lambda: number,
+    iaStart: number,
+    iaEnd: number,
+    nStep: number
+  ): { maxErr: number; nChunks: number } {
+    let maxErr = 0
+    let nChunks = 0
+    for (let ia = iaStart; ia + nStep < iaEnd; ia += nStep) {
+      const a0 = aOf(out, ia)
+      const a1 = aOf(out, ia + nStep)
+      // Skip chunks that straddle a turning surface — the WKB phase
+      // saturates there and per-cell rate diverges (`U → 0`).
+      if (wdwU(a0, 0, 0, m, lambda) >= 0) continue
+      if (wdwU(a1, 0, 0, m, lambda) >= 0) continue
+      const cStart = chiCentral(out, ia)
+      const cEnd = chiCentral(out, ia + nStep)
+      const phaseStart = Math.atan2(cStart.im, cStart.re)
+      const phaseEnd = Math.atan2(cEnd.im, cEnd.re)
+      let delta = phaseEnd - phaseStart
+      while (delta > Math.PI) delta -= 2 * Math.PI
+      while (delta < -Math.PI) delta += 2 * Math.PI
+      const analyticDelta =
+        wdwLorentzianWkbPhase(a1, 0, 0, m, lambda) - wdwLorentzianWkbPhase(a0, 0, 0, m, lambda)
+      // Wrap analytic delta to the same convention.
+      let analyticDeltaWrapped = analyticDelta % (2 * Math.PI)
+      if (analyticDeltaWrapped > Math.PI) analyticDeltaWrapped -= 2 * Math.PI
+      if (analyticDeltaWrapped < -Math.PI) analyticDeltaWrapped += 2 * Math.PI
+      let err = Math.abs(delta - analyticDeltaWrapped)
+      // Account for ambiguity at the wrap boundary.
+      if (err > Math.PI) err = 2 * Math.PI - err
+      if (err > maxErr) maxErr = err
+      nChunks++
+    }
+    return { maxErr, nChunks }
+  }
+
+  /**
+   * Pure AdS (m=0, Λ<0) phase-rate pin. The whole grid is Lorentzian
+   * (V<0 ⇒ no turning surface). With constant-φ Vilenkin outgoing-wave
+   * BC, the per-cell-chunk phase advance should equal closed-form
+   * `ΔΦ_L^{AdS} = (3/(4|Λ|))·((1+K|Λ|·a²)^{3/2} − 1)` differences to
+   * leapfrog precision.
+   *
+   * The per-chunk metric is insensitive to BC-mismatch
+   * branch-admixture (which contaminates absolute phase but not the
+   * local advance rate).
+   */
+  it('pure AdS (m=0, Λ<0): per-cell phase advance matches ΔΦ_L^{AdS} to ≤ 1e-2 rad', () => {
+    resetCflWarningBudget()
+    const m = 0
+    const lambda = -0.5
+    const aMin = 0.5
+    const aMax = 1.5
+    const Na = 1024
+    const Nphi = 17
+    const phiExtent = 5.0
+    expect(safeAUpperBound(aMin, phiExtent)).toBeGreaterThan(aMax)
+    const { boundary } = buildOutgoingWaveBC(aMin, Nphi, m, lambda)
+    const out = solveWheelerDeWitt({
+      boundaryCondition: 'tunneling',
+      inflatonMass: m,
+      cosmologicalConstant: lambda,
+      aMin,
+      aMax,
+      gridNa: Na,
+      gridNphi: Nphi,
+      phiExtent,
+      customBoundary: boundary,
+    })
+    // Skip first 64 cells (BC transient) and last 16 cells (edge).
+    // 8-cell chunks: ΔΦ ≈ 0.5 rad per chunk at mid-grid — well below π,
+    // safe from wrap ambiguity.
+    // Tolerance budget: leapfrog truncation per 8-cell chunk is
+    // O((ω·da)²/12)·8 ≈ 2e-4 rad at mid-grid. The dominant error
+    // contribution is BC-mismatch branch-admixture: the leading-WKB
+    // outgoing-wave BC `χ ∝ |U|^{-1/4}·exp(+i·Φ_L)` is asymptotically
+    // exact only when `√|U|·a >> 1`. At `aMin = 0.5` with Λ = -0.5,
+    // the AdS WKB has subleading corrections of relative size
+    // `O(1/(√|U|·a)) ~ 1/(6π·0.5·√1.7) ≈ 4%` that seed a small
+    // counter-propagating-branch admixture. The admixture causes
+    // a sinusoidal phase wobble at the AdS-Bessel periodicity with
+    // amplitude in line with the measured 7e-3 rad.
+    //
+    // 1e-2 rad is still ~3 orders of magnitude tighter than the
+    // legacy zero-crossing pin (±3π rad), and pins the leapfrog
+    // dispersion to 4 significant figures of the analytic gradient.
+    const { maxErr, nChunks } = maxLocalPhaseRateError(out, m, lambda, 64, Na - 16, 8)
+    expect(nChunks).toBeGreaterThan(50)
+    expect(maxErr, `max chunked phase advance error = ${maxErr} rad`).toBeLessThan(1e-2)
+  })
+
+  /**
+   * Pure dS (m=0, Λ>0) Lorentzian-side phase-rate pin. Same approach as
+   * the AdS test, restricted to `a < a_turn`. Use `Λ = 0.05` so
+   * `a_turn = 1/√(KΛ) ≈ 1.546` accommodates aMax = 1.4 fully on the
+   * Lorentzian side.
+   *
+   * Stage-3 Airy overwrite is inactive on Lorentzian cells (it
+   * triggers only in the Euclidean region `a > a_turn`); the test is
+   * purely a leapfrog-precision check.
+   */
+  it('pure dS (m=0, Λ>0): Lorentzian-side per-cell phase advance matches ΔΦ_L^{dS} to ≤ 5e-3 rad', () => {
+    resetCflWarningBudget()
+    const m = 0
+    const lambda = 0.05
+    const aTurn = wdwTurningA(0, 0, m, lambda)!
+    expect(aTurn).toBeGreaterThan(1.4)
+    const aMin = 0.4
+    const aMax = 1.4
+    const Na = 1024
+    const Nphi = 17
+    const phiExtent = 5.0
+    expect(safeAUpperBound(aMin, phiExtent)).toBeGreaterThan(aMax)
+    expect(wdwU(aMax, 0, 0, m, lambda)).toBeLessThan(0)
+
+    const { boundary } = buildOutgoingWaveBC(aMin, Nphi, m, lambda)
+    const out = solveWheelerDeWitt({
+      boundaryCondition: 'tunneling',
+      inflatonMass: m,
+      cosmologicalConstant: lambda,
+      aMin,
+      aMax,
+      gridNa: Na,
+      gridNphi: Nphi,
+      phiExtent,
+      customBoundary: boundary,
+    })
+    const { maxErr, nChunks } = maxLocalPhaseRateError(out, m, lambda, 64, Na - 16, 8)
+    expect(nChunks).toBeGreaterThan(50)
+    expect(maxErr, `max chunked phase advance error = ${maxErr} rad`).toBeLessThan(5e-3)
   })
 })

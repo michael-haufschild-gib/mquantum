@@ -281,6 +281,15 @@ src/rendering/webgpu/renderers/strategies/
 
 - `src/tests/lib/physics/wheelerDeWitt/*`: solver, boundary conditions,
   WKB streamlines, density grid, SRMT overlay plumbing.
+  - `analyticFixtures.test.ts`: published Bessel-table pin (1e-10),
+    Wronskian identity (1e-12 series / 5e-8 asymptotic), free-case
+    ODE residual.
+  - `solverAnalytic.test.ts`: solver-vs-fixture pointwise comparison
+    on the three minisuperspace regimes (free, AdS, dS) using the
+    test-only `customBoundary` constant-φ slab. See
+    `docs/physics/wheeler-dewitt-analytic-fixtures.md` for the full
+    derivation, BC↔Bessel-coefficient mapping, and tolerance
+    rationale.
 - `src/tests/lib/physics/srmt/*`: SVD, Lanczos, Schmidt reshape, modular
   Hamiltonian, HJ operator against harmonic-oscillator analytics, WKB
   phase, Bisognano-Wichmann cross-check, diagnostic composition.
