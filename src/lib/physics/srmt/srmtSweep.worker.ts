@@ -62,6 +62,12 @@ import type { SrmtSweepConfig, SrmtSweepLandmark, SrmtSweepPoint } from './sweep
 export interface SrmtSweepSolverSnapshot {
   chi: Float32Array
   lorentzianMask: Uint8Array
+  /**
+   * Per-cell band classification from the solver. Preserved across the
+   * worker boundary so helpers reached from the sweep drivers never see
+   * silent zeros if they later start reading it.
+   */
+  bandKind: Uint8Array
   gridSize: [number, number, number]
   aMin: number
   aMax: number
@@ -143,15 +149,23 @@ export function createSrmtSweepWorkerState(): SrmtSweepWorkerState {
 }
 
 /**
- * Reconstruct a {@link WheelerDeWittSolverOutput} from the transfered
- * snapshot. `bandKind` + `columnAiry` are not needed by the sweep
- * driver so we stub them.
+ * Reconstruct a {@link WheelerDeWittSolverOutput} from the transferred
+ * snapshot. `bandKind` is preserved so any helper reached from a sweep
+ * driver that reads it sees the real solver classification rather than
+ * a silent zero-fill. `columnAiry` is not transferred (it is heavy and
+ * sweep code never reads it) so we stub it as an empty array.
  */
 function unpackSolverSnapshot(s: SrmtSweepSolverSnapshot): WheelerDeWittSolverOutput {
+  const expectedLen = s.gridSize[0] * s.gridSize[1] * s.gridSize[2]
+  if (s.bandKind.length !== expectedLen) {
+    throw new Error(
+      `unpackSolverSnapshot: bandKind.length ${s.bandKind.length} !== expected ${expectedLen}`
+    )
+  }
   return {
     chi: s.chi,
     lorentzianMask: s.lorentzianMask,
-    bandKind: new Uint8Array(s.gridSize[0] * s.gridSize[1] * s.gridSize[2]),
+    bandKind: s.bandKind,
     gridSize: s.gridSize,
     aMin: s.aMin,
     aMax: s.aMax,

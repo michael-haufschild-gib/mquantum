@@ -101,6 +101,23 @@ function validateLatticeInput(
   }
 }
 
+/**
+ * Verify a state-vector buffer matches the lattice's expected site count.
+ * Mirrors `validateLatticeInput`'s fast-fail policy so short/long buffers
+ * surface as a clear error instead of silently producing NaN from
+ * out-of-range reads.
+ */
+function validateFieldLength(
+  fnName: string,
+  fieldName: string,
+  actual: number,
+  expected: number
+): void {
+  if (actual !== expected) {
+    throw new Error(`${fnName}: ${fieldName}.length ${actual} !== expected ${expected}`)
+  }
+}
+
 /** World coordinate of lattice index i along an axis with N cells and spacing dx. */
 function worldCoord(i: number, N: number, dx: number): number {
   return (i - (N - 1) / 2) * dx
@@ -220,6 +237,8 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
 
   const N = gridSize
   const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('applyCurvedKineticRef', 'psiRe', psiRe.length, total)
+  validateFieldLength('applyCurvedKineticRef', 'psiIm', psiIm.length, total)
   const outRe = new Float32Array(total)
   const outIm = new Float32Array(total)
   const prefactor = -(hbar * hbar) / (2 * mass)
@@ -322,6 +341,9 @@ export function computeProperNorm(
   time: number = 0
 ): number {
   validateLatticeInput('computeProperNorm', latticeDim, gridSize, spacing)
+  const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('computeProperNorm', 'psiRe', psiRe.length, total)
+  validateFieldLength('computeProperNorm', 'psiIm', psiIm.length, total)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number
@@ -377,6 +399,11 @@ export function computeInnerProduct(
   time: number = 0
 ): { re: number; im: number } {
   validateLatticeInput('computeInnerProduct', latticeDim, gridSize, spacing)
+  const total = totalSites(gridSize, latticeDim)
+  validateFieldLength('computeInnerProduct', 'phiRe', phiRe.length, total)
+  validateFieldLength('computeInnerProduct', 'phiIm', phiIm.length, total)
+  validateFieldLength('computeInnerProduct', 'psiRe', psiRe.length, total)
+  validateFieldLength('computeInnerProduct', 'psiIm', psiIm.length, total)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number

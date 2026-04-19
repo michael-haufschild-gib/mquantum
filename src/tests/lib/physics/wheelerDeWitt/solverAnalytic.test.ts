@@ -157,12 +157,25 @@ function wkbActionIntegral(a0: number, a1: number, lambda: number): number {
   }
   const K = WDW_G_PREFACTOR
   if (lambda > 0) {
-    // dS: 1 - KΛa² inside the Lorentzian band a < a_turn = 1/√(KΛ).
-    // ∫6π·a·√(1−KΛa²) da = (-2π/(KΛ))·(1−KΛa²)^{3/2} + C
-    // ⇒ definite integral = (2π/(KΛ)) · ((1−KΛa0²)^{3/2} − (1−KΛa1²)^{3/2})
-    const u0 = Math.max(0, 1 - K * lambda * a0 * a0)
-    const u1 = Math.max(0, 1 - K * lambda * a1 * a1)
-    return ((2 * Math.PI) / (K * lambda)) * (Math.pow(u0, 1.5) - Math.pow(u1, 1.5))
+    // dS: 1 − KΛa² changes sign at a_turn = 1/√(KΛ). The integrand is
+    // ∫6π·a·√|1 − KΛa²| da, so we need the *absolute* value across the
+    // turning point — clamping to zero would drop the Euclidean
+    // contribution for a > a_turn.
+    //
+    // Primitives:
+    //   a < a_turn (Lorentzian):  ∫6π·a·√(1 − KΛa²) da
+    //       = −(2π/(KΛ)) · (1 − KΛa²)^{3/2} + C
+    //   a > a_turn (Euclidean):   ∫6π·a·√(KΛa² − 1) da
+    //       = +(2π/(KΛ)) · (KΛa² − 1)^{3/2} + C
+    const KL = K * lambda
+    const aTurn = 1 / Math.sqrt(KL)
+    const lorentz = (x0: number, x1: number): number =>
+      ((2 * Math.PI) / KL) * (Math.pow(1 - KL * x0 * x0, 1.5) - Math.pow(1 - KL * x1 * x1, 1.5))
+    const euclid = (x0: number, x1: number): number =>
+      ((2 * Math.PI) / KL) * (Math.pow(KL * x1 * x1 - 1, 1.5) - Math.pow(KL * x0 * x0 - 1, 1.5))
+    if (a1 <= aTurn) return lorentz(a0, a1)
+    if (a0 >= aTurn) return euclid(a0, a1)
+    return lorentz(a0, aTurn) + euclid(aTurn, a1)
   }
   // AdS Λ<0: 1 − KΛa² = 1 + K|Λ|a²
   // ∫6π·a·√(1 + K|Λ|a²) da = (2π/(K|Λ|))·(1+K|Λ|a²)^{3/2} + C
@@ -268,7 +281,7 @@ describe('Wheeler–DeWitt analytic-limit pins', () => {
 
     const predicted = wkbPredictedZeroCrossings(a0, a1, lambda)
     const observed = countReZeroCrossings(out, iaStart, iaEnd)
-    // Predicted is fractional — the test allows ±2 crossings tolerance
+    // Predicted is fractional — the test allows ±3 crossings tolerance
     // (next-to-leading WKB drift + boundary transient + π/4 phase shift).
     expect(observed).toBeGreaterThan(predicted - 3)
     expect(observed).toBeLessThan(predicted + 3)

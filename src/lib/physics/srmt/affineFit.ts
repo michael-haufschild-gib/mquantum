@@ -25,9 +25,12 @@
  * Affine-match quality `q = Σ_n (K_n − (α E_n + β))² / Σ_n K_n²` after a
  * least-squares fit of `α`, `β` over the first `count` points.
  *
- * The metric is scale-invariant in `E` and shift-invariant in `K` (the
- * affine fit absorbs both), so it tests spectral *shape* rather than
- * absolute magnitude. `0` = perfect linear tracking; larger = worse.
+ * The metric is scale-invariant in `E` (the fitted `α` absorbs any
+ * scaling of `E`). It is **not** generally shift-invariant in `K`:
+ * while `β` removes shifts from the numerator, the final normalization
+ * `Σ K_n²` is not shift-invariant, so translating `K` changes `q`
+ * whenever the fit is imperfect. `0` = perfect linear tracking;
+ * larger = worse.
  *
  * @param K - Modular spectrum `K_n` (ascending).
  * @param E - HJ spectrum `E_n` (ascending).

@@ -224,14 +224,6 @@ const SrmtSweepContent: React.FC = React.memo(() => {
     })
   }, [running, setPendingSweep, ui])
 
-  const handleAbort = useCallback((): void => {
-    abortSweep()
-  }, [abortSweep])
-
-  const handleReset = useCallback((): void => {
-    reset()
-  }, [reset])
-
   const handleExportCsv = useCallback((): void => {
     if (points.length === 0) return
     // Build the reproducibility manifest from the sweep-start snapshot.
@@ -276,7 +268,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
 
         <div className="flex gap-2 items-center">
           {running ? (
-            <Button onClick={handleAbort} data-testid="srmt-sweep-abort">
+            <Button onClick={abortSweep} data-testid="srmt-sweep-abort">
               Abort
             </Button>
           ) : (
@@ -285,7 +277,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
             </Button>
           )}
           {(complete || showError) && (
-            <Button onClick={handleReset} data-testid="srmt-sweep-reset">
+            <Button onClick={reset} data-testid="srmt-sweep-reset">
               Reset
             </Button>
           )}

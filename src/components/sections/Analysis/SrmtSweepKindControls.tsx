@@ -23,6 +23,10 @@ function pointsMaxFor(kind: SrmtSweepKind): number {
   return 21
 }
 
+/** Symmetric clamp helper — kept local so paired min/max writes never
+ * leave the slider-renderable window. */
+const clamp = (v: number, lo: number, hi: number): number => (v < lo ? lo : v > hi ? hi : v)
+
 /** Props for the per-kind slider block. */
 export interface SweepKindControlsProps {
   ui: SrmtSweepUiState
@@ -67,7 +71,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 0.05, s.sweepMax), 0.1, 1),
+              }))
             }
             showValue
             disabled={running}
@@ -80,7 +88,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 0.05, s.sweepMin), 0, 0.9),
+              }))
             }
             showValue
             disabled={running}
@@ -97,7 +109,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 0.05, s.sweepMax), 0, 2),
+              }))
             }
             showValue
             disabled={running}
@@ -110,7 +126,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 0.05, s.sweepMin), 0, 2),
+              }))
             }
             showValue
             disabled={running}
@@ -128,7 +148,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 0.05, s.sweepMax), -1, 1),
+              }))
             }
             showValue
             disabled={running}
@@ -141,7 +165,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.01}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 0.05, s.sweepMin), -1, 1),
+              }))
             }
             showValue
             disabled={running}
@@ -154,12 +182,16 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
           <Slider
             label="φref min"
             tooltip="Lower bound for φref. q is invariant under φref by construction; the plot's read is that q stays flat while the landmark slides."
-            min={0}
+            min={-phiExtent}
             max={phiExtent}
             step={0.01}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.05, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 0.05, s.sweepMax), -phiExtent, phiExtent),
+              }))
             }
             showValue
             disabled={running}
@@ -167,12 +199,16 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
           />
           <Slider
             label="φref max"
-            min={0}
+            min={-phiExtent}
             max={phiExtent}
             step={0.01}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.05, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 0.05, s.sweepMin), -phiExtent, phiExtent),
+              }))
             }
             showValue
             disabled={running}
@@ -190,7 +226,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={1}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 1, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 1, s.sweepMax), 8, 256),
+              }))
             }
             showValue
             disabled={running}
@@ -203,7 +243,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={1}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 1, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 1, s.sweepMin), 8, 256),
+              }))
             }
             showValue
             disabled={running}
@@ -221,7 +265,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.05}
             value={ui.sweepMin}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMin: v, sweepMax: Math.max(v + 0.1, s.sweepMax) }))
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 0.1, s.sweepMax), 0.5, 5),
+              }))
             }
             showValue
             disabled={running}
@@ -234,7 +282,11 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             step={0.05}
             value={ui.sweepMax}
             onChange={(v) =>
-              setUi((s) => ({ ...s, sweepMax: v, sweepMin: Math.min(v - 0.1, s.sweepMin) }))
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 0.1, s.sweepMin), 0.5, 5),
+              }))
             }
             showValue
             disabled={running}
@@ -246,7 +298,7 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
         <Slider
           label="phi ref"
           tooltip="φ used to locate the classical turning point landmark on the plot."
-          min={0}
+          min={-phiExtent}
           max={phiExtent}
           step={0.01}
           value={ui.phiRef}

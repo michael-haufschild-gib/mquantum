@@ -148,6 +148,7 @@ export class WheelerDeWittSrmtSweepCoordinator {
       ? [
           solverSnapshot.chi.buffer as Transferable,
           solverSnapshot.lorentzianMask.buffer as Transferable,
+          solverSnapshot.bandKind.buffer as Transferable,
         ]
       : []
     try {
@@ -206,6 +207,10 @@ export class WheelerDeWittSrmtSweepCoordinator {
    * own fresh worker; source cleans up its own worker on `dispose`.
    */
   adoptFrom(source: WheelerDeWittSrmtSweepCoordinator): void {
+    // No state adoption by design: sweep results are tied to the
+    // source's physics snapshot, which the swap invalidates. Forcing
+    // abort is the only coherent option — the successor restarts
+    // clean from the new strategy's config.
     source.abortSweep()
   }
 
@@ -438,6 +443,7 @@ function copySolverSnapshot(output: WheelerDeWittSolverOutput): SrmtSweepSolverS
   return {
     chi: new Float32Array(output.chi),
     lorentzianMask: new Uint8Array(output.lorentzianMask),
+    bandKind: new Uint8Array(output.bandKind),
     gridSize: output.gridSize,
     aMin: output.aMin,
     aMax: output.aMax,

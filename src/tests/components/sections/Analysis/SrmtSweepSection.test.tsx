@@ -12,7 +12,7 @@
 
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   computeChampionFlips,
@@ -80,6 +80,11 @@ describe('SrmtSweepSection behaviour', () => {
   beforeEach(() => {
     resetStores()
     setQuantumMode('wheelerDeWitt')
+  })
+  // Guaranteed spy cleanup: if an assertion throws, direct .mockRestore()
+  // calls at the end of a test would be skipped and bleed into the next.
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('Start button writes a pending sweep to the store', async () => {
@@ -201,7 +206,7 @@ describe('SrmtSweepSection behaviour', () => {
       capturedCsvPromise = blob.text()
       return 'blob:stub'
     })
-    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     await user.click(screen.getByTestId('srmt-sweep-export-csv'))
     expect(createUrlSpy).toHaveBeenCalled()
@@ -216,9 +221,6 @@ describe('SrmtSweepSection behaviour', () => {
     expect(capturedCsv).toContain('# wdw: boundaryCondition=')
     expect(capturedCsv).toContain('# srmt: kind=cut')
     expect(capturedCsv).toContain('# grid: Na=')
-    clickSpy.mockRestore()
-    revokeSpy.mockRestore()
-    createUrlSpy.mockRestore()
   })
 })
 

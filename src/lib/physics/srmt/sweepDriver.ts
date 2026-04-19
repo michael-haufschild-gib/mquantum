@@ -489,12 +489,10 @@ export function writePerClockFit(
     if (Number.isFinite(sigma)) point.qStdev![clock] = sigma
   }
   const qRigid = computeRigidFitQuality(K, E, compareCount)
-  if (point.qRigid) point.qRigid[clock] = qRigid
+  point.qRigid![clock] = qRigid
   if (Number.isFinite(qRigid)) {
     const sigma = jackknifeRigidFitStdev(K, E, compareCount)
-    if (Number.isFinite(sigma) && point.qRigidStdev) {
-      point.qRigidStdev[clock] = sigma
-    }
+    if (Number.isFinite(sigma)) point.qRigidStdev![clock] = sigma
   }
 }
 

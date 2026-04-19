@@ -72,6 +72,7 @@ function snapshotFromOutput(o: WheelerDeWittSolverOutput): SrmtSweepSolverSnapsh
   return {
     chi: new Float32Array(o.chi),
     lorentzianMask: new Uint8Array(o.lorentzianMask),
+    bandKind: new Uint8Array(o.bandKind),
     gridSize: o.gridSize,
     aMin: o.aMin,
     aMax: o.aMax,

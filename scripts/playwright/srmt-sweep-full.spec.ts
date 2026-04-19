@@ -189,8 +189,9 @@ test.describe('Wheeler–DeWitt — full SRMT sweep battery', () => {
       // below reliably *opens* the panel. Section state is localStorage-
       // backed, so after the first iteration it would already be open
       // and the click would collapse it instead — leaving the Export
-      // button unmounted even after the sweep completes.
-      await page.addInitScript(() => window.localStorage.clear())
+      // button unmounted even after the sweep completes. Use evaluate so
+      // the clear runs on the *current* document before the next goto.
+      await page.evaluate(() => window.localStorage.clear())
       await gotoModeWithParams(page, 'wheelerDeWitt', 3, spec.params)
       await waitForRendererReady(page)
       await waitForFirstFrame(page)

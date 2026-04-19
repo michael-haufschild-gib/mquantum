@@ -109,7 +109,7 @@ relies on the modular–HJ match MUST be checked against both:
 ## Jackknife σ
 
 The leave-one-out jackknife (`jackknifeAffineFitStdev`) is computed for
-**both** metrics (see `computeRigidFitQualityJackknifeStdev`). No
+**both** metrics (see `jackknifeRigidFitStdev`). No
 published `q` lacks its σ.
 
 ## References

@@ -128,10 +128,22 @@ export function deserializeSrmtAndSweep(
 /** Parse the SRMT sweep sub-block into `state`. */
 export function deserializeSrmtSweep(params: URLSearchParams, state: SrmtSweepUrlState): void {
   const kindRaw = params.get('sw')
-  state.srmtSweepKind =
+  const kind =
     kindRaw && (VALID_SRMT_SWEEP_KINDS as readonly string[]).includes(kindRaw)
       ? (kindRaw as UrlSrmtSweepKind)
       : undefined
+  state.srmtSweepKind = kind
+  // Orphaned `sw_*` params (no `sw=…` or invalid kind) must not mutate
+  // hidden sweep state. A later manually-selected sweep would otherwise
+  // pick up stray ranges/landmarks from a malformed shared link.
+  if (kind === undefined) {
+    state.srmtSweepPoints = undefined
+    state.srmtSweepMin = undefined
+    state.srmtSweepMax = undefined
+    state.srmtSweepPhiRef = undefined
+    state.srmtSweepCutAnchor = undefined
+    return
+  }
   // Points clamps match the sweepDriver per-kind rules:
   //  cut ∈ [4, 64], mass / λ / phiRef ∈ [3, 21], rankCap ∈ [3, 32],
   //  phiExtent ∈ [3, 13]. Use the outer union and let the driver clamp.
