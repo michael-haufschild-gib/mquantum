@@ -34,6 +34,8 @@ import { hjSpectrumOnSliceTopK } from './hjOperator'
 import { modularSpectrum } from './modularHamiltonian'
 import { schmidtValues } from './schmidt'
 import {
+  clampGridNa,
+  clampGridNphi,
   clampRankCap,
   computeSrmtPointFromSolver,
   f32FromF64,
@@ -116,7 +118,8 @@ export function runPhiRefSweep(input: RunPhiRefSweepInputs): SrmtSweepPoint[] {
         cosmologicalConstant: physics.cosmologicalConstant,
         sliceIndex: cutIdx,
       },
-      rankCap
+      rankCap,
+      config.seed !== undefined ? { seed: config.seed } : undefined
     )
     const hj64 = new Float64Array(hj32.length)
     for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
@@ -255,7 +258,8 @@ export function runRankCapSweep(input: RunRankCapSweepInputs): SrmtSweepPoint[] 
           cosmologicalConstant: physics.cosmologicalConstant,
           sliceIndex: cutIdx,
         },
-        rankCap
+        rankCap,
+        config.seed !== undefined ? { seed: config.seed } : undefined
       )
       const hj64 = new Float64Array(hj32.length)
       for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
@@ -326,6 +330,170 @@ export function runPhiExtentSweep(input: RunPhiExtentSweepInputs): SrmtSweepPoin
       },
       i,
       phiExtent
+    )
+    results.push(point)
+    onProgress?.(point)
+  }
+  return results
+}
+
+/** Inputs to {@link runGridNaSweep}. */
+export interface RunGridNaSweepInputs {
+  /**
+   * Base Wheeler–DeWitt config; `gridNa` is overridden per point. Every
+   * other knob (φ-extent, mass, Λ, BC, `[aMin, aMax]`) is held fixed so
+   * the convergence read isolates the `a`-discretisation error.
+   */
+  wdwConfig: WheelerDeWittConfig
+  /** Sweep config. `kind` must be `'gridNa'`. */
+  config: SrmtSweepConfig
+  onProgress?: SrmtSweepProgressCallback
+  onSolveStart?: SrmtSweepSolveStartCallback
+  cancel?: SrmtSweepCancelToken
+}
+
+/**
+ * Run a `gridNa` (Cauchy / grid-convergence) sweep. Full solver re-run
+ * per point because the `a`-grid spacing `da = (aMax − aMin) / (Na − 1)`
+ * enters the leapfrog step. Sweep values are clamped to `[64, 1024]`,
+ * integer-rounded, and deduplicated post-round so a request that
+ * collapses (e.g. `sw_n=9` across `[64, 80]`) emits the smaller
+ * meaningful set instead of repeating identical solver calls.
+ *
+ * The end-user contract: the published `q` value is converged when the
+ * tail residual `|q(N_a) − q(N_a^max)|` shrinks monotonically with
+ * `N_a`. A claim that fails this property at the chosen publication
+ * grid is unfit to publish — it carries unbounded systematic error from
+ * the discretisation.
+ */
+export function runGridNaSweep(input: RunGridNaSweepInputs): SrmtSweepPoint[] {
+  const { wdwConfig, config, onProgress, onSolveStart, cancel } = input
+  if (config.kind !== 'gridNa') {
+    throw new Error(`runGridNaSweep: expected kind='gridNa', got '${config.kind}'`)
+  }
+  // Clamp + integer-round + dedup, exactly mirroring the rankCap pattern:
+  // a rounded linspace over a narrow range (e.g. [64, 80] with 9 points)
+  // collapses to far fewer integers, and emitting duplicates would waste
+  // the dominant per-point cost (full solver re-run).
+  const lo = clampGridNa(config.sweepMin)
+  const hi = clampGridNa(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('gridNa', config.points))
+  const uniqueValues: number[] = []
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) {
+    const v = Math.round(series[i]!)
+    if (!seen.has(v)) {
+      seen.add(v)
+      uniqueValues.push(v)
+    }
+  }
+
+  const results: SrmtSweepPoint[] = []
+  for (let i = 0; i < uniqueValues.length; i++) {
+    if (cancel?.aborted) break
+    const gridNa = uniqueValues[i]!
+    onSolveStart?.(i)
+    const solverOutput = solveWheelerDeWitt({
+      boundaryCondition: wdwConfig.boundaryCondition,
+      inflatonMass: wdwConfig.inflatonMass,
+      cosmologicalConstant: wdwConfig.cosmologicalConstant,
+      aMin: wdwConfig.aMin,
+      aMax: wdwConfig.aMax,
+      gridNa,
+      gridNphi: wdwConfig.gridNphi,
+      phiExtent: wdwConfig.phiExtent,
+    })
+    if (cancel?.aborted) break
+    const point = computeSrmtPointFromSolver(
+      solverOutput,
+      config,
+      {
+        inflatonMass: wdwConfig.inflatonMass,
+        cosmologicalConstant: wdwConfig.cosmologicalConstant,
+      },
+      i,
+      gridNa
+    )
+    results.push(point)
+    onProgress?.(point)
+  }
+  return results
+}
+
+/** Inputs to {@link runGridNphiSweep}. */
+export interface RunGridNphiSweepInputs {
+  /**
+   * Base Wheeler–DeWitt config; `gridNphi` is overridden per point. As
+   * with {@link RunGridNaSweepInputs} every other physical knob is held
+   * fixed so the convergence read isolates the φ-axis discretisation
+   * error.
+   */
+  wdwConfig: WheelerDeWittConfig
+  /** Sweep config. `kind` must be `'gridNphi'`. */
+  config: SrmtSweepConfig
+  onProgress?: SrmtSweepProgressCallback
+  onSolveStart?: SrmtSweepSolveStartCallback
+  cancel?: SrmtSweepCancelToken
+}
+
+/**
+ * Run a `gridNphi` (Cauchy / grid-convergence) sweep. Full solver re-run
+ * per point because the φ-grid spacing `dφ = 2·phiExtent / (Nφ − 1)`
+ * enters both the φ-Laplacian term in the WdW potential and the HJ
+ * operator's φ-grid. Sweep values are clamped to `[9, 33]` (driver
+ * upper bound, set by the explicit-leapfrog CFL term
+ * `da²·8/dφ²/aMin²` at the default config), integer-rounded, and
+ * deduplicated.
+ *
+ * Same publication contract as {@link runGridNaSweep}: monotonic Cauchy
+ * convergence in the tail certifies that the published `q` is not a
+ * φ-discretisation artifact.
+ */
+export function runGridNphiSweep(input: RunGridNphiSweepInputs): SrmtSweepPoint[] {
+  const { wdwConfig, config, onProgress, onSolveStart, cancel } = input
+  if (config.kind !== 'gridNphi') {
+    throw new Error(`runGridNphiSweep: expected kind='gridNphi', got '${config.kind}'`)
+  }
+  const lo = clampGridNphi(config.sweepMin)
+  const hi = clampGridNphi(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('gridNphi', config.points))
+  const uniqueValues: number[] = []
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) {
+    const v = Math.round(series[i]!)
+    if (!seen.has(v)) {
+      seen.add(v)
+      uniqueValues.push(v)
+    }
+  }
+
+  const results: SrmtSweepPoint[] = []
+  for (let i = 0; i < uniqueValues.length; i++) {
+    if (cancel?.aborted) break
+    const gridNphi = uniqueValues[i]!
+    onSolveStart?.(i)
+    const solverOutput = solveWheelerDeWitt({
+      boundaryCondition: wdwConfig.boundaryCondition,
+      inflatonMass: wdwConfig.inflatonMass,
+      cosmologicalConstant: wdwConfig.cosmologicalConstant,
+      aMin: wdwConfig.aMin,
+      aMax: wdwConfig.aMax,
+      gridNa: wdwConfig.gridNa,
+      gridNphi,
+      phiExtent: wdwConfig.phiExtent,
+    })
+    if (cancel?.aborted) break
+    const point = computeSrmtPointFromSolver(
+      solverOutput,
+      config,
+      {
+        inflatonMass: wdwConfig.inflatonMass,
+        cosmologicalConstant: wdwConfig.cosmologicalConstant,
+      },
+      i,
+      gridNphi
     )
     results.push(point)
     onProgress?.(point)

@@ -56,8 +56,29 @@ import type { SrmtClock } from './types'
  *   WdW solve and the HJ operator. Expensive: full solver re-run per
  *   point. A claim that survives phiExtent is not an artifact of
  *   grid-resolution on the spacelike axes.
+ * - `'gridNa'`     — vary `gridNa ∈ [sweepMin, sweepMax]` (integer; rounded
+ *   + dedup'd). Changes the `a`-grid spacing `da = (aMax − aMin) / (Na−1)`
+ *   and forces a full solver re-run per point. The convergence study used
+ *   to certify the leapfrog's 2nd-order accuracy: `|q(N_a) − q(N_a^max)|`
+ *   must shrink monotonically as `N_a` grows. A claim that fails this
+ *   Cauchy property has unbounded `a`-discretisation error and must not
+ *   be published.
+ * - `'gridNphi'`   — vary `gridNphi ∈ [sweepMin, sweepMax]` (integer;
+ *   rounded + dedup'd). Same role as `gridNa` but on the φ-axes. Tighter
+ *   range because the explicit-leapfrog CFL term `da²·8/dφ²/aMin²` grows
+ *   as `N_φ²` (with `dφ = 2·phiExtent/(N_φ−1)`); the upper bound 33 keeps
+ *   the default config inside the warning budget.
  */
-export type SrmtSweepKind = 'cut' | 'mass' | 'lambda' | 'bc' | 'phiRef' | 'rankCap' | 'phiExtent'
+export type SrmtSweepKind =
+  | 'cut'
+  | 'mass'
+  | 'lambda'
+  | 'bc'
+  | 'phiRef'
+  | 'rankCap'
+  | 'phiExtent'
+  | 'gridNa'
+  | 'gridNphi'
 
 /** Ordered list of boundary conditions for the `'bc'` sweep kind. */
 export const SRMT_BC_SWEEP_ORDER: readonly WdwBoundaryCondition[] = [
@@ -72,13 +93,15 @@ export interface SrmtSweepConfig {
   kind: SrmtSweepKind
   /**
    * Number of sweep points. Clamped per-kind:
-   *  - `cut`:      [4, 64]
-   *  - `mass`:     [3, 21]
-   *  - `lambda`:   [3, 21]
-   *  - `phiRef`:   [3, 21]
-   *  - `rankCap`:  [3, 32]   (integer-valued; driver dedups post-round)
-   *  - `phiExtent`:[3, 13]   (full solver re-run per point → expensive)
-   *  - `bc`:       always {@link SRMT_BC_SWEEP_ORDER}.length (3); caller's
+   *  - `cut`:       [4, 64]
+   *  - `mass`:      [3, 21]
+   *  - `lambda`:    [3, 21]
+   *  - `phiRef`:    [3, 21]
+   *  - `rankCap`:   [3, 32]   (integer-valued; driver dedups post-round)
+   *  - `phiExtent`: [3, 13]   (full solver re-run per point → expensive)
+   *  - `gridNa`:    [3, 9]    (full re-solve per point; integer round + dedup)
+   *  - `gridNphi`:  [3, 9]    (full re-solve per point; integer round + dedup)
+   *  - `bc`:        always {@link SRMT_BC_SWEEP_ORDER}.length (3); caller's
    *    `points` is ignored.
    */
   points: number
@@ -103,6 +126,22 @@ export interface SrmtSweepConfig {
   sweepMin: number
   /** Sweep range upper bound. Ignored for `bc`. */
   sweepMax: number
+  /**
+   * Seed for the Lanczos starting-vector PRNG used by
+   * {@link hjSpectrumOnSliceTopK}. When `undefined`, the library's built-in
+   * default (`0x5EED1AB1`, defined in `lanczos.ts`) is used. When set,
+   * this value is threaded through every HJ top-k extraction the sweep
+   * performs, making the sweep's byte-exact output a function of the
+   * config alone — so two runs at the same git SHA with the same config
+   * produce byte-identical CSVs, and a seed-sensitivity sweep (varying
+   * this knob across runs) can separate Lanczos-starting-vector noise
+   * from truncation sensitivity in `qStdev`.
+   *
+   * When set, this seed is also emitted in the `# srmt:` line of the
+   * reproducibility manifest so the archived CSV pins it alongside git
+   * SHA and solver versions.
+   */
+  seed?: number
 }
 
 /**
@@ -125,6 +164,8 @@ export interface SrmtSweepPoint {
    *  - `phiRef`:    landmark-reference `φ_ref`.
    *  - `rankCap`:   integer `rankCap` used at this point.
    *  - `phiExtent`: φ-grid half-range.
+   *  - `gridNa`:    integer `gridNa` (a-axis sample count) at this point.
+   *  - `gridNphi`:  integer `gridNphi` (φ-axis sample count) at this point.
    *  - `bc`:        numeric position `0, 1, 2` for the BC order in
    *    {@link SRMT_BC_SWEEP_ORDER}; the actual enum value is in
    *    `sweepValueBc`.

@@ -140,18 +140,43 @@ describe('deserializeSrmtSweep', () => {
     expect(s2.srmtSweepMax).toBe(3.0)
   })
 
-  it('clamps sw_min / sw_max to [-300, 300] on pathological input', () => {
+  it('clamps sw_min / sw_max to [-1024, 1024] on pathological input', () => {
+    // Box widened from `[-300, 300]` so the float-clamp admits the
+    // largest per-kind range — gridNa's upper bound 1024. Any tighter
+    // clamp would silently drop a `?sw=gridNa&sw_max=1024` request.
     const params = new URLSearchParams('sw=rankCap&sw_min=-9999&sw_max=99999')
     const state: SrmtSweepUrlState = {}
     deserializeSrmtSweep(params, state)
-    expect(state.srmtSweepMin).toBe(-300)
-    expect(state.srmtSweepMax).toBe(300)
+    expect(state.srmtSweepMin).toBe(-1024)
+    expect(state.srmtSweepMax).toBe(1024)
+  })
+
+  it('round-trips a gridNa sweep with sw_max up to the new clamp ceiling', () => {
+    // Driver clamps gridNa per-kind to [64, 1024]; the URL parser must
+    // not clip the upper bound before the driver gets to see it.
+    const params = new URLSearchParams('sw=gridNa&sw_n=5&sw_min=64&sw_max=1024&sw_c=0.5')
+    const state: SrmtSweepUrlState = {}
+    deserializeSrmtSweep(params, state)
+    expect(state.srmtSweepKind).toBe('gridNa')
+    expect(state.srmtSweepPoints).toBe(5)
+    expect(state.srmtSweepMin).toBe(64)
+    expect(state.srmtSweepMax).toBe(1024)
+  })
+
+  it('round-trips a gridNphi sweep with the documented range', () => {
+    const params = new URLSearchParams('sw=gridNphi&sw_n=5&sw_min=9&sw_max=33&sw_c=0.5')
+    const state: SrmtSweepUrlState = {}
+    deserializeSrmtSweep(params, state)
+    expect(state.srmtSweepKind).toBe('gridNphi')
+    expect(state.srmtSweepPoints).toBe(5)
+    expect(state.srmtSweepMin).toBe(9)
+    expect(state.srmtSweepMax).toBe(33)
   })
 })
 
 describe('serializeSrmtSweep — Tier-3 sensitivity kinds', () => {
-  it('emits sw_n/min/max for phiRef, rankCap, phiExtent', () => {
-    for (const kind of ['phiRef', 'rankCap', 'phiExtent'] as const) {
+  it('emits sw_n/min/max for phiRef, rankCap, phiExtent, gridNa, gridNphi', () => {
+    for (const kind of ['phiRef', 'rankCap', 'phiExtent', 'gridNa', 'gridNphi'] as const) {
       const params = new URLSearchParams()
       serializeSrmtSweep(params, 'wheelerDeWitt', {
         srmtSweepKind: kind,

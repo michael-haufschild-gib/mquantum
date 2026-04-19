@@ -183,4 +183,58 @@ describe('buildSrmtSweepManifest', () => {
       })
     expect(run().join('\n')).toBe(run().join('\n'))
   })
+
+  it('emits kind=gridNa with the swept range on the # srmt: line', () => {
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNa',
+      points: 5,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.75,
+      sweepMin: 64,
+      sweepMax: 512,
+    }
+    const lines = buildSrmtSweepManifest({
+      wdwConfig: WDW,
+      srmtConfig: cfg,
+      gitSha: 'abc1234',
+      wdwSolverVersion: '1.0.0',
+      srmtDiagnosticVersion: '1.0.0',
+      generatedAt: null,
+    })
+    const srmtLine = findLine(lines, '# srmt: ')
+    // Kind appears verbatim. The full line pins the field order so a
+    // future formatter change can't silently scramble downstream parsers.
+    expect(srmtLine).toBe(
+      '# srmt: kind=gridNa points=5 clocks=a rankCap=12 ' +
+        'cutNormalized=0.500000 phiRef=0.750000 sweepMin=64.0000 sweepMax=512.000'
+    )
+  })
+
+  it('emits kind=gridNphi with the swept range on the # srmt: line', () => {
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNphi',
+      points: 5,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.75,
+      sweepMin: 9,
+      sweepMax: 33,
+    }
+    const lines = buildSrmtSweepManifest({
+      wdwConfig: WDW,
+      srmtConfig: cfg,
+      gitSha: 'abc1234',
+      wdwSolverVersion: '1.0.0',
+      srmtDiagnosticVersion: '1.0.0',
+      generatedAt: null,
+    })
+    const srmtLine = findLine(lines, '# srmt: ')
+    expect(srmtLine).toBe(
+      '# srmt: kind=gridNphi points=5 clocks=a rankCap=12 ' +
+        'cutNormalized=0.500000 phiRef=0.750000 sweepMin=9.00000 sweepMax=33.0000'
+    )
+  })
 })

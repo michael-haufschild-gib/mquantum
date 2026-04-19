@@ -94,6 +94,31 @@ export function clampRankCap(rankCap: number): number {
 }
 
 /**
+ * Clamp + integerise a Wheeler–DeWitt `gridNa` value for the
+ * grid-convergence sweep. Range `[64, 1024]`. The lower bound 64 keeps
+ * the leapfrog inside its CFL budget at `aMin = 0.1`; the upper bound
+ * 1024 caps per-point compute (each per-point solver call grows linearly
+ * in `gridNa`).
+ */
+export function clampGridNa(gridNa: number): number {
+  return Math.max(64, Math.min(1024, Math.round(gridNa)))
+}
+
+/**
+ * Clamp + integerise a Wheeler–DeWitt `gridNphi` value for the
+ * grid-convergence sweep. Range `[9, 33]`. The lower bound 9 admits a
+ * meaningful φ-cut even at the coarsest resolution (interior cut indices
+ * `[1, Nφ−2]` = 7 unique cuts); the upper bound 33 keeps the explicit
+ * leapfrog inside the CFL warning budget at the default
+ * `(aMin=0.1, phiExtent=2, gridNa≥128)` configuration. The odd value 33
+ * also gives a φ-grid with a distinguished central column at
+ * `φ = 0`, which several diagnostics treat as a natural reference.
+ */
+export function clampGridNphi(gridNphi: number): number {
+  return Math.max(9, Math.min(33, Math.round(gridNphi)))
+}
+
+/**
  * Clamp + integerise a caller-supplied `points` count to the per-kind
  * range the sweep drivers expect. Mirrors `totalPointsFor` in the worker
  * so a malformed URL/programmatic config cannot allocate far more linspace
@@ -112,6 +137,9 @@ export function normalisePointCount(kind: SrmtSweepConfig['kind'], rawPoints: nu
       return Math.max(1, Math.min(32, points))
     case 'phiExtent':
       return Math.max(1, Math.min(13, points))
+    case 'gridNa':
+    case 'gridNphi':
+      return Math.max(1, Math.min(9, points))
     case 'bc':
       return 3
   }
@@ -225,7 +253,8 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
           cosmologicalConstant: physics.cosmologicalConstant,
           sliceIndex: cutIdx,
         },
-        rankCap
+        rankCap,
+        config.seed !== undefined ? { seed: config.seed } : undefined
       )
       const hj64 = new Float64Array(hj32.length)
       for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
@@ -455,7 +484,8 @@ export function computeSrmtPointFromSolver(
         cosmologicalConstant: physics.cosmologicalConstant,
         sliceIndex: cutIdx,
       },
-      rankCap
+      rankCap,
+      config.seed !== undefined ? { seed: config.seed } : undefined
     )
     const hj64 = new Float64Array(hj32.length)
     for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
@@ -496,15 +526,24 @@ export function writePerClockFit(
   }
 }
 
-// Tier-3 sensitivity drivers (phiRef / rankCap / phiExtent) live in
-// `./sweepSensitivityDrivers.ts`. They share `writePerClockFit`,
-// `linspace`, `normaliseClocks`, etc., which are exported below.
+// Tier-3 sensitivity drivers (phiRef / rankCap / phiExtent / gridNa /
+// gridNphi) live in `./sweepSensitivityDrivers.ts`. They share
+// `writePerClockFit`, `linspace`, `normaliseClocks`, etc., which are
+// exported below.
 export type {
+  RunGridNaSweepInputs,
+  RunGridNphiSweepInputs,
   RunPhiExtentSweepInputs,
   RunPhiRefSweepInputs,
   RunRankCapSweepInputs,
 } from './sweepSensitivityDrivers'
-export { runPhiExtentSweep, runPhiRefSweep, runRankCapSweep } from './sweepSensitivityDrivers'
+export {
+  runGridNaSweep,
+  runGridNphiSweep,
+  runPhiExtentSweep,
+  runPhiRefSweep,
+  runRankCapSweep,
+} from './sweepSensitivityDrivers'
 
 // Re-export so consumers that branch on landmark kind keep the symbol
 // path stable.
@@ -555,6 +594,39 @@ export function predictRankCapSweepCount(config: SrmtSweepConfig): number {
   const hi = clampRankCap(config.sweepMax)
   const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
   const series = linspace(rLo, rHi, normalisePointCount('rankCap', config.points))
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
+  return Math.max(1, seen.size)
+}
+
+/**
+ * Predict the number of distinct sweep points a `gridNa` sweep will emit
+ * after clamping to `[64, 1024]`, integer-rounding, and deduplication.
+ * Solver-independent; mirrors {@link predictRankCapSweepCount} so the
+ * worker can report an accurate `total` for progress tracking.
+ */
+export function predictGridNaSweepCount(config: SrmtSweepConfig): number {
+  if (config.kind !== 'gridNa') return normalisePointCount(config.kind, config.points)
+  const lo = clampGridNa(config.sweepMin)
+  const hi = clampGridNa(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('gridNa', config.points))
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
+  return Math.max(1, seen.size)
+}
+
+/**
+ * Predict the number of distinct sweep points a `gridNphi` sweep will
+ * emit after clamping to `[9, 33]`, integer-rounding, and deduplication.
+ * Solver-independent; mirrors {@link predictRankCapSweepCount}.
+ */
+export function predictGridNphiSweepCount(config: SrmtSweepConfig): number {
+  if (config.kind !== 'gridNphi') return normalisePointCount(config.kind, config.points)
+  const lo = clampGridNphi(config.sweepMin)
+  const hi = clampGridNphi(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('gridNphi', config.points))
   const seen = new Set<number>()
   for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
   return Math.max(1, seen.size)

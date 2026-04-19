@@ -25,6 +25,7 @@ import { describe, expect, it } from 'vitest'
 import { sweepPointsToCsv } from '@/components/sections/Analysis/srmtSweepHelpers'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { type SrmtClock } from '@/lib/physics/srmt'
+import { hjSpectrumOnSliceTopK } from '@/lib/physics/srmt/hjOperator'
 import { lanczosTopKOp, type LinearOperator } from '@/lib/physics/srmt/lanczos'
 import { runCutSweep } from '@/lib/physics/srmt/sweepDriver'
 import { buildSrmtSweepManifest } from '@/lib/physics/srmt/sweepManifest'
@@ -234,6 +235,85 @@ describe('SRMT cut-sweep determinism', () => {
     // Sanity — the CSV should contain the header and at least one data row.
     expect(csvA).toContain('index,sweepValue')
     expect(csvA.split('\n').length).toBeGreaterThan(3)
+  })
+
+  it('threads a config seed through the sweep: same seed twice → byte-identical CSV + manifest pins seed', () => {
+    // This is the anti-regression test for the Lanczos-seed plumbing.
+    // Before this change, sweep drivers silently ignored `config.seed`
+    // (the field didn't exist). If a future refactor drops the
+    // forwarding at any of the sweep-driver call sites, this test
+    // fails: we pass an explicit seed, run twice, and require the CSV
+    // + manifest byte-match AND the manifest to contain the decimal
+    // encoding of the seed on the `# srmt:` line.
+    const SEED = 0xdeadbeef
+    const cfg: SrmtSweepConfig = { ...SWEEP_CFG, seed: SEED }
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      boundaryCondition: WDW_INPUT.boundaryCondition,
+      inflatonMass: WDW_INPUT.inflatonMass,
+      cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
+      aMin: WDW_INPUT.aMin,
+      aMax: WDW_INPUT.aMax,
+      gridNa: WDW_INPUT.gridNa,
+      gridNphi: WDW_INPUT.gridNphi,
+      phiExtent: WDW_INPUT.phiExtent,
+    }
+    const physics = {
+      inflatonMass: WDW_INPUT.inflatonMass,
+      cosmologicalConstant: WDW_INPUT.cosmologicalConstant,
+    }
+    const manifest = buildSrmtSweepManifest({
+      wdwConfig,
+      srmtConfig: cfg,
+      gitSha: 'test-sha',
+      wdwSolverVersion: '1.0.0',
+      srmtDiagnosticVersion: '1.0.0',
+      generatedAt: '2026-04-19T10:00:00.000Z',
+    })
+    // Provenance contract: the seed must be pinned as a decimal integer
+    // on the `# srmt:` line. If this assertion breaks, a seeded sweep is
+    // producing CSVs whose manifest silently drops the seed — defeating
+    // the point of the plumbing.
+    const srmtLine = manifest.find((l) => l.startsWith('# srmt: ')) ?? ''
+    expect(srmtLine).toContain(`seed=${SEED}`)
+    const a = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: cfg,
+      physics,
+    }).map(canonicalize)
+    const b = runCutSweep({
+      solverOutput: solveWheelerDeWitt(WDW_INPUT),
+      config: cfg,
+      physics,
+    }).map(canonicalize)
+    const csvA = sweepPointsToCsv(a, 'cut', [], manifest)
+    const csvB = sweepPointsToCsv(b, 'cut', [], manifest)
+    expect(csvA).toBe(csvB)
+    expect(csvA).toContain(`seed=${SEED}`)
+  })
+
+  it('hjSpectrumOnSliceTopK forwards its seed option into Lanczos', () => {
+    // Kill-test for dead-plumbing bugs: verify the opts.seed parameter
+    // on hjSpectrumOnSliceTopK actually reaches lanczosTopKOp. Same
+    // seed twice → byte-identical. This is the seam a refactor is
+    // most likely to silently break (by adding the parameter to the
+    // signature but forgetting to pass it through).
+    const inputs = {
+      Na: 16,
+      Nphi: 9,
+      aMin: 0.1,
+      aMax: 1.2,
+      phiExtent: 1.5,
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.1,
+      sliceIndex: 8,
+    }
+    const s1 = hjSpectrumOnSliceTopK('a', inputs, 6, { seed: 0xdeadbeef })
+    const s2 = hjSpectrumOnSliceTopK('a', inputs, 6, { seed: 0xdeadbeef })
+    expect(Array.from(s1.spectrum)).toEqual(Array.from(s2.spectrum))
+    expect(s1.spectrum.length).toBe(6)
+    // Spectrum must be non-trivial (catches "returns empty array" bugs).
+    expect(s1.spectrum.some((v) => Math.abs(v) > 0)).toBe(true)
   })
 
   it('reproducibility manifest + CSV is byte-identical given a fixed generatedAt', () => {

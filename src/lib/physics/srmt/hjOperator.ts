@@ -337,11 +337,31 @@ function applySparseOperator(op: SparseHjOperator): LinearOperator {
  * Memory usage drops from `n²` floats to `O(n)` floats; mat-vec time
  * drops from `O(n²)` to `O(5 n)` per iteration.
  *
+/**
+ * Options forwarded from sweep drivers + the live diagnostic into the
+ * Lanczos iteration. Currently only `seed` is exposed — maxIterations
+ * and tolerance are left at the lib defaults because the HJ sparse
+ * operator has a well-understood norm and the default headroom
+ * converges reliably at the grid sizes the SRMT diagnostic uses.
+ */
+export interface HjSpectrumTopKOptions {
+  /**
+   * Seed for the Lanczos starting-vector PRNG. When omitted, the lib
+   * default (`0x5EED1AB1`) is used — preserving the byte-exact outputs
+   * of callers predating the configurable-seed plumbing and of any
+   * archived CSVs produced at earlier SHAs.
+   */
+  seed?: number
+}
+
+/**
  * @param clock - Clock axis.
  * @param inputs - Grid and potential parameters.
  * @param k - Number of top-magnitude eigenvalues to extract. Values
  *   larger than the slice order `n` are silently clipped to `n`
  *   (recovering the full spectrum).
+ * @param opts - Lanczos iteration options (currently only `seed`). Omit
+ *   to use the library default.
  * @returns `{ spectrum, n }` — `spectrum` holds the top-k eigenvalues of
  *   `H_HJ` sorted ascending; `n` is the slice dimension (`Nphi²` for
  *   clock `'a'`, `Na · Nphi` for the φ-clocks).
@@ -349,12 +369,19 @@ function applySparseOperator(op: SparseHjOperator): LinearOperator {
 export function hjSpectrumOnSliceTopK(
   clock: SrmtClock,
   inputs: HjOperatorInputs,
-  k: number
+  k: number,
+  opts?: HjSpectrumTopKOptions
 ): { spectrum: Float32Array; n: number } {
   const op = clock === 'a' ? buildSparseOpA(inputs) : buildSparseOpPhi(inputs, clock)
   if (k <= 0) return { spectrum: new Float32Array(0), n: op.n }
   const apply = applySparseOperator(op)
-  const spectrum = lanczosTopKOp(apply, op.n, Math.min(k, op.n), op.infNorm)
+  const spectrum = lanczosTopKOp(
+    apply,
+    op.n,
+    Math.min(k, op.n),
+    op.infNorm,
+    opts?.seed !== undefined ? { seed: opts.seed } : undefined
+  )
   return { spectrum, n: op.n }
 }
 

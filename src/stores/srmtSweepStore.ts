@@ -45,12 +45,27 @@ export type SrmtSweepStatus = SweepStatus | 'error'
  * default sweep config at dispatch time.
  */
 export interface PendingSrmtSweep {
-  kind: 'cut' | 'mass' | 'lambda' | 'bc' | 'phiRef' | 'rankCap' | 'phiExtent'
+  kind:
+    | 'cut'
+    | 'mass'
+    | 'lambda'
+    | 'bc'
+    | 'phiRef'
+    | 'rankCap'
+    | 'phiExtent'
+    | 'gridNa'
+    | 'gridNphi'
   points?: number
   sweepMin?: number
   sweepMax?: number
   phiRef?: number
   cutAnchor?: number
+  /**
+   * Lanczos seed to thread through every HJ top-k extraction the sweep
+   * performs. Undefined = use the coordinator default (see
+   * `materialiseSweepConfig`).
+   */
+  seed?: number
 }
 
 /** Public shape of the SRMT sweep store. */
@@ -124,6 +139,9 @@ function totalPointsFor(config: SrmtSweepConfig): number {
       return Math.max(1, Math.min(32, Math.floor(config.points)))
     case 'phiExtent':
       return Math.max(1, Math.min(13, Math.floor(config.points)))
+    case 'gridNa':
+    case 'gridNphi':
+      return Math.max(1, Math.min(9, Math.floor(config.points)))
     case 'bc':
       return 3
   }

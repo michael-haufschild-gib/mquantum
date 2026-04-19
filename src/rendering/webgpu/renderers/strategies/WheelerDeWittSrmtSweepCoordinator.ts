@@ -310,6 +310,22 @@ export class WheelerDeWittSrmtSweepCoordinator {
  * carry the kind) with sensible per-kind defaults drawn from the live
  * Wheeler–DeWitt config.
  */
+/**
+ * Default Lanczos seed for production sweeps. Purpose-picked so the
+ * sweep-level provenance record owns the seed explicitly, rather than
+ * implicitly inheriting the `lanczos.ts` library default. Callers that
+ * want a different seed (e.g. a seed-sensitivity Tier-3 sweep) pass
+ * `pending.seed` via URL load or programmatic dispatch.
+ */
+export const DEFAULT_SWEEP_LANCZOS_SEED = 0xdeadbeef
+
+/**
+ * Merge a pending sweep (possibly partial, as URL params may only
+ * carry the kind) with sensible per-kind defaults drawn from the live
+ * Wheeler–DeWitt config. The Lanczos seed defaults to
+ * {@link DEFAULT_SWEEP_LANCZOS_SEED} so every production sweep has a
+ * deterministic, provenance-tracked starting vector.
+ */
 export function materialiseSweepConfig(
   pending: PendingSrmtSweep,
   wdwConfig: WheelerDeWittConfig
@@ -321,6 +337,7 @@ export function materialiseSweepConfig(
     rankCap: wdwConfig.srmtRankCap,
     cutNormalized: pending.cutAnchor ?? wdwConfig.srmtCutNormalized,
     phiRef: pending.phiRef ?? defaultPhiRef,
+    seed: pending.seed ?? DEFAULT_SWEEP_LANCZOS_SEED,
   }
   switch (pending.kind) {
     case 'cut':
@@ -391,6 +408,30 @@ export function materialiseSweepConfig(
         // budget on default (aMin, gridNphi).
         sweepMin: pending.sweepMin ?? 1.0,
         sweepMax: pending.sweepMax ?? 3.0,
+      }
+    case 'gridNa':
+      return {
+        ...common,
+        kind: 'gridNa',
+        // Five grids by default — the smallest practical Cauchy-convergence
+        // study (need ≥ 3 to compare residuals; 5 gives one extra interior
+        // sample so the tail trend is visible). Driver rounds + dedups, so
+        // 5 points across [64, 512] yields {64, 176, 288, 400, 512}.
+        points: pending.points ?? 5,
+        sweepMin: pending.sweepMin ?? 64,
+        sweepMax: pending.sweepMax ?? 512,
+      }
+    case 'gridNphi':
+      return {
+        ...common,
+        kind: 'gridNphi',
+        points: pending.points ?? 5,
+        // Default spans the full driver-clamped range [9, 33]. The upper
+        // bound is the CFL ceiling at the default (aMin=0.1, phiExtent=2,
+        // gridNa=128) configuration; pushing past 33 risks tripping the
+        // explicit-leapfrog stability warning per docs/wheeler-dewitt.md.
+        sweepMin: pending.sweepMin ?? 9,
+        sweepMax: pending.sweepMax ?? 33,
       }
   }
 }
