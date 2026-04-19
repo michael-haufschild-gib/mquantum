@@ -306,16 +306,12 @@ export class WheelerDeWittSrmtSweepCoordinator {
 }
 
 /**
- * Merge a pending sweep (possibly partial, as URL params may only
- * carry the kind) with sensible per-kind defaults drawn from the live
- * Wheeler–DeWitt config.
- */
-/**
  * Default Lanczos seed for production sweeps. Purpose-picked so the
  * sweep-level provenance record owns the seed explicitly, rather than
  * implicitly inheriting the `lanczos.ts` library default. Callers that
  * want a different seed (e.g. a seed-sensitivity Tier-3 sweep) pass
- * `pending.seed` via URL load or programmatic dispatch.
+ * `pending.seed` via programmatic dispatch (the URL serializer does
+ * not carry a seed parameter today).
  */
 export const DEFAULT_SWEEP_LANCZOS_SEED = 0xdeadbeef
 

@@ -818,6 +818,17 @@ mod tests {
 
     #[cfg(feature = "wdw-validator")]
     #[test]
+    #[should_panic(expected = "invalid bc_code 99")]
+    fn validator_binding_rejects_unknown_bc_code() {
+        // An out-of-range `bc_code` must panic rather than silently fall
+        // back to `NoBoundary`. A silent fallback would mask a JS↔Rust
+        // ABI drift (e.g. a new BC enum variant on one side only) and
+        // turn the cross-validator into a false-positive oracle.
+        use super::bindings::solve_leapfrog_validator_native;
+        let _ = solve_leapfrog_validator_native(99, 0.0, -0.5, 0.05, 1.2, 4, 3, 2.5);
+    }
+
+    #[test]
     fn validator_binding_packs_match_solve_leapfrog() {
         // Confirms the wasm-bindgen wrapper packs the chi tensor in the
         // exact (ia, i1, i2) row-major interleaved-(re, im) layout that
@@ -966,10 +977,16 @@ pub mod bindings {
         grid_nphi: usize,
         phi_extent: f64,
     ) -> Vec<f32> {
+        // Exhaustive match with a hard panic on unknown codes so a JS↔Rust
+        // ABI drift (e.g. a new BC added on one side only) fails loudly at
+        // the first cross-validation invocation instead of silently
+        // masquerading as `NoBoundary` and producing a wrong-state
+        // comparison.
         let bc = match bc_code {
+            0 => WdwBoundaryCondition::NoBoundary,
             1 => WdwBoundaryCondition::Tunneling,
             2 => WdwBoundaryCondition::DeWitt,
-            _ => WdwBoundaryCondition::NoBoundary,
+            other => panic!("invalid bc_code {other}; expected 0 (noBoundary), 1 (tunneling), or 2 (deWitt)"),
         };
         let out = solve_leapfrog(WdwSolverInput {
             bc,

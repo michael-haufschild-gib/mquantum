@@ -43,7 +43,7 @@ reports/mutation/
 stryker-incremental.json
 
 # Build artifacts
-build
+/build
 .cache
 *.tsbuildinfo
 src/wasm/mdimension_core/target/

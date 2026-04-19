@@ -327,17 +327,6 @@ function applySparseOperator(op: SparseHjOperator): LinearOperator {
 }
 
 /**
- * Construct the discrete Hamilton-Jacobi operator on the slice selected
- * by the chosen clock and return its top-`k` eigenvalues (by magnitude)
- * sorted ascending.
- *
- * This is the production SRMT path. The operator is stored as a
- * 5-sparse stencil (see module docstring) and Lanczos calls a
- * stencil-based mat-vec callback instead of a dense row-major product.
- * Memory usage drops from `n²` floats to `O(n)` floats; mat-vec time
- * drops from `O(n²)` to `O(5 n)` per iteration.
- *
-/**
  * Options forwarded from sweep drivers + the live diagnostic into the
  * Lanczos iteration. Currently only `seed` is exposed — maxIterations
  * and tolerance are left at the lib defaults because the HJ sparse
@@ -355,6 +344,16 @@ export interface HjSpectrumTopKOptions {
 }
 
 /**
+ * Construct the discrete Hamilton-Jacobi operator on the slice selected
+ * by the chosen clock and return its top-`k` eigenvalues (by magnitude)
+ * sorted ascending.
+ *
+ * This is the production SRMT path. The operator is stored as a
+ * 5-sparse stencil (see module docstring) and Lanczos calls a
+ * stencil-based mat-vec callback instead of a dense row-major product.
+ * Memory usage drops from `n²` floats to `O(n)` floats; mat-vec time
+ * drops from `O(n²)` to `O(5 n)` per iteration.
+ *
  * @param clock - Clock axis.
  * @param inputs - Grid and potential parameters.
  * @param k - Number of top-magnitude eigenvalues to extract. Values

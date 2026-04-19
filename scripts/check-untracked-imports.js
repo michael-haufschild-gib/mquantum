@@ -14,8 +14,10 @@ import { resolve, dirname, join } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 
-// Get all untracked files under src/
-const untrackedRaw = execSync('git ls-files --others --exclude-standard src/', {
+// Get all non-tracked files under src/ — both untracked and git-ignored.
+// A git-ignored source file imported from a tracked file will fail on Vercel
+// (clean clone) identically to an untracked one, so both must be flagged.
+const untrackedRaw = execSync('git ls-files --others src/', {
   cwd: ROOT,
   encoding: 'utf-8',
 }).trim()
