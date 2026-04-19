@@ -14,12 +14,19 @@ import { resolve, dirname, join } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 
-// Get all non-tracked files under src/ — both untracked and git-ignored.
-// A git-ignored source file imported from a tracked file will fail on Vercel
-// (clean clone) identically to an untracked one, so both must be flagged.
+// Get non-tracked files under src/ — both untracked and git-ignored.
+// A git-ignored source file imported from a tracked file will fail on
+// Vercel (clean clone) identically to an untracked one, so both must be
+// flagged. Restrict to extensions the import resolver can actually
+// match so large generated trees (e.g. src/wasm/mdimension_core/target/
+// Rust build intermediates) don't dominate the walk.
+// (Filtering happens Node-side: git pathspecs are OR-combined, so
+//  `git ls-files src/ -- "*.ts"` leaks `*.ts` matches outside src/.)
+const SOURCE_EXT_RE = /\.(?:ts|tsx|js|jsx)$/
 const untrackedRaw = execSync('git ls-files --others src/', {
   cwd: ROOT,
   encoding: 'utf-8',
+  maxBuffer: 64 * 1024 * 1024,
 }).trim()
 
 if (!untrackedRaw) {
@@ -27,7 +34,12 @@ if (!untrackedRaw) {
   process.exit(0)
 }
 
-const untrackedSet = new Set(untrackedRaw.split('\n').map((f) => resolve(ROOT, f)))
+const untrackedSet = new Set(
+  untrackedRaw
+    .split('\n')
+    .filter((f) => SOURCE_EXT_RE.test(f))
+    .map((f) => resolve(ROOT, f))
+)
 
 // Get all tracked .ts/.tsx files under src/
 const trackedRaw = execSync('git ls-files src/ -- "*.ts" "*.tsx"', {

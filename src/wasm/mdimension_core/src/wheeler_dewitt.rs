@@ -828,6 +828,7 @@ mod tests {
         let _ = solve_leapfrog_validator_native(99, 0.0, -0.5, 0.05, 1.2, 4, 3, 2.5);
     }
 
+    #[cfg(feature = "wdw-validator")]
     #[test]
     fn validator_binding_packs_match_solve_leapfrog() {
         // Confirms the wasm-bindgen wrapper packs the chi tensor in the
@@ -935,7 +936,9 @@ pub mod bindings {
     /// pointwise comparison.
     ///
     /// `bc_code`: 0=NoBoundary (Hartle–Hawking), 1=Tunneling (Vilenkin),
-    /// 2=DeWitt. Any other value defaults to NoBoundary.
+    /// 2=DeWitt. Any other value panics to fail fast on JS↔Rust ABI
+    /// drift — the underlying `solve_leapfrog_validator_native` rejects
+    /// unknown codes rather than defaulting to NoBoundary.
     ///
     /// No Stage-2 / Stage-3 corrections — this is the raw PDE integrator
     /// output. See the module-level docstring on `wheeler_dewitt.rs` for

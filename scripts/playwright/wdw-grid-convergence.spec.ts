@@ -204,6 +204,26 @@ function assertCauchyConvergence(samples: ClockQualitySample[], label: string): 
 }
 
 /**
+ * Assert the per-point sweep ladder emitted by the worker matches the
+ * deterministic integer sequence produced by `linspace + round + dedupe`
+ * for the requested `[sweepMin, sweepMax, points]` triple.
+ *
+ * `assertSweepMatchesUrl` proves the URL deserialised into the right
+ * config; this checks the driver actually produced the ladder that
+ * config implies. Without it, a regression in
+ * `runGridNaSweep` / `runGridNphiSweep` that silently emits a different
+ * sequence (e.g. dedupe miscount, off-by-one rounding) can still pass
+ * the convergence assertion as long as whatever sequence it did emit
+ * happens to be monotone.
+ */
+function assertSweepValues(samples: ClockQualitySample[], expected: number[], label: string): void {
+  expect(
+    samples.map((s) => s.sweepValue),
+    `${label}: realised sweep ladder mismatch`
+  ).toEqual(expected)
+}
+
+/**
  * Assert the materialised sweep config matches the URL the test drove:
  * correct `kind`, correct endpoints, correct point count. A pass on the
  * wrong kind would falsely certify convergence of a sweep the test did
@@ -258,7 +278,11 @@ test.describe('Wheeler–DeWitt — SRMT grid convergence (URL-driven)', () => {
           `q_phi1=${s.qPhi1.toFixed(6)} q_phi2=${s.qPhi2.toFixed(6)}`
       )
     }
-    expect(samples.length, 'URL point-count mismatch').toBe(5)
+    // linspace(64, 512, 5) → [64, 176, 288, 400, 512] after round+dedupe.
+    // Pinning the ladder means a silent driver regression (e.g. an
+    // unwanted dedupe at the refined end) fails loudly instead of sliding
+    // through whatever monotone sequence it happened to produce.
+    assertSweepValues(samples, [64, 176, 288, 400, 512], 'gridNa')
     assertCauchyConvergence(samples, 'gridNa')
   })
 
@@ -294,7 +318,8 @@ test.describe('Wheeler–DeWitt — SRMT grid convergence (URL-driven)', () => {
           `q_phi1=${s.qPhi1.toFixed(6)} q_phi2=${s.qPhi2.toFixed(6)}`
       )
     }
-    expect(samples.length, 'URL point-count mismatch').toBe(5)
+    // linspace(9, 33, 5) → [9, 15, 21, 27, 33] after round+dedupe.
+    assertSweepValues(samples, [9, 15, 21, 27, 33], 'gridNphi')
     assertCauchyConvergence(samples, 'gridNphi')
   })
 })
