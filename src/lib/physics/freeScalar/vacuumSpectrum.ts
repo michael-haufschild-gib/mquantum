@@ -18,7 +18,7 @@
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
 import { ifftNd } from '@/lib/math/fft'
-import { computeStrides, linearToNDCoords, ndToLinearIdx } from '@/lib/math/ndArray'
+import { computeStrides, linearToNDCoordsInto, ndToLinearIdx } from '@/lib/math/ndArray'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /** Minimum mass used for zero-mode regularization when physical mass is zero. */
@@ -245,13 +245,18 @@ export function sampleVacuumSpectrum(
 
   const omegaOf = resolveOmegaEvaluator(config, dispersion)
 
+  // Pre-allocated scratch coords — reused per mode. Under the default
+  // 64³ config this loop runs ~260k times; per-iteration `Array`
+  // allocation dominates the pack budget with GC churn.
+  const coords = new Array<number>(latticeDim).fill(0)
+  const conjCoords = new Array<number>(latticeDim).fill(0)
+
   for (let idx = 0; idx < totalSites; idx++) {
     if (visited[idx]) continue
 
-    const coords = linearToNDCoords(idx, dims)
+    linearToNDCoordsInto(idx, dims, coords)
 
     // Conjugate mode: (-n_d mod N_d) for each dimension
-    const conjCoords = new Array<number>(latticeDim)
     for (let d = 0; d < latticeDim; d++) {
       conjCoords[d] = (dims[d]! - coords[d]!) % dims[d]!
     }
@@ -349,10 +354,11 @@ export function estimateVacuumMaxPhi(
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
   const omegaOf = resolveOmegaEvaluator(config, dispersion)
+  const coords = new Array<number>(latticeDim).fill(0)
 
   let varianceSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
-    const coords = linearToNDCoords(idx, dims)
+    linearToNDCoordsInto(idx, dims, coords)
     const omega = omegaOf(coords, dims)
     varianceSum += 1 / (2 * omega)
   }
@@ -383,10 +389,11 @@ export function estimateVacuumMaxPi(
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
   const omegaOf = resolveOmegaEvaluator(config, dispersion)
+  const coords = new Array<number>(latticeDim).fill(0)
 
   let varianceSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
-    const coords = linearToNDCoords(idx, dims)
+    linearToNDCoordsInto(idx, dims, coords)
     const omega = omegaOf(coords, dims)
     varianceSum += omega / 2
   }
@@ -428,10 +435,11 @@ export function estimateVacuumEnergyVisualScale(
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
   const omegaOf = resolveOmegaEvaluator(config, dispersion)
+  const coords = new Array<number>(latticeDim).fill(0)
 
   let omegaSum = 0
   for (let idx = 0; idx < totalSites; idx++) {
-    const coords = linearToNDCoords(idx, dims)
+    linearToNDCoordsInto(idx, dims, coords)
     const omega = omegaOf(coords, dims)
     omegaSum += omega
   }

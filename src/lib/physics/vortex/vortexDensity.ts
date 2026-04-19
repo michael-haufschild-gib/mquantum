@@ -34,14 +34,23 @@ export const TAU = 2 * Math.PI
 
 /**
  * Wrap a raw phase difference into the principal branch (-pi, pi] using the
- * classic shortest-arc formula. This is identical to the WGSL helper of the
- * same name.
+ * classic shortest-arc formula.
  *
- * Note: at exact odd multiples of pi (dtheta = ±3*pi, ±5*pi, ...) the result is
- * bit-exact but sign-dependent on the platform `round()` convention. Tests
- * that probe those exact values must check |wrapPhase(x)| ≈ pi rather than the
- * signed result, because JS `Math.round` (half-away-from-zero) and WGSL
- * `round` (half-to-even) disagree.
+ * ## Relation to the WGSL helper
+ * The shader in `vortexDetect.wgsl.ts` implements `wrapPhase` with a single
+ * `if (w > π) w -= 2π; if (w < -π) w += 2π;` pair of branches — a one-shot
+ * wrap that only produces the correct principal-branch result for inputs in
+ * `(-3π, 3π]`. This CPU routine uses `Math.round(dTheta / TAU)` and is
+ * correct for any real input. In the vortex-detection hot path the input is
+ * always a difference of `atan2` outputs and therefore lives in `(-2π, 2π)`,
+ * so both implementations produce the same value on every physically-reached
+ * sample; the CPU helper is the more general one.
+ *
+ * ## Exact-boundary behaviour
+ * At exact odd multiples of π (`dtheta = ±π, ±3π, ±5π, …`) the signed result
+ * depends on the platform `round()` convention (JS `Math.round` is
+ * half-away-from-zero; WGSL `round` is half-to-even). Tests that probe those
+ * exact values must assert `|wrapPhase(x)| ≈ π`, not a signed result.
  *
  * @param dTheta Raw phase difference in radians.
  * @returns Wrapped difference in (-pi, pi] (or [-pi, pi) at exact boundaries).

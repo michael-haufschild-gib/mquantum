@@ -234,6 +234,12 @@ export function qExponent(params: CosmologyPresetParams): number {
  *
  * @param params - Preset parameters
  * @returns `β·(β − 1)` for the chosen preset
+ * @throws {RangeError} For the anisotropic / tabulated presets
+ *   (`bianchiKasner`, `lqcBounce`): the Mukhanov-Sasaki `β(β−1)/η²`
+ *   coefficient is a closed-form scalar only under the `a(η) = A·|η|^q`
+ *   ansatz, which these presets do not satisfy. Callers must dispatch
+ *   through `computeBianchiKasnerCoefs` / `evaluateLqcBounceCoefs`
+ *   directly and consume the axis-specific or tabulated coefficients.
  */
 export function zppOverZCoefficient(params: CosmologyPresetParams): number {
   // Always validate dimensionality, even in the Minkowski short-circuit, so
@@ -251,6 +257,11 @@ export function zppOverZCoefficient(params: CosmologyPresetParams): number {
  *
  * @param params - Preset parameters
  * @returns `β`
+ * @throws {RangeError} For the anisotropic / tabulated presets
+ *   (`bianchiKasner`, `lqcBounce`) because `β` is derived from the
+ *   closed-form `q` exponent, which those presets do not expose. Bianchi-I
+ *   and LQC bounce vacuum sampling must route through the preset-specific
+ *   coefficient evaluators.
  */
 export function betaExponent(params: CosmologyPresetParams): number {
   validateSpacetimeDim(params.spacetimeDim)

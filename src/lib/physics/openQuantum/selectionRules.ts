@@ -38,18 +38,3 @@ export function isAllowedE1(stateI: HydrogenBasisState, stateJ: HydrogenBasisSta
 
   return true
 }
-
-/**
- * Compute the spherical component q of the dipole transition.
- *
- * q = m_final - m_initial, must be in {-1, 0, +1} for E1.
- *
- * @param mI - Magnetic quantum number of initial state
- * @param mJ - Magnetic quantum number of final state
- * @returns Spherical component q, or null if |Δm| > 1
- */
-export function dipoleComponent(mI: number, mJ: number): number | null {
-  const q = mJ - mI
-  if (Math.abs(q) > 1) return null
-  return q
-}

@@ -13,12 +13,17 @@
  * This implementation uses **full reorthogonalization**: after each
  * three-term recurrence step, we subtract the projection of the new
  * Lanczos vector onto every previously-stored basis vector. This adds
- * `O(j·n)` work per step (`O(m²·n)` over all `m` steps), which is
- * negligible next to the `O(m·n²)` matrix-vector cost when `m << n`, and
- * restores the numerical orthogonality that pure three-term Lanczos loses
- * after a few steps due to round-off — without full reorth the extracted
- * spectrum develops spurious duplicated eigenvalues (Paige's ghost
- * phenomenon).
+ * `O(j·n)` work per step (`O(m²·n)` over all `m` steps) and restores the
+ * numerical orthogonality that pure three-term Lanczos loses after a few
+ * steps due to round-off — without full reorth the extracted spectrum
+ * develops spurious duplicated eigenvalues (Paige's ghost phenomenon).
+ *
+ * Cost breakdown:
+ *   - Dense input (`lanczosTopK` path): matvec = O(n²) per step, reorth =
+ *     O(m·n) per step. Matvec dominates when `m << n`.
+ *   - Callback input (`lanczosTopKOp` path) with a sparse stencil: matvec
+ *     can be O(n) per step (5-point Hamilton-Jacobi stencil is the motivating
+ *     case). In that regime reorth at O(m·n) per step dominates — expected.
  *
  * The tridiagonal subproblem is diagonalized by the existing cyclic Jacobi
  * eigensolver ({@link jacobiEigendecompose}). At the sizes Lanczos ever
@@ -149,6 +154,12 @@ export interface LanczosOptions {
    * eigenvalues of the tridiagonal converge to the top-k eigenvalues of
    * `A` within `~1e-10` for well-separated spectra and `~1e-4` for
    * clustered ones.
+   *
+   * The effective iteration count is clamped to `[k, n]` regardless of
+   * this setting — a user-provided `maxIterations < k` is floored to `k`
+   * (otherwise the tridiagonal is too small to deliver `k` top eigenvalues),
+   * and any value above `n` is clipped to `n` (no further Krylov basis
+   * vectors can exist past dimension `n`).
    */
   maxIterations?: number
   /**
@@ -244,10 +255,14 @@ export function lanczosTopK(
  * @param applyA - Linear operator: `y := A · x`.
  * @param n - Operator order (must be a non-negative integer).
  * @param k - Number of top-magnitude eigenvalues to extract.
- * @param infNormEstimate - Optional scale estimate used in the β-breakdown
- *   check. Callers who know an upper bound on `||A||_∞` can supply it to
- *   skip the internal estimate; pass `0` or omit to let the routine
- *   estimate via `trace(A²)` — see note below.
+ * @param infNormEstimate - Scale estimate used in the β-breakdown
+ *   check. Pass an upper bound on `||A||_∞` (e.g. `maxDiag + Σ_j |offDiag|`
+ *   for a sparse stencil) so the β-convergence threshold scales with the
+ *   operator's magnitude. Must be a finite non-negative number; `0` is
+ *   legal but collapses the β threshold to the raw tolerance
+ *   (`tol * max(1, infNormEstimate)`), which can let the iteration walk
+ *   past a true Krylov breakdown on large-norm operators — callers
+ *   should supply a real estimate when available.
  * @param opts - Lanczos options (`maxIterations`, `tolerance`, `seed`).
  * @returns Ascending-sorted top-k eigenvalues.
  */

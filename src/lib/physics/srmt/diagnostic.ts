@@ -17,6 +17,7 @@
 
 import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solver'
 
+import { computeAffineFitQuality } from './affineFit'
 import { hjSpectrumOnSliceTopK } from './hjOperator'
 import { modularSpectrum } from './modularHamiltonian'
 import { schmidtValues } from './schmidt'
@@ -59,57 +60,6 @@ function slicePlaneFor(clock: SrmtConfig['clock']): SrmtSlicePlane {
   if (clock === 'a') return 'phi-phi'
   if (clock === 'phi1') return 'a-phi2'
   return 'a-phi1'
-}
-
-/**
- * Affine-match quality `q = Σ_n (K_n − (α E_n + β))² / Σ_n K_n²` after
- * a least-squares fit of `α`, `β` over the first `count` points.
- *
- * @param K - Modular spectrum values (ascending).
- * @param E - HJ spectrum values (ascending).
- * @param count - Number of leading values to include in the fit.
- * @returns The fit quality metric, or `NaN` when the input is degenerate
- *          (fewer than 2 points or zero-variance `E`).
- */
-function affineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
-  if (count < 2) return Number.NaN
-
-  let sumE = 0
-  let sumK = 0
-  for (let i = 0; i < count; i++) {
-    sumE += E[i]!
-    sumK += K[i]!
-  }
-  const meanE = sumE / count
-  const meanK = sumK / count
-
-  let sEE = 0
-  let sEK = 0
-  let sKK = 0
-  for (let i = 0; i < count; i++) {
-    const dE = E[i]! - meanE
-    const dK = K[i]! - meanK
-    sEE += dE * dE
-    sEK += dE * dK
-    sKK += dK * dK
-  }
-
-  if (sEE <= 0) return Number.NaN
-  const alpha = sEK / sEE
-  const beta = meanK - alpha * meanE
-
-  let num = 0
-  let den = 0
-  for (let i = 0; i < count; i++) {
-    const k = K[i]!
-    const predicted = alpha * E[i]! + beta
-    const r = k - predicted
-    num += r * r
-    den += k * k
-  }
-
-  if (den <= 0) return sKK > 0 ? num / sKK : Number.NaN
-  return num / den
 }
 
 /**
@@ -261,9 +211,23 @@ export function computeSrmtDiagnostic(
   }
   const Nphi = Nphi1
 
-  if (!Number.isInteger(config.cutIndex) || config.cutIndex <= 0) {
+  // The diagnostic requires a STRICTLY INTERIOR cut. `buildSliceK` silently
+  // clamps out-of-range indices to the axis boundary, which would produce a
+  // boundary slice and a misleadingly low diagnostic quality — so enforce
+  // the range at the API boundary instead. The coordinator's
+  // `resolveSrmtCutIndexForLen` already maps the UI's normalized cut into
+  // `[1, N-2]`, so in production this guard is never tripped; direct callers
+  // (tests, ad-hoc scripts) get a clear error instead of garbage.
+  const clockAxisLen = config.clock === 'a' ? Na : Nphi
+  if (
+    !Number.isInteger(config.cutIndex) ||
+    config.cutIndex <= 0 ||
+    config.cutIndex >= clockAxisLen - 1
+  ) {
     throw new Error(
-      `computeSrmtDiagnostic: cutIndex must be a positive integer, got ${config.cutIndex}`
+      `computeSrmtDiagnostic: cutIndex must be an interior integer in [1, ${
+        clockAxisLen - 2
+      }] for clock '${config.clock}', got ${config.cutIndex}`
     )
   }
   if (!Number.isInteger(config.rankCap) || config.rankCap <= 0) {
@@ -305,13 +269,13 @@ export function computeSrmtDiagnostic(
   for (let i = 0; i < hjSpec32.length; i++) hjSpec[i] = hjSpec32[i]!
 
   const compareCount = Math.min(kSpec.length, hjSpec.length, config.rankCap)
-  const q = affineFitQuality(kSpec, hjSpec, compareCount)
+  const q = computeAffineFitQuality(kSpec, hjSpec, compareCount)
 
-  // Cast outputs to Float32 per SrmtResult contract.
-  const schmidtF32 = new Float32Array(schmidt.length)
-  for (let i = 0; i < schmidt.length; i++) schmidtF32[i] = schmidt[i]!
-  const kF32 = new Float32Array(kSpec.length)
-  for (let i = 0; i < kSpec.length; i++) kF32[i] = kSpec[i]!
+  // Cast outputs to Float32 per SrmtResult contract. `new Float32Array(f64)`
+  // performs the element-wise cast in one call — same shape as the old manual
+  // loops, no TypedArray polyfill risk in the supported browsers.
+  const schmidtF32 = new Float32Array(schmidt)
+  const kF32 = new Float32Array(kSpec)
   // hjSpec32 is already Float32 from lanczosTopK; hold the reference
   // directly to avoid a redundant allocation + copy.
   const hjF32 = hjSpec32

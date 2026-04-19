@@ -327,6 +327,25 @@ function applyWdwParams(
     ext.setWdwSrmtHeatmapIntensity(urlState.wdwSrmtHeatmapIntensity)
 }
 
+/**
+ * Queue the SRMT sweep configuration from URL params so the sweep
+ * section can auto-dispatch it once the Wheeler–DeWitt strategy has
+ * produced its first solver output. No-op when `sw` is absent.
+ */
+function applySrmtSweepParams(urlState: ParsedShareableState): void {
+  if (!urlState.srmtSweepKind) return
+  void import('@/stores/srmtSweepStore').then(({ useSrmtSweepStore }) => {
+    useSrmtSweepStore.getState().setPendingSweep({
+      kind: urlState.srmtSweepKind!,
+      points: urlState.srmtSweepPoints,
+      sweepMin: urlState.srmtSweepMin,
+      sweepMax: urlState.srmtSweepMax,
+      phiRef: urlState.srmtSweepPhiRef,
+      cutAnchor: urlState.srmtSweepCutAnchor,
+    })
+  })
+}
+
 /** Apply coordinate entanglement URL state params (lazy import). */
 function applyEntanglementParams(urlState: ParsedShareableState): void {
   if (urlState.entanglementEnabled === undefined) return
@@ -443,6 +462,7 @@ export function applyUrlStateParams(urlState: ParsedShareableState): void {
     applyCosmologyParams(urlState, ext)
     applyWdwParams(urlState, ext)
     applyAdsParams(urlState, ext)
+    applySrmtSweepParams(urlState)
   } catch (error) {
     logger.warn('[useUrlState] Failed to apply URL state:', error)
   } finally {

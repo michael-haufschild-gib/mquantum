@@ -20,8 +20,6 @@ import {
   type WdwGridPreset,
 } from '@/stores/slices/geometry/setters/wheelerDeWittSetters'
 
-import { WheelerDeWittSrmtControls } from './WheelerDeWittSrmtControls'
-
 const BOUNDARY_CONDITION_OPTIONS = [
   { value: 'noBoundary', label: 'Hartle–Hawking' },
   { value: 'tunneling', label: 'Vilenkin' },
@@ -137,7 +135,6 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
           data-testid="wdw-streamline-density"
         />
       )}
-      <WheelerDeWittSrmtControls />
     </div>
   )
 })

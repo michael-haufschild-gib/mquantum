@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { complexMatIdentity, complexMatZero } from '@/lib/physics/openQuantum/complexMatrix'
-import { densityMatrixFromCoefficients } from '@/lib/physics/openQuantum/integrator'
+import { densityMatrixFromCoefficients, MAX_K } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
-import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'
+import {
+  applyPropagator,
+  computePropagator,
+  evolvePropagatorStep,
+} from '@/lib/physics/openQuantum/propagator'
 import type { DensityMatrix, LindbladChannel } from '@/lib/physics/openQuantum/types'
 
 // ---------------------------------------------------------------------------
@@ -220,6 +224,63 @@ describe('evolvePropagatorStep', () => {
     expect(trace(rho)).toBeCloseTo(1.0, 10)
     expect(rho.elements[0]).toBeCloseTo(1.0, 10)
     expect(rho.elements[1]).toBeCloseTo(0.0, 10)
+  })
+
+  it('handles K = MAX_K at the scratch-buffer boundary', () => {
+    // MAX_K (14) is the size the module-scoped scratch buffers are allocated
+    // for. K = MAX_K is the largest legal case; a regression that shaved a
+    // single element from the scratch allocation would turn the last-row
+    // matvec into a NaN-propagating read.
+    const K = MAX_K
+    const energies = new Float64Array(K)
+    for (let k = 0; k < K; k++) energies[k] = -1 / (k + 1)
+    // Emission chain: each level decays into the one below it.
+    const channels: LindbladChannel[] = []
+    for (let k = 0; k < K - 1; k++) {
+      channels.push({ row: k, col: k + 1, amplitudeRe: 0.05, amplitudeIm: 0 })
+    }
+    const L = buildLiouvillian(energies, channels, K)
+    const P = computePropagator(L, 0.01, K)
+
+    // Start in |K-1⟩ (the highest excited state).
+    const coeffsRe = new Float64Array(K)
+    const coeffsIm = new Float64Array(K)
+    coeffsRe[K - 1] = 1
+    const rho = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
+
+    for (let step = 0; step < 200; step++) {
+      evolvePropagatorStep(P, rho)
+    }
+
+    // All populations must be finite and the trace must be 1 — a scratch
+    // overflow would turn the last-row sums into NaN and the trace into NaN.
+    expect(trace(rho)).toBeCloseTo(1.0, 6)
+    for (let k = 0; k < K; k++) {
+      const pop = rho.elements[2 * (k * K + k)]!
+      expect(Number.isFinite(pop)).toBe(true)
+      expect(pop).toBeGreaterThanOrEqual(-1e-12)
+    }
+  })
+
+  it('rejects K > MAX_K instead of silently corrupting the density matrix', () => {
+    // Pre-fix, an oversize K wrote past the scratch buffer (a no-op on
+    // TypedArrays) and read `undefined` back, which the `!` non-null
+    // assertion happily cast into NaN arithmetic — a density matrix
+    // that LOOKED finished but was garbage. Post-fix, the entry points
+    // throw at the API boundary.
+    const K = MAX_K + 1
+    const N = K * K
+    const zeroL = complexMatZero(N)
+    expect(() => computePropagator(zeroL, 0.01, K)).toThrow(/MAX_K/)
+
+    // applyPropagator should also refuse — even if the caller obtained a
+    // valid propagator some other way.
+    const smallP = complexMatIdentity(MAX_K * MAX_K)
+    const oversize: DensityMatrix = {
+      K: MAX_K + 1,
+      elements: new Float64Array((MAX_K + 1) * (MAX_K + 1) * 2),
+    }
+    expect(() => applyPropagator(smallP, oversize)).toThrow(/MAX_K/)
   })
 
   it('drives population toward ground state under emission-only dissipation', () => {

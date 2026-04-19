@@ -21,7 +21,11 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { AntiDeSitterConfig } from '@/lib/geometry/extended/antiDeSitter'
-import { packAntiDeSitterDensityGrid } from '@/lib/physics/antiDeSitter/densityGrid'
+import {
+  type AdsPackerScratch,
+  createAdsPackerScratch,
+  packAntiDeSitterDensityGrid,
+} from '@/lib/physics/antiDeSitter/densityGrid'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
 import { createDensityTexture } from '../../passes/computePassUtils'
@@ -78,6 +82,12 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
   private densityTextureView: GPUTextureView | null = null
   private lastConfigHash: string | null = null
   private transferredOut = false
+  /**
+   * Lazily-allocated packer scratch. Allocated on the first pack and reused
+   * on every dirty frame so slider drags don't churn ~6 MB of typed arrays
+   * per frame. Dropped when the strategy is disposed.
+   */
+  private packerScratch: AdsPackerScratch | null = null
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
@@ -137,7 +147,8 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     const dirty = hash !== this.lastConfigHash || !!ads.needsReset
     if (!dirty) return
 
-    const packed = packAntiDeSitterDensityGrid(ads)
+    if (!this.packerScratch) this.packerScratch = createAdsPackerScratch()
+    const packed = packAntiDeSitterDensityGrid(ads, this.packerScratch)
 
     ctx.device.queue.writeTexture(
       { texture: this.densityTexture },
@@ -160,6 +171,11 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     this.densityTexture = source.densityTexture
     this.densityTextureView = source.densityTextureView
     this.lastConfigHash = source.lastConfigHash
+    // Adopt the predecessor's scratch pool too — otherwise the first post-
+    // adoption frame allocates 6 MB all over again. Leave the predecessor's
+    // reference null so dispose() on it doesn't touch ours.
+    this.packerScratch = source.packerScratch
+    source.packerScratch = null
     source.densityTexture = null
     source.densityTextureView = null
     source.transferredOut = true
@@ -175,5 +191,6 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     this.densityTexture = null
     this.densityTextureView = null
     this.lastConfigHash = null
+    this.packerScratch = null
   }
 }

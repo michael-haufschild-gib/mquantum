@@ -43,6 +43,7 @@ import type {
 } from './types'
 import { WheelerDeWittPhysicsCache } from './WheelerDeWittPhysicsCache'
 import { WheelerDeWittSrmtCoordinator } from './WheelerDeWittSrmtCoordinator'
+import { WheelerDeWittSrmtSweepCoordinator } from './WheelerDeWittSrmtSweepCoordinator'
 
 // Re-export the hash helpers so existing imports keep resolving.
 export { computeWdwConfigHash, computeWdwTrajectoryHash } from './WheelerDeWittPhysicsCache'
@@ -58,6 +59,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
 
   private physics = new WheelerDeWittPhysicsCache()
   private srmt = new WheelerDeWittSrmtCoordinator()
+  private srmtSweep = new WheelerDeWittSrmtSweepCoordinator()
 
   /**
    * Tracks the last-packed worldline-enabled state so a toggle-off
@@ -130,6 +132,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     if (!physicsTick.output) return
 
     const srmtTick = this.srmt.update(wdw, physicsTick.output, physicsTick.solverDirty)
+    this.srmtSweep.update(wdw, physicsTick.solverDirty)
+    this.srmtSweep.maybeDispatchPending(wdw, physicsTick.output)
 
     // Worldline pulse re-packs every playing frame; a toggle-off
     // triggers a one-shot repack to clear the pulse snapshot.
@@ -218,6 +222,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.densityTextureView = source.densityTextureView
     this.physics.adoptFrom(source.physics)
     this.srmt.adoptFrom(source.srmt)
+    this.srmtSweep.adoptFrom(source.srmtSweep)
     this.lastWorldlineEnabled = source.lastWorldlineEnabled
     source.densityTexture = null
     source.densityTextureView = null
@@ -235,6 +240,17 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     this.densityTextureView = null
     this.physics.reset()
     this.srmt.dispose()
+    this.srmtSweep.dispose()
     this.lastWorldlineEnabled = false
+  }
+
+  /** Accessor for UI + tests that need to trigger a sweep via the coordinator. */
+  getSrmtSweepCoordinator(): WheelerDeWittSrmtSweepCoordinator {
+    return this.srmtSweep
+  }
+
+  /** Accessor for UI + tests that need the cached solver output. */
+  getSolverOutput(): ReturnType<WheelerDeWittPhysicsCache['getOutput']> {
+    return this.physics.getOutput()
   }
 }

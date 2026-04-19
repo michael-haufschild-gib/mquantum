@@ -906,3 +906,54 @@ describe('computeProperNorm', () => {
     expect(nT / n0).toBeCloseTo(aCubed, 6)
   })
 })
+
+describe('curvedKineticRef — input validation', () => {
+  // Pre-fix, `latticeDim = 3` with `gridSize = [64, 64]` crashed with silent
+  // NaN cascades (N[2] = undefined, `undefined as number` casts passed
+  // tsc, downstream arithmetic NaN'd). These tests confirm the length
+  // guard now reports a clear error at the API boundary.
+  const metric: MetricConfig = { kind: 'flat' }
+  const psi = new Float32Array(64)
+
+  it('applyCurvedKineticRef rejects gridSize shorter than latticeDim', () => {
+    expect(() =>
+      applyCurvedKineticRef({
+        psiRe: psi,
+        psiIm: psi,
+        gridSize: [4, 4],
+        spacing: [1, 1, 1],
+        mass: 1,
+        hbar: 1,
+        latticeDim: 3,
+        metric,
+      })
+    ).toThrow(/gridSize length 2 < latticeDim 3/)
+  })
+
+  it('applyCurvedKineticRef rejects spacing shorter than latticeDim', () => {
+    expect(() =>
+      applyCurvedKineticRef({
+        psiRe: psi,
+        psiIm: psi,
+        gridSize: [4, 4, 4],
+        spacing: [1, 1],
+        mass: 1,
+        hbar: 1,
+        latticeDim: 3,
+        metric,
+      })
+    ).toThrow(/spacing length 2 < latticeDim 3/)
+  })
+
+  it('computeProperNorm rejects gridSize shorter than latticeDim', () => {
+    expect(() => computeProperNorm(psi, psi, [4, 4], [1, 1, 1], 3, metric)).toThrow(
+      /gridSize length 2 < latticeDim 3/
+    )
+  })
+
+  it('computeInnerProduct rejects spacing shorter than latticeDim', () => {
+    expect(() => computeInnerProduct(psi, psi, psi, psi, [4, 4, 4], [1, 1], 3, metric)).toThrow(
+      /spacing length 2 < latticeDim 3/
+    )
+  })
+})

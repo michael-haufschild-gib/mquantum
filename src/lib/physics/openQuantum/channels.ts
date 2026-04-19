@@ -14,6 +14,17 @@ import type { LindbladChannel, OpenQuantumConfig } from './types'
 /**
  * Build the complete set of Lindblad channels from the open quantum configuration.
  *
+ * ## Rate gating
+ * Each block is gated by the paired `<channel>Enabled` flag AND a strict
+ * `rate > 0` check. Consequences:
+ *   - Zero rate ⇒ silently skipped (equivalent to `Enabled: false`).
+ *   - Negative rate ⇒ silently skipped (physically meaningless, never
+ *     produces an imaginary-amplitude channel).
+ *   - `NaN` rate ⇒ silently skipped (`NaN > 0` is `false`).
+ *   - `Infinity` rate ⇒ produces an infinite-amplitude channel. Downstream
+ *     would cascade to NaN in the Liouvillian; validate at the URL /
+ *     store layer before calling this helper.
+ *
  * @param config - Open quantum system configuration
  * @param K - Number of basis states (term count)
  * @returns Array of sparse rank-1 Lindblad operators

@@ -59,6 +59,26 @@ describe('PAULI_SCENARIO_PRESETS', () => {
     }
   })
 
+  it('all presets set initialCondition to a valid PauliInitialCondition', () => {
+    // Parity with the fieldView / fieldType guards — a preset that sneaks in
+    // an invalid `initialCondition` would silently fall through to the
+    // default initializer rather than raise a load-time error.
+    const validConditions = new Set([
+      'gaussianSpinUp',
+      'gaussianSpinDown',
+      'gaussianSuperposition',
+      'planeWaveSpinor',
+    ])
+    for (const preset of PAULI_SCENARIO_PRESETS) {
+      if (preset.overrides.initialCondition) {
+        expect(
+          validConditions.has(preset.overrides.initialCondition),
+          `Invalid initialCondition "${preset.overrides.initialCondition}" in preset "${preset.id}"`
+        ).toBe(true)
+      }
+    }
+  })
+
   it('dt overrides are within clamping range [0.0001, 0.1]', () => {
     for (const preset of PAULI_SCENARIO_PRESETS) {
       if (preset.overrides.dt !== undefined) {
@@ -106,6 +126,18 @@ describe('PAULI_SCENARIO_PRESETS', () => {
     expect(rabi.overrides.fieldType).toBe('rotating')
     expect(rabi.overrides.rotatingFrequency).toBeGreaterThan(0)
     expect(rabi.overrides.initialCondition).toBe('gaussianSpinUp')
+  })
+
+  it('spinFlip is on-resonance: rotatingFrequency matches the Larmor frequency', () => {
+    // The preset describes a "resonant rotating field driving spin
+    // transitions". In sim units with μ_B = ℏ = 1 the Larmor frequency is
+    // ω_L = fieldStrength. If an edit desyncs the two, the preset turns into
+    // an off-resonance Rabi drive whose population transfer never reaches
+    // full flipping — a subtle physics regression the basic "rotating field
+    // + positive frequency" check would miss.
+    const rabi = PAULI_SCENARIO_PRESETS.find((p) => p.id === 'spinFlip')!
+    expect(rabi.overrides.fieldStrength).toBeGreaterThan(0)
+    expect(rabi.overrides.rotatingFrequency).toBe(rabi.overrides.fieldStrength)
   })
 
   it('freeSpinUp has zero field strength', () => {

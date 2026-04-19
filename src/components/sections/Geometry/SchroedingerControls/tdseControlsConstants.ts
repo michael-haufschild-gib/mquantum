@@ -6,7 +6,6 @@
  * @module components/sections/Geometry/SchroedingerControls/tdseControlsConstants
  */
 
-import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 
 /** Initial wavefunction shape options. */
@@ -55,12 +54,6 @@ export const FIELD_VIEW_OPTIONS = [
   { value: 'potential', label: 'Potential V(x)' },
 ]
 
-/** All scenario preset dropdown options (unfiltered). */
-export const SCENARIO_PRESET_OPTIONS = TDSE_SCENARIO_PRESETS.map((p) => ({
-  value: p.id,
-  label: p.name,
-}))
-
 /**
  * Filter scenario presets to those compatible with the current dimension.
  * A preset is compatible if its latticeDim matches the user's dimension,
@@ -77,41 +70,4 @@ export function getScenarioPresetOptions(dim: number): { value: string; label: s
     // Preset designed for this dimension or lower (TDSE can scale arrays up)
     return presetDim <= dim
   }).map((p) => ({ value: p.id, label: p.name }))
-}
-
-/**
- * Check whether a single override value matches the corresponding config value.
- *
- * Arrays are compared only over their overlapping prefix because TDSE arrays
- * are resized to match the current dimension at runtime.
- */
-function overrideValueMatches(expected: unknown, actual: unknown): boolean {
-  if (!Array.isArray(expected)) return actual === expected
-  if (!Array.isArray(actual)) return false
-  const len = Math.min(expected.length, (actual as number[]).length)
-  return !expected.slice(0, len).some((v, i) => v !== (actual as number[])[i])
-}
-
-/**
- * Check whether every override in a preset matches the current config.
- * `latticeDim` is skipped because `applyTdsePreset` strips it.
- */
-function presetMatchesConfig(overrides: Record<string, unknown>, config: TdseConfig): boolean {
-  return Object.entries(overrides).every(([key, expected]) => {
-    if (key === 'latticeDim') return true
-    return overrideValueMatches(expected, config[key as keyof TdseConfig])
-  })
-}
-
-/**
- * Compare current config against all presets to find a match.
- *
- * @param config - Current TDSE configuration
- * @returns The matching preset id, or empty string if no match
- */
-export function detectActivePreset(config: TdseConfig): string {
-  const match = TDSE_SCENARIO_PRESETS.find((preset) =>
-    presetMatchesConfig(preset.overrides, config)
-  )
-  return match?.id ?? ''
 }

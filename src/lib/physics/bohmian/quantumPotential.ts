@@ -23,11 +23,16 @@
  * @module lib/physics/bohmian/quantumPotential
  */
 
-/** Density floor used inside sqrt(max(ρ, RHO_FLOOR)) — mirrors the WGSL ε. */
-const RHO_FLOOR = 1e-8
+/**
+ * Density floor used inside `sqrt(max(ρ, RHO_FLOOR))`. Mirrors the `1e-8`
+ * literal in `densityGridSampling.wgsl.ts` → `computeQuantumPotentialFromGrid`;
+ * `quantumPotential.test.ts` pins the mirror via `expectConstantsMatchWGSL`.
+ * Exported so consumers can import the single source of truth.
+ */
+export const RHO_FLOOR = 1e-8
 
 /** R-safe denominator floor — mirrors the WGSL `max(R_c, 1e-4)`. */
-const R_DENOM_FLOOR = 1e-4
+export const R_DENOM_FLOOR = 1e-4
 
 /**
  * Raw-density cutoff below which a voxel's Q is forced to 0 (mirrors the WGSL
@@ -39,7 +44,7 @@ const R_DENOM_FLOOR = 1e-4
  * near-vacuum zeroing never triggered. The fix is to compare the raw
  * (unfloored) density against the equivalent ρ-space cutoff.
  */
-const RHO_ZERO_CUTOFF = 1e-12
+export const RHO_ZERO_CUTOFF = 1e-12
 
 /**
  * Linear-index helper: voxel (i, j, k) → `i + size·(j + size·k)`.
@@ -100,11 +105,13 @@ export function computeQuantumPotentialCpu(
   gridSize: number,
   boundingRadius: number
 ): Float32Array {
-  if (gridSize <= 2) {
-    throw new Error(`computeQuantumPotentialCpu: gridSize must be >= 3, got ${gridSize}`)
+  if (!Number.isInteger(gridSize) || gridSize <= 2) {
+    throw new Error(`computeQuantumPotentialCpu: gridSize must be an integer ≥ 3, got ${gridSize}`)
   }
-  if (boundingRadius <= 0) {
-    throw new Error(`computeQuantumPotentialCpu: boundingRadius must be > 0, got ${boundingRadius}`)
+  if (!Number.isFinite(boundingRadius) || boundingRadius <= 0) {
+    throw new Error(
+      `computeQuantumPotentialCpu: boundingRadius must be a finite positive number, got ${boundingRadius}`
+    )
   }
   const expected = gridSize * gridSize * gridSize
   if (densityGrid.length !== expected) {

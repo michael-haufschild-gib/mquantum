@@ -11,7 +11,11 @@ import {
   computeHarmonicPotentialV,
   computeQuantumPotentialCpu,
   indexGrid,
+  R_DENOM_FLOOR,
+  RHO_FLOOR,
+  RHO_ZERO_CUTOFF,
 } from '@/lib/physics/bohmian/quantumPotential'
+import { densityGridSamplingBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl'
 
 /** Cell-centred world coordinate for voxel index `i` on [−bound, +bound]. */
 function voxelWorld(i: number, gridSize: number, bound: number): number {
@@ -204,6 +208,48 @@ describe('computeQuantumPotentialCpu — near-vacuum cutoff gate', () => {
       }
     }
     expect(denseHasNonzero).toBe(true)
+  })
+})
+
+describe('CPU/WGSL constant mirror', () => {
+  it('WGSL computeQuantumPotentialFromGrid uses the same three magic numbers as the TS module', () => {
+    // The WGSL stencil and the TS mirror each hold their own copy of the
+    // three guard constants. Any drift silently breaks the unit-test
+    // contract ("CPU mirror must match WGSL stencil exactly"). We parse the
+    // WGSL text and assert the three constants appear inside the
+    // `computeQuantumPotentialFromGrid` function body — if a future shader
+    // refactor renames the function we need to update this test too, but
+    // that's a one-line change with a clear signal.
+    const body = densityGridSamplingBlock
+    const fnMarker = 'fn computeQuantumPotentialFromGrid'
+    const start = body.indexOf(fnMarker)
+    expect(start).toBeGreaterThanOrEqual(0)
+    // Grab everything from the function marker to the end — good enough
+    // because the magic numbers below don't reappear elsewhere in the file.
+    const slice = body.slice(start)
+    // WGSL literals use exponential notation (`1e-12`, `1e-8`, `1e-4`) while
+    // JS `${n}` interpolation decimalises them to `0.0001`, etc. Match the
+    // raw WGSL literal form and assert numeric agreement separately.
+    expect(slice).toContain('rhoC < 1e-12')
+    expect(slice).toContain('max(rhoC,  1e-8)')
+    expect(slice).toContain('max(Rc, 1e-4)')
+    // Numeric cross-check: the three literals in the WGSL must equal the
+    // exported TS constants. If either drifts, the equality fails.
+    expect(1e-12).toBe(RHO_ZERO_CUTOFF)
+    expect(1e-8).toBe(RHO_FLOOR)
+    expect(1e-4).toBe(R_DENOM_FLOOR)
+  })
+})
+
+describe('computeQuantumPotentialCpu — input validation', () => {
+  it('rejects a non-integer gridSize', () => {
+    expect(() => computeQuantumPotentialCpu(new Float32Array(64), 3.5, 1)).toThrow(/integer/)
+  })
+
+  it('rejects non-finite boundingRadius', () => {
+    const rho = new Float32Array(27).fill(0.1)
+    expect(() => computeQuantumPotentialCpu(rho, 3, Number.POSITIVE_INFINITY)).toThrow(/finite/)
+    expect(() => computeQuantumPotentialCpu(rho, 3, Number.NaN)).toThrow(/finite/)
   })
 })
 

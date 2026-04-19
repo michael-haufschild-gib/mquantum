@@ -215,4 +215,33 @@ describe('buildLindbladChannels', () => {
       expect(channels[3]!.amplitudeRe).toBeCloseTo(1.0, 12) // sqrt(1.0)
     })
   })
+
+  describe('non-finite rate handling', () => {
+    // These paths aren't enforced anywhere upstream; the function's gating
+    // is pure `rate > 0`. Pinning the observed behaviour prevents a future
+    // "clean up the math branch" edit from turning a silently-disabled
+    // channel into a NaN-bomb channel.
+
+    it('negative rate is treated as disabled (not sqrt of negative)', () => {
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: -1 })
+      expect(buildLindbladChannels(cfg, K)).toEqual([])
+    })
+
+    it('NaN rate is treated as disabled', () => {
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: Number.NaN })
+      expect(buildLindbladChannels(cfg, K)).toEqual([])
+    })
+
+    it('Infinity rate propagates to Infinity amplitude (caller responsibility)', () => {
+      // Documents the gotcha — `Infinity > 0` is true, `sqrt(Infinity)` is
+      // `Infinity`, and the channel is emitted. Downstream this becomes NaN
+      // via 0·∞ inside the Liouvillian. The URL layer clamps so production
+      // can't hit this; the test nails it down so a future internal guard
+      // can't change the contract by accident.
+      const cfg = configWith({ dephasingEnabled: true, dephasingRate: Number.POSITIVE_INFINITY })
+      const channels = buildLindbladChannels(cfg, 2)
+      expect(channels).toHaveLength(2)
+      expect(channels[0]!.amplitudeRe).toBe(Number.POSITIVE_INFINITY)
+    })
+  })
 })

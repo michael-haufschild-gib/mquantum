@@ -66,6 +66,31 @@ function totalSites(gridSize: readonly number[], latticeDim: number): number {
   return n
 }
 
+/**
+ * Shared validation for every entry point: `latticeDim ∈ [1, 3]` and
+ * `gridSize.length >= latticeDim`, `spacing.length >= latticeDim`.
+ *
+ * The per-axis accesses later cast `N[d]` via `as number`, which hides
+ * `undefined` when the caller passes a too-short array. Catching it here
+ * turns the downstream NaN cascade into a clear error.
+ */
+function validateLatticeInput(
+  fnName: string,
+  latticeDim: number,
+  gridSize: readonly number[],
+  spacing: readonly number[]
+): void {
+  if (latticeDim < 1 || latticeDim > 3) {
+    throw new Error(`${fnName}: latticeDim ${latticeDim} unsupported (expected 1–3)`)
+  }
+  if (gridSize.length < latticeDim) {
+    throw new Error(`${fnName}: gridSize length ${gridSize.length} < latticeDim ${latticeDim}`)
+  }
+  if (spacing.length < latticeDim) {
+    throw new Error(`${fnName}: spacing length ${spacing.length} < latticeDim ${latticeDim}`)
+  }
+}
+
 /** World coordinate of lattice index i along an axis with N cells and spacing dx. */
 function worldCoord(i: number, N: number, dx: number): number {
   return (i - (N - 1) / 2) * dx
@@ -181,9 +206,7 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
 } {
   const { psiRe, psiIm, gridSize, spacing, mass, hbar, latticeDim, metric } = params
   const time = params.time ?? 0
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`applyCurvedKineticRef: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('applyCurvedKineticRef', latticeDim, gridSize, spacing)
 
   const N = gridSize
   const total = totalSites(gridSize, latticeDim)
@@ -288,9 +311,7 @@ export function computeProperNorm(
   metric: MetricConfig,
   time: number = 0
 ): number {
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`computeProperNorm: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('computeProperNorm', latticeDim, gridSize, spacing)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number
@@ -345,9 +366,7 @@ export function computeInnerProduct(
   metric: MetricConfig,
   time: number = 0
 ): { re: number; im: number } {
-  if (latticeDim < 1 || latticeDim > 3) {
-    throw new Error(`computeInnerProduct: latticeDim ${latticeDim} unsupported (expected 1–3)`)
-  }
+  validateLatticeInput('computeInnerProduct', latticeDim, gridSize, spacing)
 
   let cellVol = 1
   for (let d = 0; d < latticeDim; d++) cellVol *= spacing[d] as number

@@ -63,11 +63,6 @@ export const HELLER_MAX_INTERPOLATION_FRACTION = 0.2
  */
 export const HELLER_DEFAULT_MIN_SAMPLES = 64
 
-/** @deprecated use {@link HELLER_DEFAULT_CAPACITY}. */
-const DEFAULT_CAPACITY = HELLER_DEFAULT_CAPACITY
-/** @deprecated use {@link HELLER_DEFAULT_MIN_SAMPLES}. */
-const DEFAULT_MIN_SAMPLES = HELLER_DEFAULT_MIN_SAMPLES
-
 /** Default number of peaks returned by `extractSpectrumPeaks`. */
 const DEFAULT_TOP_N = 6
 
@@ -100,7 +95,7 @@ export interface HellerRingBuffer {
  * @param capacity - Maximum number of retained samples (default 1024)
  * @returns Newly allocated buffer with `head = 0` and `count = 0`
  */
-export function createHellerBuffer(capacity: number = DEFAULT_CAPACITY): HellerRingBuffer {
+export function createHellerBuffer(capacity: number = HELLER_DEFAULT_CAPACITY): HellerRingBuffer {
   if (!Number.isInteger(capacity) || capacity <= 0) {
     throw new Error(`HellerRingBuffer capacity must be a positive integer, got ${capacity}`)
   }
@@ -243,7 +238,7 @@ export interface HellerSpectrum {
  */
 export function computeHellerSpectrum(
   buf: HellerRingBuffer,
-  minSamples: number = DEFAULT_MIN_SAMPLES
+  minSamples: number = HELLER_DEFAULT_MIN_SAMPLES
 ): HellerSpectrum {
   const empty: HellerSpectrum = {
     omega: new Float64Array(0),

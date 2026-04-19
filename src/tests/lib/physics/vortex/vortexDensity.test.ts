@@ -142,3 +142,31 @@ describe('computeVortexDensityCpu2D — isolated defects', () => {
     expect(totalVortexCharge(vortex)).toBeCloseTo(2, 4)
   })
 })
+
+describe('computeVortexDensityCpu2D — input validation', () => {
+  it('returns an empty array when either dimension is below 2 plaquettes', () => {
+    // No interior plaquettes possible — output length must be 0 so downstream
+    // code reduces on a well-defined empty array instead of reading past its
+    // bounds.
+    expect(computeVortexDensityCpu2D(new Float32Array(0), 0, 0).length).toBe(0)
+    expect(computeVortexDensityCpu2D(new Float32Array(8), 8, 1).length).toBe(0)
+    expect(computeVortexDensityCpu2D(new Float32Array(8), 1, 8).length).toBe(0)
+  })
+
+  it('throws when phaseField.length disagrees with width × height', () => {
+    // A silent off-by-one here would produce garbage plaquette windings — far
+    // worse than a crash, because the caller would see a plausible Float32
+    // output and never realise the indexing was wrong.
+    expect(() => computeVortexDensityCpu2D(new Float32Array(7), 4, 4)).toThrow(
+      /phaseField length 7 !== 16/
+    )
+    expect(() => computeVortexDensityCpu2D(new Float32Array(100), 4, 4)).toThrow()
+  })
+
+  it('totalVortexCharge on an empty array returns exactly 0', () => {
+    // Downstream code sums over disconnected plaquette strips — the empty
+    // case must produce an exact 0 (not NaN from 0/TAU divide-by-zero worries
+    // that a naive implementation might hit).
+    expect(totalVortexCharge(new Float32Array(0))).toBe(0)
+  })
+})
