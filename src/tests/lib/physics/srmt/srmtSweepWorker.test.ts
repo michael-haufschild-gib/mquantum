@@ -169,6 +169,40 @@ describe('handleSrmtSweepRequest — cut', () => {
     }
   })
 
+  it('reports error when snapshot.chi length disagrees with gridSize', () => {
+    const output = makeSyntheticOutput(20, 8)
+    const snapshot = snapshotFromOutput(output)
+    // Truncate chi so unpackSolverSnapshot should fail-fast. The reported
+    // error preserves the epoch so callers can route it to the right run.
+    const truncated: SrmtSweepSolverSnapshot = {
+      ...snapshot,
+      chi: snapshot.chi.slice(0, snapshot.chi.length - 2),
+    }
+    handleSrmtSweepRequest(cutRequest(state, 7, truncated), emit, state)
+    const err = responses.find((r) => r.type === 'error')
+    expect(err?.type).toBe('error')
+    if (err && err.type === 'error') {
+      expect(err.message).toMatch(/chi\.length/)
+      expect(err.epoch).toBe(7)
+    }
+  })
+
+  it('reports error when snapshot.lorentzianMask length disagrees with gridSize', () => {
+    const output = makeSyntheticOutput(20, 8)
+    const snapshot = snapshotFromOutput(output)
+    const truncated: SrmtSweepSolverSnapshot = {
+      ...snapshot,
+      lorentzianMask: snapshot.lorentzianMask.slice(0, snapshot.lorentzianMask.length - 1),
+    }
+    handleSrmtSweepRequest(cutRequest(state, 8, truncated), emit, state)
+    const err = responses.find((r) => r.type === 'error')
+    expect(err?.type).toBe('error')
+    if (err && err.type === 'error') {
+      expect(err.message).toMatch(/lorentzianMask\.length/)
+      expect(err.epoch).toBe(8)
+    }
+  })
+
   it('drops messages whose epoch is stale after a new start', () => {
     const output = makeSyntheticOutput(20, 8)
     // First, start a sweep; then bump epoch before finalisation.

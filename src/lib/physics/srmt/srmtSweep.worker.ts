@@ -157,6 +157,17 @@ export function createSrmtSweepWorkerState(): SrmtSweepWorkerState {
  */
 function unpackSolverSnapshot(s: SrmtSweepSolverSnapshot): WheelerDeWittSolverOutput {
   const expectedLen = s.gridSize[0] * s.gridSize[1] * s.gridSize[2]
+  const expectedChiLen = expectedLen * 2
+  if (s.chi.length !== expectedChiLen) {
+    throw new Error(
+      `unpackSolverSnapshot: chi.length ${s.chi.length} !== expected ${expectedChiLen}`
+    )
+  }
+  if (s.lorentzianMask.length !== expectedLen) {
+    throw new Error(
+      `unpackSolverSnapshot: lorentzianMask.length ${s.lorentzianMask.length} !== expected ${expectedLen}`
+    )
+  }
   if (s.bandKind.length !== expectedLen) {
     throw new Error(
       `unpackSolverSnapshot: bandKind.length ${s.bandKind.length} !== expected ${expectedLen}`

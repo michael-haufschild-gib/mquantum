@@ -40,7 +40,7 @@
  *          non-zero residual).
  */
 export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
-  if (count < 2) return Number.NaN
+  if (!Number.isSafeInteger(count) || count < 2) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
 
   let sumE = 0
@@ -107,7 +107,7 @@ export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count:
  * @returns Jackknife standard deviation of `q`, or `NaN`.
  */
 export function jackknifeAffineFitStdev(K: Float64Array, E: Float64Array, count: number): number {
-  if (count < 3) return Number.NaN
+  if (!Number.isSafeInteger(count) || count < 3) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
 
   const n = count
@@ -159,7 +159,7 @@ export function jackknifeAffineFitStdev(K: Float64Array, E: Float64Array, count:
  *          points, or zero-denominator `Σ K²`).
  */
 export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: number): number {
-  if (count < 2) return Number.NaN
+  if (!Number.isSafeInteger(count) || count < 2) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
 
   let sumK = 0
@@ -193,7 +193,7 @@ export function computeRigidFitQuality(K: Float64Array, E: Float64Array, count: 
  * @returns Jackknife standard deviation of `q_rigid`, or `NaN`.
  */
 export function jackknifeRigidFitStdev(K: Float64Array, E: Float64Array, count: number): number {
-  if (count < 3) return Number.NaN
+  if (!Number.isSafeInteger(count) || count < 3) return Number.NaN
   if (count > K.length || count > E.length) return Number.NaN
 
   const n = count

@@ -225,7 +225,10 @@ function cellCoords(
  *
  * @param params - Field, grid, metric, and (optional) simulation time.
  * @returns New real/imaginary arrays holding Tψ (input arrays not mutated).
- * @throws If `latticeDim > 3` or `< 1`.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         `psiRe`/`psiIm` length does not equal the total site count.
  */
 export function applyCurvedKineticRef(params: CurvedKineticParams): {
   re: Float32Array
@@ -330,6 +333,10 @@ export function applyCurvedKineticRef(params: CurvedKineticParams): {
  *   (e.g. `deSitter`) the returned norm is time-dependent because √|g|
  *   depends on time.
  * @returns ∫ |ψ|² √|g| dⁿx as a non-negative real number.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         `psiRe`/`psiIm` length does not equal the total site count.
  */
 export function computeProperNorm(
   psiRe: Float32Array,
@@ -386,6 +393,11 @@ export function computeProperNorm(
  * @param metric - Background metric.
  * @param time - Simulation time (default 0); forwarded to `sampleMetric`.
  * @returns `{re, im}` of ⟨φ|ψ⟩_g.
+ * @throws If `latticeDim` is outside `[1, 3]`, `gridSize`/`spacing` length
+ *         disagrees with `latticeDim`, any `gridSize[i]` is not a positive
+ *         integer, any `spacing[i]` is not a positive finite number, or
+ *         any of `phiRe`/`phiIm`/`psiRe`/`psiIm` length does not equal the
+ *         total site count.
  */
 export function computeInnerProduct(
   phiRe: Float32Array,

@@ -88,7 +88,12 @@ function chiAt(
   const [, Nphi] = out.gridSize
   const slab = Nphi * Nphi
   const off = 2 * (ia * slab + i1 * Nphi + i2)
-  return { re: out.chi[off] ?? 0, im: out.chi[off + 1] ?? 0 }
+  if (off < 0 || off + 1 >= out.chi.length) {
+    throw new RangeError(
+      `chiAt: offset ${off} out of bounds for chi.length=${out.chi.length} at (ia=${ia}, i1=${i1}, i2=${i2})`
+    )
+  }
+  return { re: out.chi[off] as number, im: out.chi[off + 1] as number }
 }
 
 /** `a` coordinate at index `ia`. */
@@ -110,8 +115,11 @@ function centerIdx(Nphi: number): number {
 
 /**
  * Count zero-crossings of `Re χ(a)` along the central column on the
- * sub-array `[iaStart, iaEnd)`. A zero-crossing is a strict sign change
- * (consecutive `+, −` or `−, +`). Returns 0 if fewer than 2 cells.
+ * sub-array `[iaStart, iaEnd)`. A zero-crossing is a sign change between
+ * consecutive non-zero samples; zero-valued cells do not reset the
+ * reference sign, so a node that lands exactly on a sampled cell still
+ * contributes one crossing to the count (the run `+, 0, −` is one
+ * crossing).
  */
 function countReZeroCrossings(
   out: WheelerDeWittSolverOutput,
@@ -120,16 +128,20 @@ function countReZeroCrossings(
 ): number {
   const Nphi = out.gridSize[1]
   const c = centerIdx(Nphi)
-  let prev = chiAt(out, iaStart, c, c).re
+  let lastNonZero = 0
+  for (let ia = iaStart; ia < iaEnd; ia++) {
+    const v = chiAt(out, ia, c, c).re
+    if (v !== 0) {
+      lastNonZero = v
+      break
+    }
+  }
   let count = 0
   for (let ia = iaStart + 1; ia < iaEnd; ia++) {
     const cur = chiAt(out, ia, c, c).re
-    if (prev === 0 || cur === 0) {
-      prev = cur
-      continue
-    }
-    if (prev > 0 !== cur > 0) count++
-    prev = cur
+    if (cur === 0) continue
+    if (lastNonZero !== 0 && lastNonZero > 0 !== cur > 0) count++
+    lastNonZero = cur
   }
   return count
 }
