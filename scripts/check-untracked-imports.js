@@ -70,13 +70,16 @@ function tryResolve(specifier, fromFile) {
     return null // node_modules — skip
   }
 
-  // Try common extensions AND the bare path (in case the specifier
-  // already included the extension, e.g. `import x from './foo.ts'`).
-  // Candidate list mirrors SOURCE_EXT_RE above so a file in the
-  // untracked set cannot slip past because of an extension the
+  // Try common extensions AND — when the specifier already includes a
+  // source extension (e.g. `import x from './foo.ts'`) — the bare path.
+  // The bare-path candidate is gated on SOURCE_EXT_RE so a directory
+  // import like `./foo` cannot short-circuit to the `foo/` directory
+  // (existsSync is true for directories) and bypass the `index.*`
+  // probes. Candidate list otherwise mirrors SOURCE_EXT_RE so a file
+  // in the untracked set cannot slip past because of an extension the
   // resolver never tried.
   const candidates = [
-    base,
+    ...(SOURCE_EXT_RE.test(base) ? [base] : []),
     base + '.ts',
     base + '.tsx',
     base + '.js',
