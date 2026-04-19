@@ -47,6 +47,8 @@ build
 .cache
 *.tsbuildinfo
 src/wasm/mdimension_core/target/
+# Validator wasm output — regenerated locally via `pnpm wasm:build:validator`
+src/wasm/mdimension_core/pkg-validator/
 
 # Temporary task/session files
 task_*.md

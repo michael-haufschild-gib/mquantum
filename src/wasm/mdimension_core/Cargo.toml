@@ -14,6 +14,14 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1.7"
 
+[features]
+# Off by default. Enables wasm-bindgen exports for the independent
+# Wheeler–DeWitt leapfrog validator. Build the validator pkg via
+# `pnpm wasm:build:validator` (writes to ./pkg-validator/, separate from
+# the production ./pkg/ binary). Production builds (no `--features`)
+# never compile these bindings, so the public-facing wasm is unchanged.
+wdw-validator = []
+
 # Optimization profile for Release builds (MAXIMUM SPEED)
 [profile.release]
 opt-level = 3           # Maximum optimization for speed
