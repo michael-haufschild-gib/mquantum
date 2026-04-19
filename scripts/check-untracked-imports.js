@@ -41,6 +41,11 @@ const untrackedSet = new Set(
     .map((f) => resolve(ROOT, f))
 )
 
+if (untrackedSet.size === 0) {
+  console.log('No untracked source files — OK')
+  process.exit(0)
+}
+
 // Get all tracked .ts/.tsx files under src/
 const trackedRaw = execSync('git ls-files src/ -- "*.ts" "*.tsx"', {
   cwd: ROOT,
@@ -65,13 +70,21 @@ function tryResolve(specifier, fromFile) {
     return null // node_modules — skip
   }
 
-  // Try common extensions
+  // Try common extensions AND the bare path (in case the specifier
+  // already included the extension, e.g. `import x from './foo.ts'`).
+  // Candidate list mirrors SOURCE_EXT_RE above so a file in the
+  // untracked set cannot slip past because of an extension the
+  // resolver never tried.
   const candidates = [
+    base,
     base + '.ts',
     base + '.tsx',
     base + '.js',
+    base + '.jsx',
     join(base, 'index.ts'),
     join(base, 'index.tsx'),
+    join(base, 'index.js'),
+    join(base, 'index.jsx'),
   ]
   return candidates.find((c) => existsSync(c)) ?? null
 }
