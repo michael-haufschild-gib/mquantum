@@ -115,12 +115,28 @@ describe('modularHamiltonian.floorFractionFromModular', () => {
     const epsilon = MODULAR_EPSILON
     const floor = -Math.log(epsilon)
     const K = new Float64Array([floor - 10, floor - 3, floor - 1, floor])
-    // tol=0.5 catches K[3] only.
+    // Predicate is now inclusive on both ends: `0 ≤ gap ≤ tol`.
+    // tol=0.5 catches K[3] only (gap=0).
     expect(floorFractionFromModular(K, epsilon, 0.5)).toBe(0.25)
-    // tol=2 catches K[2], K[3].
+    // tol=2 catches K[2] (gap=1), K[3] (gap=0).
     expect(floorFractionFromModular(K, epsilon, 2)).toBe(0.5)
-    // tol=10 catches K[1], K[2], K[3].
-    expect(floorFractionFromModular(K, epsilon, 10)).toBe(0.75)
+    // tol=5 catches K[1] (gap=3), K[2] (gap=1), K[3] (gap=0).
+    expect(floorFractionFromModular(K, epsilon, 5)).toBe(0.75)
+    // tol=10 catches all four (K[0] gap=10 lies on the inclusive upper edge).
+    expect(floorFractionFromModular(K, epsilon, 10)).toBe(1)
+  })
+
+  it('counts exact floor hits when tolerance is zero', () => {
+    // Regression: prior strict `gap < tol` predicate silently excluded
+    // the most clearly pinned modes (those sitting exactly at the floor)
+    // when `tol === 0`. The inclusive `gap <= tol` guard fixes that and
+    // also avoids counting modes above the floor (negative gap — numerical
+    // overshoot rather than pinning).
+    const epsilon = MODULAR_EPSILON
+    const floor = -Math.log(epsilon)
+    const K = new Float64Array([floor - 0.5, floor, floor + 0.5, floor])
+    // tol=0 keeps only the two K_n === floor (indices 1 and 3).
+    expect(floorFractionFromModular(K, epsilon, 0)).toBe(0.5)
   })
 
   it('returns 0 for empty input or non-positive epsilon', () => {

@@ -157,7 +157,10 @@ pub fn compute_level_spacing(energies: &[f64]) -> Vec<f64> {
     // Unfolding: normalize by mean spacing
     let mean_spacing: f64 = raw_spacings.iter().sum::<f64>() / num_spacings as f64;
     let mut spacings = if mean_spacing > 0.0 {
-        raw_spacings.iter().map(|&s| s / mean_spacing).collect::<Vec<f64>>()
+        raw_spacings
+            .iter()
+            .map(|&s| s / mean_spacing)
+            .collect::<Vec<f64>>()
     } else {
         raw_spacings.clone()
     };
@@ -472,7 +475,11 @@ mod tests {
     #[test]
     fn test_gamma_1() {
         // Γ(1) = 0! = 1
-        assert!((gamma_fn(1.0) - 1.0).abs() < TOL, "Γ(1) = {}", gamma_fn(1.0));
+        assert!(
+            (gamma_fn(1.0) - 1.0).abs() < TOL,
+            "Γ(1) = {}",
+            gamma_fn(1.0)
+        );
     }
 
     #[test]
@@ -657,8 +664,16 @@ mod tests {
         let orbit_points = vec![0.0f64; 6]; // 2 points × 3 dims
         let orbit_lengths = vec![2u32];
 
-        let result =
-            compute_scar_correlation(&density_re, &density_im, &grid_sizes, &spacings, &orbit_points, &orbit_lengths, 1.0, 3);
+        let result = compute_scar_correlation(
+            &density_re,
+            &density_im,
+            &grid_sizes,
+            &spacings,
+            &orbit_points,
+            &orbit_lengths,
+            1.0,
+            3,
+        );
 
         // Should have 1 correlation + 4 summary values
         assert_eq!(result.len(), 5);
@@ -694,7 +709,7 @@ mod tests {
         );
 
         assert_eq!(result.len(), 5); // 1 orbit + 4 summary
-        // For uniform density, correlation should be ≈ 1.0
+                                     // For uniform density, correlation should be ≈ 1.0
         let correlation = result[0];
         assert!(
             (correlation - 1.0).abs() < 0.15,

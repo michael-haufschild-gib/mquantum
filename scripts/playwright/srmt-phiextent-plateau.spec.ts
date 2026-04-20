@@ -116,7 +116,8 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
     const row = lines[i]!
     if (row.length === 0 || row.startsWith('#')) continue
     const cells = row.split(',')
-    if (cells.length !== 29) throw new Error(`bad CSV row (expected 29 cols): ${row}`)
+    if (cells.length < 29)
+      throw new Error(`bad CSV row (expected >= 29 cols, got ${cells.length}): ${row}`)
     points.push({
       index: Number(cells[0]),
       sweepValue: Number(cells[1]),

@@ -632,7 +632,19 @@ export function coupledGridNaFor(Nphi: number, wdwConfig: WheelerDeWittConfig): 
   const { aMin, aMax, phiExtent, gridNa: baseline } = wdwConfig
   const delta = aMax - aMin
   const cflBumped = Math.ceil(1 + (delta * (Nphi - 1)) / (Math.SQRT2 * phiExtent * aMin))
-  return clampGridNa(Math.max(Math.round(baseline), cflBumped))
+  const gridNa = clampGridNa(Math.max(Math.round(baseline), cflBumped))
+  // Fail fast rather than silently publish a point that looks
+  // "publication-grade" but violates its own CFL contract. `clampGridNa`
+  // caps at 1024; if the CFL-derived minimum exceeds that, no physically
+  // valid coupled value exists for this `(aMax, aMin, phiExtent, Nφ)`.
+  if (gridNa < cflBumped) {
+    throw new Error(
+      `gridNphiCoupled cannot satisfy the CFL budget: cflBumped=${cflBumped} ` +
+        `exceeds clampGridNa's ceiling (gridNa=${gridNa}). ` +
+        `Raise aMin or phiExtent, or lower Nφ=${Nphi}.`
+    )
+  }
+  return gridNa
 }
 
 /**

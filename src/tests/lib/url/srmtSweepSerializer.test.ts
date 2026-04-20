@@ -175,6 +175,20 @@ describe('deserializeSrmtSweep', () => {
     expect(state.srmtSweepMin).toBe(32)
     expect(state.srmtSweepMax).toBe(64)
   })
+
+  it('round-trips a gridNphiCoupled sweep with the documented range', () => {
+    // Coupled joint (Nφ, Nₐ) convergence kind — Nφ walks the same
+    // [32, 64] driver range as `gridNphi`; the per-point gridNa is
+    // derived by the driver, so the URL only needs to encode the Nφ
+    // range. Points cap is [3, 7] at the driver level.
+    const params = new URLSearchParams('sw=gridNphiCoupled&sw_n=5&sw_min=32&sw_max=64&sw_c=0.5')
+    const state: SrmtSweepUrlState = {}
+    deserializeSrmtSweep(params, state)
+    expect(state.srmtSweepKind).toBe('gridNphiCoupled')
+    expect(state.srmtSweepPoints).toBe(5)
+    expect(state.srmtSweepMin).toBe(32)
+    expect(state.srmtSweepMax).toBe(64)
+  })
 })
 
 describe('serializeSrmtSweep — Tier-3 sensitivity kinds', () => {

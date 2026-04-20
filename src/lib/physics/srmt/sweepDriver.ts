@@ -122,8 +122,14 @@ export function clampGridNa(gridNa: number): number {
  * commodity hardware. At `N_φ=64` the explicit-leapfrog CFL budget is
  * exceeded (`da²·8/dφ²/aMin² ≈ 24`, 6× over); the solver already emits
  * a dev-only rate-limited warn (solver.ts:447-456) rather than failing.
- * For publication runs `N_φ ≥ 48`, simultaneously raise `gridNa` to
- * `max(128, 4·Nφ²·phiExtent²/aMin²)` or `aMin` to keep CFL ≤ 4.
+ * For publication runs that need `N_φ ≥ 48`, prefer the coupled
+ * `gridNphiCoupled` sweep (see {@link coupledGridNaFor} in
+ * `sweepSensitivityDrivers.ts`) so `gridNa` is raised from the actual
+ * CFL-derived linear bound `Na_min = ceil(1 + (aMax − aMin)·(N_φ − 1) /
+ * (√2·phiExtent·aMin))` instead of the old quadratic `4·Nφ²·phiExt²/aMin²`
+ * heuristic (which saturated `clampGridNa`'s ceiling for every Nφ ≥ 32
+ * at default physics and therefore never actually coupled `gridNa` to
+ * Nφ). Alternatively raise `aMin` to keep the budget satisfied.
  */
 export function clampGridNphi(gridNphi: number): number {
   return Math.max(32, Math.min(64, Math.round(gridNphi)))

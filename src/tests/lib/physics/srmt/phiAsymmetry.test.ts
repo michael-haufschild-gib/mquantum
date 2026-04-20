@@ -16,7 +16,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { modularSpectrum } from '@/lib/physics/srmt/modularHamiltonian'
-import { schmidtValues } from '@/lib/physics/srmt/schmidt'
+import { computeVolumeElement, normalizedSchmidtValues } from '@/lib/physics/srmt/schmidt'
 import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 
 /**
@@ -43,8 +43,14 @@ describe('Wheeler–DeWitt inflatonMassAsymmetry — Schmidt / modular spectra',
     // grid size). If this test ever fails, something has silently broken
     // the φ-symmetry of the solver at α = 1.
     const out = solveWheelerDeWitt({ ...BASE, inflatonMassAsymmetry: 1 })
-    const sPhi1 = schmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi1')
-    const sPhi2 = schmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi2')
+    const dVol = computeVolumeElement({
+      gridSize: out.gridSize,
+      aMin: out.aMin,
+      aMax: out.aMax,
+      phiExtent: out.phiExtent,
+    })
+    const sPhi1 = normalizedSchmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi1', dVol)
+    const sPhi2 = normalizedSchmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi2', dVol)
     const k1 = modularSpectrum(sPhi1).spectrum
     const k2 = modularSpectrum(sPhi2).spectrum
     const compareCount = Math.min(k1.length, k2.length, 8)
@@ -63,8 +69,14 @@ describe('Wheeler–DeWitt inflatonMassAsymmetry — Schmidt / modular spectra',
     // at least one of the first 8 modes by ≥ 1e-3 — well above the
     // ~1e-4 FP floor from the symmetric baseline.
     const out = solveWheelerDeWitt({ ...BASE, inflatonMassAsymmetry: 2.0 })
-    const sPhi1 = schmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi1')
-    const sPhi2 = schmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi2')
+    const dVol = computeVolumeElement({
+      gridSize: out.gridSize,
+      aMin: out.aMin,
+      aMax: out.aMax,
+      phiExtent: out.phiExtent,
+    })
+    const sPhi1 = normalizedSchmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi1', dVol)
+    const sPhi2 = normalizedSchmidtValues({ chi: out.chi, gridSize: out.gridSize }, 'phi2', dVol)
     const k1 = modularSpectrum(sPhi1).spectrum
     const k2 = modularSpectrum(sPhi2).spectrum
     const compareCount = Math.min(k1.length, k2.length, 8)
@@ -86,8 +98,28 @@ describe('Wheeler–DeWitt inflatonMassAsymmetry — Schmidt / modular spectra',
     // α = 2 χ must produce different Schmidt-derived modular spectra.
     const symOut = solveWheelerDeWitt({ ...BASE, inflatonMassAsymmetry: 1 })
     const asymOut = solveWheelerDeWitt({ ...BASE, inflatonMassAsymmetry: 2 })
-    const sSym = schmidtValues({ chi: symOut.chi, gridSize: symOut.gridSize }, 'phi2')
-    const sAsym = schmidtValues({ chi: asymOut.chi, gridSize: asymOut.gridSize }, 'phi2')
+    const dVolSym = computeVolumeElement({
+      gridSize: symOut.gridSize,
+      aMin: symOut.aMin,
+      aMax: symOut.aMax,
+      phiExtent: symOut.phiExtent,
+    })
+    const dVolAsym = computeVolumeElement({
+      gridSize: asymOut.gridSize,
+      aMin: asymOut.aMin,
+      aMax: asymOut.aMax,
+      phiExtent: asymOut.phiExtent,
+    })
+    const sSym = normalizedSchmidtValues(
+      { chi: symOut.chi, gridSize: symOut.gridSize },
+      'phi2',
+      dVolSym
+    )
+    const sAsym = normalizedSchmidtValues(
+      { chi: asymOut.chi, gridSize: asymOut.gridSize },
+      'phi2',
+      dVolAsym
+    )
     const kSym = modularSpectrum(sSym).spectrum
     const kAsym = modularSpectrum(sAsym).spectrum
     const compareCount = Math.min(kSym.length, kAsym.length, 8)

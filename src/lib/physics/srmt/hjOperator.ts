@@ -94,8 +94,12 @@ export function resetHjTopKWarnBudget(budget: number = HJ_TOPK_WARN_DEFAULT): vo
 /**
  * Physical grid + potential parameters needed to build `H_HJ`. All units
  * match the WdW solver: `G = ℏ = c = 1`, potential
- * `U(a, φ) = −36π²·a²·(1 − (8πG/3)·a² · V(φ))`, with
- * `V(φ) = ½ m² (φ₁² + φ₂²) + Λ`.
+ * `U(a, φ) = −36π²·a²·(1 − (8πG/3)·a² · V(φ))`, with the anisotropic
+ * potential `V(φ) = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ` where `α ≡
+ * inflatonMassAsymmetry` (defaults to `1`, recovering the isotropic
+ * form `V = ½ m² (φ₁² + φ₂²) + Λ`). The HJ spectrum therefore depends on
+ * `inflatonMassAsymmetry` whenever `α ≠ 1` and must match the value
+ * passed to the solver.
  */
 export interface HjOperatorInputs {
   /** Number of `a` grid points. */
@@ -161,6 +165,16 @@ interface SparseHjOperator {
    */
   offAxis1Variable: Float64Array | null
   /**
+   * When true, out-of-bounds axis-0 neighbours inherit the centre cell's
+   * value (Neumann / zero-flux ghost) — matches the WdW solver's updated
+   * φ-edge treatment. When false, the missing-neighbour contribution is
+   * zero (ghost-zero Dirichlet). Axis-0 is φ-typed for clock `'a'` and
+   * `a`-typed for φ-clocks; only φ-typed axes use Neumann.
+   */
+  neumannAxis0: boolean
+  /** Same as {@link neumannAxis0} for axis-1. */
+  neumannAxis1: boolean
+  /**
    * Infinity-norm estimate `max_i Σ_j |A_ij|` — used by the callback
    * Lanczos for its β-breakdown threshold. Precomputed once so the
    * Lanczos driver does not need to know the operator structure.
@@ -208,11 +222,18 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const n = Nphi * Nphi
   const diag = new Float64Array(n)
 
-  // Operator H_φ = −(1/a²) Δ_φ + U, discretised with ghost-zero Dirichlet:
+  // Operator H_φ = −(1/a²) Δ_φ + U, discretised with Neumann (zero-flux)
+  // ghost cells matching the WdW solver's φ-Laplacian (see
+  // `phiLaplacianAt` in `src/lib/physics/wheelerDeWitt/solver.ts`). The
+  // interior stencil is:
   //   −Δ_φ → diag += +4/dφ²,   off-diag (each of 4 neighbours) += −1/dφ²
   // scaled by 1/a²:
   //   diag += +4/(a² dφ²),     off-diag += −1/(a² dφ²)
-  // Plus +U on the diagonal.
+  // Plus +U on the diagonal. On the φ-edge, the ghost inherits the
+  // centre-cell value — `applySparseOperator` substitutes `x[idx]` for
+  // missing neighbours, which reduces the effective diagonal by
+  // `|offKin|` per missing axis. Both axes of the clock-`a` slice are
+  // φ-typed, hence Neumann on both.
   const diagKin = 4 * invDphi2 * kinCoeff
   const offKin = -invDphi2 * kinCoeff
 
@@ -226,7 +247,10 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   }
 
   // infNorm = max_i (|diag_i| + 4·|offKin|) (interior cells have 4
-  // neighbours; boundary cells have fewer, so this is an upper bound).
+  // neighbours; under Neumann, edge cells substitute the centre for
+  // missing neighbours which raises each missing off-diag to the same
+  // `|offKin|·|x[idx]|` contribution, so the 4-neighbour upper bound
+  // still holds for every cell).
   let maxDiag = 0
   for (let i = 0; i < n; i++) {
     const v = Math.abs(diag[i]!)
@@ -241,6 +265,8 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
     offAxis0: offKin,
     offAxis1: offKin,
     offAxis1Variable: null,
+    neumannAxis0: true,
+    neumannAxis1: true,
     infNorm,
   }
 }
@@ -339,34 +365,48 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
     offAxis0: -invDa2,
     offAxis1: 0,
     offAxis1Variable,
+    // Axis-0 is the `a` axis — no Neumann (HJ boundary treatment on `a`
+    // is the same as before). Axis-1 is the φ-axis, which mirrors the
+    // solver's Neumann (zero-flux) ghost — see `phiLaplacianAt` in
+    // `src/lib/physics/wheelerDeWitt/solver.ts`.
+    neumannAxis0: false,
+    neumannAxis1: true,
     infNorm,
   }
 }
 
 /**
  * Given a sparse operator, return a {@link LinearOperator} that computes
- * `y = A · x` by iterating over the stencil. Ghost-zero Dirichlet is
- * implicit — out-of-bound neighbour contributions are skipped.
+ * `y = A · x` by iterating over the stencil. For each axis the missing-
+ * neighbour contribution is selected by `neumannAxis{0,1}`:
+ *
+ *  - `false` → ghost-zero Dirichlet: the missing neighbour contributes 0.
+ *  - `true`  → Neumann (zero-flux): the missing neighbour inherits the
+ *              centre cell's value, so its off-diagonal contribution is
+ *              `off · x[idx]`. This matches the WdW solver's updated
+ *              φ-edge stencil (see `phiLaplacianAt` in
+ *              `src/lib/physics/wheelerDeWitt/solver.ts`) — without the
+ *              match, SRMT compares χ evolved under one boundary rule
+ *              against the HJ spectrum of a different one, skewing the
+ *              affine-fit quality the diagnostic reports.
  */
 function applySparseOperator(op: SparseHjOperator): LinearOperator {
-  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable } = op
+  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable, neumannAxis0, neumannAxis1 } = op
   const size0 = n / size1
   return (x, y) => {
     for (let i0 = 0; i0 < size0; i0++) {
       const rowBase = i0 * size1
       for (let i1 = 0; i1 < size1; i1++) {
         const idx = rowBase + i1
-        let acc = diag[idx]! * x[idx]!
-        if (i0 > 0) acc += offAxis0 * x[idx - size1]!
-        if (i0 < size0 - 1) acc += offAxis0 * x[idx + size1]!
-        if (offAxis1Variable !== null) {
-          const c = offAxis1Variable[idx]!
-          if (i1 > 0) acc += c * x[idx - 1]!
-          if (i1 < size1 - 1) acc += c * x[idx + 1]!
-        } else {
-          if (i1 > 0) acc += offAxis1 * x[idx - 1]!
-          if (i1 < size1 - 1) acc += offAxis1 * x[idx + 1]!
-        }
+        const xc = x[idx]!
+        let acc = diag[idx]! * xc
+        // Axis-0 neighbours.
+        acc += offAxis0 * (i0 > 0 ? x[idx - size1]! : neumannAxis0 ? xc : 0)
+        acc += offAxis0 * (i0 < size0 - 1 ? x[idx + size1]! : neumannAxis0 ? xc : 0)
+        // Axis-1 neighbours (variable coefficient per cell when populated).
+        const offRow = offAxis1Variable !== null ? offAxis1Variable[idx]! : offAxis1
+        acc += offRow * (i1 > 0 ? x[idx - 1]! : neumannAxis1 ? xc : 0)
+        acc += offRow * (i1 < size1 - 1 ? x[idx + 1]! : neumannAxis1 ? xc : 0)
         y[idx] = acc
       }
     }

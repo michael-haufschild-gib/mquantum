@@ -139,6 +139,7 @@ function statsForClock(
       phiExtent: output.phiExtent,
       inflatonMass: cfg.inflatonMass,
       cosmologicalConstant: cfg.cosmologicalConstant,
+      inflatonMassAsymmetry: cfg.inflatonMassAsymmetry,
       sliceIndex,
     },
     rankCap
@@ -253,6 +254,7 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
         const output = solveWheelerDeWitt({
           boundaryCondition: bc,
           inflatonMass: cfg.inflatonMass,
+          inflatonMassAsymmetry: cfg.inflatonMassAsymmetry,
           cosmologicalConstant: cfg.cosmologicalConstant,
           aMin: cfg.aMin,
           aMax,
@@ -261,7 +263,20 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
           phiExtent: cfg.phiExtent,
         })
         const solveMs = Date.now() - t0
-        const chiTotal = chiFrobeniusNormSq(output.chi)
+        // Volume-weight the raw Frobenius sum so `chiTotalDensity` is a
+        // true Riemann-sum density, not a sample count that scales with
+        // cell volume. `aMax` varies across the scan at fixed `gridNa`,
+        // which means `da` and therefore `dVol` vary per point — an
+        // unweighted sum would report monotonic growth driven by larger
+        // integration cells rather than by physical amplification.
+        const chiTotal =
+          chiFrobeniusNormSq(output.chi) *
+          computeVolumeElement({
+            gridSize: output.gridSize,
+            aMin: output.aMin,
+            aMax: output.aMax,
+            phiExtent: output.phiExtent,
+          })
 
         const clocks = {} as Record<SrmtClock, ClockStats>
         for (const clock of CLOCKS) {

@@ -123,7 +123,11 @@ export function floorFractionFromModular(
   const tol = Math.max(0, floorTolerance)
   let hits = 0
   for (let i = 0; i < K.length; i++) {
-    if (floor - K[i]! < tol) hits++
+    // `gap >= 0` excludes K values above the floor (negative gap —
+    // numerical overshoot rather than pinning); `gap <= tol` includes
+    // exact floor hits when `tol === 0`.
+    const gap = floor - K[i]!
+    if (gap >= 0 && gap <= tol) hits++
   }
   return hits / K.length
 }

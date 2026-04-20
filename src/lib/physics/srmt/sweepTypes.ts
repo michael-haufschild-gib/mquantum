@@ -73,12 +73,14 @@ import type { SrmtClock } from './types'
  *   point to hold the CFL term approximately constant. Where
  *   {@link SrmtSweepKind.gridNphi} holds `gridNa` fixed and forces the
  *   CFL term to grow as `N_φ²` — pushing the solver past its warn budget
- *   at the upper end — this coupled kind bumps `gridNa` with `N_φ²` so
- *   the publication-grade sweep reports `q(N_φ)` without CFL-contaminated
+ *   at the upper end — this coupled kind bumps `gridNa` approximately
+ *   linearly in `(N_φ − 1)` (see {@link coupledGridNaFor}) so the
+ *   publication-grade sweep reports `q(N_φ)` without CFL-contaminated
  *   tails. Expensive: each per-point solve scales linearly with the
- *   auto-bumped `gridNa`, so clamp `points ∈ [3, 7]` (4–8× per-point
- *   cost vs. uncoupled `gridNphi`). Emits `sweepValue = N_φ`; the
- *   per-point `gridNa` is derived, not reported as the swept axis.
+ *   auto-bumped `gridNa`, which therefore also grows roughly linearly
+ *   across the sweep, so clamp `points ∈ [3, 7]` (4–8× per-point cost
+ *   vs. uncoupled `gridNphi`). Emits `sweepValue = N_φ`; the per-point
+ *   `gridNa` is derived, not reported as the swept axis.
  */
 export type SrmtSweepKind =
   | 'cut'
@@ -114,7 +116,8 @@ export interface SrmtSweepConfig {
    *  - `gridNa`:    [3, 9]    (full re-solve per point; integer round + dedup)
    *  - `gridNphi`:  [3, 9]    (full re-solve per point; integer round + dedup)
    *  - `gridNphiCoupled`: [3, 7] (coupled kind; 4–8× solve cost per point
-   *    vs. uncoupled `gridNphi` because `gridNa` is co-scaled with `N_φ²`)
+   *    vs. uncoupled `gridNphi` because the derived `gridNa` rises roughly
+   *    linearly with `(N_φ − 1)`, not as `N_φ²`)
    *  - `bc`:        always {@link SRMT_BC_SWEEP_ORDER}.length (3); caller's
    *    `points` is ignored.
    */

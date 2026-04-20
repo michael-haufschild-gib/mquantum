@@ -43,6 +43,7 @@ interface SweepSpec {
     | 'phiExtent'
     | 'gridNa'
     | 'gridNphi'
+    | 'gridNphiCoupled'
   params: Record<string, string>
   label: string
 }
@@ -180,6 +181,23 @@ const SWEEPS: SweepSpec[] = [
       sw_c: '0.5',
     },
   },
+  {
+    kind: 'gridNphiCoupled',
+    label: 'Joint (Nφ, Nₐ) convergence with CFL-derived coupling (publication-grade)',
+    // Publication-grade companion to `gridNphi`: Nφ walks [32, 64] and
+    // per-point Nₐ is bumped linearly in (Nφ−1) so the explicit-leapfrog
+    // CFL budget stays satisfied. Clamped to [3, 7] points because each
+    // per-point solve costs 4–8× the uncoupled kind. See
+    // coupledGridNaFor in sweepSensitivityDrivers.ts.
+    params: {
+      sw: 'gridNphiCoupled',
+      sw_n: '3',
+      sw_min: '32',
+      sw_max: '64',
+      sw_phi: '1.0',
+      sw_c: '0.5',
+    },
+  },
 ]
 
 function parseCell(cell: string): number | null {
@@ -268,8 +286,8 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
   return { landmarks, points }
 }
 
-test.describe('Wheeler–DeWitt — all 9 SRMT sweep kinds', () => {
-  test('runs cut/mass/lambda/bc/phiRef/rankCap/phiExtent/gridNa/gridNphi and writes /tmp/srmt-sweep-all-results.json', async ({
+test.describe('Wheeler–DeWitt — all 10 SRMT sweep kinds', () => {
+  test('runs cut/mass/lambda/bc/phiRef/rankCap/phiExtent/gridNa/gridNphi/gridNphiCoupled and writes /tmp/srmt-sweep-all-results.json', async ({
     page,
   }, testInfo) => {
     await page.goto('/')

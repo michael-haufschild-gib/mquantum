@@ -1,49 +1,27 @@
-import react from '@vitejs/plugin-react'
-import path from 'path'
 import { defineConfig } from 'vitest/config'
 
-// Research-only override config: extends the main vitest config, but drops
-// the `_oneshot*.test.ts` exclude so explicit one-shot diagnostic drivers
-// can run via:
+import baseConfig from './vitest.config'
+
+// Research-only override: extends vitest.config.ts and drops the
+// `_oneshot*.test.ts` entry from its exclude list so explicit one-shot
+// diagnostic drivers can run via:
 //   pnpm exec vitest run --config vitest.oneshot.config.ts <path>
-// This file is intentionally NOT exported from package.json scripts — it is
-// manual-invoke only. Kept alongside the main config so vite can resolve
-// `@vitejs/plugin-react` through the project's node_modules tree.
+// This file is intentionally NOT exported from package.json scripts —
+// it is manual-invoke only. Keeping it as a genuine extension (rather
+// than a re-declaration) prevents silent drift when the main config
+// changes (plugins, aliases, env match globs, coverage settings).
+//
+// Vite's `mergeConfig` concatenates arrays, which would re-introduce
+// the `_oneshot*.test.ts` entry we are trying to drop, so we copy the
+// base config and filter its exclude list instead.
+const ONESHOT_PATTERN = '**/_oneshot*.test.ts'
+const baseExclude = baseConfig.test?.exclude ?? []
+const filteredExclude = baseExclude.filter((p) => p !== ONESHOT_PATTERN)
+
 export default defineConfig({
-  plugins: [react()],
+  ...baseConfig,
   test: {
-    globals: true,
-    environment: 'happy-dom',
-    setupFiles: './src/tests/setup.ts',
-    css: true,
-    pool: 'vmThreads',
-    maxWorkers: 4,
-    environmentMatchGlobs: [
-      ['src/tests/lib/**', 'node'],
-      ['src/tests/stores/**', 'node'],
-      ['src/tests/wasm/**', 'node'],
-      ['src/tests/rendering/**', 'node'],
-    ],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/scripts/playwright/**',
-      '**/.claude/worktrees/**',
-      // NB: '**/_oneshot*.test.ts' is INTENTIONALLY omitted vs. vitest.config.ts.
-    ],
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(import.meta.dirname, './src'),
-      '@/components': path.resolve(import.meta.dirname, './src/components'),
-      '@/lib': path.resolve(import.meta.dirname, './src/lib'),
-      '@/hooks': path.resolve(import.meta.dirname, './src/hooks'),
-      '@/stores': path.resolve(import.meta.dirname, './src/stores'),
-      '@/types': path.resolve(import.meta.dirname, './src/types'),
-      'mdimension-core': path.resolve(
-        import.meta.dirname,
-        './src/tests/__mocks__/mdimension-core.ts'
-      ),
-    },
+    ...baseConfig.test,
+    exclude: filteredExclude,
   },
 })

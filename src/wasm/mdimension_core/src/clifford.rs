@@ -202,7 +202,10 @@ fn permute_matrix(m: &[f32], s: usize, perm: &[usize]) -> ComplexMatrix {
 /// Construction uses recursive tensor products followed by a basis
 /// permutation to achieve the standard block-diagonal β.
 pub fn generate_dirac_matrices(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix) {
-    assert!((1..=11).contains(&spatial_dim), "spatial_dim must be 1..=11");
+    assert!(
+        (1..=11).contains(&spatial_dim),
+        "spatial_dim must be 1..=11"
+    );
 
     match spatial_dim {
         1 => {
@@ -267,8 +270,10 @@ fn generate_higher_dim(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix
 
     // Now all_alphas has base_even alphas and beta, all of size current_s = target_s.
     // Select the first spatial_dim alphas (spatial_dim <= base_even always holds).
-    assert!(spatial_dim <= base_even,
-        "spatial_dim={spatial_dim} exceeds base_even={base_even}");
+    assert!(
+        spatial_dim <= base_even,
+        "spatial_dim={spatial_dim} exceeds base_even={base_even}"
+    );
     all_alphas.truncate(spatial_dim);
 
     // Permute to standard Dirac form: β = diag(I_{S/2}, −I_{S/2}).
@@ -291,11 +296,7 @@ fn generate_higher_dim(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix
 ///   {αᵢ, αⱼ} = 2δᵢⱼ·I  for all i, j
 ///   {αⱼ, β} = 0          for all j
 ///   β² = I
-pub fn verify_clifford_algebra(
-    alphas: &[ComplexMatrix],
-    beta: &ComplexMatrix,
-    s: usize,
-) -> bool {
+pub fn verify_clifford_algebra(alphas: &[ComplexMatrix], beta: &ComplexMatrix, s: usize) -> bool {
     let id = complex_identity(s);
     let two_id = complex_mat_scale(&id, 2.0);
     let tol = 1e-5;
@@ -377,7 +378,11 @@ mod tests {
         for dim in 1..=11 {
             let (alphas, beta) = generate_dirac_matrices(dim);
             let s = spinor_size(dim);
-            assert_eq!(alphas.len(), dim, "Wrong number of alpha matrices for dim={dim}");
+            assert_eq!(
+                alphas.len(),
+                dim,
+                "Wrong number of alpha matrices for dim={dim}"
+            );
             assert_eq!(beta.len(), s * s * 2, "Wrong beta size for dim={dim}");
             assert!(
                 verify_clifford_algebra(&alphas, &beta, s),

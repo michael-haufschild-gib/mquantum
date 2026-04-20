@@ -351,7 +351,6 @@ function buildQaMatrix(results: readonly GridResult[]): (number | null)[][] {
  * monotonic in).
  */
 function isMonotoneAlongAxis(
-  _matrix: (number | null)[][],
   outerLen: number,
   innerLen: number,
   fetch: (outer: number, inner: number) => number | null
@@ -440,13 +439,11 @@ function collectJointViolations(
 function computeJointCauchy(matrix: (number | null)[][]): JointCauchyReport {
   const qMax = matrix[GRID_NA_VALUES.length - 1]![GRID_NPHI_VALUES.length - 1] ?? null
   const monotoneOnNa = isMonotoneAlongAxis(
-    matrix,
     GRID_NPHI_VALUES.length,
     GRID_NA_VALUES.length,
     (nphiIdx, naIdx) => matrix[naIdx]![nphiIdx]!
   )
   const monotoneOnNphi = isMonotoneAlongAxis(
-    matrix,
     GRID_NA_VALUES.length,
     GRID_NPHI_VALUES.length,
     (naIdx, nphiIdx) => matrix[naIdx]![nphiIdx]!

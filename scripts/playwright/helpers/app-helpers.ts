@@ -1401,7 +1401,7 @@ export async function readSimulationState(page: Page) {
     const s = mod.useSimulationStateStore.getState()
     return {
       storedEigenstateCount: s.storedEigenstateCount,
-      pendingStoreRequest: s.storeEigenstateRequested,
+      storeEigenstateRequested: s.storeEigenstateRequested,
     }
   })
 }

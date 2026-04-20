@@ -509,8 +509,8 @@ describe('Wheeler–DeWitt solver', () => {
     // symmetric) then the asymmetry is silently dropped somewhere in
     // the pipeline.
     const out = solveWheelerDeWitt({ ...BASE_INPUT, inflatonMassAsymmetry: 2.0 })
-    const [, Nphi] = out.gridSize
-    const iMid = Math.floor(BASE_INPUT.gridNa / 2)
+    const [Na, Nphi] = out.gridSize
+    const iMid = Math.floor(Na / 2)
     const slab = Nphi * Nphi
     let maxDiff = 0
     // Compare χ(ia=iMid, i1, i2) vs χ(ia=iMid, i2, i1) for a handful of

@@ -175,7 +175,7 @@ async function injectSweepWithSeed(
   seed: number
 ): Promise<void> {
   await page.evaluate(
-    async ({
+    ({
       seed,
       points,
       sweepMin,
@@ -190,8 +190,14 @@ async function injectSweepWithSeed(
       phiRef: number
       cutAnchor: number
     }) => {
-      const mod = await import('/src/stores/srmtSweepStore.ts')
-      mod.useSrmtSweepStore.getState().setPendingSweep({
+      // Use the DEV bridge rather than `await import('/src/stores/...')`: the
+      // dynamic-import path hits Vite's dev-server module cache and can
+      // deliver a stale store snapshot when multiple seeds run back-to-back.
+      const store = window.__SRMT_SWEEP_STORE__
+      if (!store) {
+        throw new Error('__SRMT_SWEEP_STORE__ missing on window — DEV bridge not registered')
+      }
+      store.getState().setPendingSweep({
         kind: 'rankCap',
         points,
         sweepMin,

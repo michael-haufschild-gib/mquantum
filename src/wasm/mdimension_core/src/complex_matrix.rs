@@ -358,7 +358,16 @@ pub fn solve_linear_system(
     let mut result_im = vec![0.0; size];
 
     solve_linear_system_into(
-        q_re, q_im, p_re, p_im, n, &mut ar, &mut ai, &mut br, &mut bi, &mut result_re,
+        q_re,
+        q_im,
+        p_re,
+        p_im,
+        n,
+        &mut ar,
+        &mut ai,
+        &mut br,
+        &mut bi,
+        &mut result_re,
         &mut result_im,
     );
 
@@ -703,8 +712,7 @@ mod tests {
 
         // Random-ish matrix
         let a_re = vec![
-            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
-            16.0,
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0,
         ];
         let a_im = vec![
             0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6,

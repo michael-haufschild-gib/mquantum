@@ -180,22 +180,34 @@ export interface ChiGridSpec {
 
 /**
  * Compute the uniform-grid volume element
- * `dVol = da · dφ² = (aMax − aMin)/(Na − 1) · (2·phiExtent/(Nphi − 1))²`.
+ * `dVol = da · dφ₁ · dφ₂ = (aMax − aMin)/(Na − 1) ·
+ * (2·phiExtent/(Nphi1 − 1)) · (2·phiExtent/(Nphi2 − 1))`.
  *
- * Degenerate grids (`Na < 2` or `Nphi < 2`) yield `dVol = 0`; callers
- * that pass `dVol = 0` into {@link normalizedSchmidtValues} fall back to
- * the Frobenius-only rescale, preserving the unit-volume contract used
- * by tests that do not set up a physical grid.
+ * Both φ axes share the same physical window by construction, so on a
+ * square φ-grid this reduces to `da · dφ²`. Reading both axes separately
+ * guards the rescale path against a future rectangular φ-grid silently
+ * slipping through.
+ *
+ * Degenerate grids (any axis with fewer than 2 points) yield `dVol = 0`;
+ * callers that pass `dVol = 0` into {@link normalizedSchmidtValues} fall
+ * back to the Frobenius-only rescale, preserving the unit-volume
+ * contract used by tests that do not set up a physical grid.
  *
  * @param spec - Grid metadata as exported by the WdW solver.
  * @returns Per-cell 3D volume element.
  */
 export function computeVolumeElement(spec: ChiGridSpec): number {
-  const [Na, Nphi] = spec.gridSize
-  if (Na < 2 || Nphi < 2) return 0
+  const [Na, Nphi1, Nphi2] = spec.gridSize
+  if (Na < 2 || Nphi1 < 2 || Nphi2 < 2) return 0
   const da = (spec.aMax - spec.aMin) / (Na - 1)
-  const dphi = (2 * spec.phiExtent) / (Nphi - 1)
-  return da * dphi * dphi
+  // Both φ axes share the same symmetric `[−phiExtent, +phiExtent]`
+  // window by construction (see {@link ChiGridSpec.gridSize}); reading
+  // both dimensions separately guards against a future rectangular grid
+  // landing in the Schmidt path without anyone noticing the volume
+  // element silently treated it as square.
+  const dphi1 = (2 * spec.phiExtent) / (Nphi1 - 1)
+  const dphi2 = (2 * spec.phiExtent) / (Nphi2 - 1)
+  return da * dphi1 * dphi2
 }
 
 /**
