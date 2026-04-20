@@ -71,7 +71,7 @@ import {
   extractColumnAiry,
   langerEvaluate,
 } from './airyConnection'
-import { buildWdwBoundary } from './boundaryConditions'
+import { buildWdwBoundary, type WdwBoundaryField } from './boundaryConditions'
 import { WDW_C_U, wdwEuclideanWkbAction, wdwTurningA, wdwU } from './constants'
 
 // Re-export for downstream consumers that import `wdwU` from the solver
@@ -179,6 +179,31 @@ export interface WheelerDeWittSolverInput {
   gridNa: number
   gridNphi: number
   phiExtent: number
+  /**
+   * Optional override for the initial slab `χ(a_min, φ)` and its
+   * `a`-derivative. When supplied, the solver bypasses
+   * `buildWdwBoundary(boundaryCondition, …)` and consumes these buffers
+   * directly. Provided for analytic-fixture validation: tests need to
+   * inject a constant-in-φ slab so the φ-Laplacian term contributes
+   * exactly zero everywhere, isolating the 1D problem `−χ'' + U(a)·χ
+   * = 0` for pointwise comparison against closed-form Bessel/Hankel
+   * solutions (see `analyticFixtures.ts` and `solverAnalytic.test.ts`).
+   *
+   * Buffer layout MUST match the BC-generator output: each entry is an
+   * interleaved `(re, im)` complex pair indexed by
+   * `i = i_phi1 * Nphi + i_phi2`. Total length per buffer:
+   * `2 · Nphi · Nphi`. Mismatched lengths throw.
+   *
+   * **Caveat**: Stage-3 Airy/Langer overwrite still consults
+   * `boundaryCondition` for the per-BC c1/c2 branch selection rule
+   * (`airyConnection.ts:applyBcWeighting`). If a custom boundary is
+   * combined with a BC enum that disagrees with the physical BC the
+   * boundary actually represents, the Stage-3 overwrite will pick the
+   * wrong branch in dS columns. Pure-Lorentzian regimes (`Λ ≤ 0` at
+   * `m = 0`) skip Stage-3 entirely — for those tests the BC enum is a
+   * no-op label.
+   */
+  customBoundary?: WdwBoundaryField
 }
 
 /** Dense output of the Wheeler–DeWitt solver. */
@@ -434,14 +459,36 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   // Stage-2 per-column WKB state (turning point, α, pending match).
   const columnStates = initColumnWkbStates(Nphi, phiExtent, inflatonMass, cosmologicalConstant)
 
-  // Initial slab from the chosen boundary condition.
-  const initial = buildWdwBoundary(boundaryCondition, {
-    Nphi,
-    phiExtent,
-    aMin,
-    mass: inflatonMass,
-    lambda: cosmologicalConstant,
-  })
+  // Initial slab: either a caller-supplied override or the dispatched
+  // BC generator. See {@link WheelerDeWittSolverInput#customBoundary}
+  // for the override contract (primarily used by analytic-fixture tests
+  // to inject a constant-in-φ slab that isolates the 1D WdW problem).
+  const expectedInitialLen = 2 * slabSize
+  let initial: WdwBoundaryField
+  if (input.customBoundary) {
+    const custom = input.customBoundary
+    if (custom.chi.length !== expectedInitialLen) {
+      throw new Error(
+        `customBoundary.chi length ${custom.chi.length} does not match ` +
+          `expected 2·Nphi·Nphi = ${expectedInitialLen}`
+      )
+    }
+    if (custom.chiDeriv.length !== expectedInitialLen) {
+      throw new Error(
+        `customBoundary.chiDeriv length ${custom.chiDeriv.length} does not match ` +
+          `expected 2·Nphi·Nphi = ${expectedInitialLen}`
+      )
+    }
+    initial = custom
+  } else {
+    initial = buildWdwBoundary(boundaryCondition, {
+      Nphi,
+      phiExtent,
+      aMin,
+      mass: inflatonMass,
+      lambda: cosmologicalConstant,
+    })
+  }
 
   // Copy χ(a_min, ·) into slab 0.
   chi.set(initial.chi, 0)

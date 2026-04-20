@@ -100,7 +100,7 @@ function formatSrmtConfig(c: SrmtSweepConfig): string {
   // manifests for the same {clock-set, physics} pair). Dispatch order
   // belongs in runtime logs, not provenance.
   const clocksList = c.clocks.length > 0 ? [...c.clocks].sort().join('+') : 'a+phi1+phi2'
-  return [
+  const fields = [
     `kind=${sanitise(c.kind)}`,
     `points=${formatInteger(c.points)}`,
     `clocks=${sanitise(clocksList)}`,
@@ -109,7 +109,14 @@ function formatSrmtConfig(c: SrmtSweepConfig): string {
     `phiRef=${formatNumeric(c.phiRef)}`,
     `sweepMin=${formatNumeric(c.sweepMin)}`,
     `sweepMax=${formatNumeric(c.sweepMax)}`,
-  ].join(' ')
+  ]
+  // Only pin the seed when the sweep config carries one. Pre-seed-field
+  // callers (and any archived CSVs reproduced from them) stay byte-exact;
+  // seeded runs get the explicit provenance line they need.
+  if (c.seed !== undefined) {
+    fields.push(`seed=${formatInteger(c.seed)}`)
+  }
+  return fields.join(' ')
 }
 
 function formatGridInfo(w: WheelerDeWittConfig): string {

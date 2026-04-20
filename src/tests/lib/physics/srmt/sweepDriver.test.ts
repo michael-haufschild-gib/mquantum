@@ -17,10 +17,16 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_WHEELER_DEWITT_CONFIG } from '@/lib/geometry/extended/wheelerDeWitt'
 import { computeSrmtDiagnostic } from '@/lib/physics/srmt/diagnostic'
 import {
+  clampGridNa,
+  clampGridNphi,
   clampRankCap,
+  predictGridNaSweepCount,
+  predictGridNphiSweepCount,
   resolveCutIndexForAxisLen,
   runBcSweep,
   runCutSweep,
+  runGridNaSweep,
+  runGridNphiSweep,
   runLambdaSweep,
   runMassSweep,
   runPhiExtentSweep,
@@ -580,5 +586,283 @@ describe('runBcSweep', () => {
       expect(result[i]!.sweepValueBc).toBe(SRMT_BC_SWEEP_ORDER[i])
       expect(result[i]!.sweepValue).toBe(i)
     }
+  })
+})
+
+describe('clampGridNa', () => {
+  it('clamps to [64, 1024] and rounds non-integers', () => {
+    expect(clampGridNa(0)).toBe(64)
+    expect(clampGridNa(63.4)).toBe(64)
+    expect(clampGridNa(127.6)).toBe(128)
+    expect(clampGridNa(2000)).toBe(1024)
+  })
+})
+
+describe('clampGridNphi', () => {
+  it('clamps to [9, 33] and rounds non-integers', () => {
+    expect(clampGridNphi(0)).toBe(9)
+    expect(clampGridNphi(8.4)).toBe(9)
+    expect(clampGridNphi(16.7)).toBe(17)
+    expect(clampGridNphi(100)).toBe(33)
+  })
+})
+
+describe('predictGridNaSweepCount', () => {
+  it('matches the dedup count produced by runGridNaSweep across a collapsing range', () => {
+    // Range [64, 80] with 9 points → linspace produces {64, 66, 68, …, 80};
+    // after integer-rounding all 9 values are unique and the predict
+    // helper must agree with the driver's actual emission count.
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNa',
+      points: 9,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.8,
+      sweepMin: 64,
+      sweepMax: 80,
+    }
+    const predicted = predictGridNaSweepCount(cfg)
+    expect(predicted).toBe(9)
+  })
+
+  it('reports the deduplicated count when linspace collapses to repeats', () => {
+    // Range [64, 65] with 9 points → linspace {64, 64.125, 64.25, …, 65};
+    // after rounding only {64, 65} survive.
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNa',
+      points: 9,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.8,
+      sweepMin: 64,
+      sweepMax: 65,
+    }
+    expect(predictGridNaSweepCount(cfg)).toBe(2)
+  })
+})
+
+describe('predictGridNphiSweepCount', () => {
+  it('reports the deduplicated count for a clamped narrow range', () => {
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNphi',
+      points: 5,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.8,
+      sweepMin: 9,
+      sweepMax: 33,
+    }
+    // 5 points across [9, 33] → {9, 15, 21, 27, 33}.
+    expect(predictGridNphiSweepCount(cfg)).toBe(5)
+  })
+})
+
+describe('runGridNaSweep', () => {
+  it('rounds + dedups + invokes onSolveStart per unique gridNa with sweepValue=gridNa', () => {
+    const solveStarts: number[] = []
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      // Hold gridNphi tiny so each per-point solve is cheap; gridNa
+      // is the swept knob.
+      gridNphi: 9,
+      inflatonMass: 0.5,
+      cosmologicalConstant: 0.0,
+    }
+    const result = runGridNaSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNa',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.8,
+        sweepMin: 64,
+        sweepMax: 96,
+      },
+      onSolveStart: (i) => solveStarts.push(i),
+    })
+    // 3 points across [64, 96] → {64, 80, 96}, all unique integers.
+    expect(result.length).toBe(3)
+    expect(solveStarts).toEqual([0, 1, 2])
+    const sweptValues = result.map((p) => p.sweepValue)
+    expect(sweptValues).toEqual([64, 80, 96])
+    for (const point of result) {
+      expect(Number.isInteger(point.sweepValue)).toBe(true)
+      expect(Number.isFinite(point.quality.a!)).toBe(true)
+      expect(point.quality.a!).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('clamps out-of-range sweepMin / sweepMax into [64, 1024]', () => {
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNphi: 9,
+      inflatonMass: 0.5,
+    }
+    const result = runGridNaSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNa',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.8,
+        // Below-range / way-above-range bounds — driver must clamp.
+        sweepMin: 10,
+        sweepMax: 5000,
+      },
+    })
+    // Series after clamp: linspace(64, 1024, 3) = {64, 544, 1024}.
+    // All 3 are unique integers within the driver clamp.
+    expect(result.length).toBe(3)
+    expect(result[0]!.sweepValue).toBe(64)
+    expect(result[result.length - 1]!.sweepValue).toBe(1024)
+  })
+
+  it('rejects wrong kind', () => {
+    expect(() =>
+      runGridNaSweep({
+        wdwConfig: {
+          ...DEFAULT_WHEELER_DEWITT_CONFIG,
+          gridNphi: 9,
+        },
+        config: baseCutConfig({ kind: 'cut' }),
+      })
+    ).toThrow(/kind='gridNa'/)
+  })
+
+  it('produces Cauchy-monotonic q convergence as gridNa grows (small WdW config)', () => {
+    // End-to-end convergence assertion: the residual at the second-finest
+    // grid relative to the finest (|q(N_med) − q(N_max)|) must be
+    // strictly smaller than the residual at the coarsest grid relative
+    // to the finest (|q(N_min) − q(N_max)|). This is the publication-
+    // grid Cauchy-convergence contract that gridNa sweeps exist to test.
+    //
+    // Use a small but real Wheeler-DeWitt config so the test runs in a
+    // sensible budget while still exercising real solver/Schmidt/HJ
+    // behaviour.
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNphi: 9,
+      phiExtent: 1.5,
+      aMin: 0.2,
+      aMax: 1.2,
+      inflatonMass: 0.4,
+      cosmologicalConstant: 0.0,
+    }
+    const result = runGridNaSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNa',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.6,
+        sweepMin: 64,
+        sweepMax: 192,
+      },
+    })
+    expect(result.length).toBe(3)
+    // Sweep values are sorted ascending by linspace + dedup.
+    expect(result[0]!.sweepValue).toBeLessThan(result[1]!.sweepValue)
+    expect(result[1]!.sweepValue).toBeLessThan(result[2]!.sweepValue)
+    const qLow = result[0]!.quality.a!
+    const qMid = result[1]!.quality.a!
+    const qHigh = result[2]!.quality.a!
+    expect(Number.isFinite(qLow) && Number.isFinite(qMid) && Number.isFinite(qHigh)).toBe(true)
+    const tail = Math.abs(qMid - qHigh)
+    const head = Math.abs(qLow - qHigh)
+    // The Cauchy property: refinement narrows the gap. If `head ≤ tail`
+    // the solver is either diverging in `gridNa` or noise-dominated at
+    // this configuration — both would fail a publication grid check.
+    expect(tail).toBeLessThan(head)
+  })
+})
+
+describe('runGridNphiSweep', () => {
+  it('rounds + dedups + invokes onSolveStart per unique gridNphi with sweepValue=gridNphi', () => {
+    const solveStarts: number[] = []
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      // Hold gridNa small so per-point solves stay cheap; gridNphi is
+      // the swept knob. aMin lifted to 0.3 so the CFL term
+      // `da²·8/dφ²/aMin²` stays inside the solver's warning budget at
+      // the largest sweep value (gridNphi=21 here, sub-default
+      // phiExtent=1.5).
+      gridNa: 64,
+      phiExtent: 1.5,
+      aMin: 0.3,
+      aMax: 1.2,
+      inflatonMass: 0.4,
+      cosmologicalConstant: 0.0,
+    }
+    const result = runGridNphiSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNphi',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.6,
+        sweepMin: 9,
+        sweepMax: 21,
+      },
+      onSolveStart: (i) => solveStarts.push(i),
+    })
+    // 3 points across [9, 21] → {9, 15, 21}, all unique integers.
+    expect(result.length).toBe(3)
+    expect(solveStarts).toEqual([0, 1, 2])
+    expect(result.map((p) => p.sweepValue)).toEqual([9, 15, 21])
+    for (const point of result) {
+      expect(Number.isInteger(point.sweepValue)).toBe(true)
+      expect(Number.isFinite(point.quality.a!)).toBe(true)
+    }
+  })
+
+  it('clamps sweep bounds into [9, 33]', () => {
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNa: 64,
+      phiExtent: 1.5,
+      aMin: 0.3,
+      aMax: 1.2,
+      inflatonMass: 0.4,
+    }
+    const result = runGridNphiSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNphi',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.6,
+        sweepMin: 1,
+        sweepMax: 1000,
+      },
+    })
+    // Clamped to [9, 33], 3 points → {9, 21, 33}.
+    expect(result.length).toBe(3)
+    expect(result[0]!.sweepValue).toBe(9)
+    expect(result[result.length - 1]!.sweepValue).toBe(33)
+  })
+
+  it('rejects wrong kind', () => {
+    expect(() =>
+      runGridNphiSweep({
+        wdwConfig: {
+          ...DEFAULT_WHEELER_DEWITT_CONFIG,
+          gridNa: 64,
+        },
+        config: baseCutConfig({ kind: 'cut' }),
+      })
+    ).toThrow(/kind='gridNphi'/)
   })
 })

@@ -814,6 +814,55 @@ mod tests {
     /// This is the "implementation bugs any single code path misses"
     /// check — a wrong stencil would give O(1) error that doesn't
     /// improve with refinement.
+    // -- Section 6: wasm-bindgen validator binding parity --
+
+    #[cfg(feature = "wdw-validator")]
+    #[test]
+    #[should_panic(expected = "invalid bc_code 99")]
+    fn validator_binding_rejects_unknown_bc_code() {
+        // An out-of-range `bc_code` must panic rather than silently fall
+        // back to `NoBoundary`. A silent fallback would mask a JS↔Rust
+        // ABI drift (e.g. a new BC enum variant on one side only) and
+        // turn the cross-validator into a false-positive oracle.
+        use super::bindings::solve_leapfrog_validator_native;
+        let _ = solve_leapfrog_validator_native(99, 0.0, -0.5, 0.05, 1.2, 4, 3, 2.5);
+    }
+
+    #[cfg(feature = "wdw-validator")]
+    #[test]
+    fn validator_binding_packs_match_solve_leapfrog() {
+        // Confirms the wasm-bindgen wrapper packs the chi tensor in the
+        // exact (ia, i1, i2) row-major interleaved-(re, im) layout that
+        // solve_leapfrog produces, with no transformation. A regression
+        // here would silently mis-align the JS↔Rust comparison test.
+        use super::bindings::solve_leapfrog_validator_native;
+        let na = 8usize;
+        let nphi = 5usize;
+        let packed = solve_leapfrog_validator_native(0, 0.0, -0.5, 0.05, 1.2, na, nphi, 2.5);
+        let expected_len = 2 * na * nphi * nphi;
+        assert_eq!(packed.len(), expected_len);
+        let direct = solve_leapfrog(WdwSolverInput {
+            bc: WdwBoundaryCondition::NoBoundary,
+            mass: 0.0,
+            lambda: -0.5,
+            a_min: 0.05,
+            a_max: 1.2,
+            grid_na: na,
+            grid_nphi: nphi,
+            phi_extent: 2.5,
+        });
+        for i in 0..expected_len {
+            let p = packed[i] as f64;
+            let d = direct.chi[i];
+            // Pack does an f64 -> f32 -> f64 round-trip; tolerance ~1 ULP at f32.
+            let tol = 1e-5 * d.abs().max(1.0);
+            assert!(
+                (p - d).abs() <= tol,
+                "binding mismatch at i={i}: packed={p}, direct={d}"
+            );
+        }
+    }
+
     #[test]
     fn leapfrog_second_order_convergence() {
         let base = WdwSolverInput {
@@ -859,5 +908,99 @@ mod tests {
             diff_im < 1e-4,
             "im diverges across refinement: {base_im} vs {refined_im} (|Δ|={diff_im})"
         );
+    }
+}
+
+// ============================================================================
+// Validator wasm-bindgen bindings (feature-gated).
+//
+// Compiled only when the crate is built with `--features wdw-validator`.
+// Production builds (default features) exclude this entire module so the
+// public-facing pkg/mdimension_core.wasm stays byte-identical.
+// ============================================================================
+
+#[cfg(feature = "wdw-validator")]
+pub mod bindings {
+    //! wasm-bindgen exports for the independent Wheeler–DeWitt leapfrog
+    //! cross-validator. Consumed by `solverWasmComparison.test.ts` via
+    //! the separate pkg-validator/ output of `pnpm wasm:build:validator`.
+
+    use super::{solve_leapfrog, WdwBoundaryCondition, WdwSolverInput};
+    use wasm_bindgen::prelude::*;
+
+    /// Run the f64 leapfrog Wheeler–DeWitt solver and return the dense
+    /// `χ(a, φ₁, φ₂)` tensor as interleaved `(re, im)` `f32` pairs.
+    ///
+    /// Layout: `chi[2·(ia·N_phi² + i1·N_phi + i2) + (0=re, 1=im)]`.
+    /// This matches the TypeScript solver's `Float32Array` layout for
+    /// pointwise comparison.
+    ///
+    /// `bc_code`: 0=NoBoundary (Hartle–Hawking), 1=Tunneling (Vilenkin),
+    /// 2=DeWitt. Any other value panics to fail fast on JS↔Rust ABI
+    /// drift — the underlying `solve_leapfrog_validator_native` rejects
+    /// unknown codes rather than defaulting to NoBoundary.
+    ///
+    /// No Stage-2 / Stage-3 corrections — this is the raw PDE integrator
+    /// output. See the module-level docstring on `wheeler_dewitt.rs` for
+    /// scope rationale.
+    #[wasm_bindgen]
+    #[allow(clippy::too_many_arguments)]
+    pub fn solve_leapfrog_validator_wasm(
+        bc_code: u32,
+        mass: f64,
+        lambda: f64,
+        a_min: f64,
+        a_max: f64,
+        grid_na: u32,
+        grid_nphi: u32,
+        phi_extent: f64,
+    ) -> Vec<f32> {
+        solve_leapfrog_validator_native(
+            bc_code,
+            mass,
+            lambda,
+            a_min,
+            a_max,
+            grid_na as usize,
+            grid_nphi as usize,
+            phi_extent,
+        )
+    }
+
+    /// Pure-Rust entry exposed to the in-crate test that asserts the
+    /// wasm-bindgen pack/unpack contract. Identical to the wasm export
+    /// minus the integer-width conversion at the JS boundary.
+    pub fn solve_leapfrog_validator_native(
+        bc_code: u32,
+        mass: f64,
+        lambda: f64,
+        a_min: f64,
+        a_max: f64,
+        grid_na: usize,
+        grid_nphi: usize,
+        phi_extent: f64,
+    ) -> Vec<f32> {
+        // Exhaustive match with a hard panic on unknown codes so a JS↔Rust
+        // ABI drift (e.g. a new BC added on one side only) fails loudly at
+        // the first cross-validation invocation instead of silently
+        // masquerading as `NoBoundary` and producing a wrong-state
+        // comparison.
+        let bc = match bc_code {
+            0 => WdwBoundaryCondition::NoBoundary,
+            1 => WdwBoundaryCondition::Tunneling,
+            2 => WdwBoundaryCondition::DeWitt,
+            other => panic!("invalid bc_code {other}; expected 0 (noBoundary), 1 (tunneling), or 2 (deWitt)"),
+        };
+        let out = solve_leapfrog(WdwSolverInput {
+            bc,
+            mass,
+            lambda,
+            a_min,
+            a_max,
+            grid_na,
+            grid_nphi,
+            phi_extent,
+        });
+        out.chi.into_iter().map(|v| v as f32).collect()
     }
 }

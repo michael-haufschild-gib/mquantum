@@ -50,9 +50,13 @@ import type { SrmtPhysicsContext } from './diagnostic'
 import {
   normalisePointCount,
   predictCutSweepCount,
+  predictGridNaSweepCount,
+  predictGridNphiSweepCount,
   predictRankCapSweepCount,
   runBcSweep,
   runCutSweep,
+  runGridNaSweep,
+  runGridNphiSweep,
   runLambdaSweep,
   runMassSweep,
   runPhiExtentSweep,
@@ -299,6 +303,22 @@ export function handleSrmtSweepRequest(
         onSolveStart,
         cancel,
       })
+    } else if (msg.config.kind === 'gridNa') {
+      runGridNaSweep({
+        wdwConfig: msg.wdwConfig,
+        config: msg.config,
+        onProgress,
+        onSolveStart,
+        cancel,
+      })
+    } else if (msg.config.kind === 'gridNphi') {
+      runGridNphiSweep({
+        wdwConfig: msg.wdwConfig,
+        config: msg.config,
+        onProgress,
+        onSolveStart,
+        cancel,
+      })
     } else {
       runBcSweep({
         wdwConfig: msg.wdwConfig,
@@ -361,6 +381,12 @@ function totalPointsFor(
   }
   if (config.kind === 'rankCap') {
     return predictRankCapSweepCount(config)
+  }
+  if (config.kind === 'gridNa') {
+    return predictGridNaSweepCount(config)
+  }
+  if (config.kind === 'gridNphi') {
+    return predictGridNphiSweepCount(config)
   }
   return normalisePointCount(config.kind, config.points)
 }

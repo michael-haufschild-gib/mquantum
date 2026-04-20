@@ -3,14 +3,14 @@
  *
  * A complete sweep configuration encodes into five URL params:
  *
- *   | Key       | Range                      | Meaning                                  |
- *   |-----------|----------------------------|------------------------------------------|
- *   | `sw`      | `cut \| mass \| bc`        | Sweep kind; presence triggers auto-run.  |
- *   | `sw_n`    | int 3-64 (kind-clamped)    | Points. Forced to 3 for `bc`.            |
- *   | `sw_min`  | float                      | Lower range bound. Ignored for `bc`.     |
- *   | `sw_max`  | float                      | Upper range bound. Ignored for `bc`.     |
- *   | `sw_phi`  | float                      | Landmark φ reference.                    |
- *   | `sw_c`    | float ∈ [0.1, 0.9]         | Anchor cut-normalized for mass/bc.       |
+ *   | Key       | Range                                | Meaning                                  |
+ *   |-----------|--------------------------------------|------------------------------------------|
+ *   | `sw`      | one of {@link VALID_SRMT_SWEEP_KINDS}| Sweep kind; presence triggers auto-run.  |
+ *   | `sw_n`    | int 3-64 (kind-clamped)              | Points. Forced to 3 for `bc`.            |
+ *   | `sw_min`  | float ∈ [-1024, 1024] (kind-clamped) | Lower range bound. Ignored for `bc`.     |
+ *   | `sw_max`  | float ∈ [-1024, 1024] (kind-clamped) | Upper range bound. Ignored for `bc`.     |
+ *   | `sw_phi`  | float ∈ [-10, 10]                    | Landmark φ reference.                    |
+ *   | `sw_c`    | float ∈ [0.1, 0.9]                   | Anchor cut-normalized for mass/bc.       |
  *
  * Emission is scoped to `quantumMode === 'wheelerDeWitt'` — sweep fields
  * are meaningless outside WdW mode and must not pollute unrelated
@@ -31,6 +31,8 @@ export const VALID_SRMT_SWEEP_KINDS = [
   'phiRef',
   'rankCap',
   'phiExtent',
+  'gridNa',
+  'gridNphi',
 ] as const satisfies readonly SrmtSweepKind[]
 
 /** String union accepted by `sw=…` — one per entry of {@link VALID_SRMT_SWEEP_KINDS}. */
@@ -91,7 +93,9 @@ export function serializeSrmtSweep(
     state.srmtSweepKind === 'lambda' ||
     state.srmtSweepKind === 'phiRef' ||
     state.srmtSweepKind === 'rankCap' ||
-    state.srmtSweepKind === 'phiExtent'
+    state.srmtSweepKind === 'phiExtent' ||
+    state.srmtSweepKind === 'gridNa' ||
+    state.srmtSweepKind === 'gridNphi'
   ) {
     if (state.srmtSweepPoints !== undefined) params.set('sw_n', String(state.srmtSweepPoints))
     if (state.srmtSweepMin !== undefined) params.set('sw_min', state.srmtSweepMin.toFixed(3))
@@ -146,14 +150,16 @@ export function deserializeSrmtSweep(params: URLSearchParams, state: SrmtSweepUr
   }
   // Points clamps match the sweepDriver per-kind rules:
   //  cut ∈ [4, 64], mass / λ / phiRef ∈ [3, 21], rankCap ∈ [3, 32],
-  //  phiExtent ∈ [3, 13]. Use the outer union and let the driver clamp.
+  //  phiExtent ∈ [3, 13], gridNa / gridNphi ∈ [3, 9]. Use the outer
+  //  union and let the driver clamp per kind.
   state.srmtSweepPoints = parseIntClamped(params, 'sw_n', 3, 64)
-  // Float range must admit rankCap sweeps (8..256), so the box is
-  // `[-300, 300]`. All narrower physical ranges (cut ∈ [0,1], mass ∈
-  // [0,2], λ ∈ [-1,1], phiRef ∈ [-phiExtent, +phiExtent], phiExtent ∈
-  // [0.5, 5]) are comfortably inside. Driver enforces per-kind bounds.
-  state.srmtSweepMin = parseFloatClamped(params, 'sw_min', -300, 300)
-  state.srmtSweepMax = parseFloatClamped(params, 'sw_max', -300, 300)
+  // Float range must admit the widest per-kind sweep — `gridNa` extends
+  // up to 1024 (driver clamp). Box `[-1024, 1024]` covers every kind:
+  // cut ∈ [0,1], mass ∈ [0,2], λ ∈ [-1,1], phiRef ∈ [-phiExtent,
+  // +phiExtent], phiExtent ∈ [0.5, 5], rankCap ∈ [8, 256], gridNa ∈
+  // [64, 1024], gridNphi ∈ [9, 33]. Driver enforces per-kind bounds.
+  state.srmtSweepMin = parseFloatClamped(params, 'sw_min', -1024, 1024)
+  state.srmtSweepMax = parseFloatClamped(params, 'sw_max', -1024, 1024)
   state.srmtSweepPhiRef = parseFloatClamped(params, 'sw_phi', -10, 10)
   state.srmtSweepCutAnchor = parseFloatClamped(params, 'sw_c', 0.1, 0.9)
 }

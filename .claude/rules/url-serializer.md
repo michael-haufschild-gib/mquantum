@@ -62,10 +62,10 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `ads_hkll_src` | int 0..2 | HKLL boundary source (0 = eigenstate, 1 = localized, 2 = planeWave) |
 | `ads_hkll_sigma` | float 0.05..1.5 | Gaussian spot angular width σ (radians) for the `localized` source |
 | `ads_hkll_mb` | int 0..8 | Azimuthal quantum number m_b for the `planeWave` source |
-| `sw` | enum `cut\|mass\|lambda\|bc\|phiRef\|rankCap\|phiExtent` | SRMT parameter-sweep kind. Presence triggers the sweep section to auto-start after the Wheeler–DeWitt solver produces its first output. `phiRef`/`rankCap`/`phiExtent` are Tier-3 sensitivity sweeps: a claim that survives variation across these knobs is genuine physics, not a numerical artifact. See `docs/physics/srmt-metric.md`. |
-| `sw_n` | int 3-64 | Sweep points. Clamped per-kind (cut: [4, 64]; mass / lambda / phiRef: [3, 21]; rankCap: [3, 32]; phiExtent: [3, 13]). Ignored when `sw=bc`. |
-| `sw_min` | float -300..300 | Lower sweep bound (cut: [0, 1]; mass: [0, 2]; lambda: [-1, 1]; phiRef: [0, phiExtent]; rankCap: [8, 256]; phiExtent: [0.5, 5]). Driver clamps per-kind. Ignored for `sw=bc`. |
-| `sw_max` | float -300..300 | Upper sweep bound (same per-kind ranges as `sw_min`). Ignored for `sw=bc`. |
+| `sw` | enum `cut\|mass\|lambda\|bc\|phiRef\|rankCap\|phiExtent\|gridNa\|gridNphi` | SRMT parameter-sweep kind. Presence triggers the sweep section to auto-start after the Wheeler–DeWitt solver produces its first output. `phiRef`/`rankCap`/`phiExtent`/`gridNa`/`gridNphi` are Tier-3 sensitivity sweeps: a claim that survives variation across these knobs is genuine physics, not a numerical artifact. `gridNa`/`gridNphi` specifically certify the leapfrog's 2nd-order Cauchy convergence — a publication grid whose `q(N)` does not approach `q(N_max)` monotonically as `N` grows is unfit to publish. See `docs/physics/srmt-metric.md`. |
+| `sw_n` | int 3-64 | Sweep points. Clamped per-kind (cut: [4, 64]; mass / lambda / phiRef: [3, 21]; rankCap: [3, 32]; phiExtent: [3, 13]; gridNa / gridNphi: [3, 9]). Ignored when `sw=bc`. |
+| `sw_min` | float -1024..1024 | Lower sweep bound (cut: [0, 1]; mass: [0, 2]; lambda: [-1, 1]; phiRef: [0, phiExtent]; rankCap: [8, 256]; phiExtent: [0.5, 5]; gridNa: [64, 1024]; gridNphi: [9, 33]). Driver clamps per-kind. Ignored for `sw=bc`. |
+| `sw_max` | float -1024..1024 | Upper sweep bound (same per-kind ranges as `sw_min`). Ignored for `sw=bc`. |
 | `sw_phi` | float -10..10 | φ reference used when computing the turning-point landmark. |
 | `sw_c` | float 0.1..0.9 | Anchor `srmtCutNormalized` for mass/bc sweeps (the cut held fixed while physics varies). Ignored for `sw=cut`. |
 
