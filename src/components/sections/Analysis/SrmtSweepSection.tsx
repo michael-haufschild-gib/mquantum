@@ -304,7 +304,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
           value={ui.kind}
           onChange={handleKindChange}
           ariaLabel="SRMT sweep kind"
-          tooltip="Which parameter to vary across sweep points. Cut: sweep the cut position at fixed physics. Mass: sweep inflaton mass. BC: iterate the three boundary conditions."
+          tooltip="Which parameter to vary across sweep points. Cut: cut position. Mass: inflaton mass. Lambda: cosmological constant. BC: boundary conditions. PhiRef/RankCap/PhiExtent: sensitivity. GridNa/GridNphi: convergence. GridNphiCoupled: joint (Nφ, Nₐ) convergence with CFL coupling."
           fullWidth
           disabled={running}
           data-testid="srmt-sweep-kind-selector"

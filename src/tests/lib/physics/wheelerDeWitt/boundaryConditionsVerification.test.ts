@@ -130,7 +130,7 @@ describe('Tunneling BC: post-integration phase accumulates in +a direction', () 
       gridNphi: 17,
       phiExtent: 2.0,
     })
-    const [, Nphi] = out.gridSize
+    const [Na, Nphi] = out.gridSize
     const slab = Nphi * Nphi
     const c = (Nphi - 1) >> 1
 
@@ -156,7 +156,7 @@ describe('Tunneling BC: post-integration phase accumulates in +a direction', () 
     // makes the test diagnostic of the BC sign alone, as originally
     // intended.
     const iaStart = 8
-    const iaEnd = 96
+    const iaEnd = Math.min(96, Na - 4)
     let unwrapped = 0
     let prev = 0
     for (let ia = iaStart; ia < iaEnd; ia++) {

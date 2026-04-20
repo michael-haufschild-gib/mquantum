@@ -101,9 +101,9 @@ import { WDW_C_U, wdwLangerVariable, wdwLorentzianWkbAction, wdwTurningA, wdwU }
 /**
  * φ-boundary note: this module samples `χ(a, φ₁, φ₂)` at a **fixed**
  * `(i1, i2)` column across varying `a` slabs. It does not apply any
- * φ-axis finite-difference stencil, so it is invariant under the
- * solver's φ-boundary rule (ghost-zero Dirichlet / Neumann /
- * anything else). The connection formula and Langer evaluation
+ * φ-axis finite-difference stencil, so it does not assume a specific
+ * φ-boundary rule (ghost-zero Dirichlet / Neumann / anything else).
+ * The connection formula and Langer evaluation
  * depend only on per-column `χ` values, which are themselves
  * produced by the leapfrog's chosen stencil — no implicit ghost
  * assumption leaks into the Airy transfer function.

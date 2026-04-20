@@ -35,6 +35,8 @@
  */
 
 import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 import { expect, test } from './fixtures'
 import {
@@ -412,9 +414,8 @@ test.describe('SRMT rankCap sweep — Lanczos seed sensitivity', () => {
     // needs to either seed-average or report the larger envelope.
     annotateSeedDominatedBuckets(aggregate, testInfo)
 
-    fs.writeFileSync(
-      '/tmp/srmt-seed-sensitivity-results.json',
-      JSON.stringify({ perSeed, aggregate }, null, 2) + '\n'
-    )
+    const outPath = path.join(os.tmpdir(), 'srmt-seed-sensitivity-results.json')
+    fs.writeFileSync(outPath, JSON.stringify({ perSeed, aggregate }, null, 2) + '\n')
+    console.log(`Results written to: ${outPath}`)
   })
 })

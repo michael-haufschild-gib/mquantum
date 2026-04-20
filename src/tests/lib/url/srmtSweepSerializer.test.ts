@@ -192,8 +192,15 @@ describe('deserializeSrmtSweep', () => {
 })
 
 describe('serializeSrmtSweep — Tier-3 sensitivity kinds', () => {
-  it('emits sw_n/min/max for phiRef, rankCap, phiExtent, gridNa, gridNphi', () => {
-    for (const kind of ['phiRef', 'rankCap', 'phiExtent', 'gridNa', 'gridNphi'] as const) {
+  it('emits sw_n/min/max for phiRef, rankCap, phiExtent, gridNa, gridNphi, gridNphiCoupled', () => {
+    for (const kind of [
+      'phiRef',
+      'rankCap',
+      'phiExtent',
+      'gridNa',
+      'gridNphi',
+      'gridNphiCoupled',
+    ] as const) {
       const params = new URLSearchParams()
       serializeSrmtSweep(params, 'wheelerDeWitt', {
         srmtSweepKind: kind,

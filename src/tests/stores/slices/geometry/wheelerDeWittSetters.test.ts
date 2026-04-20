@@ -140,6 +140,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
       const wdw = getWdw()
       expect(wdw.gridNa).toBe(192)
       expect(wdw.gridNphi).toBe(40)
+      expect(wdw.needsReset).toBe(true)
     })
 
     it('applies the Publication preset', () => {

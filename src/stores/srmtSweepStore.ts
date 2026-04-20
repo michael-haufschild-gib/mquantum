@@ -144,7 +144,7 @@ function totalPointsFor(config: SrmtSweepConfig): number {
     case 'gridNphi':
       return Math.max(1, Math.min(9, Math.floor(config.points)))
     case 'gridNphiCoupled':
-      return Math.max(1, Math.min(7, Math.floor(config.points)))
+      return Math.max(3, Math.min(7, Math.floor(config.points)))
     case 'bc':
       return 3
   }

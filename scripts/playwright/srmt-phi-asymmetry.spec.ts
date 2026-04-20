@@ -72,9 +72,9 @@ async function runCutSweepAndExtract(
   // under `section-state-srmt-sweep`. A prior test run (or the first run in
   // this browser profile) can leave the section expanded, in which case the
   // click below would COLLAPSE it and the Export-CSV button would never
-  // appear. Clearing localStorage forces the `defaultOpen=false` branch so
-  // the subsequent click reliably expands the section.
-  await page.evaluate(() => window.localStorage.clear())
+  // appear. Removing the key forces the `defaultOpen=false` branch so the
+  // subsequent click reliably expands the section.
+  await page.evaluate(() => window.localStorage.removeItem('section-state-srmt-sweep'))
   await waitForRendererReady(page)
   await waitForFirstFrame(page)
 

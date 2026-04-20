@@ -121,6 +121,8 @@ export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void 
 export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): void {
   state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
   state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
+  // [0.1, 10]: α < 0.1 makes the φ₂ axis nearly massless (numerical
+  // instability); α > 10 makes it so stiff the grid can't resolve it.
   state.wdwInflatonMassAsymmetry = parseFloatParam(params, 'wdw_ma', 0.1, 10)
   state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')

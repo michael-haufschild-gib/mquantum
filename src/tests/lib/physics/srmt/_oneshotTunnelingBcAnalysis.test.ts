@@ -8,12 +8,14 @@
  *   H2 — genuine physics: tunneling BC produces a modular spectrum whose
  *        shape tracks the HJ spectrum under the phi1 clock.
  *
- * Writes `/tmp/srmt-tunneling-analysis.json` with the per-BC per-clock
+ * Writes `<tmpdir>/srmt-tunneling-analysis.json` with the per-BC per-clock
  * table. Does not assert anything — this test is documentation, not a
  * guard; it prints a summary so vitest surfaces the numbers.
  */
 
 import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -233,7 +235,7 @@ describe('SRMT tunneling-BC inversion analysis (one-shot)', () => {
       }
     }
 
-    const outPath = '/tmp/srmt-tunneling-analysis.json'
+    const outPath = join(tmpdir(), 'srmt-tunneling-analysis.json')
     writeFileSync(
       outPath,
       JSON.stringify(

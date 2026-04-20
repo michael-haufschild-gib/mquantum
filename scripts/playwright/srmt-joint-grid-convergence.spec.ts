@@ -35,7 +35,7 @@
  *       extract `q_a`, `q_a_sigma`, `alpha_a`, `beta_a`, `computeMs`.
  *    d. Click the sweep reset button so status → idle and the next
  *       iteration can inject a fresh pending sweep.
- * 3. Write a consolidated JSON to `/tmp/srmt-joint-grid-convergence-results.json`.
+ * 3. Write a consolidated JSON to `<tmpdir>/srmt-joint-grid-convergence-results.json`.
  *
  * ## α-dependence at the refined corner
  *
@@ -55,6 +55,8 @@
  */
 
 import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 import type { Page } from '@playwright/test'
 
@@ -571,10 +573,9 @@ test.describe('Wheeler–DeWitt — SRMT joint (N_a, N_φ) grid convergence', ()
       jointCauchy,
     }
 
-    fs.writeFileSync(
-      '/tmp/srmt-joint-grid-convergence-results.json',
-      JSON.stringify(consolidated, null, 2) + '\n'
-    )
+    const outPath = path.join(os.tmpdir(), 'srmt-joint-grid-convergence-results.json')
+    fs.writeFileSync(outPath, JSON.stringify(consolidated, null, 2) + '\n')
+    console.log(`Results written to: ${outPath}`)
 
     // ── Hard assertion: per-Na monotonicity (each fixed Nphi column) ──
     expect(
