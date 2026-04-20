@@ -131,7 +131,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
       useExtendedObjectStore.getState().setWdwGridSize('medium')
       const wdw = getWdw()
       expect(wdw.gridNa).toBe(128)
-      expect(wdw.gridNphi).toBe(32)
+      expect(wdw.gridNphi).toBe(40)
       expect(wdw.needsReset).toBe(true)
     })
 
@@ -139,7 +139,7 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
       useExtendedObjectStore.getState().setWdwGridSize('high')
       const wdw = getWdw()
       expect(wdw.gridNa).toBe(192)
-      expect(wdw.gridNphi).toBe(32)
+      expect(wdw.gridNphi).toBe(40)
     })
 
     it('applies the Publication preset', () => {

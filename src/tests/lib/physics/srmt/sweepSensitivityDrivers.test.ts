@@ -76,14 +76,15 @@ describe('coupledGridNaFor', () => {
 
   it('does not saturate clampGridNa at default physics for Nφ ∈ [32, 64]', () => {
     // Regression guard for the prior Nφ² formula, which saturated at
-    // 1024 for every Nφ ∈ [32, 64] under default physics (aMin=0.1,
-    // phiExt=2, Δa=1.4) and therefore held `gridNa` constant across
-    // the coupled sweep. Under the correct CFL-derived linear formula
-    // Nφ=32 → 155 and Nφ=64 → 313, both safely below the upper clamp.
+    // 1024 for every Nφ ∈ [32, 64] under default physics and therefore
+    // held `gridNa` constant across the coupled sweep. Under the correct
+    // CFL-derived linear formula with phiExtent=3.5, Nφ=32 is below the
+    // baseline (128 wins via Math.max floor) and Nφ=64 → 180 — both
+    // safely below the upper clamp, confirming the coupling differentiates.
     const na32 = coupledGridNaFor(32, DEFAULT_WHEELER_DEWITT_CONFIG)
     const na64 = coupledGridNaFor(64, DEFAULT_WHEELER_DEWITT_CONFIG)
-    expect(na32).toBe(155)
-    expect(na64).toBe(313)
+    expect(na32).toBe(128)
+    expect(na64).toBe(180)
     expect(na32).toBeLessThan(1024)
     expect(na64).toBeLessThan(1024)
     expect(na64).toBeGreaterThan(na32)

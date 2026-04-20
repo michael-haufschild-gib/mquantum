@@ -100,7 +100,7 @@ export { wdwU } from './constants'
  * invariants that preserve existing output, patch for internal cleanup
  * with byte-identical output.
  */
-export const WDW_SOLVER_VERSION = '1.0.0'
+export const WDW_SOLVER_VERSION = '2.0.0'
 
 /**
  * Explicit-leapfrog stability budget for the φ-Laplacian term
@@ -153,6 +153,30 @@ export function resetCflWarningBudget(budget: number = WDW_CFL_WARN_DEFAULT): vo
  * the analytic WKB propagator output instead.
  */
 const WDW_EUCLIDEAN_ABSORBER_ETA = 1.0
+
+/**
+ * Width (in grid cells) of the φ-boundary absorbing sponge layer.
+ * Waves reaching the outer φ-cells are damped by a quadratic-profile
+ * exponential `exp(−γ_max · d²)` per leapfrog step, where
+ * `d = (cells from sponge inner edge) / spongeWidth ∈ [0, 1]`. This
+ * replaces reflections (Neumann) with smooth absorption — no standing
+ * waves and no artificial sink (Dirichlet). At 5 cells the damping
+ * profile is gentle enough that interior physics is unaffected while
+ * the outermost cell receives `exp(−0.15)^N_a ≈ 0` total damping over
+ * the full a-march.
+ */
+const WDW_PHI_SPONGE_WIDTH = 5
+
+/**
+ * Per-step peak damping rate at the outermost φ-cell. The effective
+ * damping at cell `k` from the grid edge (k=0 at the edge) is
+ * `exp(−γ_max · ((spongeWidth − k) / spongeWidth)²)`. Chosen so the
+ * total damping over `N_a = 128` steps is `exp(−0.15 · 128) ≈ 5e-9`
+ * at the outermost cell (effectively zero) while the innermost sponge
+ * cell sees `exp(−0.15/25 · 128) ≈ 0.47` (mild, one-sided attenuation
+ * that does not create a visible boundary in the density texture).
+ */
+const WDW_PHI_SPONGE_GAMMA = 0.15
 
 /**
  * WKB-phase threshold past the Lorentzian-Euclidean turning surface at
@@ -225,6 +249,14 @@ export interface WheelerDeWittSolverInput {
    * no-op label.
    */
   customBoundary?: WdwBoundaryField
+  /**
+   * When `true`, the absorbing sponge layer on the φ-boundary is
+   * disabled. Used by the JS↔Rust cross-validation tests: the Rust
+   * validator does not yet implement the sponge, so enabling it in the
+   * JS solver would create a systematic mismatch that masks real bugs.
+   * Production code should never set this.
+   */
+  disableSponge?: boolean
 }
 
 /** Dense output of the Wheeler–DeWitt solver. */
@@ -444,6 +476,42 @@ function initColumnWkbStates(
 }
 
 /**
+ * Build a per-cell multiplicative sponge-damping table for the φ-grid.
+ * Each entry is in `(0, 1]`: `1.0` in the bulk, smoothly decreasing
+ * toward the grid edges via a quadratic profile. The caller multiplies
+ * `(re, im)` by this factor after each leapfrog step.
+ *
+ * Profile: for a cell at distance `k` from the nearest edge (k=0 at
+ * the edge), the factor is `exp(−γ · d²)` where `d = max(0, 1 − k/W)`
+ * and W = {@link WDW_PHI_SPONGE_WIDTH}. Cells with `k ≥ W` get 1.0.
+ *
+ * @returns Float32Array of length `Nphi²`, indexed `i1 * Nphi + i2`.
+ */
+/**
+ * Effective sponge width for a given `Nphi`. Exported so the
+ * {@link wdwOperatorResidual} function can skip sponge-affected cells
+ * when computing the PDE residual.
+ */
+export function effectiveSpongeWidth(Nphi: number): number {
+  return Math.min(WDW_PHI_SPONGE_WIDTH, Math.floor(Nphi / 6))
+}
+
+function buildPhiSpongeDamping(Nphi: number): Float32Array {
+  const sponge = new Float32Array(Nphi * Nphi)
+  const W = effectiveSpongeWidth(Nphi)
+  for (let i1 = 0; i1 < Nphi; i1++) {
+    const d1 = Math.min(i1, Nphi - 1 - i1)
+    const s1 = d1 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d1 / W, 2)) : 1
+    for (let i2 = 0; i2 < Nphi; i2++) {
+      const d2 = Math.min(i2, Nphi - 1 - i2)
+      const s2 = d2 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d2 / W, 2)) : 1
+      sponge[i1 * Nphi + i2] = s1 * s2
+    }
+  }
+  return sponge
+}
+
+/**
  * Run the leapfrog Wheeler–DeWitt solver.
  *
  * @param input - Solver config.
@@ -495,11 +563,23 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       WDW_CFL_WARN_BUDGET.remaining -= 1
       logger.warn(
         `[wdw] CFL margin tight: da²·(1/aMin²)·8/dphi² = ${cflPhi.toFixed(2)} (budget ${WDW_CFL_BUDGET}). ` +
-          `Recommend aMin ≥ 0.1, gridNphi ≤ 32, gridNa ≤ 256, phiExtent ≥ 1.5. ` +
+          `Recommend aMin ≥ 0.1, gridNphi ≤ 48, gridNa ≤ 256, phiExtent ≥ 2.0. ` +
           `Current: aMin=${aMin}, aMax=${aMax}, gridNa=${gridNa}, gridNphi=${gridNphi}, phiExtent=${phiExtent}.`
       )
     }
   }
+
+  // Absorbing sponge layer: per-cell multiplicative damping applied
+  // after each leapfrog step. Bulk cells get 1.0 (no damping); cells
+  // near the φ-grid edges get < 1.0, absorbing outgoing waves without
+  // creating reflections (unlike Dirichlet) or standing waves (unlike
+  // pure Neumann on a too-small grid).
+  //
+  // Disabled when `customBoundary` is supplied: analytic-fixture tests
+  // inject constant-in-φ slabs to isolate the 1D a-march; applying the
+  // sponge would break the constant-in-φ invariant those tests verify.
+  const spongeEnabled = !input.customBoundary && !input.disableSponge
+  const phiSponge = spongeEnabled ? buildPhiSpongeDamping(Nphi) : null
 
   // Stage-2 per-column WKB state (turning point, α, pending match).
   const columnStates = initColumnWkbStates(
@@ -542,8 +622,17 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     })
   }
 
-  // Copy χ(a_min, ·) into slab 0.
+  // Copy χ(a_min, ·) into slab 0, applying the sponge damping to the
+  // boundary condition itself so edge cells start with reduced amplitude.
   chi.set(initial.chi, 0)
+  if (phiSponge) {
+    for (let idx = 0; idx < slabSize; idx++) {
+      const sf = phiSponge[idx]!
+      const off = 2 * idx
+      chi[off] = (chi[off] ?? 0) * sf
+      chi[off + 1] = (chi[off + 1] ?? 0) * sf
+    }
+  }
 
   // Classify slab 0 up front so the bandKind output is complete.
   for (let i1 = 0; i1 < Nphi; i1++) {
@@ -615,8 +704,9 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         )
       }
 
-      chi[complexSlabFloats + 2 * idx] = nextRe
-      chi[complexSlabFloats + 2 * idx + 1] = nextIm
+      const sf = phiSponge ? phiSponge[idx]! : 1
+      chi[complexSlabFloats + 2 * idx] = nextRe * sf
+      chi[complexSlabFloats + 2 * idx + 1] = nextIm * sf
       mask[slabSize + idx] = U1 < 0 ? 1 : 0
       bandKind[slabSize + idx] = band
     }
@@ -700,8 +790,9 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
           }
         }
 
-        chi[curSlabBase + 2 * idx] = nextRe
-        chi[curSlabBase + 2 * idx + 1] = nextIm
+        const spongeFactor = phiSponge ? phiSponge[idx]! : 1
+        chi[curSlabBase + 2 * idx] = nextRe * spongeFactor
+        chi[curSlabBase + 2 * idx + 1] = nextIm * spongeFactor
         mask[maskBase + idx] = Ucur < 0 ? 1 : 0
         bandKind[maskBase + idx] = band
       }
@@ -867,12 +958,18 @@ export function wdwOperatorResidual(
   let resNorm = 0
   let ucNorm = 0
 
+  // Skip sponge-affected cells: the φ-Laplacian reads (i1±1, i2±1),
+  // so the margin must be sponge width + 1 to avoid contamination.
+  const spongeMargin = effectiveSpongeWidth(Nphi) + 1
+  const phiLo = Math.max(1, spongeMargin)
+  const phiHi = Math.min(Nphi - 1, Nphi - spongeMargin)
+
   for (let ia = 1; ia < Na - 1; ia++) {
     const a = output.aMin + ia * da
     const invAsq = 1 / (a * a)
-    for (let i1 = 1; i1 < Nphi - 1; i1++) {
+    for (let i1 = phiLo; i1 < phiHi; i1++) {
       const phi1 = -output.phiExtent + i1 * dphi
-      for (let i2 = 1; i2 < Nphi - 1; i2++) {
+      for (let i2 = phiLo; i2 < phiHi; i2++) {
         const phi2 = -output.phiExtent + i2 * dphi
         const idx = i1 * Nphi + i2
         const bandCur = output.bandKind[ia * slabSize + idx] ?? 0

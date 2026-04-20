@@ -118,7 +118,7 @@ export function clampGridNa(gridNa: number): number {
  * docs/physics/srmt-metric.md).
  *
  * Upper bound 64: the largest `N_φ` that completes a per-point solver
- * re-run in < ~10 s at default `(N_a=128, aMin=0.1, phiExtent=2)` on
+ * re-run in < ~10 s at default `(N_a=128, aMin=0.1, phiExtent=3.5)` on
  * commodity hardware. At `N_φ=64` the explicit-leapfrog CFL budget is
  * exceeded (`da²·8/dφ²/aMin² ≈ 24`, 6× over); the solver already emits
  * a dev-only rate-limited warn (solver.ts:447-456) rather than failing.
