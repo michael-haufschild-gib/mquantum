@@ -57,7 +57,9 @@ function rank90(schmidt: Float64Array): number {
   const target = 0.9 * total
   for (let i = 0; i < schmidt.length; i++) {
     cum += schmidt[i]! * schmidt[i]!
-    if (cum > target) return i + 1
+    // `>=` so a spectrum whose first mode already carries exactly 90%
+    // of the weight reports 1, not 2.
+    if (cum >= target) return i + 1
   }
   return schmidt.length
 }

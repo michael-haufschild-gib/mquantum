@@ -399,9 +399,22 @@ export function runPhiExtentSweep(input: RunPhiExtentSweepInputs): SrmtSweepPoin
       phiExtent,
     })
     if (cancel?.aborted) break
+    // Enforce the documented `phiRef ∈ [-phiExtent, +phiExtent]` contract
+    // per-point: the sweep varies `phiExtent`, so a configured `phiRef`
+    // (e.g. 1.0) can fall outside the window on small `phiExtent`
+    // points (e.g. 0.5) and either push the landmark off-domain or be
+    // rejected downstream. Clamp in-place so every point's landmark
+    // lives inside its own φ-grid.
+    const pointConfig =
+      Math.abs(config.phiRef) <= phiExtent
+        ? config
+        : {
+            ...config,
+            phiRef: Math.max(-phiExtent, Math.min(phiExtent, config.phiRef)),
+          }
     const point = computeSrmtPointFromSolver(
       solverOutput,
-      config,
+      pointConfig,
       {
         inflatonMass: wdwConfig.inflatonMass,
         cosmologicalConstant: wdwConfig.cosmologicalConstant,

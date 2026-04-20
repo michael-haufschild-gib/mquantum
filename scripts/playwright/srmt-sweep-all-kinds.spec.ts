@@ -78,6 +78,13 @@ interface ParsedPoint {
   rEff_phi2: number | null
   floorFrac_phi2: number | null
   computeMs: number
+  /**
+   * Derived `gridNa` from {@link coupledGridNaFor}, populated only for
+   * `gridNphiCoupled` sweep rows (empty on every other kind). Captured
+   * here so the per-row JSON output can reconstruct the exact
+   * `(Nφ, Nₐ)` pair without re-implementing the coupling formula.
+   */
+  coupledGridNa: number | null
 }
 
 interface SweepResult {
@@ -282,6 +289,7 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
       rEff_phi2: parseCell(cells[26]!),
       floorFrac_phi2: parseCell(cells[27]!),
       computeMs: Number(cells[28]),
+      coupledGridNa: parseCell(cells[29] ?? ''),
     })
   }
   return { landmarks, points }
