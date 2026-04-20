@@ -98,8 +98,12 @@ export function modularSpectrum(
  * affine fit over such a K vector is dominated by the constant floor
  * value, producing misleading `β` offsets and degenerate `q_affine`.
  *
- * Returns `|{ n : (−log(ε)) − K_n < floorTolerance }| / K.length`, i.e.
- * the proportion of modes lying within `floorTolerance` of the floor.
+ * Returns `|{ n : 0 ≤ (−log(ε)) − K_n ≤ floorTolerance }| / K.length`,
+ * i.e. the proportion of modes whose gap to the floor lies in the
+ * closed interval `[0, floorTolerance]`. The lower bound excludes
+ * modes above the floor (`K_n > −log(ε)` — numerical overshoot, not
+ * pinning); the inclusive upper bound ensures exact floor hits
+ * (`K_n = −log(ε)`) are counted even when `floorTolerance === 0`.
  *
  * @param K - Modular spectrum as returned by {@link modularSpectrum}.
  *            Expected to be ascending; the calculation does not require

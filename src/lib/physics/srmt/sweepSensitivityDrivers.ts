@@ -691,7 +691,7 @@ export function runGridNphiCoupledSweep(input: RunGridNphiCoupledSweepInputs): S
   for (let i = 0; i < uniqueValues.length; i++) {
     if (cancel?.aborted) break
     const gridNphi = uniqueValues[i]!
-    const gridNa = coupledGridNaFor(gridNphi, wdwConfig)
+    const coupledGridNa = coupledGridNaFor(gridNphi, wdwConfig)
     onSolveStart?.(i)
     const solverOutput = solveWheelerDeWitt({
       boundaryCondition: wdwConfig.boundaryCondition,
@@ -700,7 +700,7 @@ export function runGridNphiCoupledSweep(input: RunGridNphiCoupledSweepInputs): S
       cosmologicalConstant: wdwConfig.cosmologicalConstant,
       aMin: wdwConfig.aMin,
       aMax: wdwConfig.aMax,
-      gridNa,
+      gridNa: coupledGridNa,
       gridNphi,
       phiExtent: wdwConfig.phiExtent,
     })
@@ -716,6 +716,11 @@ export function runGridNphiCoupledSweep(input: RunGridNphiCoupledSweepInputs): S
       i,
       gridNphi
     )
+    // Surface the derived gridNa so CSV consumers (and the Rust
+    // cross-validator) can reproduce the exact `(Nφ, Nₐ)` pair without
+    // re-implementing `coupledGridNaFor`. Set-once post-hoc so
+    // `computeSrmtPointFromSolver` stays agnostic to the coupled kind.
+    point.coupledGridNa = coupledGridNa
     results.push(point)
     onProgress?.(point)
   }

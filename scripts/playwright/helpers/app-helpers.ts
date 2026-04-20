@@ -507,6 +507,11 @@ export async function waitForSrmtQueueDrain(page: Page, timeoutMs = 60_000): Pro
  * caller that adds a new store receives a loud failure instead of a silent
  * stale-snapshot race.
  */
+// To add a new store here: append its source path → window-key mapping
+// AND register the bridge in `src/main.tsx` (the DEV `window.__*_STORE__`
+// assignments) so the key actually exists at runtime. The `keyof Window`
+// type only proves the key is declared in `src/types/dev.d.ts`; it does
+// not catch a missing main.tsx assignment.
 const STORE_PATH_TO_WINDOW_KEY: Record<string, keyof Window> = {
   '/src/stores/diagnosticsStore.ts': '__DIAGNOSTICS_STORE__',
 }

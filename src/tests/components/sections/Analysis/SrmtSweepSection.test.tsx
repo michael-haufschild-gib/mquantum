@@ -253,7 +253,7 @@ describe('sweepPointsToCsv', () => {
         'rEff_phi1,floorFrac_phi1,' +
         'q_phi2,q_phi2_sigma,q_phi2_rigid,q_phi2_rigid_sigma,alpha_phi2,beta_phi2,' +
         'rEff_phi2,floorFrac_phi2,' +
-        'computeMs'
+        'computeMs,coupledGridNa'
     )
     // Main block: 1 kind + 1 landmark + 1 header + 2 data = 5 lines.
     // Tail block: blank + marker + sub-header (no data since the test
@@ -394,11 +394,11 @@ describe('sweepPointsToCsv', () => {
     const csv = sweepPointsToCsv([p0, p1], 'cut', [])
     const lines = csv.trim().split('\n')
 
-    // Main 29-col block intact.
+    // Main 30-col block intact.
     const headerLine = lines.findIndex((l) => l.startsWith('index,'))
     expect(headerLine).toBeGreaterThanOrEqual(0)
-    expect(lines[headerLine + 1]!.split(',')).toHaveLength(29)
-    expect(lines[headerLine + 2]!.split(',')).toHaveLength(29)
+    expect(lines[headerLine + 1]!.split(',')).toHaveLength(30)
+    expect(lines[headerLine + 2]!.split(',')).toHaveLength(30)
 
     // Tail marker + sub-header present.
     const markerLine = lines.indexOf(SRMT_SWEEP_SPECTRA_TAIL_MARKER)

@@ -195,8 +195,11 @@ export function sweepPointsToCsv(
     // within 1.5 nats of the ε-floor. A claim rooted in points with
     // `rEff < 8` or `floorFrac ≥ 0.25` is probably a metric artifact
     // — the champion-clock UI gate reflects the same rule.
-    // Total column count: 29 — Playwright CSV parsers assert on this
-    // width by index, so never reorder existing columns.
+    // Total column count: 30 — Playwright CSV parsers tolerate `>= 29`
+    // so the trailing `coupledGridNa` column can be appended without
+    // breaking existing readers. `coupledGridNa` is populated only for
+    // `gridNphiCoupled` (empty on every other kind). Never reorder
+    // existing columns.
     [
       'index',
       'sweepValue',
@@ -227,6 +230,7 @@ export function sweepPointsToCsv(
       'rEff_phi2',
       'floorFrac_phi2',
       'computeMs',
+      'coupledGridNa',
     ].join(','),
   ].join('\n')
   const rows = points.map((p) =>
@@ -260,6 +264,7 @@ export function sweepPointsToCsv(
       formatNumber(p.rEffByClock?.phi2),
       formatNumber(p.floorFractionByClock?.phi2),
       p.computeMs.toFixed(1),
+      p.coupledGridNa !== undefined ? String(p.coupledGridNa) : '',
     ]
       .map(csvCell)
       .join(',')

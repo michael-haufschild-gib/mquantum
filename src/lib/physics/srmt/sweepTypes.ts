@@ -183,14 +183,24 @@ export interface SrmtSweepPoint {
    *  - `phiExtent`: φ-grid half-range.
    *  - `gridNa`:    integer `gridNa` (a-axis sample count) at this point.
    *  - `gridNphi`:  integer `gridNphi` (φ-axis sample count) at this point.
-   *  - `gridNphiCoupled`: integer `gridNphi`; the per-point `gridNa` used
-   *    by the solver is derived from the coupling formula and is NOT
-   *    surfaced on the point.
+   *  - `gridNphiCoupled`: integer `gridNphi`; the per-point `gridNa`
+   *    used by the solver is the CFL-derived companion and is surfaced
+   *    on the point as {@link SrmtSweepPoint.coupledGridNa} so CSV
+   *    exports and downstream validators see the actual `(Nφ, Nₐ)` pair
+   *    without re-implementing {@link coupledGridNaFor}.
    *  - `bc`:        numeric position `0, 1, 2` for the BC order in
    *    {@link SRMT_BC_SWEEP_ORDER}; the actual enum value is in
    *    `sweepValueBc`.
    */
   sweepValue: number
+  /**
+   * Derived `gridNa` used by the solver for this point, surfaced only
+   * for the `gridNphiCoupled` kind. Populated from
+   * {@link coupledGridNaFor}. Downstream tooling that reads the CSV
+   * should use this column (when present) to reproduce the exact solve
+   * shape without recomputing the coupling formula.
+   */
+  coupledGridNa?: number
   /** Populated only for `bc` sweep kind. */
   sweepValueBc?: WdwBoundaryCondition
   /**

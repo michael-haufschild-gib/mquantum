@@ -510,6 +510,7 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
         gridNphi: cfg.gridNphi,
         phiExtent: cfg.phiExtent,
         inflatonMass: cfg.inflatonMass,
+        inflatonMassAsymmetry: cfg.inflatonMassAsymmetry,
         cosmologicalConstant: cfg.cosmologicalConstant,
       })}\n` +
       `- aMax swept ∈ {${AMAX_VALUES.join(', ')}}, aMin held at ${cfg.aMin}.\n` +
