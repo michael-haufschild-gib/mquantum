@@ -49,6 +49,7 @@
  * @module lib/physics/srmt/hjOperator
  */
 
+import { logger } from '@/lib/logger'
 import { jacobiEigenvalues } from '@/lib/math/jacobiEigenvalues'
 import { wdwU } from '@/lib/physics/wheelerDeWitt/constants'
 
@@ -56,10 +57,49 @@ import { lanczosTopKOp, type LinearOperator } from './lanczos'
 import type { SrmtClock } from './types'
 
 /**
+ * Rate-limit state for the top-k contamination-guard warning. Callback
+ * Lanczos top-`k` on a sparse slice operator extracts only the leading
+ * Ritz values of the Krylov subspace; beyond roughly `n/2` the trailing
+ * Ritz values degenerate into garbage driven by round-off rather than
+ * true operator eigenvalues. To keep a future caller (e.g. a low-`N_φ`
+ * gridNphi sensitivity point paired with a high `rankCap`) from
+ * silently polluting `hj64[k−1..rankCap−1]` with those garbage values,
+ * {@link hjSpectrumOnSliceTopK} auto-clips `k` to `floor(n/2)` and
+ * emits a dev-only `logger.warn` the first {@link HJ_TOPK_WARN_DEFAULT}
+ * times the guard fires per process. The mutable `remaining` counter
+ * lives on the shared {@link HJ_TOPK_WARN_BUDGET} object so tests can
+ * reset it deterministically via {@link resetHjTopKWarnBudget}.
+ */
+interface HjTopKWarningBudget {
+  remaining: number
+}
+
+const HJ_TOPK_WARN_DEFAULT = 3
+const HJ_TOPK_WARN_BUDGET: HjTopKWarningBudget = { remaining: HJ_TOPK_WARN_DEFAULT }
+
+/**
+ * Test helper: reset the top-k contamination-guard warning budget so
+ * subsequent {@link hjSpectrumOnSliceTopK} calls can observe the warn
+ * again. Safe to call from production code — the default budget is small
+ * and exhausting it is benign. Exported so the shared module state does
+ * not leak between tests.
+ *
+ * @param budget - New budget value (clamped to a non-negative integer).
+ *   Defaults to the production default of `3`.
+ */
+export function resetHjTopKWarnBudget(budget: number = HJ_TOPK_WARN_DEFAULT): void {
+  HJ_TOPK_WARN_BUDGET.remaining = Math.max(0, Math.floor(budget))
+}
+
+/**
  * Physical grid + potential parameters needed to build `H_HJ`. All units
  * match the WdW solver: `G = ℏ = c = 1`, potential
- * `U(a, φ) = −36π²·a²·(1 − (8πG/3)·a² · V(φ))`, with
- * `V(φ) = ½ m² (φ₁² + φ₂²) + Λ`.
+ * `U(a, φ) = −36π²·a²·(1 − (8πG/3)·a² · V(φ))`, with the anisotropic
+ * potential `V(φ) = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ` where `α ≡
+ * inflatonMassAsymmetry` (defaults to `1`, recovering the isotropic
+ * form `V = ½ m² (φ₁² + φ₂²) + Λ`). The HJ spectrum therefore depends on
+ * `inflatonMassAsymmetry` whenever `α ≠ 1` and must match the value
+ * passed to the solver.
  */
 export interface HjOperatorInputs {
   /** Number of `a` grid points. */
@@ -76,6 +116,13 @@ export interface HjOperatorInputs {
   inflatonMass: number
   /** Cosmological constant `Λ`. */
   cosmologicalConstant: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis
+   * (`V = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ`). Optional; defaults to `1`
+   * (isotropic). Must match the value passed to the solver, otherwise
+   * the modular and HJ spectra probe different physics.
+   */
+  inflatonMassAsymmetry?: number
   /**
    * Clock-axis index of the slice at which to evaluate `H_HJ`. For clock
    * `'a'` this is an index into the `a` axis; for `'φ₁'` / `'φ₂'` an
@@ -118,6 +165,16 @@ interface SparseHjOperator {
    */
   offAxis1Variable: Float64Array | null
   /**
+   * When true, out-of-bounds axis-0 neighbours inherit the centre cell's
+   * value (Neumann / zero-flux ghost) — matches the WdW solver's updated
+   * φ-edge treatment. When false, the missing-neighbour contribution is
+   * zero (ghost-zero Dirichlet). Axis-0 is φ-typed for clock `'a'` and
+   * `a`-typed for φ-clocks; only φ-typed axes use Neumann.
+   */
+  neumannAxis0: boolean
+  /** Same as {@link neumannAxis0} for axis-1. */
+  neumannAxis1: boolean
+  /**
    * Infinity-norm estimate `max_i Σ_j |A_ij|` — used by the callback
    * Lanczos for its β-breakdown threshold. Precomputed once so the
    * Lanczos driver does not need to know the operator structure.
@@ -135,6 +192,7 @@ interface SparseHjOperator {
  */
 function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  const asymmetry = inputs.inflatonMassAsymmetry ?? 1
   // Explicit `Na >= 2` guard — otherwise the failing `sliceIndex` check
   // below issues a confusing "must be strictly interior" error when the
   // real problem is that the `a` grid is too small to have any interior.
@@ -164,11 +222,18 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const n = Nphi * Nphi
   const diag = new Float64Array(n)
 
-  // Operator H_φ = −(1/a²) Δ_φ + U, discretised with ghost-zero Dirichlet:
+  // Operator H_φ = −(1/a²) Δ_φ + U, discretised with Neumann (zero-flux)
+  // ghost cells matching the WdW solver's φ-Laplacian (see
+  // `phiLaplacianAt` in `src/lib/physics/wheelerDeWitt/solver.ts`). The
+  // interior stencil is:
   //   −Δ_φ → diag += +4/dφ²,   off-diag (each of 4 neighbours) += −1/dφ²
   // scaled by 1/a²:
   //   diag += +4/(a² dφ²),     off-diag += −1/(a² dφ²)
-  // Plus +U on the diagonal.
+  // Plus +U on the diagonal. On the φ-edge, the ghost inherits the
+  // centre-cell value — `applySparseOperator` substitutes `x[idx]` for
+  // missing neighbours, which reduces the effective diagonal by
+  // `|offKin|` per missing axis. Both axes of the clock-`a` slice are
+  // φ-typed, hence Neumann on both.
   const diagKin = 4 * invDphi2 * kinCoeff
   const offKin = -invDphi2 * kinCoeff
 
@@ -177,12 +242,15 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = -phiExtent + i2 * dphi
       const idx = i1 * Nphi + i2
-      diag[idx] = diagKin + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+      diag[idx] = diagKin + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
     }
   }
 
   // infNorm = max_i (|diag_i| + 4·|offKin|) (interior cells have 4
-  // neighbours; boundary cells have fewer, so this is an upper bound).
+  // neighbours; under Neumann, edge cells substitute the centre for
+  // missing neighbours which raises each missing off-diag to the same
+  // `|offKin|·|x[idx]|` contribution, so the 4-neighbour upper bound
+  // still holds for every cell).
   let maxDiag = 0
   for (let i = 0; i < n; i++) {
     const v = Math.abs(diag[i]!)
@@ -197,6 +265,8 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
     offAxis0: offKin,
     offAxis1: offKin,
     offAxis1Variable: null,
+    neumannAxis0: true,
+    neumannAxis1: true,
     infNorm,
   }
 }
@@ -211,6 +281,7 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
  */
 function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  const asymmetry = inputs.inflatonMassAsymmetry ?? 1
   if (Na < 2) {
     throw new Error(`buildSparseOpPhi: Na must be >= 2, got ${Na}`)
   }
@@ -262,7 +333,9 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
       //   from (1/a²) ∂²_φ: −2/(a² dφ²)
       //   plus U(a, φ)
       diag[idx] =
-        2 * invDa2 - 2 * invAsq * invDphi2 + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+        2 * invDa2 -
+        2 * invAsq * invDphi2 +
+        wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
 
       // Per-cell φ-kinetic off-diagonal. Positive (see sign note above).
       offAxis1Variable[idx] = offPhi
@@ -292,34 +365,48 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
     offAxis0: -invDa2,
     offAxis1: 0,
     offAxis1Variable,
+    // Axis-0 is the `a` axis — no Neumann (HJ boundary treatment on `a`
+    // is the same as before). Axis-1 is the φ-axis, which mirrors the
+    // solver's Neumann (zero-flux) ghost — see `phiLaplacianAt` in
+    // `src/lib/physics/wheelerDeWitt/solver.ts`.
+    neumannAxis0: false,
+    neumannAxis1: true,
     infNorm,
   }
 }
 
 /**
  * Given a sparse operator, return a {@link LinearOperator} that computes
- * `y = A · x` by iterating over the stencil. Ghost-zero Dirichlet is
- * implicit — out-of-bound neighbour contributions are skipped.
+ * `y = A · x` by iterating over the stencil. For each axis the missing-
+ * neighbour contribution is selected by `neumannAxis{0,1}`:
+ *
+ *  - `false` → ghost-zero Dirichlet: the missing neighbour contributes 0.
+ *  - `true`  → Neumann (zero-flux): the missing neighbour inherits the
+ *              centre cell's value, so its off-diagonal contribution is
+ *              `off · x[idx]`. This matches the WdW solver's updated
+ *              φ-edge stencil (see `phiLaplacianAt` in
+ *              `src/lib/physics/wheelerDeWitt/solver.ts`) — without the
+ *              match, SRMT compares χ evolved under one boundary rule
+ *              against the HJ spectrum of a different one, skewing the
+ *              affine-fit quality the diagnostic reports.
  */
 function applySparseOperator(op: SparseHjOperator): LinearOperator {
-  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable } = op
+  const { n, size1, diag, offAxis0, offAxis1, offAxis1Variable, neumannAxis0, neumannAxis1 } = op
   const size0 = n / size1
   return (x, y) => {
     for (let i0 = 0; i0 < size0; i0++) {
       const rowBase = i0 * size1
       for (let i1 = 0; i1 < size1; i1++) {
         const idx = rowBase + i1
-        let acc = diag[idx]! * x[idx]!
-        if (i0 > 0) acc += offAxis0 * x[idx - size1]!
-        if (i0 < size0 - 1) acc += offAxis0 * x[idx + size1]!
-        if (offAxis1Variable !== null) {
-          const c = offAxis1Variable[idx]!
-          if (i1 > 0) acc += c * x[idx - 1]!
-          if (i1 < size1 - 1) acc += c * x[idx + 1]!
-        } else {
-          if (i1 > 0) acc += offAxis1 * x[idx - 1]!
-          if (i1 < size1 - 1) acc += offAxis1 * x[idx + 1]!
-        }
+        const xc = x[idx]!
+        let acc = diag[idx]! * xc
+        // Axis-0 neighbours.
+        acc += offAxis0 * (i0 > 0 ? x[idx - size1]! : neumannAxis0 ? xc : 0)
+        acc += offAxis0 * (i0 < size0 - 1 ? x[idx + size1]! : neumannAxis0 ? xc : 0)
+        // Axis-1 neighbours (variable coefficient per cell when populated).
+        const offRow = offAxis1Variable !== null ? offAxis1Variable[idx]! : offAxis1
+        acc += offRow * (i1 > 0 ? x[idx - 1]! : neumannAxis1 ? xc : 0)
+        acc += offRow * (i1 < size1 - 1 ? x[idx + 1]! : neumannAxis1 ? xc : 0)
         y[idx] = acc
       }
     }
@@ -356,14 +443,21 @@ export interface HjSpectrumTopKOptions {
  *
  * @param clock - Clock axis.
  * @param inputs - Grid and potential parameters.
- * @param k - Number of top-magnitude eigenvalues to extract. Values
- *   larger than the slice order `n` are silently clipped to `n`
- *   (recovering the full spectrum).
+ * @param k - Requested number of top-magnitude eigenvalues. Auto-clipped
+ *   to `min(k, floor(n/2))` to suppress Lanczos trailing-Ritz
+ *   contamination — when this guard fires, a dev-only rate-limited
+ *   `logger.warn` is emitted and the returned `spectrum.length` is less
+ *   than the requested `k`. Callers must therefore bound their compare
+ *   loops by the returned `spectrum.length`, not the requested `k` (the
+ *   sweep drivers already do this via
+ *   `compareCount = Math.min(kSpec.length, hj64.length, rankCap)`).
  * @param opts - Lanczos iteration options (currently only `seed`). Omit
  *   to use the library default.
- * @returns `{ spectrum, n }` — `spectrum` holds the top-k eigenvalues of
- *   `H_HJ` sorted ascending; `n` is the slice dimension (`Nphi²` for
- *   clock `'a'`, `Na · Nphi` for the φ-clocks).
+ * @returns `{ spectrum, n }` — `spectrum` holds the top-`k_eff`
+ *   eigenvalues of `H_HJ` sorted ascending, where
+ *   `k_eff = min(k, floor(n/2))` (so `spectrum.length ≤ k`); `n` is the
+ *   slice dimension (`Nphi²` for clock `'a'`, `Na · Nphi` for the
+ *   φ-clocks).
  */
 export function hjSpectrumOnSliceTopK(
   clock: SrmtClock,
@@ -373,11 +467,27 @@ export function hjSpectrumOnSliceTopK(
 ): { spectrum: Float32Array; n: number } {
   const op = clock === 'a' ? buildSparseOpA(inputs) : buildSparseOpPhi(inputs, clock)
   if (k <= 0) return { spectrum: new Float32Array(0), n: op.n }
+  // Contamination guard: callback Lanczos top-`k` resolves the leading
+  // Ritz values reliably only up to about `n/2`; above that the trailing
+  // Ritz values are round-off-driven and would silently poison any
+  // downstream affine-fit comparison. Cap to `floor(n/2)` and warn (dev,
+  // rate-limited) so the symptom — a shorter-than-expected spectrum —
+  // stays diagnosable without flooding the console during sweeps.
+  const kCap = Math.floor(op.n / 2)
+  const kEff = Math.min(k, kCap)
+  if (k > kCap && HJ_TOPK_WARN_BUDGET.remaining > 0) {
+    HJ_TOPK_WARN_BUDGET.remaining -= 1
+    logger.warn(
+      `[srmt:hjOperator] top-k contamination guard clipped requested k=${k} to k_eff=${kEff} ` +
+        `on clock='${clock}' slice of order n=${op.n} (ceiling = floor(n/2) = ${kCap}). ` +
+        `The returned spectrum has length ${kEff}; bound compare loops by spectrum.length, not k.`
+    )
+  }
   const apply = applySparseOperator(op)
   const spectrum = lanczosTopKOp(
     apply,
     op.n,
-    Math.min(k, op.n),
+    kEff,
     op.infNorm,
     opts?.seed !== undefined ? { seed: opts.seed } : undefined
   )

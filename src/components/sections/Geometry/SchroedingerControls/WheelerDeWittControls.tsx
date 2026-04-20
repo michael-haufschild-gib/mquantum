@@ -30,11 +30,12 @@ const GRID_PRESET_OPTIONS = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
+  { value: 'publication', label: 'Publication' },
 ]
 
 /** Resolve the current `(gridNa, gridNphi)` pair to a preset label. */
 function gridPresetKey(gridNa: number, gridNphi: number): WdwGridPreset {
-  for (const key of ['low', 'medium', 'high'] as const) {
+  for (const key of ['low', 'medium', 'high', 'publication'] as const) {
     const p = WDW_GRID_PRESETS[key]
     if (p.gridNa === gridNa && p.gridNphi === gridNphi) return key
   }
@@ -101,7 +102,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         value={activePreset}
         onChange={(v) => setWdwGridSize(v as WdwGridPreset)}
         ariaLabel="Wheeler–DeWitt grid size"
-        tooltip={`Solver grid: Low ${WDW_GRID_PRESETS.low.gridNa}×${WDW_GRID_PRESETS.low.gridNphi}², Medium ${WDW_GRID_PRESETS.medium.gridNa}×${WDW_GRID_PRESETS.medium.gridNphi}² (default), High ${WDW_GRID_PRESETS.high.gridNa}×${WDW_GRID_PRESETS.high.gridNphi}². Higher = finer classical-regime fringes, slower solve.`}
+        tooltip={`Solver grid: Low ${WDW_GRID_PRESETS.low.gridNa}×${WDW_GRID_PRESETS.low.gridNphi}², Medium ${WDW_GRID_PRESETS.medium.gridNa}×${WDW_GRID_PRESETS.medium.gridNphi}² (default), High ${WDW_GRID_PRESETS.high.gridNa}×${WDW_GRID_PRESETS.high.gridNphi}², Publication ${WDW_GRID_PRESETS.publication.gridNa}×${WDW_GRID_PRESETS.publication.gridNphi}². Higher = finer classical-regime fringes, slower solve.`}
         fullWidth
         data-testid="wdw-grid-size"
       />

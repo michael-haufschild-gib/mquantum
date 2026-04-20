@@ -13,12 +13,23 @@
  *
  *   χ(a+da, φ) = 2 χ(a, φ) − χ(a−da, φ) + da²·[ (1/a²)·∇²_φ χ − U·χ ]
  *
- * The φ-Laplacian uses 2nd-order central differences with ghost-zero
- * Dirichlet conditions at the outer φ-edges — cells one step beyond the
- * grid are treated as `χ = 0` when computing the Laplacian at edge cells
- * `i1 ∈ {0, Nphi-1}` or `i2 ∈ {0, Nphi-1}`. Edge cells themselves evolve
- * under the PDE (they are not pinned to zero), which preserves the
- * non-trivial Gaussian-in-φ envelope supplied by the boundary generators.
+ * The φ-Laplacian uses 2nd-order central differences with **Neumann
+ * (zero-flux) ghost** conditions at the outer φ-edges — cells one step
+ * beyond the grid are treated as equal to the adjacent interior-edge
+ * cell (`χ_ghost = χ_edge`, so `dχ/dφ = 0` at the boundary face) when
+ * computing the Laplacian at edge cells `i1 ∈ {0, Nphi-1}` or
+ * `i2 ∈ {0, Nphi-1}`. This replaces the earlier ghost-zero Dirichlet
+ * rule (`χ_ghost = 0`), which was found to drive non-monotone
+ * `q_a(phiExtent)` behaviour in SRMT sensitivity sweeps: the χ tail
+ * was artificially clipped at the boundary, producing a hump around
+ * `phiExtent ≈ 3` before falling (see `/tmp/srmt-phiextent-plateau-results.json`).
+ *
+ * Neumann is the correct approximation of "χ → 0 smoothly past the
+ * window" for a bound-state envelope that has physical mass at the
+ * grid edge: the ghost inherits the edge value rather than forcing a
+ * discontinuity-at-cliff. Edge cells still evolve under the PDE (they
+ * are not pinned), so the non-trivial Gaussian-in-φ envelope supplied
+ * by the boundary generators is preserved without the Dirichlet sink.
  *
  * ## Stage-2 deep-Euclidean analytic tail
  *
@@ -89,7 +100,7 @@ export { wdwU } from './constants'
  * invariants that preserve existing output, patch for internal cleanup
  * with byte-identical output.
  */
-export const WDW_SOLVER_VERSION = '1.0.0'
+export const WDW_SOLVER_VERSION = '2.0.0'
 
 /**
  * Explicit-leapfrog stability budget for the φ-Laplacian term
@@ -144,6 +155,30 @@ export function resetCflWarningBudget(budget: number = WDW_CFL_WARN_DEFAULT): vo
 const WDW_EUCLIDEAN_ABSORBER_ETA = 1.0
 
 /**
+ * Width (in grid cells) of the φ-boundary absorbing sponge layer.
+ * Waves reaching the outer φ-cells are damped by a quadratic-profile
+ * exponential `exp(−γ_max · d²)` per leapfrog step, where
+ * `d = (cells from sponge inner edge) / spongeWidth ∈ [0, 1]`. This
+ * replaces reflections (Neumann) with smooth absorption — no standing
+ * waves and no artificial sink (Dirichlet). At 5 cells the damping
+ * profile is gentle enough that interior physics is unaffected while
+ * the outermost cell receives `exp(−0.15)^N_a ≈ 0` total damping over
+ * the full a-march.
+ */
+const WDW_PHI_SPONGE_WIDTH = 5
+
+/**
+ * Per-step peak damping rate at the outermost φ-cell. The effective
+ * damping at cell `k` from the grid edge (k=0 at the edge) is
+ * `exp(−γ_max · ((spongeWidth − k) / spongeWidth)²)`. Chosen so the
+ * total damping over `N_a = 128` steps is `exp(−0.15 · 128) ≈ 5e-9`
+ * at the outermost cell (effectively zero) while the innermost sponge
+ * cell sees `exp(−0.15/25 · 128) ≈ 0.47` (mild, one-sided attenuation
+ * that does not create a visible boundary in the density texture).
+ */
+const WDW_PHI_SPONGE_GAMMA = 0.15
+
+/**
  * WKB-phase threshold past the Lorentzian-Euclidean turning surface at
  * which the analytic decaying-branch propagator takes over from the
  * numerical leapfrog.
@@ -173,6 +208,16 @@ const WDW_WKB_MATCH_PHASE_THRESHOLD = 2.0
 export interface WheelerDeWittSolverInput {
   boundaryCondition: WdwBoundaryCondition
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` applied to the φ₂ component of the
+   * potential `V(φ) = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ`. Optional; defaults
+   * to `1` (isotropic) which reproduces the pre-asymmetry behaviour
+   * bit-identically (multiplication by the exact IEEE-754 constant `1`
+   * is a no-op). Values `α ≠ 1` break the φ₁↔φ₂ exchange symmetry of
+   * `χ` so the SRMT diagnostic can distinguish clocks `phi1` and
+   * `phi2`.
+   */
+  inflatonMassAsymmetry?: number
   cosmologicalConstant: number
   aMin: number
   aMax: number
@@ -204,6 +249,14 @@ export interface WheelerDeWittSolverInput {
    * no-op label.
    */
   customBoundary?: WdwBoundaryField
+  /**
+   * When `true`, the absorbing sponge layer on the φ-boundary is
+   * disabled. Used by the JS↔Rust cross-validation tests: the Rust
+   * validator does not yet implement the sponge, so enabling it in the
+   * JS solver would create a systematic mismatch that masks real bugs.
+   * Production code should never set this.
+   */
+  disableSponge?: boolean
 }
 
 /** Dense output of the Wheeler–DeWitt solver. */
@@ -250,16 +303,30 @@ interface ComplexPair {
 }
 
 /**
- * Compute the ghost-zero Dirichlet φ-Laplacian stencil at grid point
+ * Compute the Neumann-ghost φ-Laplacian stencil at grid point
  * `(i1, i2)` reading complex pairs from a contiguous slab buffer.
  *
  * Ghost rule: cells whose required neighbour would sit outside the grid
- * contribute `0` to the stencil sum — mathematically equivalent to
- * imposing `χ = 0` on the phantom cell one step past the boundary. The
- * subtraction `−2·c` is applied unconditionally for each axis so the
- * operator stays second-order accurate even at the edge (the missing
- * neighbour's contribution is exactly `(0 + c − 2c) = −c`, which equals
- * replacing the missing term with a literal zero).
+ * inherit the value of the adjacent interior-edge cell (so the ghost
+ * takes the centre cell's value when `i1 = 0` or `i1 = Nphi-1`, and
+ * likewise for `i2`). This imposes `dχ/dφ = 0` at the outer boundary
+ * face (first-order accurate at the edge, second-order accurate at
+ * all interior points) — a reflecting / zero-flux boundary condition.
+ *
+ * This replaces the prior ghost-zero Dirichlet rule (`χ_ghost = 0`),
+ * which artificially clipped the χ tail at the boundary and produced
+ * non-monotone `q_a(phiExtent)` in SRMT sensitivity sweeps (see the
+ * module-level docstring for the physics rationale). Under Neumann,
+ * a constant-in-φ seed is an exact eigenfunction of `∇²_φ` with
+ * eigenvalue `0` at every cell including the edges, so the
+ * analytic-comparison tests in `solverAnalytic.test.ts` are no longer
+ * contaminated by a `−2·const/dφ²` edge leak.
+ *
+ * Edge-cell stencil algebra: at `i1 = 0` the `−2·c` axis-1 term
+ * collapses to `(c + n − 2c) = (n − c)`, since the missing `p`
+ * neighbour contributes `c` rather than `0`. The axis-2 contribution
+ * is unchanged for interior `i2`. Corner cells get the reduction on
+ * both axes.
  *
  * @param slab - Interleaved-complex slab buffer of length `2·Nphi²`.
  * @param slabBase - Offset into `slab` for the φ-plane being laplacianised.
@@ -281,14 +348,18 @@ function phiLaplacianAt(
   const cre = slab[center] ?? 0
   const cim = slab[center + 1] ?? 0
 
-  const pre1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2)] ?? 0) : 0
-  const pim1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2) + 1] ?? 0) : 0
-  const nre1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2)] ?? 0) : 0
-  const nim1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2) + 1] ?? 0) : 0
-  const pre2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1)] ?? 0) : 0
-  const pim2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1) + 1] ?? 0) : 0
-  const nre2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1)] ?? 0) : 0
-  const nim2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1) + 1] ?? 0) : 0
+  // Neumann ghost: when a neighbour would sit outside the grid, fall
+  // back to the centre-cell value so the stencil contribution is
+  // `(c + c − 2c) = 0` on that side and the one-sided difference on
+  // the other side dominates.
+  const pre1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2)] ?? 0) : cre
+  const pim1 = i1 > 0 ? (slab[slabBase + 2 * ((i1 - 1) * Nphi + i2) + 1] ?? 0) : cim
+  const nre1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2)] ?? 0) : cre
+  const nim1 = i1 < Nphi - 1 ? (slab[slabBase + 2 * ((i1 + 1) * Nphi + i2) + 1] ?? 0) : cim
+  const pre2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1)] ?? 0) : cre
+  const pim2 = i2 > 0 ? (slab[slabBase + 2 * (i1 * Nphi + i2 - 1) + 1] ?? 0) : cim
+  const nre2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1)] ?? 0) : cre
+  const nim2 = i2 < Nphi - 1 ? (slab[slabBase + 2 * (i1 * Nphi + i2 + 1) + 1] ?? 0) : cim
 
   return {
     re: (pre1 + nre1 - 2 * cre + pre2 + nre2 - 2 * cre) * invDphi2,
@@ -379,7 +450,8 @@ function initColumnWkbStates(
   Nphi: number,
   phiExtent: number,
   m: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): ColumnWkbState[] {
   const states: ColumnWkbState[] = new Array(Nphi * Nphi)
   const dphi = Nphi > 1 ? (2 * phiExtent) / (Nphi - 1) : 0
@@ -387,7 +459,7 @@ function initColumnWkbStates(
     const phi1 = -phiExtent + i1 * dphi
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = -phiExtent + i2 * dphi
-      const aTurn = wdwTurningA(phi1, phi2, m, lambda)
+      const aTurn = wdwTurningA(phi1, phi2, m, lambda, asymmetry)
       const alpha = aTurn !== null ? 2 * WDW_C_U * aTurn : null
       states[i1 * Nphi + i2] = {
         aTurn,
@@ -401,6 +473,42 @@ function initColumnWkbStates(
     }
   }
   return states
+}
+
+/**
+ * Build a per-cell multiplicative sponge-damping table for the φ-grid.
+ * Each entry is in `(0, 1]`: `1.0` in the bulk, smoothly decreasing
+ * toward the grid edges via a quadratic profile. The caller multiplies
+ * `(re, im)` by this factor after each leapfrog step.
+ *
+ * Profile: for a cell at distance `k` from the nearest edge (k=0 at
+ * the edge), the factor is `exp(−γ · d²)` where `d = max(0, 1 − k/W)`
+ * and W = {@link WDW_PHI_SPONGE_WIDTH}. Cells with `k ≥ W` get 1.0.
+ *
+ * @returns Float32Array of length `Nphi²`, indexed `i1 * Nphi + i2`.
+ */
+/**
+ * Effective sponge width for a given `Nphi`. Exported so the
+ * {@link wdwOperatorResidual} function can skip sponge-affected cells
+ * when computing the PDE residual.
+ */
+export function effectiveSpongeWidth(Nphi: number): number {
+  return Math.min(WDW_PHI_SPONGE_WIDTH, Math.floor(Nphi / 6))
+}
+
+function buildPhiSpongeDamping(Nphi: number): Float32Array {
+  const sponge = new Float32Array(Nphi * Nphi)
+  const W = effectiveSpongeWidth(Nphi)
+  for (let i1 = 0; i1 < Nphi; i1++) {
+    const d1 = Math.min(i1, Nphi - 1 - i1)
+    const s1 = d1 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d1 / W, 2)) : 1
+    for (let i2 = 0; i2 < Nphi; i2++) {
+      const d2 = Math.min(i2, Nphi - 1 - i2)
+      const s2 = d2 < W ? Math.exp(-WDW_PHI_SPONGE_GAMMA * Math.pow(1 - d2 / W, 2)) : 1
+      sponge[i1 * Nphi + i2] = s1 * s2
+    }
+  }
+  return sponge
 }
 
 /**
@@ -420,6 +528,11 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     gridNphi,
     phiExtent,
   } = input
+  // Default `inflatonMassAsymmetry` to 1 (isotropic) when the caller
+  // omits it. Multiplication by the exact IEEE-754 value `1` is a no-op
+  // inside `wdwPotential` / `wdwU`, so the output stays bit-identical
+  // to the pre-asymmetry code path.
+  const inflatonMassAsymmetry = input.inflatonMassAsymmetry ?? 1
 
   if (gridNa < 3) throw new Error('gridNa must be >= 3')
   if (gridNphi < 3) throw new Error('gridNphi must be >= 3')
@@ -450,14 +563,32 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       WDW_CFL_WARN_BUDGET.remaining -= 1
       logger.warn(
         `[wdw] CFL margin tight: da²·(1/aMin²)·8/dphi² = ${cflPhi.toFixed(2)} (budget ${WDW_CFL_BUDGET}). ` +
-          `Recommend aMin ≥ 0.1, gridNphi ≤ 32, gridNa ≤ 256, phiExtent ≥ 1.5. ` +
+          `Recommend aMin ≥ 0.1, gridNphi ≤ 48, gridNa ≤ 256, phiExtent ≥ 2.0. ` +
           `Current: aMin=${aMin}, aMax=${aMax}, gridNa=${gridNa}, gridNphi=${gridNphi}, phiExtent=${phiExtent}.`
       )
     }
   }
 
+  // Absorbing sponge layer: per-cell multiplicative damping applied
+  // after each leapfrog step. Bulk cells get 1.0 (no damping); cells
+  // near the φ-grid edges get < 1.0, absorbing outgoing waves without
+  // creating reflections (unlike Dirichlet) or standing waves (unlike
+  // pure Neumann on a too-small grid).
+  //
+  // Disabled when `customBoundary` is supplied: analytic-fixture tests
+  // inject constant-in-φ slabs to isolate the 1D a-march; applying the
+  // sponge would break the constant-in-φ invariant those tests verify.
+  const spongeEnabled = !input.customBoundary && !input.disableSponge
+  const phiSponge = spongeEnabled ? buildPhiSpongeDamping(Nphi) : null
+
   // Stage-2 per-column WKB state (turning point, α, pending match).
-  const columnStates = initColumnWkbStates(Nphi, phiExtent, inflatonMass, cosmologicalConstant)
+  const columnStates = initColumnWkbStates(
+    Nphi,
+    phiExtent,
+    inflatonMass,
+    cosmologicalConstant,
+    inflatonMassAsymmetry
+  )
 
   // Initial slab: either a caller-supplied override or the dispatched
   // BC generator. See {@link WheelerDeWittSolverInput#customBoundary}
@@ -487,11 +618,21 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       aMin,
       mass: inflatonMass,
       lambda: cosmologicalConstant,
+      asymmetry: inflatonMassAsymmetry,
     })
   }
 
-  // Copy χ(a_min, ·) into slab 0.
+  // Copy χ(a_min, ·) into slab 0, applying the sponge damping to the
+  // boundary condition itself so edge cells start with reduced amplitude.
   chi.set(initial.chi, 0)
+  if (phiSponge) {
+    for (let idx = 0; idx < slabSize; idx++) {
+      const sf = phiSponge[idx]!
+      const off = 2 * idx
+      chi[off] = (chi[off] ?? 0) * sf
+      chi[off + 1] = (chi[off + 1] ?? 0) * sf
+    }
+  }
 
   // Classify slab 0 up front so the bandKind output is complete.
   for (let i1 = 0; i1 < Nphi; i1++) {
@@ -499,7 +640,7 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = -phiExtent + i2 * dphi
       const idx = i1 * Nphi + i2
-      const U0 = wdwU(aMin, phi1, phi2, inflatonMass, cosmologicalConstant)
+      const U0 = wdwU(aMin, phi1, phi2, inflatonMass, cosmologicalConstant, inflatonMassAsymmetry)
       mask[idx] = U0 < 0 ? 1 : 0
       bandKind[idx] = classifyCellBand(columnStates[idx]!, aMin, U0)
     }
@@ -519,8 +660,8 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       const phi2 = -phiExtent + i2 * dphi
       const idx = i1 * Nphi + i2
 
-      const U0 = wdwU(a0, phi1, phi2, inflatonMass, cosmologicalConstant)
-      const U1 = wdwU(a1, phi1, phi2, inflatonMass, cosmologicalConstant)
+      const U0 = wdwU(a0, phi1, phi2, inflatonMass, cosmologicalConstant, inflatonMassAsymmetry)
+      const U1 = wdwU(a1, phi1, phi2, inflatonMass, cosmologicalConstant, inflatonMassAsymmetry)
 
       const cre = initial.chi[2 * idx] ?? 0
       const cim = initial.chi[2 * idx + 1] ?? 0
@@ -549,11 +690,23 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         // very large V in this column). Capture the numerical result as
         // the match cell and leave nextRe/nextIm unchanged (the match
         // cell is NOT overwritten).
-        captureMatch(state, a1, phi1, phi2, inflatonMass, cosmologicalConstant, U1, nextRe, nextIm)
+        captureMatch(
+          state,
+          a1,
+          phi1,
+          phi2,
+          inflatonMass,
+          cosmologicalConstant,
+          inflatonMassAsymmetry,
+          U1,
+          nextRe,
+          nextIm
+        )
       }
 
-      chi[complexSlabFloats + 2 * idx] = nextRe
-      chi[complexSlabFloats + 2 * idx + 1] = nextIm
+      const sf = phiSponge ? phiSponge[idx]! : 1
+      chi[complexSlabFloats + 2 * idx] = nextRe * sf
+      chi[complexSlabFloats + 2 * idx + 1] = nextIm * sf
       mask[slabSize + idx] = U1 < 0 ? 1 : 0
       bandKind[slabSize + idx] = band
     }
@@ -575,8 +728,15 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         const phi2 = -phiExtent + i2 * dphi
         const idx = i1 * Nphi + i2
 
-        const Uprev = wdwU(aPrev, phi1, phi2, inflatonMass, cosmologicalConstant)
-        const Ucur = wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+        const Uprev = wdwU(
+          aPrev,
+          phi1,
+          phi2,
+          inflatonMass,
+          cosmologicalConstant,
+          inflatonMassAsymmetry
+        )
+        const Ucur = wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, inflatonMassAsymmetry)
 
         const cre = chi[prevSlabBase + 2 * idx] ?? 0
         const cim = chi[prevSlabBase + 2 * idx + 1] ?? 0
@@ -610,20 +770,29 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
               phi2,
               inflatonMass,
               cosmologicalConstant,
+              inflatonMassAsymmetry,
               Ucur,
               nextRe,
               nextIm
             )
           } else {
-            const S = wdwEuclideanWkbAction(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+            const S = wdwEuclideanWkbAction(
+              a,
+              phi1,
+              phi2,
+              inflatonMass,
+              cosmologicalConstant,
+              inflatonMassAsymmetry
+            )
             const propagated = propagateWkbTail(state, S, Ucur)
             nextRe = propagated.re
             nextIm = propagated.im
           }
         }
 
-        chi[curSlabBase + 2 * idx] = nextRe
-        chi[curSlabBase + 2 * idx + 1] = nextIm
+        const spongeFactor = phiSponge ? phiSponge[idx]! : 1
+        chi[curSlabBase + 2 * idx] = nextRe * spongeFactor
+        chi[curSlabBase + 2 * idx + 1] = nextIm * spongeFactor
         mask[maskBase + idx] = Ucur < 0 ? 1 : 0
         bandKind[maskBase + idx] = band
       }
@@ -655,6 +824,7 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
           phi2,
           mass: inflatonMass,
           lambda: cosmologicalConstant,
+          asymmetry: inflatonMassAsymmetry,
         },
         boundaryCondition
       )
@@ -664,7 +834,15 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
       for (let ia = 0; ia < Na; ia++) {
         const a = aMin + ia * da
         if (a <= info.aTurn!) continue
-        const { re, im } = langerEvaluate(info, a, phi1, phi2, inflatonMass, cosmologicalConstant)
+        const { re, im } = langerEvaluate(
+          info,
+          a,
+          phi1,
+          phi2,
+          inflatonMass,
+          cosmologicalConstant,
+          inflatonMassAsymmetry
+        )
         const cellOff = 2 * (ia * slabSize + slabIndex)
         chi[cellOff] = re
         chi[cellOff + 1] = im
@@ -726,12 +904,13 @@ function captureMatch(
   phi2: number,
   m: number,
   lambda: number,
+  asymmetry: number,
   U: number,
   chiRe: number,
   chiIm: number
 ): void {
   state.matched = true
-  state.sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda)
+  state.sEucAtMatch = wdwEuclideanWkbAction(a, phi1, phi2, m, lambda, asymmetry)
   state.uPrefactorAtMatch = Math.pow(Math.abs(U), 0.25)
   state.chiReAtMatch = chiRe
   state.chiImAtMatch = chiIm
@@ -779,12 +958,18 @@ export function wdwOperatorResidual(
   let resNorm = 0
   let ucNorm = 0
 
+  // Skip sponge-affected cells: the φ-Laplacian reads (i1±1, i2±1),
+  // so the margin must be sponge width + 1 to avoid contamination.
+  const spongeMargin = effectiveSpongeWidth(Nphi) + 1
+  const phiLo = Math.max(1, spongeMargin)
+  const phiHi = Math.min(Nphi - 1, Nphi - spongeMargin)
+
   for (let ia = 1; ia < Na - 1; ia++) {
     const a = output.aMin + ia * da
     const invAsq = 1 / (a * a)
-    for (let i1 = 1; i1 < Nphi - 1; i1++) {
+    for (let i1 = phiLo; i1 < phiHi; i1++) {
       const phi1 = -output.phiExtent + i1 * dphi
-      for (let i2 = 1; i2 < Nphi - 1; i2++) {
+      for (let i2 = phiLo; i2 < phiHi; i2++) {
         const phi2 = -output.phiExtent + i2 * dphi
         const idx = i1 * Nphi + i2
         const bandCur = output.bandKind[ia * slabSize + idx] ?? 0
@@ -824,7 +1009,14 @@ export function wdwOperatorResidual(
 
         const lap = phiLaplacianAt(output.chi, ia * complexSlab, i1, i2, Nphi, invDphi2)
 
-        const U = wdwU(a, phi1, phi2, input.inflatonMass, input.cosmologicalConstant)
+        const U = wdwU(
+          a,
+          phi1,
+          phi2,
+          input.inflatonMass,
+          input.cosmologicalConstant,
+          input.inflatonMassAsymmetry ?? 1
+        )
 
         const resRe = -d2aRe + invAsq * lap.re + U * cre
         const resIm = -d2aIm + invAsq * lap.im + U * cim

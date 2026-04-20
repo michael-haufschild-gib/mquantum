@@ -92,6 +92,11 @@ export interface SrmtDispatchArgs {
   rankCap: number
   /** Inflaton mass `m` for the HJ potential. */
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis. Optional; defaults
+   * to `1` (isotropic) when absent. Must match the solver's value.
+   */
+  inflatonMassAsymmetry?: number
   /** Cosmological constant `Λ` for the HJ potential. */
   cosmologicalConstant: number
   /** Compute hash for this clock's dispatch — deduplicates retries. */
@@ -374,6 +379,7 @@ function postArgsToWorker(state: SrmtWorkerState, args: SrmtDispatchArgs): void 
       physics: {
         inflatonMass: args.inflatonMass,
         cosmologicalConstant: args.cosmologicalConstant,
+        inflatonMassAsymmetry: args.inflatonMassAsymmetry ?? 1,
       },
     }
     worker.postMessage(request, [chiCopy.buffer, maskCopy.buffer])
@@ -507,6 +513,7 @@ export function dispatchSrmtCompute(state: SrmtWorkerState, args: SrmtDispatchAr
       physics: {
         inflatonMass: args.inflatonMass,
         cosmologicalConstant: args.cosmologicalConstant,
+        inflatonMassAsymmetry: args.inflatonMassAsymmetry ?? 1,
       },
     }
     worker.postMessage(request, [chiCopy.buffer, maskCopy.buffer])

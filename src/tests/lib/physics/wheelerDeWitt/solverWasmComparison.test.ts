@@ -102,7 +102,10 @@ async function assertSolverParity(
   tolerance: number
 ): Promise<void> {
   resetCflWarningBudget()
-  const ts = solveWheelerDeWitt(input)
+  // Disable the φ-sponge so the JS solver matches the sponge-free Rust
+  // validator. The sponge is a JS-side rendering aid that the Rust
+  // validator does not implement.
+  const ts = solveWheelerDeWitt({ ...input, disableSponge: true })
   const rs = await solveWheelerDeWittWasmValidator({
     boundaryCondition: input.boundaryCondition,
     inflatonMass: input.inflatonMass,

@@ -46,8 +46,18 @@ export type WdwSrmtClock = 'a' | 'phi1' | 'phi2'
 export interface WheelerDeWittConfig {
   /** Selected boundary condition proposal (physics) */
   boundaryCondition: WdwBoundaryCondition
-  /** Inflaton mass m for V(φ) = ½m²(φ₁²+φ₂²) + Λ (physics) */
+  /** Inflaton mass m for V(φ) = ½m²φ₁² + ½(m·α)²φ₂² + Λ (physics) */
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` applied to the φ₂ component of
+   * the potential (effective mass on the φ₂ axis = `m·α`, on the φ₁
+   * axis = `m`). `α = 1` is the isotropic default that reproduces the
+   * pre-asymmetry symmetric potential bit-identically. Anisotropic
+   * values break the φ₁↔φ₂ exchange symmetry, allowing the SRMT
+   * diagnostic to distinguish the three clocks `{a, phi1, phi2}`
+   * instead of producing `q_phi1 == q_phi2` by construction. Clamped
+   * to `[0.1, 10]` by the setter. (physics) */
+  inflatonMassAsymmetry: number
   /** Cosmological constant Λ (physics) */
   cosmologicalConstant: number
   /** Minimum scale factor a_min at which boundary data is imposed (physics) */
@@ -102,6 +112,18 @@ export interface WheelerDeWittConfig {
  * second-order leapfrog march and produces a visible density distribution
  * at the middle of the (a, φ₁, φ₂) grid.
  *
+ * `phiExtent = 3.5` ensures the physical wavefunction has decayed to
+ * negligible amplitude (`exp(−0.5·3.5²) ≈ 0.2 %` of the Gaussian seed)
+ * at the φ-grid boundary regardless of the ghost BC (Neumann). The solver
+ * uses a Neumann zero-flux ghost for the φ-Laplacian to avoid artificial
+ * sink artifacts at the grid edge; at `phiExtent ≥ 3.5` the boundary
+ * amplitude is exponentially suppressed by the WKB Euclidean decay so
+ * reflections are physically irrelevant.
+ *
+ * `gridNphi = 40` provides ~5.7 cells per Gaussian σ across the full
+ * extent and ~23 cells in the physically interesting region `|φ| < 2`
+ * where the Lorentzian oscillatory features live.
+ *
  * `aMin = 0.1` (rather than the literature-minimal 0.05) keeps the explicit
  * leapfrog comfortably inside its CFL bound. The φ-Laplacian contribution
  * scales as `da² · (1/aMin²) · 8/dphi²`, which doubles when `aMin` halves;
@@ -113,12 +135,13 @@ export interface WheelerDeWittConfig {
 export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
+  inflatonMassAsymmetry: 1.0,
   cosmologicalConstant: 0.0,
   aMin: 0.1,
   aMax: 1.5,
   gridNa: 128,
-  gridNphi: 32,
-  phiExtent: 2.0,
+  gridNphi: 40,
+  phiExtent: 3.5,
   streamlinesEnabled: true,
   streamlineDensity: 6,
   phaseRotationEnabled: false,

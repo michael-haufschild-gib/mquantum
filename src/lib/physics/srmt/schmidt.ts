@@ -142,3 +142,159 @@ export function schmidtValues(tensor: ChiTensor, clock: SrmtClock): Float64Array
   const M = reshapeForClock(tensor, clock)
   return complexSvdSingularValues(M)
 }
+
+/**
+ * Sum of squared magnitudes of a complex interleaved tensor `χ`. Uses
+ * the raw `(re, im)` layout defined on {@link ChiTensor}.
+ *
+ * @param chi - Complex amplitudes as interleaved real/imaginary floats.
+ * @returns `Σ (re² + im²)`. Equals zero when the buffer is empty or all
+ *          amplitudes are zero.
+ */
+export function chiFrobeniusNormSq(chi: Float32Array): number {
+  let acc = 0
+  for (let i = 0; i < chi.length; i++) {
+    const v = chi[i]!
+    acc += v * v
+  }
+  return acc
+}
+
+/**
+ * Grid metadata sufficient to compute the per-cell volume element
+ * `dVol = da · dφ²`. Matches the subset of
+ * {@link WheelerDeWittSolverOutput} used downstream for HJ/Schmidt
+ * analysis — keeping the type local avoids a module cycle with the
+ * solver output contract.
+ */
+export interface ChiGridSpec {
+  /** `[Na, Nphi, Nphi]`. */
+  gridSize: readonly [number, number, number]
+  /** Lower bound of the `a` axis. */
+  aMin: number
+  /** Upper bound of the `a` axis. */
+  aMax: number
+  /** Half-width of the symmetric φ windows `[−phiExtent, +phiExtent]`. */
+  phiExtent: number
+}
+
+/**
+ * Compute the uniform-grid volume element
+ * `dVol = da · dφ₁ · dφ₂ = (aMax − aMin)/(Na − 1) ·
+ * (2·phiExtent/(Nphi1 − 1)) · (2·phiExtent/(Nphi2 − 1))`.
+ *
+ * Both φ axes share the same physical window by construction, so on a
+ * square φ-grid this reduces to `da · dφ²`. Reading both axes separately
+ * guards the rescale path against a future rectangular φ-grid silently
+ * slipping through.
+ *
+ * Degenerate grids (any axis with fewer than 2 points) yield `dVol = 0`;
+ * callers that pass `dVol = 0` into {@link normalizedSchmidtValues} fall
+ * back to the Frobenius-only rescale, preserving the unit-volume
+ * contract used by tests that do not set up a physical grid.
+ *
+ * @param spec - Grid metadata as exported by the WdW solver.
+ * @returns Per-cell 3D volume element.
+ */
+export function computeVolumeElement(spec: ChiGridSpec): number {
+  const [Na, Nphi1, Nphi2] = spec.gridSize
+  if (Na < 2 || Nphi1 < 2 || Nphi2 < 2) return 0
+  const da = (spec.aMax - spec.aMin) / (Na - 1)
+  // Both φ axes share the same symmetric `[−phiExtent, +phiExtent]`
+  // window by construction (see {@link ChiGridSpec.gridSize}); reading
+  // both dimensions separately guards against a future rectangular grid
+  // landing in the Schmidt path without anyone noticing the volume
+  // element silently treated it as square.
+  const dphi1 = (2 * spec.phiExtent) / (Nphi1 - 1)
+  const dphi2 = (2 * spec.phiExtent) / (Nphi2 - 1)
+  return da * dphi1 * dphi2
+}
+
+/**
+ * L²-normalised Schmidt singular values under a volume-weighted or
+ * unit-volume convention.
+ *
+ * Runs the raw {@link schmidtValues} and rescales by
+ * `1 / sqrt(Σ|χ|² · dVol)` so the resulting singular values satisfy the
+ * volume-weighted normalisation `Σ s_n² · dVol = 1` — the Riemann-sum
+ * approximation of the continuum identity `∫|χ|² d³x = 1`. Passing
+ * `volumeElement = 1` (the default) reduces the rescale to the pure
+ * discrete Frobenius norm `Σ s_n² = 1`, preserving the prior API
+ * contract for callers that do not set up a physical grid.
+ *
+ * Physical interpretation: the modular Hamiltonian
+ * `K_n = −log(s_n² + ε)` is defined against a probability density — not
+ * a raw sum of lattice amplitudes. Discretising the continuum via
+ * Riemann sum requires `|χ|² · dVol` for the density reading, which
+ * introduces a `log(dVol)` additive term into `K_n`. Under a
+ * fixed-physics, fixed-`(aMin, aMax, phiExtent)`, variable-`(Na, Nphi)`
+ * sweep (`gridNa`, `gridNphi`, `phiExtent`) the Frobenius-only convention
+ * leaves that term as a residual drift in the affine fit's `β`; the
+ * volume-weighted convention absorbs it into the lattice density
+ * normalisation so `β` tracks only the genuine `K ≈ α·E + β`
+ * zero-of-energy offset the SRMT conjecture is probing.
+ *
+ * See {@link computeVolumeElement} for the `dVol` formula.
+ *
+ * @param tensor - `χ` tensor (raw, unnormalised).
+ * @param clock - Clock axis used as the row index of the reshaped matrix.
+ * @param volumeElement - Per-cell volume element
+ *                        `dVol = da · dφ²`. Defaults to `1`
+ *                        (unit-volume Frobenius, backward-compatible).
+ *                        Must be non-negative; `dVol = 0` falls back to
+ *                        the Frobenius-only rescale.
+ * @returns Descending singular values of the (volume-weighted) unit-norm
+ *          state. When `χ` is identically zero the raw singular values
+ *          are returned unchanged (all zeros).
+ */
+export function normalizedSchmidtValues(
+  tensor: ChiTensor,
+  clock: SrmtClock,
+  volumeElement: number = 1
+): Float64Array {
+  const sv = schmidtValues(tensor, clock)
+  const fro2 = chiFrobeniusNormSq(tensor.chi)
+  if (fro2 <= 0) return sv
+  const dVol = volumeElement > 0 ? volumeElement : 1
+  const scale = 1 / Math.sqrt(fro2 * dVol)
+  for (let i = 0; i < sv.length; i++) sv[i] = sv[i]! * scale
+  return sv
+}
+
+/**
+ * Effective Schmidt rank — count of modes whose squared weight relative
+ * to the dominant mode exceeds `thresholdSqRatio`.
+ *
+ * Returns `|{ n : (s_n / s_0)² > thresholdSqRatio }|`. A pure pure
+ * state has `rEff = 1`; a maximally-mixed rank-`r` state has
+ * `rEff ≈ r`. The metric is insensitive to an overall rescale of `s`,
+ * so it can be computed on raw or L²-normalised Schmidt arrays
+ * interchangeably.
+ *
+ * Publication guideline: affine / rigid fits run over fewer than ~8
+ * non-trivial modes are dominated by noise — callers should suppress
+ * champion-clock selection when `rEff < 8` (see
+ * {@link SrmtSweepPoint.rEffByClock}).
+ *
+ * @param schmidt - Descending singular values.
+ * @param thresholdSqRatio - Relative squared-weight cutoff. Default
+ *          `1e-6` matches the effective-rank diagnostic in
+ *          `_oneshotTunnelingBcAnalysis.test.ts`.
+ * @returns Count in `[0, schmidt.length]`. Returns 0 when the input is
+ *          empty or the dominant Schmidt value is zero.
+ */
+export function effectiveRankFromSchmidt(
+  schmidt: Float64Array,
+  thresholdSqRatio: number = 1e-6
+): number {
+  if (schmidt.length === 0) return 0
+  const s0 = schmidt[0]!
+  if (!(s0 > 0)) return 0
+  const thresh = thresholdSqRatio * s0 * s0
+  let n = 0
+  for (let i = 0; i < schmidt.length; i++) {
+    const s = schmidt[i]!
+    if (s * s > thresh) n++
+  }
+  return n
+}

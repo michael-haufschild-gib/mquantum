@@ -68,6 +68,19 @@ import type { SrmtClock } from './types'
  *   range because the explicit-leapfrog CFL term `da²·8/dφ²/aMin²` grows
  *   as `N_φ²` (with `dφ = 2·phiExtent/(N_φ−1)`); the upper bound 33 keeps
  *   the default config inside the warning budget.
+ * - `'gridNphiCoupled'` — joint grid-convergence sweep that varies
+ *   `gridNphi ∈ [sweepMin, sweepMax]` **and** co-scales `gridNa` per
+ *   point to hold the CFL term approximately constant. Where
+ *   {@link SrmtSweepKind.gridNphi} holds `gridNa` fixed and forces the
+ *   CFL term to grow as `N_φ²` — pushing the solver past its warn budget
+ *   at the upper end — this coupled kind bumps `gridNa` approximately
+ *   linearly in `(N_φ − 1)` (see {@link coupledGridNaFor}) so the
+ *   publication-grade sweep reports `q(N_φ)` without CFL-contaminated
+ *   tails. Expensive: each per-point solve scales linearly with the
+ *   auto-bumped `gridNa`, which therefore also grows roughly linearly
+ *   across the sweep, so clamp `points ∈ [3, 7]` (4–8× per-point cost
+ *   vs. uncoupled `gridNphi`). Emits `sweepValue = N_φ`; the per-point
+ *   `gridNa` is derived, not reported as the swept axis.
  */
 export type SrmtSweepKind =
   | 'cut'
@@ -79,6 +92,7 @@ export type SrmtSweepKind =
   | 'phiExtent'
   | 'gridNa'
   | 'gridNphi'
+  | 'gridNphiCoupled'
 
 /** Ordered list of boundary conditions for the `'bc'` sweep kind. */
 export const SRMT_BC_SWEEP_ORDER: readonly WdwBoundaryCondition[] = [
@@ -101,6 +115,9 @@ export interface SrmtSweepConfig {
    *  - `phiExtent`: [3, 13]   (full solver re-run per point → expensive)
    *  - `gridNa`:    [3, 9]    (full re-solve per point; integer round + dedup)
    *  - `gridNphi`:  [3, 9]    (full re-solve per point; integer round + dedup)
+   *  - `gridNphiCoupled`: [3, 7] (coupled kind; 4–8× solve cost per point
+   *    vs. uncoupled `gridNphi` because the derived `gridNa` rises roughly
+   *    linearly with `(N_φ − 1)`, not as `N_φ²`)
    *  - `bc`:        always {@link SRMT_BC_SWEEP_ORDER}.length (3); caller's
    *    `points` is ignored.
    */
@@ -166,11 +183,24 @@ export interface SrmtSweepPoint {
    *  - `phiExtent`: φ-grid half-range.
    *  - `gridNa`:    integer `gridNa` (a-axis sample count) at this point.
    *  - `gridNphi`:  integer `gridNphi` (φ-axis sample count) at this point.
+   *  - `gridNphiCoupled`: integer `gridNphi`; the per-point `gridNa`
+   *    used by the solver is the CFL-derived companion and is surfaced
+   *    on the point as {@link SrmtSweepPoint.coupledGridNa} so CSV
+   *    exports and downstream validators see the actual `(Nφ, Nₐ)` pair
+   *    without re-implementing {@link coupledGridNaFor}.
    *  - `bc`:        numeric position `0, 1, 2` for the BC order in
    *    {@link SRMT_BC_SWEEP_ORDER}; the actual enum value is in
    *    `sweepValueBc`.
    */
   sweepValue: number
+  /**
+   * Derived `gridNa` used by the solver for this point, surfaced only
+   * for the `gridNphiCoupled` kind. Populated from
+   * {@link coupledGridNaFor}. Downstream tooling that reads the CSV
+   * should use this column (when present) to reproduce the exact solve
+   * shape without recomputing the coupling formula.
+   */
+  coupledGridNa?: number
   /** Populated only for `bc` sweep kind. */
   sweepValueBc?: WdwBoundaryCondition
   /**
@@ -213,6 +243,56 @@ export interface SrmtSweepPoint {
    * functional.
    */
   qRigidStdev?: Partial<Record<SrmtClock, number>>
+  /**
+   * Per-clock fitted slope `α` from the least-squares affine fit
+   * `K ≈ α·E + β` that produces `quality[clock]`. Exposed so downstream
+   * analysis can see the unit-conversion factor the scalar `q_affine`
+   * would otherwise hide: when `q_rigid / q_affine` spans many decades
+   * (see `docs/physics/srmt-metric.md`), `α` is carrying the orders of
+   * magnitude. `undefined` when the clock was excluded or the affine
+   * fit degenerated (zero-variance `E`, too few points).
+   */
+  alphaByClock?: Partial<Record<SrmtClock, number>>
+  /**
+   * Per-clock fitted intercept `β` from the least-squares affine fit
+   * `K ≈ α·E + β` that produces `quality[clock]`. Reported alongside
+   * {@link alphaByClock} so the full linear fit is machine-readable
+   * from the CSV export. `undefined` under the same conditions as
+   * `alphaByClock`.
+   */
+  betaByClock?: Partial<Record<SrmtClock, number>>
+  /**
+   * Per-clock effective Schmidt rank — count of modes with
+   * `(s_n / s_0)² > 1e-6`. Surfaces degeneracy that would otherwise
+   * silently collapse the affine fit: with too few non-trivial modes
+   * the `K ≈ α·E + β` regression has almost no signal to bind, and
+   * `quality` differences between clocks reflect floor-pinned K
+   * vectors rather than physics.
+   *
+   * Publication guideline: reject champion-clock determination when
+   * `rEff < 8` on any requested clock. The UI's
+   * `computeChampionFlips` helper enforces this gate automatically.
+   *
+   * `undefined` per-clock when the clock was excluded from the sweep.
+   */
+  rEffByClock?: Partial<Record<SrmtClock, number>>
+  /**
+   * Per-clock fraction of `K_n` within `1.5` nats of the ε-floor
+   * (`−log(ε)` where `ε = MODULAR_EPSILON · s_0²`), measured over the
+   * top-`rankCap` modes kept for the affine fit. A value approaching
+   * `1` means the modular spectrum has collapsed into its
+   * regularisation floor — the `quality` score is then a property of
+   * the floor, not of the SRMT conjecture. Per
+   * `/tmp/srmt-tunneling-bc-analysis.md` this happened in the
+   * tunneling-BC, `phi1`-clock slice: 53 % of `K_n` pinned, producing
+   * the `q_phi1 < q_a` inversion that looked like physics but was a
+   * metric artifact.
+   *
+   * Publication guideline: `floorFraction ≥ 0.25` is a warning flag;
+   * `≥ 0.5` is disqualifying. `undefined` per-clock when the clock
+   * was excluded from the sweep.
+   */
+  floorFractionByClock?: Partial<Record<SrmtClock, number>>
   /** K_n modular spectrum per clock, length `≤ rankCap`. */
   kSpectrumByClock: Partial<Record<SrmtClock, Float32Array>>
   /** E_n HJ spectrum per clock, length `≤ rankCap`. */

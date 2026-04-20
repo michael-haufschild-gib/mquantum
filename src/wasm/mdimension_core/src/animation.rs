@@ -5181,21 +5181,14 @@ mod tests {
     fn test_compose_rotations_multi_plane_structure() {
         // Multi-plane composition produces a matrix with correct structure:
         // all entries finite, diagonal entries near ±1, off-diagonal bounded.
-        let plane_names = vec![
-            "XY".to_string(),
-            "XZ".to_string(),
-            "YZ".to_string(),
-        ];
+        let plane_names = vec!["XY".to_string(), "XZ".to_string(), "YZ".to_string()];
         let angles = vec![0.3, 0.5, 0.7];
         let r = compose_rotations(4, &plane_names, &angles);
 
         assert_eq!(r.len(), 16);
         for val in &r {
             assert!(val.is_finite(), "Non-finite value in rotation matrix");
-            assert!(
-                val.abs() < 2.0,
-                "Rotation matrix entry too large: {val}"
-            );
+            assert!(val.abs() < 2.0, "Rotation matrix entry too large: {val}");
         }
 
         // Near-orthogonal check with loose tolerance for fsin/fcos

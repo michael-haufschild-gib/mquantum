@@ -224,13 +224,30 @@ export class WheelerDeWittSrmtSweepCoordinator {
    * action, if the current strategy has produced a solver output the
    * sweep can anchor to. No-op when nothing is pending or when the
    * solver has not yet produced its first output.
+   *
+   * The `solverDirty` flag defers dispatch for one frame when the
+   * Wheeler–DeWitt solver is still re-running for a fresh config (e.g.
+   * a `needsReset` tick injected by a test spec or a physics-knob edit
+   * that landed on the same frame as `setPendingSweep`). Deferring —
+   * rather than aborting — keeps the pending slot queued so the very
+   * next `executeFrame` (where `solverDirty=false`) captures the sweep
+   * snapshot against the fully-settled solver output. Aborting here
+   * would silently drop URL-triggered sweeps whose physics params
+   * forced a re-solve on mount.
    */
   maybeDispatchPending(
     wdwConfig: WheelerDeWittConfig,
-    solverOutput: WheelerDeWittSolverOutput | null
+    solverOutput: WheelerDeWittSolverOutput | null,
+    solverDirty: boolean = false
   ): void {
     if (this.disposed) return
     if (!solverOutput) return
+    // Defer (do NOT consume) while the solver is still re-running. Next
+    // frame the solver settles, this method runs again, and dispatch
+    // proceeds on the fresh snapshot. The existing `update()` stale
+    // guard above handles the separate concern of in-flight sweeps
+    // whose physics drift mid-run.
+    if (solverDirty) return
     const store = useSrmtSweepStore.getState()
     if (store.status === 'running') return
     const pending = store.consumePendingSweep()
@@ -243,6 +260,7 @@ export class WheelerDeWittSrmtSweepCoordinator {
       physics: {
         inflatonMass: wdwConfig.inflatonMass,
         cosmologicalConstant: wdwConfig.cosmologicalConstant,
+        inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
       },
       landmarks,
       solverOutput: sweepReusesSolver(config.kind) ? solverOutput : undefined,
@@ -422,12 +440,30 @@ export function materialiseSweepConfig(
         ...common,
         kind: 'gridNphi',
         points: pending.points ?? 5,
-        // Default spans the full driver-clamped range [9, 33]. The upper
-        // bound is the CFL ceiling at the default (aMin=0.1, phiExtent=2,
-        // gridNa=128) configuration; pushing past 33 risks tripping the
-        // explicit-leapfrog stability warning per docs/wheeler-dewitt.md.
-        sweepMin: pending.sweepMin ?? 9,
-        sweepMax: pending.sweepMax ?? 33,
+        // Default spans the driver-clamped asymptotic range [32, 64] —
+        // see `clampGridNphi` docstring. Below 32 the Schmidt column
+        // count Nφ² drops below Na=128 and q_a hits a pre-asymptotic
+        // hump; above 64 the explicit-leapfrog CFL term exceeds the
+        // solver's warn budget (solver.ts:447-456 rate-limits the dev
+        // warn, so behaviour is preserved).
+        sweepMin: pending.sweepMin ?? 32,
+        sweepMax: pending.sweepMax ?? 64,
+      }
+    case 'gridNphiCoupled':
+      return {
+        ...common,
+        kind: 'gridNphiCoupled',
+        // Joint (Nφ, Nₐ) grid-convergence sweep: Nφ walks the same
+        // [32, 64] asymptotic band as the uncoupled `gridNphi` kind, but
+        // Nₐ is co-scaled per point via
+        // `coupledGridNaFor(Nφ, wdwConfig)` so the leapfrog CFL term
+        // stays approximately constant. Each per-point solve is 4–8×
+        // the cost of the uncoupled kind, so the default point count is
+        // kept conservative (5 points across [32, 64] → {32, 40, 48,
+        // 56, 64}).
+        points: pending.points ?? 5,
+        sweepMin: pending.sweepMin ?? 32,
+        sweepMax: pending.sweepMax ?? 64,
       }
   }
 }

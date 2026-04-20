@@ -55,6 +55,14 @@ import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt
 export interface WdwValidatorInput {
   boundaryCondition: WdwBoundaryCondition
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis
+   * (`V = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ`). Optional; defaults to `1`
+   * (isotropic potential), preserving the original wrapper contract.
+   * Must match the value passed to the TS solver when comparing
+   * outputs, otherwise the two paths integrate different PDEs.
+   */
+  inflatonMassAsymmetry?: number
   cosmologicalConstant: number
   aMin: number
   aMax: number
@@ -111,6 +119,7 @@ interface ValidatorModule {
   solve_leapfrog_validator_wasm: (
     bcCode: number,
     mass: number,
+    massAsymmetry: number,
     lambda: number,
     aMin: number,
     aMax: number,
@@ -191,6 +200,7 @@ export async function solveWheelerDeWittWasmValidator(
   const chi = mod.solve_leapfrog_validator_wasm(
     bcToCode(input.boundaryCondition),
     input.inflatonMass,
+    input.inflatonMassAsymmetry ?? 1,
     input.cosmologicalConstant,
     input.aMin,
     input.aMax,

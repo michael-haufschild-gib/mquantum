@@ -280,6 +280,84 @@ describe('WheelerDeWittSrmtSweepCoordinator.update', () => {
   })
 })
 
+describe('WheelerDeWittSrmtSweepCoordinator.maybeDispatchPending', () => {
+  beforeEach(() => {
+    useSrmtSweepStore.getState().reset()
+    useSrmtSweepStore.getState().setPendingSweep(null)
+  })
+
+  it('defers dispatch while the solver is dirty, then dispatches on the next clean frame', () => {
+    const { worker, posts } = createFakeWorker()
+    const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
+
+    // Queue a pending sweep the way URL deserialization or the Start
+    // button would.
+    useSrmtSweepStore.getState().setPendingSweep({
+      kind: 'gridNa',
+      points: 1,
+      sweepMin: 256,
+      sweepMax: 256,
+    })
+
+    // Simulate the test-spec injection: config mutated with
+    // needsReset=true, solver is re-running on THIS frame.
+    const mutatedConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNa: 256,
+      gridNphi: 48,
+      needsReset: true,
+    }
+    const freshOutput = mkSolverOutput()
+
+    // Frame N — solver dirty. Coordinator MUST NOT start the sweep,
+    // MUST NOT consume the pending slot.
+    coord.maybeDispatchPending(mutatedConfig, freshOutput, /* solverDirty */ true)
+    expect(useSrmtSweepStore.getState().status).toBe('idle')
+    expect(useSrmtSweepStore.getState().pendingSweep).toMatchObject({
+      kind: 'gridNa',
+      points: 1,
+      sweepMin: 256,
+      sweepMax: 256,
+    })
+    expect(posts).toHaveLength(0)
+
+    // Frame N+1 — solver has settled (needsReset cleared by the
+    // physics cache callback, lastConfigHash updated). Coordinator
+    // dispatches on the fresh snapshot.
+    const settledConfig = { ...mutatedConfig, needsReset: false }
+    coord.maybeDispatchPending(settledConfig, freshOutput, /* solverDirty */ false)
+
+    const s = useSrmtSweepStore.getState()
+    expect(s.status).toBe('running')
+    expect(s.pendingSweep).toBeNull()
+    expect(posts).toHaveLength(1)
+    const msg = posts[0]!.message
+    expect(msg.type).toBe('start')
+    if (msg.type === 'start') {
+      expect(msg.config.kind).toBe('gridNa')
+    }
+  })
+
+  it('does not consume the pending slot when solverDirty is true (repeated dirty frames)', () => {
+    const { worker, posts } = createFakeWorker()
+    const coord = new WheelerDeWittSrmtSweepCoordinator(() => worker)
+    useSrmtSweepStore.getState().setPendingSweep({ kind: 'cut', points: 5 })
+    const output = mkSolverOutput()
+
+    // Several consecutive dirty frames — all must defer.
+    coord.maybeDispatchPending(DEFAULT_WHEELER_DEWITT_CONFIG, output, true)
+    coord.maybeDispatchPending(DEFAULT_WHEELER_DEWITT_CONFIG, output, true)
+    coord.maybeDispatchPending(DEFAULT_WHEELER_DEWITT_CONFIG, output, true)
+
+    expect(useSrmtSweepStore.getState().pendingSweep).toMatchObject({
+      kind: 'cut',
+      points: 5,
+    })
+    expect(useSrmtSweepStore.getState().status).toBe('idle')
+    expect(posts).toHaveLength(0)
+  })
+})
+
 describe('WheelerDeWittSrmtSweepCoordinator.dispose', () => {
   beforeEach(() => {
     useSrmtSweepStore.getState().reset()

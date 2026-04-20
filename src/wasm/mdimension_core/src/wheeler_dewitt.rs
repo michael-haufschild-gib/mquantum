@@ -13,8 +13,12 @@
 //!
 //! - **Implemented**: `U(a, φ)` and `V(φ)` operators, `a_turn(φ)`, the three
 //!   boundary-condition generators (HH / Vilenkin / DeWitt), and the raw
-//!   second-order leapfrog PDE integrator with ghost-zero Dirichlet
-//!   boundaries at the outer φ-edges.
+//!   second-order leapfrog PDE integrator with Neumann (zero-flux) ghost
+//!   boundaries at the outer φ-edges. Ghost cells inherit the value of
+//!   the adjacent interior-edge cell, matching the TS solver's updated
+//!   φ-boundary rule (see the module docstring of
+//!   `src/lib/physics/wheelerDeWitt/solver.ts` for the SRMT sensitivity
+//!   sweep that motivated the switch from ghost-zero Dirichlet).
 //! - **NOT implemented**: Stage-2 deep-Euclidean WKB tail ("WDW_WKB_MATCH
 //!   _PHASE_THRESHOLD") and Stage-3 Airy/Langer connection. These are
 //!   numerical post-processing layers applied on top of the raw PDE solve
@@ -48,16 +52,23 @@ pub const WDW_G_PREFACTOR: f64 = 8.0 * std::f64::consts::PI / 3.0;
 /// Potential prefactor `c_U = 36 π²` in `U(a, φ) = −c_U·a²·(…)`.
 pub const WDW_C_U: f64 = 36.0 * std::f64::consts::PI * std::f64::consts::PI;
 
-/// `V(φ₁, φ₂) = ½ m² (φ₁² + φ₂²) + Λ`.
+/// `V(φ₁, φ₂) = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ` where `α ≡ mass_asymmetry`
+/// (the per-axis effective-mass ratio on the φ₂ axis; `α = 1` recovers
+/// the isotropic `V = ½ m² (φ₁² + φ₂²) + Λ`). Must receive the same `α`
+/// as the TS solver, otherwise the cross-validator compares solutions
+/// of different PDEs.
 #[inline]
-pub fn wdw_potential(phi1: f64, phi2: f64, mass: f64, lambda: f64) -> f64 {
-    0.5 * mass * mass * (phi1 * phi1 + phi2 * phi2) + lambda
+pub fn wdw_potential(phi1: f64, phi2: f64, mass: f64, lambda: f64, mass_asymmetry: f64) -> f64 {
+    let m1_sq = mass * mass;
+    let m2 = mass * mass_asymmetry;
+    let m2_sq = m2 * m2;
+    0.5 * m1_sq * phi1 * phi1 + 0.5 * m2_sq * phi2 * phi2 + lambda
 }
 
-/// `U(a, φ) = −c_U·a²·(1 − (8πG/3)·a² · V(φ))`.
+/// `U(a, φ) = −c_U·a²·(1 − (8πG/3)·a² · V(φ))` with the anisotropic `V`.
 #[inline]
-pub fn wdw_u(a: f64, phi1: f64, phi2: f64, mass: f64, lambda: f64) -> f64 {
-    let v = wdw_potential(phi1, phi2, mass, lambda);
+pub fn wdw_u(a: f64, phi1: f64, phi2: f64, mass: f64, lambda: f64, mass_asymmetry: f64) -> f64 {
+    let v = wdw_potential(phi1, phi2, mass, lambda, mass_asymmetry);
     let a2 = a * a;
     -WDW_C_U * a2 * (1.0 - WDW_G_PREFACTOR * a2 * v)
 }
@@ -65,8 +76,14 @@ pub fn wdw_u(a: f64, phi1: f64, phi2: f64, mass: f64, lambda: f64) -> f64 {
 /// Scale-factor turning surface `a_turn(φ)` where `U(a_turn, φ) = 0`.
 /// Returns `None` when `V(φ) ≤ 0` (no turning surface exists).
 #[inline]
-pub fn wdw_turning_a(phi1: f64, phi2: f64, mass: f64, lambda: f64) -> Option<f64> {
-    let v = wdw_potential(phi1, phi2, mass, lambda);
+pub fn wdw_turning_a(
+    phi1: f64,
+    phi2: f64,
+    mass: f64,
+    lambda: f64,
+    mass_asymmetry: f64,
+) -> Option<f64> {
+    let v = wdw_potential(phi1, phi2, mass, lambda, mass_asymmetry);
     if v <= 0.0 {
         None
     } else {
@@ -92,6 +109,10 @@ pub struct WdwSolverInput {
     pub bc: WdwBoundaryCondition,
     /// Inflaton mass `m`.
     pub mass: f64,
+    /// Per-axis effective-mass ratio `α` on the φ₂ axis
+    /// (`V = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ`). `α = 1` ⇒ isotropic potential,
+    /// matching the TS `inflatonMassAsymmetry` default.
+    pub mass_asymmetry: f64,
     /// Cosmological constant `Λ`.
     pub lambda: f64,
     /// Lower bound of `a` grid (must be > 0).
@@ -136,6 +157,7 @@ fn index_to_phi(i: usize, nphi: usize, phi_extent: f64) -> f64 {
 /// `V ≤ 0` or the bounce is closed (`a² K V > 1`).
 ///
 /// Writes `N_phi²` complex entries into each of `chi` and `chi_deriv`.
+#[allow(clippy::too_many_arguments)]
 fn hartle_hawking_boundary(
     chi: &mut [f64],
     chi_deriv: &mut [f64],
@@ -144,13 +166,14 @@ fn hartle_hawking_boundary(
     a_min: f64,
     mass: f64,
     lambda: f64,
+    mass_asymmetry: f64,
 ) {
     let a2 = a_min * a_min;
     for i1 in 0..nphi {
         let phi1 = index_to_phi(i1, nphi, phi_extent);
         for i2 in 0..nphi {
             let phi2 = index_to_phi(i2, nphi, phi_extent);
-            let v = wdw_potential(phi1, phi2, mass, lambda);
+            let v = wdw_potential(phi1, phi2, mass, lambda, mass_asymmetry);
             let idx = i1 * nphi + i2;
             let (amp, dchi) = if v <= 1e-12 {
                 // Fallback Gaussian envelope in φ.
@@ -177,6 +200,7 @@ fn hartle_hawking_boundary(
 
 /// Vilenkin tunneling boundary: `χ = e^{−½|φ|²} · e^{+i·a³V/3}` with the
 /// full WKB outgoing-wave derivative in the Lorentzian region.
+#[allow(clippy::too_many_arguments)]
 fn vilenkin_boundary(
     chi: &mut [f64],
     chi_deriv: &mut [f64],
@@ -185,6 +209,7 @@ fn vilenkin_boundary(
     a_min: f64,
     mass: f64,
     lambda: f64,
+    mass_asymmetry: f64,
 ) {
     let a3 = a_min * a_min * a_min;
     let a2 = a_min * a_min;
@@ -192,7 +217,7 @@ fn vilenkin_boundary(
         let phi1 = index_to_phi(i1, nphi, phi_extent);
         for i2 in 0..nphi {
             let phi2 = index_to_phi(i2, nphi, phi_extent);
-            let v = wdw_potential(phi1, phi2, mass, lambda);
+            let v = wdw_potential(phi1, phi2, mass, lambda, mass_asymmetry);
             let amp = (-0.5 * (phi1 * phi1 + phi2 * phi2)).exp();
             let s_l = (a3 * v) / 3.0;
             let cos_s = s_l.cos();
@@ -203,7 +228,7 @@ fn vilenkin_boundary(
             chi[2 * idx] = cre;
             chi[2 * idx + 1] = cim;
 
-            let u0 = wdw_u(a_min, phi1, phi2, mass, lambda);
+            let u0 = wdw_u(a_min, phi1, phi2, mass, lambda, mass_asymmetry);
             if u0 < 0.0 {
                 // Full WKB outgoing-wave derivative (Lorentzian).
                 // ∂_a U = −2·c_U·a·(1 − 2·K·V·a²);  ∂_a|U| = −∂_a U.
@@ -260,21 +285,49 @@ fn build_boundary(
     a_min: f64,
     mass: f64,
     lambda: f64,
+    mass_asymmetry: f64,
 ) {
     match bc {
         WdwBoundaryCondition::NoBoundary => {
-            hartle_hawking_boundary(chi, chi_deriv, nphi, phi_extent, a_min, mass, lambda);
+            hartle_hawking_boundary(
+                chi,
+                chi_deriv,
+                nphi,
+                phi_extent,
+                a_min,
+                mass,
+                lambda,
+                mass_asymmetry,
+            );
         }
         WdwBoundaryCondition::Tunneling => {
-            vilenkin_boundary(chi, chi_deriv, nphi, phi_extent, a_min, mass, lambda);
+            vilenkin_boundary(
+                chi,
+                chi_deriv,
+                nphi,
+                phi_extent,
+                a_min,
+                mass,
+                lambda,
+                mass_asymmetry,
+            );
         }
         WdwBoundaryCondition::DeWitt => dewitt_boundary(chi, chi_deriv, nphi, phi_extent, a_min),
     }
 }
 
-/// Ghost-zero Dirichlet φ-Laplacian at `(i1, i2)` on the complex slab
+/// Neumann-ghost φ-Laplacian at `(i1, i2)` on the complex slab
 /// `slab[slab_base..slab_base + 2·N_phi²]` (interleaved re, im).
 /// Returns `(re, im)` of `∇²_φ χ`.
+///
+/// Ghost rule (zero-flux): cells one step past the outer `φ`-edge
+/// inherit the value of the adjacent interior-edge cell. This matches
+/// the TS production solver's updated boundary treatment — the
+/// previous ghost-zero Dirichlet rule clipped the χ tail at the edge
+/// and produced non-monotone `q_a(phiExtent)` in SRMT sensitivity
+/// sweeps. Under Neumann, a constant-in-φ seed is an exact
+/// eigenfunction of this stencil with eigenvalue `0` at every cell
+/// including the edges.
 #[inline]
 fn phi_laplacian_at(
     slab: &[f64],
@@ -287,45 +340,48 @@ fn phi_laplacian_at(
     let center = slab_base + 2 * (i1 * nphi + i2);
     let cre = slab[center];
     let cim = slab[center + 1];
+    // Neumann ghost: fall back to the centre-cell value when the
+    // neighbour would sit outside the grid (so that side's stencil
+    // contribution is `(c + c − 2c) = 0`).
     let pre1 = if i1 > 0 {
         slab[slab_base + 2 * ((i1 - 1) * nphi + i2)]
     } else {
-        0.0
+        cre
     };
     let pim1 = if i1 > 0 {
         slab[slab_base + 2 * ((i1 - 1) * nphi + i2) + 1]
     } else {
-        0.0
+        cim
     };
     let nre1 = if i1 < nphi - 1 {
         slab[slab_base + 2 * ((i1 + 1) * nphi + i2)]
     } else {
-        0.0
+        cre
     };
     let nim1 = if i1 < nphi - 1 {
         slab[slab_base + 2 * ((i1 + 1) * nphi + i2) + 1]
     } else {
-        0.0
+        cim
     };
     let pre2 = if i2 > 0 {
         slab[slab_base + 2 * (i1 * nphi + i2 - 1)]
     } else {
-        0.0
+        cre
     };
     let pim2 = if i2 > 0 {
         slab[slab_base + 2 * (i1 * nphi + i2 - 1) + 1]
     } else {
-        0.0
+        cim
     };
     let nre2 = if i2 < nphi - 1 {
         slab[slab_base + 2 * (i1 * nphi + i2 + 1)]
     } else {
-        0.0
+        cre
     };
     let nim2 = if i2 < nphi - 1 {
         slab[slab_base + 2 * (i1 * nphi + i2 + 1) + 1]
     } else {
-        0.0
+        cim
     };
     (
         (pre1 + nre1 - 2.0 * cre + pre2 + nre2 - 2.0 * cre) * inv_dphi2,
@@ -339,9 +395,10 @@ fn phi_laplacian_at(
 ///
 ///   `−∂²_a χ + (1/a²) ∇²_φ χ + U·χ = 0`
 ///
-/// with ghost-zero Dirichlet on the φ-edges and the chosen boundary
-/// condition at `a = a_min`. Returns the full `(a, φ₁, φ₂)` tensor. No
-/// clamping, no absorber, no Airy overwrite — the raw PDE output.
+/// with Neumann (zero-flux) ghost on the φ-edges and the chosen
+/// boundary condition at `a = a_min`. Returns the full `(a, φ₁, φ₂)`
+/// tensor. No clamping, no absorber, no Airy overwrite — the raw PDE
+/// output.
 ///
 /// # Panics
 ///
@@ -350,6 +407,7 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
     let WdwSolverInput {
         bc,
         mass,
+        mass_asymmetry,
         lambda,
         a_min,
         a_max,
@@ -374,7 +432,17 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
     let mut bc_deriv = vec![0.0f64; complex_slab];
     {
         let (slab0, _rest) = chi.split_at_mut(complex_slab);
-        build_boundary(bc, slab0, &mut bc_deriv, nphi, phi_extent, a_min, mass, lambda);
+        build_boundary(
+            bc,
+            slab0,
+            &mut bc_deriv,
+            nphi,
+            phi_extent,
+            a_min,
+            mass,
+            lambda,
+            mass_asymmetry,
+        );
     }
 
     // Slab 1 from Taylor expansion: χ(a_min + da) = χ + da·χ' + ½·da²·χ''.
@@ -385,7 +453,7 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
         for i2 in 0..nphi {
             let phi2 = index_to_phi(i2, nphi, phi_extent);
             let idx = i1 * nphi + i2;
-            let u0 = wdw_u(a0, phi1, phi2, mass, lambda);
+            let u0 = wdw_u(a0, phi1, phi2, mass, lambda, mass_asymmetry);
             let cre = chi[2 * idx];
             let cim = chi[2 * idx + 1];
             let (lap_re, lap_im) = phi_laplacian_at(&chi, 0, i1, i2, nphi, inv_dphi2);
@@ -416,7 +484,7 @@ pub fn solve_leapfrog(input: WdwSolverInput) -> WdwSolverOutput {
             for i2 in 0..nphi {
                 let phi2 = index_to_phi(i2, nphi, phi_extent);
                 let idx = i1 * nphi + i2;
-                let u_prev = wdw_u(a_prev, phi1, phi2, mass, lambda);
+                let u_prev = wdw_u(a_prev, phi1, phi2, mass, lambda, mass_asymmetry);
                 let cre = chi[prev_base + 2 * idx];
                 let cim = chi[prev_base + 2 * idx + 1];
                 let prev_re = chi[prev_prev_base + 2 * idx];
@@ -463,7 +531,7 @@ mod tests {
         //
         // Case 1: a=0.1, φ=0, m=0, Λ=0.
         //   V = 0, U = −c_U·0.01·1 = −3.553057584392184.
-        let u = wdw_u(0.1, 0.0, 0.0, 0.0, 0.0);
+        let u = wdw_u(0.1, 0.0, 0.0, 0.0, 0.0, 1.0);
         assert!(
             (u - (-WDW_C_U * 0.01)).abs() < 1e-12,
             "wdw_u free case: got {u}, expected {}",
@@ -476,7 +544,7 @@ mod tests {
         //   U = −c_U·0.25·0.3716815 = −33.0093...
         let k_va2 = WDW_G_PREFACTOR * 0.3 * 0.25;
         let expected = -WDW_C_U * 0.25 * (1.0 - k_va2);
-        let u2 = wdw_u(0.5, 0.0, 0.0, 0.0, 0.3);
+        let u2 = wdw_u(0.5, 0.0, 0.0, 0.0, 0.3, 1.0);
         assert!(
             (u2 - expected).abs() < 1e-12,
             "wdw_u ds case: got {u2}, expected {expected}"
@@ -486,13 +554,13 @@ mod tests {
     #[test]
     fn wdw_turning_a_matches_closed_form() {
         // a_turn = 1/√(K·V). For V=0.3, K=8π/3: a_turn = 1/√(8π/3·0.3) ≈ 0.631.
-        let at = wdw_turning_a(0.0, 0.0, 0.0, 0.3).expect("turning surface exists for V>0");
+        let at = wdw_turning_a(0.0, 0.0, 0.0, 0.3, 1.0).expect("turning surface exists for V>0");
         let expected = 1.0 / (WDW_G_PREFACTOR * 0.3).sqrt();
         assert!((at - expected).abs() < 1e-12);
 
         // No turning surface when V ≤ 0.
-        assert!(wdw_turning_a(0.0, 0.0, 0.0, -0.5).is_none());
-        assert!(wdw_turning_a(0.0, 0.0, 0.0, 0.0).is_none());
+        assert!(wdw_turning_a(0.0, 0.0, 0.0, -0.5, 1.0).is_none());
+        assert!(wdw_turning_a(0.0, 0.0, 0.0, 0.0, 1.0).is_none());
     }
 
     #[test]
@@ -513,6 +581,7 @@ mod tests {
             a_min,
             mass,
             lambda,
+            1.0,
         );
         // Central cell (i1=1, i2=1) has φ=(0, 0), envelope = 1, S_L = a³·V/3.
         let c = 1 * nphi + 1;
@@ -525,7 +594,7 @@ mod tests {
 
         // Derivative at the central cell follows the Lorentzian-branch
         // formula (U < 0 at a=0.1, V=0.3).
-        let u0 = wdw_u(a_min, 0.0, 0.0, mass, lambda);
+        let u0 = wdw_u(a_min, 0.0, 0.0, mass, lambda, 1.0);
         assert!(u0 < 0.0, "a_min must be Lorentzian for this test");
         let duda = -2.0 * WDW_C_U * a_min * (1.0 - 2.0 * WDW_G_PREFACTOR * v * a_min * a_min);
         let abs_u = -u0;
@@ -553,7 +622,16 @@ mod tests {
         let phi_extent = 1.5;
         let mut chi = vec![0.0f64; 2 * nphi * nphi];
         let mut chi_deriv = vec![0.0f64; 2 * nphi * nphi];
-        hartle_hawking_boundary(&mut chi, &mut chi_deriv, nphi, phi_extent, 0.05, 0.0, 0.5);
+        hartle_hawking_boundary(
+            &mut chi,
+            &mut chi_deriv,
+            nphi,
+            phi_extent,
+            0.05,
+            0.0,
+            0.5,
+            1.0,
+        );
         for i in 0..nphi * nphi {
             assert!(
                 chi[2 * i + 1].abs() < 1e-15,
@@ -578,6 +656,7 @@ mod tests {
         let input = WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: 0.3,
             a_min: 0.05,
             a_max: 0.2,
@@ -594,10 +673,10 @@ mod tests {
         let complex_slab = 2 * nphi * nphi;
         let cre = out.chi[2 * c]; // slab 0 central
         let cim = out.chi[2 * c + 1];
-        let u0 = wdw_u(a0, 0.0, 0.0, input.mass, input.lambda);
-        // Edge-adjacent cells drive the laplacian; reconstruct the stencil:
-        // ghost-zero means neighbours outside are 0. For the 3×3 central cell,
-        // all 4 neighbours exist.
+        let u0 = wdw_u(a0, 0.0, 0.0, input.mass, input.lambda, input.mass_asymmetry);
+        // Edge-adjacent cells drive the laplacian; reconstruct the stencil.
+        // For the 3×3 central cell all 4 neighbours exist, so the Neumann /
+        // Dirichlet distinction does not affect this assertion.
         let dphi = (2.0 * input.phi_extent) / (nphi - 1) as f64;
         let inv_dphi2 = 1.0 / (dphi * dphi);
         let (lap_re, lap_im) = phi_laplacian_at(&out.chi, 0, 1, 1, nphi, inv_dphi2);
@@ -615,6 +694,7 @@ mod tests {
             a0,
             input.mass,
             input.lambda,
+            input.mass_asymmetry,
         );
         let dre = bc_deriv[2 * c];
         let dim = bc_deriv[2 * c + 1];
@@ -670,6 +750,7 @@ mod tests {
         let input = WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: -0.5,
             a_min: 0.05,
             a_max: 1.4,
@@ -708,6 +789,7 @@ mod tests {
         let input = WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: 0.0,
             a_min: 0.05,
             a_max: 1.4,
@@ -751,6 +833,7 @@ mod tests {
         let input = WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: -0.5, // AdS — pure Lorentzian column
             a_min: 0.05,
             a_max: 1.2,
@@ -769,8 +852,8 @@ mod tests {
 
         let mut res_norm = 0.0f64;
         let mut uc_norm = 0.0f64;
-        // Interior loop — skip outer boundaries where stencil reaches
-        // ghost-zero cells.
+        // Interior loop — skip outer boundaries where the Neumann ghost
+        // substitution differs from the bulk central-difference stencil.
         for ia in 1..(na - 1) {
             let a = input.a_min + ia as f64 * da;
             let inv_asq = 1.0 / (a * a);
@@ -789,7 +872,14 @@ mod tests {
                     let d2a_im = (next_im - 2.0 * cim + prev_im) * inv_da2;
                     let (lap_re, lap_im) =
                         phi_laplacian_at(&out.chi, ia * complex_slab, i1, i2, nphi, inv_dphi2);
-                    let u = wdw_u(a, phi1, phi2, input.mass, input.lambda);
+                    let u = wdw_u(
+                        a,
+                        phi1,
+                        phi2,
+                        input.mass,
+                        input.lambda,
+                        input.mass_asymmetry,
+                    );
                     let res_re = -d2a_re + inv_asq * lap_re + u * cre;
                     let res_im = -d2a_im + inv_asq * lap_im + u * cim;
                     res_norm += res_re * res_re + res_im * res_im;
@@ -825,7 +915,7 @@ mod tests {
         // ABI drift (e.g. a new BC enum variant on one side only) and
         // turn the cross-validator into a false-positive oracle.
         use super::bindings::solve_leapfrog_validator_native;
-        let _ = solve_leapfrog_validator_native(99, 0.0, -0.5, 0.05, 1.2, 4, 3, 2.5);
+        let _ = solve_leapfrog_validator_native(99, 0.0, 1.0, -0.5, 0.05, 1.2, 4, 3, 2.5);
     }
 
     #[cfg(feature = "wdw-validator")]
@@ -838,12 +928,13 @@ mod tests {
         use super::bindings::solve_leapfrog_validator_native;
         let na = 8usize;
         let nphi = 5usize;
-        let packed = solve_leapfrog_validator_native(0, 0.0, -0.5, 0.05, 1.2, na, nphi, 2.5);
+        let packed = solve_leapfrog_validator_native(0, 0.0, 1.0, -0.5, 0.05, 1.2, na, nphi, 2.5);
         let expected_len = 2 * na * nphi * nphi;
         assert_eq!(packed.len(), expected_len);
         let direct = solve_leapfrog(WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: -0.5,
             a_min: 0.05,
             a_max: 1.2,
@@ -864,10 +955,55 @@ mod tests {
     }
 
     #[test]
+    fn mass_asymmetry_threads_into_rust_solver() {
+        // With α ≠ 1 the potential `V = ½ m² φ₁² + ½ (m·α)² φ₂² + Λ`
+        // breaks the exchange symmetry `χ(a, φ₁, φ₂) = χ(a, φ₂, φ₁)`
+        // that holds under α = 1. This test locks the Rust validator's
+        // wiring of the parameter: if `mass_asymmetry` is silently
+        // dropped anywhere (potential, U, boundary), the swap χ − χ^T
+        // would stay at round-off magnitude and the assertion fails.
+        let input = WdwSolverInput {
+            bc: WdwBoundaryCondition::NoBoundary,
+            mass: 0.3,
+            mass_asymmetry: 2.0,
+            lambda: 0.05,
+            a_min: 0.1,
+            a_max: 1.2,
+            grid_na: 48,
+            grid_nphi: 11,
+            phi_extent: 1.5,
+        };
+        let out = solve_leapfrog(input);
+        let (na, nphi, _) = out.grid_size;
+        let slab = nphi * nphi;
+        let ia = na / 2; // interior slab
+        let mut max_diff = 0.0f64;
+        for i1 in 0..nphi {
+            for i2 in (i1 + 1)..nphi {
+                let a_off = 2 * (ia * slab + i1 * nphi + i2);
+                let b_off = 2 * (ia * slab + i2 * nphi + i1);
+                let a_re = out.chi[a_off];
+                let a_im = out.chi[a_off + 1];
+                let b_re = out.chi[b_off];
+                let b_im = out.chi[b_off + 1];
+                let d = ((a_re - b_re).powi(2) + (a_im - b_im).powi(2)).sqrt();
+                if d > max_diff {
+                    max_diff = d;
+                }
+            }
+        }
+        assert!(
+            max_diff > 1e-4,
+            "α = 2 must break φ₁↔φ₂ symmetry but max swap diff was {max_diff:e} (≤ 1e-4)"
+        );
+    }
+
+    #[test]
     fn leapfrog_second_order_convergence() {
         let base = WdwSolverInput {
             bc: WdwBoundaryCondition::NoBoundary,
             mass: 0.0,
+            mass_asymmetry: 1.0,
             lambda: 0.3,
             a_min: 0.05,
             a_max: 0.1,
@@ -948,6 +1084,7 @@ pub mod bindings {
     pub fn solve_leapfrog_validator_wasm(
         bc_code: u32,
         mass: f64,
+        mass_asymmetry: f64,
         lambda: f64,
         a_min: f64,
         a_max: f64,
@@ -958,6 +1095,7 @@ pub mod bindings {
         solve_leapfrog_validator_native(
             bc_code,
             mass,
+            mass_asymmetry,
             lambda,
             a_min,
             a_max,
@@ -970,9 +1108,11 @@ pub mod bindings {
     /// Pure-Rust entry exposed to the in-crate test that asserts the
     /// wasm-bindgen pack/unpack contract. Identical to the wasm export
     /// minus the integer-width conversion at the JS boundary.
+    #[allow(clippy::too_many_arguments)]
     pub fn solve_leapfrog_validator_native(
         bc_code: u32,
         mass: f64,
+        mass_asymmetry: f64,
         lambda: f64,
         a_min: f64,
         a_max: f64,
@@ -989,11 +1129,14 @@ pub mod bindings {
             0 => WdwBoundaryCondition::NoBoundary,
             1 => WdwBoundaryCondition::Tunneling,
             2 => WdwBoundaryCondition::DeWitt,
-            other => panic!("invalid bc_code {other}; expected 0 (noBoundary), 1 (tunneling), or 2 (deWitt)"),
+            other => panic!(
+                "invalid bc_code {other}; expected 0 (noBoundary), 1 (tunneling), or 2 (deWitt)"
+            ),
         };
         let out = solve_leapfrog(WdwSolverInput {
             bc,
             mass,
+            mass_asymmetry,
             lambda,
             a_min,
             a_max,

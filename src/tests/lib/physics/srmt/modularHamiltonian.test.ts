@@ -11,7 +11,11 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { modularSpectrum } from '@/lib/physics/srmt/modularHamiltonian'
+import {
+  floorFractionFromModular,
+  MODULAR_EPSILON,
+  modularSpectrum,
+} from '@/lib/physics/srmt/modularHamiltonian'
 
 describe('modularHamiltonian.modularSpectrum', () => {
   it('computes K_n = −log(s_n² + ε) for a short known sequence', () => {
@@ -61,5 +65,83 @@ describe('modularHamiltonian.modularSpectrum', () => {
     expect(spectrum.length).toBe(0)
     expect(epsilon).toBe(0)
     expect(rankThreshold).toBe(0)
+  })
+})
+
+describe('modularHamiltonian.MODULAR_EPSILON', () => {
+  it('is a positive small constant the spectrum uses to regularise zeros', () => {
+    expect(MODULAR_EPSILON).toBeGreaterThan(0)
+    expect(MODULAR_EPSILON).toBeLessThan(1e-10)
+    // With s_0 = 1 the effective epsilon equals MODULAR_EPSILON; the
+    // resulting floor −log(ε) should match the max-K value the spectrum
+    // saturates to when s = 0.
+    const schmidt = new Float64Array([1, 0])
+    const { spectrum, epsilon } = modularSpectrum(schmidt)
+    expect(epsilon).toBeCloseTo(MODULAR_EPSILON, 20)
+    expect(spectrum[1]!).toBeCloseTo(-Math.log(MODULAR_EPSILON), 6)
+  })
+})
+
+describe('modularHamiltonian.floorFractionFromModular', () => {
+  it('returns 1.0 when every K_n sits at the floor', () => {
+    // Modular spectrum of an all-zero Schmidt ⇒ every K_n = −log(ε).
+    const schmidt = new Float64Array([1, 0, 0, 0, 0])
+    const { spectrum, epsilon } = modularSpectrum(schmidt)
+    // All but the leading mode are exactly at −log(ε); the leading one
+    // is K_0 = −log(1 + ε) ≈ 0. Default tolerance 1.5 excludes K_0.
+    const frac = floorFractionFromModular(spectrum, epsilon)
+    expect(frac).toBeCloseTo(4 / 5, 6)
+  })
+
+  it('returns 0 for an identity-style spectrum with no floor-pinned modes', () => {
+    // All K values are well below the floor: construct K by shifting
+    // −log(ε) downward by 10 nats. Tolerance 1.5 catches nothing.
+    const epsilon = MODULAR_EPSILON
+    const floor = -Math.log(epsilon)
+    const K = new Float64Array([floor - 20, floor - 18, floor - 15, floor - 12])
+    expect(floorFractionFromModular(K, epsilon)).toBe(0)
+  })
+
+  it('returns 0.5 when half the modes are pinned (all-equal half at floor)', () => {
+    // Build K with two values at the floor (distance 0) and two at
+    // distance 5 nats. Default tolerance 1.5 counts only the two at 0.
+    const epsilon = MODULAR_EPSILON
+    const floor = -Math.log(epsilon)
+    const K = new Float64Array([floor - 5, floor - 5, floor, floor])
+    expect(floorFractionFromModular(K, epsilon)).toBe(0.5)
+  })
+
+  it('scales with the tolerance parameter', () => {
+    const epsilon = MODULAR_EPSILON
+    const floor = -Math.log(epsilon)
+    const K = new Float64Array([floor - 10, floor - 3, floor - 1, floor])
+    // Predicate is now inclusive on both ends: `0 ≤ gap ≤ tol`.
+    // tol=0.5 catches K[3] only (gap=0).
+    expect(floorFractionFromModular(K, epsilon, 0.5)).toBe(0.25)
+    // tol=2 catches K[2] (gap=1), K[3] (gap=0).
+    expect(floorFractionFromModular(K, epsilon, 2)).toBe(0.5)
+    // tol=5 catches K[1] (gap=3), K[2] (gap=1), K[3] (gap=0).
+    expect(floorFractionFromModular(K, epsilon, 5)).toBe(0.75)
+    // tol=10 catches all four (K[0] gap=10 lies on the inclusive upper edge).
+    expect(floorFractionFromModular(K, epsilon, 10)).toBe(1)
+  })
+
+  it('counts exact floor hits when tolerance is zero', () => {
+    // Regression: prior strict `gap < tol` predicate silently excluded
+    // the most clearly pinned modes (those sitting exactly at the floor)
+    // when `tol === 0`. The inclusive `gap <= tol` guard fixes that and
+    // also avoids counting modes above the floor (negative gap — numerical
+    // overshoot rather than pinning).
+    const epsilon = MODULAR_EPSILON
+    const floor = -Math.log(epsilon)
+    const K = new Float64Array([floor - 0.5, floor, floor + 0.5, floor])
+    // tol=0 keeps only the two K_n === floor (indices 1 and 3).
+    expect(floorFractionFromModular(K, epsilon, 0)).toBe(0.5)
+  })
+
+  it('returns 0 for empty input or non-positive epsilon', () => {
+    expect(floorFractionFromModular(new Float64Array(0), MODULAR_EPSILON)).toBe(0)
+    expect(floorFractionFromModular(new Float64Array([1, 2, 3]), 0)).toBe(0)
+    expect(floorFractionFromModular(new Float64Array([1, 2, 3]), -1)).toBe(0)
   })
 })

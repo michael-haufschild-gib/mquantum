@@ -133,7 +133,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
 
     const srmtTick = this.srmt.update(wdw, physicsTick.output, physicsTick.solverDirty)
     this.srmtSweep.update(wdw, physicsTick.solverDirty)
-    this.srmtSweep.maybeDispatchPending(wdw, physicsTick.output)
+    this.srmtSweep.maybeDispatchPending(wdw, physicsTick.output, physicsTick.solverDirty)
 
     // Worldline pulse re-packs every playing frame; a toggle-off
     // triggers a one-shot repack to clear the pulse snapshot.

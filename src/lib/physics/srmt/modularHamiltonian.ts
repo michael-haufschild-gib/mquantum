@@ -25,8 +25,14 @@
 /** Default relative rank-truncation cutoff. */
 const DEFAULT_RANK_TRUNCATION = 1e-8
 
-/** Epsilon floor multiplier applied to the dominant squared Schmidt value. */
-const EPS_REL_FLOOR = 1e-14
+/**
+ * Epsilon floor multiplier applied to the dominant squared Schmidt value.
+ * Exported so downstream diagnostics (e.g. {@link floorFractionFromModular})
+ * can reference the same saturation constant the modular spectrum uses.
+ * Effective ε = `MODULAR_EPSILON · s_0²`, so on a unit-normalised state
+ * (Σ|χ|² = 1 ⇒ s_0 ≤ 1) the floor `−log(ε)` is at least `−log(MODULAR_EPSILON)`.
+ */
+export const MODULAR_EPSILON = 1e-14
 
 /**
  * Compute the modular-Hamiltonian spectrum from Schmidt singular values.
@@ -58,7 +64,7 @@ export function modularSpectrum(
   // Dominant singular value.
   const s0 = schmidt[0]!
   const maxSq = s0 * s0
-  const epsilon = maxSq > 0 ? EPS_REL_FLOOR * maxSq : EPS_REL_FLOOR
+  const epsilon = maxSq > 0 ? MODULAR_EPSILON * maxSq : MODULAR_EPSILON
 
   const spectrum = new Float64Array(n)
   for (let i = 0; i < n; i++) {
@@ -80,4 +86,52 @@ export function modularSpectrum(
   }
 
   return { spectrum, epsilon, rankThreshold }
+}
+
+/**
+ * Fraction of modular-Hamiltonian values pinned at the ε-floor.
+ *
+ * The modular spectrum saturates at `K_max = −log(ε)` as Schmidt weights
+ * go to zero. When a large share of `K_n` sits within `floorTolerance`
+ * nats of that ceiling, the spectrum has effectively decayed into the
+ * regularisation floor rather than reflecting physical structure — an
+ * affine fit over such a K vector is dominated by the constant floor
+ * value, producing misleading `β` offsets and degenerate `q_affine`.
+ *
+ * Returns `|{ n : 0 ≤ (−log(ε)) − K_n ≤ floorTolerance }| / K.length`,
+ * i.e. the proportion of modes whose gap to the floor lies in the
+ * closed interval `[0, floorTolerance]`. The lower bound excludes
+ * modes above the floor (`K_n > −log(ε)` — numerical overshoot, not
+ * pinning); the inclusive upper bound ensures exact floor hits
+ * (`K_n = −log(ε)`) are counted even when `floorTolerance === 0`.
+ *
+ * @param K - Modular spectrum as returned by {@link modularSpectrum}.
+ *            Expected to be ascending; the calculation does not require
+ *            order, so any permutation still yields a meaningful count.
+ * @param epsilon - Same ε used to regularise `K = −log(s² + ε)`. Pass the
+ *            value returned from {@link modularSpectrum} so the floor
+ *            reference matches the spectrum's own saturation ceiling.
+ * @param floorTolerance - Distance from the floor (in nats) below which
+ *            a K value counts as "pinned". Default 1.5 corresponds to a
+ *            density ratio of `e^1.5 ≈ 4.5`.
+ * @returns Fraction in `[0, 1]`. `0` when `K` is empty or when `epsilon`
+ *            is non-positive (no well-defined floor).
+ */
+export function floorFractionFromModular(
+  K: Float64Array,
+  epsilon: number,
+  floorTolerance: number = 1.5
+): number {
+  if (K.length === 0 || !(epsilon > 0) || !Number.isFinite(floorTolerance)) return 0
+  const floor = -Math.log(epsilon)
+  const tol = Math.max(0, floorTolerance)
+  let hits = 0
+  for (let i = 0; i < K.length; i++) {
+    // `gap >= 0` excludes K values above the floor (negative gap —
+    // numerical overshoot rather than pinning); `gap <= tol` includes
+    // exact floor hits when `tol === 0`.
+    const gap = floor - K[i]!
+    if (gap >= 0 && gap <= tol) hits++
+  }
+  return hits / K.length
 }

@@ -33,7 +33,10 @@ thread_local! {
 /// Panics if n is not a power of 2 or is zero.
 #[inline]
 fn log2_exact(n: usize) -> usize {
-    assert!(n > 0 && n.is_power_of_two(), "n must be a non-zero power of 2");
+    assert!(
+        n > 0 && n.is_power_of_two(),
+        "n must be a non-zero power of 2"
+    );
     let idx = n.trailing_zeros() as usize;
     assert!(idx < MAX_LOG2, "FFT size exceeds the supported maximum");
     idx
@@ -226,11 +229,7 @@ fn compute_fiber_base(
 }
 
 /// Apply a 1D transform along each axis of an N-D grid.
-fn nd_transform(
-    data: &mut [f64],
-    grid_size: &[usize],
-    transform_1d: fn(&mut [f64], usize),
-) {
+fn nd_transform(data: &mut [f64], grid_size: &[usize], transform_1d: fn(&mut [f64], usize)) {
     let dim = grid_size.len();
     if dim == 0 {
         return;
@@ -462,8 +461,8 @@ mod tests {
             for iy in 0..4 {
                 for ix in 0..4 {
                     let idx = iz * 16 + iy * 4 + ix;
-                    original[idx * 2] = (2.0 * PI * (ix as f64) / 4.0).sin()
-                        * (2.0 * PI * (iy as f64) / 4.0).cos();
+                    original[idx * 2] =
+                        (2.0 * PI * (ix as f64) / 4.0).sin() * (2.0 * PI * (iy as f64) / 4.0).cos();
                 }
             }
         }

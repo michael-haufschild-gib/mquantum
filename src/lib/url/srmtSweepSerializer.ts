@@ -33,6 +33,7 @@ export const VALID_SRMT_SWEEP_KINDS = [
   'phiExtent',
   'gridNa',
   'gridNphi',
+  'gridNphiCoupled',
 ] as const satisfies readonly SrmtSweepKind[]
 
 /** String union accepted by `sw=…` — one per entry of {@link VALID_SRMT_SWEEP_KINDS}. */
@@ -95,7 +96,8 @@ export function serializeSrmtSweep(
     state.srmtSweepKind === 'rankCap' ||
     state.srmtSweepKind === 'phiExtent' ||
     state.srmtSweepKind === 'gridNa' ||
-    state.srmtSweepKind === 'gridNphi'
+    state.srmtSweepKind === 'gridNphi' ||
+    state.srmtSweepKind === 'gridNphiCoupled'
   ) {
     if (state.srmtSweepPoints !== undefined) params.set('sw_n', String(state.srmtSweepPoints))
     if (state.srmtSweepMin !== undefined) params.set('sw_min', state.srmtSweepMin.toFixed(3))
@@ -150,14 +152,16 @@ export function deserializeSrmtSweep(params: URLSearchParams, state: SrmtSweepUr
   }
   // Points clamps match the sweepDriver per-kind rules:
   //  cut ∈ [4, 64], mass / λ / phiRef ∈ [3, 21], rankCap ∈ [3, 32],
-  //  phiExtent ∈ [3, 13], gridNa / gridNphi ∈ [3, 9]. Use the outer
-  //  union and let the driver clamp per kind.
+  //  phiExtent ∈ [3, 13], gridNa / gridNphi ∈ [3, 9],
+  //  gridNphiCoupled ∈ [3, 7]. Use the outer union and let the driver
+  //  clamp per kind.
   state.srmtSweepPoints = parseIntClamped(params, 'sw_n', 3, 64)
   // Float range must admit the widest per-kind sweep — `gridNa` extends
   // up to 1024 (driver clamp). Box `[-1024, 1024]` covers every kind:
   // cut ∈ [0,1], mass ∈ [0,2], λ ∈ [-1,1], phiRef ∈ [-phiExtent,
-  // +phiExtent], phiExtent ∈ [0.5, 5], rankCap ∈ [8, 256], gridNa ∈
-  // [64, 1024], gridNphi ∈ [9, 33]. Driver enforces per-kind bounds.
+  // +phiExtent], phiExtent ∈ [0.5, 10], rankCap ∈ [8, 256], gridNa ∈
+  // [64, 1024], gridNphi / gridNphiCoupled ∈ [32, 64]. Driver enforces
+  // per-kind bounds.
   state.srmtSweepMin = parseFloatClamped(params, 'sw_min', -1024, 1024)
   state.srmtSweepMax = parseFloatClamped(params, 'sw_max', -1024, 1024)
   state.srmtSweepPhiRef = parseFloatClamped(params, 'sw_phi', -10, 10)

@@ -42,11 +42,11 @@
  *
  * Per-iteration cost grows roughly with `Na · Nφ²`. The default URL
  * sweeps (5 points each across `gridNa ∈ [64, 512]` and `gridNphi ∈
- * [9, 33]`) finish well inside the 10-minute test timeout on local
- * hardware. The CFL term `da² · 8/dφ² / aMin²` stays inside the
- * solver's warning budget at the largest swept gridNphi=33 because
- * the default config keeps `aMin = 0.1`, `phiExtent = 2`, `gridNa ≥
- * 128`.
+ * [32, 64]`) finish well inside the 10-minute test timeout on local
+ * hardware. The CFL term `da² · 8/dφ² / aMin²` crosses the solver's
+ * warning budget at the largest swept `gridNphi=64` (≈6× over); the
+ * solver dev-warns rate-limited rather than failing, so behaviour is
+ * preserved.
  *
  * Per repo policy this Playwright spec is local-only — never run in
  * CI. See `.claude/projects/.../memory/MEMORY.md` (E2E policy).
@@ -293,21 +293,21 @@ test.describe('Wheeler–DeWitt — SRMT grid convergence (URL-driven)', () => {
     await gotoModeWithParams(page, 'wheelerDeWitt', 3, {
       sw: 'gridNphi',
       sw_n: '5',
-      sw_min: '9',
-      sw_max: '33',
+      sw_min: '32',
+      sw_max: '64',
     })
     await waitForRendererReady(page)
     await waitForFirstFrame(page)
 
-    // 8-minute budget — Nφ=33 at default gridNa=128 is comfortably
-    // cheaper than the gridNa=512 case but still needs space for the
-    // 5 sequential solver re-runs.
+    // 8-minute budget — Nφ=64 at default gridNa=128 crosses the CFL
+    // warning budget but the solver dev-warns rate-limited rather than
+    // failing; 5 sequential solver re-runs fit comfortably.
     await waitForSweepCompletion(page, 480_000)
 
     await assertSweepMatchesUrl(page, {
       kind: 'gridNphi',
-      sweepMin: 9,
-      sweepMax: 33,
+      sweepMin: 32,
+      sweepMax: 64,
       points: 5,
     })
 
@@ -318,8 +318,11 @@ test.describe('Wheeler–DeWitt — SRMT grid convergence (URL-driven)', () => {
           `q_phi1=${s.qPhi1.toFixed(6)} q_phi2=${s.qPhi2.toFixed(6)}`
       )
     }
-    // linspace(9, 33, 5) → [9, 15, 21, 27, 33] after round+dedupe.
-    assertSweepValues(samples, [9, 15, 21, 27, 33], 'gridNphi')
+    // linspace(32, 64, 5) → [32, 40, 48, 56, 64] after round+dedupe.
+    // Clamp range [32, 64] samples the asymptotic branch of q_a(Nφ);
+    // the legacy range [9, 33] landed on a non-monotone pre-asymptotic
+    // hump (see sweepDriver.ts:clampGridNphi).
+    assertSweepValues(samples, [32, 40, 48, 56, 64], 'gridNphi')
     assertCauchyConvergence(samples, 'gridNphi')
   })
 })

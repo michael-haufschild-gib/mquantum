@@ -22,26 +22,51 @@
  */
 
 /**
- * Affine-match quality `q = Σ_n (K_n − (α E_n + β))² / Σ_n K_n²` after a
- * least-squares fit of `α`, `β` over the first `count` points.
+ * Result of the least-squares affine fit `K ≈ α·E + β`.
  *
- * The metric is scale-invariant in `E` (the fitted `α` absorbs any
- * scaling of `E`). It is **not** generally shift-invariant in `K`:
- * while `β` removes shifts from the numerator, the final normalization
- * `Σ K_n²` is not shift-invariant, so translating `K` changes `q`
- * whenever the fit is imperfect. `0` = perfect linear tracking;
- * larger = worse.
+ * `q` is the normalised residual (see {@link computeAffineFitQuality});
+ * `alpha` and `beta` are the fitted linear-regression parameters in the
+ * natural unit system of `E` and `K`. Exposing `alpha` and `beta`
+ * alongside `q` is what lets downstream analysis diagnose the
+ * orders-of-magnitude gap between `q_affine` and `q_rigid`: the affine
+ * fit can silently absorb a large unit-conversion factor into `α`,
+ * which the `q_affine` scalar hides but `alpha` surfaces directly.
+ */
+export interface AffineFitResult {
+  /** Normalised residual `Σ(K − (αE + β))² / Σ K²` (or `NaN`). */
+  q: number
+  /** Fitted slope. `NaN` when the fit is degenerate. */
+  alpha: number
+  /** Fitted intercept. `NaN` when the fit is degenerate. */
+  beta: number
+}
+
+/**
+ * Least-squares affine fit of `K` onto `E` over the first `count`
+ * indices. Returns the quality metric `q` **and** the fitted `α, β`
+ * parameters so callers can inspect the fit directly. `q` is identical
+ * bit-for-bit to what {@link computeAffineFitQuality} returns — the
+ * existing helper is a thin wrapper over this function.
+ *
+ * Degenerate inputs return `{ q: NaN, alpha: NaN, beta: NaN }` when
+ * `count<2`, `count` exceeds buffer length, or `Σ(E − mean(E))² ≤ 0`
+ * (zero-variance `E`). When the fit succeeds but `Σ K² = 0` (zero-norm
+ * `K`), `α` and `β` are finite (they parameterise the `K ≈ αE + β` fit
+ * even at `K≡0`) and `q` falls back to `Σ residual² / Σ ΔK²` via `sKK`,
+ * or `NaN` when that is also zero.
  *
  * @param K - Modular spectrum `K_n` (ascending).
  * @param E - HJ spectrum `E_n` (ascending).
  * @param count - Number of leading values to include in the fit.
- * @returns Fit quality, or `NaN` for degenerate inputs (fewer than 2
- *          points, zero-variance `E`, or zero-variance `K` with
- *          non-zero residual).
+ * @returns `{ q, alpha, beta }` — see {@link AffineFitResult}.
  */
-export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
-  if (!Number.isSafeInteger(count) || count < 2) return Number.NaN
-  if (count > K.length || count > E.length) return Number.NaN
+export function fitAffineParams(K: Float64Array, E: Float64Array, count: number): AffineFitResult {
+  if (!Number.isSafeInteger(count) || count < 2) {
+    return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
+  }
+  if (count > K.length || count > E.length) {
+    return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
+  }
 
   let sumE = 0
   let sumK = 0
@@ -63,7 +88,7 @@ export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count:
     sKK += dK * dK
   }
 
-  if (sEE <= 0) return Number.NaN
+  if (sEE <= 0) return { q: Number.NaN, alpha: Number.NaN, beta: Number.NaN }
   const alpha = sEK / sEE
   const beta = meanK - alpha * meanE
 
@@ -77,8 +102,38 @@ export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count:
     den += k * k
   }
 
-  if (den <= 0) return sKK > 0 ? num / sKK : Number.NaN
-  return num / den
+  if (den <= 0) {
+    return { q: sKK > 0 ? num / sKK : Number.NaN, alpha, beta }
+  }
+  return { q: num / den, alpha, beta }
+}
+
+/**
+ * Affine-match quality `q = Σ_n (K_n − (α E_n + β))² / Σ_n K_n²` after a
+ * least-squares fit of `α`, `β` over the first `count` points.
+ *
+ * The metric is scale-invariant in `E` (the fitted `α` absorbs any
+ * scaling of `E`). It is **not** generally shift-invariant in `K`:
+ * while `β` removes shifts from the numerator, the final normalization
+ * `Σ K_n²` is not shift-invariant, so translating `K` changes `q`
+ * whenever the fit is imperfect. `0` = perfect linear tracking;
+ * larger = worse.
+ *
+ * Implemented as a thin projection of {@link fitAffineParams}; see that
+ * function when the fitted `α` / `β` are also required (for example to
+ * diagnose unit-conversion factors hidden in `q_affine`). The math is
+ * bit-identical to the pre-split version — same floating-point ops in
+ * the same order.
+ *
+ * @param K - Modular spectrum `K_n` (ascending).
+ * @param E - HJ spectrum `E_n` (ascending).
+ * @param count - Number of leading values to include in the fit.
+ * @returns Fit quality, or `NaN` for degenerate inputs (fewer than 2
+ *          points, zero-variance `E`, or zero-variance `K` with
+ *          non-zero residual).
+ */
+export function computeAffineFitQuality(K: Float64Array, E: Float64Array, count: number): number {
+  return fitAffineParams(K, E, count).q
 }
 
 /**

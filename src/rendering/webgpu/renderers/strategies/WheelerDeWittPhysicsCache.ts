@@ -57,6 +57,10 @@ export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
   return [
     config.boundaryCondition,
     config.inflatonMass.toFixed(6),
+    // `inflatonMassAsymmetry ?? 1` makes the default elision in the URL
+    // serializer round-trip hash-stable: omitted `wdw_ma` (= 1) hashes
+    // identically to an explicit `wdw_ma=1`.
+    (config.inflatonMassAsymmetry ?? 1).toFixed(6),
     config.cosmologicalConstant.toFixed(6),
     config.aMin.toFixed(4),
     config.aMax.toFixed(4),
@@ -121,6 +125,7 @@ export class WheelerDeWittPhysicsCache {
       this.lastSolverOutput = solveWheelerDeWitt({
         boundaryCondition: config.boundaryCondition,
         inflatonMass: config.inflatonMass,
+        inflatonMassAsymmetry: config.inflatonMassAsymmetry,
         cosmologicalConstant: config.cosmologicalConstant,
         aMin: config.aMin,
         aMax: config.aMax,

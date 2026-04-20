@@ -471,4 +471,62 @@ describe('Wheeler–DeWitt solver', () => {
     }
     expect(a.maxDensity).toBe(b.maxDensity)
   })
+
+  it('inflatonMassAsymmetry=1 is byte-identical to omitting the field (isotropic default)', () => {
+    // The new per-axis asymmetry knob enters the potential via
+    // `½m²·φ₁² + ½(m·α)²·φ₂² + Λ`. At `α = 1` the product `m² · 1 · 1`
+    // is exactly `m² · m² / m² = m²` in IEEE-754 (multiplying by the
+    // exact constant 1.0 is a no-op), so every `wdwPotential` /
+    // `wdwU` / `wdwTurningA` / `wdwEuclideanWkbAction` call returns
+    // bit-identical values whether `inflatonMassAsymmetry` is absent
+    // or set to `1`. The solver must therefore produce byte-exact
+    // `chi`, `mask`, and `maxDensity` buffers under both call shapes.
+    //
+    // This is the backward-compat regression pin: every existing call
+    // site in the repo that omits `inflatonMassAsymmetry` now relies
+    // on this property.
+    const omitted = solveWheelerDeWitt(BASE_INPUT)
+    const explicit = solveWheelerDeWitt({ ...BASE_INPUT, inflatonMassAsymmetry: 1 })
+    expect(explicit.chi.length).toBe(omitted.chi.length)
+    for (let i = 0; i < omitted.chi.length; i++) {
+      expect(explicit.chi[i]).toBe(omitted.chi[i])
+    }
+    for (let i = 0; i < omitted.lorentzianMask.length; i++) {
+      expect(explicit.lorentzianMask[i]).toBe(omitted.lorentzianMask[i])
+    }
+    for (let i = 0; i < omitted.bandKind.length; i++) {
+      expect(explicit.bandKind[i]).toBe(omitted.bandKind[i])
+    }
+    expect(explicit.maxDensity).toBe(omitted.maxDensity)
+  })
+
+  it('inflatonMassAsymmetry != 1 breaks φ₁↔φ₂ exchange symmetry of χ', () => {
+    // With `α = 2`, the effective mass on the φ₂ axis is `2m`, so the
+    // potential weighs φ₂ displacements 4× more heavily than φ₁. The
+    // solved χ must therefore lose the `χ(a, φ₁, φ₂) = χ(a, φ₂, φ₁)`
+    // exchange symmetry the isotropic case enjoys. If this test
+    // passes at `α = 1` (which it does not — the isotropic case is
+    // symmetric) then the asymmetry is silently dropped somewhere in
+    // the pipeline.
+    const out = solveWheelerDeWitt({ ...BASE_INPUT, inflatonMassAsymmetry: 2.0 })
+    const [Na, Nphi] = out.gridSize
+    const iMid = Math.floor(Na / 2)
+    const slab = Nphi * Nphi
+    let maxDiff = 0
+    // Compare χ(ia=iMid, i1, i2) vs χ(ia=iMid, i2, i1) for a handful of
+    // off-diagonal cells.
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      for (let i2 = i1 + 1; i2 < Nphi; i2++) {
+        const aOff = 2 * (iMid * slab + i1 * Nphi + i2)
+        const bOff = 2 * (iMid * slab + i2 * Nphi + i1)
+        const aRe = out.chi[aOff] ?? 0
+        const aIm = out.chi[aOff + 1] ?? 0
+        const bRe = out.chi[bOff] ?? 0
+        const bIm = out.chi[bOff + 1] ?? 0
+        const d = Math.hypot(aRe - bRe, aIm - bIm)
+        if (d > maxDiff) maxDiff = d
+      }
+    }
+    expect(maxDiff).toBeGreaterThan(1e-4)
+  })
 })

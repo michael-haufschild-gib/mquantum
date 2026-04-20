@@ -173,7 +173,10 @@ export async function requireWebGPU(
 /** Read geometry store fields from the running app. */
 export async function getGeometryState(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/geometryStore.ts')
+    const mod = { useGeometryStore: window.__GEOMETRY_STORE__ }
+    if (!mod.useGeometryStore) {
+      throw new Error('__GEOMETRY_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useGeometryStore.getState()
     return { dimension: s.dimension, objectType: s.objectType }
   })
@@ -182,8 +185,11 @@ export async function getGeometryState(page: Page) {
 /** Read the current quantum mode from the extended object store. */
 export async function getQuantumMode(page: Page): Promise<string> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    const s = mod.useExtendedObjectStore.getState() as unknown as Record<string, unknown>
     const schroedinger = s.schroedinger as Record<string, unknown> | undefined
     return (schroedinger?.quantumMode as string) ?? 'unknown'
   })
@@ -192,7 +198,10 @@ export async function getQuantumMode(page: Page): Promise<string> {
 /** Read dimension from geometry store. */
 export async function getDimension(page: Page): Promise<number> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/geometryStore.ts')
+    const mod = { useGeometryStore: window.__GEOMETRY_STORE__ }
+    if (!mod.useGeometryStore) {
+      throw new Error('__GEOMETRY_STORE__ missing on window — DEV bridge not registered')
+    }
     return mod.useGeometryStore.getState().dimension
   })
 }
@@ -200,10 +209,15 @@ export async function getDimension(page: Page): Promise<number> {
 /** Read full app state snapshot for URL/store consistency checks. */
 export async function getAppState(page: Page) {
   return page.evaluate(async () => {
-    const geoMod = await import('/src/stores/geometryStore.ts')
-    const extMod = await import('/src/stores/extendedObjectStore.ts')
-    const geo = geoMod.useGeometryStore.getState()
-    const ext = extMod.useExtendedObjectStore.getState() as Record<string, unknown>
+    const geoStore = window.__GEOMETRY_STORE__
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!geoStore || !extStore) {
+      throw new Error(
+        '__GEOMETRY_STORE__/__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered'
+      )
+    }
+    const geo = geoStore.getState()
+    const ext = extStore.getState() as unknown as Record<string, unknown>
     const schroedinger = ext.schroedinger as Record<string, unknown> | undefined
     return {
       dimension: geo.dimension,
@@ -238,7 +252,10 @@ export function filterBenignErrors(errors: string[]): string[] {
 /** Read TDSE diagnostics from the running app (GPU readback values). */
 export async function readTdseDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().tdse
     return {
       hasData: s.hasData,
@@ -256,7 +273,10 @@ export async function readTdseDiagnostics(page: Page) {
 /** Read Pauli spinor diagnostics from the running app (GPU readback values). */
 export async function readPauliDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().pauli
     return {
       hasData: s.hasData,
@@ -275,7 +295,10 @@ export async function readPauliDiagnostics(page: Page) {
 /** Read BEC diagnostics from the running app (GPU readback values). */
 export async function readBecDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().bec
     return {
       hasData: s.hasData,
@@ -300,7 +323,10 @@ export async function readBecDiagnostics(page: Page) {
 /** Read Dirac diagnostics from the running app (GPU readback values). */
 export async function readDiracDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().dirac
     return {
       hasData: s.hasData,
@@ -316,7 +342,10 @@ export async function readDiracDiagnostics(page: Page) {
 /** Read free scalar field diagnostics from the running app (GPU readback values). */
 export async function readFsfDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().fsf
     return {
       hasData: s.hasData,
@@ -334,7 +363,10 @@ export async function readFsfDiagnostics(page: Page) {
 /** Read density grid diagnostics from the running app (GPU readback values). */
 export async function readDensityDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().density
     return {
       hasData: s.hasData,
@@ -374,7 +406,10 @@ export interface SrmtDiagnosticsSnapshot {
  */
 export async function readSrmtDiagnostics(page: Page): Promise<SrmtDiagnosticsSnapshot> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/srmtDiagnosticStore.ts')
+    const mod = { useSrmtDiagnosticStore: window.__SRMT_DIAGNOSTIC_STORE__ }
+    if (!mod.useSrmtDiagnosticStore) {
+      throw new Error('__SRMT_DIAGNOSTIC_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useSrmtDiagnosticStore.getState()
     const snap = s.snapshot
     return {
@@ -428,7 +463,10 @@ export async function waitForSrmtQueueDrain(page: Page, timeoutMs = 60_000): Pro
   const pollMs = 250
   for (;;) {
     const snapshot = await page.evaluate(async () => {
-      const mod = await import('/src/stores/srmtDiagnosticStore.ts')
+      const mod = { useSrmtDiagnosticStore: window.__SRMT_DIAGNOSTIC_STORE__ }
+      if (!mod.useSrmtDiagnosticStore) {
+        throw new Error('__SRMT_DIAGNOSTIC_STORE__ missing on window — DEV bridge not registered')
+      }
       const s = mod.useSrmtDiagnosticStore.getState()
       return {
         a: s.clockAffineQuality.a,
@@ -461,6 +499,34 @@ export async function waitForSrmtQueueDrain(page: Page, timeoutMs = 60_000): Pro
  * which channel to check (e.g. 'tdse', 'bec', 'density'). Without `channel`,
  * checks top-level `hasData` (for legacy per-store modules).
  */
+/**
+ * Map a legacy `storeModule` path string (e.g. `/src/stores/diagnosticsStore.ts`)
+ * to the `window.__*_STORE__` key set in `src/main.tsx`. Keeps the call sites
+ * stable while routing module access through DEV bridges that guarantee
+ * same-instance access as the live React app. Throws on unknown paths so a
+ * caller that adds a new store receives a loud failure instead of a silent
+ * stale-snapshot race.
+ */
+// To add a new store here: append its source path → window-key mapping
+// AND register the bridge in `src/main.tsx` (the DEV `window.__*_STORE__`
+// assignments) so the key actually exists at runtime. The `keyof Window`
+// type only proves the key is declared in `src/types/dev.d.ts`; it does
+// not catch a missing main.tsx assignment.
+const STORE_PATH_TO_WINDOW_KEY: Record<string, keyof Window> = {
+  '/src/stores/diagnosticsStore.ts': '__DIAGNOSTICS_STORE__',
+}
+
+function storePathToWindowKey(storeModule: string): keyof Window {
+  const key = STORE_PATH_TO_WINDOW_KEY[storeModule]
+  if (!key) {
+    throw new Error(
+      `waitForDiagnostics/waitForFreshReadback: unknown storeModule "${storeModule}". ` +
+        `Add it to STORE_PATH_TO_WINDOW_KEY and register the bridge in src/main.tsx.`
+    )
+  }
+  return key
+}
+
 export async function waitForDiagnostics(
   page: Page,
   storeModule: string,
@@ -468,21 +534,18 @@ export async function waitForDiagnostics(
   channel?: string
 ): Promise<void> {
   const effectiveTimeout = timeout ?? 30_000
+  const windowKey = storePathToWindowKey(storeModule)
   await page.waitForFunction(
-    async ([modulePath, ch]: [string, string | null]) => {
-      const mod = await import(/* @vite-ignore */ modulePath)
-      const storeExports = Object.values(mod) as Array<{
-        getState: () => Record<string, { hasData: boolean }>
-      }>
-      const store = storeExports.find(
-        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
-      )
-      if (!store) return false
+    ([key, ch]: [keyof Window, string | null]) => {
+      const store = window[key] as
+        | { getState: () => Record<string, { hasData: boolean }> }
+        | undefined
+      if (!store?.getState) return false
       const state = store.getState()
       if (ch) return (state[ch] as { hasData: boolean } | undefined)?.hasData === true
       return (state as unknown as { hasData: boolean }).hasData === true
     },
-    [storeModule, channel ?? null] as [string, string | null],
+    [windowKey, channel ?? null] as [keyof Window, string | null],
     { timeout: effectiveTimeout }
   )
 }
@@ -513,36 +576,28 @@ export async function waitForFreshReadback(
   const fc = await getFrameCount(page)
   await waitForFrameAdvance(page, fc + 3, timeout)
 
+  const windowKey = storePathToWindowKey(storeModule)
+
   // Phase 2: snapshot generation and wait for a post-drain readback
   const gen = await page.evaluate(
-    async ([mod, ch]: [string, string | null]) => {
-      const m = await import(/* @vite-ignore */ mod)
-      const store = (
-        Object.values(m) as Array<{
-          getState?: () => Record<string, { readbackGeneration: number }>
-        }>
-      ).find(
-        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
-      )
+    ([key, ch]: [keyof Window, string | null]) => {
+      const store = window[key] as
+        | { getState?: () => Record<string, { readbackGeneration: number }> }
+        | undefined
       if (!store?.getState) return 0
       const state = store.getState()
       if (ch)
         return (state[ch] as { readbackGeneration: number } | undefined)?.readbackGeneration ?? 0
       return (state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0
     },
-    [storeModule, channel ?? null] as [string, string | null]
+    [windowKey, channel ?? null] as [keyof Window, string | null]
   )
 
   await page.waitForFunction(
-    async ([mod, prevGen, ch]: [string, number, string | null]) => {
-      const m = await import(/* @vite-ignore */ mod)
-      const store = (
-        Object.values(m) as Array<{
-          getState?: () => Record<string, { readbackGeneration: number }>
-        }>
-      ).find(
-        (v) => (typeof v === 'object' || typeof v === 'function') && v !== null && 'getState' in v
-      )
+    ([key, prevGen, ch]: [keyof Window, number, string | null]) => {
+      const store = window[key] as
+        | { getState?: () => Record<string, { readbackGeneration: number }> }
+        | undefined
       if (!store?.getState) return false
       const state = store.getState()
       const gen = ch
@@ -550,7 +605,7 @@ export async function waitForFreshReadback(
         : ((state as unknown as { readbackGeneration: number }).readbackGeneration ?? 0)
       return gen > prevGen
     },
-    [storeModule, gen, channel ?? null] as [string, number, string | null],
+    [windowKey, gen, channel ?? null] as [keyof Window, number, string | null],
     { timeout }
   )
 }
@@ -564,7 +619,10 @@ export async function resetAndWaitForDensityDiagnostics(
   timeout = 30_000
 ): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     mod.useDiagnosticsStore.getState().resetDensity()
   })
   await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', timeout, 'density')
@@ -778,9 +836,10 @@ export interface PerfMetricsSnapshot {
 /** Read a performance metrics snapshot from the performanceMetricsStore. */
 export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnapshot> {
   return page.evaluate(async () => {
-    const store =
-      window.__PERFORMANCE_METRICS_STORE__ ??
-      (await import('/src/stores/performanceMetricsStore.ts')).usePerformanceMetricsStore
+    const store = window.__PERFORMANCE_METRICS_STORE__
+    if (!store) {
+      throw new Error('__PERFORMANCE_METRICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = store.getState()
     return {
       fps: s.fps,
@@ -887,9 +946,11 @@ export function snapshotDistance(a: PixelSnapshot, b: PixelSnapshot): number {
 
   let totalDiff = 0
   for (let i = 0; i < count; i++) {
-    totalDiff += Math.abs(a.samples[i].r - b.samples[i].r)
-    totalDiff += Math.abs(a.samples[i].g - b.samples[i].g)
-    totalDiff += Math.abs(a.samples[i].b - b.samples[i].b)
+    const sa = a.samples[i]!
+    const sb = b.samples[i]!
+    totalDiff += Math.abs(sa.r - sb.r)
+    totalDiff += Math.abs(sa.g - sb.g)
+    totalDiff += Math.abs(sa.b - sb.b)
   }
   return totalDiff / (count * 3)
 }
@@ -951,7 +1012,10 @@ export async function setHydrogenQuantumNumbers(
 ): Promise<void> {
   await page.evaluate(
     async ({ n, l, m }: { n: number; l: number; m: number }) => {
-      const mod = await import('/src/stores/extendedObjectStore.ts')
+      const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+      if (!mod.useExtendedObjectStore) {
+        throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+      }
       const store = mod.useExtendedObjectStore.getState()
       store.setSchroedingerPrincipalQuantumNumber(n)
       store.setSchroedingerAzimuthalQuantumNumber(l)
@@ -964,7 +1028,10 @@ export async function setHydrogenQuantumNumbers(
 /** Set HO superposition term count via store injection. */
 export async function setTermCount(page: Page, count: number): Promise<void> {
   await page.evaluate(async (tc: number) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     mod.useExtendedObjectStore.getState().setSchroedingerTermCount(tc)
   }, count)
 }
@@ -972,7 +1039,10 @@ export async function setTermCount(page: Page, count: number): Promise<void> {
 /** Pause animation for deterministic snapshots/readback. */
 export async function pauseAnimation(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
+    const mod = { useAnimationStore: window.__ANIMATION_STORE__ }
+    if (!mod.useAnimationStore) {
+      throw new Error('__ANIMATION_STORE__ missing on window — DEV bridge not registered')
+    }
     const store = mod.useAnimationStore.getState()
     if (store.isPlaying) store.togglePlayPause()
   })
@@ -981,7 +1051,10 @@ export async function pauseAnimation(page: Page): Promise<void> {
 /** Read animation store state. */
 export async function getAnimationState(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/animationStore.ts')
+    const mod = { useAnimationStore: window.__ANIMATION_STORE__ }
+    if (!mod.useAnimationStore) {
+      throw new Error('__ANIMATION_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useAnimationStore.getState()
     return {
       isPlaying: s.isPlaying,
@@ -999,44 +1072,53 @@ export async function gotoPauli(page: Page, dim = 3): Promise<void> {
 
 /** Apply a TDSE preset via store injection. */
 export async function applyTdsePreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyTdsePreset(id)
+  await page.evaluate((id: string) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().applyTdsePreset(id)
   }, presetId)
 }
 
 /** Apply a BEC preset via store injection. */
 export async function applyBecPreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyBecPreset(id)
+  await page.evaluate((id: string) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().applyBecPreset(id)
   }, presetId)
 }
 
 /** Apply a Dirac preset via store injection. */
 export async function applyDiracPreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate(async (id: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).applyDiracPreset(id)
+  await page.evaluate((id: string) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().applyDiracPreset(id)
   }, presetId)
 }
 
 /** Apply a Pauli preset via setPauliConfig. */
 export async function applyPauliPreset(page: Page, presetId: string): Promise<void> {
-  await page.evaluate(async (id: string) => {
-    const presetMod = await import('/src/lib/physics/pauli/presets.ts')
-    const storeMod = await import('/src/stores/extendedObjectStore.ts')
-    const preset = presetMod.PAULI_SCENARIO_PRESETS.find((p: { id: string }) => p.id === id)
+  await page.evaluate((id: string) => {
+    const presets = window.__PAULI_SCENARIO_PRESETS__
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!presets || !extStore) {
+      throw new Error(
+        '__PAULI_SCENARIO_PRESETS__/__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered'
+      )
+    }
+    const preset = presets.find((p: { id: string }) => p.id === id)
     if (preset) {
-      ;(
-        storeMod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-      ).setPauliConfig({ ...preset.overrides, needsReset: true })
+      extStore.getState().setPauliConfig({
+        ...preset.overrides,
+        needsReset: true,
+      })
     }
   }, presetId)
 }
@@ -1083,7 +1165,10 @@ export interface OQDiagnosticsSnapshot {
 /** Read the open quantum diagnostics store from the running app. */
 export async function readOQDiagnostics(page: Page): Promise<OQDiagnosticsSnapshot> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().openQuantum
     return {
       purity: s.purity,
@@ -1111,7 +1196,10 @@ export async function waitForOQEvolution(
 ): Promise<void> {
   await page.waitForFunction(
     async (min: number) => {
-      const mod = await import('/src/stores/diagnosticsStore.ts')
+      const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+      if (!mod.useDiagnosticsStore) {
+        throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+      }
       return mod.useDiagnosticsStore.getState().openQuantum.historyCount >= min
     },
     minUpdates,
@@ -1125,7 +1213,10 @@ export async function waitForOQEvolution(
  */
 export async function setOQConfig(page: Page, config: Record<string, unknown>): Promise<void> {
   await page.evaluate(async (cfg: Record<string, unknown>) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     const store = mod.useExtendedObjectStore.getState()
     // Apply each setting via the individual setters when available
     if ('enabled' in cfg) store.setOpenQuantumEnabled(cfg.enabled as boolean)
@@ -1141,7 +1232,9 @@ export async function setOQConfig(page: Page, config: Record<string, unknown>): 
     if ('dephasingModel' in cfg)
       store.setOpenQuantumDephasingModel(cfg.dephasingModel as 'none' | 'uniform')
     if ('visualizationMode' in cfg)
-      store.setOpenQuantumVisualizationMode(cfg.visualizationMode as string)
+      store.setOpenQuantumVisualizationMode(
+        cfg.visualizationMode as Parameters<typeof store.setOpenQuantumVisualizationMode>[0]
+      )
 
     // Channel toggles via generic setter.
     // The setter expects short channel names ('dephasing', 'relaxation', 'thermal'),
@@ -1161,10 +1254,15 @@ export async function setOQConfig(page: Page, config: Record<string, unknown>): 
  */
 export async function resetOQState(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const diagMod = await import('/src/stores/diagnosticsStore.ts')
-    diagMod.useDiagnosticsStore.getState().resetOpenQuantum()
-    const extMod = await import('/src/stores/extendedObjectStore.ts')
-    extMod.useExtendedObjectStore.getState().requestOpenQuantumStateReset()
+    const diagStore = window.__DIAGNOSTICS_STORE__
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!diagStore || !extStore) {
+      throw new Error(
+        '__DIAGNOSTICS_STORE__/__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered'
+      )
+    }
+    diagStore.getState().resetOpenQuantum()
+    extStore.getState().requestOpenQuantumStateReset()
   })
   await waitForFreshReadback(page, '/src/stores/diagnosticsStore.ts', 30_000, 'openQuantum')
 }
@@ -1174,7 +1272,10 @@ export async function resetOQState(page: Page): Promise<void> {
 /** Read observables diagnostics from the GPU readback store. */
 export async function readObservablesDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().observables
     return {
       hasData: s.hasData,
@@ -1194,7 +1295,10 @@ export async function readObservablesDiagnostics(page: Page) {
 /** Read quantum walk diagnostics from the running app (GPU readback values). */
 export async function readQwDiagnostics(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/diagnosticsStore.ts')
+    const mod = { useDiagnosticsStore: window.__DIAGNOSTICS_STORE__ }
+    if (!mod.useDiagnosticsStore) {
+      throw new Error('__DIAGNOSTICS_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useDiagnosticsStore.getState().qw
     return {
       hasData: s.hasData,
@@ -1212,7 +1316,10 @@ export async function readQwDiagnostics(page: Page) {
 /** Read quantum walk configuration from the store. */
 export async function getQuantumWalkConfig(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     const qw = mod.useExtendedObjectStore.getState().schroedinger.quantumWalk
     return {
       coinType: qw.coinType,
@@ -1228,7 +1335,10 @@ export async function getQuantumWalkConfig(page: Page) {
 /** Set quantum walk coin type via store injection. */
 export async function setQuantumWalkCoin(page: Page, coinType: string): Promise<void> {
   await page.evaluate(async (coin: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     const store = mod.useExtendedObjectStore.getState()
     store.setSchroedingerConfig({
       quantumWalk: { ...store.schroedinger.quantumWalk, coinType: coin as never, needsReset: true },
@@ -1239,7 +1349,10 @@ export async function setQuantumWalkCoin(page: Page, coinType: string): Promise<
 /** Set quantum walk field view via store injection. */
 export async function setQuantumWalkFieldView(page: Page, fieldView: string): Promise<void> {
   await page.evaluate(async (view: string) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     const store = mod.useExtendedObjectStore.getState()
     store.setSchroedingerConfig({
       quantumWalk: { ...store.schroedinger.quantumWalk, fieldView: view as never },
@@ -1252,7 +1365,10 @@ export async function setQuantumWalkFieldView(page: Page, fieldView: string): Pr
 /** Read measurement store state. */
 export async function readMeasurementState(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/measurementStore.ts')
+    const mod = { useMeasurementStore: window.__MEASUREMENT_STORE__ }
+    if (!mod.useMeasurementStore) {
+      throw new Error('__MEASUREMENT_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useMeasurementStore.getState()
     return {
       enabled: s.enabled,
@@ -1272,7 +1388,10 @@ export async function readMeasurementState(page: Page) {
 /** Enable imaginary-time propagation. */
 export async function enableImaginaryTime(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     mod.useExtendedObjectStore.getState().setTdseImaginaryTimeEnabled(true)
   })
 }
@@ -1280,11 +1399,14 @@ export async function enableImaginaryTime(page: Page): Promise<void> {
 /** Read simulation state (eigenstate storage, etc). */
 export async function readSimulationState(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/simulationStateStore.ts')
+    const mod = { useSimulationStateStore: window.__SIMULATION_STATE_STORE__ }
+    if (!mod.useSimulationStateStore) {
+      throw new Error('__SIMULATION_STATE_STORE__ missing on window — DEV bridge not registered')
+    }
     const s = mod.useSimulationStateStore.getState()
     return {
       storedEigenstateCount: s.storedEigenstateCount,
-      pendingStoreRequest: s.pendingStoreRequest,
+      storeEigenstateRequested: s.storeEigenstateRequested,
     }
   })
 }
@@ -1292,7 +1414,10 @@ export async function readSimulationState(page: Page) {
 /** Read TDSE imaginary-time configuration. */
 export async function getImaginaryTimeConfig(page: Page) {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
     const tdse = mod.useExtendedObjectStore.getState().schroedinger.tdse
     return {
       imaginaryTimeEnabled: tdse.imaginaryTimeEnabled,
@@ -1379,15 +1504,22 @@ export async function waitForModeReady(page: Page, extraFrames = 0): Promise<voi
  * (bypasses clamped setters). Use this before pixel-checking skybox rendering.
  */
 export async function hideQuantumObject(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    const mod = await import('/src/stores/geometryStore.ts')
-    mod.useGeometryStore.setState({
+  await page.evaluate(() => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    // densityGain + schroedingerScale live on `state.schroedinger`, which is
+    // owned by the extended object store (not the geometry store). Use
+    // setState directly to bypass the clamped setters and reach near-zero
+    // values that the UI-facing setters reject.
+    extStore.setState((state) => ({
       schroedinger: {
-        ...mod.useGeometryStore.getState().schroedinger,
+        ...state.schroedinger,
         densityGain: 0.001,
         schroedingerScale: 0.01,
       },
-    })
+    }))
   })
   await waitForUniformUpdate(page)
 }
@@ -1425,41 +1557,49 @@ export interface CurvedMetricConfig {
  * setter's normalizer.
  */
 export async function setTdseMetricV2(page: Page, cfg: CurvedMetricConfig): Promise<void> {
-  await page.evaluate(async (metric) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).setTdseMetric(metric)
+  await page.evaluate((metric: CurvedMetricConfig) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore
+      .getState()
+      .setTdseMetric(
+        metric as unknown as Parameters<ReturnType<typeof extStore.getState>['setTdseMetric']>[0]
+      )
   }, cfg)
 }
 
 /** Toggle the Wave 6 Ricci-scalar curvature overlay (render-only). */
 export async function setTdseShowCurvatureOverlay(page: Page, enabled: boolean): Promise<void> {
-  await page.evaluate(async (flag: boolean) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).setShowCurvatureOverlay(flag)
+  await page.evaluate((flag: boolean) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().setShowCurvatureOverlay(flag)
   }, enabled)
 }
 
 /** Set the overlay opacity (clamped to `[0, 1]` by the setter). */
 export async function setTdseCurvatureOverlayOpacity(page: Page, opacity: number): Promise<void> {
-  await page.evaluate(async (v: number) => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).setCurvatureOverlayOpacity(v)
+  await page.evaluate((v: number) => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().setCurvatureOverlayOpacity(v)
   }, opacity)
 }
 
 /** Select coordinate- vs. proper-volume density view. Render-only. */
 export async function setTdseDensityView(page: Page, view: 'coordinate' | 'proper'): Promise<void> {
-  await page.evaluate(async (v: 'coordinate' | 'proper') => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    ;(
-      mod.useExtendedObjectStore.getState() as Record<string, (...args: unknown[]) => void>
-    ).setDensityView(v)
+  await page.evaluate((v: 'coordinate' | 'proper') => {
+    const extStore = window.__EXTENDED_OBJECT_STORE__
+    if (!extStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    extStore.getState().setDensityView(v)
   }, view)
 }
 
@@ -1480,8 +1620,11 @@ export interface TdseV2StateSnapshot {
  */
 export async function readTdseV2State(page: Page): Promise<TdseV2StateSnapshot> {
   return page.evaluate(async () => {
-    const mod = await import('/src/stores/extendedObjectStore.ts')
-    const s = mod.useExtendedObjectStore.getState() as Record<string, unknown>
+    const mod = { useExtendedObjectStore: window.__EXTENDED_OBJECT_STORE__ }
+    if (!mod.useExtendedObjectStore) {
+      throw new Error('__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered')
+    }
+    const s = mod.useExtendedObjectStore.getState() as unknown as Record<string, unknown>
     const schroedinger = s.schroedinger as { tdse?: Record<string, unknown> } | undefined
     const tdse = schroedinger?.tdse ?? {}
     return {

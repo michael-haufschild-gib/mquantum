@@ -20,6 +20,9 @@ function pointsMaxFor(kind: SrmtSweepKind): number {
   if (kind === 'cut') return 64
   if (kind === 'rankCap') return 32
   if (kind === 'phiExtent') return 13
+  if (kind === 'gridNa') return 9
+  if (kind === 'gridNphi') return 9
+  if (kind === 'gridNphiCoupled') return 7
   return 21
 }
 
@@ -261,14 +264,14 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
             label="φext min"
             tooltip="Lower φ-extent bound. CFL stability tightens as φext shrinks at fixed gridNphi; the solver dev-warns below the safe envelope."
             min={0.5}
-            max={5}
+            max={10}
             step={0.05}
             value={ui.sweepMin}
             onChange={(v) =>
               setUi((s) => ({
                 ...s,
                 sweepMin: v,
-                sweepMax: clamp(Math.max(v + 0.1, s.sweepMax), 0.5, 5),
+                sweepMax: clamp(Math.max(v + 0.1, s.sweepMax), 0.5, 10),
               }))
             }
             showValue
@@ -278,19 +281,97 @@ export const SweepKindControls: React.FC<SweepKindControlsProps> = ({
           <Slider
             label="φext max"
             min={0.5}
-            max={5}
+            max={10}
             step={0.05}
             value={ui.sweepMax}
             onChange={(v) =>
               setUi((s) => ({
                 ...s,
                 sweepMax: v,
-                sweepMin: clamp(Math.min(v - 0.1, s.sweepMin), 0.5, 5),
+                sweepMin: clamp(Math.min(v - 0.1, s.sweepMin), 0.5, 10),
               }))
             }
             showValue
             disabled={running}
             data-testid="srmt-sweep-phiextmax-slider"
+          />
+        </>
+      )}
+      {ui.kind === 'gridNa' && (
+        <>
+          <Slider
+            label="N_a min"
+            tooltip="Lower gridNa. Integer-valued; driver rounds + dedups adjacent points."
+            min={64}
+            max={1024}
+            step={1}
+            value={ui.sweepMin}
+            onChange={(v) =>
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 1, s.sweepMax), 64, 1024),
+              }))
+            }
+            showValue
+            disabled={running}
+            data-testid="srmt-sweep-gridnamin-slider"
+          />
+          <Slider
+            label="N_a max"
+            min={64}
+            max={1024}
+            step={1}
+            value={ui.sweepMax}
+            onChange={(v) =>
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 1, s.sweepMin), 64, 1024),
+              }))
+            }
+            showValue
+            disabled={running}
+            data-testid="srmt-sweep-gridnamax-slider"
+          />
+        </>
+      )}
+      {(ui.kind === 'gridNphi' || ui.kind === 'gridNphiCoupled') && (
+        <>
+          <Slider
+            label="N_φ min"
+            tooltip="Lower gridNphi. Integer-valued; driver rounds + dedups adjacent points. For the coupled kind, gridNa is co-scaled per point via the CFL-preserving formula."
+            min={32}
+            max={64}
+            step={1}
+            value={ui.sweepMin}
+            onChange={(v) =>
+              setUi((s) => ({
+                ...s,
+                sweepMin: v,
+                sweepMax: clamp(Math.max(v + 1, s.sweepMax), 32, 64),
+              }))
+            }
+            showValue
+            disabled={running}
+            data-testid="srmt-sweep-gridnphimin-slider"
+          />
+          <Slider
+            label="N_φ max"
+            min={32}
+            max={64}
+            step={1}
+            value={ui.sweepMax}
+            onChange={(v) =>
+              setUi((s) => ({
+                ...s,
+                sweepMax: v,
+                sweepMin: clamp(Math.min(v - 1, s.sweepMin), 32, 64),
+              }))
+            }
+            showValue
+            disabled={running}
+            data-testid="srmt-sweep-gridnphimax-slider"
           />
         </>
       )}

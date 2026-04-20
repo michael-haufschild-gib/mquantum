@@ -24,8 +24,16 @@
  * with
  *
  *     U(a, φ) = −c_U·a²·(1 − (8πG/3)·a²·V(φ))
- *     V(φ)   = ½m²(φ₁²+φ₂²) + Λ
+ *     V(φ)   = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ
  *     c_U    = 36 π²
+ *
+ * `α = inflatonMassAsymmetry` is the per-axis effective-mass ratio that
+ * multiplies the φ₂ component of the potential (effective mass on the
+ * φ₂ axis is `m·α`). `α = 1` is the isotropic default under which
+ * `V(φ₁, φ₂) = ½m²(φ₁²+φ₂²) + Λ`, matching the pre-asymmetry
+ * literature form bit-identically. Values `α ≠ 1` break the φ₁↔φ₂
+ * exchange symmetry and are required for SRMT three-clock
+ * discrimination (`docs/physics/srmt-metric.md`).
  *
  * The sign convention is: `U < 0` defines the Lorentzian (classically
  * allowed) region of minisuperspace; `U > 0` defines the Euclidean
@@ -60,16 +68,33 @@ export const WDW_G_PREFACTOR = (8 * Math.PI) / 3
 export const WDW_C_U = 36 * Math.PI * Math.PI
 
 /**
- * Inflaton potential `V(φ₁, φ₂) = ½m²(φ₁²+φ₂²) + Λ`. Real scalar.
+ * Inflaton potential
+ *
+ *   `V(φ₁, φ₂) = ½·m²·φ₁² + ½·(m·α)²·φ₂² + Λ`
+ *
+ * where `α = asymmetry` is the per-axis effective-mass ratio. `α = 1`
+ * reduces to the symmetric form `V = ½m²(φ₁²+φ₂²) + Λ` bit-identically
+ * (multiplication by the exact IEEE-754 constant `1` is a no-op). Real
+ * scalar.
  *
  * @param phi1 - First inflaton coordinate.
  * @param phi2 - Second inflaton coordinate.
- * @param m - Inflaton mass `m`.
+ * @param m - Inflaton mass `m` (shared scale).
  * @param lambda - Cosmological constant `Λ`.
+ * @param asymmetry - Per-axis effective-mass ratio on the φ₂ axis
+ *   (effective mass = `m·asymmetry`). Defaults to `1` (isotropic).
  * @returns Potential value in natural units.
  */
-export function wdwPotential(phi1: number, phi2: number, m: number, lambda: number): number {
-  return 0.5 * m * m * (phi1 * phi1 + phi2 * phi2) + lambda
+export function wdwPotential(
+  phi1: number,
+  phi2: number,
+  m: number,
+  lambda: number,
+  asymmetry: number = 1
+): number {
+  const massSqPhi1 = m * m
+  const massSqPhi2 = m * m * asymmetry * asymmetry
+  return 0.5 * massSqPhi1 * phi1 * phi1 + 0.5 * massSqPhi2 * phi2 * phi2 + lambda
 }
 
 /**
@@ -85,10 +110,20 @@ export function wdwPotential(phi1: number, phi2: number, m: number, lambda: numb
  * @param phi2 - Second inflaton coordinate.
  * @param m - Inflaton mass.
  * @param lambda - Cosmological constant.
+ * @param asymmetry - Per-axis effective-mass ratio on the φ₂ axis
+ *   (defaults to `1` — fully symmetric, matches pre-asymmetry behaviour
+ *   bit-identically).
  * @returns `U(a, φ)` in natural units.
  */
-export function wdwU(a: number, phi1: number, phi2: number, m: number, lambda: number): number {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+export function wdwU(
+  a: number,
+  phi1: number,
+  phi2: number,
+  m: number,
+  lambda: number,
+  asymmetry: number = 1
+): number {
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   const a2 = a * a
   return -WDW_C_U * a2 * (1 - WDW_G_PREFACTOR * a2 * V)
 }
@@ -108,8 +143,14 @@ export function wdwU(a: number, phi1: number, phi2: number, m: number, lambda: n
  * @param lambda - Cosmological constant.
  * @returns `a_turn(φ)` or `null` if the column has no turning surface.
  */
-export function wdwTurningA(phi1: number, phi2: number, m: number, lambda: number): number | null {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+export function wdwTurningA(
+  phi1: number,
+  phi2: number,
+  m: number,
+  lambda: number,
+  asymmetry: number = 1
+): number | null {
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   if (V <= 0) return null
   return 1 / Math.sqrt(WDW_G_PREFACTOR * V)
 }
@@ -146,9 +187,10 @@ export function wdwEuclideanWkbAction(
   phi1: number,
   phi2: number,
   m: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 <= 1) return 0
@@ -193,9 +235,10 @@ export function wdwLorentzianWkbAction(
   phi1: number,
   phi2: number,
   m: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 >= 1) return 0
@@ -235,9 +278,10 @@ export function wdwLorentzianWkbPhase(
   phi1: number,
   phi2: number,
   m: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   if (V > 0) {
     const KVa2 = WDW_G_PREFACTOR * V * a * a
     if (KVa2 >= 1) return 3 / (4 * V)
@@ -282,9 +326,10 @@ export function wdwLangerVariable(
   phi1: number,
   phi2: number,
   m: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): number {
-  const V = wdwPotential(phi1, phi2, m, lambda)
+  const V = wdwPotential(phi1, phi2, m, lambda, asymmetry)
   if (V <= 0) return 0
   const KVa2 = WDW_G_PREFACTOR * V * a * a
   if (KVa2 >= 1) {

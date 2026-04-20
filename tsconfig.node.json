@@ -21,6 +21,7 @@
   "include": [
     "vite.config.ts",
     "vitest.config.ts",
+    "vitest.oneshot.config.ts",
     "vitest.config.stryker.ts",
     "playwright.config.ts",
     "playwright.benchmark.config.ts",

@@ -56,6 +56,9 @@ const KIND_OPTIONS: { value: SrmtSweepKind; label: string }[] = [
   { value: 'phiRef', label: 'φref' },
   { value: 'rankCap', label: 'rank' },
   { value: 'phiExtent', label: 'φext' },
+  { value: 'gridNa', label: 'gridN_a' },
+  { value: 'gridNphi', label: 'gridN_φ' },
+  { value: 'gridNphiCoupled', label: 'gridN_φ*' },
 ]
 
 function defaultUiStateFor(
@@ -127,6 +130,49 @@ function defaultUiStateFor(
       points: 5,
       sweepMin: 1.0,
       sweepMax: 3.0,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'gridNa') {
+    // Cauchy / grid-convergence sweep on the a-axis. Driver clamps
+    // `points` to [3, 9]; Nₐ to [64, 1024]. Defaults span a >2× range
+    // so the leapfrog's 2nd-order convergence is observable in one
+    // sweep without blowing the per-point solve budget at the upper
+    // end.
+    return {
+      kind,
+      points: 3,
+      sweepMin: 128,
+      sweepMax: 384,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'gridNphi') {
+    // Cauchy / grid-convergence sweep on the φ-axes. Driver clamps
+    // `points` to [3, 9]; Nφ to [32, 64]. Upper bound is conservative:
+    // the explicit-leapfrog CFL term grows as `N_φ²` at fixed `gridNa`,
+    // so callers hunting a true Cauchy tail should switch to
+    // `gridNphiCoupled` once the solver warns.
+    return {
+      kind,
+      points: 3,
+      sweepMin: 32,
+      sweepMax: 64,
+      phiRef: commonPhiRef,
+      cutAnchor: srmtCutNormalized,
+    }
+  }
+  if (kind === 'gridNphiCoupled') {
+    // Joint (Nφ, Nₐ) grid-convergence sweep. Driver clamps `points` to
+    // [3, 7]; Nφ to [32, 64]. Per-point `gridNa` is co-scaled via the
+    // coupling formula so the CFL term stays bounded.
+    return {
+      kind,
+      points: 5,
+      sweepMin: 32,
+      sweepMax: 64,
       phiRef: commonPhiRef,
       cutAnchor: srmtCutNormalized,
     }
@@ -258,7 +304,7 @@ const SrmtSweepContent: React.FC = React.memo(() => {
           value={ui.kind}
           onChange={handleKindChange}
           ariaLabel="SRMT sweep kind"
-          tooltip="Which parameter to vary across sweep points. Cut: sweep the cut position at fixed physics. Mass: sweep inflaton mass. BC: iterate the three boundary conditions."
+          tooltip="Which parameter to vary across sweep points. Cut: cut position. Mass: inflaton mass. Lambda: cosmological constant. BC: boundary conditions. PhiRef/RankCap/PhiExtent: sensitivity. GridNa/GridNphi: convergence. GridNphiCoupled: joint (Nφ, Nₐ) convergence with CFL coupling."
           fullWidth
           disabled={running}
           data-testid="srmt-sweep-kind-selector"

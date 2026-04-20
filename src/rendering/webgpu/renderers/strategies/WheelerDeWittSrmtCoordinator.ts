@@ -351,6 +351,7 @@ export class WheelerDeWittSrmtCoordinator {
       cutIndex: this.resolveSrmtCutIndex(config, solverOutput, clock),
       rankCap,
       inflatonMass: config.inflatonMass,
+      inflatonMassAsymmetry: config.inflatonMassAsymmetry,
       cosmologicalConstant: config.cosmologicalConstant,
       hash,
     }

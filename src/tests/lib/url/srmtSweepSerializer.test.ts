@@ -164,19 +164,43 @@ describe('deserializeSrmtSweep', () => {
   })
 
   it('round-trips a gridNphi sweep with the documented range', () => {
-    const params = new URLSearchParams('sw=gridNphi&sw_n=5&sw_min=9&sw_max=33&sw_c=0.5')
+    // Driver clamp is [32, 64] (see clampGridNphi docstring); URL layer
+    // only enforces the outer box [-1024, 1024], so the driver range is
+    // what callers should encode.
+    const params = new URLSearchParams('sw=gridNphi&sw_n=5&sw_min=32&sw_max=64&sw_c=0.5')
     const state: SrmtSweepUrlState = {}
     deserializeSrmtSweep(params, state)
     expect(state.srmtSweepKind).toBe('gridNphi')
     expect(state.srmtSweepPoints).toBe(5)
-    expect(state.srmtSweepMin).toBe(9)
-    expect(state.srmtSweepMax).toBe(33)
+    expect(state.srmtSweepMin).toBe(32)
+    expect(state.srmtSweepMax).toBe(64)
+  })
+
+  it('round-trips a gridNphiCoupled sweep with the documented range', () => {
+    // Coupled joint (Nφ, Nₐ) convergence kind — Nφ walks the same
+    // [32, 64] driver range as `gridNphi`; the per-point gridNa is
+    // derived by the driver, so the URL only needs to encode the Nφ
+    // range. Points cap is [3, 7] at the driver level.
+    const params = new URLSearchParams('sw=gridNphiCoupled&sw_n=5&sw_min=32&sw_max=64&sw_c=0.5')
+    const state: SrmtSweepUrlState = {}
+    deserializeSrmtSweep(params, state)
+    expect(state.srmtSweepKind).toBe('gridNphiCoupled')
+    expect(state.srmtSweepPoints).toBe(5)
+    expect(state.srmtSweepMin).toBe(32)
+    expect(state.srmtSweepMax).toBe(64)
   })
 })
 
 describe('serializeSrmtSweep — Tier-3 sensitivity kinds', () => {
-  it('emits sw_n/min/max for phiRef, rankCap, phiExtent, gridNa, gridNphi', () => {
-    for (const kind of ['phiRef', 'rankCap', 'phiExtent', 'gridNa', 'gridNphi'] as const) {
+  it('emits sw_n/min/max for phiRef, rankCap, phiExtent, gridNa, gridNphi, gridNphiCoupled', () => {
+    for (const kind of [
+      'phiRef',
+      'rankCap',
+      'phiExtent',
+      'gridNa',
+      'gridNphi',
+      'gridNphiCoupled',
+    ] as const) {
       const params = new URLSearchParams()
       serializeSrmtSweep(params, 'wheelerDeWitt', {
         srmtSweepKind: kind,

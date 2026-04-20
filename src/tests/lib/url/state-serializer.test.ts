@@ -802,6 +802,55 @@ describe('state-serializer', () => {
       expect(negative.wdwWorldlineSpeed).toBe(0.1)
       expect(negative.wdwWorldlinePulseWidth).toBe(0.02)
     })
+
+    it('round-trips wdw_ma (inflaton mass asymmetry) when != 1', () => {
+      // Anisotropic value must round-trip exactly (within 4-decimal
+      // serialization precision). This is the canonical URL the
+      // thesis experiment uses to enable the SRMT three-clock test.
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwInflatonMassAsymmetry: 2.5,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_ma=2.5000')
+      const round = deserializeState(serialized)
+      expect(round.wdwInflatonMassAsymmetry).toBeCloseTo(2.5, 4)
+    })
+
+    it('elides wdw_ma when value equals the isotropic default (1)', () => {
+      // Default elision policy: baseline share links for the symmetric
+      // potential must stay free of `wdw_ma=1` noise. An explicit
+      // `wdwInflatonMassAsymmetry: 1` on the state should NOT appear
+      // in the serialized URL.
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwInflatonMassAsymmetry: 1,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).not.toContain('wdw_ma=')
+    })
+
+    it('omits wdw_ma when quantumMode is NOT wheelerDeWitt', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+        wdwInflatonMassAsymmetry: 2.5,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).not.toContain('wdw_ma=')
+    })
+
+    it('clamps wdw_ma to [0.1, 10] on deserialize', () => {
+      const tooLow = deserializeState('wdw_ma=0.01')
+      const tooHigh = deserializeState('wdw_ma=999')
+      expect(tooLow.wdwInflatonMassAsymmetry).toBe(0.1)
+      expect(tooHigh.wdwInflatonMassAsymmetry).toBe(10)
+    })
   })
 
   describe('Wheeler–DeWitt SRMT diagnostic params', () => {

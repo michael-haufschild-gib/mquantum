@@ -122,9 +122,9 @@ describe('SrmtDiagnosticSection', () => {
     })
     render(<SrmtDiagnosticSection />)
     await openSection(user)
-    // phi2* = 2.0 * (2*0.75 - 1) = 1.0 at default phiExtent.
+    // phi2* = 3.5 * (2*0.75 - 1) = 1.75 at default phiExtent.
     expect(screen.getByTestId('wdw-srmt-cut-coord-readout')).toHaveTextContent(
-      /^phi2\*\s*=\s*1\.000/
+      /^phi2\*\s*=\s*1\.750/
     )
   })
 

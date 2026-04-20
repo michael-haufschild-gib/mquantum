@@ -195,8 +195,7 @@ pub fn compute_joint_rdm(
     if k_len > 0 {
         joint_strides[k_len - 1] = 1;
         for k in (0..k_len - 1).rev() {
-            joint_strides[k] =
-                joint_strides[k + 1] * grid_size[kept_dims[k + 1] as usize] as usize;
+            joint_strides[k] = joint_strides[k + 1] * grid_size[kept_dims[k + 1] as usize] as usize;
         }
     }
 
@@ -216,7 +215,8 @@ pub fn compute_joint_rdm(
     let t_n = traced_dims.len();
 
     // Build reduced strides for traced dimensions
-    let traced_grid_sizes: Vec<usize> = traced_dims.iter().map(|&d| grid_size[d] as usize).collect();
+    let traced_grid_sizes: Vec<usize> =
+        traced_dims.iter().map(|&d| grid_size[d] as usize).collect();
     let traced_full_strides: Vec<usize> = traced_dims.iter().map(|&d| strides[d]).collect();
     let mut traced_red_strides = vec![0usize; t_n];
     if t_n > 0 {
@@ -671,10 +671,7 @@ mod tests {
         for i in 0..m_sz {
             trace += rho_re[i * m_sz + i];
         }
-        assert!(
-            (trace - 1.0).abs() < 1e-5,
-            "trace = {trace}, expected 1.0"
-        );
+        assert!((trace - 1.0).abs() < 1e-5, "trace = {trace}, expected 1.0");
     }
 
     #[test]
@@ -799,8 +796,16 @@ mod tests {
         let im = vec![0.0, 0.2, -0.2, 0.0];
 
         let eigs = hermitian_eigenvalues(&re, &im, 2);
-        assert!((eigs[0] - 0.8).abs() < TOL, "λ₁ = {}, expected 0.8", eigs[0]);
-        assert!((eigs[1] - 0.2).abs() < TOL, "λ₂ = {}, expected 0.2", eigs[1]);
+        assert!(
+            (eigs[0] - 0.8).abs() < TOL,
+            "λ₁ = {}, expected 0.8",
+            eigs[0]
+        );
+        assert!(
+            (eigs[1] - 0.2).abs() < TOL,
+            "λ₂ = {}, expected 0.2",
+            eigs[1]
+        );
     }
 
     #[test]
@@ -868,10 +873,7 @@ mod tests {
 
         let eigs = hermitian_eigenvalues(rho_re, rho_im, m_sz);
         for (k, &e) in eigs.iter().enumerate() {
-            assert!(
-                e >= -1e-10,
-                "eigenvalue[{k}] = {e}, expected >= 0"
-            );
+            assert!(e >= -1e-10, "eigenvalue[{k}] = {e}, expected >= 0");
         }
     }
 
@@ -941,10 +943,7 @@ mod tests {
         let eigs: Vec<f64> = vec![1.0 / m as f64; m];
         let s = von_neumann_entropy(&eigs);
         let expected = (m as f64).ln();
-        assert!(
-            (s - expected).abs() < TOL,
-            "S = {s}, expected {expected}"
-        );
+        assert!((s - expected).abs() < TOL, "S = {s}, expected {expected}");
     }
 
     #[test]

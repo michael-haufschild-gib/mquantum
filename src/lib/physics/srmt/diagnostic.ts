@@ -20,7 +20,7 @@ import type { WheelerDeWittSolverOutput } from '@/lib/physics/wheelerDeWitt/solv
 import { computeAffineFitQuality } from './affineFit'
 import { hjSpectrumOnSliceTopK } from './hjOperator'
 import { modularSpectrum } from './modularHamiltonian'
-import { schmidtValues } from './schmidt'
+import { computeVolumeElement, normalizedSchmidtValues } from './schmidt'
 import type { SrmtConfig, SrmtResult, SrmtSlicePlane } from './types'
 
 /**
@@ -33,20 +33,29 @@ import type { SrmtConfig, SrmtResult, SrmtSlicePlane } from './types'
  * Schmidt spectrum of a free-wave χ.
  */
 export interface SrmtPhysicsContext {
-  /** Inflaton mass `m` used in `V(φ) = ½ m² |φ|² + Λ`. */
+  /** Inflaton mass `m` used in `V(φ) = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ`. */
   inflatonMass: number
   /** Cosmological constant `Λ`. */
   cosmologicalConstant: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis. Optional;
+   * defaults to `1` (isotropic). Must match the value the solver used
+   * when producing `χ` — otherwise the modular and HJ spectra probe
+   * different physics and the affine-fit quality `q` becomes
+   * meaningless.
+   */
+  inflatonMassAsymmetry?: number
 }
 
 /**
- * Default physics context — zeros — used when the caller omits the
- * parameter. Documented separately rather than inlined so consumers can
- * reason about the fallback behaviour.
+ * Default physics context — zeros + isotropic mass — used when the
+ * caller omits the parameter. Documented separately rather than inlined
+ * so consumers can reason about the fallback behaviour.
  */
 const DEFAULT_PHYSICS: SrmtPhysicsContext = {
   inflatonMass: 0,
   cosmologicalConstant: 0,
+  inflatonMassAsymmetry: 1,
 }
 
 /**
@@ -236,8 +245,24 @@ export function computeSrmtDiagnostic(
     )
   }
 
-  // Schmidt decomposition and modular spectrum.
-  const allSchmidt = schmidtValues({ chi: output.chi, gridSize: output.gridSize }, config.clock)
+  // Schmidt decomposition and modular spectrum. `normalizedSchmidtValues`
+  // applies the volume-weighted rescale `Σ s_n²·dVol = 1` before forming
+  // `K_n = −log(s_n² + ε)`, so the affine fit's `β` absorbs only the
+  // genuine zero-of-energy offset — not `−log(Σ|χ|²)` (the original
+  // Σ|χ|²=raw offset that produced `β ≈ −14`) nor the residual
+  // `log(dVol)` drift that Frobenius-only normalisation left across
+  // grid-variation sweeps. See `computeVolumeElement` + task #8.
+  const dVol = computeVolumeElement({
+    gridSize: output.gridSize,
+    aMin: output.aMin,
+    aMax: output.aMax,
+    phiExtent: output.phiExtent,
+  })
+  const allSchmidt = normalizedSchmidtValues(
+    { chi: output.chi, gridSize: output.gridSize },
+    config.clock,
+    dVol
+  )
   const keep = Math.min(config.rankCap, allSchmidt.length)
   const schmidt = new Float64Array(keep)
   for (let i = 0; i < keep; i++) schmidt[i] = allSchmidt[i]!
@@ -257,6 +282,7 @@ export function computeSrmtDiagnostic(
       phiExtent: output.phiExtent,
       inflatonMass: physics.inflatonMass,
       cosmologicalConstant: physics.cosmologicalConstant,
+      inflatonMassAsymmetry: physics.inflatonMassAsymmetry ?? 1,
       sliceIndex: config.cutIndex,
     },
     config.rankCap
