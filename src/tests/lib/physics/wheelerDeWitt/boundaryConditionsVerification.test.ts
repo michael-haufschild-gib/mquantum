@@ -130,13 +130,33 @@ describe('Tunneling BC: post-integration phase accumulates in +a direction', () 
       gridNphi: 17,
       phiExtent: 2.0,
     })
-    const [Na, Nphi] = out.gridSize
+    const [, Nphi] = out.gridSize
     const slab = Nphi * Nphi
     const c = (Nphi - 1) >> 1
 
-    // Unwrap phase across the column (skip first/last few cells).
+    // Unwrap phase across the column, stopping BEFORE the φ-edge
+    // reflection reaches the centre. Character speed of the φ-axis
+    // PDE is `dφ/da = 1/a`, so the edge-to-centre travel time from
+    // `a_min = 0.05` across `Δφ = phiExtent = 2` is
+    // `Δa = a_min·(exp(Δφ) − 1) = 0.05·(e² − 1) ≈ 0.32`. The
+    // centre becomes edge-contaminated from `a ≈ 0.37` onward
+    // (slab ≈ 111 of 192). We stop at slab 96 (just below that) so
+    // the unwrapped phase reflects the **marched outgoing wave**
+    // alone, not a superposition with the boundary-reflected wave.
+    //
+    // Drift comment: the prior version used `iaEnd = Na − 4`, which
+    // integrated all the way to `aMax`. That worked under ghost-zero
+    // Dirichlet only because Dirichlet reflects with a π phase flip,
+    // and the accumulated reflected-wave phase happened to preserve
+    // the net-positive sign by coincidence. Under the updated Neumann
+    // ghost (which reflects without a phase flip) the outgoing and
+    // reflected waves interfere constructively into a standing-wave
+    // pattern whose unwrapped phase at the centre drifts around zero.
+    // Restricting the window to the causally-uncontaminated region
+    // makes the test diagnostic of the BC sign alone, as originally
+    // intended.
     const iaStart = 8
-    const iaEnd = Na - 4
+    const iaEnd = 96
     let unwrapped = 0
     let prev = 0
     for (let ia = iaStart; ia < iaEnd; ia++) {

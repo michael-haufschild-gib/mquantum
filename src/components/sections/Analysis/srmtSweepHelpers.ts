@@ -15,6 +15,20 @@ import type {
   SrmtSweepPoint,
 } from '@/lib/physics/srmt/sweepTypes'
 
+/**
+ * Delimiter line marking the start of the per-point spectra tail block
+ * emitted by {@link sweepPointsToCsv}. Legacy parsers that only consume
+ * the main 29-column table should stop row accumulation when this line
+ * appears — the rows that follow have a different schema (4 cells) and
+ * would otherwise trip a `cells.length !== 29` guard.
+ */
+export const SRMT_SWEEP_SPECTRA_TAIL_MARKER = '# ---- spectra tail ----'
+
+/** Column header for the tail block: one row per (point, clock, kind). */
+export const SRMT_SWEEP_SPECTRA_TAIL_HEADER = 'point,clock,kind,values'
+
+const SRMT_CLOCKS_IN_TAIL_ORDER: readonly SrmtClock[] = ['a', 'phi1', 'phi2']
+
 /** Indices where the winning clock changes across consecutive sweep points. */
 export interface ChampionFlip {
   index: number
@@ -23,23 +37,61 @@ export interface ChampionFlip {
 }
 
 /**
+ * Minimum effective Schmidt rank required before a point's champion
+ * clock counts as meaningful. Below this the spectrum has too few
+ * non-trivial modes for the `K ≈ α·E + β` fit to discriminate between
+ * clocks — the "winner" reflects floor-pinning of K_n, not physics
+ * (see `/tmp/srmt-tunneling-bc-analysis.md`, where tunneling-φ₁'s
+ * `r_eff = 4` produced a false `q_phi1 < q_a` inversion).
+ */
+const CHAMPION_MIN_REFF = 8
+
+/**
+ * Return `true` when a sweep point's effective-rank diagnostics clear
+ * the publication gate — every clock with a reported `rEff` meets the
+ * {@link CHAMPION_MIN_REFF} threshold. Points that predate the
+ * `rEffByClock` field (no `rEffByClock` at all) pass unconditionally
+ * so downstream UIs loading historical fixtures still render.
+ */
+function passesChampionGate(p: SrmtSweepPoint): boolean {
+  const rEff = p.rEffByClock
+  if (!rEff) return true
+  for (const clock of ['a', 'phi1', 'phi2'] as const) {
+    const r = rEff[clock]
+    if (r !== undefined && r < CHAMPION_MIN_REFF) return false
+  }
+  return true
+}
+
+/**
  * Find indices where the champion clock changes (non-null →
  * different non-null). Ties (either side null) are skipped so the
  * marker renders only on decisive transitions, which is what the UI
  * wants.
+ *
+ * ## Publication gate
+ *
+ * Points whose effective Schmidt rank falls below
+ * {@link CHAMPION_MIN_REFF} on any clock are treated as "no champion"
+ * — their `findChampionClock` result is discarded before the
+ * transition scan. This suppresses spurious flips driven by
+ * floor-pinned K_n vectors rather than genuine clock preference. The
+ * gate is UI-visible: such points render the plot line but never
+ * mark a champion flip.
  *
  * @param points - The streamed sweep points, ascending-index order.
  * @returns Flip events; empty when one clock dominates the whole sweep.
  */
 export function computeChampionFlips(points: SrmtSweepPoint[]): ChampionFlip[] {
   const out: ChampionFlip[] = []
-  const champions = points.map((p) =>
-    findChampionClock({
+  const champions = points.map((p) => {
+    if (!passesChampionGate(p)) return null
+    return findChampionClock({
       a: p.quality.a ?? Number.NaN,
       phi1: p.quality.phi1 ?? Number.NaN,
       phi2: p.quality.phi2 ?? Number.NaN,
     })
-  )
+  })
   for (let i = 1; i < champions.length; i++) {
     const prev = champions[i - 1]
     const cur = champions[i]
@@ -84,6 +136,30 @@ function csvCell(value: string): string {
  * between the leading `# SRMT sweep, kind=<kind>` line and the landmark
  * block so the full provenance stays visible in every archived export.
  *
+ * ## Spectra tail block
+ *
+ * After the main 29-column table, a secondary table is appended:
+ *
+ * ```
+ * # ---- spectra tail ----
+ * point,clock,kind,values
+ * 0,a,K,-8.247689|-6.620331|…
+ * 0,a,E,0.5123456|1.487234|…
+ * ```
+ *
+ * One row per `(point, clock, kind ∈ {K, E})` where the underlying
+ * spectrum Float32Array is populated. The `values` cell pipe-delimits
+ * `.toPrecision(7)` numbers — pipes never collide with CSV delimiters,
+ * so the cell requires no RFC-4180 quoting in practice but still passes
+ * through {@link csvCell} for formula-injection hardening.
+ *
+ * The tail is OPTIONAL for downstream parsers: the marker line is a
+ * `#` comment and can be recognised to break out of a main-row loop
+ * that enforces a fixed cell width (see
+ * {@link SRMT_SWEEP_SPECTRA_TAIL_MARKER}). The marker and sub-header
+ * are always emitted, even when no spectra are present, so consumers
+ * can key off a stable "tail begins here" signal.
+ *
  * @param manifest - Reproducibility manifest lines (git SHA, solver
  *   versions, wdw + srmt config, grid info). Default `[]` preserves the
  *   legacy minimal header for callers (e.g. Lanczos-determinism tests)
@@ -109,6 +185,18 @@ export function sweepPointsToCsv(
     // "every published q ships with its σ" — never collapse these.
     // q_rigid_* columns follow the same pattern for the strict-α=1
     // metric; see docs/physics/srmt-metric.md for why both are emitted.
+    // alpha_* / beta_* are the raw least-squares parameters from the
+    // affine fit `K ≈ α·E + β`; exposed here so the unit-conversion
+    // factor hidden inside `q_affine` (which `α` carries across many
+    // decades when `q_rigid / q_affine ≫ 1`) is visible in the CSV.
+    // rEff_* / floorFrac_* are spectrum-degeneracy diagnostics: rEff
+    // is the count of Schmidt modes with `(s_n/s_0)² > 1e-6`,
+    // floorFrac is the fraction of the top-rankCap `K_n` pinned
+    // within 1.5 nats of the ε-floor. A claim rooted in points with
+    // `rEff < 8` or `floorFrac ≥ 0.25` is probably a metric artifact
+    // — the champion-clock UI gate reflects the same rule.
+    // Total column count: 29 — Playwright CSV parsers assert on this
+    // width by index, so never reorder existing columns.
     [
       'index',
       'sweepValue',
@@ -118,14 +206,26 @@ export function sweepPointsToCsv(
       'q_a_sigma',
       'q_a_rigid',
       'q_a_rigid_sigma',
+      'alpha_a',
+      'beta_a',
+      'rEff_a',
+      'floorFrac_a',
       'q_phi1',
       'q_phi1_sigma',
       'q_phi1_rigid',
       'q_phi1_rigid_sigma',
+      'alpha_phi1',
+      'beta_phi1',
+      'rEff_phi1',
+      'floorFrac_phi1',
       'q_phi2',
       'q_phi2_sigma',
       'q_phi2_rigid',
       'q_phi2_rigid_sigma',
+      'alpha_phi2',
+      'beta_phi2',
+      'rEff_phi2',
+      'floorFrac_phi2',
       'computeMs',
     ].join(','),
   ].join('\n')
@@ -139,20 +239,61 @@ export function sweepPointsToCsv(
       formatNumber(p.qStdev?.a),
       formatNumber(p.qRigid?.a),
       formatNumber(p.qRigidStdev?.a),
+      formatNumber(p.alphaByClock?.a),
+      formatNumber(p.betaByClock?.a),
+      formatNumber(p.rEffByClock?.a),
+      formatNumber(p.floorFractionByClock?.a),
       formatNumber(p.quality.phi1),
       formatNumber(p.qStdev?.phi1),
       formatNumber(p.qRigid?.phi1),
       formatNumber(p.qRigidStdev?.phi1),
+      formatNumber(p.alphaByClock?.phi1),
+      formatNumber(p.betaByClock?.phi1),
+      formatNumber(p.rEffByClock?.phi1),
+      formatNumber(p.floorFractionByClock?.phi1),
       formatNumber(p.quality.phi2),
       formatNumber(p.qStdev?.phi2),
       formatNumber(p.qRigid?.phi2),
       formatNumber(p.qRigidStdev?.phi2),
+      formatNumber(p.alphaByClock?.phi2),
+      formatNumber(p.betaByClock?.phi2),
+      formatNumber(p.rEffByClock?.phi2),
+      formatNumber(p.floorFractionByClock?.phi2),
       p.computeMs.toFixed(1),
     ]
       .map(csvCell)
       .join(',')
   )
-  return [header, ...rows].join('\n') + '\n'
+  const tailRows: string[] = []
+  for (const p of points) {
+    for (const clock of SRMT_CLOCKS_IN_TAIL_ORDER) {
+      const k = p.kSpectrumByClock[clock]
+      if (k && k.length > 0) {
+        tailRows.push([String(p.index), clock, 'K', formatSpectrumCell(k)].map(csvCell).join(','))
+      }
+      const e = p.hjSpectrumByClock[clock]
+      if (e && e.length > 0) {
+        tailRows.push([String(p.index), clock, 'E', formatSpectrumCell(e)].map(csvCell).join(','))
+      }
+    }
+  }
+  const tail = ['', SRMT_SWEEP_SPECTRA_TAIL_MARKER, SRMT_SWEEP_SPECTRA_TAIL_HEADER, ...tailRows]
+  return [header, ...rows, ...tail].join('\n') + '\n'
+}
+
+/**
+ * Serialise a `Float32Array` as a pipe-delimited list of
+ * 7-significant-digit decimals. Pipes are chosen so the cell contains
+ * no CSV delimiters (comma / newline / double-quote), keeping the
+ * encoded spectrum a single un-quoted CSV cell.
+ */
+function formatSpectrumCell(values: Float32Array): string {
+  const parts: string[] = new Array(values.length)
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i]!
+    parts[i] = Number.isFinite(v) ? v.toPrecision(7) : String(v)
+  }
+  return parts.join('|')
 }
 
 /**
@@ -195,6 +336,9 @@ export function labelForKind(kind: SrmtSweepKind): string {
   if (kind === 'phiRef') return 'φref (landmark reference)'
   if (kind === 'rankCap') return 'rankCap'
   if (kind === 'phiExtent') return 'φextent'
+  if (kind === 'gridNa') return 'gridN_a'
+  if (kind === 'gridNphi') return 'gridN_φ'
+  if (kind === 'gridNphiCoupled') return 'gridN_φ (coupled N_a)'
   return 'boundary condition'
 }
 

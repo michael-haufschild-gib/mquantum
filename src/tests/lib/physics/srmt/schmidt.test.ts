@@ -10,7 +10,14 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { reshapeForClock, schmidtValues } from '@/lib/physics/srmt/schmidt'
+import {
+  chiFrobeniusNormSq,
+  computeVolumeElement,
+  effectiveRankFromSchmidt,
+  normalizedSchmidtValues,
+  reshapeForClock,
+  schmidtValues,
+} from '@/lib/physics/srmt/schmidt'
 
 /** Deterministic LCG producing `[0, 1)`. */
 function lcgRng(seed: number): () => number {
@@ -166,6 +173,128 @@ describe('schmidt.schmidtValues', () => {
     }
   })
 
+  it('normalizedSchmidtValues divides every singular value by sqrt(Σ|χ|²)', () => {
+    const Na = 4
+    const Nphi = 3
+    const rng = lcgRng(0xbadcafe)
+    const chi = new Float32Array(2 * Na * Nphi * Nphi)
+    for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
+    const fro2 = chiFrobeniusNormSq(chi)
+    const raw = schmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a')
+    const norm = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a')
+    expect(fro2).toBeGreaterThan(0)
+    const scale = 1 / Math.sqrt(fro2)
+    expect(norm.length).toBe(raw.length)
+    for (let i = 0; i < raw.length; i++) {
+      expect(norm[i]!).toBeCloseTo(raw[i]! * scale, 10)
+    }
+    // Σ norm² = 1 (unit L² norm).
+    let sumSq = 0
+    for (let i = 0; i < norm.length; i++) sumSq += norm[i]! * norm[i]!
+    expect(sumSq).toBeCloseTo(1, 3)
+  })
+
+  it('normalizedSchmidtValues returns zeros for an all-zero χ', () => {
+    const chi = new Float32Array(2 * 3 * 2 * 2)
+    const norm = normalizedSchmidtValues({ chi, gridSize: [3, 2, 2] }, 'a')
+    expect(norm.length).toBeGreaterThan(0)
+    for (const s of norm) expect(s).toBe(0)
+  })
+
+  it('volume-weighted normalizedSchmidtValues with dVol=1 matches the Frobenius-only default (task #8)', () => {
+    const Na = 5
+    const Nphi = 4
+    const rng = lcgRng(0xc0ffee01)
+    const chi = new Float32Array(2 * Na * Nphi * Nphi)
+    for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
+    const frobenius = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a')
+    const volumeUnit = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', 1)
+    expect(volumeUnit.length).toBe(frobenius.length)
+    for (let i = 0; i < frobenius.length; i++) {
+      expect(volumeUnit[i]!).toBeCloseTo(frobenius[i]!, 14)
+    }
+  })
+
+  it('volume-weighted normalizedSchmidtValues scales singular values by 1/sqrt(dVol) relative to dVol=1 (task #8)', () => {
+    const Na = 6
+    const Nphi = 4
+    const rng = lcgRng(0xc0ffee02)
+    const chi = new Float32Array(2 * Na * Nphi * Nphi)
+    for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
+    const dVol = 0.01
+    const unit = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', 1)
+    const volWeighted = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', dVol)
+    const ratio = 1 / Math.sqrt(dVol)
+    expect(volWeighted.length).toBe(unit.length)
+    for (let i = 0; i < unit.length; i++) {
+      expect(volWeighted[i]!).toBeCloseTo(unit[i]! * ratio, 10)
+    }
+  })
+
+  it('volume-weighted normalizedSchmidtValues enforces Σ s_n² · dVol = 1 (task #8)', () => {
+    const Na = 7
+    const Nphi = 5
+    const rng = lcgRng(0xc0ffee03)
+    const chi = new Float32Array(2 * Na * Nphi * Nphi)
+    for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
+    for (const dVol of [0.5, 0.01, 1, 2.5]) {
+      for (const clock of ['a', 'phi1', 'phi2'] as const) {
+        const sv = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, clock, dVol)
+        let integral = 0
+        for (let i = 0; i < sv.length; i++) integral += sv[i]! * sv[i]! * dVol
+        expect(integral).toBeCloseTo(1, 3)
+      }
+    }
+  })
+
+  it('volume-weighted normalizedSchmidtValues with dVol=0 or negative falls back to Frobenius-only (task #8)', () => {
+    const Na = 4
+    const Nphi = 3
+    const rng = lcgRng(0xc0ffee04)
+    const chi = new Float32Array(2 * Na * Nphi * Nphi)
+    for (let i = 0; i < chi.length; i++) chi[i] = rng() - 0.5
+    const fallbackZero = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', 0)
+    const fallbackNeg = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a', -1)
+    const frobenius = normalizedSchmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a')
+    for (let i = 0; i < frobenius.length; i++) {
+      expect(fallbackZero[i]!).toBeCloseTo(frobenius[i]!, 14)
+      expect(fallbackNeg[i]!).toBeCloseTo(frobenius[i]!, 14)
+    }
+  })
+})
+
+describe('schmidt.computeVolumeElement', () => {
+  it('returns da · dφ² for a uniform grid (task #8)', () => {
+    // gridSize [Na=11, Nphi=5, Nphi=5], a-span = 1.0, phiExtent = 2.
+    // da = 1.0 / (11-1) = 0.1; dphi = 2·2 / (5-1) = 1.0; dVol = 0.1·1.0² = 0.1.
+    const dVol = computeVolumeElement({
+      gridSize: [11, 5, 5],
+      aMin: 0.5,
+      aMax: 1.5,
+      phiExtent: 2,
+    })
+    expect(dVol).toBeCloseTo(0.1, 14)
+  })
+
+  it('returns 0 for degenerate axes (task #8)', () => {
+    expect(computeVolumeElement({ gridSize: [1, 5, 5], aMin: 0, aMax: 1, phiExtent: 1 })).toBe(0)
+    expect(computeVolumeElement({ gridSize: [10, 1, 1], aMin: 0, aMax: 1, phiExtent: 1 })).toBe(0)
+  })
+
+  it('matches the default-grid formula at production config (task #8)', () => {
+    // Default WdW config approximation: aMin=0.1, aMax=1.5, gridNa=128,
+    // phiExtent=2, gridNphi=32. Exercises the exact formula the drivers
+    // compute at the production call sites.
+    const dVol = computeVolumeElement({
+      gridSize: [128, 32, 32],
+      aMin: 0.1,
+      aMax: 1.5,
+      phiExtent: 2,
+    })
+    const expected = (1.4 / 127) * (4 / 31) ** 2
+    expect(dVol).toBeCloseTo(expected, 14)
+  })
+
   it('concentrates spectral weight on the leading few singular values for a low-rank χ', () => {
     // Construct χ = Σ_k c_k · u_k(a) · v_k(φ) for k = 0..2 — rank 3.
     const Na = 8
@@ -194,5 +323,42 @@ describe('schmidt.schmidtValues', () => {
     const sv = schmidtValues({ chi, gridSize: [Na, Nphi, Nphi] }, 'a')
     // Top 3 values dominate; rank-4+ are well below rank-3.
     expect(sv[3]!).toBeLessThan(0.2 * sv[2]!)
+  })
+})
+
+describe('schmidt.effectiveRankFromSchmidt', () => {
+  it('returns length when every mode has equal weight (identity-style)', () => {
+    const schmidt = new Float64Array([1, 1, 1, 1, 1])
+    expect(effectiveRankFromSchmidt(schmidt)).toBe(5)
+  })
+
+  it('returns 1 when the tail is below the relative cutoff (dominant mode only)', () => {
+    // s² ratios: 1, 1e-7, 1e-8. Default threshold 1e-6 keeps only s_0.
+    const schmidt = new Float64Array([1, Math.sqrt(1e-7), Math.sqrt(1e-8)])
+    expect(effectiveRankFromSchmidt(schmidt)).toBe(1)
+  })
+
+  it('all-floor-pinned (tiny-tail): count matches the explicit ratio predicate', () => {
+    // Manually construct a descending spectrum with a known cutoff
+    // crossing. s²/s_0² = 1, 1, 0.5, 1e-4, 1e-7. Default threshold 1e-6
+    // keeps the first 4.
+    const schmidt = new Float64Array([1, 1, Math.sqrt(0.5), Math.sqrt(1e-4), Math.sqrt(1e-7)])
+    expect(effectiveRankFromSchmidt(schmidt)).toBe(4)
+  })
+
+  it('honours a custom thresholdSqRatio (strict >, so leading mode excluded at threshold=1)', () => {
+    const schmidt = new Float64Array([1, 0.5, 0.1, 0.01])
+    // s²/s_0² = 1, 0.25, 0.01, 0.0001. Strict > excludes the leading
+    // mode when threshold equals the normalised dominant weight (=1).
+    expect(effectiveRankFromSchmidt(schmidt, 1)).toBe(0)
+    expect(effectiveRankFromSchmidt(schmidt, 0.5)).toBe(1)
+    expect(effectiveRankFromSchmidt(schmidt, 0.1)).toBe(2)
+    expect(effectiveRankFromSchmidt(schmidt, 0.005)).toBe(3)
+    expect(effectiveRankFromSchmidt(schmidt, 1e-6)).toBe(4)
+  })
+
+  it('returns 0 for an empty or zero-dominant spectrum', () => {
+    expect(effectiveRankFromSchmidt(new Float64Array(0))).toBe(0)
+    expect(effectiveRankFromSchmidt(new Float64Array([0, 0, 0]))).toBe(0)
   })
 })

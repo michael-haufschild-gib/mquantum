@@ -51,11 +51,13 @@ import {
   normalisePointCount,
   predictCutSweepCount,
   predictGridNaSweepCount,
+  predictGridNphiCoupledSweepCount,
   predictGridNphiSweepCount,
   predictRankCapSweepCount,
   runBcSweep,
   runCutSweep,
   runGridNaSweep,
+  runGridNphiCoupledSweep,
   runGridNphiSweep,
   runLambdaSweep,
   runMassSweep,
@@ -128,6 +130,12 @@ function nowMs(): number {
  * Collect transferable buffers from a sweep point so the main thread
  * owns them zero-copy. Schmidt and HJ spectra are per-clock typed
  * arrays. Exported for direct-dispatch tests.
+ *
+ * Scalar per-clock fields on the point (`quality`, `qStdev`, `qRigid`,
+ * `qRigidStdev`, `alphaByClock`, `betaByClock`, `rEffByClock`,
+ * `floorFractionByClock`) are plain JS objects of numbers — structured
+ * clone copies them automatically across the worker boundary, so no
+ * explicit transfer entries are needed here.
  */
 export function transferablesForPoint(point: SrmtSweepPoint): Transferable[] {
   const out: Transferable[] = []
@@ -319,6 +327,14 @@ export function handleSrmtSweepRequest(
         onSolveStart,
         cancel,
       })
+    } else if (msg.config.kind === 'gridNphiCoupled') {
+      runGridNphiCoupledSweep({
+        wdwConfig: msg.wdwConfig,
+        config: msg.config,
+        onProgress,
+        onSolveStart,
+        cancel,
+      })
     } else {
       runBcSweep({
         wdwConfig: msg.wdwConfig,
@@ -387,6 +403,9 @@ function totalPointsFor(
   }
   if (config.kind === 'gridNphi') {
     return predictGridNphiSweepCount(config)
+  }
+  if (config.kind === 'gridNphiCoupled') {
+    return predictGridNphiCoupledSweepCount(config)
   }
   return normalisePointCount(config.kind, config.points)
 }

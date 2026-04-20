@@ -19,12 +19,16 @@ import {
 } from './sliceSetterUtils'
 
 /** Grid-size preset tuple: (Na, Nphi). All within the solver's CFL budget at
- * default `(aMin, aMax, phiExtent)` and the hard minima (>= 3). */
-export type WdwGridPreset = 'low' | 'medium' | 'high'
+ * default `(aMin, aMax, phiExtent)` and the hard minima (>= 3). The
+ * `publication` preset raises Nphi to 48 for the finer classical-regime
+ * fringe resolution required for thesis-grade figures; CFL at (256, 48)
+ * stays inside budget. */
+export type WdwGridPreset = 'low' | 'medium' | 'high' | 'publication'
 export const WDW_GRID_PRESETS: Record<WdwGridPreset, { gridNa: number; gridNphi: number }> = {
   low: { gridNa: 64, gridNphi: 16 },
   medium: { gridNa: 128, gridNphi: 32 },
   high: { gridNa: 192, gridNphi: 32 },
+  publication: { gridNa: 256, gridNphi: 48 },
 }
 
 /** Actions exposed by the Wheeler–DeWitt setter bundle. */
@@ -32,6 +36,7 @@ export interface WheelerDeWittSetters {
   setWdwBoundaryCondition: (bc: WdwBoundaryCondition) => void
   setWdwInflatonMass: (m: number) => void
   setWdwCosmologicalConstant: (lambda: number) => void
+  setWdwInflatonMassAsymmetry: (ratio: number) => void
   setWdwGridSize: (preset: WdwGridPreset) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
@@ -143,6 +148,13 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         return
       }
       applyWithReset('cosmologicalConstant', clamp(lambda, -1, 1))
+    },
+    setWdwInflatonMassAsymmetry: (ratio) => {
+      if (!ctx.isFinite(ratio)) {
+        ctx.warnNonFinite('wheelerDeWitt.inflatonMassAsymmetry', ratio)
+        return
+      }
+      applyWithReset('inflatonMassAsymmetry', clamp(ratio, 0.1, 10))
     },
     setWdwGridSize: (preset) => {
       const { gridNa, gridNphi } = WDW_GRID_PRESETS[preset]

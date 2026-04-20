@@ -26,6 +26,13 @@ export interface WdwBoundaryInputs {
   mass: number
   /** Cosmological constant Λ */
   lambda: number
+  /**
+   * Per-axis effective-mass ratio on the φ₂ axis. Optional; defaults to
+   * `1` (isotropic — matches pre-asymmetry behaviour bit-identically).
+   * Threaded into `wdwPotential` / `wdwU` so boundary data stays
+   * consistent with the bulk evolution's anisotropic potential.
+   */
+  asymmetry?: number
 }
 
 /** Output buffers for the boundary condition: χ(a_min, φ) and ∂_a χ(a_min, φ). */
@@ -77,6 +84,7 @@ function indexToPhi(i: number, Nphi: number, phiExtent: number): number {
  */
 export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin, mass, lambda } = input
+  const asymmetry = input.asymmetry ?? 1
   const chi = allocComplexGrid(Nphi)
   const chiDeriv = allocComplexGrid(Nphi)
   const a2 = aMin * aMin
@@ -85,7 +93,7 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
     const phi1 = indexToPhi(i1, Nphi, phiExtent)
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = indexToPhi(i2, Nphi, phiExtent)
-      const V = wdwPotential(phi1, phi2, mass, lambda)
+      const V = wdwPotential(phi1, phi2, mass, lambda, asymmetry)
       const idx = i1 * Nphi + i2
       let amp: number
       let dChi = 0
@@ -149,6 +157,7 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
  */
 export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
   const { Nphi, phiExtent, aMin, mass, lambda } = input
+  const asymmetry = input.asymmetry ?? 1
   const chi = allocComplexGrid(Nphi)
   const chiDeriv = allocComplexGrid(Nphi)
   const a3 = aMin * aMin * aMin
@@ -158,7 +167,7 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
     const phi1 = indexToPhi(i1, Nphi, phiExtent)
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = indexToPhi(i2, Nphi, phiExtent)
-      const V = wdwPotential(phi1, phi2, mass, lambda)
+      const V = wdwPotential(phi1, phi2, mass, lambda, asymmetry)
       const amp = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
       const S_L = (a3 * V) / 3.0
       const cosS = Math.cos(S_L)
@@ -168,7 +177,7 @@ export function vilenkinBoundary(input: WdwBoundaryInputs): WdwBoundaryField {
       const cim = amp * sinS
       setPair(chi, idx, cre, cim)
 
-      const U0 = wdwU(aMin, phi1, phi2, mass, lambda)
+      const U0 = wdwU(aMin, phi1, phi2, mass, lambda, asymmetry)
       if (U0 < 0) {
         // Lorentzian: full WKB outgoing-wave derivative.
         //   ∂_a U = −2·c_U·a·(1 − 2·K·V·a²)

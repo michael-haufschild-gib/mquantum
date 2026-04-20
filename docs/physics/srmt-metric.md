@@ -44,6 +44,17 @@ while β removes shifts from the numerator, the denominator `Σ K_n²` is
 not shift-invariant, so translating `K` changes `q` when the fit is
 imperfect.
 
+`β` is the clock's zero-of-energy offset — the constant term the HJ
+spectrum is defined up to. Under the **volume-weighted** Schmidt
+normalisation `Σ s_n² · dVol = 1` (task #8, implemented in
+`src/lib/physics/srmt/schmidt.ts:normalizedSchmidtValues`), `β` tracks
+only the genuine physics offset: neither `−log(Σ|χ|²)` (the raw-buffer
+artefact that produced the historical `β ≈ −14`) nor `log(dVol)` (the
+Frobenius-only residual that drifted across `gridNa` / `gridNphi` /
+`phiExtent` sweeps) leaks in. Expected magnitude `|β| ≲ 1` at any
+well-posed physics configuration; a reported `|β| > 5` in a production
+sweep signals a diagnostic-pipeline bug, not physics.
+
 `q_affine = 0` iff `K_n = α·E_n + β` for some `(α, β)`. This tests a
 **strictly weaker** claim than (C1):
 

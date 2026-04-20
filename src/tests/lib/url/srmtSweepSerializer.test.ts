@@ -164,13 +164,16 @@ describe('deserializeSrmtSweep', () => {
   })
 
   it('round-trips a gridNphi sweep with the documented range', () => {
-    const params = new URLSearchParams('sw=gridNphi&sw_n=5&sw_min=9&sw_max=33&sw_c=0.5')
+    // Driver clamp is [32, 64] (see clampGridNphi docstring); URL layer
+    // only enforces the outer box [-1024, 1024], so the driver range is
+    // what callers should encode.
+    const params = new URLSearchParams('sw=gridNphi&sw_n=5&sw_min=32&sw_max=64&sw_c=0.5')
     const state: SrmtSweepUrlState = {}
     deserializeSrmtSweep(params, state)
     expect(state.srmtSweepKind).toBe('gridNphi')
     expect(state.srmtSweepPoints).toBe(5)
-    expect(state.srmtSweepMin).toBe(9)
-    expect(state.srmtSweepMax).toBe(33)
+    expect(state.srmtSweepMin).toBe(32)
+    expect(state.srmtSweepMax).toBe(64)
   })
 })
 

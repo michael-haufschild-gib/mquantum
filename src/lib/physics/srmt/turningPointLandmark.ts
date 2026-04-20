@@ -44,6 +44,11 @@ export interface TurningPointLandmarkInputs {
   clock: SrmtClock
   /** Inflaton mass `m`. */
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis. Optional;
+   * defaults to `1` (isotropic) for byte-identical legacy callers.
+   */
+  inflatonMassAsymmetry?: number
   /** Cosmological constant `Λ`. */
   cosmologicalConstant: number
   /** Grid scale-factor lower bound. */
@@ -79,6 +84,7 @@ export function landmarkInputsFromConfig(
   return {
     clock,
     inflatonMass: config.inflatonMass,
+    inflatonMassAsymmetry: config.inflatonMassAsymmetry,
     cosmologicalConstant: config.cosmologicalConstant,
     aMin: config.aMin,
     aMax: config.aMax,
@@ -111,9 +117,10 @@ export function computeCutLandmark(inputs: TurningPointLandmarkInputs): SrmtSwee
     phiRef,
     cutNormalized,
   } = inputs
+  const asymmetry = inputs.inflatonMassAsymmetry ?? 1
 
   if (clock === 'a') {
-    const aTp = wdwTurningA(phiRef, phiRef, inflatonMass, cosmologicalConstant)
+    const aTp = wdwTurningA(phiRef, phiRef, inflatonMass, cosmologicalConstant, asymmetry)
     if (aTp === null) {
       return {
         kind: 'a_turn',
@@ -165,7 +172,7 @@ export function computeCutLandmark(inputs: TurningPointLandmarkInputs): SrmtSwee
   // isotropic inflaton gives V = m²|phi|² + Λ — factor of 2 in the sum).
   // For the visible clock (phi1 or phi2) the *other* axis is held at
   // `phiRef`, so V(phi_TP, phiRef) = ½m²(phi_TP² + phiRef²) + Λ.
-  const refV = wdwPotential(phiRef, phiRef, inflatonMass, cosmologicalConstant)
+  const refV = wdwPotential(phiRef, phiRef, inflatonMass, cosmologicalConstant, asymmetry)
   if (!Number.isFinite(refV)) {
     return {
       kind: 'phi_turn',
@@ -186,9 +193,25 @@ export function computeCutLandmark(inputs: TurningPointLandmarkInputs): SrmtSwee
       absoluteCoordinate: null,
     }
   }
-  // Solve ½ m² (phi_TP² + phiRef²) + Λ = targetV
-  //   ⇒ phi_TP² = (2 / m²) · (targetV − Λ) − phiRef²
-  const rhs = (2 / mSq) * (targetV - cosmologicalConstant) - phiRef * phiRef
+  // Per-axis anisotropy: V(φ₁, φ₂) = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ.
+  // For clock `'phi1'` the swept axis is φ₁ (→ phi_TP lives on axis 1),
+  // with φ₂ = phiRef held fixed. For clock `'phi2'` it's mirrored. The
+  // `(mass on swept axis)²` drives the quadratic solve.
+  const massSqSweep = clock === 'phi1' ? mSq : mSq * asymmetry * asymmetry
+  const massSqFixed = clock === 'phi1' ? mSq * asymmetry * asymmetry : mSq
+  if (massSqSweep <= 0) {
+    return {
+      kind: 'phi_turn',
+      clock,
+      phiRef,
+      sweepValueAtLandmark: null,
+      absoluteCoordinate: null,
+    }
+  }
+  // Solve ½·massSqSweep·phi_TP² + ½·massSqFixed·phiRef² + Λ = targetV
+  //   ⇒ phi_TP² = (2 / massSqSweep) · (targetV − Λ − ½·massSqFixed·phiRef²)
+  const rhs =
+    (2 / massSqSweep) * (targetV - cosmologicalConstant - 0.5 * massSqFixed * phiRef * phiRef)
   if (!(rhs > 0)) {
     return {
       kind: 'phi_turn',

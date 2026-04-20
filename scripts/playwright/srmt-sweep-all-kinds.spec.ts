@@ -1,23 +1,22 @@
 /**
- * End-to-end SRMT sweep experiment.
+ * Full-battery SRMT sweep experiment across all 9 sweep kinds.
  *
- * Runs all four sweep kinds (cut, mass, lambda, bc) against the live
- * Wheeler–DeWitt minisuperspace solver, exports each sweep's CSV via
- * the in-app button, parses it, and writes a consolidated
- * `/tmp/srmt-sweep-results.json` that a downstream analysis step
- * interprets.
+ * Extends `srmt-sweep-full.spec.ts` (which covered 4 kinds) with the 5
+ * additional tier-1/tier-3 kinds that landed later:
+ *   - phiRef     (tier-3 sensitivity: landmark reference φ)
+ *   - rankCap    (tier-3 sensitivity: Schmidt truncation)
+ *   - phiExtent  (tier-3 sensitivity: φ-grid half-range)
+ *   - gridNa     (tier-3 convergence: a-axis sample count)
+ *   - gridNphi   (tier-3 convergence: φ-axis sample count)
  *
- * Design constraints:
- *   - Single test body: all four kinds share the same browser context so
- *     the WebGPU adapter / shader cache is amortised.
- *   - Point counts sized for the 3-min default budget: cut is cheap
- *     (single solve), mass/lambda re-solve per point so kept small, bc
- *     is fixed at 3 by the driver.
- *   - Uses the CSV export path rather than reading the store directly
- *     because Vite's dev server serves the store module under a
- *     different URL from `@/` aliases on cold imports inside
- *     `page.evaluate` — the app and the test otherwise end up holding
- *     two different zustand instances.
+ * Each sweep is triggered via URL params (`sw=kind&sw_n=…`). The CSV is
+ * exported through the in-app button, parsed, and written to
+ * `/tmp/srmt-sweep-all-results.json` for downstream interpretation.
+ *
+ * Point counts sized for ~10-20 min total budget: sensitivity sweeps with
+ * full solver re-runs (phiExtent, gridNa, gridNphi) kept to their
+ * per-kind minimums; rankCap + phiRef keep the default mid-range counts
+ * because those never re-solve.
  */
 
 import * as fs from 'node:fs'
@@ -31,10 +30,19 @@ import {
 } from './helpers/app-helpers'
 import { splitSrmtSweepCsv } from './helpers/srmt-csv'
 
-test.setTimeout(600_000)
+test.setTimeout(1_800_000) // 30 min
 
 interface SweepSpec {
-  kind: 'cut' | 'mass' | 'lambda' | 'bc'
+  kind:
+    | 'cut'
+    | 'mass'
+    | 'lambda'
+    | 'bc'
+    | 'phiRef'
+    | 'rankCap'
+    | 'phiExtent'
+    | 'gridNa'
+    | 'gridNphi'
   params: Record<string, string>
   label: string
 }
@@ -82,17 +90,17 @@ interface SweepResult {
 const SWEEPS: SweepSpec[] = [
   {
     kind: 'cut',
-    label: 'Cut position sweep (single solve, HJ rebuilt per point)',
+    label: 'Cut position (single solve; HJ rebuilt per point)',
     params: { sw: 'cut', sw_n: '17', sw_min: '0.10', sw_max: '0.90', sw_phi: '1.0' },
   },
   {
     kind: 'mass',
-    label: 'Inflaton mass sweep (solver re-runs per point)',
+    label: 'Inflaton mass (solver re-runs per point)',
     params: { sw: 'mass', sw_n: '5', sw_min: '0.10', sw_max: '1.50', sw_phi: '1.0', sw_c: '0.5' },
   },
   {
     kind: 'lambda',
-    label: 'Cosmological constant sweep (AdS → dS, solver re-runs per point)',
+    label: 'Cosmological constant Λ (AdS→dS; solver re-runs per point)',
     params: {
       sw: 'lambda',
       sw_n: '5',
@@ -104,8 +112,73 @@ const SWEEPS: SweepSpec[] = [
   },
   {
     kind: 'bc',
-    label: 'Boundary-condition sweep (noBoundary / tunneling / deWitt)',
+    label: 'Boundary condition (noBoundary / tunneling / deWitt)',
     params: { sw: 'bc', sw_phi: '1.0', sw_c: '0.5' },
+  },
+  {
+    kind: 'phiRef',
+    label: 'φ-landmark reference (flat q; moves landmark only)',
+    params: {
+      sw: 'phiRef',
+      sw_n: '7',
+      sw_min: '0.2',
+      sw_max: '1.8',
+      sw_phi: '1.0',
+      sw_c: '0.5',
+    },
+  },
+  {
+    kind: 'rankCap',
+    label: 'Schmidt rank cap (truncation sensitivity)',
+    params: {
+      sw: 'rankCap',
+      sw_n: '7',
+      sw_min: '8',
+      sw_max: '128',
+      sw_phi: '1.0',
+      sw_c: '0.5',
+    },
+  },
+  {
+    kind: 'phiExtent',
+    label: 'φ-grid half-range (changes both solve + HJ)',
+    params: {
+      sw: 'phiExtent',
+      sw_n: '3',
+      sw_min: '1.0',
+      sw_max: '3.0',
+      sw_phi: '0.5',
+      sw_c: '0.5',
+    },
+  },
+  {
+    kind: 'gridNa',
+    label: 'Grid N_a convergence (leapfrog 2nd-order check)',
+    params: {
+      sw: 'gridNa',
+      sw_n: '3',
+      sw_min: '128',
+      sw_max: '384',
+      sw_phi: '1.0',
+      sw_c: '0.5',
+    },
+  },
+  {
+    kind: 'gridNphi',
+    label: 'Grid N_φ convergence (leapfrog 2nd-order on φ-axes)',
+    // Clamp range is [32, 64] — samples the asymptotic branch of
+    // q_a(Nφ). Legacy range [9, 33] landed on the pre-asymptotic hump
+    // where Schmidt column count min(Na, Nφ²) drops below Na, producing
+    // a non-monotone q_a that falsely fails the Cauchy convergence
+    // contract. See sweepDriver.ts:clampGridNphi docstring.
+    params: {
+      sw: 'gridNphi',
+      sw_n: '3',
+      sw_min: '32',
+      sw_max: '64',
+      sw_phi: '1.0',
+      sw_c: '0.5',
+    },
   },
 ]
 
@@ -115,11 +188,6 @@ function parseCell(cell: string): number | null {
   return Number.isFinite(v) ? v : null
 }
 
-/**
- * Poll until the SRMT sweep export button appears, the error banner
- * surfaces, or the deadline elapses. Pulled out of the test body to
- * keep cognitive complexity inside the eslint budget.
- */
 async function waitForSweepCompletion(
   page: import('@playwright/test').Page,
   kindLabel: string,
@@ -140,7 +208,6 @@ async function waitForSweepCompletion(
     const prog = (await progress.count()) > 0 ? await progress.textContent() : '(no progress)'
     const running = (await abortBtn.count()) > 0 ? 'running' : 'not-running'
     const idle = (await startBtn.count()) > 0 ? 'idle' : 'not-idle'
-
     console.log(`[${kindLabel}] ${running} ${idle} — ${prog?.trim()}`)
     await page.waitForTimeout(3000)
   }
@@ -201,8 +268,8 @@ function parseCsv(csv: string): { landmarks: string[]; points: ParsedPoint[] } {
   return { landmarks, points }
 }
 
-test.describe('Wheeler–DeWitt — full SRMT sweep battery', () => {
-  test('runs cut, mass, lambda, bc sweeps and writes results to /tmp/srmt-sweep-results.json', async ({
+test.describe('Wheeler–DeWitt — all 9 SRMT sweep kinds', () => {
+  test('runs cut/mass/lambda/bc/phiRef/rankCap/phiExtent/gridNa/gridNphi and writes /tmp/srmt-sweep-all-results.json', async ({
     page,
   }, testInfo) => {
     await page.goto('/')
@@ -211,27 +278,17 @@ test.describe('Wheeler–DeWitt — full SRMT sweep battery', () => {
     const results: SweepResult[] = []
 
     for (const spec of SWEEPS) {
-      // Clear persisted section-collapsed state so the header-click
-      // below reliably *opens* the panel. Section state is localStorage-
-      // backed, so after the first iteration it would already be open
-      // and the click would collapse it instead — leaving the Export
-      // button unmounted even after the sweep completes. Use evaluate so
-      // the clear runs on the *current* document before the next goto.
       await page.evaluate(() => window.localStorage.clear())
       await gotoModeWithParams(page, 'wheelerDeWitt', 3, spec.params)
       await waitForRendererReady(page)
       await waitForFirstFrame(page)
 
-      // Open the Analysis tab + SRMT Sweep section so the export button
-      // mounts when the sweep completes.
       await page.getByTestId('right-panel-tabs-tab-analysis').click()
       const header = page.getByTestId('srmt-sweep-section-header')
       await expect(header).toBeVisible({ timeout: 15_000 })
       await header.click()
 
-      // Completion is gated on the export-csv button becoming visible —
-      // the UI only renders it at status='complete'.
-      await waitForSweepCompletion(page, spec.kind, 300_000)
+      await waitForSweepCompletion(page, spec.kind, 900_000)
       const exportBtn = page.getByTestId('srmt-sweep-export-csv')
 
       const dl = page.waitForEvent('download')
@@ -251,11 +308,9 @@ test.describe('Wheeler–DeWitt — full SRMT sweep battery', () => {
         totalComputeMs,
       })
 
-      // Each sweep must produce at least two points so the landscape
-      // view has something to interpret. BC forces 3.
       expect(parsed.points.length, `${spec.kind} point count`).toBeGreaterThanOrEqual(2)
     }
 
-    fs.writeFileSync('/tmp/srmt-sweep-results.json', JSON.stringify(results, null, 2) + '\n')
+    fs.writeFileSync('/tmp/srmt-sweep-all-results.json', JSON.stringify(results, null, 2) + '\n')
   })
 })

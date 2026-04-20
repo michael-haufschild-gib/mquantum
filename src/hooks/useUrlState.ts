@@ -298,33 +298,81 @@ function applyWdwParams(
   urlState: ParsedShareableState,
   ext: ReturnType<typeof useExtendedObjectStore.getState>
 ): void {
-  if (urlState.wdwBoundaryCondition !== undefined)
-    ext.setWdwBoundaryCondition(urlState.wdwBoundaryCondition)
-  if (urlState.wdwInflatonMass !== undefined) ext.setWdwInflatonMass(urlState.wdwInflatonMass)
-  if (urlState.wdwCosmologicalConstant !== undefined)
-    ext.setWdwCosmologicalConstant(urlState.wdwCosmologicalConstant)
-  if (urlState.wdwStreamlinesEnabled !== undefined)
-    ext.setWdwStreamlinesEnabled(urlState.wdwStreamlinesEnabled)
-  if (urlState.wdwStreamlineDensity !== undefined)
-    ext.setWdwStreamlineDensity(urlState.wdwStreamlineDensity)
-  // Render-only animation effects — these setters do NOT flip needsReset.
-  if (urlState.wdwPhaseRotationEnabled !== undefined)
-    ext.setWdwPhaseRotationEnabled(urlState.wdwPhaseRotationEnabled)
-  if (urlState.wdwPhaseRotationSpeed !== undefined)
-    ext.setWdwPhaseRotationSpeed(urlState.wdwPhaseRotationSpeed)
-  if (urlState.wdwWorldlineEnabled !== undefined)
-    ext.setWdwWorldlineEnabled(urlState.wdwWorldlineEnabled)
-  if (urlState.wdwWorldlineSpeed !== undefined) ext.setWdwWorldlineSpeed(urlState.wdwWorldlineSpeed)
-  if (urlState.wdwWorldlinePulseWidth !== undefined)
-    ext.setWdwWorldlinePulseWidth(urlState.wdwWorldlinePulseWidth)
-  // SRMT diagnostic — display-only; these setters do not flip needsReset.
-  if (urlState.wdwSrmtEnabled !== undefined) ext.setWdwSrmtEnabled(urlState.wdwSrmtEnabled)
-  if (urlState.wdwSrmtClock !== undefined) ext.setWdwSrmtClock(urlState.wdwSrmtClock)
-  if (urlState.wdwSrmtCutNormalized !== undefined)
-    ext.setWdwSrmtCutNormalized(urlState.wdwSrmtCutNormalized)
-  if (urlState.wdwSrmtRankCap !== undefined) ext.setWdwSrmtRankCap(urlState.wdwSrmtRankCap)
-  if (urlState.wdwSrmtHeatmapIntensity !== undefined)
-    ext.setWdwSrmtHeatmapIntensity(urlState.wdwSrmtHeatmapIntensity)
+  type Apply = (s: ParsedShareableState, e: typeof ext) => void
+  const apply =
+    (get: (s: ParsedShareableState) => unknown, run: Apply): Apply =>
+    (s, e) => {
+      if (get(s) !== undefined) run(s, e)
+    }
+  const steps: Apply[] = [
+    apply(
+      (s) => s.wdwBoundaryCondition,
+      (s, e) => e.setWdwBoundaryCondition(s.wdwBoundaryCondition!)
+    ),
+    apply(
+      (s) => s.wdwInflatonMass,
+      (s, e) => e.setWdwInflatonMass(s.wdwInflatonMass!)
+    ),
+    apply(
+      (s) => s.wdwInflatonMassAsymmetry,
+      (s, e) => e.setWdwInflatonMassAsymmetry(s.wdwInflatonMassAsymmetry!)
+    ),
+    apply(
+      (s) => s.wdwCosmologicalConstant,
+      (s, e) => e.setWdwCosmologicalConstant(s.wdwCosmologicalConstant!)
+    ),
+    apply(
+      (s) => s.wdwStreamlinesEnabled,
+      (s, e) => e.setWdwStreamlinesEnabled(s.wdwStreamlinesEnabled!)
+    ),
+    apply(
+      (s) => s.wdwStreamlineDensity,
+      (s, e) => e.setWdwStreamlineDensity(s.wdwStreamlineDensity!)
+    ),
+    // Render-only animation effects — these setters do NOT flip needsReset.
+    apply(
+      (s) => s.wdwPhaseRotationEnabled,
+      (s, e) => e.setWdwPhaseRotationEnabled(s.wdwPhaseRotationEnabled!)
+    ),
+    apply(
+      (s) => s.wdwPhaseRotationSpeed,
+      (s, e) => e.setWdwPhaseRotationSpeed(s.wdwPhaseRotationSpeed!)
+    ),
+    apply(
+      (s) => s.wdwWorldlineEnabled,
+      (s, e) => e.setWdwWorldlineEnabled(s.wdwWorldlineEnabled!)
+    ),
+    apply(
+      (s) => s.wdwWorldlineSpeed,
+      (s, e) => e.setWdwWorldlineSpeed(s.wdwWorldlineSpeed!)
+    ),
+    apply(
+      (s) => s.wdwWorldlinePulseWidth,
+      (s, e) => e.setWdwWorldlinePulseWidth(s.wdwWorldlinePulseWidth!)
+    ),
+    // SRMT diagnostic — display-only; these setters do not flip needsReset.
+    apply(
+      (s) => s.wdwSrmtEnabled,
+      (s, e) => e.setWdwSrmtEnabled(s.wdwSrmtEnabled!)
+    ),
+    apply(
+      (s) => s.wdwSrmtClock,
+      (s, e) => e.setWdwSrmtClock(s.wdwSrmtClock!)
+    ),
+    apply(
+      (s) => s.wdwSrmtCutNormalized,
+      (s, e) => e.setWdwSrmtCutNormalized(s.wdwSrmtCutNormalized!)
+    ),
+    apply(
+      (s) => s.wdwSrmtRankCap,
+      (s, e) => e.setWdwSrmtRankCap(s.wdwSrmtRankCap!)
+    ),
+    apply(
+      (s) => s.wdwSrmtHeatmapIntensity,
+      (s, e) => e.setWdwSrmtHeatmapIntensity(s.wdwSrmtHeatmapIntensity!)
+    ),
+  ]
+  for (const step of steps) step(urlState, ext)
 }
 
 /**

@@ -46,8 +46,18 @@ export type WdwSrmtClock = 'a' | 'phi1' | 'phi2'
 export interface WheelerDeWittConfig {
   /** Selected boundary condition proposal (physics) */
   boundaryCondition: WdwBoundaryCondition
-  /** Inflaton mass m for V(φ) = ½m²(φ₁²+φ₂²) + Λ (physics) */
+  /** Inflaton mass m for V(φ) = ½m²φ₁² + ½(m·α)²φ₂² + Λ (physics) */
   inflatonMass: number
+  /**
+   * Per-axis effective-mass ratio `α` applied to the φ₂ component of
+   * the potential (effective mass on the φ₂ axis = `m·α`, on the φ₁
+   * axis = `m`). `α = 1` is the isotropic default that reproduces the
+   * pre-asymmetry symmetric potential bit-identically. Anisotropic
+   * values break the φ₁↔φ₂ exchange symmetry, allowing the SRMT
+   * diagnostic to distinguish the three clocks `{a, phi1, phi2}`
+   * instead of producing `q_phi1 == q_phi2` by construction. Clamped
+   * to `[0.1, 10]` by the setter. (physics) */
+  inflatonMassAsymmetry: number
   /** Cosmological constant Λ (physics) */
   cosmologicalConstant: number
   /** Minimum scale factor a_min at which boundary data is imposed (physics) */
@@ -113,6 +123,7 @@ export interface WheelerDeWittConfig {
 export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   boundaryCondition: 'noBoundary',
   inflatonMass: 0.3,
+  inflatonMassAsymmetry: 1.0,
   cosmologicalConstant: 0.0,
   aMin: 0.1,
   aMax: 1.5,

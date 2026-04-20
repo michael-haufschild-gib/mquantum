@@ -126,11 +126,28 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
       expect(wdw.needsReset).toBe(true)
     })
 
+    it('applies the Medium preset', () => {
+      useExtendedObjectStore.getState().setWdwGridSize('low')
+      useExtendedObjectStore.getState().setWdwGridSize('medium')
+      const wdw = getWdw()
+      expect(wdw.gridNa).toBe(128)
+      expect(wdw.gridNphi).toBe(32)
+      expect(wdw.needsReset).toBe(true)
+    })
+
     it('applies the High preset', () => {
       useExtendedObjectStore.getState().setWdwGridSize('high')
       const wdw = getWdw()
       expect(wdw.gridNa).toBe(192)
       expect(wdw.gridNphi).toBe(32)
+    })
+
+    it('applies the Publication preset', () => {
+      useExtendedObjectStore.getState().setWdwGridSize('publication')
+      const wdw = getWdw()
+      expect(wdw.gridNa).toBe(256)
+      expect(wdw.gridNphi).toBe(48)
+      expect(wdw.needsReset).toBe(true)
     })
   })
 

@@ -482,6 +482,7 @@ export interface SchroedingerSliceActions {
     bc: import('@/lib/geometry/extended/wheelerDeWitt').WdwBoundaryCondition
   ) => void
   setWdwInflatonMass: (m: number) => void
+  setWdwInflatonMassAsymmetry: (ratio: number) => void
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwGridSize: (
     preset: import('@/stores/slices/geometry/setters/wheelerDeWittSetters').WdwGridPreset

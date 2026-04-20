@@ -49,11 +49,47 @@
  * @module lib/physics/srmt/hjOperator
  */
 
+import { logger } from '@/lib/logger'
 import { jacobiEigenvalues } from '@/lib/math/jacobiEigenvalues'
 import { wdwU } from '@/lib/physics/wheelerDeWitt/constants'
 
 import { lanczosTopKOp, type LinearOperator } from './lanczos'
 import type { SrmtClock } from './types'
+
+/**
+ * Rate-limit state for the top-k contamination-guard warning. Callback
+ * Lanczos top-`k` on a sparse slice operator extracts only the leading
+ * Ritz values of the Krylov subspace; beyond roughly `n/2` the trailing
+ * Ritz values degenerate into garbage driven by round-off rather than
+ * true operator eigenvalues. To keep a future caller (e.g. a low-`N_φ`
+ * gridNphi sensitivity point paired with a high `rankCap`) from
+ * silently polluting `hj64[k−1..rankCap−1]` with those garbage values,
+ * {@link hjSpectrumOnSliceTopK} auto-clips `k` to `floor(n/2)` and
+ * emits a dev-only `logger.warn` the first {@link HJ_TOPK_WARN_DEFAULT}
+ * times the guard fires per process. The mutable `remaining` counter
+ * lives on the shared {@link HJ_TOPK_WARN_BUDGET} object so tests can
+ * reset it deterministically via {@link resetHjTopKWarnBudget}.
+ */
+interface HjTopKWarningBudget {
+  remaining: number
+}
+
+const HJ_TOPK_WARN_DEFAULT = 3
+const HJ_TOPK_WARN_BUDGET: HjTopKWarningBudget = { remaining: HJ_TOPK_WARN_DEFAULT }
+
+/**
+ * Test helper: reset the top-k contamination-guard warning budget so
+ * subsequent {@link hjSpectrumOnSliceTopK} calls can observe the warn
+ * again. Safe to call from production code — the default budget is small
+ * and exhausting it is benign. Exported so the shared module state does
+ * not leak between tests.
+ *
+ * @param budget - New budget value (clamped to a non-negative integer).
+ *   Defaults to the production default of `3`.
+ */
+export function resetHjTopKWarnBudget(budget: number = HJ_TOPK_WARN_DEFAULT): void {
+  HJ_TOPK_WARN_BUDGET.remaining = Math.max(0, Math.floor(budget))
+}
 
 /**
  * Physical grid + potential parameters needed to build `H_HJ`. All units
@@ -76,6 +112,13 @@ export interface HjOperatorInputs {
   inflatonMass: number
   /** Cosmological constant `Λ`. */
   cosmologicalConstant: number
+  /**
+   * Per-axis effective-mass ratio `α` on the φ₂ axis
+   * (`V = ½m²·φ₁² + ½(m·α)²·φ₂² + Λ`). Optional; defaults to `1`
+   * (isotropic). Must match the value passed to the solver, otherwise
+   * the modular and HJ spectra probe different physics.
+   */
+  inflatonMassAsymmetry?: number
   /**
    * Clock-axis index of the slice at which to evaluate `H_HJ`. For clock
    * `'a'` this is an index into the `a` axis; for `'φ₁'` / `'φ₂'` an
@@ -135,6 +178,7 @@ interface SparseHjOperator {
  */
 function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  const asymmetry = inputs.inflatonMassAsymmetry ?? 1
   // Explicit `Na >= 2` guard — otherwise the failing `sliceIndex` check
   // below issues a confusing "must be strictly interior" error when the
   // real problem is that the `a` grid is too small to have any interior.
@@ -177,7 +221,7 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
     for (let i2 = 0; i2 < Nphi; i2++) {
       const phi2 = -phiExtent + i2 * dphi
       const idx = i1 * Nphi + i2
-      diag[idx] = diagKin + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+      diag[idx] = diagKin + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
     }
   }
 
@@ -211,6 +255,7 @@ function buildSparseOpA(inputs: HjOperatorInputs): SparseHjOperator {
  */
 function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): SparseHjOperator {
   const { Nphi, aMin, aMax, Na, phiExtent, inflatonMass, cosmologicalConstant, sliceIndex } = inputs
+  const asymmetry = inputs.inflatonMassAsymmetry ?? 1
   if (Na < 2) {
     throw new Error(`buildSparseOpPhi: Na must be >= 2, got ${Na}`)
   }
@@ -262,7 +307,9 @@ function buildSparseOpPhi(inputs: HjOperatorInputs, clock: 'phi1' | 'phi2'): Spa
       //   from (1/a²) ∂²_φ: −2/(a² dφ²)
       //   plus U(a, φ)
       diag[idx] =
-        2 * invDa2 - 2 * invAsq * invDphi2 + wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant)
+        2 * invDa2 -
+        2 * invAsq * invDphi2 +
+        wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, asymmetry)
 
       // Per-cell φ-kinetic off-diagonal. Positive (see sign note above).
       offAxis1Variable[idx] = offPhi
@@ -356,14 +403,21 @@ export interface HjSpectrumTopKOptions {
  *
  * @param clock - Clock axis.
  * @param inputs - Grid and potential parameters.
- * @param k - Number of top-magnitude eigenvalues to extract. Values
- *   larger than the slice order `n` are silently clipped to `n`
- *   (recovering the full spectrum).
+ * @param k - Requested number of top-magnitude eigenvalues. Auto-clipped
+ *   to `min(k, floor(n/2))` to suppress Lanczos trailing-Ritz
+ *   contamination — when this guard fires, a dev-only rate-limited
+ *   `logger.warn` is emitted and the returned `spectrum.length` is less
+ *   than the requested `k`. Callers must therefore bound their compare
+ *   loops by the returned `spectrum.length`, not the requested `k` (the
+ *   sweep drivers already do this via
+ *   `compareCount = Math.min(kSpec.length, hj64.length, rankCap)`).
  * @param opts - Lanczos iteration options (currently only `seed`). Omit
  *   to use the library default.
- * @returns `{ spectrum, n }` — `spectrum` holds the top-k eigenvalues of
- *   `H_HJ` sorted ascending; `n` is the slice dimension (`Nphi²` for
- *   clock `'a'`, `Na · Nphi` for the φ-clocks).
+ * @returns `{ spectrum, n }` — `spectrum` holds the top-`k_eff`
+ *   eigenvalues of `H_HJ` sorted ascending, where
+ *   `k_eff = min(k, floor(n/2))` (so `spectrum.length ≤ k`); `n` is the
+ *   slice dimension (`Nphi²` for clock `'a'`, `Na · Nphi` for the
+ *   φ-clocks).
  */
 export function hjSpectrumOnSliceTopK(
   clock: SrmtClock,
@@ -373,11 +427,27 @@ export function hjSpectrumOnSliceTopK(
 ): { spectrum: Float32Array; n: number } {
   const op = clock === 'a' ? buildSparseOpA(inputs) : buildSparseOpPhi(inputs, clock)
   if (k <= 0) return { spectrum: new Float32Array(0), n: op.n }
+  // Contamination guard: callback Lanczos top-`k` resolves the leading
+  // Ritz values reliably only up to about `n/2`; above that the trailing
+  // Ritz values are round-off-driven and would silently poison any
+  // downstream affine-fit comparison. Cap to `floor(n/2)` and warn (dev,
+  // rate-limited) so the symptom — a shorter-than-expected spectrum —
+  // stays diagnosable without flooding the console during sweeps.
+  const kCap = Math.floor(op.n / 2)
+  const kEff = Math.min(k, kCap)
+  if (k > kCap && HJ_TOPK_WARN_BUDGET.remaining > 0) {
+    HJ_TOPK_WARN_BUDGET.remaining -= 1
+    logger.warn(
+      `[srmt:hjOperator] top-k contamination guard clipped requested k=${k} to k_eff=${kEff} ` +
+        `on clock='${clock}' slice of order n=${op.n} (ceiling = floor(n/2) = ${kCap}). ` +
+        `The returned spectrum has length ${kEff}; bound compare loops by spectrum.length, not k.`
+    )
+  }
   const apply = applySparseOperator(op)
   const spectrum = lanczosTopKOp(
     apply,
     op.n,
-    Math.min(k, op.n),
+    kEff,
     op.infNorm,
     opts?.seed !== undefined ? { seed: opts.seed } : undefined
   )

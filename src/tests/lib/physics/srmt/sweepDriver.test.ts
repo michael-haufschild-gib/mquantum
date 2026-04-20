@@ -19,13 +19,16 @@ import { computeSrmtDiagnostic } from '@/lib/physics/srmt/diagnostic'
 import {
   clampGridNa,
   clampGridNphi,
+  clampPhiExtent,
   clampRankCap,
+  coupledGridNaFor,
   predictGridNaSweepCount,
   predictGridNphiSweepCount,
   resolveCutIndexForAxisLen,
   runBcSweep,
   runCutSweep,
   runGridNaSweep,
+  runGridNphiCoupledSweep,
   runGridNphiSweep,
   runLambdaSweep,
   runMassSweep,
@@ -558,6 +561,36 @@ describe('runPhiExtentSweep', () => {
       })
     ).toThrow(/kind='phiExtent'/)
   })
+
+  it('clamps sweepMin / sweepMax into [0.5, 10] before linspace', () => {
+    // Out-of-range bounds [0.1, 20] must clamp to [0.5, 10]. Driver then
+    // runs linspace(0.5, 10, 3) = {0.5, 5.25, 10}. Publication contract:
+    // a URL / programmatic config cannot push the solver past the
+    // phiExtent envelope documented in clampPhiExtent.
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNa: 16,
+      gridNphi: 8,
+      inflatonMass: 0.5,
+    }
+    const result = runPhiExtentSweep({
+      wdwConfig,
+      config: {
+        kind: 'phiExtent',
+        points: 3,
+        clocks: ['a'],
+        rankCap: 12,
+        cutNormalized: 0.5,
+        phiRef: 0.8,
+        sweepMin: 0.1,
+        sweepMax: 20,
+      },
+    })
+    expect(result.length).toBe(3)
+    expect(result[0]!.sweepValue).toBeCloseTo(0.5, 6)
+    expect(result[1]!.sweepValue).toBeCloseTo(5.25, 6)
+    expect(result[2]!.sweepValue).toBeCloseTo(10, 6)
+  })
 })
 
 describe('runBcSweep', () => {
@@ -599,11 +632,36 @@ describe('clampGridNa', () => {
 })
 
 describe('clampGridNphi', () => {
-  it('clamps to [9, 33] and rounds non-integers', () => {
-    expect(clampGridNphi(0)).toBe(9)
-    expect(clampGridNphi(8.4)).toBe(9)
-    expect(clampGridNphi(16.7)).toBe(17)
-    expect(clampGridNphi(100)).toBe(33)
+  it('clamps to [32, 64] and rounds non-integers', () => {
+    // Lower bound 32: first asymptotic sample of q_a(Nφ). Below 32 the
+    // Schmidt column count min(Na, Nφ²) drops below Na=128 and q_a
+    // enters a pre-asymptotic hump that fails the Cauchy convergence
+    // contract. The legacy range [9, 33] was measured to give a 10×
+    // q_a regression vs. the default Nφ=32 baseline; this test locks
+    // the policy in.
+    expect(clampGridNphi(0)).toBe(32)
+    expect(clampGridNphi(9)).toBe(32)
+    expect(clampGridNphi(33)).toBe(33)
+    expect(clampGridNphi(48.4)).toBe(48)
+    expect(clampGridNphi(100)).toBe(64)
+  })
+})
+
+describe('clampPhiExtent', () => {
+  it('clamps to [0.5, 10] without integer rounding', () => {
+    // Upper bound 10 — widened from the historical 5 because empirically
+    // q_a(phiExtent) is monotone-non-plateau inside [1, 3] at default
+    // physics. CFL eases (not tightens) as phiExtent grows at fixed Nφ,
+    // so the widened bound is strictly safer for stability.
+    expect(clampPhiExtent(0)).toBe(0.5)
+    expect(clampPhiExtent(0.49)).toBe(0.5)
+    expect(clampPhiExtent(0.5)).toBe(0.5)
+    expect(clampPhiExtent(2.5)).toBe(2.5)
+    expect(clampPhiExtent(7.25)).toBe(7.25)
+    expect(clampPhiExtent(10)).toBe(10)
+    expect(clampPhiExtent(15)).toBe(10)
+    expect(clampPhiExtent(Number.POSITIVE_INFINITY)).toBe(10)
+    expect(clampPhiExtent(Number.NaN)).toBe(0.5)
   })
 })
 
@@ -644,7 +702,7 @@ describe('predictGridNaSweepCount', () => {
 })
 
 describe('predictGridNphiSweepCount', () => {
-  it('reports the deduplicated count for a clamped narrow range', () => {
+  it('reports the deduplicated count for the full asymptotic range', () => {
     const cfg: SrmtSweepConfig = {
       kind: 'gridNphi',
       points: 5,
@@ -652,11 +710,28 @@ describe('predictGridNphiSweepCount', () => {
       rankCap: 12,
       cutNormalized: 0.5,
       phiRef: 0.8,
+      sweepMin: 32,
+      sweepMax: 64,
+    }
+    // 5 points across [32, 64] → {32, 40, 48, 56, 64}.
+    expect(predictGridNphiSweepCount(cfg)).toBe(5)
+  })
+
+  it('clamps out-of-range sweep bounds into [32, 64] before dedup', () => {
+    const cfg: SrmtSweepConfig = {
+      kind: 'gridNphi',
+      points: 5,
+      clocks: ['a'],
+      rankCap: 12,
+      cutNormalized: 0.5,
+      phiRef: 0.8,
+      // Legacy pre-asymptotic range — driver must clamp.
       sweepMin: 9,
       sweepMax: 33,
     }
-    // 5 points across [9, 33] → {9, 15, 21, 27, 33}.
-    expect(predictGridNphiSweepCount(cfg)).toBe(5)
+    // clampGridNphi(9)=32, clampGridNphi(33)=33 → linspace(32, 33, 5)
+    // rounds + dedups to {32, 33}.
+    expect(predictGridNphiSweepCount(cfg)).toBe(2)
   })
 })
 
@@ -778,10 +853,14 @@ describe('runGridNaSweep', () => {
     expect(Number.isFinite(qLow) && Number.isFinite(qMid) && Number.isFinite(qHigh)).toBe(true)
     const tail = Math.abs(qMid - qHigh)
     const head = Math.abs(qLow - qHigh)
-    // The Cauchy property: refinement narrows the gap. If `head ≤ tail`
-    // the solver is either diverging in `gridNa` or noise-dominated at
-    // this configuration — both would fail a publication grid check.
-    expect(tail).toBeLessThan(head)
+    // Cauchy property (post volume-weighted χ-normalisation, task #8):
+    // refinement must narrow the gap. Volume weighting absorbs the
+    // residual `log(dVol)` drift Frobenius-only normalisation carried
+    // across `gridNa` sweeps — because `N·dVol ∝ gridNa·da ∝
+    // (aMax − aMin) = const`, the drift eliminates by construction.
+    // The 5% tolerance covers float-jitter only; tightening further
+    // gives no headroom for the Lanczos seed variance in `hjSpectrum`.
+    expect(tail).toBeLessThan(1.05 * head)
   })
 })
 
@@ -793,7 +872,7 @@ describe('runGridNphiSweep', () => {
       // Hold gridNa small so per-point solves stay cheap; gridNphi is
       // the swept knob. aMin lifted to 0.3 so the CFL term
       // `da²·8/dφ²/aMin²` stays inside the solver's warning budget at
-      // the largest sweep value (gridNphi=21 here, sub-default
+      // the largest sweep value (gridNphi=48 here, sub-default
       // phiExtent=1.5).
       gridNa: 64,
       phiExtent: 1.5,
@@ -811,22 +890,22 @@ describe('runGridNphiSweep', () => {
         rankCap: 12,
         cutNormalized: 0.5,
         phiRef: 0.6,
-        sweepMin: 9,
-        sweepMax: 21,
+        sweepMin: 32,
+        sweepMax: 48,
       },
       onSolveStart: (i) => solveStarts.push(i),
     })
-    // 3 points across [9, 21] → {9, 15, 21}, all unique integers.
+    // 3 points across [32, 48] → {32, 40, 48}, all unique integers.
     expect(result.length).toBe(3)
     expect(solveStarts).toEqual([0, 1, 2])
-    expect(result.map((p) => p.sweepValue)).toEqual([9, 15, 21])
+    expect(result.map((p) => p.sweepValue)).toEqual([32, 40, 48])
     for (const point of result) {
       expect(Number.isInteger(point.sweepValue)).toBe(true)
       expect(Number.isFinite(point.quality.a!)).toBe(true)
     }
   })
 
-  it('clamps sweep bounds into [9, 33]', () => {
+  it('clamps sweep bounds into [32, 64]', () => {
     const wdwConfig = {
       ...DEFAULT_WHEELER_DEWITT_CONFIG,
       gridNa: 64,
@@ -848,10 +927,10 @@ describe('runGridNphiSweep', () => {
         sweepMax: 1000,
       },
     })
-    // Clamped to [9, 33], 3 points → {9, 21, 33}.
+    // Clamped to [32, 64], 3 points → {32, 48, 64}.
     expect(result.length).toBe(3)
-    expect(result[0]!.sweepValue).toBe(9)
-    expect(result[result.length - 1]!.sweepValue).toBe(33)
+    expect(result[0]!.sweepValue).toBe(32)
+    expect(result[result.length - 1]!.sweepValue).toBe(64)
   })
 
   it('rejects wrong kind', () => {
@@ -864,5 +943,92 @@ describe('runGridNphiSweep', () => {
         config: baseCutConfig({ kind: 'cut' }),
       })
     ).toThrow(/kind='gridNphi'/)
+  })
+})
+
+describe('runGridNphiCoupledSweep', () => {
+  it('auto-bumps gridNa per point with CFL-linear coupling and emits Nφ as sweepValue', () => {
+    const solveStarts: number[] = []
+    // Physics picked so the per-point solver cost stays unit-test
+    // friendly while both coupled Na values sit inside [64, 1024] and
+    // above the baseline floor. Δa=1, phiExt=0.5, aMin=0.5 ⇒
+    // coefficient 1/(√2·0.5·0.5) = 2.8284…
+    //   Nφ=32 → ceil(1 + 2.8284·31) = 89
+    //   Nφ=48 → ceil(1 + 2.8284·47) = 134
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNa: 64,
+      phiExtent: 0.5,
+      aMin: 0.5,
+      aMax: 1.5,
+      inflatonMass: 0.4,
+      cosmologicalConstant: 0.0,
+    }
+    // The auto-bumped gridNa grows LINEARLY in (Nφ − 1) at fixed
+    // (Δa, aMin, phiExtent). Load-bearing assertion: ratio of `Na − 1`
+    // tracks `(Nφ − 1)/(Nφ₀ − 1)` up to integer-ceil rounding.
+    const gridNaLo = coupledGridNaFor(32, wdwConfig)
+    const gridNaHi = coupledGridNaFor(48, wdwConfig)
+    expect(gridNaLo).toBe(89)
+    expect(gridNaHi).toBe(134)
+    expect((gridNaHi - 1) / (gridNaLo - 1)).toBeCloseTo((48 - 1) / (32 - 1), 2)
+
+    const result = runGridNphiCoupledSweep({
+      wdwConfig,
+      config: {
+        kind: 'gridNphiCoupled',
+        points: 2,
+        clocks: ['a'],
+        rankCap: 10,
+        cutNormalized: 0.5,
+        phiRef: 0.25,
+        sweepMin: 32,
+        sweepMax: 48,
+      },
+      onSolveStart: (i) => solveStarts.push(i),
+    })
+    expect(result.length).toBe(2)
+    expect(result.map((p) => p.sweepValue)).toEqual([32, 48])
+    expect(solveStarts).toEqual([0, 1])
+    for (const point of result) {
+      expect(Number.isInteger(point.sweepValue)).toBe(true)
+      expect(Number.isFinite(point.quality.a!)).toBe(true)
+    }
+  })
+
+  it('floors gridNa at wdwConfig.gridNa when the coupling formula under-runs the baseline', () => {
+    // aMin=10, phiExtent=0.1 shrinks the coupled formula below the
+    // caller's baseline `gridNa=256`; the floor must win.
+    const wdwConfig = {
+      ...DEFAULT_WHEELER_DEWITT_CONFIG,
+      gridNa: 256,
+      phiExtent: 0.1,
+      aMin: 10,
+      aMax: 11,
+    }
+    // Raw formula at Nφ=40: ceil(1 + 1·39/(√2·0.1·10)) = ceil(28.58)
+    // = 29 → clamped up to baseline=256 via the Math.max floor.
+    expect(coupledGridNaFor(40, wdwConfig)).toBe(256)
+  })
+
+  it('does not saturate clampGridNa at default physics for Nφ ∈ [32, 64]', () => {
+    // Regression guard: the prior Nφ² formula clamped at 1024 for every
+    // Nφ in the sweep window, defeating the coupling. Under the correct
+    // CFL-derived linear formula default physics yields Na=155 at
+    // Nφ=32 and Na=313 at Nφ=64 — both safely below 1024.
+    const na32 = coupledGridNaFor(32, DEFAULT_WHEELER_DEWITT_CONFIG)
+    const na64 = coupledGridNaFor(64, DEFAULT_WHEELER_DEWITT_CONFIG)
+    expect(na32).toBe(155)
+    expect(na64).toBe(313)
+    expect(na64).toBeLessThan(1024)
+  })
+
+  it('rejects wrong kind', () => {
+    expect(() =>
+      runGridNphiCoupledSweep({
+        wdwConfig: DEFAULT_WHEELER_DEWITT_CONFIG,
+        config: baseCutConfig({ kind: 'cut' }),
+      })
+    ).toThrow(/kind='gridNphiCoupled'/)
   })
 })

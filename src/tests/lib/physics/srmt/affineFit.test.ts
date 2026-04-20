@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeAffineFitQuality,
   computeRigidFitQuality,
+  fitAffineParams,
   jackknifeAffineFitStdev,
   jackknifeRigidFitStdev,
 } from '@/lib/physics/srmt/affineFit'
@@ -38,6 +39,69 @@ function affinePair(
   }
   return { K, E }
 }
+
+describe('fitAffineParams', () => {
+  it('returns α=1 β=0 q=0 for identity K = E', () => {
+    const E = new Float64Array([1, 2, 3, 4, 5])
+    const K = new Float64Array([1, 2, 3, 4, 5])
+    const { q, alpha, beta } = fitAffineParams(K, E, 5)
+    expect(alpha).toBeCloseTo(1, 14)
+    expect(beta).toBeCloseTo(0, 14)
+    expect(q).toBeLessThan(1e-28)
+  })
+
+  it('returns α=1 β=5 when K = E + 5 (pure shift)', () => {
+    const E = new Float64Array([1, 2, 3, 4, 5, 6])
+    const K = new Float64Array([6, 7, 8, 9, 10, 11])
+    const { q, alpha, beta } = fitAffineParams(K, E, 6)
+    expect(alpha).toBeCloseTo(1, 14)
+    expect(beta).toBeCloseTo(5, 14)
+    // q = Σ(K − (αE+β))² / ΣK²; residuals are zero by construction.
+    expect(q).toBeLessThan(1e-28)
+  })
+
+  it('returns α=2 β=0 when K = 2·E (pure scale)', () => {
+    const E = new Float64Array([1, 2, 3, 4, 5])
+    const K = new Float64Array([2, 4, 6, 8, 10])
+    const { q, alpha, beta } = fitAffineParams(K, E, 5)
+    expect(alpha).toBeCloseTo(2, 14)
+    expect(beta).toBeCloseTo(0, 14)
+    expect(q).toBeLessThan(1e-28)
+  })
+
+  it('returns NaNs throughout for degenerate zero-variance E', () => {
+    // Constant E → sEE = 0 → fit is unsolvable. All three fields NaN.
+    const E = new Float64Array([3, 3, 3, 3])
+    const K = new Float64Array([0.1, 0.2, 0.3, 0.4])
+    const { q, alpha, beta } = fitAffineParams(K, E, 4)
+    expect(q).toBeNaN()
+    expect(alpha).toBeNaN()
+    expect(beta).toBeNaN()
+  })
+
+  it('returns NaNs throughout for count<2 and count>buffer', () => {
+    const E = new Float64Array([1, 2, 3])
+    const K = new Float64Array([1, 2, 3])
+    for (const bad of [0, 1, 7]) {
+      const r = fitAffineParams(K, E, bad)
+      expect(r.q).toBeNaN()
+      expect(r.alpha).toBeNaN()
+      expect(r.beta).toBeNaN()
+    }
+  })
+
+  it('q matches computeAffineFitQuality bit-for-bit on non-degenerate inputs', () => {
+    // Contract: computeAffineFitQuality is a thin wrapper over
+    // fitAffineParams. A divergence between the two would mean the
+    // delegation was silently rewritten to use different FP ops.
+    const E = new Float64Array([1, 2, 3, 5, 8, 13, 21])
+    const K = new Float64Array([1.05, 2.1, 2.95, 5.05, 8.2, 13.1, 20.8])
+    const n = 7
+    const viaWrapper = computeAffineFitQuality(K, E, n)
+    const viaDirect = fitAffineParams(K, E, n).q
+    expect(Object.is(viaWrapper, viaDirect)).toBe(true)
+  })
+})
 
 describe('jackknifeAffineFitStdev', () => {
   it('returns 0 for a perfectly affine spectrum (every replicate hits q=0)', () => {

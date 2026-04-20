@@ -13,8 +13,12 @@
 //!
 //! - **Implemented**: `U(a, φ)` and `V(φ)` operators, `a_turn(φ)`, the three
 //!   boundary-condition generators (HH / Vilenkin / DeWitt), and the raw
-//!   second-order leapfrog PDE integrator with ghost-zero Dirichlet
-//!   boundaries at the outer φ-edges.
+//!   second-order leapfrog PDE integrator with Neumann (zero-flux) ghost
+//!   boundaries at the outer φ-edges. Ghost cells inherit the value of
+//!   the adjacent interior-edge cell, matching the TS solver's updated
+//!   φ-boundary rule (see the module docstring of
+//!   `src/lib/physics/wheelerDeWitt/solver.ts` for the SRMT sensitivity
+//!   sweep that motivated the switch from ghost-zero Dirichlet).
 //! - **NOT implemented**: Stage-2 deep-Euclidean WKB tail ("WDW_WKB_MATCH
 //!   _PHASE_THRESHOLD") and Stage-3 Airy/Langer connection. These are
 //!   numerical post-processing layers applied on top of the raw PDE solve
@@ -272,9 +276,18 @@ fn build_boundary(
     }
 }
 
-/// Ghost-zero Dirichlet φ-Laplacian at `(i1, i2)` on the complex slab
+/// Neumann-ghost φ-Laplacian at `(i1, i2)` on the complex slab
 /// `slab[slab_base..slab_base + 2·N_phi²]` (interleaved re, im).
 /// Returns `(re, im)` of `∇²_φ χ`.
+///
+/// Ghost rule (zero-flux): cells one step past the outer `φ`-edge
+/// inherit the value of the adjacent interior-edge cell. This matches
+/// the TS production solver's updated boundary treatment — the
+/// previous ghost-zero Dirichlet rule clipped the χ tail at the edge
+/// and produced non-monotone `q_a(phiExtent)` in SRMT sensitivity
+/// sweeps. Under Neumann, a constant-in-φ seed is an exact
+/// eigenfunction of this stencil with eigenvalue `0` at every cell
+/// including the edges.
 #[inline]
 fn phi_laplacian_at(
     slab: &[f64],
@@ -287,45 +300,48 @@ fn phi_laplacian_at(
     let center = slab_base + 2 * (i1 * nphi + i2);
     let cre = slab[center];
     let cim = slab[center + 1];
+    // Neumann ghost: fall back to the centre-cell value when the
+    // neighbour would sit outside the grid (so that side's stencil
+    // contribution is `(c + c − 2c) = 0`).
     let pre1 = if i1 > 0 {
         slab[slab_base + 2 * ((i1 - 1) * nphi + i2)]
     } else {
-        0.0
+        cre
     };
     let pim1 = if i1 > 0 {
         slab[slab_base + 2 * ((i1 - 1) * nphi + i2) + 1]
     } else {
-        0.0
+        cim
     };
     let nre1 = if i1 < nphi - 1 {
         slab[slab_base + 2 * ((i1 + 1) * nphi + i2)]
     } else {
-        0.0
+        cre
     };
     let nim1 = if i1 < nphi - 1 {
         slab[slab_base + 2 * ((i1 + 1) * nphi + i2) + 1]
     } else {
-        0.0
+        cim
     };
     let pre2 = if i2 > 0 {
         slab[slab_base + 2 * (i1 * nphi + i2 - 1)]
     } else {
-        0.0
+        cre
     };
     let pim2 = if i2 > 0 {
         slab[slab_base + 2 * (i1 * nphi + i2 - 1) + 1]
     } else {
-        0.0
+        cim
     };
     let nre2 = if i2 < nphi - 1 {
         slab[slab_base + 2 * (i1 * nphi + i2 + 1)]
     } else {
-        0.0
+        cre
     };
     let nim2 = if i2 < nphi - 1 {
         slab[slab_base + 2 * (i1 * nphi + i2 + 1) + 1]
     } else {
-        0.0
+        cim
     };
     (
         (pre1 + nre1 - 2.0 * cre + pre2 + nre2 - 2.0 * cre) * inv_dphi2,
@@ -339,9 +355,10 @@ fn phi_laplacian_at(
 ///
 ///   `−∂²_a χ + (1/a²) ∇²_φ χ + U·χ = 0`
 ///
-/// with ghost-zero Dirichlet on the φ-edges and the chosen boundary
-/// condition at `a = a_min`. Returns the full `(a, φ₁, φ₂)` tensor. No
-/// clamping, no absorber, no Airy overwrite — the raw PDE output.
+/// with Neumann (zero-flux) ghost on the φ-edges and the chosen
+/// boundary condition at `a = a_min`. Returns the full `(a, φ₁, φ₂)`
+/// tensor. No clamping, no absorber, no Airy overwrite — the raw PDE
+/// output.
 ///
 /// # Panics
 ///
@@ -595,9 +612,9 @@ mod tests {
         let cre = out.chi[2 * c]; // slab 0 central
         let cim = out.chi[2 * c + 1];
         let u0 = wdw_u(a0, 0.0, 0.0, input.mass, input.lambda);
-        // Edge-adjacent cells drive the laplacian; reconstruct the stencil:
-        // ghost-zero means neighbours outside are 0. For the 3×3 central cell,
-        // all 4 neighbours exist.
+        // Edge-adjacent cells drive the laplacian; reconstruct the stencil.
+        // For the 3×3 central cell all 4 neighbours exist, so the Neumann /
+        // Dirichlet distinction does not affect this assertion.
         let dphi = (2.0 * input.phi_extent) / (nphi - 1) as f64;
         let inv_dphi2 = 1.0 / (dphi * dphi);
         let (lap_re, lap_im) = phi_laplacian_at(&out.chi, 0, 1, 1, nphi, inv_dphi2);
@@ -769,8 +786,8 @@ mod tests {
 
         let mut res_norm = 0.0f64;
         let mut uc_norm = 0.0f64;
-        // Interior loop — skip outer boundaries where stencil reaches
-        // ghost-zero cells.
+        // Interior loop — skip outer boundaries where the Neumann ghost
+        // substitution differs from the bulk central-difference stencil.
         for ia in 1..(na - 1) {
             let a = input.a_min + ia as f64 * da;
             let inv_asq = 1.0 / (a * a);

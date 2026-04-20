@@ -34,6 +34,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `brc_p` | float -1 to 1 | Normalized branch plane position along axis 0 |
 | `wdw_bc` | enum | Wheeler–DeWitt boundary condition (`noBoundary`, `tunneling`, `deWitt`) |
 | `wdw_m` | float 0-2 | Wheeler–DeWitt inflaton mass m |
+| `wdw_ma` | float 0.1-10 | Wheeler–DeWitt φ₂-axis inflaton-mass asymmetry ratio (effective m on φ₂ axis = m·wdw_ma; 1 = isotropic, SRMT default). Default elided on serialize: only emitted when `!== 1`. |
 | `wdw_lambda` | float -1..1 | Wheeler–DeWitt cosmological constant Λ |
 | `wdw_sl` | 0/1 | Wheeler–DeWitt WKB streamline overlay toggle |
 | `wdw_sld` | int 2-16 | Wheeler–DeWitt streamline seed density per axis |
@@ -62,9 +63,9 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 | `ads_hkll_src` | int 0..2 | HKLL boundary source (0 = eigenstate, 1 = localized, 2 = planeWave) |
 | `ads_hkll_sigma` | float 0.05..1.5 | Gaussian spot angular width σ (radians) for the `localized` source |
 | `ads_hkll_mb` | int 0..8 | Azimuthal quantum number m_b for the `planeWave` source |
-| `sw` | enum `cut\|mass\|lambda\|bc\|phiRef\|rankCap\|phiExtent\|gridNa\|gridNphi` | SRMT parameter-sweep kind. Presence triggers the sweep section to auto-start after the Wheeler–DeWitt solver produces its first output. `phiRef`/`rankCap`/`phiExtent`/`gridNa`/`gridNphi` are Tier-3 sensitivity sweeps: a claim that survives variation across these knobs is genuine physics, not a numerical artifact. `gridNa`/`gridNphi` specifically certify the leapfrog's 2nd-order Cauchy convergence — a publication grid whose `q(N)` does not approach `q(N_max)` monotonically as `N` grows is unfit to publish. See `docs/physics/srmt-metric.md`. |
-| `sw_n` | int 3-64 | Sweep points. Clamped per-kind (cut: [4, 64]; mass / lambda / phiRef: [3, 21]; rankCap: [3, 32]; phiExtent: [3, 13]; gridNa / gridNphi: [3, 9]). Ignored when `sw=bc`. |
-| `sw_min` | float -1024..1024 | Lower sweep bound (cut: [0, 1]; mass: [0, 2]; lambda: [-1, 1]; phiRef: [0, phiExtent]; rankCap: [8, 256]; phiExtent: [0.5, 5]; gridNa: [64, 1024]; gridNphi: [9, 33]). Driver clamps per-kind. Ignored for `sw=bc`. |
+| `sw` | enum `cut\|mass\|lambda\|bc\|phiRef\|rankCap\|phiExtent\|gridNa\|gridNphi\|gridNphiCoupled` | SRMT parameter-sweep kind. Presence triggers the sweep section to auto-start after the Wheeler–DeWitt solver produces its first output. `phiRef`/`rankCap`/`phiExtent`/`gridNa`/`gridNphi`/`gridNphiCoupled` are Tier-3 sensitivity sweeps: a claim that survives variation across these knobs is genuine physics, not a numerical artifact. `gridNa`/`gridNphi` specifically certify the leapfrog's 2nd-order Cauchy convergence — a publication grid whose `q(N)` does not approach `q(N_max)` monotonically as `N` grows is unfit to publish. `gridNphiCoupled` is the publication-grade joint `(Nφ, Nₐ)` convergence sweep: Nφ walks `[32, 64]` and the per-point `gridNa` is co-scaled via `ceil(4·Nφ²·phiExtent²/aMin²)` (floor = `wdwConfig.gridNa`, cap = `clampGridNa`) so the explicit-leapfrog CFL term stays approximately bounded across the sweep instead of exceeding the solver's warn budget at Nφ=64 as the uncoupled `gridNphi` kind does. See `docs/physics/srmt-metric.md`. |
+| `sw_n` | int 3-64 | Sweep points. Clamped per-kind (cut: [4, 64]; mass / lambda / phiRef: [3, 21]; rankCap: [3, 32]; phiExtent: [3, 13]; gridNa / gridNphi: [3, 9]; gridNphiCoupled: [3, 7] — coupled kind is 4–8× solve cost per point). Ignored when `sw=bc`. |
+| `sw_min` | float -1024..1024 | Lower sweep bound (cut: [0, 1]; mass: [0, 2]; lambda: [-1, 1]; phiRef: [0, phiExtent]; rankCap: [8, 256]; phiExtent: [0.5, 10]; gridNa: [64, 1024]; gridNphi / gridNphiCoupled: [32, 64]). Driver clamps per-kind. Ignored for `sw=bc`. |
 | `sw_max` | float -1024..1024 | Upper sweep bound (same per-kind ranges as `sw_min`). Ignored for `sw=bc`. |
 | `sw_phi` | float -10..10 | φ reference used when computing the turning-point landmark. |
 | `sw_c` | float 0.1..0.9 | Anchor `srmtCutNormalized` for mass/bc sweeps (the cut held fixed while physics varies). Ignored for `sw=cut`. |
@@ -74,7 +75,7 @@ The URL state serializer (`src/lib/url/state-serializer.ts`) provides shareable 
 - Unknown params are silently ignored (forward compatible)
 - Missing params keep app defaults (merge behavior)
 - All extended params are optional — only `d` and `t` are required for object links
-- `wdw_*` params are only applied when `qm=wheelerDeWitt`
+- `wdw_*` params are only applied when `qm=wheelerDeWitt` (this includes `wdw_ma`, which triggers a Wheeler–DeWitt solver re-run when its value changes because the asymmetry enters the PDE potential)
 - `srmt*` params (`srmt`, `srmt_c`, `srmt_x`, `srmt_r`, `srmt_h`) are Wheeler–DeWitt SRMT-scoped — only emitted when `qm=wheelerDeWitt`, and accepted on parse regardless but only wired into `schroedinger.wheelerDeWitt.*` by `applyWdwParams`. They are display-only: toggling them does not re-run the Wheeler–DeWitt solver.
 - `ads_*` params are only emitted when `qm=antiDeSitter` (but are accepted on parse regardless)
 - `ads_hkll` and `ads_btz` are mutually exclusive at the store level — setting one clears the other. The URL parser accepts both; the store applies them in order, so the last-applied setter wins.

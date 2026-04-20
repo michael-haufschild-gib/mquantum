@@ -10,12 +10,14 @@
  *  - Champion-flip computation picks the index where the winner changes.
  */
 
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   computeChampionFlips,
+  SRMT_SWEEP_SPECTRA_TAIL_HEADER,
+  SRMT_SWEEP_SPECTRA_TAIL_MARKER,
   sweepPointsToCsv,
 } from '@/components/sections/Analysis/srmtSweepHelpers'
 import { SrmtSweepSection } from '@/components/sections/Analysis/SrmtSweepSection'
@@ -246,14 +248,22 @@ describe('sweepPointsToCsv', () => {
     expect(lines[1]).toMatch(/# landmark clock=a/)
     expect(lines[2]).toBe(
       'index,sweepValue,sweepValueBc,cutNormalized,' +
-        'q_a,q_a_sigma,q_a_rigid,q_a_rigid_sigma,' +
-        'q_phi1,q_phi1_sigma,q_phi1_rigid,q_phi1_rigid_sigma,' +
-        'q_phi2,q_phi2_sigma,q_phi2_rigid,q_phi2_rigid_sigma,' +
+        'q_a,q_a_sigma,q_a_rigid,q_a_rigid_sigma,alpha_a,beta_a,rEff_a,floorFrac_a,' +
+        'q_phi1,q_phi1_sigma,q_phi1_rigid,q_phi1_rigid_sigma,alpha_phi1,beta_phi1,' +
+        'rEff_phi1,floorFrac_phi1,' +
+        'q_phi2,q_phi2_sigma,q_phi2_rigid,q_phi2_rigid_sigma,alpha_phi2,beta_phi2,' +
+        'rEff_phi2,floorFrac_phi2,' +
         'computeMs'
     )
-    expect(lines).toHaveLength(5)
+    // Main block: 1 kind + 1 landmark + 1 header + 2 data = 5 lines.
+    // Tail block: blank + marker + sub-header (no data since the test
+    // points have empty spectra) = 3 more lines. Total = 8.
+    expect(lines).toHaveLength(8)
     expect(lines[3]!).toMatch(/^0,/)
     expect(lines[4]!).toMatch(/^1,/)
+    expect(lines[5]).toBe('')
+    expect(lines[6]).toBe(SRMT_SWEEP_SPECTRA_TAIL_MARKER)
+    expect(lines[7]).toBe(SRMT_SWEEP_SPECTRA_TAIL_HEADER)
   })
 
   it('inserts supplied manifest lines between the kind header and the landmark block', () => {
@@ -289,8 +299,11 @@ describe('sweepPointsToCsv', () => {
     expect(lines[manifest.length + 1]).toMatch(/# landmark clock=a/)
     // Column header next.
     expect(lines[manifest.length + 2]).toMatch(/^index,sweepValue,/)
-    // One data row at the end.
-    expect(lines.at(-1)!).toMatch(/^0,/)
+    // One data row follows the main header.
+    expect(lines[manifest.length + 3]!).toMatch(/^0,/)
+    // The CSV ends with the (spectra-less) tail marker + sub-header.
+    expect(lines.at(-2)).toBe(SRMT_SWEEP_SPECTRA_TAIL_MARKER)
+    expect(lines.at(-1)).toBe(SRMT_SWEEP_SPECTRA_TAIL_HEADER)
   })
 
   it('does not escape legitimate negative numeric cells', () => {
@@ -306,7 +319,10 @@ describe('sweepPointsToCsv', () => {
       computeMs: 15,
     }
     const csv = sweepPointsToCsv([point], 'mass', [])
-    const dataRow = csv.trim().split('\n').at(-1)!
+    const dataRow = csv
+      .trim()
+      .split('\n')
+      .find((l) => l.startsWith('0,'))!
     const cells = dataRow.split(',')
     expect(cells[1]).toBe('-0.123')
     expect(cells[3]).toBe('-0.5')
@@ -329,7 +345,10 @@ describe('sweepPointsToCsv', () => {
       computeMs: 15,
     }
     const csv = sweepPointsToCsv([point], 'bc', [])
-    const dataRow = csv.trim().split('\n').at(-1)!
+    const dataRow = csv
+      .trim()
+      .split('\n')
+      .find((l) => l.startsWith('0,'))!
     const cells = dataRow.split(',')
     expect(cells[2]).toBe(`'=cmd|/c calc`)
   })
@@ -347,6 +366,143 @@ describe('sweepPointsToCsv', () => {
     }
     const csv = sweepPointsToCsv([point], 'bc', [])
     expect(csv).toContain('"no,Boundary"')
+  })
+
+  it('emits pipe-delimited K and E spectra in the tail block for each populated clock', () => {
+    const kA0 = new Float32Array([-8.247689, -6.620331, -5.835303, -4.712001])
+    const eA0 = new Float32Array([0.512, 1.487, 2.602, 3.711])
+    const kA1 = new Float32Array([-7.0, -5.5, -4.2, -3.0])
+    const eA1 = new Float32Array([0.6, 1.5, 2.4, 3.5])
+    const p0: SrmtSweepPoint = {
+      index: 0,
+      sweepValue: 0.1,
+      cutNormalized: 0.1,
+      quality: { a: 0.02 },
+      kSpectrumByClock: { a: kA0 },
+      hjSpectrumByClock: { a: eA0 },
+      computeMs: 15,
+    }
+    const p1: SrmtSweepPoint = {
+      index: 1,
+      sweepValue: 0.2,
+      cutNormalized: 0.2,
+      quality: { a: 0.03 },
+      kSpectrumByClock: { a: kA1 },
+      hjSpectrumByClock: { a: eA1 },
+      computeMs: 16,
+    }
+    const csv = sweepPointsToCsv([p0, p1], 'cut', [])
+    const lines = csv.trim().split('\n')
+
+    // Main 29-col block intact.
+    const headerLine = lines.findIndex((l) => l.startsWith('index,'))
+    expect(headerLine).toBeGreaterThanOrEqual(0)
+    expect(lines[headerLine + 1]!.split(',')).toHaveLength(29)
+    expect(lines[headerLine + 2]!.split(',')).toHaveLength(29)
+
+    // Tail marker + sub-header present.
+    const markerLine = lines.indexOf(SRMT_SWEEP_SPECTRA_TAIL_MARKER)
+    expect(markerLine).toBeGreaterThan(headerLine + 2)
+    expect(lines[markerLine + 1]).toBe(SRMT_SWEEP_SPECTRA_TAIL_HEADER)
+
+    const tailRows = lines.slice(markerLine + 2)
+    // Two points, one clock ('a'), two kinds (K + E) = 4 tail rows.
+    expect(tailRows).toHaveLength(4)
+
+    const kRow0 = tailRows.find((r) => r.startsWith('0,a,K,'))
+    if (!kRow0) throw new Error('missing tail row for point=0 clock=a kind=K')
+    const kValues0 = kRow0.slice('0,a,K,'.length).split('|')
+    expect(kValues0).toHaveLength(kA0.length)
+    // Each formatted float is toPrecision(7); round-trip within 1e-5.
+    expect(Number(kValues0[0])).toBeCloseTo(kA0[0]!, 5)
+    expect(Number(kValues0[3])).toBeCloseTo(kA0[3]!, 5)
+
+    const eRow1 = tailRows.find((r) => r.startsWith('1,a,E,'))
+    if (!eRow1) throw new Error('missing tail row for point=1 clock=a kind=E')
+    const eValues1 = eRow1.slice('1,a,E,'.length).split('|')
+    expect(eValues1).toHaveLength(eA1.length)
+    expect(Number(eValues1[2])).toBeCloseTo(eA1[2]!, 5)
+  })
+
+  it('emits the tail marker + sub-header even when no spectra are populated', () => {
+    const csv = sweepPointsToCsv([mkPoint(0, { a: 0.02 })], 'cut', [])
+    const lines = csv.trim().split('\n')
+    expect(lines.indexOf(SRMT_SWEEP_SPECTRA_TAIL_MARKER)).toBeGreaterThan(0)
+    const sub = lines.indexOf(SRMT_SWEEP_SPECTRA_TAIL_HEADER)
+    expect(sub).toBeGreaterThan(0)
+    // No tail data rows should follow the sub-header.
+    expect(lines.slice(sub + 1).filter((l) => l.length > 0)).toHaveLength(0)
+  })
+})
+
+describe('SrmtSweepSection kind selector coverage', () => {
+  beforeEach(() => {
+    resetStores()
+    setQuantumMode('wheelerDeWitt')
+  })
+
+  // The authoritative order: cut/mass/lambda/bc first, then phiRef/rankCap/
+  // phiExtent, then the three grid-convergence kinds (gridNa, gridNphi,
+  // gridNphiCoupled). Changing this order is a user-visible UI shuffle;
+  // update the spec before the test.
+  const EXPECTED_KIND_ORDER: readonly string[] = [
+    'cut',
+    'mass',
+    'lambda',
+    'bc',
+    'phiRef',
+    'rankCap',
+    'phiExtent',
+    'gridNa',
+    'gridNphi',
+    'gridNphiCoupled',
+  ]
+
+  it('exposes all 10 sweep kinds in the toggle group in the expected order', async () => {
+    const user = userEvent.setup()
+    render(<SrmtSweepSection />)
+    await openSection(user)
+    const selector = screen.getByTestId('srmt-sweep-kind-selector')
+    const radios = within(selector).getAllByRole('radio')
+    expect(radios).toHaveLength(EXPECTED_KIND_ORDER.length)
+    for (const [i, kind] of EXPECTED_KIND_ORDER.entries()) {
+      // Each radio carries `srmt-sweep-kind-selector-<kind>` — stable
+      // test contract emitted by ToggleGroup.
+      expect(radios[i]).toBe(screen.getByTestId(`srmt-sweep-kind-selector-${kind}`))
+    }
+  })
+
+  // Selecting a kind resets the UI to its default, which then drives the
+  // sweep dispatched by Start. Read the default back through the store's
+  // pendingSweep to avoid coupling to slider DOM shapes.
+  async function readDefaultsForKind(kind: 'gridNa' | 'gridNphi' | 'gridNphiCoupled'): Promise<{
+    points: number | undefined
+    sweepMin: number | undefined
+    sweepMax: number | undefined
+  }> {
+    const user = userEvent.setup()
+    render(<SrmtSweepSection />)
+    await openSection(user)
+    await user.click(screen.getByTestId(`srmt-sweep-kind-selector-${kind}`))
+    await user.click(screen.getByTestId('srmt-sweep-start'))
+    const pending = useSrmtSweepStore.getState().pendingSweep
+    if (!pending) throw new Error(`pendingSweep not set for kind=${kind}`)
+    return { points: pending.points, sweepMin: pending.sweepMin, sweepMax: pending.sweepMax }
+  }
+
+  it('gridNa default UI state: points=3, sweepMin=128, sweepMax=384', async () => {
+    const defaults = await readDefaultsForKind('gridNa')
+    expect(defaults).toEqual({ points: 3, sweepMin: 128, sweepMax: 384 })
+  })
+
+  it('gridNphi default UI state: points=3, sweepMin=32, sweepMax=64', async () => {
+    const defaults = await readDefaultsForKind('gridNphi')
+    expect(defaults).toEqual({ points: 3, sweepMin: 32, sweepMax: 64 })
+  })
+
+  it('gridNphiCoupled default UI state: points=5, sweepMin=32, sweepMax=64', async () => {
+    const defaults = await readDefaultsForKind('gridNphiCoupled')
+    expect(defaults).toEqual({ points: 5, sweepMin: 32, sweepMax: 64 })
   })
 })
 

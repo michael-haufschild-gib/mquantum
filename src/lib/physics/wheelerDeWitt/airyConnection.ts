@@ -98,6 +98,17 @@ import type { WdwBoundaryCondition } from '@/lib/geometry/extended/wheelerDeWitt
 import { airyAll } from './airy'
 import { WDW_C_U, wdwLangerVariable, wdwLorentzianWkbAction, wdwTurningA, wdwU } from './constants'
 
+/**
+ * φ-boundary note: this module samples `χ(a, φ₁, φ₂)` at a **fixed**
+ * `(i1, i2)` column across varying `a` slabs. It does not apply any
+ * φ-axis finite-difference stencil, so it is invariant under the
+ * solver's φ-boundary rule (ghost-zero Dirichlet / Neumann /
+ * anything else). The connection formula and Langer evaluation
+ * depend only on per-column `χ` values, which are themselves
+ * produced by the leapfrog's chosen stencil — no implicit ghost
+ * assumption leaks into the Airy transfer function.
+ */
+
 /** Minimum `|ζ|` at which the deep-WKB asymptotic is trusted for extraction. */
 export const AIRY_CONNECTION_LZETA_MIN = 1.5
 
@@ -191,6 +202,14 @@ interface ColumnContext {
   mass: number
   /** Cosmological constant. */
   lambda: number
+  /**
+   * Per-axis effective-mass ratio on the φ₂ axis. Optional; defaults
+   * to `1` (symmetric). Threaded through every `wdwPotential` /
+   * `wdwU` / turning-point / Langer-variable call so the Langer
+   * overwrite of Euclidean cells uses the same anisotropic potential
+   * as the leapfrog.
+   */
+  asymmetry?: number
 }
 
 /**
@@ -204,7 +223,8 @@ interface ColumnContext {
  *   weighting policy).
  */
 export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition): ColumnAiryInfo {
-  const aTurn = wdwTurningA(ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda)
+  const asymmetry = ctx.asymmetry ?? 1
+  const aTurn = wdwTurningA(ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
   if (aTurn === null) return emptyColumnAiry(null)
   const aMax = ctx.aMin + (ctx.Na - 1) * ctx.da
   if (aTurn <= ctx.aMin) return emptyColumnAiry(aTurn)
@@ -216,7 +236,7 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
   for (let ia = 0; ia < ctx.Na; ia++) {
     const a = ctx.aMin + ia * ctx.da
     if (a >= aTurn) break
-    const zeta = wdwLangerVariable(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda)
+    const zeta = wdwLangerVariable(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
     if (Math.abs(zeta) >= AIRY_CONNECTION_LZETA_MIN) samplesIa.push(ia)
   }
   if (samplesIa.length < MIN_EXTRACTION_CELLS) return emptyColumnAiry(aTurn)
@@ -234,8 +254,8 @@ export function extractColumnAiry(ctx: ColumnContext, bc: WdwBoundaryCondition):
   let bsIm = 0
   for (const ia of samplesIa) {
     const a = ctx.aMin + ia * ctx.da
-    const SL = wdwLorentzianWkbAction(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda)
-    const U = wdwU(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda)
+    const SL = wdwLorentzianWkbAction(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
+    const U = wdwU(a, ctx.phi1, ctx.phi2, ctx.mass, ctx.lambda, asymmetry)
     const c = Math.cos(SL)
     const s = Math.sin(SL)
     const cellOff = 2 * (ia * ctx.slabSize + ctx.slabIndex)
@@ -369,6 +389,8 @@ function applyBcWeighting(
  * @param a - Scale factor at the cell.
  * @param phi1, phi2 - Inflaton coordinates.
  * @param mass, lambda - Physics constants.
+ * @param asymmetry - Per-axis effective-mass ratio on the φ₂ axis.
+ *   Optional; defaults to `1` for byte-identical legacy callers.
  * @returns Complex `(re, im)` value to overwrite the cell with.
  */
 export function langerEvaluate(
@@ -377,10 +399,11 @@ export function langerEvaluate(
   phi1: number,
   phi2: number,
   mass: number,
-  lambda: number
+  lambda: number,
+  asymmetry: number = 1
 ): { re: number; im: number } {
-  const zeta = wdwLangerVariable(a, phi1, phi2, mass, lambda)
-  const U = wdwU(a, phi1, phi2, mass, lambda)
+  const zeta = wdwLangerVariable(a, phi1, phi2, mass, lambda, asymmetry)
+  const U = wdwU(a, phi1, phi2, mass, lambda, asymmetry)
   let prefactor: number
   if (Math.abs(U) < LANGER_PREFACTOR_FLOOR) {
     // Linearised limit: (ζ/U)^{1/4} → κ^{-1/6}.

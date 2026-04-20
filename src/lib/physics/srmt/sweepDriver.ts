@@ -50,15 +50,15 @@ import {
 } from '@/lib/physics/wheelerDeWitt/solver'
 
 import {
-  computeAffineFitQuality,
   computeRigidFitQuality,
+  fitAffineParams,
   jackknifeAffineFitStdev,
   jackknifeRigidFitStdev,
 } from './affineFit'
 import type { SrmtPhysicsContext } from './diagnostic'
 import { hjSpectrumOnSliceTopK } from './hjOperator'
-import { modularSpectrum } from './modularHamiltonian'
-import { schmidtValues } from './schmidt'
+import { floorFractionFromModular, modularSpectrum } from './modularHamiltonian'
+import { computeVolumeElement, effectiveRankFromSchmidt, normalizedSchmidtValues } from './schmidt'
 import {
   SRMT_BC_SWEEP_ORDER,
   type SrmtSweepConfig,
@@ -106,16 +106,53 @@ export function clampGridNa(gridNa: number): number {
 
 /**
  * Clamp + integerise a Wheeler–DeWitt `gridNphi` value for the
- * grid-convergence sweep. Range `[9, 33]`. The lower bound 9 admits a
- * meaningful φ-cut even at the coarsest resolution (interior cut indices
- * `[1, Nφ−2]` = 7 unique cuts); the upper bound 33 keeps the explicit
- * leapfrog inside the CFL warning budget at the default
- * `(aMin=0.1, phiExtent=2, gridNa≥128)` configuration. The odd value 33
- * also gives a φ-grid with a distinguished central column at
- * `φ = 0`, which several diagnostics treat as a natural reference.
+ * grid-convergence sweep. Range `[32, 64]`.
+ *
+ * Lower bound 32: first asymptotic sample of `q_a(N_φ)`. Below `N_φ=32`
+ * the clock-`a` Schmidt matrix has column count `min(N_a, N_φ²)` that
+ * drops below `N_a=128`, and the HJ Lanczos top-k/n ratio approaches
+ * full-rank extraction — both produce a non-monotone pre-asymptotic
+ * hump in `q_a` that falsely fails the Cauchy convergence contract. The
+ * `[9, 33]` regime was empirically measured to give a 10× `q_a`
+ * regression vs. the default `N_φ=32` baseline (see
+ * docs/physics/srmt-metric.md).
+ *
+ * Upper bound 64: the largest `N_φ` that completes a per-point solver
+ * re-run in < ~10 s at default `(N_a=128, aMin=0.1, phiExtent=2)` on
+ * commodity hardware. At `N_φ=64` the explicit-leapfrog CFL budget is
+ * exceeded (`da²·8/dφ²/aMin² ≈ 24`, 6× over); the solver already emits
+ * a dev-only rate-limited warn (solver.ts:447-456) rather than failing.
+ * For publication runs `N_φ ≥ 48`, simultaneously raise `gridNa` to
+ * `max(128, 4·Nφ²·phiExtent²/aMin²)` or `aMin` to keep CFL ≤ 4.
  */
 export function clampGridNphi(gridNphi: number): number {
-  return Math.max(9, Math.min(33, Math.round(gridNphi)))
+  return Math.max(32, Math.min(64, Math.round(gridNphi)))
+}
+
+/**
+ * Clamp a Wheeler–DeWitt `phiExtent` value for the φ-window sensitivity
+ * sweep. Range `[0.5, 10]` — widened from `[0.5, 5]` because empirically
+ * `q_a(phiExtent)` is monotone-non-plateau inside `[1, 3]` at default
+ * physics, so a meaningful convergence (plateau) claim requires window
+ * expansion.
+ *
+ * CFL stays inside budget across the widened range: the explicit
+ * leapfrog CFL term scales as `da²·(1/dφ²)·(1/aMin²)` with
+ * `dφ = 2·phiExtent/(Nφ−1)`. Larger `phiExtent` ⇒ larger `dφ` ⇒ smaller
+ * `1/dφ²` ⇒ looser CFL. At the default `Nφ=32`, moving `phiExtent` from
+ * 2 (default) to 10 shrinks `1/dφ²` by ~25×, so the widened upper bound
+ * is strictly safer for stability at fixed `Nφ`, not tighter.
+ *
+ * Unlike `clampGridNa` / `clampGridNphi`, `phiExtent` is a continuous
+ * real-valued knob — no integer rounding.
+ */
+export function clampPhiExtent(phiExtent: number): number {
+  // NaN falls through to the lower bound (safest default); ±Infinity
+  // map to their respective bounds via Math.max / Math.min, matching
+  // the behaviour of clampRankCap / clampGridNa / clampGridNphi on
+  // out-of-range numeric input.
+  if (Number.isNaN(phiExtent)) return 0.5
+  return Math.max(0.5, Math.min(10, phiExtent))
 }
 
 /**
@@ -140,6 +177,8 @@ export function normalisePointCount(kind: SrmtSweepConfig['kind'], rawPoints: nu
     case 'gridNa':
     case 'gridNphi':
       return Math.max(1, Math.min(9, points))
+    case 'gridNphiCoupled':
+      return Math.max(1, Math.min(7, points))
     case 'bc':
       return 3
   }
@@ -191,16 +230,35 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
     throw new Error(`runCutSweep: non-square φ-grid (${Nphi1}×${Nphi2}) unsupported`)
   }
 
-  // Precompute Schmidt + K spectra once per clock. Cut-independent.
+  // Precompute Schmidt + K spectra once per clock. Cut-independent. Uses
+  // volume-weighted `normalizedSchmidtValues` (`Σ s_n²·dVol = 1`) so the
+  // downstream affine fit's `β` is neither contaminated by `−log(Σ|χ|²)`
+  // nor the residual `log(dVol)` drift Frobenius-only normalisation left
+  // across `gridNa` / `gridNphi` / `phiExtent` sweeps (task #8).
+  const dVol = computeVolumeElement({
+    gridSize: solverOutput.gridSize,
+    aMin: solverOutput.aMin,
+    aMax: solverOutput.aMax,
+    phiExtent: solverOutput.phiExtent,
+  })
   const schmidtByClock = new Map<SrmtClock, Float64Array>()
   const kSpectrumByClock = new Map<SrmtClock, Float64Array>()
+  const schmidtFullByClock = new Map<SrmtClock, Float64Array>()
+  const modularEpsilonByClock = new Map<SrmtClock, number>()
   for (const clock of clocks) {
-    const s = schmidtValues({ chi: solverOutput.chi, gridSize: solverOutput.gridSize }, clock)
+    const s = normalizedSchmidtValues(
+      { chi: solverOutput.chi, gridSize: solverOutput.gridSize },
+      clock,
+      dVol
+    )
+    schmidtFullByClock.set(clock, s)
     const kept = Math.min(rankCap, s.length)
     const trimmed = new Float64Array(kept)
     for (let i = 0; i < kept; i++) trimmed[i] = s[i]!
     schmidtByClock.set(clock, trimmed)
-    kSpectrumByClock.set(clock, modularSpectrum(trimmed).spectrum)
+    const modular = modularSpectrum(trimmed)
+    kSpectrumByClock.set(clock, modular.spectrum)
+    modularEpsilonByClock.set(clock, modular.epsilon)
   }
 
   // Generate normalised sweep values, resolve per-clock integer indices,
@@ -232,6 +290,10 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
       qStdev: {},
       qRigid: {},
       qRigidStdev: {},
+      alphaByClock: {},
+      betaByClock: {},
+      rEffByClock: {},
+      floorFractionByClock: {},
       kSpectrumByClock: {},
       hjSpectrumByClock: {},
       computeMs: 0,
@@ -251,6 +313,7 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
           phiExtent: solverOutput.phiExtent,
           inflatonMass: physics.inflatonMass,
           cosmologicalConstant: physics.cosmologicalConstant,
+          inflatonMassAsymmetry: physics.inflatonMassAsymmetry ?? 1,
           sliceIndex: cutIdx,
         },
         rankCap,
@@ -260,7 +323,15 @@ export function runCutSweep(input: RunCutSweepInputs): SrmtSweepPoint[] {
       for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
       const kSpec = kSpectrumByClock.get(clock)!
       const compareCount = Math.min(kSpec.length, hj64.length, rankCap)
-      writePerClockFit(point, clock, kSpec, hj64, compareCount)
+      writePerClockFit(
+        point,
+        clock,
+        kSpec,
+        hj64,
+        compareCount,
+        schmidtFullByClock.get(clock)!,
+        modularEpsilonByClock.get(clock)!
+      )
       point.kSpectrumByClock[clock] = f32FromF64(kSpec)
       point.hjSpectrumByClock[clock] = hj32
     }
@@ -305,6 +376,7 @@ export function runMassSweep(input: RunMassSweepInputs): SrmtSweepPoint[] {
     const solverOutput = solveWheelerDeWitt({
       boundaryCondition: wdwConfig.boundaryCondition,
       inflatonMass: m,
+      inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
       cosmologicalConstant: wdwConfig.cosmologicalConstant,
       aMin: wdwConfig.aMin,
       aMax: wdwConfig.aMax,
@@ -316,7 +388,11 @@ export function runMassSweep(input: RunMassSweepInputs): SrmtSweepPoint[] {
     const point = computeSrmtPointFromSolver(
       solverOutput,
       config,
-      { inflatonMass: m, cosmologicalConstant: wdwConfig.cosmologicalConstant },
+      {
+        inflatonMass: m,
+        cosmologicalConstant: wdwConfig.cosmologicalConstant,
+        inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
+      },
       i,
       m
     )
@@ -361,6 +437,7 @@ export function runLambdaSweep(input: RunLambdaSweepInputs): SrmtSweepPoint[] {
     const solverOutput = solveWheelerDeWitt({
       boundaryCondition: wdwConfig.boundaryCondition,
       inflatonMass: wdwConfig.inflatonMass,
+      inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
       cosmologicalConstant: lambda,
       aMin: wdwConfig.aMin,
       aMax: wdwConfig.aMax,
@@ -372,7 +449,11 @@ export function runLambdaSweep(input: RunLambdaSweepInputs): SrmtSweepPoint[] {
     const point = computeSrmtPointFromSolver(
       solverOutput,
       config,
-      { inflatonMass: wdwConfig.inflatonMass, cosmologicalConstant: lambda },
+      {
+        inflatonMass: wdwConfig.inflatonMass,
+        cosmologicalConstant: lambda,
+        inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
+      },
       i,
       lambda
     )
@@ -409,6 +490,7 @@ export function runBcSweep(input: RunBcSweepInputs): SrmtSweepPoint[] {
     const solverOutput = solveWheelerDeWitt({
       boundaryCondition: bc,
       inflatonMass: wdwConfig.inflatonMass,
+      inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
       cosmologicalConstant: wdwConfig.cosmologicalConstant,
       aMin: wdwConfig.aMin,
       aMax: wdwConfig.aMax,
@@ -423,6 +505,7 @@ export function runBcSweep(input: RunBcSweepInputs): SrmtSweepPoint[] {
       {
         inflatonMass: wdwConfig.inflatonMass,
         cosmologicalConstant: wdwConfig.cosmologicalConstant,
+        inflatonMassAsymmetry: wdwConfig.inflatonMassAsymmetry,
       },
       i,
       i
@@ -458,19 +541,34 @@ export function computeSrmtPointFromSolver(
     qStdev: {},
     qRigid: {},
     qRigidStdev: {},
+    alphaByClock: {},
+    betaByClock: {},
+    rEffByClock: {},
+    floorFractionByClock: {},
     kSpectrumByClock: {},
     hjSpectrumByClock: {},
     computeMs: 0,
   }
   const [Na, Nphi1] = solverOutput.gridSize
+  const dVol = computeVolumeElement({
+    gridSize: solverOutput.gridSize,
+    aMin: solverOutput.aMin,
+    aMax: solverOutput.aMax,
+    phiExtent: solverOutput.phiExtent,
+  })
   for (const clock of clocks) {
     const axisLen = clockAxisLen(clock, solverOutput.gridSize)
     const cutIdx = resolveCutIndexForAxisLen(config.cutNormalized, axisLen)
-    const schmidt = schmidtValues({ chi: solverOutput.chi, gridSize: solverOutput.gridSize }, clock)
+    const schmidt = normalizedSchmidtValues(
+      { chi: solverOutput.chi, gridSize: solverOutput.gridSize },
+      clock,
+      dVol
+    )
     const kept = Math.min(rankCap, schmidt.length)
     const trimmed = new Float64Array(kept)
     for (let i = 0; i < kept; i++) trimmed[i] = schmidt[i]!
-    const kSpec = modularSpectrum(trimmed).spectrum
+    const modular = modularSpectrum(trimmed)
+    const kSpec = modular.spectrum
 
     const { spectrum: hj32 } = hjSpectrumOnSliceTopK(
       clock,
@@ -482,6 +580,7 @@ export function computeSrmtPointFromSolver(
         phiExtent: solverOutput.phiExtent,
         inflatonMass: physics.inflatonMass,
         cosmologicalConstant: physics.cosmologicalConstant,
+        inflatonMassAsymmetry: physics.inflatonMassAsymmetry ?? 1,
         sliceIndex: cutIdx,
       },
       rankCap,
@@ -490,7 +589,7 @@ export function computeSrmtPointFromSolver(
     const hj64 = new Float64Array(hj32.length)
     for (let j = 0; j < hj32.length; j++) hj64[j] = hj32[j]!
     const compareCount = Math.min(kSpec.length, hj64.length, rankCap)
-    writePerClockFit(point, clock, kSpec, hj64, compareCount)
+    writePerClockFit(point, clock, kSpec, hj64, compareCount, schmidt, modular.epsilon)
     point.kSpectrumByClock[clock] = f32FromF64(kSpec)
     point.hjSpectrumByClock[clock] = hj32
   }
@@ -499,22 +598,49 @@ export function computeSrmtPointFromSolver(
 }
 
 /**
- * Write the affine + rigid fit quality and their jackknife σ for one
- * clock into a sweep point. Factored out so every sweep kind — cut,
- * mass, λ, bc, phiRef, rankCap, phiExtent — fills the same per-clock
- * fields via a single call site. `compareCount` must already be clamped
- * to `min(K.length, E.length, rankCap)`.
+ * Write the affine + rigid fit quality, their jackknife σ, the
+ * affine-fit parameters `α` / `β`, and the spectrum-diagnostic
+ * `rEff` / `floorFraction` fields for one clock into a sweep point.
+ *
+ * Factored out so every sweep kind — cut, mass, λ, bc, phiRef, rankCap,
+ * phiExtent, gridNa, gridNphi — fills the same per-clock fields via a
+ * single call site. `compareCount` must already be clamped to
+ * `min(K.length, E.length, rankCap)`.
+ *
+ * `q_affine` and `q_rigid` remain numerically identical to the
+ * pre-`fitAffineParams` implementation — the affine q is pulled from
+ * the unified `fitAffineParams` result (same FP ops in the same order)
+ * and the rigid q is unchanged. `α` / `β` are written only when finite
+ * so consumers can distinguish "fit succeeded" from "degenerate".
+ *
+ * `rEff` is computed over the FULL schmidt array (pre-rankCap trim) so
+ * a caller with `rankCap < fullRank` still sees the true
+ * effective-rank rather than a ceiling at `rankCap`. `floorFraction`
+ * is computed over the top-`compareCount` slice of K (the window the
+ * affine fit actually consumed), using the same ε the modular
+ * spectrum was regularised with — so pinned-at-floor modes the fit
+ * saw are the same ones the diagnostic counts.
+ *
+ * @param schmidtFull - Full (untrimmed) descending Schmidt array,
+ *                      L²-normalised. Pass the array returned from
+ *                      {@link normalizedSchmidtValues}.
+ * @param modularEpsilon - The `epsilon` value returned from
+ *                      {@link modularSpectrum} for this clock's K.
  */
 export function writePerClockFit(
   point: SrmtSweepPoint,
   clock: SrmtClock,
   K: Float64Array,
   E: Float64Array,
-  compareCount: number
+  compareCount: number,
+  schmidtFull: Float64Array,
+  modularEpsilon: number
 ): void {
-  const qAffine = computeAffineFitQuality(K, E, compareCount)
-  point.quality[clock] = qAffine
-  if (Number.isFinite(qAffine)) {
+  const affine = fitAffineParams(K, E, compareCount)
+  point.quality[clock] = affine.q
+  if (Number.isFinite(affine.alpha)) point.alphaByClock![clock] = affine.alpha
+  if (Number.isFinite(affine.beta)) point.betaByClock![clock] = affine.beta
+  if (Number.isFinite(affine.q)) {
     const sigma = jackknifeAffineFitStdev(K, E, compareCount)
     if (Number.isFinite(sigma)) point.qStdev![clock] = sigma
   }
@@ -524,6 +650,9 @@ export function writePerClockFit(
     const sigma = jackknifeRigidFitStdev(K, E, compareCount)
     if (Number.isFinite(sigma)) point.qRigidStdev![clock] = sigma
   }
+  point.rEffByClock![clock] = effectiveRankFromSchmidt(schmidtFull)
+  const floorWindow = compareCount > 0 && compareCount <= K.length ? K.subarray(0, compareCount) : K
+  point.floorFractionByClock![clock] = floorFractionFromModular(floorWindow, modularEpsilon)
 }
 
 // Tier-3 sensitivity drivers (phiRef / rankCap / phiExtent / gridNa /
@@ -532,13 +661,16 @@ export function writePerClockFit(
 // exported below.
 export type {
   RunGridNaSweepInputs,
+  RunGridNphiCoupledSweepInputs,
   RunGridNphiSweepInputs,
   RunPhiExtentSweepInputs,
   RunPhiRefSweepInputs,
   RunRankCapSweepInputs,
 } from './sweepSensitivityDrivers'
 export {
+  coupledGridNaFor,
   runGridNaSweep,
+  runGridNphiCoupledSweep,
   runGridNphiSweep,
   runPhiExtentSweep,
   runPhiRefSweep,
@@ -618,7 +750,7 @@ export function predictGridNaSweepCount(config: SrmtSweepConfig): number {
 
 /**
  * Predict the number of distinct sweep points a `gridNphi` sweep will
- * emit after clamping to `[9, 33]`, integer-rounding, and deduplication.
+ * emit after clamping to `[32, 64]`, integer-rounding, and deduplication.
  * Solver-independent; mirrors {@link predictRankCapSweepCount}.
  */
 export function predictGridNphiSweepCount(config: SrmtSweepConfig): number {
@@ -627,6 +759,23 @@ export function predictGridNphiSweepCount(config: SrmtSweepConfig): number {
   const hi = clampGridNphi(config.sweepMax)
   const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
   const series = linspace(rLo, rHi, normalisePointCount('gridNphi', config.points))
+  const seen = new Set<number>()
+  for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
+  return Math.max(1, seen.size)
+}
+
+/**
+ * Predict the number of distinct sweep points a `gridNphiCoupled` sweep
+ * will emit. The Nφ axis is sampled and deduplicated identically to the
+ * uncoupled `gridNphi` kind — the coupling only affects per-point
+ * `gridNa`, which is not part of the unique-key set.
+ */
+export function predictGridNphiCoupledSweepCount(config: SrmtSweepConfig): number {
+  if (config.kind !== 'gridNphiCoupled') return normalisePointCount(config.kind, config.points)
+  const lo = clampGridNphi(config.sweepMin)
+  const hi = clampGridNphi(config.sweepMax)
+  const [rLo, rHi] = lo <= hi ? [lo, hi] : [hi, lo]
+  const series = linspace(rLo, rHi, normalisePointCount('gridNphiCoupled', config.points))
   const seen = new Set<number>()
   for (let i = 0; i < series.length; i++) seen.add(Math.round(series[i]!))
   return Math.max(1, seen.size)

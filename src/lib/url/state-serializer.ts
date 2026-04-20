@@ -57,16 +57,13 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
 ]
 
 import { type AdsUrlState, deserializeAds, serializeAds } from './adsSerializer'
-
-const VALID_WDW_BOUNDARY_CONDITIONS = ['noBoundary', 'tunneling', 'deWitt'] as const
-type UrlWdwBoundaryCondition = (typeof VALID_WDW_BOUNDARY_CONDITIONS)[number]
-
 import type { SrmtUrlState } from './srmtSerializer'
 import {
   deserializeSrmtAndSweep,
   serializeSrmtAndSweep,
   type SrmtSweepUrlState,
 } from './srmtSweepSerializer'
+import { deserializeWdw, serializeWdw, type UrlWdwBoundaryCondition } from './wdwSerializer'
 
 const VALID_REPRESENTATIONS: SchroedingerRepresentation[] = ['position', 'momentum', 'wigner']
 
@@ -268,6 +265,12 @@ export interface ShareableObjectState extends AdsUrlState, SrmtUrlState, SrmtSwe
   wdwBoundaryCondition?: UrlWdwBoundaryCondition
   /** Wheeler–DeWitt inflaton mass m */
   wdwInflatonMass?: number
+  /**
+   * Wheeler–DeWitt per-axis effective-mass ratio `α` on the φ₂ axis.
+   * Clamped to `[0.1, 10]`. `1` is the isotropic default — only emitted
+   * in the URL when `!== 1` so baseline links stay clean.
+   */
+  wdwInflatonMassAsymmetry?: number
   /** Wheeler–DeWitt cosmological constant Λ */
   wdwCosmologicalConstant?: number
   /** Wheeler–DeWitt WKB streamline overlay toggle */
@@ -558,16 +561,7 @@ export function serializeState(state: ShareableState): string {
 
   // Wheeler–DeWitt minisuperspace (physics + render-only + SRMT diagnostic)
   if (state.quantumMode === 'wheelerDeWitt') {
-    setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
-    setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
-    setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
-    setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
-    setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
-    setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
-    setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed, true)
-    setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
-    setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
-    setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+    serializeWdw(params, state)
     serializeSrmtAndSweep(params, state.quantumMode, state)
   }
 
@@ -880,16 +874,7 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   // available for the s_c(n) check).
   deserializeCosmologyParams(params, state)
 
-  state.wdwBoundaryCondition = parseEnumParam(params, 'wdw_bc', VALID_WDW_BOUNDARY_CONDITIONS)
-  state.wdwInflatonMass = parseFloatParam(params, 'wdw_m', 0, 2.0)
-  state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
-  state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
-  state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
-  state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')
-  state.wdwPhaseRotationSpeed = parseFloatParam(params, 'wdw_prs', 0, 5)
-  state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
-  state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
-  state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
+  deserializeWdw(params, state)
   deserializeSrmtAndSweep(params, state)
 
   // Anti-de Sitter (Stage 1) — extracted to keep `deserializeState` under

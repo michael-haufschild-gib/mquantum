@@ -35,17 +35,50 @@ if (import.meta.env.DEV) {
     import('@/stores/extendedObjectStore'),
     import('@/stores/performanceStore'),
     import('@/stores/performanceMetricsStore'),
-  ]).then(([geo, ui, env, app, layout, pp, ext, perf, perfMetrics]) => {
-    window.__GEOMETRY_STORE__ = geo.useGeometryStore
-    window.__UI_STORE__ = ui.useUIStore
-    window.__ENVIRONMENT_STORE__ = env.useEnvironmentStore
-    window.__APPEARANCE_STORE__ = app.useAppearanceStore
-    window.__LAYOUT_STORE__ = layout.useLayoutStore
-    window.__POST_PROCESSING_STORE__ = pp.usePostProcessingStore
-    window.__EXTENDED_OBJECT_STORE__ = ext.useExtendedObjectStore
-    window.__PERFORMANCE_STORE__ = perf.usePerformanceStore
-    window.__PERFORMANCE_METRICS_STORE__ = perfMetrics.usePerformanceMetricsStore
-  })
+    import('@/stores/animationStore'),
+    import('@/stores/diagnosticsStore'),
+    import('@/stores/measurementStore'),
+    import('@/stores/simulationStateStore'),
+    import('@/stores/srmtDiagnosticStore'),
+    import('@/stores/srmtSweepStore'),
+    import('@/lib/physics/pauli/presets'),
+  ]).then(
+    ([
+      geo,
+      ui,
+      env,
+      app,
+      layout,
+      pp,
+      ext,
+      perf,
+      perfMetrics,
+      anim,
+      diag,
+      meas,
+      sim,
+      srmtDiag,
+      srmtSweep,
+      pauliPresets,
+    ]) => {
+      window.__GEOMETRY_STORE__ = geo.useGeometryStore
+      window.__UI_STORE__ = ui.useUIStore
+      window.__ENVIRONMENT_STORE__ = env.useEnvironmentStore
+      window.__APPEARANCE_STORE__ = app.useAppearanceStore
+      window.__LAYOUT_STORE__ = layout.useLayoutStore
+      window.__POST_PROCESSING_STORE__ = pp.usePostProcessingStore
+      window.__EXTENDED_OBJECT_STORE__ = ext.useExtendedObjectStore
+      window.__PERFORMANCE_STORE__ = perf.usePerformanceStore
+      window.__PERFORMANCE_METRICS_STORE__ = perfMetrics.usePerformanceMetricsStore
+      window.__ANIMATION_STORE__ = anim.useAnimationStore
+      window.__DIAGNOSTICS_STORE__ = diag.useDiagnosticsStore
+      window.__MEASUREMENT_STORE__ = meas.useMeasurementStore
+      window.__SIMULATION_STATE_STORE__ = sim.useSimulationStateStore
+      window.__SRMT_DIAGNOSTIC_STORE__ = srmtDiag.useSrmtDiagnosticStore
+      window.__SRMT_SWEEP_STORE__ = srmtSweep.useSrmtSweepStore
+      window.__PAULI_SCENARIO_PRESETS__ = pauliPresets.PAULI_SCENARIO_PRESETS
+    }
+  )
 }
 
 const rootElement = document.getElementById('root')

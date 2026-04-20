@@ -12,9 +12,15 @@
  *   - Passing a sliceIndex at an endpoint of the clock axis throws.
  */
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { harmonicOscillator1DSpectrum, hjSpectrumOnSlice } from '@/lib/physics/srmt/hjOperator'
+import { logger } from '@/lib/logger'
+import {
+  harmonicOscillator1DSpectrum,
+  hjSpectrumOnSlice,
+  hjSpectrumOnSliceTopK,
+  resetHjTopKWarnBudget,
+} from '@/lib/physics/srmt/hjOperator'
 
 describe('hjOperator.harmonicOscillator1DSpectrum', () => {
   it('approximates analytic HO eigenvalues 2ω(n + ½) for small n on a fine grid', () => {
@@ -78,6 +84,111 @@ describe('hjOperator.hjSpectrumOnSlice — clock="a"', () => {
     expect(() => hjSpectrumOnSlice('a', { ...args, sliceIndex: args.Na - 1 })).toThrow(
       /strictly interior/
     )
+  })
+})
+
+describe('hjOperator.hjSpectrumOnSliceTopK — contamination guard', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    resetHjTopKWarnBudget()
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warnSpy.mockRestore()
+    resetHjTopKWarnBudget()
+  })
+
+  it('clips k to floor(n/2) when the requested k exceeds the Krylov-reliable ceiling', () => {
+    // clock='a' with Nphi=4 → n = Nphi² = 16. floor(16/2) = 8.
+    // Requested k=15 must be clipped to 8.
+    const { spectrum, n } = hjSpectrumOnSliceTopK(
+      'a',
+      {
+        Na: 12,
+        Nphi: 4,
+        aMin: 0.2,
+        aMax: 1.2,
+        phiExtent: 2.0,
+        inflatonMass: 0,
+        cosmologicalConstant: 0,
+        sliceIndex: 6,
+      },
+      15
+    )
+    expect(n).toBe(16)
+    expect(spectrum.length).toBe(8)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    const message = warnSpy.mock.calls[0]![0] as string
+    expect(message).toContain('k=15')
+    expect(message).toContain('k_eff=8')
+    expect(message).toContain('n=16')
+  })
+
+  it('clips k to floor(n/2) on phi-clock slices when n = Na·Nphi', () => {
+    // clock='phi1' with Na=8, Nphi=4 → n = 32. floor(32/2) = 16.
+    // Requested k=40 must be clipped to 16.
+    const { spectrum, n } = hjSpectrumOnSliceTopK(
+      'phi1',
+      {
+        Na: 8,
+        Nphi: 4,
+        aMin: 0.2,
+        aMax: 1.2,
+        phiExtent: 1.5,
+        inflatonMass: 0,
+        cosmologicalConstant: 0,
+        sliceIndex: 2,
+      },
+      40
+    )
+    expect(n).toBe(32)
+    expect(spectrum.length).toBe(16)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    const message = warnSpy.mock.calls[0]![0] as string
+    expect(message).toContain('k=40')
+    expect(message).toContain('k_eff=16')
+  })
+
+  it('leaves k unchanged and does not warn when k <= floor(n/2)', () => {
+    // clock='a' with Nphi=16 → n = 256. floor(256/2) = 128.
+    // Requested k=8 is well below the ceiling — no clip, no warn.
+    const { spectrum, n } = hjSpectrumOnSliceTopK(
+      'a',
+      {
+        Na: 8,
+        Nphi: 16,
+        aMin: 0.2,
+        aMax: 1.2,
+        phiExtent: 2.0,
+        inflatonMass: 0,
+        cosmologicalConstant: 0,
+        sliceIndex: 4,
+      },
+      8
+    )
+    expect(n).toBe(256)
+    expect(spectrum.length).toBe(8)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('rate-limits the warn — further clips after budget exhaustion stay silent', () => {
+    resetHjTopKWarnBudget(1)
+    const inputs = {
+      Na: 12,
+      Nphi: 4,
+      aMin: 0.2,
+      aMax: 1.2,
+      phiExtent: 2.0,
+      inflatonMass: 0,
+      cosmologicalConstant: 0,
+      sliceIndex: 6,
+    }
+    hjSpectrumOnSliceTopK('a', inputs, 15)
+    hjSpectrumOnSliceTopK('a', inputs, 15)
+    hjSpectrumOnSliceTopK('a', inputs, 15)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
   })
 })
 
