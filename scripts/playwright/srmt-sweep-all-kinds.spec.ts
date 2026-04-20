@@ -1,13 +1,15 @@
 /**
- * Full-battery SRMT sweep experiment across all 9 sweep kinds.
+ * Full-battery SRMT sweep experiment across all 10 sweep kinds.
  *
- * Extends `srmt-sweep-full.spec.ts` (which covered 4 kinds) with the 5
+ * Extends `srmt-sweep-full.spec.ts` (which covered 4 kinds) with the 6
  * additional tier-1/tier-3 kinds that landed later:
- *   - phiRef     (tier-3 sensitivity: landmark reference φ)
- *   - rankCap    (tier-3 sensitivity: Schmidt truncation)
- *   - phiExtent  (tier-3 sensitivity: φ-grid half-range)
- *   - gridNa     (tier-3 convergence: a-axis sample count)
- *   - gridNphi   (tier-3 convergence: φ-axis sample count)
+ *   - phiRef          (tier-3 sensitivity: landmark reference φ)
+ *   - rankCap         (tier-3 sensitivity: Schmidt truncation)
+ *   - phiExtent       (tier-3 sensitivity: φ-grid half-range)
+ *   - gridNa          (tier-3 convergence: a-axis sample count)
+ *   - gridNphi        (tier-3 convergence: φ-axis sample count)
+ *   - gridNphiCoupled (tier-3 joint (Nφ, Nₐ) convergence with CFL
+ *                      coupling — companion to gridNphi)
  *
  * Each sweep is triggered via URL params (`sw=kind&sw_n=…`). The CSV is
  * exported through the in-app button, parsed, and written to
@@ -88,7 +90,7 @@ interface ParsedPoint {
 }
 
 interface SweepResult {
-  kind: string
+  kind: SweepSpec['kind']
   label: string
   landmarks: string[]
   points: ParsedPoint[]

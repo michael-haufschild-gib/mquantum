@@ -15,15 +15,19 @@
  * Tertiary:  (q_phi1 − q_a) under tunneling approaches the non-tunneling
  *   value as aMax shrinks.
  *
- * Writes `/tmp/srmt-tunneling-amax-scan.json` with the structured scan
+ * Writes `<tmp>/srmt-tunneling-amax-scan.json` with the structured scan
  * table and a computed verdict object. Also writes a narrative markdown
- * companion at `/tmp/srmt-tunneling-amax-verdict.md`.
+ * companion at `<tmp>/srmt-tunneling-amax-verdict.md`. The temp dir is
+ * resolved via `os.tmpdir()` (paths are logged on the console), so the
+ * driver is portable across POSIX and Windows hosts.
  *
  * This is a research driver, not a regression test. No production src
  * edits. Underscore-prefixed so the default `pnpm test` glob excludes it.
  */
 
 import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
@@ -83,11 +87,19 @@ interface ClockStats {
   q_rigid: number
 }
 
+/**
+ * Clocks actually populated in this scan. `'phi2'` is intentionally
+ * excluded — the scan only consumes `'a'` and `'phi1'` (see `CLOCKS`).
+ * Narrower than `SrmtClock` so TypeScript surfaces any accidental
+ * `.phi2` access in the verdict-computation section as a type error.
+ */
+type ActiveClock = 'a' | 'phi1'
+
 interface PerBcBlock {
   bc: WdwBoundaryCondition
   solveMs: number
   chiTotalDensity: number
-  clocks: Record<SrmtClock, ClockStats>
+  clocks: Record<ActiveClock, ClockStats>
 }
 
 interface ScanEntry {
@@ -104,7 +116,7 @@ function statsForClock(
     aMax: number
     phiExtent: number
   },
-  clock: SrmtClock,
+  clock: ActiveClock,
   cutNorm: number,
   rankCap: number,
   cfg: typeof DEFAULT_WHEELER_DEWITT_CONFIG
@@ -242,7 +254,7 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
   it('locks amplification hypothesis by varying aMax across {0.6, 0.8, 1.0, 1.2, 1.5}', () => {
     const AMAX_VALUES = [0.6, 0.8, 1.0, 1.2, 1.5]
     const BCs: WdwBoundaryCondition[] = ['noBoundary', 'tunneling', 'deWitt']
-    const CLOCKS: SrmtClock[] = ['a', 'phi1']
+    const CLOCKS: readonly ActiveClock[] = ['a', 'phi1']
     const cutNorm = 0.5
     const rankCap = 64
     const cfg = DEFAULT_WHEELER_DEWITT_CONFIG
@@ -280,7 +292,7 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
             phiExtent: output.phiExtent,
           })
 
-        const clocks = {} as Record<SrmtClock, ClockStats>
+        const clocks = {} as Record<ActiveClock, ClockStats>
         for (const clock of CLOCKS) {
           clocks[clock] = statsForClock(output, clock, cutNorm, rankCap, cfg)
         }
@@ -321,11 +333,14 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
       const tun = s.perBc.find((b) => b.bc === 'tunneling')!
       return { aMax: s.aMax, r_eff: tun.clocks.phi1.r_eff_1em6 }
     })
-    // Crossover: lowest aMax where tunneling-phi1 r_eff ≥ 16.
-    const crossovers = tunnelingPhi1RByAmax
-      .filter((row) => row.r_eff >= 16)
-      .sort((a, b) => a.aMax - b.aMax)
-    const crossoverAmax = crossovers.length > 0 ? crossovers[0]!.aMax : null
+    // Crossover: first aMax where tunneling-phi1 r_eff ≥ 16 scanning in
+    // the physical sweep direction (shrinking from the default high
+    // aMax). The earlier implementation picked the smallest qualifying
+    // aMax, which misreports `1.5→4, 1.2→6, 1.0→10, 0.8→17, 0.6→20` as
+    // crossing at 0.6 rather than at 0.8.
+    const crossoverAmax =
+      [...tunnelingPhi1RByAmax].sort((a, b) => b.aMax - a.aMax).find((row) => row.r_eff >= 16)
+        ?.aMax ?? null
 
     // Inversion weakens monotonically: (q_phi1 − q_a) under tunneling must be
     // monotonically non-decreasing as aMax shrinks (i.e. inversion becomes
@@ -407,7 +422,11 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
       scans,
       verdict,
     }
-    const jsonPath = '/tmp/srmt-tunneling-amax-scan.json'
+    // Resolve once via `os.tmpdir()` so the driver runs unchanged on
+    // POSIX hosts (/tmp), macOS private temp dirs, and Windows temp paths.
+    const tmpDir = tmpdir()
+    const jsonPath = join(tmpDir, 'srmt-tunneling-amax-scan.json')
+    const mdPath = join(tmpDir, 'srmt-tunneling-amax-verdict.md')
     writeFileSync(jsonPath, JSON.stringify(jsonOut, null, 2))
     console.log(`[srmt amax scan] wrote ${jsonPath} (${scans.length} scans)`)
 
@@ -517,10 +536,10 @@ describe('SRMT tunneling-BC aMax scan (one-shot)', () => {
       })}\n` +
       `- aMax swept ∈ {${AMAX_VALUES.join(', ')}}, aMin held at ${cfg.aMin}.\n` +
       `- Driver: \`src/tests/lib/physics/srmt/_oneshotTunnelingAmaxScan.test.ts\`.\n` +
-      `- Structured data: \`/tmp/srmt-tunneling-amax-scan.json\`.\n`
+      `- Structured data: \`${jsonPath}\`.\n`
 
-    writeFileSync('/tmp/srmt-tunneling-amax-verdict.md', md)
-    console.log('[srmt amax scan] wrote /tmp/srmt-tunneling-amax-verdict.md')
+    writeFileSync(mdPath, md)
+    console.log(`[srmt amax scan] wrote ${mdPath}`)
     console.log(`[srmt amax scan] VERDICT: ${verdictLine}`)
 
     expect(scans.length).toBeGreaterThan(0)
