@@ -13,7 +13,7 @@
  *
  * Each sweep is triggered via URL params (`sw=kind&sw_n=…`). The CSV is
  * exported through the in-app button, parsed, and written to
- * `/tmp/srmt-sweep-all-results.json` for downstream interpretation.
+ * `<tmpdir>/srmt-sweep-all-results.json` for downstream interpretation.
  *
  * Point counts sized for ~10-20 min total budget: sensitivity sweeps with
  * full solver re-runs (phiExtent, gridNa, gridNphi) kept to their
@@ -22,6 +22,8 @@
  */
 
 import * as fs from 'node:fs'
+import * as os from 'node:os'
+import * as path from 'node:path'
 
 import { expect, test } from './fixtures'
 import {
@@ -340,6 +342,8 @@ test.describe('Wheeler–DeWitt — all 10 SRMT sweep kinds', () => {
       expect(parsed.points.length, `${spec.kind} point count`).toBeGreaterThanOrEqual(2)
     }
 
-    fs.writeFileSync('/tmp/srmt-sweep-all-results.json', JSON.stringify(results, null, 2) + '\n')
+    const outPath = path.join(os.tmpdir(), 'srmt-sweep-all-results.json')
+    fs.writeFileSync(outPath, JSON.stringify(results, null, 2) + '\n')
+    console.log(`Results written to: ${outPath}`)
   })
 })
