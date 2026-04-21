@@ -119,10 +119,17 @@ describe('SrmtDiagnosticSection', () => {
       store.setWdwSrmtEnabled(true)
       store.setWdwSrmtClock('phi2')
       store.setWdwSrmtCutNormalized(0.75)
+      const wdwState = store.schroedinger.wheelerDeWitt
+      useExtendedObjectStore.setState({
+        schroedinger: {
+          ...store.schroedinger,
+          wheelerDeWitt: { ...wdwState, phiExtent: 3.5 },
+        },
+      })
     })
     render(<SrmtDiagnosticSection />)
     await openSection(user)
-    // phi2* = 3.5 * (2*0.75 - 1) = 1.75 at default phiExtent.
+    // phi2* = 3.5 * (2*0.75 - 1) = 1.75 at phiExtent = 3.5.
     expect(screen.getByTestId('wdw-srmt-cut-coord-readout')).toHaveTextContent(
       /^phi2\*\s*=\s*1\.750/
     )

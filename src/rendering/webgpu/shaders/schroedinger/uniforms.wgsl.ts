@@ -291,9 +291,10 @@ struct SchroedingerUniforms {
   pauliSpinDownColor: vec3f,        // offset 1504
   _padPauliDown: f32,               // offset 1516
 
-  // Precomputed normalization constants for coupled hydrogen ND (offset 1520)
+  // Precomputed hyperspherical-layer norms for coupled hydrogen ND (offset 1520).
   // Eliminates redundant log/exp/gamma per-sample — these are constant per quantum state.
-  // [0].x = radial norm, [0].yzw...[2].xyzw = hyperspherical layer norms (up to 8 layers)
+  // Slot [0].x reserved; layer k is stored at slot k+1 (up to 11 layers).
+  // Read via getCoupledLayerNorm(uniforms, k). Radial norm lives in hydrogenRadialNorm.
   coupledNorms: array<vec4f, 3>,
 
   // Decoherent branching visualization colors (offset 1568)
@@ -358,14 +359,10 @@ fn getAngularChainL(uniforms: SchroedingerUniforms, k: i32) -> i32 {
   return getExtraDimN(uniforms, k - 1);
 }
 
-// Precomputed radial norm for coupled hydrogen ND: hydrogenRadialNormND(nr, λ, n_eff, a₀)
-fn getCoupledRadialNorm(uniforms: SchroedingerUniforms) -> f32 {
-  return uniforms.coupledNorms[0].x;
-}
-
-// Precomputed hyperspherical layer norm for layer k (exp(lnHypersphericalLayerNorm(...)))
+// Precomputed hyperspherical layer norm for layer k (exp(lnHypersphericalLayerNorm(...))).
+// Slot 0 of coupledNorms is reserved; layer k is packed at slot k+1 by packCoupledNorms().
 fn getCoupledLayerNorm(uniforms: SchroedingerUniforms, k: i32) -> f32 {
-  let idx = k + 1; // slot 0 is radial norm
+  let idx = k + 1;
   return uniforms.coupledNorms[idx / 4][idx % 4];
 }
 

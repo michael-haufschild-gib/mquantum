@@ -383,9 +383,10 @@ function sampleSrmtVoxelAlpha(
 export function packWdwDensityGrid(
   output: WheelerDeWittSolverOutput,
   overlay: StreamlineOverlay | null,
-  srmtOverlay?: WdwSrmtOverlay
+  srmtOverlay?: WdwSrmtOverlay,
+  targetGridSize: number = DENSITY_GRID_SIZE
 ): WdwDensityUpload {
-  const N = DENSITY_GRID_SIZE
+  const N = Math.max(1, Math.round(targetGridSize))
   const total = N * N * N
   const density = new Uint16Array(total * 4)
 

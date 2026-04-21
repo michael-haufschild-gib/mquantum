@@ -36,9 +36,17 @@ function ensureWorker(state: BecSpectrumWorkerState): Worker {
   )
   worker.onmessage = (e: MessageEvent<IncompressibleSpectrumWorkerResponse>) => {
     if (state.disposed) return
-    if (e.data.type !== 'result') return
     if (e.data.epoch !== state.epoch) return
     state.inFlight = false
+    if (e.data.type === 'error') {
+      // The worker's typed error response replaced the previous
+      // "silently post an empty result" path so the cause is no longer
+      // invisible to devs. Logging here mirrors the onerror branch
+      // below for non-compute-caught failures.
+      logger.warn('[BEC] Spectrum worker reported compute error:', e.data.message)
+      return
+    }
+    if (e.data.type !== 'result') return
     const spec = e.data.result
     useDiagnosticsStore
       .getState()

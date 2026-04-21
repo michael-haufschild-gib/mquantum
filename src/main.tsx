@@ -79,8 +79,8 @@ if (import.meta.env.DEV) {
         window.__SRMT_SWEEP_STORE__ = srmtSweep.useSrmtSweepStore
         window.__PAULI_SCENARIO_PRESETS__ = pauliPresets.PAULI_SCENARIO_PRESETS
       }
-      // eslint-disable-next-line no-console
     )
+    // eslint-disable-next-line no-console
     .catch((err) => console.error('[DEV] store bridge init failed:', err))
 }
 

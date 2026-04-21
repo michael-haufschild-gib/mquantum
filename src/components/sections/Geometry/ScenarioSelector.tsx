@@ -211,25 +211,32 @@ export const ScenarioSelector: React.FC = React.memo(() => {
   // compute modes use async apply actions that make reverse-detection unreliable.
   const [computePreset, setComputePreset] = useState<Record<string, string>>({})
 
-  // Auto-apply first Pauli preset on mode entry.
-  // Pauli is object-type based (not quantum-mode), so the mode setter auto-apply
-  // in quantumModeSetters doesn't cover it.
+  // Auto-apply first Pauli preset when the mode transitions INTO
+  // pauliSpinor. Pauli is driven by `objectType`, not `quantumMode`, so
+  // the auto-apply logic in `quantumModeSetters` never sees the
+  // transition. We fill the gap here.
+  //
+  // The side effect lives at the effect-body level, not inside a
+  // `setComputePreset((prev) => ...)` updater. React 19 StrictMode
+  // double-invokes state-updater functions in dev to flush impure
+  // logic, so a store write inside the updater would double-fire
+  // `applyPauliPresetById` per mode switch and duplicate
+  // color-algorithm syncs. A plain effect-body runs once.
+  //
+  // The earlier implementation also seeded `computePreset[mode]` here,
+  // but that was redundant: `activeValue` already falls back to
+  // `getFirstPresetId(mode, dimension)` when the key is absent, and
+  // `handleChange` populates the entry on first user selection.
   const prevModeRef = useRef(mode)
   useEffect(() => {
-    if (prevModeRef.current !== mode) {
-      // Seed tracked value and auto-apply preset only on first visit
-      setComputePreset((prev) => {
-        if (prev[mode]) return prev
-        const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
-        if (firstId) {
-          // Pauli is object-type based, so the mode setter auto-apply doesn't cover it
-          if (mode === 'pauliSpinor') applyPauliPresetById(firstId, setPauliConfig)
-        }
-        return firstId ? { ...prev, [mode]: firstId } : prev
-      })
-    }
+    if (prevModeRef.current === mode) return
     prevModeRef.current = mode
-  }, [mode, dimension, setPauliConfig])
+    if (mode !== 'pauliSpinor') return
+    const selectedId =
+      computePreset[mode] ??
+      getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
+    if (selectedId) applyPauliPresetById(selectedId, setPauliConfig)
+  }, [mode, dimension, computePreset, setPauliConfig])
 
   // Derive the active preset value from store state or tracked selection.
   const activeValue = useMemo(() => {

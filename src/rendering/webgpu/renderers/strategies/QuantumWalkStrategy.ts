@@ -41,10 +41,9 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     // Compute mode overrides are applied by the renderer constructor's isComputeMode path
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    // If compute state was already adopted from a predecessor, reuse it.
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     if (!this.qwPass) {
-      this.qwPass = new QuantumWalkComputePass()
+      this.qwPass = new QuantumWalkComputePass(config.densityGridResolution)
       this.qwPass.initializeDensityTexture(ctx.device)
     }
 
@@ -116,9 +115,10 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, qwPass, ['quantumWalk'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof QuantumWalkStrategy) || !source.qwPass) return false
-    // Steal the compute pass — the source becomes empty (dispose is a no-op).
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.qwPass.getDensityGridSize() !== nextN) return false
     this.qwPass?.dispose()
     this.qwPass = source.qwPass
     source.qwPass = null

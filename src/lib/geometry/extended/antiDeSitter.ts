@@ -103,9 +103,20 @@ export interface AntiDeSitterConfig {
 }
 
 /**
- * Named preset identifiers. Fifteen curated states covering the BF-bound
- * interior, the Klebanov-Witten window, higher-dimensional SUGRA-like
- * towers, and a tachyonic state for visual contrast.
+ * Named preset identifiers. Twenty-two entries covering three stages:
+ *
+ *   - Stage 1 (bound-state eigenstates): fifteen `adsThree*` / `adsFour*`
+ *     / `adsFive*` / `adsSix*` / `adsSeven*` presets spanning the
+ *     BF-bound interior, the Klebanov-Witten window, higher-dimensional
+ *     SUGRA-like towers, and a tachyonic state for visual contrast.
+ *   - Stage 2A (BTZ thermal state): `btzHotSmall` / `btzWarmMedium` /
+ *     `btzCoolLarge` — d=3 only, selects r₊, ω, m_A via preset.
+ *   - Stage 2B (HKLL bulk-from-boundary reconstruction):
+ *     `hkllEigenstateCheck` / `hkllBoundarySpot` / `hkllBoundaryPlaneWave`
+ *     — exercises each of the three boundary-source modes.
+ *
+ * `'custom'` represents any user-edited state that doesn't match a
+ * registered preset.
  */
 export type AdsPresetName =
   | 'adsFourGround'

@@ -169,11 +169,12 @@ export function computeConfigHash(gridSize: number[], latticeDim: number): strin
 export function createDensityTexture(
   device: GPUDevice,
   label: string,
-  extraUsage: GPUTextureUsageFlags = 0
+  extraUsage: GPUTextureUsageFlags = 0,
+  gridSize: number = DENSITY_GRID_SIZE
 ): GPUTexture {
   return device.createTexture({
     label: `${label}-density-grid`,
-    size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
+    size: [gridSize, gridSize, gridSize],
     format: 'rgba16float',
     dimension: '3d',
     usage:
@@ -191,13 +192,21 @@ export function createDensityTexture(
  * pair plus their 3D views in a single call so the compute pass can
  * assign them atomically.
  */
-export function createFsfDensityAndAnalysisTextures(device: GPUDevice): {
+export function createFsfDensityAndAnalysisTextures(
+  device: GPUDevice,
+  gridSize: number = DENSITY_GRID_SIZE
+): {
   densityTexture: GPUTexture
   densityTextureView: GPUTextureView
   analysisTexture: GPUTexture
   analysisTextureView: GPUTextureView
 } {
-  const densityTexture = createDensityTexture(device, 'free-scalar', GPUTextureUsage.COPY_DST)
+  const densityTexture = createDensityTexture(
+    device,
+    'free-scalar',
+    GPUTextureUsage.COPY_DST,
+    gridSize
+  )
   const densityTextureView = densityTexture.createView({
     label: 'free-scalar-density-view',
     dimension: '3d',
@@ -205,9 +214,9 @@ export function createFsfDensityAndAnalysisTextures(device: GPUDevice): {
   const analysisTexture = device.createTexture({
     label: 'free-scalar-analysis-grid',
     size: {
-      width: DENSITY_GRID_SIZE,
-      height: DENSITY_GRID_SIZE,
-      depthOrArrayLayers: DENSITY_GRID_SIZE,
+      width: gridSize,
+      height: gridSize,
+      depthOrArrayLayers: gridSize,
     },
     format: 'rgba16float',
     dimension: '3d',
@@ -259,23 +268,21 @@ let cachedTextureZeros: Uint8Array<ArrayBuffer> | null = null
 export function clearFsfDensityAndAnalysisTextures(
   device: GPUDevice,
   densityTexture: GPUTexture,
-  analysisTexture: GPUTexture
+  analysisTexture: GPUTexture,
+  gridSize: number = DENSITY_GRID_SIZE
 ): void {
   const bytesPerTexel = 8
-  const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
-  const rowsPerImage = DENSITY_GRID_SIZE
-  const byteLength = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
+  const bytesPerRow = gridSize * bytesPerTexel
+  const rowsPerImage = gridSize
+  const byteLength = bytesPerRow * rowsPerImage * gridSize
   if (cachedTextureZeros === null || cachedTextureZeros.byteLength !== byteLength) {
-    // Explicit ArrayBuffer constructor (not ArrayBufferLike) so the resulting
-    // Uint8Array satisfies `Uint8Array<ArrayBuffer>` and can be fed directly
-    // into `writeTexture` without a SharedArrayBuffer vs ArrayBuffer cast.
     cachedTextureZeros = new Uint8Array(new ArrayBuffer(byteLength))
   }
   const zeros = cachedTextureZeros
   const texSize = {
-    width: DENSITY_GRID_SIZE,
-    height: DENSITY_GRID_SIZE,
-    depthOrArrayLayers: DENSITY_GRID_SIZE,
+    width: gridSize,
+    height: gridSize,
+    depthOrArrayLayers: gridSize,
   }
   device.queue.writeTexture(
     { texture: densityTexture },

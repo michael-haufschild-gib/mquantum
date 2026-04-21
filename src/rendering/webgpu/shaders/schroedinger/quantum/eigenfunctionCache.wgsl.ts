@@ -14,11 +14,28 @@
  * @module rendering/webgpu/shaders/schroedinger/quantum/eigenfunctionCache.wgsl
  */
 
+import { MAX_DIM, MAX_TERMS } from '../uniforms.wgsl'
+
 /** Number of sample points per cached eigenfunction */
 export const EIGEN_CACHE_SAMPLES = 2048
 
-/** Maximum unique (n, ω) pairs (MAX_TERMS × MAX_DIM) */
-export const MAX_EIGEN_FUNCS = 88
+/**
+ * Maximum unique (n, ω) pairs — MAX_TERMS × MAX_DIM. Derived from the
+ * canonical constants so a change to either MAX_DIM or MAX_TERMS
+ * propagates into every downstream array size automatically instead
+ * of requiring each call site to be hand-edited in lockstep.
+ */
+export const MAX_EIGEN_FUNCS = MAX_TERMS * MAX_DIM
+
+/**
+ * Number of `vec4<i32>` slots needed to pack `MAX_EIGEN_FUNCS` i32
+ * index-map entries. The runtime assert below keeps the calculation
+ * honest — the current (88 functions) layout divides cleanly; a future
+ * MAX_EIGEN_FUNCS not a multiple of 4 would need to re-examine the
+ * packing convention in `EigenfunctionCacheComputePass` and the
+ * `indexMap[vecIdx][compIdx]` lookup in `getEigenFuncIdx`.
+ */
+export const MAX_EIGEN_FUNCS_VEC4_COUNT = Math.ceil(MAX_EIGEN_FUNCS / 4)
 
 /**
  * WGSL struct definition + bind group declarations for the eigenfunction cache.
@@ -30,7 +47,7 @@ export const eigenfunctionCacheBindingsBlock = /* wgsl */ `
 // ============================================
 
 const EIGEN_CACHE_SAMPLES: u32 = ${EIGEN_CACHE_SAMPLES}u;
-const MAX_EIGEN_FUNCS: u32 = 88u;
+const MAX_EIGEN_FUNCS: u32 = ${MAX_EIGEN_FUNCS}u;
 
 struct EigenfunctionCacheMeta {
   numFuncs: u32,
@@ -38,10 +55,10 @@ struct EigenfunctionCacheMeta {
   _pad0: u32,
   _pad1: u32,
   // Per-function metadata: vec4f(xMin, xMax, invRange, 0)
-  funcMeta: array<vec4f, 88>,
-  // Index map: maps (termIdx * 11 + dimIdx) to function index
-  // 88 i32 values packed as 22 vec4<i32>
-  indexMap: array<vec4<i32>, 22>,
+  funcMeta: array<vec4f, ${MAX_EIGEN_FUNCS}>,
+  // Index map: maps (termIdx * MAX_DIM + dimIdx) to function index.
+  // ${MAX_EIGEN_FUNCS} i32 values packed as ${MAX_EIGEN_FUNCS_VEC4_COUNT} vec4<i32>.
+  indexMap: array<vec4<i32>, ${MAX_EIGEN_FUNCS_VEC4_COUNT}>,
 }
 
 @group(2) @binding(2) var<storage, read> eigenCache: array<vec2f>;
@@ -57,9 +74,11 @@ export const eigenfunctionCacheLookupBlock = /* wgsl */ `
 // Eigenfunction Cache - Lookup Functions
 // ============================================
 
-// Get the cache function index for a given (termIdx, dimIdx) pair
+// Get the cache function index for a given (termIdx, dimIdx) pair.
+// The flat index (termIdx * MAX_DIM + dimIdx) matches the row-major
+// packing in EigenfunctionCacheComputePass.writeFuncMeta.
 fn getEigenFuncIdx(termIdx: i32, dimIdx: i32) -> i32 {
-  let flatIdx = termIdx * 11 + dimIdx;
+  let flatIdx = termIdx * ${MAX_DIM} + dimIdx;
   let vecIdx = flatIdx >> 2;  // / 4
   let compIdx = flatIdx & 3;  // % 4
   return eigenMeta.indexMap[vecIdx][compIdx];

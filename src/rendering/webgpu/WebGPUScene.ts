@@ -74,6 +74,7 @@ const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getSta
   eigenfunctionCacheEnabled: state.eigenfunctionCacheEnabled,
   analyticalGradientEnabled: state.analyticalGradientEnabled,
   fastEigenInterpolationEnabled: state.fastEigenInterpolationEnabled,
+  densityGridResolution: state.densityGridResolution,
 })
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
@@ -356,6 +357,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       crossSectionEnabled: schroedingerCompile.crossSectionEnabled,
       probabilityCurrentEnabled: schroedingerCompile.probabilityCurrentEnabled,
+      densityGridResolution: performance_.densityGridResolution,
       skyboxEnabled: environment.skyboxEnabled,
       skyboxMode: environment.skyboxMode as SkyboxMode,
       backgroundColor: environment.backgroundColor,
@@ -525,6 +527,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,
     performance_.fastEigenInterpolationEnabled,
+    performance_.densityGridResolution,
     schroedingerCompile.openQuantumEnabled,
     cameraRef,
   ])

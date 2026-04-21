@@ -39,10 +39,9 @@ export class DiracStrategy implements QuantumModeStrategy {
     // Compute mode overrides applied by renderer constructor
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    // If compute state was already adopted from a predecessor, reuse it.
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     if (!this.diracPass) {
-      this.diracPass = new DiracComputePass()
+      this.diracPass = new DiracComputePass(config.densityGridResolution)
       this.diracPass.initializeDensityTexture(ctx.device)
     }
 
@@ -126,8 +125,10 @@ export class DiracStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, diracPass, ['diracEquation'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof DiracStrategy) || !source.diracPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.diracPass.getDensityGridSize() !== nextN) return false
     this.diracPass?.dispose()
     this.diracPass = source.diracPass
     source.diracPass = null

@@ -177,7 +177,8 @@ export class FsfKSpaceManager {
     piBuffer: GPUBuffer,
     totalSites: number,
     config: FreeScalarConfig,
-    simEta: number
+    simEta: number,
+    densityGridSize?: number
   ): void {
     this.kSpaceFrameCounter++
     if (
@@ -193,7 +194,7 @@ export class FsfKSpaceManager {
     const bufferSize = totalSites * 4
     encoder.copyBufferToBuffer(phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
     encoder.copyBufferToBuffer(piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-    void this.readbackAndComputeKSpace(device, config, simEta) // fire-and-forget async
+    void this.readbackAndComputeKSpace(device, config, simEta, densityGridSize)
   }
 
   /**
@@ -278,7 +279,8 @@ export class FsfKSpaceManager {
   private async readbackAndComputeKSpace(
     _device: GPUDevice,
     config: FreeScalarConfig,
-    simEta: number
+    simEta: number,
+    densityGridSize?: number
   ): Promise<void> {
     const phiReadbackBuffer = this.phiReadbackBuffer
     const piReadbackBuffer = this.piReadbackBuffer
@@ -346,6 +348,7 @@ export class FsfKSpaceManager {
           kSpaceViz: config.kSpaceViz,
           dispersion,
           basisCoefs,
+          outputGridSize: densityGridSize,
         },
         [phiComplex.buffer, piComplex.buffer]
       )

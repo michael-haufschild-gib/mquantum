@@ -39,10 +39,9 @@ export class PauliStrategy implements QuantumModeStrategy {
     // Compute mode overrides applied by renderer constructor
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
-    // If compute state was already adopted from a predecessor, reuse it.
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     if (!this.pauliPass) {
-      this.pauliPass = new PauliComputePass()
+      this.pauliPass = new PauliComputePass(config.densityGridResolution)
       this.pauliPass.initializeDensityTexture(ctx.device)
     }
 
@@ -109,8 +108,10 @@ export class PauliStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof PauliStrategy) || !source.pauliPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.pauliPass.getDensityGridSize() !== nextN) return false
     this.pauliPass?.dispose()
     this.pauliPass = source.pauliPass
     source.pauliPass = null

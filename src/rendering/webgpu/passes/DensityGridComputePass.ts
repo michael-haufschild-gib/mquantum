@@ -127,6 +127,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private lastDimension = -1
   private lastQuantumMode: string | undefined
   private lastTimeBucket = -1
+  /**
+   * Guards against per-frame console spam from the "pipeline not initialized"
+   * warning. `execute()` runs every frame; `createPipeline` is async. Between
+   * mount and first pipeline-ready frame, the warning would otherwise fire
+   * 20-60 times per mode switch. Reset back to `false` whenever the pipeline
+   * becomes `null` so a genuine stuck-init re-triggers the signal.
+   */
+  private hasWarnedPipelineNotReady = false
   // Version tracking for uniform buffers - prevents unnecessary recomputation
   private lastSchroedingerVersion = -1
   private lastBasisVersion = -1
@@ -386,9 +394,17 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   execute(ctx: WebGPURenderContext): void {
     if (!this.computePipeline || !this.computeBindGroup) {
-      logger.warn('DensityGridComputePass: Pipeline not initialized')
+      // Async pipeline compilation is in flight the first several frames
+      // after mount; only log once per init phase so the signal stays
+      // useful for genuine stuck-init scenarios without flooding the
+      // console. `hasWarnedPipelineNotReady` resets in `dispose` below.
+      if (!this.hasWarnedPipelineNotReady) {
+        logger.warn('DensityGridComputePass: Pipeline not initialized')
+        this.hasWarnedPipelineNotReady = true
+      }
       return
     }
+    this.hasWarnedPipelineNotReady = false
 
     const animation = getStoreSnapshot<AnimationSnapshot>(ctx, 'animation')
     const time = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
@@ -518,6 +534,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.readbackInFlight = false
     this.readbackPendingSubmit = false
     this.shouldRefreshDistribution = true
+    // Reset the per-init warning guard so a genuine stuck re-init
+    // surfaces once after dispose, not zero times.
+    this.hasWarnedPipelineNotReady = false
 
     super.dispose()
   }

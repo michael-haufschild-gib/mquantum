@@ -205,7 +205,7 @@ async function injectSweepWithSeed(
         sweepMin,
         sweepMax,
         phiRef,
-        cutAnchor,
+        cutNormalized: cutAnchor,
         seed,
       })
     },
@@ -263,6 +263,8 @@ async function runOneSeedSweep(
       timeout: 10_000,
     })
     await resetBtn.click()
+    await expect(page.getByTestId('srmt-sweep-export-csv')).toHaveCount(0)
+    await expect(page.getByTestId('srmt-sweep-start')).toBeVisible({ timeout: 10_000 })
   }
 
   await injectSweepWithSeed(page, seed)

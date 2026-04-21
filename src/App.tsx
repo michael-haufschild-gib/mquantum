@@ -202,7 +202,10 @@ function AppContent() {
             </div>
           </div>
         ) : isSupported && safariChoice === 'continue' ? (
-          // WebGPU Renderer (normal path, or Safari user chose to continue)
+          // WebGPU Renderer — the normal non-Safari path. `'continue'` is
+          // exclusively the initial state for non-Safari browsers; Safari
+          // users can only transition `pending → stop` via
+          // `handleSafariAcknowledge`, so they never reach this branch.
           <ErrorBoundary
             fallback={
               <div className="flex h-full w-full items-center justify-center text-red-400 bg-black/90">

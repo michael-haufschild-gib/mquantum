@@ -47,6 +47,17 @@ const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
 /** localStorage key for persisting max FPS */
 const MAX_FPS_KEY = 'mdim_max_fps'
 
+/** localStorage key for persisting density grid resolution */
+const DENSITY_GRID_RESOLUTION_KEY = 'mdim_density_grid_resolution'
+
+/** Valid density grid resolution options. */
+export type DensityGridResolution = 64 | 96 | 128 | 256
+
+const VALID_DENSITY_GRID_RESOLUTIONS = new Set<number>([64, 96, 128, 256])
+
+/** Default density grid resolution. */
+export const DEFAULT_DENSITY_GRID_RESOLUTION: DensityGridResolution = 96
+
 /**
  * Parse persisted numeric strings without accepting partial prefixes.
  * Rejects malformed payloads such as `0.75junk` or `45fps`.
@@ -136,6 +147,29 @@ function persistMaxFps(fps: number): void {
  */
 export function hasPersistedMaxFps(): boolean {
   return loadPersistedMaxFps() !== null
+}
+
+function loadPersistedDensityGridResolution(): DensityGridResolution | null {
+  try {
+    const stored = localStorage.getItem(DENSITY_GRID_RESOLUTION_KEY)
+    if (stored !== null) {
+      const value = parseStrictPersistedNumber(stored)
+      if (value !== null && VALID_DENSITY_GRID_RESOLUTIONS.has(value)) {
+        return value as DensityGridResolution
+      }
+    }
+  } catch {
+    // Silent fail
+  }
+  return null
+}
+
+function persistDensityGridResolution(resolution: DensityGridResolution): void {
+  try {
+    localStorage.setItem(DENSITY_GRID_RESOLUTION_KEY, resolution.toString())
+  } catch {
+    // Silent fail
+  }
 }
 
 // ============================================================================
@@ -228,6 +262,9 @@ interface PerformanceState {
   /** Maximum frames per second (device-specific preference) */
   maxFps: number
 
+  /** 3D density grid resolution per axis (compile-time shader constant). */
+  densityGridResolution: DensityGridResolution
+
   // Shader Debugging
   shaderDebugInfos: Record<string, ShaderDebugInfo>
   shaderOverrides: string[]
@@ -275,6 +312,9 @@ interface PerformanceState {
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => void
+
+  // Density Grid Resolution
+  setDensityGridResolution: (resolution: DensityGridResolution) => void
 
   // FPS Limiting
   setMaxFps: (fps: number) => void
@@ -338,6 +378,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // FPS Limiting (load from localStorage, default to DEFAULT_MAX_FPS)
   maxFps: loadPersistedMaxFps() ?? DEFAULT_MAX_FPS,
+
+  // Density Grid Resolution (load from localStorage, default 96)
+  densityGridResolution: loadPersistedDensityGridResolution() ?? DEFAULT_DENSITY_GRID_RESOLUTION,
 
   // Shader Debugging
   shaderDebugInfos: {},
@@ -454,6 +497,16 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     persistResolutionScale(clampedScale)
   },
 
+  // Density Grid Resolution
+  setDensityGridResolution: (resolution: DensityGridResolution) => {
+    if (!VALID_DENSITY_GRID_RESOLUTIONS.has(resolution)) {
+      logger.warn('[performanceStore] Invalid density grid resolution:', resolution)
+      return
+    }
+    set({ densityGridResolution: resolution })
+    persistDensityGridResolution(resolution)
+  },
+
   // FPS Limiting
   setMaxFps: (fps: number) => {
     if (!Number.isFinite(fps)) {
@@ -543,6 +596,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       analyticalGradientEnabled: true,
       fastEigenInterpolationEnabled: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
+      densityGridResolution: DEFAULT_DENSITY_GRID_RESOLUTION,
       maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},
       shaderOverrides: [],

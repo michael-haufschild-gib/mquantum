@@ -71,8 +71,8 @@ export interface FsfDestroyableBuffers {
 
 /**
  * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
- * The density texture is NOT recreated here -- it has a fixed size (DENSITY_GRID_SIZE^3)
- * and persists across grid size changes to avoid invalidating the renderer's bind group.
+ * The density texture is NOT recreated here -- its size is set at construction
+ * and persists across lattice grid size changes to avoid invalidating the renderer's bind group.
  *
  * @param device - GPU device
  * @param config - Current free scalar config

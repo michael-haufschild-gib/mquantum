@@ -33,6 +33,7 @@ interface ScenePassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  densityGridResolution: number
   colorAlgorithm:
     | 'lch'
     | 'multiSource'
@@ -85,6 +86,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    densityGridResolution: 96,
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
     skyboxMode: 'classic',

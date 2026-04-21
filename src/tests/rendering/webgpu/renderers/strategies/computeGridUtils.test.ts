@@ -3,37 +3,38 @@ import { describe, expect, it } from 'vitest'
 import {
   applySharedPml,
   computeLatticeBoundingRadius,
+  FALLBACK_LATTICE_EXTENT,
+  LATTICE_BOUNDING_MARGIN,
 } from '@/rendering/webgpu/renderers/strategies/computeGridUtils'
 
 describe('computeLatticeBoundingRadius', () => {
-  it('computes half-extent with 1.15x margin for 3D grid', () => {
-    // 32 * 0.1 = 3.2 per dimension
+  it('computes half-extent with the configured margin for a 3D grid', () => {
+    // 32 * 0.1 = 3.2 per dimension — matches FALLBACK_LATTICE_EXTENT.
     const radius = computeLatticeBoundingRadius(3, [32, 32, 32], [0.1, 0.1, 0.1])
-    expect(radius).toBeCloseTo((3.2 / 2) * 1.15, 5)
+    expect(radius).toBeCloseTo((FALLBACK_LATTICE_EXTENT / 2) * LATTICE_BOUNDING_MARGIN, 5)
   })
 
   it('uses largest dimension extent', () => {
     // dim 0: 64*0.1=6.4, dim 1: 32*0.1=3.2, dim 2: 32*0.2=6.4 — max is 6.4
     const radius = computeLatticeBoundingRadius(3, [64, 32, 32], [0.1, 0.1, 0.2])
-    expect(radius).toBeCloseTo((6.4 / 2) * 1.15, 5)
+    expect(radius).toBeCloseTo((6.4 / 2) * LATTICE_BOUNDING_MARGIN, 5)
   })
 
   it('falls back to default extent when all extents are zero', () => {
     const radius = computeLatticeBoundingRadius(3, [0, 0, 0], [0, 0, 0])
-    // maxExtent fallback = 3.2
-    expect(radius).toBeCloseTo((3.2 / 2) * 1.15, 5)
+    expect(radius).toBeCloseTo((FALLBACK_LATTICE_EXTENT / 2) * LATTICE_BOUNDING_MARGIN, 5)
   })
 
   it('uses default values for missing grid/spacing entries', () => {
     const radius = computeLatticeBoundingRadius(3, [], [])
-    // Defaults: (32 * 0.1) = 3.2
-    expect(radius).toBeCloseTo((3.2 / 2) * 1.15, 5)
+    // Missing-entry defaults produce 32 × 0.1 = FALLBACK_LATTICE_EXTENT.
+    expect(radius).toBeCloseTo((FALLBACK_LATTICE_EXTENT / 2) * LATTICE_BOUNDING_MARGIN, 5)
   })
 
   it('handles single-dimension lattice', () => {
     const radius = computeLatticeBoundingRadius(1, [128], [0.05])
     // 128 * 0.05 = 6.4
-    expect(radius).toBeCloseTo((6.4 / 2) * 1.15, 5)
+    expect(radius).toBeCloseTo((6.4 / 2) * LATTICE_BOUNDING_MARGIN, 5)
   })
 })
 

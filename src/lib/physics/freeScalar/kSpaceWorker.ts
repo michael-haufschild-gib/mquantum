@@ -44,6 +44,8 @@ export interface KSpaceWorkerRequest {
    * `computeRawKSpaceData` for the derivation).
    */
   basisCoefs?: KSpaceBasisCoefs
+  /** Output display grid size — must match the density texture dimension. */
+  outputGridSize?: number
 }
 
 /** Outbound result from the k-space web worker with computed display textures. */
@@ -71,8 +73,12 @@ self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
     msg.basisCoefs
   )
 
-  // nkOnly=true: k-space occupation only reads analysis.r
-  const { density, analysis } = buildKSpaceDisplayTextures(raw, msg.kSpaceViz, true)
+  const { density, analysis } = buildKSpaceDisplayTextures(
+    raw,
+    msg.kSpaceViz,
+    true,
+    msg.outputGridSize
+  )
   const totalParticles = computeTotalParticleNumber(raw)
 
   const response: KSpaceWorkerResponse = {

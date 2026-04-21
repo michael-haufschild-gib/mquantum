@@ -64,7 +64,16 @@ export interface LegacyStrangStepParams extends StrangStepCommon {
 
 /**
  * Run one Strang substep inside a single compute pass.
- * Requires per-slot fftSharedMemBGs to be populated.
+ *
+ * **Precondition**: every bind group this function dereferences must be
+ * populated — specifically `potentialHalfBG`, `kineticBG`, `initBG`
+ * (when `config.absorberEnabled`), all `cachedPackBGs[0..S)`,
+ * `cachedUnpackBGs[0..S)`, `cachedUnpackBGsNoNorm[0..S)`, and
+ * `fftSharedMemBGs[0..2·latticeDim)`. The upstream caller in
+ * `DiracComputePass.dispatchCompute` gates the batched-vs-legacy
+ * branch, so by the time control reaches this function every one of
+ * those must be non-null or the non-null assertions below will explode
+ * at dispatch time with a hard-to-diagnose WebGPU validation error.
  */
 export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
   const { ctx, pl, bg, config, step, S, linearWG, dispatchCompute, ifftSlotOffset, totalSites } = p
@@ -124,6 +133,13 @@ export function runBatchedStrangStep(p: BatchedStrangStepParams): void {
 /**
  * Run one Strang substep using the legacy per-dispatch pass layout.
  * Bit-identical to the pre-batching path.
+ *
+ * **Precondition**: same as {@link runBatchedStrangStep} for the non-FFT
+ * bind groups (`potentialHalfBG`, `kineticBG`, `initBG` when absorber is
+ * enabled, plus all `cachedPackBGs`/`cachedUnpackBGs`/
+ * `cachedUnpackBGsNoNorm`). FFT axes route through
+ * `dispatchFFTAxisDelegated` so the per-slot `fftSharedMemBGs`
+ * population requirement does NOT apply here.
  */
 export function runLegacyStrangStep(p: LegacyStrangStepParams): void {
   const {

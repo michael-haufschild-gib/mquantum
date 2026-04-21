@@ -196,4 +196,34 @@ describe('Slider', () => {
       expect(screen.getByTestId('my-slider')).toBeInTheDocument()
     })
   })
+
+  describe('edge-case step values', () => {
+    // Without the Number.isFinite / positivity guards, `-log10(0) = Inf`
+    // flows into `toFixed(Infinity)` inside `decimals` and throws
+    // RangeError — tearing down the entire slider subtree on first
+    // render. These cases pin the invariant that the slider treats
+    // non-finite-positive-sub-unit step inputs as zero decimals and
+    // never crashes at display time.
+    it('renders without throwing when step=0', () => {
+      expect(() =>
+        render(<Slider label="Scale" value={5} min={0} max={10} step={0} onChange={vi.fn()} />)
+      ).not.toThrow()
+    })
+
+    it('renders without throwing when step=NaN', () => {
+      expect(() =>
+        render(
+          <Slider label="Scale" value={5} min={0} max={10} step={Number.NaN} onChange={vi.fn()} />
+        )
+      ).not.toThrow()
+    })
+
+    it('renders without throwing when step is a pathologically small positive value', () => {
+      // step=1e-200 would push ceil(-log10(step)) past toFixed's 100
+      // digits-max; the 100-cap keeps the call inside the spec bound.
+      expect(() =>
+        render(<Slider label="Scale" value={5} min={0} max={10} step={1e-200} onChange={vi.fn()} />)
+      ).not.toThrow()
+    })
+  })
 })

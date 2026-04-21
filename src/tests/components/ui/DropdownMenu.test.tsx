@@ -160,6 +160,72 @@ describe('DropdownMenu (invariants)', () => {
     })
   })
 
+  describe('invariant: keyboard navigation moves focus across enabled items', () => {
+    // DropdownMenu auto-focuses the first enabled menuitem on open; subsequent
+    // Arrow/Home/End keys shift `document.activeElement` across the non-
+    // disabled [role="menuitem"] list. The menu skips disabled items via the
+    // `:not(:disabled)` selector in `handleMenuKeyDown`.
+    const navigationItems: DropdownMenuItem[] = [
+      { label: 'First', onClick: vi.fn() },
+      { label: 'Second', onClick: vi.fn() },
+      { label: 'Disabled', onClick: vi.fn(), disabled: true },
+      { label: 'Third', onClick: vi.fn() },
+    ]
+
+    /** Query the menu button for `label` — works whether focus is on it or not. */
+    const menuButton = (label: string): HTMLElement => screen.getByRole('menuitem', { name: label })
+
+    it('ArrowDown advances to the next enabled item and skips disabled', async () => {
+      const user = userEvent.setup()
+      render(
+        <DropdownMenu trigger={<Button>Open Menu</Button>} items={navigationItems} id="test-menu" />
+      )
+      await user.click(screen.getByText('Open Menu'))
+      // After open, focus lands on the first enabled item.
+      await vi.waitFor(() => expect(menuButton('First')).toHaveFocus())
+
+      await user.keyboard('{ArrowDown}')
+      expect(menuButton('Second')).toHaveFocus()
+
+      // Third ArrowDown must skip the disabled middle item (the `:not(:disabled)`
+      // selector removes it from the navigable list).
+      await user.keyboard('{ArrowDown}')
+      expect(menuButton('Third')).toHaveFocus()
+
+      // ArrowDown on the last item wraps to the first.
+      await user.keyboard('{ArrowDown}')
+      expect(menuButton('First')).toHaveFocus()
+    })
+
+    it('ArrowUp moves to the previous enabled item with wrap-around', async () => {
+      const user = userEvent.setup()
+      render(
+        <DropdownMenu trigger={<Button>Open Menu</Button>} items={navigationItems} id="test-menu" />
+      )
+      await user.click(screen.getByText('Open Menu'))
+      await vi.waitFor(() => expect(menuButton('First')).toHaveFocus())
+
+      // ArrowUp from the first item wraps to the last enabled item (Third).
+      await user.keyboard('{ArrowUp}')
+      expect(menuButton('Third')).toHaveFocus()
+    })
+
+    it('Home jumps to the first enabled item and End jumps to the last', async () => {
+      const user = userEvent.setup()
+      render(
+        <DropdownMenu trigger={<Button>Open Menu</Button>} items={navigationItems} id="test-menu" />
+      )
+      await user.click(screen.getByText('Open Menu'))
+      await vi.waitFor(() => expect(menuButton('First')).toHaveFocus())
+
+      await user.keyboard('{End}')
+      expect(menuButton('Third')).toHaveFocus()
+
+      await user.keyboard('{Home}')
+      expect(menuButton('First')).toHaveFocus()
+    })
+  })
+
   describe('invariant: item click fires handler and closes, disabled items blocked', () => {
     it('should call onClick handler and close menu when clicking item', async () => {
       const handleClick = vi.fn()
@@ -187,7 +253,20 @@ describe('DropdownMenu (invariants)', () => {
       await user.click(screen.getByText('Open Menu'))
 
       // Disabled button should not be clickable
-      expect(screen.getByRole('menuitem', { name: 'Disabled Item' })).toBeDisabled()
+      const disabledItem = screen.getByRole('menuitem', { name: 'Disabled Item' })
+      expect(disabledItem).toBeDisabled()
+
+      // Contract: clicking a disabled item must never invoke its onClick.
+      // `toBeDisabled()` alone doesn't prove that — userEvent.click on a
+      // disabled button is a no-op by design, but a regression that moves
+      // the disabled check from HTML `disabled` attribute to CSS class
+      // (`pointer-events: none`) would still pass toBeDisabled while
+      // allowing programmatic clicks through.
+      await user.click(disabledItem)
+      expect(handleClick).not.toHaveBeenCalled()
+      // Dropdown must also stay open — the disabled click is not an action,
+      // so `onClose` must not fire.
+      expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
     })
   })
 

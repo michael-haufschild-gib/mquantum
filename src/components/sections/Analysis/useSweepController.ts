@@ -55,6 +55,14 @@ export function useSweepController(): {
   }
 
   const handleStartSweep = () => {
+    // Guard against double-start: a programmatic re-invocation or a
+    // fast double-click bypassing React's render cycle would otherwise
+    // overwrite preSweepRef with the mid-sweep physics config, and a
+    // subsequent abort/unmount would "restore" to that wrong state.
+    // The UI gates the Start button by status, but the handler must
+    // stay idempotent-safe for non-UI callers (tests, future wiring).
+    if (useCoordinateEntanglementStore.getState().sweepStatus === 'running') return
+
     const config: AtlasSweepConfig = {
       lambdaMin: 0.01,
       lambdaMax: 50,

@@ -51,7 +51,15 @@ export const Slider: React.FC<SliderProps> = React.memo(
     const id = useId()
     const percentage =
       max > min ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100)) : 0
-    const decimals = step >= 1 ? 0 : Math.max(0, Math.ceil(-Math.log10(step)))
+    const decimals = (() => {
+      if (!Number.isFinite(step) || step <= 0) return 0
+      const text = step.toString().toLowerCase()
+      if (text.includes('e-')) {
+        const [mantissa, exponent] = text.split('e-')
+        return Math.min(100, Number(exponent) + (mantissa!.split('.')[1]?.length ?? 0))
+      }
+      return Math.min(100, text.split('.')[1]?.length ?? 0)
+    })()
 
     const [inputValue, setInputValue] = useState(value.toString())
     // Removed isHovered state - use pure CSS group-hover instead (eliminates re-renders on hover)

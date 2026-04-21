@@ -97,7 +97,9 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
   private stepAccumulator = 0
   private lastGridSize0 = 64
 
-  constructor() {
+  private readonly densityGridSize: number
+
+  constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
       id: 'quantum-walk-compute',
       inputs: [],
@@ -105,6 +107,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [COIN_WG, 1, 1],
     })
+    this.densityGridSize = densityGridSize
   }
 
   /**
@@ -115,7 +118,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
    */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = createDensityTexture(device, 'qw')
+    this.densityTexture = createDensityTexture(device, 'qw', 0, this.densityGridSize)
     this.densityTextureView = this.densityTexture.createView({
       label: 'qw-density-view',
       dimension: '3d',
@@ -129,6 +132,11 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
    */
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
+  }
+
+  /** Get the configured density grid resolution. */
+  getDensityGridSize(): number {
+    return this.densityGridSize
   }
 
   /**
@@ -497,7 +505,7 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
         device.queue.writeBuffer(this.maxDensityAtomicBuffer, 0, new Uint32Array([0]))
       }
 
-      const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
+      const gridWG = Math.ceil(this.densityGridSize / GRID_WG)
       const wgPass = ctx.beginComputePass({ label: 'qw-write-grid' })
       this.dispatchCompute(
         wgPass,
@@ -537,28 +545,34 @@ export class QuantumWalkComputePass extends WebGPUBaseComputePass {
     // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
     // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
     // map" state when queue.submit() fires later in the same synchronous block.
-    queueMicrotask(() => readbackBuf.mapAsync(GPUMapMode.READ).then(
-      () => {
-        if (epoch !== this.readbackEpoch) {
-          try { readbackBuf.unmap() } catch { /* already unmapped */ }
+    queueMicrotask(() =>
+      readbackBuf.mapAsync(GPUMapMode.READ).then(
+        () => {
+          if (epoch !== this.readbackEpoch) {
+            try {
+              readbackBuf.unmap()
+            } catch {
+              /* already unmapped */
+            }
+            this.readbackPending = false
+            return
+          }
+          const mapped = readbackBuf.getMappedRange()
+          // The shader stores bitcast<u32>(f32) via atomicMax.
+          // Reinterpret the u32 bytes as f32 to recover the peak density.
+          const peakDensity = new Float32Array(mapped.slice(0))[0]!
+          readbackBuf.unmap()
           this.readbackPending = false
-          return
-        }
-        const mapped = readbackBuf.getMappedRange()
-        // The shader stores bitcast<u32>(f32) via atomicMax.
-        // Reinterpret the u32 bytes as f32 to recover the peak density.
-        const peakDensity = new Float32Array(mapped.slice(0))[0]!
-        readbackBuf.unmap()
-        this.readbackPending = false
 
-        if (peakDensity > 0 && isFinite(peakDensity)) {
-          this.gpuMaxDensity = peakDensity
+          if (peakDensity > 0 && isFinite(peakDensity)) {
+            this.gpuMaxDensity = peakDensity
+          }
+        },
+        () => {
+          this.readbackPending = false
         }
-      },
-      () => {
-        this.readbackPending = false
-      }
-    ))
+      )
+    )
   }
 
   execute(_ctx: WebGPURenderContext): void {

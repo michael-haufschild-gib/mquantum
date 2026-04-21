@@ -69,6 +69,47 @@ describe('useSweepController — handleStartSweep', () => {
   })
 })
 
+describe('useSweepController — double-start guard', () => {
+  beforeEach(() => {
+    useExtendedObjectStore.getState().reset()
+    useCoordinateEntanglementStore.getState().abortSweep()
+    useGeometryStore.setState(useGeometryStore.getInitialState())
+    setupPhysicsState()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('preserves the original pre-sweep snapshot when handleStartSweep is called twice in a row', () => {
+    // First start: captures the true pre-sweep physics ({harmonicTrap, λ=3.5, dim=5}).
+    // A bare re-invocation without the guard would overwrite preSweepRef with
+    // the mid-sweep config ({coupledAnharmonic, λ=lambdaForStep(0), dim=3}),
+    // so a subsequent abort would restore to that wrong state.
+    const { result } = renderHook(() => useSweepController())
+    act(() => {
+      result.current.handleStartSweep()
+    })
+    expect(getEnt().sweepStatus).toBe('running')
+
+    act(() => {
+      // Double-start while running — must no-op and not overwrite the snapshot.
+      result.current.handleStartSweep()
+    })
+
+    act(() => {
+      result.current.handleAbortSweep()
+    })
+
+    // True pre-sweep state must be restored — if the double-start had
+    // overwritten the snapshot, potentialType would still be 'coupledAnharmonic'.
+    expect(getExt().schroedinger.tdse.potentialType).toBe('harmonicTrap')
+    expect(getExt().schroedinger.tdse.anharmonicLambda).toBeCloseTo(3.5)
+    expect(getGeo().dimension).toBe(5)
+  })
+})
+
 describe('useSweepController — handleAbortSweep', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()

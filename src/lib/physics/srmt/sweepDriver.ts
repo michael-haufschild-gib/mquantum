@@ -644,9 +644,10 @@ export function writePerClockFit(
 ): void {
   const affine = fitAffineParams(K, E, compareCount)
   point.quality[clock] = affine.q
-  if (Number.isFinite(affine.alpha)) point.alphaByClock![clock] = affine.alpha
-  if (Number.isFinite(affine.beta)) point.betaByClock![clock] = affine.beta
-  if (Number.isFinite(affine.q)) {
+  const { alpha, beta, q } = affine
+  if (Number.isFinite(alpha)) point.alphaByClock![clock] = alpha
+  if (Number.isFinite(beta)) point.betaByClock![clock] = beta
+  if (Number.isFinite(q)) {
     const sigma = jackknifeAffineFitStdev(K, E, compareCount)
     if (Number.isFinite(sigma)) point.qStdev![clock] = sigma
   }

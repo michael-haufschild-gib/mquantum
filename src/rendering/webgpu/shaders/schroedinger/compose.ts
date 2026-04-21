@@ -140,6 +140,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     useWignerCache,
     crossSectionEnabled,
     probabilityCurrentEnabled,
+    sampleSpaceRotation: config.sampleSpaceRotation,
     profilingStrip: config.profilingStrip,
   })
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)

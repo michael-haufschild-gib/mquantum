@@ -127,6 +127,42 @@ describe('reggeWheeler — electromagnetic (s=1, ℓ=2, M=1) peak', () => {
   })
 })
 
+describe('reggeWheeler — defensive input guards', () => {
+  // computeReggeWheelerPotential fences off non-finite inputs at the
+  // public boundary so a legacy preset that delivers `undefined` for
+  // `bhMultipoleL` or `bhSpin` never poisons the diagnostics HUD with
+  // NaNs. The same contract already covers `rStar` and `M`; the
+  // assertions below pin the uniform behaviour so a future refactor
+  // that loosens one guard but not the others stands out.
+  it('returns 0 for non-finite rStar', () => {
+    expect(computeReggeWheelerPotential(Number.NaN, 1.0, 2, 2)).toBe(0)
+    expect(computeReggeWheelerPotential(Number.POSITIVE_INFINITY, 1.0, 2, 2)).toBe(0)
+  })
+
+  it('returns 0 for non-finite ell', () => {
+    expect(computeReggeWheelerPotential(2.0, 1.0, Number.NaN, 2)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, Number.POSITIVE_INFINITY, 2)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, Number.NEGATIVE_INFINITY, 2)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, undefined as unknown as number, 2)).toBe(0)
+  })
+
+  it('returns 0 for non-finite spin', () => {
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.NaN)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.POSITIVE_INFINITY)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.NEGATIVE_INFINITY)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, undefined as unknown as number)).toBe(0)
+  })
+
+  it('clamps non-finite M rather than returning 0', () => {
+    // M is the one parameter the existing guard clamps rather than zeroing —
+    // the Newton inversion needs SOME positive M to converge on the horizon.
+    // Verify the existing behaviour still holds so the guard additions
+    // above didn't collapse the asymmetry.
+    const v = computeReggeWheelerPotential(2.0, Number.NaN, 2, 2)
+    expect(Number.isFinite(v)).toBe(true)
+  })
+})
+
 describe('reggeWheeler — CPU / WGSL (f32) parity', () => {
   // Mirror the WGSL Newton loop in `tdsePotential.wgsl.ts` using `Math.fround`
   // at every operation so the arithmetic is bit-equivalent to the f32 GPU

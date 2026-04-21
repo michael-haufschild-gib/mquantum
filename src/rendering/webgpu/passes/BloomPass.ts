@@ -394,12 +394,18 @@ export class BloomPass extends WebGPUBasePass {
     pass.end()
   }
 
+  /**
+   * Run the full bloom chain. Returns `true` when the output texture is
+   * written, `false` when resources aren't ready yet (caller must fall
+   * back to a scene→output copy so the render graph's output-resource
+   * contract isn't violated for that frame).
+   */
   private executeBloom(
     ctx: WebGPURenderContext,
     sceneView: GPUTextureView,
     bloomInputView: GPUTextureView,
     outputView: GPUTextureView
-  ): void {
+  ): boolean {
     if (
       !this.device ||
       !this.prefilterPipeline ||
@@ -415,13 +421,13 @@ export class BloomPass extends WebGPUBasePass {
       !this.compositeUB ||
       !this.sampler
     ) {
-      return
+      return false
     }
 
     this.ensureTextures(this.device, ctx.size.width, ctx.size.height)
 
     if (this.downMipViews.length < NUM_DOWN_MIPS || this.upMipViews.length < NUM_UP_MIPS) {
-      return
+      return false
     }
 
     // --- Write prefilter uniforms ---
@@ -570,6 +576,7 @@ export class BloomPass extends WebGPUBasePass {
     })
     this.renderFullscreen(compositePass, this.compositePipeline, [this.compositeBindGroup])
     compositePass.end()
+    return true
   }
 
   execute(ctx: WebGPURenderContext): void {
@@ -580,14 +587,26 @@ export class BloomPass extends WebGPUBasePass {
     const sceneView = ctx.getTextureView(this.sceneInputResource)
     const bloomInputView = ctx.getTextureView(this.bloomInputResource)
     const outputView = ctx.getWriteTarget(this.outputResource) ?? ctx.getCanvasTextureView()
-    if (!sceneView || !bloomInputView) return
+    if (!sceneView) return
+    if (!bloomInputView) {
+      this.renderCopy(ctx, sceneView, outputView)
+      return
+    }
 
     if (this.gain <= 0) {
       this.renderCopy(ctx, sceneView, outputView)
       return
     }
 
-    this.executeBloom(ctx, sceneView, bloomInputView, outputView)
+    // When bloom resources aren't ready yet (first frames after async
+    // pipeline compilation, or a resize that hasn't fully propagated),
+    // fall back to a scene-copy so the output resource is always
+    // populated. The alternative — silently skipping — leaves the graph's
+    // output texture with stale or uninitialized content, which the
+    // downstream compositor then renders as a visible garbage frame.
+    if (!this.executeBloom(ctx, sceneView, bloomInputView, outputView)) {
+      this.renderCopy(ctx, sceneView, outputView)
+    }
   }
 
   releaseInternalResources(): void {

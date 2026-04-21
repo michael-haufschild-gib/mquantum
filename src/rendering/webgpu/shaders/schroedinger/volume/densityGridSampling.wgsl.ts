@@ -116,23 +116,29 @@ export const densityGridSamplingBlock = /* wgsl */ `
 // ============================================
 
 /**
+ * Rotate a world-space position through the N-D basis vectors (3D projection).
+ * Active only when SAMPLE_SPACE_ROTATION is true (AdS modes). Dead-code-eliminated
+ * otherwise. Used by all density grid sampling functions so rotation applies
+ * uniformly to density, gradient, quantum potential, and vortex lookups.
+ */
+fn applySampleRotation(pos: vec3f) -> vec3f {
+  if (SAMPLE_SPACE_ROTATION) {
+    let bx = vec3f(basis.basisX[0].x, basis.basisX[0].y, basis.basisX[0].z);
+    let by = vec3f(basis.basisY[0].x, basis.basisY[0].y, basis.basisY[0].z);
+    let bz = vec3f(basis.basisZ[0].x, basis.basisZ[0].y, basis.basisZ[0].z);
+    return pos.x * bx + pos.y * by + pos.z * bz;
+  }
+  return pos;
+}
+
+/**
  * Convert world position to density grid UVW coordinates.
  * Maps [-boundingRadius, +boundingRadius] to [0, 1].
- *
- * @param pos World-space position (model space during raymarching)
- * @param uniforms Schroedinger uniforms containing boundingRadius
- * @return UVW coordinates for texture sampling
+ * Applies sample-space rotation when enabled (AdS modes).
  */
 fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   let bound = uniforms.boundingRadius;
-  var gridPos = pos;
-
-  // Free-scalar density textures are now written in model space by the writeGrid
-  // compute shader (which applies basis-rotated N-D slicing). No additional
-  // basis remap is needed here — gridPos = pos (identity).
-  // Hydrogen/HO density textures also bake basis/origin during compute write
-  // (mapPosToND), so gridPos = pos is correct for all modes.
-
+  let gridPos = applySampleRotation(pos);
   return (gridPos + vec3f(bound)) / (2.0 * bound);
 }
 
@@ -179,7 +185,8 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
 
   // Step size in UVW space: 2 texels / gridSize
   let uvwStep = 2.0 / DENSITY_GRID_SIZE;
-  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+  let rotatedPos = applySampleRotation(pos);
+  let baseUVW = (rotatedPos + vec3f(bound)) * invDiameter;
 
   // Sample 6 neighbors in UVW space with zero-outside-grid semantics.
   // Matches sampleDensityFromGrid: positions outside [0,1] return zero,
@@ -257,7 +264,8 @@ fn computeQuantumPotentialFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -
   // Single-texel step in UVW space — gives higher spatial resolution than
   // the 2-texel stencil used by computeGradientFromGrid.
   let uvwStep = 1.0 / DENSITY_GRID_SIZE;
-  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+  let qpRotatedPos = applySampleRotation(pos);
+  let baseUVW = (qpRotatedPos + vec3f(bound)) * invDiameter;
 
   // If the centre itself falls outside the grid, the voxel is meaningless.
   if (any(baseUVW < vec3f(0.0)) || any(baseUVW > vec3f(1.0))) {
@@ -394,7 +402,8 @@ fn computeVortexDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> f
 
   let bound = uniforms.boundingRadius;
   let invDiameter = uniforms.invBoundingRadius * 0.5;
-  let baseUVW = (pos + vec3f(bound)) * invDiameter;
+  let vortexRotatedPos = applySampleRotation(pos);
+  let baseUVW = (vortexRotatedPos + vec3f(bound)) * invDiameter;
 
   // Quantise to the nearest texel corner. Phase must be read from discrete
   // texel centres via textureLoad (see samplePhaseOrZero); linear filtering

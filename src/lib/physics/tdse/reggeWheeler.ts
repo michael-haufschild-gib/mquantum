@@ -127,19 +127,20 @@ export function reggeWheelerPotentialFromR(
  *
  * Inverts r*(r) via Newton iteration, then applies the radial formula.
  *
- * Non-finite or non-positive `M` poisons the Newton inversion (every
- * intermediate derivative becomes NaN / divides by zero) and propagates
- * into the diagnostics HUD as a silent wall of NaNs. The setter
- * `setTdseBhMass` already clamps to `[0.1, 5]`, but a config loaded
- * from disk or migrated from a legacy preset can still carry a garbage
- * value. Clamp at the entry point so the helper is safe to call from
- * any CPU code path without pre-validation.
+ * Defensive input guards apply to every physics parameter. Setters
+ * (`setTdseBhMass`, `setTdseBhMultipoleL`, `setTdseBhSpin`) already
+ * clamp live state, but a config loaded from disk or migrated from a
+ * legacy preset can carry `undefined` or `NaN` in any of these fields —
+ * one such value poisons the arithmetic and surfaces as a silent wall
+ * of NaNs in the 1D-potential preview and diagnostics HUD. Guarding at
+ * the public entry point keeps the helper safe to call from any CPU
+ * code path without pre-validation.
  *
  * @param rStar - Tortoise coordinate
  * @param M - Black-hole mass (clamped to ≥ 1e-4 on non-finite/non-positive input)
  * @param ell - Multipole index ℓ
  * @param spin - Perturbation spin s ∈ {0, 1, 2}
- * @returns V_ℓ^s(r*), or 0 when `rStar` itself is non-finite
+ * @returns V_ℓ^s(r*), or 0 when `rStar`, `ell`, or `spin` is non-finite
  */
 export function computeReggeWheelerPotential(
   rStar: number,
@@ -148,6 +149,10 @@ export function computeReggeWheelerPotential(
   spin: number
 ): number {
   if (!Number.isFinite(rStar)) return 0
+  // Match the M guard for the other two physics parameters. Returning 0
+  // (no potential) is the same fallback used for non-finite rStar so
+  // the helper's contract is uniform across every input.
+  if (!Number.isFinite(ell) || !Number.isFinite(spin)) return 0
   const safeM = Number.isFinite(M) && M > 0 ? M : 1e-4
   const r = tortoiseToRadial(rStar, safeM)
   return reggeWheelerPotentialFromR(r, safeM, ell, spin)

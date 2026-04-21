@@ -1,20 +1,13 @@
 /**
- * Strategy for the Anti-de Sitter (Stage 1) quantum mode.
+ * Strategy for the Anti-de Sitter quantum mode.
  *
- * The AdS state is evaluated in closed form on the CPU and written into the
- * shared `DENSITY_GRID_SIZE`³ rgba16float density texture — mirroring the
- * Wheeler–DeWitt approach. The solver is pure TypeScript math (no PDE
- * integration) so repack cost is linear in voxel count and dominated by
- * transcendental evaluation.
+ * Owns a single shared density texture that both paths write to:
+ * - **Bound-state eigenstates**: GPU compute pass ({@link AdsDensityComputePass})
+ *   with basis-rotation support for animation.
+ * - **BTZ / HKLL**: CPU packer writes via `queue.writeTexture` to the same
+ *   texture (static — no per-frame rotation needed).
  *
- * Dirty signalling keyed off a config hash + the `needsReset` flag.
- *
- * TODO(Stage2): BTZ thermal state (rebuild density from thermal
- *   two-point-function sum), HKLL bulk reconstruction (requires boundary
- *   primary upload + smearing kernel), dS/CFT continuation, backreaction
- *   feedback (would modify the Poincaré ball → perturbed-ball mapping),
- *   Chern-Simons level display. Each extension re-enters this file at the
- *   `executeFrame` dirty gate.
+ * The fragment shader always reads from this one texture.
  *
  * @module rendering/webgpu/renderers/strategies/AntiDeSitterStrategy
  */
@@ -28,7 +21,7 @@ import {
 } from '@/lib/physics/antiDeSitter/densityGrid'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../../core/types'
-import { createDensityTexture } from '../../passes/computePassUtils'
+import { AdsDensityComputePass } from '../../passes/AdsDensityComputePass'
 import type { SchroedingerWGSLShaderConfig } from '../../shaders/schroedinger/compose'
 import type { SchrodingerRendererConfig } from '../schrodingerRendererTypes'
 import { type ExtendedStoreSnapshot, getStoreSnapshot } from '../schrodingerRendererTypes'
@@ -41,12 +34,8 @@ import type {
 } from './types'
 
 /**
- * Deterministic hash of the physics-relevant AdS config fields. Excluded:
- * `needsReset` (the flag itself) and `preset` (the preset label is a UI
- * identifier — two presets with identical parameters must not force a
- * repack).
- *
- * Exported for unit-testing hash stability across non-physics mutations.
+ * Deterministic hash of the physics-relevant AdS config fields.
+ * Exported for unit-testing hash stability.
  */
 export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
   return [
@@ -57,16 +46,10 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
     config.mL.toFixed(6),
     config.branch,
     config.boundaryOverlay ? 1 : 0,
-    // Stage 2A BTZ fields — every knob that changes the packed density
-    // must be in the hash, otherwise the strategy will skip repacks on
-    // BTZ slider moves and the rendered horizon will desync.
     config.btzEnabled ? 1 : 0,
     config.btzHorizonRadius.toFixed(6),
     config.btzOmega.toFixed(6),
     config.btzAngularM,
-    // Stage 2B HKLL fields — repack whenever the reconstruction parameters
-    // change, otherwise the strategy would serve a stale density from the
-    // previous source mode.
     config.hkllEnabled ? 1 : 0,
     config.hkllBoundarySource,
     config.hkllSourceSigma.toFixed(6),
@@ -74,52 +57,94 @@ export function computeAdsConfigHash(config: AntiDeSitterConfig): string {
   ].join('|')
 }
 
-/** Strategy owning a CPU-packed Anti-de Sitter density texture. */
+/** Whether the current config uses a CPU-packed special path (BTZ or HKLL). */
+function isCpuPackedPath(ads: AntiDeSitterConfig): boolean {
+  return (ads.btzEnabled && ads.d === 3) || ads.hkllEnabled
+}
+
+/** Strategy owning a shared density texture for Anti-de Sitter modes. */
 export class AntiDeSitterStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
 
+  // Shared density texture — both GPU compute and CPU packer write here.
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
-  private lastConfigHash: string | null = null
-  private transferredOut = false
-  /**
-   * Lazily-allocated packer scratch. Allocated on the first pack and reused
-   * on every dirty frame so slider drags don't churn ~6 MB of typed arrays
-   * per frame. Dropped when the strategy is disposed.
-   */
+
+  // GPU compute path (bound-state eigenstates).
+  private computePass: AdsDensityComputePass | null = null
+  private computePassInitialized = false
+
+  // CPU fallback path (BTZ / HKLL).
+  private lastCpuConfigHash: string | null = null
   private packerScratch: AdsPackerScratch | null = null
+
+  private transferredOut = false
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     if (this.transferredOut && !this.densityTexture) {
-      // Adopted by a successor — stay dormant.
       return { initPromises: [], ...createDensityTextureBindings(ctx.device, null) }
     }
+
+    const gridSize = config.densityGridResolution ?? DENSITY_GRID_SIZE
+
+    // Recreate texture when resolution changes (setup is called on pipeline rebuild).
+    if (this.densityTexture) {
+      const currentSize = this.densityTexture.width
+      if (currentSize !== gridSize) {
+        this.densityTexture.destroy()
+        this.densityTexture = null
+        this.densityTextureView = null
+      }
+    }
+
     if (!this.densityTexture) {
-      this.densityTexture = createDensityTexture(
-        ctx.device,
-        'anti-de-sitter',
-        GPUTextureUsage.COPY_DST
-      )
+      this.densityTexture = ctx.device.createTexture({
+        label: 'anti-de-sitter-density-grid',
+        size: [gridSize, gridSize, gridSize],
+        format: 'rgba16float',
+        dimension: '3d',
+        usage:
+          GPUTextureUsage.STORAGE_BINDING |
+          GPUTextureUsage.TEXTURE_BINDING |
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.COPY_DST,
+      })
       this.densityTextureView = this.densityTexture.createView({
         label: 'anti-de-sitter-density-view',
         dimension: '3d',
       })
-      // Zero-fill the texture so every voxel is defined before the first
-      // `executeFrame` fires the packer.
-      const N = DENSITY_GRID_SIZE
-      const bytesPerTexel = 8 // rgba16float
-      const zeros = new Uint8Array(N * N * N * bytesPerTexel)
-      ctx.device.queue.writeTexture(
-        { texture: this.densityTexture },
-        zeros,
-        { bytesPerRow: N * bytesPerTexel, rowsPerImage: N },
-        { width: N, height: N, depthOrArrayLayers: N }
-      )
     }
+
+    // GPU compute pass writes to the shared texture.
+    this.computePass?.dispose()
+    this.computePass = null
+    this.computePassInitialized = false
+
+    if (this.densityTextureView) {
+      this.computePass = new AdsDensityComputePass({
+        densityTextureView: this.densityTextureView,
+        gridSize,
+      })
+      const initPromises = [
+        this.computePass.initialize(ctx).then(
+          () => {
+            this.computePassInitialized = true
+          },
+          () => {
+            this.computePassInitialized = false
+          }
+        ),
+      ]
+      return {
+        initPromises,
+        ...createDensityTextureBindings(ctx.device, this.densityTextureView),
+      }
+    }
+
     return {
       initPromises: [],
       ...createDensityTextureBindings(ctx.device, this.densityTextureView),
@@ -131,24 +156,64 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
     _dimension: number,
     _config: SchrodingerRendererConfig
   ): number | null {
-    // Poincaré ball is r ∈ [0, 1). Add 2% padding so the thin boundary
-    // shell at r ≈ 0.985 stays inside the rendered cube even with small
-    // camera-projection overshoot. Stays above the strategy floor of 0.25.
     return 1.02
   }
 
-  executeFrame(ctx: WebGPURenderContext, _shared: ModeFrameContext): void {
-    if (!this.densityTexture) return
+  executeFrame(ctx: WebGPURenderContext, shared: ModeFrameContext): void {
     const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const ads = extended?.schroedinger?.antiDeSitter as AntiDeSitterConfig | undefined
     if (!ads) return
 
+    if (isCpuPackedPath(ads)) {
+      this.executeCpuFrame(ctx, ads, extended)
+    } else {
+      this.executeGpuFrame(ctx, shared, ads, extended)
+    }
+  }
+
+  // ── GPU compute path (bound-state eigenstates) ─────────────────────────
+
+  private executeGpuFrame(
+    ctx: WebGPURenderContext,
+    shared: ModeFrameContext,
+    ads: AntiDeSitterConfig,
+    extended: ExtendedStoreSnapshot | undefined
+  ): void {
+    if (!this.computePass || !this.computePassInitialized) return
+
+    this.computePass.updateSchroedingerUniforms(
+      ctx.device,
+      shared.schroedingerUniformData,
+      extended?.schroedingerVersion ?? 0
+    )
+    this.computePass.updateBasisUniforms(ctx.device, shared.basisUniformData.buffer as ArrayBuffer)
+    this.computePass.updateAdsConfig(ctx.device, ads)
+    if (ads.needsReset) {
+      this.computePass.markDirty()
+      extended?.clearAdsNeedsReset?.()
+    }
+
+    this.computePass.execute(ctx)
+  }
+
+  // ── CPU fallback path (BTZ / HKLL) ────────────────────────────────────
+
+  private executeCpuFrame(
+    ctx: WebGPURenderContext,
+    ads: AntiDeSitterConfig,
+    extended: ExtendedStoreSnapshot | undefined
+  ): void {
+    if (!this.densityTexture) return
+
     const hash = computeAdsConfigHash(ads)
-    const dirty = hash !== this.lastConfigHash || !!ads.needsReset
+    const dirty = hash !== this.lastCpuConfigHash || !!ads.needsReset
     if (!dirty) return
 
-    if (!this.packerScratch) this.packerScratch = createAdsPackerScratch()
-    const packed = packAntiDeSitterDensityGrid(ads, this.packerScratch)
+    const N = this.densityTexture.width
+    if (!this.packerScratch || this.packerScratch.density.length !== N * N * N * 4) {
+      this.packerScratch = createAdsPackerScratch(N)
+    }
+    const packed = packAntiDeSitterDensityGrid(ads, this.packerScratch, N)
 
     ctx.device.queue.writeTexture(
       { texture: this.densityTexture },
@@ -161,19 +226,26 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
       { width: packed.gridSize, height: packed.gridSize, depthOrArrayLayers: packed.gridSize }
     )
 
-    this.lastConfigHash = hash
+    this.lastCpuConfigHash = hash
     if (ads.needsReset) extended?.clearAdsNeedsReset?.()
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof AntiDeSitterStrategy) || !source.densityTexture) return false
+    // Skip adoption when the density grid size is about to change — see
+    // the equivalent comment in `WheelerDeWittStrategy.adoptComputeState`
+    // for the rationale (destroying the adopted texture in `setup()` on
+    // the size-mismatch branch would invalidate the predecessor's still-
+    // active bind groups during the warm-swap window).
+    const nextN = nextConfig?.densityGridResolution ?? DENSITY_GRID_SIZE
+    if (source.densityTexture.width !== nextN) return false
+    this.computePass?.dispose()
+    this.computePass = null
+    this.computePassInitialized = false
     this.densityTexture?.destroy()
     this.densityTexture = source.densityTexture
     this.densityTextureView = source.densityTextureView
-    this.lastConfigHash = source.lastConfigHash
-    // Adopt the predecessor's scratch pool too — otherwise the first post-
-    // adoption frame allocates 6 MB all over again. Leave the predecessor's
-    // reference null so dispose() on it doesn't touch ours.
+    this.lastCpuConfigHash = source.lastCpuConfigHash
     this.packerScratch = source.packerScratch
     source.packerScratch = null
     source.densityTexture = null
@@ -187,10 +259,13 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
   }
 
   dispose(): void {
+    this.computePass?.dispose()
+    this.computePass = null
+    this.computePassInitialized = false
     this.densityTexture?.destroy()
     this.densityTexture = null
     this.densityTextureView = null
-    this.lastConfigHash = null
+    this.lastCpuConfigHash = null
     this.packerScratch = null
   }
 }

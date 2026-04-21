@@ -192,7 +192,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.strategy.dispose()
     this.strategy = createModeStrategy(this.rendererConfig)
     if (this.predecessorStrategy) {
-      this.strategy.adoptComputeState?.(this.predecessorStrategy)
+      this.strategy.adoptComputeState?.(this.predecessorStrategy, this.rendererConfig)
       this.predecessorStrategy = null
     }
     const modeSetup = this.strategy.setup(ctx, this.rendererConfig)
@@ -443,7 +443,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           this.carpetSlicePass.dispatch(
             ctx.encoder,
             densityView,
-            { ...carpetState, readAlpha: computeMode },
+            {
+              ...carpetState,
+              readAlpha: computeMode,
+              densityGridSize: this.shaderConfig.densityGridSize ?? 96,
+            },
             (data, gridSize, wh, tf) => {
               useCarpetStore.getState().setCarpetData(data, gridSize, wh, tf)
             }

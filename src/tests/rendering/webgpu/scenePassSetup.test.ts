@@ -41,6 +41,7 @@ function makePassConfig(overrides: Partial<PassConfig> = {}): PassConfig {
     openQuantumEnabled: false,
     crossSectionEnabled: false,
     probabilityCurrentEnabled: false,
+    densityGridResolution: 96,
     skyboxEnabled: false,
     skyboxMode: 'classic',
     backgroundColor: '#232323',

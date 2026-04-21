@@ -12,12 +12,20 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { type DensityGridResolution, usePerformanceStore } from '@/stores/performanceStore'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
 
 const SURFACE_MODE_OPTIONS = [
   { value: 'volumetric' as const, label: 'Volumetric Cloud' },
   { value: 'isosurface' as const, label: 'Iso Surface' },
+]
+
+const GRID_RESOLUTION_OPTIONS = [
+  { value: '64', label: '64³' },
+  { value: '96', label: '96³' },
+  { value: '128', label: '128³' },
+  { value: '256', label: '256³' },
 ]
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
@@ -36,8 +44,15 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const { isoEnabled, isoThreshold, representation, setIsoEnabled, setIsoThreshold } =
     useExtendedObjectStore(isoSelector)
 
+  const densityGridResolution = usePerformanceStore((s) => s.densityGridResolution)
+  const setDensityGridResolution = usePerformanceStore((s) => s.setDensityGridResolution)
+
   const handleSurfaceModeChange = (mode: SurfaceMode) => {
     setIsoEnabled(mode === 'isosurface')
+  }
+
+  const handleGridResolutionChange = (value: string) => {
+    setDensityGridResolution(Number(value) as DensityGridResolution)
   }
 
   const tabs: Tab[] = [
@@ -70,6 +85,22 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           disabled={sweepRunning}
           className={`min-h-full transition-opacity border-0 p-0 m-0 min-w-0${sweepRunning ? ' opacity-50' : ''}`}
         >
+          <div className="px-4 pt-3 pb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider shrink-0">
+                Grid
+              </span>
+              <ToggleGroup
+                options={GRID_RESOLUTION_OPTIONS}
+                value={String(densityGridResolution)}
+                onChange={handleGridResolutionChange}
+                fullWidth
+                ariaLabel="Density grid resolution"
+                tooltip="3D density grid resolution per axis. Higher = sharper detail, more GPU memory."
+                data-testid="density-grid-resolution"
+              />
+            </div>
+          </div>
           <ObjectSettingsSection />
         </fieldset>
       ),

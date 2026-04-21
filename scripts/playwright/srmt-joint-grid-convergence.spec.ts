@@ -361,7 +361,9 @@ function isMonotoneAlongAxis(
     for (let inner = 1; inner < innerLen; inner++) {
       const prev = fetch(outer, inner - 1)
       const curr = fetch(outer, inner)
-      if (prev === null || curr === null || !(curr <= prev)) return false
+      if (prev === null || curr === null) return false
+      if (!Number.isFinite(prev) || !Number.isFinite(curr)) return false
+      if (curr > prev) return false
     }
   }
   return true

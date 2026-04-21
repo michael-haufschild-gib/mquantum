@@ -48,7 +48,7 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     // If compute state was already adopted from a predecessor, reuse it.
     if (!this.freeScalarFieldPass) {
-      this.freeScalarFieldPass = new FreeScalarFieldComputePass()
+      this.freeScalarFieldPass = new FreeScalarFieldComputePass(config.densityGridResolution)
       this.freeScalarFieldPass.initializeDensityTexture(ctx.device)
     }
 
@@ -194,8 +194,10 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof FreeScalarFieldStrategy) || !source.freeScalarFieldPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.freeScalarFieldPass.getDensityGridSize() !== nextN) return false
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = source.freeScalarFieldPass
     source.freeScalarFieldPass = null

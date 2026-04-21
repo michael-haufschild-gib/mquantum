@@ -13,7 +13,6 @@
  * @module rendering/webgpu/passes/CarpetSliceComputePass
  */
 
-import { DENSITY_GRID_SIZE } from '@/rendering/webgpu/passes/computePassUtils'
 import { carpetSliceShader } from '@/rendering/webgpu/shaders/schroedinger/compute/carpetSlice.wgsl'
 
 /** Uniform buffer size for CarpetSliceParams (8 u32/f32 fields x 4 bytes = 32 bytes). */
@@ -36,6 +35,8 @@ export interface CarpetDispatchParams {
   totalFrames: number
   /** When true, read density from alpha channel (compute modes); otherwise read from red (analytic modes). */
   readAlpha: boolean
+  /** Density grid resolution — must match the 3D density texture dimension. */
+  densityGridSize: number
 }
 
 /** Callback to deliver readback data to the store with capture-time metadata. */
@@ -107,6 +108,7 @@ export class CarpetSliceComputePass {
   private carpetTexture: GPUTexture | null = null
   private carpetTextureView: GPUTextureView | null = null
   private currentHistoryLength = 0
+  private currentGridSize = 0
 
   // Readback
   private stagingBuffer: GPUBuffer | null = null
@@ -181,18 +183,24 @@ export class CarpetSliceComputePass {
 
   /**
    * Ensure the carpet texture and staging buffer exist with the correct size.
-   * Recreates them if historyLength changed.
+   * Recreates them if historyLength or densityGridSize changed.
    */
-  private ensureTextures(historyLength: number): void {
+  private ensureTextures(historyLength: number, densityGridSize: number): void {
     if (!this.device) return
-    if (this.carpetTexture && this.currentHistoryLength === historyLength) return
+    if (
+      this.carpetTexture &&
+      this.currentHistoryLength === historyLength &&
+      this.currentGridSize === densityGridSize
+    ) {
+      return
+    }
 
     this.carpetTexture?.destroy()
     this.stagingBuffer?.destroy()
 
     this.carpetTexture = this.device.createTexture({
       label: 'carpet-rolling-2d',
-      size: { width: DENSITY_GRID_SIZE, height: historyLength },
+      size: { width: densityGridSize, height: historyLength },
       format: 'r32float',
       usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
     })
@@ -200,8 +208,7 @@ export class CarpetSliceComputePass {
       label: 'carpet-rolling-2d-view',
     })
 
-    // Staging buffer — row stride must be 256-byte aligned for copyTextureToBuffer
-    const bytesPerRow = alignedBytesPerRow(DENSITY_GRID_SIZE)
+    const bytesPerRow = alignedBytesPerRow(densityGridSize)
     this.stagingBuffer = this.device.createBuffer({
       label: 'carpet-staging',
       size: bytesPerRow * historyLength,
@@ -209,6 +216,7 @@ export class CarpetSliceComputePass {
     })
 
     this.currentHistoryLength = historyLength
+    this.currentGridSize = densityGridSize
     this.bindGroup = null
     this.lastDensityView = null
   }
@@ -237,9 +245,10 @@ export class CarpetSliceComputePass {
       historyLength,
       writeHead,
       readAlpha,
+      densityGridSize,
     } = params
 
-    this.ensureTextures(historyLength)
+    this.ensureTextures(historyLength, densityGridSize)
     if (!this.carpetTextureView) return
 
     // Write uniforms
@@ -248,7 +257,7 @@ export class CarpetSliceComputePass {
     this.uniformF32[2] = slicePositionY
     this.uniformF32[3] = slicePositionZ
     this.uniformU32[4] = logScale ? 1 : 0
-    this.uniformU32[5] = DENSITY_GRID_SIZE
+    this.uniformU32[5] = densityGridSize
     this.uniformU32[6] = readAlpha ? 1 : 0
     this.uniformU32[7] = 0
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
@@ -267,17 +276,23 @@ export class CarpetSliceComputePass {
       this.lastDensityView = densityTextureView
     }
 
-    // Dispatch compute (2 workgroups for 96 threads)
     const computePass = encoder.beginComputePass({ label: 'carpet-slice' })
     computePass.setPipeline(this.pipeline)
     computePass.setBindGroup(0, this.bindGroup)
-    computePass.dispatchWorkgroups(Math.ceil(DENSITY_GRID_SIZE / WORKGROUP_SIZE))
+    computePass.dispatchWorkgroups(Math.ceil(densityGridSize / WORKGROUP_SIZE))
     computePass.end()
 
     // Throttled readback — capture writeHead/totalFrames at submission time
     this.framesSinceReadback++
     if (this.framesSinceReadback >= READBACK_INTERVAL && !this.readbackInFlight) {
-      this.performReadback(encoder, historyLength, writeHead, params.totalFrames, onReadback)
+      this.performReadback(
+        encoder,
+        historyLength,
+        densityGridSize,
+        writeHead,
+        params.totalFrames,
+        onReadback
+      )
       this.framesSinceReadback = 0
     }
   }
@@ -289,25 +304,26 @@ export class CarpetSliceComputePass {
   private performReadback(
     encoder: GPUCommandEncoder,
     historyLength: number,
+    densityGridSize: number,
     captureWriteHead: number,
     captureTotalFrames: number,
     onReadback: CarpetReadbackCallback
   ): void {
     if (!this.device || !this.carpetTexture || !this.stagingBuffer) return
 
-    const bytesPerRow = alignedBytesPerRow(DENSITY_GRID_SIZE)
+    const bytesPerRow = alignedBytesPerRow(densityGridSize)
 
     encoder.copyTextureToBuffer(
       { texture: this.carpetTexture },
       { buffer: this.stagingBuffer, bytesPerRow, rowsPerImage: historyLength },
-      { width: DENSITY_GRID_SIZE, height: historyLength }
+      { width: densityGridSize, height: historyLength }
     )
 
     this.readbackInFlight = true
 
     const staging = this.stagingBuffer
     const device = this.device
-    const gridSize = DENSITY_GRID_SIZE
+    const gridSize = densityGridSize
     const hl = historyLength
 
     device.queue

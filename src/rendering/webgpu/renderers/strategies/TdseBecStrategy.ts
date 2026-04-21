@@ -89,7 +89,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     // Compute mode overrides applied by renderer constructor
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     // Dormancy guard: if this strategy was previously the source of a
     // warm-swap transfer (adoptComputeState set `transferredOut = true` and
     // nulled out `tdsePass`), we must not silently allocate a brand-new
@@ -113,7 +113,7 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     this.warnedTdsePassNull = false
     this.warnedDensityNull = false
     if (!this.tdsePass) {
-      this.tdsePass = new TDSEComputePass()
+      this.tdsePass = new TDSEComputePass(config.densityGridResolution)
       this.tdsePass.initializeDensityTexture(ctx.device)
     }
     logger.log(
@@ -483,8 +483,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     )
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof TdseBecStrategy) || !source.tdsePass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.tdsePass.densityGridSize !== nextN) return false
     this.tdsePass?.dispose()
     this.tdsePass = source.tdsePass
     source.tdsePass = null
