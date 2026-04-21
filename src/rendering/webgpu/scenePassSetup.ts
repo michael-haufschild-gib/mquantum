@@ -435,6 +435,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         openQuantumEnabled: config.openQuantumEnabled,
         crossSectionEnabled: config.crossSectionEnabled,
         probabilityCurrentEnabled: config.probabilityCurrentEnabled,
+        densityGridResolution: config.densityGridResolution,
       })
 
     case 'pauliSpinor':
@@ -457,6 +458,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         isPauli: true,
         crossSectionEnabled: false,
         probabilityCurrentEnabled: false,
+        densityGridResolution: config.densityGridResolution,
       })
 
     default:

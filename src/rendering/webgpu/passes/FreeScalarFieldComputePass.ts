@@ -189,7 +189,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   // K-space and diagnostics readback (delegated to FsfKSpaceManager)
   private readonly kSpace = new FsfKSpaceManager()
 
-  constructor() {
+  private readonly densityGridSize: number
+
+  constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
       id: 'free-scalar-field-compute',
       inputs: [],
@@ -197,6 +199,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [LINEAR_WORKGROUP_SIZE, 1, 1],
     })
+    this.densityGridSize = densityGridSize
   }
 
   /**
@@ -207,14 +210,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    const textures = createFsfDensityAndAnalysisTextures(device)
+    const textures = createFsfDensityAndAnalysisTextures(device, this.densityGridSize)
     this.densityTexture = textures.densityTexture
     this.densityTextureView = textures.densityTextureView
     this.analysisTexture = textures.analysisTexture
     this.analysisTextureView = textures.analysisTextureView
 
     // Pre-computed gradient normal texture (see FreeScalarFieldGradient.ts).
-    const normals = createFsfNormalTexture(device)
+    const normals = createFsfNormalTexture(device, this.densityGridSize)
     this.normalTexture = normals.normalTexture
     this.normalTextureView = normals.normalTextureView
   }
@@ -332,7 +335,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /**
    * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
-   * The density texture is NOT recreated here — it has a fixed size (DENSITY_GRID_SIZE³)
+   * The density texture is NOT recreated here — its size is set at construction
    * and persists across grid size changes to avoid invalidating the renderer's bind group.
    */
   private rebuildFieldBuffers(device: GPUDevice, config: FreeScalarConfig): void {
@@ -373,7 +376,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         (pipeline, bindGroup) => {
           this.gradientPipeline = pipeline
           this.gradientBindGroup = bindGroup
-        }
+        },
+        this.densityGridSize
       )
     }
   }
@@ -732,7 +736,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // Write to 3D density grid texture
     if (this.pl && this.bg) {
-      const gridWorkgroups = Math.ceil(DENSITY_GRID_SIZE / GRID_WORKGROUP_SIZE)
+      const gridWorkgroups = Math.ceil(this.densityGridSize / GRID_WORKGROUP_SIZE)
       const gridPass = ctx.beginComputePass({ label: 'free-scalar-write-grid-pass' })
       this.dispatchCompute(
         gridPass,
@@ -745,7 +749,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       gridPass.end()
 
       // Dispatch pre-computed gradient normals (1-fetch raymarcher path).
-      dispatchFsfGradientNormals(ctx, this.gradientPipeline, this.gradientBindGroup)
+      dispatchFsfGradientNormals(
+        ctx,
+        this.gradientPipeline,
+        this.gradientBindGroup,
+        this.densityGridSize
+      )
     } else {
       logger.warn(
         `[FreeScalarFieldComputePass] writeGrid skipped: pl=${!!this.pl}, bg=${!!this.bg}`
@@ -763,7 +772,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.densityTexture &&
       this.analysisTexture
     ) {
-      clearFsfDensityAndAnalysisTextures(device, this.densityTexture, this.analysisTexture)
+      clearFsfDensityAndAnalysisTextures(
+        device,
+        this.densityTexture,
+        this.analysisTexture,
+        this.densityGridSize
+      )
     }
     this.lastAnalysisMode = analysisMode
 
@@ -783,7 +797,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.piBuffer,
         this.totalSites,
         config,
-        this.simEta
+        this.simEta,
+        this.densityGridSize
       )
       // Snapshot cosmology + preheating coefs at the readback instant so
       // the diagnostics Hamiltonian matches the time-dependent terms the

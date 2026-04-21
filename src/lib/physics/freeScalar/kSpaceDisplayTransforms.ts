@@ -53,9 +53,10 @@ export interface KSpaceDisplayGrid {
  */
 export function projectToDisplayGrid(
   raw: KSpaceRawData,
-  config: KSpaceVizConfig
+  config: KSpaceVizConfig,
+  outputGridSize: number = OUTPUT_GRID_SIZE
 ): KSpaceDisplayGrid {
-  const G = OUTPUT_GRID_SIZE
+  const G = outputGridSize
   const outputTotal = G ** 3
   const nk = new Float64Array(outputTotal)
   const kNorm = new Float64Array(outputTotal)
@@ -66,9 +67,9 @@ export function projectToDisplayGrid(
   const oNormFactor = Math.max(raw.omegaMax, 1e-10)
 
   if (raw.latticeDim <= 3) {
-    projectDirect3D(raw, config, nk, kNorm, omegaNorm, nkOmega, kNormFactor, oNormFactor)
+    projectDirect3D(raw, config, nk, kNorm, omegaNorm, nkOmega, kNormFactor, oNormFactor, G)
   } else {
-    projectMarginalize(raw, config, nk, kNorm, omegaNorm, nkOmega, kNormFactor, oNormFactor)
+    projectMarginalize(raw, config, nk, kNorm, omegaNorm, nkOmega, kNormFactor, oNormFactor, G)
   }
 
   // Find nkMax in the grid
@@ -93,9 +94,9 @@ function projectDirect3D(
   omegaNorm: Float64Array,
   nkOmega: Float64Array,
   kNormFactor: number,
-  oNormFactor: number
+  oNormFactor: number,
+  G: number
 ): void {
-  const G = OUTPUT_GRID_SIZE
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
 
@@ -203,9 +204,9 @@ function projectMarginalize(
   omegaNorm: Float64Array,
   nkOmega: Float64Array,
   kNormFactor: number,
-  oNormFactor: number
+  oNormFactor: number,
+  G: number
 ): void {
-  const G = OUTPUT_GRID_SIZE
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
 
@@ -399,11 +400,12 @@ export function applyBroadening(
   grid: KSpaceDisplayGrid,
   config: KSpaceVizConfig,
   latticeDim: number = 3,
-  nkOnly: boolean = false
+  nkOnly: boolean = false,
+  outputGridSize: number = OUTPUT_GRID_SIZE
 ): void {
   if (!config.broadeningEnabled) return
 
-  const G = OUTPUT_GRID_SIZE
+  const G = outputGridSize
   const radius = Math.min(5, Math.max(1, Math.round(config.broadeningRadius)))
   const sigma = Math.max(0.5, Math.min(3.0, config.broadeningSigma))
 
@@ -587,9 +589,10 @@ function blurAxis(
  */
 export function packDisplayTextures(
   grid: KSpaceDisplayGrid,
-  nkOnly: boolean = false
+  nkOnly: boolean = false,
+  outputGridSize: number = OUTPUT_GRID_SIZE
 ): { density: Uint16Array; analysis: Uint16Array } {
-  const G = OUTPUT_GRID_SIZE
+  const G = outputGridSize
   const outputTotal = G ** 3
   const density = new Uint16Array(outputTotal * 4)
   const analysis = new Uint16Array(outputTotal * 4)
@@ -636,22 +639,18 @@ export function packDisplayTextures(
 export function buildKSpaceDisplayTextures(
   raw: KSpaceRawData,
   config: KSpaceVizConfig,
-  nkOnly: boolean = false
+  nkOnly: boolean = false,
+  outputGridSize: number = OUTPUT_GRID_SIZE
 ): { density: Uint16Array; analysis: Uint16Array } {
-  // Choose projection method
   let grid: KSpaceDisplayGrid
   if (config.displayMode === 'radial3d') {
-    grid = buildRadialDisplayGrid(raw, config)
+    grid = buildRadialDisplayGrid(raw, config, outputGridSize)
   } else {
-    grid = projectToDisplayGrid(raw, config)
+    grid = projectToDisplayGrid(raw, config, outputGridSize)
   }
 
-  // Apply exposure transfer
   applyExposureTransfer(grid, config)
+  applyBroadening(grid, config, raw.latticeDim, nkOnly, outputGridSize)
 
-  // Apply broadening (only blur axes with physical lattice dimensions)
-  applyBroadening(grid, config, raw.latticeDim, nkOnly)
-
-  // Pack to textures
-  return packDisplayTextures(grid, nkOnly)
+  return packDisplayTextures(grid, nkOnly, outputGridSize)
 }

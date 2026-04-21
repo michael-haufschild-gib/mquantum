@@ -15,6 +15,21 @@ import type { WebGPURenderContext } from '../../core/types'
 import type { ModeSetupResult } from './types'
 
 /**
+ * Fallback lattice extent when every active dimension's `gridSize × spacing`
+ * is zero or missing. Matches the canonical `DEFAULT_FREE_SCALAR_CONFIG`
+ * (32 grid points × 0.1 spacing per axis), so a strategy that mounts
+ * before its config has populated still produces a sane bounding radius.
+ */
+export const FALLBACK_LATTICE_EXTENT = 3.2
+
+/**
+ * Margin multiplier applied to the half-extent when sizing the bounding
+ * cube. 1.15 keeps a ~7.5% breathing room on each side so the wavefunction
+ * isn't clamped hard against the cube edge under N-D rotation.
+ */
+export const LATTICE_BOUNDING_MARGIN = 1.15
+
+/**
  * Compute bounding radius from lattice extent.
  * Uses the maximum extent across all active dimensions (not just 0..2) so that
  * after N-D rotation, the density texture covers the full lattice.
@@ -22,7 +37,7 @@ import type { ModeSetupResult } from './types'
  * @param latticeDim - Number of lattice dimensions
  * @param gridSize - Grid points per dimension
  * @param spacing - Spatial spacing per dimension
- * @returns Raw bounding radius (half-extent × 1.15 margin)
+ * @returns Raw bounding radius (half-extent × {@link LATTICE_BOUNDING_MARGIN})
  */
 export function computeLatticeBoundingRadius(
   latticeDim: number,
@@ -34,10 +49,8 @@ export function computeLatticeBoundingRadius(
     const Ld = (gridSize[d] ?? 32) * (spacing[d] ?? 0.1)
     if (Ld > maxExtent) maxExtent = Ld
   }
-  // Fallback: 32 grid points × 0.1 default spacing = 3.2 (matches DEFAULT_FREE_SCALAR_CONFIG)
-  if (maxExtent <= 0) maxExtent = 3.2
-  // 1.15x margin so the field doesn't fill the entire cube edge-to-edge
-  return (maxExtent / 2) * 1.15
+  if (maxExtent <= 0) maxExtent = FALLBACK_LATTICE_EXTENT
+  return (maxExtent / 2) * LATTICE_BOUNDING_MARGIN
 }
 
 /**

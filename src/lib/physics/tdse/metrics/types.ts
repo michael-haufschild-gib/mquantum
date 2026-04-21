@@ -117,17 +117,51 @@ export const MAX_DOUBLE_THROAT_SEPARATION = 20
 /**
  * Returns true iff the metric kind has explicit time dependence.
  * Currently only `deSitter` (a(t) = exp(H·t)).
+ *
+ * Implemented as an exhaustive switch (no default clause) so adding a new
+ * `MetricKind` without classifying it trips `noImplicitReturns` in tsc
+ * — silent fall-through to `false` would suppress curved-stage times for
+ * a genuinely time-dependent metric. Sibling `describeMetric` below uses
+ * the same pattern.
  */
 export function isTimeDependentMetric(kind: MetricKind): boolean {
-  return kind === 'deSitter'
+  switch (kind) {
+    case 'deSitter':
+      return true
+    case 'flat':
+    case 'morrisThorne':
+    case 'schwarzschild':
+    case 'antiDeSitter':
+    case 'sphere2D':
+    case 'torus':
+    case 'doubleThroat':
+      return false
+  }
 }
 
 /**
  * Returns true iff the metric kind imposes periodic boundary conditions on
  * the spatial lattice. Currently only `torus`.
+ *
+ * Exhaustive switch for the same reason as `isTimeDependentMetric`:
+ * downstream routing (the curved kinetic integrator's boundary-condition
+ * branch) depends on a correct classification, and a silent `false`
+ * fall-through would quietly apply Dirichlet BCs where periodic are
+ * required.
  */
 export function hasPeriodicBoundary(kind: MetricKind): boolean {
-  return kind === 'torus'
+  switch (kind) {
+    case 'torus':
+      return true
+    case 'flat':
+    case 'morrisThorne':
+    case 'schwarzschild':
+    case 'deSitter':
+    case 'antiDeSitter':
+    case 'sphere2D':
+    case 'doubleThroat':
+      return false
+  }
 }
 
 /**

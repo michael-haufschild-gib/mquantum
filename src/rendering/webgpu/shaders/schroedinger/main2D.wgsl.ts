@@ -115,20 +115,27 @@ export function generateMainBlock2D(): string {
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 ${generate2DCommonBody()}
-  // Nodal lines (2D equivalent of nodal surfaces)
+  // Alpha from density — use a smooth mapping for 2D.
+  // Direct density gives good results without volumetric integration losses.
+  // Must be computed BEFORE the nodal block so the nodal overlay can bump
+  // alpha above the discard threshold; nodal lines live where ψ=0, i.e.
+  // exactly where density is near zero, and would be silently culled by
+  // the discard below if alpha stayed density-only.
+  let densityGained = rho * schroedinger.densityGain;
+  var alpha = clamp(densityGained * 8.0, 0.0, 1.0);
+
+  // Nodal lines (2D equivalent of nodal surfaces). Mirror the isoline
+  // entry point: mix the color AND bump alpha so nodal-line pixels
+  // survive the transparency cull below.
   if (FEATURE_NODAL && schroedinger.nodalEnabled != 0u && schroedinger.nodalStrength > 0.0) {
     let nodalResult = evaluateNodalLines2D(pos, animTime, schroedinger);
     if (nodalResult.x > 0.0) {
       let nodalAlpha = nodalResult.x * schroedinger.nodalStrength;
       let nodalColor = vec3f(nodalResult.y, nodalResult.z, nodalResult.w);
       col = mix(col, nodalColor, clamp(nodalAlpha, 0.0, 0.95));
+      alpha = max(alpha, nodalAlpha);
     }
   }
-
-  // Alpha from density — use a smooth mapping for 2D
-  // Direct density gives good results without volumetric integration losses
-  let densityGained = rho * schroedinger.densityGain;
-  let alpha = clamp(densityGained * 8.0, 0.0, 1.0);
 
   // Discard fully transparent pixels
   if (alpha < 0.005) {

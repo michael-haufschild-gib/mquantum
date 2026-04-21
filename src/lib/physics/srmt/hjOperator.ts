@@ -46,6 +46,47 @@
  * space — versus the dense `O(n²)` = 16 M flops and 16 MB alloc per
  * call. For Lanczos with `k = 64` eigenvalues that is 64× less work.
  *
+ * ## GPU acceleration analysis (2026-04-20)
+ *
+ * Moving the sparse mat-vec to a WebGPU compute shader was evaluated and
+ * **rejected** as premature at current grid sizes. Key findings:
+ *
+ * 1. **Mat-vec is not the bottleneck.** At n=5,120 (default phi-clock),
+ *    the Lanczos mat-vec totals ~2.5M FLOPs across 96 steps (~2.5 ms).
+ *    Reorthogonalization dominates at O(m^2·n) = ~47M FLOPs (~47 ms).
+ *    GPU-accelerating the mat-vec alone addresses <6% of runtime.
+ *
+ * 2. **GPU readback latency exceeds CPU mat-vec time.** Each Lanczos
+ *    step requires `w = A·q` before computing alpha and reorthogonalizing.
+ *    The mapAsync readback alone costs 100-500 us per call. Over 96
+ *    iterations: 10-48 ms of sync overhead vs ~2.5 ms of CPU mat-vec.
+ *    The GPU path is strictly slower.
+ *
+ * 3. **Crossover requires n > ~50,000-100,000.** At that point the CPU
+ *    mat-vec exceeds ~500 us per call, amortizing the readback. Current
+ *    grids: default n=5,120, publication n=12,288 — 4-10x below crossover.
+ *
+ * 4. **f32 precision risk.** WGSL lacks f64. The Lanczos uses Float64
+ *    accumulators. An f32 mat-vec introduces an impedance mismatch that
+ *    may degrade eigenvalue accuracy via accumulated round-off in the
+ *    Krylov basis.
+ *
+ * 5. **Dual-path maintenance cost.** Two implementations of the
+ *    5-stencil operator (CPU + WGSL) with different precision and
+ *    boundary-condition logic must be kept in sync. The GPU path is
+ *    untestable in most CI environments.
+ *
+ * **Recommended acceleration path:** Rust/WASM SIMD port of the entire
+ * Lanczos iteration (mat-vec + reorth). Zero sync overhead, addresses the
+ * actual bottleneck, single implementation, testable in CI. Expected
+ * speedup: 2-4x on total Lanczos runtime. The project's existing WASM
+ * crate (`src/wasm/mdimension_core/`) is the natural home.
+ *
+ * **Re-evaluate when:** grid sizes exceed n=50,000 AND the problem
+ * requires >256 Krylov steps (making mat-vec the dominant cost). At that
+ * point, block Lanczos with batched GPU mat-vecs (amortizing readback
+ * across multiple vectors) becomes viable.
+ *
  * @module lib/physics/srmt/hjOperator
  */
 

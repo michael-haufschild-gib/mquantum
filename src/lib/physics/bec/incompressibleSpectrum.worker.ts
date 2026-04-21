@@ -36,12 +36,31 @@ export interface IncompressibleSpectrumWorkerRequest {
   mass: number
 }
 
-/** Outbound result from the incompressible spectrum worker. */
-export interface IncompressibleSpectrumWorkerResponse {
+/** Successful spectrum response. */
+export interface IncompressibleSpectrumWorkerResultResponse {
   type: 'result'
   epoch: number
   result: IncompressibleSpectrumResult
 }
+
+/**
+ * Error response — mirrors the `srmtDiagnostic.worker.ts` pattern so the
+ * main-thread dispatcher can distinguish "compute threw" from "no data
+ * yet" and surface the cause through `logger.warn`. Previously the
+ * worker posted an empty-spectrum `result` on failure, which looked
+ * identical to an uncomputed initial state and gave the renderer no
+ * signal that anything had gone wrong.
+ */
+export interface IncompressibleSpectrumWorkerErrorResponse {
+  type: 'error'
+  epoch: number
+  message: string
+}
+
+/** Outbound message from the incompressible spectrum worker. */
+export type IncompressibleSpectrumWorkerResponse =
+  | IncompressibleSpectrumWorkerResultResponse
+  | IncompressibleSpectrumWorkerErrorResponse
 
 self.onmessage = (e: MessageEvent<IncompressibleSpectrumWorkerRequest>) => {
   const msg = e.data
@@ -64,14 +83,12 @@ self.onmessage = (e: MessageEvent<IncompressibleSpectrumWorkerRequest>) => {
     // Spectrum buffers are small (NUM_SPECTRUM_BINS Float32 = 128 bytes each);
     // structured-clone copy is cheaper than setting up the transfer list.
     self.postMessage(response)
-  } catch {
-    // Post an empty result on failure so the main thread can clear its in-flight flag.
-    const empty: IncompressibleSpectrumResult = {
-      spectrum: new Float32Array(0),
-      kValues: new Float32Array(0),
-      totalIncompressible: 0,
-      totalCompressible: 0,
+  } catch (err) {
+    const response: IncompressibleSpectrumWorkerResponse = {
+      type: 'error',
+      epoch: msg.epoch,
+      message: err instanceof Error ? err.message : String(err),
     }
-    self.postMessage({ type: 'result', epoch: msg.epoch, result: empty })
+    self.postMessage(response)
   }
 }

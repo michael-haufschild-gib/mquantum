@@ -173,10 +173,25 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
 
       if (isCtrlOrMeta) return false
 
+      // Backslash sidebar-toggles are matched on event.code (physical key
+      // position) rather than event.key (layout-dependent character).
+      // US layouts produce `\\` (unshifted) and `|` (shifted); German /
+      // French / Swiss / etc. layouts produce different characters for
+      // the same physical key, which would break the key-based match
+      // and leave the documented shortcut dead for non-US users.
+      if (event.code === 'Backslash') {
+        event.preventDefault()
+        if (shiftKey) {
+          toggleLeftPanel()
+        } else {
+          toggleCollapsed()
+        }
+        return true
+      }
+
       // Plain or shift-only actions
       const plainActions: Record<string, () => void> = {
         ...(!shiftKey && { c: toggleCinematicMode }),
-        ...(!shiftKey && { '\\': toggleCollapsed }),
         ...(!shiftKey && !selectedLightId && { r: resetCamera }),
         '?': toggleShortcuts,
         ArrowUp: () => {
@@ -185,13 +200,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         ArrowDown: () => {
           if (dimension > MIN_DIMENSION) setDimension(dimension - 1)
         },
-      }
-
-      // Shift+\ produces '|' on most keyboards
-      if (shiftKey && key === '|') {
-        event.preventDefault()
-        toggleLeftPanel()
-        return true
       }
 
       const plainAction = plainActions[key] ?? plainActions[lowerKey]

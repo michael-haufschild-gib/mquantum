@@ -8,6 +8,8 @@
  * @module
  */
 
+import { logger } from '@/lib/logger'
+
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { tdseUniformsBlock } from '../shaders/schroedinger/compute/tdseUniforms.wgsl'
 import {
@@ -268,22 +270,34 @@ export function dispatchAndReadbackVortexDetect(
   // PERF: mapAsync waits for the GPU copy — skip onSubmittedWorkDone() to avoid
   // a pipeline stall. Defer via queueMicrotask so the buffer isn't in "pending
   // map" state when queue.submit() fires later in the same synchronous block.
-  queueMicrotask(() => staging
-    .mapAsync(GPUMapMode.READ)
-    .then(() => {
-      if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
-        try { staging.unmap() } catch { /* already destroyed */ }
+  queueMicrotask(() =>
+    staging
+      .mapAsync(GPUMapMode.READ)
+      .then(() => {
+        if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
+          try {
+            staging.unmap()
+          } catch {
+            /* already destroyed */
+          }
+          clearIfCurrent()
+          return
+        }
+        const mapped = new Uint32Array(staging.getMappedRange().slice(0))
+        state.lastResult = [mapped[0] ?? 0, mapped[1] ?? 0, mapped[2] ?? 0]
+        staging.unmap()
         clearIfCurrent()
-        return
-      }
-      const mapped = new Uint32Array(staging.getMappedRange().slice(0))
-      state.lastResult = [mapped[0] ?? 0, mapped[1] ?? 0, mapped[2] ?? 0]
-      staging.unmap()
-      clearIfCurrent()
-    })
-    .catch(() => {
-      clearIfCurrent()
-    }))
+      })
+      .catch((err) => {
+        // Match the TDSEWormholeReadback sibling — surface device-lost,
+        // OOM, or buffer-validation errors via logger.warn instead of
+        // swallowing silently, which would hide real GPU health signals
+        // during development and leave the readback chain looking healthy
+        // while diagnostics permanently stop refreshing.
+        logger.warn('[TDSE] Vortex-detect readback failed:', err)
+        clearIfCurrent()
+      })
+  )
 }
 
 /**
@@ -335,7 +349,14 @@ export function rebuildVortexDetect(
 }
 
 /**
- * Run vortex detection if applicable (BEC mode with positive interaction).
+ * Dispatch vortex detection when it is meaningful — i.e. when the TDSE
+ * config has `interactionStrength > 0` (the Gross–Pitaevskii non-linearity
+ * that produces quantized vortices). The check is strength-based, not
+ * mode-based: free-Schroedinger configs carry `interactionStrength = 0`
+ * and short-circuit here, while BEC configs drive the detection. A
+ * non-finite or missing `interactionStrength` falls through the truthy
+ * guard and skips dispatch.
+ *
  * Called from TDSEComputePass.dispatchDiagnostics.
  */
 export function runVortexDetection(

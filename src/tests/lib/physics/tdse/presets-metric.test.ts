@@ -24,17 +24,22 @@ const NEW_V2_IDS = [
   'adsBoundaryBounce',
 ] as const
 
-const PHYSICS_KEYWORDS = [
-  'wormhole',
-  'Schwarzschild',
-  'de Sitter',
-  'AdS',
-  'sphere',
-  'torus',
-  'throat',
-  'cosmological',
-  'compactif',
-] as const
+/**
+ * Per-preset keyword regex. Replaces a single global union list so a
+ * description copy-pasted between presets (for example, pasting the
+ * gravitational-redshift blurb into `sphereCompactification`) is caught —
+ * the old global check would pass either description because both
+ * contain keywords from the unified list.
+ */
+const REQUIRED_KEYWORDS_PER_ID: Record<(typeof NEW_V2_IDS)[number], RegExp> = {
+  wormholeEntangledPair: /wormhole|throat/i,
+  schwarzschildOrbit: /schwarzschild|curvature|lensing/i,
+  gravitationalRedshift: /schwarzschild|conformal|redshift|phase/i,
+  cosmologicalRedshift: /de sitter|cosmological|hubble|scale factor|expansion/i,
+  sphereCompactification: /sphere|polar|azimuthal|compactif/i,
+  torusEigenstates: /torus|compact|period|plane wave/i,
+  adsBoundaryBounce: /ads|anti-de sitter|poincar|boundary/i,
+}
 
 describe('TDSE curved-space v2 presets', () => {
   const v2Presets = TDSE_SCENARIO_PRESETS.filter((p) =>
@@ -66,11 +71,14 @@ describe('TDSE curved-space v2 presets', () => {
       expect(dt!).toBeLessThanOrEqual(0.01)
     })
 
-    it('description contains "NOT" caveat and a physics keyword', () => {
+    it('description contains "NOT" caveat and a topic-specific keyword', () => {
       const desc = preset.description
       expect(desc.includes('NOT')).toBe(true)
-      const hasKeyword = PHYSICS_KEYWORDS.some((k) => desc.toLowerCase().includes(k.toLowerCase()))
-      expect(hasKeyword).toBe(true)
+      const requiredPattern = REQUIRED_KEYWORDS_PER_ID[id]
+      expect(
+        requiredPattern.test(desc),
+        `preset ${id} description must match ${requiredPattern}; got: ${desc.slice(0, 120)}…`
+      ).toBe(true)
     })
 
     it('has matching latticeDim and array lengths for grid/spacing/packetCenter', () => {
@@ -83,6 +91,42 @@ describe('TDSE curved-space v2 presets', () => {
       expect(o.spacing?.length).toBe(dim)
       expect(o.packetCenter?.length).toBe(dim)
       expect(o.packetMomentum?.length).toBe(dim)
+    })
+
+    it('has strictly positive physics-scale metric parameters', () => {
+      // Every populated metric parameter must be > 0. A zero throat
+      // radius or sphere radius produces a singular metric that the
+      // Laplace–Beltrami integrator cannot evolve. A zero packetWidth
+      // collapses the Gaussian to a Dirac delta that aliases across the
+      // lattice.
+      const o = preset.overrides
+      expect(o.packetWidth ?? 0, `${id}: packetWidth must be > 0`).toBeGreaterThan(0)
+      const m = o.metric
+      if (!m) throw new Error(`${id}: expected metric override`)
+      // Every kind-specific scale must be > 0 when present. Optional
+      // chaining because not every field applies to every kind.
+      if (m.throatRadius !== undefined) expect(m.throatRadius).toBeGreaterThan(0)
+      if (m.schwarzschildMass !== undefined) expect(m.schwarzschildMass).toBeGreaterThan(0)
+      if (m.hubbleRate !== undefined) expect(m.hubbleRate).toBeGreaterThan(0)
+      if (m.adsRadius !== undefined) expect(m.adsRadius).toBeGreaterThan(0)
+      if (m.sphereRadius !== undefined) expect(m.sphereRadius).toBeGreaterThan(0)
+      if (m.doubleThroatRadius !== undefined) expect(m.doubleThroatRadius).toBeGreaterThan(0)
+      if (m.doubleThroatSeparation !== undefined) {
+        // Geometric non-overlap invariant: the two throats live on axis 0
+        // centered at ±separation/2 with per-throat radius
+        // doubleThroatRadius; their interior surfaces must not cross.
+        expect(m.doubleThroatSeparation).toBeGreaterThan(0)
+        const radius = m.doubleThroatRadius ?? m.throatRadius ?? 0
+        expect(
+          m.doubleThroatSeparation,
+          `${id}: doubleThroatSeparation=${m.doubleThroatSeparation} must exceed 2·doubleThroatRadius=${2 * radius} for disjoint throats`
+        ).toBeGreaterThan(2 * radius)
+      }
+      if (m.torusPeriod !== undefined) {
+        for (let i = 0; i < m.torusPeriod.length; i++) {
+          expect(m.torusPeriod[i], `${id}: torusPeriod[${i}] must be > 0`).toBeGreaterThan(0)
+        }
+      }
     })
   })
 

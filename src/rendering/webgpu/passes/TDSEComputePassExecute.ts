@@ -94,6 +94,7 @@ export interface TdseExecuteFields {
   wormholePipeline: WormholePipelineResources | null
   wormholeBG: GPUBindGroup | null
   _hellerLastResetToken: number
+  readonly densityGridSize: number
 
   // Methods
   syncSharedState(): void
@@ -373,5 +374,6 @@ export function runTdseExecute(
     vdState: pass._vdState,
     dispatchCompute: pass.dc,
     dispatchFFTAxis: (c, axisDim, slot) => pass.dispatchFFTAxis(c, axisDim, slot),
+    densityGridSize: pass.densityGridSize,
   })
 }

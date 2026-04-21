@@ -19,13 +19,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 import { isTimeDependentMetric } from '@/lib/physics/tdse/metrics/types'
 
 import type { WebGPURenderContext } from '../core/types'
-import {
-  computeStridesPadded,
-  DENSITY_GRID_SIZE,
-  DIAG_DECIMATION,
-  GRID_WG,
-  LINEAR_WG,
-} from './computePassUtils'
+import { computeStridesPadded, DIAG_DECIMATION, GRID_WG, LINEAR_WG } from './computePassUtils'
 import { dispatchDiagnostics as extDispatchDiagnostics } from './TDSEComputePassDispatchers'
 import type { TdseBindGroupResult, TdsePipelineResult } from './TDSEComputePassSetup'
 import {
@@ -496,6 +490,7 @@ export interface PostStepResources {
   vdState: VortexDetectState
   dispatchCompute: EvolutionResources['dc']
   dispatchFFTAxis: EvolutionResources['dispatchFFTAxis']
+  densityGridSize: number
 }
 
 /**
@@ -516,7 +511,7 @@ export function runPostStepDispatches(
   const { pl, bg, dispatchCompute: dc } = res
 
   // Write density grid
-  const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
+  const gridWG = Math.ceil(res.densityGridSize / GRID_WG)
   const wgPass = ctx.beginComputePass({ label: 'tdse-write-grid-pass' })
   res.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG], gridWG, gridWG, gridWG)
   wgPass.end()

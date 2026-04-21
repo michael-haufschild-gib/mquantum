@@ -286,7 +286,7 @@ function packHydrogenAndExtraDims(
 
   // Precompute normalization constants for coupled hydrogen ND
   if (isCoupled && dimension >= 3) {
-    packCoupledNorms(floatView, validN, validL, bohrRadius, dimension, extraDimSource)
+    packCoupledNorms(floatView, validL, dimension, extraDimSource)
   }
 
   return { validN, validL, bohrRadius }
@@ -302,29 +302,25 @@ import {
 } from './uniformPackingHydrogenMath'
 
 /**
- * Pack precomputed normalization constants for coupled hydrogen ND.
- * Layout: coupledNorms[0].x = radial norm, [0].yzw...[2].xyzw = layer norms
+ * Pack precomputed hyperspherical-layer norms for coupled hydrogen ND.
+ *
+ * Layout: coupledNorms[0] is reserved; layer k (k = 0..D-4) is packed at
+ * slot k+1. The shader reads via `getCoupledLayerNorm(uniforms, k)`.
+ *
+ * The radial norm is stored separately in `hydrogenRadialNorm`; writing it
+ * here too would duplicate the uniform without any shader consuming it.
  */
 function packCoupledNorms(
   floatView: Float32Array,
-  n: number,
   l: number,
-  a0: number,
   D: number,
   angularChain: number[] | undefined
 ): void {
-  const lambda = l + (D - 3) / 2
-  const nr = n - l - 1
-  const nEff = nr + lambda + 1
-
-  // Slot 0: radial normalization constant
-  floatView[I.coupledNorms] = computeHydrogenRadialNormND(nr, lambda, nEff, a0)
-
-  // Slots 1..numLayers: hyperspherical layer norms
   const numTheta = D - 2
   const numLayers = numTheta - 1
+  const MAX_LAYERS = 11
 
-  for (let k = 0; k < numLayers && k < 11; k++) {
+  for (let k = 0; k < numLayers && k < MAX_LAYERS; k++) {
     const lk = k === 0 ? l : (angularChain?.[k - 1] ?? 0)
     const lkp1 = angularChain?.[k] ?? 0
     floatView[I.coupledNorms + k + 1] = computeHypersphericalLayerNorm(lk, lkp1, D, k)

@@ -252,6 +252,8 @@ export interface SchrodingerRendererConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field. */
   probabilityCurrentEnabled?: boolean
+  /** Density grid resolution per axis (64/96/128/256). */
+  densityGridResolution?: number
 }
 
 // ---------------------------------------------------------------------------

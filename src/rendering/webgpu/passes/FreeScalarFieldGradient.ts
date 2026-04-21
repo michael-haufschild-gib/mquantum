@@ -17,13 +17,16 @@ const GRADIENT_WORKGROUP_SIZE = 8
 import { createGradientPipeline } from './DensityGridGradientSetup'
 
 /** Allocate the rgba8snorm normal texture + view. */
-export function createFsfNormalTexture(device: GPUDevice): {
+export function createFsfNormalTexture(
+  device: GPUDevice,
+  gridSize: number = DENSITY_GRID_SIZE
+): {
   normalTexture: GPUTexture
   normalTextureView: GPUTextureView
 } {
   const normalTexture = device.createTexture({
     label: 'free-scalar-normal-grid',
-    size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
+    size: [gridSize, gridSize, gridSize],
     format: 'rgba8snorm',
     dimension: '3d',
     usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
@@ -48,15 +51,10 @@ export function buildFsfGradientPipeline(
   normalTextureView: GPUTextureView,
   generation: number,
   getCurrentGeneration: () => number,
-  onReady: (pipeline: GPUComputePipeline, bindGroup: GPUBindGroup) => void
+  onReady: (pipeline: GPUComputePipeline, bindGroup: GPUBindGroup) => void,
+  gridSize: number = DENSITY_GRID_SIZE
 ): void {
-  createGradientPipeline(
-    device,
-    densityTextureView,
-    normalTextureView,
-    'rgba16float',
-    DENSITY_GRID_SIZE
-  )
+  createGradientPipeline(device, densityTextureView, normalTextureView, 'rgba16float', gridSize)
     .then((r) => {
       if (generation !== getCurrentGeneration()) return
       onReady(r.pipeline, r.bindGroup)
@@ -72,10 +70,11 @@ export function buildFsfGradientPipeline(
 export function dispatchFsfGradientNormals(
   ctx: WebGPURenderContext,
   pipeline: GPUComputePipeline | null,
-  bindGroup: GPUBindGroup | null
+  bindGroup: GPUBindGroup | null,
+  gridSize: number = DENSITY_GRID_SIZE
 ): void {
   if (!pipeline || !bindGroup) return
-  const gradWG = Math.ceil(DENSITY_GRID_SIZE / GRADIENT_WORKGROUP_SIZE)
+  const gradWG = Math.ceil(gridSize / GRADIENT_WORKGROUP_SIZE)
   const gradPass = ctx.beginComputePass({ label: 'free-scalar-gradient-grid-pass' })
   gradPass.setPipeline(pipeline)
   gradPass.setBindGroup(0, bindGroup)

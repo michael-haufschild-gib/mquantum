@@ -10,6 +10,7 @@
 
 import { logger } from '@/lib/logger'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useWavefunctionSliceStore } from '@/stores/wavefunctionSliceStore'
 
 import type { WebGPURenderContext } from '../core/types'
 import { requestStateSave as genericStateSave } from './stateSave'
@@ -154,7 +155,6 @@ export function requestSliceCapture(
       stagingRe.destroy()
       stagingIm.destroy()
 
-      const { useWavefunctionSliceStore } = await import('@/stores/wavefunctionSliceStore')
       useWavefunctionSliceStore.getState().fulfillCapture({
         sliceData,
         axis,

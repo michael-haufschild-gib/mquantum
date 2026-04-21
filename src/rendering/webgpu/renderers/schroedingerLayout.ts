@@ -200,9 +200,9 @@ const SCHROEDINGER_FIELDS = [
   { name: 'pauliSpinDownColor', type: 'vec3f' },
   { name: '_padPauliDown', type: 'f32' },
 
-  // --- Precomputed normalization constants for coupled hydrogen ND (offset 1520) ---
+  // --- Precomputed hyperspherical-layer norms for coupled hydrogen ND (offset 1520) ---
   // Eliminates redundant log/exp/gamma calls that are constant per quantum state.
-  // [0].x = radial norm, [0].yzw...[2].xyzw = hyperspherical layer norms (up to 8)
+  // Slot [0].x reserved; layer k packed at slot k+1 (up to 11 layers).
   { name: 'coupledNorms', type: arr('vec4f', 3) },
 
   // --- Decoherent branching visualization colors ---

@@ -126,7 +126,11 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     var outputPhase = spatialPhase;
     if (uniforms.phaseAnimationEnabled != 0u) {
       // D-dimensional hydrogen energy: E = -0.5/n_eff² with n_eff = n + (D-3)/2
-      let nf = f32(uniforms.principalN);
+      // Guard against principalN=0 (unreachable via setters/URL, but a
+      // legacy-preset bypass could slip through and produce E=-Inf →
+      // NaN phase animation). Matches the max() guard in the momentum
+      // variant; costs one GPU max() per fragment.
+      let nf = f32(max(uniforms.principalN, 1));
       let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
       let E = -0.5 / (nEff * nEff);
 
@@ -230,7 +234,11 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
     var outputPhase = spatialPhase;
     if (uniforms.phaseAnimationEnabled != 0u) {
-      let nf = f32(uniforms.principalN);
+      // Guard against principalN=0 (unreachable via setters/URL, but a
+      // legacy-preset bypass could slip through and produce E=-Inf →
+      // NaN phase animation). Matches the max() guard in the momentum
+      // variant; costs one GPU max() per fragment.
+      let nf = f32(max(uniforms.principalN, 1));
       let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
       let E = -0.5 / (nEff * nEff);
       outputPhase = spatialPhase - E * t;
@@ -481,7 +489,10 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
 
   var outputPhase = spatialPhase;
   if (uniforms.phaseAnimationEnabled != 0u) {
-    let nf = f32(uniforms.principalN);
+    // Guard against principalN=0 — matches the explicit max() in the
+    // other psi blocks and the momentum variant; keeps phase animation
+    // NaN-free if a legacy-preset import ever bypasses the setter clamp.
+    let nf = f32(max(uniforms.principalN, 1));
     let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
     let E = -0.5 / (nEff * nEff);
     outputPhase = spatialPhase - E * t;
@@ -524,7 +535,10 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
 
   var outputPhase = spatialPhase;
   if (uniforms.phaseAnimationEnabled != 0u) {
-    let nf = f32(uniforms.principalN);
+    // Guard against principalN=0 — matches the explicit max() in the
+    // other psi blocks and the momentum variant; keeps phase animation
+    // NaN-free if a legacy-preset import ever bypasses the setter clamp.
+    let nf = f32(max(uniforms.principalN, 1));
     let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
     let E = -0.5 / (nEff * nEff);
     outputPhase = spatialPhase - E * t;

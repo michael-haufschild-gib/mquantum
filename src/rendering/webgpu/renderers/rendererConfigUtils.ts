@@ -110,13 +110,13 @@ function computeDensityGridConfig(
   computeMode: boolean,
   isosurface: boolean,
   pipelineIs2D: boolean,
-  dim: number,
   openQuantumEnabled: boolean,
   isHydrogen: boolean,
-  termCount: number | undefined
+  termCount: number | undefined,
+  configuredResolution?: number
 ): { useDensityGrid: boolean; densityGridSize: number } {
   const useDensityGrid = computeMode || (!isosurface && !pipelineIs2D)
-  const baseDensityGridSize = computeMode ? 96 : !useDensityGrid ? 64 : dim <= 5 ? 96 : 128
+  const baseDensityGridSize = configuredResolution ?? 96
   const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (termCount ?? 4)) : 0
   const densityGridSize = openQuantumEnabled
     ? computeOpenQuantumGridSize(baseDensityGridSize, estimatedK)
@@ -150,10 +150,10 @@ export function buildShaderConfig(
     computeMode,
     isosurface,
     pipelineIs2D,
-    dim,
     openQuantumEnabled,
     isHydrogen,
-    rendererConfig.termCount
+    rendererConfig.termCount,
+    rendererConfig.densityGridResolution
   )
 
   // Enable the eigenfunction cache alongside the density grid so the inline
@@ -203,6 +203,7 @@ export function buildShaderConfig(
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
     crossSectionEnabled: rendererConfig.crossSectionEnabled ?? true,
     probabilityCurrentEnabled: rendererConfig.probabilityCurrentEnabled ?? true,
+    sampleSpaceRotation: rendererConfig.quantumMode === 'antiDeSitter',
     // Profiling strip flags: read from window global (set by A/B benchmark tests)
     profilingStrip:
       typeof globalThis !== 'undefined'

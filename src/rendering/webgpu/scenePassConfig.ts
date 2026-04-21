@@ -77,6 +77,7 @@ export interface PassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  densityGridResolution: number
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
   backgroundColor: string
@@ -102,6 +103,7 @@ export interface SchrodingerPassConfig {
   openQuantumEnabled: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  densityGridResolution: number
 }
 
 /** Subset of PassConfig fields that trigger post-processing pass rebuild when changed. */
@@ -296,6 +298,7 @@ export function extractSchrodingerConfig(config: PassConfig): SchrodingerPassCon
     temporalReprojectionEnabled: gate(config.temporalReprojectionEnabled, disableAnalytical),
     crossSectionEnabled: gate(config.crossSectionEnabled, disableAnalytical),
     probabilityCurrentEnabled: gate(config.probabilityCurrentEnabled, disableAnalytical),
+    densityGridResolution: config.densityGridResolution,
   }
 }
 

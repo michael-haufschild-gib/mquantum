@@ -98,9 +98,10 @@ export function computeRadialShells(raw: KSpaceRawData, binCount: number): Radia
  */
 export function buildRadialDisplayGrid(
   raw: KSpaceRawData,
-  config: KSpaceVizConfig
+  config: KSpaceVizConfig,
+  outputGridSize: number = OUTPUT_GRID_SIZE
 ): KSpaceDisplayGrid {
-  const G = OUTPUT_GRID_SIZE
+  const G = outputGridSize
   const outputTotal = G ** 3
   const nk = new Float64Array(outputTotal)
   const kNorm = new Float64Array(outputTotal)

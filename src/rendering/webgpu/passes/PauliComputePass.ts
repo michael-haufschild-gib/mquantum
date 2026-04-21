@@ -97,7 +97,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 
-  constructor() {
+  private readonly densityGridSize: number
+
+  constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
       id: 'pauli-compute',
       inputs: [],
@@ -105,6 +107,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [LINEAR_WG, 1, 1],
     })
+    this.densityGridSize = densityGridSize
   }
 
   /** Pipeline creation is managed by buildPipelines() during executePauli */
@@ -222,7 +225,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   /** Create the 3D density texture for spin-resolved rendering */
   initializeDensityTexture(device: GPUDevice): void {
     this.densityTexture?.destroy()
-    this.densityTexture = createDensityTexture(device, 'pauli')
+    this.densityTexture = createDensityTexture(device, 'pauli', 0, this.densityGridSize)
     this.densityTextureView = this.densityTexture.createView({
       label: 'pauli-density-view',
       dimension: '3d',
@@ -524,7 +527,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     }
 
     // Write density grid
-    const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
+    const gridWG = Math.ceil(this.densityGridSize / GRID_WG)
     const wgPass = ctx.beginComputePass({ label: 'pauli-write-grid-pass' })
     this.dispatchCompute(
       wgPass,

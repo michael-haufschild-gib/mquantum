@@ -20,7 +20,9 @@ import { composeEigenfunctionCacheComputeShader } from '../shaders/schroedinger/
 import {
   EIGEN_CACHE_SAMPLES,
   MAX_EIGEN_FUNCS,
+  MAX_EIGEN_FUNCS_VEC4_COUNT,
 } from '../shaders/schroedinger/quantum/eigenfunctionCache.wgsl'
+import { MAX_DIM, MAX_TERMS } from '../shaders/schroedinger/uniforms.wgsl'
 
 // SchroedingerUniforms byte offsets — pulled from the declarative struct
 // layout so a future field reorder doesn't silently drift these into the
@@ -34,24 +36,19 @@ const OFFSET_QUANTUM = SCHROEDINGER_LAYOUT.byteOffset.quantum
 const OFFSET_EXTRA_DIM_N = SCHROEDINGER_LAYOUT.byteOffset.extraDimN
 const OFFSET_EXTRA_DIM_OMEGA = SCHROEDINGER_LAYOUT.byteOffset.extraDimOmega
 
-const MAX_TERMS = 8
-const MAX_DIM = 11
-
 // Compute shader workgroup size (must match WGSL)
 const WORKGROUP_SIZE = 256
 
 // Per-function compute params: vec4f(xMin, xMax, n_as_f32, omega)
 // Global header: u32 numFuncs + 3 padding = 16 bytes
-// Func array: MAX_EIGEN_FUNCS × 16 bytes = 1408 bytes
-// Total: 1424 bytes
+// Func array: MAX_EIGEN_FUNCS × 16 bytes
 const COMPUTE_PARAMS_SIZE = 16 + MAX_EIGEN_FUNCS * 16
 
 // Metadata for fragment shader:
 // Header: u32 numFuncs, u32 dimension, u32 _pad0, u32 _pad1 = 16 bytes
-// Per-func metadata: MAX_EIGEN_FUNCS × vec4f(xMin, xMax, invRange, 0) = 1408 bytes
-// Index map: 22 × vec4<i32> = 352 bytes
-// Total: 1776 bytes
-const FRAGMENT_META_SIZE = 16 + MAX_EIGEN_FUNCS * 16 + 22 * 16
+// Per-func metadata: MAX_EIGEN_FUNCS × vec4f(xMin, xMax, invRange, 0)
+// Index map: MAX_EIGEN_FUNCS_VEC4_COUNT × vec4<i32> (packed i32 map)
+const FRAGMENT_META_SIZE = 16 + MAX_EIGEN_FUNCS * 16 + MAX_EIGEN_FUNCS_VEC4_COUNT * 16
 
 /**
  * Configuration for the eigenfunction cache compute pass.

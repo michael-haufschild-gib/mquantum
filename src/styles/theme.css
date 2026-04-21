@@ -45,10 +45,8 @@
     --border-highlight: var(--border-strong); /* Legacy alias */
 
     /* ═══════════════════════════════════════════════════════════════════
-       PANEL ALIASES (for backward compatibility)
-       These map to the semantic variables above.
+       PANEL ALIASES (consumed by the @theme block in index.css)
        ═══════════════════════════════════════════════════════════════════ */
-    --panel-bg: var(--bg-panel);
     --panel-border: var(--border-default);
     --panel-header: var(--bg-hover);
 
@@ -151,25 +149,7 @@
     --dirac-particle: oklch(70% 0.15 220deg);
     --dirac-antiparticle: oklch(70% 0.15 0deg);
 
-    /* ═══════════════════════════════════════════════════════════════════
-       LEGACY COMPATIBILITY
-       Old variable names that may still be referenced.
-       ═══════════════════════════════════════════════════════════════════ */
-    --color-slate-0: var(--token-slate-0);
-    --color-slate-50: var(--token-slate-50);
-    --color-slate-100: var(--token-slate-100);
-    --color-slate-200: var(--token-slate-200);
-    --color-slate-300: var(--token-slate-300);
-    --color-slate-400: var(--token-slate-400);
-    --color-slate-500: var(--token-slate-500);
-    --color-slate-600: var(--token-slate-600);
-    --color-slate-700: var(--token-slate-700);
-    --color-slate-800: var(--token-slate-800);
-    --color-slate-900: var(--token-slate-900);
-    --color-slate-950: var(--token-slate-950);
-    --color-slate-1000: var(--token-slate-1000);
-
-    /* Glass alias for legacy code */
+    /* Glass alias — consumed by pageCurve, Knob, WormholeCoherencePanel. */
     --color-glass: var(--bg-glass);
   }
 
@@ -217,9 +197,6 @@
     --health-medium-stroke: var(--token-amber-600);
     --health-low: var(--token-red-600);
     --health-low-stroke: var(--token-red-600);
-
-    /* Glass alias update */
-    --color-glass: var(--bg-glass);
   }
 
   /* ═══════════════════════════════════════════════════════════════════

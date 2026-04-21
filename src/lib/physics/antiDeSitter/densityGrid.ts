@@ -87,15 +87,15 @@ export interface AdsPackerScratch {
 }
 
 /**
- * Allocate a fresh pool of scratch buffers sized for the renderer-wide
- * `DENSITY_GRID_SIZE` and the max HKLL coarse grid. The pool is safe to
+ * Allocate a fresh pool of scratch buffers sized for the given density
+ * grid resolution and the max HKLL coarse grid. The pool is safe to
  * reuse across successive packer calls as long as the caller never mutates
  * the returned `density` array between hand-off and the GPU upload — the
  * WebGPU `queue.writeTexture` call copies the source synchronously so the
  * pool can be reused on the very next frame.
  */
-export function createAdsPackerScratch(): AdsPackerScratch {
-  const N = DENSITY_GRID_SIZE
+export function createAdsPackerScratch(gridSize: number = DENSITY_GRID_SIZE): AdsPackerScratch {
+  const N = gridSize
   const total = N * N * N
   const coarseMax = Math.max(HKLL_COARSE_SIZE_S1, HKLL_COARSE_SIZE_S2) ** 3
   return {
@@ -133,18 +133,19 @@ function clamp01(v: number): number {
  */
 export function packAntiDeSitterDensityGrid(
   config: AntiDeSitterConfig,
-  scratch?: AdsPackerScratch
+  scratch?: AdsPackerScratch,
+  targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
   // HKLL takes precedence (Stage 2B). The UI setters also enforce mutex so
   // both flags should not be true simultaneously, but in case they are, the
   // HKLL reconstruction wins because it's the more specialised story.
   if (config.hkllEnabled) {
-    return packHkllReconstructedDensityGrid(config, scratch)
+    return packHkllReconstructedDensityGrid(config, scratch, targetGridSize)
   }
   if (config.btzEnabled && config.d === 3) {
-    return packBtzThermalDensityGrid(config, scratch)
+    return packBtzThermalDensityGrid(config, scratch, targetGridSize)
   }
-  const N = DENSITY_GRID_SIZE
+  const N = targetGridSize
   const total = N * N * N
   const density = scratch ? scratch.density : new Uint16Array(total * 4)
 
@@ -361,9 +362,10 @@ const BTZ_HORIZON_MARKER_AMP = BTZ_AMPLITUDE_CEILING * 2
  */
 export function packBtzThermalDensityGrid(
   config: AntiDeSitterConfig,
-  scratch?: AdsPackerScratch
+  scratch?: AdsPackerScratch,
+  targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
-  const N = DENSITY_GRID_SIZE
+  const N = targetGridSize
   const total = N * N * N
   const density = scratch ? scratch.density : new Uint16Array(total * 4)
   let bulk: Float32Array
@@ -499,9 +501,10 @@ const HKLL_COARSE_SIZE_S2 = 24
  */
 export function packHkllReconstructedDensityGrid(
   config: AntiDeSitterConfig,
-  scratch?: AdsPackerScratch
+  scratch?: AdsPackerScratch,
+  targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
-  const N = DENSITY_GRID_SIZE
+  const N = targetGridSize
   const density = scratch ? scratch.density : new Uint16Array(N * N * N * 4)
 
   const resolved = resolveDelta(config.d, config.mL, config.branch)

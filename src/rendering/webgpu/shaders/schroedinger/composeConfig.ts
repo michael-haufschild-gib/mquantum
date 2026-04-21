@@ -77,6 +77,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   crossSectionEnabled?: boolean
   /** Compile-time gate for probability current j-field (default: true). */
   probabilityCurrentEnabled?: boolean
+  /** Apply basis-vector rotation to density grid sample positions (AdS modes). */
+  sampleSpaceRotation?: boolean
   /**
    * Profiling strip flags — compile out specific hot-path components to measure
    * their actual GPU cost via A/B benchmarking. Each flag replaces the real
@@ -209,6 +211,7 @@ export function buildShaderDefinesAndFeatures(flags: {
   useWignerCache: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
+  sampleSpaceRotation?: boolean
   profilingStrip?: SchroedingerWGSLShaderConfig['profilingStrip']
 }): { defines: string[]; features: string[] } {
   const defines: string[] = []
@@ -311,8 +314,11 @@ export function buildShaderDefinesAndFeatures(flags: {
     defines.push('const PROFILING_HALF_SAMPLES: bool = false;')
   }
 
+  defines.push(`const SAMPLE_SPACE_ROTATION: bool = ${flags.sampleSpaceRotation ?? false};`)
+
   if (flags.useDensityGrid) features.push('Density Grid Raymarching')
   if (flags.isWigner && flags.useWignerCache) features.push('Wigner Cache')
+  if (flags.sampleSpaceRotation) features.push('Sample-Space Rotation')
 
   return { defines, features }
 }

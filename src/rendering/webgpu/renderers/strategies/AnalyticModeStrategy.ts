@@ -124,8 +124,8 @@ export class AnalyticModeStrategy implements QuantumModeStrategy {
       const forceRgba = useDensityGrid || dim > 3 || openQuantumEnabled || isHydrogen
       const isHydrogenOQ = openQuantumEnabled && isHydrogen
 
-      // Adaptive grid resolution
-      const baseDensityGridSize = dim <= 3 ? 96 : dim <= 5 ? 96 : 128
+      // User-selected grid resolution (fallback to dimension-adaptive default).
+      const baseDensityGridSize = config.densityGridResolution ?? (dim <= 5 ? 96 : 128)
       const estimatedK = openQuantumEnabled ? (isHydrogen ? 10 : (config.termCount ?? 4)) : 0
       const densityGridSize = openQuantumEnabled
         ? AnalyticOpenQuantumExecutor.computeGridSize(baseDensityGridSize, estimatedK)

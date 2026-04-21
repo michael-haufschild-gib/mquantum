@@ -277,8 +277,18 @@ export interface QuantumModeStrategy {
    * Used to preserve simulation state (coin buffers, density textures) across
    * pipeline rebuilds triggered by non-structural config changes (e.g. color algorithm).
    * Returns true if the transfer succeeded and the source's compute pass was adopted.
+   *
+   * `nextConfig` is the new renderer config that the successor strategy will
+   * run under. Strategies whose density texture size depends on
+   * `densityGridResolution` (e.g. Wheeler–DeWitt, Anti-de Sitter) inspect
+   * this to skip texture adoption when the size is about to change — the
+   * predecessor's still-active bind groups reference the adopted texture
+   * during the warm-swap window, so destroying it in `setup()` would cause
+   * "Destroyed texture used in a submit" on the next frame. Skipping
+   * adoption keeps the predecessor's texture alive until its pass is
+   * replaced in the graph and its `dispose()` cleans it up.
    */
-  adoptComputeState?(source: QuantumModeStrategy): boolean
+  adoptComputeState?(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean
 
   /**
    * Release all mode-specific GPU resources and state.

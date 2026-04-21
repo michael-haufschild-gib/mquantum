@@ -72,27 +72,24 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     // Compute-mode overrides are applied by the renderer constructor.
   }
 
-  setup(ctx: WebGPUSetupContext, _config: SchrodingerRendererConfig): ModeSetupResult {
+  setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
     if (this.transferredOut && !this.densityTexture) {
-      // Adopted by a successor — stay dormant.
       return { initPromises: [], ...createDensityTextureBindings(ctx.device, null) }
     }
-    if (!this.densityTexture) {
+    const N = config.densityGridResolution ?? DENSITY_GRID_SIZE
+    if (!this.densityTexture || this.densityTexture.width !== N) {
+      this.densityTexture?.destroy()
       this.densityTexture = createDensityTexture(
         ctx.device,
         'wheeler-dewitt',
-        GPUTextureUsage.COPY_DST
+        GPUTextureUsage.COPY_DST,
+        N
       )
       this.densityTextureView = this.densityTexture.createView({
         label: 'wheeler-dewitt-density-view',
         dimension: '3d',
       })
-      // Initial write — zero-filled density covering the FULL density
-      // texture (`DENSITY_GRID_SIZE`³) so every voxel is defined before
-      // the first `executeFrame` runs the solver and overwrites the
-      // texture.
-      const N = DENSITY_GRID_SIZE
-      const bytesPerTexel = 8 // rgba16float
+      const bytesPerTexel = 8
       const zeros = new Uint8Array(N * N * N * bytesPerTexel)
       ctx.device.queue.writeTexture(
         { texture: this.densityTexture },
@@ -164,7 +161,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const packed = packWdwDensityGrid(
       physicsTick.output,
       streamlineOverlay,
-      srmtTick.overlay ?? undefined
+      srmtTick.overlay ?? undefined,
+      this.densityTexture.width
     )
 
     ctx.device.queue.writeTexture(
@@ -215,8 +213,19 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
   /** Expose the canonical clock order for tests + debugging. */
   static readonly SRMT_CLOCKS = WheelerDeWittSrmtCoordinator.SRMT_CLOCKS
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof WheelerDeWittStrategy) || !source.densityTexture) return false
+    // Skip adoption when the density grid size is about to change. The
+    // predecessor's pipeline + bind group (still live in the render graph
+    // during the warm-swap window) reference the adopted texture. If we
+    // adopt and then `setup()` destroys it on the size-mismatch branch,
+    // the next frame submits a command buffer that references the
+    // destroyed texture. Skipping adoption leaves the predecessor's
+    // texture untouched — the successor creates a fresh one and re-runs
+    // the solver on first frame, which is ~100ms one-time cost for a
+    // resolution change.
+    const nextN = nextConfig?.densityGridResolution ?? DENSITY_GRID_SIZE
+    if (source.densityTexture.width !== nextN) return false
     this.densityTexture?.destroy()
     this.densityTexture = source.densityTexture
     this.densityTextureView = source.densityTextureView

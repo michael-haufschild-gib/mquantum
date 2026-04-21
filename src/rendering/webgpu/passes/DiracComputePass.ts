@@ -141,7 +141,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private readonly uniformU32 = new Uint32Array(this.uniformData)
   private readonly uniformF32 = new Float32Array(this.uniformData)
 
-  constructor() {
+  private readonly densityGridSize: number
+
+  constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
       id: 'dirac-compute',
       inputs: [],
@@ -149,12 +151,13 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [LINEAR_WG, 1, 1],
     })
+    this.densityGridSize = densityGridSize
   }
 
   /** Create density texture eagerly for renderer bind group creation. */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = createDensityTexture(device, 'dirac')
+    this.densityTexture = createDensityTexture(device, 'dirac', 0, this.densityGridSize)
     this.densityTextureView = this.densityTexture.createView({
       label: 'dirac-density-view',
       dimension: '3d',
@@ -609,7 +612,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     }
 
     // Write density grid
-    const gridWG = Math.ceil(DENSITY_GRID_SIZE / GRID_WG)
+    const gridWG = Math.ceil(this.densityGridSize / GRID_WG)
     const wgPass = ctx.beginComputePass({ label: 'dirac-write-grid-pass' })
     this.dispatchCompute(wgPass, pl.writeGridPipeline, [bg.writeGridBG!], gridWG, gridWG, gridWG)
     wgPass.end()

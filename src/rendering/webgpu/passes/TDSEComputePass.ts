@@ -30,7 +30,12 @@ import { useHellerSpectrometerStore } from '@/stores/hellerSpectrometerStore'
 
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
-import { computeConfigHash, createDensityTexture, LINEAR_WG } from './computePassUtils'
+import {
+  computeConfigHash,
+  createDensityTexture,
+  DENSITY_GRID_SIZE,
+  LINEAR_WG,
+} from './computePassUtils'
 import {
   applyBufferResult,
   collectOldBuffers,
@@ -272,7 +277,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.dispatchCompute(pe, p, b, x, y ?? 1, z ?? 1)
   }
 
-  constructor() {
+  readonly densityGridSize: number
+
+  constructor(densityGridSize: number = DENSITY_GRID_SIZE) {
     super({
       id: 'tdse-compute',
       inputs: [],
@@ -280,15 +287,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [LINEAR_WG, 1, 1],
     })
-    // Publish the Heller ring buffer reference to the spectrometer store so
-    // that the UI can read samples on demand (see TDSESpectrometerPanel).
+    this.densityGridSize = densityGridSize
     useHellerSpectrometerStore.getState().setBufferRef(this._hellerState.buffer)
   }
 
   /** Create density texture eagerly for renderer bind group creation. */
   initializeDensityTexture(device: GPUDevice): void {
     if (this.densityTexture) return
-    this.densityTexture = createDensityTexture(device, 'tdse')
+    this.densityTexture = createDensityTexture(device, 'tdse', 0, this.densityGridSize)
     this.densityTextureView = this.densityTexture.createView({
       label: 'tdse-density-view',
       dimension: '3d',

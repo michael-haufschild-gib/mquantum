@@ -4,7 +4,7 @@ import { Tooltip } from '@/components/ui/Tooltip'
 import { hsvToHex, isValidHex, parseColorToHsv, rgbToHex } from '@/lib/colors/colorUtils'
 
 import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
-import { CHECKERBOARD, HUE_GRADIENT, NOISE_BG } from './colorPickerUtils'
+import { CHECKERBOARD_BG, HUE_GRADIENT, NOISE_BG } from './colorPickerUtils'
 import { Popover } from './Popover'
 import { useColorPickerState } from './useColorPickerState'
 
@@ -82,7 +82,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
               <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-[box-shadow]">
                 <div
                   className="absolute inset-0 z-0"
-                  style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
+                  style={{ backgroundImage: CHECKERBOARD_BG, opacity: 0.4 }}
                 />
                 <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
               </div>
@@ -100,7 +100,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   >
                     <div
                       className="absolute inset-0 -z-10"
-                      style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
+                      style={{ backgroundImage: CHECKERBOARD_BG, opacity: 0.4 }}
                     />
                     <div className="w-1/2 h-full" style={{ backgroundColor: initialColor }} />
                     <div className="w-1/2 h-full" style={{ backgroundColor: value }} />
@@ -198,7 +198,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                     <div
                       className="absolute inset-0 z-0"
-                      style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
+                      style={{ backgroundImage: CHECKERBOARD_BG, opacity: 0.4 }}
                     />
                     <div
                       className="absolute inset-0 z-1"
@@ -340,7 +340,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       >
                         <div
                           className="absolute inset-0 -z-10"
-                          style={{ backgroundImage: `url(${CHECKERBOARD})`, opacity: 0.4 }}
+                          style={{ backgroundImage: CHECKERBOARD_BG, opacity: 0.4 }}
                         />
                         <div className="absolute inset-0" style={{ backgroundColor: c }} />
                       </button>
