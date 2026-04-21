@@ -158,10 +158,9 @@ export class AdsDensityComputePass extends WebGPUBaseComputePass {
   }
 
   /** Upload SchroedingerUniforms (needed for boundingRadius, time). */
-  updateSchroedingerUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
+  updateSchroedingerUniforms(device: GPUDevice, data: ArrayBuffer, _version: number): void {
     if (!this.schroedingerBuffer) return
     device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
-    void version
   }
 
   /**

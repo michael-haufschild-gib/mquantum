@@ -483,8 +483,10 @@ export class TdseBecStrategy implements QuantumModeStrategy {
     )
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof TdseBecStrategy) || !source.tdsePass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.tdsePass.densityGridSize !== nextN) return false
     this.tdsePass?.dispose()
     this.tdsePass = source.tdsePass
     source.tdsePass = null

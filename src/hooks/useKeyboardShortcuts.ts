@@ -179,7 +179,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       // French / Swiss / etc. layouts produce different characters for
       // the same physical key, which would break the key-based match
       // and leave the documented shortcut dead for non-US users.
-      if (event.code === 'Backslash') {
+      if (event.code === 'Backslash' || event.code === 'IntlBackslash') {
         event.preventDefault()
         if (shiftKey) {
           toggleLeftPanel()

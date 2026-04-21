@@ -252,6 +252,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     return this.densityTexture
   }
 
+  /** Get the configured density grid resolution. */
+  getDensityGridSize(): number {
+    return this.densityGridSize
+  }
+
   /**
    * Set loaded field data for injection on next initialization.
    * For FSF, "re" maps to phi (field) and "im" maps to pi (conjugate momentum).

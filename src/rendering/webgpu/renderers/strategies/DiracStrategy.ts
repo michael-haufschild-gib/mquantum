@@ -125,8 +125,10 @@ export class DiracStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, diracPass, ['diracEquation'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof DiracStrategy) || !source.diracPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.diracPass.getDensityGridSize() !== nextN) return false
     this.diracPass?.dispose()
     this.diracPass = source.diracPass
     source.diracPass = null

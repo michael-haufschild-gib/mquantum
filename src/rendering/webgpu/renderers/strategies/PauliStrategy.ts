@@ -108,8 +108,10 @@ export class PauliStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, pauliPass, ['pauliSpinor'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof PauliStrategy) || !source.pauliPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.pauliPass.getDensityGridSize() !== nextN) return false
     this.pauliPass?.dispose()
     this.pauliPass = source.pauliPass
     source.pauliPass = null

@@ -287,5 +287,6 @@ export function computePipelineCacheKey(
     config.crossSectionEnabled ? 1 : 0,
     config.probabilityCurrentEnabled ? 1 : 0,
     config.isPauli ? 1 : 0,
+    config.sampleSpaceRotation ? 1 : 0,
   ].join(':')
 }

@@ -26,6 +26,7 @@
  */
 
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 
 import { expect, test } from './fixtures'
 import {
@@ -263,7 +264,7 @@ test.describe('Wheeler-DeWitt — SRMT phiExtent plateau search', () => {
     }
 
     fs.writeFileSync(
-      '/tmp/srmt-phiextent-plateau-results.json',
+      `${os.tmpdir()}/srmt-phiextent-plateau-results.json`,
       JSON.stringify(results, null, 2) + '\n'
     )
 

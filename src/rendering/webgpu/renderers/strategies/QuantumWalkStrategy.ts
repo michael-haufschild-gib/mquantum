@@ -115,9 +115,10 @@ export class QuantumWalkStrategy implements QuantumModeStrategy {
     handleSimulationStateIO(ctx, qwPass, ['quantumWalk'])
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof QuantumWalkStrategy) || !source.qwPass) return false
-    // Steal the compute pass — the source becomes empty (dispose is a no-op).
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.qwPass.getDensityGridSize() !== nextN) return false
     this.qwPass?.dispose()
     this.qwPass = source.qwPass
     source.qwPass = null

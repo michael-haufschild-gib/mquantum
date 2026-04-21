@@ -130,9 +130,14 @@ export class AntiDeSitterStrategy implements QuantumModeStrategy {
         gridSize,
       })
       const initPromises = [
-        this.computePass.initialize(ctx).then(() => {
-          this.computePassInitialized = true
-        }),
+        this.computePass.initialize(ctx).then(
+          () => {
+            this.computePassInitialized = true
+          },
+          () => {
+            this.computePassInitialized = false
+          }
+        ),
       ]
       return {
         initPromises,

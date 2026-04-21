@@ -137,7 +137,7 @@ describe('computeHydrogenRadialNormND — closed-form values (3D hydrogen, a₀=
 })
 
 describe('computeHydrogenRadialNormND — CPU/GPU parity (f32 emulation ≤ 3 ULP)', () => {
-  // 3 ULP × 1.19e-7 ≈ 3.6e-7 relative, with a floor for very small norms.
+  // ~30 ULP budget for chained f32 transcendentals (log, exp, sqrt, pow).
   const REL_TOL = 3.6e-6
   const ABS_TOL = 1e-12
 

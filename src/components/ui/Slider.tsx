@@ -51,19 +51,15 @@ export const Slider: React.FC<SliderProps> = React.memo(
     const id = useId()
     const percentage =
       max > min ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100)) : 0
-    // Derive decimal places from the step size. Guard against non-finite,
-    // zero, or negative step inputs: `-log10(0)` is `Infinity`, which
-    // flows into `toFixed(Infinity)` at the three display sites below
-    // and throws RangeError ("digits must be between 0 and 100") — the
-    // whole slider subtree then tears down on the first value change.
-    // The snap branch in `handleLabelMouseDown` already treats step=0
-    // as a valid "no snap" input; decimals must match to avoid a latent
-    // mismatch. Cap at `toFixed`'s 100-max so pathological micro-steps
-    // (e.g. step=1e-200) don't blow past the spec bound either.
-    const decimals =
-      !Number.isFinite(step) || step <= 0 || step >= 1
-        ? 0
-        : Math.min(100, Math.max(0, Math.ceil(-Math.log10(step))))
+    const decimals = (() => {
+      if (!Number.isFinite(step) || step <= 0) return 0
+      const text = step.toString().toLowerCase()
+      if (text.includes('e-')) {
+        const [mantissa, exponent] = text.split('e-')
+        return Math.min(100, Number(exponent) + (mantissa!.split('.')[1]?.length ?? 0))
+      }
+      return Math.min(100, text.split('.')[1]?.length ?? 0)
+    })()
 
     const [inputValue, setInputValue] = useState(value.toString())
     // Removed isHovered state - use pure CSS group-hover instead (eliminates re-renders on hover)

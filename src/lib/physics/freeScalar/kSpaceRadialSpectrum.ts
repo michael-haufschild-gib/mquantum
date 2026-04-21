@@ -101,7 +101,7 @@ export function buildRadialDisplayGrid(
   config: KSpaceVizConfig,
   outputGridSize: number = OUTPUT_GRID_SIZE
 ): KSpaceDisplayGrid {
-  const G = outputGridSize
+  const G = Math.max(1, Math.min(512, Math.round(outputGridSize)))
   const outputTotal = G ** 3
   const nk = new Float64Array(outputTotal)
   const kNorm = new Float64Array(outputTotal)

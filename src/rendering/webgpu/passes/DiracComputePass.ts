@@ -168,6 +168,11 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     return this.densityTextureView
   }
 
+  /** Get the configured density grid resolution. */
+  getDensityGridSize(): number {
+    return this.densityGridSize
+  }
+
   /**
    * Set loaded wavefunction data for injection on next maybeInitialize.
    *

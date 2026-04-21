@@ -386,7 +386,7 @@ export function packWdwDensityGrid(
   srmtOverlay?: WdwSrmtOverlay,
   targetGridSize: number = DENSITY_GRID_SIZE
 ): WdwDensityUpload {
-  const N = targetGridSize
+  const N = Math.max(1, Math.round(targetGridSize))
   const total = N * N * N
   const density = new Uint16Array(total * 4)
 

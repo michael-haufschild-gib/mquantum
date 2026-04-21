@@ -3,7 +3,7 @@
  * Section wrapper for object geometry controls
  */
 
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback } from 'react'
 
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
@@ -38,11 +38,6 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
       [setDensityGridResolution]
     )
 
-    const gridOptions = useMemo(
-      () => GRID_RESOLUTION_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
-      []
-    )
-
     return (
       <Section title="Geometry" defaultOpen={defaultOpen} data-testid="geometry-section">
         <div className="space-y-1">
@@ -53,7 +48,7 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
             data-testid="control-group-grid-resolution"
           >
             <ToggleGroup
-              options={gridOptions}
+              options={GRID_RESOLUTION_OPTIONS as unknown as { value: string; label: string }[]}
               value={String(densityGridResolution)}
               onChange={handleGridResolutionChange}
               fullWidth

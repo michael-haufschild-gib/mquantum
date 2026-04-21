@@ -54,6 +54,7 @@ describe('Wheeler–DeWitt inflatonMassAsymmetry — Schmidt / modular spectra',
     const k1 = modularSpectrum(sPhi1).spectrum
     const k2 = modularSpectrum(sPhi2).spectrum
     const compareCount = Math.min(k1.length, k2.length, 8)
+    expect(compareCount).toBeGreaterThan(0)
     for (let i = 0; i < compareCount; i++) {
       expect(Math.abs(k1[i]! - k2[i]!)).toBeLessThan(1e-4)
     }
@@ -123,6 +124,7 @@ describe('Wheeler–DeWitt inflatonMassAsymmetry — Schmidt / modular spectra',
     const kSym = modularSpectrum(sSym).spectrum
     const kAsym = modularSpectrum(sAsym).spectrum
     const compareCount = Math.min(kSym.length, kAsym.length, 8)
+    expect(compareCount).toBeGreaterThan(0)
     let maxDiff = 0
     for (let i = 0; i < compareCount; i++) {
       const d = Math.abs(kSym[i]! - kAsym[i]!)

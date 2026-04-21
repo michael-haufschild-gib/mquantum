@@ -232,9 +232,11 @@ export const ScenarioSelector: React.FC = React.memo(() => {
     if (prevModeRef.current === mode) return
     prevModeRef.current = mode
     if (mode !== 'pauliSpinor') return
-    const firstId = getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
-    if (firstId) applyPauliPresetById(firstId, setPauliConfig)
-  }, [mode, dimension, setPauliConfig])
+    const selectedId =
+      computePreset[mode] ??
+      getFirstPresetId(mode as Parameters<typeof getFirstPresetId>[0], dimension)
+    if (selectedId) applyPauliPresetById(selectedId, setPauliConfig)
+  }, [mode, dimension, computePreset, setPauliConfig])
 
   // Derive the active preset value from store state or tracked selection.
   const activeValue = useMemo(() => {

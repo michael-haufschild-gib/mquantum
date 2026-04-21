@@ -141,14 +141,15 @@ describe('reggeWheeler — defensive input guards', () => {
 
   it('returns 0 for non-finite ell', () => {
     expect(computeReggeWheelerPotential(2.0, 1.0, Number.NaN, 2)).toBe(0)
-    // undefined arithmetic produces NaN — the guard must catch that too.
-    // (Upcast via `as number` reproduces the legacy-preset wiring where
-    // the field is missing from the deserialized config.)
+    expect(computeReggeWheelerPotential(2.0, 1.0, Number.POSITIVE_INFINITY, 2)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, Number.NEGATIVE_INFINITY, 2)).toBe(0)
     expect(computeReggeWheelerPotential(2.0, 1.0, undefined as unknown as number, 2)).toBe(0)
   })
 
   it('returns 0 for non-finite spin', () => {
     expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.NaN)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.POSITIVE_INFINITY)).toBe(0)
+    expect(computeReggeWheelerPotential(2.0, 1.0, 2, Number.NEGATIVE_INFINITY)).toBe(0)
     expect(computeReggeWheelerPotential(2.0, 1.0, 2, undefined as unknown as number)).toBe(0)
   })
 

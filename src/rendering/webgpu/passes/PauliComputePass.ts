@@ -232,6 +232,11 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     })
   }
 
+  /** Get the configured density grid resolution. */
+  getDensityGridSize(): number {
+    return this.densityGridSize
+  }
+
   // ============================================================================
   // Pipeline & Bind Group Rebuild (delegated to PauliComputePassSetup)
   // ============================================================================

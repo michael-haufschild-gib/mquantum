@@ -133,7 +133,7 @@ ${generate2DCommonBody()}
       let nodalAlpha = nodalResult.x * schroedinger.nodalStrength;
       let nodalColor = vec3f(nodalResult.y, nodalResult.z, nodalResult.w);
       col = mix(col, nodalColor, clamp(nodalAlpha, 0.0, 0.95));
-      alpha = max(alpha, nodalAlpha);
+      alpha = clamp(max(alpha, nodalAlpha), 0.0, 1.0);
     }
   }
 
@@ -184,7 +184,7 @@ ${generate2DCommonBody()}
       let nodalAlpha = nodalResult.x * schroedinger.nodalStrength;
       let nodalColor = vec3f(nodalResult.y, nodalResult.z, nodalResult.w);
       col = mix(col, nodalColor, clamp(nodalAlpha, 0.0, 0.95));
-      alpha = max(alpha, nodalAlpha);
+      alpha = clamp(max(alpha, nodalAlpha), 0.0, 1.0);
     }
   }
 

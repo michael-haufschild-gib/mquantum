@@ -35,12 +35,7 @@ export const MAX_EIGEN_FUNCS = MAX_TERMS * MAX_DIM
  * packing convention in `EigenfunctionCacheComputePass` and the
  * `indexMap[vecIdx][compIdx]` lookup in `getEigenFuncIdx`.
  */
-export const MAX_EIGEN_FUNCS_VEC4_COUNT = MAX_EIGEN_FUNCS / 4
-if (MAX_EIGEN_FUNCS % 4 !== 0) {
-  throw new Error(
-    `MAX_EIGEN_FUNCS (${MAX_EIGEN_FUNCS}) must be a multiple of 4 for the vec4<i32> packing in EigenfunctionCacheMeta.indexMap`
-  )
-}
+export const MAX_EIGEN_FUNCS_VEC4_COUNT = Math.ceil(MAX_EIGEN_FUNCS / 4)
 
 /**
  * WGSL struct definition + bind group declarations for the eigenfunction cache.

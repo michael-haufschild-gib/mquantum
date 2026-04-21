@@ -366,7 +366,8 @@ export function runVortexDetection(
   totalSites: number,
   maxDensity: number
 ): void {
-  if (state.initialized && config.interactionStrength && config.interactionStrength > 0) {
+  const g = config.interactionStrength ?? 0
+  if (state.initialized && Number.isFinite(g) && g > 0) {
     dispatchAndReadbackVortexDetect(
       ctx.device,
       ctx.encoder,

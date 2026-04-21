@@ -194,8 +194,10 @@ export class FreeScalarFieldStrategy implements QuantumModeStrategy {
     }
   }
 
-  adoptComputeState(source: QuantumModeStrategy): boolean {
+  adoptComputeState(source: QuantumModeStrategy, nextConfig?: SchrodingerRendererConfig): boolean {
     if (!(source instanceof FreeScalarFieldStrategy) || !source.freeScalarFieldPass) return false
+    const nextN = nextConfig?.densityGridResolution
+    if (nextN && source.freeScalarFieldPass.getDensityGridSize() !== nextN) return false
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = source.freeScalarFieldPass
     source.freeScalarFieldPass = null

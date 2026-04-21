@@ -131,6 +131,19 @@ function clamp01(v: number): number {
  * instead; the horizon is painted as an opaque cylinder at a fixed world
  * radius. See `packBtzThermalDensityGrid` below.
  */
+function isScratchCompatible(scratch: AdsPackerScratch, total: number): boolean {
+  return (
+    scratch.density.length >= total * 4 &&
+    scratch.bulk.length >= total &&
+    scratch.reField.length >= total &&
+    scratch.boundary.length >= total &&
+    scratch.horizonFlags.length >= total
+  )
+}
+
+/**
+ *
+ */
 export function packAntiDeSitterDensityGrid(
   config: AntiDeSitterConfig,
   scratch?: AdsPackerScratch,
@@ -147,7 +160,8 @@ export function packAntiDeSitterDensityGrid(
   }
   const N = targetGridSize
   const total = N * N * N
-  const density = scratch ? scratch.density : new Uint16Array(total * 4)
+  const useScratch = !!scratch && isScratchCompatible(scratch, total)
+  const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 
   const resolved = resolveDelta(config.d, config.mL, config.branch)
   const delta = resolved.delta
@@ -167,11 +181,9 @@ export function packAntiDeSitterDensityGrid(
   // ψ < 0 (captures real-eigenstate nodal sign flips).
   let bulk: Float32Array
   let reField: Float32Array
-  if (scratch) {
-    bulk = scratch.bulk
-    reField = scratch.reField
-    // Stale voxels from a prior pack would bleed through the "outside the
-    // ball" skip — zero before the loop.
+  if (useScratch) {
+    bulk = scratch!.bulk
+    reField = scratch!.reField
     bulk.fill(0)
     reField.fill(0)
   } else {
@@ -235,8 +247,8 @@ export function packAntiDeSitterDensityGrid(
   let boundary: Float32Array | null = null
   let peakBoundary = 0
   if (config.boundaryOverlay) {
-    if (scratch) {
-      boundary = scratch.boundary
+    if (useScratch) {
+      boundary = scratch!.boundary
       boundary.fill(0)
     } else {
       boundary = new Float32Array(total)
@@ -367,10 +379,11 @@ export function packBtzThermalDensityGrid(
 ): AdsDensityUpload {
   const N = targetGridSize
   const total = N * N * N
-  const density = scratch ? scratch.density : new Uint16Array(total * 4)
+  const useScratch = !!scratch && isScratchCompatible(scratch, total)
+  const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
   let bulk: Float32Array
-  if (scratch) {
-    bulk = scratch.bulk
+  if (useScratch) {
+    bulk = scratch!.bulk
     bulk.fill(0)
   } else {
     bulk = new Float32Array(total)
@@ -390,8 +403,8 @@ export function packBtzThermalDensityGrid(
 
   let peakDensity = 0
   let horizonFlags: Uint8Array
-  if (scratch) {
-    horizonFlags = scratch.horizonFlags
+  if (useScratch) {
+    horizonFlags = scratch!.horizonFlags
     horizonFlags.fill(0)
   } else {
     horizonFlags = new Uint8Array(total)
@@ -505,7 +518,9 @@ export function packHkllReconstructedDensityGrid(
   targetGridSize: number = DENSITY_GRID_SIZE
 ): AdsDensityUpload {
   const N = targetGridSize
-  const density = scratch ? scratch.density : new Uint16Array(N * N * N * 4)
+  const total = N * N * N
+  const useScratch = !!scratch && scratch.density.length >= total * 4
+  const density = useScratch ? scratch!.density : new Uint16Array(total * 4)
 
   const resolved = resolveDelta(config.d, config.mL, config.branch)
   const delta = resolved.delta
@@ -531,14 +546,10 @@ export function packHkllReconstructedDensityGrid(
   const coarseTotal = C ** 3
   let reField: Float32Array
   let imField: Float32Array
-  if (scratch) {
-    // The pooled buffers are sized for max(C_s1, C_s2)³ — safe to use at
-    // either C. They must be zeroed before use because the coarse loop
-    // skips voxels outside the Poincaré ball, and stale values from the
-    // previous pack would otherwise propagate into the trilinear
-    // upsampler.
-    reField = scratch.hkllRe
-    imField = scratch.hkllIm
+  const useCoarseScratch = !!scratch && scratch.hkllRe.length >= coarseTotal
+  if (useCoarseScratch) {
+    reField = scratch!.hkllRe
+    imField = scratch!.hkllIm
     reField.subarray(0, coarseTotal).fill(0)
     imField.subarray(0, coarseTotal).fill(0)
   } else {

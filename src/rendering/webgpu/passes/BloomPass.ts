@@ -587,7 +587,11 @@ export class BloomPass extends WebGPUBasePass {
     const sceneView = ctx.getTextureView(this.sceneInputResource)
     const bloomInputView = ctx.getTextureView(this.bloomInputResource)
     const outputView = ctx.getWriteTarget(this.outputResource) ?? ctx.getCanvasTextureView()
-    if (!sceneView || !bloomInputView) return
+    if (!sceneView) return
+    if (!bloomInputView) {
+      this.renderCopy(ctx, sceneView, outputView)
+      return
+    }
 
     if (this.gain <= 0) {
       this.renderCopy(ctx, sceneView, outputView)

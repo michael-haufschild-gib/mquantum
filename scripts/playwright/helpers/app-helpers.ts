@@ -1113,7 +1113,9 @@ export async function applyPauliPreset(page: Page, presetId: string): Promise<vo
         '__PAULI_SCENARIO_PRESETS__/__EXTENDED_OBJECT_STORE__ missing on window — DEV bridge not registered'
       )
     }
-    const preset = presets.find((p: { id: string }) => p.id === id)
+    const preset = presets.find(
+      (p: { id: string; overrides?: Record<string, unknown> }) => p.id === id
+    ) as { id: string; overrides?: Record<string, unknown> } | undefined
     if (preset) {
       extStore.getState().setPauliConfig({
         ...preset.overrides,
