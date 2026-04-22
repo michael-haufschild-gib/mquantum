@@ -19,6 +19,7 @@ import {
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
+  FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
@@ -364,7 +365,7 @@ describe('writeFsfUniforms', () => {
       absorberEnabled: true,
       selfInteractionEnabled: false,
     })
-    const uniformData = new ArrayBuffer(528)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -391,7 +392,7 @@ describe('writeFsfUniforms', () => {
       selfInteractionEnabled: true,
       selfInteractionVev: 1.0,
     })
-    const uniformData = new ArrayBuffer(528)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -415,7 +416,7 @@ describe('writeFsfUniforms', () => {
       absorberEnabled: true,
       selfInteractionEnabled: false,
     })
-    const uniformData = new ArrayBuffer(528)
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
     const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
 
     writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
@@ -748,5 +749,57 @@ describe('computeFsfMaxPhiEstimate with self-interaction', () => {
     expect(withAutoOff).toBe(withAutoOn)
     expect(withAutoOff).toBeGreaterThan(0)
     expect(withAutoOff).not.toBe(1.0)
+  })
+
+  it('vacuum estimator diverges from isotropic baseline under anisotropic Bianchi-I', () => {
+    // Regression: `resolveVacuumAutoScale` must route through the
+    // axis-weighted dispersion when any aPotentialRatio_d ≠ 1, otherwise
+    // the visualizer mis-normalizes initial vacuum brightness on Kasner
+    // presets (collapses back to scalar `m²·a²`). Compare:
+    //   isotropic baseline — flat-Minkowski, no cosmology
+    //   anisotropic — bianchiKasner with the canonical (-1/3, 2/3, 2/3)
+    //                 triple, evaluated at η₀=2 (axis-weighted ω_k path)
+    // The estimates must differ; equality would prove the anisotropic
+    // metadata never reached `estimateVacuumMaxPhi`/`estimateVacuumEnergy`.
+    const base = {
+      initialCondition: 'vacuumNoise' as const,
+      latticeDim: 3,
+      gridSize: [32, 32, 32] as [number, number, number],
+      spacing: [0.15, 0.15, 0.15] as [number, number, number],
+      mass: 0.3,
+      fieldView: 'energyDensity' as const,
+    }
+    const isotropic = createConfig({
+      ...base,
+      autoScale: true,
+      cosmology: { ...DEFAULT_FREE_SCALAR_CONFIG.cosmology, enabled: false },
+    })
+    const anisotropic = createConfig({
+      ...base,
+      autoScale: true,
+      cosmology: {
+        ...DEFAULT_FREE_SCALAR_CONFIG.cosmology,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: 2,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    })
+
+    const phi0Iso = computeFsfMaxPhiEstimate(isotropic)
+    const phi0Aniso = computeFsfMaxPhiEstimate(anisotropic)
+
+    const isoEstimate = estimateFsfMaxFieldValue(isotropic, phi0Iso)
+    const anisoEstimate = estimateFsfMaxFieldValue(anisotropic, phi0Aniso)
+
+    expect(Number.isFinite(isoEstimate)).toBe(true)
+    expect(Number.isFinite(anisoEstimate)).toBe(true)
+    expect(isoEstimate).toBeGreaterThan(0)
+    expect(anisoEstimate).toBeGreaterThan(0)
+    // Must not collapse to the scalar-isotropic value — the axis ratios
+    // (1, 2, 2) shift the per-axis k-weighted ω, yielding a distinct
+    // brightness calibration. Same value would prove the anisotropic
+    // dispersion was silently reduced to the scalar branch.
+    expect(anisoEstimate).not.toBe(isoEstimate)
   })
 })

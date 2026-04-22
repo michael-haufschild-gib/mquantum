@@ -189,8 +189,12 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
       }))
     },
     setWdwGridDimensions: (gridNa: number, gridNphi: number) => {
-      if (!ctx.isFinite(gridNa) || !ctx.isFinite(gridNphi)) {
-        ctx.warnNonFinite('wheelerDeWitt.gridNa/gridNphi', NaN)
+      if (!ctx.isFinite(gridNa)) {
+        ctx.warnNonFinite('wheelerDeWitt.gridNa', gridNa)
+        return
+      }
+      if (!ctx.isFinite(gridNphi)) {
+        ctx.warnNonFinite('wheelerDeWitt.gridNphi', gridNphi)
         return
       }
       const clampedNa = clamp(Math.round(gridNa), 16, 1024)

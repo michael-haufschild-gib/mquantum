@@ -538,7 +538,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Reverse the transfer: predecessor reclaims the compute pass from this.strategy.
     // After this returns, this.strategy's compute pass is null (source.X = null inside
     // adoptComputeState) so our upcoming dispose() is a no-op on that state.
-    predecessor.strategy.adoptComputeState?.(this.strategy)
+    // Pass the predecessor's rendererConfig so the adoptee — which is now the
+    // *predecessor* — sees its own config as `nextConfig`, mirroring the
+    // forward-path semantic at line 195.
+    predecessor.strategy.adoptComputeState?.(this.strategy, predecessor.rendererConfig)
   }
 
   dispose(): void {

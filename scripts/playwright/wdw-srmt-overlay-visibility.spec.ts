@@ -101,8 +101,14 @@ async function setSrmtConfig(
     const setHeatmap = s.setWdwSrmtHeatmapIntensity as ((v: number) => void) | undefined
     if (!setEnabled) throw new Error('setWdwSrmtEnabled missing')
     setEnabled(c.enabled)
-    if (c.clock && setClock) setClock(c.clock)
-    if (typeof c.heatmapIntensity === 'number' && setHeatmap) setHeatmap(c.heatmapIntensity)
+    if (c.clock) {
+      if (!setClock) throw new Error('setWdwSrmtClock missing')
+      setClock(c.clock)
+    }
+    if (typeof c.heatmapIntensity === 'number') {
+      if (!setHeatmap) throw new Error('setWdwSrmtHeatmapIntensity missing')
+      setHeatmap(c.heatmapIntensity)
+    }
   }, cfg)
 }
 

@@ -131,8 +131,12 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Guards against per-frame console spam from the "pipeline not initialized"
    * warning. `execute()` runs every frame; `createPipeline` is async. Between
    * mount and first pipeline-ready frame, the warning would otherwise fire
-   * 20-60 times per mode switch. Reset back to `false` whenever the pipeline
-   * becomes `null` so a genuine stuck-init re-triggers the signal.
+   * 20-60 times per mode switch. The flag flips back to `false` in two
+   * places — both intentional:
+   *   - `execute()` once the pipeline becomes ready (so a future re-init
+   *     that gets stuck mid-flight will warn again instead of being silently
+   *     suppressed by a leftover `true`)
+   *   - `dispose()` when GPU resources are torn down for the same reason
    */
   private hasWarnedPipelineNotReady = false
   // Version tracking for uniform buffers - prevents unnecessary recomputation

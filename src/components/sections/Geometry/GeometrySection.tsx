@@ -8,7 +8,7 @@ import React, { useCallback } from 'react'
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { ToggleGroup, type ToggleOption } from '@/components/ui/ToggleGroup'
-import { type DensityGridResolution, usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 import { DimensionSelector } from './DimensionSelector'
 import { ObjectSettingsSection } from './ObjectSettingsSection'
@@ -33,7 +33,10 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
 
     const handleGridResolutionChange = useCallback(
       (value: string) => {
-        setDensityGridResolution(Number(value) as DensityGridResolution)
+        const parsed = Number(value)
+        if (parsed === 64 || parsed === 96 || parsed === 128 || parsed === 256) {
+          setDensityGridResolution(parsed)
+        }
       },
       [setDensityGridResolution]
     )

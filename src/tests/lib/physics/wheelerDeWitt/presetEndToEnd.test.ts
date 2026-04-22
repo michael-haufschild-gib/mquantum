@@ -170,15 +170,30 @@ describe('WDW preset end-to-end pipeline', () => {
         }
       })
 
-      it('density packer produces finite, unit-normalised R channel', () => {
+      it('density packer produces finite, unit-normalised R channel and log-paired G channel', () => {
         const packed = packWdwDensityGrid(output, null, undefined, 32)
         const floats = new Float32Array(packed.density.length)
         for (let i = 0; i < packed.density.length; i++) {
           floats[i] = decodeFloat16(packed.density[i]!)
         }
-        // R, G, B, A layout — step 4.
+        // R, G, B, A layout — step 4. The packer contract is:
+        //   R = rhoNorm (capped/normalised |χ|², clamped to [0, 1])
+        //   G = log(rhoNorm + LOG_DENSITY_EPSILON) — log-density companion.
+        //       Note: G is computed from rhoNorm BEFORE the f16 round-trip,
+        //       so it can be far below log(R_decoded + eps) for cells where
+        //       rhoNorm < float16 precision (R rounds to 0 but G keeps the
+        //       log signal). The assertion compares G to its f16 ceiling
+        //       (`log(1 + eps) ≈ 0`) and floor (`log(eps) ≈ -23`), and
+        //       asserts the matched-pair log relationship only on cells
+        //       where R is large enough to survive the f16 round-trip.
+        //   B = arg(χ) ∈ (−π, π]
+        //   A = overlay alpha ∈ [0, 1]
+        const LOG_DENSITY_EPSILON = 1e-10
+        const G_FLOOR = Math.log(LOG_DENSITY_EPSILON) // ≈ -23.026
+        const G_CEIL = Math.log(1 + LOG_DENSITY_EPSILON) // ≈ 1e-10
         for (let i = 0; i < packed.density.length; i += 4) {
           const R = floats[i]! // rho normalised
+          const G = floats[i + 1]! // log(R + eps)
           const B = floats[i + 2]! // arg(χ)
           const A = floats[i + 3]! // overlay alpha
           expect(Number.isFinite(R)).toBe(true)
@@ -186,6 +201,21 @@ describe('WDW preset end-to-end pipeline', () => {
           // The mix+clamp in the packer guarantees R ≤ 1; float16
           // round-trip preserves the bound.
           expect(R).toBeLessThanOrEqual(1 + 1e-3)
+          // G must be a finite, log-shaped value in the closed interval
+          // `[log(eps), log(1+eps)]`. Anything outside this band would
+          // indicate the channel was repurposed (overlay leak, raw rho,
+          // phase, etc.) — the regression CodeRabbit asked us to catch.
+          expect(Number.isFinite(G)).toBe(true)
+          // 1.0 of float16 slack on each end accounts for the worst-case
+          // mantissa step in the relevant exponent band.
+          expect(G).toBeGreaterThanOrEqual(G_FLOOR - 1.0)
+          expect(G).toBeLessThanOrEqual(G_CEIL + 1.0)
+          // For cells where R survived the f16 round-trip with reasonable
+          // precision, G must equal log(R + eps) within float16 slack.
+          if (R > 1e-3) {
+            const expectedG = Math.log(R + LOG_DENSITY_EPSILON)
+            expect(Math.abs(G - expectedG)).toBeLessThan(0.05)
+          }
           expect(Number.isFinite(B)).toBe(true)
           // arg(χ) ∈ (-π, π] + small float16 slack.
           expect(B).toBeGreaterThanOrEqual(-Math.PI - 1e-3)

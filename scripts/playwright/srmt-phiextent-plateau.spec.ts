@@ -3,7 +3,8 @@
  *
  * Runs a single 9-point `phiExtent` sweep across [1.0, 10.0] and writes
  * the parsed CSV plus a plateau-analysis block to
- * `/tmp/srmt-phiextent-plateau-results.json`.
+ * `<os.tmpdir()>/srmt-phiextent-plateau-results.json` (e.g. `/tmp/...`
+ * on Linux/macOS; the per-OS Windows temp dir on Windows runners).
  *
  * Publication contract (see `docs/physics/srmt-metric.md`): a metric
  * that does not plateau under window expansion carries an unbounded

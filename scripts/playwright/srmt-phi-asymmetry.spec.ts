@@ -193,9 +193,20 @@ test.describe('Wheeler–DeWitt — SRMT φ-axis mass-asymmetry', () => {
       let finiteCount = 0
       let maxDiff = 0
       for (const p of points) {
-        if (p.qPhi1 !== null && p.qPhi2 !== null) {
+        // `page.evaluate` preserves NaN, so a broken sweep that returns
+        // NaN-pairs would otherwise satisfy a non-null check while
+        // leaving `maxDiff` stuck at 0 — making the precondition a
+        // false-positive guard. Require Number.isFinite on both clocks.
+        const qPhi1 = p.qPhi1
+        const qPhi2 = p.qPhi2
+        if (
+          typeof qPhi1 === 'number' &&
+          Number.isFinite(qPhi1) &&
+          typeof qPhi2 === 'number' &&
+          Number.isFinite(qPhi2)
+        ) {
           finiteCount += 1
-          const d = Math.abs(p.qPhi1 - p.qPhi2)
+          const d = Math.abs(qPhi1 - qPhi2)
           if (d > maxDiff) maxDiff = d
         }
       }

@@ -453,7 +453,7 @@ describe('sampleAdiabaticVacuum', () => {
     expect(ratio).toBeGreaterThan(0.5)
   })
 
-  it('reduces bit-identically to the FLRW path under isotropic Bianchi-I ratios', () => {
+  it('produces finite outputs under isotropic-degenerate Bianchi-I ratios', () => {
     // Sanity check: if the Bianchi-I triple is degenerate (1/3, 1/3, 1/3)
     // — the isotropic FLRW-like subset — the anisotropy detector sees
     // ratios = 1 and routes through the scalar-massSq path. The output

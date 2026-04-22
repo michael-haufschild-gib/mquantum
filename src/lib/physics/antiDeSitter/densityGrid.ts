@@ -142,7 +142,20 @@ function isScratchCompatible(scratch: AdsPackerScratch, total: number): boolean 
 }
 
 /**
+ * Top-level density-grid dispatcher for the Anti-de Sitter mode. Routes to
+ * one of three packers based on which AdS variant is active (mutex-enforced
+ * by the store; if both flags are set the HKLL story wins because it's the
+ * more specialised reconstruction):
  *
+ *   - HKLL bulk-from-boundary reconstruction (`config.hkllEnabled`)
+ *   - BTZ thermal Hartle-Hawking correlator (`config.btzEnabled && d === 3`)
+ *   - Bound-state eigenstate (default fallback)
+ *
+ * @param config - Resolved AdS configuration (preset + overrides)
+ * @param scratch - Optional reusable scratch buffers; reallocated if the
+ *                  shape doesn't match `targetGridSize³`.
+ * @param targetGridSize - Edge length of the cubic density grid in voxels.
+ * @returns Packed RGBA16F density texture upload + diagnostic metadata.
  */
 export function packAntiDeSitterDensityGrid(
   config: AntiDeSitterConfig,

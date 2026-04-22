@@ -153,12 +153,13 @@ describe('WDW multi-condition edge cases', () => {
     }
   })
 
-  it('handles densityContrast = 1 exactly (edge of smoothstep width = 1)', () => {
-    // `applyDensityContrast` sets width = 1 / densityContrast; with
-    // densityContrast = 1 the smoothstep spans [0, 1] identically,
-    // so the call reduces to a gentle S-curve. Assert the packer
-    // produces the same layout as for densityContrast = 2 (different
-    // R but same packing shape).
+  it('packer produces finite, deterministic output across repeated calls', () => {
+    // `packWdwDensityGrid` is deterministic — the same solver output must
+    // pack to byte-identical buffers on repeated invocations and every
+    // half-precision texel must decode to a finite value (no NaN/Inf via
+    // the 0x1f exponent code). Density-contrast smoothstep tuning lives
+    // in the shader (the packer doesn't accept a contrast parameter), so
+    // this test guards the packer's deterministic-finite contract only.
     const output = solveSmall()
     const { density: packedLow } = packWdwDensityGrid(output, null, undefined, 16)
     const { density: packedHigh } = packWdwDensityGrid(output, null, undefined, 16)

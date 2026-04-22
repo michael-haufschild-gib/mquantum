@@ -160,6 +160,10 @@ describe('reggeWheeler — defensive input guards', () => {
     // above didn't collapse the asymmetry.
     const v = computeReggeWheelerPotential(2.0, Number.NaN, 2, 2)
     expect(Number.isFinite(v)).toBe(true)
+    // Number.isFinite(0) is true, so without this we'd silently miss a
+    // regression that collapses the M-clamp into a zero-fallback — the
+    // existing guard must produce a non-zero clamped value.
+    expect(v).not.toBe(0)
   })
 })
 

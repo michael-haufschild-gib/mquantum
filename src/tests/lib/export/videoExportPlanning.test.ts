@@ -94,8 +94,7 @@ describe('videoExportPlanning', () => {
     it('falls back to export dimensions when crop width is non-positive', () => {
       // crop.enabled=true but crop.width<=0 must still route through the
       // early-return path — otherwise division by zero would corrupt
-      // scaleX and downstream renderWidth. Exercises the guard at
-      // videoExportPlanning.ts:81-88.
+      // scaleX and downstream renderWidth.
       const result = computeRenderDimensions({
         exportWidth: 1920,
         exportHeight: 1080,

@@ -99,7 +99,7 @@ describe('Hartle–Hawking boundary', () => {
     }
     const { chi, chiDeriv } = hartleHawkingBoundary(input)
     const centre = 8 * 17 + 8
-    const inner = 8 * 17 + 9 // adjacent cell at (i1=8, i2=9) with φ₁=0, φ₂≈0.22
+    const inner = 8 * 17 + 9 // adjacent cell at (i1=8, i2=9) with φ₁=0, φ₂=0.4375
     const ampCentre = chi[2 * centre]!
     const ampInner = chi[2 * inner]!
     const dChiCentre = chiDeriv[2 * centre]!
@@ -190,10 +190,12 @@ describe('Hartle–Hawking boundary', () => {
     // Corner cell at φ = (-phiExtent, -phiExtent) → env = exp(-phiExtent²).
     const cornerEnv = Math.exp(-0.5 * (phiExtent ** 2 + phiExtent ** 2))
     expect(chi[2 * cornerIdx]!).toBeCloseTo(cornerEnv, 3)
-    // Full-grid derivative check: every cell has zero a-derivative.
+    // Full-grid derivative check: every cell has near-zero a-derivative.
+    // Use toBeCloseTo so floating-point noise from the envelope eval can't
+    // break the strict-zero pinning even though the analytic value is 0.
     for (let i = 0; i < chiDeriv.length; i += 2) {
-      expect(chiDeriv[i]!).toBe(0)
-      expect(chiDeriv[i + 1]!).toBe(0)
+      expect(chiDeriv[i]!).toBeCloseTo(0, 10)
+      expect(chiDeriv[i + 1]!).toBeCloseTo(0, 10)
     }
   })
 
@@ -217,7 +219,7 @@ describe('Hartle–Hawking boundary', () => {
     const centreIdx = cMid * Nphi + cMid
     // Origin cell φ = (0, 0) → V = -0.5 < 0 → Gaussian envelope, amp = 1.
     expect(chi[2 * centreIdx]!).toBeCloseTo(1.0, 6)
-    expect(chiDeriv[2 * centreIdx]!).toBe(0)
+    expect(chiDeriv[2 * centreIdx]!).toBeCloseTo(0, 10)
   })
 })
 

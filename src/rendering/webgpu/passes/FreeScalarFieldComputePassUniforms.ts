@@ -81,6 +81,7 @@ import {
   estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
+  type VacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
@@ -439,17 +440,21 @@ export function writeFsfUniforms(
  */
 interface VacuumAutoScale {
   /**
-   * Scalar dispersion for the auto-scale estimators — either `'kgFloor'`
-   * (Minkowski / cosmology-disabled) or a numeric `m²·a²(η₀)`. The
-   * Bianchi-I anisotropic variant of {@link VacuumDispersion} is never
-   * returned here: non-vacuum initial conditions (singleMode /
-   * gaussianPacket / kinkProfile) compute their own per-mode ω via the
-   * `config.modeK` / `packetCenter` hooks downstream, so the sampler's
-   * axis-weighting is not plumbed through this estimator — the returned
-   * `dispersion` must be a plain number so consumer code can use it in
-   * arithmetic.
+   * Dispersion for the auto-scale estimators. Three branches mirror the
+   * actual sampler's dispatch in `sampleAdiabaticVacuum`:
+   *
+   * - `'kgFloor'` — Minkowski / cosmology-disabled. Klein-Gordon
+   *   `ω² = k_lat² + max(m, M_FLOOR)²`.
+   * - `number` — isotropic FLRW. Scalar `m²·a²(η₀)` forwarded to the
+   *   Mukhanov-Sasaki branch via `ω² = k_lat² + m²·a²(η₀)`.
+   * - `AnisotropicVacuumDispersion` — genuinely anisotropic Bianchi-I
+   *   (any `aPotentialRatio_i ≠ 1`). Carries per-axis `axisPotentials`
+   *   plus `kineticScale = aKinetic` so the brightness estimator
+   *   integrates the same axis-weighted ω the actual sampler uses.
+   *   Without this branch the visualizer mis-normalizes initial vacuum
+   *   brightness on Kasner presets — see #62 review.
    */
-  dispersion: 'kgFloor' | number
+  dispersion: VacuumDispersion
   aPotential: number
   aFull: number
 }
@@ -465,6 +470,25 @@ function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
   // sites operate in the flat-space branch.
   const aPotential = coefs.aPotential > 0 ? coefs.aPotential : 1
   const aFull = coefs.aFull > 0 ? coefs.aFull : 1
+  const ratio1 = coefs.aPotentialRatio1 ?? 1
+  const ratio2 = coefs.aPotentialRatio2 ?? 1
+  const anisotropic = ratio1 !== 1 || ratio2 !== 1
+  if (anisotropic && Number.isFinite(coefs.aKinetic) && coefs.aKinetic > 0) {
+    // Mirror `sampleAdiabaticVacuum`: axisPotentials_d = aPotential · ratio_d
+    // (Bianchi-I touches only the three spatial axes; extra dims keep the
+    // axis-0 weight). massSqEff = m²·aFull. kineticScale = aKinetic.
+    const massSqEff = config.mass * config.mass * aFull
+    if (Number.isFinite(massSqEff)) {
+      const axisPotentials = new Array<number>(config.latticeDim).fill(aPotential)
+      if (config.latticeDim > 1) axisPotentials[1] = aPotential * ratio1
+      if (config.latticeDim > 2) axisPotentials[2] = aPotential * ratio2
+      return {
+        dispersion: { massSq: massSqEff, axisPotentials, kineticScale: coefs.aKinetic },
+        aPotential,
+        aFull,
+      }
+    }
+  }
   const aSq = aFull / aPotential // a^n / a^(n−2) = a²
   return {
     dispersion: config.mass * config.mass * aSq,
@@ -598,8 +622,21 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
   }
 
   // Non-vacuum modes (singleMode, gaussianPacket, kinkProfile):
-  // physical dispersion ω² = k_lat² + m²·a².
-  let omegaSq = dispersion === 'kgFloor' ? config.mass * config.mass : dispersion
+  // physical dispersion ω² = k_lat² + m²·a². Anisotropic Bianchi-I
+  // metadata is stripped here: per-mode ω for these initial conditions
+  // is computed downstream via `config.modeK` / `packetCenter`, so the
+  // axis-weighting isn't plumbed through this scalar estimator.
+  let scalarMassSq: number
+  if (dispersion === 'kgFloor') {
+    scalarMassSq = config.mass * config.mass
+  } else if (typeof dispersion === 'number') {
+    scalarMassSq = dispersion
+  } else {
+    // Anisotropic record — collapse to the carried scalar massSq for
+    // the non-vacuum estimator's flat-mass term.
+    scalarMassSq = dispersion.massSq
+  }
+  let omegaSq = scalarMassSq
   for (let d = 0; d < config.latticeDim; d++) {
     const N = config.gridSize[d]!
     const a = config.spacing[d]!
