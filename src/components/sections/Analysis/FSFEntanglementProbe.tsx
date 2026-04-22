@@ -251,7 +251,24 @@ export const FSFEntanglementProbe: React.FC = React.memo(() => {
       // scheduled dispatch is already stale.
       if (dispatchedEpoch !== epochRef.current) return
       const dispersion = computeFsfVacuumDispersion(fsf, cosmologyEta0)
-      const massSq = dispersion === 'kgFloor' ? mass * mass : dispersion
+      // Collapse the vacuum-dispersion enum back to a scalar massSq for
+      // the Peschel worker. The anisotropic Bianchi-I variant (an object)
+      // is not consumed here because the probe computes its own per-mode
+      // ω spectrum; we feed it `m²·a²(η)` instead, matching what the
+      // worker's existing formula expects.
+      let massSq: number
+      if (dispersion === 'kgFloor') {
+        massSq = mass * mass
+      } else if (typeof dispersion === 'number') {
+        massSq = dispersion
+      } else {
+        // Bianchi-I anisotropic variant — collapse to kineticScale·massSq
+        // (its scalar ω² contribution). Under the Bianchi-I vacuum preset
+        // at η₀=1.5 this equals m²·a² exactly (aKinetic=aFull=1 at t=1);
+        // at non-symmetric η it approximates the FLRW trace the probe
+        // already assumes.
+        massSq = dispersion.kineticScale * dispersion.massSq
+      }
       // Thread the full N-D lattice geometry through to the worker so it
       // can build the slice correlator by summing over transverse k modes.
       // Slicing the stored config at `latticeDim` drops any stale entries

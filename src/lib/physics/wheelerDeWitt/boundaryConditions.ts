@@ -76,8 +76,21 @@ function indexToPhi(i: number, Nphi: number, phiExtent: number): number {
  * relation χ' = −|dS_E/da|·χ. Setting χ' = 0 (classically symmetric between
  * growing and decaying branches) would let the non-physical growing branch
  * dominate the march and saturate the solver's overflow clamp at the cube
- * corners. Outside the bounce or in the V ≤ 1e-12 fallback the WKB relation
- * is ill-defined, so we fall back to χ' = 0.
+ * corners.
+ *
+ * Small-V limit (|V| ≤ WDW_HH_SMALL_V_THRESHOLD): the 1/V factor in S_E is
+ * removable. The first-order Taylor expansion gives
+ * `S_E(a, φ) → −K·a²/2 + O(V)`, so `|S_E| → K·a²/2` and
+ * `dS_E/da → −K·a`. Using this continuous small-V form (instead of a
+ * discrete amp = exp(−½|φ|²) / dChi = 0 fallback) eliminates the O(0.04)
+ * amplitude discontinuity and O(0.8) derivative discontinuity that the
+ * prior fallback introduced at V = 0 cells (origin for Λ = 0, m > 0 —
+ * five out of six curated presets).
+ *
+ * Classically forbidden region (V > 0 and `1 − K·V·a² ≤ 0`, i.e.,
+ * `a ≥ a_turn`): fall back to the exponentially damped tail — the WKB
+ * relation is ill-defined past the turning surface and the `(arg)^{3/2}`
+ * branch goes complex.
  *
  * @param input - Grid + physics inputs
  * @returns Real-valued (im = 0) boundary field
@@ -89,6 +102,12 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
   const chiDeriv = allocComplexGrid(Nphi)
   const a2 = aMin * aMin
 
+  // Free case (V ≡ 0 across the grid): no potential defines an amplitude,
+  // so we use a Gaussian-in-φ envelope as a conventional gauge choice and
+  // let the solver's leapfrog + Neumann ghost evolve it. `mass = 0` with
+  // `lambda = 0` is the only way V is identically zero at every cell.
+  const isFreeCase = mass === 0 && lambda === 0
+
   for (let i1 = 0; i1 < Nphi; i1++) {
     const phi1 = indexToPhi(i1, Nphi, phiExtent)
     for (let i2 = 0; i2 < Nphi; i2++) {
@@ -97,13 +116,36 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
       const idx = i1 * Nphi + i2
       let amp: number
       let dChi = 0
-      if (V <= 1e-12) {
-        // Λ ≤ 0 region: fall back to exponential damping in φ.
+      // Per-cell branch selection. The previous `isAdsCase = lambda < 0`
+      // gate flipped every column to the Gaussian envelope as soon as
+      // Λ < 0, even outer-φ columns where `V(φ) = 0.5·m²·(φ₁²+φ₂²) + Λ`
+      // is positive and a genuine turning surface exists. Those outer
+      // cells legitimately want the HH V-dependent seed; the global
+      // gate suppressed their φ-structure. Pick per cell: V < 0 →
+      // Gaussian gauge (AdS cell); V ≥ 0 → HH WKB seed (the existing
+      // small-V branch already smoothly handles V = 0).
+      const isAdsCell = V < 0
+      if (isFreeCase || isAdsCell) {
+        // Gauge-choice Gaussian envelope for cells with no classical
+        // turning surface (V ≤ 0) and for the identically-free grid.
         amp = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
+      } else if (V <= WDW_HH_SMALL_V_THRESHOLD) {
+        // Small-positive-V limit (and V = 0 columns inside a V > 0 grid):
+        //   (arg^{3/2} − 1) / (3V)  →  −K·a²/2  as V → 0⁺,
+        // with derivative `dS_E/da → −K·a`. Applying this continuous
+        // small-V form removes the O(0.04) amp discontinuity and O(0.8)
+        // dChi discontinuity the legacy V ≤ 1e-12 fallback introduced at
+        // origin cells of Λ = 0 presets (noBoundaryBaseline, deWittOrigin,
+        // inflationHighMass use HH-family BCs that hit this path at the
+        // grid centre). Gated on `!isAdsCase && !isFreeCase` so truly-zero
+        // V grids retain the Gaussian-envelope gauge choice.
+        amp = Math.exp(-0.5 * WDW_G_PREFACTOR * a2)
+        dChi = -WDW_G_PREFACTOR * aMin * amp
       } else {
+        // V > WDW_HH_SMALL_V_THRESHOLD: full HH formula.
         const arg = 1.0 - a2 * WDW_G_PREFACTOR * V
         if (arg <= 0) {
-          // Classically forbidden region — damped tail.
+          // a_min sits past the turning surface — damped tail.
           amp = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
         } else {
           const Se = (1.0 / (3.0 * V)) * (Math.pow(arg, 1.5) - 1.0)
@@ -121,6 +163,21 @@ export function hartleHawkingBoundary(input: WdwBoundaryInputs): WdwBoundaryFiel
   }
   return { chi, chiDeriv }
 }
+
+/**
+ * Threshold below which the HH boundary generator uses the small-V
+ * Taylor expansion of `S_E` rather than the literal
+ * `(arg^{3/2} − 1) / (3·V)` formula. The Taylor expansion gives
+ * `S_E(a, φ) = −K·a²/2 − K²·a⁴·V/8 + O(V²)`; the next-order correction
+ * is `O(V)`, so at V ~ 1e-6 the amp error is `|K²·a⁴·V/8| ~ 1e-10` at
+ * `a = a_min = 0.1` — below f32 mantissa precision. Chosen larger than
+ * 1/V's singular region (V ~ 1e-12) to also absorb IEEE-754 rounding
+ * noise around V = 0 for the Λ = 0 presets' origin cell.
+ *
+ * Only the "small-positive-V" path uses this constant; columns with
+ * V < 0 fall through the `isAdsCase` branch instead.
+ */
+const WDW_HH_SMALL_V_THRESHOLD = 1e-6
 
 /**
  * Vilenkin tunneling boundary data.

@@ -182,7 +182,26 @@ describe('buildShaderConfig', () => {
     expect(config.interference).toBe(false)
     expect(config.uncertaintyBoundary).toBe(false)
     expect(config.temporalAccumulation).toBe(false)
+    // `isFreeScalar` = compute-grid mode flag (all compute modes).
+    // `isFreeScalarField` = strictly the FSF mode — must be false for TDSE.
     expect(config.isFreeScalar).toBe(true)
+    expect(config.isFreeScalarField).toBe(false)
+  })
+
+  it('separates compute-grid flag from the true FSF semantic', () => {
+    const fsf = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'freeScalarField' })
+    expect(fsf.isFreeScalar).toBe(true)
+    expect(fsf.isFreeScalarField).toBe(true)
+
+    const wdw = buildShaderConfig({ ...BASE_CONFIG, quantumMode: 'wheelerDeWitt' })
+    // WdW shares the compute-grid pipeline but writes continuous phase,
+    // so it must NOT be classified as binary-sign (isFreeScalarField).
+    expect(wdw.isFreeScalar).toBe(true)
+    expect(wdw.isFreeScalarField).toBe(false)
+
+    const ho = buildShaderConfig(BASE_CONFIG)
+    expect(ho.isFreeScalar).toBe(false)
+    expect(ho.isFreeScalarField).toBe(false)
   })
 
   it('enables analytic features for HO mode', () => {

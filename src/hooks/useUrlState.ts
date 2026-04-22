@@ -321,6 +321,16 @@ function applyWdwParams(
       (s) => s.wdwCosmologicalConstant,
       (s, e) => e.setWdwCosmologicalConstant(s.wdwCosmologicalConstant!)
     ),
+    // Grid dimensions — physics-relevant: different Nphi/Na produce
+    // numerically different χ. Applied as a single `setWdwGridDimensions`
+    // call so both fields flip `needsReset` atomically (one solver re-run
+    // per URL apply, not two).
+    (s, e) => {
+      if (s.wdwGridNa !== undefined || s.wdwGridNphi !== undefined) {
+        const current = e.schroedinger.wheelerDeWitt
+        e.setWdwGridDimensions(s.wdwGridNa ?? current.gridNa, s.wdwGridNphi ?? current.gridNphi)
+      }
+    },
     apply(
       (s) => s.wdwStreamlinesEnabled,
       (s, e) => e.setWdwStreamlinesEnabled(s.wdwStreamlinesEnabled!)
@@ -349,6 +359,10 @@ function applyWdwParams(
     apply(
       (s) => s.wdwWorldlinePulseWidth,
       (s, e) => e.setWdwWorldlinePulseWidth(s.wdwWorldlinePulseWidth!)
+    ),
+    apply(
+      (s) => s.wdwRenderDynamicRange,
+      (s, e) => e.setWdwRenderDynamicRange(s.wdwRenderDynamicRange!)
     ),
     // SRMT diagnostic — display-only; these setters do not flip needsReset.
     apply(

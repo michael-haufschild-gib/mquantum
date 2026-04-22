@@ -289,6 +289,14 @@ export function dispatchAndReadbackVortexDetect(
         clearIfCurrent()
       })
       .catch((err) => {
+        // Stale-buffer rejections during dispose/rebuild races are
+        // expected — the staging buffer has been destroyed by the new
+        // dispatch's setup. Suppress those silently; only warn when the
+        // buffer the closure captured is still the live one.
+        if (state.generation !== dispatchGen || state.stagingBuffer !== staging) {
+          clearIfCurrent()
+          return
+        }
         // Match the TDSEWormholeReadback sibling — surface device-lost,
         // OOM, or buffer-validation errors via logger.warn instead of
         // swallowing silently, which would hide real GPU health signals

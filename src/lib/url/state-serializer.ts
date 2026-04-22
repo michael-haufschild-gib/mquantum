@@ -273,6 +273,10 @@ export interface ShareableObjectState extends AdsUrlState, SrmtUrlState, SrmtSwe
   wdwInflatonMassAsymmetry?: number
   /** Wheeler–DeWitt cosmological constant Λ */
   wdwCosmologicalConstant?: number
+  /** Wheeler–DeWitt solver grid size — `Na` scale-factor steps (16..1024). */
+  wdwGridNa?: number
+  /** Wheeler–DeWitt solver grid size — `Nphi` φ-axis points (8..128). */
+  wdwGridNphi?: number
   /** Wheeler–DeWitt WKB streamline overlay toggle */
   wdwStreamlinesEnabled?: boolean
   /** Wheeler–DeWitt streamline seed density (2-16) */
@@ -287,6 +291,11 @@ export interface ShareableObjectState extends AdsUrlState, SrmtUrlState, SrmtSwe
   wdwWorldlineSpeed?: number
   /** Wheeler–DeWitt worldline Gaussian pulse width in normalized progress (0.02-0.3) */
   wdwWorldlinePulseWidth?: number
+  /**
+   * Wheeler–DeWitt R-channel render headroom (dynamic range slider; 1..10 000).
+   * Default 100 is elided from the URL by the Wheeler–DeWitt serializer.
+   */
+  wdwRenderDynamicRange?: number
 
   // ── Anti-de Sitter (Stage 1 + Stage 2A BTZ) ─────────────────────────────
   // AdS / BTZ fields inherited from `AdsUrlState` — see adsSerializer.ts.

@@ -61,14 +61,39 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   isWigner?: boolean
   /** Use pre-computed Wigner cache texture instead of inline evaluation. */
   useWignerCache?: boolean
-  /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
+  /**
+   * Compute mode flag — true for every mode that writes into the density
+   * grid (FSF, TDSE, BEC, Dirac, QuantumWalk, Pauli, Wheeler–DeWitt).
+   * Gates: cube (not sphere) bounding-volume intersection, negative-A
+   * potential-overlay path, and the "no inline fallback" safety branch.
+   * Historically named `isFreeScalar` and conflated with the "true FSF"
+   * semantic, which mis-typed WdW as binary-sign-phase and broke the
+   * diverging Re/Im algorithm. The two are now separate.
+   */
   isFreeScalar?: boolean
+  /**
+   * Strictly true for the free-scalar-field mode (`quantumMode ===
+   * 'freeScalarField'`). Only this mode writes binary-sign phase
+   * `{0, π}` — the diverging color algorithm must use `cos(phase)` to
+   * extract the sign rather than `sin(phase)` (see HAS_BINARY_SIGN_PHASE).
+   * WdW writes continuous `atan2(im, re)` and must NOT be in this set.
+   */
+  isFreeScalarField?: boolean
   /** Compute mode has a pre-computed normal grid texture at binding 7. */
   hasPrecomputedNormals?: boolean
   /** Quantum walk mode — discrete lattice, density brightness uses linear rho. */
   isQuantumWalk?: boolean
   /** Pauli spinor mode — alpha encodes density, not potential. */
   isPauli?: boolean
+  /**
+   * AdS (anti-de Sitter) mode. Rides on the shared Schrödinger shader
+   * composition path, so the top-level `quantumMode` is narrowed to
+   * `'harmonicOscillator'` by `rendererConfigUtils` even for AdS. This
+   * separate flag lets the composer emit AdS-specific compile-time
+   * constants (currently: the binary-sign-phase fallback in color
+   * algorithm 9). Leave `false` for every non-AdS mode.
+   */
+  isAds?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
@@ -118,6 +143,9 @@ export interface DerivedShaderFlags {
   needsCosine: boolean
   needsOklab: boolean
   usePrecomputedNormals: boolean
+  /** Strictly true for the free-scalar-field mode; see composeConfig
+   *  field doc for the binary-sign-phase rationale. Defaults to false. */
+  isFreeScalarField: boolean
 }
 
 /**
@@ -134,6 +162,7 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
     useRobustEigenInterpolation: useRobustEigenInterpolationFlag = true,
     isWigner = false,
     isFreeScalar = false,
+    isFreeScalarField = false,
     useDensityGrid = false,
     termCount,
   } = config
@@ -175,6 +204,7 @@ export function derivedShaderFlags(config: SchroedingerWGSLShaderConfig): Derive
     needsCosine,
     needsOklab,
     usePrecomputedNormals,
+    isFreeScalarField,
   }
 }
 
@@ -205,9 +235,11 @@ export function buildShaderDefinesAndFeatures(flags: {
   densityGridHasPhase: boolean
   densityGridSize: number
   isFreeScalar: boolean
+  isFreeScalarField: boolean
   usePrecomputedNormals: boolean
   isQuantumWalk: boolean
   isPauli: boolean
+  isAds: boolean
   useWignerCache: boolean
   crossSectionEnabled: boolean
   probabilityCurrentEnabled: boolean
@@ -297,6 +329,17 @@ export function buildShaderDefinesAndFeatures(flags: {
   defines.push(`const IS_FREE_SCALAR: bool = ${flags.isFreeScalar};`)
   defines.push(`const IS_QUANTUM_WALK: bool = ${flags.isQuantumWalk};`)
   defines.push(`const IS_PAULI: bool = ${flags.isPauli};`)
+  // Binary-sign phase: ONLY the free-scalar-field mode (not all compute
+  // modes), Wigner, and AdS write phase = {0, π} based on sign(field).
+  // Phase-based color algorithms that extract the sign via `sin(phase)`
+  // (e.g. algorithm 9 Diverging with useImag = true) see ≈ 0 for both
+  // values and produce no signal. The algorithms gate on this const to
+  // fall back to `cos(phase)` extraction for binary-phase modes, which
+  // correctly recovers the sign as ±1. WdW writes continuous
+  // `atan2(im, re)` phase and must NOT be classified binary.
+  const hasBinarySignPhase = flags.isFreeScalarField || flags.isWigner || flags.isAds
+  defines.push(`const IS_ADS: bool = ${flags.isAds};`)
+  defines.push(`const HAS_BINARY_SIGN_PHASE: bool = ${hasBinarySignPhase};`)
   // Pre-computed gradient normals: enabled for density-grid analytic modes (HO/hydrogen)
   // and any compute mode that explicitly provides a normal grid (e.g. FSF).
   defines.push(`const USE_PRECOMPUTED_NORMALS: bool = ${flags.usePrecomputedNormals};`)

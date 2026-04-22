@@ -140,14 +140,21 @@ describe('packWdwDensityGrid — SRMT overlay', () => {
     const { density: withSrmt } = packWdwDensityGrid(output, null, srmt)
 
     const N = DENSITY_GRID_SIZE
-    // Sample a few voxels on a plane that is NOT the SRMT cut — all of R
-    // (density), G (log-density), and B (phase) must match the baseline
-    // exactly. Asserting G closes the previous blind spot where log-density
-    // regressions could slip through unnoticed.
+    // Sample voxels that are demonstrably OUTSIDE the SRMT cut band. The
+    // cut disk at `cutIndex=3` with `clockAxisLen=10` centres on
+    // density-x `= 3/9 ≈ 0.333` with half-width `1.5 / N ≈ 0.0156`, so
+    // any voxel with `(x + 0.5)/N` outside `[0.317, 0.349]` is safely
+    // unaffected. The grid corners `(0,…)`, `(N-1,…)` are trivially
+    // outside; the third sample is anchored at `N/5` (tx ≈ 0.20), far
+    // enough from the cut that the SRMT alpha cannot leak in via the
+    // cut-disk half-width. Inside the cut the SRMT overlay boosts the
+    // log-density channel by `srmtAlpha · maxRho`, so a cut-plane voxel
+    // would legitimately have a different G value and must not be
+    // asserted against the baseline here.
     const samples: [number, number, number][] = [
       [0, 0, 0],
       [N - 1, N - 1, N - 1],
-      [Math.floor(N / 3), Math.floor(N / 3), Math.floor(N / 3)],
+      [Math.floor(N / 5), Math.floor(N / 5), Math.floor(N / 5)],
     ]
     for (const [x, y, z] of samples) {
       expect(readRed(withSrmt, x, y, z)).toBeCloseTo(readRed(baseline, x, y, z), 6)

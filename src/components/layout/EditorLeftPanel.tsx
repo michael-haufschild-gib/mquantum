@@ -12,7 +12,7 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { useAnySweepRunning } from '@/hooks/useAnySweepRunning'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { type DensityGridResolution, usePerformanceStore } from '@/stores/performanceStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 type SurfaceMode = 'volumetric' | 'isosurface'
 
@@ -52,7 +52,10 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   }
 
   const handleGridResolutionChange = (value: string) => {
-    setDensityGridResolution(Number(value) as DensityGridResolution)
+    const parsed = Number(value)
+    if (parsed === 64 || parsed === 96 || parsed === 128 || parsed === 256) {
+      setDensityGridResolution(parsed)
+    }
   }
 
   const tabs: Tab[] = [

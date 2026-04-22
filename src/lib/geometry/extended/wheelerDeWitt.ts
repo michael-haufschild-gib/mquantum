@@ -87,6 +87,19 @@ export interface WheelerDeWittConfig {
   /** Gaussian pulse width in normalized trajectory-progress units (0.02–0.3) (render-only) */
   worldlinePulseWidth: number
 
+  /**
+   * Render-only dynamic-range headroom factor applied to
+   * `computeWdwRenderMaxRho`. The R-channel normalisation cap is
+   * `headroom · max_Lorentzian`, clamped to the physical global max.
+   * Lowering it toward 1 reveals more Lorentzian interior structure
+   * but saturates the Euclidean Airy-Bi corner sooner; raising it
+   * toward 10 000 hides Lorentzian detail under a uniform dim
+   * interior until only the extreme-corner Bi growth shows. 100 is
+   * the legacy default that shipped with H2. Clamped to [1, 10 000]
+   * by the setter. (render-only)
+   */
+  renderDynamicRange: number
+
   // ── SRMT (Superspace-Relational Modular Time) diagnostic (display-only) ──
   // Feeds the modular-vs-HJ spectrum overlay. All five fields participate in
   // the SRMT hash (see `computeWdwSrmtHash`) but NOT in the solver hash —
@@ -149,6 +162,7 @@ export const DEFAULT_WHEELER_DEWITT_CONFIG: WheelerDeWittConfig = {
   worldlineEnabled: false,
   worldlineSpeed: 0.5,
   worldlinePulseWidth: 0.08,
+  renderDynamicRange: 100,
   srmtEnabled: false,
   srmtClock: 'a',
   srmtCutNormalized: 0.5,

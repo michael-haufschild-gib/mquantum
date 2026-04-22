@@ -1037,7 +1037,7 @@ export default [
             '!@/stores/wavefunctionSliceStore',
           ],
           allowTypeImports: true,
-          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), wavefunctionSliceStore (write-direction slice readback fulfillment), and defaults/* are exempt.',
+          message: 'Render passes access stores via ctx.stores. Only diagnostic stores (write-direction), simulationStateStore, hellerSpectrometerStore, performanceStore, wormholeCoherenceStore (HUD write-direction), wavefunctionSliceStore (write-direction slice readback fulfillment, used only by TDSEStateSaveLoad.ts), and defaults/* are exempt.',
         }],
       }],
     },

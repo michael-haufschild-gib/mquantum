@@ -44,7 +44,21 @@ export const BAYER_OFFSETS: [number, number][] = [
 // String → integer enum maps for GPU uniform packing
 // ---------------------------------------------------------------------------
 
-/** Maps quantum mode names to the integer values expected by WGSL shaders */
+/** Maps quantum mode names to the integer values expected by WGSL shaders.
+ *
+ * The integer values are interpreted by the shader's
+ * `uniforms.quantumMode == N` guards (e.g. `== 3` for TDSE branch
+ * coloring, `!= 8` for AdS relative-phase gating). Each slot must stay
+ * unique across modes the shader can ever encounter at runtime, so a
+ * missing entry cannot silently collide with another mode's branch.
+ *
+ * Wheeler–DeWitt takes slot `9` (next free after AdS's `8`) so the
+ * shader's AdS `!= 8` guard correctly recognises WdW as non-AdS and
+ * the `uniforms.quantumMode` channel stays unambiguous. Earlier
+ * revisions omitted WdW from this map — WdW would fall back to `0`
+ * (HO), and any shader guard newly keyed to `== 0` would fire
+ * spuriously for WdW's density grid.
+ */
 export const QUANTUM_MODE_MAP: Record<string, number> = {
   harmonicOscillator: 0,
   hydrogenND: 1,
@@ -56,6 +70,7 @@ export const QUANTUM_MODE_MAP: Record<string, number> = {
   quantumWalk: 6,
   // 7 = hydrogenNDCoupled (pre-existing). AdS takes the next free slot.
   antiDeSitter: 8,
+  wheelerDeWitt: 9,
 }
 
 /** Maps color algorithm names to shader integer constants */

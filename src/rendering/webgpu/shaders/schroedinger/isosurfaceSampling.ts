@@ -124,12 +124,20 @@ export function generateColorSample(useDensityGrid: boolean): string {
     if (IS_DUAL_CHANNEL) {
       dualSecondary = gridColor.g * isoGain;
     }
-    // AdS (mode 8) reuses the .a channel as boundary-overlay / horizon marker
-    // intensity, NOT a relative-phase angle. Force phase-based palettes back to
-    // the spatial-phase channel B so the relativePhase palette stays sane.
-    // quantumMode is i32 (see SchroedingerUniforms layout) — compare with the
-    // signed literal 8 to keep WGSL strict type checking happy.
-    let useRelPhase = (COLOR_ALGORITHM == 10) && (schroedinger.quantumMode != 8);
+    // Only the three analytical modes (harmonicOscillator=0, hydrogenND=1,
+    // hydrogenNDCoupled=7) write relativePhase into the density grid's A
+    // channel via sampleDensityWithPhaseComponents. Every other mode
+    // packs something else (overlay alpha for AdS/WdW, total density for
+    // Dirac/Pauli, coherenceFraction for open quantum, potOverlay / raw
+    // density for TDSE/BEC/FSF/QW). Reading those as a phase yields hue
+    // garbage, so whitelist the analytical modes and fall back to the
+    // spatial-phase channel B for everything else. quantumMode is i32 —
+    // use signed literals to keep WGSL strict typing happy.
+    let useRelPhase =
+      (COLOR_ALGORITHM == 10)
+      && (schroedinger.quantumMode == 0
+          || schroedinger.quantumMode == 1
+          || schroedinger.quantumMode == 7);
     phase = select(gridColor.b, gridColor.a, useRelPhase);
   } else {
     let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);

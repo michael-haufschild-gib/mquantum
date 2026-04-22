@@ -59,7 +59,13 @@ export const FSFAnalysisContent: React.FC = React.memo(() => {
   // numeric input.
   const effectiveMassSq = useMemo(() => {
     const dispersion = computeFsfVacuumDispersion(fsf, fsf.cosmology.eta0)
-    return dispersion === 'kgFloor' ? fsf.mass * fsf.mass : dispersion
+    if (dispersion === 'kgFloor') return fsf.mass * fsf.mass
+    if (typeof dispersion === 'number') return dispersion
+    // Bianchi-I anisotropic variant — collapse to a scalar massSq for the
+    // dispersion-diagram overlay. The diagram shows an isotropic ω(k), so
+    // we use the (kineticScale · massSq) component that matches the
+    // isotropic FLRW trace at the Bianchi-I symmetric-gauge anchor.
+    return dispersion.kineticScale * dispersion.massSq
   }, [fsf])
 
   return (

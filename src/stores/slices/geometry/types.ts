@@ -487,6 +487,7 @@ export interface SchroedingerSliceActions {
   setWdwGridSize: (
     preset: import('@/stores/slices/geometry/setters/wheelerDeWittSetters').WdwGridPreset
   ) => void
+  setWdwGridDimensions: (gridNa: number, gridNphi: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
   setWdwPhaseRotationEnabled: (enabled: boolean) => void
@@ -494,6 +495,7 @@ export interface SchroedingerSliceActions {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  setWdwRenderDynamicRange: (range: number) => void
   setWdwSrmtEnabled: (enabled: boolean) => void
   setWdwSrmtClock: (clock: import('@/lib/geometry/extended/wheelerDeWitt').WdwSrmtClock) => void
   setWdwSrmtCutNormalized: (cut: number) => void

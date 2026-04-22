@@ -4,16 +4,28 @@
  *
  * Channel packing (matching the raymarcher sampler expectations):
  *
- *   R = |χ|² / max(|χ|²)                  — normalized probability density
- *   G = log(|χ|² + ε)                     — log-density for volumetric exposure
- *   B = arg(χ)                            — phase (used by phase-density color algorithm)
- *   A = max(streamline overlay,            — combined "overlay" channel: the streamline
- *           SRMT sliceK overlay)            WKB intensity is preserved, and when SRMT is
- *                                          enabled the modular spectrum heatmap broadcasts
- *                                          along the clock axis at the cut plane, blending
- *                                          via a per-voxel `max()` so both overlays remain
- *                                          visible at the boundaries they individually
- *                                          populate (they rarely overlap in voxel space).
+ *   R = |χ|² / max(|χ|²)                   — normalized probability density.
+ *                                            Overlays are NOT mixed here — the shader
+ *                                            composites them additively from A so
+ *                                            densityGain / densityContrast / empty-skip
+ *                                            / adaptive-step all operate on clean
+ *                                            physical density.
+ *   G = log(R + ε)                         — log of R, range (-∞, 0]. Every color
+ *                                            algorithm downstream uses
+ *                                            `normalized = clamp((s + 8)/8, 0, 1)`
+ *                                            which assumes s ∈ [-8, 0]; storing
+ *                                            `log(|χ|²)` directly (which for WdW is
+ *                                            often > 0) saturated `normalized = 1`
+ *                                            everywhere. Aligning with the convention
+ *                                            used by every other compute mode restores
+ *                                            density contrast.
+ *   B = arg(χ)                             — phase (phase-density / domain colouring).
+ *   A = max(streamline overlay, SRMT       — combined overlay alpha ∈ [0, 1]. The shader
+ *           sliceK overlay)                  reads this as an additive overlay layer for
+ *                                            WdW (mode 9) and composites it AFTER the
+ *                                            density-driven alpha. Streamline and SRMT
+ *                                            rarely overlap in voxel space so a single
+ *                                            `max()` merge is acceptable.
  *
  * Coordinate mapping (texel-to-physics, independent of world-space cube size):
  *
@@ -117,11 +129,116 @@ const SRMT_CUT_HALF_WIDTH_TEXELS = 1.5
  */
 const DENSITY_MAX_FLOOR = 1e-20
 
-/** Log-density epsilon — keeps `log(ρ_physical)` finite at `ρ = 0`. */
+/** Log-density epsilon — keeps `log(R)` finite at `R = 0` (empty cells). */
 const LOG_DENSITY_EPSILON = 1e-10
 
 /** Streamline overlay normalisation floor (same purpose as `DENSITY_MAX_FLOOR`). */
 const STREAMLINE_MAX_FLOOR = 1e-20
+
+/**
+ * Headroom multiplier applied to the Lorentzian-max when deriving the
+ * R-channel render normalisation. Euclidean cells within this headroom
+ * of the Lorentzian peak (i.e., `|χ|² < WDW_EUCLIDEAN_RENDER_HEADROOM
+ * · max_Lorentzian`) keep a proportional R value; deeper Euclidean
+ * cells saturate the R channel at `1.0`. The G channel now carries
+ * `log(R)` (the same normalised value, log-transformed), so density-
+ * keyed color algorithms (Blackbody, Viridis, Inferno, Density Contours,
+ * HDR emission glow, phase materiality, adaptive stepping, …) see the
+ * headroom-capped dynamic range rather than the raw physical range.
+ * This aligns WdW with the convention used by every other compute mode.
+ *
+ * Motivation: Vilenkin-BC columns in the deep Euclidean region
+ * (specifically `deSitterLargeLambda` with `Λ = 0.8` and
+ * `vilenkinTunneling` with `Λ = 0.3`) hit `|χ|² ~ 10²⁰–10³⁰` at cube
+ * corners because the Airy `Bi(ζ)` term in Stage-3 has an intrinsic
+ * `exp((2/3)|ζ|^{3/2})` growth that the Vilenkin branch policy
+ * (`c₂ = +i · c₁`) cannot turn off — this is the unnormalisable
+ * "outgoing-only" signature of the tunneling proposal. Using the raw
+ * global max `|χ|²` to normalise the R channel would crush every
+ * Lorentzian cell to `rho / maxRho ≈ 10⁻²⁰` — i.e., invisible. Capping
+ * the R-channel denominator at `headroom · Lorentzian_max` restores
+ * Lorentzian-interior visibility while still letting the Euclidean
+ * corner saturate brightly.
+ *
+ * Value `100×` was picked to keep Vilenkin near-turning-surface
+ * amplitudes (which can legitimately exceed Lorentzian peak by an
+ * order of magnitude before the Bi blowup kicks in — see
+ * `analyticFixtures.ts`) inside the un-clamped region, while clipping
+ * the asymptotic `Bi` runaway. Tuning higher makes Vilenkin fringes
+ * dimmer in Lorentzian; lower creates a visible plateau at the Stage-3
+ * overwrite edge.
+ */
+export const WDW_EUCLIDEAN_RENDER_HEADROOM = 100
+
+/** Inclusive lower bound for the user-adjustable headroom slider. */
+export const WDW_HEADROOM_MIN = 1
+/** Inclusive upper bound for the user-adjustable headroom slider. */
+export const WDW_HEADROOM_MAX = 10_000
+
+/**
+ * Clamp an arbitrary headroom value into the valid slider range. The
+ * renderer, URL serializer, and store setter all share this helper so
+ * an out-of-range URL param or stale preset never leaks into the
+ * packer.
+ *
+ * @param raw - Headroom candidate.
+ * @param fallback - Value used when `raw` is not a finite number.
+ * @returns Finite value in `[WDW_HEADROOM_MIN, WDW_HEADROOM_MAX]`.
+ */
+export function clampWdwHeadroom(
+  raw: number,
+  fallback: number = WDW_EUCLIDEAN_RENDER_HEADROOM
+): number {
+  const v = Number.isFinite(raw) ? raw : fallback
+  if (v < WDW_HEADROOM_MIN) return WDW_HEADROOM_MIN
+  if (v > WDW_HEADROOM_MAX) return WDW_HEADROOM_MAX
+  return v
+}
+
+/**
+ * Compute the R-channel render-normalisation max for a Wheeler-DeWitt
+ * solver output. Preferred: max `|χ|²` over the Lorentzian mask, scaled
+ * by `headroom`. Falls back to the global max when the mask is empty
+ * (pathological: every cell Euclidean — can only happen for `Λ > 0`
+ * with a grid entirely past the turning surface, which the curated
+ * presets avoid). The fallback keeps behaviour byte-identical to the
+ * pre-cap renderer for that edge case.
+ *
+ * Exported so tests can assert the rendering-normalisation invariant
+ * directly on the packer's input rather than having to re-derive it
+ * from the float16 round-trip of the R channel.
+ *
+ * @param output - Dense solver output.
+ * @param headroom - Lorentzian-max multiplier. Defaults to
+ *   {@link WDW_EUCLIDEAN_RENDER_HEADROOM} so call sites that have not
+ *   yet been plumbed through keep the legacy behaviour. The final
+ *   value is clamped via {@link clampWdwHeadroom}.
+ * @returns `maxRho_render` in the same units as `output.maxDensity`.
+ */
+export function computeWdwRenderMaxRho(
+  output: WheelerDeWittSolverOutput,
+  headroom: number = WDW_EUCLIDEAN_RENDER_HEADROOM
+): number {
+  const h = clampWdwHeadroom(headroom)
+  const chi = output.chi
+  const mask = output.lorentzianMask
+  let lorentzianMax = 0
+  let globalMax = 0
+  for (let i = 0; i < chi.length; i += 2) {
+    const re = chi[i] ?? 0
+    const im = chi[i + 1] ?? 0
+    const d = re * re + im * im
+    if (d > globalMax) globalMax = d
+    const cellIdx = i >> 1
+    if ((mask[cellIdx] ?? 0) !== 0 && d > lorentzianMax) lorentzianMax = d
+  }
+  const capped = lorentzianMax > 0 ? lorentzianMax * h : globalMax
+  // Never exceed the actual solver max: if the Airy-grown Euclidean
+  // corner does not reach `headroom · lorentzian_max`, there is nothing
+  // to clamp and the packer should use the genuine max (which is what
+  // the legacy packer did for every HH / DeWitt / low-Λ preset).
+  return Math.max(Math.min(capped, globalMax), DENSITY_MAX_FLOOR)
+}
 
 function clamp01(v: number): number {
   if (v < 0) return 0
@@ -384,7 +501,8 @@ export function packWdwDensityGrid(
   output: WheelerDeWittSolverOutput,
   overlay: StreamlineOverlay | null,
   srmtOverlay?: WdwSrmtOverlay,
-  targetGridSize: number = DENSITY_GRID_SIZE
+  targetGridSize: number = DENSITY_GRID_SIZE,
+  headroom: number = WDW_EUCLIDEAN_RENDER_HEADROOM
 ): WdwDensityUpload {
   const N = Math.max(1, Math.round(targetGridSize))
   const total = N * N * N
@@ -392,7 +510,17 @@ export function packWdwDensityGrid(
 
   const [Na, Nphi] = output.gridSize
   const slab = Nphi * Nphi
-  const maxRho = Math.max(output.maxDensity, DENSITY_MAX_FLOOR)
+  // `maxRho` is the R-channel normalisation base — capped to
+  // `headroom · max_Lorentzian` so Vilenkin's Airy Bi blowup at cube
+  // corners cannot crush the Lorentzian interior into invisibility.
+  // See {@link computeWdwRenderMaxRho} for the cap rationale and
+  // {@link WDW_EUCLIDEAN_RENDER_HEADROOM} for the default headroom
+  // factor; the user-facing "Dynamic Range" slider surfaces `headroom`
+  // directly. The G (log-density) channel separately carries the
+  // `log(rhoNorm)` (the same capped-normalised value in log space)
+  // so density-keyed color algorithms see the same dynamic range the
+  // R channel exposes.
+  const maxRho = computeWdwRenderMaxRho(output, headroom)
   const maxStreamline = overlay ? Math.max(overlay.maxIntensity, STREAMLINE_MAX_FLOOR) : 1
 
   // Fractional solver-grid index per normalised texture coordinate.
@@ -467,18 +595,18 @@ export function packWdwDensityGrid(
 
         const srmtAlpha = srmtState ? sampleSrmtVoxelAlpha(srmtState, tx, ty, tz) : 0
 
-        // Mix BOTH the streamline/worldline overlay AND the SRMT disk
-        // into the rendered R/G channels so they are actually visible.
-        // The raymarcher only reads R (rho) and G (logRho); A is
-        // reserved for negative-encoded potential overlays in TDSE.
+        // Overlay (streamline + SRMT) is stored ONLY in the alpha channel.
+        // R and G carry the clean physical density so densityGain,
+        // densityContrast, empty-space skipping, and adaptive stepping
+        // all operate on real |χ|² — overlays are composited separately
+        // by the WdW branch in `volumeRaymarchGrid` (positive A). Mixing
+        // overlay into R/G previously plateaued highlights on streamlines,
+        // shrank Euclidean structure near the SRMT cut, and made
+        // densityContrast shape an overlay-contaminated surrogate.
         const overlayVal = overlay ? overlayRaw / maxStreamline : 0
-        const rhoWithOverlay = clamp01(rhoNorm + overlayVal + srmtAlpha)
-        const rhoPhysicalBoosted = rhoWithOverlay * maxRho
-        const logRho = Math.log(rhoPhysicalBoosted + LOG_DENSITY_EPSILON)
-
-        const streamlineAlpha = clamp01(overlayVal)
-        const alpha = streamlineAlpha > srmtAlpha ? streamlineAlpha : srmtAlpha
-        packRGBA16F(density, pixelIdx, rhoWithOverlay, logRho, phase, alpha)
+        const overlayAlpha = clamp01(Math.max(overlayVal, srmtAlpha))
+        const logRho = Math.log(rhoNorm + LOG_DENSITY_EPSILON)
+        packRGBA16F(density, pixelIdx, rhoNorm, logRho, phase, overlayAlpha)
       }
     }
   }

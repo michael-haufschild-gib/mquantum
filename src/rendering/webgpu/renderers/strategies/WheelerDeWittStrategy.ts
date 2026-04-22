@@ -17,7 +17,11 @@
 
 import { DENSITY_GRID_SIZE } from '@/constants/densityGrid'
 import type { WheelerDeWittConfig } from '@/lib/geometry/extended/wheelerDeWitt'
-import { packWdwDensityGrid } from '@/lib/physics/wheelerDeWitt/densityGrid'
+import {
+  clampWdwHeadroom,
+  packWdwDensityGrid,
+  WDW_EUCLIDEAN_RENDER_HEADROOM,
+} from '@/lib/physics/wheelerDeWitt/densityGrid'
 import {
   buildPulseOverlay,
   buildStaticOverlay,
@@ -49,7 +53,36 @@ import { WheelerDeWittSrmtSweepCoordinator } from './WheelerDeWittSrmtSweepCoord
 export { computeWdwConfigHash, computeWdwTrajectoryHash } from './WheelerDeWittPhysicsCache'
 export { computeWdwSrmtComputeHash, computeWdwSrmtRenderHash } from './WheelerDeWittSrmtCoordinator'
 
-/** Strategy owning a CPU-solved Wheeler–DeWitt density texture. */
+/**
+ * Strategy owning a CPU-solved Wheeler–DeWitt density texture.
+ *
+ * ## Exposure pipeline (the "auto-scale" semantic for WdW)
+ *
+ * WdW does not join the per-frame auto-scale toggle in `ExposureSection`
+ * because its density is solved once per config change (no time
+ * evolution). The effective normalization pipeline is instead:
+ *
+ *   `output.maxDensity` (physical `|χ|²`, can hit 10²⁰ for Vilenkin Λ > 0)
+ *     → `computeWdwRenderMaxRho(output)` caps at `WDW_EUCLIDEAN_RENDER_HEADROOM
+ *       · max_Lorentzian` (current default 100×) so the Airy-Bi blowup at
+ *       cube corners does not crush Lorentzian interior visibility
+ *     → R channel = `|χ|² / maxRho_render` clamped to `[0, 1]`
+ *     → shader `applyDensityContrast` with `cachedPeakDensity = 1.0`
+ *       (correct for pre-normalized R) applies the user's density-contrast
+ *       curve on `[0, 1]`
+ *     → `computeAlpha` with `densityGain`.
+ *
+ * Streamline + SRMT overlays do NOT enter this pipeline — they are
+ * stored in the A channel and composited in the shader as an additive
+ * layer (see `packWdwDensityGrid` and `volumeRaymarchGrid` `hasWdwOverlay`
+ * branch). Previously overlays were mixed into R/G, which contaminated
+ * contrast / gain / empty-skip / adaptive stepping.
+ *
+ * Consequence: dense Airy-Bi cells (Vilenkin deep Euclidean) saturate
+ * at R = 1 regardless of contrast. This is by design — revealing that
+ * regime requires a user-controllable headroom multiplier (filed as
+ * a follow-up UX task).
+ */
 export class WheelerDeWittStrategy implements QuantumModeStrategy {
   readonly isComputeMode = true
 
@@ -67,6 +100,14 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
    * snapshot from the texture).
    */
   private lastWorldlineEnabled = false
+
+  /**
+   * Tracks the last-packed `renderDynamicRange` (headroom) value so a
+   * slider change without any solver / trajectory / overlay dirty bit
+   * still triggers exactly one repack. NaN initial value ensures the
+   * first packed frame primes it unconditionally.
+   */
+  private lastRenderDynamicRange = Number.NaN
 
   configureShader(_shader: SchroedingerWGSLShaderConfig, _config: SchrodingerRendererConfig): void {
     // Compute-mode overrides are applied by the renderer constructor.
@@ -116,6 +157,18 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     // shader (`worldToDensityGridUVW`) maps world positions by the same
     // bound. Any multiplier here introduces a silent spatial rescale
     // mismatch between the baked texels and the rendered cube.
+    //
+    // Anisotropy note: the rendered cube is [-aMax, +aMax]^3 in world
+    // space, but the solver grid spans `a ∈ [aMin, aMax]` along x and
+    // `phi1, phi2 ∈ [-phiExtent, +phiExtent]` along y/z. With the
+    // defaults (aMax = 1.5, phiExtent = 3.5), phi features are visually
+    // compressed by ~2.33× relative to a features — the phi axis packs
+    // 7 physics units into the same world extent that the a axis uses
+    // for ~1.45 physics units. This is cosmetic (physics is correct) and
+    // aMax / phiExtent are not exposed as user-facing sliders, so no
+    // tooltip fix applies. If we later add per-axis scaling, the natural
+    // home is a `SchroedingerUniforms.densityScale: vec3f` plus a
+    // matching divide inside `worldToDensityGridUVW`.
     return Math.max(0.25, wdw.aMax)
   }
 
@@ -141,12 +194,16 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       worldlineEnabled && isPlaying && (physicsTick.trajectories?.length ?? 0) > 0
     const worldlineToggled = worldlineEnabled !== this.lastWorldlineEnabled
 
+    const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
+    const headroomChanged = headroom !== this.lastRenderDynamicRange
+
     const needRepack =
       physicsTick.solverDirty ||
       physicsTick.trajectoryDirty ||
       worldlineAnimating ||
       worldlineToggled ||
-      srmtTick.overlayDirty
+      srmtTick.overlayDirty ||
+      headroomChanged
 
     if (!needRepack) return
 
@@ -162,7 +219,8 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       physicsTick.output,
       streamlineOverlay,
       srmtTick.overlay ?? undefined,
-      this.densityTexture.width
+      this.densityTexture.width,
+      headroom
     )
 
     ctx.device.queue.writeTexture(
@@ -177,6 +235,7 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     )
 
     this.lastWorldlineEnabled = worldlineEnabled
+    this.lastRenderDynamicRange = headroom
   }
 
   /**

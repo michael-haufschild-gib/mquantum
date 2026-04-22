@@ -174,9 +174,9 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       absorberWidth: 0.2,
       pmlTargetReflection: 1e-6,
       fieldView: 'phi',
-      autoScale: true,
+      autoScale: false,
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 1.0 },
   },
   {
     id: 'heavyField',
@@ -196,9 +196,9 @@ export const FREE_SCALAR_PRESETS: FreeScalarScenarioPreset[] = [
       absorberWidth: 0.2,
       pmlTargetReflection: 1e-6,
       fieldView: 'phi',
-      autoScale: true,
+      autoScale: false,
     },
-    renderingOverrides: { densityGain: 0.2, densityContrast: 1.0 },
+    renderingOverrides: { densityGain: 5.0, densityContrast: 1.0 },
   },
 
   // ─────────────────────────────────────────────────────────────────────────

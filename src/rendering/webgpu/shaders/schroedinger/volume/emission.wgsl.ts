@@ -294,7 +294,14 @@ const ALGO_BRANCH: Record<number, string> = {
   9: /* wgsl */ `
     // 9: Zero-centered diverging map for Re/Im(psi)
     // divergingPositiveParams.w: 0.0 = Re(psi) via cos, 1.0 = Im(psi) via sin
-    let useImag = uniforms.divergingPositiveParams.w >= 0.5;
+    //
+    // Binary-sign phase fallback: for modes that write phase = {0, π}
+    // (FSF, Wigner, AdS — see HAS_BINARY_SIGN_PHASE), sin(phase) ≈ 0 for
+    // both values and would collapse every sample to the neutral color.
+    // Force useImag = false for those modes so the cos(phase) path (which
+    // gives ±1 on {0, π}) extracts the sign correctly. Other modes retain
+    // the user's useImag selection.
+    let useImag = !HAS_BINARY_SIGN_PHASE && uniforms.divergingPositiveParams.w >= 0.5;
     let signedVal = normalized * select(cos(phase), sin(phase), useImag);
     let signStrength = clamp(abs(signedVal), 0.0, 1.0);
     let neutral = uniforms.divergingNeutralParams.xyz;

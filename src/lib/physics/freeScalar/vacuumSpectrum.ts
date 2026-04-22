@@ -162,19 +162,89 @@ function validateVacuumConfig(
 }
 
 /**
+ * Anisotropic (Bianchi-I) dispersion variant.
+ *
+ * The canonical δφ Hamiltonian on a Bianchi-I background is
+ *
+ *     H_k = ½ aKinetic |π_k|² + ½ (Σ_d aPot_d·k_d² + m²·aFull) |δφ_k|²
+ *
+ * so the oscillator frequency is `ω_k = √(aKinetic · (Σ_d aPot_d·k_lat_d² + massSq))`.
+ * This variant lets the caller pass per-axis `axisPotentials[d] = aPot_d`
+ * and a scalar `kineticScale = aKinetic` so the sampler computes the
+ * anisotropic ω² directly. Axes beyond the first three in `axisPotentials`
+ * are reserved — Bianchi-I defines only three spatial directions and
+ * higher-dim lattices should populate those entries with the shader's
+ * `aPotential` fallback (typically 1 at η₀=1.5 default anchor).
+ *
+ * The per-sample amplitude rescale happens at the caller after IFFT:
+ * `φ = √kineticScale · φ_M`, `π = π_M / √kineticScale`.
+ */
+export interface AnisotropicVacuumDispersion {
+  /** Effective squared mass `m²·aFull` to add to the axis-weighted k² term. */
+  massSq: number
+  /** Per-axis `aPot_d` weights — must have `≥ latticeDim` entries. */
+  axisPotentials: readonly number[]
+  /** Scalar `aKinetic` multiplier applied after the weighted k²+m² sum. */
+  kineticScale: number
+}
+
+/**
  * Mass-term dispatch for the vacuum sampler and the auto-scale estimators.
  *
  * - `'kgFloor'` selects the ordinary Klein-Gordon path with the
  *   `max(mass, M_FLOOR)` regularization (used when cosmology is disabled).
  * - A finite `number` selects the Mukhanov-Sasaki path with `ω_k² = k_lat² + value`,
  *   using the supplied (possibly negative) effective mass squared directly.
+ * - An {@link AnisotropicVacuumDispersion} record selects the Bianchi-I
+ *   path with `ω² = kineticScale·(Σ_d axisPotentials[d]·k_lat_d² + massSq)`.
+ *   Under isotropic input (all `axisPotentials[d] = 1`, `kineticScale = 1`)
+ *   this reduces bit-identically to the scalar-`massSq` path.
  *
  * Callers must pick one — there is no implicit fallback. The previous
  * implementation accepted `omegaSqMassTerm?: number` and silently fell
  * through to the KG floor when omitted, which masked bugs at every call
  * site that forgot to thread the cosmology-aware mass through.
  */
-export type VacuumDispersion = 'kgFloor' | number
+export type VacuumDispersion = 'kgFloor' | number | AnisotropicVacuumDispersion
+
+/**
+ * True iff `d` is an {@link AnisotropicVacuumDispersion} record.
+ */
+function isAnisotropicDispersion(d: VacuumDispersion): d is AnisotropicVacuumDispersion {
+  return typeof d === 'object' && d !== null && 'axisPotentials' in d
+}
+
+/**
+ * Anisotropic ω_k evaluator for Bianchi-I. Axis-weighted sum:
+ * `ω² = kineticScale · (Σ_d axisPotentials[d]·(2 sin(π n_d/N_d)/a_d)² + massSq)`.
+ * Applies the same `max(ω², M_FLOOR²)` zero-mode floor as
+ * `computeOmegaKFromMassSq` so a `k_lat = 0, massSq ≤ 0` mode still has
+ * finite `1/(2ω)` variance.
+ */
+function computeOmegaKAnisotropic(
+  nIndices: readonly number[],
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  axisPotentials: readonly number[],
+  massSq: number,
+  kineticScale: number,
+  latticeDim: number
+): number {
+  let weightedKSq = 0
+  for (let d = 0; d < latticeDim; d++) {
+    const N = gridSize[d]!
+    const a = spacing[d]!
+    if (N <= 1) continue
+    const sinVal = Math.sin((Math.PI * nIndices[d]!) / N)
+    const kLat = (2 * sinVal) / a
+    const weight = d < axisPotentials.length ? axisPotentials[d]! : 1
+    weightedKSq += weight * kLat * kLat
+  }
+  let omegaSq = kineticScale * (weightedKSq + massSq)
+  const floorSq = M_FLOOR * M_FLOOR
+  if (omegaSq < floorSq) omegaSq = floorSq
+  return Math.sqrt(omegaSq)
+}
 
 /**
  * Resolve a dispersion choice into a concrete `omega_k` evaluator. Closes
@@ -189,9 +259,32 @@ function resolveOmegaEvaluator(
   if (dispersion === 'kgFloor') {
     return (coords, dims) => computeOmegaK(coords, dims, spacing, mass, latticeDim)
   }
+  if (isAnisotropicDispersion(dispersion)) {
+    const { massSq, axisPotentials, kineticScale } = dispersion
+    if (!Number.isFinite(massSq) || !Number.isFinite(kineticScale) || !(kineticScale > 0)) {
+      throw new RangeError(
+        `vacuum sampler anisotropic dispersion requires finite massSq and positive kineticScale, got massSq=${massSq}, kineticScale=${kineticScale}`
+      )
+    }
+    if (axisPotentials.length < latticeDim) {
+      throw new RangeError(
+        `vacuum sampler anisotropic dispersion requires axisPotentials.length ≥ latticeDim (${latticeDim}), got ${axisPotentials.length}`
+      )
+    }
+    return (coords, dims) =>
+      computeOmegaKAnisotropic(
+        coords,
+        dims,
+        spacing,
+        axisPotentials,
+        massSq,
+        kineticScale,
+        latticeDim
+      )
+  }
   if (!Number.isFinite(dispersion)) {
     throw new RangeError(
-      `vacuum sampler dispersion must be 'kgFloor' or a finite number, got ${dispersion}`
+      `vacuum sampler dispersion must be 'kgFloor', a finite number, or an anisotropic record, got ${dispersion}`
     )
   }
   return (coords, dims) => computeOmegaKFromMassSq(coords, dims, spacing, dispersion, latticeDim)

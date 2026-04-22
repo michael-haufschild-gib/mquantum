@@ -329,11 +329,26 @@ export interface FsfSubstepClock {
  * Compute the per-substep coefficient bundle to upload to the GPU uniform
  * buffer during one drift→kick leapfrog substep.
  *
+ * **Midpoint evaluation**: cosmology coefs and the preheating drive are
+ * evaluated at `simEta + subDt/2` — the midpoint of the substep interval —
+ * and the clock is then advanced by the full `subDt`. Using midpoint coefs
+ * for both the drift (phi) and the kick (pi) gives time-reversible,
+ * second-order accuracy in the coef time derivative. The earlier
+ * "evaluate at endpoint, drift with previous coefs, kick with new coefs"
+ * scheme is only first-order in the coef rate of change, which accumulates
+ * to O(1) trajectory drift at late times under de Sitter / Bianchi where
+ * `a(η)` varies fast across the outer step. With midpoint eval the drift
+ * accumulates only O(dt) — one extra order of cancellation per frame.
+ *
+ * Under Minkowski + preheating disabled every field collapses to 1 and the
+ * output is bit-identical to the pre-fix behaviour (constant coefs are
+ * evaluated at the midpoint but produce the same 1s either way).
+ *
  * Advances the relevant clock (`simEta` when cosmology is on, a separate
- * Minkowski counter otherwise) and returns both the updated coefficients
- * and the new `preheatingTime` so the caller can assign it back to the
- * pass instance. Keeps all cosmology+preheating composition logic in one
- * place so the compute pass stays focused on GPU dispatch bookkeeping.
+ * Minkowski counter otherwise) by `subDt` and returns both the midpoint
+ * coefficients and the new `preheatingTime`. The caller uploads the
+ * midpoint coefs to the GPU BEFORE `updatePhi` so both drift and kick see
+ * the same midpoint-evaluated coefficients.
  *
  * @param config - Free scalar field configuration
  * @param subDt - Size of this leapfrog substep
@@ -364,24 +379,34 @@ export function resolveFsfSubstepCoefs(
   let nextPreheatingTime = clock.preheatingTime
 
   if (cosmologyActive) {
-    const newEta = clock.advanceSimEta(subDt)
-    const coefs = evaluateCosmologyCoefs(newEta)
+    // Advance the clock to the midpoint, evaluate the coefs there, then
+    // advance the remaining half to land at the endpoint. Two
+    // `advanceSimEta` calls respect the η-floor / sign-flip guard on both
+    // halves; a single "read midpoint without advancing, then advance
+    // full" would bypass the floor during the midpoint read and could
+    // evaluate the coefs on the wrong side of the singularity.
+    const halfDt = subDt * 0.5
+    const midEta = clock.advanceSimEta(halfDt)
+    const coefs = evaluateCosmologyCoefs(midEta)
+    clock.advanceSimEta(halfDt)
     aKinetic = coefs.aKinetic
     aPotential = coefs.aPotential
     aFull = coefs.aFull
     aPotentialRatio1 = coefs.aPotentialRatio1 ?? 1
     aPotentialRatio2 = coefs.aPotentialRatio2 ?? 1
     // Cosmology + preheating composition: the drive reads the
-    // cosmological clock directly, so `preheatingReferenceEta` was
-    // captured as the reset `simEta` and the drive fires at phase 0 from
-    // the instant the lattice was initialised.
-    preheatingClock = newEta
+    // cosmological clock at the substep midpoint so the Mathieu phase is
+    // sampled consistently with the FLRW coefs above. `preheatingReferenceEta`
+    // was captured as the reset `simEta` and the drive fires at phase 0
+    // from the instant the lattice was initialised.
+    preheatingClock = midEta
   } else {
-    // Minkowski + preheating: advance the separate counter so
-    // `sin(Ω·(t−ref))` produces the Mathieu equation of motion tied to
-    // real physical time, not conformal time.
+    // Minkowski + preheating: advance the separate counter to the full
+    // substep endpoint but sample the drive at the substep midpoint, so
+    // `sin(Ω·(t−ref))` sees the same second-order centered stencil as the
+    // cosmology-active branch.
+    preheatingClock = clock.preheatingTime + subDt * 0.5
     nextPreheatingTime = clock.preheatingTime + subDt
-    preheatingClock = nextPreheatingTime
   }
 
   const massSquaredScale = preheatingActive

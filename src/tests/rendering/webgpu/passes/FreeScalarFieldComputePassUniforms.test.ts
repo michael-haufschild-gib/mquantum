@@ -19,6 +19,7 @@ import {
   computeFsfInitHash,
   computeFsfMaxPhiEstimate,
   estimateFsfMaxFieldValue,
+  FSF_UNIFORM_SIZE,
   writeFsfUniforms,
 } from '@/rendering/webgpu/passes/FreeScalarFieldComputePassUniforms'
 
@@ -354,6 +355,81 @@ describe('writeFsfUniforms', () => {
 
     expect(new Uint32Array(uniformData)[120]).toBe(0)
   })
+
+  it('encodes absorberEnabled as 1u for plain PML configs', () => {
+    // Non-kink configs with absorber on must pack `1u` at index 123 so
+    // the shader falls through its target-0 damping path — bit-identical
+    // to the pre-fix behaviour for every non-domainWall preset.
+    const config = createConfig({
+      initialCondition: 'gaussianPacket',
+      absorberEnabled: true,
+      selfInteractionEnabled: false,
+    })
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[123]).toBe(1)
+  })
+
+  it('encodes absorberEnabled as 2u for kink+self-interaction configs', () => {
+    // The domainWall preset (kinkProfile + selfInteractionEnabled +
+    // absorberEnabled) selects the vacuum-aware PML branch so the absorber
+    // damps toward the local ±v vacuum instead of dragging the asymptotic
+    // tails toward 0. The CPU must emit `2u` at index 123 so the absorber
+    // shader takes the sign-of-x branch.
+    const config = createConfig({
+      initialCondition: 'kinkProfile',
+      absorberEnabled: true,
+      selfInteractionEnabled: true,
+      selfInteractionVev: 1.0,
+    })
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[123]).toBe(2)
+  })
+
+  it('falls back to 1u when kinkProfile is used without self-interaction', () => {
+    // kinkProfile without self-interaction has no well-defined vacuum
+    // (no double well → no ±v branches), so the kink-aware PML would damp
+    // toward an arbitrary value. Revert to the plain target-0 path.
+    const config = createConfig({
+      initialCondition: 'kinkProfile',
+      absorberEnabled: true,
+      selfInteractionEnabled: false,
+    })
+    const uniformData = new ArrayBuffer(FSF_UNIFORM_SIZE)
+    const mockDevice = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+
+    writeFsfUniforms(mockDevice, {} as GPUBuffer, uniformData, {
+      config,
+      totalSites: 32768,
+      maxFieldValue: 1.0,
+      simEta: 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    })
+
+    expect(new Uint32Array(uniformData)[123]).toBe(1)
+  })
 })
 
 describe('estimateFsfMaxFieldValue with self-interaction', () => {
@@ -471,11 +547,13 @@ describe('estimateFsfMaxFieldValue — proper-density convention (cosmology)', (
     expect(cosmoEstimate).toBeGreaterThan(0)
   })
 
-  it('non-vacuum energyDensity estimate divides by aFull(η₀) under cosmology', () => {
-    // For a gaussianPacket init, the canonical-density formula is
-    // `0.5·φ₀²·ω²`. Under Minkowski this is the final value; under
-    // cosmology we divide by aFull(η₀). The ratio between the two must
-    // equal aFull(η₀) up to the dispersion difference.
+  it('non-vacuum energyDensity estimate rescales by aPotential/aFull = 1/a² under cosmology', () => {
+    // For a plane-wave / packet init the canonical Hamiltonian density is
+    //   H_can ≈ aPotential·φ₀²·ω² (time-averaged)
+    // and the proper (shader-rendered) density is H_can/aFull, giving a
+    // cosmology→Minkowski scale ratio of aPotential/aFull = 1/a², NOT the
+    // naive 1/aFull = 1/a^n a buggy estimator would produce by dropping
+    // the aPotential factor.
     const flatConfig = createConfig({
       initialCondition: 'gaussianPacket',
       fieldView: 'energyDensity',
@@ -485,6 +563,10 @@ describe('estimateFsfMaxFieldValue — proper-density convention (cosmology)', (
     })
     const flatEstimate = estimateFsfMaxFieldValue(flatConfig, 1.0)
 
+    // de Sitter η₀=-10, H=1, n=4 ⇒ a(η₀)=0.1, 1/a²=100. The cosmology
+    // estimate carries the same aPotential·ω² canonical prefactor as the
+    // shader, so the ratio is bounded to the 1/a² window rather than the
+    // 1/a^n blowup that motivated the original "black render" bug.
     const cosmoConfig = createConfig({
       initialCondition: 'gaussianPacket',
       fieldView: 'energyDensity',
@@ -501,13 +583,79 @@ describe('estimateFsfMaxFieldValue — proper-density convention (cosmology)', (
     })
     const cosmoEstimate = estimateFsfMaxFieldValue(cosmoConfig, 1.0)
 
-    // Cosmology estimate must be finite, positive, and LARGER than flat
-    // (because dividing by aFull(η₀)=1e-4 inflates the scale by 10⁴×).
     expect(Number.isFinite(cosmoEstimate)).toBe(true)
     expect(cosmoEstimate).toBeGreaterThan(flatEstimate)
-    // Sanity check: the ratio should be at least 10³× larger (the
-    // dispersion difference is small compared to the 10⁴ aFull factor).
-    expect(cosmoEstimate / flatEstimate).toBeGreaterThan(1e3)
+    // 1/a² = 100; the dispersion also shifts (m²a²=0.01 vs m²=1) which
+    // pulls the ratio slightly below 100. Guard band [40, 200] accepts
+    // the physical ≈80 value and rejects both a regression back to the
+    // 1/a^n = 10⁴ inflation (failing >200) and an over-correction that
+    // would bring the ratio below the 1/a² floor (failing <40).
+    const ratio = cosmoEstimate / flatEstimate
+    expect(ratio).toBeGreaterThan(40)
+    expect(ratio).toBeLessThan(200)
+  })
+
+  it('singleMode + deSitter estimator tracks shader peak within an order of magnitude', () => {
+    // Regression test for the "deSitter plane-wave renders black under
+    // autoScale" bug. The shader's peak canonical H for a single plane
+    // wave is aPotential·A²·ω² (at the π-maximum of the oscillation).
+    // Divided by aFull to land in proper density:
+    //   shaderPeak = aPotential · A² · ω² / aFull = A²·ω²/a²
+    // The estimator must track this to within ~2× so normRho≈1 at the
+    // initial time — otherwise the field renders black under autoScale
+    // (estimator too big) or saturates to a full white cube (too small).
+    const config = createConfig({
+      initialCondition: 'singleMode',
+      fieldView: 'energyDensity',
+      autoScale: true,
+      packetAmplitude: 1.0,
+      modeK: [3, 0, 0],
+      mass: 1.0,
+      cosmology: {
+        enabled: true,
+        preset: 'deSitter',
+        steepness: 5,
+        hubble: 2,
+        eta0: -8,
+      },
+    })
+    const estimate = estimateFsfMaxFieldValue(config, 1.0)
+
+    // Hand-computed spatial peak of the proper energy density ρ_proper for
+    // the single plane wave:
+    //   a = 1/(H·|η|) = 1/(2·8) = 0.0625, a² ≈ 3.906e-3
+    //   latticeL = 32·0.1 = 3.2, kPhys = 2π·3/3.2 ≈ 5.8905
+    //   sk = 2·sin(kPhys·a_spacing/2)/a_spacing = 2·sin(0.29452)/0.1 ≈ 5.8057
+    //   k_lat² = sk² ≈ 33.706
+    //   ω² = k_lat² + m²·a² ≈ 33.706 + 3.906e-3 ≈ 33.710
+    //   shaderPeakBound = A²·ω²/a² ≈ 33.710/3.906e-3 ≈ 8629.8
+    //
+    // Why `ω²/a²` is the right reference bound (derivation):
+    // The pointwise canonical H for δφ = A·cos(kx−ωt) evaluates to
+    //   H_can(x,t) = ½·aPotential·A²·(ω² − k²·cos(2(kx−ωt)))
+    // and the proper density divides by aFull = aPotential·a², giving
+    //   ρ_proper(x,t) = ½·A²·(ω² − k²·cos(2(kx−ωt)))/a².
+    // Its extrema are ½·A²·(ω²±k²)/a². For the massless-dominated regime
+    // here (m²·a² ≈ 3.9e-3 ≪ k² ≈ 33.7) the spatial peak equals
+    //   ρ_peak = ½·A²·(ω²+k²)/a² ≈ A²·ω²/a² = shaderPeakBound,
+    // so the hand-computed bound matches the true spatial peak up to a
+    // sub-percent mass-term correction. The estimator's time-average
+    // convention puts it at exactly half the bound.
+    const a = 1 / (2 * 8)
+    const latticeL = 32 * 0.1
+    const kPhys = (2 * Math.PI * 3) / latticeL
+    const sk = (2 * Math.sin(kPhys * 0.05)) / 0.1
+    const omegaSq = sk * sk + 1 * a * a
+    const shaderPeakBound = (omegaSq / (a * a)) * 1
+
+    // The estimator carries the ½·A²·ω²/a² time-average, so the spatial
+    // peak is at most 2× it. Demand the estimator lands in [0.2, 1.0]
+    // times the hand-computed bound — this catches a regression to the
+    // pre-fix factor-~128 overshoot (estimator ≈ 275,000) while staying
+    // tight enough to reject an over-correction that would under-fill
+    // the dynamic range.
+    expect(estimate).toBeGreaterThan(shaderPeakBound * 0.2)
+    expect(estimate).toBeLessThan(shaderPeakBound * 1.0)
   })
 })
 
@@ -546,5 +694,112 @@ describe('computeFsfMaxPhiEstimate with self-interaction', () => {
     })
 
     expect(computeFsfMaxPhiEstimate(config)).toBe(1.0)
+  })
+
+  it('still returns the vacuum estimate for vacuumNoise even when autoScale is off', () => {
+    // Regression: `bianchiKasnerCigar` and similar cosmology presets use
+    // autoScale=false to preserve the brightness-grows-with-η signature.
+    // Under the pre-fix code the estimator short-circuited to 1.0,
+    // leaving the shader saturated on massless 64³ lattices whose typical
+    // vacuum amplitude exceeds 1. The fix keeps the static, physics-based
+    // estimator for vacuumNoise regardless of autoScale — calibrating the
+    // initial frame while letting later η evolution push normRho above 1.
+    const base = {
+      initialCondition: 'vacuumNoise' as const,
+      latticeDim: 3,
+      gridSize: [32, 32, 32] as [number, number, number],
+      spacing: [0.15, 0.15, 0.15] as [number, number, number],
+      mass: 0,
+    }
+    const autoOn = createConfig({ ...base, autoScale: true })
+    const autoOff = createConfig({ ...base, autoScale: false })
+
+    const withAutoOn = computeFsfMaxPhiEstimate(autoOn)
+    const withAutoOff = computeFsfMaxPhiEstimate(autoOff)
+
+    // Bit-identical: both branches run the same vacuum estimator.
+    expect(withAutoOff).toBe(withAutoOn)
+    // And the estimate must be finite, positive, and ≠ 1.0 (the pre-fix
+    // sentinel) for a massless 32³ cosmology-off vacuum on this lattice —
+    // guards against a silent regression back to the short-circuit.
+    expect(Number.isFinite(withAutoOff)).toBe(true)
+    expect(withAutoOff).toBeGreaterThan(0)
+    expect(withAutoOff).not.toBe(1.0)
+  })
+
+  it('estimateFsfMaxFieldValue returns physics-based value for vacuumNoise + autoScale=false', () => {
+    // Sibling of the computeFsfMaxPhiEstimate test above — same rationale
+    // at the maxFieldValue layer. Bianchi-Kasner Cigar initialization at
+    // η₀=1.5 in n=4 has every aPot_d = 1, so the anisotropic path reduces
+    // to the isotropic estimator.
+    const base = {
+      initialCondition: 'vacuumNoise' as const,
+      latticeDim: 3,
+      gridSize: [32, 32, 32] as [number, number, number],
+      spacing: [0.15, 0.15, 0.15] as [number, number, number],
+      mass: 0,
+      fieldView: 'energyDensity' as const,
+    }
+    const autoOn = createConfig({ ...base, autoScale: true })
+    const autoOff = createConfig({ ...base, autoScale: false })
+
+    const phi0 = computeFsfMaxPhiEstimate(autoOff)
+    const withAutoOn = estimateFsfMaxFieldValue(autoOn, phi0)
+    const withAutoOff = estimateFsfMaxFieldValue(autoOff, phi0)
+    expect(withAutoOff).toBe(withAutoOn)
+    expect(withAutoOff).toBeGreaterThan(0)
+    expect(withAutoOff).not.toBe(1.0)
+  })
+
+  it('vacuum estimator diverges from isotropic baseline under anisotropic Bianchi-I', () => {
+    // Regression: `resolveVacuumAutoScale` must route through the
+    // axis-weighted dispersion when any aPotentialRatio_d ≠ 1, otherwise
+    // the visualizer mis-normalizes initial vacuum brightness on Kasner
+    // presets (collapses back to scalar `m²·a²`). Compare:
+    //   isotropic baseline — flat-Minkowski, no cosmology
+    //   anisotropic — bianchiKasner with the canonical (-1/3, 2/3, 2/3)
+    //                 triple, evaluated at η₀=2 (axis-weighted ω_k path)
+    // The estimates must differ; equality would prove the anisotropic
+    // metadata never reached `estimateVacuumMaxPhi`/`estimateVacuumEnergy`.
+    const base = {
+      initialCondition: 'vacuumNoise' as const,
+      latticeDim: 3,
+      gridSize: [32, 32, 32] as [number, number, number],
+      spacing: [0.15, 0.15, 0.15] as [number, number, number],
+      mass: 0.3,
+      fieldView: 'energyDensity' as const,
+    }
+    const isotropic = createConfig({
+      ...base,
+      autoScale: true,
+      cosmology: { ...DEFAULT_FREE_SCALAR_CONFIG.cosmology, enabled: false },
+    })
+    const anisotropic = createConfig({
+      ...base,
+      autoScale: true,
+      cosmology: {
+        ...DEFAULT_FREE_SCALAR_CONFIG.cosmology,
+        enabled: true,
+        preset: 'bianchiKasner',
+        eta0: 2,
+        kasnerExponents: { p1: -1 / 3, p2: 2 / 3, p3: 2 / 3 },
+      },
+    })
+
+    const phi0Iso = computeFsfMaxPhiEstimate(isotropic)
+    const phi0Aniso = computeFsfMaxPhiEstimate(anisotropic)
+
+    const isoEstimate = estimateFsfMaxFieldValue(isotropic, phi0Iso)
+    const anisoEstimate = estimateFsfMaxFieldValue(anisotropic, phi0Aniso)
+
+    expect(Number.isFinite(isoEstimate)).toBe(true)
+    expect(Number.isFinite(anisoEstimate)).toBe(true)
+    expect(isoEstimate).toBeGreaterThan(0)
+    expect(anisoEstimate).toBeGreaterThan(0)
+    // Must not collapse to the scalar-isotropic value — the axis ratios
+    // (1, 2, 2) shift the per-axis k-weighted ω, yielding a distinct
+    // brightness calibration. Same value would prove the anisotropic
+    // dispersion was silently reduced to the scalar branch.
+    expect(anisoEstimate).not.toBe(isoEstimate)
   })
 })

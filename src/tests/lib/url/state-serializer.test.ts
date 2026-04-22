@@ -803,6 +803,41 @@ describe('state-serializer', () => {
       expect(negative.wdwWorldlinePulseWidth).toBe(0.02)
     })
 
+    it('round-trips wdw_dr (renderDynamicRange) and elides the default 100', () => {
+      // Non-default value round-trips through the URL.
+      const custom: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwRenderDynamicRange: 500,
+      }
+      const serialized = serializeState(custom)
+      expect(serialized).toContain('wdw_dr=500')
+      const round = deserializeState(serialized)
+      expect(round.wdwRenderDynamicRange).toBeCloseTo(500, 3)
+
+      // Default 100 is elided from the URL so share links stay short.
+      const atDefault: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwRenderDynamicRange: 100,
+      }
+      expect(serializeState(atDefault)).not.toContain('wdw_dr')
+
+      // Unset field also omits the param entirely.
+      const unset: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+      }
+      expect(serializeState(unset)).not.toContain('wdw_dr')
+
+      // Clamp on parse: below floor / above ceiling land inside [1, 10 000].
+      expect(deserializeState('wdw_dr=0.1').wdwRenderDynamicRange).toBe(1)
+      expect(deserializeState('wdw_dr=999999').wdwRenderDynamicRange).toBe(10_000)
+    })
+
     it('round-trips wdw_ma (inflaton mass asymmetry) when != 1', () => {
       // Anisotropic value must round-trip exactly (within 4-decimal
       // serialization precision). This is the canonical URL the
@@ -850,6 +885,140 @@ describe('state-serializer', () => {
       const tooHigh = deserializeState('wdw_ma=999')
       expect(tooLow.wdwInflatonMassAsymmetry).toBe(0.1)
       expect(tooHigh.wdwInflatonMassAsymmetry).toBe(10)
+    })
+
+    it('emits wdw_m=0 (free-kinetic regime is physically distinct from default)', () => {
+      // m = 0 is the free massless inflaton case — it's a valid physics
+      // configuration, not "unset". The previous `omitZero: true` elided
+      // this value so shared URLs silently restored recipients to the
+      // default m = 0.3, which produces a completely different PDE.
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwInflatonMass: 0,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_m=0.00')
+      const round = deserializeState(serialized)
+      expect(round.wdwInflatonMass).toBe(0)
+    })
+
+    it('emits wdw_prs=0 (rotation disabled is distinct from default 1.0)', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwPhaseRotationSpeed: 0,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_prs=0.00')
+      const round = deserializeState(serialized)
+      expect(round.wdwPhaseRotationSpeed).toBe(0)
+    })
+
+    it('round-trips wdw_gn_a / wdw_gn_p grid dimensions', () => {
+      // Share links must reproduce the sender's solver resolution — two
+      // recipients running different (Na, Nphi) will see numerically
+      // different χ for the same nominal physics.
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        quantumMode: 'wheelerDeWitt',
+        wdwGridNa: 192,
+        wdwGridNphi: 48,
+      }
+      const serialized = serializeState(state)
+      expect(serialized).toContain('wdw_gn_a=192')
+      expect(serialized).toContain('wdw_gn_p=48')
+      const round = deserializeState(serialized)
+      expect(round.wdwGridNa).toBe(192)
+      expect(round.wdwGridNphi).toBe(48)
+    })
+
+    it('clamps wdw_gn_a / wdw_gn_p on deserialize to solver-safe ranges', () => {
+      const lo = deserializeState('wdw_gn_a=4&wdw_gn_p=2')
+      const hi = deserializeState('wdw_gn_a=99999&wdw_gn_p=99999')
+      expect(lo.wdwGridNa).toBe(16)
+      expect(lo.wdwGridNphi).toBe(8)
+      expect(hi.wdwGridNa).toBe(1024)
+      expect(hi.wdwGridNphi).toBe(128)
+    })
+
+    it('round-trips all six curated scenario presets without information loss', () => {
+      // Each curated preset pushes the WDW parameter space to a
+      // different corner (tunneling + positive Λ, AdS-like negative Λ,
+      // heavy inflaton, etc.). A URL share of a preset must resurrect
+      // the same physics triple on the receiving side, or the sender
+      // and receiver will see different Wheeler–DeWitt solutions for
+      // the same link.
+      const curatedPresets: Array<{
+        id: string
+        wdwBoundaryCondition: 'noBoundary' | 'tunneling' | 'deWitt'
+        wdwInflatonMass: number
+        wdwCosmologicalConstant: number
+      }> = [
+        {
+          id: 'noBoundaryBaseline',
+          wdwBoundaryCondition: 'noBoundary',
+          wdwInflatonMass: 0.3,
+          wdwCosmologicalConstant: 0,
+        },
+        {
+          id: 'vilenkinTunneling',
+          wdwBoundaryCondition: 'tunneling',
+          wdwInflatonMass: 0.3,
+          wdwCosmologicalConstant: 0.3,
+        },
+        {
+          id: 'deWittOrigin',
+          wdwBoundaryCondition: 'deWitt',
+          wdwInflatonMass: 0.3,
+          wdwCosmologicalConstant: 0,
+        },
+        {
+          id: 'inflationHighMass',
+          wdwBoundaryCondition: 'noBoundary',
+          wdwInflatonMass: 0.8,
+          wdwCosmologicalConstant: 0,
+        },
+        {
+          id: 'deSitterLargeLambda',
+          wdwBoundaryCondition: 'noBoundary',
+          wdwInflatonMass: 0.3,
+          wdwCosmologicalConstant: 0.8,
+        },
+        {
+          id: 'antiDeSitterContracting',
+          wdwBoundaryCondition: 'noBoundary',
+          wdwInflatonMass: 0.5,
+          wdwCosmologicalConstant: -0.5,
+        },
+      ]
+      for (const p of curatedPresets) {
+        const state: ShareableState = {
+          dimension: 3,
+          objectType: 'schroedinger',
+          quantumMode: 'wheelerDeWitt',
+          wdwBoundaryCondition: p.wdwBoundaryCondition,
+          wdwInflatonMass: p.wdwInflatonMass,
+          wdwCosmologicalConstant: p.wdwCosmologicalConstant,
+        }
+        const round = deserializeState(serializeState(state))
+        expect(round.wdwBoundaryCondition).toBe(p.wdwBoundaryCondition)
+        expect(round.wdwInflatonMass).toBeCloseTo(p.wdwInflatonMass, 4)
+        // The URL serializer elides Λ = 0 (default-value compression)
+        // so a share link for a Λ = 0 preset deserializes with
+        // `wdwCosmologicalConstant = undefined`. Downstream the
+        // applier leaves the store's current (default-0) value,
+        // which is physically-equivalent. Non-zero Λ must round-trip
+        // exactly to the 4-decimal precision the serializer emits.
+        if (p.wdwCosmologicalConstant === 0) {
+          expect(round.wdwCosmologicalConstant).toBeUndefined()
+        } else {
+          expect(round.wdwCosmologicalConstant).toBeCloseTo(p.wdwCosmologicalConstant, 4)
+        }
+      }
     })
   })
 

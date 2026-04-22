@@ -101,6 +101,11 @@ fn volumeRaymarchGrid(
 
     // Potential overlay: .a < 0 encodes -potOverlay from compute write-grid
     let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
+    // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
+    // (packer stores max(streamlineAlpha, srmtAlpha) in [0, 1]). Gated
+    // by quantumMode so the free-scalar negative-encoding path on other
+    // compute modes is not disturbed.
+    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && gridSample.a > 0.01;
 
     // Empty-skip: jump ahead when density is negligible.
     // Compute modes produce smoothly trilinearly-interpolated density fields on
@@ -113,12 +118,13 @@ fn volumeRaymarchGrid(
     // attempt with no detectable correctness loss on BEC groundState /
     // singleVortex / quantumTurbulence (measured via
     // bec-raymarch-profile.spec.ts at DPR=2).
-    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * 10.0, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD && !midHasPot) {
+        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !midHasWdwOverlay) {
           t += skipDistance;
           continue;
         }
@@ -133,13 +139,24 @@ fn volumeRaymarchGrid(
       adaptiveStep = min(stepLen, tFar - t);
     }
 
-    // Potential overlay rendering
+    // Potential overlay rendering (TDSE / FSF negative-encoded).
     if (DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potIntensity = abs(gridSample.a);
       let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
+    }
+
+    // Wheeler-DeWitt overlay (streamlines + SRMT heatmap). Additive,
+    // composited BEFORE density so the overlay is visible even when
+    // rho = 0 at a cell. Fixed warm color; clamp keeps a single overlay
+    // voxel from saturating the frame when the overlay alpha is near 1.
+    if (hasWdwOverlay) {
+      let overlayColor = vec3f(0.96, 0.78, 0.28);
+      let overlayOpacity = clamp(gridSample.a * min(adaptiveStep * invStepLen, 2.0) * 0.5, 0.0, 0.35);
+      accColor += transmittance * overlayOpacity * overlayColor;
+      transmittance *= (1.0 - overlayOpacity);
     }
 
     // Density → alpha
@@ -308,12 +325,25 @@ fn volumeRaymarchGrid(
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
       let rotatedB = gridSample.b - phaseOffset;
-      // AdS (mode 8) packs boundary-overlay / horizon-marker intensity into
-      // channel A, not a radian-valued relative phase. Fall back to the
-      // spatial-phase (B) channel so the relativePhase palette doesn't read
-      // [0, 1] overlay amplitudes as phase angles. quantumMode is i32 so
-      // compare with the signed literal 8 rather than the u32 suffix 8u.
-      let useRelPhase = (COLOR_ALGORITHM == 10) && (uniforms.quantumMode != 8);
+      // Only the three analytical modes write relativePhase into the A
+      // channel of the density grid (see compute/densityGrid.wgsl.ts,
+      // sampleDensityWithPhaseComponents):
+      //   mode 0 = harmonicOscillator
+      //   mode 1 = hydrogenND
+      //   mode 7 = hydrogenNDCoupled
+      // Every other mode stores something else in A — AdS (8) and WdW (9)
+      // pack overlay alpha; TDSE/BEC/Dirac/QW/FSF pack total density or a
+      // potential-overlay sentinel; open quantum mode stores
+      // coherenceFraction. Reading any of those as a radian-valued phase
+      // produces hue garbage (or collapses the palette to the first ~60°
+      // of the hue ring). Default to the spatial-phase (B) channel for
+      // every mode outside the analytical whitelist. quantumMode is i32
+      // so compare with signed literals rather than u32 suffixes.
+      let useRelPhase =
+        (COLOR_ALGORITHM == 10)
+        && (uniforms.quantumMode == 0
+            || uniforms.quantumMode == 1
+            || uniforms.quantumMode == 7);
       phase = select(rotatedB, gridSample.a, useRelPhase);
     } else {
       phase = 0.0;
@@ -336,17 +366,27 @@ fn volumeRaymarchGrid(
     // For HO/hydrogen modes, alpha is relativePhase (always >= 0).
     // Pauli spinor: alpha is total density — skip potential check.
     let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a < -0.01;
-    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
+    // Wheeler-DeWitt overlay: A > 0 carries streamline / SRMT overlay alpha
+    // (packer stores the max of the two alphas in [0, 1]). Must protect
+    // overlay cells from empty-skip when rho = 0.
+    let hasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && gridSample.a > 0.01;
+    if (!PROFILING_STRIP_EMPTY_SKIP && rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay && !hasWdwOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a < -0.01;
         let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a < -0.01;
+        let midHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeMid.a > 0.01;
+        let farHasWdwOverlay = DENSITY_GRID_HAS_PHASE && uniforms.quantumMode == 9 && probeFar.a > 0.01;
         // For dual-channel modes, include secondary density (G channel) in skip check
         let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
         let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
-        if (midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+        if (
+          midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD
+          && !midHasPot && !farHasPot
+          && !midHasWdwOverlay && !farHasWdwOverlay
+        ) {
           t += skipDistance;
           continue;
         }
@@ -377,6 +417,18 @@ fn volumeRaymarchGrid(
       let potOpacity = clamp(potIntensity * 0.06 * transmittance * min(adaptiveStep * invStepLen, 2.0), 0.0, 0.2);
       accColor += transmittance * potOpacity * potColor;
       transmittance *= (1.0 - potOpacity);
+    }
+
+    // Wheeler-DeWitt overlay (streamlines + SRMT heatmap). Composited
+    // additively BEFORE the density-driven alpha so overlays remain
+    // visible even on cells where rho = 0 — and so overlays never flow
+    // into densityGain / densityContrast / empty-skip / adaptive-step
+    // (which would be the case if overlay values lived in R/G).
+    if (hasWdwOverlay) {
+      let overlayColor = vec3f(0.96, 0.78, 0.28);
+      let overlayOpacity = clamp(gridSample.a * min(adaptiveStep * invStepLen, 2.0) * 0.5, 0.0, 0.35);
+      accColor += transmittance * overlayOpacity * overlayColor;
+      transmittance *= (1.0 - overlayOpacity);
     }
 
     // Nodal surface overlay (uses inline evaluation, not grid)

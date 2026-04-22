@@ -198,6 +198,7 @@ const ExposureSectionInner: React.FC<{
           showValue
           data-testid="exposure-density-contrast"
         />
+        {quantumMode === 'wheelerDeWitt' && <WdwDynamicRangeSlider />}
       </Section>
     )
   }
@@ -295,3 +296,43 @@ const ExposureIndicator: React.FC = React.memo(() => {
   )
 })
 ExposureIndicator.displayName = 'ExposureIndicator'
+
+/**
+ * Wheeler-DeWitt R-channel headroom slider. Maps linearly in log10-space
+ * from 1 to 10 000 so the useful working range around the default (100)
+ * is easy to hit with the mouse — a plain linear slider would put 100
+ * at 1 % of the track. Emits raw decimal values to the store so the
+ * URL serializer and physics layer never deal with log-space units.
+ */
+const WdwDynamicRangeSlider: React.FC = React.memo(() => {
+  const { renderDynamicRange, setWdwRenderDynamicRange } = useExtendedObjectStore(
+    useShallow((s) => ({
+      renderDynamicRange: s.schroedinger.wheelerDeWitt?.renderDynamicRange ?? 100,
+      setWdwRenderDynamicRange: s.setWdwRenderDynamicRange,
+    }))
+  )
+
+  const logValue = Math.log10(Math.max(1, renderDynamicRange))
+  const handleChange = useCallback(
+    (logV: number) => {
+      setWdwRenderDynamicRange(Math.pow(10, logV))
+    },
+    [setWdwRenderDynamicRange]
+  )
+
+  return (
+    <Slider
+      label="Dynamic Range"
+      tooltip="Headroom multiplier applied to the Lorentzian-max for Wheeler-DeWitt R-channel normalization. Lower (→1) reveals more interior structure but saturates Euclidean corners sooner; higher (→10 000) hides interior detail under a uniform dim background while Bi-Airy corner growth stays visible. 100 is the physics default."
+      min={0}
+      max={4}
+      step={0.05}
+      value={logValue}
+      onChange={handleChange}
+      showValue
+      formatValue={(v) => Math.round(Math.pow(10, v)).toString()}
+      data-testid="exposure-wdw-dynamic-range"
+    />
+  )
+})
+WdwDynamicRangeSlider.displayName = 'WdwDynamicRangeSlider'

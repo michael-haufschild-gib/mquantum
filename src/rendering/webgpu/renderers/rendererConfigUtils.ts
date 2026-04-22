@@ -194,10 +194,18 @@ export function buildShaderConfig(
     densityGridHasPhase: computeMode ? true : undefined,
     isWigner: computeMode ? false : isWigner,
     useWignerCache: computeMode ? false : isWigner,
+    // `isFreeScalar` is the legacy compute-mode-grid flag (box bounds,
+    // density-grid raymarch, no inline fallback). All compute modes need
+    // it. The strictly-FSF semantic lives in `isFreeScalarField` below
+    // so binary-sign-phase and precomputed-normal gates can distinguish
+    // "true FSF" from "any compute mode". WdW writes continuous phase
+    // and must NOT be classified binary-sign.
     isFreeScalar: computeMode,
+    isFreeScalarField: isFreeScalar,
     hasPrecomputedNormals: isFreeScalar,
     isQuantumWalk: rendererConfig.quantumMode === 'quantumWalk',
     isPauli,
+    isAds: rendererConfig.quantumMode === 'antiDeSitter',
     freeScalarAnalysis:
       isFreeScalar && isFreeScalarAnalysisAlgorithm(rendererConfig.colorAlgorithm),
     useDensityMatrix: rendererConfig.openQuantumEnabled ?? false,
@@ -280,6 +288,7 @@ export function computePipelineCacheKey(
     config.useWignerCache ? 1 : 0,
     pipelineIs2D ? 1 : 0,
     config.isFreeScalar ? 1 : 0,
+    config.isFreeScalarField ? 1 : 0,
     config.hasPrecomputedNormals ? 1 : 0,
     config.isQuantumWalk ? 1 : 0,
     config.freeScalarAnalysis ? 1 : 0,

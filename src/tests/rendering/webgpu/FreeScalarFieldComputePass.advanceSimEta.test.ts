@@ -13,10 +13,12 @@ vi.mock('@/lib/physics/freeScalar/vacuumSpectrum', () => ({
   sampleVacuumSpectrum: vi.fn(() => ({ phi: new Float32Array(0), pi: new Float32Array(0) })),
 }))
 
+import { DEFAULT_FREE_SCALAR_CONFIG } from '@/lib/geometry/extended/freeScalar'
 import { FreeScalarFieldComputePass } from '@/rendering/webgpu/passes/FreeScalarFieldComputePass'
 import {
   computeAdiabaticSubsteps,
   projectSimEta,
+  resolveFsfSubstepCoefs,
 } from '@/rendering/webgpu/passes/fsfCosmologyStepping'
 
 describe('FreeScalarFieldComputePass.advanceSimEta (cosmology clock direction)', () => {
@@ -329,5 +331,99 @@ describe('FreeScalarFieldComputePass.setLoadedRuntimePreheatingState', () => {
     // pair rather than leaving it behind.
     pass.setLoadedRuntimePreheatingState(-1, Number.NaN)
     expect(getSlot(pass)).toBeNull()
+  })
+})
+
+describe('resolveFsfSubstepCoefs (midpoint eval for time-dependent H)', () => {
+  it('evaluates cosmology coefs at the substep midpoint', () => {
+    // Probe the midpoint evaluation: pass a mock `evaluateCosmologyCoefs`
+    // that returns a linear function of η, so we can read back which η
+    // the resolver invoked it at. Pre-fix behaviour would call at
+    // η_start + subDt (endpoint); midpoint eval calls at
+    // η_start + subDt/2.
+    const etaStart = -5
+    const subDt = 0.1
+    const etasSeen: number[] = []
+    const config = {
+      ...DEFAULT_FREE_SCALAR_CONFIG,
+      cosmology: { ...DEFAULT_FREE_SCALAR_CONFIG.cosmology, enabled: true },
+    }
+    let currentEta = etaStart
+    const clock = {
+      advanceSimEta: (dt: number) => {
+        currentEta += dt
+        return currentEta
+      },
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    }
+    // Return the η at which we were evaluated; the resolver reads the
+    // aKinetic slot so use that as the carrier.
+    const evaluateCosmologyCoefs = (eta: number) => {
+      etasSeen.push(eta)
+      return { aKinetic: eta, aPotential: 1, aFull: 1, aPotentialRatio1: 1, aPotentialRatio2: 1 }
+    }
+    resolveFsfSubstepCoefs(config, subDt, true, false, clock, evaluateCosmologyCoefs)
+    // Exactly one eval per resolver call, at the midpoint.
+    expect(etasSeen).toHaveLength(1)
+    expect(etasSeen[0]).toBeCloseTo(etaStart + subDt / 2, 12)
+    // Clock advanced by full subDt (midpoint eval ≠ reduced advance).
+    expect(currentEta).toBeCloseTo(etaStart + subDt, 12)
+  })
+
+  it('evaluates preheating drive at the substep midpoint under Minkowski', () => {
+    // Minkowski + preheating: the drive runs on its own counter. We
+    // still want midpoint eval so the Mathieu phase stencil is centered.
+    const subDt = 0.2
+    const preheatingTime = 10
+    const config = {
+      ...DEFAULT_FREE_SCALAR_CONFIG,
+      preheating: { enabled: true, amplitude: 0.5, frequency: 4.4 },
+    }
+    const clock = {
+      advanceSimEta: () => 0,
+      preheatingTime,
+      preheatingReferenceEta: 0,
+    }
+    const evaluateCosmologyCoefs = () => ({
+      aKinetic: 1,
+      aPotential: 1,
+      aFull: 1,
+      aPotentialRatio1: 1,
+      aPotentialRatio2: 1,
+    })
+    const r = resolveFsfSubstepCoefs(config, subDt, false, true, clock, evaluateCosmologyCoefs)
+    // massSquaredScale = 1 + 0.5·sin(4.4·(preheatingTime + subDt/2 - 0))
+    const expectedMid = 1 + 0.5 * Math.sin(4.4 * (preheatingTime + subDt / 2))
+    expect(r.coefs.massSquaredScale).toBeCloseTo(expectedMid, 10)
+    // preheatingTime advanced by full subDt — the return is the endpoint
+    // clock, not the midpoint (the counter must track physical time so a
+    // pause/resume lands back on the same phase).
+    expect(r.preheatingTime).toBeCloseTo(preheatingTime + subDt, 12)
+  })
+
+  it('produces identity coefs under Minkowski + preheating-off', () => {
+    // Regression: the midpoint eval must not perturb the cosmology-off,
+    // preheating-off fast path. Every coef collapses to 1.
+    const config = { ...DEFAULT_FREE_SCALAR_CONFIG }
+    const clock = {
+      advanceSimEta: () => 0,
+      preheatingTime: 0,
+      preheatingReferenceEta: 0,
+    }
+    const evaluateCosmologyCoefs = () => ({
+      aKinetic: 1,
+      aPotential: 1,
+      aFull: 1,
+      aPotentialRatio1: 1,
+      aPotentialRatio2: 1,
+    })
+    const r = resolveFsfSubstepCoefs(config, 0.1, false, false, clock, evaluateCosmologyCoefs)
+    expect(r.coefs.aKinetic).toBe(1)
+    expect(r.coefs.aPotential).toBe(1)
+    expect(r.coefs.aFull).toBe(1)
+    expect(r.coefs.massSquaredScale).toBe(1)
+    expect(r.coefs.aPotentialRatio1).toBe(1)
+    expect(r.coefs.aPotentialRatio2).toBe(1)
   })
 })

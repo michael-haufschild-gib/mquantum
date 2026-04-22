@@ -40,7 +40,11 @@ export class PauliStrategy implements QuantumModeStrategy {
   }
 
   setup(ctx: WebGPUSetupContext, config: SchrodingerRendererConfig): ModeSetupResult {
-    if (!this.pauliPass) {
+    // Recreate the compute pass when the density grid resolution changes
+    // in-place — otherwise the existing PauliComputePass keeps its old
+    // texture/buffer sizes and the new resolution silently has no effect.
+    if (!this.pauliPass || this.pauliPass.getDensityGridSize() !== config.densityGridResolution) {
+      this.pauliPass?.dispose()
       this.pauliPass = new PauliComputePass(config.densityGridResolution)
       this.pauliPass.initializeDensityTexture(ctx.device)
     }

@@ -57,7 +57,12 @@ struct FreeScalarUniforms {
   selfInteractionEnabled: u32,  // offset 480
   selfInteractionLambda: f32,   // offset 484
   selfInteractionVev: f32,      // offset 488
-  absorberEnabled: u32,         // offset 492
+  absorberEnabled: u32,         // offset 492 — 0=disabled, 1=damp toward φ=0,
+                                //              2=damp toward φ=sign(x−center)·vev
+                                //                (kink-aware target preserves the
+                                //                 domain-wall asymptotes at the PML
+                                //                 boundary rather than dissolving
+                                //                 them toward 0).
 
   // PML absorber + cosmology A/B coefficients (16 bytes)
   absorberWidth: f32,           // offset 496

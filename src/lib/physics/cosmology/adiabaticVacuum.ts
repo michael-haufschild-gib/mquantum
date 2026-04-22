@@ -39,6 +39,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import type { VacuumDispersion } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 import { computeCosmologyAt } from './background'
@@ -167,17 +168,28 @@ export function clampEta0(
  * Draw a Bunch-Davies adiabatic vacuum state in the canonical `(δφ, π_δφ)`
  * variables at conformal time `η₀`.
  *
- * Algorithm:
+ * **Algorithm (isotropic FLRW)**:
  *
- * 1. Evaluate the scale factor `a(η₀)` and the gradient coefficient
- *    `B = a^(n−2)` from the preset.
- * 2. Draw a Minkowski-style vacuum sample with the injected physical
- *    dispersion `ω_k² = k_lat² + m²·a²(η₀)`. The existing lattice sampler
- *    accepts this as its `VacuumDispersion` number argument.
- * 3. Rescale to the canonical basis: `δφ = φ_M · B^(−1/2)`,
- *    `π_δφ = π_M · B^(1/2)`. This is a per-site scalar multiply, so the
- *    Hermitian structure and the per-mode amplitude calibration from the
- *    Minkowski sampler transfer intact.
+ * 1. Evaluate `a(η₀)` and the gradient coefficient `B = a^(n−2)` from the
+ *    preset.
+ * 2. Draw a Minkowski-style sample with the injected physical dispersion
+ *    `ω_k² = k_lat² + m²·a²(η₀)`.
+ * 3. Rescale: `δφ = φ_M · B^(−1/2)`, `π_δφ = π_M · B^(1/2)`.
+ *
+ * **Bianchi-I generalization**: the canonical Hamiltonian picks up
+ * per-axis gradient weights `aPot_d` and a scalar kinetic coefficient
+ * `aKinetic`, so the ground-state oscillator frequency is
+ *
+ *     ω_k² = aKinetic · (Σ_d aPot_d·k_lat_d² + m²·aFull)
+ *
+ * We draw with that axis-weighted ω and rescale by
+ * `√aKinetic` (φ) / `1/√aKinetic` (π). Under any isotropic FLRW preset
+ * `aKinetic = 1/aPotential` and `aFull = aKinetic·aPotential·a²`, so the
+ * dispersion collapses to `k² + m²·a²` and the rescale factor `√aKinetic =
+ * 1/√aPotential = B^(−1/2)` — bit-identical to the original formula. The
+ * fix only activates the axis-weighting when the preset actually produces
+ * `aPotentialRatio1 ≠ 1` or `aPotentialRatio2 ≠ 1` (i.e. Bianchi-I away
+ * from the symmetric η=1 anchor).
  *
  * The Minkowski preset is handled by the early-out `B = 1` branch — the
  * rescale is a bit-identical no-op and the result collapses to
@@ -207,6 +219,57 @@ export function sampleAdiabaticVacuum(
   }
 
   const snap = computeCosmologyAt(eta0, params)
+
+  // Detect genuinely anisotropic Bianchi-I — skip the axis-weighted path
+  // when the ratios are exactly 1 so every isotropic FLRW preset continues
+  // to dispatch through the scalar-massSq sampler branch bit-identically.
+  // `aPotentialRatio{1,2}` are CosmologySnapshot optional fields that
+  // `computeCosmologyAt` sets to 1 for every isotropic preset and to the
+  // true axis ratio for Bianchi-I. `undefined` collapses to 1 (isotropic)
+  // so older snapshot payloads that predate the Bianchi extension still
+  // route through the FLRW branch.
+  const ratio1 = snap.aPotentialRatio1 ?? 1
+  const ratio2 = snap.aPotentialRatio2 ?? 1
+  const anisotropic = ratio1 !== 1 || ratio2 !== 1
+
+  if (anisotropic) {
+    // Canonical Bianchi-I δφ dispersion:
+    //   ω² = aKinetic · (Σ_d aPot_d·k_lat_d² + m²·aFull)
+    // where aPot_0 = aPotential, aPot_1 = aPotential·ratio1,
+    // aPot_2 = aPotential·ratio2, aPot_{d≥3} = aPotential (Bianchi-I only
+    // touches the three spatial axes). Amplitude rescale is uniform in real
+    // space: φ = √aKinetic · φ_M, π = π_M/√aKinetic. Under isotropic
+    // inputs this collapses to the scalar-massSq path — see the else branch
+    // for the bit-identical FLRW code.
+    const massSqEff = config.mass * config.mass * snap.aFull
+    if (!Number.isFinite(massSqEff)) {
+      throw new RangeError(
+        `sampleAdiabaticVacuum: non-finite m²·aFull at eta0=${eta0} (aFull=${snap.aFull}, mass=${config.mass})`
+      )
+    }
+    const axisPotentials = new Array<number>(config.latticeDim).fill(snap.aPotential)
+    if (config.latticeDim > 1) axisPotentials[1] = snap.aPotential * ratio1
+    if (config.latticeDim > 2) axisPotentials[2] = snap.aPotential * ratio2
+    const dispersion: VacuumDispersion = {
+      massSq: massSqEff,
+      axisPotentials,
+      kineticScale: snap.aKinetic,
+    }
+    const { phi: phiM, pi: piM } = sampleVacuumSpectrum(config, seed, dispersion)
+    const sampleScale = Math.sqrt(snap.aKinetic)
+    const invScale = sampleScale > 0 ? 1 / sampleScale : 1
+    const phi = new Float32Array(phiM.length)
+    const pi = new Float32Array(piM.length)
+    for (let i = 0; i < phiM.length; i++) {
+      phi[i] = phiM[i]! * sampleScale
+      pi[i] = piM[i]! * invScale
+    }
+    return { phi, pi }
+  }
+
+  // Isotropic FLRW path — preserved bit-for-bit from the pre-Bianchi
+  // implementation. Every existing test ("rescales δφ amplitudes by
+  // 1/√aPotential vs the bare Minkowski sampler" etc.) pins this branch.
   const aSq = snap.a * snap.a
   const massSq = config.mass * config.mass * aSq
 

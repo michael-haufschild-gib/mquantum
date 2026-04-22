@@ -119,11 +119,16 @@ describe('SrmtDiagnosticSection', () => {
       store.setWdwSrmtEnabled(true)
       store.setWdwSrmtClock('phi2')
       store.setWdwSrmtCutNormalized(0.75)
-      const wdwState = store.schroedinger.wheelerDeWitt
+      // Re-fetch state AFTER the setters fire — the original `store`
+      // reference was captured before the setter calls above. Zustand
+      // replaces the root state immutably, so `store.schroedinger` is
+      // now stale and spreading it would overwrite the srmtEnabled /
+      // srmtClock / srmtCutNormalized updates that just ran.
+      const freshSchroedinger = useExtendedObjectStore.getState().schroedinger
       useExtendedObjectStore.setState({
         schroedinger: {
-          ...store.schroedinger,
-          wheelerDeWitt: { ...wdwState, phiExtent: 3.5 },
+          ...freshSchroedinger,
+          wheelerDeWitt: { ...freshSchroedinger.wheelerDeWitt, phiExtent: 3.5 },
         },
       })
     })
