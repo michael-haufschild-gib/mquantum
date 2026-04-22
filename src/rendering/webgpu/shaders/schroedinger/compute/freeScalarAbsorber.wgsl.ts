@@ -1,9 +1,18 @@
 /**
  * Free Scalar Field PML Absorber Compute Shader
  *
- * Applies PML cubic polynomial damping to both field components (φ, π):
- *   φ(x) *= exp(-σ(x) · dt)
- *   π(x) *= exp(-σ(x) · dt)
+ * Applies PML cubic polynomial damping to both field components (φ, π).
+ * The damping is applied to `(φ − φ_target)` rather than `φ` directly so
+ * configurations with a non-trivial vacuum (e.g. the Mexican-Hat kink
+ * `φ = v·tanh(x/w)` whose asymptotes sit at ±v at the PML boundary) are
+ * not slowly dragged toward 0 by the absorber:
+ *   φ(x) := φ_target + (φ(x) − φ_target) · exp(−σ(x) · dt)
+ *   π(x) *= exp(−σ(x) · dt)
+ *
+ * `params.absorberEnabled` picks the target:
+ *   - `1u` → `φ_target = 0` (free KG vacuum, pre-existing behaviour)
+ *   - `2u` → `φ_target = sign(x_axis0 − packetCenter[0]) · selfInteractionVev`
+ *     (kink / domain-wall vacuum branch selected by position along axis 0)
  *
  * Unlike the Schrödinger/Pauli/Dirac modes where PML is merged into
  * the potential half-step, the Free Scalar Field uses a leapfrog scheme
@@ -51,7 +60,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (sigma > 0.0) {
     let dampFactor = exp(-sigma * params.dt);
-    phi[idx] *= dampFactor;
+    var phiTarget: f32 = 0.0;
+    // Kink-aware target: damp toward the local vacuum branch (plus/minus
+    // v) instead of toward 0. Position along axis 0 picks the branch —
+    // matches the kink's asymptotic tanh sign and preserves the domain
+    // wall shape. Mode 1u (ordinary PML) leaves phiTarget = 0 so the
+    // expression reduces to the pre-fix phi *= dampFactor bit-identically.
+    if (params.absorberEnabled == 2u) {
+      let halfExtent0 = f32(params.gridSize[0]) * params.spacing[0] * 0.5;
+      let x0 = f32(coords[0]) * params.spacing[0] - halfExtent0;
+      let dx0 = x0 - params.packetCenter[0];
+      phiTarget = select(-1.0, 1.0, dx0 >= 0.0) * params.selfInteractionVev;
+    }
+    phi[idx] = phiTarget + (phi[idx] - phiTarget) * dampFactor;
     pi[idx] *= dampFactor;
   }
 }

@@ -259,10 +259,16 @@ describe('k-space worker body — dispersion dispatch', () => {
     }
     const { phi, pi } = sampleAdiabaticVacuum(cfg, cosmoParams, cfg.cosmology.eta0, 131)
 
-    const dispersion = computeFsfVacuumDispersion(cfg, cfg.cosmology.eta0)
-    if (dispersion === 'kgFloor') {
+    const rawDispersion = computeFsfVacuumDispersion(cfg, cfg.cosmology.eta0)
+    if (rawDispersion === 'kgFloor') {
       throw new Error('deSitter must resolve to a numeric dispersion')
     }
+    if (typeof rawDispersion !== 'number') {
+      // deSitter is an isotropic FLRW preset — it must resolve to a
+      // scalar `m²·a²`, never the Bianchi-I anisotropic variant.
+      throw new Error('deSitter must resolve to a scalar dispersion, not the anisotropic variant')
+    }
+    const dispersion: number = rawDispersion
     const coefs = computeFsfCosmologyCoefs(cfg, cfg.cosmology.eta0)
     const basisCoefs = {
       aKinetic: coefs.aKinetic,

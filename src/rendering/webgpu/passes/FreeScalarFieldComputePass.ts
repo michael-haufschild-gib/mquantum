@@ -466,6 +466,13 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       pendingInjection: this.pendingInjection,
       pendingStagingBuffers: this.pendingStagingBuffers,
       kSpace: this.kSpace,
+      // Midpoint-coef kickstart needs these to stage the correct coefs
+      // before the kickstart kick dispatch. Under Minkowski +
+      // preheating-off the initializer skips the stage entirely, so
+      // these fields are just carried along.
+      cosmoCoefsScratch: this.cosmoCoefsScratch,
+      preheatingTime: this.preheatingTime,
+      preheatingReferenceEta: this.preheatingReferenceEta,
       dispatchCompute: (pass, pipeline, bindGroups, x, y?, z?) =>
         this.dispatchCompute(pass, pipeline, bindGroups, x, y, z),
       beginComputePass: (desc) => ctx.beginComputePass(desc),
@@ -653,31 +660,23 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         }
 
         for (let sub = 0; sub < nSub; sub++) {
-          const phiPass = ctx.beginComputePass({
-            label: `free-scalar-update-phi-${step}-${sub}`,
-          })
-          this.dispatchCompute(
-            phiPass,
-            this.pl.updatePhiPipeline,
-            [this.bg.updatePhiBG],
-            linearWorkgroups
-          )
-          phiPass.end()
-
-          // Advance the cosmological clock AFTER the phi drift and BEFORE
-          // the pi kick so the time-dependent coefficients used by the pi
-          // dispatch match the advanced phi time slice. This is the
-          // canonical leapfrog time ordering extended to time-dependent
-          // Hamiltonians — first-order accurate in the coefficient time,
-          // second-order in the (p, q) update. When cosmology is disabled
-          // there is no cosmological clock, but the preheating drive still
-          // runs on a separate `preheatingTime` counter and fires the same
-          // coef-slot upload path — composing the Mathieu-equation drive
-          // with the flat-background free field.
+          // MIDPOINT COEF EVALUATION. `resolveFsfSubstepCoefs` advances
+          // the clock by subDt/2 + subDt/2 and evaluates coefs at the
+          // midpoint. We upload the midpoint coefs BEFORE both drift and
+          // kick so the time-dependent Hamiltonian is sampled with a
+          // centered, second-order stencil. The earlier "drift at
+          // η_start, kick at η_end" ordering was first-order in the coef
+          // time derivative — visible as O(1) trajectory drift at late
+          // times in de Sitter / Bianchi. When cosmology is disabled
+          // there is no cosmological clock, but the preheating drive
+          // still runs on a separate `preheatingTime` counter and fires
+          // the same coef-slot upload path — composing the
+          // Mathieu-equation drive with the flat-background free field.
+          const subDt = nSub === 1 ? dtFull : dtFull / nSub
           if (coefUploadActive && this.uniformBuffer) {
             const r = resolveFsfSubstepCoefs(
               config,
-              nSub === 1 ? dtFull : dtFull / nSub,
+              subDt,
               cosmologyActive,
               preheatingActive,
               {
@@ -700,6 +699,17 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
               r.coefs.aPotentialRatio2
             )
           }
+
+          const phiPass = ctx.beginComputePass({
+            label: `free-scalar-update-phi-${step}-${sub}`,
+          })
+          this.dispatchCompute(
+            phiPass,
+            this.pl.updatePhiPipeline,
+            [this.bg.updatePhiBG],
+            linearWorkgroups
+          )
+          phiPass.end()
 
           const piPass = ctx.beginComputePass({
             label: `free-scalar-update-pi-${step}-${sub}`,

@@ -81,7 +81,6 @@ import {
   estimateVacuumEnergyVisualScale,
   estimateVacuumMaxPhi,
   estimateVacuumMaxPi,
-  type VacuumDispersion,
 } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { computePMLSigmaMaxND, PML_GRADING_EXPONENT } from '@/lib/physics/pml/profile'
 import type { FsfDiagnosticsSnapshot } from '@/stores/diagnostics/types'
@@ -97,17 +96,26 @@ const _i32Cache = new WeakMap<ArrayBuffer, Int32Array>()
 
 function _getCachedU32(buf: ArrayBuffer): Uint32Array {
   let v = _u32Cache.get(buf)
-  if (!v) { v = new Uint32Array(buf); _u32Cache.set(buf, v) }
+  if (!v) {
+    v = new Uint32Array(buf)
+    _u32Cache.set(buf, v)
+  }
   return v
 }
 function _getCachedF32(buf: ArrayBuffer): Float32Array {
   let v = _f32Cache.get(buf)
-  if (!v) { v = new Float32Array(buf); _f32Cache.set(buf, v) }
+  if (!v) {
+    v = new Float32Array(buf)
+    _f32Cache.set(buf, v)
+  }
   return v
 }
 function _getCachedI32(buf: ArrayBuffer): Int32Array {
   let v = _i32Cache.get(buf)
-  if (!v) { v = new Int32Array(buf); _i32Cache.set(buf, v) }
+  if (!v) {
+    v = new Int32Array(buf)
+    _i32Cache.set(buf, v)
+  }
   return v
 }
 
@@ -149,9 +157,10 @@ export function computeFsfConfigHash(config: FreeScalarConfig): string {
 export function computeFsfInitHash(config: FreeScalarConfig): string {
   const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
   const cosmo = config.cosmology
-  const bk = cosmo.enabled && cosmo.preset === 'bianchiKasner' && cosmo.kasnerExponents
-    ? `_bk${cosmo.kasnerExponents.p1},${cosmo.kasnerExponents.p2},${cosmo.kasnerExponents.p3}`
-    : ''
+  const bk =
+    cosmo.enabled && cosmo.preset === 'bianchiKasner' && cosmo.kasnerExponents
+      ? `_bk${cosmo.kasnerExponents.p1},${cosmo.kasnerExponents.p2},${cosmo.kasnerExponents.p3}`
+      : ''
   const cosmoHash = cosmo.enabled
     ? `_cosmo1_${cosmo.preset}_eta${cosmo.eta0}_h${cosmo.hubble}_st${cosmo.steepness}${bk}`
     : '_cosmo0'
@@ -349,7 +358,19 @@ export function writeFsfUniforms(
   u32[120] = config.selfInteractionEnabled ? 1 : 0 // offset 480
   f32[121] = config.selfInteractionLambda // offset 484
   f32[122] = config.selfInteractionVev // offset 488
-  u32[123] = config.absorberEnabled ? 1 : 0 // offset 492 (absorberEnabled)
+  // absorberEnabled mode: 0 = off, 1 = damp toward φ=0, 2 = damp toward
+  // φ = sign(x₀−center)·vev (kink-aware). The kink-aware branch preserves
+  // the domain-wall asymptotes at the PML boundary instead of dragging
+  // them toward 0 — a bug in the pre-fix code that slowly dissolved the
+  // kink. Route to it when the initial condition is `kinkProfile` AND
+  // self-interaction is on (so `selfInteractionVev` holds the physical
+  // vacuum value); every other config keeps the ordinary damp-toward-0
+  // path, bit-identical to the pre-fix behaviour.
+  const useKinkAwarePml =
+    config.absorberEnabled &&
+    config.initialCondition === 'kinkProfile' &&
+    config.selfInteractionEnabled
+  u32[123] = config.absorberEnabled ? (useKinkAwarePml ? 2 : 1) : 0 // offset 492
 
   // PML absorber parameters (offset 496-511, indices 124-127)
   f32[124] = config.absorberWidth ?? 0.2 // offset 496
@@ -417,7 +438,18 @@ export function writeFsfUniforms(
  * Klein-Gordon auto-scale bit-identically (for `mass > M_FLOOR`).
  */
 interface VacuumAutoScale {
-  dispersion: VacuumDispersion
+  /**
+   * Scalar dispersion for the auto-scale estimators — either `'kgFloor'`
+   * (Minkowski / cosmology-disabled) or a numeric `m²·a²(η₀)`. The
+   * Bianchi-I anisotropic variant of {@link VacuumDispersion} is never
+   * returned here: non-vacuum initial conditions (singleMode /
+   * gaussianPacket / kinkProfile) compute their own per-mode ω via the
+   * `config.modeK` / `packetCenter` hooks downstream, so the sampler's
+   * axis-weighting is not plumbed through this estimator — the returned
+   * `dispersion` must be a plain number so consumer code can use it in
+   * arithmetic.
+   */
+  dispersion: 'kgFloor' | number
   aPotential: number
   aFull: number
 }
@@ -453,16 +485,31 @@ function resolveVacuumAutoScale(config: FreeScalarConfig): VacuumAutoScale {
  * estimate. Using bare `mass²` would under- or over-estimate the on-screen
  * density floor whenever `a(η₀) ≠ 1`.
  *
+ * **Vacuum + autoScale=false**: the vacuum-noise initial condition has no
+ * user-set "amplitude" to fall back on (`packetAmplitude`, VEV, etc. are
+ * irrelevant). Returning `1.0` under `!autoScale` leaves the shader
+ * saturated on any lattice whose typical vacuum amplitude exceeds 1 —
+ * the observed "over-bright initial frame" on the Bianchi-Kasner Cigar
+ * preset. The autoScale=false branch for vacuumNoise therefore reuses
+ * the exact same physics-based estimator as the autoScale=true branch,
+ * giving a static (config-deterministic, never rescaling per frame)
+ * baseline that calibrates the brightness at η=η₀ once. Subsequent η
+ * evolution pushes normRho above/below 1, preserving the "fixed gain,
+ * brightness-is-physics" intent of presets like `bianchiKasnerCigar`.
+ *
+ * Other non-vacuum initial conditions keep the `=1` fallback because
+ * `packetAmplitude`/VEV supply the scale.
+ *
  * @param config - Free scalar field configuration
  * @returns Estimated peak phi amplitude
  */
 export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
-  if (!config.autoScale) return 1.0
   if (config.initialCondition === 'vacuumNoise') {
     const { dispersion, aPotential } = resolveVacuumAutoScale(config)
     const rawMaxPhi = estimateVacuumMaxPhi(config, dispersion)
     return rawMaxPhi / Math.sqrt(aPotential)
   }
+  if (!config.autoScale) return 1.0
   if (config.initialCondition === 'kinkProfile') return config.selfInteractionVev
   return config.packetAmplitude
 }
@@ -490,7 +537,14 @@ export function computeFsfMaxPhiEstimate(config: FreeScalarConfig): number {
  * @returns Estimated maximum field value for normalization
  */
 export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimate: number): number {
-  if (!config.autoScale) return 1.0
+  // Vacuum noise has no user-set amplitude to fall back on, so we compute
+  // the physics-based estimator even under autoScale=false. The result is
+  // deterministic in the config (no runtime chasing), providing a static
+  // calibration anchor at η=η₀. Matches `computeFsfMaxPhiEstimate`, which
+  // mirrors the same logic so `maxPhiEstimate` has consistent semantics
+  // whether autoScale is on or off. See that function's docstring for the
+  // "bianchiKasnerCigar over-bright" regression that motivated this.
+  if (!config.autoScale && config.initialCondition !== 'vacuumNoise') return 1.0
 
   const phi0 = maxPhiEstimate
 
@@ -563,13 +617,20 @@ export function estimateFsfMaxFieldValue(config: FreeScalarConfig, maxPhiEstimat
     return phi0 * omega * aPotential
   }
 
-  // energyDensity (proper, per comoving observer): for an envelope of peak
-  // amplitude φ₀ oscillating with frequency ω, the canonical Hamiltonian
-  // density is ½·φ₀²·ω². Divide by `aFull(η₀)` to land in the proper frame
-  // — no-op under Minkowski, correctly rescales under cosmology. Self-
-  // interaction carries the `aFull` weight from the action term before the
-  // same uniform division, which collapses it to the bare potential.
-  let canonicalEnergy = phi0 * phi0 * omegaSq * 0.5
+  // energyDensity (proper, per comoving observer): for a plane-wave / packet
+  // with peak amplitude φ₀ and frequency ω, the canonical Hamiltonian density
+  // time-averages to ½·aPotential·φ₀²·ω² — π = aPotential·φ₀·ω·sin(k·x) makes
+  // the kinetic term scale with aPotential rather than 1, and (using
+  // aKinetic·aPotential² = aPotential) the kinetic / gradient / mass pieces
+  // collapse into a single aPotential·ω² prefactor. Without the aPotential
+  // factor the estimator overshoots by ≈ 1/aPotential under cosmology (e.g.
+  // ~128× for de Sitter at η=-8, H=2, n=4), driving normRho near zero and
+  // making the field render as black. Divide by `aFull(η₀)` to land in the
+  // proper frame — no-op under Minkowski (aPotential = aFull = 1), correctly
+  // rescales under cosmology. Self-interaction carries the `aFull` weight
+  // from the action term before the same uniform division, which collapses
+  // it to the bare potential.
+  let canonicalEnergy = aPotential * phi0 * phi0 * omegaSq * 0.5
   if (config.selfInteractionEnabled) {
     const v = config.selfInteractionVev
     canonicalEnergy += aFull * config.selfInteractionLambda * v * v * v * v
