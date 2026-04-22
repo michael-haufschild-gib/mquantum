@@ -29,13 +29,29 @@ import { DrawerSection } from './DrawerSection'
  * Wheeler–DeWitt phase rotation only modulates B; `relativePhase` reads A and
  * is unaffected by rotation, so it is intentionally absent from this set —
  * toggling rotation while on it would be a silent no-op.
+ *
+ * Includes every algorithm that reads `phase` inside its shader branch in
+ * `emission.wgsl.ts`:
+ *   - `phase` (3)               — direct hue shift.
+ *   - `mixed` (4)               — `baseHSL.x + hueShift` with hueShift = (phase − 0.5·2π).
+ *   - `phaseCyclicUniform` (6)  — `hueAngle = phase + π` feeds `cos / sin`.
+ *   - `phaseDiverging` (7)      — signed `cos(phase)` carrier.
+ *   - `domainColoringPsi` (8)   — full HSL wheel from `phaseNorm`.
+ *   - `diverging` (9)           — `cos(phase) or sin(phase)` Re/Im picker.
+ *   - `phaseDensity` (22)       — cosine-palette hue from `phaseNorm`.
+ * Missing any one of these from the set causes the phase-rotation
+ * toggle to silently auto-switch AWAY from a visually-responsive
+ * algorithm (previous omissions: `mixed`, `diverging`), which is
+ * indistinguishable to the user from a no-op bug.
  */
 const PHASE_SENSITIVE_COLOR_ALGORITHMS = new Set([
   'phase',
+  'mixed',
   'phaseCyclicUniform',
   'phaseDiverging',
-  'phaseDensity',
   'domainColoringPsi',
+  'diverging',
+  'phaseDensity',
 ])
 
 /** Default algorithm we switch TO when the user enables phase rotation. */

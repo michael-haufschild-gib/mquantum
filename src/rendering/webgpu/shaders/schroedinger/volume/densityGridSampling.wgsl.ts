@@ -139,6 +139,12 @@ fn applySampleRotation(pos: vec3f) -> vec3f {
 fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   let bound = uniforms.boundingRadius;
   let gridPos = applySampleRotation(pos);
+  // Linear world-to-UVW for the isotropic cube [-bound, +bound]^3. Modes
+  // whose solver grid has different physical extents per axis (notably
+  // Wheeler-DeWitt: a in [aMin, aMax], phi1/phi2 in [-phiExtent, +phiExtent])
+  // inherit a cosmetic anisotropy -- phi features render visually
+  // compressed relative to a features whenever phiExtent > (aMax - aMin).
+  // See WheelerDeWittStrategy.computeBoundingRadius for the full note.
   return (gridPos + vec3f(bound)) / (2.0 * bound);
 }
 

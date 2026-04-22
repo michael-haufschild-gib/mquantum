@@ -39,6 +39,10 @@ export interface WheelerDeWittSetters {
   setWdwCosmologicalConstant: (lambda: number) => void
   setWdwInflatonMassAsymmetry: (ratio: number) => void
   setWdwGridSize: (preset: WdwGridPreset) => void
+  /** Set raw solver grid dimensions (URL round-trip). `Na ∈ [16, 1024]`,
+   *  `Nphi ∈ [8, 128]`. Off-preset values supported so shared links
+   *  preserve the sender's exact resolution. */
+  setWdwGridDimensions: (gridNa: number, gridNphi: number) => void
   setWdwStreamlinesEnabled: (enabled: boolean) => void
   setWdwStreamlineDensity: (density: number) => void
   setWdwPhaseRotationEnabled: (enabled: boolean) => void
@@ -46,6 +50,7 @@ export interface WheelerDeWittSetters {
   setWdwWorldlineEnabled: (enabled: boolean) => void
   setWdwWorldlineSpeed: (speed: number) => void
   setWdwWorldlinePulseWidth: (w: number) => void
+  setWdwRenderDynamicRange: (range: number) => void
   setWdwSrmtEnabled: (enabled: boolean) => void
   setWdwSrmtClock: (clock: WdwSrmtClock) => void
   setWdwSrmtCutNormalized: (cut: number) => void
@@ -82,6 +87,16 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     'worldlinePulseWidth',
     0.02,
     0.3
+  )
+  // Render-only: user-controllable R-channel headroom for Wheeler-DeWitt.
+  // Clamp range matches `WDW_HEADROOM_MIN` / `WDW_HEADROOM_MAX` in
+  // `lib/physics/wheelerDeWitt/densityGrid.ts` — keep the bounds in lockstep.
+  const setRenderDynamicRange = nestedClampedSetter(
+    ctx,
+    'wheelerDeWitt',
+    'renderDynamicRange',
+    1,
+    10_000
   )
 
   // SRMT diagnostic setters — all display-only: they do NOT flip needsReset
@@ -173,6 +188,25 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
         },
       }))
     },
+    setWdwGridDimensions: (gridNa: number, gridNphi: number) => {
+      if (!ctx.isFinite(gridNa) || !ctx.isFinite(gridNphi)) {
+        ctx.warnNonFinite('wheelerDeWitt.gridNa/gridNphi', NaN)
+        return
+      }
+      const clampedNa = clamp(Math.round(gridNa), 16, 1024)
+      const clampedNphi = clamp(Math.round(gridNphi), 8, 128)
+      ctx.setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          wheelerDeWitt: {
+            ...state.schroedinger.wheelerDeWitt,
+            gridNa: clampedNa,
+            gridNphi: clampedNphi,
+            needsReset: true,
+          },
+        },
+      }))
+    },
     // Display-only: no applyWithReset — solver output is unaffected, only the
     // WKB trajectory overlay is rebuilt on the next frame.
     setWdwStreamlinesEnabled: setStreamlinesEnabled,
@@ -198,6 +232,7 @@ export function createWheelerDeWittSetters(ctx: SetterContext): WheelerDeWittSet
     setWdwWorldlineEnabled: setWorldlineEnabled,
     setWdwWorldlineSpeed: setWorldlineSpeed,
     setWdwWorldlinePulseWidth: setWorldlinePulseWidth,
+    setWdwRenderDynamicRange: setRenderDynamicRange,
     // SRMT diagnostic — display-only, no solver re-run.
     setWdwSrmtEnabled: setSrmtEnabled,
     setWdwSrmtClock: setSrmtClock,

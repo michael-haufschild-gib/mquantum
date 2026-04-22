@@ -18,6 +18,10 @@ export interface WdwUrlState {
   wdwInflatonMass?: number
   wdwInflatonMassAsymmetry?: number
   wdwCosmologicalConstant?: number
+  /** Number of `a` steps in the leapfrog march (solver resolution, 16..1024). */
+  wdwGridNa?: number
+  /** Number of φ grid points per inflaton axis (8..128). */
+  wdwGridNphi?: number
   wdwStreamlinesEnabled?: boolean
   wdwStreamlineDensity?: number
   wdwPhaseRotationEnabled?: boolean
@@ -25,6 +29,8 @@ export interface WdwUrlState {
   wdwWorldlineEnabled?: boolean
   wdwWorldlineSpeed?: number
   wdwWorldlinePulseWidth?: number
+  /** R-channel headroom slider (1..10 000). See `densityGrid.packWdwDensityGrid`. */
+  wdwRenderDynamicRange?: number
 }
 
 const INTEGER_RE = /^-?\d+$/
@@ -103,18 +109,33 @@ function setFloatParam(
  */
 export function serializeWdw(params: URLSearchParams, state: WdwUrlState): void {
   setStringParam(params, 'wdw_bc', state.wdwBoundaryCondition)
-  setFloatParam(params, 'wdw_m', state.wdwInflatonMass, true)
+  // `wdwInflatonMass` and `wdwPhaseRotationSpeed` emit zero values — m=0
+  // is the free-kinetic regime (physically distinct from the default
+  // m=0.3), and speed=0 disables phase rotation (physically distinct
+  // from the default 1.0). Previous omitZero=true silently restored
+  // URLs of these zero states to the defaults on reload.
+  setFloatParam(params, 'wdw_m', state.wdwInflatonMass)
   if (state.wdwInflatonMassAsymmetry !== undefined && state.wdwInflatonMassAsymmetry !== 1) {
     params.set('wdw_ma', state.wdwInflatonMassAsymmetry.toFixed(4))
   }
   setFloatParam(params, 'wdw_lambda', state.wdwCosmologicalConstant, true)
+  // Solver resolution — share links must reproduce the sender's grid
+  // otherwise physics/render detail silently diverge across recipients.
+  setIntParam(params, 'wdw_gn_a', state.wdwGridNa)
+  setIntParam(params, 'wdw_gn_p', state.wdwGridNphi)
   setBoolParam(params, 'wdw_sl', state.wdwStreamlinesEnabled)
   setIntParam(params, 'wdw_sld', state.wdwStreamlineDensity)
   setBoolParam(params, 'wdw_pr', state.wdwPhaseRotationEnabled)
-  setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed, true)
+  setFloatParam(params, 'wdw_prs', state.wdwPhaseRotationSpeed)
   setBoolParam(params, 'wdw_wl', state.wdwWorldlineEnabled)
   setFloatParam(params, 'wdw_wls', state.wdwWorldlineSpeed, true)
   setFloatParam(params, 'wdw_wlw', state.wdwWorldlinePulseWidth, true, 4)
+  // Default elision: the stock headroom is 100, so omit `wdw_dr` when the
+  // value is unset or exactly at the default. Any user tweak round-trips
+  // through the URL like the other wdw_* fields.
+  if (state.wdwRenderDynamicRange !== undefined && state.wdwRenderDynamicRange !== 100) {
+    setFloatParam(params, 'wdw_dr', state.wdwRenderDynamicRange, true, 3)
+  }
 }
 
 /** Parse Wheeler–DeWitt URL params into the shared state object. */
@@ -125,6 +146,12 @@ export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): voi
   // instability); α > 10 makes it so stiff the grid can't resolve it.
   state.wdwInflatonMassAsymmetry = parseFloatParam(params, 'wdw_ma', 0.1, 10)
   state.wdwCosmologicalConstant = parseFloatParam(params, 'wdw_lambda', -1, 1)
+  // Grid bounds match the solver's hard minima (≥ 3 per axis) and the
+  // publication preset's max of (256, 48); we leave headroom above that
+  // for power-user experiments while keeping the serializer cheap to
+  // validate.
+  state.wdwGridNa = parseIntParam(params, 'wdw_gn_a', 16, 1024)
+  state.wdwGridNphi = parseIntParam(params, 'wdw_gn_p', 8, 128)
   state.wdwStreamlinesEnabled = parseBoolParam(params, 'wdw_sl')
   state.wdwStreamlineDensity = parseIntParam(params, 'wdw_sld', 2, 16)
   state.wdwPhaseRotationEnabled = parseBoolParam(params, 'wdw_pr')
@@ -132,4 +159,5 @@ export function deserializeWdw(params: URLSearchParams, state: WdwUrlState): voi
   state.wdwWorldlineEnabled = parseBoolParam(params, 'wdw_wl')
   state.wdwWorldlineSpeed = parseFloatParam(params, 'wdw_wls', 0.1, 3)
   state.wdwWorldlinePulseWidth = parseFloatParam(params, 'wdw_wlw', 0.02, 0.3)
+  state.wdwRenderDynamicRange = parseFloatParam(params, 'wdw_dr', 1, 10_000)
 }

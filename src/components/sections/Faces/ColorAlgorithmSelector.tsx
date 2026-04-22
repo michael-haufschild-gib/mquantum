@@ -92,13 +92,22 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       [availableOptions]
     )
 
+    // Wheeler–DeWitt is a density-grid-compute mode (CPU-solved, uploaded
+    // to a 3D texture), not an analytic mode — it should follow the same
+    // fallback rule as the other compute modes when the stored color
+    // algorithm becomes invalid on a mode switch. Missing this caused
+    // WdW to fall back to `radialDistance` (an analytic-only algo) on
+    // any transition that invalidated the prior pick, which rendered a
+    // radial colour ramp centred on world origin regardless of what the
+    // WdW density actually looked like.
     const isComputeMode =
       objectType === 'pauliSpinor' ||
       quantumMode === 'tdseDynamics' ||
       quantumMode === 'freeScalarField' ||
       quantumMode === 'becDynamics' ||
       quantumMode === 'diracEquation' ||
-      quantumMode === 'quantumWalk'
+      quantumMode === 'quantumWalk' ||
+      quantumMode === 'wheelerDeWitt'
 
     // Auto-switch away from unavailable algorithm when mode changes.
     // Spatially misleading algorithms (radialDistance, radial, lch, multiSource)

@@ -459,6 +459,60 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('fn intersectBox(')
     expect(wgsl).toContain('tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);')
   })
+
+  it('emits HAS_BINARY_SIGN_PHASE = true for FSF, Wigner, and AdS modes', () => {
+    // Free scalar field writes phase = {0, π} based on sign(fieldValue).
+    // Color algorithm 9 (Diverging) uses sin/cos(phase) to recover the
+    // sign; `sin(π) ≈ 0` collapses the whole cube to neutral. The shader
+    // composer must flag these modes so the algorithm falls back to
+    // cos-based extraction. Regression: previously the flag did not
+    // exist and FSF + useImag rendered gray.
+    const fsf = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+      // isFreeScalar = compute-grid mode (all compute modes set it).
+      // isFreeScalarField = strictly the FSF mode — this is what drives
+      // HAS_BINARY_SIGN_PHASE. See composeConfig.ts field docs.
+      isFreeScalar: true,
+      isFreeScalarField: true,
+    })
+    expect(fsf.wgsl).toContain('const HAS_BINARY_SIGN_PHASE: bool = true;')
+
+    const wigner = composeSchroedingerShader({
+      dimension: 2,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+      isWigner: true,
+    })
+    expect(wigner.wgsl).toContain('const HAS_BINARY_SIGN_PHASE: bool = true;')
+
+    const ads = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      // AdS rides on the shared HO shader composition path at runtime —
+      // `rendererConfigUtils` narrows the shader `quantumMode` to
+      // `'harmonicOscillator'` for AdS and carries the AdS-ness through
+      // the explicit `isAds` flag instead.
+      quantumMode: 'harmonicOscillator',
+      isAds: true,
+    })
+    expect(ads.wgsl).toContain('const IS_ADS: bool = true;')
+    expect(ads.wgsl).toContain('const HAS_BINARY_SIGN_PHASE: bool = true;')
+  })
+
+  it('emits HAS_BINARY_SIGN_PHASE = false for continuous-phase modes', () => {
+    // Analytical modes (HO, hydrogen) compute ψ = Re + i·Im and write a
+    // continuous phase = atan2(Im, Re), so sin(phase) carries genuine
+    // Im(ψ) information. These modes must NOT trigger the fallback.
+    const ho = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+    })
+    expect(ho.wgsl).toContain('const HAS_BINARY_SIGN_PHASE: bool = false;')
+    expect(ho.wgsl).toContain('const IS_ADS: bool = false;')
+  })
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
@@ -706,10 +760,15 @@ describe('WGSL Color Algorithm Specialization', () => {
     })
 
     expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 10;')
-    // AdS (mode 8) reuses gridColor.a as boundary-overlay / horizon-marker
-    // intensity, so the relativePhase palette now runtime-gates on the
-    // quantum mode — see isosurfaceSampling.ts.
-    expect(wgsl).toContain('(COLOR_ALGORITHM == 10) && (schroedinger.quantumMode != 8)')
+    // Only analytical modes (0, 1, 7) actually write relativePhase into the
+    // density grid's A channel; every other mode packs overlay alpha, total
+    // density, coherenceFraction, or potential overlay. The relativePhase
+    // palette runtime-gates to that whitelist and falls back to spatial
+    // phase (B) everywhere else — see isosurfaceSampling.ts.
+    expect(wgsl).toContain('(COLOR_ALGORITHM == 10)')
+    expect(wgsl).toContain('schroedinger.quantumMode == 0')
+    expect(wgsl).toContain('schroedinger.quantumMode == 1')
+    expect(wgsl).toContain('schroedinger.quantumMode == 7')
     expect(wgsl).toContain('select(gridColor.b, gridColor.a, useRelPhase)')
   })
 

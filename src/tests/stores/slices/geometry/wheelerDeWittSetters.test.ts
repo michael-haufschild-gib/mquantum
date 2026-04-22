@@ -92,6 +92,22 @@ describe('wheelerDeWittSetters — render-only animation effects', () => {
     })
   })
 
+  describe('setWdwRenderDynamicRange — render-only, no solver re-run', () => {
+    it('writes the value, clamps to [1, 10000], and does not flip needsReset', () => {
+      useExtendedObjectStore.getState().setWdwRenderDynamicRange(42.5)
+      expect(getWdw().renderDynamicRange).toBe(42.5)
+      expect(getWdw().needsReset).toBe(false)
+
+      useExtendedObjectStore.getState().setWdwRenderDynamicRange(1_000_000)
+      expect(getWdw().renderDynamicRange).toBe(10_000)
+      expect(getWdw().needsReset).toBe(false)
+
+      useExtendedObjectStore.getState().setWdwRenderDynamicRange(-5)
+      expect(getWdw().renderDynamicRange).toBe(1)
+      expect(getWdw().needsReset).toBe(false)
+    })
+  })
+
   describe('setWdwStreamlinesEnabled — display-only, no solver re-run', () => {
     it('writes the toggle without flipping needsReset', () => {
       const initial = getWdw().streamlinesEnabled
@@ -224,4 +240,63 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
     expect(getWdw().phiExtent).toBe(before.phiExtent)
     expect(getWdw().inflatonMass).toBeCloseTo(0.8)
   })
+
+  // Per-preset end-to-end write verification. A new preset added without
+  // a matching entry below would slip through untested, since the earlier
+  // per-preset cases only hit a hand-picked subset.
+  const CURATED_PRESET_EXPECTATIONS: Array<{
+    id: string
+    boundaryCondition: 'noBoundary' | 'tunneling' | 'deWitt'
+    inflatonMass: number
+    cosmologicalConstant: number
+  }> = [
+    {
+      id: 'noBoundaryBaseline',
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.0,
+    },
+    {
+      id: 'vilenkinTunneling',
+      boundaryCondition: 'tunneling',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.3,
+    },
+    {
+      id: 'deWittOrigin',
+      boundaryCondition: 'deWitt',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.0,
+    },
+    {
+      id: 'inflationHighMass',
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.8,
+      cosmologicalConstant: 0.0,
+    },
+    {
+      id: 'deSitterLargeLambda',
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.3,
+      cosmologicalConstant: 0.8,
+    },
+    {
+      id: 'antiDeSitterContracting',
+      boundaryCondition: 'tunneling',
+      inflatonMass: 0.3,
+      cosmologicalConstant: -0.5,
+    },
+  ]
+
+  for (const preset of CURATED_PRESET_EXPECTATIONS) {
+    it(`applies preset '${preset.id}' to the three physics fields`, async () => {
+      useExtendedObjectStore.getState().applyWheelerDeWittPreset(preset.id)
+      await new Promise((r) => setTimeout(r, 0))
+      const after = getWdw()
+      expect(after.boundaryCondition).toBe(preset.boundaryCondition)
+      expect(after.inflatonMass).toBeCloseTo(preset.inflatonMass, 6)
+      expect(after.cosmologicalConstant).toBeCloseTo(preset.cosmologicalConstant, 6)
+      expect(after.needsReset).toBe(true)
+    })
+  }
 })

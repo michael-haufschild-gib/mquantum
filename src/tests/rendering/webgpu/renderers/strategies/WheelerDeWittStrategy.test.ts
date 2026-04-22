@@ -69,6 +69,19 @@ describe('computeWdwConfigHash', () => {
 })
 
 describe('computeWdwTrajectoryHash', () => {
+  it('changes when worldlineEnabled toggles (pulse consumes trajectories too)', () => {
+    // Regression guard: a prior revision hashed only `streamlinesEnabled`
+    // and `streamlineDensity`, so a user enabling the worldline pulse
+    // with the static streamline overlay OFF got `lastTrajectories =
+    // null` forever — the pulse silently did not render. Including
+    // `worldlineEnabled` in the hash forces a trajectory rebuild on
+    // toggle so the pulse has data to splat.
+    const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG, streamlinesEnabled: false }
+    expect(computeWdwTrajectoryHash({ ...base, worldlineEnabled: true })).not.toBe(
+      computeWdwTrajectoryHash({ ...base, worldlineEnabled: false })
+    )
+  })
+
   it('changes when display-only streamline fields change', () => {
     const base = { ...DEFAULT_WHEELER_DEWITT_CONFIG }
     const baseHash = computeWdwTrajectoryHash(base)
@@ -228,5 +241,22 @@ describe('WheelerDeWittStrategy.executeFrame', () => {
     wdw.inflatonMass = (wdw.inflatonMass as number) + 0.05
     render()
     expect(writeTexture.mock.calls.length).toBeGreaterThan(firstFrameWrites)
+  })
+})
+
+describe('WheelerDeWittStrategy.adoptComputeState', () => {
+  it('refuses to adopt from a non-WdW predecessor', () => {
+    // Type guard must refuse before touching any predecessor state.
+    const toStrat = new WheelerDeWittStrategy()
+    const notAWdw = { densityTexture: null } as never
+    expect(toStrat.adoptComputeState(notAWdw)).toBe(false)
+  })
+
+  it('refuses to adopt when the predecessor has no density texture', () => {
+    // A fresh predecessor (never called setup) has `densityTexture =
+    // null` — adoption must refuse rather than NPE.
+    const fromStrat = new WheelerDeWittStrategy()
+    const toStrat = new WheelerDeWittStrategy()
+    expect(toStrat.adoptComputeState(fromStrat)).toBe(false)
   })
 })

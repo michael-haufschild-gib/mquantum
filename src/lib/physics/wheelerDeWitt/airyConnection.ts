@@ -109,7 +109,41 @@ import { WDW_C_U, wdwLangerVariable, wdwLorentzianWkbAction, wdwTurningA, wdwU }
  * assumption leaks into the Airy transfer function.
  */
 
-/** Minimum `|ζ|` at which the deep-WKB asymptotic is trusted for extraction. */
+/**
+ * Minimum `|ζ|` at which the deep-WKB asymptotic is trusted for
+ * extraction. At `|ζ| = 1.5` the subleading Airy-asymptotic correction
+ * is ~1% of the leading term — small enough that the `c₁, c₂` fit is
+ * not contaminated by the ignored subleading modes. Lowering this
+ * threshold would broaden extraction coverage at the cost of mixing
+ * subleading terms into the fitted amplitudes.
+ *
+ * ## Physics-dictated coverage ceiling
+ *
+ * The WKB-phase depth is fundamentally bounded by `S_L_max = 3/(4·V)`
+ * on the Lorentzian side (closed-form integrating from `a = 0` to
+ * `a_turn = 1/√(K·V)`). Because `|ζ_max|^{3/2} = (3/2)·S_L_max`, the
+ * achievable `|ζ_max|` scales as `V^{−2/3}` — so for large-`V`
+ * columns the Lorentzian region is too shallow for the asymptotic to
+ * apply. Concrete bounds:
+ *
+ *  - `V ≥ 0.85`: `|ζ_max| ≤ 1.15`. Stage-3 will never fire; Stage-2
+ *    (absorber + analytic match-cell propagator) handles the
+ *    Euclidean tail.
+ *  - `V ≈ 0.25–0.50`: "sweet spot" where `|ζ_max|` comfortably exceeds
+ *    1.5 and the extraction is well-conditioned.
+ *  - `V ≤ 0.1`: `a_turn > a_max` at default grid, column has no
+ *    Euclidean region on-grid — extraction irrelevant.
+ *
+ * Consequence for curated presets: `deSitterLargeLambda` (`Λ = 0.8`)
+ * sits above the 0.85 ceiling at every column — 0 fits out of 1600 —
+ * which is a physics-consistent "cannot apply here", not a
+ * regression. The Stage-2 tail is still BC-agnostic for this preset
+ * (the absorber damps both branches uniformly) but the resulting
+ * Euclidean amplitudes are numerically small enough that the
+ * rendering cap in `computeWdwRenderMaxRho` keeps everything visible.
+ * See `tests/lib/physics/wheelerDeWitt/presetEndToEnd.test.ts` for
+ * the per-preset fit-count measurements.
+ */
 export const AIRY_CONNECTION_LZETA_MIN = 1.5
 
 /** Minimum number of Lorentzian-asymptotic cells required for extraction. */

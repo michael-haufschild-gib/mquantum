@@ -75,9 +75,23 @@ export function computeWdwConfigHash(config: WheelerDeWittConfig): string {
  * hash changes but {@link computeWdwConfigHash} does not, trajectories
  * rebuild from the cached solver output — the solver itself is NOT
  * re-invoked.
+ *
+ * Trajectories are integrated when EITHER the static streamline overlay
+ * is enabled OR the semiclassical worldline pulse is enabled — both
+ * consume the same `WkbTrajectory[]` payload. A prior revision keyed
+ * trajectory-integration only on `streamlinesEnabled`, which meant a
+ * user enabling the worldline pulse without the static overlay got
+ * a null trajectory list and the pulse silently never rendered.
+ * `worldlineEnabled` is therefore part of the trajectory hash; toggling
+ * it invalidates `lastTrajectories` but never triggers a full solver
+ * re-run.
  */
 export function computeWdwTrajectoryHash(config: WheelerDeWittConfig): string {
-  return [config.streamlinesEnabled ? 1 : 0, config.streamlineDensity].join('|')
+  return [
+    config.streamlinesEnabled ? 1 : 0,
+    config.streamlineDensity,
+    config.worldlineEnabled ? 1 : 0,
+  ].join('|')
 }
 
 /** Result of a physics-cache update. */
@@ -138,7 +152,13 @@ export class WheelerDeWittPhysicsCache {
     }
 
     if (trajectoryDirty && this.lastSolverOutput) {
-      this.lastTrajectories = config.streamlinesEnabled
+      // Trajectories feed BOTH the static streamline overlay
+      // (`buildStaticOverlay`) and the worldline pulse overlay
+      // (`buildPulseOverlay`). Rebuild them whenever either consumer
+      // is enabled — gating only on `streamlinesEnabled` left the
+      // pulse invisible when a user toggled it on alone.
+      const trajectoriesNeeded = config.streamlinesEnabled || config.worldlineEnabled
+      this.lastTrajectories = trajectoriesNeeded
         ? integrateWkbTrajectories(this.lastSolverOutput, {
             ...DEFAULT_STREAMLINE_INPUT,
             density: config.streamlineDensity,

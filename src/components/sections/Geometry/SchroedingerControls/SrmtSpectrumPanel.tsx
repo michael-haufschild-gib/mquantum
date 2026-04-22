@@ -63,6 +63,14 @@ const PopulatedPanel: React.FC<{
   computing: boolean
 }> = ({ snapshot, quality, selectedClock, computing }) => {
   const completedClocks = countCompletedClocks(quality)
+  // Highlight the clock that actually produced the displayed snapshot,
+  // not the user's newly-selected clock. During a cross-clock batch
+  // drain the store-level `selectedClock` updates immediately but the
+  // snapshot stays on the previous clock until the new worker reply
+  // lands (≈50–200 ms). Highlighting `selectedClock` during that
+  // window pointed to the wrong row — the panel claimed "clock a" was
+  // active while the displayed spectrum was still "clock phi1".
+  const highlightedClock = computing ? snapshot.clock : selectedClock
   return (
     <div className="space-y-2" data-testid="wdw-srmt-spectrum-panel">
       {computing && <SrmtComputingStrip completed={completedClocks} total={3} />}
@@ -82,7 +90,7 @@ const PopulatedPanel: React.FC<{
         </div>
         <SrmtSpectrumChart snapshot={snapshot} />
         <SrmtSpectrumLegend />
-        <SrmtClockTable quality={quality} selectedClock={selectedClock} />
+        <SrmtClockTable quality={quality} selectedClock={highlightedClock} />
       </div>
     </div>
   )

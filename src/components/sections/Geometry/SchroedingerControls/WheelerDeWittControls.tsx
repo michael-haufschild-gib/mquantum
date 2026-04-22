@@ -53,6 +53,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
     wdw,
     setWdwBoundaryCondition,
     setWdwInflatonMass,
+    setWdwInflatonMassAsymmetry,
     setWdwCosmologicalConstant,
     setWdwGridSize,
     setWdwStreamlinesEnabled,
@@ -62,6 +63,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       wdw: s.schroedinger.wheelerDeWitt,
       setWdwBoundaryCondition: s.setWdwBoundaryCondition,
       setWdwInflatonMass: s.setWdwInflatonMass,
+      setWdwInflatonMassAsymmetry: s.setWdwInflatonMassAsymmetry,
       setWdwCosmologicalConstant: s.setWdwCosmologicalConstant,
       setWdwGridSize: s.setWdwGridSize,
       setWdwStreamlinesEnabled: s.setWdwStreamlinesEnabled,
@@ -88,7 +90,7 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       />
       <Slider
         label="Inflaton mass m"
-        tooltip="Mass in V(φ) = ½m²(φ₁² + φ₂²) + Λ. Drives the slow-roll vs eternal-inflation character."
+        tooltip="Mass in V(φ) = ½m²φ₁² + ½(m·α)²φ₂² + Λ. Drives the slow-roll vs eternal-inflation character."
         min={0}
         max={2}
         step={0.01}
@@ -96,6 +98,17 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
         onChange={setWdwInflatonMass}
         showValue
         data-testid="wdw-mass-slider"
+      />
+      <Slider
+        label="Mass asymmetry α"
+        tooltip="Effective-mass ratio on the φ₂ axis (m_eff = m·α). α = 1 is isotropic. α ≠ 1 breaks the φ₁↔φ₂ exchange symmetry so the SRMT diagnostic can distinguish the three clocks {a, φ₁, φ₂}."
+        min={0.1}
+        max={10}
+        step={0.01}
+        value={wdw.inflatonMassAsymmetry}
+        onChange={setWdwInflatonMassAsymmetry}
+        showValue
+        data-testid="wdw-asymmetry-slider"
       />
       <ToggleGroup
         options={GRID_PRESET_OPTIONS}
@@ -108,10 +121,10 @@ export const WheelerDeWittControls: React.FC = React.memo(() => {
       />
       <Slider
         label="Cosmological constant Λ"
-        tooltip="Added to V(φ). Positive Λ produces a de-Sitter-like Lorentzian region for small φ."
-        min={-0.3}
-        max={0.3}
-        step={0.005}
+        tooltip="Added to V(φ). Positive Λ produces a de-Sitter-like Lorentzian region for small φ; strongly negative Λ yields AdS-like unbounded oscillation. Range matches the setter's physical clamp so the curated presets (Λ = 0.8 deSitter, Λ = −0.5 antiDeSitter) land inside the visible slider track."
+        min={-1}
+        max={1}
+        step={0.01}
         value={wdw.cosmologicalConstant}
         onChange={setWdwCosmologicalConstant}
         showValue
