@@ -7,7 +7,7 @@ import React, { useCallback } from 'react'
 
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
-import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { ToggleGroup, type ToggleOption } from '@/components/ui/ToggleGroup'
 import { type DensityGridResolution, usePerformanceStore } from '@/stores/performanceStore'
 
 import { DimensionSelector } from './DimensionSelector'
@@ -19,12 +19,12 @@ export interface GeometrySectionProps {
   defaultOpen?: boolean
 }
 
-const GRID_RESOLUTION_OPTIONS = [
+const GRID_RESOLUTION_OPTIONS: ToggleOption<string>[] = [
   { value: '64', label: '64³' },
   { value: '96', label: '96³' },
   { value: '128', label: '128³' },
   { value: '256', label: '256³' },
-] as const
+]
 
 export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
   ({ defaultOpen = true }) => {
@@ -48,7 +48,7 @@ export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
             data-testid="control-group-grid-resolution"
           >
             <ToggleGroup
-              options={GRID_RESOLUTION_OPTIONS as unknown as { value: string; label: string }[]}
+              options={GRID_RESOLUTION_OPTIONS}
               value={String(densityGridResolution)}
               onChange={handleGridResolutionChange}
               fullWidth
