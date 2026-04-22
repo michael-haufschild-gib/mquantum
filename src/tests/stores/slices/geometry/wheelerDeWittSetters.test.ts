@@ -282,8 +282,8 @@ describe('wheelerDeWittSetters — applyWheelerDeWittPreset', () => {
     },
     {
       id: 'antiDeSitterContracting',
-      boundaryCondition: 'tunneling',
-      inflatonMass: 0.3,
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.5,
       cosmologicalConstant: -0.5,
     },
   ]

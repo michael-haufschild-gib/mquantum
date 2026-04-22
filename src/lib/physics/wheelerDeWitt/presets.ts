@@ -104,10 +104,10 @@ export const WDW_SCENARIO_PRESETS: WdwScenarioPreset[] = [
     id: 'antiDeSitterContracting',
     name: 'Anti-de Sitter Λ = −0.5',
     description:
-      'Negative Λ with tunneling BC — AdS-like contracting classical branch, oscillatory bulk density',
+      'Negative Λ with no-boundary (Hartle–Hawking) BC — real-valued χ = equal superposition of expanding and contracting classical branches (the AdS-oscillatory signature), plus visibly oscillatory bulk density. Previously shipped with Vilenkin/tunneling BC, which has no principled definition for Λ < 0 (Vilenkin selects the outgoing branch relative to a classical turning surface; none exists inside the grid for Λ < 0, m = 0.3, so the boundary-seeded Gaussian just leaked into the Euclidean corners and produced a Bi-runaway that crushed the Lorentzian bulk into invisibility). Raising `m` from 0.3 → 0.5 moves the classical turning surface `|φ|² = 2|Λ|/m²` inward from 3.33 to 2.0, so the grid hosts a genuine Lorentzian / Euclidean split and WKB streamlines pick up φ-motion instead of collapsing into seed dots along the a-axis.',
     overrides: {
-      boundaryCondition: 'tunneling',
-      inflatonMass: 0.3,
+      boundaryCondition: 'noBoundary',
+      inflatonMass: 0.5,
       inflatonMassAsymmetry: 1,
       cosmologicalConstant: -0.5,
     },

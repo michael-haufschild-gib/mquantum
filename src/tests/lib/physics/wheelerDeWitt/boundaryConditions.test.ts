@@ -201,9 +201,9 @@ describe('Hartle–Hawking boundary', () => {
     // When V < 0 at the origin (Λ negative and |Λ| > m²·φ²), no
     // classical turning surface exists and the WKB formula is
     // inapplicable. The generator falls back to the Gaussian envelope
-    // (continuous with the legacy V < 0 path). Asserts the AdS-like
-    // `antiDeSitterContracting` preset's HH equivalent would reduce
-    // to the same gauge choice as the free case.
+    // (continuous with the legacy V < 0 path). Asserts the
+    // `antiDeSitterContracting` preset (HH BC, Λ = −0.5) reduces to
+    // the same gauge choice as the free case at the grid origin.
     const Nphi = 17
     const adsInput = {
       Nphi,

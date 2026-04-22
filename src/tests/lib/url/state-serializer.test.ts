@@ -990,8 +990,8 @@ describe('state-serializer', () => {
         },
         {
           id: 'antiDeSitterContracting',
-          wdwBoundaryCondition: 'tunneling',
-          wdwInflatonMass: 0.3,
+          wdwBoundaryCondition: 'noBoundary',
+          wdwInflatonMass: 0.5,
           wdwCosmologicalConstant: -0.5,
         },
       ]

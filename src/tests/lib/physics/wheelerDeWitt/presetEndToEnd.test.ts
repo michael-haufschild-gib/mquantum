@@ -143,7 +143,7 @@ describe('WDW preset end-to-end pipeline', () => {
         }
       })
 
-      it('has at least one Lorentzian cell and one Euclidean cell (or all-Lorentzian for V ≤ 0)', () => {
+      it('has at least one Lorentzian cell and one Euclidean cell', () => {
         let lo = 0
         let eu = 0
         for (let i = 0; i < output.lorentzianMask.length; i++) {
@@ -152,18 +152,11 @@ describe('WDW preset end-to-end pipeline', () => {
         }
         // Every preset must produce visible density somewhere.
         expect(lo).toBeGreaterThan(0)
-        // The all-Lorentzian branch is only reachable when the whole
-        // grid sits inside the turning surface at every column — that
-        // happens iff `a_max < a_turn(φ_max)` for the maximally-bounding
-        // column, OR `V(φ) ≤ 0` everywhere.
-        // For the six curated presets, only `antiDeSitterContracting`
-        // (Λ = −0.5) has V ≤ 0 over a non-empty region; for that case
-        // the Euclidean count may legitimately be zero since V remains
-        // ≤ 0 until |φ| ≳ √(0.5/(0.5·m²)) ≈ √(0.5/0.045) ≈ 3.33, and
-        // `phiExtent = 3.5` straddles the boundary.
-        if (preset.id !== 'antiDeSitterContracting') {
-          expect(eu).toBeGreaterThan(0)
-        }
+        // All six curated presets are tuned so the V = 0 turning surface
+        // falls inside the grid — `antiDeSitterContracting` uses m = 0.5
+        // at Λ = −0.5, so |φ|_turn = √(2·|Λ|/m²) = 2.0 < phiExtent = 3.5
+        // and Euclidean cells exist at the φ corners.
+        expect(eu).toBeGreaterThan(0)
       })
 
       it('band classification matches solver mask (Lorentzian implies bandKind == 0)', () => {
