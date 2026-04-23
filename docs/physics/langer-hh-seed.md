@@ -48,9 +48,9 @@ The operator `U(a, φ)` is a quartic polynomial in `a` with zero at the turning 
 | ----------- | ------ | --------------------- | ----------------------------------------------------------------------------- |
 | dS cell     | `> 0`  | `a_turn = 1/√(K·V)`   | Langer-uniform Airy: `(ζ/U)^{1/4}·[c₁·Ai(ζ) + c₂·Bi(ζ)]`                      |
 | Free cell   | `= 0`  | None                  | Exact Bessel-¼: `√a·[A·J_{1/4}(3π·a²) + B·Y_{1/4}(3π·a²)]`                    |
-| AdS cell    | `< 0`  | None                  | Hankel ¼ (exact) or leading-WKB `|U|^{−1/4}·[A·cos Φ_L + B·sin Φ_L]`         |
+| AdS cell    | `< 0`  | None                  | Leading-WKB `|U|^{−1/4}·[A·cos Φ_L + B·sin Φ_L]` (asymptotic only; see §4)     |
 
-These three forms are the closed-form references used by `exactColumnSolution.ts` (see table at lines 14–24 of that file) and by the validation harness `exactSolutionAgreement.test.ts` introduced in Phase 1.
+The V>0 Langer-Airy form is uniform-asymptotic across the turning surface, the V=0 Bessel form is pointwise-exact, and the V<0 form is accurate only in the leading-WKB regime `Φ_L ≫ 1` — there is no closed-form exact solution of the quartic-in-`a` ODE on the Lorentzian-everywhere AdS branch (see §4 for the error bound and why the agreement test tolerates `O(1/Φ_L)` for V<0). These are the references used by `exactColumnSolution.ts` (see table at lines 14–24 of that file) and by the validation harness `exactSolutionAgreement.test.ts` introduced in Phase 1.
 
 ## 3. V > 0: Langer-uniform Airy form
 
@@ -437,7 +437,7 @@ A future implementer of `boundaryConditions.ts` should:
 2. **For each column `(φ₁, φ₂)`** in the HH seed:
    - Compute `V = wdwPotential(φ₁, φ₂, m, Λ, α)`.
    - If `V > 0`: compute `S_E^HH = (1/(3V))·((1 − K·V·a_min²)^{3/2} − 1)` (or the small-V Taylor form for `|V| ≤ 1e-6`). Call `columnSolutionPositiveV({a: a_min, φ₁, φ₂, m, Λ, α}, 1, 0)` to get `{chi: χ_col, dChi: dχ_col}`. Compute `N_HH = exp(−|S_E^HH|) / χ_col.re` (with safety floor on `|χ_col.re|`). Write `(N_HH·χ_col.re, 0)` to `chi[idx]` and `(N_HH·dχ_col.re, 0)` to `chiDeriv[idx]`.
-   - If `V = 0` exactly (or `|V| < 1e-12`): use the V=0 limit of the Langer form (equivalent to Bessel-¼ with specific matched coefficients). The simplest valid choice is to call `columnSolutionPositiveV` with `V → 1e-6` (graceful small-V limit). A more principled treatment calls `columnSolutionZeroV` with coefficients matched to the `V → 0⁺` limit of the V>0 branch.
+   - If `V = 0` exactly (or `|V| < 1e-12`): call `columnSolutionZeroV` with coefficients matched to the `V → 0⁺` limit of the V>0 branch. This is the only correct form — nudging `V → 1e-6` and re-entering `columnSolutionPositiveV` is **not** a valid shortcut: the V=0 and V>0 regimes have different asymptotic structure (Bessel-¼ vs Langer-Airy), and `columnSolution` now actively rejects a `kind: 'positive'` tag at a `V = 0` column (see `exactColumnSolution.ts`). The shipped code already dispatches by the exact sign of `V(φ)` — do not re-introduce the small-V bypass.
    - If `V < 0`: call `columnSolutionNegativeV` with real `(A, B)` matched to the V→0⁻ limit of the V=0 form (real standing wave); write the result to `chi[idx]` and `chiDeriv[idx]`.
 3. **Vilenkin**: same structure, but with `(c₁, c₂) = (1, +i)` in the V>0 branch (requires a complex variant of `columnSolutionPositiveV`, or two calls: `(1, 0)` and `(0, 1)` combined with `+i`). Write complex `(re, im)` pairs.
 4. **Update** `boundaryConditionsVerification.test.ts` with:

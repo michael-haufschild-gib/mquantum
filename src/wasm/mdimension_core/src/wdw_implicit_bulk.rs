@@ -32,6 +32,22 @@
 ///   Row N-1: `a_{N-1} = −κ̂, b_{N-1} = 1 + κ̂`
 ///
 /// Diagonally dominant for `κ̂ ≥ 0`, so Thomas is stable.
+///
+/// # Preconditions
+///
+/// - `kappa >= 0` — diagonal dominance only holds for non-negative κ̂; a
+///   negative value puts us outside the Crank–Nicolson stability envelope
+///   the caller is relying on and trips a `debug_assert!` here.
+/// - `rhs.len() >= n`, `out.len() >= n`, `c_prime.len() >= n`,
+///   `work.len() >= n` — the function indexes `[0, n)` on each buffer.
+/// - `n >= 1` — `n = 0` is a silent no-op; `n = 1` returns the rhs as the
+///   solution (trivial 1×1 system where κ̂·L = 0).
+///
+/// Debug builds enforce the assertions; release builds trust the caller
+/// (the solver always satisfies them and we have no runtime signal to
+/// fall back to on a violation). Exported `pub` because both the bulk
+/// driver and the unit tests in `tests/` need to construct sweeps
+/// directly against this kernel.
 pub fn solve_neumann_tridiag_1d(
     rhs: &[f64],
     out: &mut [f64],
@@ -40,6 +56,16 @@ pub fn solve_neumann_tridiag_1d(
     c_prime: &mut [f64],
     work: &mut [f64],
 ) {
+    debug_assert!(kappa >= 0.0, "solve_neumann_tridiag_1d: kappa must be >= 0, got {kappa}");
+    debug_assert!(rhs.len() >= n, "solve_neumann_tridiag_1d: rhs.len()={} < n={}", rhs.len(), n);
+    debug_assert!(out.len() >= n, "solve_neumann_tridiag_1d: out.len()={} < n={}", out.len(), n);
+    debug_assert!(
+        c_prime.len() >= n,
+        "solve_neumann_tridiag_1d: c_prime.len()={} < n={}",
+        c_prime.len(),
+        n
+    );
+    debug_assert!(work.len() >= n, "solve_neumann_tridiag_1d: work.len()={} < n={}", work.len(), n);
     if n < 2 {
         if n == 1 {
             out[0] = rhs[0];
@@ -227,6 +253,58 @@ mod tests {
                 "κ=0 identity at {i}: got {}, expected {}",
                 out[i],
                 rhs[i]
+            );
+        }
+    }
+
+    /// Non-constant eigenmode recovery. The discrete Neumann Laplacian
+    /// on an N-point node-centred grid has eigenvectors
+    ///
+    ///   `v_k(i) = cos(k·π·(i + 0.5) / N)`
+    ///
+    /// with eigenvalues `μ_k = −2·(1 − cos(k·π / N))`. A separable mode
+    /// `χ(i1, i2) = v_1(i1)·v_0(i2) = v_1(i1)` (constant in i2) is an
+    /// eigenvector of both 1D operators with `L_x·χ = μ_1·χ`,
+    /// `L_y·χ = 0`. The full ADI operator satisfies
+    ///
+    ///   `(I − κ̂·L_x)(I − κ̂·L_y)·χ = (1 − κ̂·μ_1)·χ`
+    ///
+    /// Feed `RHS = (1 − κ̂·μ_1)·χ` in and the solve must return χ exactly
+    /// (up to round-off). A sign or indexing bug in either 1D sweep —
+    /// the kind the constant and κ̂=0 tests don't exercise — would
+    /// produce either a wrong amplitude (≥ `κ̂·μ_1` relative error) or a
+    /// spurious y-direction gradient.
+    #[test]
+    fn adi_recovers_nonconstant_eigenmode() {
+        let nphi = 5;
+        let kappa = 0.37;
+        let k = 1usize;
+        let n_f = nphi as f64;
+        let mu_k = -2.0 * (1.0 - (k as f64 * std::f64::consts::PI / n_f).cos());
+        let factor = 1.0 - kappa * mu_k;
+
+        // χ(i1, i2) = v_k(i1) on both re and im channels (with different amplitudes
+        // so the re/im decoupling is also exercised).
+        let mut chi = vec![0.0f64; 2 * nphi * nphi];
+        for i1 in 0..nphi {
+            let v = (k as f64 * std::f64::consts::PI * (i1 as f64 + 0.5) / n_f).cos();
+            for i2 in 0..nphi {
+                chi[2 * (i1 * nphi + i2)] = v;
+                chi[2 * (i1 * nphi + i2) + 1] = -0.5 * v;
+            }
+        }
+        let rhs: Vec<f64> = chi.iter().map(|c| c * factor).collect();
+
+        let mut out = vec![0.0f64; 2 * nphi * nphi];
+        let mut scratch = alloc_implicit_bulk_scratch(nphi);
+        solve_adi_laplacian_neumann_2d(&rhs, &mut out, nphi, kappa, &mut scratch);
+
+        for i in 0..(2 * nphi * nphi) {
+            assert!(
+                (out[i] - chi[i]).abs() < 1e-12,
+                "eigenmode recovery at {i}: got {}, expected {}",
+                out[i],
+                chi[i]
             );
         }
     }

@@ -875,24 +875,26 @@ describe('runGridNaSweep', () => {
     //     monotone.
     //
     // Thresholds were originally 20 % / 30 %, tuned against the
-    // pre-Phase-2 (buggy) HH seed. Phase 2 replaced that seed with the
-    // Langer-uniform Ai form — physically correct, but the SRMT modular
-    // spectrum now reads off a solver whose bulk is still unstable
-    // (Phase 3 will fix). The observed Cauchy sequence on Phase-2-only
-    // output widens transiently; thresholds are relaxed to 90 % / 100 %
-    // to survive the interim without suppressing real divergence
-    // regressions (an order-of-magnitude drift still fails). Per
-    // `docs/plans/wdw-solver-physics-correctness.md` §Risk 2, re-tighten
-    // these bounds after Phase 3 stabilises the bulk propagator; the
-    // SRMT diagnostic's q-plateau will then be re-baselined against the
-    // physics-correct solver.
+    // pre-Phase-2 (buggy) HH seed. Phase 2 (Langer seed) and Phase 3
+    // (semi-implicit Crank–Nicolson bulk) jointly deliver the corrected
+    // solver; the SRMT q-sequence now reads `q(64) = 0.2100, q(128) =
+    // 0.1423, q(192) = 0.1161` — monotone-decreasing with an endpoint
+    // drift of 80.6 % and a spread of 60.3 %. At these coarse test
+    // grids the absolute q-errors are dominated by the Lanczos spectrum
+    // extractor's own coarse-grid behaviour, not by the WdW solver, so
+    // the pre-Phase-2 20 %/30 % target is unachievable without raising
+    // Na into the 256+ range (prohibitive for an O(seconds) unit test).
+    // We tighten to 85 %/65 % — a real regression budget over the
+    // Phase-2 90 %/100 % threshold — which leaves ~5 %/8 % headroom on
+    // the current measurement and still catches an order-of-magnitude
+    // Cauchy divergence.
     const qMin = Math.min(qLow, qMid, qHigh)
     const qMax = Math.max(qLow, qMid, qHigh)
     const qMean = (qLow + qMid + qHigh) / 3
     const endpointResidual = Math.abs(qLow - qHigh) / Math.max(Math.abs(qHigh), 1e-12)
     const spreadRatio = (qMax - qMin) / Math.max(qMean, 1e-12)
-    expect(endpointResidual).toBeLessThan(0.9)
-    expect(spreadRatio).toBeLessThan(1.0)
+    expect(endpointResidual).toBeLessThan(0.85)
+    expect(spreadRatio).toBeLessThan(0.65)
   })
 })
 

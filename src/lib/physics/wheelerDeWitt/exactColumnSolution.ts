@@ -379,6 +379,16 @@ export function rk4ColumnTrajectory(
     dChi: { re: dyRe, im: dyIm },
   }
 
+  if (
+    !Number.isFinite(substepsPerInterval) ||
+    !Number.isInteger(substepsPerInterval) ||
+    substepsPerInterval < 1
+  ) {
+    throw new RangeError(
+      `rk4ColumnTrajectory: substepsPerInterval must be a positive integer, got ${substepsPerInterval}`
+    )
+  }
+
   for (let i = 1; i < N; i++) {
     const aFrom = aGrid[i - 1] as number
     const aTo = aGrid[i] as number
@@ -454,15 +464,26 @@ export function rk4ColumnTrajectory(
 }
 
 /**
- * Dispatch by sign of `V(φ)`: V>0 → Langer-Airy, V=0 → exact Bessel,
- * V<0 → leading-WKB. The Langer form takes real coefficients `(c₁, c₂)`
- * while the other two take complex `(A, B)`. For a uniform interface
- * this dispatcher requires callers to pick the right encoding — the
- * agreement test calls the three branch functions directly.
+ * Dispatch to the regime-specific column solver, verifying at call time
+ * that the caller-tagged `coeffs.kind` matches the actual sign of `V(φ)`.
+ *
+ * `V > 0` selects the Langer-uniform Airy branch (real `(c₁, c₂)`), `V = 0`
+ * the exact Bessel-¼ branch (complex `(A, B)`), `V < 0` the leading-WKB
+ * branch (complex `(A, B)`). A caller that tags the wrong kind — e.g. asking
+ * for `kind: 'positive'` at a column where `V(φ) < 0` — gets a `RangeError`
+ * instead of a silently-wrong result. This is the only place in this module
+ * that *inspects* `V(φ)`; the per-branch functions trust their tag (enforced
+ * by their own guards against the unsupported sign).
+ *
+ * `V = 0` uses an exact-equality threshold of `1e-12` — smaller than float64
+ * round-off on the `(m², Λ)` combination and wider than the magnitudes that
+ * downstream tests exercise on the free branch.
  *
  * @param input - Column args.
- * @param coeffs - Regime-specific coefficients (see branch functions).
+ * @param coeffs - Regime-specific coefficients. The tag must match the
+ *                 actual sign of `V(φ)` at the caller-supplied column.
  * @returns `{ chi, dChi }`.
+ * @throws RangeError when `coeffs.kind` disagrees with `sign(V(φ))`.
  */
 export function columnSolution(
   input: ColumnArgs,
@@ -471,6 +492,16 @@ export function columnSolution(
     | { kind: 'zero'; A: ComplexPair; B: ComplexPair }
     | { kind: 'negative'; A: ComplexPair; B: ComplexPair }
 ): ColumnSample {
+  const V = wdwPotential(input.phi1, input.phi2, input.m, input.lambda, input.asymmetry ?? 1)
+  const V_ZERO_TOL = 1e-12
+  const actualKind: 'positive' | 'zero' | 'negative' =
+    Math.abs(V) < V_ZERO_TOL ? 'zero' : V > 0 ? 'positive' : 'negative'
+  if (coeffs.kind !== actualKind) {
+    throw new RangeError(
+      `columnSolution: coeffs.kind='${coeffs.kind}' disagrees with sign(V(φ))='${actualKind}' ` +
+        `(V=${V} at φ₁=${input.phi1}, φ₂=${input.phi2}, m=${input.m}, Λ=${input.lambda}).`
+    )
+  }
   switch (coeffs.kind) {
     case 'positive':
       return columnSolutionPositiveV(input, coeffs.c1, coeffs.c2)
