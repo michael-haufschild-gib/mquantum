@@ -109,7 +109,12 @@ struct FreeScalarUniforms {
  * handled by CPU-side exact vacuum spectrum sampling via writeBuffer.
  */
 export const freeScalarInitBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: FreeScalarUniforms;
+// Bound as 'storage, read' (not 'uniform') because FreeScalarUniforms
+// contains scalar arrays ('array<u32, 12>', 'array<f32, 12>') which the WGSL
+// spec forbids in uniform address space (element stride must be a multiple of
+// 16 bytes). Chrome/Tint silently accepts it, naga correctly rejects it;
+// storage buffers have no such restriction. Tiny read-bandwidth cost.
+@group(0) @binding(0) var<storage, read> params: FreeScalarUniforms;
 @group(0) @binding(1) var<storage, read_write> phi: array<f32>;
 @group(0) @binding(2) var<storage, read_write> pi: array<f32>;
 

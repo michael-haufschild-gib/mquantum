@@ -45,7 +45,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let sigma2 = params.collapseWidth * params.collapseWidth;
-  let amplitude = exp(-dist2 / (2.0 * max(sigma2, 1e-8)));
+  // Precompute 1/(2σ²) once (uniform for all threads) so per-thread exp uses multiply, not divide.
+  let invTwoSigma2 = 1.0 / (2.0 * max(sigma2, 1e-8));
+  let amplitude = exp(-dist2 * invTwoSigma2);
 
   psiRe[idx] = amplitude;
   psiIm[idx] = 0.0;

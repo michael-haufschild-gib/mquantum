@@ -23,7 +23,8 @@
  */
 
 export const freeScalarWriteGridBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: FreeScalarUniforms;
+// See freeScalarInit.wgsl for why this binding is 'storage, read'.
+@group(0) @binding(0) var<storage, read> params: FreeScalarUniforms;
 @group(0) @binding(1) var<storage, read> phi: array<f32>;
 @group(0) @binding(2) var<storage, read> pi: array<f32>;
 @group(0) @binding(3) var outputTex: texture_storage_3d<rgba16float, write>;

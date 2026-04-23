@@ -26,7 +26,7 @@
  *   @group(0) @binding(4) complexBuf (read_write)
  */
 export const tdseFusedPotentialPackBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiIm: array<f32>;
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
@@ -86,7 +86,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  *   @group(0) @binding(4) potential (read)
  */
 export const tdseFusedUnpackPotentialBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> complexBuf: array<f32>;
 @group(0) @binding(2) var<storage, read_write> psiRe: array<f32>;
 @group(0) @binding(3) var<storage, read_write> psiIm: array<f32>;

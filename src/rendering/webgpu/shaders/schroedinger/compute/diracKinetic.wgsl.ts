@@ -22,7 +22,7 @@
  */
 
 export const diracKineticBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: DiracUniforms;
+@group(0) @binding(0) var<storage, read> params: DiracUniforms;
 @group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
 @group(0) @binding(3) var<storage, read> gammaMatrices: array<f32>;
@@ -53,6 +53,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let mc2 = params.mass * c_light * c_light;
   let c_hbar = c_light * params.hbar;
   let latDim = params.latticeDim;
+  // PERF: hoist dt/hbar once — replaces per-thread divide on 'arg = E*dt/max(hbar,eps)' with a multiply.
+  let dtOverHbar = params.dt / max(params.hbar, 1e-6);
 
   // Decode k-space coordinates using N-D index helper
   let coords = linearToND(idx, params.strides, params.gridSize, latDim);
@@ -140,7 +142,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Apply matrix exponential using H² = E²·I identity:
   //   exp(-iH·dt/ℏ)·ψ = cos(E·dt/ℏ)·ψ - i·sin(E·dt/ℏ)·(H·ψ)/E
-  let arg = E * params.dt / max(params.hbar, 1e-6);
+  let arg = E * dtOverHbar;
   // Reduce to [-π, π] so f32 cos/sin stay precise at high energies
   let argReduced = arg - round(arg * 0.15915494) * 6.28318530;
   let cosArg = cos(argReduced);

@@ -38,7 +38,7 @@ struct VortexDetectUniforms {
 @group(0) @binding(0) var<uniform> vdParams: VortexDetectUniforms;
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var<uniform> tParams: TDSEUniforms;
+@group(0) @binding(3) var<storage, read> tParams: TDSEUniforms;
 @group(0) @binding(4) var<storage, read_write> partialCounts: array<u32>;
 @group(0) @binding(5) var<storage, read_write> partialPosCharge: array<u32>;
 @group(0) @binding(6) var<storage, read_write> partialNegCharge: array<u32>;

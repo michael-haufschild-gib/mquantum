@@ -14,7 +14,7 @@
  */
 
 export const tdseApplyKineticBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read_write> complexBuf: array<f32>;
 
 @compute @workgroup_size(64)

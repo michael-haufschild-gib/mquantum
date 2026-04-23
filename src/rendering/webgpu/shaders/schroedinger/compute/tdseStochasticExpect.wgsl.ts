@@ -32,7 +32,7 @@ struct StochasticParams {
   centers: array<vec4f, 96>,
 };
 
-@group(0) @binding(0) var<uniform> tdseParams: TDSEUniforms;
+@group(0) @binding(0) var<storage, read> tdseParams: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
 @group(0) @binding(3) var<uniform> sParams: StochasticParams;

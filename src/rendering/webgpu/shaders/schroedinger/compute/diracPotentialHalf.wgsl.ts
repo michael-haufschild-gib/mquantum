@@ -17,7 +17,7 @@
  */
 
 export const diracPotentialHalfBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: DiracUniforms;
+@group(0) @binding(0) var<storage, read> params: DiracUniforms;
 @group(0) @binding(1) var<storage, read_write> spinorRe: array<f32>;
 @group(0) @binding(2) var<storage, read_write> spinorIm: array<f32>;
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
@@ -29,8 +29,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
+  // PERF: dt / (2ℏ) is uniform across threads — hoist so per-thread work is a multiply.
+  let dtOver2Hbar = params.dt / (2.0 * max(params.hbar, 1e-6));
   let V = potential[idx];
-  let phase = -V * params.dt / (2.0 * max(params.hbar, 1e-6));
+  let phase = -V * dtOver2Hbar;
   let cosP = cos(phase);
   let sinP = sin(phase);
 

@@ -50,11 +50,13 @@ struct GridParams {
  * @param opts.includeOpenQuantum - Include open quantum density matrix uniforms at binding 4
  * @param opts.includeHydrogenBasis - Include hydrogen basis quantum numbers at binding 5
  */
-export function generateDensityGridBindingsBlock(opts: {
-  storageFormat?: 'r16float' | 'rgba16float'
-  includeOpenQuantum?: boolean
-  includeHydrogenBasis?: boolean
-} = {}): string {
+export function generateDensityGridBindingsBlock(
+  opts: {
+    storageFormat?: 'r16float' | 'rgba16float'
+    includeOpenQuantum?: boolean
+    includeHydrogenBasis?: boolean
+  } = {}
+): string {
   const {
     storageFormat = 'rgba16float',
     includeOpenQuantum = false,
@@ -119,19 +121,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Convert grid coordinate to normalized [0,1] space
-  // Note: gridSize-1 ensures we sample at grid cell centers including boundaries
+  // PERF: hoist 1/gridSize to a per-warp reciprocal — 1 vec3 div → 1 vec3 mul per thread.
   let gridSizeF = vec3f(gridParams.gridSize);
-  let uvw = (vec3f(gid) + 0.5) / gridSizeF;
+  let invGridSize = 1.0 / gridSizeF;
+  let uvw = (vec3f(gid) + 0.5) * invGridSize;
 
   // Convert to world-space position within bounding volume
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // Check if position is within the bounding sphere (dynamic radius)
-  // Grid is a cube, but quantum volume is spherical - skip corners
-  // PERF: Compare squared distances to avoid sqrt per thread
-  let dist2 = dot(worldPos, worldPos);
+  // Check if position is within the bounding sphere (dynamic radius).
+  // PERF: precompute boundR² once so the per-thread compare is a scalar no-op.
   let boundR = schroedinger.boundingRadius;
-  if (dist2 > boundR * boundR) {
+  let boundR2 = boundR * boundR;
+  let dist2 = dot(worldPos, worldPos);
+  if (dist2 > boundR2) {
     // Outside bounding sphere - store zero density
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
@@ -174,16 +177,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Convert grid coordinate to world-space position
+  // Convert grid coordinate to world-space position.
+  // PERF: 1/gridSize hoisted so per-thread cost is a vec3 multiply, not a vec3 divide.
   let gridSizeF = vec3f(gridParams.gridSize);
-  let uvw = (vec3f(gid) + 0.5) / gridSizeF;
+  let invGridSize = 1.0 / gridSizeF;
+  let uvw = (vec3f(gid) + 0.5) * invGridSize;
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // Skip positions outside bounding sphere (dynamic radius)
-  // PERF: Compare squared distances to avoid sqrt per thread
-  let dist2 = dot(worldPos, worldPos);
+  // Skip positions outside bounding sphere (dynamic radius).
+  // PERF: precompute boundR² to keep the per-thread test to a single compare.
   let boundR = schroedinger.boundingRadius;
-  if (dist2 > boundR * boundR) {
+  let boundR2 = boundR * boundR;
+  let dist2 = dot(worldPos, worldPos);
+  if (dist2 > boundR2) {
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
   }
@@ -229,9 +235,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Convert grid coordinate to world-space position
+  // Convert grid coordinate to world-space position.
+  // PERF: hoist 1/gridSize so per-thread work is a vec3 multiply, not a divide.
   let gridSizeF = vec3f(gridParams.gridSize);
-  let uvw = (vec3f(gid) + 0.5) / gridSizeF;
+  let invGridSize = 1.0 / gridSizeF;
+  let uvw = (vec3f(gid) + 0.5) * invGridSize;
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
   // Sphere clipping: skip cube corners outside the bounding sphere.
@@ -239,9 +247,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // negligible beyond the bounding radius. The density-grid raymarcher
   // samples only from the texture — no inline fallback exists — so zero
   // values in corners are handled correctly via empty-skip acceleration.
-  let dist2 = dot(worldPos, worldPos);
   let boundR = schroedinger.boundingRadius;
-  if (dist2 > boundR * boundR) {
+  let boundR2 = boundR * boundR;
+  let dist2 = dot(worldPos, worldPos);
+  if (dist2 > boundR2) {
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
   }

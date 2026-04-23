@@ -34,7 +34,10 @@ struct QWAbsorberUniforms {
 export const QW_ABSORBER_UNIFORMS_SIZE = 128
 
 export const quantumWalkAbsorberBlock = /* wgsl */ `
-@group(0) @binding(0) var<uniform> params: QWAbsorberUniforms;
+// QWAbsorberUniforms binds as storage because the struct embeds scalar arrays
+// (array<u32, 12>) with 4-byte stride — spec-forbidden in uniform address
+// space. Chrome/Tint accepts it; naga rejects.
+@group(0) @binding(0) var<storage, read> params: QWAbsorberUniforms;
 @group(0) @binding(1) var<storage, read_write> coinState: array<f32>;
 
 @compute @workgroup_size(64)
