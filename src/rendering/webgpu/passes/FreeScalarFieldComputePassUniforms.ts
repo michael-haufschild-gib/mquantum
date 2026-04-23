@@ -373,7 +373,9 @@ export function writeFsfUniforms(
   // agree bit-for-bit with the legacy ternary block.
   const effectiveAbsorberWidth = config.absorberWidth ?? 0.2
   f32[124] = effectiveAbsorberWidth // offset 496
-  f32[125] = sigmaMaxFromPmlConfig({ ...config, absorberWidth: effectiveAbsorberWidth }) // offset 500 (sigma_max)
+  // Pass the resolved width as an override so the per-frame writer doesn't
+  // allocate a spread-clone of `config` on every upload.
+  f32[125] = sigmaMaxFromPmlConfig(config, effectiveAbsorberWidth) // offset 500 (sigma_max)
 
   // Cosmology coefficients at the current conformal time. Under Minkowski
   // or cosmology-disabled configs these collapse to (1, 1, 1), so the

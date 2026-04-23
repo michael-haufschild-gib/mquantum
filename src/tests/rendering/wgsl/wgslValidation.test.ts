@@ -27,8 +27,20 @@ const RUN = process.env.WGSL_VALIDATE === '1'
  * Floor assertion on unique shader count — fails loud if a future refactor
  * silently shrinks enumerator coverage. Measured baseline: establish on
  * first green run, then raise. Not yet seeded (set after first run).
+ *
+ * `Number(...)` would coerce malformed env vars to NaN and the comparison
+ * `report.unique < NaN` is always false, silently disabling the guard;
+ * parse and validate explicitly so a typo fails fast at boot instead.
  */
-const MIN_UNIQUE_SHADERS = Number(process.env.WGSL_MIN_UNIQUE ?? 0)
+const rawMinUnique = process.env.WGSL_MIN_UNIQUE
+const MIN_UNIQUE_SHADERS =
+  rawMinUnique === undefined || rawMinUnique === '' ? 0 : Number.parseInt(rawMinUnique, 10)
+
+if (!Number.isInteger(MIN_UNIQUE_SHADERS) || MIN_UNIQUE_SHADERS < 0) {
+  throw new Error(
+    `[wgsl] WGSL_MIN_UNIQUE must be a non-negative integer, got: ${String(rawMinUnique)}`
+  )
+}
 
 describe.skipIf(!RUN)('WGSL validation (naga bulk-validate)', () => {
   it(

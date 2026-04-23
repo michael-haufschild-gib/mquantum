@@ -41,14 +41,6 @@ export function createDtStagingBuffer(
 }
 
 /**
- * Helper callbacks that bridge to the base class's protected methods
- * for uniform buffer creation.
- */
-export interface FsfBufferHelpers {
-  createUniformBuffer: (device: GPUDevice, size: number, label: string) => GPUBuffer
-}
-
-/**
  * Result of rebuilding the FSF field buffers. All GPU resources are
  * non-null after a successful call.
  */
@@ -77,7 +69,6 @@ export interface FsfDestroyableBuffers {
  * @param device - GPU device
  * @param config - Current free scalar config
  * @param old - Old buffers to destroy
- * @param helpers - Base-class helper for uniform buffer creation
  * @param kSpace - K-space manager whose staging buffers must be rebuilt
  * @returns Newly created buffers and derived state
  */
@@ -85,7 +76,6 @@ export function rebuildFsfFieldBuffers(
   device: GPUDevice,
   config: FreeScalarConfig,
   old: FsfDestroyableBuffers,
-  helpers: FsfBufferHelpers,
   kSpace: FsfKSpaceManager
 ): FsfBufferResult {
   // Destroy old k-space staging buffers and invalidate in-flight jobs
@@ -128,7 +118,6 @@ export function rebuildFsfFieldBuffers(
     size: FSF_UNIFORM_SIZE,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   })
-  void helpers // retained for callsite symmetry; buffer is created inline here.
 
   const configHash = computeFsfConfigHash(config)
 

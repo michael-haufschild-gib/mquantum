@@ -4,11 +4,13 @@
  * Composes all available sub-enumerators into a single stream. Supports
  * subsetting via env vars for smoke runs:
  *
- * - `WGSL_SUBSET` comma list ∈ {schroedinger-analytic, schroedinger-compute,
- *   profiling-strip, skybox, ads, wigner, passes, all}. Default `all`.
+ * - `WGSL_SUBSET` comma list ∈ {schroedinger-vertex, schroedinger-analytic,
+ *   schroedinger-compute, profiling-strip, skybox, ads, wigner, passes, all}.
+ *   Default `all`. Unknown values throw.
  * - `WGSL_MODE` restrict analytic walker to a single quantumMode
- *   (harmonicOscillator | hydrogenND | hydrogenNDCoupled).
- * - `WGSL_MAX` numeric cap on total unique shaders emitted.
+ *   (harmonicOscillator | hydrogenND | hydrogenNDCoupled). Unknown values throw.
+ * - `WGSL_MAX` numeric cap on total unique shaders emitted. Non-finite or
+ *   non-positive values throw.
  *
  * Dedup across enumerators is by sha256 — two enumerators producing the
  * same WGSL (rare but possible for minimal shaders) yield only one record.
@@ -46,23 +48,63 @@ export interface EnumerateAllOptions {
   maxUnique?: number
 }
 
+const VALID_SURFACES: ReadonlySet<SurfaceName> = new Set([
+  'schroedinger-vertex',
+  'schroedinger-analytic',
+  'schroedinger-compute',
+  'profiling-strip',
+  'skybox',
+  'ads',
+  'wigner',
+  'passes',
+])
+
+const VALID_MODES: ReadonlySet<NonNullable<EnumerateAllOptions['onlyMode']>> = new Set([
+  'harmonicOscillator',
+  'hydrogenND',
+  'hydrogenNDCoupled',
+])
+
 /**
  * Parse env-var controls into options. Centralized so the vitest test and
- * any on-demand script use identical semantics.
+ * any on-demand script use identical semantics. Throws on typos so a
+ * mistyped `WGSL_SUBSET=skbox` doesn't silently enumerate nothing and
+ * report a green run.
  */
 export function optionsFromEnv(
   env: Record<string, string | undefined> = process.env
 ): EnumerateAllOptions {
   const opts: EnumerateAllOptions = {}
   if (env.WGSL_SUBSET && env.WGSL_SUBSET !== 'all') {
-    opts.subsets = env.WGSL_SUBSET.split(',').map((s) => s.trim()) as SurfaceName[]
+    const subsets = env.WGSL_SUBSET.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const invalid = subsets.filter((s) => !VALID_SURFACES.has(s as SurfaceName))
+    if (invalid.length > 0) {
+      throw new Error(
+        `[enumerateAll] WGSL_SUBSET contains unknown surface(s): ${invalid.join(', ')}. ` +
+          `Allowed: ${[...VALID_SURFACES].join(', ')}`
+      )
+    }
+    opts.subsets = subsets as SurfaceName[]
   }
   if (env.WGSL_MODE) {
+    if (!VALID_MODES.has(env.WGSL_MODE as NonNullable<EnumerateAllOptions['onlyMode']>)) {
+      throw new Error(
+        `[enumerateAll] WGSL_MODE is unknown: ${env.WGSL_MODE}. ` +
+          `Allowed: ${[...VALID_MODES].join(', ')}`
+      )
+    }
     opts.onlyMode = env.WGSL_MODE as EnumerateAllOptions['onlyMode']
   }
   if (env.WGSL_MAX) {
     const n = Number(env.WGSL_MAX)
-    if (Number.isFinite(n) && n > 0) opts.maxUnique = n
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(
+        `[enumerateAll] WGSL_MAX must be a positive finite number, got: ${env.WGSL_MAX}`
+      )
+    }
+    opts.maxUnique = n
   }
   return opts
 }
@@ -81,8 +123,10 @@ export function* enumerateAll(opts: EnumerateAllOptions = {}): Generator<ShaderR
   let yielded = 0
 
   const gen = function* (): Generator<ShaderRecord> {
-    if (isEnabled('schroedinger-analytic')) {
+    if (isEnabled('schroedinger-vertex')) {
       yield* enumerateSchroedingerVertex()
+    }
+    if (isEnabled('schroedinger-analytic')) {
       yield* enumerateSchroedingerAnalytic({ onlyMode, maxUnique })
     }
     if (isEnabled('schroedinger-compute')) {

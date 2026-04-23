@@ -58,15 +58,25 @@ function findWgslTemplateRanges(source) {
       continue
     }
     const bodyStart = i + 1
-    // Find the matching closing backtick, respecting `\\\`` escapes.
+    // Find the matching closing backtick. JavaScript template-literal
+    // semantics: a backtick is escaped iff it is preceded by an ODD number
+    // of consecutive backslashes. Counting parity (rather than skipping two
+    // chars on every `\\`) avoids a false negative where a stray unescaped
+    // backtick inside the body silently becomes the recorded terminator —
+    // tsc would still parse it as the closing delimiter, but the validator
+    // would conclude the body has no inner backticks and pass the file.
     let j = bodyStart
     while (j < source.length) {
       const ch = source[j]
-      if (ch === '\\') {
-        j += 2
-        continue
+      if (ch === '`') {
+        let backslashRun = 0
+        let k = j - 1
+        while (k >= bodyStart && source[k] === '\\') {
+          backslashRun++
+          k--
+        }
+        if (backslashRun % 2 === 0) break
       }
-      if (ch === '`') break
       j++
     }
     const line = source.slice(0, bodyStart).split('\n').length

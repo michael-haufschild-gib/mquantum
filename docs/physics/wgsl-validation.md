@@ -17,10 +17,10 @@ pnpm test:shaders                   # full run
 | Schrödinger analytic (HO, hydrogenND, hydrogenNDCoupled) | `enumerateSchroedingerAnalytic.ts` | ✅ Phase 1a |
 | Schrödinger vertex (2D + 3D) | `enumerateSchroedingerVertex.ts` | ✅ Phase 1a |
 | Schrödinger compute (FSF, TDSE, BEC, Dirac, QuantumWalk, Pauli, WdW, AdS) | `enumerateSchroedingerCompute.ts` | ✅ Phase 1b |
-| ProfilingStrip (64 combos) | `enumerateProfilingStrip.ts` | ⬜ Phase 1c |
-| Skybox / AdS density / Wigner cache / Wigner spatial / Wigner reconstruct | `enumerate{Skybox,Ads,Wigner*}.ts` | ⬜ Phase 1d |
-| Pass-level shaders (class A/B/C) | `enumeratePassShaders.ts` | ⬜ Phase 1d / 2b |
-| Tint (Chrome) validation tier | `scripts/playwright/wgsl-tint-validation.spec.ts` | ⬜ Phase 5 |
+| ProfilingStrip (64 combos) | `enumerateProfilingStrip.ts` | ✅ Phase 1c |
+| Skybox / AdS density / Wigner cache / Wigner spatial / Wigner reconstruct | `enumerateAuxiliary.ts` (`enumerateSkybox`, `enumerateAds`, `enumerateWigner`) | ✅ Phase 1d |
+| Pass-level shaders (eigenfunction cache, density grid) | `enumerateAuxiliary.ts` (`enumerateDensityGridEigenCache`) | ✅ Phase 1d (partial — Class C inline-concat passes still pending Phase 2b) |
+| Tint (Chrome) validation tier | `scripts/playwright/wgsl-tint-validation.spec.ts` | ✅ Phase 5 |
 
 ## Out of scope (explicit)
 
@@ -47,7 +47,7 @@ Timing: 4.5s for 2000 shaders on a single naga process (2.25ms/shader amortized)
 | Variable | Meaning |
 |---|---|
 | `WGSL_VALIDATE=1` | Required to run the validation test (otherwise skipped in `pnpm test`). |
-| `WGSL_SUBSET` | Comma-list ∈ {schroedinger-analytic, schroedinger-compute, profiling-strip, skybox, ads, wigner, passes}. Default: all surfaces. |
+| `WGSL_SUBSET` | Comma-list ∈ {schroedinger-vertex, schroedinger-analytic, schroedinger-compute, profiling-strip, skybox, ads, wigner, passes}. Default: all surfaces. Unknown values throw. |
 | `WGSL_MODE` | Restrict analytic walker: `harmonicOscillator` \| `hydrogenND` \| `hydrogenNDCoupled`. |
 | `WGSL_MAX` | Cap unique shader count (for smoke runs). |
 | `WGSL_MIN_UNIQUE` | Drift-guard floor. Fails if enumerator emits fewer unique shaders than this. Seed after first green run, then raise each time coverage grows. |

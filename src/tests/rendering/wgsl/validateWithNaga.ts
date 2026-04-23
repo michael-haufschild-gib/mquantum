@@ -49,7 +49,12 @@ export interface ValidationReport {
 interface ValidateOptions {
   /** Batch size for `naga --bulk-validate`. Default 256. */
   batchSize?: number
-  /** Temp directory; default a unique subdir of `os.tmpdir()`. */
+  /**
+   * Base directory under which a unique scratch subdir is created. We never
+   * write into the directory the caller passes — only into a freshly-created
+   * child of it — so cleanup can never delete caller-owned files. Defaults
+   * to `os.tmpdir()`.
+   */
   tmpDir?: string
   /** Retain temp files on exit (for debugging). Default false. */
   keepTempFiles?: boolean
@@ -87,76 +92,97 @@ export function validateWithNaga(
   const { batchSize = 256, keepTempFiles = false, knownDeviations = [] } = opts
   const start = Date.now()
 
-  const dir = opts.tmpDir ?? mkdtempSync(join(tmpdir(), 'mquantum-wgsl-'))
-  mkdirSync(dir, { recursive: true })
+  // Always allocate a fresh scratch subdir under the chosen base so cleanup
+  // can never delete a caller-owned directory. `mkdtempSync` returns a
+  // unique path like `<base>/mquantum-wgsl-XXXXXX`.
+  const baseDir = opts.tmpDir ?? tmpdir()
+  mkdirSync(baseDir, { recursive: true })
+  const dir = mkdtempSync(join(baseDir, 'mquantum-wgsl-'))
 
-  let total = 0
-  const deduped = new Map<string, ShaderRecord>()
-  for (const rec of records) {
-    total++
-    if (!deduped.has(rec.sha256)) deduped.set(rec.sha256, rec)
-  }
-
-  const byPath = new Map<string, ShaderRecord>()
-  let idx = 0
-  for (const rec of deduped.values()) {
-    const path = join(dir, `${idx}.wgsl`)
-    writeFileSync(path, rec.wgsl)
-    byPath.set(path, rec)
-    idx++
-  }
-
-  const paths = [...byPath.keys()]
-  const failures: ShaderFailure[] = []
-  const deviations: ShaderFailure[] = []
-  let passed = 0
-
-  for (let i = 0; i < paths.length; i += batchSize) {
-    const batch = paths.slice(i, i + batchSize)
-    const result = spawnSync('naga', ['--bulk-validate', ...batch], {
-      encoding: 'utf8',
-      maxBuffer: 256 * 1024 * 1024,
-      // Force no ANSI output so signature normalization is stable. naga emits
-      // color when stderr is a TTY; vitest's capture path looks TTY-shaped.
-      env: {
-        ...process.env,
-        NO_COLOR: '1',
-        CLICOLOR: '0',
-        CLICOLOR_FORCE: '0',
-      },
-    })
-
-    if (result.error) {
-      throw new Error(
-        `[validateWithNaga] naga subprocess failed to spawn: ${result.error.message}. ` +
-          `Is naga-cli installed? Run: cargo install naga-cli`
-      )
+  try {
+    let total = 0
+    const deduped = new Map<string, ShaderRecord>()
+    for (const rec of records) {
+      total++
+      if (!deduped.has(rec.sha256)) deduped.set(rec.sha256, rec)
     }
 
-    // Exit code 0 = all files in batch passed. Nonzero = at least one failure.
-    // Parse stderr regardless (naga prints diagnostics on stderr).
-    const stderr = result.stderr ?? ''
-    const batchFailures = parseNagaBulkStderr(stderr, batch, byPath)
-    for (const f of batchFailures) {
-      const deviation = knownDeviations.some((re) => re.test(f.signature))
-      if (deviation) deviations.push(f)
-      else failures.push(f)
+    const byPath = new Map<string, ShaderRecord>()
+    let idx = 0
+    for (const rec of deduped.values()) {
+      const path = join(dir, `${idx}.wgsl`)
+      writeFileSync(path, rec.wgsl)
+      byPath.set(path, rec)
+      idx++
     }
 
-    passed += batch.length - batchFailures.length
-  }
+    const paths = [...byPath.keys()]
+    const failures: ShaderFailure[] = []
+    const deviations: ShaderFailure[] = []
+    let passed = 0
 
-  if (!keepTempFiles) {
-    rmSync(dir, { recursive: true, force: true })
-  }
+    for (let i = 0; i < paths.length; i += batchSize) {
+      const batch = paths.slice(i, i + batchSize)
+      const result = spawnSync('naga', ['--bulk-validate', ...batch], {
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+        // Force no ANSI output so signature normalization is stable. naga emits
+        // color when stderr is a TTY; vitest's capture path looks TTY-shaped.
+        env: {
+          ...process.env,
+          NO_COLOR: '1',
+          CLICOLOR: '0',
+          CLICOLOR_FORCE: '0',
+        },
+      })
 
-  return {
-    total,
-    unique: deduped.size,
-    passed,
-    failures,
-    knownDeviations: deviations,
-    durationMs: Date.now() - start,
+      if (result.error) {
+        throw new Error(
+          `[validateWithNaga] naga subprocess failed to spawn: ${result.error.message}. ` +
+            `Is naga-cli installed? Run: cargo install naga-cli`
+        )
+      }
+
+      // Exit code 0 = all files in batch passed. Nonzero = at least one failure.
+      // Parse stderr regardless (naga prints diagnostics on stderr).
+      const stderr = result.stderr ?? ''
+      const batchFailures = parseNagaBulkStderr(stderr, batch, byPath)
+
+      // If naga exited non-zero (or was signaled) but we couldn't attribute
+      // any per-file diagnostic, the process crashed or emitted unexpected
+      // stderr. Treat that as a hard failure rather than counting every
+      // file in the batch as `passed` — silent green here would mask broken
+      // tooling. Status `0` with empty diagnostics is the legitimate
+      // all-passed path and stays untouched.
+      if ((result.status !== 0 || result.signal !== null) && batchFailures.length === 0) {
+        throw new Error(
+          `[validateWithNaga] naga exited unexpectedly (status=${result.status}, signal=${result.signal ?? 'none'}) with no per-file diagnostics. stderr:\n${stderr}`
+        )
+      }
+
+      for (const f of batchFailures) {
+        const deviation = knownDeviations.some((re) => re.test(f.signature))
+        if (deviation) deviations.push(f)
+        else failures.push(f)
+      }
+
+      passed += batch.length - batchFailures.length
+    }
+
+    return {
+      total,
+      unique: deduped.size,
+      passed,
+      failures,
+      knownDeviations: deviations,
+      durationMs: Date.now() - start,
+    }
+  } finally {
+    if (!keepTempFiles) {
+      // Only the freshly-created child is removed; `opts.tmpDir` (if the
+      // caller passed one) is left intact.
+      rmSync(dir, { recursive: true, force: true })
+    }
   }
 }
 

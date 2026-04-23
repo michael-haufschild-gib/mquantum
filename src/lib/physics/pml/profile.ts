@@ -131,11 +131,15 @@ export interface PmlSigmaMaxConfig {
  * the target-reflection default — encoding those in this wrapper would
  * change QW behaviour, so QW keeps the explicit call.
  */
-export function sigmaMaxFromPmlConfig(config: PmlSigmaMaxConfig): number {
+export function sigmaMaxFromPmlConfig(
+  config: PmlSigmaMaxConfig,
+  absorberWidthOverride?: number
+): number {
   if (!config.absorberEnabled) return 0
+  const width = absorberWidthOverride ?? config.absorberWidth
   return computePMLSigmaMaxND(
     config.pmlTargetReflection ?? 1e-6,
-    config.absorberWidth,
+    width,
     config.gridSize,
     config.dt,
     PML_GRADING_EXPONENT,

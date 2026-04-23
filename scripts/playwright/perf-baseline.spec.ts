@@ -10,7 +10,8 @@
  * Output: baseline.json in logs/ (structured results the audit can diff against).
  */
 
-import { writeFileSync } from 'fs'
+import { mkdirSync, writeFileSync } from 'fs'
+import { dirname } from 'path'
 
 import { test } from './fixtures'
 import {
@@ -72,7 +73,9 @@ test.describe('perf baseline', () => {
       chromium: 'chrome-channel',
       results,
     }
-    writeFileSync('logs/perf-baseline.json', JSON.stringify(out, null, 2))
+    const outPath = 'logs/perf-baseline.json'
+    mkdirSync(dirname(outPath), { recursive: true })
+    writeFileSync(outPath, JSON.stringify(out, null, 2))
     // Compact console summary
 
     console.log('\n==== PERF BASELINE SUMMARY ====')
@@ -90,9 +93,11 @@ test.describe('perf baseline', () => {
 
   for (const scen of SCENARIOS) {
     test(`baseline: ${scen.label}`, async ({ page }) => {
-      // Hard-reload each scenario to measure cold TTI.
-      const tNavStart = await page.evaluate(() => performance.now())
-
+      // Hard-reload each scenario to measure cold TTI. `performance.now()`
+      // is reset per document (its time origin is set at navigation start),
+      // so timings sampled before navigation can't be subtracted from those
+      // sampled after — we instead read post-navigation timestamps directly,
+      // which already represent ms-from-navigation-start.
       await gotoMode(page, scen.mode, scen.dim)
       await requireWebGPU(page, test.info())
       await waitForRendererReady(page)
@@ -156,8 +161,8 @@ test.describe('perf baseline', () => {
         mode: scen.mode,
         dim: scen.dim,
         nav: {
-          navigationToRendererReadyMs: tReady - tNavStart,
-          navigationToFirstFrameMs: tFirstFrame - tNavStart,
+          navigationToRendererReadyMs: tReady,
+          navigationToFirstFrameMs: tFirstFrame,
           rendererReadyToFirstFrameMs: tFirstFrame - tReady,
           domContentLoadedMs: navTiming.domContentLoadedMs,
           loadEventEndMs: navTiming.loadEventEndMs,

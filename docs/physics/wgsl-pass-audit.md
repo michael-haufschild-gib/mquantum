@@ -4,7 +4,7 @@
 
 **Classifications:**
 
-- **A (static import)** — imports a WGSL constant from a `.wgsl.ts` file, calls `createShaderModule` with it directly. Trivially enumerable; no refactor needed.
+- **A (static shader source)** — uses a fixed WGSL source (either imported from a `.wgsl.ts` file or defined as a file-local `const` in the pass), then calls `createShaderModule` with it directly. Trivially enumerable; no refactor needed.
 - **B (pure compose fn)** — imports a `compose{Name}Shader(config)` function that returns a WGSL string with no GPU dependency. Trivially enumerable; no refactor needed.
 - **C (inline concat)** — WGSL string is built by concatenating imported blocks (`unifAndIndex + tdseInitBlock`, `preamble + pauliInitBlock`, etc.) inside the pass's setup function. Enumerable if we replicate the concatenation, but drift risk: if setup logic changes, the enumerator desyncs. Recommend refactor to extract a pure `compose{Name}Shader()` that setup calls.
 

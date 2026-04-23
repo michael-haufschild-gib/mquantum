@@ -36,6 +36,7 @@ import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroeding
 
 /** Enumerator surface identifiers. Must stay in sync with `enumerateAll.SurfaceName`. */
 export type ShaderSurface =
+  | 'schroedinger-vertex'
   | 'schroedinger-analytic'
   | 'schroedinger-compute'
   | 'profiling-strip'
@@ -66,8 +67,13 @@ const ANALYTIC_MODES: readonly AnalyticMode[] = [
   'hydrogenNDCoupled',
 ] as const
 
-/** Color algorithm indices declared in `COLOR_ALG_NAMES`. */
-const COLOR_ALGORITHMS: readonly number[] = Array.from({ length: 29 }, (_, i) => i)
+/**
+ * Color algorithm indices declared in `COLOR_ALG_NAMES`. The renderer's
+ * supported runtime range is 0..26 (validated by `resolveColorAlgorithmInt`)
+ * — enumerating beyond that walks configs the app never accepts and
+ * distorts dedup/failure counts.
+ */
+const COLOR_ALGORITHMS: readonly number[] = Array.from({ length: 27 }, (_, i) => i)
 
 const REPRESENTATIONS: readonly SchrodingerRendererConfig['representation'][] = [
   'position',

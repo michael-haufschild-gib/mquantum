@@ -22,7 +22,7 @@ export function* enumerateSchroedingerVertex(): Generator<ShaderRecord> {
     wgsl: vert3D,
     sha256: createHash('sha256').update(vert3D).digest('hex'),
     cacheKey: 'vertex-3d',
-    surface: 'schroedinger-analytic',
+    surface: 'schroedinger-vertex',
   }
 
   const vert2D = composeSchroedingerVertexShader2D()
@@ -31,6 +31,6 @@ export function* enumerateSchroedingerVertex(): Generator<ShaderRecord> {
     wgsl: vert2D,
     sha256: createHash('sha256').update(vert2D).digest('hex'),
     cacheKey: 'vertex-2d',
-    surface: 'schroedinger-analytic',
+    surface: 'schroedinger-vertex',
   }
 }

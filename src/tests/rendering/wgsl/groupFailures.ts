@@ -41,7 +41,11 @@ export function groupFailures(
     if (g.examples.length < examplesPerGroup) g.examples.push(f)
   }
 
-  return [...groups.values()].sort((a, b) => b.count - a.count)
+  // Stable secondary sort by signature so equal-count groups land in a
+  // deterministic order — repeated red runs produce diff-able output.
+  return [...groups.values()].sort(
+    (a, b) => b.count - a.count || a.signature.localeCompare(b.signature)
+  )
 }
 
 /**
@@ -57,7 +61,7 @@ export function formatTriageReport(groups: readonly FailureGroup[], topN = 10): 
   const shown = groups.slice(0, topN)
   for (const g of shown) {
     lines.push('')
-    lines.push(`── ${g.count}× [${[...g.surfaces].join(', ')}] ──`)
+    lines.push(`── ${g.count}× [${[...g.surfaces].sort().join(', ')}] ──`)
     lines.push(`signature: ${g.signature}`)
     lines.push(`example labels:`)
     for (const ex of g.examples) {

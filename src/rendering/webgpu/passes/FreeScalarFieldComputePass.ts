@@ -27,7 +27,7 @@ import {
   GRID_WG as GRID_WORKGROUP_SIZE,
   LINEAR_WG as LINEAR_WORKGROUP_SIZE,
 } from './computePassUtils'
-import { type FsfBufferHelpers, rebuildFsfFieldBuffers } from './FreeScalarFieldComputePassBuffers'
+import { rebuildFsfFieldBuffers } from './FreeScalarFieldComputePassBuffers'
 import { disposeFsfPassGpu, type FsfGpuFields } from './FreeScalarFieldComputePassDispose'
 import { initializeFsfField } from './FreeScalarFieldComputePassInit'
 import type {
@@ -333,11 +333,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     })
   }
 
-  /** Bridge to base-class `createUniformBuffer` for the buffer helper. */
-  private readonly bufferHelpers: FsfBufferHelpers = {
-    createUniformBuffer: (d, size, label) => this.createUniformBuffer(d, size, label),
-  }
-
   /**
    * Rebuild phi/pi storage buffers and uniform buffer when grid size changes.
    * The density texture is NOT recreated here — its size is set at construction
@@ -348,7 +343,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       device,
       config,
       { phiBuffer: this.phiBuffer, piBuffer: this.piBuffer, uniformBuffer: this.uniformBuffer },
-      this.bufferHelpers,
       this.kSpace
     )
     this.phiBuffer = result.phiBuffer

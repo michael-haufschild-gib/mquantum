@@ -43,12 +43,20 @@ test.describe('@wgsl-tint WGSL validation (Chrome/Tint)', () => {
     // WGSL_TINT_MAX bounds the batch (default 500). WGSL_SUBSET / WGSL_MODE /
     // WGSL_MAX all pass through to the enumerator so the curation can be
     // narrowed further.
-    const TINT_MAX = Number(process.env.WGSL_TINT_MAX ?? 500)
+    const parsedTintMax = Number(process.env.WGSL_TINT_MAX ?? 500)
+    const TINT_MAX =
+      Number.isFinite(parsedTintMax) && parsedTintMax > 0 ? Math.floor(parsedTintMax) : 500
     const records: Array<{ label: string; wgsl: string; surface: string }> = []
     for (const rec of enumerateAll({ maxUnique: TINT_MAX })) {
       records.push({ label: rec.label, wgsl: rec.wgsl, surface: rec.surface })
       if (records.length >= TINT_MAX) break
     }
+    // Fail loudly if curation/filtering yielded nothing — a green run with
+    // zero validated shaders is meaningless and would mask coverage drops.
+    expect(
+      records.length,
+      'No shaders collected — check WGSL_TINT_MAX, WGSL_SUBSET, WGSL_MODE filters'
+    ).toBeGreaterThan(0)
 
     // Need the app to boot so the worker registers `navigator.gpu`, even
     // though we request our own adapter/device below. The renderer-ready

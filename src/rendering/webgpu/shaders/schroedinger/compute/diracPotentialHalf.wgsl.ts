@@ -29,7 +29,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // PERF: dt / (2ℏ) is uniform across threads — hoist so per-thread work is a multiply.
+  // Extract the dt/(2ℏ) factor once so the inner phase computation stays
+  // a single multiply, and the divide-by-(2·max(hbar, ε)) doesn't repeat
+  // for each spinor component below. Readability + dedup, not a guaranteed
+  // cross-thread hoist (WGSL evaluates uniform expressions per invocation
+  // and relies on the driver compiler to recognize them).
   let dtOver2Hbar = params.dt / (2.0 * max(params.hbar, 1e-6));
   let V = potential[idx];
   let phase = -V * dtOver2Hbar;

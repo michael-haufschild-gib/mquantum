@@ -36,8 +36,8 @@ After every single WGSL-side flip to `var<storage, read>`:
 1. `Edit` the matching `createComputeBGL` entry in the setup file: change `'uniform'` to `'read-only-storage'` on the binding that holds the struct you just migrated. ONLY that one binding — the other entries (psi buffers, etc.) stay as they were.
 2. `Edit` the matching `createBuffer` or `createUniformBuffer` call. Replace the `createUniformBuffer` helper call with an inline `device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST, label })` (preserve the label).
 3. Run `pnpm exec tsc --noEmit -p tsconfig.json` and confirm zero errors.
-4. Run `WGSL_VALIDATE=1 WGSL_SUBSET=schroedinger-compute pnpm exec vitest run src/tests/rendering/wgsl/wgslValidation.test.ts --reporter=verbose` and confirm the `known-deviations` count went DOWN by the number of shaders you migrated.
-5. Run `pnpm exec vitest run` (full unit suite) and confirm 8406 passing / no regressions.
+4. Run `WGSL_VALIDATE=1 WGSL_SUBSET=schroedinger-compute pnpm exec vitest run src/tests/rendering/wgsl/wgslValidation.test.ts --reporter=verbose` and confirm the `known-deviations` count does NOT increase (and ideally drops). The validator counts unique composed WGSL after sha256 dedup, so a single migrated file can change zero, one, or several counted deviations depending on specialization overlap — do not chase a strict 1:1 drop per file.
+5. Run `pnpm exec vitest run` (full unit suite) and confirm no regressions.
 6. Only after (1–5) green, move to the next struct.
 
 ## How to verify end-to-end after all structs migrated
