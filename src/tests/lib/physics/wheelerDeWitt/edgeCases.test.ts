@@ -14,6 +14,7 @@
 
 import { describe, expect, it } from 'vitest'
 
+import { hhLangerSeed } from '@/lib/physics/wheelerDeWitt/hhLangerSeed'
 import { solveWheelerDeWitt } from '@/lib/physics/wheelerDeWitt/solver'
 
 function assertAllFinite(chi: Float32Array): void {
@@ -204,13 +205,11 @@ describe('WDW solver — extreme parameter corners', () => {
 
   it('handles m = 0 with Λ > 0 (constant-V free-with-Λ regime)', () => {
     // Degenerate but physically meaningful: no inflaton mass so V(φ) = Λ
-    // everywhere; the HH small-V expansion is skipped (|Λ| > threshold)
-    // and the solver takes the full WKB formula with a V = Λ column.
-    // Stage-3 Airy extraction may or may not fire depending on Λ; the
-    // only hard invariant is that χ stays finite and the initial slab
-    // matches the expected `amp = exp(-|S_E|)` shape at every φ.
-    const out = solveWheelerDeWitt({
-      boundaryCondition: 'noBoundary',
+    // everywhere. The Phase 2 HH seed produces a φ-independent slab
+    // (V = Λ = const → χ(a_min, φ) = (ζ/U)^{1/4}·Ai(ζ) same for every
+    // cell) — the constant-in-φ property is the load-bearing invariant.
+    const params = {
+      boundaryCondition: 'noBoundary' as const,
       inflatonMass: 0,
       cosmologicalConstant: 0.3,
       aMin: 0.1,
@@ -218,28 +217,29 @@ describe('WDW solver — extreme parameter corners', () => {
       gridNa: 32,
       gridNphi: 16,
       phiExtent: 3.5,
-    })
+    }
+    const out = solveWheelerDeWitt(params)
     assertAllFinite(out.chi)
-    // V is constant in φ so the initial slab's amplitude is also
-    // constant in φ (up to the sponge-layer attenuation that clamps
-    // near the grid edges). Check that interior cells agree to
-    // high precision.
+    // V is constant in φ so the initial slab must be constant in φ. Check
+    // interior cells (sponge-free).
     const Nphi = out.gridSize[1]
     const centre = Math.floor(Nphi / 2) * Nphi + Math.floor(Nphi / 2)
     const interior = Math.floor(Nphi / 2) * Nphi + (Math.floor(Nphi / 2) + 1)
     const a0Centre = out.chi[2 * centre]!
     const a0Interior = out.chi[2 * interior]!
-    expect(Math.abs(a0Centre - a0Interior)).toBeLessThan(0.01)
-    // m=0, Λ=0.3 gives a constant V=0.3 — initial seed amp is
-    // `exp(-|S_E|)` with S_E(a_min=0.1, V=0.3) =
-    //   (1/(3·0.3))·((1 - K·0.01·0.3)^{1.5} - 1)
-    //   ≈ (1.111)·((1 - 0.0838)^{1.5} - 1)
-    //   ≈ 1.111·(-0.1258)
-    //   ≈ -0.1398
-    // → amp ≈ exp(-0.1398) ≈ 0.870. Assert within a loose tolerance
-    // to survive floating-point drift.
-    expect(a0Centre).toBeGreaterThan(0.8)
-    expect(a0Centre).toBeLessThan(1.0)
+    // Langer-Ai seed magnitude for this config is O(0.01) (near a first
+    // Ai-zero at this ζ); absolute tolerance 1e-4 preserves the
+    // constant-in-φ invariant without over-constraining magnitude.
+    expect(Math.abs(a0Centre - a0Interior)).toBeLessThan(1e-4)
+    // Seed value matches the Langer-Ai reference at the grid centre.
+    const ref = hhLangerSeed({
+      a: params.aMin,
+      phi1: 0,
+      phi2: 0,
+      m: params.inflatonMass,
+      lambda: params.cosmologicalConstant,
+    })
+    expect(a0Centre).toBeCloseTo(ref.chi.re, 5)
   })
 
   it('handles m = 0 with Λ < 0 (free-kinetic AdS regime)', () => {

@@ -84,6 +84,11 @@ import {
 } from './airyConnection'
 import { buildWdwBoundary, type WdwBoundaryField } from './boundaryConditions'
 import { WDW_C_U, wdwEuclideanWkbAction, wdwTurningA, wdwU } from './constants'
+import {
+  allocImplicitBulkScratch,
+  type ImplicitBulkScratch,
+  solveADILaplacianNeumann2D,
+} from './implicitBulk'
 
 // Re-export for downstream consumers that import `wdwU` from the solver
 // module (e.g. tests that need the operator alongside the solver output).
@@ -100,14 +105,20 @@ export { wdwU } from './constants'
  * invariants that preserve existing output, patch for internal cleanup
  * with byte-identical output.
  */
-export const WDW_SOLVER_VERSION = '2.0.0'
+export const WDW_SOLVER_VERSION = '3.0.0'
 
 /**
- * Explicit-leapfrog stability budget for the φ-Laplacian term
- * `da² · (1/aMin²) · 8/dphi²`. Empirically the solver stays well-behaved up
- * to ~4; values above that are flagged as borderline. The guard is
- * informational only (dev-only `logger.warn`) so existing callers —
- * including the in-app default config and unit tests — are never blocked.
+ * Advisory CFL threshold for the Lorentzian bulk `da²·(1/aMin²)·8/dphi²`.
+ *
+ * **Phase 3 note**: the bulk is now propagated with semi-implicit
+ * Crank–Nicolson (via ADI, see `./implicitBulk`), which is
+ * unconditionally stable — the CFL number no longer bounds a stability
+ * envelope. The warning is retained as an **accuracy** hint: at high
+ * CFL the trapezoidal scheme is still second-order but resolves high-k
+ * dynamics less faithfully (numerical dispersion grows as `(κ·|λ_k|)²`).
+ * The threshold `4` is kept for backwards compatibility with the pre-Phase-3
+ * diagnostic and as an order-of-magnitude indicator; exceeding it does
+ * not imply instability.
  */
 const WDW_CFL_BUDGET = 4
 
@@ -158,25 +169,36 @@ const WDW_EUCLIDEAN_ABSORBER_ETA = 1.0
  * Width (in grid cells) of the φ-boundary absorbing sponge layer.
  * Waves reaching the outer φ-cells are damped by a quadratic-profile
  * exponential `exp(−γ_max · d²)` per leapfrog step, where
- * `d = (cells from sponge inner edge) / spongeWidth ∈ [0, 1]`. This
- * replaces reflections (Neumann) with smooth absorption — no standing
- * waves and no artificial sink (Dirichlet). At 5 cells the damping
- * profile is gentle enough that interior physics is unaffected while
- * the outermost cell receives `exp(−0.15)^N_a ≈ 0` total damping over
- * the full a-march.
+ * `d = (cells from sponge inner edge) / spongeWidth ∈ [0, 1]`.
+ *
+ * **Phase 3 retune** (docs/physics/wdw-bulk-stability.md): dropped from
+ * 5 to 3. The semi-implicit CN bulk propagator damps high-k noise in
+ * the interior on its own (factor `1/(1 + κ̂·|λ_k|)` per step with
+ * `κ̂·|λ_k| ~ O(1)` at `k = N/2`), so the sponge no longer needs to
+ * double as a noise filter — it only has to absorb legitimately
+ * outgoing bulk modes at the domain boundary. A narrower layer leaves
+ * more cells in the unity-factor interior for the symmetry-preservation
+ * test. The sponge is NOT applied to the initial slabs (`ia = 0, 1`):
+ * they carry the physical boundary condition exactly, and damping them
+ * would re-introduce the φ-translation-symmetry-breaking perturbation
+ * the Phase 3 rewrite removed.
  */
-const WDW_PHI_SPONGE_WIDTH = 5
+const WDW_PHI_SPONGE_WIDTH = 3
 
 /**
  * Per-step peak damping rate at the outermost φ-cell. The effective
  * damping at cell `k` from the grid edge (k=0 at the edge) is
- * `exp(−γ_max · ((spongeWidth − k) / spongeWidth)²)`. Chosen so the
- * total damping over `N_a = 128` steps is `exp(−0.15 · 128) ≈ 5e-9`
- * at the outermost cell (effectively zero) while the innermost sponge
- * cell sees `exp(−0.15/25 · 128) ≈ 0.47` (mild, one-sided attenuation
- * that does not create a visible boundary in the density texture).
+ * `exp(−γ_max · ((spongeWidth − k) / spongeWidth)²)`.
+ *
+ * **Phase 3 retune**: raised from 0.15 to 0.45 — heavier absorption to
+ * compensate for the narrower layer. Total damping over `N_a = 128`
+ * steps at the outermost cell is `exp(−0.45 · 128) ≈ 10⁻²⁵`; the
+ * innermost sponge cell (depth = W-1 out of W=3) sees
+ * `exp(−0.45 · (1/3)² · 128) = exp(−6.4) ≈ 10⁻³` per full march —
+ * enough one-sided attenuation to damp outgoing waves without creating
+ * a texture-visible boundary.
  */
-const WDW_PHI_SPONGE_GAMMA = 0.15
+const WDW_PHI_SPONGE_GAMMA = 0.45
 
 /**
  * WKB-phase threshold past the Lorentzian-Euclidean turning surface at
@@ -336,7 +358,7 @@ interface ComplexPair {
  * @param invDphi2 - `1 / dφ²`; caller precomputes once per solve.
  * @returns `(Re, Im)` pair of `∇²_φ χ` at `(i1, i2)`.
  */
-function phiLaplacianAt(
+export function phiLaplacianAt(
   slab: Float32Array,
   slabBase: number,
   i1: number,
@@ -390,7 +412,7 @@ interface ColumnWkbState {
 }
 
 /** Band classification for a single cell. */
-enum BandKind {
+export enum BandKind {
   Lorentzian = 0,
   EuclideanTransition = 1,
   EuclideanDeep = 2,
@@ -496,6 +518,52 @@ export function effectiveSpongeWidth(Nphi: number): number {
   return Math.min(WDW_PHI_SPONGE_WIDTH, Math.floor(Nphi / 6))
 }
 
+/**
+ * Detect whether an interleaved-complex boundary slab is constant in
+ * the φ grid (within `Float32` precision).
+ *
+ * Used by {@link solveWheelerDeWitt} to auto-disable the φ-boundary
+ * sponge on initial data that has no φ-variation — when V(φ) is
+ * independent of φ (the `m = 0` regime, {@link ./hhLangerSeed}
+ * delegating to `columnSolutionPositiveV`/`columnSolutionZeroV`/
+ * `columnSolutionNegativeV` with Λ-only inputs produces a slab that is
+ * exactly constant over every `(φ₁, φ₂)`) there are no outgoing φ-waves
+ * for the sponge to absorb, and the sponge's multiplicative damping
+ * only seeds a spurious edge-to-bulk wave that violates φ-translation
+ * symmetry.
+ *
+ * Tolerance is an absolute+relative check: deviations below `1e-6` of
+ * the centre-cell magnitude count as constant. Float32 round-off on the
+ * BC generator's trig + Airy evaluations bounds the natural spread to
+ * the `~1e-7` level, so the tolerance has a comfortable margin above
+ * precision noise.
+ *
+ * @param chi  Interleaved `(re, im)` slab, length `2·Nphi²`.
+ * @param Nphi Grid size.
+ * @returns `true` iff every cell agrees with the centre cell within
+ *   tolerance.
+ */
+function isConstantInPhiSlab(chi: Float32Array, Nphi: number): boolean {
+  if (Nphi < 2) return true
+  const center = Math.floor(Nphi / 2)
+  const centerOff = 2 * (center * Nphi + center)
+  const refRe = chi[centerOff] ?? 0
+  const refIm = chi[centerOff + 1] ?? 0
+  const refMag = Math.hypot(refRe, refIm)
+  const absTol = 1e-10
+  const relTol = 1e-6
+  const tol = Math.max(absTol, relTol * refMag)
+  const N = Nphi * Nphi
+  for (let idx = 0; idx < N; idx++) {
+    const re = chi[2 * idx] ?? 0
+    const im = chi[2 * idx + 1] ?? 0
+    if (Math.abs(re - refRe) > tol || Math.abs(im - refIm) > tol) {
+      return false
+    }
+  }
+  return true
+}
+
 function buildPhiSpongeDamping(Nphi: number): Float32Array {
   const sponge = new Float32Array(Nphi * Nphi)
   const W = effectiveSpongeWidth(Nphi)
@@ -570,16 +638,14 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
   }
 
   // Absorbing sponge layer: per-cell multiplicative damping applied
-  // after each leapfrog step. Bulk cells get 1.0 (no damping); cells
-  // near the φ-grid edges get < 1.0, absorbing outgoing waves without
-  // creating reflections (unlike Dirichlet) or standing waves (unlike
-  // pure Neumann on a too-small grid).
-  //
-  // Disabled when `customBoundary` is supplied: analytic-fixture tests
-  // inject constant-in-φ slabs to isolate the 1D a-march; applying the
-  // sponge would break the constant-in-φ invariant those tests verify.
-  const spongeEnabled = !input.customBoundary && !input.disableSponge
-  const phiSponge = spongeEnabled ? buildPhiSpongeDamping(Nphi) : null
+  // after each leapfrog step. Disabled when `customBoundary` is supplied
+  // (analytic-fixture tests inject constant-in-φ slabs), when
+  // `disableSponge` is explicitly set (JS↔Rust parity tests), or when
+  // the BC generator produced a constant-in-φ slab (typically `m = 0`
+  // with V = Λ = const) — the dynamics are then φ-translation-invariant
+  // and the sponge would seed a spurious edge-to-bulk wave that breaks
+  // the `symmetryPreservation` Phase 1 bound. See `isConstantPhiSlab`.
+  let spongeEnabled = !input.customBoundary && !input.disableSponge
 
   // Stage-2 per-column WKB state (turning point, α, pending match).
   const columnStates = initColumnWkbStates(
@@ -622,17 +688,24 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
     })
   }
 
-  // Copy χ(a_min, ·) into slab 0, applying the sponge damping to the
-  // boundary condition itself so edge cells start with reduced amplitude.
+  // Copy χ(a_min, ·) into slab 0 unchanged — this is the physical
+  // boundary condition, and Phase 3 removes the sponge damping of the
+  // initial slab that earlier versions applied. Retaining the damping
+  // broke the φ-translation-invariance of a constant-in-φ seed (the
+  // `m = 0` regime, V(φ) = Λ = const) before the first leapfrog step,
+  // seeding the spurious sliceVarMax = 13.7× structure documented in
+  // the plan's Finding 2.
   chi.set(initial.chi, 0)
-  if (phiSponge) {
-    for (let idx = 0; idx < slabSize; idx++) {
-      const sf = phiSponge[idx]!
-      const off = 2 * idx
-      chi[off] = (chi[off] ?? 0) * sf
-      chi[off + 1] = (chi[off + 1] ?? 0) * sf
-    }
+
+  // Case 3 sponge-disable detection (see `spongeEnabled` comment above):
+  // skip the absorbing layer when the BC generator produced a slab
+  // that is φ-constant to within f32 precision. The test is a max-diff
+  // scan against the centre cell; its cost is `O(Nphi²)` and pays for
+  // itself against the `O(Nphi²·Na)` sponge-propagation work it avoids.
+  if (spongeEnabled && isConstantInPhiSlab(initial.chi, Nphi)) {
+    spongeEnabled = false
   }
+  const phiSponge: Float32Array | null = spongeEnabled ? buildPhiSpongeDamping(Nphi) : null
 
   // Classify slab 0 up front so the bandKind output is complete.
   for (let i1 = 0; i1 < Nphi; i1++) {
@@ -704,96 +777,199 @@ export function solveWheelerDeWitt(input: WheelerDeWittSolverInput): WheelerDeWi
         )
       }
 
-      const sf = phiSponge ? phiSponge[idx]! : 1
-      chi[complexSlabFloats + 2 * idx] = nextRe * sf
-      chi[complexSlabFloats + 2 * idx + 1] = nextIm * sf
+      // Slab 1 is a Taylor extrapolation of slab 0 — preserving the
+      // physical boundary's φ-translation structure (constant-in-φ at
+      // m = 0, Gaussian-enveloped at m > 0) matters as much here as on
+      // slab 0 itself, so the sponge is also deferred to the CN-implicit
+      // update from slab 2 onward.
+      chi[complexSlabFloats + 2 * idx] = nextRe
+      chi[complexSlabFloats + 2 * idx + 1] = nextIm
       mask[slabSize + idx] = U1 < 0 ? 1 : 0
       bandKind[slabSize + idx] = band
     }
   }
 
-  // Leapfrog main loop for slabs ia = 2 .. Na-1.
+  // Pre-allocated ADI workspace for the Crank–Nicolson bulk propagator.
+  // Reused across every a-step; sized once for the φ-grid.
+  const adiScratch: ImplicitBulkScratch = allocImplicitBulkScratch(Nphi)
+  const adiRhs = new Float32Array(complexSlabFloats)
+  const adiOut = new Float32Array(complexSlabFloats)
+  const da2 = da * da
+  const halfDa2 = 0.5 * da2
+
+  // Main loop for slabs ia = 2 .. Na-1. Lorentzian cells use the
+  // semi-implicit Crank–Nicolson update solved by the ADI propagator;
+  // Euclidean transition cells fall back to the explicit leapfrog +
+  // soft absorber; Euclidean deep cells continue to receive the
+  // analytic WKB propagator from their per-column match coefficient.
   for (let ia = 2; ia < Na; ia++) {
-    const a = aMin + ia * da
-    const aPrev = aMin + (ia - 1) * da
+    // Leapfrog variable naming: `next` (slab ia, being computed),
+    // `cur` (slab ia-1, the midpoint of the 3-point stencil), `prev`
+    // (slab ia-2). The CN trapezoidal rule on `(1/a²)·∇²_φ χ` averages
+    // the term between `next` and `prev`; `U·χ` is kept explicit at
+    // `cur`.
+    const aNext = aMin + ia * da
+    const aCur = aMin + (ia - 1) * da
+    const aPrev = aMin + (ia - 2) * da
+    const invAcurSq = 1 / (aCur * aCur)
     const invAprevSq = 1 / (aPrev * aPrev)
-    const prevSlabBase = (ia - 1) * complexSlabFloats
-    const prevPrevSlabBase = (ia - 2) * complexSlabFloats
-    const curSlabBase = ia * complexSlabFloats
+    const prevSlabBase = (ia - 2) * complexSlabFloats
+    const curSlabBase = (ia - 1) * complexSlabFloats
+    const nextSlabBase = ia * complexSlabFloats
     const maskBase = ia * slabSize
 
+    // CN-implicit operator coefficient for this a-step:
+    //   κ̂ = (da²/2)·(1/aNext²)·(1/dphi²)
+    // Same value for every (i1, i2) on the slab (grid is uniform).
+    const kappaNext = (halfDa2 * (1 / (aNext * aNext))) / (dphi * dphi)
+    // Explicit L_prev·χ_prev scaling (trapezoidal):
+    //   (da²/2)·(1/aPrev²) · (∇²_φ χ_prev)
+    const lapPrevScale = halfDa2 * invAprevSq
+
+    // Step A — Assemble RHS for the ADI solve on every (i1, i2):
+    //   RHS = 2·χ_cur − χ_prev + (da²/2)·(1/aPrev²)·∇²_φ χ_prev
+    //                         + da²·U_cur·χ_cur
+    // Identical structure for Lorentzian, transition, and deep-band
+    // cells — the band-specific overrides come in Step C.
     for (let i1 = 0; i1 < Nphi; i1++) {
       const phi1 = -phiExtent + i1 * dphi
       for (let i2 = 0; i2 < Nphi; i2++) {
         const phi2 = -phiExtent + i2 * dphi
         const idx = i1 * Nphi + i2
 
-        const Uprev = wdwU(
-          aPrev,
+        const Ucur = wdwU(
+          aCur,
           phi1,
           phi2,
           inflatonMass,
           cosmologicalConstant,
           inflatonMassAsymmetry
         )
-        const Ucur = wdwU(a, phi1, phi2, inflatonMass, cosmologicalConstant, inflatonMassAsymmetry)
 
-        const cre = chi[prevSlabBase + 2 * idx] ?? 0
-        const cim = chi[prevSlabBase + 2 * idx + 1] ?? 0
-        const prevRe = chi[prevPrevSlabBase + 2 * idx] ?? 0
-        const prevIm = chi[prevPrevSlabBase + 2 * idx + 1] ?? 0
+        const curRe = chi[curSlabBase + 2 * idx] ?? 0
+        const curIm = chi[curSlabBase + 2 * idx + 1] ?? 0
+        const prevRe = chi[prevSlabBase + 2 * idx] ?? 0
+        const prevIm = chi[prevSlabBase + 2 * idx + 1] ?? 0
 
-        const lap = phiLaplacianAt(chi, prevSlabBase, i1, i2, Nphi, invDphi2)
+        const lapPrev = phiLaplacianAt(chi, prevSlabBase, i1, i2, Nphi, invDphi2)
 
-        // Leapfrog: χ_next = 2·χ_cur − χ_prev + da²·χ''
-        const chiDDotRe = invAprevSq * lap.re + Uprev * cre
-        const chiDDotIm = invAprevSq * lap.im + Uprev * cim
-        let nextRe = 2 * cre - prevRe + da * da * chiDDotRe
-        let nextIm = 2 * cim - prevIm + da * da * chiDDotIm
+        adiRhs[2 * idx] = 2 * curRe - prevRe + lapPrevScale * lapPrev.re + da2 * Ucur * curRe
+        adiRhs[2 * idx + 1] = 2 * curIm - prevIm + lapPrevScale * lapPrev.im + da2 * Ucur * curIm
+      }
+    }
+
+    // Step B — ADI solve `(I − κ̂·D_x)(I − κ̂·D_y)·χ_next = RHS`.
+    // Writes to `adiOut`. The splitting residual `κ̂²·D_x·D_y·χ` is
+    // below the scheme's `O(da²)` truncation error at default grids;
+    // see `./implicitBulk` module docstring for the bound.
+    solveADILaplacianNeumann2D(adiRhs, adiOut, Nphi, kappaNext, adiScratch)
+
+    // Step C — Per-cell band classification and band-specific update.
+    // Lorentzian cells (the bulk) keep the CN-implicit ADI output;
+    // Euclidean transition cells recompute the explicit leapfrog + soft
+    // absorber (the CN implicit result is discarded for these cells);
+    // Euclidean deep cells receive the analytic WKB propagator or
+    // capture the match coefficient on their first deep-band slab.
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = -phiExtent + i1 * dphi
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = -phiExtent + i2 * dphi
+        const idx = i1 * Nphi + i2
+
+        const Ucur = wdwU(
+          aCur,
+          phi1,
+          phi2,
+          inflatonMass,
+          cosmologicalConstant,
+          inflatonMassAsymmetry
+        )
+        const Unext = wdwU(
+          aNext,
+          phi1,
+          phi2,
+          inflatonMass,
+          cosmologicalConstant,
+          inflatonMassAsymmetry
+        )
 
         const state = columnStates[idx]!
-        const band = classifyCellBand(state, a, Ucur)
+        const band = classifyCellBand(state, aNext, Unext)
 
-        if (band === BandKind.EuclideanTransition) {
-          const damped = applyTransitionAbsorber(nextRe, nextIm, Ucur, da)
+        let nextRe: number
+        let nextIm: number
+
+        if (band === BandKind.Lorentzian) {
+          // Use the Crank–Nicolson ADI result directly.
+          nextRe = adiOut[2 * idx] ?? 0
+          nextIm = adiOut[2 * idx + 1] ?? 0
+        } else if (band === BandKind.EuclideanTransition) {
+          // Fall back to the explicit leapfrog + soft Euclidean absorber.
+          // The CN-implicit scheme smoothes the Euclidean-growing branch
+          // too aggressively near the turning surface where the absorber
+          // already violates the PDE by construction; keeping the old
+          // transition-band rule preserves the Stage-2 match-cell handoff
+          // semantics unchanged.
+          const curRe = chi[curSlabBase + 2 * idx] ?? 0
+          const curIm = chi[curSlabBase + 2 * idx + 1] ?? 0
+          const prevRe = chi[prevSlabBase + 2 * idx] ?? 0
+          const prevIm = chi[prevSlabBase + 2 * idx + 1] ?? 0
+          const lapCur = phiLaplacianAt(chi, curSlabBase, i1, i2, Nphi, invDphi2)
+          const chiDDotRe = invAcurSq * lapCur.re + Ucur * curRe
+          const chiDDotIm = invAcurSq * lapCur.im + Ucur * curIm
+          const explicitRe = 2 * curRe - prevRe + da2 * chiDDotRe
+          const explicitIm = 2 * curIm - prevIm + da2 * chiDDotIm
+          const damped = applyTransitionAbsorber(explicitRe, explicitIm, Unext, da)
           nextRe = damped.re
           nextIm = damped.im
-        } else if (band === BandKind.EuclideanDeep) {
+        } else {
+          // EuclideanDeep. On the first deep-band slab capture the
+          // current numerical χ as the match coefficient (we use the
+          // CN-implicit ADI output here — it is a smoother, noise-free
+          // numerical χ than the explicit leapfrog would give, but
+          // represents the same physical χ at the match threshold).
+          // Subsequent slabs receive the analytic WKB propagator.
           if (!state.matched) {
-            // First deep-band slab: capture numerical χ as the match
-            // coefficient and write the numerical value out unchanged.
-            // Subsequent deep-band slabs receive the analytic propagator.
+            nextRe = adiOut[2 * idx] ?? 0
+            nextIm = adiOut[2 * idx + 1] ?? 0
             captureMatch(
               state,
-              a,
+              aNext,
               phi1,
               phi2,
               inflatonMass,
               cosmologicalConstant,
               inflatonMassAsymmetry,
-              Ucur,
+              Unext,
               nextRe,
               nextIm
             )
           } else {
             const S = wdwEuclideanWkbAction(
-              a,
+              aNext,
               phi1,
               phi2,
               inflatonMass,
               cosmologicalConstant,
               inflatonMassAsymmetry
             )
-            const propagated = propagateWkbTail(state, S, Ucur)
+            const propagated = propagateWkbTail(state, S, Unext)
             nextRe = propagated.re
             nextIm = propagated.im
           }
         }
 
+        // Step D — Apply the φ-boundary absorbing sponge post-hoc.
+        // Sponge parameters are Phase 3-retuned (narrower + heavier,
+        // see WDW_PHI_SPONGE_WIDTH / _GAMMA constants above). The
+        // initial slabs (ia = 0, 1) are NOT sponged so a physically
+        // constant-in-φ boundary condition is propagated with exact
+        // φ-translation symmetry through at least the first
+        // CN-implicit step.
         const spongeFactor = phiSponge ? phiSponge[idx]! : 1
-        chi[curSlabBase + 2 * idx] = nextRe * spongeFactor
-        chi[curSlabBase + 2 * idx + 1] = nextIm * spongeFactor
-        mask[maskBase + idx] = Ucur < 0 ? 1 : 0
+        chi[nextSlabBase + 2 * idx] = nextRe * spongeFactor
+        chi[nextSlabBase + 2 * idx + 1] = nextIm * spongeFactor
+        mask[maskBase + idx] = Unext < 0 ? 1 : 0
         bandKind[maskBase + idx] = band
       }
     }
@@ -916,159 +1092,13 @@ function captureMatch(
   state.chiImAtMatch = chiIm
 }
 
-/**
- * Residual check: plug the solution back into the WdW equation and
- * return the relative L² residual across the interior of the grid.
- * Exposed for tests and the benchmark harness.
- *
- *   residual(a, φ) = −∂²_a χ + (1/a²)·∇²_φ χ + U·χ
- *
- * We restrict the measurement to cells whose stencil sits entirely in
- * one of the two WdW-equation-respecting bands:
- *
- *  - All three stencil points (ia−1, ia, ia+1) Lorentzian → residual
- *    measures leapfrog fidelity in the oscillating region.
- *  - All three stencil points deep-band Euclidean → residual measures
- *    the deviation of the analytic WKB propagator from the full PDE
- *    (the leading-WKB approximation has `O(1/U)` sub-leading terms
- *    that show up here).
- *
- * Transition-band stencils are excluded because the absorber violates
- * the raw PDE there by construction. The residual is normalised
- * against `‖U·χ‖₂` over the same included cells.
- *
- * @param output - Solver output.
- * @param input - Original solver input.
- * @returns Fractional residual (dimensionless), or `0` if no cells are
- *   included.
- */
-export function wdwOperatorResidual(
-  output: WheelerDeWittSolverOutput,
-  input: WheelerDeWittSolverInput
-): number {
-  const Na = output.gridSize[0]
-  const Nphi = output.gridSize[1]
-  const slabSize = Nphi * Nphi
-  const complexSlab = 2 * slabSize
-  const da = (output.aMax - output.aMin) / (Na - 1)
-  const dphi = (2 * output.phiExtent) / (Nphi - 1)
-  const invDphi2 = 1 / (dphi * dphi)
-  const invDa2 = 1 / (da * da)
-
-  let resNorm = 0
-  let ucNorm = 0
-
-  // Skip sponge-affected cells: the φ-Laplacian reads (i1±1, i2±1),
-  // so the margin must be sponge width + 1 to avoid contamination.
-  const spongeMargin = effectiveSpongeWidth(Nphi) + 1
-  const phiLo = Math.max(1, spongeMargin)
-  const phiHi = Math.min(Nphi - 1, Nphi - spongeMargin)
-
-  for (let ia = 1; ia < Na - 1; ia++) {
-    const a = output.aMin + ia * da
-    const invAsq = 1 / (a * a)
-    for (let i1 = phiLo; i1 < phiHi; i1++) {
-      const phi1 = -output.phiExtent + i1 * dphi
-      for (let i2 = phiLo; i2 < phiHi; i2++) {
-        const phi2 = -output.phiExtent + i2 * dphi
-        const idx = i1 * Nphi + i2
-        const bandCur = output.bandKind[ia * slabSize + idx] ?? 0
-        const bandPrev = output.bandKind[(ia - 1) * slabSize + idx] ?? 0
-        const bandNext = output.bandKind[(ia + 1) * slabSize + idx] ?? 0
-
-        // Only all-Lorentzian or all-deep-band stencils contribute. The
-        // φ-Laplacian below reads (i1±1, i2) and (i1, i2±1), so those
-        // neighbours must also be in the same valid band — otherwise the
-        // residual is contaminated by transition-band cells where the
-        // absorber intentionally violates the PDE.
-        const allSameValid =
-          (bandCur === BandKind.Lorentzian &&
-            bandPrev === BandKind.Lorentzian &&
-            bandNext === BandKind.Lorentzian) ||
-          (bandCur === BandKind.EuclideanDeep &&
-            bandPrev === BandKind.EuclideanDeep &&
-            bandNext === BandKind.EuclideanDeep)
-        if (!allSameValid) continue
-
-        const samePhiStencil =
-          (output.bandKind[ia * slabSize + (i1 - 1) * Nphi + i2] ?? 0) === bandCur &&
-          (output.bandKind[ia * slabSize + (i1 + 1) * Nphi + i2] ?? 0) === bandCur &&
-          (output.bandKind[ia * slabSize + i1 * Nphi + (i2 - 1)] ?? 0) === bandCur &&
-          (output.bandKind[ia * slabSize + i1 * Nphi + (i2 + 1)] ?? 0) === bandCur
-        if (!samePhiStencil) continue
-
-        const cre = output.chi[ia * complexSlab + 2 * idx] ?? 0
-        const cim = output.chi[ia * complexSlab + 2 * idx + 1] ?? 0
-        const prevRe = output.chi[(ia - 1) * complexSlab + 2 * idx] ?? 0
-        const prevIm = output.chi[(ia - 1) * complexSlab + 2 * idx + 1] ?? 0
-        const nextRe = output.chi[(ia + 1) * complexSlab + 2 * idx] ?? 0
-        const nextIm = output.chi[(ia + 1) * complexSlab + 2 * idx + 1] ?? 0
-
-        const d2aRe = (nextRe - 2 * cre + prevRe) * invDa2
-        const d2aIm = (nextIm - 2 * cim + prevIm) * invDa2
-
-        const lap = phiLaplacianAt(output.chi, ia * complexSlab, i1, i2, Nphi, invDphi2)
-
-        const U = wdwU(
-          a,
-          phi1,
-          phi2,
-          input.inflatonMass,
-          input.cosmologicalConstant,
-          input.inflatonMassAsymmetry ?? 1
-        )
-
-        const resRe = -d2aRe + invAsq * lap.re + U * cre
-        const resIm = -d2aIm + invAsq * lap.im + U * cim
-        resNorm += resRe * resRe + resIm * resIm
-        ucNorm += U * U * (cre * cre + cim * cim)
-      }
-    }
-  }
-
-  if (ucNorm <= 0) return 0
-  return Math.sqrt(resNorm / ucNorm)
-}
-
-/**
- * Count cells that have been overwritten by the Stage-2 analytic WKB
- * propagator (`bandKind === EuclideanDeep`, excluding the match slab).
- * The match slab itself is classified deep but written unchanged, so
- * this counter is a proxy for "how many cells carry the analytic tail";
- * exposed for tests that validate Stage-2 is actually engaging at
- * default parameters.
- *
- * @param output - Solver output.
- * @returns Number of deep-band cells.
- */
-export function countEuclideanDeepCells(output: WheelerDeWittSolverOutput): number {
-  let count = 0
-  for (let i = 0; i < output.bandKind.length; i++) {
-    if (output.bandKind[i] === BandKind.EuclideanDeep) count += 1
-  }
-  return count
-}
-
-/**
- * Maximum `|χ|²` over all Euclidean (non-Lorentzian) cells. With
- * Stage-2 active this reflects the physical exp(−S_Euc) tail, not a
- * numerical runaway; exposed so tests can assert the expected
- * astronomically-small amplitude at default parameters.
- *
- * @param output - Solver output.
- * @returns Max `|χ|²` in Euclidean cells.
- */
-export function maxEuclideanChiSquared(output: WheelerDeWittSolverOutput): number {
-  const chi = output.chi
-  const mask = output.lorentzianMask
-  let maxDensity = 0
-  for (let i = 0; i < chi.length; i += 2) {
-    const cellIdx = i >> 1
-    if ((mask[cellIdx] ?? 0) !== 0) continue
-    const re = chi[i] ?? 0
-    const im = chi[i + 1] ?? 0
-    const d = re * re + im * im
-    if (d > maxDensity) maxDensity = d
-  }
-  return maxDensity
-}
+// Diagnostic helpers (`wdwOperatorResidual`, `countEuclideanDeepCells`,
+// `maxEuclideanChiSquared`) live in `./solverDiagnostics` to keep this
+// module under the `max-lines` lint cap. Re-exported below so existing
+// call sites (`import { wdwOperatorResidual } from '@/lib/physics/wheelerDeWitt/solver'`)
+// keep working.
+export {
+  countEuclideanDeepCells,
+  maxEuclideanChiSquared,
+  wdwOperatorResidual,
+} from './solverDiagnostics'

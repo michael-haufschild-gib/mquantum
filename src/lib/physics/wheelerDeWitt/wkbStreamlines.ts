@@ -417,16 +417,22 @@ export function integrateWkbTrajectories(
  * @param trajectories - Raw trajectories from `integrateWkbTrajectories`.
  * @param splatRadius - Gaussian splat radius in grid cells.
  * @param gridSize - Solver grid size `[Na, Nphi, Nphi]`.
- * @returns Per-voxel additive overlay.
+ * @param out - Optional pre-allocated intensity buffer of length
+ *   `Na · Nphi · Nphi`. Zeroed internally before splatting. Supplying a
+ *   caller-owned buffer avoids per-frame allocation of an 800 KB-class
+ *   Float32Array in the render hot path.
+ * @returns Per-voxel additive overlay. When `out` is supplied the returned
+ *   `intensity` field aliases it.
  */
 export function buildStaticOverlay(
   trajectories: WkbTrajectory[],
   splatRadius: number,
-  gridSize: [number, number, number]
+  gridSize: [number, number, number],
+  out?: Float32Array
 ): StreamlineOverlay {
   const [Na, Nphi] = gridSize
   const total = Na * Nphi * Nphi
-  const intensity = new Float32Array(total)
+  const intensity = pickOverlayBuffer(out, total)
 
   for (const traj of trajectories) {
     for (const [ia, i1, i2] of traj.points) {
@@ -440,6 +446,20 @@ export function buildStaticOverlay(
     if (v > maxIntensity) maxIntensity = v
   }
   return { intensity, maxIntensity }
+}
+
+/**
+ * Pick the overlay intensity buffer. If the caller supplied a buffer of
+ * the expected length, zero-fill and reuse it; otherwise allocate a
+ * fresh one. `fill(0)` on 800 KB is ~0.2 ms — negligible compared with
+ * a `new Float32Array` allocation's downstream GC cost at 60 FPS.
+ */
+function pickOverlayBuffer(out: Float32Array | undefined, total: number): Float32Array {
+  if (out && out.length === total) {
+    out.fill(0)
+    return out
+  }
+  return new Float32Array(total)
 }
 
 /**
@@ -459,18 +479,24 @@ export function buildStaticOverlay(
  * @param pulseWidth - Gaussian width in normalized progress units.
  * @param splatRadius - Gaussian splat radius in grid cells.
  * @param gridSize - Solver grid size `[Na, Nphi, Nphi]`.
+ * @param out - Optional pre-allocated intensity buffer of length
+ *   `Na · Nphi · Nphi`. Zeroed internally before splatting. Supplying a
+ *   caller-owned buffer is the render-hot-path variant — a fresh
+ *   Float32Array per frame triggers major GC pauses at 60 FPS.
  * @returns Per-voxel additive pulse overlay with `maxIntensity = 1.0`.
+ *   When `out` is supplied the returned `intensity` aliases it.
  */
 export function buildPulseOverlay(
   trajectories: WkbTrajectory[],
   animTime: number,
   pulseWidth: number,
   splatRadius: number,
-  gridSize: [number, number, number]
+  gridSize: [number, number, number],
+  out?: Float32Array
 ): StreamlineOverlay {
   const [Na, Nphi] = gridSize
   const total = Na * Nphi * Nphi
-  const intensity = new Float32Array(total)
+  const intensity = pickOverlayBuffer(out, total)
   const invW = 1 / Math.max(1e-6, pulseWidth)
 
   for (const traj of trajectories) {

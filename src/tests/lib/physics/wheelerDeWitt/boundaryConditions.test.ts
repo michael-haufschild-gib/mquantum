@@ -5,9 +5,13 @@ import {
   deWittBoundary,
   hartleHawkingBoundary,
   vilenkinBoundary,
-  WDW_G_PREFACTOR,
   wdwPotential,
 } from '@/lib/physics/wheelerDeWitt/boundaryConditions'
+import {
+  columnSolutionNegativeV,
+  columnSolutionPositiveV,
+  columnSolutionZeroV,
+} from '@/lib/physics/wheelerDeWitt/exactColumnSolution'
 
 const INPUT = {
   Nphi: 16,
@@ -33,63 +37,76 @@ function meanAbsPhase(chi: Float32Array): number {
 }
 
 describe('Hartle–Hawking boundary', () => {
-  it('produces real-valued initial data with decaying-branch derivative', () => {
+  it('produces real-valued initial data matching the Langer-uniform pure-Ai seed', () => {
+    // Phase 2 rewrite: the HH generator delegates to `hhLangerSeed`,
+    // which produces `χ = (ζ/U)^{1/4}·Ai(ζ)` on V>0 cells (pure Ai
+    // branch). χ and χ' are both real. Reference: `columnSolutionPositiveV`
+    // with `c₁ = 1, c₂ = 0` reproduces the generator's output bit-identically
+    // (up to f32 storage truncation).
     const { chi, chiDeriv } = hartleHawkingBoundary(INPUT)
-    // χ is real.
+    // χ and χ' are real-valued across the entire grid.
     for (let i = 0; i < chi.length; i += 2) {
       expect(chi[i + 1]).toBeCloseTo(0, 6)
     }
-    // χ' imaginary part is zero everywhere.
     for (let i = 1; i < chiDeriv.length; i += 2) {
       expect(chiDeriv[i]).toBeCloseTo(0, 6)
     }
-    // χ' real part follows the decaying-branch WKB formula inside the bounce,
-    // zero otherwise. Reconstruct per-cell via INPUT.
     const { Nphi, phiExtent, aMin, mass, lambda } = INPUT
-    const a2 = aMin * aMin
-    let insideBounceCells = 0
+    // Per-cell exact agreement with the Langer-Ai reference. Every cell
+    // has V > 0 at these parameters (m = 0.3, Λ = 0.05 makes V > 0
+    // everywhere since V = 0.5·0.09·|φ|² + 0.05 ≥ 0.05).
+    let langerCells = 0
     for (let i1 = 0; i1 < Nphi; i1++) {
       const phi1 = -phiExtent + (2 * phiExtent * i1) / (Nphi - 1)
       for (let i2 = 0; i2 < Nphi; i2++) {
         const phi2 = -phiExtent + (2 * phiExtent * i2) / (Nphi - 1)
         const V = wdwPotential(phi1, phi2, mass, lambda)
+        expect(V).toBeGreaterThan(0)
+        const ref = columnSolutionPositiveV({ a: aMin, phi1, phi2, m: mass, lambda }, 1, 0)
         const idx = i1 * Nphi + i2
-        const actual = chiDeriv[2 * idx] ?? 0
-        if (V > 1e-12) {
-          const arg = 1.0 - a2 * WDW_G_PREFACTOR * V
-          if (arg > 0) {
-            insideBounceCells++
-            const amp = chi[2 * idx] ?? 0
-            const expected = -WDW_G_PREFACTOR * aMin * Math.sqrt(arg) * amp
-            expect(actual).toBeCloseTo(expected, 5)
-            continue
-          }
-        }
-        expect(actual).toBeCloseTo(0, 6)
+        // f32 storage → absolute tolerance around 1e-5 of |ref| magnitude;
+        // tolerate min tolerance 1e-6 for near-zero cells.
+        const chiAbs = Math.abs(ref.chi.re)
+        const dChiAbs = Math.abs(ref.dChi.re)
+        const chiTol = Math.max(1e-6, 1e-5 * chiAbs)
+        const dChiTol = Math.max(1e-6, 1e-5 * dChiAbs)
+        expect(chi[2 * idx]! - ref.chi.re).toBeGreaterThan(-chiTol)
+        expect(chi[2 * idx]! - ref.chi.re).toBeLessThan(chiTol)
+        expect(chiDeriv[2 * idx]! - ref.dChi.re).toBeGreaterThan(-dChiTol)
+        expect(chiDeriv[2 * idx]! - ref.dChi.re).toBeLessThan(dChiTol)
+        langerCells++
       }
     }
-    // With m=0.3, Λ=0.05, aMin=0.05 every cell should be inside the bounce.
-    expect(insideBounceCells).toBeGreaterThan(0)
+    // Sanity: the loop actually ran over the full grid.
+    expect(langerCells).toBe(Nphi * Nphi)
   })
-  it('amplitude is bounded in [0, 1]', () => {
+  it('amplitude magnitude is bounded within the Langer-Ai range', () => {
+    // The Langer-Ai amplitude |(ζ/U)^{1/4}·Ai(ζ)| is bounded in terms of
+    // the Airy function magnitude. On the `INPUT` grid (V > 0 everywhere,
+    // a_min = 0.05) the observed peak is ~0.5 — well below the old
+    // bounded-[0,1] leading-WKB amplitude, reflecting the finite-ζ
+    // oscillatory nature of Ai.
     const { chi } = hartleHawkingBoundary(INPUT)
     for (let i = 0; i < chi.length; i += 2) {
       const amp = Math.abs(chi[i] ?? 0)
       expect(amp).toBeGreaterThanOrEqual(0)
-      expect(amp).toBeLessThanOrEqual(1 + 1e-6)
+      // Loose ceiling: (ζ/U)^{1/4}·|Ai(ζ)| never exceeds ~2 in this regime.
+      // The old leading-WKB bound `amp ≤ 1` is specific to the
+      // `exp(−|S_E|)` envelope that the Phase 2 rewrite replaces.
+      expect(amp).toBeLessThanOrEqual(2)
     }
   })
 
-  it('is continuous at the V = 0 origin cell for Λ = 0, m > 0', () => {
-    // Regression guard: the legacy V ≤ 1e-12 fallback set
-    // `amp = exp(-½|φ|²)` and `dChi = 0` at cells where V ≈ 0, while
-    // neighbouring V > 1e-12 cells used the full WKB formula giving
-    // `amp = exp(-K·a²/2)·(1 + O(V))` and
-    // `dChi = -K·a·amp·(1 + O(V))`. For Λ = 0, m > 0 configs this put
-    // a step discontinuity at exactly the grid origin. The new
-    // small-V expansion drives both branches to the same limit, so
-    // amp and dChi should be continuous from origin to the inner
-    // ring (first off-origin cells).
+  it('V = 0 origin cell uses the exact √a·J_{1/4} Bessel seed (Λ = 0, m > 0)', () => {
+    // Phase 2 rewrite: at V = 0 exactly (origin cell when Λ = 0, m > 0)
+    // the HH seed is `env · √a · J_{1/4}(3π·a²)` from
+    // `columnSolutionZeroV`. All off-origin cells of this config have
+    // V > 0 and use the Langer-Ai seed. The origin-to-inner transition
+    // is no longer "continuous amp" in the naive sense (the Langer-Ai
+    // form at V = 1e-2 carries a different amplitude scale than the
+    // V = 0 Bessel form) — continuity is instead guaranteed in the
+    // V → 0⁺ asymptotic limit, not as a pointwise amp-match between
+    // adjacent grid cells at finite spacing.
     const input = {
       Nphi: 17, // odd so the origin cell lands at (8, 8) exactly
       phiExtent: 3.5,
@@ -99,32 +116,25 @@ describe('Hartle–Hawking boundary', () => {
     }
     const { chi, chiDeriv } = hartleHawkingBoundary(input)
     const centre = 8 * 17 + 8
-    const inner = 8 * 17 + 9 // adjacent cell at (i1=8, i2=9) with φ₁=0, φ₂=0.4375
     const ampCentre = chi[2 * centre]!
-    const ampInner = chi[2 * inner]!
     const dChiCentre = chiDeriv[2 * centre]!
-    const dChiInner = chiDeriv[2 * inner]!
-    // Continuity: origin-to-inner jump must be small (O(V·a²)).
-    expect(Math.abs(ampCentre - ampInner)).toBeLessThan(0.02)
-    expect(Math.abs(dChiCentre - dChiInner)).toBeLessThan(0.5)
-    // Specific-value check: at V = 0 exactly the small-V expansion
-    // predicts `amp = exp(-K·a²/2)` and `dChi = -K·a·amp`. Both must
-    // evaluate to their predicted limits, not 1 / 0 from the legacy
-    // fallback.
-    const K = (8 * Math.PI) / 3
-    expect(ampCentre).toBeCloseTo(Math.exp(-0.5 * K * 0.01), 6)
-    expect(dChiCentre).toBeCloseTo(-K * 0.1 * Math.exp(-0.5 * K * 0.01), 6)
+    // Reference: origin cell has V = 0 exactly. Seed = env·√a·J_{1/4}(3π·a²)
+    // with env = exp(-0) = 1.
+    const ref = columnSolutionZeroV(input.aMin, { re: 1, im: 0 }, { re: 0, im: 0 })
+    expect(ampCentre).toBeCloseTo(ref.chi.re, 5)
+    expect(dChiCentre).toBeCloseTo(ref.dChi.re, 5)
+    // Imaginary parts are zero for this HH seed.
+    expect(chi[2 * centre + 1]).toBeCloseTo(0, 7)
+    expect(chiDeriv[2 * centre + 1]).toBeCloseTo(0, 7)
   })
 
-  it('uses HH WKB seed on outer V > 0 columns even when Λ < 0', () => {
-    // Regression guard: previously `isAdsCase = lambda < 0` flipped every
-    // cell to the Gaussian envelope on any Λ < 0 config, including outer
-    // columns where V = 0.5·m²·(φ₁²+φ₂²) + Λ > 0 has a genuine turning
-    // surface. Those columns legitimately want the HH V-dependent seed;
-    // the global flag suppressed their φ-structure.
+  it('outer V > 0 columns receive the Langer-Ai seed even when Λ < 0', () => {
+    // Regression guard: V > 0 cells must route to the Langer-Ai path
+    // regardless of grid-wide `lambda` sign (earlier `isAdsCase = lambda < 0`
+    // gate wrongly routed them to the Gaussian envelope).
     //
     // Config: m = 1.0, Λ = -0.2. Inner cells have V < 0; outer-φ cells
-    // have V > 0 as soon as |φ|² > -2Λ/m² = 0.4, i.e., |φ| > 0.63.
+    // have V > 0 once |φ|² > -2Λ/m² = 0.4, i.e., |φ| > 0.63.
     const negLambdaInput = {
       Nphi: 17,
       phiExtent: 2.0,
@@ -133,45 +143,40 @@ describe('Hartle–Hawking boundary', () => {
       lambda: -0.2,
     }
     const { chi, chiDeriv } = hartleHawkingBoundary(negLambdaInput)
-    const { Nphi, aMin } = negLambdaInput
+    const { Nphi, aMin, mass, lambda } = negLambdaInput
     // Pick an outer cell with V > 0 (V(φ=1.0, φ=1.0) = 0.5·1·2 - 0.2 = 0.8)
-    // and assert it received the V-dependent seed. φ=1.0 on our grid
-    // corresponds to i = 8 + round(1.0 / (4/16)) = 12 (since dphi = 0.25).
+    // and assert it matches the Langer-Ai reference bit-for-bit (modulo
+    // f32 storage).
     const outerI = 12
     const outerIdx = outerI * Nphi + outerI
     const outerPhi = -2.0 + (2 * 2.0 * outerI) / (Nphi - 1)
-    const V = wdwPotential(outerPhi, outerPhi, 1.0, -0.2)
+    const V = wdwPotential(outerPhi, outerPhi, mass, lambda)
     expect(V).toBeGreaterThan(0)
-    // With V > 0, HH predicts `amp = exp(-|S_E|)` where S_E is the
-    // instanton action. The Gaussian envelope would give
-    // `exp(-|outerPhi|²)` ≈ exp(-2) ≈ 0.135 — distinguishably different
-    // from the WKB value for our parameters (V = 0.8 at this cell).
     const ampAtOuter = chi[2 * outerIdx]!
+    const dChi = chiDeriv[2 * outerIdx]!
+    // Distinguishable from the Gaussian-envelope gauge (env = exp(-|φ|²)
+    // ≈ exp(-2) ≈ 0.135) — the Langer-Ai amplitude at this cell is
+    // qualitatively different.
     const gaussianEnvPrediction = Math.exp(-outerPhi * outerPhi)
     expect(Math.abs(ampAtOuter - gaussianEnvPrediction)).toBeGreaterThan(1e-3)
-    // The WKB derivative at a V > 0 cell is non-zero; the Gaussian
-    // branch forces it to zero.
-    const dChi = chiDeriv[2 * outerIdx]!
-    expect(Math.abs(dChi)).toBeGreaterThan(1e-3)
-    // Derivative value check: HH predicts
-    //   dChi = -K·a·sqrt(1 - K·V·a²)·amp
-    const K = WDW_G_PREFACTOR
-    const arg = 1.0 - K * V * aMin * aMin
-    if (arg > 0) {
-      const predicted = -K * aMin * Math.sqrt(arg) * ampAtOuter
-      expect(dChi).toBeCloseTo(predicted, 5)
-    }
+    // Derivative value check: match the Langer-Ai analytic derivative.
+    const ref = columnSolutionPositiveV(
+      { a: aMin, phi1: outerPhi, phi2: outerPhi, m: mass, lambda },
+      1,
+      0
+    )
+    expect(ampAtOuter).toBeCloseTo(ref.chi.re, 5)
+    expect(dChi).toBeCloseTo(ref.dChi.re, 5)
+    // And nontrivial — ensure we're not comparing against a zero-valued
+    // reference (which would make the closeness check trivially pass).
+    expect(Math.abs(ref.dChi.re)).toBeGreaterThan(1e-3)
   })
 
-  it('retains the Gaussian envelope for the free regime (m = 0, Λ = 0)', () => {
+  it('uses Gaussian-enveloped Bessel-¼ seed for the free regime (m = 0, Λ = 0)', () => {
     // The free case has V ≡ 0 across the whole grid — no classical
-    // turning surface exists, so the WKB instanton formula is
-    // inapplicable. The generator falls back to an envelope-damped
-    // Gaussian with zero initial a-derivative; this is the gauge
-    // choice the Rust WASM cross-validator was pinned against in
-    // `solverWasmComparison.test.ts`.
-    // Use odd Nphi so the exact origin lands on the central cell and
-    // the Gaussian peak is assertable without interpolation slack.
+    // turning surface, so the Langer-Ai form is undefined. The
+    // generator uses `env · √a · J_{1/4}(3π·a²)` on each cell (see
+    // `hhLangerSeed`: V = 0 branch). `env = exp(-½|φ|²)` is the gauge.
     const Nphi = 17
     const phiExtent = 2.0
     const freeInput = {
@@ -185,27 +190,35 @@ describe('Hartle–Hawking boundary', () => {
     const cMid = Math.floor(Nphi / 2)
     const centreIdx = cMid * Nphi + cMid
     const cornerIdx = 0
-    // Origin cell φ = (0, 0) → amp = exp(0) = 1.
-    expect(chi[2 * centreIdx]!).toBeCloseTo(1.0, 6)
-    // Corner cell at φ = (-phiExtent, -phiExtent) → env = exp(-phiExtent²).
+    // Origin (φ = 0, env = 1): seed = √a·J_{1/4}(3π·a²). Reference via
+    // `columnSolutionZeroV`.
+    const centreRef = columnSolutionZeroV(freeInput.aMin, { re: 1, im: 0 }, { re: 0, im: 0 })
+    expect(chi[2 * centreIdx]!).toBeCloseTo(centreRef.chi.re, 5)
+    // Corner (φ = (-phiExtent, -phiExtent), env = exp(-phiExtent²)).
     const cornerEnv = Math.exp(-0.5 * (phiExtent ** 2 + phiExtent ** 2))
-    expect(chi[2 * cornerIdx]!).toBeCloseTo(cornerEnv, 3)
-    // Full-grid derivative check: every cell has near-zero a-derivative.
-    // Use toBeCloseTo so floating-point noise from the envelope eval can't
-    // break the strict-zero pinning even though the analytic value is 0.
-    for (let i = 0; i < chiDeriv.length; i += 2) {
-      expect(chiDeriv[i]!).toBeCloseTo(0, 10)
-      expect(chiDeriv[i + 1]!).toBeCloseTo(0, 10)
+    const cornerRef = columnSolutionZeroV(
+      freeInput.aMin,
+      { re: cornerEnv, im: 0 },
+      { re: 0, im: 0 }
+    )
+    expect(chi[2 * cornerIdx]!).toBeCloseTo(cornerRef.chi.re, 5)
+    // Per-cell χ derivative matches the Bessel-¼ closed-form derivative.
+    for (let i1 = 0; i1 < Nphi; i1++) {
+      const phi1 = -phiExtent + (2 * phiExtent * i1) / (Nphi - 1)
+      for (let i2 = 0; i2 < Nphi; i2++) {
+        const phi2 = -phiExtent + (2 * phiExtent * i2) / (Nphi - 1)
+        const env = Math.exp(-0.5 * (phi1 * phi1 + phi2 * phi2))
+        const ref = columnSolutionZeroV(freeInput.aMin, { re: env, im: 0 }, { re: 0, im: 0 })
+        const idx = i1 * Nphi + i2
+        expect(chiDeriv[2 * idx]!).toBeCloseTo(ref.dChi.re, 5)
+        expect(chiDeriv[2 * idx + 1]!).toBeCloseTo(0, 7)
+      }
     }
   })
 
-  it('retains the Gaussian envelope for Λ-dominated AdS regime (Λ < 0)', () => {
-    // When V < 0 at the origin (Λ negative and |Λ| > m²·φ²), no
-    // classical turning surface exists and the WKB formula is
-    // inapplicable. The generator falls back to the Gaussian envelope
-    // (continuous with the legacy V < 0 path). Asserts the
-    // `antiDeSitterContracting` preset (HH BC, Λ = −0.5) reduces to
-    // the same gauge choice as the free case at the grid origin.
+  it('Λ-dominated AdS regime (Λ < 0) origin cell matches Gaussian-enveloped cos·|U|^{-1/4} seed', () => {
+    // V < 0 at the origin → no classical turning surface. `hhLangerSeed`
+    // uses `env · |U|^{-1/4} · cos(Φ_L)` (real standing-wave gauge).
     const Nphi = 17
     const adsInput = {
       Nphi,
@@ -215,11 +228,20 @@ describe('Hartle–Hawking boundary', () => {
       lambda: -0.5,
     }
     const { chi, chiDeriv } = hartleHawkingBoundary(adsInput)
+    const { mass, lambda, aMin } = adsInput
     const cMid = Math.floor(Nphi / 2)
     const centreIdx = cMid * Nphi + cMid
-    // Origin cell φ = (0, 0) → V = -0.5 < 0 → Gaussian envelope, amp = 1.
-    expect(chi[2 * centreIdx]!).toBeCloseTo(1.0, 6)
-    expect(chiDeriv[2 * centreIdx]!).toBeCloseTo(0, 10)
+    // Origin cell has env = 1. Seed = |U|^{-1/4}·cos(Φ_L(a_min, 0, 0)).
+    const ref = columnSolutionNegativeV(
+      { a: aMin, phi1: 0, phi2: 0, m: mass, lambda },
+      { re: 1, im: 0 },
+      { re: 0, im: 0 }
+    )
+    expect(chi[2 * centreIdx]!).toBeCloseTo(ref.chi.re, 5)
+    expect(chiDeriv[2 * centreIdx]!).toBeCloseTo(ref.dChi.re, 5)
+    // Imaginary components remain zero.
+    expect(chi[2 * centreIdx + 1]).toBeCloseTo(0, 7)
+    expect(chiDeriv[2 * centreIdx + 1]).toBeCloseTo(0, 7)
   })
 })
 
