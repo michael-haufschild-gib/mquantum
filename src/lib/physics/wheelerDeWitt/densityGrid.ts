@@ -485,10 +485,12 @@ export interface WdwPackScratch {
   density?: Uint16Array
   /**
    * Optional companion float32 buffer of length `N³` — when provided, the
-   * packer writes the unpacked `baseline A` value per voxel into it. This
-   * is what the animation-tick fast path reads to compute
-   * `A_new = max(baselineA, pulseAlpha)` without having to decode the
-   * float16 back from the RGBA byte buffer.
+   * packer writes the same `overlayAlpha ∈ [0, 1]` value per voxel that
+   * lands in the A channel of the RGBA16F density texture. It is the
+   * clamped `max(overlayVal, srmtAlpha)` — bit-identical to what the
+   * shader samples, just stored as float32 so the animation-tick fast
+   * path can compute `A_new = max(baselineA, pulseAlpha)` without having
+   * to decode the float16 half back out of the RGBA byte buffer.
    */
   baselineAlpha?: Float32Array
 }
@@ -514,8 +516,9 @@ export interface WdwPackScratch {
  * @param scratch - Optional pre-allocated buffers for reuse. When
  *   `scratch.density` is supplied it is overwritten in place (no fresh
  *   allocation); when `scratch.baselineAlpha` is supplied the packer
- *   also fills it with the per-voxel pre-clamp A value for the
- *   animation-tick fast path.
+ *   also fills it with the per-voxel clamped overlay-A value (same
+ *   number packed into the RGBA16F A channel) for the animation-tick
+ *   fast path.
  * @returns Upload-ready `Uint16Array` + texture layout.
  */
 export function packWdwDensityGrid(

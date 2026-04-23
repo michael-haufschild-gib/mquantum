@@ -70,6 +70,7 @@ import {
   type ComplexPair,
 } from '@/lib/physics/wheelerDeWitt/exactColumnSolution'
 import {
+  effectiveSpongeWidth,
   resetCflWarningBudget,
   solveWheelerDeWitt,
   type WheelerDeWittSolverOutput,
@@ -82,12 +83,6 @@ const SYMMETRY_BOUND = 1e-3
  * centre). We skip those slices entirely — they happen near solution nodes.
  */
 const CENTER_MAG_FLOOR = 1e-6
-/**
- * Cells with `|i1 − center|` or `|i2 − center|` at least this many
- * cells from the sponge edge are the legitimate measurement range. The
- * solver's sponge width is 5 cells; we exclude those by definition.
- */
-const SPONGE_MARGIN = 5
 
 /** Read χ complex pair at (ia, i1, i2). */
 function chiAt(out: WheelerDeWittSolverOutput, ia: number, i1: number, i2: number) {
@@ -165,8 +160,9 @@ function sliceVarMaxAt(out: WheelerDeWittSolverOutput, ia: number): number {
   const refMag = Math.hypot(refC.re, refC.im)
   if (refMag < CENTER_MAG_FLOOR) return 0
 
-  const iMin = SPONGE_MARGIN + 1
-  const iMax = Nphi - SPONGE_MARGIN - 2
+  const spongeMargin = effectiveSpongeWidth(Nphi)
+  const iMin = spongeMargin + 1
+  const iMax = Nphi - spongeMargin - 2
   let worst = 0
   for (let i1 = iMin; i1 <= iMax; i1++) {
     for (let i2 = iMin; i2 <= iMax; i2++) {
@@ -307,8 +303,9 @@ describe('Wheeler–DeWitt solver preserves φ-translation symmetry', () => {
         customBoundary: boundary,
       })
 
-      const iMin = SPONGE_MARGIN + 1
-      const iMax = Nphi - SPONGE_MARGIN - 2
+      const spongeMargin = effectiveSpongeWidth(Nphi)
+      const iMin = spongeMargin + 1
+      const iMax = Nphi - spongeMargin - 2
       let maxAsym = 0
       let iaWhere = 0
       for (let ia = 4; ia < Na - 4; ia++) {

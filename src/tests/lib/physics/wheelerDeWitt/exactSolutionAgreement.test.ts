@@ -77,6 +77,7 @@ import {
   rk4ColumnTrajectory,
 } from '@/lib/physics/wheelerDeWitt/exactColumnSolution'
 import {
+  effectiveSpongeWidth,
   resetCflWarningBudget,
   solveWheelerDeWitt,
   type WheelerDeWittSolverInput,
@@ -175,9 +176,9 @@ function maxRelError(
 /**
  * Enumerate a cross-cell sample covering the full grid: central column
  * plus a few off-axis columns (one cell in from each edge, plus the
- * φ=0 column). Skips sponge cells (last `WDW_PHI_SPONGE_WIDTH = 5`
- * cells on each side) to avoid measuring the absorber's deliberate PDE
- * violation.
+ * φ=0 column). Skips sponge cells (width supplied by
+ * {@link effectiveSpongeWidth} — currently 3) to avoid measuring the
+ * absorber's deliberate PDE violation.
  */
 function crossCellSample(
   Na: number,
@@ -188,7 +189,7 @@ function crossCellSample(
 ): { ia: number; i1: number; i2: number }[] {
   const cells: { ia: number; i1: number; i2: number }[] = []
   const center = Math.floor(Nphi / 2)
-  const spongeMargin = 5
+  const spongeMargin = effectiveSpongeWidth(Nphi)
   const iEnd = aEnd ?? Na - 4
   const innerLow = spongeMargin + 1
   const innerHigh = Nphi - spongeMargin - 2

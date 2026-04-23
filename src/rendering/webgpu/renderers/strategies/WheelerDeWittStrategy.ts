@@ -217,6 +217,18 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
     const headroom = clampWdwHeadroom(wdw.renderDynamicRange ?? WDW_EUCLIDEAN_RENDER_HEADROOM)
     const headroomChanged = headroom !== this.lastRenderDynamicRange
 
+    const N = this.densityTexture.width
+    // A density-grid resolution change recreates the 3D texture in
+    // `setup()` and re-allocates the scratch buffers in
+    // `ensureScratchBuffers()` — but neither path touches the dirty
+    // bits. Without this check a resolution toggle between solver /
+    // overlay / headroom updates would render from a zeroed baseline
+    // buffer for one frame (worldline animation path), or sample a
+    // stale texture (static path). Compare against `baselineGridSize`
+    // because that is the grid size the current `baselineDensity`
+    // snapshot was packed for.
+    const resolutionChanged = N !== this.baselineGridSize
+
     // A "baseline" repack regenerates R/G/B and the non-animating part
     // of A (SRMT + static streamline). An "animation-only" tick reuses
     // the cached baseline and only rewrites the pulse overlay into A.
@@ -230,12 +242,12 @@ export class WheelerDeWittStrategy implements QuantumModeStrategy {
       worldlineToggled ||
       srmtTick.overlayDirty ||
       headroomChanged ||
+      resolutionChanged ||
       this.baselineDensity === null
     const animationOnlyDirty = !baselineDirty && worldlineAnimating
 
     if (!baselineDirty && !animationOnlyDirty) return
 
-    const N = this.densityTexture.width
     this.ensureScratchBuffers(N, physicsTick.output.gridSize)
 
     if (baselineDirty) {
