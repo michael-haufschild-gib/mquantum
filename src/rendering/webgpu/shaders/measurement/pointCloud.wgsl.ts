@@ -35,7 +35,7 @@ const QUAD_UVS = array<vec2f, 6>(
 @vertex
 fn main(@builtin(vertex_index) vid: u32) -> VertexOutput {
   let quadIdx = vid / 6u;
-  let vertIdx = vid % 6u;
+  let vertIdx = vid - quadIdx * 6u;
 
   var out: VertexOutput;
   if (quadIdx >= uni.pointCount) {
@@ -80,16 +80,18 @@ struct Uniforms {
 
 @fragment
 fn main(in: VertexOutput) -> @location(0) vec4f {
-  let dist = length(in.uv);
-  if (dist > 1.0) { discard; }
+  // Compare squared distance to avoid length()'s sqrt — we square dist immediately after.
+  let dist2 = dot(in.uv, in.uv);
+  if (dist2 > 1.0) { discard; }
 
-  // Radial glow falloff
-  let glow = exp(-dist * dist * 3.0);
+  // Radial glow falloff (dist² used directly — no sqrt+square roundtrip)
+  let glow = exp(-dist2 * 3.0);
   let fade = 1.0 - in.age * 0.7; // older measurements are dimmer
 
-  let color = vec3f(0.4, 0.8, 1.0) * glow * fade;
-  let alpha = glow * fade * uni.opacity;
-
+  // CSE: glow*fade used twice; share to save 1 multiply per fragment.
+  let att = glow * fade;
+  let alpha = att * uni.opacity;
+  let color = vec3f(0.4, 0.8, 1.0) * att;
   return vec4f(color * alpha, alpha);
 }
 `

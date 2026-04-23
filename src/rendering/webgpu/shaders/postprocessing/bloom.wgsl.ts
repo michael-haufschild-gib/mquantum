@@ -138,13 +138,15 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let l = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0,  2.0)).rgb;
   let m = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  2.0)).rgb;
 
-  // Center diamond (d+e+i+j) gets weight 0.5 (0.125 each)
-  // Four corner blocks get weight 0.125 total each (0.03125 per sample)
-  var result = (d + e + i + j) * 0.125;
-  result += (a + b + f + g) * 0.03125;
-  result += (b + c + g + h) * 0.03125;
-  result += (f + g + k + l) * 0.03125;
-  result += (g + h + l + m) * 0.03125;
+  // Regrouped by final weight (mathematically identical to the 5-block form):
+  //   corner taps (a,c,k,m) each appear in 1 block  → weight 0.03125
+  //   edge taps   (b,f,h,l) each appear in 2 blocks → weight 0.0625
+  //   center taps (d,e,i,j) from diamond (0.125) + g from 4 corner blocks (4*0.03125=0.125)
+  // Avoids 7 vec3 adds + 2 vec3 muls per pixel vs the literal-block form.
+  let w03125 = (a + c + k + m) * 0.03125;
+  let w0625 = (b + f + h + l) * 0.0625;
+  let w125 = (d + e + g + i + j) * 0.125;
+  let result = w03125 + w0625 + w125;
 
   return vec4f(result, 1.0);
 }
@@ -183,16 +185,19 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
   // 9-tap tent filter: corners 1/16, edges 2/16, center 4/16
-  var bloom = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x, -texelSize.y)).rgb;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,           -texelSize.y)).rgb * 2.0;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,   -texelSize.y)).rgb;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    0.0)).rgb * 2.0;
-  bloom += textureSample(tLowerMip, linearSampler, uv).rgb * 4.0;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    0.0)).rgb * 2.0;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    texelSize.y)).rgb;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,            texelSize.y)).rgb * 2.0;
-  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    texelSize.y)).rgb;
-  bloom *= (1.0 / 16.0);
+  // Regrouped so weight multiplies happen after summation (saves 2 vec3 muls per pixel).
+  let tl = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x, -texelSize.y)).rgb;
+  let top = textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,           -texelSize.y)).rgb;
+  let tr = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,   -texelSize.y)).rgb;
+  let left = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    0.0)).rgb;
+  let center = textureSample(tLowerMip, linearSampler, uv).rgb;
+  let right = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    0.0)).rgb;
+  let bl = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    texelSize.y)).rgb;
+  let bot = textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,            texelSize.y)).rgb;
+  let br = textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    texelSize.y)).rgb;
+  let corners = tl + tr + bl + br;
+  let edges = top + left + right + bot;
+  var bloom = (corners + edges * 2.0 + center * 4.0) * (1.0 / 16.0);
 
   // Additive blend with current mip
   let current = textureSample(tCurrentMip, linearSampler, uv).rgb;

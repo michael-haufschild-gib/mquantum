@@ -48,17 +48,19 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let texelSize = 1.0 / uniforms.resolution;
 
   // Sample the center and 4 neighbors
-  let colorC = textureSample(tInput, linearSampler, input.uv).rgb;
-  let colorN = textureSample(tInput, linearSampler, input.uv + vec2f(0.0, texelSize.y)).rgb;
-  let colorS = textureSample(tInput, linearSampler, input.uv - vec2f(0.0, texelSize.y)).rgb;
-  let colorE = textureSample(tInput, linearSampler, input.uv + vec2f(texelSize.x, 0.0)).rgb;
-  let colorW = textureSample(tInput, linearSampler, input.uv - vec2f(texelSize.x, 0.0)).rgb;
+  // textureSampleLevel(..., 0.0) skips ddx/ddy derivative computation required by textureSample.
+  // The bound texture is non-mipped, so mip 0 is the only valid level — derivatives are wasted work.
+  let colorC = textureSampleLevel(tInput, linearSampler, input.uv, 0.0).rgb;
+  let colorN = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(0.0, texelSize.y), 0.0).rgb;
+  let colorS = textureSampleLevel(tInput, linearSampler, input.uv - vec2f(0.0, texelSize.y), 0.0).rgb;
+  let colorE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, 0.0), 0.0).rgb;
+  let colorW = textureSampleLevel(tInput, linearSampler, input.uv - vec2f(texelSize.x, 0.0), 0.0).rgb;
 
   // Sample corners (moved here for uniform control flow - all textureSamples before conditionals)
-  let colorNW = textureSample(tInput, linearSampler, input.uv + vec2f(-texelSize.x, texelSize.y)).rgb;
-  let colorNE = textureSample(tInput, linearSampler, input.uv + vec2f(texelSize.x, texelSize.y)).rgb;
-  let colorSW = textureSample(tInput, linearSampler, input.uv + vec2f(-texelSize.x, -texelSize.y)).rgb;
-  let colorSE = textureSample(tInput, linearSampler, input.uv + vec2f(texelSize.x, -texelSize.y)).rgb;
+  let colorNW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, texelSize.y), 0.0).rgb;
+  let colorNE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, texelSize.y), 0.0).rgb;
+  let colorSW = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(-texelSize.x, -texelSize.y), 0.0).rgb;
+  let colorSE = textureSampleLevel(tInput, linearSampler, input.uv + vec2f(texelSize.x, -texelSize.y), 0.0).rgb;
 
   // Calculate luminance
   let lumC = luminance(colorC);
@@ -110,7 +112,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Calculate subpixel offset
   var lumaSum = lumN + lumS + lumE + lumW;
   lumaSum += lumNW + lumNE + lumSW + lumSE;
-  let lumaAverage = lumaSum / 8.0;
+  let lumaAverage = lumaSum * 0.125;
   // Use max to avoid division by zero when lumRange is 0
   let subpixelOffset = clamp(abs(lumaAverage - lumC) / max(lumRange, 0.0001), 0.0, 1.0);
   let subpixelOffsetFinal = (-2.0 * subpixelOffset + 3.0) * subpixelOffset * subpixelOffset;
@@ -127,7 +129,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let finalOffset = select(finalOffsetV, finalOffsetH, isHorizontal);
 
   // Sample final color (must be before any conditionals for uniform control flow)
-  let finalColor = textureSample(tInput, linearSampler, input.uv + finalOffset).rgb;
+  let finalColor = textureSampleLevel(tInput, linearSampler, input.uv + finalOffset, 0.0).rgb;
 
   // Use select to choose between original color (skip AA) or processed color
   let outputColor = select(finalColor, colorC, skipAA);

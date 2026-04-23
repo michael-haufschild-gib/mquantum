@@ -200,9 +200,13 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 // Search for the end of horizontal/vertical edge
-// Uses textureSampleLevel to avoid WGSL uniform control flow restrictions
+// Uses textureSampleLevel to avoid WGSL uniform control flow restrictions.
+// Perf: precompute the step size outside the loop - up to 32 iterations x 1 mul removed per search,
+// and the final divide becomes a multiply (invTexelX = resolution.x so that offset * invTexelX == offset / texelSize.x).
 fn searchXLeft(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
+  let stepX = 2.0 * texelSize.x;
+  let invTexelX = uniforms.resolution.x;  // 1.0 / texelSize.x
   var coord = texcoord;
   let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
@@ -210,15 +214,17 @@ fn searchXLeft(texcoord: vec2f, end: f32) -> f32 {
     if (coord.x <= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }  // Found a discontinuity
-    coord.x -= 2.0 * texelSize.x;
+    coord.x -= stepX;
   }
 
   // Return the offset, accounting for the extra step
-  return (texcoord.x - coord.x) / texelSize.x;
+  return (texcoord.x - coord.x) * invTexelX;
 }
 
 fn searchXRight(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
+  let stepX = 2.0 * texelSize.x;
+  let invTexelX = uniforms.resolution.x;
   var coord = texcoord;
   let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
@@ -226,14 +232,16 @@ fn searchXRight(texcoord: vec2f, end: f32) -> f32 {
     if (coord.x >= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }
-    coord.x += 2.0 * texelSize.x;
+    coord.x += stepX;
   }
 
-  return (coord.x - texcoord.x) / texelSize.x;
+  return (coord.x - texcoord.x) * invTexelX;
 }
 
 fn searchYUp(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
+  let stepY = 2.0 * texelSize.y;
+  let invTexelY = uniforms.resolution.y;
   var coord = texcoord;
   let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
@@ -241,14 +249,16 @@ fn searchYUp(texcoord: vec2f, end: f32) -> f32 {
     if (coord.y <= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }
-    coord.y -= 2.0 * texelSize.y;
+    coord.y -= stepY;
   }
 
-  return (texcoord.y - coord.y) / texelSize.y;
+  return (texcoord.y - coord.y) * invTexelY;
 }
 
 fn searchYDown(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
+  let stepY = 2.0 * texelSize.y;
+  let invTexelY = uniforms.resolution.y;
   var coord = texcoord;
   let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
@@ -256,10 +266,10 @@ fn searchYDown(texcoord: vec2f, end: f32) -> f32 {
     if (coord.y >= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }
-    coord.y += 2.0 * texelSize.y;
+    coord.y += stepY;
   }
 
-  return (coord.y - texcoord.y) / texelSize.y;
+  return (coord.y - texcoord.y) * invTexelY;
 }
 
 // Approximate area calculation for crossing edges
